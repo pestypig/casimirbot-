@@ -81,6 +81,10 @@ const mailLoopSummary = (
   mailbox_thread_id: "ask-thread-provider-goal",
   source_id: "document_markdown:docs/research/nhm2.md",
   source_kind: "document_markdown",
+  source_identity_key:
+    "document_markdown:docs/research/nhm2.md::fnv1a32:mail-doc::fnv1a32:mail-source-text::6144::document_markdown::docs_chunk::es-US::es",
+  latest_source_identity_key:
+    "document_markdown:docs/research/nhm2.md::fnv1a32:mail-doc::fnv1a32:mail-source-text-latest::2048::document_markdown::docs_chunk::es-US::es",
   chunk_id: "chunk-provider-goal",
   chunk_index: 4,
   dedupe_key: "docs/research/nhm2.md:chunk-provider-goal:es",
@@ -114,13 +118,13 @@ const mailLoopSummary = (
 });
 
 describe("capability lane provider adapter context", () => {
-  it("packages one-shot lane execution for any selected runtime provider", () => {
-    const helix = buildHelixCapabilityLaneProviderAdapterContext({
+  it("packages one-shot lane execution for any selected runtime provider", async () => {
+    const helix = await buildHelixCapabilityLaneProviderAdapterContext({
       provider: buildProvider("helix"),
       body,
       env: { STT_LOCAL_URL: "http://127.0.0.1:9000" } as NodeJS.ProcessEnv,
     });
-    const codex = buildHelixCapabilityLaneProviderAdapterContext({
+    const codex = await buildHelixCapabilityLaneProviderAdapterContext({
       provider: buildProvider("codex"),
       body,
       env: { STT_LOCAL_URL: "http://127.0.0.1:9000" } as NodeJS.ProcessEnv,
@@ -206,6 +210,7 @@ describe("capability lane provider adapter context", () => {
         schema: "helix.capability_lane.provider_timeline_event.v1",
         stage: "lane_visible",
         selected_runtime_agent_provider: "codex",
+        adapter_boundary: "helix_agent_provider_edge",
         lane_id: "live_translation",
         capability_id: "live_translation.translate_text",
         lane_visible: true,
@@ -218,17 +223,43 @@ describe("capability lane provider adapter context", () => {
       }),
       expect.objectContaining({
         stage: "lane_requested",
+        adapter_boundary: "helix_agent_provider_edge",
         lane_id: "utility_text",
         capability_id: "utility_text.normalize_text",
+        requested_backend_provider: "utility_text.openai_compatible",
+        requested_backend_provider_known: true,
+        selected_backend_provider: "utility_text.local_runtime",
+        fallback_backend_provider: null,
+        selection_reason: "requested_backend_unconfigured_default_backend_selected_by_helix_policy",
+        lane_visible: false,
+        lane_requested: true,
+        lane_executed: false,
+      }),
+      expect.objectContaining({
+        stage: "lane_backend_selected",
+        adapter_boundary: "helix_agent_provider_edge",
+        lane_id: "utility_text",
+        capability_id: "utility_text.normalize_text",
+        requested_backend_provider: "utility_text.openai_compatible",
+        requested_backend_provider_known: true,
+        selected_backend_provider: "utility_text.local_runtime",
+        fallback_backend_provider: null,
+        selection_reason: "requested_backend_unconfigured_default_backend_selected_by_helix_policy",
         lane_visible: false,
         lane_requested: true,
         lane_executed: false,
       }),
       expect.objectContaining({
         stage: "lane_observation",
+        adapter_boundary: "helix_agent_provider_edge",
         lane_id: "utility_text",
         capability_id: "utility_text.normalize_text",
         status: "completed",
+        requested_backend_provider: "utility_text.openai_compatible",
+        requested_backend_provider_known: true,
+        selected_backend_provider: "utility_text.local_runtime",
+        fallback_backend_provider: null,
+        selection_reason: "requested_backend_unconfigured_default_backend_selected_by_helix_policy",
         lane_visible: false,
         lane_requested: true,
         lane_executed: true,
@@ -236,8 +267,10 @@ describe("capability lane provider adapter context", () => {
       }),
       expect.objectContaining({
         stage: "lane_reentered",
-        lane_id: "capability_lane",
-        capability_id: "capability_lane.reentry",
+        adapter_boundary: "helix_agent_provider_edge",
+        lane_id: "utility_text",
+        capability_id: "utility_text.normalize_text",
+        observation_ref: expect.stringContaining("turn-provider-adapter-context:capability_lane:utility_text.normalize_text:"),
         observation_reentered: true,
         terminal_authority_status: "pending_helix_terminal_authority",
       }),
@@ -279,8 +312,8 @@ describe("capability lane provider adapter context", () => {
     expect(codex.prompt_observation_block).toContain("capability_lane_reentry_status");
   });
 
-  it("packages governed lane session lifecycle calls for the selected runtime provider", () => {
-    const context = buildHelixCapabilityLaneProviderAdapterContext({
+  it("packages governed lane session lifecycle calls for the selected runtime provider", async () => {
+    const context = await buildHelixCapabilityLaneProviderAdapterContext({
       provider: buildProvider("codex"),
       body: {
         turn_id: "turn-provider-adapter-session",
@@ -340,6 +373,7 @@ describe("capability lane provider adapter context", () => {
         projection_target: "docs_chunk",
         account_locale: "es-US",
         latest_event_id: "lane-session-provider-context:start:200",
+        latest_source_identity_key: null,
         has_observation: false,
         last_observation_ref: null,
         last_receipt_ref: null,
@@ -355,21 +389,36 @@ describe("capability lane provider adapter context", () => {
         stage: "lane_session",
         selected_runtime_agent_provider: "codex",
         lane_id: "live_translation",
+        lane_session_id: "lane-session-provider-context",
         capability_id: null,
         status: "running",
         lane_visible: false,
         lane_requested: true,
         lane_executed: false,
         observation_reentered: false,
+        requested_backend_provider: "google_gemini",
+        requested_backend_provider_known: true,
         selected_backend_provider: "live_translation.local_runtime",
+        selection_reason: "requested_backend_unconfigured_default_backend_selected_by_helix_policy",
+        cost_class: "free_local",
+        latency_class: "interactive",
+        privacy_class: "local_only",
+        backend_selection_decision: expect.objectContaining({
+          requested_backend_provider: "google_gemini",
+          selected_backend_provider: "live_translation.local_runtime",
+          selected_runtime_provider_remains_root: true,
+          backend_provider_becomes_root_agent: false,
+        }),
         observation_ref: null,
         receipt_ref: null,
         latest_event_id: "lane-session-provider-context:start:200",
         lifecycle_action: "start",
         session_lifecycle_action: "start",
         session_action: "start",
-        session_control_key: "lane-session-provider-context::docs:nhm2::docs_chunk::es-US",
-        source_binding_key: "docs:nhm2::docs_chunk::es-US",
+        session_control_key: "lane-session-provider-context::docs:nhm2::docs_chunk::es-US::es",
+        source_binding_key: "docs:nhm2::docs_chunk::es-US::es",
+        source_identity_key: "docs:nhm2::docs::docs_chunk::es-US::es",
+        latest_source_identity_key: null,
         latest_observation_key: null,
         has_observation: false,
         source_id: "docs:nhm2",
@@ -394,9 +443,9 @@ describe("capability lane provider adapter context", () => {
     expect(context.prompt_observation_block).toContain("final_reports_require_terminal_authority");
   });
 
-  it("keeps pause and resume lifecycle events visible through the provider timeline", () => {
+  it("keeps pause and resume lifecycle events visible through the provider timeline", async () => {
     const sessionStore = createHelixCapabilityLaneSessionStore();
-    const context = buildHelixCapabilityLaneProviderAdapterContext({
+    const context = await buildHelixCapabilityLaneProviderAdapterContext({
       provider: buildProvider("codex"),
       sessionStore,
       body: {
@@ -486,6 +535,7 @@ describe("capability lane provider adapter context", () => {
         session_control_key:
           "lane-session-provider-pause-resume::docs:nhm2::sha256:provider-pause-resume::docs_chunk::es-US::es",
         source_binding_key: "docs:nhm2::sha256:provider-pause-resume::docs_chunk::es-US::es",
+        source_identity_key: "docs:nhm2::sha256:provider-pause-resume::docs::docs_chunk::es-US::es",
         has_observation: false,
         backend_provider_becomes_root_agent: false,
         final_reports_require_terminal_authority: true,
@@ -507,6 +557,7 @@ describe("capability lane provider adapter context", () => {
         session_control_key:
           "lane-session-provider-pause-resume::docs:nhm2::sha256:provider-pause-resume::docs_chunk::es-US::es",
         source_binding_key: "docs:nhm2::sha256:provider-pause-resume::docs_chunk::es-US::es",
+        source_identity_key: "docs:nhm2::sha256:provider-pause-resume::docs::docs_chunk::es-US::es",
         lane_executed: false,
         observation_reentered: false,
         has_observation: false,
@@ -521,9 +572,145 @@ describe("capability lane provider adapter context", () => {
     expect(context.prompt_observation_block).toContain("user_resumed_account_language_translation");
   });
 
-  it("packages goal-bound lane session calls for the selected runtime provider", () => {
+  it("keeps read-only lane session list controls visible without implying execution", async () => {
     const sessionStore = createHelixCapabilityLaneSessionStore();
-    const context = buildHelixCapabilityLaneProviderAdapterContext({
+    const provider = buildProvider("codex");
+
+    const started = await buildHelixCapabilityLaneProviderAdapterContext({
+      provider,
+      sessionStore,
+      body: {
+        turn_id: "turn-provider-adapter-session-list-start",
+        capability_lane_session_call: {
+          action: "start",
+          lane_id: "live_translation",
+          lane_session_id: "lane-session-provider-list",
+          requested_backend_provider: "google_gemini",
+          now_ms: 200,
+          source_binding: {
+            source_id: "docs:list-provider",
+            source_hash: "sha256:provider-list",
+            source_text_hash: "sha256:provider-list-text",
+            source_text_char_count: 72,
+            source_kind: "docs",
+            projection_target: "docs_chunk",
+            account_locale: "es-US",
+            target_language: "es",
+          },
+        },
+      },
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(started.calls_succeeded).toBe(true);
+    expect(started.debug_projection.capability_lane_session_debug_summaries).toEqual([
+      expect.objectContaining({
+        lane_session_id: "lane-session-provider-list",
+        session_lifecycle_action: "start",
+        session_event_count: 1,
+      }),
+    ]);
+
+    const listed = await buildHelixCapabilityLaneProviderAdapterContext({
+      provider,
+      sessionStore,
+      body: {
+        turn_id: "turn-provider-adapter-session-list",
+        capability_lane_session_call: {
+          action: "list",
+          lane_session_id: "lane-session-provider-list",
+        },
+      },
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(listed.calls_succeeded).toBe(true);
+    expect(listed.debug_projection.capability_lane_session_results).toEqual([
+      expect.objectContaining({
+        ok: true,
+        action: "list",
+        lane_session_id: "lane-session-provider-list",
+        selected_runtime_agent_provider: "codex",
+        session_supported: true,
+        lane_session: null,
+        blocked_reason: null,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(listed.debug_projection.capability_lane_session_debug_summaries).toEqual([
+      expect.objectContaining({
+        schema: "helix.capability_lane.session_debug_summary.v1",
+        lane_session_id: "lane-session-provider-list",
+        lane_id: "live_translation",
+        selected_runtime_agent_provider: "codex",
+        selected_backend_provider: "live_translation.local_runtime",
+        session_status: "running",
+        session_health: "healthy",
+        session_lifecycle_action: "start",
+        session_event_count: 1,
+        source_id: "docs:list-provider",
+        source_hash: "sha256:provider-list",
+        source_text_hash: "sha256:provider-list-text",
+        source_text_char_count: 72,
+        projection_target: "docs_chunk",
+        account_locale: "es-US",
+        target_language: "es",
+        has_observation: false,
+        last_observation_ref: null,
+        last_receipt_ref: null,
+        backend_selection_decision: expect.objectContaining({
+          selected_runtime_provider_remains_root: true,
+          backend_provider_becomes_root_agent: false,
+          terminal_authority_owner: "helix",
+        }),
+        backend_provider_becomes_root_agent: false,
+        final_reports_require_terminal_authority: true,
+        terminal_authority_status: "not_terminal_authority",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(listed.capability_lane_turn_timeline).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        stage: "lane_session",
+        selected_runtime_agent_provider: "codex",
+        lane_id: "live_translation",
+        lane_session_id: "lane-session-provider-list",
+        status: "running",
+        lane_visible: false,
+        lane_requested: true,
+        lane_executed: false,
+        observation_reentered: false,
+        lifecycle_action: "start",
+        session_lifecycle_action: "start",
+        session_action: "start",
+        has_observation: false,
+        observation_ref: null,
+        receipt_ref: null,
+        terminal_authority_status: "not_terminal_authority",
+        selected_runtime_provider_remains_root: true,
+        backend_provider_becomes_root_agent: false,
+        final_reports_require_terminal_authority: true,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]));
+    expect(listed.prompt_observation_block).toContain("capability_lane_session_results");
+    expect(listed.prompt_observation_block).toContain('"action": "list"');
+    expect(listed.prompt_observation_block).toContain("capability_lane_session_debug_summaries");
+    expect(listed.prompt_observation_block).toContain("lane-session-provider-list");
+    expect(listed.prompt_observation_block).toContain("session_lifecycle_action");
+    expect(listed.prompt_observation_block).toContain("selected_runtime_provider_remains_root");
+    expect(listed.prompt_observation_block).toContain("final_reports_require_terminal_authority");
+  });
+
+  it("packages goal-bound lane session calls for the selected runtime provider", async () => {
+    const sessionStore = createHelixCapabilityLaneSessionStore();
+    const context = await buildHelixCapabilityLaneProviderAdapterContext({
       provider: buildProvider("codex"),
       sessionStore,
       body: {
@@ -604,11 +791,12 @@ describe("capability lane provider adapter context", () => {
     expect(context.prompt_observation_block).toContain("goal:account-language-translation");
     expect(context.prompt_observation_block).toContain("backend_provider_becomes_root_agent");
     expect(context.prompt_observation_block).toContain("final_reports_require_terminal_authority");
+    expect(context.prompt_observation_block).toContain('"answer_authority": false');
   });
 
-  it("fails closed for malformed goal-bound lane calls without creating debug summaries", () => {
+  it("fails closed for malformed goal-bound lane calls without creating debug summaries", async () => {
     const sessionStore = createHelixCapabilityLaneSessionStore();
-    const context = buildHelixCapabilityLaneProviderAdapterContext({
+    const context = await buildHelixCapabilityLaneProviderAdapterContext({
       provider: buildProvider("codex"),
       sessionStore,
       body: {
@@ -685,10 +873,10 @@ describe("capability lane provider adapter context", () => {
     expect(context.prompt_observation_block).not.toContain("goal_binding_debug_summary.v1");
   });
 
-  it("packages goal-bound speech, translation, and voice lane sessions as one non-terminal workflow", () => {
+  it("packages goal-bound speech, translation, and voice lane sessions as one non-terminal workflow", async () => {
     const sessionStore = createHelixCapabilityLaneSessionStore();
     const goalBindingStore = createHelixCapabilityLaneGoalBindingStore({ sessionStore });
-    const context = buildHelixCapabilityLaneProviderAdapterContext({
+    const context = await buildHelixCapabilityLaneProviderAdapterContext({
       provider: buildProvider("codex"),
       sessionStore,
       goalBindingStore,
@@ -876,10 +1064,10 @@ describe("capability lane provider adapter context", () => {
     expect(context.prompt_observation_block).toContain("final_reports_require_terminal_authority");
   });
 
-  it("packages goal-bound mail-loop evidence without terminal answer authority", () => {
+  it("packages goal-bound mail-loop evidence without terminal answer authority", async () => {
     const sessionStore = createHelixCapabilityLaneSessionStore();
     const goalBindingStore = createHelixCapabilityLaneGoalBindingStore({ sessionStore });
-    const context = buildHelixCapabilityLaneProviderAdapterContext({
+    const context = await buildHelixCapabilityLaneProviderAdapterContext({
       provider: buildProvider("codex"),
       sessionStore,
       goalBindingStore,
@@ -1096,6 +1284,13 @@ describe("capability lane provider adapter context", () => {
       next_lane_ids: ["live_translation"],
       next_goal_binding_ids: ["goal-binding-provider-mail"],
       next_lane_session_ids: ["lane-session-provider-goal-mail"],
+      next_runtime_agent_providers: ["codex"],
+      next_selected_backend_providers: ["live_translation.local_runtime"],
+      next_fallback_backend_providers: [],
+      next_backend_selection_reasons: ["requested_backend_unconfigured_default_backend_selected_by_helix_policy"],
+      next_cost_classes: ["free_local"],
+      next_latency_classes: ["interactive"],
+      next_privacy_classes: ["local_only"],
       next_evidence_refs: ["stage-play-mail-provider-goal"],
       next_receipt_refs: ["ask:lane:translation:mail-obs:projection:receipt"],
       wake_dispatch_allowed: false,
@@ -1125,6 +1320,10 @@ describe("capability lane provider adapter context", () => {
         session_control_key:
           "lane-session-provider-goal-mail::document_markdown:docs/research/nhm2.md::docs_chunk::es",
         source_binding_key: "document_markdown:docs/research/nhm2.md::docs_chunk::es",
+        source_identity_key:
+          "document_markdown:docs/research/nhm2.md::fnv1a32:mail-doc::fnv1a32:mail-source-text::6144::document_markdown::docs_chunk::es-US::es",
+        latest_source_identity_key:
+          "document_markdown:docs/research/nhm2.md::fnv1a32:mail-doc::fnv1a32:mail-source-text-latest::2048::document_markdown::docs_chunk::es-US::es",
         latest_observation_key:
           "document_markdown:docs/research/nhm2.md::docs_chunk::es::chunk-provider-goal::ask:lane:translation:mail-obs:projection:receipt",
         has_observation: true,
@@ -1201,6 +1400,12 @@ describe("capability lane provider adapter context", () => {
         lane_requested: true,
         lane_executed: false,
         observation_reentered: false,
+        selected_backend_provider: "live_translation.local_runtime",
+        fallback_backend_provider: null,
+        selection_reason: "requested_backend_unconfigured_default_backend_selected_by_helix_policy",
+        cost_class: "free_local",
+        latency_class: "interactive",
+        privacy_class: "local_only",
         observation_ref: "stage-play-mail-provider-goal",
         receipt_ref: "ask:lane:translation:mail-obs:projection:receipt",
         goal_id: "goal:account-language-translation",
@@ -1220,6 +1425,12 @@ describe("capability lane provider adapter context", () => {
         selected_runtime_agent_provider: "codex",
         lane_id: "live_translation",
         status: "blocked",
+        selected_backend_provider: "live_translation.local_runtime",
+        fallback_backend_provider: null,
+        selection_reason: "requested_backend_unconfigured_default_backend_selected_by_helix_policy",
+        cost_class: "free_local",
+        latency_class: "interactive",
+        privacy_class: "local_only",
         observation_ref: "stage-play-mail-provider-goal",
         receipt_ref: "ask:lane:translation:mail-obs:projection:receipt",
         goal_id: "goal:account-language-translation",
@@ -1242,6 +1453,12 @@ describe("capability lane provider adapter context", () => {
         lane_id: "live_translation",
         status: "partial",
         lane_requested: true,
+        selected_backend_provider: "live_translation.local_runtime",
+        fallback_backend_provider: null,
+        selection_reason: "requested_backend_unconfigured_default_backend_selected_by_helix_policy",
+        cost_class: "free_local",
+        latency_class: "interactive",
+        privacy_class: "local_only",
         observation_ref: "stage-play-mail-provider-goal",
         receipt_ref: "ask:lane:translation:mail-obs:projection:receipt",
         goal_binding_id: "goal-binding-provider-mail",
@@ -1263,11 +1480,12 @@ describe("capability lane provider adapter context", () => {
     expect(context.prompt_observation_block).toContain("capability_lane_goal_dispatch_admissions");
     expect(context.prompt_observation_block).toContain("capability_lane_goal_dispatch_readiness");
     expect(context.prompt_observation_block).toContain("lane_goal_dispatch_readiness");
+    expect(context.prompt_observation_block).toContain("next_selected_backend_providers");
     expect(context.prompt_observation_block).toContain("wake_on_salience");
     expect(context.prompt_observation_block).toContain("eligible_waiting_for_mail_loop");
   });
 
-  it("normalizes hostile goal-bound mail-loop payloads back to non-terminal evidence", () => {
+  it("normalizes hostile goal-bound mail-loop payloads back to non-terminal evidence", async () => {
     const sessionStore = createHelixCapabilityLaneSessionStore();
     const goalBindingStore = createHelixCapabilityLaneGoalBindingStore({ sessionStore });
     const hostileMailLoopSummary = {
@@ -1288,7 +1506,7 @@ describe("capability lane provider adapter context", () => {
       },
     };
 
-    const context = buildHelixCapabilityLaneProviderAdapterContext({
+    const context = await buildHelixCapabilityLaneProviderAdapterContext({
       provider: buildProvider("codex"),
       sessionStore,
       goalBindingStore,
@@ -1395,8 +1613,202 @@ describe("capability lane provider adapter context", () => {
     expect(context.prompt_observation_block).not.toContain("terminal_authority_granted");
   });
 
-  it("exposes projection receipts at the provider adapter edge without answer authority", () => {
-    const context = buildHelixCapabilityLaneProviderAdapterContext({
+  it("shows receipt-only mail-loop packets as executed non-terminal evidence", async () => {
+    const sessionStore = createHelixCapabilityLaneSessionStore();
+    const goalBindingStore = createHelixCapabilityLaneGoalBindingStore({ sessionStore });
+    const receiptOnlyMailLoopSummary = mailLoopSummary({
+      observation_ref: null,
+      receipt_ref: "ask:lane:translation:mail-receipt-only:projection:receipt",
+      mail_loop_observation_key: "mail-loop:receipt-only:key",
+      stage_play_mail_delivery_status: "created",
+      materialized_mail_loop_evidence: false,
+      evidence_refs: [
+        "lane-session-provider-goal-mail",
+        "stage-play-mail-provider-goal",
+        "ask:lane:translation:mail-receipt-only:projection:receipt",
+      ],
+    });
+
+    const context = await buildHelixCapabilityLaneProviderAdapterContext({
+      provider: buildProvider("codex"),
+      sessionStore,
+      goalBindingStore,
+      body: {
+        turn_id: "turn-provider-adapter-receipt-only-mail",
+        capability_lane_session_call: [
+          {
+            action: "start",
+            lane_id: "live_translation",
+            lane_session_id: "lane-session-provider-goal-mail",
+            requested_backend_provider: "google_gemini",
+            now_ms: 200,
+            source_binding: {
+              source_id: "document_markdown:docs/research/nhm2.md",
+              source_kind: "docs",
+              projection_target: "docs_chunk",
+              account_locale: "es-US",
+            },
+          },
+        ],
+        capability_lane_goal_binding_call: [
+          {
+            action: "bind",
+            goal_binding_id: "goal-binding-provider-mail",
+            goal_id: "goal:account-language-translation",
+            lane_session_id: "lane-session-provider-goal-mail",
+            activation_policy: "while_goal_active",
+            attention_policy: "quiet_until_salient",
+            stop_condition: "goal_complete",
+            report_policy: "ask_on_salience",
+            quiet_behavior: "wake_on_salience",
+            now_ms: 260,
+          },
+          {
+            action: "record_mail_loop",
+            goal_binding_id: "goal-binding-provider-mail",
+            mail_loop_summary: receiptOnlyMailLoopSummary,
+            now_ms: 270,
+          },
+        ],
+      },
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(context.capability_lane_turn_timeline).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        stage: "lane_mail_loop",
+        selected_runtime_agent_provider: "codex",
+        lane_id: "live_translation",
+        capability_id: "live_translation.translate_text",
+        status: "created",
+        lane_executed: true,
+        observation_reentered: true,
+        observation_ref: null,
+        receipt_ref: "ask:lane:translation:mail-receipt-only:projection:receipt",
+        latest_receipt_ref: "ask:lane:translation:mail-receipt-only:projection:receipt",
+        latest_observation_key: "mail-loop:receipt-only:key",
+        has_observation: true,
+        report_summary_text: "lane mail loop materialized observation evidence",
+        terminal_authority_status: "pending_helix_terminal_authority",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+      expect.objectContaining({
+        stage: "goal_binding",
+        selected_runtime_agent_provider: "codex",
+        lane_id: "live_translation",
+        status: "bound",
+        lane_requested: true,
+        lane_executed: true,
+        observation_reentered: true,
+        observation_ref: null,
+        receipt_ref: "ask:lane:translation:mail-receipt-only:projection:receipt",
+        latest_observation_key: "mail-loop:receipt-only:key",
+        has_observation: true,
+        terminal_authority_status: "pending_helix_terminal_authority",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]));
+  });
+
+  it("uses the current mail-loop receipt in goal-binding timeline rows when session last receipt is stale", async () => {
+    const sessionStore = createHelixCapabilityLaneSessionStore();
+    const goalBindingStore = createHelixCapabilityLaneGoalBindingStore({ sessionStore });
+    const currentMailLoopSummary = mailLoopSummary({
+      observation_ref: "ask:lane:translation:current-mail-obs",
+      receipt_ref: "ask:lane:translation:current-mail-obs:projection:receipt",
+      stage_play_mail_id: "stage-play-mail-current-receipt",
+      mail_loop_observation_key: "mail-loop:current-receipt:key",
+      evidence_refs: [
+        "lane-session-provider-goal-mail",
+        "stage-play-mail-current-receipt",
+        "ask:lane:translation:current-mail-obs:projection:receipt",
+      ],
+    });
+
+    const context = await buildHelixCapabilityLaneProviderAdapterContext({
+      provider: buildProvider("codex"),
+      sessionStore,
+      goalBindingStore,
+      body: {
+        turn_id: "turn-provider-adapter-stale-session-receipt",
+        capability_lane_session_call: [
+          {
+            action: "start",
+            lane_id: "live_translation",
+            lane_session_id: "lane-session-provider-goal-mail",
+            requested_backend_provider: "google_gemini",
+            now_ms: 200,
+            source_binding: {
+              source_id: "document_markdown:docs/research/nhm2.md",
+              source_kind: "docs",
+              projection_target: "docs_chunk",
+              account_locale: "es-US",
+            },
+          },
+          {
+            action: "record_observation",
+            lane_session_id: "lane-session-provider-goal-mail",
+            observation_ref: "ask:lane:translation:previous-session-obs",
+            receipt_ref: "ask:lane:translation:previous-session-obs:projection:receipt",
+            chunk_id: "chunk-previous",
+            chunk_index: 1,
+            observed_at_ms: 210,
+            freshness_status: "stale",
+            now_ms: 210,
+          },
+        ],
+        capability_lane_goal_binding_call: [
+          {
+            action: "bind",
+            goal_binding_id: "goal-binding-provider-mail",
+            goal_id: "goal:account-language-translation",
+            lane_session_id: "lane-session-provider-goal-mail",
+            activation_policy: "while_goal_active",
+            attention_policy: "quiet_until_salient",
+            stop_condition: "goal_complete",
+            report_policy: "ask_on_salience",
+            quiet_behavior: "wake_on_salience",
+            now_ms: 260,
+          },
+          {
+            action: "record_mail_loop",
+            goal_binding_id: "goal-binding-provider-mail",
+            mail_loop_summary: currentMailLoopSummary,
+            now_ms: 270,
+          },
+        ],
+      },
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    const goalBindingRow = context.capability_lane_turn_timeline
+      .filter((row) => row.stage === "goal_binding" && row.goal_binding_id === "goal-binding-provider-mail")
+      .at(-1);
+    const latestGoalSummary = context.debug_projection.capability_lane_goal_binding_debug_summaries.at(-1);
+
+    expect(latestGoalSummary).toEqual(expect.objectContaining({
+      goal_binding_id: "goal-binding-provider-mail",
+      last_receipt_ref: "ask:lane:translation:current-mail-obs:projection:receipt",
+      report_decision: expect.objectContaining({
+        receipt_ref: "ask:lane:translation:current-mail-obs:projection:receipt",
+      }),
+      dispatch_plan: expect.objectContaining({
+        receipt_ref: "ask:lane:translation:current-mail-obs:projection:receipt",
+      }),
+    }));
+    expect(goalBindingRow).toEqual(expect.objectContaining({
+      receipt_ref: "ask:lane:translation:current-mail-obs:projection:receipt",
+      latest_receipt_ref: "ask:lane:translation:current-mail-obs:projection:receipt",
+    }));
+    expect(goalBindingRow?.receipt_ref).not.toBe("ask:lane:translation:previous-session-obs:projection:receipt");
+  });
+
+  it("exposes projection receipts at the provider adapter edge without answer authority", async () => {
+    const context = await buildHelixCapabilityLaneProviderAdapterContext({
       provider: buildProvider("codex"),
       body: {
         turn_id: "turn-provider-adapter-translation-receipt",
@@ -1409,6 +1821,8 @@ describe("capability lane provider adapter context", () => {
           chunk_id: "chunk-11",
           chunk_index: 11,
           dedupe_key: "docs:nhm2:chunk-11:fr",
+          source_identity_key:
+            "docs:nhm2::fnv1a32:provider-adapter-doc::sha256:provider-adapter-source::9::docs::docs_chunk::es-US::fr",
           source_event_ms: 1,
           projection_target: "docs_chunk",
           requested_backend_provider: "google_gemini",
@@ -1441,6 +1855,8 @@ describe("capability lane provider adapter context", () => {
       projection_target: "docs_chunk",
       projection_status: "stale",
       source_id: "docs:nhm2",
+      source_identity_key:
+        "docs:nhm2::fnv1a32:provider-adapter-doc::sha256:provider-adapter-source::9::docs::docs_chunk::es-US::fr",
       chunk_id: "chunk-11",
       chunk_index: 11,
       dedupe_key: "docs:nhm2:chunk-11:fr",
@@ -1484,6 +1900,10 @@ describe("capability lane provider adapter context", () => {
         observation_ref: receipt?.observation_ref,
         receipt_ref: receipt?.receipt_ref,
         source_id: "docs:nhm2",
+        source_identity_key:
+          "docs:nhm2::fnv1a32:provider-adapter-doc::sha256:provider-adapter-source::9::docs::docs_chunk::es-US::fr",
+        latest_source_identity_key:
+          "docs:nhm2::fnv1a32:provider-adapter-doc::sha256:provider-adapter-source::9::docs::docs_chunk::es-US::fr",
         latest_chunk_id: "chunk-11",
         latest_chunk_index: 11,
         latest_target_language: "fr",
@@ -1504,11 +1924,14 @@ describe("capability lane provider adapter context", () => {
     expect(context.prompt_observation_block).toContain("capability_lane_projection_receipts");
     expect(context.prompt_observation_block).toContain("lane_projection_receipt");
     expect(context.prompt_observation_block).toContain(receipt?.receipt_ref ?? "");
+    expect(context.prompt_observation_block).toContain(
+      "docs:nhm2::fnv1a32:provider-adapter-doc::sha256:provider-adapter-source::9::docs::docs_chunk::es-US::fr",
+    );
     expect(context.prompt_observation_block).toContain("live_translation_projection");
   });
 
-  it("exposes shadow future-lane packets and backend selections to the runtime provider context", () => {
-    const context = buildHelixCapabilityLaneProviderAdapterContext({
+  it("exposes shadow future-lane packets and backend selections to the runtime provider context", async () => {
+    const context = await buildHelixCapabilityLaneProviderAdapterContext({
       provider: buildProvider("codex"),
       body: {
         turn_id: "turn-provider-adapter-shadow-lane",

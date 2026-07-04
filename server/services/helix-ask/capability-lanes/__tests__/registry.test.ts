@@ -77,6 +77,64 @@ describe("Helix capability lane registry", () => {
       "visual_analysis",
       "workstation_tool_reference",
     ]);
+    expect(helix.lanes.find((lane) => lane.lane_id === "interactive_text")).toMatchObject({
+      status: "dry_run",
+      backend_family: "openai_compatible",
+      one_shot_call_contract: expect.objectContaining({
+        supported: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+      }),
+      capabilities: [
+        expect.objectContaining({
+          capability_id: "interactive_text.respond",
+          one_shot_status: "shadow_only",
+          session_status: "not_supported",
+          backend_provider_required: true,
+          model_visible_hint: expect.objectContaining({
+            required_input_fields: ["input_text"],
+            optional_input_fields: expect.arrayContaining([
+              "response_goal",
+              "context_refs",
+              "requested_backend_provider",
+            ]),
+            when_not_to_use: expect.stringContaining("private replacement runtime"),
+          }),
+          result_authority: "observation_or_receipt_only",
+          terminal_eligible: false,
+          assistant_answer: false,
+        }),
+      ],
+    });
+    expect(helix.lanes.find((lane) => lane.lane_id === "deliberate_text")).toMatchObject({
+      status: "dry_run",
+      backend_family: "openai_compatible",
+      one_shot_call_contract: expect.objectContaining({
+        supported: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+      }),
+      capabilities: [
+        expect.objectContaining({
+          capability_id: "deliberate_text.review",
+          one_shot_status: "shadow_only",
+          session_status: "not_supported",
+          backend_provider_required: true,
+          model_visible_hint: expect.objectContaining({
+            required_input_fields: ["input_text"],
+            optional_input_fields: expect.arrayContaining([
+              "review_goal",
+              "evidence_refs",
+              "requested_backend_provider",
+            ]),
+            when_not_to_use: expect.stringContaining("hidden second answer path"),
+          }),
+          result_authority: "observation_or_receipt_only",
+          terminal_eligible: false,
+          assistant_answer: false,
+        }),
+      ],
+    });
     expect(helix.lanes.find((lane) => lane.lane_id === "code_text")).toMatchObject({
       status: "dry_run",
       backend_family: "openai_compatible",
@@ -254,6 +312,20 @@ describe("Helix capability lane registry", () => {
           one_shot_status: "executable",
           session_status: "not_supported",
           backend_provider_required: true,
+          model_visible_hint: expect.objectContaining({
+            required_input_fields: ["text"],
+            optional_input_fields: expect.arrayContaining([
+              "normalization_mode",
+              "requested_backend_provider",
+            ]),
+            when_not_to_use: expect.stringContaining("hidden text model"),
+            request_shape_hint: {
+              capability_lane_call: expect.objectContaining({
+                capability: "utility_text.normalize_text",
+                requested_backend_provider: "<optional backend preference; Helix selects the backend>",
+              }),
+            },
+          }),
           result_authority: "observation_or_receipt_only",
         }),
       ],
@@ -380,7 +452,45 @@ describe("Helix capability lane registry", () => {
         assistant_answer: false,
       }),
     });
-    expect(helix.lanes.find((lane) => lane.lane_id === "visual_analysis")?.capabilities).toEqual([
+    expect(helix.lanes.find((lane) => lane.lane_id === "visual_analysis")).toMatchObject({
+      one_shot_call_contract: expect.objectContaining({
+        supported: true,
+        request_schema_ref: "helix.visual_analysis.one_shot_request.v1",
+        response_schema_ref: "helix.visual_analysis.one_shot_response.v1",
+        terminal_eligible: false,
+        assistant_answer: false,
+      }),
+      capabilities: [
+        expect.objectContaining({
+          capability_id: "visual_analysis.inspect_image_region",
+          one_shot_status: "executable",
+          session_status: "not_supported",
+          backend_provider_required: true,
+          model_visible_hint: expect.objectContaining({
+            required_input_fields: ["source_id", "bbox_px"],
+            optional_input_fields: expect.arrayContaining([
+              "frame_id",
+              "source_attachment_id",
+              "page_number",
+              "question",
+              "reason_for_crop",
+              "latex_candidate",
+              "requested_backend_provider",
+            ]),
+            when_to_use: expect.stringContaining("Image Lens source needs a focused crop inspection"),
+            when_not_to_use: expect.stringContaining("Do not use for text-only prompts"),
+            request_shape_hint: {
+              capability_lane_call: expect.objectContaining({
+                capability: "visual_analysis.inspect_image_region",
+                source_id: "<admitted image, attachment, frame, PDF page render, or Image Lens source id>",
+                bbox_px: { x: 0, y: 0, width: 320, height: 240 },
+              }),
+            },
+          }),
+          result_authority: "observation_or_receipt_only",
+          terminal_eligible: false,
+          assistant_answer: false,
+        }),
       expect.objectContaining({
         capability_id: "visual_analysis.inspect_frame",
         one_shot_status: "shadow_only",
@@ -405,7 +515,8 @@ describe("Helix capability lane registry", () => {
         }),
         result_authority: "observation_or_receipt_only",
       }),
-    ]);
+      ],
+    });
   });
 
   it("exposes backend key status without exposing raw secret values", () => {
@@ -608,6 +719,91 @@ describe("Helix capability lane registry", () => {
     });
   });
 
+  it("selects the OpenAI-compatible translation backend only when live external execution is enabled", () => {
+    const env = {
+      OPENAI_API_KEY: "test-key",
+      HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED: "1",
+    } as NodeJS.ProcessEnv;
+    const trace = resolveHelixCapabilityLaneRequest({
+      provider: buildProvider({ id: "codex" }),
+      requestedLane: "live_translation",
+      requestedBackendProvider: "live_translation.openai_compatible",
+      env,
+    });
+
+    expect(trace).toMatchObject({
+      requested_lane: "live_translation",
+      admission_status: "admitted_shadow_only",
+      requested_backend_provider: "live_translation.openai_compatible",
+      requested_backend_provider_known: true,
+      requested_backend_configuration_status: "configured",
+      selected_backend_provider: "live_translation.openai_compatible",
+      backend_selection_decision: expect.objectContaining({
+        outcome: "requested_selected",
+        requested_backend_provider: "live_translation.openai_compatible",
+        selected_backend_provider: "live_translation.openai_compatible",
+        selected_runtime_provider_remains_root: true,
+        backend_provider_becomes_root_agent: false,
+        dynamic_switching_executed: false,
+        live_backend_execution_enabled: true,
+        terminal_authority_owner: "helix",
+      }),
+      selection_reason: "selected_requested_backend_provider_for_shadow_manifest",
+      availability_status: "dry_run",
+      permission_status: "admitted",
+      cost_class: "standard",
+      latency_class: "interactive",
+      privacy_class: "account_provider",
+      fallback_backend_provider: "live_translation.local_runtime",
+      resolved_backend_provider: "openai_compatible",
+      resolved_model_or_service: "live_translation_openai_compatible_default",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("keeps external translation requests on local fallback when live execution is not enabled", () => {
+    const env = {
+      OPENAI_API_KEY: "test-key",
+    } as NodeJS.ProcessEnv;
+    const openai = resolveHelixCapabilityLaneRequest({
+      provider: buildProvider({ id: "codex" }),
+      requestedLane: "live_translation",
+      requestedBackendProvider: "live_translation.openai_compatible",
+      env,
+    });
+    const gemini = resolveHelixCapabilityLaneRequest({
+      provider: buildProvider({ id: "codex" }),
+      requestedLane: "live_translation",
+      requestedBackendProvider: "live_translation.google_gemini",
+      env: {
+        GOOGLE_GEMINI_API_KEY: "test-gemini",
+        HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED: "1",
+      } as NodeJS.ProcessEnv,
+    });
+
+    expect(openai).toMatchObject({
+      selected_backend_provider: "live_translation.local_runtime",
+      backend_selection_decision: expect.objectContaining({
+        outcome: "requested_recorded_default_selected",
+        requested_backend_provider: "live_translation.openai_compatible",
+        selected_backend_provider: "live_translation.local_runtime",
+        live_backend_execution_enabled: false,
+      }),
+      selection_reason: "requested_backend_recorded_but_default_backend_selected_by_helix_shadow_policy",
+    });
+    expect(gemini).toMatchObject({
+      selected_backend_provider: "live_translation.local_runtime",
+      backend_selection_decision: expect.objectContaining({
+        outcome: "requested_recorded_default_selected",
+        requested_backend_provider: "live_translation.google_gemini",
+        selected_backend_provider: "live_translation.local_runtime",
+        live_backend_execution_enabled: false,
+      }),
+    });
+  });
+
   it("fails closed for unknown and unconfigured lanes", () => {
     const unknown = resolveHelixCapabilityLaneRequest({
       provider: buildProvider({ id: "helix" }),
@@ -651,5 +847,58 @@ describe("Helix capability lane registry", () => {
     expect(enabled.lane_ids).toEqual(blocked.lane_ids);
     expect(enabled.lanes.find((lane) => lane.lane_id === "workstation_tool_reference")?.status).toBe("available");
     expect(blocked.lanes.find((lane) => lane.lane_id === "workstation_tool_reference")?.status).toBe("permission_blocked");
+  });
+
+  it("keeps every provider-neutral lane model-visible and observation-only", () => {
+    const manifest = listHelixCapabilityLanes({
+      provider: buildProvider({ id: "codex" }),
+      env: {
+        OPENAI_API_KEY: "test-key",
+        ELEVENLABS_API_KEY: "test-eleven",
+        GOOGLE_GEMINI_API_KEY: "test-gemini",
+      } as NodeJS.ProcessEnv,
+    });
+
+    expect(manifest.lanes.length).toBeGreaterThan(0);
+    for (const lane of manifest.lanes) {
+      expect(lane.result_authority).toBe("observation_or_receipt_only");
+      expect(lane.reentry_required).toBe(true);
+      expect(lane.terminal_eligible).toBe(false);
+      expect(lane.assistant_answer).toBe(false);
+      expect(lane.raw_content_included).toBe(false);
+      expect(lane.terminal_policy).toMatchObject({
+        lane_output_can_be_final_answer: false,
+        terminal_authority_owner: "helix",
+        requires_evidence_reentry: true,
+        preserves_runtime_provider_root: true,
+      });
+      expect(lane.one_shot_call_contract).toMatchObject({
+        output_role: "observation_or_receipt",
+        reentry_required: true,
+        terminal_eligible: false,
+        assistant_answer: false,
+      });
+
+      expect(lane.capabilities.length).toBeGreaterThan(0);
+      for (const capability of lane.capabilities) {
+        expect(capability.lane_id).toBe(lane.lane_id);
+        expect(capability.result_authority).toBe("observation_or_receipt_only");
+        expect(capability.reentry_required).toBe(true);
+        expect(capability.terminal_eligible).toBe(false);
+        expect(capability.assistant_answer).toBe(false);
+        expect(capability.raw_content_included).toBe(false);
+        expect(capability.model_visible_hint.required_input_fields).toBeInstanceOf(Array);
+        expect(capability.model_visible_hint.optional_input_fields).toContain("requested_backend_provider");
+        expect(capability.model_visible_hint.when_to_use).toEqual(expect.any(String));
+        expect(capability.model_visible_hint.when_to_use.trim().length).toBeGreaterThan(0);
+        expect(capability.model_visible_hint.when_not_to_use).toEqual(expect.any(String));
+        expect(capability.model_visible_hint.when_not_to_use?.trim().length).toBeGreaterThan(0);
+        expect(capability.model_visible_hint.request_shape_hint).toMatchObject({
+          capability_lane_call: expect.objectContaining({
+            capability: capability.capability_id,
+          }),
+        });
+      }
+    }
   });
 });

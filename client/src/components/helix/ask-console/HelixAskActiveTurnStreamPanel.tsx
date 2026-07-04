@@ -6,6 +6,7 @@ import type {
 } from "@/lib/helix/ask-active-turn-stream";
 import {
   buildHelixAskConsoleCapabilityLaneSummary,
+  formatHelixAskConsoleCapabilityLaneRowChips,
   formatHelixAskConsoleCapabilityLaneRowDetailText,
   formatHelixAskConsoleCapabilityLaneStageDisplayText,
   formatHelixAskConsoleCapabilityLaneSummaryText,
@@ -41,9 +42,13 @@ export function HelixAskActiveTurnStreamPanel({
   if (rows.length === 0) return null;
   const capabilityLaneSummary = buildHelixAskConsoleCapabilityLaneSummary(
     rows
-      .map((row) => resolveHelixAskConsoleCapabilityLaneRowStage(row))
-      .filter((stage): stage is NonNullable<typeof stage> => Boolean(stage))
-      .map((stage) => ({ stage })),
+      .map((row) => {
+        const stage = resolveHelixAskConsoleCapabilityLaneRowStage(row);
+        return stage
+          ? { stage, detail: resolveHelixAskConsoleCapabilityLaneRowDetail(row) }
+          : null;
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry)),
   );
   const capabilityLaneSummaryText = formatHelixAskConsoleCapabilityLaneSummaryText(capabilityLaneSummary);
 
@@ -67,13 +72,33 @@ export function HelixAskActiveTurnStreamPanel({
       data-capability-lane-receipt-count={capabilityLaneSummary.receiptCount}
       data-capability-lane-reentered-count={capabilityLaneSummary.reenteredCount}
       data-capability-lane-session-count={capabilityLaneSummary.sessionCount}
+      data-capability-lane-observed-session-count={capabilityLaneSummary.observedSessionCount}
       data-capability-lane-mail-loop-count={capabilityLaneSummary.mailLoopCount}
+      data-capability-lane-observed-mail-loop-count={capabilityLaneSummary.observedMailLoopCount}
+      data-capability-lane-mailbox-wake-expected-count={capabilityLaneSummary.mailboxWakeExpectedCount}
+      data-capability-lane-decision-wake-expected-count={capabilityLaneSummary.decisionWakeExpectedCount}
       data-capability-lane-goal-binding-count={capabilityLaneSummary.goalBindingCount}
+      data-capability-lane-observed-goal-binding-count={capabilityLaneSummary.observedGoalBindingCount}
+      data-capability-lane-observed-activity-count={capabilityLaneSummary.observedLaneActivityCount}
       data-capability-lane-goal-dispatch-plan-count={capabilityLaneSummary.goalDispatchPlanCount}
       data-capability-lane-goal-dispatch-admission-count={capabilityLaneSummary.goalDispatchAdmissionCount}
       data-capability-lane-goal-dispatch-readiness-count={capabilityLaneSummary.goalDispatchReadinessCount}
       data-capability-lane-terminal-selected-count={capabilityLaneSummary.terminalSelectedCount}
       data-capability-lane-terminal-rejected-count={capabilityLaneSummary.terminalRejectedCount}
+      data-capability-lane-terminal-authority-rejected-count={capabilityLaneSummary.terminalAuthorityRejectedCount}
+      data-capability-lane-runtime-providers={
+        capabilityLaneSummary.runtimeAgentProviders.length > 0
+          ? capabilityLaneSummary.runtimeAgentProviders.join(",")
+          : undefined
+      }
+      data-capability-lane-ids={
+        capabilityLaneSummary.laneIds.length > 0 ? capabilityLaneSummary.laneIds.join(",") : undefined
+      }
+      data-capability-lane-backend-providers={
+        capabilityLaneSummary.backendProviders.length > 0
+          ? capabilityLaneSummary.backendProviders.join(",")
+          : undefined
+      }
       data-capability-lane-stage-sequence={capabilityLaneSummary.stageSequenceText || undefined}
       data-capability-lane-visible-does-not-mean-executed="true"
     >
@@ -103,6 +128,9 @@ export function HelixAskActiveTurnStreamPanel({
           const capabilityLaneDetailText = capabilityLaneStage && capabilityLaneDetail
             ? formatHelixAskConsoleCapabilityLaneRowDetailText(capabilityLaneStage, capabilityLaneDetail)
             : null;
+          const capabilityLaneChips = capabilityLaneDetail
+            ? formatHelixAskConsoleCapabilityLaneRowChips(capabilityLaneDetail)
+            : [];
           const rowClass = readRowClass(row.tone);
           const dotClass = readDotClass(row.tone);
           const visibleText = isFinalRow ? row.text : clipText(row.text, row.detailLimit ?? 360);
@@ -123,15 +151,27 @@ export function HelixAskActiveTurnStreamPanel({
               data-stream-row-source={row.source}
               data-capability-lane-stage={capabilityLaneStage ?? undefined}
               data-capability-lane-stage-display={capabilityLaneStageDisplay ?? undefined}
+              data-capability-lane-execution-state={capabilityLaneDetail?.executionState ?? undefined}
               data-capability-lane-normalized-stage={capabilityLaneDetail?.normalizedStage ?? undefined}
               data-capability-lane-state-label={capabilityLaneDetail?.stateLabel ?? undefined}
               data-capability-lane-runtime-provider={capabilityLaneDetail?.selectedRuntimeAgentProvider ?? undefined}
               data-capability-lane-adapter-boundary={capabilityLaneDetail?.adapterBoundary ?? undefined}
               data-capability-lane-id={capabilityLaneDetail?.laneId ?? undefined}
               data-capability-lane-capability-id={capabilityLaneDetail?.capabilityId ?? undefined}
+              data-capability-lane-requested-backend-provider={capabilityLaneDetail?.requestedBackendProvider ?? undefined}
               data-capability-lane-backend-provider={capabilityLaneDetail?.selectedBackendProvider ?? undefined}
+              data-capability-lane-fallback-backend-provider={capabilityLaneDetail?.fallbackBackendProvider ?? undefined}
+              data-capability-lane-backend-selection-reason={capabilityLaneDetail?.backendSelectionReason ?? undefined}
+              data-capability-lane-backend-cost-class={capabilityLaneDetail?.backendCostClass ?? undefined}
+              data-capability-lane-backend-latency-class={
+                capabilityLaneDetail?.backendLatencyClass ?? undefined
+              }
+              data-capability-lane-backend-privacy-class={
+                capabilityLaneDetail?.backendPrivacyClass ?? undefined
+              }
               data-capability-lane-observation-ref={capabilityLaneDetail?.observationRef ?? undefined}
               data-capability-lane-receipt-ref={capabilityLaneDetail?.receiptRef ?? undefined}
+              data-capability-lane-reentry-status={capabilityLaneDetail?.reentryStatus ?? undefined}
               data-capability-lane-source-id={capabilityLaneDetail?.sourceId ?? undefined}
               data-capability-lane-source-hash={capabilityLaneDetail?.sourceHash ?? undefined}
               data-capability-lane-source-kind={capabilityLaneDetail?.sourceKind ?? undefined}
@@ -162,6 +202,25 @@ export function HelixAskActiveTurnStreamPanel({
               data-capability-lane-goal-quiet-behavior={capabilityLaneDetail?.quietBehavior ?? undefined}
               data-capability-lane-goal-report-action={capabilityLaneDetail?.reportAction ?? undefined}
               data-capability-lane-goal-report-reason={capabilityLaneDetail?.reportReason ?? undefined}
+              data-capability-lane-goal-quiet-behavior-applied={
+                capabilityLaneDetail?.quietBehaviorApplied ?? undefined
+              }
+              data-capability-lane-goal-wake-expected={capabilityLaneDetail?.wakeExpected ?? undefined}
+              data-capability-lane-goal-mailbox-wake-expected={
+                capabilityLaneDetail?.mailboxWakeExpected ?? undefined
+              }
+              data-capability-lane-goal-decision-wake-expected={
+                capabilityLaneDetail?.decisionWakeExpected ?? undefined
+              }
+              data-capability-lane-goal-surface-badge-expected={
+                capabilityLaneDetail?.surfaceBadgeExpected ?? undefined
+              }
+              data-capability-lane-goal-terminal-report-requested={
+                capabilityLaneDetail?.terminalReportRequested ?? undefined
+              }
+              data-capability-lane-goal-terminal-report-authorized={
+                capabilityLaneDetail?.terminalReportAuthorized ?? undefined
+              }
               data-capability-lane-session-id={capabilityLaneDetail?.laneSessionId ?? undefined}
               data-capability-lane-session-status={capabilityLaneDetail?.sessionStatus ?? undefined}
               data-capability-lane-session-health={capabilityLaneDetail?.sessionHealth ?? undefined}
@@ -171,12 +230,29 @@ export function HelixAskActiveTurnStreamPanel({
               data-capability-lane-blocked-reason={capabilityLaneDetail?.blockedReason ?? undefined}
               data-capability-lane-session-control-key={capabilityLaneDetail?.sessionControlKey ?? undefined}
               data-capability-lane-source-binding-key={capabilityLaneDetail?.sourceBindingKey ?? undefined}
+              data-capability-lane-latest-source-binding-key={
+                capabilityLaneDetail?.latestSourceBindingKey ?? undefined
+              }
+              data-capability-lane-session-source-binding-key={
+                capabilityLaneDetail?.laneSessionSourceBindingKey ?? undefined
+              }
+              data-capability-lane-session-source-identity-key={
+                capabilityLaneDetail?.laneSessionSourceIdentityKey ?? undefined
+              }
+              data-capability-lane-source-identity-key={capabilityLaneDetail?.sourceIdentityKey ?? undefined}
+              data-capability-lane-latest-source-identity-key={
+                capabilityLaneDetail?.latestSourceIdentityKey ?? undefined
+              }
               data-capability-lane-latest-observation-key={
                 capabilityLaneDetail?.latestObservationKey ?? undefined
               }
               data-capability-lane-latest-mail-loop-observation-key={
                 capabilityLaneDetail?.latestMailLoopObservationKey ?? undefined
               }
+              data-capability-lane-evidence-ref-count={
+                capabilityLaneDetail ? String(capabilityLaneDetail.evidenceRefs.length) : undefined
+              }
+              data-capability-lane-first-evidence-ref={capabilityLaneDetail?.evidenceRefs[0] ?? undefined}
               data-capability-lane-goal-binding-key={capabilityLaneDetail?.goalBindingKey ?? undefined}
               data-capability-lane-stage-play-mail-id={capabilityLaneDetail?.stagePlayMailId ?? undefined}
               data-capability-lane-stage-play-mail-delivery-status={
@@ -192,6 +268,24 @@ export function HelixAskActiveTurnStreamPanel({
                 capabilityLaneDetail?.materializedMailLoopEvidence ?? undefined
               }
               data-capability-lane-has-observation={capabilityLaneDetail?.hasObservation ?? undefined}
+              data-capability-lane-live-mail-loop-required-count={
+                capabilityLaneDetail?.liveMailLoopRequiredCount ?? undefined
+              }
+              data-capability-lane-terminal-authority-required-count={
+                capabilityLaneDetail?.terminalAuthorityRequiredCount ?? undefined
+              }
+              data-capability-lane-any-live-mail-loop-required={
+                capabilityLaneDetail?.anyLiveMailLoopRequired ?? undefined
+              }
+              data-capability-lane-any-terminal-authority-required={
+                capabilityLaneDetail?.anyTerminalAuthorityRequired ?? undefined
+              }
+              data-capability-lane-visible={capabilityLaneDetail?.laneVisible ?? undefined}
+              data-capability-lane-requested={capabilityLaneDetail?.laneRequested ?? undefined}
+              data-capability-lane-executed={capabilityLaneDetail?.laneExecuted ?? undefined}
+              data-capability-lane-observation-reentered={
+                capabilityLaneDetail?.observationReentered ?? undefined
+              }
               data-capability-lane-observation-session-id={
                 capabilityLaneDetail?.observationLaneSessionId ?? undefined
               }
@@ -199,6 +293,11 @@ export function HelixAskActiveTurnStreamPanel({
                 capabilityLaneDetail?.observationLaneSessionId ?? undefined
               }
               data-capability-lane-report-summary={capabilityLaneDetail?.reportSummaryText ?? undefined}
+              data-capability-lane-context-role={capabilityLaneDetail?.contextRole ?? undefined}
+              data-capability-lane-answer-authority={capabilityLaneDetail?.answerAuthority ?? undefined}
+              data-capability-lane-terminal-eligible={capabilityLaneDetail?.terminalEligible ?? undefined}
+              data-capability-lane-assistant-answer={capabilityLaneDetail?.assistantAnswer ?? undefined}
+              data-capability-lane-raw-content-included={capabilityLaneDetail?.rawContentIncluded ?? undefined}
               data-capability-lane-terminal-authority-status={
                 capabilityLaneDetail?.terminalAuthorityStatus ?? undefined
               }
@@ -237,6 +336,22 @@ export function HelixAskActiveTurnStreamPanel({
                 <div className="mt-1 whitespace-pre-wrap break-words leading-relaxed">
                   {isFinalRow ? renderFinalAnswerContent(visibleText) : visibleText}
                 </div>
+                {capabilityLaneChips.length > 0 ? (
+                  <div
+                    className="mt-1 flex flex-wrap gap-1"
+                    aria-label="Capability lane quick facts"
+                    data-testid="helix-ask-capability-lane-row-chips"
+                  >
+                    {capabilityLaneChips.map((chip) => (
+                      <span
+                        key={chip}
+                        className="rounded border border-cyan-300/20 bg-cyan-950/20 px-1.5 py-0.5 text-[10px] text-cyan-50/85"
+                      >
+                        {chip}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
                 {capabilityLaneDetailText ? (
                   <p
                     className="mt-1 break-words text-[10px] uppercase tracking-[0.12em] text-cyan-100/80"

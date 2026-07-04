@@ -37,6 +37,12 @@ export const buildHelixCapabilityLaneGoalDispatchReadiness = (input: {
 }): HelixCapabilityLaneGoalDispatchReadiness => {
   const admitted = input.admissions.filter((admission) => admission.status !== "blocked");
   const blocked = input.admissions.filter((admission) => admission.status === "blocked");
+  const liveMailLoopRequiredCount = admitted.filter((admission) =>
+    admission.requires_live_mail_loop === true
+  ).length;
+  const terminalAuthorityRequiredCount = admitted.filter((admission) =>
+    admission.requires_terminal_authority === true
+  ).length;
 
   return {
     schema: HELIX_CAPABILITY_LANE_GOAL_DISPATCH_READINESS_SCHEMA,
@@ -63,11 +69,38 @@ export const buildHelixCapabilityLaneGoalDispatchReadiness = (input: {
     next_lane_session_ids: uniqueStrings(
       admitted.map((admission) => admission.lane_session_id).filter(Boolean),
     ),
+    next_runtime_agent_providers: uniqueStrings(
+      admitted.map((admission) => admission.selected_runtime_agent_provider).filter(Boolean),
+    ) as HelixCapabilityLaneGoalDispatchReadiness["next_runtime_agent_providers"],
+    next_requested_backend_providers: uniqueStrings(
+      admitted.map((admission) => admission.requested_backend_provider ?? "").filter(Boolean),
+    ),
+    next_selected_backend_providers: uniqueStrings(
+      admitted.map((admission) => admission.selected_backend_provider ?? "").filter(Boolean),
+    ),
+    next_fallback_backend_providers: uniqueStrings(
+      admitted.map((admission) => admission.fallback_backend_provider ?? "").filter(Boolean),
+    ),
+    next_backend_selection_reasons: uniqueStrings(
+      admitted.map((admission) => admission.backend_selection_reason ?? "").filter(Boolean),
+    ),
+    next_cost_classes: uniqueStrings(
+      admitted.map((admission) => admission.cost_class ?? "").filter(Boolean),
+    ) as HelixCapabilityLaneGoalDispatchReadiness["next_cost_classes"],
+    next_latency_classes: uniqueStrings(
+      admitted.map((admission) => admission.latency_class ?? "").filter(Boolean),
+    ) as HelixCapabilityLaneGoalDispatchReadiness["next_latency_classes"],
+    next_privacy_classes: uniqueStrings(
+      admitted.map((admission) => admission.privacy_class ?? "").filter(Boolean),
+    ) as HelixCapabilityLaneGoalDispatchReadiness["next_privacy_classes"],
     next_session_control_keys: uniqueStrings(
       admitted.map((admission) => admission.session_control_key ?? "").filter(Boolean),
     ),
     next_source_binding_keys: uniqueStrings(
       admitted.map((admission) => admission.source_binding_key ?? "").filter(Boolean),
+    ),
+    next_source_identity_keys: uniqueStrings(
+      admitted.map((admission) => admission.source_identity_key ?? "").filter(Boolean),
     ),
     next_mail_loop_observation_keys: uniqueStrings(
       admitted.map((admission) => admission.latest_mail_loop_observation_key ?? "").filter(Boolean),
@@ -163,6 +196,10 @@ export const buildHelixCapabilityLaneGoalDispatchReadiness = (input: {
     next_mail_loop_wake_kinds: uniqueWakeKinds(
       admitted.map((admission) => admission.latest_mail_loop_wake_kind),
     ),
+    live_mail_loop_required_count: liveMailLoopRequiredCount,
+    terminal_authority_required_count: terminalAuthorityRequiredCount,
+    any_live_mail_loop_required: liveMailLoopRequiredCount > 0,
+    any_terminal_authority_required: terminalAuthorityRequiredCount > 0,
     all_admitted_permissions_non_mutating: admitted.every(admissionPermissionsAreNonMutating),
     next_evidence_refs: uniqueStrings(
       admitted.map((admission) => admission.evidence_ref ?? "").filter(Boolean),
@@ -176,6 +213,8 @@ export const buildHelixCapabilityLaneGoalDispatchReadiness = (input: {
     badge_projection_allowed: false,
     terminal_report_allowed: false,
     terminal_report_emitted: false,
+    context_role: "tool_evidence",
+    answer_authority: false,
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,

@@ -229,8 +229,12 @@ describe("stage play micro-reasoner prompt presets", () => {
           source_hash: "fnv1a32:test",
           source_text_hash: "fnv1a32:text-payload",
           source_text_char_count: "# Account language".length,
+          receipt_ref: "receipt:doc-inline",
           lane_session_id: "lane_session:live_translation:docs:fnv1a32:test",
           session_control_key: "lane_session:live_translation:docs:fnv1a32:test::document_markdown:docs/example.md::docs_chunk",
+          source_binding_key: "document_markdown:docs/example.md::fnv1a32:test::docs_chunk::haw::haw",
+          mail_loop_observation_key:
+            "document_markdown:docs/example.md::fnv1a32:test::document_markdown::docs_chunk::haw::haw::doc-inline:fnv1a32:test:u0001::receipt:doc-inline",
           locale: "haw",
           target_language: "haw",
           account_locale: "haw",
@@ -254,8 +258,16 @@ describe("stage play micro-reasoner prompt presets", () => {
         sourceHash: "fnv1a32:test",
         sourceTextHash: "fnv1a32:text-payload",
         sourceTextCharCount: "# Account language".length,
+        receiptRef: "receipt:doc-inline",
         laneSessionId: "lane_session:live_translation:docs:fnv1a32:test",
         sessionControlKey: "lane_session:live_translation:docs:fnv1a32:test::document_markdown:docs/example.md::docs_chunk",
+        sourceBindingKey: "document_markdown:docs/example.md::fnv1a32:test::docs_chunk::haw::haw",
+        sourceIdentityKey:
+          "document_markdown:docs/example.md::fnv1a32:test::fnv1a32:text-payload::18::docs::docs_chunk::haw::haw",
+        latestSourceIdentityKey:
+          "document_markdown:docs/example.md::fnv1a32:test::fnv1a32:text-payload-latest::18::docs::docs_chunk::haw::haw",
+        mailLoopObservationKey:
+          "document_markdown:docs/example.md::fnv1a32:test::document_markdown::docs_chunk::haw::haw::doc-inline:fnv1a32:test:u0001::receipt:doc-inline",
       },
       evidenceRefs: [`${sourceId}:unit:u0001`],
     } as any];
@@ -367,10 +379,20 @@ describe("stage play micro-reasoner prompt presets", () => {
       sourceId,
       sourceTextHash: "fnv1a32:text-payload",
       sourceTextCharCount: "# Account language".length,
+      receiptRef: "receipt:doc-inline",
       chunkId: "doc-inline:fnv1a32:test:u0001",
       chunkIndex: 1,
       laneSessionId: "lane_session:live_translation:docs:fnv1a32:test",
       sessionControlKey: "lane_session:live_translation:docs:fnv1a32:test::document_markdown:docs/example.md::docs_chunk",
+      sourceBindingKey: "document_markdown:docs/example.md::fnv1a32:test::docs_chunk::haw::haw",
+      sourceIdentityKey:
+        "document_markdown:docs/example.md::fnv1a32:test::fnv1a32:text-payload::18::docs::docs_chunk::haw::haw",
+      latestSourceIdentityKey:
+        "document_markdown:docs/example.md::fnv1a32:test::fnv1a32:text-payload-latest::18::docs::docs_chunk::haw::haw",
+      mailLoopObservationKey:
+        "document_markdown:docs/example.md::fnv1a32:test::document_markdown::docs_chunk::haw::haw::doc-inline:fnv1a32:test:u0001::receipt:doc-inline",
+      latestMailLoopObservationKey:
+        "document_markdown:docs/example.md::fnv1a32:test::document_markdown::docs_chunk::haw::haw::doc-inline:fnv1a32:test:u0001::receipt:doc-inline",
       dedupeKey: `${sourceId}:doc-inline:fnv1a32:test:u0001:haw`,
       sourceEventId: "document_markdown_event:doc-inline:fnv1a32:test:u0001",
       sourceEventMs: 1780000000000,
@@ -392,6 +414,13 @@ describe("stage play micro-reasoner prompt presets", () => {
       terminal_eligible: false,
       context_role: "micro_reasoner_evidence",
     });
+    expect(prompted.packet.evidenceHandles?.sourceReceipts).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        receiptRef: "receipt:doc-inline",
+        evidenceRefs: expect.arrayContaining(["receipt:doc-inline"]),
+      }),
+    ]));
+    expect(prompted.packet.evidenceRefs).toEqual(expect.arrayContaining(["receipt:doc-inline"]));
 
     resetStagePlayProcessedMailPacketStoreForTest();
     ensureDefaultStagePlayMicroReasonerPromptPresets();
@@ -414,10 +443,20 @@ describe("stage play micro-reasoner prompt presets", () => {
       sourceId,
       sourceTextHash: "fnv1a32:text-payload",
       sourceTextCharCount: "# Account language".length,
+      receiptRef: "receipt:doc-inline",
       chunkId: "doc-inline:fnv1a32:test:u0001",
       chunkIndex: 1,
       laneSessionId: "lane_session:live_translation:docs:fnv1a32:test",
       sessionControlKey: "lane_session:live_translation:docs:fnv1a32:test::document_markdown:docs/example.md::docs_chunk",
+      sourceBindingKey: "document_markdown:docs/example.md::fnv1a32:test::docs_chunk::haw::haw",
+      sourceIdentityKey:
+        "document_markdown:docs/example.md::fnv1a32:test::fnv1a32:text-payload::18::docs::docs_chunk::haw::haw",
+      latestSourceIdentityKey:
+        "document_markdown:docs/example.md::fnv1a32:test::fnv1a32:text-payload-latest::18::docs::docs_chunk::haw::haw",
+      mailLoopObservationKey:
+        "document_markdown:docs/example.md::fnv1a32:test::document_markdown::docs_chunk::haw::haw::doc-inline:fnv1a32:test:u0001::receipt:doc-inline",
+      latestMailLoopObservationKey:
+        "document_markdown:docs/example.md::fnv1a32:test::document_markdown::docs_chunk::haw::haw::doc-inline:fnv1a32:test:u0001::receipt:doc-inline",
       dedupeKey: `${sourceId}:doc-inline:fnv1a32:test:u0001:haw`,
       sourceEventId: "document_markdown_event:doc-inline:fnv1a32:test:u0001",
       sourceEventMs: 1780000000000,
@@ -586,6 +625,7 @@ describe("stage play micro-reasoner prompt presets", () => {
       { role: "decision_selector", title: "Calculator Tool-Call Decision Selector" },
     ]);
     expect(result.packet.recommendedNext).toBe("record_interpretation");
+    expect(result.packet.answer_authority).toBe(false);
     expect(result.packet.microReasonerDeck).toMatchObject({
       presetId: "stage_play_micro_reasoner_prompt_preset:calculator-tool-call:v1",
       presetTitle: "Calculator Tool-Call Monitor",
@@ -741,6 +781,7 @@ describe("stage play micro-reasoner prompt presets", () => {
       "voice_callout_drafter",
     ]);
     expect(result.packet).toMatchObject({
+      answer_authority: false,
       recommendedNext: "request_voice_callout",
       effortEstimate: {
         currentEffort: "combat_or_recovery",

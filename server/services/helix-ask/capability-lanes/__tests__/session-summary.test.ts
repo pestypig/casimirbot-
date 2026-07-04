@@ -5,6 +5,7 @@ import {
   buildHelixCapabilityLaneSessionDebugSummaries,
   buildHelixCapabilityLaneSessionDebugSummary,
 } from "../session-summary";
+import { buildHelixCapabilityLaneSessionListTimeline } from "../session-list-timeline";
 
 const buildProvider = (id: "helix" | "codex"): HelixAgentProvider => ({
   id,
@@ -53,7 +54,8 @@ const buildObservedSession = () => {
       projection_target: "docs_chunk",
       account_locale: "es-US",
       target_language: "es",
-      source_binding_key: "docs:session-summary::sha256:session-summary-v1::docs_chunk::es-US::es",
+      source_binding_key:
+        "docs:session-summary::sha256:session-summary-v1::docs_chunk::es-US::es",
     },
     requestedBackendProvider: "google_gemini",
     env: {} as NodeJS.ProcessEnv,
@@ -85,7 +87,9 @@ const buildObservedSession = () => {
 
 describe("capability lane session debug summary", () => {
   it("projects a standalone lane session without goal binding or terminal authority", () => {
-    const summary = buildHelixCapabilityLaneSessionDebugSummary(buildObservedSession());
+    const summary = buildHelixCapabilityLaneSessionDebugSummary(
+      buildObservedSession(),
+    );
 
     expect(summary).toMatchObject({
       schema: "helix.capability_lane.session_debug_summary.v1",
@@ -108,12 +112,18 @@ describe("capability lane session debug summary", () => {
       }),
       session_status: "running",
       session_health: "healthy",
+      latest_session_reason: "lane_session_observation_recorded",
+      session_reason: "lane_session_observation_recorded",
+      session_debug_phase: "running:record_observation:observation_recorded",
+      session_observation_status: "observation_recorded",
       source_id: "docs:session-summary",
       source_hash: "sha256:session-summary-v1",
       source_kind: "docs",
       projection_target: "docs_chunk",
       account_locale: "es-US",
       target_language: "es",
+      source_identity_key:
+        "docs:session-summary::sha256:session-summary-v1::sha256:text-session-summary::43::docs::docs_chunk::es-US::es",
       session_control_key: [
         "lane-session-summary-only",
         "docs:session-summary",
@@ -146,6 +156,10 @@ describe("capability lane session debug summary", () => {
       latest_chunk_index: 1,
       latest_source_id: "docs:session-summary",
       latest_source_hash: "sha256:session-summary-v1",
+      latest_source_binding_key:
+        "docs:session-summary::sha256:session-summary-v1::docs_chunk::es-US::es",
+      latest_source_identity_key:
+        "docs:session-summary::sha256:session-summary-v1::sha256:text-session-summary::43::docs::docs_chunk::es-US::es",
       latest_source_kind: "docs",
       latest_account_locale: "es-US",
       latest_target_language: "es",
@@ -161,18 +175,49 @@ describe("capability lane session debug summary", () => {
       latest_observation_key: [
         "docs:session-summary",
         "sha256:session-summary-v1",
+        "docs",
         "docs_chunk",
+        "es-US",
         "es",
         "chunk-summary",
         "ask:lane:translation:session-obs:projection:receipt",
       ].join("::"),
+      evidence_refs: expect.arrayContaining([
+        "lane-session-summary-only",
+        "lane-session-summary-only:record_observation:120",
+        [
+          "lane-session-summary-only",
+          "docs:session-summary",
+          "sha256:session-summary-v1",
+          "docs_chunk",
+          "es-US",
+          "es",
+        ].join("::"),
+        "docs:session-summary::sha256:session-summary-v1::docs_chunk::es-US::es",
+        "docs:session-summary::sha256:session-summary-v1::sha256:text-session-summary::43::docs::docs_chunk::es-US::es",
+        "ask:lane:translation:session-obs",
+        "ask:lane:translation:session-obs:projection:receipt",
+        [
+          "docs:session-summary",
+          "sha256:session-summary-v1",
+          "docs",
+          "docs_chunk",
+          "es-US",
+          "es",
+          "chunk-summary",
+          "ask:lane:translation:session-obs:projection:receipt",
+        ].join("::"),
+      ]),
       latest_event_id: "lane-session-summary-only:record_observation:120",
+      latest_receipt_ref: "ask:lane:translation:session-obs:projection:receipt",
       session_event_count: 2,
       has_observation: true,
       terminal_authority_status: "pending_helix_terminal_authority",
       reentry_required: true,
       backend_provider_becomes_root_agent: false,
       final_reports_require_terminal_authority: true,
+      context_role: "tool_evidence",
+      answer_authority: false,
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
@@ -198,6 +243,8 @@ describe("capability lane session debug summary", () => {
       source_event_id: "docs:session-summary:event-1",
       source_id: "docs:session-summary",
       source_hash: "sha256:session-summary-v1",
+      source_identity_key:
+        "docs:session-summary::sha256:session-summary-v1::sha256:text-session-summary::43::docs::docs_chunk::es-US::es",
       source_kind: "docs",
       account_locale: "es-US",
       target_language: "es",
@@ -208,6 +255,7 @@ describe("capability lane session debug summary", () => {
       source_text_char_count: 43,
       projection_target: "docs_chunk",
       cancel_requested: true,
+      context_role: "tool_evidence",
       terminal_authority_status: "pending_helix_terminal_authority",
       reentry_required: true,
       terminal_eligible: false,
@@ -217,7 +265,9 @@ describe("capability lane session debug summary", () => {
   });
 
   it("builds array summaries for debug export projection", () => {
-    const summaries = buildHelixCapabilityLaneSessionDebugSummaries([buildObservedSession()]);
+    const summaries = buildHelixCapabilityLaneSessionDebugSummaries([
+      buildObservedSession(),
+    ]);
 
     expect(summaries).toHaveLength(1);
     expect(summaries[0]).toMatchObject({
@@ -236,12 +286,17 @@ describe("capability lane session debug summary", () => {
       source_hash: "sha256:session-summary-v1",
       latest_source_id: "docs:session-summary",
       latest_source_hash: "sha256:session-summary-v1",
+      latest_source_binding_key:
+        "docs:session-summary::sha256:session-summary-v1::docs_chunk::es-US::es",
+      latest_source_identity_key:
+        "docs:session-summary::sha256:session-summary-v1::sha256:text-session-summary::43::docs::docs_chunk::es-US::es",
       latest_source_kind: "docs",
       latest_account_locale: "es-US",
       latest_target_language: "es",
       latest_dedupe_key: "docs:session-summary:chunk-summary:es",
       latest_freshness_status: "fresh",
-      source_binding_key: "docs:session-summary::sha256:session-summary-v1::docs_chunk::es-US::es",
+      source_binding_key:
+        "docs:session-summary::sha256:session-summary-v1::docs_chunk::es-US::es",
       session_control_key: [
         "lane-session-summary-only",
         "docs:session-summary",
@@ -253,25 +308,254 @@ describe("capability lane session debug summary", () => {
       latest_observation_key: [
         "docs:session-summary",
         "sha256:session-summary-v1",
+        "docs",
         "docs_chunk",
+        "es-US",
         "es",
         "chunk-summary",
         "ask:lane:translation:session-obs:projection:receipt",
       ].join("::"),
+      evidence_refs: expect.arrayContaining([
+        "lane-session-summary-only",
+        "lane-session-summary-only:record_observation:120",
+        "lane-session-summary-only::docs:session-summary::sha256:session-summary-v1::docs_chunk::es-US::es",
+        "docs:session-summary::sha256:session-summary-v1::docs_chunk::es-US::es",
+        "docs:session-summary::sha256:session-summary-v1::sha256:text-session-summary::43::docs::docs_chunk::es-US::es",
+        "ask:lane:translation:session-obs",
+        "ask:lane:translation:session-obs:projection:receipt",
+      ]),
       source_text_hash: "sha256:text-session-summary",
       source_text_char_count: 43,
       latest_cancel_requested: true,
       latest_event_id: "lane-session-summary-only:record_observation:120",
+      latest_receipt_ref: "ask:lane:translation:session-obs:projection:receipt",
       has_observation: true,
       permission_profile: "permissions non-mutating",
       terminal_authority_status: "pending_helix_terminal_authority",
       reentry_required: true,
       backend_provider_becomes_root_agent: false,
       final_reports_require_terminal_authority: true,
+      answer_authority: false,
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
     });
+  });
+
+  it("keeps session identity explicit in list timeline rows", () => {
+    const summaries = buildHelixCapabilityLaneSessionDebugSummaries([
+      buildObservedSession(),
+    ]);
+    const timeline = buildHelixCapabilityLaneSessionListTimeline(summaries);
+
+    expect(timeline).toEqual([
+      expect.objectContaining({
+        schema: "helix.capability_lane.provider_timeline_event.v1",
+        stage: "lane_session",
+        lane_id: "live_translation",
+        lane_session_id: "lane-session-summary-only",
+        requested_backend_provider: "google_gemini",
+        requested_backend_provider_known: true,
+        selected_backend_provider: "live_translation.local_runtime",
+        selection_reason:
+          "requested_backend_unconfigured_default_backend_selected_by_helix_policy",
+        cost_class: "free_local",
+        latency_class: "interactive",
+        privacy_class: "local_only",
+        backend_selection_decision: expect.objectContaining({
+          requested_backend_provider: "google_gemini",
+          selected_backend_provider: "live_translation.local_runtime",
+          selected_runtime_provider_remains_root: true,
+          backend_provider_becomes_root_agent: false,
+        }),
+        session_control_key: [
+          "lane-session-summary-only",
+          "docs:session-summary",
+          "sha256:session-summary-v1",
+          "docs_chunk",
+          "es-US",
+          "es",
+        ].join("::"),
+        session_event_count: 2,
+        session_created_at_ms: 100,
+        session_updated_at_ms: 120,
+        permission_profile: "permissions non-mutating",
+        permissions: expect.objectContaining({
+          read: true,
+          observe: true,
+          act: true,
+          write: false,
+          shell: false,
+          code_mutation: false,
+        }),
+        source_binding_key:
+          "docs:session-summary::sha256:session-summary-v1::docs_chunk::es-US::es",
+        latest_source_binding_key:
+          "docs:session-summary::sha256:session-summary-v1::docs_chunk::es-US::es",
+        latest_account_locale: "es-US",
+        evidence_refs: expect.arrayContaining([
+          "lane-session-summary-only::docs:session-summary::sha256:session-summary-v1::docs_chunk::es-US::es",
+          "docs:session-summary::sha256:session-summary-v1::docs_chunk::es-US::es",
+          "docs:session-summary::sha256:session-summary-v1::sha256:text-session-summary::43::docs::docs_chunk::es-US::es",
+          "ask:lane:translation:session-obs",
+          "ask:lane:translation:session-obs:projection:receipt",
+        ]),
+        lane_requested: true,
+        lane_executed: true,
+        observation_reentered: false,
+        observation_ref: "ask:lane:translation:session-obs",
+        receipt_ref: "ask:lane:translation:session-obs:projection:receipt",
+        latest_receipt_ref: "ask:lane:translation:session-obs:projection:receipt",
+        reentry_required: true,
+        selected_runtime_provider_remains_root: true,
+        backend_provider_becomes_root_agent: false,
+        final_reports_require_terminal_authority: true,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+  });
+
+  it("treats receipt-only session summaries as executed lane activity", () => {
+    const summaries = buildHelixCapabilityLaneSessionDebugSummaries([
+      buildObservedSession(),
+    ]);
+    const receiptOnlySummary = {
+      ...summaries[0],
+      has_observation: false,
+      last_observation_ref: null,
+      last_receipt_ref: "ask:lane:translation:session-obs:projection:receipt:previous",
+      latest_receipt_ref: "ask:lane:translation:session-obs:projection:receipt",
+      latest_observation_key: null,
+    };
+    const timeline = buildHelixCapabilityLaneSessionListTimeline([
+      receiptOnlySummary,
+    ]);
+
+    expect(timeline).toEqual([
+      expect.objectContaining({
+        stage: "lane_session",
+        lane_session_id: "lane-session-summary-only",
+        lane_requested: true,
+        lane_executed: true,
+        observation_ref: null,
+        receipt_ref: "ask:lane:translation:session-obs:projection:receipt",
+        latest_receipt_ref: "ask:lane:translation:session-obs:projection:receipt",
+        terminal_authority_status: "pending_helix_terminal_authority",
+        context_role: "tool_evidence",
+        answer_authority: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+  });
+
+  it("builds receipt-only session summaries as observed non-terminal evidence", () => {
+    const observedSession = buildObservedSession();
+    const receiptOnlyEvent = {
+      ...observedSession.debug_history.at(-1)!,
+      event_id: "lane-session-summary-only:record_receipt_only:125",
+      observation_ref: null,
+      receipt_ref: "ask:lane:translation:session-receipt-only",
+      terminal_authority_status: "pending_helix_terminal_authority" as const,
+    };
+    const receiptOnlySession = {
+      ...observedSession,
+      last_observation_ref: null,
+      last_receipt_ref: "ask:lane:translation:session-receipt-only",
+      debug_history: [
+        observedSession.debug_history[0]!,
+        receiptOnlyEvent,
+      ],
+    };
+
+    const summary = buildHelixCapabilityLaneSessionDebugSummary(receiptOnlySession);
+
+    expect(summary).toMatchObject({
+      lane_session_id: "lane-session-summary-only",
+      session_debug_phase: "running:record_observation:observation_recorded",
+      session_observation_status: "observation_recorded",
+      has_observation: true,
+      last_observation_ref: null,
+      last_receipt_ref: "ask:lane:translation:session-receipt-only",
+      latest_event_id: "lane-session-summary-only:record_receipt_only:125",
+      latest_receipt_ref: "ask:lane:translation:session-receipt-only",
+      latest_observation_key: [
+        "docs:session-summary",
+        "sha256:session-summary-v1",
+        "docs",
+        "docs_chunk",
+        "es-US",
+        "es",
+        "chunk-summary",
+        "ask:lane:translation:session-receipt-only",
+      ].join("::"),
+      evidence_refs: expect.arrayContaining([
+        "ask:lane:translation:session-receipt-only",
+        [
+          "docs:session-summary",
+          "sha256:session-summary-v1",
+          "docs",
+          "docs_chunk",
+          "es-US",
+          "es",
+          "chunk-summary",
+          "ask:lane:translation:session-receipt-only",
+        ].join("::"),
+      ]),
+      terminal_authority_status: "pending_helix_terminal_authority",
+      context_role: "tool_evidence",
+      answer_authority: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+
+    expect(buildHelixCapabilityLaneSessionListTimeline([summary])).toEqual([
+      expect.objectContaining({
+        stage: "lane_session",
+        lane_session_id: "lane-session-summary-only",
+        lane_executed: true,
+        observation_ref: null,
+        receipt_ref: "ask:lane:translation:session-receipt-only",
+        latest_receipt_ref: "ask:lane:translation:session-receipt-only",
+        latest_observation_key: [
+          "docs:session-summary",
+          "sha256:session-summary-v1",
+          "docs",
+          "docs_chunk",
+          "es-US",
+          "es",
+          "chunk-summary",
+          "ask:lane:translation:session-receipt-only",
+        ].join("::"),
+        has_observation: true,
+        terminal_authority_status: "pending_helix_terminal_authority",
+        context_role: "tool_evidence",
+        answer_authority: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+  });
+
+  it("prefers the canonical session source identity over a reconstructed summary key", () => {
+    const observedSession = buildObservedSession();
+    const canonicalSession = {
+      ...observedSession,
+      source_binding: {
+        ...observedSession.source_binding,
+        source_identity_key: "canonical:session-source-identity",
+      },
+    };
+
+    expect(
+      buildHelixCapabilityLaneSessionDebugSummary(canonicalSession)
+        .source_identity_key,
+    ).toBe("canonical:session-source-identity");
   });
 
   it("distinguishes a started session from one that has observed lane evidence", () => {
@@ -293,12 +577,20 @@ describe("capability lane session debug summary", () => {
     });
     if (!started.lane_session) throw new Error("expected started lane session");
 
-    expect(buildHelixCapabilityLaneSessionDebugSummary(started.lane_session)).toMatchObject({
+    const summary = buildHelixCapabilityLaneSessionDebugSummary(
+      started.lane_session,
+    );
+    expect(summary).toMatchObject({
       lane_session_id: "lane-session-started-only",
       lifecycle_action: "start",
       session_lifecycle_action: "start",
       session_action: "start",
+      latest_session_reason: "lane_session_started",
+      session_reason: "lane_session_started",
+      session_debug_phase: "running:start:no_observation",
+      session_observation_status: "no_observation",
       latest_event_id: "lane-session-started-only:start:300",
+      latest_receipt_ref: null,
       session_event_count: 1,
       has_observation: false,
       last_observation_ref: null,
@@ -306,19 +598,56 @@ describe("capability lane session debug summary", () => {
       latest_chunk_id: null,
       latest_source_id: null,
       latest_source_hash: null,
+      latest_source_binding_key: null,
+      latest_source_identity_key: null,
       latest_account_locale: "fr-FR",
       latest_target_language: null,
-      source_binding_key: "docs:started-only::sha256:started-only::docs_chunk::fr-FR::fr",
-      session_control_key: "lane-session-started-only::docs:started-only::sha256:started-only::docs_chunk::fr-FR::fr",
+      source_binding_key:
+        "docs:started-only::sha256:started-only::docs_chunk::fr-FR::fr",
+      source_identity_key:
+        "docs:started-only::sha256:started-only::docs::docs_chunk::fr-FR::fr",
+      session_control_key:
+        "lane-session-started-only::docs:started-only::sha256:started-only::docs_chunk::fr-FR::fr",
       latest_observation_key: null,
+      evidence_refs: [
+        "lane-session-started-only",
+        "lane-session-started-only:start:300",
+        "lane-session-started-only::docs:started-only::sha256:started-only::docs_chunk::fr-FR::fr",
+        "docs:started-only::sha256:started-only::docs_chunk::fr-FR::fr",
+        "docs:started-only::sha256:started-only::docs::docs_chunk::fr-FR::fr",
+      ],
       terminal_authority_status: "not_terminal_authority",
       reentry_required: true,
       backend_provider_becomes_root_agent: false,
       final_reports_require_terminal_authority: true,
+      answer_authority: false,
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
     });
+
+    expect(buildHelixCapabilityLaneSessionListTimeline([summary])).toEqual([
+      expect.objectContaining({
+        stage: "lane_session",
+        lane_session_id: "lane-session-started-only",
+        session_status: "running",
+        session_health: "healthy",
+        session_lifecycle_action: "start",
+        session_observation_status: "no_observation",
+        lane_requested: true,
+        lane_executed: false,
+        observation_reentered: false,
+        observation_ref: null,
+        receipt_ref: null,
+        selected_runtime_provider_remains_root: true,
+        backend_provider_becomes_root_agent: false,
+        final_reports_require_terminal_authority: true,
+        terminal_authority_status: "not_terminal_authority",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
   });
 
   it("keeps stopped session summaries tied to the latest observation authority state", () => {
@@ -355,7 +684,8 @@ describe("capability lane session debug summary", () => {
       projectionTarget: "docs_chunk",
       nowMs: 420,
     });
-    if (!observed.lane_session) throw new Error("expected observed lane session");
+    if (!observed.lane_session)
+      throw new Error("expected observed lane session");
 
     const stopped = store.stop({
       laneSessionId: "lane-session-stopped-after-observation",
@@ -364,22 +694,36 @@ describe("capability lane session debug summary", () => {
     });
     if (!stopped.lane_session) throw new Error("expected stopped lane session");
 
-    expect(buildHelixCapabilityLaneSessionDebugSummary(stopped.lane_session)).toMatchObject({
+    expect(
+      buildHelixCapabilityLaneSessionDebugSummary(stopped.lane_session),
+    ).toMatchObject({
       lane_session_id: "lane-session-stopped-after-observation",
       lifecycle_action: "stop",
       session_lifecycle_action: "stop",
       session_action: "stop",
       session_status: "stopped",
       session_health: "stopped",
+      latest_session_reason: "goal_complete",
+      session_reason: "goal_complete",
+      session_debug_phase: "stopped:stop:observation_recorded",
+      session_observation_status: "observation_recorded",
       latest_event_id: "lane-session-stopped-after-observation:stop:430",
       session_event_count: 3,
       has_observation: true,
       last_observation_ref: "ask:lane:translation:stopped-observation",
-      last_receipt_ref: "ask:lane:translation:stopped-observation:projection:receipt",
+      last_receipt_ref:
+        "ask:lane:translation:stopped-observation:projection:receipt",
       latest_chunk_id: "chunk-stopped",
+      latest_source_binding_key:
+        "docs:stopped-after-observation::sha256:stopped-after-observation::docs_chunk::es-US::es",
+      latest_source_identity_key:
+        "docs:stopped-after-observation::sha256:stopped-after-observation::docs::docs_chunk::es-US::es",
       latest_source_event_id: "docs:stopped-after-observation:event-1",
       latest_observed_at_ms: 420,
-      source_binding_key: "docs:stopped-after-observation::sha256:stopped-after-observation::docs_chunk::es-US::es",
+      source_binding_key:
+        "docs:stopped-after-observation::sha256:stopped-after-observation::docs_chunk::es-US::es",
+      source_identity_key:
+        "docs:stopped-after-observation::sha256:stopped-after-observation::docs::docs_chunk::es-US::es",
       session_control_key: [
         "lane-session-stopped-after-observation",
         "docs:stopped-after-observation",
@@ -391,15 +735,25 @@ describe("capability lane session debug summary", () => {
       latest_observation_key: [
         "docs:stopped-after-observation",
         "sha256:stopped-after-observation",
+        "docs",
         "docs_chunk",
+        "es-US",
         "es",
         "chunk-stopped",
         "ask:lane:translation:stopped-observation:projection:receipt",
       ].join("::"),
+      evidence_refs: expect.arrayContaining([
+        "lane-session-stopped-after-observation",
+        "lane-session-stopped-after-observation:stop:430",
+        "lane-session-stopped-after-observation:record_observation:420",
+        "ask:lane:translation:stopped-observation",
+        "ask:lane:translation:stopped-observation:projection:receipt",
+      ]),
       terminal_authority_status: "pending_helix_terminal_authority",
       reentry_required: true,
       backend_provider_becomes_root_agent: false,
       final_reports_require_terminal_authority: true,
+      answer_authority: false,
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,

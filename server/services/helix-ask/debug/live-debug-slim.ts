@@ -95,6 +95,71 @@ const readHelixAskLiveDebugRecordArray = (value: unknown): RecordLike[] =>
 const readHelixAskLiveDebugString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
+const readHelixAskLiveDebugRuntimeAgentProvider = (...values: unknown[]): string | null => {
+  for (const value of values) {
+    const text = readHelixAskLiveDebugString(value);
+    if (text) return text;
+  }
+  return null;
+};
+
+const readHelixAskLiveDebugScalarString = (value: unknown): string | null => {
+  const text = readHelixAskLiveDebugString(value);
+  if (text) return text;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "boolean") return String(value);
+  return null;
+};
+
+const readHelixAskLiveDebugBoolean = (value: unknown): boolean | null =>
+  typeof value === "boolean" ? value : null;
+
+const readHelixAskLiveDebugStringArray = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value
+        .map(readHelixAskLiveDebugString)
+        .filter((entry): entry is string => Boolean(entry))
+    : [];
+
+const uniqueHelixAskLiveDebugStrings = (
+  values: Array<string | null | undefined>,
+): string[] =>
+  Array.from(new Set(values.filter((value): value is string => Boolean(value))));
+
+const buildCapabilityLaneEvidenceRefs = (record: RecordLike): string[] =>
+  uniqueHelixAskLiveDebugStrings([
+    ...readHelixAskLiveDebugStringArray(record.evidence_refs),
+    readHelixAskLiveDebugString(record.lane_session_id),
+    readHelixAskLiveDebugString(record.observation_lane_session_id),
+    readHelixAskLiveDebugString(record.latest_event_id),
+    readHelixAskLiveDebugString(record.latest_observation_event_id),
+    readHelixAskLiveDebugString(record.session_control_key),
+    readHelixAskLiveDebugString(record.observation_ref),
+    readHelixAskLiveDebugString(record.last_observation_ref),
+    readHelixAskLiveDebugString(record.receipt_ref),
+    readHelixAskLiveDebugString(record.last_receipt_ref),
+    readHelixAskLiveDebugString(record.latest_receipt_ref),
+    readHelixAskLiveDebugString(record.mail_loop_ref),
+    readHelixAskLiveDebugString(record.source_id),
+    readHelixAskLiveDebugString(record.source_hash),
+    readHelixAskLiveDebugString(record.source_binding_key),
+    readHelixAskLiveDebugString(record.latest_source_binding_key),
+    readHelixAskLiveDebugString(record.lane_session_source_binding_key),
+    readHelixAskLiveDebugString(record.source_identity_key),
+    readHelixAskLiveDebugString(record.latest_source_identity_key),
+    readHelixAskLiveDebugString(record.lane_session_source_identity_key),
+    readHelixAskLiveDebugString(record.chunk_id),
+    readHelixAskLiveDebugScalarString(record.chunk_index),
+    readHelixAskLiveDebugString(record.latest_chunk_id),
+    readHelixAskLiveDebugScalarString(record.latest_chunk_index),
+    readHelixAskLiveDebugString(record.dedupe_key),
+    readHelixAskLiveDebugString(record.latest_dedupe_key),
+    readHelixAskLiveDebugString(record.source_event_id),
+    readHelixAskLiveDebugString(record.latest_source_event_id),
+    readHelixAskLiveDebugString(record.latest_observation_key),
+    readHelixAskLiveDebugString(record.latest_mail_loop_observation_key),
+  ]);
+
 const normalizeCapabilityLaneTimelineStage = (value: unknown): string | null => {
   const stage = readHelixAskLiveDebugString(value);
   if (!stage) return null;
@@ -132,7 +197,169 @@ const normalizeCapabilityLaneTimelineStage = (value: unknown): string | null => 
   }
 };
 
-const buildCapabilityLaneTimelineSummary = (timeline: unknown): RecordLike => {
+const buildCapabilityLaneConsoleStateLabel = (
+  entry: RecordLike,
+  stage: string | null,
+): string => {
+  if (stage === "visible") return entry.lane_executed === true ? "visible_executed" : "visible_only";
+  if (stage === "backend") return "backend_selected";
+  if (stage === "observed") return entry.observation_reentered === true ? "observed_reentered" : "observed_pending_reentry";
+  if (stage === "receipt") return "receipt_recorded";
+  if (stage === "reentered") return "observation_reentered";
+  if (stage === "session") {
+    return `session_${
+      readHelixAskLiveDebugString(entry.session_lifecycle_action) ||
+      readHelixAskLiveDebugString(entry.lifecycle_action) ||
+      readHelixAskLiveDebugString(entry.session_action) ||
+      "event"
+    }`;
+  }
+  if (stage === "mail") return entry.observation_reentered === true ? "mail_loop_evidence_reentered" : "mail_loop_evidence_pending";
+  if (stage === "goal") return entry.observation_reentered === true ? "goal_bound_with_evidence" : "goal_bound_waiting_for_evidence";
+  if (stage === "terminal_selected") return "terminal_selected";
+  if (stage === "terminal_rejected") return "terminal_rejected";
+  return stage || "unknown";
+};
+
+const readCapabilityLaneTimelineContextRole = (
+  entry: RecordLike,
+  stage: string | null,
+): string | null => {
+  const explicit = readHelixAskLiveDebugString(entry.context_role);
+  if (explicit) return explicit;
+  if (
+    stage === "observed" ||
+    stage === "receipt" ||
+    stage === "reentered" ||
+    stage === "session" ||
+    stage === "mail" ||
+    stage === "goal"
+  ) {
+    return "tool_evidence";
+  }
+  return null;
+};
+
+const capabilityLaneTimelineStageCanCarryTerminalAuthority = (stage: string | null): boolean =>
+  stage === "terminal_selected" || stage === "terminal_rejected";
+
+const buildCapabilityLaneConsoleStateRows = (
+  entries: RecordLike[],
+  fallbackRuntimeAgentProvider: string | null = null,
+): RecordLike[] =>
+  entries.slice(0, HELIX_ASK_LIVE_DEBUG_ARRAY_LIMIT).map((entry, index) => {
+    const stage = normalizeCapabilityLaneTimelineStage(entry.stage);
+    const canCarryTerminalAuthority = capabilityLaneTimelineStageCanCarryTerminalAuthority(stage);
+    const reportDecision = readHelixAskLiveDebugRecord(entry.report_decision);
+    const evidenceRefs = buildCapabilityLaneEvidenceRefs(entry);
+    return {
+      schema: "helix.capability_lane.console_state_row.v1",
+      seq: typeof entry.seq === "number" ? entry.seq : index,
+      stage: entry.stage ?? null,
+      normalized_stage: stage,
+      state_label: buildCapabilityLaneConsoleStateLabel(entry, stage),
+      adapter_boundary: readHelixAskLiveDebugString(entry.adapter_boundary),
+      lane_id: readHelixAskLiveDebugString(entry.lane_id),
+      capability_id: readHelixAskLiveDebugString(entry.capability_id),
+      selected_runtime_agent_provider: readHelixAskLiveDebugRuntimeAgentProvider(
+        entry.selected_runtime_agent_provider,
+        fallbackRuntimeAgentProvider,
+      ),
+      requested_backend_provider: readHelixAskLiveDebugString(entry.requested_backend_provider),
+      requested_backend_provider_known: readHelixAskLiveDebugBoolean(entry.requested_backend_provider_known),
+      selected_backend_provider: readHelixAskLiveDebugString(entry.selected_backend_provider),
+      fallback_backend_provider: readHelixAskLiveDebugString(entry.fallback_backend_provider),
+      backend_selection_reason:
+        readHelixAskLiveDebugString(entry.backend_selection_reason) ??
+        readHelixAskLiveDebugString(entry.selection_reason),
+      lane_visible: entry.lane_visible === true,
+      lane_requested: entry.lane_requested === true,
+      lane_executed: entry.lane_executed === true,
+      observation_reentered: entry.observation_reentered === true,
+      observation_ref: readHelixAskLiveDebugString(entry.observation_ref),
+      receipt_ref: readHelixAskLiveDebugString(entry.receipt_ref),
+      lane_session_id: readHelixAskLiveDebugString(entry.lane_session_id),
+      source_id:
+        readHelixAskLiveDebugString(entry.source_id) ||
+        readHelixAskLiveDebugString(entry.latest_source_id),
+      source_hash:
+        readHelixAskLiveDebugString(entry.source_hash) ||
+        readHelixAskLiveDebugString(entry.latest_source_hash),
+      source_kind:
+        readHelixAskLiveDebugString(entry.source_kind) ||
+        readHelixAskLiveDebugString(entry.latest_source_kind),
+      source_text_hash: readHelixAskLiveDebugString(entry.source_text_hash),
+      source_text_char_count: readHelixAskLiveDebugScalarString(entry.source_text_char_count),
+      source_identity_key: readHelixAskLiveDebugString(entry.source_identity_key),
+      projection_target:
+        readHelixAskLiveDebugString(entry.projection_target) ||
+        readHelixAskLiveDebugString(entry.latest_projection_target),
+      account_locale:
+        readHelixAskLiveDebugString(entry.account_locale) ||
+        readHelixAskLiveDebugString(entry.latest_account_locale),
+      target_language:
+        readHelixAskLiveDebugString(entry.target_language) ||
+        readHelixAskLiveDebugString(entry.latest_target_language),
+      session_control_key: readHelixAskLiveDebugString(entry.session_control_key),
+      source_binding_key:
+        readHelixAskLiveDebugString(entry.source_binding_key) ||
+        readHelixAskLiveDebugString(entry.latest_source_binding_key),
+      latest_source_binding_key: readHelixAskLiveDebugString(entry.latest_source_binding_key),
+      lane_session_source_binding_key: readHelixAskLiveDebugString(entry.lane_session_source_binding_key),
+      lane_session_source_identity_key: readHelixAskLiveDebugString(entry.lane_session_source_identity_key),
+      latest_source_identity_key: readHelixAskLiveDebugString(entry.latest_source_identity_key),
+      latest_mail_loop_observation_key: readHelixAskLiveDebugString(entry.latest_mail_loop_observation_key),
+      latest_observation_key: readHelixAskLiveDebugString(entry.latest_observation_key),
+      observation_lane_session_id: readHelixAskLiveDebugString(entry.observation_lane_session_id),
+      ...(evidenceRefs.length > 0 ? { evidence_refs: evidenceRefs } : {}),
+      quiet_behavior_applied:
+        readHelixAskLiveDebugBoolean(entry.quiet_behavior_applied) ??
+        readHelixAskLiveDebugBoolean(reportDecision?.quiet_behavior_applied) ??
+        false,
+      wake_expected:
+        readHelixAskLiveDebugBoolean(entry.wake_expected) ??
+        readHelixAskLiveDebugBoolean(reportDecision?.wake_expected) ??
+        false,
+      surface_badge_expected:
+        readHelixAskLiveDebugBoolean(entry.surface_badge_expected) ??
+        readHelixAskLiveDebugBoolean(reportDecision?.surface_badge_expected) ??
+        false,
+      terminal_report_requested:
+        readHelixAskLiveDebugBoolean(entry.terminal_report_requested) ??
+        readHelixAskLiveDebugBoolean(reportDecision?.terminal_report_requested) ??
+        false,
+      terminal_report_authorized:
+        readHelixAskLiveDebugBoolean(entry.terminal_report_authorized) ??
+        readHelixAskLiveDebugBoolean(reportDecision?.terminal_report_authorized) ??
+        false,
+      terminal_authority_status:
+        readHelixAskLiveDebugString(entry.terminal_authority_status) ??
+        "not_terminal_authority",
+      context_role: readCapabilityLaneTimelineContextRole(entry, stage),
+      answer_authority: stage === "terminal_selected" && entry.answer_authority === true,
+      terminal_eligible: canCarryTerminalAuthority && entry.terminal_eligible === true,
+      assistant_answer: canCarryTerminalAuthority && entry.assistant_answer === true,
+      raw_content_included: canCarryTerminalAuthority && entry.raw_content_included === true,
+    };
+  });
+
+const capabilityLaneTimelineRowHasObservation = (entry: RecordLike): boolean => {
+  const explicit =
+    readHelixAskLiveDebugBoolean(entry.has_observation) ??
+    readHelixAskLiveDebugBoolean(entry.hasObservation);
+  if (explicit !== null) return explicit;
+  return Boolean(
+    readHelixAskLiveDebugString(entry.observation_ref) ||
+    readHelixAskLiveDebugString(entry.receipt_ref) ||
+    readHelixAskLiveDebugString(entry.latest_observation_key) ||
+    readHelixAskLiveDebugString(entry.latest_mail_loop_observation_key),
+  );
+};
+
+const buildCapabilityLaneTimelineSummary = (
+  timeline: unknown,
+  fallbackRuntimeAgentProvider: string | null = null,
+): RecordLike => {
   const entries = readHelixAskLiveDebugRecordArray(timeline);
   const stageSequence = entries
     .map((entry) => normalizeCapabilityLaneTimelineStage(entry.stage))
@@ -142,6 +369,11 @@ const buildCapabilityLaneTimelineSummary = (timeline: unknown): RecordLike => {
     entries.filter((entry) => entry[key] === true).length;
   const refCount = (key: string): number =>
     entries.filter((entry) => Boolean(readHelixAskLiveDebugString(entry[key]))).length;
+  const observedStageCount = (stage: string): number =>
+    entries.filter((entry) =>
+      normalizeCapabilityLaneTimelineStage(entry.stage) === stage &&
+      capabilityLaneTimelineRowHasObservation(entry)
+    ).length;
 
   return {
     schema: "helix.capability_lane.timeline_summary.v1",
@@ -157,6 +389,10 @@ const buildCapabilityLaneTimelineSummary = (timeline: unknown): RecordLike => {
     session_count: count("session"),
     mail_loop_count: count("mail"),
     goal_binding_count: count("goal"),
+    observed_session_count: observedStageCount("session"),
+    observed_mail_loop_count: observedStageCount("mail"),
+    observed_goal_binding_count: observedStageCount("goal"),
+    observed_lane_activity_count: entries.filter(capabilityLaneTimelineRowHasObservation).length,
     goal_dispatch_plan_count: count("goal_plan"),
     goal_dispatch_admission_count: count("goal_admission"),
     goal_dispatch_readiness_count: count("goal_readiness"),
@@ -167,37 +403,173 @@ const buildCapabilityLaneTimelineSummary = (timeline: unknown): RecordLike => {
     observation_ref_count: refCount("observation_ref"),
     receipt_ref_count: refCount("receipt_ref"),
     session_control_key_count: refCount("session_control_key"),
-    source_binding_key_count: refCount("source_binding_key"),
+    source_binding_key_count: entries.filter((entry) =>
+      Boolean(
+        readHelixAskLiveDebugString(entry.source_binding_key) ||
+        readHelixAskLiveDebugString(entry.latest_source_binding_key),
+      )
+    ).length,
+    latest_source_binding_key_count: refCount("latest_source_binding_key"),
+    source_identity_key_count: refCount("source_identity_key"),
+    latest_source_identity_key_count: refCount("latest_source_identity_key"),
+    lane_session_source_binding_key_count: refCount("lane_session_source_binding_key"),
+    lane_session_source_identity_key_count: refCount("lane_session_source_identity_key"),
+    latest_mail_loop_observation_key_count: refCount("latest_mail_loop_observation_key"),
+    latest_observation_key_count: refCount("latest_observation_key"),
     observation_lane_session_id_count: refCount("observation_lane_session_id"),
     observation_reentered_count: flagCount("observation_reentered"),
+    quiet_behavior_applied_count: flagCount("quiet_behavior_applied"),
+    mailbox_wake_expected_count: flagCount("mailbox_wake_expected"),
+    decision_wake_expected_count: flagCount("decision_wake_expected"),
+    wake_expected_count: flagCount("wake_expected"),
+    surface_badge_expected_count: flagCount("surface_badge_expected"),
+    terminal_report_requested_count: flagCount("terminal_report_requested"),
+    terminal_report_authorized_count: flagCount("terminal_report_authorized"),
     terminal_selected_count: count("terminal_selected"),
     terminal_rejected_count: count("terminal_rejected"),
+    console_state_rows: buildCapabilityLaneConsoleStateRows(
+      entries,
+      fallbackRuntimeAgentProvider,
+    ),
+    console_state_rows_truncated: entries.length > HELIX_ASK_LIVE_DEBUG_ARRAY_LIMIT,
     visible_lane_does_not_mean_executed: true,
   };
 };
 
-const normalizeCapabilityLaneMailLoopDebugSummary = (summary: RecordLike): RecordLike => {
+const normalizeCapabilityLaneTimelineSummary = (
+  summary: unknown,
+  timeline: unknown,
+  fallbackRuntimeAgentProvider: string | null = null,
+): RecordLike => {
+  const explicit = readHelixAskLiveDebugRecord(summary);
+  if (!explicit) {
+    return buildCapabilityLaneTimelineSummary(timeline, fallbackRuntimeAgentProvider);
+  }
+  const explicitRows = readHelixAskLiveDebugRecordArray(explicit.console_state_rows);
+  return {
+    ...explicit,
+    console_state_rows: explicitRows.length > 0
+      ? buildCapabilityLaneConsoleStateRows(explicitRows, fallbackRuntimeAgentProvider)
+      : buildCapabilityLaneTimelineSummary(timeline, fallbackRuntimeAgentProvider).console_state_rows,
+    visible_lane_does_not_mean_executed: true,
+  };
+};
+
+const normalizeCapabilityLaneMailLoopDebugSummary = (
+  summary: RecordLike,
+  fallbackRuntimeAgentProvider: string | null = null,
+): RecordLike => {
   const wakeKind =
     typeof summary.stage_play_wake_kind === "string"
       ? summary.stage_play_wake_kind.trim()
       : "";
-  if (wakeKind === "mailbox_wake" || wakeKind === "none") return summary;
+  const stagePlayWakeExpected = summary.stage_play_wake_expected === true;
+  const mailboxWakeExpected =
+    summary.mailbox_wake_expected === true ||
+    wakeKind === "mailbox_wake" ||
+    stagePlayWakeExpected;
+  if (wakeKind === "mailbox_wake" || wakeKind === "none") {
+    const selectedRuntimeAgentProvider = readHelixAskLiveDebugRuntimeAgentProvider(
+      summary.selected_runtime_agent_provider,
+      fallbackRuntimeAgentProvider,
+    );
+    return {
+      ...summary,
+      ...(selectedRuntimeAgentProvider
+        ? { selected_runtime_agent_provider: selectedRuntimeAgentProvider }
+        : {}),
+      mailbox_wake_expected: mailboxWakeExpected,
+      decision_wake_expected: summary.decision_wake_expected === true,
+      context_role: readHelixAskLiveDebugString(summary.context_role) ?? "tool_evidence",
+      answer_authority: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
 
+  const selectedRuntimeAgentProvider = readHelixAskLiveDebugRuntimeAgentProvider(
+    summary.selected_runtime_agent_provider,
+    fallbackRuntimeAgentProvider,
+  );
   return {
     ...summary,
-    stage_play_wake_kind: summary.stage_play_wake_expected === true ? "mailbox_wake" : "none",
+    ...(selectedRuntimeAgentProvider
+      ? { selected_runtime_agent_provider: selectedRuntimeAgentProvider }
+      : {}),
+    context_role: readHelixAskLiveDebugString(summary.context_role) ?? "tool_evidence",
+    answer_authority: false,
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+    stage_play_wake_kind: stagePlayWakeExpected ? "mailbox_wake" : "none",
+    mailbox_wake_expected: mailboxWakeExpected,
+    decision_wake_expected: summary.decision_wake_expected === true,
   };
+};
+
+const normalizeCapabilityLaneEvidenceRecord = (
+  record: RecordLike,
+  fallbackRuntimeAgentProvider: string | null = null,
+): RecordLike => {
+  const evidenceRefs = buildCapabilityLaneEvidenceRefs(record);
+  const selectedRuntimeAgentProvider = readHelixAskLiveDebugRuntimeAgentProvider(
+    record.selected_runtime_agent_provider,
+    fallbackRuntimeAgentProvider,
+  );
+  return {
+    ...record,
+    ...(evidenceRefs.length > 0 ? { evidence_refs: evidenceRefs } : {}),
+    latest_receipt_ref:
+      readHelixAskLiveDebugString(record.latest_receipt_ref) ??
+      readHelixAskLiveDebugString(record.receipt_ref) ??
+      readHelixAskLiveDebugString(record.last_receipt_ref),
+    ...(selectedRuntimeAgentProvider
+      ? { selected_runtime_agent_provider: selectedRuntimeAgentProvider }
+      : {}),
+    context_role: readHelixAskLiveDebugString(record.context_role) ?? "tool_evidence",
+    answer_authority: false,
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+const summarizeCapabilityLaneEvidenceRecords = (
+  value: unknown,
+  fallbackRuntimeAgentProvider: string | null = null,
+): unknown => {
+  const records = readHelixAskLiveDebugRecordArray(value);
+  if (records.length === 0) return summarizeHelixAskDebugValue(value);
+  return summarizeHelixAskDebugValue(
+    records.map((record) =>
+      normalizeCapabilityLaneEvidenceRecord(record, fallbackRuntimeAgentProvider),
+    ),
+  );
+};
+
+const normalizeCapabilityLaneEvidenceRecordValue = (
+  value: unknown,
+  fallbackRuntimeAgentProvider: string | null = null,
+): RecordLike | null => {
+  const record = readHelixAskLiveDebugRecord(value);
+  return record ? normalizeCapabilityLaneEvidenceRecord(record, fallbackRuntimeAgentProvider) : null;
 };
 
 const readCapabilityLaneMailLoopDebugSummaries = (
   payload: RecordLike,
   debug: RecordLike,
+  fallbackRuntimeAgentProvider: string | null = null,
 ): RecordLike[] => {
   const explicit = [
     ...readHelixAskLiveDebugRecordArray(payload.capability_lane_mail_loop_debug_summaries),
     ...readHelixAskLiveDebugRecordArray(debug.capability_lane_mail_loop_debug_summaries),
   ];
-  if (explicit.length > 0) return explicit.map(normalizeCapabilityLaneMailLoopDebugSummary);
+  if (explicit.length > 0) {
+    return explicit.map((summary) =>
+      normalizeCapabilityLaneMailLoopDebugSummary(summary, fallbackRuntimeAgentProvider),
+    );
+  }
 
   return [
     ...readHelixAskLiveDebugRecordArray(payload.capability_lane_goal_binding_debug_summaries),
@@ -205,7 +577,9 @@ const readCapabilityLaneMailLoopDebugSummaries = (
   ]
     .map((summary) => readHelixAskLiveDebugRecord(summary.latest_mail_loop_summary))
     .filter((summary): summary is RecordLike => Boolean(summary))
-    .map(normalizeCapabilityLaneMailLoopDebugSummary);
+    .map((summary) =>
+      normalizeCapabilityLaneMailLoopDebugSummary(summary, fallbackRuntimeAgentProvider),
+    );
 };
 
 export const createHelixAskLiveDebugSlimBuilder = (
@@ -250,8 +624,16 @@ export const createHelixAskLiveDebugSlimBuilder = (
       asDebugExportRecord(payload.evidence_reentry_proof) ??
       asDebugExportRecord(debug.evidence_reentry_proof) ??
       buildDebugExportEvidenceReentryProof(payload);
+    const fallbackRuntimeAgentProvider = readHelixAskLiveDebugRuntimeAgentProvider(
+      payload.selected_runtime_agent_provider,
+      payload.agent_runtime,
+      payload.agentRuntime,
+      debug.selected_runtime_agent_provider,
+      debug.agent_runtime,
+      debug.agentRuntime,
+    );
     const capabilityLaneMailLoopDebugSummaries =
-      readCapabilityLaneMailLoopDebugSummaries(payload, debug);
+      readCapabilityLaneMailLoopDebugSummaries(payload, debug, fallbackRuntimeAgentProvider);
     const capabilityLaneTurnTimeline =
       payload.capability_lane_turn_timeline ?? debug.capability_lane_turn_timeline ?? [];
     const slim: RecordLike = {
@@ -309,41 +691,56 @@ export const createHelixAskLiveDebugSlimBuilder = (
       capability_lane_call_results:
         summarizeHelixAskDebugValue(payload.capability_lane_call_results ?? debug.capability_lane_call_results ?? []),
       capability_lane_timeline_summary:
-        payload.capability_lane_timeline_summary ??
-        debug.capability_lane_timeline_summary ??
-        buildCapabilityLaneTimelineSummary(capabilityLaneTurnTimeline),
+        normalizeCapabilityLaneTimelineSummary(
+          payload.capability_lane_timeline_summary ?? debug.capability_lane_timeline_summary,
+          capabilityLaneTurnTimeline,
+          fallbackRuntimeAgentProvider,
+        ),
       capability_lane_observation_packets:
         summarizeHelixAskDebugValue(
           payload.capability_lane_observation_packets ?? debug.capability_lane_observation_packets ?? [],
         ),
       capability_lane_debug_events:
         summarizeHelixAskDebugValue(payload.capability_lane_debug_events ?? debug.capability_lane_debug_events ?? []),
+      capability_lane_session_results:
+        summarizeCapabilityLaneEvidenceRecords(
+          payload.capability_lane_session_results ?? debug.capability_lane_session_results ?? [],
+          fallbackRuntimeAgentProvider,
+        ),
       capability_lane_session_debug_summaries:
-        summarizeHelixAskDebugValue(
+        summarizeCapabilityLaneEvidenceRecords(
           payload.capability_lane_session_debug_summaries ?? debug.capability_lane_session_debug_summaries ?? [],
+          fallbackRuntimeAgentProvider,
         ),
       capability_lane_goal_binding_results:
-        summarizeHelixAskDebugValue(
+        summarizeCapabilityLaneEvidenceRecords(
           payload.capability_lane_goal_binding_results ?? debug.capability_lane_goal_binding_results ?? [],
+          fallbackRuntimeAgentProvider,
         ),
       capability_lane_mail_loop_debug_summaries:
         summarizeHelixAskDebugValue(capabilityLaneMailLoopDebugSummaries),
       capability_lane_goal_binding_debug_summaries:
-        summarizeHelixAskDebugValue(
+        summarizeCapabilityLaneEvidenceRecords(
           payload.capability_lane_goal_binding_debug_summaries ??
             debug.capability_lane_goal_binding_debug_summaries ??
             [],
+          fallbackRuntimeAgentProvider,
         ),
       capability_lane_goal_dispatch_plans:
-        summarizeHelixAskDebugValue(
+        summarizeCapabilityLaneEvidenceRecords(
           payload.capability_lane_goal_dispatch_plans ?? debug.capability_lane_goal_dispatch_plans ?? [],
+          fallbackRuntimeAgentProvider,
         ),
       capability_lane_goal_dispatch_admissions:
-        summarizeHelixAskDebugValue(
+        summarizeCapabilityLaneEvidenceRecords(
           payload.capability_lane_goal_dispatch_admissions ?? debug.capability_lane_goal_dispatch_admissions ?? [],
+          fallbackRuntimeAgentProvider,
         ),
       capability_lane_goal_dispatch_readiness:
-        payload.capability_lane_goal_dispatch_readiness ?? debug.capability_lane_goal_dispatch_readiness ?? null,
+        normalizeCapabilityLaneEvidenceRecordValue(
+          payload.capability_lane_goal_dispatch_readiness ?? debug.capability_lane_goal_dispatch_readiness,
+          fallbackRuntimeAgentProvider,
+        ),
       capability_lane_projection_receipts:
         summarizeHelixAskDebugValue(
           payload.capability_lane_projection_receipts ?? debug.capability_lane_projection_receipts ?? [],

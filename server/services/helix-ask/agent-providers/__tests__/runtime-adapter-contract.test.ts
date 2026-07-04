@@ -110,8 +110,10 @@ describe("agent runtime adapter contract", () => {
     expect(JSON.stringify(modelVisibleTranslation?.request_shape_hint)).toContain("capability_lane_call");
     expect(JSON.stringify(modelVisibleTranslation?.request_shape_hint)).toContain("live_translation.translate_text");
     expect(JSON.stringify(modelVisibleTranslation?.session_call_shape_hint)).toContain("capability_lane_session_call");
-    expect(JSON.stringify(modelVisibleTranslation?.session_call_shape_hint)).toContain("start | pause | resume | stop | record_observation");
+    expect(JSON.stringify(modelVisibleTranslation?.session_call_shape_hint)).toContain("start | pause | resume | stop | record_observation | list");
     expect(JSON.stringify(modelVisibleTranslation?.session_call_shape_hint)).toContain("source_binding");
+    expect(JSON.stringify(modelVisibleTranslation?.session_call_shape_hint)).toContain("source_text_hash");
+    expect(JSON.stringify(modelVisibleTranslation?.session_call_shape_hint)).toContain("source_text_char_count");
     expect(JSON.stringify(modelVisibleTranslation?.session_call_shape_hint)).toContain("docs_hover");
     expect(JSON.stringify(modelVisibleTranslation?.goal_binding_call_shape_hint)).toContain("capability_lane_goal_binding_call");
     expect(JSON.stringify(modelVisibleTranslation?.goal_binding_call_shape_hint)).toContain("bind | update_attention | record_mail_loop | record_report | stop");
@@ -159,7 +161,7 @@ describe("agent runtime adapter contract", () => {
     expect(contract.adapter_invariants.code_mutation_enabled).toBe(false);
     expect(contract.prompt_policy_lines.join("\n")).toContain("Runtime-specific protocol glue stays inside");
     expect(contract.prompt_policy_lines.join("\n")).toContain("Capability lanes may execute only through Helix-governed one-shot lane calls");
-    expect(contract.prompt_policy_lines.join("\n")).toContain("Lane sessions may start, pause, resume, or stop only through Helix-governed session calls");
+    expect(contract.prompt_policy_lines.join("\n")).toContain("Lane sessions may start, pause, resume, stop, or list only through Helix-governed session calls");
     expect(contract.prompt_policy_lines.join("\n")).toContain("keeps the selected runtime agent provider unchanged");
     expect(contract.prompt_policy_lines.join("\n")).toContain("prefer live_translation.translate_text");
     expect(contract.prompt_policy_lines.join("\n")).toContain("Speech-to-text results are source observations");

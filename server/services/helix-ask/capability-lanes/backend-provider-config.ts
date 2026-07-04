@@ -54,6 +54,9 @@ const configuredEnvVars = (env: NodeJS.ProcessEnv, names: string[]): string[] =>
 export const textBackendConfigured = (env: NodeJS.ProcessEnv): boolean =>
   hasAnyConfiguredEnvVar(env, ["OPENAI_API_KEY", "LLM_HTTP_BASE", "LLM_HTTP_MODEL"]);
 
+export const liveTranslationExternalBackendsEnabled = (env: NodeJS.ProcessEnv): boolean =>
+  readBooleanEnv(env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED, false);
+
 export const HELIX_LANE_BACKEND_SELECTION_POLICY: HelixCapabilityLaneBackendSelectionPolicy = {
   schema: "helix.capability_lane.backend_selection_policy.v1",
   owner: "helix",
@@ -173,6 +176,7 @@ export const buildBackendSelectionDecision = (input: {
   requestedBackendProvider: string | null;
   requestedBackend: HelixCapabilityLaneBackendProviderDescriptor | null;
   selectedBackend: HelixCapabilityLaneBackendProviderDescriptor | null;
+  liveBackendExecutionEnabled?: boolean;
 }): HelixCapabilityLaneBackendSelectionDecision => {
   const outcomeAndReason = (() => {
     if (!input.admitted) {
@@ -236,7 +240,7 @@ export const buildBackendSelectionDecision = (input: {
     selected_runtime_provider_remains_root: true,
     backend_provider_becomes_root_agent: false,
     dynamic_switching_executed: false,
-    live_backend_execution_enabled: false,
+    live_backend_execution_enabled: input.liveBackendExecutionEnabled === true,
     terminal_authority_owner: "helix",
     assistant_answer: false,
     terminal_eligible: false,

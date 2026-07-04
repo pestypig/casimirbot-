@@ -7,18 +7,34 @@ import type {
   DocumentTranslationUnitsResult,
   DocumentTranslationUnit,
 } from "@shared/document-translation";
-import { HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK } from "@shared/helix-live-translation-projection-target";
+import {
+  HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
+  normalizeHelixLiveTranslationProjectionTarget,
+} from "@shared/helix-live-translation-projection-target";
 import type { StagePlayMicroReasonerRunV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
 import type { HelixLiveTranslationTerminalAuthorityStatus } from "@/lib/helix/live-translation-projection";
 import {
+  listCapabilityLaneSessions,
   runCapabilityLaneSessionControl,
+  type CapabilityLaneSessionListResponse,
   type CapabilityLaneSessionControlResponse,
 } from "@/lib/agi/api";
 
 export const DOCUMENT_TRANSLATION_REQUEST_TIMEOUT_MS = 60_000;
 export const DOCUMENT_MARKDOWN_TRANSLATION_PRESET_ID =
   "stage_play_micro_reasoner_prompt_preset:document-translate-haw-inline:v1";
+
+const readNonEmptyText = (value: string | null | undefined): string | null => {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  return normalized || null;
+};
+
+export function resolveDocumentTranslationTargetLanguage(locale: string | null | undefined): string {
+  const normalized = readNonEmptyText(locale);
+  if (!normalized) return "";
+  return normalized.split(/[-_]/)[0]?.trim().toLowerCase() || normalized;
+}
 
 type StagePlayDocumentMarkdownMailResponse =
   | {
@@ -36,6 +52,10 @@ type StagePlayDocumentMarkdownMailResponse =
         sourceEventMs?: number;
         laneSessionId?: string | null;
         sessionControlKey?: string | null;
+        sourceBindingKey?: string | null;
+        sourceIdentityKey?: string | null;
+        mailLoopObservationKey?: string | null;
+        receiptRef?: string | null;
         projectionTarget?: string;
         targetLanguage?: string;
         accountLocale?: string;
@@ -79,6 +99,8 @@ export type DocumentMarkdownTranslationLaneSessionControlAction =
 
 export type DocumentMarkdownTranslationLaneSessionControlResponse =
   CapabilityLaneSessionControlResponse;
+export type DocumentMarkdownTranslationLaneSessionListResponse =
+  CapabilityLaneSessionListResponse;
 
 export type DocumentMarkdownTranslationEntry = {
   unitId: string;
@@ -93,8 +115,15 @@ export type DocumentMarkdownTranslationEntry = {
   laneSessionId?: string | null;
   observationLaneSessionId?: string | null;
   goalBindingId?: string | null;
+  sessionDebugPhase?: string | null;
+  sessionObservationStatus?: string | null;
   sessionControlKey?: string | null;
   sourceBindingKey?: string | null;
+  latestSourceBindingKey?: string | null;
+  sourceIdentityKey?: string | null;
+  latestSourceIdentityKey?: string | null;
+  laneSessionSourceBindingKey?: string | null;
+  laneSessionSourceIdentityKey?: string | null;
   latestObservationKey?: string | null;
   latestMailLoopObservationKey?: string | null;
   goalBindingKey?: string | null;
@@ -112,7 +141,13 @@ export type DocumentMarkdownTranslationEntry = {
   observedAtMs?: number | null;
   projectionStatus?: string | null;
   freshnessStatus?: string | null;
+  contextRole: "tool_evidence";
+  answerAuthority: false;
+  terminalEligible: false;
+  assistantAnswer: false;
+  rawContentIncluded: false;
   terminalAuthorityStatus?: HelixLiveTranslationTerminalAuthorityStatus;
+  selectedRuntimeAgentProvider?: string | null;
   selectedBackendProvider?: string | null;
   sourceId?: string | null;
   source?: "document_microdeck";
@@ -221,6 +256,12 @@ export async function enqueueDocumentMarkdownTranslationMail(params: {
   chunkIndex?: number | null;
   laneSessionId?: string | null;
   sessionControlKey?: string | null;
+  sourceBindingKey?: string | null;
+  latestSourceBindingKey?: string | null;
+  sourceIdentityKey?: string | null;
+  latestSourceIdentityKey?: string | null;
+  mailLoopObservationKey?: string | null;
+  receiptRef?: string | null;
   projectionTarget?: string | null;
   units: DocumentTranslationUnit[];
   signal?: AbortSignal;
@@ -231,6 +272,35 @@ export async function enqueueDocumentMarkdownTranslationMail(params: {
   params.signal?.addEventListener("abort", abortHandler, { once: true });
   try {
     const sourceId = params.sourceId ?? documentMarkdownSourceId(params.docPath);
+    const projectionTarget = normalizeHelixLiveTranslationProjectionTarget(
+      params.projectionTarget,
+      HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
+    );
+    const accountLocale = readNonEmptyText(params.accountLocale) ?? params.locale;
+    const targetLanguage =
+      readNonEmptyText(params.targetLanguage) ?? resolveDocumentTranslationTargetLanguage(accountLocale);
+    const sourceIdentityKey =
+      params.sourceIdentityKey ??
+      buildDocumentMarkdownSourceIdentityKey({
+        sourceId,
+        sourceHash: params.sourceHash,
+        sourceTextHash: params.sourceTextHash,
+        sourceTextCharCount: params.sourceTextCharCount,
+        projectionTarget,
+        accountLocale,
+        targetLanguage,
+      });
+    const latestSourceIdentityKey = params.latestSourceIdentityKey ?? sourceIdentityKey;
+    const sourceBindingKey =
+      params.sourceBindingKey ??
+      buildDocumentMarkdownSourceBindingKey({
+        sourceId,
+        sourceHash: params.sourceHash,
+        projectionTarget,
+        accountLocale,
+        targetLanguage,
+      });
+    const latestSourceBindingKey = params.latestSourceBindingKey ?? sourceBindingKey;
     await applyDocumentMarkdownMicroDeckPreset({ sourceId, signal: controller.signal });
     const response = await fetch("/api/helix/stage-play/live-source-mail/document-markdown", {
       method: "POST",
@@ -238,8 +308,8 @@ export async function enqueueDocumentMarkdownTranslationMail(params: {
       body: JSON.stringify({
         docPath: params.docPath,
         locale: params.locale,
-        targetLanguage: params.targetLanguage ?? params.locale,
-        accountLocale: params.accountLocale ?? params.locale,
+        targetLanguage,
+        accountLocale,
         sourceHash: params.sourceHash,
         sourceTextHash: params.sourceTextHash ?? null,
         sourceTextCharCount: params.sourceTextCharCount ?? null,
@@ -249,7 +319,13 @@ export async function enqueueDocumentMarkdownTranslationMail(params: {
         chunkIndex: params.chunkIndex ?? null,
         laneSessionId: params.laneSessionId ?? null,
         sessionControlKey: params.sessionControlKey ?? null,
-        projectionTarget: params.projectionTarget ?? HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
+        sourceBindingKey,
+        latestSourceBindingKey,
+        sourceIdentityKey,
+        latestSourceIdentityKey,
+        mailLoopObservationKey: params.mailLoopObservationKey ?? null,
+        receiptRef: params.receiptRef ?? null,
+        projectionTarget,
         units: params.units,
       }),
       signal: controller.signal,
@@ -277,6 +353,10 @@ export async function runDocumentMarkdownTranslationLaneSessionControl(params: {
   sourceHash: string;
   sourceTextHash?: string | null;
   sourceTextCharCount?: number | null;
+  sourceBindingKey?: string | null;
+  latestSourceBindingKey?: string | null;
+  sourceIdentityKey?: string | null;
+  latestSourceIdentityKey?: string | null;
   targetLanguage?: string | null;
   accountLocale?: string | null;
   sourceId?: string;
@@ -294,6 +374,35 @@ export async function runDocumentMarkdownTranslationLaneSessionControl(params: {
   try {
     const sourceId = params.sourceId ?? documentMarkdownSourceId(params.docPath);
     const agentRuntime = params.agentRuntime ?? "helix";
+    const projectionTarget = normalizeHelixLiveTranslationProjectionTarget(
+      params.projectionTarget,
+      HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
+    );
+    const accountLocale = readNonEmptyText(params.accountLocale) ?? params.locale;
+    const targetLanguage =
+      readNonEmptyText(params.targetLanguage) ?? resolveDocumentTranslationTargetLanguage(accountLocale);
+    const sourceBindingKey =
+      params.sourceBindingKey ??
+      buildDocumentMarkdownSourceBindingKey({
+        sourceId,
+        sourceHash: params.sourceHash,
+        projectionTarget,
+        accountLocale,
+        targetLanguage,
+      });
+    const latestSourceBindingKey = params.latestSourceBindingKey ?? sourceBindingKey;
+    const sourceIdentityKey =
+      params.sourceIdentityKey ??
+      buildDocumentMarkdownSourceIdentityKey({
+        sourceId,
+        sourceHash: params.sourceHash,
+        sourceTextHash: params.sourceTextHash,
+        sourceTextCharCount: params.sourceTextCharCount,
+        projectionTarget,
+        accountLocale,
+        targetLanguage,
+      });
+    const latestSourceIdentityKey = params.latestSourceIdentityKey ?? sourceIdentityKey;
     return await runCapabilityLaneSessionControl({
       agentRuntime,
       capability_lane_session_call: {
@@ -301,7 +410,13 @@ export async function runDocumentMarkdownTranslationLaneSessionControl(params: {
         lane_id: "live_translation",
         lane_session_id: params.laneSessionId ?? null,
         requested_backend_provider: params.requestedBackendProvider ?? null,
+        source_binding_key: sourceBindingKey,
+        latest_source_binding_key: latestSourceBindingKey,
+        source_identity_key: sourceIdentityKey,
+        latest_source_identity_key: latestSourceIdentityKey,
         reason: params.reason ?? `document_inline_translation_${params.action}`,
+        context_role: "tool_evidence",
+        answer_authority: false,
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -310,10 +425,14 @@ export async function runDocumentMarkdownTranslationLaneSessionControl(params: {
           source_hash: params.sourceHash,
           source_text_hash: params.sourceTextHash ?? null,
           source_text_char_count: params.sourceTextCharCount ?? null,
+          source_binding_key: sourceBindingKey,
+          latest_source_binding_key: latestSourceBindingKey,
+          source_identity_key: sourceIdentityKey,
+          latest_source_identity_key: latestSourceIdentityKey,
           source_kind: "docs",
-          projection_target: params.projectionTarget ?? HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
-          account_locale: params.accountLocale ?? params.locale,
-          target_language: params.targetLanguage ?? params.locale,
+          projection_target: projectionTarget,
+          account_locale: accountLocale,
+          target_language: targetLanguage,
         },
       },
       signal: controller.signal,
@@ -322,6 +441,115 @@ export async function runDocumentMarkdownTranslationLaneSessionControl(params: {
     globalThis.clearTimeout(timeout);
     params.signal?.removeEventListener("abort", abortHandler);
   }
+}
+
+export async function listDocumentMarkdownTranslationLaneSessions(params: {
+  docPath: string;
+  locale: string;
+  sourceHash: string;
+  sourceTextHash?: string | null;
+  sourceTextCharCount?: number | null;
+  sourceBindingKey?: string | null;
+  latestSourceBindingKey?: string | null;
+  sourceIdentityKey?: string | null;
+  latestSourceIdentityKey?: string | null;
+  targetLanguage?: string | null;
+  accountLocale?: string | null;
+  sourceId?: string;
+  laneSessionId?: string | null;
+  projectionTarget?: string | null;
+  agentRuntime?: HelixAgentRuntimeId;
+  signal?: AbortSignal;
+}): Promise<DocumentMarkdownTranslationLaneSessionListResponse> {
+  const sourceId = params.sourceId ?? documentMarkdownSourceId(params.docPath);
+  const projectionTarget = normalizeHelixLiveTranslationProjectionTarget(
+    params.projectionTarget,
+    HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
+  );
+  const accountLocale = readNonEmptyText(params.accountLocale) ?? params.locale;
+  const targetLanguage =
+    readNonEmptyText(params.targetLanguage) ?? resolveDocumentTranslationTargetLanguage(accountLocale);
+  const sourceBindingKey =
+    params.sourceBindingKey ??
+    buildDocumentMarkdownSourceBindingKey({
+      sourceId,
+      sourceHash: params.sourceHash,
+      projectionTarget,
+      accountLocale,
+      targetLanguage,
+    });
+  const sourceIdentityKey =
+    params.sourceIdentityKey ??
+    buildDocumentMarkdownSourceIdentityKey({
+      sourceId,
+      sourceHash: params.sourceHash,
+      sourceTextHash: params.sourceTextHash,
+      sourceTextCharCount: params.sourceTextCharCount,
+      projectionTarget,
+      accountLocale,
+      targetLanguage,
+    });
+  const latestSourceIdentityKey = params.latestSourceIdentityKey ?? sourceIdentityKey;
+
+  return await listCapabilityLaneSessions({
+    agentRuntime: params.agentRuntime ?? "helix",
+    laneSessionId: params.laneSessionId ?? undefined,
+    laneId: "live_translation",
+    sourceId,
+    sourceHash: params.sourceHash,
+    sourceBindingKey,
+    sourceIdentityKey,
+    latestSourceIdentityKey,
+    projectionTarget,
+    accountLocale,
+    targetLanguage,
+    signal: params.signal,
+  });
+}
+
+function buildDocumentMarkdownSourceBindingKey(input: {
+  sourceId: string;
+  sourceHash: string;
+  projectionTarget: string;
+  accountLocale: string;
+  targetLanguage: string;
+}): string {
+  return [
+    input.sourceId,
+    input.sourceHash,
+    input.projectionTarget,
+    input.accountLocale,
+    input.targetLanguage,
+  ]
+    .map((part) => typeof part === "string" ? part.trim() : "")
+    .filter(Boolean)
+    .join("::");
+}
+
+function buildDocumentMarkdownSourceIdentityKey(input: {
+  sourceId: string;
+  sourceHash: string;
+  sourceTextHash?: string | null;
+  sourceTextCharCount?: number | null;
+  projectionTarget: string;
+  accountLocale: string;
+  targetLanguage: string;
+}): string {
+  return [
+    input.sourceId,
+    input.sourceHash,
+    input.sourceTextHash,
+    typeof input.sourceTextCharCount === "number" && Number.isFinite(input.sourceTextCharCount)
+      ? String(Math.trunc(input.sourceTextCharCount))
+      : null,
+    "docs",
+    input.projectionTarget,
+    input.accountLocale,
+    input.targetLanguage,
+  ]
+    .map((part) => typeof part === "string" ? part.trim() : "")
+    .filter(Boolean)
+    .join("::");
 }
 
 export async function runDocumentMarkdownMicroDeckCycle(params: {
@@ -420,16 +648,24 @@ export function extractDocumentMarkdownTranslationsFromRuns(
     const projectionStatus = readFirstString(parsed, ["projectionStatus", "projection_status"]) ?? null;
     const freshnessStatus = readFirstString(parsed, ["freshnessStatus", "freshness_status"]) ?? null;
     const sourceId = readFirstString(parsed, ["sourceId", "source_id"]) ?? null;
+    const selectedRuntimeAgentProvider =
+      readFirstString(parsed, ["selectedRuntimeAgentProvider", "selected_runtime_agent_provider"]) ??
+      readFirstString(parsed, ["agentRuntime", "agent_runtime"]) ??
+      null;
     const selectedBackendProvider =
       readFirstString(parsed, ["selectedBackendProvider", "selected_backend_provider"]) ??
       run.modelUsed ??
       "stage_play_microdeck";
+    const projectionKey = readFirstString(parsed, ["projectionKey", "projection_key"]) ?? null;
     const observationRef = readFirstString(parsed, ["observationRef", "observation_ref"]) ?? run.runId;
     const receiptRef = readFirstString(parsed, ["receiptRef", "receipt_ref"]) ?? null;
     const laneSessionId = readFirstString(parsed, ["laneSessionId", "lane_session_id"]) ?? null;
     const observationLaneSessionId =
       readFirstString(parsed, ["observationLaneSessionId", "observation_lane_session_id"]) ?? null;
     const goalBindingId = readFirstString(parsed, ["goalBindingId", "goal_binding_id"]) ?? null;
+    const sessionDebugPhase = readFirstString(parsed, ["sessionDebugPhase", "session_debug_phase"]) ?? null;
+    const sessionObservationStatus =
+      readFirstString(parsed, ["sessionObservationStatus", "session_observation_status"]) ?? null;
     const sessionControlKey =
       readFirstString(parsed, [
         "sessionControlKey",
@@ -438,6 +674,16 @@ export function extractDocumentMarkdownTranslationsFromRuns(
         "lane_session_control_key",
       ]) ?? null;
     const sourceBindingKey = readFirstString(parsed, ["sourceBindingKey", "source_binding_key"]) ?? null;
+    const latestSourceBindingKey =
+      readFirstString(parsed, ["latestSourceBindingKey", "latest_source_binding_key"]) ??
+      sourceBindingKey;
+    const sourceIdentityKey = readFirstString(parsed, ["sourceIdentityKey", "source_identity_key"]) ?? null;
+    const latestSourceIdentityKey =
+      readFirstString(parsed, ["latestSourceIdentityKey", "latest_source_identity_key"]) ?? null;
+    const laneSessionSourceBindingKey =
+      readFirstString(parsed, ["laneSessionSourceBindingKey", "lane_session_source_binding_key"]) ?? null;
+    const laneSessionSourceIdentityKey =
+      readFirstString(parsed, ["laneSessionSourceIdentityKey", "lane_session_source_identity_key"]) ?? null;
     const latestObservationKey = readFirstString(parsed, ["latestObservationKey", "latest_observation_key"]) ?? null;
     const latestMailLoopObservationKey =
       readFirstString(parsed, ["latestMailLoopObservationKey", "latest_mail_loop_observation_key"]) ?? null;
@@ -448,7 +694,10 @@ export function extractDocumentMarkdownTranslationsFromRuns(
     const terminalAuthorityStatus = normalizeTerminalAuthorityStatus(
       readFirstString(parsed, ["terminalAuthorityStatus", "terminal_authority_status"]),
     );
-    const projectionTarget = readFirstString(parsed, ["projectionTarget", "projection_target"]) ?? null;
+    const projectionTarget = normalizeHelixLiveTranslationProjectionTarget(
+      readFirstString(parsed, ["projectionTarget", "projection_target"]),
+      HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
+    );
     const targetLanguage = readFirstString(parsed, ["targetLanguage", "target_language", "locale"]) ?? null;
     const accountLocale = readFirstString(parsed, ["accountLocale", "account_locale", "locale"]) ?? null;
     const projectionMeta = {
@@ -467,19 +716,33 @@ export function extractDocumentMarkdownTranslationsFromRuns(
       ...(projectionStatus ? { projectionStatus } : {}),
       ...(freshnessStatus ? { freshnessStatus } : {}),
       ...(sourceId ? { sourceId } : {}),
+      ...(selectedRuntimeAgentProvider ? { selectedRuntimeAgentProvider } : {}),
       ...(selectedBackendProvider ? { selectedBackendProvider } : {}),
+      ...(projectionKey ? { projectionKey } : {}),
       ...(observationRef ? { observationRef } : {}),
       ...(receiptRef ? { receiptRef } : {}),
       ...(laneSessionId ? { laneSessionId } : {}),
       ...(observationLaneSessionId ? { observationLaneSessionId } : {}),
       ...(goalBindingId ? { goalBindingId } : {}),
+      ...(sessionDebugPhase ? { sessionDebugPhase } : {}),
+      ...(sessionObservationStatus ? { sessionObservationStatus } : {}),
       ...(sessionControlKey ? { sessionControlKey } : {}),
       ...(sourceBindingKey ? { sourceBindingKey } : {}),
+      ...(latestSourceBindingKey ? { latestSourceBindingKey } : {}),
+      ...(sourceIdentityKey ? { sourceIdentityKey } : {}),
+      ...(latestSourceIdentityKey ? { latestSourceIdentityKey } : {}),
+      ...(laneSessionSourceBindingKey ? { laneSessionSourceBindingKey } : {}),
+      ...(laneSessionSourceIdentityKey ? { laneSessionSourceIdentityKey } : {}),
       ...(latestObservationKey ? { latestObservationKey } : {}),
       ...(latestMailLoopObservationKey ? { latestMailLoopObservationKey } : {}),
       ...(goalBindingKey ? { goalBindingKey } : {}),
       ...(latestEventId ? { latestEventId } : {}),
       hasObservation,
+      contextRole: "tool_evidence" as const,
+      answerAuthority: false as const,
+      terminalEligible: false as const,
+      assistantAnswer: false as const,
+      rawContentIncluded: false as const,
       terminalAuthorityStatus,
       ...(projectionTarget ? { projectionTarget } : {}),
       ...(targetLanguage ? { targetLanguage } : {}),
@@ -495,6 +758,7 @@ export function extractDocumentMarkdownTranslationsFromRuns(
         "text",
       ]);
       if (!unitId || !text) continue;
+      const itemProjectionMeta = readDocumentMarkdownUnitProjectionMeta(record);
       entries.set(unitId, {
         unitId,
         status: "ready",
@@ -502,6 +766,7 @@ export function extractDocumentMarkdownTranslationsFromRuns(
         runId: run.runId,
         role: run.role,
         ...projectionMeta,
+        ...itemProjectionMeta,
       });
     }
     const unitErrors = Array.isArray(parsed.unit_errors)
@@ -530,6 +795,7 @@ export function extractDocumentMarkdownTranslationsFromRuns(
         runId: run.runId,
         role: run.role,
         ...projectionMeta,
+        ...readDocumentMarkdownUnitProjectionMeta(record),
       });
     }
   }
@@ -594,6 +860,106 @@ function readFirstBoolean(record: Record<string, unknown> | null, keys: string[]
     if (typeof value === "boolean") return value;
   }
   return null;
+}
+
+function readDocumentMarkdownUnitProjectionMeta(
+  record: Record<string, unknown> | null,
+): Partial<DocumentMarkdownTranslationEntry> {
+  const projectionKey = readFirstString(record, ["projectionKey", "projection_key"]);
+  const observationRef = readFirstString(record, ["observationRef", "observation_ref"]);
+  const receiptRef = readFirstString(record, ["receiptRef", "receipt_ref"]);
+  const laneSessionId = readFirstString(record, ["laneSessionId", "lane_session_id"]);
+  const observationLaneSessionId =
+    readFirstString(record, ["observationLaneSessionId", "observation_lane_session_id"]);
+  const goalBindingId = readFirstString(record, ["goalBindingId", "goal_binding_id"]);
+  const sessionDebugPhase = readFirstString(record, ["sessionDebugPhase", "session_debug_phase"]);
+  const sessionObservationStatus = readFirstString(record, [
+    "sessionObservationStatus",
+    "session_observation_status",
+  ]);
+  const sessionControlKey =
+    readFirstString(record, [
+      "sessionControlKey",
+      "session_control_key",
+      "laneSessionControlKey",
+      "lane_session_control_key",
+    ]);
+  const sourceBindingKey = readFirstString(record, ["sourceBindingKey", "source_binding_key"]);
+  const latestSourceBindingKey =
+    readFirstString(record, ["latestSourceBindingKey", "latest_source_binding_key"]) ??
+    sourceBindingKey;
+  const sourceIdentityKey = readFirstString(record, ["sourceIdentityKey", "source_identity_key"]);
+  const latestSourceIdentityKey =
+    readFirstString(record, ["latestSourceIdentityKey", "latest_source_identity_key"]);
+  const laneSessionSourceBindingKey =
+    readFirstString(record, ["laneSessionSourceBindingKey", "lane_session_source_binding_key"]);
+  const laneSessionSourceIdentityKey =
+    readFirstString(record, ["laneSessionSourceIdentityKey", "lane_session_source_identity_key"]);
+  const latestObservationKey = readFirstString(record, ["latestObservationKey", "latest_observation_key"]);
+  const latestMailLoopObservationKey =
+    readFirstString(record, ["latestMailLoopObservationKey", "latest_mail_loop_observation_key"]);
+  const goalBindingKey = readFirstString(record, ["goalBindingKey", "goal_binding_key"]);
+  const latestEventId = readFirstString(record, ["latestEventId", "latest_event_id"]);
+  const sourceHash = readFirstString(record, ["sourceHash", "source_hash"]);
+  const sourceTextHash = readFirstString(record, ["sourceTextHash", "source_text_hash"]);
+  const sourceTextCharCount = readFirstNumber(record, ["sourceTextCharCount", "source_text_char_count"]);
+  const chunkId = readFirstString(record, ["chunkId", "chunk_id"]);
+  const chunkIndex = readFirstNumber(record, ["chunkIndex", "chunk_index"]);
+  const dedupeKey = readFirstString(record, ["dedupeKey", "dedupe_key"]);
+  const sourceEventId = readFirstString(record, ["sourceEventId", "source_event_id"]);
+  const sourceEventMs = readFirstNumber(record, ["sourceEventMs", "source_event_ms"]);
+  const observedAtMs =
+    readFirstNumber(record, ["observedAtMs", "observed_at_ms"]) ??
+    readIsoTimestampMs(readFirstString(record, ["createdAt", "created_at"]));
+  const projectionStatus = readFirstString(record, ["projectionStatus", "projection_status"]);
+  const freshnessStatus = readFirstString(record, ["freshnessStatus", "freshness_status"]);
+  const selectedRuntimeAgentProvider = readFirstString(record, [
+    "selectedRuntimeAgentProvider",
+    "selected_runtime_agent_provider",
+    "agentRuntime",
+    "agent_runtime",
+  ]);
+  const terminalAuthorityStatus = readFirstString(record, [
+    "terminalAuthorityStatus",
+    "terminal_authority_status",
+  ]);
+  const hasObservation = readFirstBoolean(record, ["hasObservation", "has_observation"]);
+
+  return {
+    ...(projectionKey ? { projectionKey } : {}),
+    ...(observationRef ? { observationRef } : {}),
+    ...(receiptRef ? { receiptRef } : {}),
+    ...(laneSessionId ? { laneSessionId } : {}),
+    ...(observationLaneSessionId ? { observationLaneSessionId } : {}),
+    ...(goalBindingId ? { goalBindingId } : {}),
+    ...(sessionDebugPhase ? { sessionDebugPhase } : {}),
+    ...(sessionObservationStatus ? { sessionObservationStatus } : {}),
+    ...(sessionControlKey ? { sessionControlKey } : {}),
+    ...(sourceBindingKey ? { sourceBindingKey } : {}),
+    ...(latestSourceBindingKey ? { latestSourceBindingKey } : {}),
+    ...(sourceIdentityKey ? { sourceIdentityKey } : {}),
+    ...(latestSourceIdentityKey ? { latestSourceIdentityKey } : {}),
+    ...(laneSessionSourceBindingKey ? { laneSessionSourceBindingKey } : {}),
+    ...(laneSessionSourceIdentityKey ? { laneSessionSourceIdentityKey } : {}),
+    ...(latestObservationKey ? { latestObservationKey } : {}),
+    ...(latestMailLoopObservationKey ? { latestMailLoopObservationKey } : {}),
+    ...(goalBindingKey ? { goalBindingKey } : {}),
+    ...(latestEventId ? { latestEventId } : {}),
+    ...(sourceHash ? { sourceHash } : {}),
+    ...(sourceTextHash ? { sourceTextHash } : {}),
+    ...(typeof sourceTextCharCount === "number" ? { sourceTextCharCount } : {}),
+    ...(chunkId ? { chunkId } : {}),
+    ...(typeof chunkIndex === "number" ? { chunkIndex } : {}),
+    ...(dedupeKey ? { dedupeKey } : {}),
+    ...(sourceEventId ? { sourceEventId } : {}),
+    ...(typeof sourceEventMs === "number" ? { sourceEventMs } : {}),
+    ...(typeof observedAtMs === "number" ? { observedAtMs } : {}),
+    ...(projectionStatus ? { projectionStatus } : {}),
+    ...(freshnessStatus ? { freshnessStatus } : {}),
+    ...(selectedRuntimeAgentProvider ? { selectedRuntimeAgentProvider } : {}),
+    ...(terminalAuthorityStatus ? { terminalAuthorityStatus: normalizeTerminalAuthorityStatus(terminalAuthorityStatus) } : {}),
+    ...(typeof hasObservation === "boolean" ? { hasObservation } : {}),
+  };
 }
 
 function normalizeTerminalAuthorityStatus(

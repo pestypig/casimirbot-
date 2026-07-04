@@ -9,6 +9,7 @@ import type {
   HelixCapabilityLanePrivacyClass,
 } from "./helix-capability-lane";
 import type { HelixLiveTranslationProjectionReceipt } from "./helix-live-translation-lane";
+import type { ImageLensRegionInspectionReceiptV1 } from "./contracts/image-lens-region-inspection.v1";
 
 export const HELIX_AGENT_STEP_DECISION_V2_SCHEMA = "helix.agent_step_decision.v2" as const;
 export const HELIX_RUNTIME_TOOL_CALL_V1_SCHEMA = "helix.runtime_tool_call.v1" as const;
@@ -112,6 +113,7 @@ export type HelixWorkstationTypedAffordanceKind =
   | "stage_plan"
   | "micro_reasoner_eval"
   | "visual_observer_eval"
+  | "image_lens_region_evidence"
   | "system_status"
   | "ui_projection_receipt";
 
@@ -168,7 +170,18 @@ export type HelixAgentStepObservationPacket = {
     updated_notes?: string[];
     live_translation_chunk?: {
       lane_session_id: string | null;
+      session_control_key?: string | null;
+      source_binding_key?: string | null;
+      source_identity_key?: string | null;
+      latest_source_identity_key?: string | null;
+      latest_observation_key?: string | null;
+      latest_mail_loop_observation_key?: string | null;
+      goal_binding_id?: string | null;
+      goal_binding_key?: string | null;
       source_id: string;
+      source_hash?: string | null;
+      source_kind?: string | null;
+      account_locale?: string | null;
       chunk_id: string;
       chunk_index: number | null;
       dedupe_key: string;
@@ -194,6 +207,28 @@ export type HelixAgentStepObservationPacket = {
     speech_to_text_live_source_mail_item?: unknown;
     text_to_speech_receipt?: unknown;
     voice_playback_client_receipt?: unknown;
+    visual_analysis_region_inspection?: {
+      lane_id: "visual_analysis";
+      capability: "visual_analysis.inspect_image_region";
+      source_id: string;
+      frame_id: string | null;
+      source_attachment_id: string;
+      page_number: number | null;
+      crop_region_id: string;
+      crop_bbox_px: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      };
+      crop_image_ref: string;
+      receipt_ref: string;
+      evidence_id: string;
+      receipt: ImageLensRegionInspectionReceiptV1;
+      terminal_eligible: false;
+      assistant_answer: false;
+      raw_content_included: false;
+    };
     capability_lane_shadow_execution?: {
       lane_id: HelixCapabilityLaneId;
       capability: string;

@@ -347,6 +347,8 @@ describe("Codex provider capability lane adapter", () => {
       expect(debug.capability_lane_turn_timeline).toEqual(expect.arrayContaining([
         expect.objectContaining({
           stage: "lane_visible",
+          adapter_boundary: "helix_agent_provider_edge",
+          selected_runtime_agent_provider: "codex",
           lane_visible: true,
           lane_requested: false,
           lane_executed: false,
@@ -354,6 +356,13 @@ describe("Codex provider capability lane adapter", () => {
         }),
         expect.objectContaining({
           stage: "lane_requested",
+          adapter_boundary: "helix_agent_provider_edge",
+          selected_runtime_agent_provider: "codex",
+          requested_backend_provider: "live_translation.google_gemini",
+          requested_backend_provider_known: true,
+          selected_backend_provider: "live_translation.local_runtime",
+          fallback_backend_provider: null,
+          selection_reason: "requested_backend_unconfigured_default_backend_selected_by_helix_policy",
           lane_visible: false,
           lane_requested: true,
           lane_executed: false,
@@ -361,7 +370,13 @@ describe("Codex provider capability lane adapter", () => {
         }),
         expect.objectContaining({
           stage: "lane_backend_selected",
+          adapter_boundary: "helix_agent_provider_edge",
+          selected_runtime_agent_provider: "codex",
+          requested_backend_provider: "live_translation.google_gemini",
+          requested_backend_provider_known: true,
           selected_backend_provider: "live_translation.local_runtime",
+          fallback_backend_provider: null,
+          selection_reason: "requested_backend_unconfigured_default_backend_selected_by_helix_policy",
           lane_visible: false,
           lane_requested: true,
           lane_executed: false,
@@ -369,8 +384,13 @@ describe("Codex provider capability lane adapter", () => {
         }),
         expect.objectContaining({
           stage: "lane_observation",
+          adapter_boundary: "helix_agent_provider_edge",
           capability_id: "live_translation.translate_text",
+          requested_backend_provider: "live_translation.google_gemini",
+          requested_backend_provider_known: true,
           selected_backend_provider: "live_translation.local_runtime",
+          fallback_backend_provider: null,
+          selection_reason: "requested_backend_unconfigured_default_backend_selected_by_helix_policy",
           lane_visible: false,
           lane_requested: true,
           lane_executed: true,
@@ -378,10 +398,14 @@ describe("Codex provider capability lane adapter", () => {
         }),
         expect.objectContaining({
           stage: "lane_reentered",
+          adapter_boundary: "helix_agent_provider_edge",
+          lane_id: "live_translation",
+          capability_id: "live_translation.translate_text",
           lane_visible: false,
           lane_requested: true,
           lane_executed: false,
           observation_reentered: true,
+          observation_ref: expect.any(String),
         }),
         expect.objectContaining({
           stage: "terminal_selected",
@@ -499,8 +523,10 @@ describe("Codex provider capability lane adapter", () => {
       expect(JSON.stringify(translation.request_shape_hint)).toContain("capability_lane_call");
       expect(JSON.stringify(translation.request_shape_hint)).toContain("live_translation.translate_text");
       expect(JSON.stringify(translation.session_call_shape_hint)).toContain("capability_lane_session_call");
-      expect(JSON.stringify(translation.session_call_shape_hint)).toContain("start | pause | resume | stop | record_observation");
+      expect(JSON.stringify(translation.session_call_shape_hint)).toContain("start | pause | resume | stop | record_observation | list");
       expect(JSON.stringify(translation.session_call_shape_hint)).toContain("source_binding");
+      expect(JSON.stringify(translation.session_call_shape_hint)).toContain("source_text_hash");
+      expect(JSON.stringify(translation.session_call_shape_hint)).toContain("source_text_char_count");
       expect(JSON.stringify(translation.goal_binding_call_shape_hint)).toContain("capability_lane_goal_binding_call");
       expect(JSON.stringify(translation.goal_binding_call_shape_hint)).toContain("bind | update_attention | record_mail_loop | record_report | stop");
       expect(JSON.stringify(translation.goal_binding_call_shape_hint)).toContain("terminal_authorized");
@@ -508,7 +534,7 @@ describe("Codex provider capability lane adapter", () => {
       expect(prompt).toContain("Model-visible Helix capability lane manifest:");
       expect(prompt).toContain("live_translation.translate_text");
       expect(prompt).toContain("capability_lane_session_call");
-      expect(prompt).toContain("start | pause | resume | stop | record_observation");
+      expect(prompt).toContain("start | pause | resume | stop | record_observation | list");
       expect(prompt).toContain("capability_lane_goal_binding_call");
       expect(prompt).toContain("bind | update_attention | record_mail_loop | record_report | stop");
       expect(prompt).toContain("docs-viewer.read_active_translation");
@@ -638,8 +664,10 @@ describe("Codex provider capability lane adapter", () => {
       }),
       expect.objectContaining({
         stage: "lane_reentered",
-        lane_id: "capability_lane",
+        lane_id: "utility_text",
+        capability_id: "utility_text.normalize_text",
         observation_reentered: true,
+        observation_ref: expect.any(String),
         terminal_authority_status: "pending_helix_terminal_authority",
       }),
     ]));

@@ -30,6 +30,7 @@ const eventProjectionMeta = {
   observationLaneSessionId: "lane-session-docs",
   goalBindingId: "goal-binding-translate-docs",
   sourceBindingKey: "docs:nhm2::fnv1a32:current::docs_chunk::es::es",
+  latestSourceBindingKey: "docs:nhm2::fnv1a32:current::docs_chunk::es::es",
   latestObservationKey: "docs:nhm2::fnv1a32:current::docs_chunk::es::u0001::obs:docs:u1",
   latestMailLoopObservationKey: "docs:nhm2::fnv1a32:current::docs_chunk::es::u0001::receipt:docs:u1",
   goalBindingKey: "goal:translate-docs::goal-binding-translate-docs::lane-session-docs::live_translation",
@@ -45,6 +46,8 @@ const eventProjectionMeta = {
   projectionTarget: "docs_chunk",
   targetLanguage: "es",
   cancelRequested: false,
+  contextRole: "tool_evidence",
+  answerAuthority: false,
 };
 
 describe("document live translation projection event ingestion", () => {
@@ -270,8 +273,8 @@ describe("document live translation projection event ingestion", () => {
       sourceHash: "fnv1a32:current",
       sourceTextHash: "source-text-current",
       sourceTextCharCount: 21,
-      observationRef: null,
-      receiptRef: null,
+      observationRef: "obs:docs:u1:source-text-old",
+      receiptRef: "receipt:docs:u1:source-text-old",
       terminalEligible: false,
       assistantAnswer: false,
       rawContentIncluded: false,
@@ -291,6 +294,177 @@ describe("document live translation projection event ingestion", () => {
       sourceTextCharCount: 21,
       observationRef: "obs:docs:u1:source-text-current",
       receiptRef: "receipt:docs:u1:source-text-current",
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+    });
+
+    unsubscribe();
+  });
+
+  it("honors source-identity scope for Ask live-event translation projections when provided", () => {
+    const target = new EventTarget();
+    const sourceIdentityKey = "document_markdown:docs/research/nhm2.md::fnv1a32:current::source-text-current::21::docs::docs_chunk::es::es";
+    const unsubscribe = installDocumentLiveTranslationProjectionEventIngestion({
+      eventTarget: target,
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      sourceHash: "fnv1a32:current",
+      sourceIdentityKey,
+      units: [unit("u0001")],
+    });
+
+    const dispatchProjection = (input: {
+      sourceIdentityKey: string;
+      identityField?: "sourceIdentityKey" | "latest_source_identity_key";
+      text: string;
+      observedAtMs: number;
+      suffix: string;
+    }) => {
+      const identityField = input.identityField ?? "sourceIdentityKey";
+      target.dispatchEvent(new CustomEvent(HELIX_ASK_LIVE_EVENT_BUS_EVENT, {
+        detail: {
+          contextId: "helix-ask:desktop",
+          entry: {
+            id: `receipt:docs:u1:${input.suffix}`,
+            text: "UI translation projection.",
+            meta: {
+              sourceEventType: "ui_translation_projection",
+              lane: "live_translation",
+              sourceId: "document_markdown:docs/research/nhm2.md",
+              sourceHash: "fnv1a32:current",
+              [identityField]: input.sourceIdentityKey,
+              latestProjectionTarget: "docs_chunk",
+              latestChunkId: "u0001",
+              latestObservedAtMs: input.observedAtMs,
+              targetLanguage: "es",
+              translatedText: input.text,
+              projectionStatus: "projected",
+              receiptRef: `receipt:docs:u1:${input.suffix}`,
+              observationRef: `obs:docs:u1:${input.suffix}`,
+            },
+          },
+        },
+      }));
+    };
+
+    dispatchProjection({
+      sourceIdentityKey: "document_markdown:docs/research/nhm2.md::fnv1a32:previous::source-text-old::18::docs::docs_chunk::es::es",
+      text: "Texto anterior.",
+      observedAtMs: 100,
+      suffix: "old-identity",
+    });
+
+    expect(readDocumentLiveTranslationProjectionSnapshot({
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      sourceHash: "fnv1a32:current",
+      sourceIdentityKey,
+    }).translations.u0001).toMatchObject({
+      status: "error",
+      error: "translation_projection_source_identity_mismatch",
+      projectionStatus: "missing",
+      sourceHash: "fnv1a32:current",
+      sourceIdentityKey,
+      observationRef: "obs:docs:u1:old-identity",
+      receiptRef: "receipt:docs:u1:old-identity",
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+    });
+
+    expect(readDocumentLiveTranslationProjectionSnapshot({
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      sourceHash: "fnv1a32:current",
+    }).translations.u0001).toBeUndefined();
+
+    dispatchProjection({
+      sourceIdentityKey,
+      identityField: "latest_source_identity_key",
+      text: "Texto actual.",
+      observedAtMs: 200,
+      suffix: "current-identity",
+    });
+
+    expect(readDocumentLiveTranslationProjectionSnapshot({
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      sourceHash: "fnv1a32:current",
+      sourceIdentityKey,
+    }).translations.u0001).toMatchObject({
+      status: "ready",
+      text: "Texto actual.",
+      sourceHash: "fnv1a32:current",
+      sourceIdentityKey,
+      latestSourceIdentityKey: sourceIdentityKey,
+      observationRef: "obs:docs:u1:current-identity",
+      receiptRef: "receipt:docs:u1:current-identity",
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+    });
+
+    unsubscribe();
+  });
+
+  it("accepts chunk-level source identities when the listener is scoped by document source hash", () => {
+    const target = new EventTarget();
+    const unsubscribe = installDocumentLiveTranslationProjectionEventIngestion({
+      eventTarget: target,
+      docPath: "docs/research/nhm2.md",
+      locale: "es-US",
+      sourceHash: "fnv1a32:current-document",
+      units: [unit("u0001")],
+    });
+
+    target.dispatchEvent(new CustomEvent(HELIX_ASK_LIVE_EVENT_BUS_EVENT, {
+      detail: {
+        contextId: "helix-ask:desktop",
+        entry: {
+          id: "receipt:docs:u1:chunk-identity",
+          text: "UI translation projection.",
+          meta: {
+            sourceEventType: "ui_translation_projection",
+            lane: "live_translation",
+            sourceId: "document_markdown:docs/research/nhm2.md",
+            sourceHash: "fnv1a32:current-document",
+            sourceTextHash: "fnv1a32:visible-chunk",
+            sourceTextCharCount: 17,
+            sourceIdentityKey:
+              "document_markdown:docs/research/nhm2.md::fnv1a32:current-document::fnv1a32:visible-chunk::17::docs::docs_chunk::es-US::es-US",
+            latestProjectionTarget: "docs_chunk",
+            latestChunkId: "u0001",
+            latestObservedAtMs: 210,
+            targetLanguage: "es-US",
+            translatedText: "Texto del fragmento.",
+            projectionStatus: "projected",
+            receiptRef: "receipt:docs:u1:chunk-identity",
+            observationRef: "obs:docs:u1:chunk-identity",
+            terminalAuthorityStatus: "not_terminal_authority",
+            answerAuthority: false,
+            terminalEligible: false,
+            assistantAnswer: false,
+            rawContentIncluded: false,
+          },
+        },
+      },
+    }));
+
+    const snapshot = readDocumentLiveTranslationProjectionSnapshot({
+      docPath: "docs/research/nhm2.md",
+      locale: "es-US",
+      sourceHash: "fnv1a32:current-document",
+    });
+    expect(snapshot.translations.u0001).toMatchObject({
+      status: "ready",
+      text: "Texto del fragmento.",
+      sourceHash: "fnv1a32:current-document",
+      sourceTextHash: "fnv1a32:visible-chunk",
+      sourceIdentityKey:
+        "document_markdown:docs/research/nhm2.md::fnv1a32:current-document::fnv1a32:visible-chunk::17::docs::docs_chunk::es-US::es-US",
+      observationRef: "obs:docs:u1:chunk-identity",
+      receiptRef: "receipt:docs:u1:chunk-identity",
       terminalEligible: false,
       assistantAnswer: false,
       rawContentIncluded: false,
@@ -357,6 +531,66 @@ describe("document live translation projection event ingestion", () => {
       terminalEligible: false,
       assistantAnswer: false,
       rawContentIncluded: false,
+    });
+
+    unsubscribe();
+  });
+
+  it("normalizes legacy inline projection targets to document chunk projections", () => {
+    const target = new EventTarget();
+    const unsubscribe = installDocumentLiveTranslationProjectionEventIngestion({
+      eventTarget: target,
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      projectionTarget: "docs_chunk",
+      units: [unit("u0001")],
+    });
+
+    target.dispatchEvent(new CustomEvent(HELIX_ASK_LIVE_EVENT_BUS_EVENT, {
+      detail: {
+        contextId: "helix-ask:desktop",
+        entry: {
+          id: "receipt:docs:u1:legacy-inline-target",
+          text: "Legacy inline translation projection.",
+          meta: {
+            source_event_type: "ui_translation_projection",
+            lane: "live_translation",
+            sourceId: "document_markdown:docs/research/nhm2.md",
+            latestProjectionTarget: "docs_viewer_inline",
+            latestChunkId: "u0001",
+            latestObservedAtMs: 135,
+            latestFreshnessStatus: "fresh",
+            targetLanguage: "es",
+            translatedText: "Texto heredado.",
+            projectionStatus: "projected",
+            receiptRef: "receipt:docs:u1:legacy-inline-target",
+            observationRef: "obs:docs:u1:legacy-inline-target",
+          },
+        },
+      },
+    }));
+
+    expect(readDocumentLiveTranslationProjectionSnapshot({
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      projectionTarget: "docs_chunk",
+    }).translations.u0001).toMatchObject({
+      status: "ready",
+      text: "Texto heredado.",
+      projectionTarget: "docs_chunk",
+      observationRef: "obs:docs:u1:legacy-inline-target",
+      receiptRef: "receipt:docs:u1:legacy-inline-target",
+      terminalEligible: false,
+      assistantAnswer: false,
+    });
+    expect(readDocumentLiveTranslationProjectionSnapshot({
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      projectionTarget: "docs_viewer_inline",
+    }).translations.u0001).toMatchObject({
+      status: "ready",
+      text: "Texto heredado.",
+      projectionTarget: "docs_chunk",
     });
 
     unsubscribe();
@@ -598,6 +832,8 @@ describe("document live translation projection event ingestion", () => {
             latestSourceEventId: "docs:event:session:1",
             latestSourceEventMs: 90,
             latestObservedAtMs: 100,
+            laneSessionSourceBindingKey: "docs:nhm2::session::docs_chunk::es::es",
+            laneSessionSourceIdentityKey: "docs:nhm2::session::docs::docs_chunk::es::es",
             observationRef: "obs:lane-session-docs",
             receiptRef: "receipt:lane-session-docs",
             updatedAtMs: 125,
@@ -629,6 +865,10 @@ describe("document live translation projection event ingestion", () => {
       latestSourceEventId: "docs:event:session:1",
       latestSourceEventMs: 90,
       latestObservedAtMs: 100,
+      sourceBindingKey: "docs:nhm2::session::docs_chunk::es::es",
+      sourceIdentityKey: "docs:nhm2::session::docs::docs_chunk::es::es",
+      laneSessionSourceBindingKey: "docs:nhm2::session::docs_chunk::es::es",
+      laneSessionSourceIdentityKey: "docs:nhm2::session::docs::docs_chunk::es::es",
       lastObservationRef: "obs:lane-session-docs",
       lastReceiptRef: "receipt:lane-session-docs",
       updatedAtMs: 125,
@@ -766,6 +1006,8 @@ describe("document live translation projection event ingestion", () => {
       stagePlayMailId: "stage-play-mail-translation",
       stagePlayWakeExpected: true,
       stagePlayWakeKind: "mailbox_wake",
+      mailboxWakeExpected: true,
+      decisionWakeExpected: false,
       mailboxThreadId: "thread-docs-translation",
       mailStatus: "unread",
       selectedBackendProvider: "live_translation.local_runtime",
@@ -955,6 +1197,139 @@ describe("document live translation projection event ingestion", () => {
       assistantAnswer: false,
       rawContentIncluded: false,
     });
+    unsubscribe();
+  });
+
+  it("ingests receipt-only mail-loop and goal-binding live events as observed non-answer evidence", () => {
+    const target = new EventTarget();
+    const unsubscribe = installDocumentLiveTranslationProjectionEventIngestion({
+      eventTarget: target,
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      sourceHash: "fnv1a32:receipt-only",
+      units: [unit("u0001")],
+    });
+
+    target.dispatchEvent(new CustomEvent(HELIX_ASK_LIVE_EVENT_BUS_EVENT, {
+      detail: {
+        contextId: "helix-ask:desktop",
+        entry: {
+          id: "lane-mail-loop-docs:receipt-only",
+          text: "Lane mail loop produced a projection receipt.",
+          meta: {
+            source_event_type: "lane_mail_loop",
+            lane: "live_translation",
+            laneSessionId: "lane-session-docs",
+            sourceId: "document_markdown:docs/research/nhm2.md",
+            sourceHash: "fnv1a32:receipt-only",
+            sourceKind: "docs",
+            sourceTextHash: "source-text-hash-receipt-only",
+            sourceTextCharCount: 2048,
+            latestProjectionTarget: "docs_chunk",
+            accountLocale: "es",
+            latestChunkId: "u0001",
+            latestChunkIndex: 0,
+            latestMailLoopObservationKey:
+              "docs:nhm2::fnv1a32:receipt-only::docs_chunk::es::u0001::receipt:mail-only",
+            targetLanguage: "es",
+            stagePlayMailId: "stage-play-mail-translation-receipt-only",
+            stagePlayWakeExpected: true,
+            mailboxThreadId: "thread-docs-translation",
+            mailStatus: "unread",
+            hasObservation: false,
+            has_observation: false,
+            observationRef: undefined,
+            observation_ref: undefined,
+            receiptRef: "receipt:mail-only",
+          },
+        },
+      },
+    }));
+
+    target.dispatchEvent(new CustomEvent(HELIX_ASK_LIVE_EVENT_BUS_EVENT, {
+      detail: {
+        contextId: "helix-ask:desktop",
+        entry: {
+          id: "goal-binding-translate-docs:receipt-only",
+          text: "Goal-bound lane session recorded a projection receipt.",
+          meta: {
+            source_event_type: "lane_goal_binding",
+            lane: "live_translation",
+            goalBindingId: "goal-binding-translate-docs",
+            goalId: "goal-account-language",
+            laneSessionId: "lane-session-docs",
+            bindingStatus: "active",
+            sessionStatus: "running",
+            sessionHealth: "healthy",
+            activationPolicy: "while_goal_active",
+            attentionPolicy: "quiet_until_salient",
+            stopCondition: "goal_complete",
+            reportPolicy: "debug_only",
+            quietBehavior: "record_only",
+            reportAction: "record_only",
+            targetLanguage: "es",
+            sourceId: "document_markdown:docs/research/nhm2.md",
+            sourceHash: "fnv1a32:receipt-only",
+            sourceKind: "docs",
+            sourceTextHash: "source-text-hash-receipt-only",
+            sourceTextCharCount: 2048,
+            latestProjectionTarget: "docs_chunk",
+            accountLocale: "es",
+            latestChunkId: "u0001",
+            latestChunkIndex: 0,
+            latestMailLoopObservationKey:
+              "docs:nhm2::fnv1a32:receipt-only::docs_chunk::es::u0001::receipt:goal-only",
+            hasObservation: false,
+            has_observation: false,
+            observationRef: undefined,
+            observation_ref: undefined,
+            receiptRef: "receipt:goal-only",
+          },
+        },
+      },
+    }));
+
+    const snapshot = readDocumentLiveTranslationProjectionSnapshot({
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      sourceHash: "fnv1a32:receipt-only",
+    });
+    expect(snapshot.translations).toEqual({});
+    expect(snapshot.mailLoops["stage-play-mail-translation-receipt-only"]).toMatchObject({
+      observationRef: null,
+      receiptRef: "receipt:mail-only",
+      latestMailLoopObservationKey:
+        "docs:nhm2::fnv1a32:receipt-only::docs_chunk::es::u0001::receipt:mail-only",
+      hasObservation: true,
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+    });
+    expect(snapshot.goalBindings["goal-binding-translate-docs"]).toMatchObject({
+      observationRef: null,
+      receiptRef: "receipt:goal-only",
+      latestMailLoopObservationKey:
+        "docs:nhm2::fnv1a32:receipt-only::docs_chunk::es::u0001::receipt:goal-only",
+      hasObservation: true,
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+    });
+    expect(summarizeDocumentLiveTranslationProjectionSnapshot(snapshot)).toMatchObject({
+      observedMailLoopCount: 1,
+      observedGoalBindingCount: 1,
+      observedLaneActivityCount: 2,
+      latestHasObservation: true,
+      latestGoalBindingHasObservation: true,
+      latestGoalBindingReceiptRef: "receipt:goal-only",
+      latestGoalBindingMailLoopObservationKey:
+        "docs:nhm2::fnv1a32:receipt-only::docs_chunk::es::u0001::receipt:goal-only",
+      answerAuthority: false,
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+    });
+
     unsubscribe();
   });
 

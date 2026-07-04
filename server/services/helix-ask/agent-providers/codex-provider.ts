@@ -2457,7 +2457,7 @@ export const codexProvider: HelixAgentProvider = {
       emittedIds: emittedLiveTranscriptEventIds,
       excludeSourceEventTypes: new Set(["model_reentry"]),
     });
-    let capabilityLaneContext = buildHelixCapabilityLaneProviderAdapterContext({
+    let capabilityLaneContext = await buildHelixCapabilityLaneProviderAdapterContext({
       provider: codexProvider,
       body: request.body,
       turnId,
@@ -2769,7 +2769,7 @@ export const codexProvider: HelixAgentProvider = {
     let runtimeLaneRequestLoop: Record<string, unknown> | null = null;
     if (runtimeLaneRequestCandidate) {
       const laneRequestBody = buildCodexCapabilityLaneRequestBody(request.body, runtimeLaneRequestCandidate);
-      capabilityLaneContext = buildHelixCapabilityLaneProviderAdapterContext({
+      capabilityLaneContext = await buildHelixCapabilityLaneProviderAdapterContext({
         provider: codexProvider,
         body: laneRequestBody,
         turnId,

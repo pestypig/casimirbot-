@@ -12,6 +12,7 @@ import {
   STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA,
   STAGE_PLAY_MICRO_REASONER_PROMPT_SCHEMA,
   validateStagePlayMicroReasonerRunV1,
+  validateStagePlayProcessedMailPacketV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import {
   ADAPTIVE_VISUAL_LENS_CONTROLLER_PRESET_ID,
@@ -2086,14 +2087,35 @@ export function listStagePlayMicroReasonerRuns(input: {
 }
 
 export function recordStagePlayProcessedMailPacket(
-  packet: StagePlayProcessedMailPacketV1,
+  packet:
+    | StagePlayProcessedMailPacketV1
+    | Omit<StagePlayProcessedMailPacketV1, "answer_authority" | "raw_content_included">,
 ): StagePlayProcessedMailPacketV1 {
-  packetsById.set(packet.packetId, {
+  if ("answer_authority" in packet && packet.answer_authority !== false) {
+    throw new Error("Invalid stage play processed mail packet: answer_authority must be false");
+  }
+  if ("raw_content_included" in packet && packet.raw_content_included !== false) {
+    throw new Error("Invalid stage play processed mail packet: raw_content_included must be false");
+  }
+  const normalizedPacket: StagePlayProcessedMailPacketV1 = {
     ...packet,
-    evidenceRefs: uniqueStrings(packet.evidenceRefs),
+    answer_authority: false,
+    raw_content_included: false,
+    evidenceRefs: uniqueStrings([
+      packet.packetId,
+      ...packet.mailIds,
+      ...packet.visualEvidenceRefs,
+      ...packet.microReasonerRunRefs,
+      ...packet.evidenceRefs,
+    ]),
     microReasonerRunRefs: uniqueStrings(packet.microReasonerRunRefs),
-  });
-  return packetsById.get(packet.packetId)!;
+  };
+  const validationIssues = validateStagePlayProcessedMailPacketV1(normalizedPacket);
+  if (validationIssues.length > 0) {
+    throw new Error(`Invalid stage play processed mail packet: ${validationIssues.join("; ")}`);
+  }
+  packetsById.set(normalizedPacket.packetId, normalizedPacket);
+  return normalizedPacket;
 }
 
 export function getStagePlayProcessedMailPacket(

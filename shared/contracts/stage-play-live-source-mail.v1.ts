@@ -252,6 +252,7 @@ export type StagePlayLiveSourceMailItemV1 = {
     frameRef?: string | null;
     evidenceRef?: string | null;
     observationRef?: string | null;
+    receiptRef?: string | null;
     sourceHash?: string | null;
     sourceTextHash?: string | null;
     sourceTextCharCount?: number | null;
@@ -259,6 +260,8 @@ export type StagePlayLiveSourceMailItemV1 = {
     chunkIndex?: number | null;
     laneSessionId?: string | null;
     sessionControlKey?: string | null;
+    sourceIdentityKey?: string | null;
+    latestSourceIdentityKey?: string | null;
     sourceBindingKey?: string | null;
     mailLoopObservationKey?: string | null;
     dedupeKey?: string | null;
@@ -299,6 +302,7 @@ export type StagePlayLiveSourceMailItemV1 = {
   causalTrace?: LiveSourceCausalTraceV1;
   createdAt: string;
   updatedAt: string;
+  answer_authority: false;
   assistant_answer: false;
   terminal_eligible: false;
   context_role: "tool_evidence";
@@ -777,6 +781,22 @@ const STAGE_PLAY_MICRO_REASONER_RUN_CONFIDENCE = [
   "high",
 ] as const;
 
+const STAGE_PLAY_PROCESSED_MAIL_PACKET_RESOLUTION_STATES = [
+  "mail_received",
+  "summary_split",
+  "claims_extracted",
+  "profile_compared",
+  "immersion_state_updated",
+  "prediction_validated",
+  "processed_packet_ready",
+  "ask_decision_needed",
+  "ask_decision_recorded",
+  "voice_candidate_prepared",
+  "waiting_for_next_mail",
+  "deferred_for_pressure",
+  "compacted",
+] as const;
+
 const isStagePlayRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -899,6 +919,112 @@ export function isStagePlayMicroReasonerRunV1(
   return validateStagePlayMicroReasonerRunV1(value).length === 0;
 }
 
+export function validateStagePlayProcessedMailPacketV1(value: unknown): string[] {
+  const issues: string[] = [];
+  if (!isStagePlayRecord(value)) return ["processed mail packet must be an object"];
+
+  if (value.artifactId !== "stage_play_processed_mail_packet") {
+    issues.push("artifactId must be stage_play_processed_mail_packet");
+  }
+  if (value.schemaVersion !== STAGE_PLAY_PROCESSED_MAIL_PACKET_SCHEMA) {
+    issues.push(`schemaVersion must be ${STAGE_PLAY_PROCESSED_MAIL_PACKET_SCHEMA}`);
+  }
+  if (!isStagePlayNonEmptyString(value.packetId)) issues.push("packetId must be a non-empty string");
+  if (!isStagePlayNonEmptyString(value.jobId)) issues.push("jobId must be a non-empty string");
+  if (!isStagePlayNonEmptyString(value.sourceId)) issues.push("sourceId must be a non-empty string");
+  for (const field of [
+    "mailIds",
+    "visualEvidenceRefs",
+    "observedFacts",
+    "inferredFacts",
+    "uncertainties",
+    "stableFactsUsed",
+    "changedFacts",
+    "sceneTags",
+    "activityTags",
+    "objectTags",
+    "matchedCriteria",
+    "suppressedCriteria",
+    "riskMatches",
+    "opportunityMatches",
+    "voiceCalloutMatches",
+    "watchNext",
+    "microReasonerRunRefs",
+    "evidenceRefs",
+  ]) {
+    if (!isStagePlayStringArray(value[field])) issues.push(`${field} must be strings`);
+  }
+  if (isStagePlayStringArray(value.evidenceRefs)) {
+    if (isStagePlayNonEmptyString(value.packetId) && !value.evidenceRefs.includes(value.packetId)) {
+      issues.push("evidenceRefs must include packetId");
+    }
+    for (const field of ["mailIds", "visualEvidenceRefs", "microReasonerRunRefs"]) {
+      for (const evidenceRef of isStagePlayStringArray(value[field]) ? value[field] : []) {
+        if (isStagePlayNonEmptyString(evidenceRef) && !value.evidenceRefs.includes(evidenceRef)) {
+          issues.push(`evidenceRefs must include ${field}`);
+          break;
+        }
+      }
+    }
+    if (isStagePlayRecord(value.evidenceHandles)) {
+      const sourceReceipts = value.evidenceHandles.sourceReceipts;
+      if (sourceReceipts != null && !Array.isArray(sourceReceipts)) {
+        issues.push("evidenceHandles.sourceReceipts must be an array");
+      }
+      if (Array.isArray(sourceReceipts)) {
+        for (const receipt of sourceReceipts) {
+          if (!isStagePlayRecord(receipt)) {
+            issues.push("evidenceHandles.sourceReceipts entries must be objects");
+            continue;
+          }
+          const receiptRef = typeof receipt.receiptRef === "string" ? receipt.receiptRef.trim() : "";
+          const sourceReceiptEvidenceRefs = receipt.evidenceRefs;
+          if (receipt.receiptRef != null && typeof receipt.receiptRef !== "string") {
+            issues.push("evidenceHandles.sourceReceipts receiptRef must be a string or null");
+          }
+          if (!receiptRef) continue;
+          if (!isStagePlayStringArray(sourceReceiptEvidenceRefs) || !sourceReceiptEvidenceRefs.includes(receiptRef)) {
+            issues.push("evidenceHandles.sourceReceipts evidenceRefs must include receiptRef");
+          }
+          if (!value.evidenceRefs.includes(receiptRef)) {
+            issues.push("evidenceRefs must include source receipt receiptRef");
+          }
+        }
+      }
+    }
+  }
+  if (
+    !stagePlayIncludes(
+      STAGE_PLAY_MICRO_REASONER_RUN_RECOMMENDED_NEXT,
+      value.recommendedNext,
+    )
+  ) {
+    issues.push("recommendedNext is invalid");
+  }
+  if (
+    !stagePlayIncludes(
+      STAGE_PLAY_PROCESSED_MAIL_PACKET_RESOLUTION_STATES,
+      value.resolutionState,
+    )
+  ) {
+    issues.push("resolutionState is invalid");
+  }
+  if (!isStagePlayNonEmptyString(value.createdAt)) issues.push("createdAt must be a non-empty string");
+  if (value.answer_authority !== false) issues.push("answer_authority must be false");
+  if (value.assistant_answer !== false) issues.push("assistant_answer must be false");
+  if (value.terminal_eligible !== false) issues.push("terminal_eligible must be false");
+  if (value.raw_content_included !== false) issues.push("raw_content_included must be false");
+  if (value.context_role !== "tool_evidence") issues.push("context_role must be tool_evidence");
+
+  return issues;
+}
+
+export function isStagePlayProcessedMailPacketV1(
+  value: unknown,
+): value is StagePlayProcessedMailPacketV1 {
+  return validateStagePlayProcessedMailPacketV1(value).length === 0;
+}
+
 export type StagePlayDocumentInlineTranslationOutputV1 = {
   schema: typeof STAGE_PLAY_DOCUMENT_INLINE_TRANSLATION_OUTPUT_SCHEMA;
   schemaVersion: typeof STAGE_PLAY_DOCUMENT_INLINE_TRANSLATION_OUTPUT_SCHEMA;
@@ -908,10 +1034,16 @@ export type StagePlayDocumentInlineTranslationOutputV1 = {
   sourceHash: string | null;
   sourceTextHash: string | null;
   sourceTextCharCount: number | null;
+  receiptRef?: string | null;
   chunkId: string | null;
   chunkIndex: number | null;
   laneSessionId?: string | null;
   sessionControlKey?: string | null;
+  sourceBindingKey?: string | null;
+  sourceIdentityKey?: string | null;
+  latestSourceIdentityKey?: string | null;
+  mailLoopObservationKey?: string | null;
+  latestMailLoopObservationKey?: string | null;
   dedupeKey: string | null;
   sourceEventId: string | null;
   sourceEventMs: number | null;
@@ -1003,6 +1135,7 @@ export type StagePlaySourceReceiptHandleV1 = {
   evidenceRefs: string[];
   frameRef?: string | null;
   observationRef?: string | null;
+  receiptRef?: string | null;
 };
 
 export type StagePlayFrameReceiptHandleV1 = {
@@ -1194,9 +1327,11 @@ export type StagePlayProcessedMailPacketV1 = {
   evidenceRefs: string[];
   causalTrace?: LiveSourceCausalTraceV1;
   createdAt: string;
+  answer_authority: false;
   assistant_answer: false;
   terminal_eligible: false;
   context_role: "tool_evidence";
+  raw_content_included: false;
 };
 
 export type StagePlayLiveSourceImmersionStateV1 = {

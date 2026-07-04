@@ -16,6 +16,10 @@ import {
 import type { HelixCapabilityLaneSessionStore } from "./session-manager";
 import type { HelixCapabilityLaneSession } from "@shared/helix-capability-lane-session";
 import type { HelixCapabilityLaneMailLoopDebugSummary } from "@shared/helix-capability-lane-mail-loop";
+import {
+  HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_UNKNOWN,
+  normalizeHelixLiveTranslationProjectionTarget,
+} from "@shared/helix-live-translation-projection-target";
 
 const readString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
@@ -29,10 +33,38 @@ const languageMatches = (candidate: string | null | undefined, expected: string 
     normalizedExpected.startsWith(`${normalizedCandidate}-`);
 };
 
+const normalizeComparableSourceKind = (value: string | null | undefined): string => {
+  const text = readString(value).toLowerCase();
+  if (text === "document_markdown") return "docs";
+  if (text === "audio_transcript") return "audio";
+  return text;
+};
+
+const normalizeComparableProjectionTarget = (value: string | null | undefined): string => {
+  const text = readString(value).toLowerCase();
+  if (!text) return "";
+  const canonical = normalizeHelixLiveTranslationProjectionTarget(
+    text,
+    HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_UNKNOWN,
+  );
+  return canonical === HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_UNKNOWN &&
+    text !== HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_UNKNOWN
+    ? text
+    : canonical;
+};
+
 const targetLanguageForSession = (session: HelixCapabilityLaneSession): string | null =>
   readString(session.source_binding.target_language) ||
   readString(session.source_binding.account_locale).split("-")[0] ||
   null;
+
+const compactKey = (parts: Array<string | null | undefined>): string | null => {
+  const compacted = parts
+    .map((part) => readString(part))
+    .filter(Boolean)
+    .join("::");
+  return compacted || null;
+};
 
 const latestObservationEvent = (session: HelixCapabilityLaneSession) =>
   [...session.debug_history].reverse().find((event) => event.observation_ref) ?? null;
@@ -51,6 +83,33 @@ const bindingEvent = (input: {
   terminalAuthorityStatus?: HelixCapabilityLaneGoalBindingEvent["terminal_authority_status"];
 }): HelixCapabilityLaneGoalBindingEvent => {
   const observationEvent = latestObservationEvent(input.session);
+  const sourceTextHash =
+    readString(input.sourceTextHash) ||
+    readString(observationEvent?.source_text_hash) ||
+    readString(input.session.source_binding.source_text_hash) ||
+    null;
+  const sourceTextCharCount =
+    typeof input.sourceTextCharCount === "number"
+      ? String(input.sourceTextCharCount)
+      : typeof observationEvent?.source_text_char_count === "number"
+        ? String(observationEvent.source_text_char_count)
+        : typeof input.session.source_binding.source_text_char_count === "number"
+          ? String(input.session.source_binding.source_text_char_count)
+          : null;
+  const targetLanguage =
+    readString(input.session.source_binding.target_language) ||
+    readString(observationEvent?.target_language) ||
+    null;
+  const sourceIdentityKey = compactKey([
+    input.session.source_binding.source_id,
+    input.session.source_binding.source_hash,
+    sourceTextHash,
+    sourceTextCharCount,
+    input.session.source_binding.source_kind,
+    input.session.source_binding.projection_target,
+    input.session.source_binding.account_locale,
+    targetLanguage,
+  ]);
   return {
     schema: HELIX_CAPABILITY_LANE_GOAL_BINDING_EVENT_SCHEMA,
     event_id: `${input.goalBindingId}:${input.event}:${input.atMs}`,
@@ -66,10 +125,12 @@ const bindingEvent = (input: {
     lane_session_observation_ref: input.session.last_observation_ref,
     source_id: input.session.source_binding.source_id,
     source_hash: input.session.source_binding.source_hash ?? null,
+    source_binding_key: input.session.source_binding.source_binding_key ?? null,
+    source_identity_key: sourceIdentityKey ?? input.session.source_binding.source_identity_key ?? null,
     source_kind: input.session.source_binding.source_kind,
     source_projection_target: input.session.source_binding.projection_target,
     account_locale: input.session.source_binding.account_locale,
-    target_language: input.session.source_binding.target_language ?? observationEvent?.target_language ?? null,
+    target_language: targetLanguage,
     latest_chunk_id: observationEvent?.chunk_id ?? null,
     latest_chunk_index: observationEvent?.chunk_index ?? null,
     latest_source_id: observationEvent?.source_id ?? null,
@@ -81,16 +142,16 @@ const bindingEvent = (input: {
     latest_source_event_ms: observationEvent?.source_event_ms ?? null,
     latest_observed_at_ms: observationEvent?.observed_at_ms ?? null,
     latest_freshness_status: observationEvent?.freshness_status ?? null,
-    source_text_hash: readString(input.sourceTextHash) || null,
-    source_text_char_count: typeof input.sourceTextCharCount === "number"
-      ? input.sourceTextCharCount
-      : null,
+    source_text_hash: sourceTextHash,
+    source_text_char_count: sourceTextCharCount ? Number(sourceTextCharCount) : null,
     latest_projection_target: observationEvent?.projection_target ?? null,
     latest_cancel_requested: observationEvent?.cancel_requested ?? null,
     mail_loop_ref: readString(input.mailLoopRef) || null,
     receipt_ref: readString(input.receiptRef) || null,
     terminal_authority_status: input.terminalAuthorityStatus ?? "not_terminal_authority",
     reentry_required: true,
+    context_role: "tool_evidence",
+    answer_authority: false,
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,
@@ -136,8 +197,10 @@ const withSessionSnapshot = (
   lane_session_health: session.health,
   lane_session_source_id: session.source_binding.source_id,
   lane_session_source_hash: session.source_binding.source_hash ?? null,
+  lane_session_source_binding_key: session.source_binding.source_binding_key ?? null,
   lane_session_source_text_hash: session.source_binding.source_text_hash ?? null,
   lane_session_source_text_char_count: session.source_binding.source_text_char_count ?? null,
+  lane_session_source_identity_key: session.source_binding.source_identity_key ?? null,
   lane_session_source_kind: session.source_binding.source_kind,
   lane_session_projection_target: session.source_binding.projection_target,
   lane_session_account_locale: session.source_binding.account_locale,
@@ -152,6 +215,8 @@ const blocked = (blockedReason: string): HelixCapabilityLaneGoalBindingResult =>
   ok: false,
   goal_binding: null,
   blocked_reason: blockedReason,
+  context_role: "tool_evidence",
+  answer_authority: false,
   assistant_answer: false,
   terminal_eligible: false,
   raw_content_included: false,
@@ -185,6 +250,7 @@ export const createHelixCapabilityLaneGoalBindingStore = (input: {
     const goalBindingId =
       readString(args.goalBindingId) ||
       `capability_lane_goal_binding:${crypto.randomUUID()}`;
+    if (bindings.has(goalBindingId)) return blocked("goal_binding_already_exists");
     const event = bindingEvent({
       goalBindingId,
       goalId,
@@ -211,6 +277,8 @@ export const createHelixCapabilityLaneGoalBindingStore = (input: {
       debug_history: [event],
       backend_provider_becomes_root_agent: false,
       final_reports_require_terminal_authority: true,
+      context_role: "tool_evidence",
+      answer_authority: false,
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
@@ -220,6 +288,8 @@ export const createHelixCapabilityLaneGoalBindingStore = (input: {
       ok: true,
       goal_binding: binding,
       blocked_reason: null,
+      context_role: "tool_evidence",
+      answer_authority: false,
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
@@ -259,6 +329,8 @@ export const createHelixCapabilityLaneGoalBindingStore = (input: {
       ok: true,
       goal_binding: updated,
       blocked_reason: null,
+      context_role: "tool_evidence",
+      answer_authority: false,
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
@@ -303,6 +375,8 @@ export const createHelixCapabilityLaneGoalBindingStore = (input: {
       ok: true,
       goal_binding: updated,
       blocked_reason: null,
+      context_role: "tool_evidence",
+      answer_authority: false,
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
@@ -340,6 +414,17 @@ export const createHelixCapabilityLaneGoalBindingStore = (input: {
     ) {
       return blocked("source_hash_mismatch");
     }
+    const mailLoopSourceKind = normalizeComparableSourceKind(args.mailLoopSummary.source_kind);
+    const sessionSourceKind = normalizeComparableSourceKind(session.source_binding.source_kind);
+    if (
+      mailLoopSourceKind &&
+      mailLoopSourceKind !== "unknown" &&
+      sessionSourceKind &&
+      sessionSourceKind !== "unknown" &&
+      mailLoopSourceKind !== sessionSourceKind
+    ) {
+      return blocked("source_kind_mismatch");
+    }
     if (
       args.mailLoopSummary.source_text_hash &&
       session.source_binding.source_text_hash &&
@@ -354,15 +439,20 @@ export const createHelixCapabilityLaneGoalBindingStore = (input: {
     ) {
       return blocked("source_text_char_count_mismatch");
     }
-    if (
-      args.mailLoopSummary.projection_target &&
-      session.source_binding.projection_target &&
-      args.mailLoopSummary.projection_target !== session.source_binding.projection_target
-    ) {
+    const mailLoopProjectionTarget = normalizeComparableProjectionTarget(args.mailLoopSummary.projection_target);
+    const sessionProjectionTarget = normalizeComparableProjectionTarget(session.source_binding.projection_target);
+    if (mailLoopProjectionTarget && sessionProjectionTarget && mailLoopProjectionTarget !== sessionProjectionTarget) {
       return blocked("projection_target_mismatch");
     }
     if (!languageMatches(args.mailLoopSummary.target_language, targetLanguageForSession(session))) {
       return blocked("target_language_mismatch");
+    }
+    if (
+      args.mailLoopSummary.account_locale &&
+      session.source_binding.account_locale &&
+      args.mailLoopSummary.account_locale.toLowerCase() !== session.source_binding.account_locale.toLowerCase()
+    ) {
+      return blocked("account_locale_mismatch");
     }
     const mailLoopRef =
       readString(args.mailLoopSummary.stage_play_mail_id) ||
@@ -397,6 +487,8 @@ export const createHelixCapabilityLaneGoalBindingStore = (input: {
       ok: true,
       goal_binding: updated,
       blocked_reason: null,
+      context_role: "tool_evidence",
+      answer_authority: false,
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
@@ -410,6 +502,7 @@ export const createHelixCapabilityLaneGoalBindingStore = (input: {
   }): HelixCapabilityLaneGoalBindingResult => {
     const binding = bindings.get(args.goalBindingId);
     if (!binding) return blocked("unknown_goal_binding");
+    if (binding.status === "stopped") return blocked("goal_binding_stopped");
     const session = input.sessionStore.get(binding.lane_session_id);
     if (!session) return blocked("unknown_lane_session");
     const nowMs = args.nowMs ?? Date.now();
@@ -431,6 +524,8 @@ export const createHelixCapabilityLaneGoalBindingStore = (input: {
       ok: true,
       goal_binding: updated,
       blocked_reason: null,
+      context_role: "tool_evidence",
+      answer_authority: false,
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,

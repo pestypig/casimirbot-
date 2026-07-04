@@ -127,6 +127,8 @@ const expectGoalBindingRemainsLaneBoundNonTerminal = (
   expect(binding).toMatchObject({
     backend_provider_becomes_root_agent: false,
     final_reports_require_terminal_authority: true,
+    context_role: "tool_evidence",
+    answer_authority: false,
     terminal_eligible: false,
     assistant_answer: false,
     raw_content_included: false,
@@ -141,6 +143,8 @@ const expectGoalBindingRemainsLaneBoundNonTerminal = (
   });
   expect(binding?.debug_history.every((event) => (
     event.terminal_authority_status !== "terminal_authority_granted"
+    && event.context_role === "tool_evidence"
+    && event.answer_authority === false
     && event.terminal_eligible === false
     && event.assistant_answer === false
     && event.raw_content_included === false
@@ -176,6 +180,8 @@ describe("capability lane goal binding", () => {
     expect(result).toMatchObject({
       ok: true,
       blocked_reason: null,
+      context_role: "tool_evidence",
+      answer_authority: false,
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
@@ -246,6 +252,7 @@ describe("capability lane goal binding", () => {
       last_report_ref: null,
       backend_provider_becomes_root_agent: false,
       final_reports_require_terminal_authority: true,
+      answer_authority: false,
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
@@ -492,6 +499,61 @@ describe("capability lane goal binding", () => {
     expectGoalBindingRemainsLaneBoundNonTerminal(recorded.goal_binding);
   });
 
+  it("accepts equivalent mail-loop projection target aliases for a goal-bound lane", () => {
+    const sessionStore = startTranslationSession();
+    const store = createHelixCapabilityLaneGoalBindingStore({ sessionStore });
+    store.bind({
+      goalId: "goal:translate-docs",
+      laneSessionId: "lane-session-goal",
+      goalBindingId: "goal-binding-mail-projection-alias",
+      nowMs: 200,
+    });
+    sessionStore.recordObservation({
+      laneSessionId: "lane-session-goal",
+      observationRef: "stage-play-mail-goal",
+      receiptRef: "ask:lane:translation:mail-obs:projection:receipt",
+      projectionTarget: "docs_chunk",
+      nowMs: 210,
+    });
+
+    const recorded = store.recordMailLoopEvidence({
+      goalBindingId: "goal-binding-mail-projection-alias",
+      mailLoopSummary: mailLoopSummary({
+        projection_target: "docs_viewer_inline",
+        receipt_ref: "ask:lane:translation:mail-obs:projection:receipt",
+      }),
+      nowMs: 220,
+    });
+
+    expect(recorded).toMatchObject({
+      ok: true,
+      blocked_reason: null,
+      goal_binding: {
+        latest_mail_loop_summary: {
+          projection_target: "docs_viewer_inline",
+          terminal_authority_status: "pending_helix_terminal_authority",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        lane_session_mail_loop_refs: ["stage-play-mail-goal"],
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(recorded.goal_binding?.debug_history.at(-1)).toMatchObject({
+      event: "mail_loop_recorded",
+      source_projection_target: "docs_chunk",
+      latest_projection_target: "docs_chunk",
+      terminal_authority_status: "pending_helix_terminal_authority",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expectGoalBindingRemainsLaneBoundNonTerminal(recorded.goal_binding);
+  });
+
   it("fails closed when recording mail-loop evidence for the wrong lane session", () => {
     const sessionStore = startTranslationSession();
     const store = createHelixCapabilityLaneGoalBindingStore({ sessionStore });
@@ -643,12 +705,29 @@ describe("capability lane goal binding", () => {
       reason: "goal_complete",
       nowMs: 300,
     });
+    const duplicateStop = store.stop({
+      goalBindingId: "goal-binding-3",
+      reason: "goal_complete_again",
+      nowMs: 310,
+    });
     expect(stopped.goal_binding).toMatchObject({
       status: "stopped",
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
     });
+    expect(duplicateStop).toMatchObject({
+      ok: false,
+      goal_binding: null,
+      blocked_reason: "goal_binding_stopped",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(store.get("goal-binding-3")?.debug_history.map((event) => event.event)).toEqual([
+      "bound",
+      "stopped",
+    ]);
     expect(store.updateAttention({
       goalBindingId: "goal-binding-3",
       attentionPolicy: "manual_review",
@@ -657,6 +736,75 @@ describe("capability lane goal binding", () => {
       ok: false,
       blocked_reason: "goal_binding_stopped",
     });
+  });
+
+  it("fails closed on duplicate goal binding ids without replacing the original goal link", () => {
+    const sessionStore = startTranslationSession();
+    const store = createHelixCapabilityLaneGoalBindingStore({ sessionStore });
+    const original = store.bind({
+      goalId: "goal:translate-docs",
+      laneSessionId: "lane-session-goal",
+      goalBindingId: "goal-binding-duplicate",
+      activationPolicy: "while_goal_active",
+      attentionPolicy: "quiet_until_salient",
+      stopCondition: "goal_complete",
+      reportPolicy: "terminal_authorized_summary",
+      quietBehavior: "record_only",
+      nowMs: 200,
+    });
+    const duplicate = store.bind({
+      goalId: "goal:replacement",
+      laneSessionId: "lane-session-goal",
+      goalBindingId: "goal-binding-duplicate",
+      activationPolicy: "manual",
+      attentionPolicy: "manual_review",
+      stopCondition: "manual_stop",
+      reportPolicy: "debug_only",
+      quietBehavior: "surface_badge",
+      nowMs: 250,
+    });
+
+    expect(duplicate).toMatchObject({
+      ok: false,
+      goal_binding: null,
+      blocked_reason: "goal_binding_already_exists",
+      context_role: "tool_evidence",
+      answer_authority: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(store.get("goal-binding-duplicate")).toEqual(original.goal_binding);
+    expect(store.get("goal-binding-duplicate")).toMatchObject({
+      goal_id: "goal:translate-docs",
+      goal_binding_id: "goal-binding-duplicate",
+      activation_policy: "while_goal_active",
+      attention_policy: "quiet_until_salient",
+      stop_condition: "goal_complete",
+      report_policy: "terminal_authorized_summary",
+      quiet_behavior: "record_only",
+      debug_history: [
+        expect.objectContaining({
+          event: "bound",
+          goal_id: "goal:translate-docs",
+          at_ms: 200,
+          terminal_authority_status: "not_terminal_authority",
+          reentry_required: true,
+          context_role: "tool_evidence",
+          answer_authority: false,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+      ],
+      backend_provider_becomes_root_agent: false,
+      final_reports_require_terminal_authority: true,
+      answer_authority: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(store.list()).toHaveLength(1);
   });
 
   it("fails closed when a goal-bound lane session has already stopped", () => {

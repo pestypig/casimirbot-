@@ -13,6 +13,7 @@ export const DOCUMENT_IMAGE_REGION_KIND_VALUES = [
 export const DOCUMENT_IMAGE_SOURCE_KIND_VALUES = [
   "image_attachment",
   "pdf_page_render",
+  "image_lens_source",
   "manual_image_url",
 ] as const;
 

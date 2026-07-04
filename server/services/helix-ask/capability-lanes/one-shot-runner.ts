@@ -6,6 +6,7 @@ import type {
 } from "@shared/helix-capability-lane";
 import type { HelixAgentProvider } from "../agent-providers/types";
 import {
+  buildUnknownHelixCapabilityLaneOneShotResult,
   readHelixCapabilityLaneCallCapability,
   resolveHelixCapabilityLaneOneShotHandler,
   type HelixCapabilityLaneOneShotCallResult,
@@ -143,49 +144,10 @@ const buildCapabilityLaneDebugEvents = (input: {
       "not_applicable",
     );
     append("lane_observation", status, result.ok === true ? "observation_packet_required_for_provider_reentry" : "not_applicable");
+    if (packet) {
+      append("lane_reentered", "pending", "observation_packet_required_for_provider_reentry");
+    }
   });
-
-  if (input.observationPackets.length > 0) {
-    const firstTrace = input.resolveTraces[0];
-    events.push({
-      schema: "helix.capability_lane.debug_event.v1",
-      event_id: "capability_lane:reentry",
-      seq: events.length,
-      stage: "lane_reentered",
-      selected_runtime_agent_provider: input.provider.id,
-      lane_id: "capability_lane",
-      capability: "capability_lane.reentry",
-      status: "pending",
-      requested_backend_provider: null,
-      requested_backend_provider_known: null,
-      requested_backend_configuration_status: null,
-      requested_backend_availability_status: null,
-      requested_backend_permission_status: null,
-      requested_backend_cost_class: null,
-      requested_backend_latency_class: null,
-      requested_backend_privacy_class: null,
-      requested_backend_fallback_provider: null,
-      selected_backend_provider: null,
-      selection_reason: null,
-      backend_selection_decision: null,
-      availability_status: null,
-      permission_status: null,
-      cost_class: null,
-      latency_class: null,
-      privacy_class: null,
-      fallback_backend_provider: null,
-      execution_status: firstTrace?.execution_status ?? null,
-      observation_ref: null,
-      result_ref: null,
-      receipt_ref: readReceiptRefFromPacket(input.observationPackets[0]),
-      reentry_required: true,
-      reentry_status: "observation_packet_required_for_provider_reentry",
-      terminal_authority_status: "pending_helix_terminal_authority",
-      terminal_eligible: false,
-      assistant_answer: false,
-      raw_content_included: false,
-    });
-  }
   return events;
 };
 
@@ -235,21 +197,30 @@ const buildCapabilityLaneBackendSelections = (input: {
     };
   });
 
-export const runHelixCapabilityLaneOneShotRequests = (input: {
+export const runHelixCapabilityLaneOneShotRequests = async (input: {
   provider: HelixAgentProvider;
   body: Record<string, unknown>;
   turnId?: string | null;
   iteration?: number | null;
   env?: NodeJS.ProcessEnv;
-}): HelixCapabilityLaneOneShotRunnerResult => {
+}): Promise<HelixCapabilityLaneOneShotRunnerResult> => {
   const turnId = readString(input.turnId) || readString(input.body.turn_id ?? input.body.turnId) || null;
   const calls = readStructuredLaneCalls(input.body);
   const results: HelixCapabilityLaneOneShotCallResult[] = [];
   for (const call of calls) {
     const capability = readHelixCapabilityLaneCallCapability(call);
     const handler = capability ? resolveHelixCapabilityLaneOneShotHandler(capability) : null;
-    if (!handler) continue;
-    results.push(handler.run({
+    if (!handler) {
+      results.push(buildUnknownHelixCapabilityLaneOneShotResult({
+        provider: input.provider,
+        call,
+        turnId,
+        iteration: input.iteration,
+        env: input.env,
+      }));
+      continue;
+    }
+    results.push(await handler.run({
       provider: input.provider,
       call,
       turnId,

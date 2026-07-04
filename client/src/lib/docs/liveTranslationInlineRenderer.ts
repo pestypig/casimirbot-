@@ -26,19 +26,39 @@ export function renderDocumentMarkdownWithInlineTranslations(
       const projectionAttrs = Object.entries(buildDocumentInlineTranslationDataAttributes(state))
         .map(([name, value]) => `${name}="${escapeHtml(value)}"`)
         .join(" ");
-      const projectionAttrSuffix = projectionAttrs ? ` ${projectionAttrs}` : "";
+      const projectionLanguageAttrs = buildDocumentInlineTranslationLanguageAttributes(state);
+      const projectionAttrSuffix = [projectionAttrs, projectionLanguageAttrs].filter(Boolean).join(" ");
+      const projectionAttributes = projectionAttrSuffix ? ` ${projectionAttrSuffix}` : "";
       const displayStatus = resolveDocumentInlineTranslationDisplayStatus(state);
       const projectionClassName = buildDocumentInlineTranslationProjectionClassName(displayStatus);
+      const projectionBaseAttrs =
+        `data-doc-translation-line="${escapeHtml(unit.unit_id)}" ` +
+        `data-doc-translation-role="governed-inline-projection" ` +
+        `data-doc-translation-answer-authority="false"`;
       if (state.status === "loading") {
-        return `${unit.source_markdown}\n${anchor}\n<div class="${projectionClassName}" data-doc-translation-line="${escapeHtml(unit.unit_id)}" data-doc-translation-role="governed-inline-projection"${projectionAttrSuffix}>${escapeHtml(input.loadingText)}</div>`;
+        return `${unit.source_markdown}\n${anchor}\n<div class="${projectionClassName}" ${projectionBaseAttrs}${projectionAttributes}>${escapeHtml(input.loadingText)}</div>`;
       }
       if (state.status === "error") {
-        return `${unit.source_markdown}\n${anchor}\n<div class="${projectionClassName}" data-doc-translation-line="${escapeHtml(unit.unit_id)}" data-doc-translation-role="governed-inline-projection"${projectionAttrSuffix}>${escapeHtml(input.errorText(state.error ?? input.fallbackErrorText))}</div>`;
+        return `${unit.source_markdown}\n${anchor}\n<div class="${projectionClassName}" ${projectionBaseAttrs}${projectionAttributes}>${escapeHtml(input.errorText(state.error ?? input.fallbackErrorText))}</div>`;
       }
       const translatedText = formatDocumentInlineTranslationText(state.text ?? "");
-      return `${unit.source_markdown}\n${anchor}\n<div class="${projectionClassName}" data-doc-translation-line="${escapeHtml(unit.unit_id)}" data-doc-translation-role="governed-inline-projection"${projectionAttrSuffix}>${escapeHtml(translatedText).replace(/\n/g, "<br />")}</div>`;
+      return `${unit.source_markdown}\n${anchor}\n<div class="${projectionClassName}" ${projectionBaseAttrs}${projectionAttributes}>${escapeHtml(translatedText).replace(/\n/g, "<br />")}</div>`;
     })
     .join("\n");
+}
+
+function buildDocumentInlineTranslationLanguageAttributes(
+  state: DocumentInlineTranslationRenderState,
+): string {
+  const language = normalizeHtmlLanguageTag(state.targetLanguage) || normalizeHtmlLanguageTag(state.accountLocale);
+  const langAttr = language ? `lang="${escapeHtml(language)}"` : "";
+  return [langAttr, `dir="auto"`].filter(Boolean).join(" ");
+}
+
+function normalizeHtmlLanguageTag(value: string | null | undefined): string | null {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  return /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i.test(text) ? text : null;
 }
 
 function buildDocumentInlineTranslationAnchor(
@@ -51,8 +71,10 @@ function buildDocumentInlineTranslationAnchor(
       "data-doc-translation-governed-projection": "true",
       "data-doc-translation-authority-policy": "projection_only_not_answer_authority",
       "data-doc-translation-display-status": "empty",
+      "data-doc-translation-display-status-reason": "no_projection_activity",
       "data-doc-translation-render-status": "empty",
       "data-doc-translation-projection-status": "missing",
+      "data-doc-translation-reentry-required": "true",
       "data-doc-translation-terminal-eligible": "false",
       "data-doc-translation-assistant-answer": "false",
       "data-doc-translation-raw-content-included": "false",
@@ -64,6 +86,7 @@ function buildDocumentInlineTranslationAnchor(
     `<div class="doc-translation-anchor not-prose h-0"`,
     `data-doc-translation-anchor="${escapeHtml(unitId)}"`,
     `data-doc-translation-role="governed-inline-projection-anchor"`,
+    `data-doc-translation-answer-authority="false"`,
     projectionAttrs,
     `></div>`,
   ].join(" ");

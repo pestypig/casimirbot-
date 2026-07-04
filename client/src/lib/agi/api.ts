@@ -49,8 +49,72 @@ import type { LumaMood } from "@/lib/luma-moods";
 import type { CollapseDecision, CollapseStrategyName } from "./orchestrator";
 import type { LocalCallSpec } from "@shared/local-call-spec";
 import type { HelixWorkstationAction } from "@/lib/workstation/workstationActionContract";
+import { applyImageLensRegionInspectionReceipt } from "@/lib/document-image/imageLensRegionInspectionClient";
+import {
+  isImageLensRegionInspectionReceiptV1,
+  type ImageLensRegionInspectionReceiptV1,
+} from "@shared/contracts/image-lens-region-inspection.v1";
 
 const HELIX_CONTEXT_CAPSULE_MAX_IDS = 12;
+
+const readAgiRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+
+const readAgiArray = (value: unknown): unknown[] =>
+  Array.isArray(value) ? value : [];
+
+const readAgiString = (value: unknown): string =>
+  typeof value === "string" ? value.trim() : "";
+
+const collectImageLensRegionInspectionReceipts = (payload: unknown): ImageLensRegionInspectionReceiptV1[] => {
+  const root = readAgiRecord(payload);
+  if (!root) return [];
+  const debug = readAgiRecord(root.debug);
+  const candidatePackets = [
+    ...readAgiArray(root.capability_lane_observation_packets),
+    ...readAgiArray(debug?.capability_lane_observation_packets),
+  ];
+  const candidateResults = [
+    ...readAgiArray(root.capability_lane_call_results),
+    ...readAgiArray(debug?.capability_lane_call_results),
+  ];
+  const receipts: ImageLensRegionInspectionReceiptV1[] = [];
+  const pushReceipt = (value: unknown) => {
+    if (isImageLensRegionInspectionReceiptV1(value)) receipts.push(value);
+  };
+  for (const packet of candidatePackets) {
+    const packetRecord = readAgiRecord(packet);
+    const stateDelta = readAgiRecord(packetRecord?.state_delta);
+    const inspection = readAgiRecord(stateDelta?.visual_analysis_region_inspection);
+    pushReceipt(inspection?.receipt);
+  }
+  for (const result of candidateResults) {
+    pushReceipt(readAgiRecord(result)?.receipt);
+  }
+  const seen = new Set<string>();
+  return receipts.filter((receipt) => {
+    const key = receipt.evidence_id || receipt.region_id;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const ingestImageLensRegionInspectionReceipts = (payload: unknown): void => {
+  const root = readAgiRecord(payload);
+  const threadId =
+    readAgiString(root?.thread_id) ||
+    readAgiString(root?.threadId) ||
+    readAgiString(root?.turn_id) ||
+    readAgiString(root?.turnId) ||
+    "helix-ask:image-lens";
+  for (const receipt of collectImageLensRegionInspectionReceipts(payload)) {
+    applyImageLensRegionInspectionReceipt({
+      receipt,
+      threadId,
+    });
+  }
+};
 
 export type PlanResponse = {
   traceId: string;
@@ -582,6 +646,32 @@ export type RunCapabilityLaneSessionControlPayload = {
   signal?: AbortSignal;
 };
 
+export type ListCapabilityLaneSessionsPayload = {
+  agentRuntime?: HelixAgentRuntimeId;
+  agent_runtime?: HelixAgentRuntimeId;
+  laneSessionId?: string;
+  lane_session_id?: string;
+  laneId?: string;
+  lane_id?: string;
+  sourceId?: string;
+  source_id?: string;
+  sourceHash?: string;
+  source_hash?: string;
+  sourceBindingKey?: string;
+  source_binding_key?: string;
+  sourceIdentityKey?: string;
+  source_identity_key?: string;
+  latestSourceIdentityKey?: string;
+  latest_source_identity_key?: string;
+  projectionTarget?: string;
+  projection_target?: string;
+  accountLocale?: string;
+  account_locale?: string;
+  targetLanguage?: string;
+  target_language?: string;
+  signal?: AbortSignal;
+};
+
 export type RunCapabilityLaneGoalBindingControlPayload = {
   agentRuntime?: HelixAgentRuntimeId;
   agent_runtime?: HelixAgentRuntimeId;
@@ -627,6 +717,7 @@ export type CapabilityLaneOneShotResponse = {
   ok?: boolean;
   requested?: boolean;
   agent_runtime?: HelixAgentRuntimeId | string;
+  selected_agent_provider?: Record<string, unknown>;
   capability_lane_call_results?: Array<Record<string, unknown>>;
   capability_lane_observation_packets?: Array<Record<string, unknown>>;
   capability_lane_resolve_traces?: Array<Record<string, unknown>>;
@@ -648,6 +739,7 @@ export type CapabilityLaneSessionControlResponse = {
   schema?: "helix.capability_lane.session_control_response.v1" | string;
   ok?: boolean;
   agent_runtime?: HelixAgentRuntimeId | string;
+  selected_agent_provider?: Record<string, unknown>;
   capability_lane_session_results?: Array<Record<string, unknown>>;
   capability_lane_session_debug_summaries?: Array<Record<string, unknown>>;
   capability_lane_turn_timeline?: Array<Record<string, unknown>>;
@@ -655,6 +747,29 @@ export type CapabilityLaneSessionControlResponse = {
   model_visible_capability_lane_manifest?: Record<string, unknown> | null;
   session_results?: Array<Record<string, unknown>>;
   session_debug_summaries?: Array<Record<string, unknown>>;
+  context_role?: "tool_evidence";
+  answer_authority?: false;
+  terminal_eligible?: false;
+  assistant_answer?: false;
+  raw_content_included?: false;
+  error?: string;
+  message?: string;
+};
+
+export type CapabilityLaneSessionListResponse = {
+  schema?: "helix.capability_lane.session_list_response.v1" | string;
+  ok?: boolean;
+  session_count?: number;
+  adapter_boundary?: "helix_agent_provider_edge" | string;
+  selected_runtime_agent_providers?: Array<HelixAgentRuntimeId | string>;
+  selected_agent_providers?: Array<Record<string, unknown>>;
+  filters?: Record<string, unknown>;
+  capability_lane_sessions?: Array<Record<string, unknown>>;
+  capability_lane_session_debug_summaries?: Array<Record<string, unknown>>;
+  capability_lane_turn_timeline?: Array<Record<string, unknown>>;
+  capability_lane_timeline_summary?: Record<string, unknown>;
+  context_role?: "tool_evidence";
+  answer_authority?: false;
   terminal_eligible?: false;
   assistant_answer?: false;
   raw_content_included?: false;
@@ -667,12 +782,14 @@ export type CapabilityLaneGoalBindingControlResponse = {
   ok?: boolean;
   requested?: boolean;
   agent_runtime?: HelixAgentRuntimeId | string;
+  selected_agent_provider?: Record<string, unknown>;
   capability_lane_goal_binding_results?: Array<Record<string, unknown>>;
   capability_lane_goal_binding_debug_summaries?: Array<Record<string, unknown>>;
   capability_lane_mail_loop_debug_summaries?: Array<Record<string, unknown>>;
   capability_lane_turn_timeline?: Array<Record<string, unknown>>;
   capability_lane_timeline_summary?: Record<string, unknown>;
   model_visible_capability_lane_manifest?: Record<string, unknown> | null;
+  context_role?: "tool_evidence";
   terminal_eligible?: false;
   assistant_answer?: false;
   raw_content_included?: false;
@@ -685,6 +802,7 @@ export type CapabilityLaneMailLoopResponse = {
   ok?: boolean;
   requested?: boolean;
   agent_runtime?: HelixAgentRuntimeId | string;
+  selected_agent_provider?: Record<string, unknown>;
   capability_lane_call_results?: Array<Record<string, unknown>>;
   capability_lane_observation_packets?: Array<Record<string, unknown>>;
   capability_lane_projection_receipts?: Array<Record<string, unknown>>;
@@ -2123,7 +2241,9 @@ export async function runCapabilityLaneOneShot(
     body: JSON.stringify(body),
     signal: payload.signal,
   });
-  return asJson<CapabilityLaneOneShotResponse>(response);
+  const result = await asJson<CapabilityLaneOneShotResponse>(response);
+  ingestImageLensRegionInspectionReceipts(result);
+  return result;
 }
 
 export async function runCapabilityLaneSessionControl(
@@ -2155,6 +2275,46 @@ export async function runCapabilityLaneSessionControl(
     signal: payload.signal,
   });
   return asJson<CapabilityLaneSessionControlResponse>(response);
+}
+
+export async function listCapabilityLaneSessions(
+  payload: ListCapabilityLaneSessionsPayload = {},
+): Promise<CapabilityLaneSessionListResponse> {
+  const query = new URLSearchParams();
+  const selectedRuntime = payload.agentRuntime ?? payload.agent_runtime;
+  const laneSessionId = payload.laneSessionId ?? payload.lane_session_id;
+  const laneId = payload.laneId ?? payload.lane_id;
+  const sourceId = payload.sourceId ?? payload.source_id;
+  const sourceHash = payload.sourceHash ?? payload.source_hash;
+  const sourceBindingKey = payload.sourceBindingKey ?? payload.source_binding_key;
+  const sourceIdentityKey = payload.sourceIdentityKey ?? payload.source_identity_key;
+  const latestSourceIdentityKey = payload.latestSourceIdentityKey ?? payload.latest_source_identity_key;
+  const projectionTarget = payload.projectionTarget ?? payload.projection_target;
+  const accountLocale = payload.accountLocale ?? payload.account_locale;
+  const targetLanguage = payload.targetLanguage ?? payload.target_language;
+  if (selectedRuntime) query.set("agent_runtime", selectedRuntime);
+  if (laneSessionId) query.set("lane_session_id", laneSessionId);
+  if (laneId) query.set("lane_id", laneId);
+  if (sourceId) query.set("source_id", sourceId);
+  if (sourceHash) query.set("source_hash", sourceHash);
+  if (sourceBindingKey) query.set("source_binding_key", sourceBindingKey);
+  if (sourceIdentityKey) query.set("source_identity_key", sourceIdentityKey);
+  if (latestSourceIdentityKey) query.set("latest_source_identity_key", latestSourceIdentityKey);
+  if (projectionTarget) query.set("projection_target", projectionTarget);
+  if (accountLocale) query.set("account_locale", accountLocale);
+  if (targetLanguage) query.set("target_language", targetLanguage);
+  const queryString = query.toString();
+  const path = queryString
+    ? `/api/agi/capability-lanes/session?${queryString}`
+    : "/api/agi/capability-lanes/session";
+  const response = await fetch(path, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+    },
+    signal: payload.signal,
+  });
+  return asJson<CapabilityLaneSessionListResponse>(response);
 }
 
 export async function runCapabilityLaneGoalBindingControl(
@@ -2624,6 +2784,7 @@ const buildBlockedJobDirectFallbackResponse = (
 });
 
 const normalizeLocalAskResponse = (payload: unknown): LocalAskResponse => {
+  ingestImageLensRegionInspectionReceipts(payload);
   const record = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
   const selectedFinalAnswer = typeof record.selected_final_answer === "string" ? record.selected_final_answer.trim() : "";
   const assistantAnswer = typeof record.assistant_answer === "string" ? record.assistant_answer.trim() : "";

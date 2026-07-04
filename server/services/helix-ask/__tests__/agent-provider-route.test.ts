@@ -2,6 +2,7 @@ import express from "express";
 import request from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
 import { agentProvidersRouter } from "../../../routes/agi.agent-providers";
+import { helixCapabilityLaneSessionStore } from "../capability-lanes/session-manager";
 
 const ENV_KEYS = [
   "HELIX_ASK_AGENT_RUNTIME",
@@ -15,6 +16,7 @@ for (const key of ENV_KEYS) {
 }
 
 afterEach(() => {
+  helixCapabilityLaneSessionStore.clear();
   for (const key of ENV_KEYS) {
     const original = originalEnv.get(key);
     if (original === undefined) {
@@ -355,6 +357,8 @@ describe("AGI agent provider route", () => {
       schema: "helix.capability_lane.session_control_response.v1",
       ok: true,
       agent_runtime: "helix",
+      context_role: "tool_evidence",
+      answer_authority: false,
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
@@ -446,6 +450,8 @@ describe("AGI agent provider route", () => {
       schema: "helix.capability_lane.session_control_response.v1",
       ok: true,
       agent_runtime: "helix",
+      context_role: "tool_evidence",
+      answer_authority: false,
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
@@ -492,6 +498,8 @@ describe("AGI agent provider route", () => {
       schema: "helix.capability_lane.session_control_response.v1",
       ok: true,
       agent_runtime: "helix",
+      context_role: "tool_evidence",
+      answer_authority: false,
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
@@ -538,6 +546,8 @@ describe("AGI agent provider route", () => {
       schema: "helix.capability_lane.session_control_response.v1",
       ok: true,
       agent_runtime: "helix",
+      context_role: "tool_evidence",
+      answer_authority: false,
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
@@ -570,6 +580,247 @@ describe("AGI agent provider route", () => {
     ]);
   });
 
+  it("lists governed capability lane sessions as non-authoritative tool evidence", async () => {
+    await request(createApp())
+      .post("/api/agi/capability-lanes/session")
+      .send({
+        agent_runtime: "helix",
+        turn_id: "turn-route-session-list-start",
+        capability_lane_session_call: {
+          action: "start",
+          lane_id: "live_translation",
+          lane_session_id: "lane-session-docs-list",
+          source_binding: {
+            source_id: "document_markdown:docs/list.md",
+            source_hash: "fnv1a32:list",
+            source_text_hash: "fnv1a32:list-text",
+            source_text_char_count: 64,
+            source_kind: "docs",
+            projection_target: "docs_chunk",
+            account_locale: "haw",
+            target_language: "haw",
+          },
+        },
+      })
+      .expect(200);
+    await request(createApp())
+      .post("/api/agi/capability-lanes/session")
+      .send({
+        agent_runtime: "helix",
+        turn_id: "turn-route-session-list-other-start",
+        capability_lane_session_call: {
+          action: "start",
+          lane_id: "live_translation",
+          lane_session_id: "lane-session-docs-list-other",
+          source_binding: {
+            source_id: "document_markdown:docs/other.md",
+            source_hash: "fnv1a32:other",
+            source_text_hash: "fnv1a32:other-text",
+            source_text_char_count: 12,
+            source_kind: "docs",
+            projection_target: "docs_chunk",
+            account_locale: "haw",
+            target_language: "haw",
+          },
+        },
+      })
+      .expect(200);
+
+    const response = await request(createApp())
+      .get("/api/agi/capability-lanes/session")
+      .query({
+        agent_runtime: "helix",
+        source_id: "document_markdown:docs/list.md",
+        source_hash: "fnv1a32:list",
+        source_binding_key: "document_markdown:docs/list.md::fnv1a32:list::docs_chunk::haw::haw",
+        source_identity_key:
+          "document_markdown:docs/list.md::fnv1a32:list::fnv1a32:list-text::64::docs::docs_chunk::haw::haw",
+        latest_source_identity_key:
+          "document_markdown:docs/list.md::fnv1a32:list::fnv1a32:list-text::64::docs::docs_chunk::haw::haw",
+        projection_target: "docs_chunk",
+        account_locale: "HAW",
+        target_language: "HAW",
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      schema: "helix.capability_lane.session_list_response.v1",
+      ok: true,
+      session_count: 1,
+      adapter_boundary: "helix_agent_provider_edge",
+      selected_runtime_agent_providers: ["helix"],
+      selected_agent_providers: [
+        expect.objectContaining({
+          id: "helix",
+          label: "Helix Ask Native",
+          supports: expect.objectContaining({
+            capabilityLanes: true,
+            capabilityLaneSessions: true,
+          }),
+        }),
+      ],
+      filters: {
+        lane_session_id: null,
+        lane_id: null,
+        agent_runtime: "helix",
+        source_id: "document_markdown:docs/list.md",
+        source_hash: "fnv1a32:list",
+        source_binding_key: "document_markdown:docs/list.md::fnv1a32:list::docs_chunk::haw::haw",
+        source_identity_key:
+          "document_markdown:docs/list.md::fnv1a32:list::fnv1a32:list-text::64::docs::docs_chunk::haw::haw",
+        latest_source_identity_key:
+          "document_markdown:docs/list.md::fnv1a32:list::fnv1a32:list-text::64::docs::docs_chunk::haw::haw",
+        projection_target: "docs_chunk",
+        account_locale: "HAW",
+        target_language: "HAW",
+      },
+      context_role: "tool_evidence",
+      answer_authority: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(response.body.capability_lane_sessions).toEqual([
+      expect.objectContaining({
+        lane_session_id: "lane-session-docs-list",
+        lane_id: "live_translation",
+        status: "running",
+        health: "healthy",
+        last_observation_ref: null,
+        last_receipt_ref: null,
+        source_binding: expect.objectContaining({
+          source_id: "document_markdown:docs/list.md",
+          source_hash: "fnv1a32:list",
+          source_text_hash: "fnv1a32:list-text",
+          source_text_char_count: 64,
+          source_kind: "docs",
+          projection_target: "docs_chunk",
+          account_locale: "haw",
+          target_language: "haw",
+        }),
+        permissions: expect.objectContaining({
+          read: true,
+          observe: true,
+          write: false,
+          shell: false,
+          code_mutation: false,
+        }),
+        debug_history: [
+          expect.objectContaining({
+            action: "start",
+            context_role: "tool_evidence",
+            answer_authority: false,
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          }),
+        ],
+        context_role: "tool_evidence",
+        answer_authority: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(response.body.capability_lane_session_debug_summaries).toEqual([
+      expect.objectContaining({
+        lane_session_id: "lane-session-docs-list",
+        lane_id: "live_translation",
+        session_status: "running",
+        session_health: "healthy",
+        source_binding_key:
+          "document_markdown:docs/list.md::fnv1a32:list::docs_chunk::haw::haw",
+        source_identity_key:
+          "document_markdown:docs/list.md::fnv1a32:list::fnv1a32:list-text::64::docs::docs_chunk::haw::haw",
+        session_event_count: 1,
+        has_observation: false,
+        terminal_authority_status: "not_terminal_authority",
+        context_role: "tool_evidence",
+        answer_authority: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(response.body.capability_lane_turn_timeline).toEqual([
+      expect.objectContaining({
+        schema: "helix.capability_lane.provider_timeline_event.v1",
+        seq: 0,
+        stage: "lane_session",
+        selected_runtime_agent_provider: "helix",
+        adapter_boundary: "helix_agent_provider_edge",
+        lane_id: "live_translation",
+        capability_id: null,
+        status: "running",
+        session_status: "running",
+        session_health: "healthy",
+        lane_visible: false,
+        lane_requested: true,
+        lane_executed: false,
+        observation_reentered: false,
+        observation_ref: null,
+        receipt_ref: null,
+        session_control_key:
+          "lane-session-docs-list::document_markdown:docs/list.md::fnv1a32:list::docs_chunk::haw::haw",
+        source_binding_key:
+          "document_markdown:docs/list.md::fnv1a32:list::docs_chunk::haw::haw",
+        source_identity_key:
+          "document_markdown:docs/list.md::fnv1a32:list::fnv1a32:list-text::64::docs::docs_chunk::haw::haw",
+        has_observation: false,
+        terminal_authority_status: "not_terminal_authority",
+        context_role: "tool_evidence",
+        answer_authority: false,
+        reentry_required: true,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(response.body.capability_lane_timeline_summary).toMatchObject({
+      schema: "helix.capability_lane.timeline_summary.v1",
+      event_count: 1,
+      stage_sequence: ["session"],
+      stage_sequence_text: "session",
+      session_count: 1,
+      observed_session_count: 0,
+      lane_executed_count: 0,
+      session_control_key_count: 1,
+      source_binding_key_count: 1,
+      source_identity_key_count: 1,
+      visible_lane_does_not_mean_executed: true,
+    });
+
+    const staleLatestIdentity = await request(createApp())
+      .get("/api/agi/capability-lanes/session")
+      .query({
+        agent_runtime: "helix",
+        source_id: "document_markdown:docs/list.md",
+        source_hash: "fnv1a32:list",
+        source_binding_key: "document_markdown:docs/list.md::fnv1a32:list::docs_chunk::haw::haw",
+        source_identity_key:
+          "document_markdown:docs/list.md::fnv1a32:list::fnv1a32:list-text::64::docs::docs_chunk::haw::haw",
+        latest_source_identity_key:
+          "document_markdown:docs/list.md::fnv1a32:stale::fnv1a32:stale-text::12::docs::docs_chunk::haw::haw",
+        projection_target: "docs_chunk",
+        account_locale: "HAW",
+        target_language: "HAW",
+      })
+      .expect(200);
+
+    expect(staleLatestIdentity.body).toMatchObject({
+      schema: "helix.capability_lane.session_list_response.v1",
+      ok: true,
+      session_count: 0,
+      filters: {
+        latest_source_identity_key:
+          "document_markdown:docs/list.md::fnv1a32:stale::fnv1a32:stale-text::12::docs::docs_chunk::haw::haw",
+      },
+      capability_lane_sessions: [],
+      capability_lane_session_debug_summaries: [],
+      capability_lane_turn_timeline: [],
+    });
+  });
+
   it("does not report empty session control requests as successful execution", async () => {
     const response = await request(createApp())
       .post("/api/agi/capability-lanes/session")
@@ -584,6 +835,8 @@ describe("AGI agent provider route", () => {
       ok: false,
       requested: false,
       agent_runtime: "helix",
+      context_role: "tool_evidence",
+      answer_authority: false,
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
@@ -774,6 +1027,141 @@ describe("AGI agent provider route", () => {
     });
     expect(response.body.capability_lane_timeline_summary.visible_count).toBeGreaterThan(0);
     expect(response.body.capability_lane_timeline_summary.visible_only_count).toBeGreaterThan(0);
+
+    const listed = await request(createApp())
+      .post("/api/agi/capability-lanes/goal-binding")
+      .send({
+        agent_runtime: "codex",
+        turn_id: "turn-route-goal-binding-list",
+        capability_lane_goal_binding_call: {
+          action: "list",
+          goal_binding_id: "goal-binding-route",
+          goal_id: "goal:translate-docs-route",
+          lane_session_id: "lane-session-goal-binding-route",
+        },
+      })
+      .expect(200);
+
+    expect(listed.body).toMatchObject({
+      schema: "helix.capability_lane.goal_binding_control_response.v1",
+      ok: true,
+      requested: true,
+      agent_runtime: "codex",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(listed.body.capability_lane_goal_binding_results).toEqual([
+      expect.objectContaining({
+        ok: true,
+        blocked_reason: null,
+        goal_binding: expect.objectContaining({
+          goal_binding_id: "goal-binding-route",
+          goal_id: "goal:translate-docs-route",
+          lane_session_id: "lane-session-goal-binding-route",
+          status: "bound",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+      }),
+    ]);
+    expect(listed.body.capability_lane_goal_binding_debug_summaries).toEqual([
+      expect.objectContaining({
+        goal_binding_id: "goal-binding-route",
+        goal_id: "goal:translate-docs-route",
+        lane_session_id: "lane-session-goal-binding-route",
+        binding_status: "bound",
+        latest_goal_binding_event: expect.objectContaining({
+          event: "bound",
+        }),
+        backend_provider_becomes_root_agent: false,
+        final_reports_require_terminal_authority: true,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(listed.body.capability_lane_turn_timeline).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        schema: "helix.capability_lane.provider_timeline_event.v1",
+        stage: "goal_binding",
+        selected_runtime_agent_provider: "codex",
+        lane_id: "live_translation",
+        status: "bound",
+        lane_requested: true,
+        lane_executed: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]));
+
+    const getListed = await request(createApp())
+      .get("/api/agi/capability-lanes/goal-binding")
+      .query({
+        agent_runtime: "codex",
+        goal_binding_id: "goal-binding-route",
+        goal_id: "goal:translate-docs-route",
+        lane_session_id: "lane-session-goal-binding-route",
+      })
+      .expect(200);
+
+    expect(getListed.body).toMatchObject({
+      schema: "helix.capability_lane.goal_binding_list_response.v1",
+      ok: true,
+      goal_binding_count: 1,
+      adapter_boundary: "helix_agent_provider_edge",
+      agent_runtime: "codex",
+      filters: {
+        goal_binding_id: "goal-binding-route",
+        goal_id: "goal:translate-docs-route",
+        lane_session_id: "lane-session-goal-binding-route",
+        agent_runtime: "codex",
+      },
+      context_role: "tool_evidence",
+      answer_authority: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(getListed.body.capability_lane_goal_bindings).toEqual([
+      expect.objectContaining({
+        goal_binding_id: "goal-binding-route",
+        goal_id: "goal:translate-docs-route",
+        lane_session_id: "lane-session-goal-binding-route",
+        backend_provider_becomes_root_agent: false,
+        final_reports_require_terminal_authority: true,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(getListed.body.capability_lane_goal_binding_debug_summaries).toEqual([
+      expect.objectContaining({
+        goal_binding_id: "goal-binding-route",
+        binding_status: "bound",
+        report_decision: expect.objectContaining({
+          terminal_report_requires_authority: true,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+        dispatch_plan: expect.objectContaining({
+          side_effects_executed: false,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+        dispatch_admission: expect.objectContaining({
+          side_effects_allowed: false,
+          side_effects_executed: false,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+      }),
+    ]);
   });
 
   it("routes live translation lane observations into mail-loop evidence without terminal authority", async () => {

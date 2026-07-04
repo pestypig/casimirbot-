@@ -1492,7 +1492,7 @@ describe("explicit workstation gateway derived calls", () => {
     }
   });
 
-  it("keeps structured live translation lane calls observation-only and separate from surface reads", () => {
+  it("keeps structured live translation lane calls observation-only and separate from surface reads", async () => {
     const body = {
       turn_id: "ask:test:structured-live-translation-lane",
       agent_runtime: "codex",
@@ -1511,7 +1511,7 @@ describe("explicit workstation gateway derived calls", () => {
       },
     };
 
-    const lane = runHelixCapabilityLaneOneShotRequests({
+    const lane = await runHelixCapabilityLaneOneShotRequests({
       provider: buildTestProvider("codex"),
       body,
       turnId: "ask:test:structured-live-translation-lane",

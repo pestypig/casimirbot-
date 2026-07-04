@@ -124,6 +124,7 @@ const buildReportedBinding = () => {
       source_id: "docs:summary",
       source_hash: "sha256:summary-v1",
       source_kind: "document_markdown",
+      account_locale: "es-US",
       chunk_id: "chunk-summary",
       projection_target: "docs_chunk",
       target_language: "es",
@@ -234,7 +235,9 @@ describe("capability lane goal binding debug summary", () => {
       latest_observation_key: [
         "docs:summary",
         "sha256:summary-v1",
+        "docs",
         "docs_chunk",
+        "es-US",
         "es",
         "chunk-summary-session",
         "ask:lane:translation:summary-obs:projection:receipt",
@@ -268,7 +271,9 @@ describe("capability lane goal binding debug summary", () => {
       latest_mail_loop_observation_key: [
         "docs:summary",
         "sha256:summary-v1",
+        "document_markdown",
         "docs_chunk",
+        "es-US",
         "es",
         "chunk-summary",
         "ask:lane:translation:summary-obs:projection:receipt",
@@ -308,6 +313,7 @@ describe("capability lane goal binding debug summary", () => {
         mail_loop_ref: "stage-play-mail-summary",
         receipt_ref: "ask:lane:translation:summary-obs:projection:receipt",
         reentry_required: true,
+        answer_authority: false,
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -326,7 +332,9 @@ describe("capability lane goal binding debug summary", () => {
         latest_mail_loop_observation_key: [
           "docs:summary",
           "sha256:summary-v1",
+          "document_markdown",
           "docs_chunk",
+          "es-US",
           "es",
           "chunk-summary",
           "ask:lane:translation:summary-obs:projection:receipt",
@@ -373,6 +381,7 @@ describe("capability lane goal binding debug summary", () => {
         terminal_report_emitted: false,
         terminal_authority_status: "pending_helix_terminal_authority",
         reentry_required: true,
+        answer_authority: false,
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -390,7 +399,9 @@ describe("capability lane goal binding debug summary", () => {
         latest_mail_loop_observation_key: [
           "docs:summary",
           "sha256:summary-v1",
+          "document_markdown",
           "docs_chunk",
+          "es-US",
           "es",
           "chunk-summary",
           "ask:lane:translation:summary-obs:projection:receipt",
@@ -438,6 +449,7 @@ describe("capability lane goal binding debug summary", () => {
         terminal_report_allowed: false,
         terminal_authority_status: "pending_helix_terminal_authority",
         reentry_required: true,
+        answer_authority: false,
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -453,6 +465,7 @@ describe("capability lane goal binding debug summary", () => {
       final_reports_require_terminal_authority: true,
       terminal_authority_status: "pending_helix_terminal_authority",
       reentry_required: true,
+      answer_authority: false,
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
@@ -471,6 +484,7 @@ describe("capability lane goal binding debug summary", () => {
         selected_backend_provider: "live_translation.local_runtime",
       }),
       reason: "lane_session_observation_recorded",
+      source_identity_key: "docs:summary::sha256:summary-v1::docs::docs_chunk::es-US::es",
       target_language: "es",
       observation_ref: "ask:lane:translation:summary-obs",
       receipt_ref: "ask:lane:translation:summary-obs:projection:receipt",
@@ -495,6 +509,8 @@ describe("capability lane goal binding debug summary", () => {
       receipt_ref: "ask:lane:translation:summary-obs:projection:receipt",
       source_id: "docs:summary",
       source_hash: "sha256:summary-v1",
+      source_identity_key:
+        "docs:summary::sha256:summary-v1::sha256:text-summary::42::docs::docs_chunk::es-US::es",
       target_language: "es",
       latest_chunk_id: "chunk-summary-session",
       latest_chunk_index: 7,
@@ -517,6 +533,19 @@ describe("capability lane goal binding debug summary", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+  });
+
+  it("prefers the current mail-loop receipt over a stale session last receipt", () => {
+    const binding = buildReportedBinding();
+    binding.lane_session_last_receipt_ref = "ask:lane:translation:summary-previous:projection:receipt";
+
+    const summary = buildHelixCapabilityLaneGoalBindingDebugSummary(binding);
+
+    expect(summary.last_receipt_ref).toBe("ask:lane:translation:summary-obs:projection:receipt");
+    expect(summary.report_decision.receipt_ref).toBe("ask:lane:translation:summary-obs:projection:receipt");
+    expect(summary.dispatch_plan.receipt_ref).toBe("ask:lane:translation:summary-obs:projection:receipt");
+    expect(summary.report_summary_text).toContain("receipt ask:lane:translation:summary-obs:projection:receipt");
+    expect(summary.report_summary_text).not.toContain("summary-previous");
   });
 
   it("builds array summaries while preserving non-terminal lane invariants", () => {
@@ -548,7 +577,9 @@ describe("capability lane goal binding debug summary", () => {
       latest_observation_key: [
         "docs:summary",
         "sha256:summary-v1",
+        "docs",
         "docs_chunk",
+        "es-US",
         "es",
         "chunk-summary-session",
         "ask:lane:translation:summary-obs:projection:receipt",
@@ -572,7 +603,9 @@ describe("capability lane goal binding debug summary", () => {
       latest_mail_loop_observation_key: [
         "docs:summary",
         "sha256:summary-v1",
+        "document_markdown",
         "docs_chunk",
+        "es-US",
         "es",
         "chunk-summary",
         "ask:lane:translation:summary-obs:projection:receipt",
@@ -587,6 +620,7 @@ describe("capability lane goal binding debug summary", () => {
         quiet_behavior: "record_only",
         quiet_behavior_applied: true,
         terminal_report_requires_authority: true,
+        context_role: "tool_evidence",
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -599,7 +633,9 @@ describe("capability lane goal binding debug summary", () => {
         latest_mail_loop_observation_key: [
           "docs:summary",
           "sha256:summary-v1",
+          "document_markdown",
           "docs_chunk",
+          "es-US",
           "es",
           "chunk-summary",
           "ask:lane:translation:summary-obs:projection:receipt",
@@ -623,6 +659,7 @@ describe("capability lane goal binding debug summary", () => {
         wake_dispatched: false,
         badge_projected: false,
         terminal_report_emitted: false,
+        context_role: "tool_evidence",
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -635,7 +672,9 @@ describe("capability lane goal binding debug summary", () => {
         latest_mail_loop_observation_key: [
           "docs:summary",
           "sha256:summary-v1",
+          "document_markdown",
           "docs_chunk",
+          "es-US",
           "es",
           "chunk-summary",
           "ask:lane:translation:summary-obs:projection:receipt",
@@ -657,6 +696,7 @@ describe("capability lane goal binding debug summary", () => {
         wake_dispatch_allowed: false,
         badge_projection_allowed: false,
         terminal_report_allowed: false,
+        context_role: "tool_evidence",
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -665,6 +705,7 @@ describe("capability lane goal binding debug summary", () => {
       backend_provider_becomes_root_agent: false,
       final_reports_require_terminal_authority: true,
       reentry_required: true,
+      context_role: "tool_evidence",
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
@@ -758,6 +799,74 @@ describe("capability lane goal binding debug summary", () => {
         source_text_char_count: 58,
         mail_loop_ref: null,
         receipt_ref: "ask:lane:translation:pre-mail-obs:projection:receipt",
+      }),
+    });
+  });
+
+  it("keeps bound source-text identity visible before observations or mail-loop packets exist", () => {
+    const sessionStore = createHelixCapabilityLaneSessionStore();
+    sessionStore.start({
+      provider: buildProvider("codex"),
+      laneId: "live_translation",
+      laneSessionId: "lane-session-bound-source-text",
+      sourceBinding: {
+        source_id: "docs:bound-source-text",
+        source_hash: "sha256:bound-source-text-v1",
+        source_text_hash: "sha256:text-bound-source",
+        source_text_char_count: 64,
+        source_kind: "docs",
+        projection_target: "docs_chunk",
+        account_locale: "es-US",
+        target_language: "es",
+      },
+      requestedBackendProvider: "google_gemini",
+      env: {} as NodeJS.ProcessEnv,
+      nowMs: 100,
+    });
+    const store = createHelixCapabilityLaneGoalBindingStore({ sessionStore });
+    const result = store.bind({
+      goalId: "goal:bound-source-text",
+      laneSessionId: "lane-session-bound-source-text",
+      goalBindingId: "goal-binding-bound-source-text",
+      quietBehavior: "surface_badge",
+      nowMs: 110,
+    });
+
+    if (!result.goal_binding) {
+      throw new Error("expected goal binding");
+    }
+
+    const summary = buildHelixCapabilityLaneGoalBindingDebugSummary(result.goal_binding);
+    const sourceIdentityKey = [
+      "docs:bound-source-text",
+      "sha256:bound-source-text-v1",
+      "sha256:text-bound-source",
+      "64",
+      "docs",
+      "docs_chunk",
+      "es-US",
+      "es",
+    ].join("::");
+
+    expect(summary).toMatchObject({
+      goal_binding_id: "goal-binding-bound-source-text",
+      has_observation: false,
+      source_identity_key: sourceIdentityKey,
+      source_text_hash: "sha256:text-bound-source",
+      source_text_char_count: 64,
+      latest_mail_loop_summary: null,
+      latest_mail_loop_observation_key: null,
+      dispatch_plan: expect.objectContaining({
+        target: "ui_badge",
+        source_identity_key: sourceIdentityKey,
+        source_text_hash: "sha256:text-bound-source",
+        source_text_char_count: 64,
+      }),
+      dispatch_admission: expect.objectContaining({
+        status: "blocked",
+        blocked_reason: "missing_evidence_ref",
+        source_text_hash: "sha256:text-bound-source",
+        source_text_char_count: 64,
       }),
     });
   });

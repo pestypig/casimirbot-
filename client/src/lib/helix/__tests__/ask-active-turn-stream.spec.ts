@@ -203,6 +203,8 @@ describe("ask active turn stream", () => {
             sourceKind: "docs",
             sourceTextHash: "sha256:active-source-text",
             sourceTextCharCount: 2048,
+            sourceIdentityKey:
+              "docs:active::sha256:active-doc::sha256:active-source-text::2048::docs::docs_chunk::es-US::es",
             sourceProjectionTarget: "docs_chunk",
             accountLocale: "es-US",
             latestProjectionTarget: "docs_chunk",
@@ -232,6 +234,9 @@ describe("ask active turn stream", () => {
     expect(rows[0]?.meta).toContain("source kind docs");
     expect(rows[0]?.meta).toContain("source payload hash sha256:active-source-text");
     expect(rows[0]?.meta).toContain("source payload chars 2048");
+    expect(rows[0]?.meta).toContain(
+      "source identity key docs:active::sha256:active-doc::sha256:active-source-text::2048::docs::docs_chunk::es-US::es",
+    );
     expect(rows[0]?.meta).toContain("source projection docs_chunk");
     expect(rows[0]?.meta).toContain("account locale es-US");
     expect(rows[0]?.meta).toContain("target es");

@@ -27,6 +27,9 @@ const messages: Record<string, string> = {
   "docsViewer.taxonomy.calculatorReady": "Calculator-ready",
   "docsViewer.taxonomy.sidecarsAttached": "Sidecars attached",
   "docsViewer.translation.status.ready": "Translation ready: {status}",
+  "docsViewer.translation.status.projectionFailed": "Translation failed: {reason}",
+  "docsViewer.translation.status.projectionCancelled": "Translation cancelled: {status}",
+  "docsViewer.translation.status.projectionStale": "Translation stale: {status}",
   "docsViewer.translation.hideInline": "Hide translation",
   "docsViewer.translation.generateInline": "Translate",
   "docsViewer.translation.generating": "Translating",
@@ -177,14 +180,17 @@ describe("DocViewerPanel taxonomy UI", () => {
       status: "loading",
       projectionStatus: "missing",
       sourceId: "document_markdown:docs/research/nhm2.md",
+      sourceIdentityKey:
+        "document_markdown:docs/research/nhm2.md::fnv1a32:whole-doc::fnv1a32:visible-chunk::42::docs::docs_chunk::es-US::es",
       sourceHash: "fnv1a32:whole-doc",
-      sourceKind: "document_markdown",
+      sourceKind: "docs",
       sourceTextHash: "fnv1a32:visible-chunk",
       sourceTextCharCount: 42,
       chunkId: "doc-inline:fnv1a32:whole-doc:u0001",
       chunkIndex: 1,
       accountLocale: "es-US",
       targetLanguage: "es",
+      answerAuthority: false,
       terminalEligible: false,
       assistantAnswer: false,
       rawContentIncluded: false,
@@ -199,10 +205,13 @@ describe("DocViewerPanel taxonomy UI", () => {
       '<div data-doc-translation-anchor="u-active" data-doc-translation-render-status="loading" data-doc-translation-display-status="active" data-doc-translation-projection-status="missing"></div>',
       '<div data-doc-translation-anchor="u-stale" data-doc-translation-render-status="error" data-doc-translation-display-status="stale" data-doc-translation-projection-status="stale"></div>',
       '<div data-doc-translation-anchor="u-old-source" data-doc-translation-source-hash="fnv1a32:old" data-doc-translation-render-status="ready" data-doc-translation-display-status="ready" data-doc-translation-projection-status="projected"></div>',
+      '<div data-doc-translation-anchor="u-old-identity" data-doc-translation-source-hash="fnv1a32:current" data-doc-translation-source-identity-key="document_markdown:docs/research/nhm2.md::fnv1a32:current::source-text-old::18::docs::docs_chunk::es-US::es" data-doc-translation-render-status="ready" data-doc-translation-display-status="ready" data-doc-translation-projection-status="projected"></div>',
       '<div data-doc-translation-anchor="u-memory-current" data-doc-translation-render-status="empty" data-doc-translation-display-status="empty" data-doc-translation-projection-status="missing"></div>',
       '<div data-doc-translation-anchor="u-memory-old" data-doc-translation-render-status="empty" data-doc-translation-display-status="empty" data-doc-translation-projection-status="missing"></div>',
+      '<div data-doc-translation-anchor="u-memory-old-identity" data-doc-translation-render-status="empty" data-doc-translation-display-status="empty" data-doc-translation-projection-status="missing"></div>',
       '<div data-doc-translation-anchor="u-inflight-current" data-doc-translation-render-status="empty" data-doc-translation-display-status="empty" data-doc-translation-projection-status="missing"></div>',
       '<div data-doc-translation-anchor="u-inflight-old" data-doc-translation-render-status="empty" data-doc-translation-display-status="empty" data-doc-translation-projection-status="missing"></div>',
+      '<div data-doc-translation-anchor="u-inflight-old-identity" data-doc-translation-render-status="empty" data-doc-translation-display-status="empty" data-doc-translation-projection-status="missing"></div>',
       '<div data-doc-translation-anchor="u-empty" data-doc-translation-render-status="empty" data-doc-translation-display-status="empty" data-doc-translation-projection-status="missing"></div>',
     ].join("");
     const rect = { top: 10, bottom: 20, left: 0, right: 10, width: 10, height: 10, x: 0, y: 10, toJSON: () => ({}) };
@@ -218,10 +227,13 @@ describe("DocViewerPanel taxonomy UI", () => {
         "u-active",
         "u-stale",
         "u-old-source",
+        "u-old-identity",
         "u-memory-current",
         "u-memory-old",
+        "u-memory-old-identity",
         "u-inflight-current",
         "u-inflight-old",
+        "u-inflight-old-identity",
         "u-empty",
       ].map((unitId) => ({
         unit_id: unitId,
@@ -235,28 +247,56 @@ describe("DocViewerPanel taxonomy UI", () => {
           status: "ready",
           text: "Texto actual.",
           sourceHash: "fnv1a32:current",
+          sourceIdentityKey:
+            "document_markdown:docs/research/nhm2.md::fnv1a32:current::source-text-current::42::docs::docs_chunk::es-US::es",
         } as never,
         "u-memory-old": {
           status: "ready",
           text: "Texto anterior.",
           sourceHash: "fnv1a32:old",
         } as never,
+        "u-memory-old-identity": {
+          status: "ready",
+          text: "Texto identidad anterior.",
+          sourceHash: "fnv1a32:current",
+          sourceIdentityKey:
+            "document_markdown:docs/research/nhm2.md::fnv1a32:current::source-text-old::18::docs::docs_chunk::es-US::es",
+        } as never,
         "u-inflight-current": {
           status: "loading",
           text: "",
           sourceHash: "fnv1a32:current",
+          sourceIdentityKey:
+            "document_markdown:docs/research/nhm2.md::fnv1a32:current::source-text-current::42::docs::docs_chunk::es-US::es",
         } as never,
         "u-inflight-old": {
           status: "loading",
           text: "",
           sourceHash: "fnv1a32:old",
         } as never,
+        "u-inflight-old-identity": {
+          status: "loading",
+          text: "",
+          sourceHash: "fnv1a32:current",
+          sourceIdentityKey:
+            "document_markdown:docs/research/nhm2.md::fnv1a32:current::source-text-old::18::docs::docs_chunk::es-US::es",
+        } as never,
       },
-      inFlightIds: new Set(["u-inflight-current", "u-inflight-old"]),
+      inFlightIds: new Set(["u-inflight-current", "u-inflight-old", "u-inflight-old-identity"]),
       sourceHash: "fnv1a32:current",
+      sourceIdentityKey:
+        "document_markdown:docs/research/nhm2.md::fnv1a32:current::source-text-current::42::docs::docs_chunk::es-US::es",
       maxUnits: 10,
       maxChars: 1000,
-    })).toEqual(["u-old-source", "u-memory-old", "u-inflight-old", "u-empty"]);
+    })).toEqual([
+      "u-old-source",
+      "u-old-identity",
+      "u-memory-old",
+      "u-memory-old-identity",
+      "u-inflight-old",
+      "u-inflight-old-identity",
+      "u-empty",
+    ]);
   });
 
   it("shows taxonomy badges in the open document header", () => {
@@ -278,6 +318,11 @@ describe("DocViewerPanel taxonomy UI", () => {
         translationEligible={false}
         translationAccountLocale="en"
         translationTargetLanguage="es"
+        translationSourceId={null}
+        translationSourceHash={null}
+        translationSourceTextHash={null}
+        translationSourceTextCharCount={null}
+        translationLaneSessionId={null}
         inlineTranslationEnabled={false}
         translationStatus="idle"
         translationError={null}
@@ -289,6 +334,7 @@ describe("DocViewerPanel taxonomy UI", () => {
           goalBindings: {},
         })}
         onToggleInlineTranslation={vi.fn()}
+        onToggleInlineTranslationSessionPause={vi.fn()}
         t={t}
       />,
     );
@@ -314,13 +360,27 @@ describe("DocViewerPanel taxonomy UI", () => {
       readyCount: 1,
       healthStatus: "ready" as const,
       displayStatus: "ready" as const,
+      displayStatusReason: "ready_projection_available",
       hasRenderableText: true,
       projectedCount: 1,
       latestStatus: "ready",
       latestProjectionStatus: "projected",
       latestObservationRef: "obs:translation-header",
       latestReceiptRef: "receipt:translation-header",
-      latestSourceBindingKey: "docs:nhm2::fnv1a32:doc-source::docs_chunk::es-US::es",
+      latestVisibleObservationRef: "obs:translation-header",
+      latestVisibleReceiptRef: "receipt:translation-header",
+      latestEvidenceObservationRef: "obs:translation-suppressed",
+      latestEvidenceReceiptRef: "receipt:translation-suppressed",
+      latestLaneSessionId: "lane-session-docs",
+      latestLaneSessionStatus: "running" as const,
+      latestLaneSessionDebugPhase: "running:record_observation:observation_recorded",
+      latestLaneSessionObservationStatus: "observation_recorded",
+      latestSourceBindingKey: "docs:nhm2::fnv1a32:doc-latest::docs_chunk::es-US::es",
+      latestSourceIdentityKey: "docs:nhm2::fnv1a32:doc-source::fnv1a32:source-payload::2048::docs::docs_chunk::es-US::es",
+      latestLaneSessionSourceBindingKey: "docs:nhm2::fnv1a32:lane-session::docs_chunk::es-US::es",
+      latestLaneSessionSourceIdentityKey:
+        "docs:nhm2::fnv1a32:lane-session::fnv1a32:lane-session-payload::2048::docs::docs_chunk::es-US::es",
+      latestLaneSessionSelectedBackendProvider: "live_translation.local_runtime",
       latestObservationKey: "docs:nhm2::fnv1a32:doc-source::docs_chunk::es::u0001::obs:translation-header",
       latestMailLoopObservationKey:
         "docs:nhm2::fnv1a32:doc-source::docs_chunk::es::u0001::receipt:translation-header",
@@ -335,13 +395,76 @@ describe("DocViewerPanel taxonomy UI", () => {
       latestGoalBindingSourceKind: "docs",
       latestGoalBindingSourceTextHash: "fnv1a32:goal-source-payload",
       latestGoalBindingSourceTextCharCount: 2048,
-      latestGoalBindingSourceBindingKey: "docs:nhm2::fnv1a32:goal-doc-source::docs_chunk::es-US::es",
+      latestGoalBindingSourceBindingKey: "docs:nhm2::fnv1a32:goal-latest::docs_chunk::es-US::es",
+      latestGoalBindingSourceBindingKeyFromEvent: "docs:nhm2::fnv1a32:goal-event-latest::docs_chunk::es-US::es",
+      latestGoalBindingSourceIdentityKey:
+        "docs:nhm2::fnv1a32:goal-doc-source::fnv1a32:goal-source-payload::2048::docs::docs_chunk::es-US::es",
+      latestMailLoopSourceBindingKey: "docs:nhm2::fnv1a32:mail-latest::docs_chunk::es-US::es",
+      latestMailLoopSourceIdentityKey:
+        "docs:nhm2::fnv1a32:mail-packet::fnv1a32:mail-payload::2048::docs::docs_chunk::es-US::es",
+      latestMailLoopLaneSessionSourceBindingKey:
+        "docs:nhm2::fnv1a32:mail-session::docs_chunk::es-US::es",
+      latestMailLoopLaneSessionSourceIdentityKey:
+        "docs:nhm2::fnv1a32:mail-session::fnv1a32:mail-session-payload::2048::docs::docs_chunk::es-US::es",
+      latestMailLoopSourceId: "document_markdown:docs/research/nhm2.md",
+      latestMailLoopSourceHash: "fnv1a32:mail-doc-source",
+      latestMailLoopSourceKind: "docs",
+      latestMailLoopSourceTextHash: "fnv1a32:mail-source-payload",
+      latestMailLoopSourceTextCharCount: 2048,
+      latestMailLoopProjectionTarget: "docs_chunk",
+      latestMailLoopAccountLocale: "es-US",
+      latestMailLoopTargetLanguage: "es",
+      latestMailLoopChunkId: "u0001",
+      latestMailLoopChunkIndex: 0,
+      latestMailLoopDedupeKey: "document_markdown:docs/research/nhm2.md:u0001:es",
+      latestMailLoopSourceEventId: "docs:event-mail",
+      latestMailLoopSourceEventMs: 410,
+      latestMailLoopObservedAtMs: 430,
+      latestMailLoopFreshnessStatus: "fresh",
+      latestMailLoopSelectedBackendProvider: "live_translation.local_runtime",
+      latestGoalBindingLaneSessionSourceBindingKey:
+        "docs:nhm2::fnv1a32:goal-session::docs_chunk::es-US::es",
+      latestGoalBindingLaneSessionSourceIdentityKey:
+        "docs:nhm2::fnv1a32:goal-session::fnv1a32:goal-session-payload::2048::docs::docs_chunk::es-US::es",
+      latestGoalBindingSelectedBackendProvider: "live_translation.local_runtime",
+      latestGoalBindingSourceIdentityKeyFromBinding:
+        "docs:nhm2::fnv1a32:goal-doc-source::fnv1a32:goal-source-payload::2048::docs::docs_chunk::es-US::es",
       latestGoalBindingObservationKey:
         "docs:nhm2::fnv1a32:goal-doc-source::docs_chunk::es::u0001::obs:goal-binding-docs",
       latestGoalBindingMailLoopObservationKey:
         "docs:nhm2::fnv1a32:goal-doc-source::docs_chunk::es::u0001::receipt:goal-binding-docs",
       latestGoalBindingKeyFromBinding:
         "goal:account-language::goal-binding-docs::lane-session-docs::live_translation",
+      suppressedReceiptCount: 1,
+      latestSuppressedObservationRef: "obs:translation-suppressed",
+      latestSuppressedReceiptRef: "receipt:translation-suppressed",
+      latestSuppressedSourceBindingKey: "docs:nhm2-old::fnv1a32:old-doc-source::docs_chunk::es-US::es",
+      latestSuppressedSourceIdentityKey:
+        "docs:nhm2-old::fnv1a32:old-doc-source::fnv1a32:old-source-payload::1024::docs::docs_chunk::es-US::es",
+      latestSuppressedObservationKey:
+        "docs:nhm2-old::fnv1a32:old-doc-source::docs_chunk::es::u0001::obs:translation-suppressed",
+      latestSuppressedSelectedBackendProvider: "live_translation.local_runtime",
+      latestSuppressedProjectionStatus: "stale",
+      latestSuppressedChunkId: "u0001",
+      latestSuppressedSourceEventId: "docs:event-old",
+      latestSuppressedSourceEventMs: 300,
+      latestSuppressedObservedAtMs: 310,
+      latestSuppressedFreshnessStatus: "stale",
+      latestSuppressedDisplayStatus: "stale",
+      latestSuppressedTerminalAuthorityStatus: "not_terminal_authority",
+      latestSuppressedSourceId: "document_markdown:docs/research/old-nhm2.md",
+      latestSuppressedSourceHash: "fnv1a32:old-doc-source",
+      latestSuppressedSourceKind: "docs",
+      latestSuppressedSourceTextHash: "fnv1a32:old-source-payload",
+      latestSuppressedSourceTextCharCount: 1024,
+      latestSuppressedProjectionTarget: "docs_chunk",
+      latestSuppressedTargetLanguage: "es",
+      latestSuppressedReason: "stale_projection_did_not_replace_fresh_text",
+      latestGoalBindingQuietBehaviorApplied: true,
+      latestGoalBindingWakeExpected: false,
+      latestGoalBindingSurfaceBadgeExpected: true,
+      latestGoalBindingTerminalReportRequested: false,
+      latestGoalBindingTerminalReportAuthorized: false,
       terminalEligible: false,
       assistantAnswer: false,
       rawContentIncluded: false,
@@ -360,31 +483,85 @@ describe("DocViewerPanel taxonomy UI", () => {
         onShowDirectory={vi.fn()}
         canRejoinLiveRead={false}
         onRejoinLiveRead={vi.fn()}
-        translationEligible
+        translationEligible={true}
         translationAccountLocale="es-US"
         translationTargetLanguage="es"
-        inlineTranslationEnabled
+        translationSourceId="document_markdown:docs/research/nhm2.md"
+        translationSourceHash="fnv1a32:doc-source"
+        translationSourceTextHash="fnv1a32:source-payload"
+        translationSourceTextCharCount={2048}
+        translationLaneSessionId="lane-session-docs"
+        inlineTranslationEnabled={true}
         translationStatus="cached"
         translationError={null}
         liveTranslationProjectionSummary={liveTranslationProjectionSummary}
         onToggleInlineTranslation={vi.fn()}
+        onToggleInlineTranslationSessionPause={vi.fn()}
         t={t}
       />,
     );
 
     const summary = container.querySelector("[data-doc-translation-summary-version]");
+    expect(summary?.getAttribute("data-doc-translation-summary-account-locale")).toBe("es-US");
+    expect(summary?.getAttribute("data-doc-translation-summary-target-language")).toBe("es");
+    expect(summary?.getAttribute("data-doc-translation-summary-source-id")).toBe(
+      "document_markdown:docs/research/nhm2.md",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-source-hash")).toBe("fnv1a32:doc-source");
+    expect(summary?.getAttribute("data-doc-translation-summary-source-text-hash")).toBe("fnv1a32:source-payload");
+    expect(summary?.getAttribute("data-doc-translation-summary-source-text-char-count")).toBe("2048");
+    expect(summary?.getAttribute("data-doc-translation-summary-lane-session-id")).toBe("lane-session-docs");
+    expect(summary?.getAttribute("data-doc-translation-summary-source-binding-key")).toBe(
+      "docs:nhm2::fnv1a32:doc-latest::docs_chunk::es-US::es",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-source-identity-key")).toBe(
+      "docs:nhm2::fnv1a32:doc-source::fnv1a32:source-payload::2048::docs::docs_chunk::es-US::es",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-display-status-reason")).toBe(
+      "ready_projection_available",
+    );
     expect(summary?.getAttribute("data-doc-translation-summary-latest-source-text-hash")).toBe(
       "fnv1a32:source-payload",
     );
     expect(summary?.getAttribute("data-doc-translation-summary-latest-source-text-char-count")).toBe("2048");
     expect(summary?.getAttribute("data-doc-translation-summary-latest-source-binding-key")).toBe(
-      "docs:nhm2::fnv1a32:doc-source::docs_chunk::es-US::es",
+      "docs:nhm2::fnv1a32:doc-latest::docs_chunk::es-US::es",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-source-identity-key")).toBe(
+      "docs:nhm2::fnv1a32:doc-source::fnv1a32:source-payload::2048::docs::docs_chunk::es-US::es",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-lane-session-source-binding-key")).toBe(
+      "docs:nhm2::fnv1a32:lane-session::docs_chunk::es-US::es",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-lane-session-selected-backend-provider")).toBe(
+      "live_translation.local_runtime",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-lane-session-debug-phase")).toBe(
+      "running:record_observation:observation_recorded",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-lane-session-observation-status")).toBe(
+      "observation_recorded",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-lane-session-source-identity-key")).toBe(
+      "docs:nhm2::fnv1a32:lane-session::fnv1a32:lane-session-payload::2048::docs::docs_chunk::es-US::es",
     );
     expect(summary?.getAttribute("data-doc-translation-summary-latest-observation-key")).toBe(
       "docs:nhm2::fnv1a32:doc-source::docs_chunk::es::u0001::obs:translation-header",
     );
     expect(summary?.getAttribute("data-doc-translation-summary-latest-mail-loop-observation-key")).toBe(
       "docs:nhm2::fnv1a32:doc-source::docs_chunk::es::u0001::receipt:translation-header",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-visible-observation-ref")).toBe(
+      "obs:translation-header",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-visible-receipt-ref")).toBe(
+      "receipt:translation-header",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-evidence-observation-ref")).toBe(
+      "obs:translation-suppressed",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-evidence-receipt-ref")).toBe(
+      "receipt:translation-suppressed",
     );
     expect(summary?.getAttribute("data-doc-translation-summary-latest-goal-binding-key")).toBe(
       "goal:account-language::goal-binding-docs::lane-session-docs::live_translation",
@@ -396,7 +573,73 @@ describe("DocViewerPanel taxonomy UI", () => {
       "2048",
     );
     expect(summary?.getAttribute("data-doc-translation-summary-latest-goal-binding-source-binding-key")).toBe(
-      "docs:nhm2::fnv1a32:goal-doc-source::docs_chunk::es-US::es",
+      "docs:nhm2::fnv1a32:goal-latest::docs_chunk::es-US::es",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-goal-binding-source-identity-key")).toBe(
+      "docs:nhm2::fnv1a32:goal-doc-source::fnv1a32:goal-source-payload::2048::docs::docs_chunk::es-US::es",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-mail-loop-source-identity-key")).toBe(
+      "docs:nhm2::fnv1a32:mail-packet::fnv1a32:mail-payload::2048::docs::docs_chunk::es-US::es",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-mail-loop-source-binding-key")).toBe(
+      "docs:nhm2::fnv1a32:mail-latest::docs_chunk::es-US::es",
+    );
+    expect(
+      summary?.getAttribute("data-doc-translation-summary-latest-mail-loop-lane-session-source-binding-key"),
+    ).toBe(
+      "docs:nhm2::fnv1a32:mail-session::docs_chunk::es-US::es",
+    );
+    expect(
+      summary?.getAttribute("data-doc-translation-summary-latest-mail-loop-lane-session-source-identity-key"),
+    ).toBe(
+      "docs:nhm2::fnv1a32:mail-session::fnv1a32:mail-session-payload::2048::docs::docs_chunk::es-US::es",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-mail-loop-source-id")).toBe(
+      "document_markdown:docs/research/nhm2.md",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-mail-loop-source-hash")).toBe(
+      "fnv1a32:mail-doc-source",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-mail-loop-source-kind")).toBe("docs");
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-mail-loop-source-text-hash")).toBe(
+      "fnv1a32:mail-source-payload",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-mail-loop-source-text-char-count")).toBe(
+      "2048",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-mail-loop-projection-target")).toBe(
+      "docs_chunk",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-mail-loop-account-locale")).toBe(
+      "es-US",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-mail-loop-target-language")).toBe("es");
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-mail-loop-chunk-id")).toBe("u0001");
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-mail-loop-chunk-index")).toBe("0");
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-mail-loop-dedupe-key")).toBe(
+      "document_markdown:docs/research/nhm2.md:u0001:es",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-mail-loop-source-event-id")).toBe(
+      "docs:event-mail",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-mail-loop-source-event-ms")).toBe("410");
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-mail-loop-observed-at-ms")).toBe("430");
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-mail-loop-freshness-status")).toBe("fresh");
+    expect(
+      summary?.getAttribute("data-doc-translation-summary-latest-goal-binding-lane-session-source-binding-key"),
+    ).toBe(
+      "docs:nhm2::fnv1a32:goal-session::docs_chunk::es-US::es",
+    );
+    expect(
+      summary?.getAttribute("data-doc-translation-summary-latest-goal-binding-lane-session-source-identity-key"),
+    ).toBe(
+      "docs:nhm2::fnv1a32:goal-session::fnv1a32:goal-session-payload::2048::docs::docs_chunk::es-US::es",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-goal-binding-source-binding-key-from-event")).toBe(
+      "docs:nhm2::fnv1a32:goal-event-latest::docs_chunk::es-US::es",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-goal-binding-source-identity-key-from-binding")).toBe(
+      "docs:nhm2::fnv1a32:goal-doc-source::fnv1a32:goal-source-payload::2048::docs::docs_chunk::es-US::es",
     );
     expect(summary?.getAttribute("data-doc-translation-summary-latest-goal-binding-observation-key")).toBe(
       "docs:nhm2::fnv1a32:goal-doc-source::docs_chunk::es::u0001::obs:goal-binding-docs",
@@ -407,8 +650,526 @@ describe("DocViewerPanel taxonomy UI", () => {
     expect(summary?.getAttribute("data-doc-translation-summary-latest-goal-binding-key-from-binding")).toBe(
       "goal:account-language::goal-binding-docs::lane-session-docs::live_translation",
     );
+    expect(summary?.getAttribute("data-doc-translation-summary-suppressed-receipts")).toBe("1");
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-suppressed-observation-ref")).toBe(
+      "obs:translation-suppressed",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-suppressed-receipt-ref")).toBe(
+      "receipt:translation-suppressed",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-suppressed-source-binding-key")).toBe(
+      "docs:nhm2-old::fnv1a32:old-doc-source::docs_chunk::es-US::es",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-suppressed-source-identity-key")).toBe(
+      "docs:nhm2-old::fnv1a32:old-doc-source::fnv1a32:old-source-payload::1024::docs::docs_chunk::es-US::es",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-suppressed-observation-key")).toBe(
+      "docs:nhm2-old::fnv1a32:old-doc-source::docs_chunk::es::u0001::obs:translation-suppressed",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-suppressed-selected-backend-provider")).toBe(
+      "live_translation.local_runtime",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-suppressed-source-event-id")).toBe(
+      "docs:event-old",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-suppressed-source-event-ms")).toBe("300");
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-suppressed-observed-at-ms")).toBe("310");
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-suppressed-freshness-status")).toBe("stale");
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-suppressed-display-status")).toBe("stale");
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-suppressed-terminal-authority-status")).toBe(
+      "not_terminal_authority",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-suppressed-source-id")).toBe(
+      "document_markdown:docs/research/old-nhm2.md",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-suppressed-source-hash")).toBe(
+      "fnv1a32:old-doc-source",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-suppressed-source-kind")).toBe("docs");
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-suppressed-source-text-hash")).toBe(
+      "fnv1a32:old-source-payload",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-suppressed-source-text-char-count")).toBe(
+      "1024",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-suppressed-projection-target")).toBe(
+      "docs_chunk",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-suppressed-target-language")).toBe("es");
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-suppressed-reason")).toBe(
+      "stale_projection_did_not_replace_fresh_text",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-goal-binding-quiet-behavior-applied")).toBe(
+      "true",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-goal-binding-wake-expected")).toBe("false");
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-goal-binding-mailbox-wake-expected")).toBe(
+      "",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-goal-binding-decision-wake-expected")).toBe(
+      "",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-goal-binding-surface-badge-expected")).toBe(
+      "true",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-goal-binding-terminal-report-requested")).toBe(
+      "false",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-goal-binding-terminal-report-authorized")).toBe(
+      "false",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-mail-loop-selected-backend-provider")).toBe(
+      "live_translation.local_runtime",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-mail-loop-mailbox-wake-expected")).toBe(
+      "false",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-mail-loop-decision-wake-expected")).toBe(
+      "false",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-goal-binding-selected-backend-provider")).toBe(
+      "live_translation.local_runtime",
+    );
+    const inlineControl = container.querySelector("[data-doc-translation-control='inline-account-language']");
+    expect(inlineControl?.getAttribute("data-doc-translation-control-source-binding-key")).toBe(
+      "docs:nhm2::fnv1a32:doc-latest::docs_chunk::es-US::es",
+    );
+    expect(inlineControl?.getAttribute("data-doc-translation-control-source-identity-key")).toBe(
+      "docs:nhm2::fnv1a32:doc-source::fnv1a32:source-payload::2048::docs::docs_chunk::es-US::es",
+    );
+    expect(inlineControl?.getAttribute("data-doc-translation-control-latest-source-identity-key")).toBe(
+      "docs:nhm2::fnv1a32:doc-source::fnv1a32:source-payload::2048::docs::docs_chunk::es-US::es",
+    );
+    expect(inlineControl?.getAttribute("data-doc-translation-control-account-locale")).toBe("es-US");
+    expect(inlineControl?.getAttribute("data-doc-translation-control-target-language")).toBe("es");
+    expect(inlineControl?.getAttribute("data-doc-translation-control-language-routing-policy")).toBe(
+      "account_locale_base_target",
+    );
+    expect(inlineControl?.getAttribute("data-doc-translation-control-target-language-source")).toBe(
+      "account_locale_base",
+    );
+    expect(inlineControl?.getAttribute("data-doc-translation-control-reentry-required")).toBe("true");
+    const sessionControl = container.querySelector("[data-doc-translation-session-control='pause-resume']");
+    expect(sessionControl?.getAttribute("data-doc-translation-session-control-source-binding-key")).toBe(
+      "docs:nhm2::fnv1a32:lane-session::docs_chunk::es-US::es",
+    );
+    expect(sessionControl?.getAttribute("data-doc-translation-session-control-source-identity-key")).toBe(
+      "docs:nhm2::fnv1a32:lane-session::fnv1a32:lane-session-payload::2048::docs::docs_chunk::es-US::es",
+    );
+    expect(sessionControl?.getAttribute("data-doc-translation-session-control-latest-source-identity-key")).toBe(
+      "docs:nhm2::fnv1a32:lane-session::fnv1a32:lane-session-payload::2048::docs::docs_chunk::es-US::es",
+    );
+    expect(sessionControl?.getAttribute("data-doc-translation-session-control-reentry-required")).toBe("true");
+    expect(sessionControl?.getAttribute("data-doc-translation-session-control-language-routing-policy")).toBe(
+      "account_locale_base_target",
+    );
+    expect(sessionControl?.getAttribute("data-doc-translation-session-control-target-language-source")).toBe(
+      "account_locale_base",
+    );
+    expect(sessionControl?.getAttribute("data-doc-translation-session-control-terminal-eligible")).toBe("false");
+    expect(sessionControl?.getAttribute("data-doc-translation-session-control-assistant-answer")).toBe("false");
+    expect(summary?.getAttribute("data-doc-translation-summary-language-routing-policy")).toBe(
+      "account_locale_base_target",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-target-language-source")).toBe(
+      "account_locale_base",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-reentry-required")).toBe("true");
+    expect(summary?.getAttribute("data-doc-translation-summary-authority-policy")).toBe(
+      "projection_only_not_answer_authority",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-governed-projection")).toBe("true");
     expect(summary?.getAttribute("data-doc-translation-summary-terminal-eligible")).toBe("false");
     expect(summary?.getAttribute("data-doc-translation-summary-assistant-answer")).toBe("false");
     expect(summary).toHaveTextContent("Translation ready: projected");
+  });
+
+  it("keeps failed governed translation projection receipts inspectable in the open document header", () => {
+    const { PanelHeader } = DocViewerPanelModule;
+    const liveTranslationProjectionSummary = summarizeDocumentLiveTranslationProjectionSnapshot({
+      version: 14,
+      translations: {
+        u0001: {
+          status: "error",
+          error: "lane_backend_timeout",
+          observationRef: "obs:docs:u1:failed:newer",
+          receiptRef: "receipt:docs:u1:failed:newer",
+          laneSessionId: "lane-session-docs",
+          selectedBackendProvider: "live_translation.local_runtime",
+          projectionStatus: "failed",
+          chunkId: "u0001",
+          chunkIndex: 0,
+          dedupeKey: "document_markdown:docs/research/nhm2.md:u0001:es",
+          sourceEventId: "docs:event-failed-newer",
+          sourceEventMs: 520,
+          observedAtMs: 550,
+          freshnessStatus: "fresh",
+          terminalAuthorityStatus: "not_terminal_authority",
+          sourceId: "document_markdown:docs/research/nhm2.md",
+          sourceHash: "fnv1a32:doc-source",
+          sourceKind: "docs",
+          sourceTextHash: "fnv1a32:source-payload",
+          sourceTextCharCount: 2048,
+          accountLocale: "es-US",
+          projectionTarget: "docs_chunk",
+          targetLanguage: "es",
+          cancelRequested: false,
+          contextRole: "tool_evidence",
+          source: "capability_lane",
+          answerAuthority: false,
+          terminalEligible: false,
+          assistantAnswer: false,
+          rawContentIncluded: false,
+        } as never,
+      },
+      laneSessions: {},
+      mailLoops: {},
+      goalBindings: {},
+    });
+
+    const { container } = render(
+      <PanelHeader
+        mode="doc"
+        entry={whitepaper}
+        anchor={undefined}
+        isAutoReading={false}
+        autoReadError={null}
+        proceduralStatus={null}
+        readProgress={null}
+        onStopAutoRead={vi.fn()}
+        onShowDirectory={vi.fn()}
+        canRejoinLiveRead={false}
+        onRejoinLiveRead={vi.fn()}
+        translationEligible={true}
+        translationAccountLocale="es-US"
+        translationTargetLanguage="es"
+        translationSourceId="document_markdown:docs/research/nhm2.md"
+        translationSourceHash="fnv1a32:doc-source"
+        translationSourceTextHash="fnv1a32:source-payload"
+        translationSourceTextCharCount={2048}
+        translationLaneSessionId="lane-session-docs"
+        inlineTranslationEnabled={true}
+        translationStatus="idle"
+        translationError={null}
+        liveTranslationProjectionSummary={liveTranslationProjectionSummary}
+        onToggleInlineTranslation={vi.fn()}
+        onToggleInlineTranslationSessionPause={vi.fn()}
+        t={t}
+      />,
+    );
+
+    const summary = container.querySelector("[data-doc-translation-summary-version]");
+    expect(summary?.getAttribute("data-doc-translation-summary-version")).toBe("14");
+    expect(summary?.getAttribute("data-doc-translation-summary-display-status")).toBe("failed");
+    expect(summary?.getAttribute("data-doc-translation-summary-has-errors")).toBe("true");
+    expect(summary?.getAttribute("data-doc-translation-summary-renderable")).toBe("false");
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-projection-status")).toBe("failed");
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-error")).toBe("lane_backend_timeout");
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-observation-ref")).toBe(
+      "obs:docs:u1:failed:newer",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-receipt-ref")).toBe(
+      "receipt:docs:u1:failed:newer",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-source-event-id")).toBe(
+      "docs:event-failed-newer",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-source-event-ms")).toBe("520");
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-observed-at-ms")).toBe("550");
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-terminal-authority-status")).toBe(
+      "not_terminal_authority",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-reentry-required")).toBe("true");
+    expect(summary?.getAttribute("data-doc-translation-summary-authority-policy")).toBe(
+      "projection_only_not_answer_authority",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-governed-projection")).toBe("true");
+    expect(summary?.getAttribute("data-doc-translation-summary-terminal-eligible")).toBe("false");
+    expect(summary?.getAttribute("data-doc-translation-summary-assistant-answer")).toBe("false");
+    expect(summary?.getAttribute("data-doc-translation-summary-raw-content-included")).toBe("false");
+    expect(summary).toHaveTextContent("Translation failed: lane_backend_timeout");
+  });
+
+  it.each([
+    {
+      displayStatus: "stale",
+      error: "translation_projection_stale",
+      freshnessStatus: "stale",
+      observationRef: "obs:docs:u1:stale:newer",
+      projectionStatus: "stale",
+      receiptRef: "receipt:docs:u1:stale:newer",
+      sourceEventId: "docs:event-stale-newer",
+      statusLabel: "Translation stale: stale",
+    },
+    {
+      displayStatus: "cancelled",
+      error: "translation_projection_cancelled",
+      freshnessStatus: "fresh",
+      observationRef: "obs:docs:u1:cancelled:newer",
+      projectionStatus: "cancelled",
+      receiptRef: "receipt:docs:u1:cancelled:newer",
+      sourceEventId: "docs:event-cancelled-newer",
+      statusLabel: "Translation cancelled: cancelled",
+    },
+  ] as const)(
+    "keeps $displayStatus governed translation projection receipts inspectable in the open document header",
+    ({
+      displayStatus,
+      error,
+      freshnessStatus,
+      observationRef,
+      projectionStatus,
+      receiptRef,
+      sourceEventId,
+      statusLabel,
+    }) => {
+      const { PanelHeader } = DocViewerPanelModule;
+      const liveTranslationProjectionSummary = summarizeDocumentLiveTranslationProjectionSnapshot({
+        version: 15,
+        translations: {
+          u0001: {
+            status: "error",
+            error,
+            observationRef,
+            receiptRef,
+            laneSessionId: "lane-session-docs",
+            selectedBackendProvider: "live_translation.local_runtime",
+            projectionStatus,
+            chunkId: "u0001",
+            chunkIndex: 0,
+            dedupeKey: `document_markdown:docs/research/nhm2.md:u0001:es:${projectionStatus}`,
+            sourceEventId,
+            sourceEventMs: 620,
+            observedAtMs: 650,
+            freshnessStatus,
+            terminalAuthorityStatus: "not_terminal_authority",
+            sourceId: "document_markdown:docs/research/nhm2.md",
+            sourceHash: "fnv1a32:doc-source",
+            sourceKind: "docs",
+            sourceTextHash: "fnv1a32:source-payload",
+            sourceTextCharCount: 2048,
+            accountLocale: "es-US",
+            projectionTarget: "docs_chunk",
+            targetLanguage: "es",
+            cancelRequested: projectionStatus === "cancelled",
+            contextRole: "tool_evidence",
+            source: "capability_lane",
+            answerAuthority: false,
+            terminalEligible: false,
+            assistantAnswer: false,
+            rawContentIncluded: false,
+          } as never,
+        },
+        laneSessions: {},
+        mailLoops: {},
+        goalBindings: {},
+      });
+
+      const { container } = render(
+        <PanelHeader
+          mode="doc"
+          entry={whitepaper}
+          anchor={undefined}
+          isAutoReading={false}
+          autoReadError={null}
+          proceduralStatus={null}
+          readProgress={null}
+          onStopAutoRead={vi.fn()}
+          onShowDirectory={vi.fn()}
+          canRejoinLiveRead={false}
+          onRejoinLiveRead={vi.fn()}
+          translationEligible={true}
+          translationAccountLocale="es-US"
+          translationTargetLanguage="es"
+          translationSourceId="document_markdown:docs/research/nhm2.md"
+          translationSourceHash="fnv1a32:doc-source"
+          translationSourceTextHash="fnv1a32:source-payload"
+          translationSourceTextCharCount={2048}
+          translationLaneSessionId="lane-session-docs"
+          inlineTranslationEnabled={true}
+          translationStatus="idle"
+          translationError={null}
+          liveTranslationProjectionSummary={liveTranslationProjectionSummary}
+          onToggleInlineTranslation={vi.fn()}
+          onToggleInlineTranslationSessionPause={vi.fn()}
+          t={t}
+        />,
+      );
+
+      const summary = container.querySelector("[data-doc-translation-summary-version]");
+      expect(summary?.getAttribute("data-doc-translation-summary-display-status")).toBe(displayStatus);
+      expect(summary?.getAttribute("data-doc-translation-summary-renderable")).toBe("false");
+      expect(summary?.getAttribute("data-doc-translation-summary-latest-projection-status")).toBe(projectionStatus);
+      expect(summary?.getAttribute("data-doc-translation-summary-latest-observation-ref")).toBe(observationRef);
+      expect(summary?.getAttribute("data-doc-translation-summary-latest-receipt-ref")).toBe(receiptRef);
+      expect(summary?.getAttribute("data-doc-translation-summary-latest-source-event-id")).toBe(sourceEventId);
+      expect(summary?.getAttribute("data-doc-translation-summary-latest-source-event-ms")).toBe("620");
+      expect(summary?.getAttribute("data-doc-translation-summary-latest-observed-at-ms")).toBe("650");
+      expect(summary?.getAttribute("data-doc-translation-summary-latest-terminal-authority-status")).toBe(
+        "not_terminal_authority",
+      );
+      expect(summary?.getAttribute("data-doc-translation-summary-authority-policy")).toBe(
+        "projection_only_not_answer_authority",
+      );
+      expect(summary?.getAttribute("data-doc-translation-summary-governed-projection")).toBe("true");
+      expect(summary?.getAttribute("data-doc-translation-summary-terminal-eligible")).toBe("false");
+      expect(summary?.getAttribute("data-doc-translation-summary-assistant-answer")).toBe("false");
+      expect(summary?.getAttribute("data-doc-translation-summary-raw-content-included")).toBe("false");
+      expect(summary).toHaveTextContent(statusLabel);
+    },
+  );
+
+  it("computes governed translation source identity for a new document session before receipts exist", () => {
+    const { PanelHeader } = DocViewerPanelModule;
+
+    const { container } = render(
+      <PanelHeader
+        mode="doc"
+        entry={whitepaper}
+        anchor={undefined}
+        isAutoReading={false}
+        autoReadError={null}
+        proceduralStatus={null}
+        readProgress={null}
+        onStopAutoRead={vi.fn()}
+        onShowDirectory={vi.fn()}
+        canRejoinLiveRead={false}
+        onRejoinLiveRead={vi.fn()}
+        translationEligible={true}
+        translationAccountLocale="es-US"
+        translationTargetLanguage="es"
+        translationSourceId="document_markdown:docs/research/nhm2.md"
+        translationSourceHash="fnv1a32:doc-source"
+        translationSourceTextHash="fnv1a32:doc-source"
+        translationSourceTextCharCount={2048}
+        translationLaneSessionId="lane-session-next-docs"
+        inlineTranslationEnabled={false}
+        translationStatus="idle"
+        translationError={null}
+        liveTranslationProjectionSummary={summarizeDocumentLiveTranslationProjectionSnapshot({
+          version: 0,
+          translations: {},
+          laneSessions: {},
+          mailLoops: {},
+          goalBindings: {},
+        })}
+        onToggleInlineTranslation={vi.fn()}
+        onToggleInlineTranslationSessionPause={vi.fn()}
+        t={t}
+      />,
+    );
+
+    const inlineControl = container.querySelector("[data-doc-translation-control='inline-account-language']");
+    expect(inlineControl?.getAttribute("data-doc-translation-control-source-identity-key")).toBe(
+      "document_markdown:docs/research/nhm2.md::fnv1a32:doc-source::fnv1a32:doc-source::2048::docs::docs_chunk::es-US::es",
+    );
+    expect(inlineControl?.getAttribute("data-doc-translation-control-current-source-identity-key")).toBe(
+      "document_markdown:docs/research/nhm2.md::fnv1a32:doc-source::fnv1a32:doc-source::2048::docs::docs_chunk::es-US::es",
+    );
+    expect(inlineControl?.getAttribute("data-doc-translation-control-latest-source-identity-key")).toBe(
+      "document_markdown:docs/research/nhm2.md::fnv1a32:doc-source::fnv1a32:doc-source::2048::docs::docs_chunk::es-US::es",
+    );
+    expect(inlineControl?.getAttribute("data-doc-translation-control-lane-session-id")).toBe(
+      "lane-session-next-docs",
+    );
+    expect(inlineControl?.getAttribute("data-doc-translation-control-source-hash")).toBe("fnv1a32:doc-source");
+    expect(inlineControl?.getAttribute("data-doc-translation-control-source-text-hash")).toBe("fnv1a32:doc-source");
+    expect(inlineControl?.getAttribute("data-doc-translation-control-source-text-char-count")).toBe("2048");
+    expect(inlineControl?.getAttribute("data-doc-translation-control-source-binding-key")).toBe(
+      "document_markdown:docs/research/nhm2.md::fnv1a32:doc-source::docs_chunk::es-US::es",
+    );
+    expect(inlineControl?.getAttribute("data-doc-translation-control-reentry-required")).toBe("true");
+    expect(inlineControl?.getAttribute("data-doc-translation-control-terminal-eligible")).toBe("false");
+    expect(inlineControl?.getAttribute("data-doc-translation-control-assistant-answer")).toBe("false");
+  });
+
+  it("keeps current document identity distinct from a stale latest translation receipt in the header", () => {
+    const { PanelHeader } = DocViewerPanelModule;
+    const currentIdentity =
+      "document_markdown:docs/research/current.md::fnv1a32:current-doc::fnv1a32:current-text::2048::docs::docs_chunk::es-US::es";
+    const staleIdentity =
+      "document_markdown:docs/research/previous.md::fnv1a32:previous-doc::fnv1a32:previous-text::1024::docs::docs_chunk::es-US::es";
+    const liveTranslationProjectionSummary = summarizeDocumentLiveTranslationProjectionSnapshot({
+      version: 16,
+      translations: {
+        u0001: {
+          status: "error",
+          error: "translation_projection_source_identity_mismatch",
+          observationRef: "obs:docs:u1:stale-identity",
+          receiptRef: "receipt:docs:u1:stale-identity",
+          projectionStatus: "missing",
+          sourceIdentityKey: currentIdentity,
+          latestSourceIdentityKey: staleIdentity,
+          sourceId: "document_markdown:docs/research/current.md",
+          sourceHash: "fnv1a32:current-doc",
+          sourceKind: "docs",
+          sourceTextHash: "fnv1a32:current-text",
+          sourceTextCharCount: 2048,
+          accountLocale: "es-US",
+          projectionTarget: "docs_chunk",
+          targetLanguage: "es",
+          freshnessStatus: "unknown",
+          terminalAuthorityStatus: "not_terminal_authority",
+          source: "capability_lane",
+          answerAuthority: false,
+          terminalEligible: false,
+          assistantAnswer: false,
+          rawContentIncluded: false,
+        } as never,
+      },
+      laneSessions: {},
+      mailLoops: {},
+      goalBindings: {},
+    });
+
+    const { container } = render(
+      <PanelHeader
+        mode="doc"
+        entry={whitepaper}
+        anchor={undefined}
+        isAutoReading={false}
+        autoReadError={null}
+        proceduralStatus={null}
+        readProgress={null}
+        onStopAutoRead={vi.fn()}
+        onShowDirectory={vi.fn()}
+        canRejoinLiveRead={false}
+        onRejoinLiveRead={vi.fn()}
+        translationEligible={true}
+        translationAccountLocale="es-US"
+        translationTargetLanguage="es"
+        translationSourceId="document_markdown:docs/research/current.md"
+        translationSourceHash="fnv1a32:current-doc"
+        translationSourceTextHash="fnv1a32:current-text"
+        translationSourceTextCharCount={2048}
+        translationLaneSessionId="lane-session-current-docs"
+        inlineTranslationEnabled={false}
+        translationStatus="idle"
+        translationError={null}
+        liveTranslationProjectionSummary={liveTranslationProjectionSummary}
+        onToggleInlineTranslation={vi.fn()}
+        onToggleInlineTranslationSessionPause={vi.fn()}
+        t={t}
+      />,
+    );
+
+    const summary = container.querySelector("[data-doc-translation-summary-version]");
+    expect(summary?.getAttribute("data-doc-translation-summary-current-source-identity-key")).toBe(currentIdentity);
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-source-identity-key")).toBe(staleIdentity);
+    expect(summary?.getAttribute("data-doc-translation-summary-source-identity-key")).toBe(staleIdentity);
+    expect(summary?.getAttribute("data-doc-translation-summary-observation-ref")).toBeNull();
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-observation-ref")).toBe(
+      "obs:docs:u1:stale-identity",
+    );
+
+    const inlineControl = container.querySelector("[data-doc-translation-control='inline-account-language']");
+    expect(inlineControl?.getAttribute("data-doc-translation-control-current-source-identity-key")).toBe(
+      currentIdentity,
+    );
+    expect(inlineControl?.getAttribute("data-doc-translation-control-latest-source-identity-key")).toBe(staleIdentity);
+    expect(inlineControl?.getAttribute("data-doc-translation-control-source-identity-key")).toBe(staleIdentity);
+    expect(inlineControl?.getAttribute("data-doc-translation-control-reentry-required")).toBe("true");
+    expect(inlineControl?.getAttribute("data-doc-translation-control-terminal-eligible")).toBe("false");
+    expect(inlineControl?.getAttribute("data-doc-translation-control-assistant-answer")).toBe("false");
   });
 });

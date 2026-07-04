@@ -331,10 +331,15 @@ type DocumentMarkdownVisibleUnitsPayload = {
   sourceHash: string | null;
   sourceTextHash: string | null;
   sourceTextCharCount: number | null;
+  receiptRef: string | null;
   chunkId: string | null;
   chunkIndex: number | null;
   laneSessionId: string | null;
   sessionControlKey: string | null;
+  sourceBindingKey: string | null;
+  sourceIdentityKey: string | null;
+  latestSourceIdentityKey: string | null;
+  mailLoopObservationKey: string | null;
   dedupeKey: string | null;
   sourceEventId: string | null;
   sourceEventMs: number | null;
@@ -349,6 +354,9 @@ type DocumentMarkdownVisibleUnitsPayload = {
 const readDocumentMarkdownVisibleUnitsPayload = (
   mailItems: StagePlayLiveSourceMailItemV1[],
 ): DocumentMarkdownVisibleUnitsPayload => {
+  const sourceRefs = mailItems.find((item) =>
+    item.sourceKind === "document_markdown" && item.sourceRefs.sourceIdentityKey
+  )?.sourceRefs;
   const parsed = mailItems
     .map((item: StagePlayLiveSourceMailItemV1) => parseStructuredObserverOutput(item.summary.text))
     .find((record: Record<string, unknown> | null) => record?.schema === "stage_play.document_markdown_visible_units.v1");
@@ -375,6 +383,11 @@ const readDocumentMarkdownVisibleUnitsPayload = (
     sourceTextHash: readStringFromJson(parsed, "source_text_hash") ?? readStringFromJson(parsed, "sourceTextHash"),
     sourceTextCharCount:
       readNumberFromJson(parsed, "source_text_char_count") ?? readNumberFromJson(parsed, "sourceTextCharCount"),
+    receiptRef:
+      readStringFromJson(parsed, "receipt_ref") ??
+      readStringFromJson(parsed, "receiptRef") ??
+      sourceRefs?.receiptRef ??
+      null,
     chunkId: readStringFromJson(parsed, "chunk_id") ?? readStringFromJson(parsed, "chunkId"),
     chunkIndex: readNumberFromJson(parsed, "chunk_index") ?? readNumberFromJson(parsed, "chunkIndex"),
     laneSessionId: readStringFromJson(parsed, "lane_session_id") ?? readStringFromJson(parsed, "laneSessionId"),
@@ -382,7 +395,32 @@ const readDocumentMarkdownVisibleUnitsPayload = (
       readStringFromJson(parsed, "session_control_key") ??
       readStringFromJson(parsed, "sessionControlKey") ??
       readStringFromJson(parsed, "lane_session_control_key") ??
-      readStringFromJson(parsed, "laneSessionControlKey"),
+      readStringFromJson(parsed, "laneSessionControlKey") ??
+      sourceRefs?.sessionControlKey ??
+      null,
+    sourceBindingKey:
+      readStringFromJson(parsed, "source_binding_key") ??
+      readStringFromJson(parsed, "sourceBindingKey") ??
+      sourceRefs?.sourceBindingKey ??
+      null,
+    sourceIdentityKey:
+      readStringFromJson(parsed, "source_identity_key") ??
+      readStringFromJson(parsed, "sourceIdentityKey") ??
+      sourceRefs?.sourceIdentityKey ??
+      null,
+    latestSourceIdentityKey:
+      readStringFromJson(parsed, "latest_source_identity_key") ??
+      readStringFromJson(parsed, "latestSourceIdentityKey") ??
+      sourceRefs?.latestSourceIdentityKey ??
+      sourceRefs?.sourceIdentityKey ??
+      null,
+    mailLoopObservationKey:
+      readStringFromJson(parsed, "mail_loop_observation_key") ??
+      readStringFromJson(parsed, "mailLoopObservationKey") ??
+      readStringFromJson(parsed, "latest_mail_loop_observation_key") ??
+      readStringFromJson(parsed, "latestMailLoopObservationKey") ??
+      sourceRefs?.mailLoopObservationKey ??
+      null,
     dedupeKey: readStringFromJson(parsed, "dedupe_key") ?? readStringFromJson(parsed, "dedupeKey"),
     sourceEventId: readStringFromJson(parsed, "source_event_id") ?? readStringFromJson(parsed, "sourceEventId"),
     sourceEventMs: readNumberFromJson(parsed, "source_event_ms") ?? readNumberFromJson(parsed, "sourceEventMs"),
@@ -513,10 +551,16 @@ const buildDocumentInlineTranslationOutput = (input: {
     sourceHash: visible.sourceHash,
     sourceTextHash: visible.sourceTextHash,
     sourceTextCharCount: visible.sourceTextCharCount,
+    receiptRef: visible.receiptRef,
     chunkId: visible.chunkId,
     chunkIndex: visible.chunkIndex,
     laneSessionId: visible.laneSessionId,
     sessionControlKey: visible.sessionControlKey,
+    sourceBindingKey: visible.sourceBindingKey,
+    sourceIdentityKey: visible.sourceIdentityKey,
+    latestSourceIdentityKey: visible.latestSourceIdentityKey,
+    mailLoopObservationKey: visible.mailLoopObservationKey,
+    latestMailLoopObservationKey: visible.mailLoopObservationKey,
     dedupeKey: visible.dedupeKey,
     sourceEventId: visible.sourceEventId,
     sourceEventMs: visible.sourceEventMs,
@@ -1218,9 +1262,11 @@ const buildProcessedMailEvidenceHandles = (input: {
       item.sourceRefs.frameRef,
       item.sourceRefs.evidenceRef,
       item.sourceRefs.observationRef,
+      item.sourceRefs.receiptRef,
     ]),
     frameRef: item.sourceRefs.frameRef ?? null,
     observationRef: item.sourceRefs.observationRef ?? null,
+    receiptRef: item.sourceRefs.receiptRef ?? null,
   }));
   const visualItems = input.mailItems.filter((item) => item.sourceRefs.frameRef || item.sourceKind === "visual_frame");
   const frameReceipts = visualItems.map((item, index) => {
@@ -2051,6 +2097,7 @@ export function buildStagePlayProcessedMailPacket(input: {
       input.activeProfile?.profileId,
       microReasonerDeck?.presetId,
       ...evidenceHandles.sourceReceipts.map((receipt) => receipt.receiptId),
+      ...evidenceHandles.sourceReceipts.flatMap((receipt) => receipt.evidenceRefs),
       ...evidenceHandles.frameReceipts.map((receipt) => receipt.receiptId),
       ...evidenceHandles.frameIntervals.map((interval) => interval.intervalId),
       ...evidenceHandles.situationSlices.map((slice) => slice.sliceId),
@@ -2063,6 +2110,7 @@ export function buildStagePlayProcessedMailPacket(input: {
     assistant_answer: false,
     terminal_eligible: false,
     context_role: "tool_evidence",
+    raw_content_included: false,
   }));
   const composerRun = timed("packet_composer", () => makeRun({
     role: "packet_composer",

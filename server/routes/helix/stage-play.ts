@@ -643,6 +643,17 @@ const compactStagePlayRouteObject = (value: unknown): Record<string, unknown> | 
     ? value as Record<string, unknown>
     : null;
 
+const compactStagePlayIdentityKey = (parts: Array<string | number | null | undefined>): string | null => {
+  const key = parts
+    .map((part) => {
+      if (typeof part === "number" && Number.isFinite(part)) return String(Math.trunc(part));
+      return typeof part === "string" ? part.trim() : "";
+    })
+    .filter(Boolean)
+    .join("::");
+  return key || null;
+};
+
 const compactStagePlayMailForOverview = <T extends Record<string, any>>(mail: T): T => ({
   ...mail,
   summary: {
@@ -1917,10 +1928,41 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
       readQueryString(body.laneSessionControlKey) ??
       readQueryString(body.lane_session_control_key) ??
       null;
+    const sourceBindingKey =
+      readQueryString(body.sourceBindingKey) ??
+      readQueryString(body.source_binding_key) ??
+      null;
+    const sourceIdentityKey =
+      readQueryString(body.sourceIdentityKey) ??
+      readQueryString(body.source_identity_key) ??
+      compactStagePlayIdentityKey([
+        sourceId,
+        sourceHash,
+        sourceTextHash,
+        sourceTextCharCount,
+        "docs",
+        projectionTarget,
+        accountLocale,
+        targetLanguage,
+      ]);
+    const latestSourceIdentityKey =
+      readQueryString(body.latestSourceIdentityKey) ??
+      readQueryString(body.latest_source_identity_key) ??
+      sourceIdentityKey;
     const dedupeKey =
       readQueryString(body.dedupeKey) ??
       readQueryString(body.dedupe_key) ??
       `${sourceId}:${chunkId}:${targetLanguage}`;
+    const mailLoopObservationKey =
+      readQueryString(body.mailLoopObservationKey) ??
+      readQueryString(body.mail_loop_observation_key) ??
+      readQueryString(body.latestMailLoopObservationKey) ??
+      readQueryString(body.latest_mail_loop_observation_key) ??
+      null;
+    const receiptRef =
+      readQueryString(body.receiptRef) ??
+      readQueryString(body.receipt_ref) ??
+      null;
     const sourceEventMs = Date.now();
     const sourceEventId =
       readQueryString(body.sourceEventId) ??
@@ -1967,10 +2009,16 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
     const unitIds = units.map((unit) => unit.unit_id);
     const summaryText = JSON.stringify({
       schema: "stage_play.document_markdown_visible_units.v1",
+      answer_authority: false,
       chunk_id: chunkId,
       chunk_index: chunkIndex,
       lane_session_id: laneSessionId,
       session_control_key: sessionControlKey,
+      source_binding_key: sourceBindingKey,
+      source_identity_key: sourceIdentityKey,
+      latest_source_identity_key: latestSourceIdentityKey,
+      mail_loop_observation_key: mailLoopObservationKey,
+      receipt_ref: receiptRef,
       dedupe_key: dedupeKey,
       source_event_id: sourceEventId,
       source_event_ms: sourceEventMs,
@@ -2011,6 +2059,7 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
       sourceId,
       sourceKind: "document_markdown",
       evidenceRef,
+      receiptRef,
       sourceHash,
       sourceTextHash,
       sourceTextCharCount,
@@ -2018,6 +2067,10 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
       chunkIndex,
       laneSessionId,
       sessionControlKey,
+      sourceBindingKey,
+      sourceIdentityKey,
+      latestSourceIdentityKey,
+      mailLoopObservationKey,
       dedupeKey,
       sourceEventId,
       sourceEventMs,
@@ -2053,6 +2106,11 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
         chunkIndex,
         laneSessionId,
         sessionControlKey,
+        sourceBindingKey,
+        sourceIdentityKey,
+        latestSourceIdentityKey,
+        mailLoopObservationKey,
+        receiptRef,
         dedupeKey,
         sourceEventId,
         sourceEventMs,
@@ -2069,6 +2127,7 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
       sourceId,
       mailboxThreadId: threadId,
       mailboxThreadResolution,
+      answer_authority: false,
       assistant_answer: false,
       terminal_eligible: false,
       context_role: "tool_evidence",

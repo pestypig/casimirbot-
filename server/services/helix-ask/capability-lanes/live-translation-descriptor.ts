@@ -1,0 +1,90 @@
+import { hasAnyConfiguredEnvVar } from "./backend-provider-config";
+import type { HelixCapabilityLaneTemplate } from "./lane-template";
+
+export const liveTranslationLaneTemplate: HelixCapabilityLaneTemplate = {
+  lane_id: "live_translation",
+  family: "live_translation",
+  label: "Live translation",
+  description: "Low-latency translation service lane for future transcript/audio observations.",
+  backend_family: "local_runtime",
+  model_or_service_ref: "live_translation_deterministic_v1",
+  safety_tags: ["shadow_only", "audio", "translation", "observation_only"],
+  configured: () => true,
+  cost_class: "free_local",
+  latency_class: "interactive",
+  privacy_class: "local_only",
+  one_shot_supported: true,
+  session_supported: true,
+  goal_binding_supported: true,
+  default_backend_provider: "live_translation.local_runtime",
+  backend_provider_templates: [
+    {
+      provider_id: "live_translation.local_runtime",
+      backend_family: "local_runtime",
+      label: "Deterministic local translation",
+      model_or_service_ref: "live_translation_deterministic_v1",
+      required_env_vars: [],
+      configured: () => true,
+      cost_class: "free_local",
+      latency_class: "interactive",
+      privacy_class: "local_only",
+      fallback_backend_provider: null,
+    },
+    {
+      provider_id: "live_translation.google_gemini",
+      backend_family: "google_gemini",
+      label: "Gemini translation",
+      model_or_service_ref: "gemini_translation_default",
+      required_env_vars: ["GOOGLE_GEMINI_API_KEY", "GEMINI_API_KEY"],
+      configured: (env) => hasAnyConfiguredEnvVar(env, ["GOOGLE_GEMINI_API_KEY", "GEMINI_API_KEY"]),
+      cost_class: "standard",
+      latency_class: "realtime",
+      privacy_class: "external_provider",
+      fallback_backend_provider: "live_translation.local_runtime",
+    },
+    {
+      provider_id: "live_translation.openai_compatible",
+      backend_family: "openai_compatible",
+      label: "OpenAI-compatible translation",
+      model_or_service_ref: "live_translation_openai_compatible_default",
+      required_env_vars: ["OPENAI_API_KEY", "LLM_HTTP_BASE", "LLM_HTTP_MODEL"],
+      configured: (env) => hasAnyConfiguredEnvVar(env, ["OPENAI_API_KEY", "LLM_HTTP_BASE", "LLM_HTTP_MODEL"]),
+      cost_class: "standard",
+      latency_class: "interactive",
+      privacy_class: "account_provider",
+      fallback_backend_provider: "live_translation.local_runtime",
+    },
+  ],
+  capabilities: [
+    {
+      capability_id: "live_translation.translate_text",
+      label: "Translate text",
+      one_shot_status: "executable",
+      session_status: "supported",
+      backend_provider_required: true,
+      model_visible_hint: {
+        required_input_fields: ["text", "target_language"],
+        optional_input_fields: [
+          "source_language",
+          "requested_backend_provider",
+          "chunk_id",
+          "source_id",
+          "projection_target",
+        ],
+        when_to_use:
+          "Use when the user asks to translate provided text, selected content, transcript text, or other text content.",
+        when_not_to_use:
+          "Do not use docs-viewer.read_active_translation for new translation work; that workstation tool only reads an already-existing translated Docs surface. If source text or target language is missing, ask for clarification.",
+        request_shape_hint: {
+          capability_lane_call: {
+            capability: "live_translation.translate_text",
+            text: "<text to translate>",
+            target_language: "<target language or locale>",
+            source_language: "<optional source language>",
+            requested_backend_provider: "<optional backend preference; Helix selects the backend>",
+          },
+        },
+      },
+    },
+  ],
+};

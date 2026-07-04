@@ -125,7 +125,7 @@ export type HelixCapabilityLaneBackendSelectionDecision = {
   selected_runtime_provider_remains_root: true;
   backend_provider_becomes_root_agent: false;
   dynamic_switching_executed: false;
-  live_backend_execution_enabled: false;
+  live_backend_execution_enabled: boolean;
   terminal_authority_owner: "helix";
   assistant_answer: false;
   terminal_eligible: false;
@@ -335,10 +335,27 @@ export type HelixCapabilityLaneBackendSelectionSummary = {
 };
 
 export type HelixCapabilityLaneDebugEventStage =
+  | "lane_visible"
   | "lane_requested"
   | "lane_backend_selected"
   | "lane_observation"
-  | "lane_reentered";
+  | "lane_projection_receipt"
+  | "lane_reentered"
+  | "lane_session"
+  | "lane_mail_loop"
+  | "lane_goal_binding"
+  | "goal_binding"
+  | "lane_goal_dispatch_plan"
+  | "lane_goal_dispatch_admission"
+  | "lane_goal_dispatch_readiness"
+  | "terminal_selected"
+  | "terminal_rejected";
+
+export type HelixCapabilityLaneTerminalAuthorityStatus =
+  | "not_terminal_authority"
+  | "pending_helix_terminal_authority"
+  | "authorized_by_helix_provider_candidate_bridge"
+  | "terminal_authority_rejected";
 
 export type HelixCapabilityLaneDebugEvent = {
   schema: "helix.capability_lane.debug_event.v1";
@@ -373,7 +390,7 @@ export type HelixCapabilityLaneDebugEvent = {
   receipt_ref: string | null;
   reentry_required: true;
   reentry_status: "not_applicable" | "observation_packet_required_for_provider_reentry";
-  terminal_authority_status: "pending_helix_terminal_authority";
+  terminal_authority_status: HelixCapabilityLaneTerminalAuthorityStatus;
   terminal_eligible: false;
   assistant_answer: false;
   raw_content_included: false;

@@ -102,6 +102,7 @@ describe("prompted stage-play micro-reasoners", () => {
     });
 
     expect(result.packet.riskMatches).toEqual([]);
+    expect(result.packet.answer_authority).toBe(false);
     expect(result.packet.effortEstimate?.currentEffort).toBe("cave_exploration");
     expect(result.packet.actionPredictions?.map((prediction) => prediction.predictedAction).join("\n"))
       .not.toMatch(/recover|retreat|hazard navigation/i);
@@ -239,6 +240,7 @@ describe("prompted stage-play micro-reasoners", () => {
       "decision_selector",
     ]);
     expect(result.packet.recommendedNext).toBe("wait_for_next_summary");
+    expect(result.packet.answer_authority).toBe(false);
     expect(result.packet.salience).toMatchObject({
       level: "low",
       voiceCandidate: false,
@@ -382,6 +384,7 @@ describe("prompted stage-play micro-reasoners", () => {
     });
     expect(validateStagePlayMicroReasonerRunV1(composer)).toEqual([]);
     expect(result.packet.microReasonerRunRefs).toContain(composer?.runId);
+    expect(result.packet.answer_authority).toBe(false);
     const packetRunRoles = result.packet.microReasonerRunRefs
       .map((runId) => result.microReasonerRuns.find((run) => run.runId === runId)?.role)
       .filter(Boolean)

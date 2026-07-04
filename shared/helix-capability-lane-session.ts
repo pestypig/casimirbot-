@@ -38,15 +38,22 @@ export type HelixCapabilityLaneSessionEventAction =
   | HelixCapabilityLaneSessionAction
   | "record_observation";
 
+export type HelixCapabilityLaneSessionCallAction =
+  | HelixCapabilityLaneSessionEventAction
+  | "list";
+
 export type HelixCapabilityLaneSessionCall = {
   schema?: typeof HELIX_CAPABILITY_LANE_SESSION_CALL_SCHEMA;
-  action: HelixCapabilityLaneSessionEventAction;
+  action: HelixCapabilityLaneSessionCallAction;
   lane_id?: HelixCapabilityLaneId | null;
   lane_session_id?: string | null;
   requested_backend_provider?: string | null;
   source_binding?: Partial<HelixCapabilityLaneSessionSourceBinding> | null;
   source_id?: string | null;
   source_hash?: string | null;
+  source_binding_key?: string | null;
+  source_identity_key?: string | null;
+  latest_source_identity_key?: string | null;
   source_kind?: HelixCapabilityLaneSessionSourceBinding["source_kind"] | null;
   account_locale?: string | null;
   target_language?: string | null;
@@ -65,13 +72,21 @@ export type HelixCapabilityLaneSessionCall = {
   cancel_requested?: boolean | null;
   reason?: string | null;
   now_ms?: number | null;
+  context_role?: "tool_evidence";
+  answer_authority?: false;
+  terminal_eligible?: false;
+  assistant_answer?: false;
+  raw_content_included?: false;
 };
 
 export type HelixCapabilityLaneSessionSourceBinding = {
   source_id: string;
   source_hash?: string | null;
+  source_binding_key?: string | null;
   source_text_hash?: string | null;
   source_text_char_count?: number | null;
+  source_identity_key?: string | null;
+  latest_source_identity_key?: string | null;
   source_kind:
     | "docs"
     | "docs_hover"
@@ -112,6 +127,8 @@ export type HelixCapabilityLaneSessionEvent = {
   reason: string;
   source_id: string | null;
   source_hash?: string | null;
+  source_binding_key?: string | null;
+  source_identity_key?: string | null;
   source_kind?: HelixCapabilityLaneSessionSourceBinding["source_kind"] | null;
   account_locale?: string | null;
   target_language?: string | null;
@@ -130,6 +147,8 @@ export type HelixCapabilityLaneSessionEvent = {
   cancel_requested?: boolean | null;
   terminal_authority_status: "not_terminal_authority" | "pending_helix_terminal_authority";
   reentry_required: true;
+  context_role: "tool_evidence";
+  answer_authority: false;
   assistant_answer: false;
   terminal_eligible: false;
   raw_content_included: false;
@@ -155,6 +174,8 @@ export type HelixCapabilityLaneSession = {
   last_observation_ref: string | null;
   last_receipt_ref: string | null;
   debug_history: HelixCapabilityLaneSessionEvent[];
+  context_role: "tool_evidence";
+  answer_authority: false;
   assistant_answer: false;
   terminal_eligible: false;
   raw_content_included: false;
@@ -174,6 +195,10 @@ export type HelixCapabilityLaneSessionDebugSummary = {
   lifecycle_action: HelixCapabilityLaneSessionEventAction | null;
   session_lifecycle_action: HelixCapabilityLaneSessionEventAction | null;
   session_action: HelixCapabilityLaneSessionEventAction | null;
+  latest_session_reason: string | null;
+  session_reason: string | null;
+  session_debug_phase: string;
+  session_observation_status: "no_observation" | "observation_recorded";
   session_status: HelixCapabilityLaneSessionStatus;
   session_health: HelixCapabilityLaneSessionHealth;
   source_id: string | null;
@@ -184,6 +209,7 @@ export type HelixCapabilityLaneSessionDebugSummary = {
   target_language?: string | null;
   session_control_key: string;
   source_binding_key: string;
+  source_identity_key: string;
   permissions: HelixCapabilityLaneSessionPermissions;
   permission_profile: string;
   created_at_ms: number;
@@ -194,6 +220,8 @@ export type HelixCapabilityLaneSessionDebugSummary = {
   latest_chunk_index?: number | null;
   latest_source_id?: string | null;
   latest_source_hash?: string | null;
+  latest_source_binding_key?: string | null;
+  latest_source_identity_key?: string | null;
   latest_source_kind?: HelixCapabilityLaneSessionSourceBinding["source_kind"] | null;
   latest_account_locale?: string | null;
   latest_target_language?: string | null;
@@ -208,13 +236,17 @@ export type HelixCapabilityLaneSessionDebugSummary = {
   latest_cancel_requested?: boolean | null;
   latest_session_event: HelixCapabilityLaneSessionEvent | null;
   latest_event_id: string | null;
+  latest_receipt_ref: string | null;
   latest_observation_key: string | null;
+  evidence_refs: string[];
   session_event_count: number;
   has_observation: boolean;
   terminal_authority_status: "not_terminal_authority" | "pending_helix_terminal_authority";
   reentry_required: true;
   backend_provider_becomes_root_agent: false;
   final_reports_require_terminal_authority: true;
+  context_role: "tool_evidence";
+  answer_authority: false;
   assistant_answer: false;
   terminal_eligible: false;
   raw_content_included: false;
@@ -222,13 +254,26 @@ export type HelixCapabilityLaneSessionDebugSummary = {
 
 export type HelixCapabilityLaneSessionResult = {
   ok: boolean;
-  action: HelixCapabilityLaneSessionEventAction;
+  action: HelixCapabilityLaneSessionCallAction;
   lane_id?: HelixCapabilityLaneId | null;
+  lane_session_id?: string | null;
   selected_runtime_agent_provider?: HelixAgentRuntimeId | null;
   requested_backend_provider?: string | null;
   session_supported?: boolean | null;
+  source_id?: string | null;
+  source_hash?: string | null;
+  source_binding_key?: string | null;
+  source_identity_key?: string | null;
+  source_text_hash?: string | null;
+  source_text_char_count?: number | null;
+  projection_target?: string | null;
+  account_locale?: string | null;
+  target_language?: string | null;
   lane_session: HelixCapabilityLaneSession | null;
   blocked_reason: string | null;
+  reentry_required: true;
+  context_role: "tool_evidence";
+  answer_authority: false;
   assistant_answer: false;
   terminal_eligible: false;
   raw_content_included: false;

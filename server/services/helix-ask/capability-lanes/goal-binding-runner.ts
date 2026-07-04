@@ -41,12 +41,15 @@ export type HelixCapabilityLaneGoalBindingRunnerResult = {
     capability_lane_goal_binding_results: HelixCapabilityLaneGoalBindingResult[];
     capability_lane_goal_binding_debug_summaries: HelixCapabilityLaneGoalBindingDebugSummary[];
   };
+  context_role: "tool_evidence";
+  answer_authority: false;
   terminal_eligible: false;
   assistant_answer: false;
   raw_content_included: false;
 };
 
 export type HelixCapabilityLaneGoalBindingCallAction =
+  | "list"
   | "bind"
   | "update_attention"
   | "record_mail_loop"
@@ -77,7 +80,8 @@ const readStringArray = (value: unknown): string[] =>
 
 const readAction = (value: unknown): HelixCapabilityLaneGoalBindingCallAction | null => {
   const text = readString(value).toLowerCase();
-  return text === "bind" ||
+  return text === "list" ||
+    text === "bind" ||
     text === "update_attention" ||
     text === "record_mail_loop" ||
     text === "record_report" ||
@@ -206,22 +210,58 @@ const readMailLoopDebugSummary = (value: unknown): HelixCapabilityLaneMailLoopDe
         : stagePlayWakeExpected
           ? "mailbox_wake"
           : "none",
+    stage_play_mail_delivery_status:
+      readString(record.stage_play_mail_delivery_status ?? record.stagePlayMailDeliveryStatus) === "created" ||
+      readString(record.stage_play_mail_delivery_status ?? record.stagePlayMailDeliveryStatus) === "deduped_existing" ||
+      readString(record.stage_play_mail_delivery_status ?? record.stagePlayMailDeliveryStatus) === "blocked"
+        ? readString(record.stage_play_mail_delivery_status ?? record.stagePlayMailDeliveryStatus) as
+          HelixCapabilityLaneMailLoopDebugSummary["stage_play_mail_delivery_status"]
+        : readString(record.blocked_reason ?? record.blockedReason)
+          ? "blocked"
+          : "created",
     materialized_mail_loop_evidence:
       readBoolean(record.materialized_mail_loop_evidence ?? record.materializedMailLoopEvidence) ??
       (
         Boolean(readString(record.stage_play_mail_id ?? record.stagePlayMailId)) ||
         Boolean(readString(record.observation_ref ?? record.observationRef))
       ),
+    previous_stage_play_mail_id:
+      readString(record.previous_stage_play_mail_id ?? record.previousStagePlayMailId) || null,
     mailbox_thread_id: mailboxThreadId,
+    observation_lane_session_id:
+      readString(record.observation_lane_session_id ?? record.observationLaneSessionId) || null,
     source_id: readString(record.source_id ?? record.sourceId) || null,
     source_hash: readString(record.source_hash ?? record.sourceHash) || null,
     source_text_hash: readString(record.source_text_hash ?? record.sourceTextHash) || null,
     source_text_char_count: readNumber(record.source_text_char_count ?? record.sourceTextCharCount),
     source_kind: readString(record.source_kind ?? record.sourceKind) || null,
+    account_locale: readString(record.account_locale ?? record.accountLocale) || null,
+    lane_session_source_id:
+      readString(record.lane_session_source_id ?? record.laneSessionSourceId) || null,
+    lane_session_source_hash:
+      readString(record.lane_session_source_hash ?? record.laneSessionSourceHash) || null,
     lane_session_source_text_hash:
       readString(record.lane_session_source_text_hash ?? record.laneSessionSourceTextHash) || null,
     lane_session_source_text_char_count:
       readNumber(record.lane_session_source_text_char_count ?? record.laneSessionSourceTextCharCount),
+    lane_session_projection_target:
+      readString(record.lane_session_projection_target ?? record.laneSessionProjectionTarget) || null,
+    lane_session_target_language:
+      readString(record.lane_session_target_language ?? record.laneSessionTargetLanguage) || null,
+    lane_session_account_locale:
+      readString(record.lane_session_account_locale ?? record.laneSessionAccountLocale) || null,
+    lane_session_control_key:
+      readString(record.lane_session_control_key ?? record.laneSessionControlKey) || null,
+    lane_session_source_binding_key:
+      readString(record.lane_session_source_binding_key ?? record.laneSessionSourceBindingKey) || null,
+    lane_session_source_identity_key:
+      readString(record.lane_session_source_identity_key ?? record.laneSessionSourceIdentityKey) || null,
+    source_identity_key:
+      readString(record.source_identity_key ?? record.sourceIdentityKey) || null,
+    latest_source_identity_key:
+      readString(record.latest_source_identity_key ?? record.latestSourceIdentityKey) || null,
+    mail_loop_observation_key:
+      readString(record.mail_loop_observation_key ?? record.mailLoopObservationKey) || null,
     chunk_id: readString(record.chunk_id ?? record.chunkId) || null,
     chunk_index: readNumber(record.chunk_index ?? record.chunkIndex),
     dedupe_key: readString(record.dedupe_key ?? record.dedupeKey) || null,
@@ -246,6 +286,8 @@ const readMailLoopDebugSummary = (value: unknown): HelixCapabilityLaneMailLoopDe
     terminal_authority_status: readTerminalAuthorityStatus(
       record.terminal_authority_status ?? record.terminalAuthorityStatus,
     ),
+    context_role: "tool_evidence",
+    answer_authority: false,
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,
@@ -319,6 +361,43 @@ const blocked = (blockedReason: string): HelixCapabilityLaneGoalBindingResult =>
   ok: false,
   goal_binding: null,
   blocked_reason: blockedReason,
+  context_role: "tool_evidence",
+  answer_authority: false,
+  assistant_answer: false,
+  terminal_eligible: false,
+  raw_content_included: false,
+});
+
+const readGoalBindingMatchText = (value: unknown): string =>
+  readString(value).toLowerCase();
+
+const goalBindingMatchesCall = (
+  binding: NonNullable<HelixCapabilityLaneGoalBindingResult["goal_binding"]>,
+  call: ReturnType<typeof readStructuredGoalBindingCalls>[number],
+): boolean => {
+  const goalBindingId = readGoalBindingMatchText(call.goal_binding_id);
+  if (goalBindingId && readGoalBindingMatchText(binding.goal_binding_id) !== goalBindingId) {
+    return false;
+  }
+  const goalId = readGoalBindingMatchText(call.goal_id);
+  if (goalId && readGoalBindingMatchText(binding.goal_id) !== goalId) {
+    return false;
+  }
+  const laneSessionId = readGoalBindingMatchText(call.lane_session_id);
+  if (laneSessionId && readGoalBindingMatchText(binding.lane_session_id) !== laneSessionId) {
+    return false;
+  }
+  return true;
+};
+
+const listed = (
+  goalBinding: HelixCapabilityLaneGoalBindingResult["goal_binding"],
+): HelixCapabilityLaneGoalBindingResult => ({
+  ok: true,
+  goal_binding: goalBinding,
+  blocked_reason: null,
+  context_role: "tool_evidence",
+  answer_authority: false,
   assistant_answer: false,
   terminal_eligible: false,
   raw_content_included: false,
@@ -337,6 +416,18 @@ export const runHelixCapabilityLaneGoalBindingRequests = (input: {
   const results: HelixCapabilityLaneGoalBindingResult[] = [];
 
   for (const call of calls) {
+    if (call.action === "list") {
+      const matchingBindings = store.list().filter((binding) =>
+        goalBindingMatchesCall(binding, call),
+      );
+      if (matchingBindings.length === 0) {
+        results.push(listed(null));
+        continue;
+      }
+      matchingBindings.forEach((binding) => results.push(listed(binding)));
+      continue;
+    }
+
     if (call.action === "bind") {
       if (!call.goal_id) {
         results.push(blocked("missing_goal_id"));
@@ -420,6 +511,8 @@ export const runHelixCapabilityLaneGoalBindingRequests = (input: {
       capability_lane_goal_binding_results: results,
       capability_lane_goal_binding_debug_summaries: goalBindingDebugSummaries,
     },
+    context_role: "tool_evidence",
+    answer_authority: false,
     terminal_eligible: false,
     assistant_answer: false,
     raw_content_included: false,

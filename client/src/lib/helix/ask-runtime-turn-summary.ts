@@ -36,6 +36,24 @@ function coerceText(value: unknown): string {
   return "";
 }
 
+function readCapabilityLaneReceiptRef(...values: unknown[]): string {
+  const records = values
+    .map((value) => readRecord(value))
+    .filter((record): record is RecordLike => Boolean(record));
+  const latest = records.map((record) => coerceText(record.latest_receipt_ref)).find(Boolean);
+  if (latest) return latest;
+  const direct = records.map((record) => coerceText(record.receipt_ref)).find(Boolean);
+  if (direct) return direct;
+  const last = records.map((record) => coerceText(record.last_receipt_ref)).find(Boolean);
+  if (last) return last;
+  for (const value of values) {
+    if (readRecord(value)) continue;
+    const text = coerceText(value);
+    if (text) return text;
+  }
+  return "";
+}
+
 function readNestedRecord(...values: unknown[]): RecordLike | null {
   for (const value of values) {
     const record = readRecord(value);
@@ -671,10 +689,13 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
         readArray(summary.mail_loop_refs).map(coerceText).filter(Boolean).at(-1) ||
         "";
       const receipt =
-        coerceText(latestMailLoop?.receipt_ref) ||
-        coerceText(readRecord(summary.latest_goal_binding_event)?.receipt_ref) ||
-        coerceText(readRecord(summary.report_decision)?.receipt_ref) ||
-        coerceText(readRecord(summary.dispatch_plan)?.receipt_ref);
+        readCapabilityLaneReceiptRef(
+          summary,
+          latestMailLoop,
+          summary.latest_goal_binding_event,
+          summary.report_decision,
+          summary.dispatch_plan,
+        );
       const latestGoalEvent = coerceText(readRecord(summary.latest_goal_binding_event)?.event);
       const reportDecision = readRecord(summary.report_decision);
       const reportAction = coerceText(reportDecision?.action);
@@ -881,6 +902,8 @@ function readGoalDispatchReadinessSummary(record: RecordLike | null, debug: Reco
         : "ready";
   const pendingWake = coerceText(readiness.pending_wake_count);
   const pendingTerminal = coerceText(readiness.pending_terminal_authority_count);
+  const liveMailLoopRequired = coerceText(readiness.live_mail_loop_required_count);
+  const terminalAuthorityRequired = coerceText(readiness.terminal_authority_required_count);
   const projectionOnly = coerceText(readiness.projection_only_count);
   const manualReview = coerceText(readiness.manual_review_count);
   const debugOnly = coerceText(readiness.debug_only_count);
@@ -888,6 +911,7 @@ function readGoalDispatchReadinessSummary(record: RecordLike | null, debug: Reco
   const sessions = readArray(readiness.next_lane_session_ids).map(coerceText).filter(Boolean).join(", ");
   const sessionControlKeys = readArray(readiness.next_session_control_keys).map(coerceText).filter(Boolean).join(", ");
   const sourceBindingKeys = readArray(readiness.next_source_binding_keys).map(coerceText).filter(Boolean).join(", ");
+  const sourceIdentityKeys = readArray(readiness.next_source_identity_keys).map(coerceText).filter(Boolean).join(", ");
   const mailLoopObservationKeys =
     readArray(readiness.next_mail_loop_observation_keys).map(coerceText).filter(Boolean).join(", ");
   const targets = readArray(readiness.next_dispatch_targets).map(coerceText).filter(Boolean).join(", ");
@@ -912,6 +936,8 @@ function readGoalDispatchReadinessSummary(record: RecordLike | null, debug: Reco
   const evidenceRefs = readArray(readiness.next_evidence_refs).map(coerceText).filter(Boolean).join(", ");
   const receipts = readArray(readiness.next_receipt_refs).map(coerceText).filter(Boolean).join(", ");
   const blockedReasons = readArray(readiness.blocked_reasons).map(coerceText).filter(Boolean).join(", ");
+  const anyLiveMailLoopRequired = readiness.any_live_mail_loop_required === true;
+  const anyTerminalAuthorityRequired = readiness.any_terminal_authority_required === true;
 
   return [
     `readiness ${readinessState}`,
@@ -921,6 +947,12 @@ function readGoalDispatchReadinessSummary(record: RecordLike | null, debug: Reco
     blocked ? `blocked ${blocked}` : "",
     pendingWake && pendingWake !== "0" ? `pending wake ${pendingWake}` : "",
     pendingTerminal && pendingTerminal !== "0" ? `pending terminal ${pendingTerminal}` : "",
+    liveMailLoopRequired && liveMailLoopRequired !== "0" ? `live mail loop required ${liveMailLoopRequired}` : "",
+    terminalAuthorityRequired && terminalAuthorityRequired !== "0"
+      ? `terminal authority required ${terminalAuthorityRequired}`
+      : "",
+    anyLiveMailLoopRequired ? "any live mail loop required true" : "",
+    anyTerminalAuthorityRequired ? "any terminal authority required true" : "",
     projectionOnly && projectionOnly !== "0" ? `projection only ${projectionOnly}` : "",
     manualReview && manualReview !== "0" ? `manual review ${manualReview}` : "",
     debugOnly && debugOnly !== "0" ? `debug only ${debugOnly}` : "",
@@ -928,6 +960,7 @@ function readGoalDispatchReadinessSummary(record: RecordLike | null, debug: Reco
     sessions ? `sessions ${sessions}` : "",
     sessionControlKeys ? `session controls ${sessionControlKeys}` : "",
     sourceBindingKeys ? `source bindings ${sourceBindingKeys}` : "",
+    sourceIdentityKeys ? `source identities ${sourceIdentityKeys}` : "",
     mailLoopObservationKeys ? `mail observations ${mailLoopObservationKeys}` : "",
     targets ? `targets ${targets}` : "",
     goalBindings ? `goal bindings ${goalBindings}` : "",
@@ -990,8 +1023,8 @@ function readLaneSessionSummary(record: RecordLike | null, debug: RecordLike | n
       const sourceTextCharCount = coerceText(summary.source_text_char_count);
       const sourceProjectionTarget = coerceText(summary.source_projection_target);
       const projection = coerceText(summary.projection_target);
-      const locale = coerceText(summary.account_locale);
-      const targetLanguage = coerceText(summary.target_language);
+      const locale = coerceText(summary.account_locale ?? summary.latest_account_locale);
+      const targetLanguage = coerceText(summary.target_language ?? summary.latest_target_language);
       const latestProjection = coerceText(summary.latest_projection_target);
       const latestChunk = coerceText(summary.latest_chunk_id);
       const latestChunkIndex = coerceText(summary.latest_chunk_index);
@@ -1004,7 +1037,7 @@ function readLaneSessionSummary(record: RecordLike | null, debug: RecordLike | n
       const latestEventId = coerceText(summary.latest_event_id);
       const hasObservation = summary.has_observation === true;
       const observation = coerceText(summary.last_observation_ref);
-      const receipt = coerceText(summary.last_receipt_ref);
+      const receipt = readCapabilityLaneReceiptRef(summary);
       const terminalAuthority = coerceText(summary.terminal_authority_status);
       const permissions = readCapabilityLanePermissionText(summary.permissions);
       return [
@@ -1070,10 +1103,15 @@ function readLaneMailLoopSummary(record: RecordLike | null, debug: RecordLike | 
       const previousMail = coerceText(summary.previous_stage_play_mail_id);
       const wake = summary.stage_play_wake_expected === true ? "wake expected" : "wake not expected";
       const wakeKind = coerceText(summary.stage_play_wake_kind);
+      const mailboxWakeExpected =
+        summary.mailbox_wake_expected === true ||
+        wakeKind === "mailbox_wake" ||
+        summary.stage_play_wake_expected === true;
+      const decisionWakeExpected = summary.decision_wake_expected === true;
       const observationSession = coerceText(summary.observation_lane_session_id);
       const sessionControlKey = coerceText(summary.lane_session_control_key);
       const observation = coerceText(summary.observation_ref);
-      const receipt = coerceText(summary.receipt_ref);
+      const receipt = readCapabilityLaneReceiptRef(summary);
       const source = coerceText(summary.source_id);
       const sourceHash = coerceText(summary.source_hash);
       const sourceKind = coerceText(summary.source_kind);
@@ -1105,6 +1143,8 @@ function readLaneMailLoopSummary(record: RecordLike | null, debug: RecordLike | 
         mailDelivery ? `mail delivery ${mailDelivery}` : "",
         previousMail ? `previous mail ${previousMail}` : "",
         wake,
+        `mailbox wake expected ${mailboxWakeExpected ? "true" : "false"}`,
+        `decision wake expected ${decisionWakeExpected ? "true" : "false"}`,
         wakeKind ? `wake kind ${wakeKind}` : "",
         observationSession ? `observation session ${observationSession}` : "",
         sessionControlKey ? `control ${sessionControlKey}` : "",
@@ -1163,20 +1203,77 @@ function readLaneTimelineSummary(record: RecordLike | null, debug: RecordLike | 
     const lane = coerceText(row.lane_id);
     const capability = coerceText(row.capability_id) || coerceText(row.capability) || lane || "capability_lane";
     const runtimeProvider = coerceText(row.selected_runtime_agent_provider);
+    const requestedBackend = coerceText(row.requested_backend_provider);
     const backend = coerceText(row.selected_backend_provider);
+    const fallbackBackend = coerceText(row.fallback_backend_provider);
+    const backendSelectionReason =
+      coerceText(row.backend_selection_reason) ||
+      coerceText(row.selection_reason);
     const observation = coerceText(row.observation_ref);
-    const receipt = coerceText(row.receipt_ref);
+    const receipt = readCapabilityLaneReceiptRef(row);
+    const laneSession = coerceText(row.lane_session_id);
+    const sessionControlKey = coerceText(row.session_control_key);
+    const sourceBindingKey = coerceText(row.source_binding_key);
+    const latestObservationKey = coerceText(row.latest_observation_key);
+    const latestMailLoopObservationKey = coerceText(row.latest_mail_loop_observation_key);
+    const goalBindingKey = coerceText(row.goal_binding_key);
+    const latestEventId = coerceText(row.latest_event_id);
+    const sourceId = coerceText(row.source_id);
+    const sourceHash = coerceText(row.source_hash);
+    const sourceKind = coerceText(row.source_kind);
+    const sourceTextHash = coerceText(row.source_text_hash);
+    const sourceTextCharCount = coerceText(row.source_text_char_count);
+    const sourceIdentityKey = coerceText(row.source_identity_key);
+    const latestSourceIdentityKey = coerceText(row.latest_source_identity_key);
+    const projectionTarget = coerceText(row.projection_target);
+    const accountLocale = coerceText(row.account_locale);
+    const targetLanguage = coerceText(row.target_language);
+    const chunkId = coerceText(row.chunk_id);
+    const chunkIndex = coerceText(row.chunk_index);
+    const dedupeKey = coerceText(row.dedupe_key);
+    const sourceEventId = coerceText(row.source_event_id);
+    const sourceEventMs = coerceText(row.source_event_ms);
+    const observedAtMs = coerceText(row.observed_at_ms);
+    const freshnessStatus = coerceText(row.freshness_status);
     const terminalAuthority = coerceText(row.terminal_authority_status);
     return [
       `${normalizedStage}: ${capability}`,
       state ? `state ${state}` : "",
       runtimeProvider ? `runtime ${runtimeProvider}` : "",
+      requestedBackend ? `requested backend ${requestedBackend}` : "",
       backend ? `backend ${backend}` : "",
+      fallbackBackend ? `fallback ${fallbackBackend}` : "",
+      backendSelectionReason ? `reason ${backendSelectionReason}` : "",
+      sourceId ? `source ${sourceId}` : "",
+      sourceHash ? `source hash ${sourceHash}` : "",
+      sourceKind ? `source kind ${sourceKind}` : "",
+      sourceTextHash ? `source text ${sourceTextHash}` : "",
+      sourceTextCharCount ? `source chars ${sourceTextCharCount}` : "",
+      sourceIdentityKey ? `source identity ${sourceIdentityKey}` : "",
+      latestSourceIdentityKey ? `latest source identity ${latestSourceIdentityKey}` : "",
+      projectionTarget ? `projection ${projectionTarget}` : "",
+      accountLocale ? `account locale ${accountLocale}` : "",
+      targetLanguage ? `target ${targetLanguage}` : "",
+      chunkId ? `chunk ${chunkId}` : "",
+      chunkIndex ? `chunk index ${chunkIndex}` : "",
+      dedupeKey ? `dedupe ${dedupeKey}` : "",
+      sourceEventId ? `source event ${sourceEventId}` : "",
+      sourceEventMs ? `source event ms ${sourceEventMs}` : "",
+      observedAtMs ? `observed ${observedAtMs}` : "",
+      freshnessStatus ? `freshness ${freshnessStatus}` : "",
+      row.cancel_requested === true ? "cancelled" : "",
       row.lane_visible === true ? "visible" : "",
       row.lane_requested === true ? "requested" : "",
       row.lane_executed === true ? "executed" : "",
       row.observation_reentered === true ? "re-entered" : "",
       row.lane_visible === true && row.lane_executed !== true ? "not executed" : "",
+      laneSession ? `session ${laneSession}` : "",
+      sessionControlKey ? `control ${sessionControlKey}` : "",
+      sourceBindingKey ? `source binding ${sourceBindingKey}` : "",
+      latestObservationKey ? `observation key ${latestObservationKey}` : "",
+      latestMailLoopObservationKey ? `mail observation ${latestMailLoopObservationKey}` : "",
+      goalBindingKey ? `goal binding ${goalBindingKey}` : "",
+      latestEventId ? `latest event ${latestEventId}` : "",
       observation ? `observation ${observation}` : "",
       receipt ? `receipt ${receipt}` : "",
       terminalAuthority ? `terminal authority ${terminalAuthority}` : "",

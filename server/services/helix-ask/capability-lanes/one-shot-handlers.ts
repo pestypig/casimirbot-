@@ -29,7 +29,15 @@ import {
   type HelixWorkstationToolReferenceListRequest,
   type HelixWorkstationToolReferenceListResult,
 } from "@shared/helix-workstation-tool-reference-lane";
+import {
+  IMAGE_LENS_REGION_INSPECTION_CAPABILITY,
+  IMAGE_LENS_REGION_INSPECTION_REQUEST_SCHEMA,
+  type ImageLensRegionInspectionRequestV1,
+  type ImageLensRegionInspectionResultV1,
+} from "@shared/contracts/image-lens-region-inspection.v1";
+import type { DocumentImageBboxPxV1 } from "@shared/contracts/document-image-region-receipt.v1";
 import type { HelixAgentProvider } from "../agent-providers/types";
+import { runImageLensRegionInspection } from "./image-lens-region-inspection";
 import { runLiveTranslationTranslateText } from "./live-translation";
 import { resolveHelixCapabilityLaneRequest } from "./registry";
 import { runSpeechToTextTranscribeAudio } from "./speech-to-text";
@@ -42,7 +50,7 @@ type RecordLike = Record<string, unknown>;
 export type HelixCapabilityLaneShadowOneShotResult = {
   schema: "helix.capability_lane.shadow_one_shot_result.v1";
   ok: false;
-  lane_id: HelixCapabilityLaneId;
+  lane_id: HelixCapabilityLaneId | string;
   capability: string;
   selected_runtime_agent_provider: HelixAgentProvider["id"];
   lane_resolve_trace: HelixCapabilityLaneResolveTrace;
@@ -62,6 +70,7 @@ export type HelixCapabilityLaneOneShotCallResult =
   | HelixTextToSpeechOneShotResult
   | HelixUtilityTextNormalizeResult
   | HelixWorkstationToolReferenceListResult
+  | ImageLensRegionInspectionResultV1
   | HelixCapabilityLaneShadowOneShotResult;
 
 export type HelixCapabilityLaneOneShotHandler = {
@@ -73,7 +82,7 @@ export type HelixCapabilityLaneOneShotHandler = {
     turnId: string | null;
     iteration?: number | null;
     env?: NodeJS.ProcessEnv;
-  }): HelixCapabilityLaneOneShotCallResult;
+  }): HelixCapabilityLaneOneShotCallResult | Promise<HelixCapabilityLaneOneShotCallResult>;
 };
 
 const hashShort = (value: unknown): string =>
@@ -82,6 +91,12 @@ const hashShort = (value: unknown): string =>
 const readString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
+const readRecord = (value: unknown): RecordLike | null =>
+  value && typeof value === "object" && !Array.isArray(value) ? value as RecordLike : null;
+
+const readNumber = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
 export const readHelixCapabilityLaneCallCapability = (call: RecordLike): string =>
   readString(call.capability ?? call.capability_id ?? call.capabilityId);
 
@@ -89,7 +104,7 @@ const buildShadowObservationPacket = (input: {
   turnId: string;
   iteration: number;
   capability: string;
-  laneId: HelixCapabilityLaneId;
+  laneId: HelixCapabilityLaneId | string;
   observationRef: string;
   summary: string;
   error: string;
@@ -109,7 +124,9 @@ const buildShadowObservationPacket = (input: {
   receipts: [],
   missing_requirements: [{
     code: input.error,
-    message: `${input.capability} is represented in the provider-neutral lane catalog but is not executable in this deterministic slice.`,
+    message: input.trace.lane_status === "unknown"
+      ? `${input.capability} does not match a known provider-neutral capability lane.`
+      : `${input.capability} is represented in the provider-neutral lane catalog but is not executable in this deterministic slice.`,
     repair_action: "use_configured_lane_backend_or_supported_capability",
   }],
   backend_selection_decision: input.trace.backend_selection_decision,
@@ -156,7 +173,7 @@ const buildShadowObservationPacket = (input: {
 
 const buildShadowResult = (input: {
   provider: HelixAgentProvider;
-  laneId: HelixCapabilityLaneId;
+  laneId: HelixCapabilityLaneId | string;
   capability: string;
   requestedBackendProvider: string | null;
   turnId: string | null;
@@ -187,7 +204,9 @@ const buildShadowResult = (input: {
     capability: input.capability,
     laneId: input.laneId,
     observationRef,
-    summary: `${input.capability} is cataloged on ${input.laneId} but did not execute; lane output remains non-terminal.`,
+    summary: trace.lane_status === "unknown"
+      ? `${input.capability} did not match a known capability lane; the request was blocked and remains non-terminal.`
+      : `${input.capability} is cataloged on ${input.laneId} but did not execute; lane output remains non-terminal.`,
     error,
     trace,
   });
@@ -215,6 +234,33 @@ const buildShadowResult = (input: {
   };
 };
 
+export const inferHelixCapabilityLaneFromCapability = (capability: string): string | null => {
+  const normalized = readString(capability);
+  if (!normalized) return null;
+  const [prefix] = normalized.split(".");
+  return readString(prefix) || null;
+};
+
+export const buildUnknownHelixCapabilityLaneOneShotResult = (input: {
+  provider: HelixAgentProvider;
+  call: RecordLike;
+  turnId: string | null;
+  iteration?: number | null;
+  env?: NodeJS.ProcessEnv;
+}): HelixCapabilityLaneShadowOneShotResult => {
+  const capability = readHelixCapabilityLaneCallCapability(input.call) || "unknown_capability_lane.unknown";
+  return buildShadowResult({
+    provider: input.provider,
+    laneId: inferHelixCapabilityLaneFromCapability(capability) ?? "unknown",
+    capability,
+    requestedBackendProvider:
+      readString(input.call.requested_backend_provider ?? input.call.requestedBackendProvider) || null,
+    turnId: input.turnId,
+    iteration: input.iteration,
+    env: input.env,
+  });
+};
+
 const toLiveTranslationRequest = (
   call: RecordLike,
   turnId: string | null,
@@ -230,11 +276,23 @@ const toLiveTranslationRequest = (
     requested_backend_provider:
       readString(call.requested_backend_provider ?? call.requestedBackendProvider) || null,
     turn_id: readString(call.turn_id ?? call.turnId) || turnId,
+    lane_session_id: readString(call.lane_session_id ?? call.laneSessionId) || null,
+    session_control_key: readString(call.session_control_key ?? call.sessionControlKey) || null,
+    source_binding_key: readString(call.source_binding_key ?? call.sourceBindingKey) || null,
+    source_identity_key: readString(call.source_identity_key ?? call.sourceIdentityKey) || null,
+    latest_observation_key: readString(call.latest_observation_key ?? call.latestObservationKey) || null,
+    latest_mail_loop_observation_key:
+      readString(call.latest_mail_loop_observation_key ?? call.latestMailLoopObservationKey) || null,
+    goal_binding_id: readString(call.goal_binding_id ?? call.goalBindingId) || null,
+    goal_binding_key: readString(call.goal_binding_key ?? call.goalBindingKey) || null,
     source_id: readString(call.source_id ?? call.sourceId) || null,
     source_hash: readString(call.source_hash ?? call.sourceHash) || null,
+    source_kind: readString(call.source_kind ?? call.sourceKind) || null,
+    account_locale: readString(call.account_locale ?? call.accountLocale) || null,
     chunk_id: readString(call.chunk_id ?? call.chunkId) || null,
     chunk_index: typeof call.chunk_index === "number" ? call.chunk_index : null,
     dedupe_key: readString(call.dedupe_key ?? call.dedupeKey) || null,
+    source_event_id: readString(call.source_event_id ?? call.sourceEventId) || null,
     source_event_ms: typeof call.source_event_ms === "number" ? call.source_event_ms : null,
     projection_target: readString(call.projection_target ?? call.projectionTarget) as HelixLiveTranslationOneShotRequest["projection_target"] || null,
     cancel_requested: call.cancel_requested === true || call.cancelRequested === true,
@@ -315,6 +373,74 @@ const toSpeechToTextTranscribeAudioRequest = (
     duration_ms: typeof call.duration_ms === "number" ? call.duration_ms : null,
     capture_source: readString(call.capture_source ?? call.captureSource) || null,
     source_event_ms: typeof call.source_event_ms === "number" ? call.source_event_ms : null,
+    assistant_answer: false,
+    terminal_eligible: false,
+  };
+};
+
+const readBbox = (value: unknown): DocumentImageBboxPxV1 | null => {
+  const record = readRecord(value);
+  if (!record) return null;
+  const x = readNumber(record.x);
+  const y = readNumber(record.y);
+  const width = readNumber(record.width);
+  const height = readNumber(record.height);
+  if (x === null || y === null || width === null || height === null) return null;
+  return { x, y, width, height };
+};
+
+const toImageLensRegionInspectionRequest = (
+  call: RecordLike,
+  turnId: string | null,
+): ImageLensRegionInspectionRequestV1 | null => {
+  const capability = readHelixCapabilityLaneCallCapability(call);
+  if (capability !== IMAGE_LENS_REGION_INSPECTION_CAPABILITY) return null;
+  const bbox =
+    readBbox(call.bbox_px) ??
+    readBbox(call.bboxPx) ??
+    { x: 0, y: 0, width: 1, height: 1 };
+  return {
+    schema: IMAGE_LENS_REGION_INSPECTION_REQUEST_SCHEMA,
+    capability: IMAGE_LENS_REGION_INSPECTION_CAPABILITY,
+    source_id: readString(call.source_id ?? call.sourceId),
+    frame_id: readString(call.frame_id ?? call.frameId) || null,
+    source_attachment_id:
+      readString(call.source_attachment_id ?? call.sourceAttachmentId) || null,
+    source_kind:
+      readString(call.source_kind ?? call.sourceKind) as ImageLensRegionInspectionRequestV1["source_kind"] || null,
+    source_image_ref:
+      readString(call.source_image_ref ?? call.sourceImageRef) || null,
+    page_number:
+      readNumber(call.page_number ?? call.pageNumber),
+    page_image_ref:
+      readString(call.page_image_ref ?? call.pageImageRef) || null,
+    bbox_px: bbox,
+    crop_image_ref:
+      readString(call.crop_image_ref ?? call.cropImageRef) || null,
+    question: readString(call.question) || null,
+    reason_for_crop:
+      readString(call.reason_for_crop ?? call.reasonForCrop) || null,
+    parent_region_id:
+      readString(call.parent_region_id ?? call.parentRegionId) || null,
+    detail:
+      readString(call.detail) as ImageLensRegionInspectionRequestV1["detail"] || "auto",
+    region_kind:
+      readString(call.region_kind ?? call.regionKind) as ImageLensRegionInspectionRequestV1["region_kind"] || null,
+    confidence: readNumber(call.confidence),
+    summary: readString(call.summary) || null,
+    text_candidate:
+      readString(call.text_candidate ?? call.textCandidate) || null,
+    latex_candidate:
+      readString(call.latex_candidate ?? call.latexCandidate) || null,
+    table_candidate_ref:
+      readString(call.table_candidate_ref ?? call.tableCandidateRef) || null,
+    uncertainty: Array.isArray(call.uncertainty)
+      ? call.uncertainty.map((entry) => readString(entry)).filter(Boolean)
+      : [],
+    requested_backend_provider:
+      readString(call.requested_backend_provider ?? call.requestedBackendProvider) || null,
+    turn_id: readString(call.turn_id ?? call.turnId) || turnId,
+    thread_id: readString(call.thread_id ?? call.threadId) || null,
     assistant_answer: false,
     terminal_eligible: false,
   };
@@ -468,6 +594,32 @@ const workstationToolReferenceHandler: HelixCapabilityLaneOneShotHandler = {
   },
 };
 
+const visualAnalysisHandler: HelixCapabilityLaneOneShotHandler = {
+  capabilityPrefix: "visual_analysis.",
+  laneId: "visual_analysis",
+  run(input) {
+    const request = toImageLensRegionInspectionRequest(input.call, input.turnId);
+    if (!request) {
+      return buildShadowResult({
+        provider: input.provider,
+        laneId: "visual_analysis",
+        capability: readHelixCapabilityLaneCallCapability(input.call) || "visual_analysis.unknown",
+        requestedBackendProvider: readString(input.call.requested_backend_provider ?? input.call.requestedBackendProvider) || null,
+        turnId: input.turnId,
+        iteration: input.iteration,
+        env: input.env,
+      });
+    }
+    return runImageLensRegionInspection({
+      provider: input.provider,
+      request,
+      turnId: input.turnId,
+      iteration: input.iteration,
+      env: input.env,
+    });
+  },
+};
+
 const shadowHandler = (
   laneId: HelixCapabilityLaneId,
   capabilityPrefix: string,
@@ -495,7 +647,7 @@ export const HELIX_CAPABILITY_LANE_ONE_SHOT_HANDLERS: HelixCapabilityLaneOneShot
   shadowHandler("code_text", "code_text."),
   speechToTextHandler,
   textToSpeechHandler,
-  shadowHandler("visual_analysis", "visual_analysis."),
+  visualAnalysisHandler,
   workstationToolReferenceHandler,
 ];
 

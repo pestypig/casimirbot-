@@ -44,6 +44,7 @@ const mail = (id: string, summary: string): StagePlayLiveSourceMailItemV1 => ({
   evidenceRefs: [`visual_evidence:${id}`],
   createdAt: "2026-06-08T23:30:00.000Z",
   updatedAt: "2026-06-08T23:30:00.000Z",
+  answer_authority: false,
   assistant_answer: false,
   terminal_eligible: false,
   context_role: "tool_evidence",

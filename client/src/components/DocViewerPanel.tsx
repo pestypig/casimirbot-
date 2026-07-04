@@ -26,7 +26,9 @@ import {
   documentMarkdownSourceId,
   enqueueDocumentMarkdownTranslationMail,
   extractDocumentMarkdownTranslationsFromRuns,
+  listDocumentMarkdownTranslationLaneSessions,
   readDocumentMarkdownMicroDeckRuns,
+  resolveDocumentTranslationTargetLanguage,
   runDocumentMarkdownTranslationLaneSessionControl,
 } from "@/lib/docs/documentTranslationClient";
 import {
@@ -94,6 +96,7 @@ const DOC_TRANSLATION_SCAN_DEBOUNCE_MS = 360;
 type StoredInlineTranslationSession = {
   enabled: boolean;
   sourceHash?: string | null;
+  sourceIdentityKey?: string | null;
   sourceTextHash?: string | null;
   sourceTextCharCount?: number | null;
   accountLocale?: string | null;
@@ -103,6 +106,7 @@ type StoredInlineTranslationSession = {
 
 type StoredInlineTranslationSessionScope = {
   sourceHash: string | null;
+  sourceIdentityKey: string | null;
   sourceTextHash: string | null;
   sourceTextCharCount: number | null;
   accountLocale: string;
@@ -128,10 +132,22 @@ function readRecordArray(value: unknown): Array<Record<string, unknown>> {
     : [];
 }
 
+function readLocalString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function readLocalScalarString(value: unknown): string | null {
+  const text = readLocalString(value);
+  if (text) return text;
+  return typeof value === "number" && Number.isFinite(value) ? String(value) : null;
+}
+
 function emitDocumentTranslationLaneSessionControlEvents(input: {
   response: Record<string, unknown>;
   sourceId: string;
   sourceHash: string;
+  sourceIdentityKey?: string | null;
+  latestSourceIdentityKey?: string | null;
 }): void {
   const debug = input.response.debug && typeof input.response.debug === "object" && !Array.isArray(input.response.debug)
     ? (input.response.debug as Record<string, unknown>)
@@ -140,12 +156,40 @@ function emitDocumentTranslationLaneSessionControlEvents(input: {
     ...readRecordArray(input.response.capability_lane_session_debug_summaries),
     ...readRecordArray(input.response.session_debug_summaries),
     ...readRecordArray(debug.capability_lane_session_debug_summaries),
+    ...readRecordArray(input.response.capability_lane_turn_timeline).filter((entry) =>
+      readLocalString(entry.stage) === "lane_session"
+    ),
+    ...readRecordArray(debug.capability_lane_turn_timeline).filter((entry) =>
+      readLocalString(entry.stage) === "lane_session"
+    ),
   ];
+  const emittedEventIds = new Set<string>();
   summaries.forEach((summary, index) => {
     const eventId =
-      typeof summary.latest_event_id === "string" && summary.latest_event_id.trim()
-        ? summary.latest_event_id.trim()
-        : `docs-translation-lane-session:${input.sourceId}:${index}:${Date.now()}`;
+      readLocalString(summary.latest_event_id) ??
+      readLocalString(summary.latestEventId) ??
+      (readLocalScalarString(summary.seq)
+        ? `docs-translation-lane-session:${input.sourceId}:seq:${readLocalScalarString(summary.seq)}`
+        : null) ??
+      (readLocalString(summary.session_control_key)
+        ? `docs-translation-lane-session:${input.sourceId}:${summary.session_control_key}`
+        : null) ??
+      (readLocalString(summary.sessionControlKey)
+        ? `docs-translation-lane-session:${input.sourceId}:${summary.sessionControlKey}`
+        : null) ??
+      `docs-translation-lane-session:${input.sourceId}:${index}:${Date.now()}`;
+    if (emittedEventIds.has(eventId)) return;
+    emittedEventIds.add(eventId);
+    const tsMs =
+      typeof summary.updated_at_ms === "number"
+        ? summary.updated_at_ms
+        : typeof summary.updatedAtMs === "number"
+          ? summary.updatedAtMs
+          : typeof summary.latest_observed_at_ms === "number"
+            ? summary.latest_observed_at_ms
+            : typeof summary.latestObservedAtMs === "number"
+              ? summary.latestObservedAtMs
+              : Date.now();
     emitHelixAskLiveEvent({
       contextId: HELIX_ASK_CONTEXT_ID.desktop,
       traceId: `docs-translation-lane-session:${input.sourceId}`,
@@ -153,7 +197,7 @@ function emitDocumentTranslationLaneSessionControlEvents(input: {
         id: eventId,
         text: "Document translation lane session control.",
         tool: "capability_lane_session",
-        tsMs: typeof summary.updated_at_ms === "number" ? summary.updated_at_ms : Date.now(),
+        tsMs,
         meta: {
           ...summary,
           sourceEventType: "lane_session",
@@ -163,6 +207,14 @@ function emitDocumentTranslationLaneSessionControlEvents(input: {
           source_id: input.sourceId,
           sourceHash: input.sourceHash,
           source_hash: input.sourceHash,
+          ...(input.sourceIdentityKey ? {
+            sourceIdentityKey: input.sourceIdentityKey,
+            source_identity_key: input.sourceIdentityKey,
+          } : {}),
+          ...(input.latestSourceIdentityKey ? {
+            latestSourceIdentityKey: input.latestSourceIdentityKey,
+            latest_source_identity_key: input.latestSourceIdentityKey,
+          } : {}),
           terminal_eligible: false,
           assistant_answer: false,
           raw_content_included: false,
@@ -351,6 +403,10 @@ export function DocViewerPanel() {
   } = useDocViewerStore();
   const { userSettings } = useHelixStartSettings();
   const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const documentTranslationTargetLanguage = React.useMemo(
+    () => resolveDocumentTranslationTargetLanguage(interfaceLanguage.code),
+    [interfaceLanguage.code],
+  );
   const { t } = useInterfaceText(interfaceLanguage.code);
   const [query, setQuery] = React.useState("");
   const [docClassFilter, setDocClassFilter] = React.useState<DocTaxonomyFilter>("all");
@@ -396,6 +452,27 @@ export function DocViewerPanel() {
   );
   const translationEligible =
     mode === "doc" && Boolean(currentEntry) && Boolean(rawMarkdown) && interfaceLanguage.code !== "en";
+  const activeLiveTranslationSourceIdentityKey = React.useMemo(
+    () =>
+      currentEntry && translationEligible && rawMarkdownSourceHash
+        ? buildDocumentTranslationSourceIdentityKey({
+          sourceId: documentMarkdownSourceId(currentEntry.relativePath),
+          sourceHash: rawMarkdownSourceHash,
+          sourceTextHash: rawMarkdownSourceHash,
+          sourceTextCharCount: rawMarkdown.length,
+          accountLocale: interfaceLanguage.code,
+          targetLanguage: documentTranslationTargetLanguage,
+        })
+        : null,
+    [
+      currentEntry,
+      documentTranslationTargetLanguage,
+      interfaceLanguage.code,
+      rawMarkdown.length,
+      rawMarkdownSourceHash,
+      translationEligible,
+    ],
+  );
   const liveTranslationProjectionSnapshot = React.useSyncExternalStore(
     subscribeDocumentLiveTranslationProjectionRegistry,
     () =>
@@ -404,6 +481,7 @@ export function DocViewerPanel() {
           docPath: currentEntry.relativePath,
           locale: interfaceLanguage.code,
           sourceHash: rawMarkdownSourceHash,
+          sourceIdentityKey: activeLiveTranslationSourceIdentityKey,
           projectionTarget: HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
         })
         : EMPTY_LIVE_TRANSLATION_PROJECTION_SNAPSHOT,
@@ -416,14 +494,89 @@ export function DocViewerPanel() {
   const activeTranslationScopeKey = React.useMemo(
     () =>
       translationEligible && currentEntry && rawMarkdownSourceHash
-        ? `${currentEntry.relativePath}:${interfaceLanguage.code}:${rawMarkdownSourceHash}`
+        ? [
+          currentEntry.relativePath,
+          interfaceLanguage.code,
+          documentTranslationTargetLanguage,
+          rawMarkdownSourceHash,
+          activeLiveTranslationSourceIdentityKey ?? "no-source-identity",
+        ].join(":")
         : null,
-    [currentEntry, interfaceLanguage.code, rawMarkdownSourceHash, translationEligible],
+    [
+      activeLiveTranslationSourceIdentityKey,
+      currentEntry,
+      documentTranslationTargetLanguage,
+      interfaceLanguage.code,
+      rawMarkdownSourceHash,
+      translationEligible,
+    ],
   );
   const hasLoadingInlineTranslations = React.useMemo(
     () => Object.values(inlineTranslations).some((translation) => translation.status === "loading"),
     [inlineTranslations],
   );
+
+  React.useEffect(() => {
+    if (
+      !translationEligible ||
+      !currentEntry ||
+      !rawMarkdownSourceHash ||
+      !activeTranslationScopeKey
+    ) {
+      return;
+    }
+    const controller = new AbortController();
+    const sourceId = documentMarkdownSourceId(currentEntry.relativePath);
+    const sourceIdentityKey = activeLiveTranslationSourceIdentityKey ?? buildDocumentTranslationSourceIdentityKey({
+      sourceId,
+      sourceHash: rawMarkdownSourceHash,
+      sourceTextHash: rawMarkdownSourceHash,
+      sourceTextCharCount: rawMarkdown.length,
+      accountLocale: interfaceLanguage.code,
+      targetLanguage: documentTranslationTargetLanguage,
+    });
+
+    void listDocumentMarkdownTranslationLaneSessions({
+      docPath: currentEntry.relativePath,
+      locale: interfaceLanguage.code,
+      targetLanguage: documentTranslationTargetLanguage,
+      accountLocale: interfaceLanguage.code,
+      sourceHash: rawMarkdownSourceHash,
+      sourceTextHash: rawMarkdownSourceHash,
+      sourceTextCharCount: rawMarkdown.length,
+      sourceId,
+      sourceIdentityKey,
+      projectionTarget: HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
+      agentRuntime: "helix",
+      signal: controller.signal,
+    })
+      .then((response) => {
+        if (controller.signal.aborted) return;
+        emitDocumentTranslationLaneSessionControlEvents({
+          response: response as Record<string, unknown>,
+          sourceId,
+          sourceHash: rawMarkdownSourceHash,
+          sourceIdentityKey,
+          latestSourceIdentityKey: sourceIdentityKey,
+        });
+      })
+      .catch((err) => {
+        if (isAbortError(err)) return;
+        console.warn("Document translation lane session inspection failed", err);
+      });
+
+    return () => controller.abort();
+  }, [
+    activeLiveTranslationSourceIdentityKey,
+    activeTranslationScopeKey,
+    currentEntry,
+    documentTranslationTargetLanguage,
+    interfaceLanguage.code,
+    rawMarkdown,
+    rawMarkdownSourceHash,
+    translationEligible,
+  ]);
+
   const inlineTranslationMarkdown = React.useMemo(() => {
     if (!inlineTranslationEnabled || !translationUnits.length) return rawMarkdown;
     return renderDocumentMarkdownWithInlineTranslations({
@@ -514,10 +667,11 @@ export function DocViewerPanel() {
     }
     const stored = readStoredInlineTranslationSession(activeTranslationScopeKey, {
       sourceHash: rawMarkdownSourceHash,
+      sourceIdentityKey: activeLiveTranslationSourceIdentityKey,
       sourceTextHash: rawMarkdownSourceHash,
       sourceTextCharCount: rawMarkdown.length,
       accountLocale: interfaceLanguage.code,
-      targetLanguage: interfaceLanguage.code,
+      targetLanguage: documentTranslationTargetLanguage,
     });
     setInlineTranslationEnabled(stored.enabled);
     setInlineTranslations(stored.translations);
@@ -528,23 +682,33 @@ export function DocViewerPanel() {
           : "ready"
         : "idle",
     );
-  }, [activeTranslationScopeKey, interfaceLanguage.code, rawMarkdown.length, rawMarkdownSourceHash]);
+  }, [
+    activeTranslationScopeKey,
+    activeLiveTranslationSourceIdentityKey,
+    documentTranslationTargetLanguage,
+    interfaceLanguage.code,
+    rawMarkdown.length,
+    rawMarkdownSourceHash,
+  ]);
 
   React.useEffect(() => {
     if (!activeTranslationScopeKey) return;
     writeStoredInlineTranslationSession(activeTranslationScopeKey, {
       enabled: inlineTranslationEnabled,
       sourceHash: rawMarkdownSourceHash,
+      sourceIdentityKey: activeLiveTranslationSourceIdentityKey,
       sourceTextHash: rawMarkdownSourceHash,
       sourceTextCharCount: rawMarkdown.length,
       accountLocale: interfaceLanguage.code,
-      targetLanguage: interfaceLanguage.code,
+      targetLanguage: documentTranslationTargetLanguage,
       translations: inlineTranslations,
     });
   }, [
     activeTranslationScopeKey,
+    activeLiveTranslationSourceIdentityKey,
     inlineTranslationEnabled,
     inlineTranslations,
+    documentTranslationTargetLanguage,
     interfaceLanguage.code,
     rawMarkdown.length,
     rawMarkdownSourceHash,
@@ -580,11 +744,13 @@ export function DocViewerPanel() {
       docPath: currentEntry.relativePath,
       locale: interfaceLanguage.code,
       sourceHash: rawMarkdownSourceHash,
+      sourceIdentityKey: activeLiveTranslationSourceIdentityKey,
       projectionTarget: HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
       units: translationUnits,
       allowStaleDisplayText: inlineTranslationEnabled,
     });
   }, [
+    activeLiveTranslationSourceIdentityKey,
     currentEntry,
     inlineTranslationEnabled,
     interfaceLanguage.code,
@@ -663,6 +829,7 @@ export function DocViewerPanel() {
       translations: inlineTranslations,
       inFlightIds: inFlightTranslationUnitIdsRef.current,
       sourceHash: rawMarkdownSourceHash,
+      sourceIdentityKey: activeLiveTranslationSourceIdentityKey,
       maxUnits: DOC_TRANSLATION_MAX_UNITS_PER_CHUNK,
       maxChars: DOC_TRANSLATION_MAX_CHARS_PER_CHUNK,
     });
@@ -684,7 +851,7 @@ export function DocViewerPanel() {
       chunkIndex,
       laneSessionId,
       accountLocale: interfaceLanguage.code,
-      targetLanguage: interfaceLanguage.code,
+      targetLanguage: documentTranslationTargetLanguage,
     });
     translationScopeKeyRef.current = scopeKey;
     documentTranslationChunkInFlightRef.current = true;
@@ -704,11 +871,13 @@ export function DocViewerPanel() {
       await enqueueDocumentMarkdownTranslationMail({
         docPath: currentEntry.relativePath,
         locale: interfaceLanguage.code,
-        targetLanguage: interfaceLanguage.code,
+        targetLanguage: documentTranslationTargetLanguage,
         accountLocale: interfaceLanguage.code,
         sourceHash: rawMarkdownSourceHash,
         sourceTextHash: pendingTranslationState.sourceTextHash,
         sourceTextCharCount: pendingTranslationState.sourceTextCharCount,
+        sourceIdentityKey: pendingTranslationState.sourceIdentityKey,
+        latestSourceIdentityKey: pendingTranslationState.latestSourceIdentityKey ?? pendingTranslationState.sourceIdentityKey,
         title: currentEntry.title,
         sourceId: documentMarkdownSourceId(currentEntry.relativePath),
         chunkId,
@@ -753,9 +922,11 @@ export function DocViewerPanel() {
   }, [
     activeTranslationScopeKey,
     currentEntry,
+    documentTranslationTargetLanguage,
     inlineTranslationEnabled,
     inlineTranslations,
     interfaceLanguage.code,
+    activeLiveTranslationSourceIdentityKey,
     rawMarkdownSourceHash,
     t,
     translationStatus,
@@ -1118,16 +1289,35 @@ export function DocViewerPanel() {
     setTranslationError(null);
     const sourceId = documentMarkdownSourceId(currentEntry.relativePath);
     const laneSessionId = documentInlineTranslationLaneSessionId(activeTranslationScopeKey);
+    const sourceBindingKey = buildDocumentTranslationSourceBindingKey({
+      sourceId,
+      sourceHash: rawMarkdownSourceHash,
+      accountLocale: interfaceLanguage.code,
+      targetLanguage: documentTranslationTargetLanguage,
+    });
+    const sourceIdentityKey = buildDocumentTranslationSourceIdentityKey({
+      sourceId,
+      sourceHash: rawMarkdownSourceHash,
+      sourceTextHash: rawMarkdownSourceHash,
+      sourceTextCharCount: rawMarkdown.length,
+      accountLocale: interfaceLanguage.code,
+      targetLanguage: documentTranslationTargetLanguage,
+    });
+    const latestSourceIdentityKey =
+      liveTranslationProjectionSummary.latestSourceIdentityKey ?? sourceIdentityKey;
     const runLaneSessionControl = (action: "start" | "stop") => {
       void runDocumentMarkdownTranslationLaneSessionControl({
         action,
         docPath: currentEntry.relativePath,
         locale: interfaceLanguage.code,
-        targetLanguage: interfaceLanguage.code,
+        targetLanguage: documentTranslationTargetLanguage,
         accountLocale: interfaceLanguage.code,
         sourceHash: rawMarkdownSourceHash,
         sourceTextHash: rawMarkdownSourceHash,
         sourceTextCharCount: rawMarkdown.length,
+        sourceBindingKey,
+        sourceIdentityKey,
+        latestSourceIdentityKey,
         sourceId,
         laneSessionId,
         projectionTarget: HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
@@ -1139,6 +1329,8 @@ export function DocViewerPanel() {
             response: response as Record<string, unknown>,
             sourceId,
             sourceHash: rawMarkdownSourceHash,
+            sourceIdentityKey,
+            latestSourceIdentityKey,
           });
         })
         .catch((err) => {
@@ -1151,10 +1343,11 @@ export function DocViewerPanel() {
         writeStoredInlineTranslationSession(activeTranslationScopeKey, {
           enabled: false,
           sourceHash: rawMarkdownSourceHash,
+          sourceIdentityKey,
           sourceTextHash: rawMarkdownSourceHash,
           sourceTextCharCount: rawMarkdown.length,
           accountLocale: interfaceLanguage.code,
-          targetLanguage: interfaceLanguage.code,
+          targetLanguage: documentTranslationTargetLanguage,
           translations: inlineTranslations,
         });
       }
@@ -1172,9 +1365,11 @@ export function DocViewerPanel() {
   }, [
     activeTranslationScopeKey,
     currentEntry,
+    documentTranslationTargetLanguage,
     inlineTranslationEnabled,
     inlineTranslations,
     interfaceLanguage.code,
+    liveTranslationProjectionSummary.latestSourceIdentityKey,
     rawMarkdown,
     rawMarkdownSourceHash,
     translationEligible,
@@ -1186,6 +1381,22 @@ export function DocViewerPanel() {
     const laneSessionId =
       liveTranslationProjectionSummary.latestLaneSessionId ??
       documentInlineTranslationLaneSessionId(activeTranslationScopeKey);
+    const sourceBindingKey = buildDocumentTranslationSourceBindingKey({
+      sourceId,
+      sourceHash: rawMarkdownSourceHash,
+      accountLocale: interfaceLanguage.code,
+      targetLanguage: documentTranslationTargetLanguage,
+    });
+    const sourceIdentityKey = buildDocumentTranslationSourceIdentityKey({
+      sourceId,
+      sourceHash: rawMarkdownSourceHash,
+      sourceTextHash: rawMarkdownSourceHash,
+      sourceTextCharCount: rawMarkdown.length,
+      accountLocale: interfaceLanguage.code,
+      targetLanguage: documentTranslationTargetLanguage,
+    });
+    const latestSourceIdentityKey =
+      liveTranslationProjectionSummary.latestSourceIdentityKey ?? sourceIdentityKey;
     const action = liveTranslationProjectionSummary.latestLaneSessionStatus === "paused"
       ? "resume"
       : "pause";
@@ -1201,11 +1412,14 @@ export function DocViewerPanel() {
       action,
       docPath: currentEntry.relativePath,
       locale: interfaceLanguage.code,
-      targetLanguage: interfaceLanguage.code,
+      targetLanguage: documentTranslationTargetLanguage,
       accountLocale: interfaceLanguage.code,
       sourceHash: rawMarkdownSourceHash,
       sourceTextHash: rawMarkdownSourceHash,
       sourceTextCharCount: rawMarkdown.length,
+      sourceBindingKey,
+      sourceIdentityKey,
+      latestSourceIdentityKey,
       sourceId,
       laneSessionId,
       projectionTarget: HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
@@ -1217,6 +1431,8 @@ export function DocViewerPanel() {
           response: response as Record<string, unknown>,
           sourceId,
           sourceHash: rawMarkdownSourceHash,
+          sourceIdentityKey,
+          latestSourceIdentityKey,
         });
       })
       .catch((err) => {
@@ -1226,9 +1442,11 @@ export function DocViewerPanel() {
   }, [
     activeTranslationScopeKey,
     currentEntry,
+    documentTranslationTargetLanguage,
     interfaceLanguage.code,
     liveTranslationProjectionSummary.latestLaneSessionId,
     liveTranslationProjectionSummary.latestLaneSessionStatus,
+    liveTranslationProjectionSummary.latestSourceIdentityKey,
     rawMarkdown,
     rawMarkdownSourceHash,
     translationEligible,
@@ -1323,7 +1541,7 @@ export function DocViewerPanel() {
             onRejoinLiveRead={rejoinLiveRead}
             translationEligible={translationEligible}
             translationAccountLocale={interfaceLanguage.code}
-            translationTargetLanguage={interfaceLanguage.code}
+            translationTargetLanguage={documentTranslationTargetLanguage}
             translationSourceId={currentEntry ? documentMarkdownSourceId(currentEntry.relativePath) : null}
             translationSourceHash={rawMarkdownSourceHash}
             translationSourceTextHash={rawMarkdownSourceHash}
@@ -1670,6 +1888,45 @@ export function PanelHeader({
   const latestLaneSessionStatus = liveTranslationProjectionSummary.latestLaneSessionStatus;
   const latestOrNextTranslationLaneSessionId =
     liveTranslationProjectionSummary.latestLaneSessionId ?? translationLaneSessionId;
+  const nextTranslationSourceIdentityKey = translationSourceId && translationSourceHash
+    ? buildDocumentTranslationSourceIdentityKey({
+      sourceId: translationSourceId,
+      sourceHash: translationSourceHash,
+      sourceTextHash: translationSourceTextHash,
+      sourceTextCharCount: translationSourceTextCharCount,
+      accountLocale: translationAccountLocale,
+      targetLanguage: translationTargetLanguage,
+    })
+    : null;
+  const nextTranslationSourceBindingKey = translationSourceId && translationSourceHash
+    ? buildDocumentTranslationSourceBindingKey({
+      sourceId: translationSourceId,
+      sourceHash: translationSourceHash,
+      accountLocale: translationAccountLocale,
+      targetLanguage: translationTargetLanguage,
+    })
+    : null;
+  const latestOrNextTranslationSourceBindingKey =
+    liveTranslationProjectionSummary.latestSourceBindingKey ?? nextTranslationSourceBindingKey;
+  const latestOrNextTranslationSourceIdentityKey =
+    liveTranslationProjectionSummary.latestSourceIdentityKey ?? nextTranslationSourceIdentityKey;
+  const currentTranslationSourceBindingKey = nextTranslationSourceBindingKey;
+  const currentTranslationSourceIdentityKey = nextTranslationSourceIdentityKey;
+  const latestOrNextLaneSessionSourceBindingKey =
+    liveTranslationProjectionSummary.latestLaneSessionSourceBindingKey ??
+    liveTranslationProjectionSummary.latestSourceBindingKey ??
+    nextTranslationSourceBindingKey;
+  const latestOrNextLaneSessionSourceIdentityKey =
+    liveTranslationProjectionSummary.latestLaneSessionSourceIdentityKey ??
+    liveTranslationProjectionSummary.latestSourceIdentityKey ??
+    nextTranslationSourceIdentityKey;
+  const currentLaneSessionSourceBindingKey = nextTranslationSourceBindingKey;
+  const currentLaneSessionSourceIdentityKey = nextTranslationSourceIdentityKey;
+  const translationLanguageRoutingPolicy = "account_locale_base_target";
+  const translationTargetLanguageSource =
+    translationTargetLanguage === resolveDocumentTranslationTargetLanguage(translationAccountLocale)
+      ? "account_locale_base"
+      : "explicit_target_language";
   const hasControllableTranslationLaneSession =
     inlineTranslationEnabled &&
     Boolean(latestOrNextTranslationLaneSessionId) &&
@@ -1781,6 +2038,20 @@ export function PanelHeader({
             data-doc-translation-summary-error={String(liveTranslationProjectionSummary.errorCount)}
             data-doc-translation-summary-health={liveTranslationProjectionSummary.healthStatus}
             data-doc-translation-summary-display-status={liveTranslationProjectionSummary.displayStatus}
+            data-doc-translation-summary-display-status-reason={liveTranslationProjectionSummary.displayStatusReason}
+            data-doc-translation-summary-account-locale={translationAccountLocale}
+            data-doc-translation-summary-target-language={translationTargetLanguage}
+            data-doc-translation-summary-language-routing-policy={translationLanguageRoutingPolicy}
+            data-doc-translation-summary-target-language-source={translationTargetLanguageSource}
+            data-doc-translation-summary-source-id={translationSourceId ?? ""}
+            data-doc-translation-summary-source-hash={translationSourceHash ?? ""}
+            data-doc-translation-summary-source-text-hash={translationSourceTextHash ?? ""}
+            data-doc-translation-summary-source-text-char-count={translationSourceTextCharCount ?? ""}
+            data-doc-translation-summary-lane-session-id={latestOrNextTranslationLaneSessionId ?? ""}
+            data-doc-translation-summary-source-binding-key={latestOrNextTranslationSourceBindingKey ?? ""}
+            data-doc-translation-summary-source-identity-key={latestOrNextTranslationSourceIdentityKey ?? ""}
+            data-doc-translation-summary-current-source-binding-key={currentTranslationSourceBindingKey ?? ""}
+            data-doc-translation-summary-current-source-identity-key={currentTranslationSourceIdentityKey ?? ""}
             data-doc-translation-summary-label-visible={String(Boolean(translationStatusLabel))}
             data-doc-translation-summary-renderable={String(liveTranslationProjectionSummary.hasRenderableText)}
             data-doc-translation-summary-has-errors={String(liveTranslationProjectionSummary.hasProjectionErrors)}
@@ -1794,16 +2065,22 @@ export function PanelHeader({
             data-doc-translation-summary-latest-source-event-ms={liveTranslationProjectionSummary.latestSourceEventMs ?? ""}
             data-doc-translation-summary-latest-observation-ref={liveTranslationProjectionSummary.latestObservationRef ?? ""}
             data-doc-translation-summary-latest-receipt-ref={liveTranslationProjectionSummary.latestReceiptRef ?? ""}
+            data-doc-translation-summary-latest-visible-observation-ref={liveTranslationProjectionSummary.latestVisibleObservationRef ?? ""}
+            data-doc-translation-summary-latest-visible-receipt-ref={liveTranslationProjectionSummary.latestVisibleReceiptRef ?? ""}
+            data-doc-translation-summary-latest-evidence-observation-ref={liveTranslationProjectionSummary.latestEvidenceObservationRef ?? ""}
+            data-doc-translation-summary-latest-evidence-receipt-ref={liveTranslationProjectionSummary.latestEvidenceReceiptRef ?? ""}
             data-doc-translation-summary-latest-lane-session-id={liveTranslationProjectionSummary.latestLaneSessionId ?? ""}
             data-doc-translation-summary-latest-observation-lane-session-id={liveTranslationProjectionSummary.latestObservationLaneSessionId ?? ""}
             data-doc-translation-summary-latest-goal-binding-id-from-projection={liveTranslationProjectionSummary.latestGoalBindingIdFromProjection ?? ""}
             data-doc-translation-summary-latest-session-control-key={liveTranslationProjectionSummary.latestSessionControlKey ?? ""}
             data-doc-translation-summary-latest-source-binding-key={liveTranslationProjectionSummary.latestSourceBindingKey ?? ""}
+            data-doc-translation-summary-latest-source-identity-key={liveTranslationProjectionSummary.latestSourceIdentityKey ?? ""}
             data-doc-translation-summary-latest-observation-key={liveTranslationProjectionSummary.latestObservationKey ?? ""}
             data-doc-translation-summary-latest-mail-loop-observation-key={liveTranslationProjectionSummary.latestMailLoopObservationKey ?? ""}
             data-doc-translation-summary-latest-goal-binding-key={liveTranslationProjectionSummary.latestGoalBindingKey ?? ""}
             data-doc-translation-summary-latest-event-id={liveTranslationProjectionSummary.latestEventId ?? ""}
             data-doc-translation-summary-latest-has-observation={String(liveTranslationProjectionSummary.latestHasObservation)}
+            data-doc-translation-summary-latest-selected-runtime-agent-provider={liveTranslationProjectionSummary.latestSelectedRuntimeAgentProvider ?? ""}
             data-doc-translation-summary-latest-selected-backend-provider={liveTranslationProjectionSummary.latestSelectedBackendProvider ?? ""}
             data-doc-translation-summary-latest-chunk-id={liveTranslationProjectionSummary.latestChunkId ?? ""}
             data-doc-translation-summary-latest-chunk-index={liveTranslationProjectionSummary.latestChunkIndex ?? ""}
@@ -1821,6 +2098,7 @@ export function PanelHeader({
             data-doc-translation-summary-latest-target-language={liveTranslationProjectionSummary.latestTargetLanguage ?? ""}
             data-doc-translation-summary-latest-projection-status={liveTranslationProjectionSummary.latestProjectionStatus ?? ""}
             data-doc-translation-summary-latest-freshness-status={liveTranslationProjectionSummary.latestFreshnessStatus ?? ""}
+            data-doc-translation-summary-latest-context-role={liveTranslationProjectionSummary.latestContextRole ?? ""}
             data-doc-translation-summary-latest-terminal-authority-status={liveTranslationProjectionSummary.latestTerminalAuthorityStatus}
             data-doc-translation-summary-latest-cancel-requested={String(liveTranslationProjectionSummary.latestCancelRequested)}
             data-doc-translation-summary-latest-error={liveTranslationProjectionSummary.latestError ?? ""}
@@ -1831,11 +2109,14 @@ export function PanelHeader({
             data-doc-translation-summary-latest-suppressed-goal-binding-id={liveTranslationProjectionSummary.latestSuppressedGoalBindingId ?? ""}
             data-doc-translation-summary-latest-suppressed-session-control-key={liveTranslationProjectionSummary.latestSuppressedSessionControlKey ?? ""}
             data-doc-translation-summary-latest-suppressed-source-binding-key={liveTranslationProjectionSummary.latestSuppressedSourceBindingKey ?? ""}
+            data-doc-translation-summary-latest-suppressed-source-identity-key={liveTranslationProjectionSummary.latestSuppressedSourceIdentityKey ?? ""}
             data-doc-translation-summary-latest-suppressed-observation-key={liveTranslationProjectionSummary.latestSuppressedObservationKey ?? ""}
             data-doc-translation-summary-latest-suppressed-mail-loop-observation-key={liveTranslationProjectionSummary.latestSuppressedMailLoopObservationKey ?? ""}
             data-doc-translation-summary-latest-suppressed-goal-binding-key={liveTranslationProjectionSummary.latestSuppressedGoalBindingKey ?? ""}
             data-doc-translation-summary-latest-suppressed-event-id={liveTranslationProjectionSummary.latestSuppressedEventId ?? ""}
             data-doc-translation-summary-latest-suppressed-has-observation={String(liveTranslationProjectionSummary.latestSuppressedHasObservation)}
+            data-doc-translation-summary-latest-suppressed-selected-runtime-agent-provider={liveTranslationProjectionSummary.latestSuppressedSelectedRuntimeAgentProvider ?? ""}
+            data-doc-translation-summary-latest-suppressed-selected-backend-provider={liveTranslationProjectionSummary.latestSuppressedSelectedBackendProvider ?? ""}
             data-doc-translation-summary-latest-suppressed-projection-status={liveTranslationProjectionSummary.latestSuppressedProjectionStatus ?? ""}
             data-doc-translation-summary-latest-suppressed-chunk-id={liveTranslationProjectionSummary.latestSuppressedChunkId ?? ""}
             data-doc-translation-summary-latest-suppressed-chunk-index={liveTranslationProjectionSummary.latestSuppressedChunkIndex ?? ""}
@@ -1845,6 +2126,7 @@ export function PanelHeader({
             data-doc-translation-summary-latest-suppressed-observed-at-ms={liveTranslationProjectionSummary.latestSuppressedObservedAtMs ?? ""}
             data-doc-translation-summary-latest-suppressed-freshness-status={liveTranslationProjectionSummary.latestSuppressedFreshnessStatus ?? ""}
             data-doc-translation-summary-latest-suppressed-display-status={liveTranslationProjectionSummary.latestSuppressedDisplayStatus ?? ""}
+            data-doc-translation-summary-latest-suppressed-context-role={liveTranslationProjectionSummary.latestSuppressedContextRole ?? ""}
             data-doc-translation-summary-latest-suppressed-terminal-authority-status={liveTranslationProjectionSummary.latestSuppressedTerminalAuthorityStatus}
             data-doc-translation-summary-latest-suppressed-source-id={liveTranslationProjectionSummary.latestSuppressedSourceId ?? ""}
             data-doc-translation-summary-latest-suppressed-source-hash={liveTranslationProjectionSummary.latestSuppressedSourceHash ?? ""}
@@ -1860,16 +2142,22 @@ export function PanelHeader({
             data-doc-translation-summary-latest-suppressed-reason={liveTranslationProjectionSummary.latestSuppressedReason ?? ""}
             data-doc-translation-summary-lane-sessions={String(liveTranslationProjectionSummary.laneSessionCount)}
             data-doc-translation-summary-active-lane-sessions={String(liveTranslationProjectionSummary.activeLaneSessionCount)}
+            data-doc-translation-summary-observed-lane-sessions={String(liveTranslationProjectionSummary.observedLaneSessionCount)}
             data-doc-translation-summary-paused-lane-sessions={String(liveTranslationProjectionSummary.pausedLaneSessionCount)}
             data-doc-translation-summary-stopped-lane-sessions={String(liveTranslationProjectionSummary.stoppedLaneSessionCount)}
             data-doc-translation-summary-blocked-lane-sessions={String(liveTranslationProjectionSummary.blockedLaneSessionCount)}
             data-doc-translation-summary-latest-lane-session-status={liveTranslationProjectionSummary.latestLaneSessionStatus ?? ""}
             data-doc-translation-summary-latest-lane-session-health={liveTranslationProjectionSummary.latestLaneSessionHealth ?? ""}
             data-doc-translation-summary-latest-lane-session-lifecycle-action={liveTranslationProjectionSummary.latestLaneSessionLifecycleAction ?? ""}
+            data-doc-translation-summary-latest-lane-session-reason={liveTranslationProjectionSummary.latestLaneSessionReason ?? ""}
+            data-doc-translation-summary-latest-lane-session-debug-phase={liveTranslationProjectionSummary.latestLaneSessionDebugPhase ?? ""}
+            data-doc-translation-summary-latest-lane-session-observation-status={liveTranslationProjectionSummary.latestLaneSessionObservationStatus ?? ""}
             data-doc-translation-summary-latest-lane-session-permission-profile={liveTranslationProjectionSummary.latestLaneSessionPermissionProfile ?? ""}
             data-doc-translation-summary-latest-lane-session-updated-at-ms={liveTranslationProjectionSummary.latestLaneSessionUpdatedAtMs ?? ""}
             data-doc-translation-summary-latest-lane-session-event-id={liveTranslationProjectionSummary.latestLaneSessionEventId ?? ""}
             data-doc-translation-summary-latest-lane-session-control-key={liveTranslationProjectionSummary.latestLaneSessionControlKey ?? ""}
+            data-doc-translation-summary-latest-lane-session-source-binding-key={liveTranslationProjectionSummary.latestLaneSessionSourceBindingKey ?? ""}
+            data-doc-translation-summary-latest-lane-session-source-identity-key={liveTranslationProjectionSummary.latestLaneSessionSourceIdentityKey ?? ""}
             data-doc-translation-summary-latest-lane-session-has-observation={String(liveTranslationProjectionSummary.latestLaneSessionHasObservation)}
             data-doc-translation-summary-latest-lane-session-source-id={liveTranslationProjectionSummary.latestLaneSessionSourceId ?? ""}
             data-doc-translation-summary-latest-lane-session-source-hash={liveTranslationProjectionSummary.latestLaneSessionSourceHash ?? ""}
@@ -1886,20 +2174,48 @@ export function PanelHeader({
             data-doc-translation-summary-latest-lane-session-source-event-ms={liveTranslationProjectionSummary.latestLaneSessionSourceEventMs ?? ""}
             data-doc-translation-summary-latest-lane-session-observed-at-ms={liveTranslationProjectionSummary.latestLaneSessionObservedAtMs ?? ""}
             data-doc-translation-summary-latest-lane-session-freshness-status={liveTranslationProjectionSummary.latestLaneSessionFreshnessStatus ?? ""}
+            data-doc-translation-summary-latest-lane-session-selected-runtime-agent-provider={liveTranslationProjectionSummary.latestLaneSessionSelectedRuntimeAgentProvider ?? ""}
+            data-doc-translation-summary-latest-lane-session-selected-backend-provider={liveTranslationProjectionSummary.latestLaneSessionSelectedBackendProvider ?? ""}
             data-doc-translation-summary-latest-lane-session-terminal-authority-status={liveTranslationProjectionSummary.latestLaneSessionTerminalAuthorityStatus}
             data-doc-translation-summary-mail-loops={String(liveTranslationProjectionSummary.mailLoopCount)}
             data-doc-translation-summary-pending-mail-loops={String(liveTranslationProjectionSummary.pendingMailLoopCount)}
+            data-doc-translation-summary-observed-mail-loops={String(liveTranslationProjectionSummary.observedMailLoopCount)}
             data-doc-translation-summary-blocked-mail-loops={String(liveTranslationProjectionSummary.blockedMailLoopCount)}
             data-doc-translation-summary-latest-mail-loop-status={liveTranslationProjectionSummary.latestMailLoopStatus ?? ""}
             data-doc-translation-summary-latest-mail-loop-id={liveTranslationProjectionSummary.latestMailLoopId ?? ""}
             data-doc-translation-summary-latest-mail-loop-delivery-status={liveTranslationProjectionSummary.latestMailLoopDeliveryStatus ?? ""}
+            data-doc-translation-summary-latest-mail-loop-blocked-reason={liveTranslationProjectionSummary.latestMailLoopBlockedReason ?? ""}
             data-doc-translation-summary-latest-previous-stage-play-mail-id={liveTranslationProjectionSummary.latestPreviousStagePlayMailId ?? ""}
             data-doc-translation-summary-latest-mail-loop-wake-kind={liveTranslationProjectionSummary.latestMailLoopWakeKind}
+            data-doc-translation-summary-latest-mail-loop-mailbox-wake-expected={String(liveTranslationProjectionSummary.latestMailLoopMailboxWakeExpected)}
+            data-doc-translation-summary-latest-mail-loop-decision-wake-expected={String(liveTranslationProjectionSummary.latestMailLoopDecisionWakeExpected)}
             data-doc-translation-summary-latest-mail-loop-observation-lane-session-id={liveTranslationProjectionSummary.latestMailLoopObservationLaneSessionId ?? ""}
             data-doc-translation-summary-latest-mail-loop-session-control-key={liveTranslationProjectionSummary.latestMailLoopSessionControlKey ?? ""}
+            data-doc-translation-summary-latest-mail-loop-source-binding-key={liveTranslationProjectionSummary.latestMailLoopSourceBindingKey ?? ""}
+            data-doc-translation-summary-latest-mail-loop-source-identity-key={liveTranslationProjectionSummary.latestMailLoopSourceIdentityKey ?? ""}
+            data-doc-translation-summary-latest-mail-loop-lane-session-source-binding-key={liveTranslationProjectionSummary.latestMailLoopLaneSessionSourceBindingKey ?? ""}
+            data-doc-translation-summary-latest-mail-loop-lane-session-source-identity-key={liveTranslationProjectionSummary.latestMailLoopLaneSessionSourceIdentityKey ?? ""}
+            data-doc-translation-summary-latest-mail-loop-source-id={liveTranslationProjectionSummary.latestMailLoopSourceId ?? ""}
+            data-doc-translation-summary-latest-mail-loop-source-hash={liveTranslationProjectionSummary.latestMailLoopSourceHash ?? ""}
+            data-doc-translation-summary-latest-mail-loop-source-kind={liveTranslationProjectionSummary.latestMailLoopSourceKind ?? ""}
+            data-doc-translation-summary-latest-mail-loop-source-text-hash={liveTranslationProjectionSummary.latestMailLoopSourceTextHash ?? ""}
+            data-doc-translation-summary-latest-mail-loop-source-text-char-count={liveTranslationProjectionSummary.latestMailLoopSourceTextCharCount ?? ""}
+            data-doc-translation-summary-latest-mail-loop-projection-target={liveTranslationProjectionSummary.latestMailLoopProjectionTarget ?? ""}
+            data-doc-translation-summary-latest-mail-loop-account-locale={liveTranslationProjectionSummary.latestMailLoopAccountLocale ?? ""}
+            data-doc-translation-summary-latest-mail-loop-target-language={liveTranslationProjectionSummary.latestMailLoopTargetLanguage ?? ""}
+            data-doc-translation-summary-latest-mail-loop-chunk-id={liveTranslationProjectionSummary.latestMailLoopChunkId ?? ""}
+            data-doc-translation-summary-latest-mail-loop-chunk-index={liveTranslationProjectionSummary.latestMailLoopChunkIndex ?? ""}
+            data-doc-translation-summary-latest-mail-loop-dedupe-key={liveTranslationProjectionSummary.latestMailLoopDedupeKey ?? ""}
+            data-doc-translation-summary-latest-mail-loop-source-event-id={liveTranslationProjectionSummary.latestMailLoopSourceEventId ?? ""}
+            data-doc-translation-summary-latest-mail-loop-source-event-ms={liveTranslationProjectionSummary.latestMailLoopSourceEventMs ?? ""}
+            data-doc-translation-summary-latest-mail-loop-observed-at-ms={liveTranslationProjectionSummary.latestMailLoopObservedAtMs ?? ""}
+            data-doc-translation-summary-latest-mail-loop-freshness-status={liveTranslationProjectionSummary.latestMailLoopFreshnessStatus ?? ""}
+            data-doc-translation-summary-latest-mail-loop-selected-runtime-agent-provider={liveTranslationProjectionSummary.latestMailLoopSelectedRuntimeAgentProvider ?? ""}
+            data-doc-translation-summary-latest-mail-loop-selected-backend-provider={liveTranslationProjectionSummary.latestMailLoopSelectedBackendProvider ?? ""}
             data-doc-translation-summary-latest-mail-loop-terminal-authority-status={liveTranslationProjectionSummary.latestMailLoopTerminalAuthorityStatus}
             data-doc-translation-summary-goal-bindings={String(liveTranslationProjectionSummary.goalBindingCount)}
             data-doc-translation-summary-active-goal-bindings={String(liveTranslationProjectionSummary.activeGoalBindingCount)}
+            data-doc-translation-summary-observed-goal-bindings={String(liveTranslationProjectionSummary.observedGoalBindingCount)}
             data-doc-translation-summary-blocked-goal-bindings={String(liveTranslationProjectionSummary.blockedGoalBindingCount)}
             data-doc-translation-summary-latest-goal-binding-id={liveTranslationProjectionSummary.latestGoalBindingId ?? ""}
             data-doc-translation-summary-latest-goal-id={liveTranslationProjectionSummary.latestGoalId ?? ""}
@@ -1914,10 +2230,51 @@ export function PanelHeader({
             data-doc-translation-summary-latest-goal-binding-quiet-behavior={liveTranslationProjectionSummary.latestGoalBindingQuietBehavior ?? ""}
             data-doc-translation-summary-latest-goal-binding-report-action={liveTranslationProjectionSummary.latestGoalBindingReportAction ?? ""}
             data-doc-translation-summary-latest-goal-binding-report-reason={liveTranslationProjectionSummary.latestGoalBindingReportReason ?? ""}
+            data-doc-translation-summary-latest-goal-binding-quiet-behavior-applied={
+              liveTranslationProjectionSummary.latestGoalBindingQuietBehaviorApplied === null
+                ? ""
+                : String(liveTranslationProjectionSummary.latestGoalBindingQuietBehaviorApplied)
+            }
+            data-doc-translation-summary-latest-goal-binding-wake-expected={
+              liveTranslationProjectionSummary.latestGoalBindingWakeExpected === null
+                ? ""
+                : String(liveTranslationProjectionSummary.latestGoalBindingWakeExpected)
+            }
+            data-doc-translation-summary-latest-goal-binding-mailbox-wake-expected={
+              liveTranslationProjectionSummary.latestGoalBindingMailboxWakeExpected === null
+                ? ""
+                : String(liveTranslationProjectionSummary.latestGoalBindingMailboxWakeExpected)
+            }
+            data-doc-translation-summary-latest-goal-binding-decision-wake-expected={
+              liveTranslationProjectionSummary.latestGoalBindingDecisionWakeExpected === null
+                ? ""
+                : String(liveTranslationProjectionSummary.latestGoalBindingDecisionWakeExpected)
+            }
+            data-doc-translation-summary-latest-goal-binding-surface-badge-expected={
+              liveTranslationProjectionSummary.latestGoalBindingSurfaceBadgeExpected === null
+                ? ""
+                : String(liveTranslationProjectionSummary.latestGoalBindingSurfaceBadgeExpected)
+            }
+            data-doc-translation-summary-latest-goal-binding-terminal-report-requested={
+              liveTranslationProjectionSummary.latestGoalBindingTerminalReportRequested === null
+                ? ""
+                : String(liveTranslationProjectionSummary.latestGoalBindingTerminalReportRequested)
+            }
+            data-doc-translation-summary-latest-goal-binding-terminal-report-authorized={
+              liveTranslationProjectionSummary.latestGoalBindingTerminalReportAuthorized === null
+                ? ""
+                : String(liveTranslationProjectionSummary.latestGoalBindingTerminalReportAuthorized)
+            }
+            data-doc-translation-summary-latest-goal-binding-selected-runtime-agent-provider={liveTranslationProjectionSummary.latestGoalBindingSelectedRuntimeAgentProvider ?? ""}
+            data-doc-translation-summary-latest-goal-binding-selected-backend-provider={liveTranslationProjectionSummary.latestGoalBindingSelectedBackendProvider ?? ""}
             data-doc-translation-summary-latest-goal-binding-observation-ref={liveTranslationProjectionSummary.latestGoalBindingObservationRef ?? ""}
             data-doc-translation-summary-latest-goal-binding-receipt-ref={liveTranslationProjectionSummary.latestGoalBindingReceiptRef ?? ""}
             data-doc-translation-summary-latest-goal-binding-event-id={liveTranslationProjectionSummary.latestGoalBindingEventId ?? ""}
             data-doc-translation-summary-latest-goal-binding-session-control-key={liveTranslationProjectionSummary.latestGoalBindingSessionControlKey ?? ""}
+            data-doc-translation-summary-latest-goal-binding-source-binding-key-from-event={liveTranslationProjectionSummary.latestGoalBindingSourceBindingKeyFromEvent ?? ""}
+            data-doc-translation-summary-latest-goal-binding-source-identity-key={liveTranslationProjectionSummary.latestGoalBindingSourceIdentityKey ?? ""}
+            data-doc-translation-summary-latest-goal-binding-lane-session-source-binding-key={liveTranslationProjectionSummary.latestGoalBindingLaneSessionSourceBindingKey ?? ""}
+            data-doc-translation-summary-latest-goal-binding-lane-session-source-identity-key={liveTranslationProjectionSummary.latestGoalBindingLaneSessionSourceIdentityKey ?? ""}
             data-doc-translation-summary-latest-goal-binding-has-observation={String(liveTranslationProjectionSummary.latestGoalBindingHasObservation)}
             data-doc-translation-summary-latest-goal-binding-terminal-authority-status={liveTranslationProjectionSummary.latestGoalBindingTerminalAuthorityStatus}
             data-doc-translation-summary-latest-goal-binding-source-id={liveTranslationProjectionSummary.latestGoalBindingSourceId ?? ""}
@@ -1932,9 +2289,15 @@ export function PanelHeader({
             data-doc-translation-summary-latest-goal-binding-chunk-index={liveTranslationProjectionSummary.latestGoalBindingChunkIndex ?? ""}
             data-doc-translation-summary-latest-goal-binding-dedupe-key={liveTranslationProjectionSummary.latestGoalBindingDedupeKey ?? ""}
             data-doc-translation-summary-latest-goal-binding-source-binding-key={liveTranslationProjectionSummary.latestGoalBindingSourceBindingKey ?? ""}
+            data-doc-translation-summary-latest-goal-binding-source-identity-key-from-binding={liveTranslationProjectionSummary.latestGoalBindingSourceIdentityKeyFromBinding ?? ""}
             data-doc-translation-summary-latest-goal-binding-observation-key={liveTranslationProjectionSummary.latestGoalBindingObservationKey ?? ""}
             data-doc-translation-summary-latest-goal-binding-mail-loop-observation-key={liveTranslationProjectionSummary.latestGoalBindingMailLoopObservationKey ?? ""}
             data-doc-translation-summary-latest-goal-binding-key-from-binding={liveTranslationProjectionSummary.latestGoalBindingKeyFromBinding ?? ""}
+            data-doc-translation-summary-observed-lane-activity={String(liveTranslationProjectionSummary.observedLaneActivityCount)}
+            data-doc-translation-summary-authority-policy="projection_only_not_answer_authority"
+            data-doc-translation-summary-governed-projection="true"
+            data-doc-translation-summary-reentry-required="true"
+            data-doc-translation-summary-answer-authority="false"
             data-doc-translation-summary-terminal-eligible="false"
             data-doc-translation-summary-assistant-answer="false"
             data-doc-translation-summary-raw-content-included="false"
@@ -1957,10 +2320,18 @@ export function PanelHeader({
               data-doc-translation-control-source-id={translationSourceId ?? ""}
               data-doc-translation-control-target-language={translationTargetLanguage}
               data-doc-translation-control-account-locale={translationAccountLocale}
+              data-doc-translation-control-language-routing-policy={translationLanguageRoutingPolicy}
+              data-doc-translation-control-target-language-source={translationTargetLanguageSource}
               data-doc-translation-control-source-hash={translationSourceHash ?? ""}
               data-doc-translation-control-source-text-hash={translationSourceTextHash ?? ""}
               data-doc-translation-control-source-text-char-count={translationSourceTextCharCount ?? ""}
+              data-doc-translation-control-source-binding-key={latestOrNextTranslationSourceBindingKey ?? ""}
+              data-doc-translation-control-source-identity-key={latestOrNextTranslationSourceIdentityKey ?? ""}
+              data-doc-translation-control-current-source-binding-key={currentTranslationSourceBindingKey ?? ""}
+              data-doc-translation-control-current-source-identity-key={currentTranslationSourceIdentityKey ?? ""}
+              data-doc-translation-control-latest-source-identity-key={latestOrNextTranslationSourceIdentityKey ?? ""}
               data-doc-translation-control-projection-target={HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK}
+              data-doc-translation-control-reentry-required="true"
               data-doc-translation-control-terminal-eligible="false"
               data-doc-translation-control-assistant-answer="false"
               data-doc-translation-control-raw-content-included="false"
@@ -1994,9 +2365,17 @@ export function PanelHeader({
                 data-doc-translation-session-control-source-id={translationSourceId ?? ""}
                 data-doc-translation-session-control-target-language={translationTargetLanguage}
                 data-doc-translation-session-control-account-locale={translationAccountLocale}
+                data-doc-translation-session-control-language-routing-policy={translationLanguageRoutingPolicy}
+                data-doc-translation-session-control-target-language-source={translationTargetLanguageSource}
                 data-doc-translation-session-control-source-hash={translationSourceHash ?? ""}
                 data-doc-translation-session-control-source-text-hash={translationSourceTextHash ?? ""}
                 data-doc-translation-session-control-source-text-char-count={translationSourceTextCharCount ?? ""}
+                data-doc-translation-session-control-source-binding-key={latestOrNextLaneSessionSourceBindingKey ?? ""}
+                data-doc-translation-session-control-source-identity-key={latestOrNextLaneSessionSourceIdentityKey ?? ""}
+                data-doc-translation-session-control-current-source-binding-key={currentLaneSessionSourceBindingKey ?? ""}
+                data-doc-translation-session-control-current-source-identity-key={currentLaneSessionSourceIdentityKey ?? ""}
+                data-doc-translation-session-control-latest-source-identity-key={latestOrNextLaneSessionSourceIdentityKey ?? ""}
+                data-doc-translation-session-control-reentry-required="true"
                 data-doc-translation-session-control-terminal-eligible="false"
                 data-doc-translation-session-control-assistant-answer="false"
                 data-doc-translation-session-control-raw-content-included="false"
@@ -2102,6 +2481,14 @@ export function getDocumentTranslationStatusLabel(args: {
       status: args.liveTranslationProjectionSummary.latestMailLoopStatus ?? "pending",
     });
   }
+  if (args.liveTranslationProjectionSummary.pendingCount > 0 && !args.liveTranslationProjectionSummary.hasRenderableText) {
+    return args.t("docsViewer.translation.status.projectionPending", {
+      status:
+        args.liveTranslationProjectionSummary.latestProjectionStatus ??
+        args.liveTranslationProjectionSummary.latestFreshnessStatus ??
+        "pending",
+    });
+  }
   if (args.liveTranslationProjectionSummary.activeLaneSessionCount > 0 && args.translationStatus === "idle") {
     return args.t("docsViewer.translation.status.sessionActive", {
       status: formatLaneSessionStatusForLabel({
@@ -2114,7 +2501,9 @@ export function getDocumentTranslationStatusLabel(args: {
   if (
     args.liveTranslationProjectionSummary.hasRenderableText &&
     args.liveTranslationProjectionSummary.healthStatus === "ready" &&
-    (args.translationStatus === "idle" || args.translationStatus === "cached")
+    (args.translationStatus === "idle" ||
+      args.translationStatus === "cached" ||
+      args.translationStatus === "ready")
   ) {
     return args.t("docsViewer.translation.status.ready", {
       status: args.liveTranslationProjectionSummary.latestProjectionStatus ?? "projected",
@@ -2123,7 +2512,9 @@ export function getDocumentTranslationStatusLabel(args: {
   if (
     args.liveTranslationProjectionSummary.hasRenderableText &&
     args.liveTranslationProjectionSummary.healthStatus === "degraded" &&
-    (args.translationStatus === "idle" || args.translationStatus === "cached")
+    (args.translationStatus === "idle" ||
+      args.translationStatus === "cached" ||
+      args.translationStatus === "ready")
   ) {
     return args.t("docsViewer.translation.status.projectionDegraded", {
       status:
@@ -2270,6 +2661,8 @@ function storedInlineTranslationSessionMatchesScope(
 ): boolean {
   if (!session) return false;
   if (session.sourceHash && session.sourceHash !== scope.sourceHash) return false;
+  if (scope.sourceIdentityKey && session.sourceIdentityKey !== scope.sourceIdentityKey) return false;
+  if (!scope.sourceIdentityKey && session.sourceIdentityKey) return false;
   if (session.sourceTextHash && session.sourceTextHash !== scope.sourceTextHash) return false;
   if (
     typeof session.sourceTextCharCount === "number" &&
@@ -2298,6 +2691,7 @@ function readStoredInlineTranslationSession(
     return {
       enabled: Boolean(parsed?.enabled),
       sourceHash: scope.sourceHash,
+      sourceIdentityKey: scope.sourceIdentityKey,
       sourceTextHash: scope.sourceTextHash,
       sourceTextCharCount: scope.sourceTextCharCount,
       accountLocale: scope.accountLocale,
@@ -2318,6 +2712,7 @@ function writeStoredInlineTranslationSession(scopeKey: string, session: StoredIn
       JSON.stringify({
         enabled: session.enabled,
         sourceHash: session.sourceHash ?? null,
+        sourceIdentityKey: session.sourceIdentityKey ?? null,
         sourceTextHash: session.sourceTextHash ?? null,
         sourceTextCharCount: session.sourceTextCharCount ?? null,
         accountLocale: session.accountLocale ?? null,
@@ -2342,6 +2737,8 @@ function buildPendingDocumentInlineTranslationState(args: {
   accountLocale: string;
   targetLanguage: string;
 }): InlineTranslationState {
+  const sourceKind = "docs";
+  const projectionTarget = HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK;
   return {
     status: "loading",
     observationRef: null,
@@ -2362,19 +2759,65 @@ function buildPendingDocumentInlineTranslationState(args: {
     freshnessStatus: "pending",
     terminalAuthorityStatus: "not_terminal_authority",
     sourceId: args.sourceId,
+    sourceIdentityKey: buildDocumentTranslationSourceIdentityKey(args),
     sourceHash: args.sourceHash,
-    sourceKind: "document_markdown",
+    sourceKind,
     sourceTextHash: args.sourceTextHash,
     sourceTextCharCount: args.sourceTextCharCount,
     accountLocale: args.accountLocale,
-    projectionTarget: HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
+    projectionTarget,
     targetLanguage: args.targetLanguage,
     cancelRequested: false,
     source: "capability_lane",
+    answerAuthority: false,
     terminalEligible: false,
     assistantAnswer: false,
     rawContentIncluded: false,
   };
+}
+
+function buildDocumentTranslationSourceIdentityKey(args: {
+  sourceId: string;
+  sourceHash: string;
+  sourceTextHash?: string | null;
+  sourceTextCharCount?: number | null;
+  accountLocale: string;
+  targetLanguage: string;
+}): string {
+  return compactDocumentTranslationIdentityKey([
+    args.sourceId,
+    args.sourceHash,
+    args.sourceTextHash,
+    typeof args.sourceTextCharCount === "number" && Number.isFinite(args.sourceTextCharCount)
+      ? String(Math.trunc(args.sourceTextCharCount))
+      : null,
+    "docs",
+    HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
+    args.accountLocale,
+    args.targetLanguage,
+  ]);
+}
+
+function buildDocumentTranslationSourceBindingKey(args: {
+  sourceId: string;
+  sourceHash: string;
+  accountLocale: string;
+  targetLanguage: string;
+}): string {
+  return compactDocumentTranslationIdentityKey([
+    args.sourceId,
+    args.sourceHash,
+    HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
+    args.accountLocale,
+    args.targetLanguage,
+  ]);
+}
+
+function compactDocumentTranslationIdentityKey(parts: Array<string | null | undefined>): string {
+  return parts
+    .map((part) => typeof part === "string" ? part.trim() : "")
+    .filter(Boolean)
+    .join("::");
 }
 
 function collectVisibleTranslationUnitIds(args: {
@@ -2383,6 +2826,7 @@ function collectVisibleTranslationUnitIds(args: {
   translations: Record<string, InlineTranslationState>;
   inFlightIds: Set<string>;
   sourceHash?: string | null;
+  sourceIdentityKey?: string | null;
   maxUnits: number;
   maxChars: number;
 }): string[] {
@@ -2407,20 +2851,27 @@ function collectVisibleTranslationUnitIds(args: {
     const displayStatus = marker.dataset.docTranslationDisplayStatus;
     const projectionStatus = marker.dataset.docTranslationProjectionStatus;
     const markerSourceHash = marker.dataset.docTranslationSourceHash;
+    const markerSourceIdentityKey = marker.dataset.docTranslationSourceIdentityKey;
     const hasDomProjectionState =
       Boolean(renderStatus && renderStatus !== "empty") ||
       Boolean(displayStatus && displayStatus !== "empty") ||
       Boolean(projectionStatus && projectionStatus !== "missing");
     const projectionStateMatchesCurrentSource =
-      !args.sourceHash ||
-      !markerSourceHash ||
-      markerSourceHash === args.sourceHash;
+      translationStateMatchesCurrentSource({
+        currentSourceHash: args.sourceHash,
+        currentSourceIdentityKey: args.sourceIdentityKey,
+        stateSourceHash: markerSourceHash,
+        stateSourceIdentityKey: markerSourceIdentityKey,
+      });
     if (hasDomProjectionState && projectionStateMatchesCurrentSource) continue;
     const existingTranslation = args.translations[unitId];
     const existingTranslationMatchesCurrentSource =
-      !args.sourceHash ||
-      !existingTranslation?.sourceHash ||
-      existingTranslation.sourceHash === args.sourceHash;
+      translationStateMatchesCurrentSource({
+        currentSourceHash: args.sourceHash,
+        currentSourceIdentityKey: args.sourceIdentityKey,
+        stateSourceHash: existingTranslation?.sourceHash,
+        stateSourceIdentityKey: existingTranslation?.sourceIdentityKey,
+      });
     const inFlightTranslationMatchesCurrentSource =
       args.inFlightIds.has(unitId) &&
       (!existingTranslation || existingTranslationMatchesCurrentSource);
@@ -2437,6 +2888,22 @@ function collectVisibleTranslationUnitIds(args: {
     if (visibleIds.length >= maxUnits) break;
   }
   return visibleIds;
+}
+
+function translationStateMatchesCurrentSource(args: {
+  currentSourceHash?: string | null;
+  currentSourceIdentityKey?: string | null;
+  stateSourceHash?: string | null;
+  stateSourceIdentityKey?: string | null;
+}): boolean {
+  if (
+    args.currentSourceIdentityKey &&
+    args.stateSourceIdentityKey
+  ) {
+    return args.stateSourceIdentityKey === args.currentSourceIdentityKey;
+  }
+  if (!args.currentSourceHash || !args.stateSourceHash) return true;
+  return args.stateSourceHash === args.currentSourceHash;
 }
 
 function renderDocumentMarkdownToHtml(markdown: string, docPath?: string | null): string {

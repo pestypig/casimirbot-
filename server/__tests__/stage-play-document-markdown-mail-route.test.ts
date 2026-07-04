@@ -38,6 +38,14 @@ describe("stage play document Markdown mail route", () => {
         chunkIndex: 2,
         laneSessionId: "lane_session:live_translation:docs:fnv1a32:test",
         sessionControlKey: "lane_session:live_translation:docs:fnv1a32:test::document_markdown:docs/example.md::docs_chunk",
+        sourceBindingKey: "document_markdown:docs/example.md::fnv1a32:test::docs_chunk::haw-US::haw",
+        sourceIdentityKey:
+          "document_markdown:docs/example.md::fnv1a32:test::fnv1a32:text-payload::25::docs::docs_chunk::haw-US::haw",
+        latestSourceIdentityKey:
+          "document_markdown:docs/example.md::fnv1a32:test::fnv1a32:text-payload-latest::25::docs::docs_chunk::haw-US::haw",
+        mailLoopObservationKey:
+          "document_markdown:docs/example.md::fnv1a32:test::document_markdown::docs_chunk::haw-US::haw::doc-inline:fnv1a32:test:u0001::receipt:doc-inline",
+        receiptRef: "receipt:doc-inline",
         projectionTarget: "docs_chunk",
         units: [
           {
@@ -64,11 +72,20 @@ describe("stage play document Markdown mail route", () => {
         chunkIndex: 2,
         laneSessionId: "lane_session:live_translation:docs:fnv1a32:test",
         sessionControlKey: "lane_session:live_translation:docs:fnv1a32:test::document_markdown:docs/example.md::docs_chunk",
+        sourceBindingKey: "document_markdown:docs/example.md::fnv1a32:test::docs_chunk::haw-US::haw",
+        sourceIdentityKey:
+          "document_markdown:docs/example.md::fnv1a32:test::fnv1a32:text-payload::25::docs::docs_chunk::haw-US::haw",
+        latestSourceIdentityKey:
+          "document_markdown:docs/example.md::fnv1a32:test::fnv1a32:text-payload-latest::25::docs::docs_chunk::haw-US::haw",
+        mailLoopObservationKey:
+          "document_markdown:docs/example.md::fnv1a32:test::document_markdown::docs_chunk::haw-US::haw::doc-inline:fnv1a32:test:u0001::receipt:doc-inline",
+        receiptRef: "receipt:doc-inline",
         projectionTarget: "docs_chunk",
         targetLanguage: "haw",
         accountLocale: "haw-US",
         acceptedUnits: 1,
       },
+      answer_authority: false,
       assistant_answer: false,
       terminal_eligible: false,
       context_role: "tool_evidence",
@@ -89,7 +106,16 @@ describe("stage play document Markdown mail route", () => {
         sourceTextCharCount: "Visible source paragraph.".length,
         laneSessionId: "lane_session:live_translation:docs:fnv1a32:test",
         sessionControlKey: "lane_session:live_translation:docs:fnv1a32:test::document_markdown:docs/example.md::docs_chunk",
+        sourceBindingKey: "document_markdown:docs/example.md::fnv1a32:test::docs_chunk::haw-US::haw",
+        sourceIdentityKey:
+          "document_markdown:docs/example.md::fnv1a32:test::fnv1a32:text-payload::25::docs::docs_chunk::haw-US::haw",
+        latestSourceIdentityKey:
+          "document_markdown:docs/example.md::fnv1a32:test::fnv1a32:text-payload-latest::25::docs::docs_chunk::haw-US::haw",
+        mailLoopObservationKey:
+          "document_markdown:docs/example.md::fnv1a32:test::document_markdown::docs_chunk::haw-US::haw::doc-inline:fnv1a32:test:u0001::receipt:doc-inline",
+        receiptRef: "receipt:doc-inline",
       },
+      answer_authority: false,
       assistant_answer: false,
       terminal_eligible: false,
       context_role: "tool_evidence",
@@ -99,6 +125,7 @@ describe("stage play document Markdown mail route", () => {
     const summary = JSON.parse(storedMail[0].summary.text);
     expect(summary).toMatchObject({
       schema: "stage_play.document_markdown_visible_units.v1",
+      answer_authority: false,
       doc_path: "docs/example.md",
       source_hash: "fnv1a32:test",
       source_text_hash: "fnv1a32:text-payload",
@@ -107,6 +134,14 @@ describe("stage play document Markdown mail route", () => {
       chunk_index: 2,
       lane_session_id: "lane_session:live_translation:docs:fnv1a32:test",
       session_control_key: "lane_session:live_translation:docs:fnv1a32:test::document_markdown:docs/example.md::docs_chunk",
+      source_binding_key: "document_markdown:docs/example.md::fnv1a32:test::docs_chunk::haw-US::haw",
+      source_identity_key:
+        "document_markdown:docs/example.md::fnv1a32:test::fnv1a32:text-payload::25::docs::docs_chunk::haw-US::haw",
+      latest_source_identity_key:
+        "document_markdown:docs/example.md::fnv1a32:test::fnv1a32:text-payload-latest::25::docs::docs_chunk::haw-US::haw",
+      mail_loop_observation_key:
+        "document_markdown:docs/example.md::fnv1a32:test::document_markdown::docs_chunk::haw-US::haw::doc-inline:fnv1a32:test:u0001::receipt:doc-inline",
+      receipt_ref: "receipt:doc-inline",
       projection_target: "docs_chunk",
       target_language: "haw",
       account_locale: "haw-US",

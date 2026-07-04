@@ -1,6 +1,8 @@
 import type {
   HelixCapabilityLaneDescriptor,
+  HelixCapabilityLaneId,
   HelixCapabilityLaneManifest,
+  HelixCapabilityLaneModelVisibleHint,
   HelixCapabilityLaneResolveTrace,
 } from "@shared/helix-capability-lane";
 import {
@@ -12,13 +14,19 @@ import {
   backendPermissionStatus,
   backendProvidersFor,
   buildBackendSelectionDecision,
-  hasAnyConfiguredEnvVar,
+  liveTranslationExternalBackendsEnabled,
   readBooleanEnv,
-  textBackendConfigured,
 } from "./backend-provider-config";
 import { codeTextLaneTemplate } from "./code-text";
+import { deliberateTextLaneTemplate } from "./deliberate-text";
+import { interactiveTextLaneTemplate } from "./interactive-text";
 import type { HelixCapabilityLaneTemplate } from "./lane-template";
+import { liveTranslationLaneTemplate } from "./live-translation-descriptor";
+import { speechToTextLaneTemplate } from "./speech-to-text-descriptor";
+import { textToSpeechLaneTemplate } from "./text-to-speech-descriptor";
+import { utilityTextLaneTemplate } from "./utility-text-descriptor";
 import { visualAnalysisLaneTemplate } from "./visual-analysis";
+import { workstationToolReferenceLaneTemplate } from "./workstation-tool-reference-descriptor";
 
 const defaultCapabilityModelVisibleHint = (
   capabilityId: string,
@@ -26,6 +34,8 @@ const defaultCapabilityModelVisibleHint = (
   required_input_fields: [],
   optional_input_fields: ["requested_backend_provider"],
   when_to_use: "Use only when this governed lane capability directly matches the user's requested task.",
+  when_not_to_use:
+    "Do not use from contextual, negated, future, historical, quoted, or screen-visible mentions. Lane output is observation-only and must re-enter Helix before terminal authority.",
   request_shape_hint: {
     capability_lane_call: {
       capability: capabilityId,
@@ -33,391 +43,34 @@ const defaultCapabilityModelVisibleHint = (
   },
 });
 
+const normalizeCapabilityModelVisibleHint = (
+  capabilityId: string,
+  hint?: HelixCapabilityLaneModelVisibleHint,
+): HelixCapabilityLaneModelVisibleHint => {
+  const fallback = defaultCapabilityModelVisibleHint(capabilityId);
+  const optionalInputFields = new Set([
+    ...(hint?.optional_input_fields ?? fallback.optional_input_fields),
+    "requested_backend_provider",
+  ]);
+
+  return {
+    ...fallback,
+    ...hint,
+    optional_input_fields: Array.from(optionalInputFields),
+    when_not_to_use: hint?.when_not_to_use ?? fallback.when_not_to_use,
+  };
+};
+
 const laneTemplates: HelixCapabilityLaneTemplate[] = [
-  {
-    lane_id: "utility_text",
-    family: "text_inference",
-    label: "Utility text",
-    description: "Small classification, extraction, normalization, and compact summary calls.",
-    backend_family: "local_runtime",
-    model_or_service_ref: "utility_text_deterministic_v1",
-    safety_tags: ["shadow_only", "local_deterministic", "observation_only"],
-    configured: () => true,
-    cost_class: "free_local",
-    latency_class: "interactive",
-    privacy_class: "local_only",
-    one_shot_supported: true,
-    session_supported: false,
-    goal_binding_supported: false,
-    default_backend_provider: "utility_text.local_runtime",
-    backend_provider_templates: [
-      {
-        provider_id: "utility_text.local_runtime",
-        backend_family: "local_runtime",
-        label: "Deterministic local utility text",
-        model_or_service_ref: "utility_text_deterministic_v1",
-        required_env_vars: [],
-        configured: () => true,
-        cost_class: "free_local",
-        latency_class: "interactive",
-        privacy_class: "local_only",
-        fallback_backend_provider: null,
-      },
-      {
-        provider_id: "utility_text.openai_compatible",
-        backend_family: "openai_compatible",
-        label: "OpenAI-compatible utility text",
-        model_or_service_ref: "utility_text_openai_compatible_default",
-        required_env_vars: ["OPENAI_API_KEY", "LLM_HTTP_BASE", "LLM_HTTP_MODEL"],
-        configured: textBackendConfigured,
-        cost_class: "standard",
-        latency_class: "interactive",
-        privacy_class: "account_provider",
-        fallback_backend_provider: "utility_text.local_runtime",
-      },
-    ],
-    capabilities: [
-      {
-        capability_id: "utility_text.normalize_text",
-        label: "Normalize text",
-        one_shot_status: "executable",
-        session_status: "not_supported",
-        backend_provider_required: true,
-        model_visible_hint: {
-          required_input_fields: ["text"],
-          optional_input_fields: ["normalization_mode", "requested_backend_provider"],
-          when_to_use: "Use for compact text normalization or deterministic utility text processing.",
-          request_shape_hint: {
-            capability_lane_call: {
-              capability: "utility_text.normalize_text",
-              text: "<text to normalize>",
-              normalization_mode: "<optional mode>",
-            },
-          },
-        },
-      },
-    ],
-  },
-  {
-    lane_id: "interactive_text",
-    family: "text_inference",
-    label: "Interactive text",
-    description: "Low-latency conversational and tool-backed text inference.",
-    backend_family: "openai_compatible",
-    model_or_service_ref: "interactive_text_default",
-    safety_tags: ["shadow_only", "no_raw_model_id", "observation_only"],
-    required_env_vars: ["OPENAI_API_KEY", "LLM_HTTP_BASE", "LLM_HTTP_MODEL"],
-    configured: textBackendConfigured,
-    cost_class: "standard",
-    latency_class: "interactive",
-    privacy_class: "account_provider",
-    one_shot_supported: false,
-    session_supported: false,
-    goal_binding_supported: false,
-    capabilities: [
-      {
-        capability_id: "interactive_text.respond",
-        label: "Interactive text response",
-        one_shot_status: "shadow_only",
-        session_status: "not_supported",
-        backend_provider_required: true,
-      },
-    ],
-  },
-  {
-    lane_id: "deliberate_text",
-    family: "text_inference",
-    label: "Deliberate text",
-    description: "Higher-effort synthesis, planning, and final consistency review.",
-    backend_family: "openai_compatible",
-    model_or_service_ref: "deliberate_text_default",
-    safety_tags: ["shadow_only", "no_raw_model_id", "observation_only"],
-    required_env_vars: ["OPENAI_API_KEY", "LLM_HTTP_BASE", "LLM_HTTP_MODEL"],
-    configured: textBackendConfigured,
-    cost_class: "premium",
-    latency_class: "batch",
-    privacy_class: "account_provider",
-    one_shot_supported: false,
-    session_supported: false,
-    goal_binding_supported: false,
-    capabilities: [
-      {
-        capability_id: "deliberate_text.review",
-        label: "Deliberate text review",
-        one_shot_status: "shadow_only",
-        session_status: "not_supported",
-        backend_provider_required: true,
-      },
-    ],
-  },
+  utilityTextLaneTemplate,
+  interactiveTextLaneTemplate,
+  deliberateTextLaneTemplate,
   codeTextLaneTemplate,
-  {
-    lane_id: "speech_to_text",
-    family: "speech_to_text",
-    label: "Speech to text",
-    description: "Audio transcription lane that normalizes microphone transcripts into non-terminal live-answer mail observations.",
-    backend_family: "openai_compatible",
-    model_or_service_ref: "speech_to_text_default",
-    safety_tags: ["audio", "observation_only", "live_answer_mail", "no_raw_audio"],
-    required_env_vars: ["OPENAI_API_KEY", "STT_API_KEY", "WHISPER_HTTP_API_KEY", "STT_LOCAL_URL"],
-    configured: (env) => hasAnyConfiguredEnvVar(env, ["OPENAI_API_KEY", "STT_API_KEY", "WHISPER_HTTP_API_KEY", "STT_LOCAL_URL"]),
-    cost_class: "standard",
-    latency_class: "realtime",
-    privacy_class: "external_provider",
-    one_shot_supported: true,
-    session_supported: true,
-    goal_binding_supported: true,
-    default_backend_provider: "speech_to_text.openai_compatible",
-    backend_provider_templates: [
-      {
-        provider_id: "speech_to_text.openai_compatible",
-        backend_family: "openai_compatible",
-        label: "OpenAI-compatible speech transcription",
-        model_or_service_ref: "speech_to_text_default",
-        required_env_vars: ["OPENAI_API_KEY", "STT_API_KEY", "WHISPER_HTTP_API_KEY", "STT_LOCAL_URL"],
-        configured: (env) => hasAnyConfiguredEnvVar(env, ["OPENAI_API_KEY", "STT_API_KEY", "WHISPER_HTTP_API_KEY", "STT_LOCAL_URL"]),
-        cost_class: "standard",
-        latency_class: "realtime",
-        privacy_class: "external_provider",
-        fallback_backend_provider: null,
-      },
-    ],
-    capabilities: [
-      {
-        capability_id: "speech_to_text.transcribe_audio",
-        label: "Transcribe speech",
-        one_shot_status: "executable",
-        session_status: "supported",
-        backend_provider_required: true,
-        model_visible_hint: {
-          required_input_fields: ["audio_ref"],
-          optional_input_fields: [
-            "transcript_text",
-            "language",
-            "source_id",
-            "thread_id",
-            "capture_session_id",
-            "chunk_index",
-            "requested_backend_provider",
-          ],
-          when_to_use:
-            "Use when an admitted microphone or audio capture has produced audio to transcribe or a transcript that must be packetized as speech evidence.",
-          when_not_to_use:
-            "Do not use this to answer directly, translate directly, or treat a transcript as the user's submitted prompt. STT output is an observation and should re-enter through live-answer mail before goal-bound follow-up.",
-          request_shape_hint: {
-            capability_lane_call: {
-              capability: "speech_to_text.transcribe_audio",
-              audio_ref: "<audio artifact/ref from admitted capture>",
-              transcript_text: "<optional transcript already produced by the STT backend>",
-              source_id: "<optional audio_transcript source id>",
-              requested_backend_provider: "<optional backend preference; Helix selects the backend>",
-            },
-          },
-        },
-      },
-    ],
-  },
-  {
-    lane_id: "text_to_speech",
-    family: "text_to_speech",
-    label: "Text to speech",
-    description: "Narration and callout audio generation as non-terminal receipts/artifacts.",
-    backend_family: "local_runtime",
-    model_or_service_ref: "existing_voice_service",
-    safety_tags: ["audio", "receipt_only", "observation_only", "client_playback_confirmation_required"],
-    required_env_vars: [],
-    configured: () => true,
-    cost_class: "free_local",
-    latency_class: "interactive",
-    privacy_class: "local_only",
-    one_shot_supported: true,
-    session_supported: true,
-    goal_binding_supported: true,
-    default_backend_provider: "text_to_speech.existing_voice_service",
-    backend_provider_templates: [
-      {
-        provider_id: "text_to_speech.existing_voice_service",
-        backend_family: "local_runtime",
-        label: "Existing Helix voice service",
-        model_or_service_ref: "existing_voice_service",
-        required_env_vars: [],
-        configured: () => true,
-        cost_class: "free_local",
-        latency_class: "interactive",
-        privacy_class: "local_only",
-        fallback_backend_provider: null,
-      },
-      {
-        provider_id: "text_to_speech.elevenlabs",
-        backend_family: "elevenlabs",
-        label: "ElevenLabs text to speech",
-        model_or_service_ref: "elevenlabs_default",
-        required_env_vars: ["ELEVENLABS_API_KEY"],
-        configured: (env) => hasAnyConfiguredEnvVar(env, ["ELEVENLABS_API_KEY"]),
-        cost_class: "standard",
-        latency_class: "interactive",
-        privacy_class: "external_provider",
-        fallback_backend_provider: "text_to_speech.existing_voice_service",
-      },
-    ],
-    capabilities: [
-      {
-        capability_id: "text_to_speech.speak_text",
-        label: "Speak text",
-        one_shot_status: "executable",
-        session_status: "supported",
-        backend_provider_required: true,
-        model_visible_hint: {
-          required_input_fields: ["text"],
-          optional_input_fields: [
-            "voice",
-            "profile",
-            "locale",
-            "source_observation_ref",
-            "requested_backend_provider",
-          ],
-          when_to_use:
-            "Use when the user explicitly asks to speak or read provided text aloud through the governed voice lane.",
-          when_not_to_use:
-            "Do not use for quoted, negated, future, historical, or screen-visible mentions of voice/read-aloud controls. Do not claim audio completed unless the receipt says completed.",
-          request_shape_hint: {
-            capability_lane_call: {
-              capability: "text_to_speech.speak_text",
-              text: "<text to speak>",
-              voice: "<optional voice/profile>",
-              locale: "<optional locale>",
-              source_observation_ref: "<optional source observation ref>",
-              requested_backend_provider: "<optional backend preference; Helix selects the backend>",
-            },
-          },
-        },
-      },
-    ],
-  },
-  {
-    lane_id: "live_translation",
-    family: "live_translation",
-    label: "Live translation",
-    description: "Low-latency translation service lane for future transcript/audio observations.",
-    backend_family: "local_runtime",
-    model_or_service_ref: "live_translation_deterministic_v1",
-    safety_tags: ["shadow_only", "audio", "translation", "observation_only"],
-    configured: () => true,
-    cost_class: "free_local",
-    latency_class: "interactive",
-    privacy_class: "local_only",
-    one_shot_supported: true,
-    session_supported: true,
-    goal_binding_supported: true,
-    default_backend_provider: "live_translation.local_runtime",
-    backend_provider_templates: [
-      {
-        provider_id: "live_translation.local_runtime",
-        backend_family: "local_runtime",
-        label: "Deterministic local translation",
-        model_or_service_ref: "live_translation_deterministic_v1",
-        required_env_vars: [],
-        configured: () => true,
-        cost_class: "free_local",
-        latency_class: "interactive",
-        privacy_class: "local_only",
-        fallback_backend_provider: null,
-      },
-      {
-        provider_id: "live_translation.google_gemini",
-        backend_family: "google_gemini",
-        label: "Gemini translation",
-        model_or_service_ref: "gemini_translation_default",
-        required_env_vars: ["GOOGLE_GEMINI_API_KEY", "GEMINI_API_KEY"],
-        configured: (env) => hasAnyConfiguredEnvVar(env, ["GOOGLE_GEMINI_API_KEY", "GEMINI_API_KEY"]),
-        cost_class: "standard",
-        latency_class: "realtime",
-        privacy_class: "external_provider",
-        fallback_backend_provider: "live_translation.local_runtime",
-      },
-      {
-        provider_id: "live_translation.openai_compatible",
-        backend_family: "openai_compatible",
-        label: "OpenAI-compatible translation",
-        model_or_service_ref: "live_translation_openai_compatible_default",
-        required_env_vars: ["OPENAI_API_KEY", "LLM_HTTP_BASE", "LLM_HTTP_MODEL"],
-        configured: (env) => hasAnyConfiguredEnvVar(env, ["OPENAI_API_KEY", "LLM_HTTP_BASE", "LLM_HTTP_MODEL"]),
-        cost_class: "standard",
-        latency_class: "interactive",
-        privacy_class: "account_provider",
-        fallback_backend_provider: "live_translation.local_runtime",
-      },
-    ],
-    capabilities: [
-      {
-        capability_id: "live_translation.translate_text",
-        label: "Translate text",
-        one_shot_status: "executable",
-        session_status: "supported",
-        backend_provider_required: true,
-        model_visible_hint: {
-          required_input_fields: ["text", "target_language"],
-          optional_input_fields: [
-            "source_language",
-            "requested_backend_provider",
-            "chunk_id",
-            "source_id",
-            "projection_target",
-          ],
-          when_to_use:
-            "Use when the user asks to translate provided text, selected content, transcript text, or other text content.",
-          when_not_to_use:
-            "Do not use docs-viewer.read_active_translation for new translation work; that workstation tool only reads an already-existing translated Docs surface. If source text or target language is missing, ask for clarification.",
-          request_shape_hint: {
-            capability_lane_call: {
-              capability: "live_translation.translate_text",
-              text: "<text to translate>",
-              target_language: "<target language or locale>",
-              source_language: "<optional source language>",
-              requested_backend_provider: "<optional backend preference; Helix selects the backend>",
-            },
-          },
-        },
-      },
-    ],
-  },
+  speechToTextLaneTemplate,
+  textToSpeechLaneTemplate,
+  liveTranslationLaneTemplate,
   visualAnalysisLaneTemplate,
-  {
-    lane_id: "workstation_tool_reference",
-    family: "workstation_tool_reference",
-    label: "Workstation tool reference",
-    description: "Reference lane for the existing workstation gateway catalog; no tool migration occurs here.",
-    backend_family: "helix_workstation_gateway",
-    model_or_service_ref: "workstation_gateway_existing",
-    safety_tags: ["existing_gateway_reference", "no_lane_reroute", "observation_or_receipt_only"],
-    configured: () => true,
-    cost_class: "free_local",
-    latency_class: "local",
-    privacy_class: "local_only",
-    one_shot_supported: true,
-    session_supported: false,
-    goal_binding_supported: false,
-    capabilities: [
-      {
-        capability_id: "workstation_tool_reference.list_capabilities",
-        label: "List workstation gateway capabilities",
-        one_shot_status: "executable",
-        session_status: "not_supported",
-        backend_provider_required: false,
-        model_visible_hint: {
-          required_input_fields: [],
-          optional_input_fields: ["requested_backend_provider"],
-          when_to_use:
-            "Use to inspect the governed workstation gateway capability catalog as observation-only reference data.",
-          request_shape_hint: {
-            capability_lane_call: {
-              capability: "workstation_tool_reference.list_capabilities",
-            },
-          },
-        },
-      },
-    ],
-  },
+  workstationToolReferenceLaneTemplate,
 ];
 
 const laneSet = new Set<string>(HELIX_CAPABILITY_LANE_IDS);
@@ -543,15 +196,37 @@ const laneCapabilitiesFor = (template: HelixCapabilityLaneTemplate) =>
     one_shot_status: capability.one_shot_status,
     session_status: capability.session_status,
     backend_provider_required: capability.backend_provider_required,
-    model_visible_hint:
-      capability.model_visible_hint ??
-      defaultCapabilityModelVisibleHint(capability.capability_id),
+    model_visible_hint: normalizeCapabilityModelVisibleHint(
+      capability.capability_id,
+      capability.model_visible_hint,
+    ),
     result_authority: "observation_or_receipt_only" as const,
     reentry_required: true as const,
     terminal_eligible: false as const,
     assistant_answer: false as const,
     raw_content_included: false as const,
   }));
+
+const canSelectRequestedLiveBackend = (input: {
+  lane: HelixCapabilityLaneDescriptor;
+  requestedBackend: HelixCapabilityLaneDescriptor["backend_providers"][number] | null;
+  env: NodeJS.ProcessEnv;
+}): boolean =>
+  input.lane.lane_id === "live_translation" &&
+  liveTranslationExternalBackendsEnabled(input.env) &&
+  input.requestedBackend?.provider_id === "live_translation.openai_compatible" &&
+  input.requestedBackend.configuration_status === "configured" &&
+  input.requestedBackend.availability_status === "dry_run" &&
+  input.requestedBackend.permission_status === "admitted";
+
+const liveBackendExecutionEnabledFor = (input: {
+  lane: HelixCapabilityLaneDescriptor;
+  selectedBackend: HelixCapabilityLaneDescriptor["backend_providers"][number] | null;
+  env: NodeJS.ProcessEnv;
+}): boolean =>
+  input.lane.lane_id === "live_translation" &&
+  liveTranslationExternalBackendsEnabled(input.env) &&
+  input.selectedBackend?.provider_id === "live_translation.openai_compatible";
 
 const descriptorFor = (input: {
   template: HelixCapabilityLaneTemplate;
@@ -635,6 +310,7 @@ export const resolveHelixCapabilityLaneRequest = (input: {
     provider: input.provider,
     env: input.env,
   });
+  const env = input.env ?? process.env;
   const lane = requestedLane && laneSet.has(requestedLane)
     ? manifest.lanes.find((candidate: HelixCapabilityLaneDescriptor) => candidate.lane_id === requestedLane)
     : undefined;
@@ -696,13 +372,20 @@ export const resolveHelixCapabilityLaneRequest = (input: {
   const defaultBackend = lane.default_backend_provider
     ? lane.backend_providers.find((candidate) => candidate.provider_id === lane.default_backend_provider) ?? null
     : null;
-  const selectedBackend = admitted ? defaultBackend ?? lane.backend_providers[0] ?? null : null;
+  const selectedBackend = admitted
+    ? canSelectRequestedLiveBackend({ lane, requestedBackend, env })
+      ? requestedBackend
+      : defaultBackend ?? lane.backend_providers[0] ?? null
+    : null;
   const backendSelectionDecision = buildBackendSelectionDecision({
     admitted,
     laneStatusReason: lane.status_reason,
     requestedBackendProvider,
     requestedBackend,
     selectedBackend,
+    liveBackendExecutionEnabled: selectedBackend
+      ? liveBackendExecutionEnabledFor({ lane, selectedBackend, env })
+      : false,
   });
   return {
     schema: "helix.capability_lane_resolve_trace.v1",
@@ -734,8 +417,8 @@ export const resolveHelixCapabilityLaneRequest = (input: {
     latency_class: selectedBackend?.latency_class ?? "unknown",
     privacy_class: selectedBackend?.privacy_class ?? "unknown",
     fallback_backend_provider: selectedBackend?.fallback_backend_provider ?? null,
-    resolved_backend_provider: admitted ? lane.backend_family : null,
-    resolved_model_or_service: admitted ? lane.model_or_service_ref : null,
+    resolved_backend_provider: admitted ? selectedBackend?.backend_family ?? lane.backend_family : null,
+    resolved_model_or_service: admitted ? selectedBackend?.model_or_service_ref ?? lane.model_or_service_ref : null,
     result_ref: null,
     observation_ref: null,
     receipt_ref: null,

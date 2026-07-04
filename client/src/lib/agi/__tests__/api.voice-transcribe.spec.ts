@@ -928,6 +928,11 @@ describe("askLocal lane parity default", () => {
           ok: true,
           schema: "helix.capability_lane.one_shot_response.v1",
           requested: true,
+          agent_runtime: "codex",
+          selected_agent_provider: {
+            id: "codex",
+            label: "Codex Workstation Mode",
+          },
           capability_lane_call_results: [
             {
               ok: true,
@@ -1036,6 +1041,11 @@ describe("askLocal lane parity default", () => {
       expect.objectContaining({
         schema: "helix.capability_lane.one_shot_response.v1",
         requested: true,
+        agent_runtime: "codex",
+        selected_agent_provider: expect.objectContaining({
+          id: "codex",
+          label: "Codex Workstation Mode",
+        }),
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -1088,6 +1098,11 @@ describe("askLocal lane parity default", () => {
         JSON.stringify({
           ok: true,
           schema: "helix.capability_lane.session_control_response.v1",
+          agent_runtime: "codex",
+          selected_agent_provider: {
+            id: "codex",
+            label: "Codex Workstation Mode",
+          },
           capability_lane_session_debug_summaries: [
             {
               lane_id: "live_translation",
@@ -1177,6 +1192,11 @@ describe("askLocal lane parity default", () => {
     expect(response).toEqual(
       expect.objectContaining({
         schema: "helix.capability_lane.session_control_response.v1",
+        agent_runtime: "codex",
+        selected_agent_provider: expect.objectContaining({
+          id: "codex",
+          label: "Codex Workstation Mode",
+        }),
       }),
     );
     expect(response.model_visible_capability_lane_manifest).toMatchObject({
@@ -1212,6 +1232,12 @@ describe("askLocal lane parity default", () => {
           ok: true,
           requested: true,
           schema: "helix.capability_lane.goal_binding_control_response.v1",
+          agent_runtime: "codex",
+          selected_agent_provider: {
+            id: "codex",
+            label: "Codex Workstation Mode",
+          },
+          context_role: "tool_evidence",
           capability_lane_goal_binding_debug_summaries: [
             {
               goal_binding_id: "goal-binding-docs-route",
@@ -1219,6 +1245,18 @@ describe("askLocal lane parity default", () => {
               lane_id: "live_translation",
               report_policy: "ask_on_salience",
               quiet_behavior: "wake_on_salience",
+              context_role: "tool_evidence",
+            },
+          ],
+          capability_lane_goal_binding_results: [
+            {
+              ok: true,
+              goal_binding_id: "goal-binding-docs-route",
+              lane_session_id: "lane-session-docs-route",
+              context_role: "tool_evidence",
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
             },
           ],
           capability_lane_mail_loop_debug_summaries: [],
@@ -1243,6 +1281,7 @@ describe("askLocal lane parity default", () => {
               status: "bound",
               lane_visible: false,
               lane_requested: true,
+              context_role: "tool_evidence",
               terminal_eligible: false,
               assistant_answer: false,
               raw_content_included: false,
@@ -1298,6 +1337,12 @@ describe("askLocal lane parity default", () => {
         schema: "helix.capability_lane.goal_binding_control_response.v1",
         ok: true,
         requested: true,
+        agent_runtime: "codex",
+        selected_agent_provider: expect.objectContaining({
+          id: "codex",
+          label: "Codex Workstation Mode",
+        }),
+        context_role: "tool_evidence",
       }),
     );
     expect(response.model_visible_capability_lane_manifest).toMatchObject({
@@ -1307,6 +1352,18 @@ describe("askLocal lane parity default", () => {
       expect.objectContaining({
         goal_binding_id: "goal-binding-docs-route",
         lane_id: "live_translation",
+        context_role: "tool_evidence",
+      }),
+    ]);
+    expect(response.capability_lane_goal_binding_results).toEqual([
+      expect.objectContaining({
+        ok: true,
+        goal_binding_id: "goal-binding-docs-route",
+        lane_session_id: "lane-session-docs-route",
+        context_role: "tool_evidence",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
       }),
     ]);
     expect(response.capability_lane_turn_timeline).toEqual(expect.arrayContaining([
@@ -1315,6 +1372,7 @@ describe("askLocal lane parity default", () => {
         stage: "goal_binding",
         lane_id: "live_translation",
         status: "bound",
+        context_role: "tool_evidence",
       }),
     ]));
     expect(response.capability_lane_timeline_summary).toMatchObject({
@@ -1331,6 +1389,38 @@ describe("askLocal lane parity default", () => {
           ok: true,
           requested: true,
           schema: "helix.capability_lane.mail_loop_response.v1",
+          agent_runtime: "codex",
+          selected_agent_provider: {
+            id: "codex",
+            label: "Codex Workstation Mode",
+          },
+          capability_lane_call_results: [
+            {
+              ok: true,
+              capability: "live_translation.translate_text",
+              observation_ref: "ask:turn-lane-client-mail-loop:lane:live_translation:obs",
+              context_role: "tool_evidence",
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          ],
+          capability_lane_observation_packets: [
+            {
+              observation_ref: "ask:turn-lane-client-mail-loop:lane:live_translation:obs",
+              lane_id: "live_translation",
+              packet_kind: "translation_observation",
+              context_role: "tool_evidence",
+            },
+          ],
+          capability_lane_projection_receipts: [
+            {
+              receipt_ref: "ask:turn-lane-client-mail-loop:lane:live_translation:projection",
+              projection_target: "docs_chunk",
+              terminal_eligible: false,
+              assistant_answer: false,
+            },
+          ],
           capability_lane_mail_loop_results: [
             {
               ok: true,
@@ -1422,8 +1512,48 @@ describe("askLocal lane parity default", () => {
         schema: "helix.capability_lane.mail_loop_response.v1",
         ok: true,
         requested: true,
+        agent_runtime: "codex",
+        selected_agent_provider: expect.objectContaining({
+          id: "codex",
+          label: "Codex Workstation Mode",
+        }),
       }),
     );
+    expect(response.capability_lane_call_results).toEqual([
+      expect.objectContaining({
+        capability: "live_translation.translate_text",
+        observation_ref: "ask:turn-lane-client-mail-loop:lane:live_translation:obs",
+        context_role: "tool_evidence",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(response.capability_lane_observation_packets).toEqual([
+      expect.objectContaining({
+        observation_ref: "ask:turn-lane-client-mail-loop:lane:live_translation:obs",
+        lane_id: "live_translation",
+        context_role: "tool_evidence",
+      }),
+    ]);
+    expect(response.capability_lane_projection_receipts).toEqual([
+      expect.objectContaining({
+        receipt_ref: "ask:turn-lane-client-mail-loop:lane:live_translation:projection",
+        projection_target: "docs_chunk",
+        terminal_eligible: false,
+        assistant_answer: false,
+      }),
+    ]);
+    expect(response.capability_lane_mail_loop_results).toEqual([
+      expect.objectContaining({
+        ok: true,
+        lane_session_id: "lane-session-docs-route",
+        stage_play_mail_id: "stage-play-mail-route",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
     expect(response.capability_lane_mail_loop_debug_summaries).toEqual([
       expect.objectContaining({
         lane_session_id: "lane-session-docs-route",

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   HELIX_LIVE_TRANSLATION_ONE_SHOT_REQUEST_SCHEMA,
   type HelixLiveTranslationOneShotRequest,
@@ -51,8 +51,12 @@ const request = (input: Partial<HelixLiveTranslationOneShotRequest>): HelixLiveT
 });
 
 describe("live_translation.translate_text one-shot lane", () => {
-  it("returns a deterministic translation observation and non-terminal observation packet", () => {
-    const result = runLiveTranslationTranslateText({
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns a deterministic translation observation and non-terminal observation packet", async () => {
+    const result = await runLiveTranslationTranslateText({
       provider: buildProvider("codex"),
       request: request({ requested_backend_provider: "google_gemini" }),
       turnId: "turn-translation",
@@ -149,14 +153,138 @@ describe("live_translation.translate_text one-shot lane", () => {
     expect(result.observation_packet.produced_artifact_refs).toEqual(result.artifact_refs);
   });
 
-  it("keeps Helix and Codex on the same one-shot lane contract", () => {
-    const helix = runLiveTranslationTranslateText({
+  it("executes the OpenAI-compatible backend only when Helix selects live external translation", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({ translated_text: "bonjour" }),
+          },
+        },
+      ],
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+
+    const result = await runLiveTranslationTranslateText({
+      provider: buildProvider("codex"),
+      request: request({
+        text: "hello",
+        source_language: "en",
+        target_language: "fr",
+        requested_backend_provider: "live_translation.openai_compatible",
+      }),
+      turnId: "turn-translation-openai-compatible",
+      iteration: 1,
+      env: {
+        OPENAI_API_KEY: "test-key",
+        LLM_HTTP_BASE: "https://translation-provider.test",
+        LLM_HTTP_MODEL: "translation-test-model",
+        HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED: "1",
+      } as NodeJS.ProcessEnv,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(url).toBe("https://translation-provider.test/v1/chat/completions");
+    expect(init).toMatchObject({
+      method: "POST",
+      headers: expect.objectContaining({
+        Authorization: "Bearer test-key",
+      }),
+    });
+    expect(JSON.stringify(init)).not.toContain("do-not-leak");
+    expect(result).toMatchObject({
+      ok: true,
+      translated_text: "bonjour",
+      selected_runtime_agent_provider: "codex",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(result.lane_resolve_trace).toMatchObject({
+      requested_backend_provider: "live_translation.openai_compatible",
+      selected_backend_provider: "live_translation.openai_compatible",
+      execution_status: "executed_observation_only",
+      backend_selection_decision: expect.objectContaining({
+        outcome: "requested_selected",
+        live_backend_execution_enabled: true,
+        selected_runtime_provider_remains_root: true,
+        backend_provider_becomes_root_agent: false,
+        terminal_authority_owner: "helix",
+      }),
+    });
+    expect(result.observation).toMatchObject({
+      selected_backend_provider: "live_translation.openai_compatible",
+      translated_text: "bonjour",
+      deterministic: false,
+      reentry_required: true,
+      terminal_authority_status: "pending_helix_terminal_authority",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("normalizes OpenAI-compatible provider failures as non-terminal failed receipts", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("provider down", {
+      status: 503,
+    }));
+
+    const result = await runLiveTranslationTranslateText({
+      provider: buildProvider("codex"),
+      request: request({
+        text: "hello",
+        target_language: "fr",
+        requested_backend_provider: "live_translation.openai_compatible",
+      }),
+      turnId: "turn-translation-openai-compatible-failed",
+      env: {
+        OPENAI_API_KEY: "test-key",
+        LLM_HTTP_BASE: "https://translation-provider.test",
+        HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED: "1",
+      } as NodeJS.ProcessEnv,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("translation_provider_http_503");
+    expect(result.observation).toBeNull();
+    expect(result.lane_resolve_trace).toMatchObject({
+      selected_backend_provider: "live_translation.openai_compatible",
+      execution_status: "not_executed_shadow_only",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+      backend_selection_decision: expect.objectContaining({
+        live_backend_execution_enabled: true,
+        terminal_authority_owner: "helix",
+      }),
+    });
+    expect(result.observation_packet).toMatchObject({
+      status: "failed",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(result.observation_packet.state_delta.live_translation_projection_receipt).toMatchObject({
+      projection_status: "failed",
+      translated_text: null,
+      terminal_authority_status: "not_terminal_authority",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("keeps Helix and Codex on the same one-shot lane contract", async () => {
+    const helix = await runLiveTranslationTranslateText({
       provider: buildProvider("helix"),
       request: request({ text: "The result is 72.", target_language: "fr" }),
       turnId: "turn-helix-translation",
       env: {} as NodeJS.ProcessEnv,
     });
-    const codex = runLiveTranslationTranslateText({
+    const codex = await runLiveTranslationTranslateText({
       provider: buildProvider("codex"),
       request: request({ text: "The result is 72.", target_language: "fr" }),
       turnId: "turn-codex-translation",
@@ -173,16 +301,26 @@ describe("live_translation.translate_text one-shot lane", () => {
     expect(codex.observation_packet.terminal_eligible).toBe(false);
   });
 
-  it("records chunk identity, ordering, dedupe, freshness, and projection target as observation metadata", () => {
-    const result = runLiveTranslationTranslateText({
+  it("records chunk identity, ordering, dedupe, freshness, and projection target as observation metadata", async () => {
+    const result = await runLiveTranslationTranslateText({
       provider: buildProvider("codex"),
       request: request({
         text: "thank you",
         lane_session_id: "lane-session-chunk",
+        session_control_key: "lane-session-chunk::docs:nhm2:whitepaper::fnv1a32:whitepaper-v2::docs_chunk::es-US::fr",
+        source_binding_key: "docs:nhm2:whitepaper::fnv1a32:whitepaper-v2::docs_chunk::es-US::fr",
+        source_identity_key:
+          "docs:nhm2:whitepaper::fnv1a32:whitepaper-v2::sha256:whitepaper-source::9::docs::docs_chunk::es-US::fr",
+        latest_observation_key: "docs:nhm2:whitepaper::fnv1a32:whitepaper-v2::docs_chunk::fr::chunk-7",
+        latest_mail_loop_observation_key: "docs:nhm2:whitepaper::fnv1a32:whitepaper-v2::docs_chunk::fr::chunk-7::mail",
+        goal_binding_id: "goal-binding-docs-translation",
+        goal_binding_key: "goal:docs-translation::goal-binding-docs-translation::lane-session-chunk::live_translation",
         source_language: "en",
         target_language: "fr",
         source_id: "docs:nhm2:whitepaper",
         source_hash: "fnv1a32:whitepaper-v2",
+        source_kind: "docs",
+        account_locale: "es-US",
         chunk_id: "chunk-7",
         chunk_index: 7,
         dedupe_key: "docs:nhm2:whitepaper:chunk-7:fr",
@@ -198,8 +336,18 @@ describe("live_translation.translate_text one-shot lane", () => {
     expect(result.translated_text).toBe("merci");
     expect(result.observation).toMatchObject({
       lane_session_id: "lane-session-chunk",
+      session_control_key: "lane-session-chunk::docs:nhm2:whitepaper::fnv1a32:whitepaper-v2::docs_chunk::es-US::fr",
+      source_binding_key: "docs:nhm2:whitepaper::fnv1a32:whitepaper-v2::docs_chunk::es-US::fr",
+      source_identity_key:
+        "docs:nhm2:whitepaper::fnv1a32:whitepaper-v2::sha256:whitepaper-source::9::docs::docs_chunk::es-US::fr",
+      latest_observation_key: "docs:nhm2:whitepaper::fnv1a32:whitepaper-v2::docs_chunk::fr::chunk-7",
+      latest_mail_loop_observation_key: "docs:nhm2:whitepaper::fnv1a32:whitepaper-v2::docs_chunk::fr::chunk-7::mail",
+      goal_binding_id: "goal-binding-docs-translation",
+      goal_binding_key: "goal:docs-translation::goal-binding-docs-translation::lane-session-chunk::live_translation",
       source_id: "docs:nhm2:whitepaper",
       source_hash: "fnv1a32:whitepaper-v2",
+      source_kind: "docs",
+      account_locale: "es-US",
       chunk_id: "chunk-7",
       chunk_index: 7,
       dedupe_key: "docs:nhm2:whitepaper:chunk-7:fr",
@@ -216,8 +364,18 @@ describe("live_translation.translate_text one-shot lane", () => {
     expect(result.observation_packet.state_delta).toMatchObject({
       live_translation_chunk: {
         lane_session_id: "lane-session-chunk",
+        session_control_key: "lane-session-chunk::docs:nhm2:whitepaper::fnv1a32:whitepaper-v2::docs_chunk::es-US::fr",
+        source_binding_key: "docs:nhm2:whitepaper::fnv1a32:whitepaper-v2::docs_chunk::es-US::fr",
+        source_identity_key:
+          "docs:nhm2:whitepaper::fnv1a32:whitepaper-v2::sha256:whitepaper-source::9::docs::docs_chunk::es-US::fr",
+        latest_observation_key: "docs:nhm2:whitepaper::fnv1a32:whitepaper-v2::docs_chunk::fr::chunk-7",
+        latest_mail_loop_observation_key: "docs:nhm2:whitepaper::fnv1a32:whitepaper-v2::docs_chunk::fr::chunk-7::mail",
+        goal_binding_id: "goal-binding-docs-translation",
+        goal_binding_key: "goal:docs-translation::goal-binding-docs-translation::lane-session-chunk::live_translation",
         source_id: "docs:nhm2:whitepaper",
         source_hash: "fnv1a32:whitepaper-v2",
+        source_kind: "docs",
+        account_locale: "es-US",
         chunk_id: "chunk-7",
         chunk_index: 7,
         dedupe_key: "docs:nhm2:whitepaper:chunk-7:fr",
@@ -249,6 +407,10 @@ describe("live_translation.translate_text one-shot lane", () => {
       projection_status: "stale",
       source_id: "docs:nhm2:whitepaper",
       source_hash: "fnv1a32:whitepaper-v2",
+      source_identity_key:
+        "docs:nhm2:whitepaper::fnv1a32:whitepaper-v2::sha256:whitepaper-source::9::docs::docs_chunk::es-US::fr",
+      source_kind: "docs",
+      account_locale: "es-US",
       chunk_id: "chunk-7",
       chunk_index: 7,
       dedupe_key: "docs:nhm2:whitepaper:chunk-7:fr",
@@ -275,8 +437,46 @@ describe("live_translation.translate_text one-shot lane", () => {
     );
   });
 
-  it("keeps same-text chunks distinct by source and chunk identity", () => {
-    const first = runLiveTranslationTranslateText({
+  it("normalizes legacy docs inline projection targets to docs chunk observations", async () => {
+    const result = await runLiveTranslationTranslateText({
+      provider: buildProvider("codex"),
+      request: request({
+        text: "thank you",
+        target_language: "fr",
+        source_id: "docs:nhm2:whitepaper",
+        source_hash: "fnv1a32:whitepaper-v2",
+        source_kind: "docs",
+        account_locale: "es-US",
+        chunk_id: "chunk-legacy-inline",
+        projection_target: "docs_viewer.inline_translation" as never,
+      }),
+      turnId: "turn-translation-legacy-inline-target",
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.observation).toMatchObject({
+      projection_target: "docs_chunk",
+      source_id: "docs:nhm2:whitepaper",
+      source_hash: "fnv1a32:whitepaper-v2",
+      source_kind: "docs",
+      account_locale: "es-US",
+      chunk_id: "chunk-legacy-inline",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(result.observation_packet.state_delta.live_translation_projection_receipt).toMatchObject({
+      projection_target: "docs_chunk",
+      source_kind: "docs",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("keeps same-text chunks distinct by source and chunk identity", async () => {
+    const first = await runLiveTranslationTranslateText({
       provider: buildProvider("codex"),
       request: request({
         text: "hello",
@@ -292,7 +492,7 @@ describe("live_translation.translate_text one-shot lane", () => {
       turnId: "turn-translation-chunk-identity",
       env: {} as NodeJS.ProcessEnv,
     });
-    const second = runLiveTranslationTranslateText({
+    const second = await runLiveTranslationTranslateText({
       provider: buildProvider("codex"),
       request: request({
         text: "hello",
@@ -329,8 +529,8 @@ describe("live_translation.translate_text one-shot lane", () => {
     );
   });
 
-  it("normalizes cancelled chunks as non-terminal cancelled evidence without backend execution", () => {
-    const result = runLiveTranslationTranslateText({
+  it("normalizes cancelled chunks as non-terminal cancelled evidence without backend execution", async () => {
+    const result = await runLiveTranslationTranslateText({
       provider: buildProvider("codex"),
       request: request({
         text: "hello",
@@ -412,8 +612,8 @@ describe("live_translation.translate_text one-shot lane", () => {
     });
   });
 
-  it("normalizes missing text or target language as missing-input observation evidence", () => {
-    const result = runLiveTranslationTranslateText({
+  it("normalizes missing text or target language as missing-input observation evidence", async () => {
+    const result = await runLiveTranslationTranslateText({
       provider: buildProvider("codex"),
       request: request({ text: "", target_language: "" }),
       turnId: "turn-translation-missing",

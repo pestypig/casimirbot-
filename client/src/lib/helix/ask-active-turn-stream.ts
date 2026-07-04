@@ -252,6 +252,8 @@ function buildTurnTranscriptRecordFromAskLiveEvent(
     source_kind: readFirstNonEmptyText(meta.source_kind, meta.sourceKind),
     source_text_hash: readFirstNonEmptyText(meta.source_text_hash, meta.sourceTextHash),
     source_text_char_count: readFirstNonEmptyText(meta.source_text_char_count, meta.sourceTextCharCount),
+    source_identity_key: readFirstNonEmptyText(meta.source_identity_key, meta.sourceIdentityKey),
+    latest_source_identity_key: readFirstNonEmptyText(meta.latest_source_identity_key, meta.latestSourceIdentityKey),
     source_projection_target: readFirstNonEmptyText(meta.source_projection_target, meta.sourceProjectionTarget),
     account_locale: readFirstNonEmptyText(meta.account_locale, meta.accountLocale),
     latest_chunk_id: readFirstNonEmptyText(meta.latest_chunk_id, meta.latestChunkId),

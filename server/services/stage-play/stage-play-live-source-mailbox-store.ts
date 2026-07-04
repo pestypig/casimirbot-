@@ -311,6 +311,7 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
   frameRef?: string | null;
   evidenceRef?: string | null;
   observationRef?: string | null;
+  receiptRef?: string | null;
   sourceHash?: string | null;
   sourceTextHash?: string | null;
   sourceTextCharCount?: number | null;
@@ -318,6 +319,8 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
   chunkIndex?: number | null;
   laneSessionId?: string | null;
   sessionControlKey?: string | null;
+  sourceIdentityKey?: string | null;
+  latestSourceIdentityKey?: string | null;
   sourceBindingKey?: string | null;
   mailLoopObservationKey?: string | null;
   dedupeKey?: string | null;
@@ -344,11 +347,14 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
     input.frameRef,
     input.evidenceRef,
     input.observationRef,
+    input.receiptRef,
     input.sourceHash,
     input.sourceTextHash,
     input.chunkId,
     input.laneSessionId,
     input.sessionControlKey,
+    input.sourceIdentityKey,
+    input.latestSourceIdentityKey,
     input.sourceBindingKey,
     input.mailLoopObservationKey,
     input.dedupeKey,
@@ -390,6 +396,7 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
       frameRef: input.frameRef ?? null,
       evidenceRef: input.evidenceRef ?? null,
       observationRef: input.observationRef ?? null,
+      receiptRef: input.receiptRef ?? null,
       sourceHash: input.sourceHash ?? null,
       sourceTextHash: input.sourceTextHash ?? null,
       sourceTextCharCount: input.sourceTextCharCount ?? null,
@@ -397,6 +404,8 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
       chunkIndex: input.chunkIndex ?? null,
       laneSessionId: input.laneSessionId ?? null,
       sessionControlKey: input.sessionControlKey ?? null,
+      sourceIdentityKey: input.sourceIdentityKey ?? null,
+      latestSourceIdentityKey: input.latestSourceIdentityKey ?? input.sourceIdentityKey ?? null,
       sourceBindingKey: input.sourceBindingKey ?? null,
       mailLoopObservationKey: input.mailLoopObservationKey ?? null,
       dedupeKey: input.dedupeKey ?? null,
@@ -439,6 +448,7 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
     }),
     createdAt,
     updatedAt: createdAt,
+    answer_authority: false,
     assistant_answer: false,
     terminal_eligible: false,
     context_role: "tool_evidence",

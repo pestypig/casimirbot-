@@ -18,10 +18,17 @@ import {
   type HelixLiveTranslationProjectionTarget,
   type HelixLiveTranslationOneShotResult,
 } from "@shared/helix-live-translation-lane";
+import {
+  HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_ASK_TURN,
+  normalizeHelixLiveTranslationProjectionTarget,
+} from "@shared/helix-live-translation-projection-target";
 import type { HelixAgentProvider } from "../agent-providers/types";
 import { resolveHelixCapabilityLaneRequest } from "./registry";
 
 const CAPABILITY_ID = "live_translation.translate_text" as const;
+const DEFAULT_OPENAI_BASE = "https://api.openai.com";
+const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
+const DEFAULT_EXTERNAL_TRANSLATION_TIMEOUT_MS = 20_000;
 
 const hashShort = (value: unknown): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 16);
@@ -43,18 +50,10 @@ const normalizeNonNegativeInteger = (value: unknown): number | null => {
 };
 
 const normalizeProjectionTarget = (value: unknown): HelixLiveTranslationProjectionTarget => {
-  const normalized = normalizeText(value).toLowerCase();
-  if (
-    normalized === "ask_turn" ||
-    normalized === "docs_hover" ||
-    normalized === "docs_selection" ||
-    normalized === "docs_chunk" ||
-    normalized === "audio_chunk" ||
-    normalized === "account_language"
-  ) {
-    return normalized;
-  }
-  return "ask_turn";
+  return normalizeHelixLiveTranslationProjectionTarget(
+    normalizeText(value).toLowerCase(),
+    HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_ASK_TURN,
+  );
 };
 
 const freshnessStatusFor = (input: {
@@ -95,6 +94,137 @@ const deterministicTranslate = (input: {
   return `[${target || "target"} deterministic translation] ${input.text}`;
 };
 
+const isAbortError = (error: unknown): boolean =>
+  error instanceof Error && error.name === "AbortError";
+
+const parseProviderTranslation = (content: string): string => {
+  const trimmed = content.trim();
+  if (!trimmed) return "";
+  try {
+    const parsed = JSON.parse(trimmed) as { translated_text?: unknown; translation?: unknown };
+    const translatedText = typeof parsed.translated_text === "string"
+      ? parsed.translated_text
+      : typeof parsed.translation === "string"
+        ? parsed.translation
+        : "";
+    return translatedText.trim();
+  } catch {
+    return trimmed.replace(/^["']|["']$/g, "").trim();
+  }
+};
+
+const externalTranslationTimeoutMs = (env: NodeJS.ProcessEnv): number => {
+  const parsed = Number(env.HELIX_LIVE_TRANSLATION_EXTERNAL_TIMEOUT_MS);
+  return Number.isFinite(parsed) && parsed > 0
+    ? Math.floor(parsed)
+    : DEFAULT_EXTERNAL_TRANSLATION_TIMEOUT_MS;
+};
+
+const runOpenAiCompatibleTranslation = async (input: {
+  text: string;
+  sourceLanguage: string | null;
+  targetLanguage: string;
+  env: NodeJS.ProcessEnv;
+}): Promise<string> => {
+  const providerBase = (
+    input.env.LIVE_TRANSLATION_OPENAI_BASE ||
+    input.env.DOC_TRANSLATION_BASE ||
+    input.env.LLM_HTTP_BASE ||
+    DEFAULT_OPENAI_BASE
+  ).trim();
+  const apiKey = (
+    input.env.LIVE_TRANSLATION_OPENAI_API_KEY ||
+    input.env.DOC_TRANSLATION_API_KEY ||
+    input.env.OPENAI_API_KEY ||
+    ""
+  ).trim();
+  const model = (
+    input.env.LIVE_TRANSLATION_OPENAI_MODEL ||
+    input.env.DOC_TRANSLATION_MODEL ||
+    input.env.LLM_HTTP_MODEL ||
+    DEFAULT_OPENAI_MODEL
+  ).trim();
+  const endpoint = `${providerBase.replace(/\/+$/, "")}/v1/chat/completions`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), externalTranslationTimeoutMs(input.env));
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers,
+      signal: controller.signal,
+      body: JSON.stringify({
+        model,
+        temperature: 0,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content:
+              "Translate the provided text. Return only compact JSON with a translated_text string. Preserve named entities, code, numbers, URLs, and file paths exactly.",
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              schema: "helix.live_translation.openai_compatible_request.v1",
+              source_language: input.sourceLanguage,
+              target_language: input.targetLanguage,
+              text: input.text,
+            }),
+          },
+        ],
+      }),
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      throw new Error(`translation_provider_http_${response.status}${text ? `: ${text.slice(0, 240)}` : ""}`);
+    }
+    const body = await response.json() as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const content = body.choices?.[0]?.message?.content;
+    const translated = typeof content === "string" ? parseProviderTranslation(content) : "";
+    if (!translated) throw new Error("translation_provider_empty_content");
+    return translated;
+  } catch (error) {
+    if (isAbortError(error)) throw new Error("translation_provider_timeout");
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
+const translateWithSelectedBackend = async (input: {
+  text: string;
+  targetLanguage: string;
+  sourceLanguage: string | null;
+  selectedBackendProvider: string | null;
+  env: NodeJS.ProcessEnv;
+}): Promise<{ translatedText: string; deterministic: boolean }> => {
+  if (input.selectedBackendProvider === "live_translation.openai_compatible") {
+    return {
+      translatedText: await runOpenAiCompatibleTranslation({
+        text: input.text,
+        sourceLanguage: input.sourceLanguage,
+        targetLanguage: input.targetLanguage,
+        env: input.env,
+      }),
+      deterministic: false,
+    };
+  }
+  return {
+    translatedText: deterministicTranslate({
+      text: input.text,
+      targetLanguage: input.targetLanguage,
+    }),
+    deterministic: true,
+  };
+};
+
 const buildLaneObservationPacket = (input: {
   turnId: string;
   iteration: number;
@@ -104,8 +234,18 @@ const buildLaneObservationPacket = (input: {
   backendSelectionDecision: HelixCapabilityLaneBackendSelectionDecision;
   chunk?: {
     laneSessionId: string | null;
+    sessionControlKey: string | null;
+    sourceBindingKey: string | null;
+    sourceIdentityKey: string | null;
+    latestSourceIdentityKey: string | null;
+    latestObservationKey: string | null;
+    latestMailLoopObservationKey: string | null;
+    goalBindingId: string | null;
+    goalBindingKey: string | null;
     sourceId: string;
     sourceHash: string | null;
+    sourceKind: string | null;
+    accountLocale: string | null;
     chunkId: string;
     chunkIndex: number | null;
     dedupeKey: string;
@@ -145,8 +285,18 @@ const buildLaneObservationPacket = (input: {
     ? {
         live_translation_chunk: {
           lane_session_id: input.chunk.laneSessionId,
+          session_control_key: input.chunk.sessionControlKey,
+          source_binding_key: input.chunk.sourceBindingKey,
+          source_identity_key: input.chunk.sourceIdentityKey,
+          latest_source_identity_key: input.chunk.latestSourceIdentityKey,
+          latest_observation_key: input.chunk.latestObservationKey,
+          latest_mail_loop_observation_key: input.chunk.latestMailLoopObservationKey,
+          goal_binding_id: input.chunk.goalBindingId,
+          goal_binding_key: input.chunk.goalBindingKey,
           source_id: input.chunk.sourceId,
           source_hash: input.chunk.sourceHash,
+          source_kind: input.chunk.sourceKind,
+          account_locale: input.chunk.accountLocale,
           chunk_id: input.chunk.chunkId,
           chunk_index: input.chunk.chunkIndex,
           dedupe_key: input.chunk.dedupeKey,
@@ -199,8 +349,18 @@ const buildProjectionReceipt = (input: {
   observationRef: string;
   chunk: {
     laneSessionId: string | null;
+    sessionControlKey: string | null;
+    sourceBindingKey: string | null;
+    sourceIdentityKey: string | null;
+    latestSourceIdentityKey: string | null;
+    latestObservationKey: string | null;
+    latestMailLoopObservationKey: string | null;
+    goalBindingId: string | null;
+    goalBindingKey: string | null;
     sourceId: string;
     sourceHash: string | null;
+    sourceKind: string | null;
+    accountLocale: string | null;
     chunkId: string;
     chunkIndex: number | null;
     dedupeKey: string;
@@ -230,6 +390,7 @@ const buildProjectionReceipt = (input: {
       input.chunk.sourceId,
       input.sourceTextHash,
       input.chunk.projectionTarget,
+      input.chunk.accountLocale,
       input.targetLanguage,
       input.chunk.chunkId,
       receiptRef,
@@ -237,6 +398,14 @@ const buildProjectionReceipt = (input: {
     lane_id: "live_translation",
     capability: CAPABILITY_ID,
     lane_session_id: input.chunk.laneSessionId,
+    session_control_key: input.chunk.sessionControlKey,
+    source_binding_key: input.chunk.sourceBindingKey,
+    source_identity_key: input.chunk.sourceIdentityKey,
+    latest_source_identity_key: input.chunk.latestSourceIdentityKey,
+    latest_observation_key: input.chunk.latestObservationKey,
+    latest_mail_loop_observation_key: input.chunk.latestMailLoopObservationKey,
+    goal_binding_id: input.chunk.goalBindingId,
+    goal_binding_key: input.chunk.goalBindingKey,
     selected_backend_provider: input.selectedBackendProvider,
     projection_target: input.chunk.projectionTarget,
     projection_status: input.chunk.cancelRequested
@@ -248,6 +417,8 @@ const buildProjectionReceipt = (input: {
           : "projected",
     source_id: input.chunk.sourceId,
     source_hash: input.chunk.sourceHash,
+    source_kind: input.chunk.sourceKind,
+    account_locale: input.chunk.accountLocale,
     chunk_id: input.chunk.chunkId,
     chunk_index: input.chunk.chunkIndex,
     dedupe_key: input.chunk.dedupeKey,
@@ -265,6 +436,7 @@ const buildProjectionReceipt = (input: {
     terminal_authority_status: input.translatedText === null || input.chunk.cancelRequested
       ? "not_terminal_authority"
       : "pending_helix_terminal_authority",
+    answer_authority: false,
     terminal_eligible: false,
     assistant_answer: false,
     raw_content_included: false,
@@ -286,13 +458,14 @@ const withExecutionTrace = (input: {
   blocked_reason: input.blockedReason ?? input.trace.blocked_reason,
 });
 
-export const runLiveTranslationTranslateText = (input: {
+export const runLiveTranslationTranslateText = async (input: {
   provider: HelixAgentProvider;
   request: HelixLiveTranslationOneShotRequest;
   turnId?: string | null;
   iteration?: number | null;
   env?: NodeJS.ProcessEnv;
-}): HelixLiveTranslationOneShotResult => {
+}): Promise<HelixLiveTranslationOneShotResult> => {
+  const env = input.env ?? process.env;
   const turnId = normalizeText(input.turnId) || normalizeText(input.request.turn_id) || "ask:lane:live_translation";
   const iteration = typeof input.iteration === "number" && Number.isFinite(input.iteration)
     ? Math.max(0, Math.trunc(input.iteration))
@@ -301,8 +474,18 @@ export const runLiveTranslationTranslateText = (input: {
   const targetLanguage = normalizeLanguage(input.request.target_language);
   const sourceLanguage = normalizeLanguage(input.request.source_language) || null;
   const laneSessionId = normalizeOptionalText(input.request.lane_session_id);
+  const sessionControlKey = normalizeOptionalText(input.request.session_control_key);
+  const sourceBindingKey = normalizeOptionalText(input.request.source_binding_key);
+  const sourceIdentityKey = normalizeOptionalText(input.request.source_identity_key);
+  const latestSourceIdentityKey = normalizeOptionalText(input.request.latest_source_identity_key);
+  const latestObservationKey = normalizeOptionalText(input.request.latest_observation_key);
+  const latestMailLoopObservationKey = normalizeOptionalText(input.request.latest_mail_loop_observation_key);
+  const goalBindingId = normalizeOptionalText(input.request.goal_binding_id);
+  const goalBindingKey = normalizeOptionalText(input.request.goal_binding_key);
   const sourceId = normalizeOptionalText(input.request.source_id) ?? "ask_turn";
   const sourceHash = normalizeOptionalText(input.request.source_hash);
+  const sourceKind = normalizeOptionalText(input.request.source_kind);
+  const accountLocale = normalizeOptionalText(input.request.account_locale);
   const chunkId = normalizeOptionalText(input.request.chunk_id) ?? hashShort({
     sourceId,
     text,
@@ -324,8 +507,18 @@ export const runLiveTranslationTranslateText = (input: {
   const freshnessStatus = freshnessStatusFor({ sourceEventMs, observedAtMs });
   const chunk = {
     laneSessionId,
+    sessionControlKey,
+    sourceBindingKey,
+    sourceIdentityKey,
+    latestSourceIdentityKey,
+    latestObservationKey,
+    latestMailLoopObservationKey,
+    goalBindingId,
+    goalBindingKey,
     sourceId,
     sourceHash,
+    sourceKind,
+    accountLocale,
     chunkId,
     chunkIndex,
     dedupeKey,
@@ -340,7 +533,7 @@ export const runLiveTranslationTranslateText = (input: {
     provider: input.provider,
     requestedLane: "live_translation",
     requestedBackendProvider: input.request.requested_backend_provider,
-    env: input.env,
+    env,
   });
 
   const missingRequirements: HelixAgentStepObservationPacket["missing_requirements"] = [];
@@ -450,13 +643,77 @@ export const runLiveTranslationTranslateText = (input: {
     };
   }
 
-  const translatedText = deterministicTranslate({ text, targetLanguage });
+  let translatedText = "";
+  let deterministic = true;
+  try {
+    const translation = await translateWithSelectedBackend({
+      text,
+      targetLanguage,
+      sourceLanguage,
+      selectedBackendProvider: trace.selected_backend_provider,
+      env,
+    });
+    translatedText = translation.translatedText;
+    deterministic = translation.deterministic;
+  } catch (error) {
+    const failReason = error instanceof Error ? error.message : "translation_provider_failed";
+    const observationRef = `${turnId}:capability_lane:${CAPABILITY_ID}:${hashShort({
+      status: "provider_failed",
+      failReason,
+      targetLanguage,
+      sourceId,
+      chunkId,
+    })}`;
+    const projectionReceipt = buildProjectionReceipt({
+      observationRef,
+      chunk,
+      targetLanguage,
+      sourceTextHash: hashShort(text),
+      sourceTextCharCount: text.length,
+      translatedText: null,
+      selectedBackendProvider: trace.selected_backend_provider,
+    });
+    const packet = buildLaneObservationPacket({
+      turnId,
+      iteration,
+      status: "failed",
+      summary: `Translation provider failed: ${failReason}.`,
+      observationRef,
+      backendSelectionDecision: trace.backend_selection_decision,
+      chunk,
+      projectionReceipt,
+    });
+    return {
+      schema: HELIX_LIVE_TRANSLATION_ONE_SHOT_RESULT_SCHEMA,
+      ok: false,
+      lane_id: "live_translation",
+      capability: CAPABILITY_ID,
+      selected_runtime_agent_provider: input.provider.id,
+      lane_resolve_trace: withExecutionTrace({
+        trace,
+        observationRef,
+        receiptRef: projectionReceipt.receipt_ref,
+        status: "not_executed_shadow_only",
+        blockedReason: failReason,
+      }),
+      observation: null,
+      observation_packet: packet,
+      artifact_refs: packet.produced_artifact_refs,
+      error: failReason,
+      reentry_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
   const observationRef = `${turnId}:capability_lane:${CAPABILITY_ID}:${hashShort({
     text,
     targetLanguage,
     sourceLanguage,
     sourceId,
     sourceHash,
+    sourceKind,
+    accountLocale,
     chunkId,
     chunkIndex,
     dedupeKey,
@@ -475,10 +732,20 @@ export const runLiveTranslationTranslateText = (input: {
     selection_reason: trace.selection_reason,
     backend_selection_decision: trace.backend_selection_decision,
     lane_session_id: laneSessionId,
+    session_control_key: sessionControlKey,
+    source_binding_key: sourceBindingKey,
+    source_identity_key: sourceIdentityKey,
+    latest_source_identity_key: latestSourceIdentityKey,
+    latest_observation_key: latestObservationKey,
+    latest_mail_loop_observation_key: latestMailLoopObservationKey,
+    goal_binding_id: goalBindingId,
+    goal_binding_key: goalBindingKey,
     source_language: sourceLanguage,
     target_language: targetLanguage,
     source_id: sourceId,
     source_hash: sourceHash,
+    source_kind: sourceKind,
+    account_locale: accountLocale,
     chunk_id: chunkId,
     chunk_index: chunkIndex,
     dedupe_key: dedupeKey,
@@ -491,7 +758,7 @@ export const runLiveTranslationTranslateText = (input: {
     source_text_hash: hashShort(text),
     source_text_char_count: text.length,
     translated_text: translatedText,
-    deterministic: true,
+    deterministic,
     confidence: 0.62,
     reentry_required: true,
     terminal_authority_status: "pending_helix_terminal_authority",
