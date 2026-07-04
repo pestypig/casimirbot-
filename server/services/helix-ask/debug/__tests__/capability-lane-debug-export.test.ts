@@ -999,7 +999,7 @@ describe("capability lane debug export fields", () => {
             capability: "text_to_speech.speak_text",
             ok: true,
             receipt: {
-              playback_status: "started",
+              playback_status: "pending",
               assistant_answer: false,
               terminal_eligible: false,
             },
@@ -1043,7 +1043,7 @@ describe("capability lane debug export fields", () => {
               text_to_speech_receipt: {
                 schema: "helix.text_to_speech.receipt.v1",
                 receipt_ref: "receipt:voice",
-                playback_status: "started",
+                playback_status: "pending",
                 assistant_answer: false,
                 terminal_eligible: false,
               },
@@ -1182,7 +1182,7 @@ describe("capability lane debug export fields", () => {
         capability: "text_to_speech.speak_text",
         ok: true,
         receipt: expect.objectContaining({
-          playback_status: "started",
+          playback_status: "pending",
           terminal_eligible: false,
           assistant_answer: false,
         }),
@@ -1215,7 +1215,7 @@ describe("capability lane debug export fields", () => {
         state_delta: expect.objectContaining({
           text_to_speech_receipt: expect.objectContaining({
             receipt_ref: "receipt:voice",
-            playback_status: "started",
+            playback_status: "pending",
             terminal_eligible: false,
             assistant_answer: false,
           }),

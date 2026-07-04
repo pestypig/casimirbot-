@@ -263,7 +263,7 @@ export const runTextToSpeechSpeakText = (input: {
   };
   const clientPlaybackHandoff = {
     schema: "helix.interim_voice_callout_tool_result.v1",
-    ok: playbackStatus !== "blocked" && playbackStatus !== "unavailable",
+    ok: playbackStatus === "pending" || playbackStatus === "played",
     request: backend.request,
     receipt: backend.receipt,
     assistant_answer: false,

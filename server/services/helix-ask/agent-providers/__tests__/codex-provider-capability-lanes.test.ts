@@ -765,7 +765,7 @@ describe("Codex provider capability lane adapter", () => {
           terminal_eligible: false,
           raw_content_included: false,
           receipt: expect.objectContaining({
-            playback_status: expect.stringMatching(/^(started|unavailable)$/),
+            playback_status: expect.stringMatching(/^(pending|blocked)$/),
             terminal_eligible: false,
             assistant_answer: false,
           }),
@@ -820,7 +820,7 @@ describe("Codex provider capability lane adapter", () => {
           raw_content_included: false,
           state_delta: expect.objectContaining({
             text_to_speech_receipt: expect.objectContaining({
-              playback_status: expect.stringMatching(/^(started|unavailable)$/),
+              playback_status: expect.stringMatching(/^(pending|blocked)$/),
               terminal_eligible: false,
               assistant_answer: false,
             }),
