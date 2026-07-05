@@ -1829,6 +1829,355 @@ describe("Codex provider capability lane adapter", () => {
     }
   });
 
+  it("bridges scientific Image Lens sidecars into Theory Badge Graph when reflection is requested", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    const previousExtractionFixtures = process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        "The scientific image sidecar was reflected through the Theory Badge Graph observation.",
+      ],
+    });
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([
+      {
+        region_label: "scientific_page",
+        text_candidate: "Bianchi identities as field equations for the Weyl tensor.",
+        latex_candidate: "\\nabla^{AA'}\\psi_{ABCD}=0",
+        extraction_status: "extracted",
+        uncertainty: ["fixture-backed OCR/math candidate"],
+      },
+    ]);
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-image-sidecar-theory-bridge",
+          question: "Here is a scientific document image. Extract the equations and compare them to the theory badge graph.",
+          source_target_intent: {
+            schema: "helix.ask_source_target_intent.v1",
+            target_source: "scientific_image_evidence",
+            target_kind: "scientific_image_evidence_sidecar",
+            requested_outputs: [
+              "image_lens_crop_observation",
+              "scientific_evidence_packet",
+              "scientific_evidence_sidecar",
+              "theory_reflection",
+              "calculator_payload_filter",
+              "typed_failure",
+            ],
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          mandatory_next_tool: {
+            schema: "helix.mandatory_next_tool.v1",
+            tool_name: "visual_analysis.inspect_image_region",
+            missing_required_evidence: "scientific_evidence_sidecar",
+            terminal_forbidden: true,
+          },
+          workspace_context_snapshot: {
+            activePanel: "image-lens",
+          },
+          turn_input_items: [
+            {
+              type: "image",
+              image_ref: "visual_evidence:scientific-image-sidecar-bridge",
+              image_base64: "test-image",
+              mime_type: "image/png",
+              file_name: "scientific-page.png",
+              evidence_id: "visual_evidence:scientific-image-sidecar-bridge",
+              width_px: 346,
+              height_px: 372,
+              raw_image_included: false,
+            },
+          ],
+        },
+      });
+      const debug = result.debug as Record<string, any>;
+      const gatewayResults = debug.workstation_gateway_call_results as Array<Record<string, any>>;
+      const theoryResult = gatewayResults.find((entry) =>
+        entry.capability_id === "theory-badge-graph.reflect_discussion_context"
+      );
+
+      expect(result).toMatchObject({
+        ok: true,
+        answer: "The scientific image sidecar was reflected through the Theory Badge Graph observation.",
+      });
+      expect(theoryResult).toBeTruthy();
+      expect(theoryResult?.observation).toMatchObject({
+        scientific_evidence_source: "sidecar",
+        scientific_evidence_sidecar: {
+          schema: "helix.scientific_image_evidence_sidecar.v1",
+          sidecar_id: "turn-codex-scientific-image-sidecar-theory-bridge:scientific_image_evidence_sidecar",
+          packet_count: 8,
+          admissibility: {
+            status: "admissible_observation",
+          },
+        },
+        scientific_branch_gate: {
+          status: expect.stringMatching(/admitted|restricted/),
+          primary_domain: "weyl_bianchi",
+        },
+      });
+      expect(debug.current_turn_artifact_ledger).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          kind: "scientific_image_evidence_sidecar",
+          artifact_id: expect.stringContaining(":scientific_image_sidecar"),
+          sidecar_id: expect.stringContaining(":scientific_image_sidecar"),
+          memory_kind: "transient_scientific_image_evidence",
+          retrieval_tags: expect.arrayContaining(["scientific_image", "image_lens", "weyl_bianchi"]),
+          primary_domain: "weyl_bianchi",
+          admissibility_status: "admissible_observation",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        }),
+      ]));
+      expect(debug.runtime_lane_request_loop).toMatchObject({
+        scientific_image_sidecar_gateway_bridge: {
+          status: "completed",
+          capability_id: "theory-badge-graph.reflect_discussion_context",
+          result_count: 1,
+        },
+      });
+    } finally {
+      if (previousStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      }
+      if (previousStdoutSequence === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      }
+      if (previousCallIndex === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      } else {
+        process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      }
+      if (previousExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      }
+      if (previousExtractionFixtures === undefined) {
+        delete process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+      } else {
+        process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = previousExtractionFixtures;
+      }
+    }
+  });
+
+  it("blocks scientific Image Lens theory reflection when the sidecar is inadmissible", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    const previousExtractionFixtures = process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        "The image evidence sidecar was not admissible, so graph reflection was blocked.",
+      ],
+    });
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([
+      {
+        region_label: "scientific_page",
+        extraction_status: "failed",
+        uncertainty: ["fixture intentionally returned no OCR or math candidate"],
+      },
+    ]);
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-image-sidecar-theory-blocked",
+          question: "Here is a scientific document image. Extract the equations and compare them to the theory badge graph.",
+          source_target_intent: {
+            schema: "helix.ask_source_target_intent.v1",
+            target_source: "scientific_image_evidence",
+            target_kind: "scientific_image_evidence_sidecar",
+            requested_outputs: [
+              "image_lens_crop_observation",
+              "scientific_evidence_packet",
+              "scientific_evidence_sidecar",
+              "theory_reflection",
+              "calculator_payload_filter",
+              "typed_failure",
+            ],
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          mandatory_next_tool: {
+            schema: "helix.mandatory_next_tool.v1",
+            tool_name: "visual_analysis.inspect_image_region",
+            missing_required_evidence: "scientific_evidence_sidecar",
+            terminal_forbidden: true,
+          },
+          workspace_context_snapshot: {
+            activePanel: "image-lens",
+          },
+          turn_input_items: [
+            {
+              type: "image",
+              image_ref: "visual_evidence:scientific-image-sidecar-blocked",
+              image_base64: "test-image",
+              mime_type: "image/png",
+              file_name: "scientific-page.png",
+              evidence_id: "visual_evidence:scientific-image-sidecar-blocked",
+              width_px: 346,
+              height_px: 372,
+              raw_image_included: false,
+            },
+          ],
+        },
+      });
+      const debug = result.debug as Record<string, any>;
+      const gatewayResults = debug.workstation_gateway_call_results as Array<Record<string, any>>;
+
+      expect(result).toMatchObject({
+        ok: true,
+        answer: "The image evidence sidecar was not admissible, so graph reflection was blocked.",
+      });
+      expect(gatewayResults.some((entry) =>
+        entry.capability_id === "theory-badge-graph.reflect_discussion_context"
+      )).toBe(false);
+      expect(debug.runtime_lane_request_loop).toMatchObject({
+        scientific_image_sidecar_gateway_bridge: {
+          status: "blocked",
+          capability_id: "theory-badge-graph.reflect_discussion_context",
+          result_count: 0,
+          blocked_reason: "scientific_image_evidence_sidecar_not_admissible",
+          sidecar_admissibility_status: "inadmissible_for_exact_mapping",
+        },
+      });
+    } finally {
+      if (previousStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      }
+      if (previousStdoutSequence === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      }
+      if (previousCallIndex === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      } else {
+        process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      }
+      if (previousExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      }
+      if (previousExtractionFixtures === undefined) {
+        delete process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+      } else {
+        process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = previousExtractionFixtures;
+      }
+    }
+  });
+
+  it("blocks scientific image theory reflection when no image sidecar can be materialized", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        "No image evidence sidecar was available, so graph reflection was blocked.",
+      ],
+    });
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-image-sidecar-theory-missing",
+          question: "Here is a scientific document image. Extract the equations and compare them to the theory badge graph.",
+          source_target_intent: {
+            schema: "helix.ask_source_target_intent.v1",
+            target_source: "scientific_image_evidence",
+            target_kind: "scientific_image_evidence_sidecar",
+            requested_outputs: [
+              "image_lens_crop_observation",
+              "scientific_evidence_packet",
+              "scientific_evidence_sidecar",
+              "theory_reflection",
+              "calculator_payload_filter",
+              "typed_failure",
+            ],
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          mandatory_next_tool: {
+            schema: "helix.mandatory_next_tool.v1",
+            tool_name: "visual_analysis.inspect_image_region",
+            missing_required_evidence: "scientific_evidence_sidecar",
+            terminal_forbidden: true,
+          },
+          workspace_context_snapshot: {
+            activePanel: "image-lens",
+          },
+        },
+      });
+      const debug = result.debug as Record<string, any>;
+      const gatewayResults = debug.workstation_gateway_call_results as Array<Record<string, any>>;
+
+      expect(result).toMatchObject({
+        ok: true,
+        answer: "No image evidence sidecar was available, so graph reflection was blocked.",
+      });
+      expect(debug.capability_lane_call_results ?? []).toEqual([]);
+      expect(gatewayResults.some((entry) =>
+        entry.capability_id === "theory-badge-graph.reflect_discussion_context"
+      )).toBe(false);
+      expect(debug.runtime_lane_request_loop).toMatchObject({
+        scientific_image_sidecar_gateway_bridge: {
+          status: "blocked",
+          capability_id: "theory-badge-graph.reflect_discussion_context",
+          result_count: 0,
+          blocked_reason: "scientific_image_evidence_sidecar_missing",
+        },
+      });
+    } finally {
+      if (previousStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      }
+      if (previousStdoutSequence === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      }
+      if (previousCallIndex === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      } else {
+        process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      }
+      if (previousExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      }
+    }
+  });
+
   it("reports Image Lens observations when the post-observation provider response leaks prompt instructions", async () => {
     const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
     const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
@@ -1904,9 +2253,9 @@ describe("Codex provider capability lane adapter", () => {
         response_type: "final_answer",
       });
       expect(result.answer).toContain("**equation_area**");
-      expect(result.answer).toContain("latex_candidate: E = mc^2");
+      expect(result.answer).toContain("- latex_candidate:\n```latex\nE = mc^2\n```");
       expect(result.answer).toContain("**caption_text**");
-      expect(result.answer).toContain("text_candidate: As in Chapter 2 we use the Bianchi identities...");
+      expect(result.answer).toContain("- text_candidate:\n```text\nAs in Chapter 2 we use the Bianchi identities...\n```");
       expect(result.answer).toContain("inline image/png crop data redacted");
       expect(result.answer).not.toContain("data:image");
       expect(result.provider_prompt_leak_guard).toMatchObject({
@@ -1916,6 +2265,104 @@ describe("Codex provider capability lane adapter", () => {
       expect(visibleAndRawText).not.toContain("Available Helix workstation gateway capabilities");
       expect(visibleAndRawText).not.toContain("model_visible_capability_lane_manifest");
       expect(result.answer).not.toContain("No visual observation receipt was produced");
+    } finally {
+      if (previousStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      }
+      if (previousStdoutSequence === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      }
+      if (previousCallIndex === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      } else {
+        process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      }
+      if (previousExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      }
+      if (previousExtractionFixtures === undefined) {
+        delete process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+      } else {
+        process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = previousExtractionFixtures;
+      }
+    }
+  });
+
+  it("recovers scientific document image extraction prompts from post-observation provider prompt leaks", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    const previousExtractionFixtures = process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        'HELIX_CAPABILITY_LANE_REQUEST_JSON: {"capability":"visual_analysis.inspect_image_region","bbox_px":{"x":0,"y":0,"width":1,"height":1},"question":"Extract scientific document image evidence.","region_label":"scientific_page","reason_for_crop":"Scientific document image evidence extraction.","assistant_answer":false,"terminal_eligible":false}',
+        "model_visible_capability_lane_manifest Available Helix workstation gateway capabilities: visual_analysis.inspect_image_region Before giving a final answer, decide whether the user request needs a one-shot capability lane.",
+      ],
+    });
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([
+      {
+        region_label: "scientific_page",
+        text_candidate: "As in Chapter 2 we use the Bianchi identities as field equations for the Weyl tensor.",
+        latex_candidate: "\\nabla^{AA'}\\psi_{ABCD}=0",
+        extraction_status: "extracted",
+        uncertainty: ["fixture-backed scientific image extraction"],
+      },
+    ]);
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-document-image-post-observation-leak",
+          question: [
+            "Here is a scientific document image.",
+            "Extract the visible text, equations, equation labels, LaTeX candidates, symbols, bbox/crop refs, confidence, and uncertainty.",
+            "Do not compare to the Theory Badge Graph yet.",
+          ].join(" "),
+          workspace_context_snapshot: {
+            activePanel: "image-lens",
+          },
+          turn_input_items: [
+            {
+              type: "image",
+              image_ref: "visual_evidence:scientific-document-image",
+              image_base64: "test-image",
+              mime_type: "image/png",
+              file_name: "scientific-document.png",
+              evidence_id: "visual_evidence:scientific-document-image",
+              width_px: 346,
+              height_px: 372,
+              raw_image_included: false,
+            },
+          ],
+        },
+      });
+
+      expect(result).toMatchObject({
+        ok: true,
+        response_type: "final_answer",
+        final_answer_source: "provider_image_lens_observation_report",
+        terminal_artifact_kind: "image_lens_observation_report",
+      });
+      expect(result.answer).toContain("**scientific_page**");
+      expect(result.answer).toContain("Bbox: x=0, y=0, width=346, height=372");
+      expect(result.answer).toContain("Extraction status: extracted");
+      expect(result.answer).toContain("\\nabla^{AA'}\\psi_{ABCD}=0");
+      expect(result.answer).not.toContain("No visual observation receipt was produced");
+      expect(result.provider_prompt_leak_guard).toMatchObject({
+        status: "recovered_with_image_lens_observation_report",
+        recovered_with_observation_only_image_lens_report: true,
+      });
     } finally {
       if (previousStdout === undefined) {
         delete process.env.CODEX_AGENT_FAKE_STDOUT;

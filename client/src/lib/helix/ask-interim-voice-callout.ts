@@ -68,6 +68,14 @@ const readInterimVoiceRecord = (value: unknown): Record<string, unknown> | null 
 const readInterimVoiceString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
+const readInterimVoiceBoolean = (value: unknown): boolean | null =>
+  typeof value === "boolean" ? value : null;
+
+const readInterimVoiceStringList = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.map(readInterimVoiceString).filter((text): text is string => Boolean(text))
+    : [];
+
 const isInterimVoiceAuthoritySafe = (record: Record<string, unknown>): boolean =>
   record.assistant_answer === false &&
   record.terminal_eligible === false &&
@@ -103,6 +111,11 @@ export const buildInterimVoiceReceiptPlaybackIntent = (
   const utteranceId = readInterimVoiceString(delivery?.utteranceId) ?? readInterimVoiceString(delivery?.utterance_id);
   const receiptKey = utteranceId ?? receiptId;
   const requestedPlaybackKind = readInterimVoiceString(request.voicePlaybackKind);
+  const reasonCodes = readInterimVoiceStringList(request.reasonCodes);
+  const requestAllowMicOffPlayback = readInterimVoiceBoolean(request.allowMicOffPlayback);
+  const allowMicOffPlayback =
+    requestAllowMicOffPlayback ??
+    (reasonCodes.includes("capability_lane_text_to_speech_speak_text") ? true : undefined);
   const playbackKind =
     requestedPlaybackKind === "translation_relay" || calloutKind === "translation_relay"
       ? "translation_relay"
@@ -128,6 +141,7 @@ export const buildInterimVoiceReceiptPlaybackIntent = (
     interimVoiceReceiptId: receiptId,
     interimVoiceReceiptKey: receiptKey,
     interimVoiceCalloutKind: calloutKind,
+    allowMicOffPlayback,
   };
 };
 
@@ -187,19 +201,20 @@ export function buildInterimVoiceClientHandoffDebug(input: {
   allowMicOffPlayback?: boolean | null;
 }): InterimVoiceClientHandoffDebug {
   const micArmed = input.micArmState === "on";
+  const allowMicOffPlayback = input.allowMicOffPlayback ?? null;
   return {
     schema: "helix.interim_voice_client_handoff_debug.v1",
     micArmState: input.micArmState,
     voiceMode: input.voiceMode ?? null,
     micArmed,
     outputModeEnabled: input.outputModeEnabled,
-    outputArmed: micArmed || input.outputModeEnabled,
+    outputArmed: input.outputModeEnabled || allowMicOffPlayback === true,
     requestId: input.intent.requestId,
     receiptId: input.intent.receiptId,
     receiptKey: input.intent.receiptKey,
     calloutKind: input.intent.calloutKind,
     playbackKind: input.intent.kind,
-    allowMicOffPlayback: input.allowMicOffPlayback ?? null,
+    allowMicOffPlayback,
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,

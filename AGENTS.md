@@ -16,6 +16,34 @@ This repo uses `WARP_AGENTS.md` for warp-physics constraints and required tests.
 Always read and follow those requirements when working on warp/GR features.
 For deterministic G4 debugging workflow, also follow `AGENT_PLAYBOOK.md`.
 
+## Account/workstation access contract
+
+CasimirBot has two workstation account modes: `developer` and `user`.
+`developer` is the full development surface and should remain the superset of
+all current panels, workstation actions, runtime controls, and experimental
+features. `user` is a public-release permission layer over that system; it is
+not a separate development target and must not become the only place a feature
+is reachable.
+
+No sign-in / no session is treated as `user`. New panels, tools, runtime
+controls, or unfinished workflows should remain visible and usable to
+`developer` accounts by default, then be added to the `user` policy only when
+they are stable enough for the public workstation. User-facing locks and hidden
+launch entries are presentation guidance only; server-side account policy is
+the access boundary.
+
+Primary policy locations:
+- Shared policy shape and panel/tool allowlists:
+  `shared/helix-account-session.ts`
+- Session defaults and account-type assignment:
+  `server/services/helix-account/account-session-store.ts`
+- Backend tool/action enforcement:
+  `server/routes/agi.workstation-tool-gateway.ts`
+- Workstation launch and direct-panel lock behavior:
+  `client/src/components/workstation/WorkstationPanelTabs.tsx`,
+  `client/src/components/workstation/WorkstationPanelHost.tsx`, and
+  `client/src/pages/mobile-start.tsx`
+
 ## Casimir verification gate
 
 Run Casimir verification when the patch touches warp/GR physics, adapter

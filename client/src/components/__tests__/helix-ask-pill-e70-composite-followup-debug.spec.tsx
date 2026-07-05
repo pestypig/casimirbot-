@@ -87,9 +87,12 @@ describe("HelixAskPill E70 composite follow-up debug export", () => {
     );
 
     expect(exported.active_turn_id).toBe("ask:e70-server");
-    expect(exported.backend_debug_response_ref).toBeUndefined();
-    expect(exported.debug_export_source).toBe("client_projection");
-    expect(exported.backend_debug_response_status).toBe("not_advertised");
+    expect(exported.backend_debug_response_ref).toEqual({
+      endpoint: "/api/agi/ask/turn/ask%3Ae70-server/debug-export",
+      turn_id: "ask:e70-server",
+    });
+    expect(exported.debug_export_source).toBe("embedded_backend_payload");
+    expect(exported.backend_debug_response_status).toBe("embedded_payload");
     expect(exported.composite_subgoal_reference_intent?.reference_kind).toBe("that_result");
     expect(exported.composite_subgoal_binding?.binding_status).toBe("ambiguous");
     expect(exported.pending_server_request?.item_id).toBe("item:e70");

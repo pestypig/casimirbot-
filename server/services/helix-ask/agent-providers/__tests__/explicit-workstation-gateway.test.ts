@@ -1449,6 +1449,8 @@ describe("explicit workstation gateway derived calls", () => {
           workspace_context_snapshot: {
             activePanel: "docs-viewer",
             activeDocPath: "docs/helix-ask-flow.md",
+            activeTranslationAccountLocale: "es-MX",
+            activeTranslationTargetLanguage: "es",
             activeTranslationBlocks: [{
               unit_id: "doc-unit:1",
               translated_text: "Translated sentence.",
@@ -1479,6 +1481,8 @@ describe("explicit workstation gateway derived calls", () => {
           workspace_context_snapshot: {
             activePanel: "docs-viewer",
             activeDocPath: "docs/helix-ask-flow.md",
+            activeTranslationAccountLocale: "es-MX",
+            activeTranslationTargetLanguage: "es",
             activeTranslationBlocks: [{
               unit_id: "doc-unit:1",
               translated_text: "Translated sentence.",
@@ -1489,6 +1493,15 @@ describe("explicit workstation gateway derived calls", () => {
       });
 
       expect(capabilities(requests)).toContain("docs-viewer.read_active_translation");
+      const translationRequest = requests.find((request) => request.capability_id === "docs-viewer.read_active_translation");
+      expect(translationRequest?.arguments).toMatchObject({
+        account_locale: "es-MX",
+        target_language: "es",
+        source_target_intent: {
+          account_locale: "es-MX",
+          target_language: "es",
+        },
+      });
     }
   });
 
@@ -1546,6 +1559,8 @@ describe("explicit workstation gateway derived calls", () => {
       workspace_context_snapshot: {
         activePanel: "docs-viewer",
         activeDocPath: "docs/helix-ask-flow.md",
+        activeTranslationAccountLocale: "es-MX",
+        activeTranslationTargetLanguage: "es",
         activeTranslationBlocks: [{
           unit_id: "doc-unit:1",
           source_text: "Helix Ask flow",
@@ -1574,6 +1589,10 @@ describe("explicit workstation gateway derived calls", () => {
       observation: {
         schema: "helix.workstation_readable_surface_observation.v1",
         text: "Flujo de Helix Ask",
+        translation: {
+          account_locale: "es-MX",
+          target_language: "es",
+        },
         terminal_eligible: false,
         assistant_answer: false,
       },

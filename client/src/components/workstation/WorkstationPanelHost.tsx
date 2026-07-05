@@ -58,7 +58,7 @@ export function WorkstationPanelHost({ panelId }: { panelId: string }) {
   if (!def || !LazyPanel) {
     return (
       <div className="p-4 text-sm text-slate-400">
-        Panel not found: {panelId}
+        {t("workstation.panel.notFound", { panelId })}
       </div>
     );
   }
@@ -76,9 +76,11 @@ export function WorkstationPanelHost({ panelId }: { panelId: string }) {
               <Lock className="h-5 w-5" aria-hidden="true" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-sm font-semibold text-amber-50">{panelTitle} is locked</h2>
+              <h2 className="text-sm font-semibold text-amber-50">
+                {t("workstation.panel.lockedTitle", { title: panelTitle })}
+              </h2>
               <p className="mt-2 text-sm leading-6 text-amber-100/80">
-                This workstation feature is reserved for developer mode or is still under construction for user profiles.
+                {t("workstation.panel.lockedDescription")}
               </p>
               {panelAccess.reason ? (
                 <p className="mt-3 text-xs text-amber-100/60">{panelAccess.reason}</p>
@@ -110,7 +112,7 @@ export function WorkstationPanelHost({ panelId }: { panelId: string }) {
         fallback={
           <HelixLoadingMark
             title={t("workstation.panel.loadingTitle", { title: panelTitle })}
-            detail="Preparing panel workspace"
+            detail={t("workstation.panel.loadingDetail")}
             compact
           />
         }

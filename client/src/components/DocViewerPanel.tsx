@@ -456,9 +456,10 @@ export function DocViewerPanel() {
   } = useDocViewerStore();
   const { userSettings } = useHelixStartSettings();
   const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const documentTranslationAccountLocale = interfaceLanguage.bcp47;
   const documentTranslationTargetLanguage = React.useMemo(
-    () => resolveDocumentTranslationTargetLanguage(interfaceLanguage.code),
-    [interfaceLanguage.code],
+    () => resolveDocumentTranslationTargetLanguage(documentTranslationAccountLocale),
+    [documentTranslationAccountLocale],
   );
   const { t } = useInterfaceText(interfaceLanguage.code);
   const [query, setQuery] = React.useState("");
@@ -525,14 +526,14 @@ export function DocViewerPanel() {
           sourceHash: rawMarkdownSourceHash,
           sourceTextHash: rawMarkdownSourceHash,
           sourceTextCharCount: rawMarkdown.length,
-          accountLocale: interfaceLanguage.code,
+          accountLocale: documentTranslationAccountLocale,
           targetLanguage: documentTranslationTargetLanguage,
         })
         : null,
     [
       currentEntry,
       documentTranslationTargetLanguage,
-      interfaceLanguage.code,
+      documentTranslationAccountLocale,
       rawMarkdown.length,
       rawMarkdownSourceHash,
       translationEligible,
@@ -544,7 +545,7 @@ export function DocViewerPanel() {
       currentEntry && liveTranslationProjectionEligible
         ? readDocumentLiveTranslationProjectionSnapshot({
           docPath: currentEntry.relativePath,
-          locale: interfaceLanguage.code,
+          locale: documentTranslationAccountLocale,
           sourceHash: rawMarkdownSourceHash,
           projectionTarget: HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
         })
@@ -585,14 +586,14 @@ export function DocViewerPanel() {
       regionId: hoveredVisibleText.hoverRef,
       docPath: currentEntry.relativePath,
       chunkId: hoveredVisibleText.hoverRef,
-      accountLocale: interfaceLanguage.code,
+      accountLocale: documentTranslationAccountLocale,
       targetLanguage: documentTranslationTargetLanguage,
     });
   }, [
     currentEntry,
     documentTranslationTargetLanguage,
+    documentTranslationAccountLocale,
     hoveredVisibleText,
-    interfaceLanguage.code,
     visibleTranslationProjections,
   ]);
   const selectedTranslationProjection = React.useMemo(() => {
@@ -604,13 +605,13 @@ export function DocViewerPanel() {
       regionId: selectedVisibleText.selectionRef,
       docPath: currentEntry.relativePath,
       chunkId: selectedVisibleText.selectionRef,
-      accountLocale: interfaceLanguage.code,
+      accountLocale: documentTranslationAccountLocale,
       targetLanguage: documentTranslationTargetLanguage,
     });
   }, [
     currentEntry,
     documentTranslationTargetLanguage,
-    interfaceLanguage.code,
+    documentTranslationAccountLocale,
     selectedVisibleText,
     visibleTranslationProjections,
   ]);
@@ -627,7 +628,7 @@ export function DocViewerPanel() {
       regionId: DOC_VIEWER_TRANSLATE_BUTTON_REGION_ID,
       docPath: currentEntry.relativePath,
       sourceId: DOC_VIEWER_TRANSLATE_BUTTON_SOURCE_ID,
-      accountLocale: interfaceLanguage.code,
+      accountLocale: documentTranslationAccountLocale,
       targetLanguage: documentTranslationTargetLanguage,
     });
     const existingTitleProjection = selectHelixAccountLanguageTranslationProjection({
@@ -636,7 +637,7 @@ export function DocViewerPanel() {
       regionId: DOC_VIEWER_TITLE_TRANSLATION_REGION_ID,
       docPath: currentEntry.relativePath,
       sourceId: DOC_VIEWER_TITLE_TRANSLATION_SOURCE_ID,
-      accountLocale: interfaceLanguage.code,
+      accountLocale: documentTranslationAccountLocale,
       targetLanguage: documentTranslationTargetLanguage,
     });
     return [
@@ -681,6 +682,7 @@ export function DocViewerPanel() {
     accountLanguageTranslationProjections,
     currentEntry,
     documentTranslationTargetLanguage,
+    documentTranslationAccountLocale,
     inlineTranslationEnabled,
     interfaceLanguage.code,
     t,
@@ -692,17 +694,17 @@ export function DocViewerPanel() {
       translationEligible && currentEntry && rawMarkdownSourceHash
         ? [
           currentEntry.relativePath,
-          interfaceLanguage.code,
+          documentTranslationAccountLocale,
           documentTranslationTargetLanguage,
           rawMarkdownSourceHash,
-          activeLiveTranslationSourceIdentityKey ?? "no-source-identity",
+      activeLiveTranslationSourceIdentityKey ?? "no-source-identity",
         ].join(":")
         : null,
     [
       activeLiveTranslationSourceIdentityKey,
       currentEntry,
+      documentTranslationAccountLocale,
       documentTranslationTargetLanguage,
-      interfaceLanguage.code,
       rawMarkdownSourceHash,
       translationEligible,
     ],
@@ -728,15 +730,15 @@ export function DocViewerPanel() {
       sourceHash: rawMarkdownSourceHash,
       sourceTextHash: rawMarkdownSourceHash,
       sourceTextCharCount: rawMarkdown.length,
-      accountLocale: interfaceLanguage.code,
+      accountLocale: documentTranslationAccountLocale,
       targetLanguage: documentTranslationTargetLanguage,
     });
 
     void listDocumentMarkdownTranslationLaneSessions({
       docPath: currentEntry.relativePath,
-      locale: interfaceLanguage.code,
+      locale: documentTranslationAccountLocale,
       targetLanguage: documentTranslationTargetLanguage,
-      accountLocale: interfaceLanguage.code,
+      accountLocale: documentTranslationAccountLocale,
       sourceHash: rawMarkdownSourceHash,
       sourceTextHash: rawMarkdownSourceHash,
       sourceTextCharCount: rawMarkdown.length,
@@ -766,8 +768,8 @@ export function DocViewerPanel() {
     activeLiveTranslationSourceIdentityKey,
     activeTranslationScopeKey,
     currentEntry,
+    documentTranslationAccountLocale,
     documentTranslationTargetLanguage,
-    interfaceLanguage.code,
     rawMarkdown,
     rawMarkdownSourceHash,
     translationEligible,
@@ -862,7 +864,7 @@ export function DocViewerPanel() {
         rawMarkdownSourceHash,
         units: translationUnits,
         existingTranslations: liveTranslationProjectionSnapshot.translations,
-        accountLocale: interfaceLanguage.code,
+        accountLocale: documentTranslationAccountLocale,
         targetLanguage: documentTranslationTargetLanguage,
         uiTextRegions: activeDocVisibleUiTextRegions,
         selectedText: selectedVisibleText?.text ?? null,
@@ -879,8 +881,8 @@ export function DocViewerPanel() {
   }, [
     activeDocVisibleUiTextRegions,
     currentEntry,
+    documentTranslationAccountLocale,
     documentTranslationTargetLanguage,
-    interfaceLanguage.code,
     liveTranslationProjectionSnapshot.translations,
     hoveredTranslationProjection,
     hoveredVisibleText,
@@ -914,7 +916,7 @@ export function DocViewerPanel() {
           units: translationUnits,
           visibleUnitIds,
           existingTranslations: liveTranslationProjectionSnapshot.translations,
-          accountLocale: interfaceLanguage.code,
+          accountLocale: documentTranslationAccountLocale,
           targetLanguage: documentTranslationTargetLanguage,
           uiTextRegions: activeDocVisibleUiTextRegions,
           selectedText: selectedVisibleText?.text ?? null,
@@ -947,8 +949,8 @@ export function DocViewerPanel() {
     activeHtml,
     activeDocVisibleUiTextRegions,
     currentEntry,
+    documentTranslationAccountLocale,
     documentTranslationTargetLanguage,
-    interfaceLanguage.code,
     liveTranslationProjectionSnapshot.translations,
     hoveredTranslationProjection,
     hoveredVisibleText,
@@ -1058,7 +1060,7 @@ export function DocViewerPanel() {
       sourceIdentityKey: activeLiveTranslationSourceIdentityKey,
       sourceTextHash: rawMarkdownSourceHash,
       sourceTextCharCount: rawMarkdown.length,
-      accountLocale: interfaceLanguage.code,
+      accountLocale: documentTranslationAccountLocale,
       targetLanguage: documentTranslationTargetLanguage,
     });
     setInlineTranslationEnabled(stored.enabled);
@@ -1073,8 +1075,8 @@ export function DocViewerPanel() {
   }, [
     activeTranslationScopeKey,
     activeLiveTranslationSourceIdentityKey,
+    documentTranslationAccountLocale,
     documentTranslationTargetLanguage,
-    interfaceLanguage.code,
     rawMarkdown.length,
     rawMarkdownSourceHash,
   ]);
@@ -1087,7 +1089,7 @@ export function DocViewerPanel() {
       sourceIdentityKey: activeLiveTranslationSourceIdentityKey,
       sourceTextHash: rawMarkdownSourceHash,
       sourceTextCharCount: rawMarkdown.length,
-      accountLocale: interfaceLanguage.code,
+      accountLocale: documentTranslationAccountLocale,
       targetLanguage: documentTranslationTargetLanguage,
       translations: inlineTranslations,
     });
@@ -1096,8 +1098,8 @@ export function DocViewerPanel() {
     activeLiveTranslationSourceIdentityKey,
     inlineTranslationEnabled,
     inlineTranslations,
+    documentTranslationAccountLocale,
     documentTranslationTargetLanguage,
-    interfaceLanguage.code,
     rawMarkdown.length,
     rawMarkdownSourceHash,
   ]);
@@ -1140,7 +1142,7 @@ export function DocViewerPanel() {
         capability_lane_projection_receipts: projectionReceipts,
       },
       docPath: currentEntry.relativePath,
-      locale: interfaceLanguage.code,
+      locale: documentTranslationAccountLocale,
       targetLanguage: documentTranslationTargetLanguage,
       sourceHash: rawMarkdownSourceHash,
       units: translationUnits,
@@ -1166,9 +1168,9 @@ export function DocViewerPanel() {
   }, [
     activeTranslationScopeKey,
     currentEntry,
+    documentTranslationAccountLocale,
     documentTranslationTargetLanguage,
     inlineTranslationEnabled,
-    interfaceLanguage.code,
     liveTranslationProjectionEligible,
     rawMarkdownSourceHash,
     translationUnits,
@@ -1181,7 +1183,7 @@ export function DocViewerPanel() {
     return installDocumentLiveTranslationProjectionEventIngestion({
       eventTarget: window,
       docPath: currentEntry.relativePath,
-      locale: interfaceLanguage.code,
+      locale: documentTranslationAccountLocale,
       sourceHash: rawMarkdownSourceHash,
       projectionTarget: HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
       units: translationUnits,
@@ -1189,8 +1191,8 @@ export function DocViewerPanel() {
     });
   }, [
     currentEntry,
+    documentTranslationAccountLocale,
     inlineTranslationEnabled,
-    interfaceLanguage.code,
     liveTranslationProjectionEligible,
     rawMarkdown.length,
     rawMarkdownSourceHash,
@@ -1288,7 +1290,7 @@ export function DocViewerPanel() {
       chunkId,
       chunkIndex,
       laneSessionId,
-      accountLocale: interfaceLanguage.code,
+      accountLocale: documentTranslationAccountLocale,
       targetLanguage: documentTranslationTargetLanguage,
     });
     translationScopeKeyRef.current = scopeKey;
@@ -1308,9 +1310,9 @@ export function DocViewerPanel() {
     try {
       await enqueueDocumentMarkdownTranslationMail({
         docPath: currentEntry.relativePath,
-        locale: interfaceLanguage.code,
+        locale: documentTranslationAccountLocale,
         targetLanguage: documentTranslationTargetLanguage,
-        accountLocale: interfaceLanguage.code,
+        accountLocale: documentTranslationAccountLocale,
         sourceHash: rawMarkdownSourceHash,
         sourceTextHash: pendingTranslationState.sourceTextHash,
         sourceTextCharCount: pendingTranslationState.sourceTextCharCount,
@@ -1360,10 +1362,10 @@ export function DocViewerPanel() {
   }, [
     activeTranslationScopeKey,
     currentEntry,
+    documentTranslationAccountLocale,
     documentTranslationTargetLanguage,
     inlineTranslationEnabled,
     inlineTranslations,
-    interfaceLanguage.code,
     activeLiveTranslationSourceIdentityKey,
     rawMarkdownSourceHash,
     t,
@@ -1730,7 +1732,7 @@ export function DocViewerPanel() {
     const sourceBindingKey = buildDocumentTranslationSourceBindingKey({
       sourceId,
       sourceHash: rawMarkdownSourceHash,
-      accountLocale: interfaceLanguage.code,
+      accountLocale: documentTranslationAccountLocale,
       targetLanguage: documentTranslationTargetLanguage,
     });
     const sourceIdentityKey = buildDocumentTranslationSourceIdentityKey({
@@ -1738,7 +1740,7 @@ export function DocViewerPanel() {
       sourceHash: rawMarkdownSourceHash,
       sourceTextHash: rawMarkdownSourceHash,
       sourceTextCharCount: rawMarkdown.length,
-      accountLocale: interfaceLanguage.code,
+      accountLocale: documentTranslationAccountLocale,
       targetLanguage: documentTranslationTargetLanguage,
     });
     const latestSourceIdentityKey =
@@ -1747,9 +1749,9 @@ export function DocViewerPanel() {
       void runDocumentMarkdownTranslationLaneSessionControl({
         action,
         docPath: currentEntry.relativePath,
-        locale: interfaceLanguage.code,
+        locale: documentTranslationAccountLocale,
         targetLanguage: documentTranslationTargetLanguage,
-        accountLocale: interfaceLanguage.code,
+        accountLocale: documentTranslationAccountLocale,
         sourceHash: rawMarkdownSourceHash,
         sourceTextHash: rawMarkdownSourceHash,
         sourceTextCharCount: rawMarkdown.length,
@@ -1784,7 +1786,7 @@ export function DocViewerPanel() {
           sourceIdentityKey,
           sourceTextHash: rawMarkdownSourceHash,
           sourceTextCharCount: rawMarkdown.length,
-          accountLocale: interfaceLanguage.code,
+          accountLocale: documentTranslationAccountLocale,
           targetLanguage: documentTranslationTargetLanguage,
           translations: inlineTranslations,
         });
@@ -1803,10 +1805,10 @@ export function DocViewerPanel() {
   }, [
     activeTranslationScopeKey,
     currentEntry,
+    documentTranslationAccountLocale,
     documentTranslationTargetLanguage,
     inlineTranslationEnabled,
     inlineTranslations,
-    interfaceLanguage.code,
     liveTranslationProjectionSummary.latestSourceIdentityKey,
     rawMarkdown,
     rawMarkdownSourceHash,
@@ -1822,7 +1824,7 @@ export function DocViewerPanel() {
     const sourceBindingKey = buildDocumentTranslationSourceBindingKey({
       sourceId,
       sourceHash: rawMarkdownSourceHash,
-      accountLocale: interfaceLanguage.code,
+      accountLocale: documentTranslationAccountLocale,
       targetLanguage: documentTranslationTargetLanguage,
     });
     const sourceIdentityKey = buildDocumentTranslationSourceIdentityKey({
@@ -1830,7 +1832,7 @@ export function DocViewerPanel() {
       sourceHash: rawMarkdownSourceHash,
       sourceTextHash: rawMarkdownSourceHash,
       sourceTextCharCount: rawMarkdown.length,
-      accountLocale: interfaceLanguage.code,
+      accountLocale: documentTranslationAccountLocale,
       targetLanguage: documentTranslationTargetLanguage,
     });
     const latestSourceIdentityKey =
@@ -1849,9 +1851,9 @@ export function DocViewerPanel() {
     void runDocumentMarkdownTranslationLaneSessionControl({
       action,
       docPath: currentEntry.relativePath,
-      locale: interfaceLanguage.code,
+      locale: documentTranslationAccountLocale,
       targetLanguage: documentTranslationTargetLanguage,
-      accountLocale: interfaceLanguage.code,
+      accountLocale: documentTranslationAccountLocale,
       sourceHash: rawMarkdownSourceHash,
       sourceTextHash: rawMarkdownSourceHash,
       sourceTextCharCount: rawMarkdown.length,
@@ -1880,8 +1882,8 @@ export function DocViewerPanel() {
   }, [
     activeTranslationScopeKey,
     currentEntry,
+    documentTranslationAccountLocale,
     documentTranslationTargetLanguage,
-    interfaceLanguage.code,
     liveTranslationProjectionSummary.latestLaneSessionId,
     liveTranslationProjectionSummary.latestLaneSessionStatus,
     liveTranslationProjectionSummary.latestSourceIdentityKey,
@@ -1978,7 +1980,7 @@ export function DocViewerPanel() {
             canRejoinLiveRead={false}
             onRejoinLiveRead={rejoinLiveRead}
             translationEligible={translationEligible}
-            translationAccountLocale={interfaceLanguage.code}
+            translationAccountLocale={documentTranslationAccountLocale}
             translationTargetLanguage={documentTranslationTargetLanguage}
             translationSourceId={currentEntry ? documentMarkdownSourceId(currentEntry.relativePath) : null}
             translationSourceHash={rawMarkdownSourceHash}

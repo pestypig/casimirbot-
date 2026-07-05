@@ -72,7 +72,7 @@ workspaceOsRouter.get("/command-reliability/status", async (_req: Request, res: 
 });
 
 workspaceOsRouter.get("/storage/status", async (req: Request, res: Response) => {
-  const accountStatus = getAccountSessionStatus(readHelixSessionCookie(req.headers.cookie));
+  const accountStatus = await getAccountSessionStatus(readHelixSessionCookie(req.headers.cookie));
   const status = await getHelixWorkspaceStorageStatus({
     thread_id: queryString(req.query.thread_id),
     room_id: queryString(req.query.room_id),

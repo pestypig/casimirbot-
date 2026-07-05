@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildScientificEvidencePacket,
+  buildScientificImageEvidenceSidecar,
+} from "../../scientific-evidence-adaptor";
+import {
   IMAGE_LENS_REGION_INSPECTION_CAPABILITY,
   IMAGE_LENS_REGION_INSPECTION_RECEIPT_SCHEMA,
   IMAGE_LENS_REGION_INSPECTION_REQUEST_SCHEMA,
@@ -32,6 +36,16 @@ describe("image lens region inspection contract", () => {
   });
 
   it("accepts a non-terminal crop receipt with embedded document-region provenance", () => {
+    const scientificEvidencePacket = buildScientificEvidencePacket({
+      cropRegionId: "image_lens_region:test",
+      sourceRefHash: "sha256:test-scientific",
+      sourceKind: "image_lens_source",
+      bboxPx: { x: 1, y: 2, width: 30, height: 40 },
+      textCandidate: "T00 = rho",
+      latexCandidate: "T_{00}=\\rho",
+      uncertainty: ["symbol clarity is candidate-only"],
+      extractionStatus: "extracted",
+    });
     const receipt: ImageLensRegionInspectionReceiptV1 = {
       schema: IMAGE_LENS_REGION_INSPECTION_RECEIPT_SCHEMA,
       capability: IMAGE_LENS_REGION_INSPECTION_CAPABILITY,
@@ -89,6 +103,11 @@ describe("image lens region inspection contract", () => {
           notProofAuthority: true,
         },
       },
+      scientific_evidence_packet: scientificEvidencePacket,
+      scientific_evidence_sidecar: buildScientificImageEvidenceSidecar({
+        sidecarId: "evidence:image-lens:test:scientific_image_sidecar",
+        packets: [scientificEvidencePacket],
+      }),
       claim_boundary: {
         cropObservationOnly: true,
         ocrCandidateOnly: true,

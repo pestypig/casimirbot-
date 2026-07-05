@@ -12,40 +12,44 @@ describe("launchPanelPolicy", () => {
     expect(isUserLaunchPanel("workstation-notes")).toBe(true);
   });
 
-  it("shows one unified Situation Room entry in the user launch panel list", () => {
+  it("keeps situation room panels outside the public user launch list", () => {
     expect(isUserLaunchPanel("situation-room-sources")).toBe(false);
-    expect(isUserLaunchPanel("situation-room-pipelines")).toBe(true);
+    expect(isUserLaunchPanel("situation-room-pipelines")).toBe(false);
   });
 
-  it("includes the Live Answer panel for present-state monitoring", () => {
-    expect(isUserLaunchPanel("live-answer-environment")).toBe(true);
+  it("keeps the Live Answer panel outside the public user launch list", () => {
+    expect(isUserLaunchPanel("live-answer-environment")).toBe(false);
   });
 
-  it("includes workstation clipboard and workflow timeline panels", () => {
+  it("includes only the requested workstation utility panels", () => {
     expect(isUserLaunchPanel("image-lens")).toBe(true);
     expect(isUserLaunchPanel("document-image-lens")).toBe(false);
     expect(isUserLaunchPanel("workstation-clipboard-history")).toBe(true);
-    expect(isUserLaunchPanel("workstation-workflow-timeline")).toBe(true);
+    expect(isUserLaunchPanel("workstation-workflow-timeline")).toBe(false);
     expect(isUserLaunchPanel("workstation-task-manager")).toBe(true);
     expect(isUserLaunchPanel("workstation-storage-map")).toBe(true);
     expect(isUserLaunchPanel("scientific-calculator")).toBe(true);
+    expect(isUserLaunchPanel("agi-task-history")).toBe(true);
+    expect(isUserLaunchPanel("narrator")).toBe(true);
+    expect(isUserLaunchPanel("docs-viewer")).toBe(true);
+    expect(isUserLaunchPanel("account-session")).toBe(true);
   });
 
   it("includes the theory badge graph in launch panels", () => {
     expect(isUserLaunchPanel("theory-badge-graph")).toBe(true);
   });
 
-  it("includes the Moral Badge Graph and Fruition Calculator in launch panels", () => {
+  it("includes the Moral Badge Graph but not the Fruition Calculator in public launch panels", () => {
     expect(isUserLaunchPanel("moral-graph")).toBe(true);
-    expect(isUserLaunchPanel("fruition-calculator")).toBe(true);
+    expect(isUserLaunchPanel("fruition-calculator")).toBe(false);
   });
 
-  it("includes the Stage Play Badge Graph in launch panels", () => {
-    expect(isUserLaunchPanel("stage-play-badge-graph")).toBe(true);
+  it("keeps the Stage Play Badge Graph outside public launch panels", () => {
+    expect(isUserLaunchPanel("stage-play-badge-graph")).toBe(false);
   });
 
-  it("includes the Civilization Bounds Roadmap in launch panels", () => {
-    expect(isUserLaunchPanel("civilization-bounds-roadmap")).toBe(true);
+  it("keeps roadmaps outside public launch panels", () => {
+    expect(isUserLaunchPanel("civilization-bounds-roadmap")).toBe(false);
     expect(isUserLaunchPanel("needle-world-roadmap")).toBe(false);
   });
 
@@ -54,9 +58,9 @@ describe("launchPanelPolicy", () => {
     expect(isLegacyDebugPanel("agi-essence-console")).toBe(true);
   });
 
-  it("shows the main Ideology & Moral panel but hides its source/debug variant", () => {
-    expect(isUserLaunchPanel("mission-ethos")).toBe(true);
-    expect(isUnfinishedPanel("mission-ethos")).toBe(false);
+  it("keeps mission ethos panels outside public launch panels", () => {
+    expect(isUserLaunchPanel("mission-ethos")).toBe(false);
+    expect(isUnfinishedPanel("mission-ethos")).toBe(true);
     expect(isUserLaunchPanel("mission-ethos-source")).toBe(false);
     expect(isUnfinishedPanel("mission-ethos-source")).toBe(true);
   });
@@ -70,10 +74,15 @@ describe("launchPanelPolicy", () => {
       "agi-contribution-workbench",
       "code-admin",
       "document-image-lens",
+      "live-answer-environment",
       "helix-noise-gens",
+      "mission-ethos",
       "mission-ethos-source",
       "needle-world-roadmap",
       "rag-admin",
+      "situation-room-pipelines",
+      "stage-play-badge-graph",
+      "workstation-workflow-timeline",
     ];
 
     for (const panelId of unfinishedPanels) {

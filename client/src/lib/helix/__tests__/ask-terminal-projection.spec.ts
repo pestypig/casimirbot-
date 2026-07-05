@@ -157,6 +157,13 @@ describe("Helix Ask terminal projection", () => {
           final_status: "final_answer",
           terminal_artifact_kind: "workstation_tool_evaluation",
         },
+        terminal_answer_authority: {
+          schema: "helix.turn_terminal_authority.v1",
+          server_authoritative: true,
+          terminal_text_preview: answer,
+          final_answer_source: "workstation_tool_evaluation",
+          terminal_artifact_kind: "workstation_tool_evaluation",
+        },
         ui_debug_parity_harness: {
           visible_final_answer: answer,
         },
@@ -167,6 +174,46 @@ describe("Helix Ask terminal projection", () => {
     expect(visible.primary_source_label).not.toBe("typed failure");
     expect(visible.terminal_error_code).toBeNull();
     expect(visible.selected_final_answer).toBe(answer);
+  });
+
+  it("does not treat Image Lens projection text as a materialized backend final without authority", () => {
+    const projectedImageLensAnswer =
+      "The runtime provider echoed Helix internal capability instructions after Image Lens observations re-entered, so I am using only the observation receipts below.";
+    const visible = buildVisibleResolvedTurn({
+      id: "reply-image-lens-client-projection",
+      ok: true,
+      selected_final_answer: projectedImageLensAnswer,
+      final_answer_source: "workstation_tool_evaluation",
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      ask_entrypoint_required: true,
+      ask_entrypoint_observed: false,
+      ask_entrypoint_failure_code: "backend_ask_entry_required",
+      debug: {
+        ask_entrypoint_required: true,
+        ask_entrypoint_observed: false,
+        selected_final_answer: projectedImageLensAnswer,
+        final_answer_source: "workstation_tool_evaluation",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        resolved_turn_summary: {
+          final_status: "final_answer",
+          terminal_artifact_kind: "workstation_tool_evaluation",
+          final_answer_source: "workstation_tool_evaluation",
+        },
+        ui_debug_parity_harness: {
+          has_terminal_authority: false,
+          has_receipt_artifact: false,
+          visible_final_answer: projectedImageLensAnswer,
+        },
+        current_turn_artifact_ledger: [],
+      },
+    });
+
+    expect(visible.primary_terminal_label).toBe("final_failure");
+    expect(visible.primary_source_label).toBe("typed failure");
+    expect(visible.terminal_error_code).toBe("backend_ask_entry_required");
+    expect(visible.selected_final_answer).toBe(
+      "This prompt requires the backend Ask solver path before a final answer can be shown.",
+    );
   });
 
   it("lets structured workstation gateway success outrank stale typed-failure labels", () => {

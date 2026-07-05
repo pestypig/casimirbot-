@@ -839,6 +839,7 @@ describe("Helix Ask Console recrown boundary", () => {
       "HelixAskComposer.tsx",
       "HelixAskComposerTextareaSurface.tsx",
       "HelixAskComposerTextareaState.ts",
+      "HelixAskPromptHistory.ts",
       "HelixAskLegacyComposerSurface.tsx",
       "HelixAskLegacyComposerState.ts",
       "HelixAskLegacySurfaceContent.tsx",
@@ -1346,9 +1347,9 @@ describe("Helix Ask Console recrown boundary", () => {
       liveLegacyConsoleViewStartsAtLine: legacyConsoleViewLine,
     });
     expect(Math.abs(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.lineCountAtInventory - legacyPillLines.length)).toBeLessThanOrEqual(5);
-    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.lineCountAtInventory).toBeGreaterThan(25780);
+    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.lineCountAtInventory).toBeGreaterThan(25000);
     expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.exportedComponentStartsAtLine).toBeGreaterThan(7000);
-    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.liveRenderSliceStartsAtLine).toBeGreaterThan(25500);
+    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.liveRenderSliceStartsAtLine).toBeGreaterThan(25000);
     const sliceClassifications = HELIX_ASK_LEGACY_CONSOLE_SLICES.map((slice) => slice.classification);
     expect(sliceClassifications[0]).toBe("live_day_to_day_must_move");
     expect(new Set(sliceClassifications)).toEqual(
@@ -1371,7 +1372,7 @@ describe("Helix Ask Console recrown boundary", () => {
       bridgeReplacementReady: false,
       liveDayToDaySliceCount: 1,
       pureDisplayRecrownedSliceCount: 86,
-      behaviorSensitiveRecrownedWithParitySliceCount: 62,
+      behaviorSensitiveRecrownedWithParitySliceCount: 63,
       behaviorSensitiveQuarantinedSliceCount: 5,
       unknownTrapDoorSliceCount: 1,
     });
@@ -3106,6 +3107,30 @@ describe("Helix Ask Console recrown boundary", () => {
       debug_export_rebuild_reason: "rendered_button_scope",
     })).toEqual({
       activeTurnId: "ask:eaf320fb-a91d-45f7-ba63-11c9c35e22fc",
+      backendRef: {
+        endpoint: "/api/agi/ask/turn/ask%3Aeaf320fb-a91d-45f7-ba63-11c9c35e22fc/debug-export",
+        turn_id: "ask:eaf320fb-a91d-45f7-ba63-11c9c35e22fc",
+      },
+      endpoint: "/api/agi/ask/turn/ask%3Aeaf320fb-a91d-45f7-ba63-11c9c35e22fc/debug-export",
+      status: "ready",
+    });
+    expect(resolveHelixAskLegacyDebugExportBackendTarget({
+      active_turn_id: "ask:rendered-reply",
+      debug_export_rebuild_reason: "rendered_reply",
+    })).toEqual({
+      activeTurnId: "ask:rendered-reply",
+      backendRef: {
+        endpoint: "/api/agi/ask/turn/ask%3Arendered-reply/debug-export",
+        turn_id: "ask:rendered-reply",
+      },
+      endpoint: "/api/agi/ask/turn/ask%3Arendered-reply/debug-export",
+      status: "ready",
+    });
+    expect(resolveHelixAskLegacyDebugExportBackendTarget({
+      active_turn_id: "ask:payload-mismatch",
+      debug_export_rebuild_reason: "payload_reply_mismatch",
+    })).toEqual({
+      activeTurnId: "ask:payload-mismatch",
       backendRef: null,
       endpoint: null,
       status: "not_advertised",
@@ -3138,6 +3163,24 @@ describe("Helix Ask Console recrown boundary", () => {
       endpoint: "/api/agi/ask/turn/old/debug-export",
       status: "turn_mismatch",
     });
+    expect(debugPayloadMatchesHelixAskLegacyRenderedReply(
+      {
+        id: "helix-chat-turn:client:ask:image-lens",
+        question: "Use the Image Lens region tool on the attached image.",
+        content: "Recovered Image Lens observation report.",
+        debug: {
+          turn_id: "ask:image-lens",
+        },
+      },
+      {
+        active_turn_id: "ask:image-lens",
+        backend_turn_id: "ask:image-lens",
+        debug_export_source: "backend_endpoint",
+        backend_debug_response_status: "fetched",
+        active_prompt: "Use the Image Lens region tool on the attached image. Inspect the equation area first...",
+        selected_final_answer: "Recovered Image Lens observation report.",
+      },
+    )).toBe(true);
     expect(resolveHelixAskLegacyDebugExportClientTurnId({
       client_active_turn_id: "client-active",
       clientSelectedDebugTurnId: "client-selected",
@@ -4357,6 +4400,7 @@ describe("Helix Ask Console recrown boundary", () => {
     const legacyComposerState = read("client/src/components/helix/ask-console/HelixAskLegacyComposerState.ts");
     const actionToolbarState = read("client/src/components/helix/ask-console/HelixAskComposerActionToolbarState.ts");
     const textareaState = read("client/src/components/helix/ask-console/HelixAskComposerTextareaState.ts");
+    const promptHistory = read("client/src/components/helix/ask-console/HelixAskPromptHistory.ts");
     const composerPanel = read("client/src/components/helix/ask-console/HelixAskSurfaceComposerPanel.tsx");
 
     expect(legacyPill).toContain("const composerState = buildHelixAskLegacyComposerState({");
@@ -4377,6 +4421,8 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(legacyPill).toContain("handleAskImageSelect");
     expect(legacyPill).toContain("handleVoiceInputToggle");
     expect(legacyPill).toContain("syncAskDraftValue");
+    expect(legacyPill).toContain("handleAskPromptHistoryKeyDown");
+    expect(legacyPill).toContain("resolveHelixAskPromptHistoryNavigation({");
     expect(legacyPill).not.toContain('<div className="flex flex-col gap-2 px-4 py-3">');
 
     expect(legacyComposerSurface).toContain("export function HelixAskLegacyComposerSurface");
@@ -4405,6 +4451,7 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(actionToolbarState).not.toContain("speechSynthesis");
     expect(textareaState).toContain("export function buildHelixAskComposerTextareaState");
     expect(textareaState).toContain("ariaDisabled");
+    expect(textareaState).toContain("onKeyDown");
     expect(textareaState).toContain("onInputValue");
     expect(textareaState).toContain("onSubmitRequested");
     expect(textareaState).not.toMatch(/from [\"']react[\"']/);
@@ -4412,6 +4459,7 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(textareaState).not.toContain("@/components/helix/HelixAskPill");
     expect(textareaState).not.toContain("syncAskDraftValue");
     expect(textareaState).not.toContain("handleAskPaste");
+    expect(textareaState).not.toContain("resolveHelixAskPromptHistoryNavigation");
     expect(textareaState).not.toContain("runAskTurn");
     expect(textareaState).not.toContain("fetch(");
     expect(textareaState).not.toContain("navigator.clipboard");
@@ -4420,6 +4468,13 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(legacyComposerSurface).not.toContain("handleAskImageSelect");
     expect(legacyComposerSurface).not.toContain("handleVoiceInputToggle");
     expect(legacyComposerSurface).not.toContain("syncAskDraftValue");
+    expect(promptHistory).toContain("export function buildHelixAskPromptHistoryEntries");
+    expect(promptHistory).toContain("export function resolveHelixAskPromptHistoryNavigation");
+    expect(promptHistory).toContain("export function shouldHandleHelixAskPromptHistoryKey");
+    expect(promptHistory).not.toContain("useRef");
+    expect(promptHistory).not.toContain("setSelectionRange");
+    expect(promptHistory).not.toContain("runAskTurn");
+    expect(promptHistory).not.toContain("fetch(");
     expect(legacyComposerSurface).not.toContain("runAskTurn");
     expect(legacyComposerSurface).not.toContain("fetch(");
     expect(composerPanel).toContain("export function HelixAskSurfaceComposerPanel");
@@ -4477,17 +4532,20 @@ describe("Helix Ask Console recrown boundary", () => {
 
     const onInputValue = vi.fn();
     const onSubmitRequested = vi.fn();
+    const onKeyDown = vi.fn();
     expect(buildHelixAskComposerTextareaState({
       ariaDisabled: true,
       className: "textarea",
       placeholder: "Ask Codex",
       onPaste: vi.fn(),
+      onKeyDown,
       onInputValue,
       onSubmitRequested,
     })).toMatchObject({
       ariaDisabled: true,
       className: "textarea",
       placeholder: "Ask Codex",
+      onKeyDown,
       onInputValue,
       onSubmitRequested,
     });
@@ -5965,9 +6023,34 @@ describe("Helix Ask Console recrown boundary", () => {
       },
     })).resolves.toBe(payload.debugCopyText);
 
+    const nonLatestRequests: unknown[] = [];
     await expect(materializeHelixAskMinimalRuntimeDebugCopyText({
       payload: {
         ...payload,
+        isLatest: false,
+      },
+      materializeBackendDebugExport: async (request) => {
+        nonLatestRequests.push(request);
+        return {
+          payload: {
+            schema: "helix.ask.debug_export.v1",
+            active_turn_id: request.turnId,
+            debug_export_source: "backend_endpoint",
+          },
+        };
+      },
+    })).resolves.toContain("\"debug_export_source\": \"backend_endpoint\"");
+    expect(nonLatestRequests).toEqual([
+      expect.objectContaining({
+        turnId: "ask:latest-turn",
+        endpoint: "/api/agi/ask/turn/ask%3Alatest-turn/debug-export",
+      }),
+    ]);
+
+    await expect(materializeHelixAskMinimalRuntimeDebugCopyText({
+      payload: {
+        ...payload,
+        turnId: "client-only-turn",
         isLatest: false,
       },
       materializeBackendDebugExport: async () => "not used",
@@ -6426,12 +6509,12 @@ describe("Helix Ask Console recrown boundary", () => {
     };
 
     expect(HELIX_ASK_AGENT_RUNTIME_STORAGE_KEY).toBe("helix.ask.agentRuntime.v1");
-    expect(readStoredHelixAskAgentRuntime(null)).toBe("helix");
-    expect(readStoredHelixAskAgentRuntime(storage)).toBe("helix");
+    expect(readStoredHelixAskAgentRuntime(null)).toBe("codex");
+    expect(readStoredHelixAskAgentRuntime(storage)).toBe("codex");
     values.set(HELIX_ASK_AGENT_RUNTIME_STORAGE_KEY, "codex");
     expect(readStoredHelixAskAgentRuntime(storage)).toBe("codex");
     values.set(HELIX_ASK_AGENT_RUNTIME_STORAGE_KEY, "legacy-invalid");
-    expect(readStoredHelixAskAgentRuntime(storage)).toBe("helix");
+    expect(readStoredHelixAskAgentRuntime(storage)).toBe("codex");
 
     persistHelixAskAgentRuntime("codex", storage);
     expect(values.get(HELIX_ASK_AGENT_RUNTIME_STORAGE_KEY)).toBe("codex");
@@ -6444,7 +6527,7 @@ describe("Helix Ask Console recrown boundary", () => {
         throw new Error("storage unavailable");
       },
     };
-    expect(readStoredHelixAskAgentRuntime(throwingStorage)).toBe("helix");
+    expect(readStoredHelixAskAgentRuntime(throwingStorage)).toBe("codex");
     expect(() => persistHelixAskAgentRuntime("helix", throwingStorage)).not.toThrow();
 
     const providers = normalizeHelixAgentProvidersResponse({

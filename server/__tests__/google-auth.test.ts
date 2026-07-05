@@ -14,8 +14,8 @@ const createApp = (options: Parameters<typeof createGoogleAuthRouter>[0] = {}): 
 };
 
 describe("Google auth route", () => {
-  beforeEach(() => {
-    resetAccountSessionStore();
+  beforeEach(async () => {
+    await resetAccountSessionStore();
   });
 
   it("rejects missing Google client id", async () => {

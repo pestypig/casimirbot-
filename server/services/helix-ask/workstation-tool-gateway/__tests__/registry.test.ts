@@ -5,6 +5,10 @@ import {
   listWorkstationGatewayCapabilities,
 } from "../registry";
 import { runtimeMemoryGovernor } from "../../../runtime/runtime-memory-governor";
+import {
+  buildScientificEvidencePacket,
+  buildScientificImageEvidenceSidecar,
+} from "@shared/scientific-evidence-adaptor";
 
 const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context";
 const WORKSTATION_NOTES_LIST_NOTES_CAPABILITY = "workstation-notes.list_notes";
@@ -4207,12 +4211,687 @@ describe("Helix workstation tool gateway", () => {
       typed_handoff_contract: expect.objectContaining({
         produced_affordance_kinds: expect.arrayContaining([
           "theory_context",
+          "scientific_evidence",
           "calculator_expression_template",
           "claim_boundary",
         ]),
         required_affordance_kinds: [],
       }),
     });
+  });
+
+  it("gates Image Lens Bianchi/Weyl evidence away from tokamak calculator payloads", async () => {
+    const scientificEvidence = buildScientificEvidencePacket({
+      cropRegionId: "image_lens_region:test-bianchi",
+      sourceRefHash: "sha256:test-bianchi",
+      bboxPx: { x: 0, y: 0, width: 346, height: 255 },
+      textCandidate:
+        "As in Chapter 2 we use the Bianchi identities as field equations for the Weyl tensor.",
+      latexCandidate:
+        "\\nabla^\\mu \\psi_\\nu - D_\\nu S_\\phi = 0",
+      uncertainty: ["OCR symbols are uncertain; observation only."],
+      extractionStatus: "partial",
+    });
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+      arguments: {
+        prompt:
+          "Reflect these extracted equations for congruence to the theory badge graph and mention tokamak thermal pressure only if the evidence branch admits it.",
+        scientific_evidence_packet: scientificEvidence,
+        mentioned_symbols: ["p_Pa", "n_m3", "T_eV", "W_th", "P_loss", "tau_E"],
+        mentioned_domains: ["tokamak plasma"],
+        limit: 12,
+      },
+      turnId: "ask:test:gateway-theory-reflection-image-lens-branch-gate",
+      iteration: 7,
+    });
+    const observation = result.observation as {
+      calculator_payloads?: Array<Record<string, unknown>>;
+      rejected_calculator_payload_ids?: string[];
+      scientific_branch_gate?: Record<string, any>;
+      scientific_evidence_packet?: Record<string, unknown>;
+      scientific_run_trace?: Record<string, unknown>;
+      claim_boundary_notes?: string[];
+    };
+
+    expect(result.ok).toBe(true);
+    expect(observation.scientific_evidence_packet).toMatchObject({
+      schema: "helix.scientific_evidence_packet.v1",
+      primary_domain: "weyl_bianchi",
+      source_image: expect.objectContaining({
+        ref_hash: "sha256:test-bianchi",
+        source_kind: "unknown",
+        raw_ref_included: false,
+      }),
+      crop_region: expect.objectContaining({
+        region_id: "image_lens_region:test-bianchi",
+        bbox_px: { x: 0, y: 0, width: 346, height: 255 },
+        source_ref_hash: "sha256:test-bianchi",
+      }),
+      ocr_text_candidate: "As in Chapter 2 we use the Bianchi identities as field equations for the Weyl tensor.",
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+    expect(observation.scientific_branch_gate).toMatchObject({
+      schema: "helix.scientific_branch_gate.v1",
+      status: "restricted",
+      primary_domain: "weyl_bianchi",
+      rejected_calculator_payload_ids: expect.arrayContaining([
+        "tokamak_thermal_pressure_payload",
+        "tokamak_confinement_energy_payload",
+      ]),
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+    expect(observation.scientific_branch_gate?.congruence_assessments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          target_ref: "tokamak_thermal_pressure_payload",
+          target_kind: "calculator_payload",
+          grade: "false_friend",
+          blocked_by_branch_hint: true,
+        }),
+        expect.objectContaining({
+          target_ref: "tokamak_confinement_energy_payload",
+          target_kind: "calculator_payload",
+          grade: "false_friend",
+          blocked_by_branch_hint: true,
+        }),
+      ]),
+    );
+    expect(observation.scientific_run_trace).toMatchObject({
+      schema: "helix.scientific_run_trace.v1",
+      primary_domain: "weyl_bianchi",
+      branch_gate_status: "restricted",
+      rejected_calculator_payload_ids: expect.arrayContaining([
+        "tokamak_thermal_pressure_payload",
+        "tokamak_confinement_energy_payload",
+      ]),
+      final_answer_guard: expect.objectContaining({
+        required_claim_boundary: "observation_ocr_graph_match_not_proof",
+        must_disclose_rejections: true,
+      }),
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+    expect(observation.claim_boundary_notes).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("scientific_branch_gate=restricted"),
+        expect.stringContaining("rejected_calculator_payloads=tokamak_thermal_pressure_payload"),
+      ]),
+    );
+    expect(observation.calculator_payloads ?? []).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ payload_id: "tokamak_thermal_pressure_payload" }),
+        expect.objectContaining({ payload_id: "tokamak_confinement_energy_payload" }),
+      ]),
+    );
+    expect(result.observation_packet.produced_affordances ?? []).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "calculator_expression_template",
+          expression: "p_Pa = n_m3*T_eV*e_charge",
+        }),
+      ]),
+    );
+    expect(result.observation_packet.produced_affordances ?? []).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "scientific_evidence",
+          claim_boundary: expect.stringContaining("scientific_branch_gate=restricted"),
+        }),
+      ]),
+    );
+    expect(result.observation_packet.observation_summary).toContain("Scientific branch gate: restricted");
+  });
+
+  it("blocks calculator handoff when explicit Image Lens evidence failed exact mapping", async () => {
+    const scientificEvidence = buildScientificEvidencePacket({
+      cropRegionId: "image_lens_region:test-failed",
+      sourceRefHash: "sha256:test-failed",
+      bboxPx: { x: 10, y: 8, width: 326, height: 238 },
+      textCandidate: null,
+      latexCandidate: null,
+      uncertainty: ["Image Lens OCR/math extraction backend returned no inline crop or source image data."],
+      extractionStatus: "failed",
+    });
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+      arguments: {
+        prompt:
+          "Reflect this failed equation crop, but do not substitute tokamak thermal pressure unless the crop evidence admits it.",
+        scientific_evidence_packet: scientificEvidence,
+        mentioned_symbols: ["p_Pa", "n_m3", "T_eV", "W_th", "P_loss", "tau_E"],
+        mentioned_domains: ["tokamak plasma"],
+        limit: 12,
+      },
+      turnId: "ask:test:gateway-theory-reflection-failed-image-lens-block",
+      iteration: 9,
+    });
+    const observation = result.observation as {
+      calculator_payloads?: Array<Record<string, unknown>>;
+      rejected_calculator_payload_ids?: string[];
+      scientific_branch_gate?: Record<string, any>;
+      scientific_evidence_packet?: Record<string, unknown>;
+      scientific_run_trace?: Record<string, any>;
+      claim_boundary_notes?: string[];
+    };
+
+    expect(result.ok).toBe(true);
+    expect(observation.scientific_evidence_packet).toMatchObject({
+      schema: "helix.scientific_evidence_packet.v1",
+      primary_domain: "unknown_math",
+      extraction_status: "failed",
+      admissibility: expect.objectContaining({
+        status: "inadmissible_for_exact_mapping",
+      }),
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+    expect(observation.scientific_branch_gate).toMatchObject({
+      schema: "helix.scientific_branch_gate.v1",
+      status: "blocked",
+      primary_domain: "unknown_math",
+      congruence_grade_floor: "insufficient_evidence",
+      rejected_calculator_payload_ids: expect.arrayContaining([
+        "tokamak_thermal_pressure_payload",
+        "tokamak_confinement_energy_payload",
+      ]),
+      notes: expect.arrayContaining([
+        "Explicit Image Lens evidence was not replaced by prompt context.",
+        "Calculator payloads were suppressed because exact mapping evidence is missing.",
+      ]),
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+    expect(observation.scientific_branch_gate?.congruence_assessments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          target_ref: "tokamak_thermal_pressure_payload",
+          target_kind: "calculator_payload",
+          grade: "insufficient_evidence",
+          blocked_by_branch_hint: true,
+        }),
+        expect.objectContaining({
+          target_ref: "tokamak_confinement_energy_payload",
+          target_kind: "calculator_payload",
+          grade: "insufficient_evidence",
+          blocked_by_branch_hint: true,
+        }),
+      ]),
+    );
+    expect(observation.scientific_run_trace).toMatchObject({
+      schema: "helix.scientific_run_trace.v1",
+      primary_domain: "unknown_math",
+      branch_gate_status: "blocked",
+      congruence_grade_floor: "insufficient_evidence",
+      rejected_calculator_payload_ids: expect.arrayContaining([
+        "tokamak_thermal_pressure_payload",
+        "tokamak_confinement_energy_payload",
+      ]),
+      final_answer_guard: expect.objectContaining({
+        required_claim_boundary: "observation_ocr_graph_match_not_proof",
+        must_disclose_uncertainty: true,
+        must_disclose_rejections: true,
+      }),
+    });
+    expect(observation.scientific_run_trace?.stages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ stage: "image_extraction", status: "observed" }),
+        expect.objectContaining({ stage: "scientific_evidence_sidecar", status: "blocked" }),
+        expect.objectContaining({ stage: "theory_reflection", status: "blocked" }),
+        expect.objectContaining({ stage: "calculator_payload_filter", status: "blocked" }),
+      ]),
+    );
+    expect(observation.claim_boundary_notes).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("scientific_branch_gate=blocked"),
+        expect.stringContaining("rejected_calculator_payloads=tokamak_thermal_pressure_payload"),
+      ]),
+    );
+    expect(observation.calculator_payloads ?? []).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ payload_id: "tokamak_thermal_pressure_payload" }),
+        expect.objectContaining({ payload_id: "tokamak_confinement_energy_payload" }),
+      ]),
+    );
+    expect(result.observation_packet.produced_affordances ?? []).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "calculator_expression_template",
+          expression: "p_Pa = n_m3*T_eV*e_charge",
+        }),
+      ]),
+    );
+    expect(result.observation_packet.produced_affordances ?? []).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "scientific_evidence",
+          status: "blocked",
+          claim_boundary: expect.stringContaining("scientific_branch_gate=blocked"),
+        }),
+      ]),
+    );
+  });
+
+  it("consumes scientific image sidecars for Theory Badge Graph branch gating", async () => {
+    const scientificEvidence = buildScientificEvidencePacket({
+      cropRegionId: "image_lens_region:test-sidecar-bianchi",
+      sourceRefHash: "sha256:test-sidecar-bianchi",
+      sourceKind: "image_attachment",
+      bboxPx: { x: 0, y: 70, width: 346, height: 65 },
+      textCandidate:
+        "As in Chapter 2 we use the Bianchi identities as field equations for the Weyl tensor.",
+      latexCandidate:
+        "\\nabla^\\mu \\psi_\\nu - D_\\nu S_\\phi = 0",
+      uncertainty: [],
+      extractionStatus: "extracted",
+    });
+    const sidecar = buildScientificImageEvidenceSidecar({
+      sidecarId: "scientific_image_sidecar:test-sidecar-bianchi",
+      packets: [scientificEvidence],
+    });
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+      arguments: {
+        prompt:
+          "Here is a scientific document image. Extract the equations and compare them to the theory graph without substituting tokamak formulas.",
+        scientific_evidence_sidecar: sidecar,
+        mentioned_symbols: ["p_Pa", "n_m3", "T_eV", "W_th", "P_loss", "tau_E"],
+        mentioned_domains: ["tokamak plasma"],
+        limit: 12,
+      },
+      turnId: "ask:test:gateway-theory-reflection-scientific-image-sidecar",
+      iteration: 10,
+    });
+    const observation = result.observation as {
+      scientific_evidence_source?: string;
+      scientific_evidence_sidecar?: Record<string, unknown>;
+      scientific_evidence_packet?: Record<string, unknown>;
+      scientific_branch_gate?: Record<string, any>;
+      calculator_payloads?: Array<Record<string, unknown>>;
+      claim_boundary_notes?: string[];
+    };
+
+    expect(result.ok).toBe(true);
+    expect(observation.scientific_evidence_source).toBe("sidecar");
+    expect(observation.scientific_evidence_sidecar).toMatchObject({
+      schema: "helix.scientific_image_evidence_sidecar.v1",
+      sidecar_id: "scientific_image_sidecar:test-sidecar-bianchi",
+      admissibility: expect.objectContaining({ status: "admissible_observation" }),
+    });
+    expect(observation.scientific_evidence_packet).toMatchObject({
+      crop_region_id: "image_lens_region:test-sidecar-bianchi",
+      primary_domain: "weyl_bianchi",
+    });
+    expect(observation.scientific_branch_gate).toMatchObject({
+      status: "restricted",
+      primary_domain: "weyl_bianchi",
+      rejected_calculator_payload_ids: expect.arrayContaining([
+        "tokamak_thermal_pressure_payload",
+        "tokamak_confinement_energy_payload",
+      ]),
+    });
+    expect(observation.calculator_payloads ?? []).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ payload_id: "tokamak_thermal_pressure_payload" }),
+      ]),
+    );
+    expect(observation.claim_boundary_notes).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("scientific_image_sidecar=scientific_image_sidecar:test-sidecar-bianchi"),
+        expect.stringContaining("evidence_source=sidecar"),
+      ]),
+    );
+  });
+
+  it("blocks graph and calculator handoff when scientific image sidecar evidence is failed", async () => {
+    const failedEvidence = buildScientificEvidencePacket({
+      cropRegionId: "image_lens_region:test-sidecar-failed",
+      sourceRefHash: "sha256:test-sidecar-failed",
+      sourceKind: "image_attachment",
+      bboxPx: { x: 0, y: 0, width: 346, height: 72 },
+      textCandidate: null,
+      latexCandidate: null,
+      uncertainty: ["Image Lens OCR/math extraction backend returned no payload."],
+      extractionStatus: "failed",
+    });
+    const sidecar = buildScientificImageEvidenceSidecar({
+      sidecarId: "scientific_image_sidecar:test-sidecar-failed",
+      packets: [failedEvidence],
+    });
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+      arguments: {
+        prompt:
+          "Here is a scientific document image. Extract the equations and compare them to the theory graph.",
+        scientific_evidence_sidecar: sidecar,
+        mentioned_symbols: ["p_Pa", "n_m3", "T_eV", "W_th", "P_loss", "tau_E"],
+        mentioned_domains: ["tokamak plasma"],
+        limit: 12,
+      },
+      turnId: "ask:test:gateway-theory-reflection-scientific-image-sidecar-failed",
+      iteration: 11,
+    });
+    const observation = result.observation as {
+      scientific_evidence_source?: string;
+      scientific_evidence_sidecar?: Record<string, any>;
+      scientific_branch_gate?: Record<string, any>;
+      scientific_run_trace?: Record<string, any>;
+      calculator_payloads?: Array<Record<string, unknown>>;
+    };
+
+    expect(result.ok).toBe(true);
+    expect(observation.scientific_evidence_source).toBe("sidecar");
+    expect(observation.scientific_evidence_sidecar).toMatchObject({
+      admissibility: expect.objectContaining({
+        status: "inadmissible_for_exact_mapping",
+      }),
+    });
+    expect(observation.scientific_branch_gate).toMatchObject({
+      status: "blocked",
+      congruence_grade_floor: "insufficient_evidence",
+      notes: expect.arrayContaining([
+        "Strict scientific image sidecar gating requires admissible Image Lens evidence before graph or calculator handoff.",
+      ]),
+      rejected_calculator_payload_ids: expect.arrayContaining([
+        "tokamak_thermal_pressure_payload",
+        "tokamak_confinement_energy_payload",
+      ]),
+    });
+    expect(observation.scientific_run_trace?.stages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ stage: "theory_reflection", status: "blocked" }),
+        expect.objectContaining({ stage: "calculator_payload_filter", status: "blocked" }),
+      ]),
+    );
+    expect(observation.calculator_payloads ?? []).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ payload_id: "tokamak_thermal_pressure_payload" }),
+      ]),
+    );
+  });
+
+  it("blocks graph and calculator handoff when scientific image sidecar evidence is low-confidence", async () => {
+    const lowConfidenceEvidence = buildScientificEvidencePacket({
+      cropRegionId: "image_lens_region:test-sidecar-low-confidence",
+      sourceRefHash: "sha256:test-sidecar-low-confidence",
+      sourceKind: "image_attachment",
+      bboxPx: { x: 12, y: 88, width: 120, height: 30 },
+      textCandidate: null,
+      latexCandidate: "\\nabla",
+      uncertainty: ["symbol-only crop; no equation body recovered"],
+      extractionStatus: "partial",
+    });
+    const sidecar = buildScientificImageEvidenceSidecar({
+      sidecarId: "scientific_image_sidecar:test-sidecar-low-confidence",
+      packets: [lowConfidenceEvidence],
+    });
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+      arguments: {
+        prompt:
+          "Here is a scientific document image. Extract the equations and compare them to the theory graph.",
+        scientific_evidence_sidecar: sidecar,
+        mentioned_symbols: ["p_Pa", "n_m3", "T_eV", "W_th", "P_loss", "tau_E"],
+        mentioned_domains: ["tokamak plasma"],
+        limit: 12,
+      },
+      turnId: "ask:test:gateway-theory-reflection-scientific-image-sidecar-low-confidence",
+      iteration: 13,
+    });
+    const observation = result.observation as {
+      scientific_evidence_source?: string;
+      scientific_evidence_sidecar?: Record<string, any>;
+      scientific_evidence_packet?: Record<string, any>;
+      scientific_branch_gate?: Record<string, any>;
+      scientific_run_trace?: Record<string, any>;
+      calculator_payloads?: Array<Record<string, unknown>>;
+    };
+
+    expect(result.ok).toBe(true);
+    expect(observation.scientific_evidence_source).toBe("sidecar");
+    expect(observation.scientific_evidence_packet).toMatchObject({
+      confidence: 0.55,
+      admissibility: expect.objectContaining({
+        status: "unverified_math_observation",
+      }),
+    });
+    expect(observation.scientific_evidence_sidecar).toMatchObject({
+      admissibility: expect.objectContaining({
+        status: "unverified_math_observation",
+      }),
+    });
+    expect(observation.scientific_branch_gate).toMatchObject({
+      status: "blocked",
+      congruence_grade_floor: "insufficient_evidence",
+      notes: expect.arrayContaining([
+        "Strict scientific image sidecar gating requires admissible Image Lens evidence before graph or calculator handoff.",
+      ]),
+      rejected_calculator_payload_ids: expect.arrayContaining([
+        "tokamak_thermal_pressure_payload",
+        "tokamak_confinement_energy_payload",
+      ]),
+    });
+    expect(observation.scientific_run_trace?.stages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ stage: "scientific_evidence_sidecar", status: "restricted" }),
+        expect.objectContaining({ stage: "theory_reflection", status: "blocked" }),
+        expect.objectContaining({ stage: "calculator_payload_filter", status: "blocked" }),
+      ]),
+    );
+    expect(observation.calculator_payloads ?? []).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ payload_id: "tokamak_thermal_pressure_payload" }),
+      ]),
+    );
+  });
+
+  it("does not admit prompt-context scientific branches for source-targeted image prompts without sidecar evidence", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+      arguments: {
+        prompt:
+          "Here is a scientific document image. Extract the equations and compare them to the theory graph. Mention tokamak plasma only if the image evidence admits it.",
+        mentioned_symbols: ["p_Pa", "n_m3", "T_eV", "W_th", "P_loss", "tau_E"],
+        mentioned_domains: ["tokamak plasma"],
+        limit: 12,
+      },
+      turnId: "ask:test:gateway-theory-reflection-prompt-context-image-block",
+      iteration: 12,
+    });
+    const observation = result.observation as {
+      scientific_evidence_source?: string;
+      scientific_evidence_sidecar?: Record<string, unknown> | null;
+      scientific_evidence_packet?: Record<string, any>;
+      scientific_branch_gate?: Record<string, any>;
+      calculator_payloads?: Array<Record<string, unknown>>;
+    };
+
+    expect(result.ok).toBe(true);
+    expect(observation.scientific_evidence_source).toBe("prompt_context");
+    expect(observation.scientific_evidence_sidecar).toBeNull();
+    expect(observation.scientific_evidence_packet).toMatchObject({
+      source_image: expect.objectContaining({ source_kind: "prompt_context" }),
+      crop_region_id: "theory_reflection_prompt_context",
+    });
+    expect(observation.scientific_branch_gate).toMatchObject({
+      status: "blocked",
+      notes: expect.arrayContaining([
+        "Prompt-context fallback packets cannot admit graph or calculator branches for source-targeted image prompts.",
+      ]),
+      rejected_calculator_payload_ids: expect.arrayContaining([
+        "tokamak_thermal_pressure_payload",
+        "tokamak_confinement_energy_payload",
+      ]),
+    });
+    expect(observation.calculator_payloads ?? []).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ payload_id: "tokamak_thermal_pressure_payload" }),
+      ]),
+    );
+  });
+
+  it("keeps tokamak calculator payloads admitted when scientific evidence is tokamak-scoped", async () => {
+    const scientificEvidence = buildScientificEvidencePacket({
+      cropRegionId: "image_lens_region:test-tokamak",
+      sourceRefHash: "sha256:test-tokamak",
+      bboxPx: { x: 0, y: 0, width: 300, height: 80 },
+      textCandidate: "Tokamak plasma beta uses p_Pa = n_m3*T_eV*e_charge and W_th = P_loss*tau_E.",
+      latexCandidate: "p_{Pa}=n_{m3}T_{eV}e,\\quad W_{th}=P_{loss}\\tau_E",
+      uncertainty: [],
+      extractionStatus: "extracted",
+    });
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+      arguments: {
+        prompt: "Reflect tokamak thermal pressure and confinement time formulas against the theory badge graph.",
+        scientific_evidence_packet: scientificEvidence,
+        mentioned_symbols: ["p_Pa", "n_m3", "T_eV", "W_th", "P_loss", "tau_E"],
+        mentioned_domains: ["tokamak plasma"],
+        limit: 8,
+      },
+      turnId: "ask:test:gateway-theory-reflection-tokamak-branch-gate",
+      iteration: 8,
+    });
+    const observation = result.observation as {
+      calculator_payloads?: Array<Record<string, unknown>>;
+      rejected_calculator_payload_ids?: string[];
+      scientific_branch_gate?: Record<string, any>;
+      scientific_run_trace?: Record<string, unknown>;
+    };
+
+    expect(result.ok).toBe(true);
+    expect(observation.scientific_branch_gate).toMatchObject({
+      primary_domain: "tokamak_plasma",
+      rejected_calculator_payload_ids: [],
+    });
+    expect(observation.scientific_branch_gate?.congruence_assessments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          target_ref: "tokamak_thermal_pressure_payload",
+          target_kind: "calculator_payload",
+          grade: "exact_symbol_match",
+          blocked_by_branch_hint: false,
+          matched_symbols: expect.arrayContaining(["p_Pa", "n_m3", "T_eV"]),
+        }),
+        expect.objectContaining({
+          target_ref: "tokamak_confinement_energy_payload",
+          target_kind: "calculator_payload",
+          grade: "exact_symbol_match",
+          blocked_by_branch_hint: false,
+          matched_symbols: expect.arrayContaining(["W_th", "P_loss", "tau_E"]),
+        }),
+      ]),
+    );
+    expect(observation.scientific_run_trace).toMatchObject({
+      branch_gate_status: "admitted",
+      primary_domain: "tokamak_plasma",
+      rejected_calculator_payload_ids: [],
+    });
+    expect(observation.calculator_payloads).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ payload_id: "tokamak_thermal_pressure_payload" }),
+        expect.objectContaining({ payload_id: "tokamak_confinement_energy_payload" }),
+      ]),
+    );
+  });
+
+  it("blocks prompt-context branch admission for source-targeted Image Lens scientific evidence prompts", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+      arguments: {
+        prompt:
+          "Using only the re-entered Image Lens scientific evidence packet, reflect the attached equation crop against the Theory Badge Graph. Do not substitute tokamak, plasma, or calculator formulas unless the crop evidence admits that branch.",
+        mentioned_symbols: ["tokamak", "plasma", "Report"],
+        mentioned_domains: ["tokamak plasma"],
+        limit: 8,
+      },
+      turnId: "ask:test:gateway-theory-reflection-prompt-context-image-lens-block",
+      iteration: 10,
+    });
+    const observation = result.observation as {
+      calculator_payloads?: Array<Record<string, unknown>>;
+      rejected_calculator_payload_ids?: string[];
+      scientific_branch_gate?: Record<string, any>;
+      scientific_evidence_packet?: Record<string, any>;
+      scientific_run_trace?: Record<string, any>;
+      claim_boundary_notes?: string[];
+    };
+
+    expect(result.ok).toBe(true);
+    expect(observation.scientific_evidence_packet).toMatchObject({
+      schema: "helix.scientific_evidence_packet.v1",
+      source_image: expect.objectContaining({
+        source_kind: "prompt_context",
+      }),
+      bbox_px: { x: 0, y: 0, width: 1, height: 1 },
+    });
+    expect(observation.scientific_branch_gate).toMatchObject({
+      schema: "helix.scientific_branch_gate.v1",
+      status: "blocked",
+      congruence_grade_floor: "insufficient_evidence",
+      rejected_calculator_payload_ids: expect.arrayContaining([
+        "tokamak_thermal_pressure_payload",
+        "tokamak_confinement_energy_payload",
+      ]),
+      notes: expect.arrayContaining([
+        "Prompt-context fallback packets cannot admit graph or calculator branches for source-targeted image prompts.",
+        "Calculator payloads were suppressed because exact mapping evidence is missing.",
+      ]),
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+    expect(observation.scientific_run_trace).toMatchObject({
+      branch_gate_status: "blocked",
+      congruence_grade_floor: "insufficient_evidence",
+      rejected_calculator_payload_ids: expect.arrayContaining([
+        "tokamak_thermal_pressure_payload",
+        "tokamak_confinement_energy_payload",
+      ]),
+    });
+    expect(observation.scientific_run_trace?.stages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ stage: "theory_reflection", status: "blocked" }),
+        expect.objectContaining({ stage: "calculator_payload_filter", status: "blocked" }),
+      ]),
+    );
+    expect(observation.calculator_payloads ?? []).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ payload_id: "tokamak_thermal_pressure_payload" }),
+        expect.objectContaining({ payload_id: "tokamak_confinement_energy_payload" }),
+      ]),
+    );
+    expect(result.observation_packet.produced_affordances ?? []).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "calculator_expression_template",
+          expression: "p_Pa = n_m3*T_eV*e_charge",
+        }),
+      ]),
+    );
   });
 
   it("blocks theory-badge reflection without prompt as a missing observation", async () => {

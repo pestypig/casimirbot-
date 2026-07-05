@@ -37,6 +37,53 @@ function collectClientVoicePlaybackReceipts(source: Record<string, unknown>): Re
     .filter((receipt): receipt is Record<string, unknown> => Boolean(receipt));
 }
 
+export function buildVoiceClientDebugProjectionFields(input: {
+  localPayload: Record<string, unknown>;
+  liveVoice?: Record<string, unknown> | null;
+  nowMs?: number;
+}): Record<string, unknown> {
+  const localPayload = input.localPayload;
+  const channels = readVoiceDiagnosticsRecord(localPayload.channels);
+  const voice =
+    readVoiceDiagnosticsRecord(localPayload.voice) ??
+    readVoiceDiagnosticsRecord(channels?.voice) ??
+    readVoiceDiagnosticsRecord(localPayload.client_voice_debug) ??
+    readVoiceDiagnosticsRecord(readVoiceDiagnosticsRecord(localPayload.client_debug_projection)?.voice) ??
+    input.liveVoice ??
+    null;
+  const unifiedTimeline = Array.isArray(localPayload.unifiedTimeline)
+    ? localPayload.unifiedTimeline
+    : Array.isArray(localPayload.unified_timeline)
+      ? localPayload.unified_timeline
+      : null;
+  const projection: Record<string, unknown> = {
+    schema: "helix.client_debug_projection.v1",
+    source: "browser_runtime",
+    voice: voice ?? null,
+    voice_authority_debug: voice && readVoiceDiagnosticsRecord(voice.voiceAuthorityDebug)
+      ? voice.voiceAuthorityDebug
+      : null,
+    voice_playback_receipts: voice && Array.isArray(voice.playbackReceipts) ? voice.playbackReceipts : [],
+    voice_playback_output: voice && readVoiceDiagnosticsRecord(voice.playbackOutput) ? voice.playbackOutput : null,
+    voice_playback_metrics: voice && readVoiceDiagnosticsRecord(voice.playback) ? voice.playback : null,
+    voice_calls: voice && Array.isArray(voice.voiceCalls) ? voice.voiceCalls : [],
+    captured_at_ms:
+      typeof localPayload.exportedAtMs === "number"
+        ? localPayload.exportedAtMs
+        : typeof localPayload.exported_at_ms === "number"
+          ? localPayload.exported_at_ms
+          : input.nowMs ?? Date.now(),
+  };
+  if (unifiedTimeline) {
+    projection.unified_timeline_voice_rows = unifiedTimeline.filter((row) => {
+      const record = readVoiceDiagnosticsRecord(row);
+      const channel = coerceVoiceDiagnosticsText(record?.channel).trim();
+      return channel === "voice_timeline" || channel === "voice_call" || channel === "voice_playback_receipt";
+    });
+  }
+  return projection;
+}
+
 function isActiveVoicePlaybackReceipt(receipt: Record<string, unknown>, activeTurnId: string): boolean {
   if (!activeTurnId) return true;
   return [
@@ -302,12 +349,115 @@ export function buildVoicePlaybackReceiptBarrierDebug(input: {
   };
 }
 
+function buildVoiceAuthorityDebugSummary(snapshot: VoiceCaptureDiagnosticsSnapshot): Record<string, unknown> {
+  const segments = Array.isArray(snapshot.segments) ? snapshot.segments : [];
+  const playbackReceipts = Array.isArray(snapshot.playbackReceipts) ? snapshot.playbackReceipts : [];
+  const voiceCalls = Array.isArray(snapshot.voiceCalls) ? snapshot.voiceCalls : [];
+  const timeline = Array.isArray(snapshot.timelineEvents) ? snapshot.timelineEvents : [];
+  const handoffEvents = timeline.filter((event) =>
+    event.kind === "interim_voice_handoff_seen" || event.kind === "interim_voice_enqueue_attempted"
+  );
+  const latestHandoff = handoffEvents[handoffEvents.length - 1] ?? null;
+  const latestReceipt = playbackReceipts[playbackReceipts.length - 1] ?? null;
+  const deliveredReceipts = playbackReceipts.filter((receipt) => receipt.status === "delivered");
+  const queuedReceipts = playbackReceipts.filter((receipt) => receipt.status === "queued");
+  const failedReceipts = playbackReceipts.filter((receipt) =>
+    receipt.status === "failed" || receipt.status === "cancelled" || receipt.status === "suppressed"
+  );
+  const audioBytesObserved = voiceCalls
+    .filter((call) => call.kind === "speak")
+    .reduce((total, call) => total + Math.max(0, call.audioBytes ?? 0), 0);
+  return {
+    schema: "helix.voice_authority_debug_summary.v1",
+    voice_input_capture: {
+      mic_armed: snapshot.micArmState === "on",
+      mic_arm_state: snapshot.micArmState,
+      voice_input_state: snapshot.voiceInputState,
+      voice_signal_state: snapshot.voiceSignalState,
+      media_chunk_count: snapshot.mediaChunkCount,
+      media_bytes: snapshot.mediaBytes,
+      segment_count: segments.length,
+      stt_transcribing_count: segments.filter((segment) => segment.status === "transcribing").length,
+      stt_ok_count: segments.filter((segment) => segment.status === "stt_ok").length,
+      stt_error_count: segments.filter((segment) => segment.status === "stt_error").length,
+      dispatch_queued_count: segments.filter((segment) => segment.dispatch === "queued").length,
+      dispatch_completed_count: segments.filter((segment) => segment.dispatch === "completed").length,
+      dispatch_suppressed_count: segments.filter((segment) => segment.dispatch === "suppressed").length,
+      observation_role: "input_capture_observation",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    },
+    voice_output_playback: {
+      output_path_expected: snapshot.playbackOutput?.expectedPath ?? null,
+      current_utterance_path: snapshot.playbackOutput?.currentUtterancePath ?? null,
+      audio_unlocked: snapshot.playbackOutput?.audioUnlocked ?? null,
+      audio_graph_attached: snapshot.playbackOutput?.audioGraphAttached ?? null,
+      active_utterance_id: snapshot.playback?.utteranceId ?? null,
+      active_turn_key: snapshot.playback?.turnKey ?? null,
+      active_kind: snapshot.playback?.kind ?? null,
+      active_authority: snapshot.playback?.authority ?? null,
+      active_source: snapshot.playback?.source ?? null,
+      audio_bytes_observed: audioBytesObserved,
+      observation_role: "output_playback_observation",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    },
+    tool_admission: {
+      handoff_event_count: handoffEvents.length,
+      latest_handoff_kind: latestHandoff?.kind ?? null,
+      latest_handoff_status: latestHandoff?.status ?? null,
+      latest_handoff_turn_key: latestHandoff?.turnKey ?? null,
+      latest_handoff_utterance_id: latestHandoff?.utteranceId ?? null,
+      latest_handoff_authority: latestHandoff?.utteranceAuthority ?? null,
+      latest_handoff_source: latestHandoff?.utteranceSource ?? null,
+      latest_handoff_debug: latestHandoff?.debugContext ?? null,
+      observation_role: "tool_admission_projection",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    },
+    playback_receipt: {
+      receipt_count: playbackReceipts.length,
+      latest_receipt_id: latestReceipt?.receiptId ?? null,
+      latest_request_id: latestReceipt?.requestId ?? null,
+      latest_source_receipt_id: latestReceipt?.sourceReceiptId ?? null,
+      latest_utterance_id: latestReceipt?.utteranceId ?? null,
+      latest_turn_key: latestReceipt?.turnKey ?? null,
+      latest_status: latestReceipt?.status ?? null,
+      queued_count: queuedReceipts.length,
+      delivered_count: deliveredReceipts.length,
+      failed_count: failedReceipts.length,
+      delivered_at_ms: deliveredReceipts[deliveredReceipts.length - 1]?.atMs ?? null,
+      observation_role: "playback_receipt_observation",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    },
+    terminal_answer_authority: {
+      receipts_are_answers: false,
+      playback_claim_requires_client_receipt: true,
+      final_answer_may_report_receipt_only: true,
+      terminal_authority_owner: "completed_solver_path",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    },
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+    output_authority: "voice_debug_projection",
+  };
+}
+
 export function sanitizeVoiceDiagnosticsForExport(
   snapshot: VoiceCaptureDiagnosticsSnapshot | null,
 ): Record<string, unknown> | null {
   if (!snapshot) return null;
   const timeline = Array.isArray(snapshot.timelineEvents) ? snapshot.timelineEvents.slice(-160) : [];
   return {
+    voiceAuthorityDebug: buildVoiceAuthorityDebugSummary(snapshot),
     updatedAtMs: snapshot.updatedAtMs,
     micArmState: snapshot.micArmState,
     voiceInputState: snapshot.voiceInputState,

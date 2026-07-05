@@ -510,6 +510,334 @@ describe("final_answer_draft terminal selection", () => {
     expect(payload.terminal_artifact_kind).toBe("typed_failure");
   });
 
+  it("adds scientific evidence guard text to theory reflection terminal answers", () => {
+    const turnId = "ask:test:theory-reflection-scientific-final-answer-guard";
+    const receiptRef = `${turnId}:theory_context_reflection_tool_receipt`;
+    const evaluationRef = `${turnId}:workstation_tool_evaluation`;
+    const scientificBranchGate = {
+      schema: "helix.scientific_branch_gate.v1",
+      status: "restricted",
+      primary_domain: "weyl_bianchi",
+      congruence_grade_floor: "domain_context_match",
+      rejected_calculator_payload_ids: [
+        "tokamak_thermal_pressure_payload",
+        "tokamak_confinement_energy_payload",
+      ],
+      rejected_badge_ids: [],
+      congruence_assessments: [
+        {
+          target_ref: "tokamak_thermal_pressure_payload",
+          target_kind: "calculator_payload",
+          grade: "false_friend",
+          reasons: ["Target matched a blocked scientific branch hint for this evidence domain."],
+          matched_symbols: [],
+          blocked_by_branch_hint: true,
+        },
+      ],
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const scientificRunTrace = {
+      schema: "helix.scientific_run_trace.v1",
+      trace_id: "scientific_run:test-bianchi-restricted",
+      primary_domain: "weyl_bianchi",
+      branch_gate_status: "restricted",
+      congruence_grade_floor: "domain_context_match",
+      rejected_calculator_payload_ids: [
+        "tokamak_thermal_pressure_payload",
+        "tokamak_confinement_energy_payload",
+      ],
+      rejected_badge_ids: [],
+      final_answer_guard: {
+        required_claim_boundary: "observation_ocr_graph_match_not_proof",
+        must_disclose_uncertainty: true,
+        must_disclose_rejections: true,
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const artifacts = [
+      {
+        artifact_id: receiptRef,
+        kind: "helix_theory_context_reflection_tool_receipt",
+        payload: {
+          schema: "helix.theory_context_reflection_tool_receipt.v1",
+          capability: "helix_ask.reflect_theory_context",
+          tool_id: "helix_ask.reflect_theory_context",
+          text: "Theory graph reflection observed Weyl/Bianchi context.",
+          observation: {
+            schema: "helix.theory_context_reflection_observation.v1",
+            scientific_branch_gate: scientificBranchGate,
+            scientific_run_trace: scientificRunTrace,
+          },
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+      },
+      {
+        artifact_id: evaluationRef,
+        kind: "workstation_tool_evaluation",
+        payload: {
+          schema: "helix.workstation_tool_evaluation.v1",
+          result: "supports_subgoal",
+          capability: "theory_context_reflection",
+          summary: "Theory reflection located discussion context as evidence only: Weyl/Bianchi crop context.",
+          evidence_refs: [receiptRef],
+          observation: {
+            scientific_branch_gate: scientificBranchGate,
+            scientific_run_trace: scientificRunTrace,
+          },
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      active_prompt: "Use the Image Lens Bianchi/Weyl crop evidence in the Theory Badge Graph.",
+      route_product_contract: {
+        ...modelOnlyContract(turnId),
+        source_target: "theory_locator",
+        allowed_terminal_artifact_kinds: ["theory_context_reflection_answer", "typed_failure", "request_user_input"],
+        forbidden_terminal_artifact_kinds: ["workstation_tool_evaluation", "tool_receipt", "direct_answer_text"],
+        side_artifact_kinds_allowed: ["helix_theory_context_reflection_tool_receipt", "workstation_tool_evaluation"],
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "theory_context_reflection",
+        required_terminal_kind: "theory_context_reflection_answer",
+      },
+      goal_satisfaction_evaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+        required_evidence: [
+          { kind: "helix_theory_context_reflection_tool_receipt", satisfied: true, evidence_ref: receiptRef },
+          { kind: "workstation_tool_evaluation", satisfied: true, evidence_ref: evaluationRef },
+        ],
+      },
+      agent_runtime_loop: {
+        schema: "helix.agent_runtime_loop.v1",
+        iterations: [
+          {
+            iteration: 1,
+            decision_id: `${turnId}:decision:reflect`,
+            next_step: "tool",
+            decision_authority: "llm",
+            chosen_capability: "helix_ask.reflect_theory_context",
+            executed_action_key: "helix_ask.reflect_theory_context",
+            observed_artifact_refs: [receiptRef, evaluationRef],
+          },
+          {
+            iteration: 2,
+            decision_id: `${turnId}:decision:answer`,
+            next_step: "answer",
+            decision_timing: "post_observation_terminal_review",
+            decision_authority: "llm",
+            chosen_capability: "model.synthesize_from_theory_context_reflection",
+            observed_artifact_refs: [receiptRef, evaluationRef],
+            observation_role: "terminal_decision",
+          },
+        ],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: artifacts,
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      selected_final_answer: "I could not complete that turn.",
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("theory_context_reflection_answer");
+    expect(result.visible_text).toContain("Scientific evidence guard:");
+    expect(result.visible_text).toContain("Evidence domain: weyl_bianchi; branch gate: restricted");
+    expect(result.visible_text).toContain("False-friend branch refs: tokamak_thermal_pressure_payload");
+    expect(result.visible_text).toContain("tokamak_thermal_pressure_payload");
+    expect(result.visible_text).toContain("OCR/LaTeX candidates and graph matches are observation evidence, not proof");
+    expect(payload.theory_context_reflection_answer).toMatchObject({
+      schema: "helix.theory_context_reflection_answer.v1",
+      support_refs: [receiptRef, evaluationRef],
+      scientific_final_answer_guard: expect.objectContaining({
+        primaryDomain: "weyl_bianchi",
+        branchGateStatus: "restricted",
+        falseFriendRefs: ["tokamak_thermal_pressure_payload"],
+        mustDiscloseRejections: true,
+      }),
+    });
+  });
+
+  it("renders blocked scientific evidence as a blocker instead of a theory reflection answer", () => {
+    const turnId = "ask:test:theory-reflection-scientific-blocker-answer";
+    const receiptRef = `${turnId}:theory_context_reflection_tool_receipt`;
+    const evaluationRef = `${turnId}:workstation_tool_evaluation`;
+    const scientificBranchGate = {
+      schema: "helix.scientific_branch_gate.v1",
+      status: "blocked",
+      primary_domain: "unknown_math",
+      congruence_grade_floor: "insufficient_evidence",
+      rejected_calculator_payload_ids: [
+        "tokamak_thermal_pressure_payload",
+        "tokamak_confinement_energy_payload",
+      ],
+      rejected_badge_ids: [],
+      congruence_assessments: [
+        {
+          target_ref: "tokamak_thermal_pressure_payload",
+          target_kind: "calculator_payload",
+          grade: "insufficient_evidence",
+          reasons: ["Explicit scientific evidence was not admissible for calculator handoff."],
+          matched_symbols: [],
+          blocked_by_branch_hint: true,
+        },
+      ],
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const scientificRunTrace = {
+      schema: "helix.scientific_run_trace.v1",
+      trace_id: "scientific_run:test-failed-crop-blocked",
+      primary_domain: "unknown_math",
+      branch_gate_status: "blocked",
+      congruence_grade_floor: "insufficient_evidence",
+      rejected_calculator_payload_ids: [
+        "tokamak_thermal_pressure_payload",
+        "tokamak_confinement_energy_payload",
+      ],
+      rejected_badge_ids: [],
+      final_answer_guard: {
+        required_claim_boundary: "observation_ocr_graph_match_not_proof",
+        must_disclose_uncertainty: true,
+        must_disclose_rejections: true,
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const artifacts = [
+      {
+        artifact_id: receiptRef,
+        kind: "helix_theory_context_reflection_tool_receipt",
+        payload: {
+          schema: "helix.theory_context_reflection_tool_receipt.v1",
+          capability: "helix_ask.reflect_theory_context",
+          tool_id: "helix_ask.reflect_theory_context",
+          text: "Theory graph reflection observed nearby tokamak context.",
+          observation: {
+            schema: "helix.theory_context_reflection_observation.v1",
+            scientific_branch_gate: scientificBranchGate,
+            scientific_run_trace: scientificRunTrace,
+          },
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+      },
+      {
+        artifact_id: evaluationRef,
+        kind: "workstation_tool_evaluation",
+        payload: {
+          schema: "helix.workstation_tool_evaluation.v1",
+          result: "supports_subgoal",
+          capability: "theory_context_reflection",
+          summary: "Theory reflection located nearby tokamak context that should not become answer authority.",
+          evidence_refs: [receiptRef],
+          observation: {
+            scientific_branch_gate: scientificBranchGate,
+            scientific_run_trace: scientificRunTrace,
+          },
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      active_prompt: "Use the failed Image Lens equation crop before any theory badge or calculator answer.",
+      route_product_contract: {
+        ...modelOnlyContract(turnId),
+        source_target: "theory_locator",
+        allowed_terminal_artifact_kinds: ["theory_context_reflection_answer", "typed_failure", "request_user_input"],
+        forbidden_terminal_artifact_kinds: ["workstation_tool_evaluation", "tool_receipt", "direct_answer_text"],
+        side_artifact_kinds_allowed: ["helix_theory_context_reflection_tool_receipt", "workstation_tool_evaluation"],
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "theory_context_reflection",
+        required_terminal_kind: "theory_context_reflection_answer",
+      },
+      goal_satisfaction_evaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+        required_evidence: [
+          { kind: "helix_theory_context_reflection_tool_receipt", satisfied: true, evidence_ref: receiptRef },
+          { kind: "workstation_tool_evaluation", satisfied: true, evidence_ref: evaluationRef },
+        ],
+      },
+      agent_runtime_loop: {
+        schema: "helix.agent_runtime_loop.v1",
+        iterations: [
+          {
+            iteration: 1,
+            decision_id: `${turnId}:decision:reflect`,
+            next_step: "tool",
+            decision_authority: "llm",
+            chosen_capability: "helix_ask.reflect_theory_context",
+            executed_action_key: "helix_ask.reflect_theory_context",
+            observed_artifact_refs: [receiptRef, evaluationRef],
+          },
+          {
+            iteration: 2,
+            decision_id: `${turnId}:decision:answer`,
+            next_step: "answer",
+            decision_timing: "post_observation_terminal_review",
+            decision_authority: "llm",
+            observed_artifact_refs: [receiptRef, evaluationRef],
+            observation_role: "terminal_decision",
+          },
+        ],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: artifacts,
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      selected_final_answer: "I could not complete that turn.",
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("theory_context_reflection_answer");
+    expect(result.visible_text).toContain("Scientific evidence blocker:");
+    expect(result.visible_text).toContain("branch gate: blocked");
+    expect(result.visible_text).toContain("not admissible for exact graph mapping or calculator handoff");
+    expect(result.visible_text).toContain("Suppressed graph/calculator refs: tokamak_thermal_pressure_payload");
+    expect(result.visible_text).toContain("no nearby theory badge, analogy, or calculator template may be substituted");
+    expect(result.visible_text).not.toContain("Theory reflection located nearby tokamak context");
+    expect(payload.theory_context_reflection_answer).toMatchObject({
+      schema: "helix.theory_context_reflection_answer.v1",
+      support_refs: [receiptRef, evaluationRef],
+      scientific_final_answer_guard: expect.objectContaining({
+        primaryDomain: "unknown_math",
+        branchGateStatus: "blocked",
+        congruenceGradeFloor: "insufficient_evidence",
+        mustDiscloseRejections: true,
+      }),
+    });
+  });
+
   it("selects a later complete final draft over an earlier weak direct answer", () => {
     const turnId = "ask:test:later-draft-over-direct";
     const draftText = [

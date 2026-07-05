@@ -57,6 +57,23 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
+const normalizeBackendDebugExportTurnId = (value: unknown): string | null => {
+  const text = readString(value);
+  if (!text) return null;
+  if (text.startsWith("ask:")) return text;
+  const match = text.match(/(?:^|:)(ask:[^:]+)/i);
+  return match?.[1] ?? null;
+};
+
+const buildBackendDebugExportRef = (turnId: unknown): Record<string, string> | null => {
+  const normalizedTurnId = normalizeBackendDebugExportTurnId(turnId);
+  if (!normalizedTurnId) return null;
+  return {
+    endpoint: `/api/agi/ask/turn/${encodeURIComponent(normalizedTurnId)}/debug-export`,
+    turn_id: normalizedTurnId,
+  };
+};
+
 const readRuntimeAgentProvider = (...values: unknown[]): string | null => {
   for (const value of values) {
     const text = readString(value);
@@ -1120,7 +1137,7 @@ const readCapabilityLaneMailLoopDebugSummaries = (input: {
 };
 
 const HELIX_DEBUG_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE =
-  /\b(?:scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\s+viewer|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|scholarly-research\.[a-z0-9_.-]+|scholarly_research\.[a-z0-9_.-]+|scholarly\s+research\s+tool|lookup_papers|fetch_full_text|extract_numeric_parameters|live_env\.[a-z0-9_.-]+|helix_ask\.[a-z0-9_.-]+|image_lens|visual_capture)\b/i;
+  /\b(?:scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\s+viewer|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|scholarly-research\.[a-z0-9_.-]+|scholarly_research\.[a-z0-9_.-]+|scholarly\s+research\s+tool|lookup_papers|fetch_full_text|extract_numeric_parameters|live_env\.[a-z0-9_.-]+|helix_ask\.[a-z0-9_.-]+|image[_\s-]?lens|visual_analysis\.inspect_image_region|visual_capture)\b/i;
 
 const requiresBackendEntrypointForDebugExport = (value: unknown): boolean => {
   const text = readString(value);
@@ -1813,6 +1830,213 @@ const answerNoteForCompactToolTraceItems = (items: Array<{ role: string }>): str
   return null;
 };
 
+const compactScientificRunTraceStages = (trace: Record<string, unknown>): Record<string, unknown>[] =>
+  readRecordArray(trace.stages).slice(0, 8).map((stage) => ({
+    stage: readString(stage.stage),
+    status: readString(stage.status),
+    artifact_refs: readStringArray(stage.artifact_refs).slice(0, 8),
+  }));
+
+const buildScientificEvidenceDebugProjection = (input: {
+  activeTurnId: string | null;
+  source: Record<string, unknown>;
+  ledger: unknown[];
+}): Record<string, unknown> | null => {
+  const debug = asRecord(input.source.debug);
+  const agentLoop = asRecord(input.source.agentLoop);
+  const candidates = [
+    input.source,
+    debug,
+    agentLoop,
+    ...input.ledger,
+  ].filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const evidencePackets = uniqueRecordsById(
+    candidates.flatMap((candidate) => collectRecordsDeep(candidate, (record) =>
+      readString(record.schema) === "helix.scientific_evidence_packet.v1"
+    )),
+    ["source_ref_hash", "crop_region_id"],
+  );
+  const evidenceSidecars = uniqueRecordsById(
+    candidates.flatMap((candidate) => collectRecordsDeep(candidate, (record) =>
+      readString(record.schema) === "helix.scientific_image_evidence_sidecar.v1"
+    )),
+    ["sidecar_id"],
+  );
+  const branchGates = uniqueRecordsById(
+    candidates.flatMap((candidate) => collectRecordsDeep(candidate, (record) =>
+      readString(record.schema) === "helix.scientific_branch_gate.v1"
+    )),
+    ["primary_domain", "status", "congruence_grade_floor"],
+  );
+  const runTraces = uniqueRecordsById(
+    candidates.flatMap((candidate) => collectRecordsDeep(candidate, (record) =>
+      readString(record.schema) === "helix.scientific_run_trace.v1"
+    )),
+    ["trace_id"],
+  );
+  const sidecarGatewayBridges = uniqueRecordsById(
+    candidates.flatMap((candidate) => collectRecordsDeep(candidate, (record) =>
+      readString(record.schema) === "helix.scientific_image_sidecar_gateway_bridge.v1"
+    )),
+    ["scientific_evidence_sidecar_id", "status", "blocked_reason"],
+  );
+  if (
+    evidencePackets.length === 0 &&
+    evidenceSidecars.length === 0 &&
+    branchGates.length === 0 &&
+    runTraces.length === 0 &&
+    sidecarGatewayBridges.length === 0
+  ) return null;
+  const rejectedCalculatorPayloadIds = uniqueStrings([
+    ...branchGates.flatMap((gate) => readStringArray(gate.rejected_calculator_payload_ids)),
+    ...runTraces.flatMap((trace) => readStringArray(trace.rejected_calculator_payload_ids)),
+  ]);
+  const rejectedBadgeIds = uniqueStrings([
+    ...branchGates.flatMap((gate) => readStringArray(gate.rejected_badge_ids)),
+    ...runTraces.flatMap((trace) => readStringArray(trace.rejected_badge_ids)),
+  ]);
+  const congruenceAssessments = uniqueRecordsById(
+    branchGates.flatMap((gate) =>
+      Array.isArray(gate.congruence_assessments)
+        ? gate.congruence_assessments.map(asRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry))
+        : []
+    ),
+    ["target_ref", "target_kind", "grade"],
+  );
+  const falseFriendRefs = uniqueStrings(
+    congruenceAssessments
+      .filter((assessment) => readString(assessment.grade) === "false_friend")
+      .map((assessment) => readString(assessment.target_ref)),
+  );
+  const finalAnswerGuardRequired = runTraces.some((trace) => {
+    const finalAnswerGuard = asRecord(trace.final_answer_guard);
+    return Boolean(finalAnswerGuard) || readString(trace.branch_gate_status) === "restricted";
+  }) || branchGates.some((gate) => readString(gate.status) === "restricted" || readString(gate.status) === "blocked");
+  return {
+    schema: "helix.scientific_evidence_debug_projection.v1",
+    turn_id: input.activeTurnId,
+    evidence_packet_count: evidencePackets.length,
+    evidence_sidecar_count: evidenceSidecars.length,
+    branch_gate_count: branchGates.length,
+    run_trace_count: runTraces.length,
+    sidecar_gateway_bridge_count: sidecarGatewayBridges.length,
+    primary_domains: uniqueStrings([
+      ...evidencePackets.map((packet) => readString(packet.primary_domain)),
+      ...branchGates.map((gate) => readString(gate.primary_domain)),
+      ...runTraces.map((trace) => readString(trace.primary_domain)),
+    ]),
+    branch_gate_statuses: uniqueStrings([
+      ...branchGates.map((gate) => readString(gate.status)),
+      ...runTraces.map((trace) => readString(trace.branch_gate_status)),
+    ]),
+    congruence_grade_floors: uniqueStrings([
+      ...evidencePackets.map((packet) => readString(asRecord(packet.admissibility)?.congruence_grade_floor)),
+      ...branchGates.map((gate) => readString(gate.congruence_grade_floor)),
+      ...runTraces.map((trace) => readString(trace.congruence_grade_floor)),
+    ]),
+    congruence_assessment_count: congruenceAssessments.length,
+    congruence_grades: uniqueStrings(congruenceAssessments.map((assessment) => readString(assessment.grade))),
+    false_friend_refs: falseFriendRefs.slice(0, 24),
+    congruence_assessments: congruenceAssessments.slice(0, 24).map((assessment) => ({
+      target_ref: readString(assessment.target_ref),
+      target_kind: readString(assessment.target_kind),
+      grade: readString(assessment.grade),
+      matched_symbols: readStringArray(assessment.matched_symbols).slice(0, 12),
+      blocked_by_branch_hint: assessment.blocked_by_branch_hint === true,
+    })),
+    source_ref_hashes: uniqueStrings(evidencePackets.map((packet) => readString(packet.source_ref_hash))).slice(0, 12),
+    sidecar_ids: uniqueStrings(evidenceSidecars.map((sidecar) => readString(sidecar.sidecar_id))).slice(0, 12),
+    sidecar_admissibility_statuses: uniqueStrings(
+      evidenceSidecars.map((sidecar) => readString(asRecord(sidecar.admissibility)?.status)),
+    ),
+    sidecar_memory_kinds: uniqueStrings(
+      evidenceSidecars.map((sidecar) => readString(asRecord(sidecar.memory_classification)?.memory_kind)),
+    ),
+    sidecar_gateway_bridge_statuses: uniqueStrings(
+      sidecarGatewayBridges.map((bridge) => readString(bridge.status)),
+    ),
+    sidecar_gateway_bridge_blocked_reasons: uniqueStrings(
+      sidecarGatewayBridges.map((bridge) => readString(bridge.blocked_reason)),
+    ),
+    sidecar_gateway_bridges: sidecarGatewayBridges.slice(0, 8).map((bridge) => ({
+      status: readString(bridge.status),
+      capability_id: readString(bridge.capability_id),
+      result_count: typeof bridge.result_count === "number" ? bridge.result_count : null,
+      blocked_reason: readString(bridge.blocked_reason),
+      scientific_evidence_sidecar_id: readString(bridge.scientific_evidence_sidecar_id),
+      sidecar_admissibility_status: readString(bridge.sidecar_admissibility_status),
+      sidecar_primary_domain: readString(bridge.sidecar_primary_domain),
+      observation_refs: readStringArray(bridge.observation_refs).slice(0, 12),
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    })),
+    compound_stage_sequence: uniqueStrings([
+      ...evidenceSidecars.flatMap((sidecar) =>
+        readRecordArray(sidecar.compound_route_stages).map((stage) => readString(stage.stage)),
+      ),
+      ...runTraces.flatMap((trace) =>
+        readRecordArray(trace.stages).map((stage) => readString(stage.stage)),
+      ),
+    ]).slice(0, 12),
+    sidecars: evidenceSidecars.slice(0, 8).map((sidecar) => ({
+      sidecar_id: readString(sidecar.sidecar_id),
+      sidecar_kind: readString(sidecar.sidecar_kind),
+      source_ref_hash: readString(sidecar.source_ref_hash),
+      source_kind: readString(sidecar.source_kind),
+      packet_count: typeof sidecar.packet_count === "number" ? sidecar.packet_count : null,
+      primary_packet_ref: readString(sidecar.primary_packet_ref),
+      primary_domain: readString(sidecar.primary_domain),
+      primary_domains: readStringArray(sidecar.primary_domains).slice(0, 8),
+      admissibility_status: readString(asRecord(sidecar.admissibility)?.status),
+      extraction_summary: asRecord(sidecar.extraction_summary),
+      memory_classification: asRecord(sidecar.memory_classification),
+      stages: compactScientificRunTraceStages({ stages: sidecar.compound_route_stages }),
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    })),
+    crop_region_ids: uniqueStrings(evidencePackets.map((packet) => readString(packet.crop_region_id))).slice(0, 12),
+    source_images: evidencePackets.slice(0, 12).map((packet) => {
+      const sourceImage = asRecord(packet.source_image);
+      return {
+        ref_hash: readString(sourceImage?.ref_hash) ?? readString(packet.source_ref_hash),
+        source_kind: readString(sourceImage?.source_kind),
+        page_number: typeof sourceImage?.page_number === "number" ? sourceImage.page_number : null,
+        raw_ref_included: false,
+      };
+    }),
+    crop_regions: evidencePackets.slice(0, 12).map((packet) => {
+      const cropRegion = asRecord(packet.crop_region);
+      return {
+        region_id: readString(cropRegion?.region_id) ?? readString(packet.crop_region_id),
+        bbox_px: asRecord(cropRegion?.bbox_px) ?? asRecord(packet.bbox_px),
+        source_ref_hash: readString(cropRegion?.source_ref_hash) ?? readString(packet.source_ref_hash),
+      };
+    }),
+    run_trace_ids: uniqueStrings(runTraces.map((trace) => readString(trace.trace_id))).slice(0, 12),
+    rejected_calculator_payload_ids: rejectedCalculatorPayloadIds.slice(0, 24),
+    rejected_badge_ids: rejectedBadgeIds.slice(0, 24),
+    final_answer_guard_required: finalAnswerGuardRequired,
+    claim_boundary: "observation_ocr_graph_match_not_proof",
+    traces: runTraces.slice(0, 8).map((trace) => ({
+      trace_id: readString(trace.trace_id),
+      source_ref_hash: readString(trace.source_ref_hash),
+      primary_domain: readString(trace.primary_domain),
+      branch_gate_status: readString(trace.branch_gate_status),
+      congruence_grade_floor: readString(trace.congruence_grade_floor),
+      admitted_calculator_payload_ids: readStringArray(trace.admitted_calculator_payload_ids).slice(0, 12),
+      rejected_calculator_payload_ids: readStringArray(trace.rejected_calculator_payload_ids).slice(0, 12),
+      rejected_badge_ids: readStringArray(trace.rejected_badge_ids).slice(0, 12),
+      stages: compactScientificRunTraceStages(trace),
+    })),
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+    output_authority: "scientific_evidence_debug_projection",
+  };
+};
+
 const collectLedgerPayloads = (
   ledger: unknown[],
   predicate: (artifact: Record<string, unknown>) => boolean,
@@ -1841,7 +2065,12 @@ const findLedgerPayload = (ledger: unknown[], kind: string): Record<string, unkn
       )
     : null;
 
-const buildCompactToolTraceDisclosure = (actionEnvelope: Record<string, unknown> | null, turnId: string) => {
+const buildCompactToolTraceDisclosure = (input: {
+  actionEnvelope: Record<string, unknown> | null;
+  turnId: string;
+  scientificEvidenceTrace?: Record<string, unknown> | null;
+}) => {
+  const actionEnvelope = input.actionEnvelope;
   const workstationActions = Array.isArray(actionEnvelope?.workstation_actions)
     ? actionEnvelope.workstation_actions
         .map(asRecord)
@@ -1860,12 +2089,13 @@ const buildCompactToolTraceDisclosure = (actionEnvelope: Record<string, unknown>
   }));
   return {
     schema: "helix.ask_tool_trace_disclosure.v1",
-    disclosureId: `${turnId}:tool_trace_disclosure`,
-    turnId,
+    disclosureId: `${input.turnId}:tool_trace_disclosure`,
+    turnId: input.turnId,
     action_keys: actionKeys,
     items,
     workstation_actions: workstationActions,
     answerNote: answerNoteForCompactToolTraceItems(items),
+    scientific_evidence_trace: input.scientificEvidenceTrace ?? null,
     assistant_answer: false,
     terminal_eligible: false,
   };
@@ -2327,10 +2557,24 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     : readString(agentLoop?.terminal_error_code) ??
       readString(debug?.terminal_error_code) ??
       readString(payload.terminal_error_code);
+  const debugExportRebuildReason = readString(payload.debug_export_rebuild_reason)?.trim() ?? "";
+  const debugExportSource = readString(payload.debug_export_source)?.trim() ?? "";
+  const isReplyScopedDebugProjection =
+    debugExportSource === "rendered_reply_dom" ||
+    debugExportRebuildReason === "rendered_button_scope" ||
+    debugExportRebuildReason === "rendered_reply" ||
+    debugExportRebuildReason === "payload_reply_mismatch" ||
+    debugExportRebuildReason === "empty_payload" ||
+    debugExportRebuildReason === "invalid_json_payload";
   const promptRequiresBackendEntrypoint = requiresBackendEntrypointForDebugExport(
     readString(reply.question) ?? readString(payload.selectedDebugQuestion) ?? "",
   );
-  const backendDebugRefPresent = Boolean(asRecord(debug?.debug_export_ref) ?? asRecord(payload.debug_export_ref));
+  const existingBackendDebugRef =
+    asRecord(debug?.backend_debug_response_ref) ??
+    asRecord(debug?.debug_export_ref) ??
+    asRecord(payload.backend_debug_response_ref) ??
+    asRecord(payload.debug_export_ref);
+  const backendDebugRefPresent = Boolean(existingBackendDebugRef);
   const capabilityLaneBackendArtifactPresent = Boolean(
     readRecordArray(capabilityLaneCallResults).length > 0 ||
       readRecordArray(capabilityLaneObservationPackets).length > 0 ||
@@ -2347,8 +2591,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       payload.canonical_goal_frame ??
       debug?.canonical_goal_frame ??
       agentLoop?.canonical_goal_frame ??
-      (capabilityLaneBackendArtifactPresent ? { capability_lane_backend_artifact_present: true } : null) ??
-      (imageLensPromptLeakRecovered ? { provider_prompt_leak_recovered: true } : null),
+      (capabilityLaneBackendArtifactPresent ? { capability_lane_backend_artifact_present: true } : null),
   );
   const askEntrypointRequired =
     readBoolean(agentLoop?.ask_entrypoint_required) ??
@@ -2359,7 +2602,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     readBoolean(agentLoop?.ask_entrypoint_observed) ??
     readBoolean(debug?.ask_entrypoint_observed) ??
     readBoolean(payload.ask_entrypoint_observed) ??
-    (askEntrypointRequired ? backendDebugRefPresent || backendSolverArtifactPresent : null);
+    (askEntrypointRequired ? (isReplyScopedDebugProjection ? null : backendSolverArtifactPresent) : null);
   const askEntrypointFailureCode =
     readString(agentLoop?.ask_entrypoint_failure_code) ??
     readString(debug?.ask_entrypoint_failure_code) ??
@@ -2458,25 +2701,26 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       : firstBrokenRail === "backend_ask_entrypoint" || firstBrokenRail === "prompt_submit_entrypoint"
         ? "prompt_submit_entrypoint"
         : null);
-  const backendEntrypointProjectionBlocked = askEntrypointRequired && askEntrypointObserved === false;
+  const backendEntrypointProjectionBlocked =
+    askEntrypointRequired && askEntrypointObserved === false && !isReplyScopedDebugProjection;
   const effectiveTerminalErrorCode =
-    imageLensPromptLeakRecovered
-      ? null
-      : backendEntrypointProjectionBlocked
+    backendEntrypointProjectionBlocked
         ? askEntrypointFailureCode
-        : terminalErrorCode ?? askEntrypointFailureCode;
+        : imageLensPromptLeakRecovered
+          ? null
+          : terminalErrorCode ?? askEntrypointFailureCode;
   const effectiveTerminalArtifactKind =
-    imageLensPromptLeakRecovered
-      ? terminalArtifactKind ?? "agent_provider_terminal_candidate"
-      : backendEntrypointProjectionBlocked
+    backendEntrypointProjectionBlocked
       ? "typed_failure"
-      : terminalArtifactKind ?? (effectiveTerminalErrorCode ? "typed_failure" : null);
+      : imageLensPromptLeakRecovered
+        ? terminalArtifactKind ?? "agent_provider_terminal_candidate"
+        : terminalArtifactKind ?? (effectiveTerminalErrorCode ? "typed_failure" : null);
   const effectiveFinalAnswerSource =
-    imageLensPromptLeakRecovered
-      ? finalAnswerSource ?? "agent_provider_terminal_candidate"
-      : backendEntrypointProjectionBlocked
+    backendEntrypointProjectionBlocked
       ? "typed_failure"
-      : finalAnswerSource ?? (effectiveTerminalErrorCode ? "typed_failure" : null);
+      : imageLensPromptLeakRecovered
+        ? finalAnswerSource ?? "agent_provider_terminal_candidate"
+        : finalAnswerSource ?? (effectiveTerminalErrorCode ? "typed_failure" : null);
   const typedFailure = asRecord(payload.typed_failure ?? debug?.typed_failure ?? agentLoop?.typed_failure);
   const terminalAuthorityText = readString(terminalAuthority?.terminal_text_preview);
   const terminalIsTypedFailure =
@@ -2518,8 +2762,22 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     readString(reply.id) ??
     "unknown-turn";
   const canonicalActiveTurnId = readString(terminalAuthority?.turn_id) ?? activeTurnId;
+  const projectedBackendDebugRef =
+    existingBackendDebugRef ??
+    buildBackendDebugExportRef(canonicalActiveTurnId) ??
+    buildBackendDebugExportRef(activeTurnId) ??
+    buildBackendDebugExportRef(reply.id);
   const clientActiveTurnId = readString(reply.id);
-  const toolTraceDisclosure = buildCompactToolTraceDisclosure(actionEnvelope, canonicalActiveTurnId);
+  const scientificEvidenceTrace = buildScientificEvidenceDebugProjection({
+    activeTurnId: canonicalActiveTurnId,
+    source: payload,
+    ledger,
+  });
+  const toolTraceDisclosure = buildCompactToolTraceDisclosure({
+    actionEnvelope,
+    turnId: canonicalActiveTurnId,
+    scientificEvidenceTrace,
+  });
   const voicePlaybackReconciliation = buildVoicePlaybackReconciliationDebug({
     activeTurnId: canonicalActiveTurnId,
     selectedFinalAnswer,
@@ -2578,6 +2836,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     voice_playback_receipt_barrier: voicePlaybackReceiptBarrier,
     voice_steering_debug: voiceSteeringDebug,
     narrator_debug: narratorDebug,
+    scientific_evidence_trace: scientificEvidenceTrace,
     resolved_turn_summary: {
       turn_id: canonicalActiveTurnId,
       final_status: "final_answer",
@@ -2737,20 +2996,20 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       debug?.live_interpretation_epoch_delta ??
       agentLoop?.live_interpretation_epoch_delta,
     pending_server_request: agentLoop?.pending_request ?? payload.pending_server_request ?? payload.pending_request ?? null,
-    backend_debug_response_ref:
-      asRecord(debug?.debug_export_ref) ??
-      asRecord(payload.debug_export_ref) ??
-      undefined,
-    debug_export_source: asRecord(debug?.debug_export_ref) || asRecord(payload.debug_export_ref)
-      ? "backend_ref_advertised"
+    backend_debug_response_ref: projectedBackendDebugRef ?? undefined,
+    debug_export_ref: projectedBackendDebugRef ?? undefined,
+    debug_export_source: isReplyScopedDebugProjection
+      ? debugExportSource || "rendered_reply"
       : backendSolverArtifactPresent || capabilityLaneBackendArtifactPresent || imageLensPromptLeakRecovered
         ? "embedded_backend_payload"
-        : "client_projection",
-    backend_debug_response_status: asRecord(debug?.debug_export_ref) || asRecord(payload.debug_export_ref)
-      ? "ref_advertised"
-      : backendSolverArtifactPresent || capabilityLaneBackendArtifactPresent || imageLensPromptLeakRecovered
+        : projectedBackendDebugRef
+          ? "backend_ref_advertised"
+          : "client_projection",
+    backend_debug_response_status: backendSolverArtifactPresent || capabilityLaneBackendArtifactPresent || imageLensPromptLeakRecovered
         ? "embedded_payload"
-        : "not_advertised",
+        : projectedBackendDebugRef
+          ? "ref_advertised"
+          : "not_advertised",
     debug_export_anti_determinism_audit: {
       verdict: "clean",
       checks: [
@@ -2763,9 +3022,10 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       ],
     },
   };
-  const visibleFinalAnswerForParity = modelSynthesizedFinalDraft
-    ? selectedFinalAnswer
-    : readString(reply.content) ?? selectedFinalAnswer;
+  const visibleFinalAnswerForParity =
+    modelSynthesizedFinalDraft || backendEntrypointProjectionBlocked || terminalIsTypedFailure
+      ? selectedFinalAnswer
+      : readString(reply.content) ?? selectedFinalAnswer;
   const uiDebugParityHarness = buildHelixUiDebugParityHarnessSnapshot({
     visibleFinalAnswer: visibleFinalAnswerForParity,
     debugExport: envelopeWithoutHash,

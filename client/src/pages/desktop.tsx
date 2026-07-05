@@ -53,6 +53,16 @@ import {
   type WorkstationViewState,
 } from "@/lib/workstation/workstationDeepLink";
 import { useProfileStorageSync } from "@/lib/workstation/profileStorageSync";
+import {
+  HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT,
+  fetchAccountCapabilityPolicy,
+  readCachedAccountCapabilityPolicy,
+} from "@/lib/workstation/accountCapabilityPolicy";
+import {
+  HELIX_USER_ACCOUNT_POLICY,
+  resolveHelixAccountPanelAccess,
+  type HelixAccountCapabilityPolicy,
+} from "@shared/helix-account-session";
 
 const LAYOUT_COLLECTION_KEYS = ["panels", "windows", "openPanels", "items", "children", "columns", "stack", "slots"];
 const MAX_LAYOUT_DEPTH = 5;
@@ -149,6 +159,9 @@ export default function DesktopPage({
   const urlSyncRestoringRef = useRef(false);
   const environmentAppliedRef = useRef(false);
   const autoOpenSuppressRef = useRef<Set<string> | null>(null);
+  const accountPolicyRef = useRef<HelixAccountCapabilityPolicy>(
+    readCachedAccountCapabilityPolicy() ?? HELIX_USER_ACCOUNT_POLICY,
+  );
   const { mood } = useLumaMoodTheme({ randomize: true, listenToBus: true });
   const orientation = layoutVariant === "mobile" ? "mobile" : "desktop";
   const wallpaperRecipe = useMemo(
@@ -170,22 +183,40 @@ export default function DesktopPage({
   const workstationEnabled =
     workstationEnabledFlag && (workstationMode === "workstation" || layoutVariant === "mobile");
 
+  const canOpenPanelForAccount = useCallback((panelId: string): boolean => {
+    return resolveHelixAccountPanelAccess(accountPolicyRef.current, panelId).state === "available";
+  }, []);
+
+  const filterPanelsForAccount = useCallback(
+    (panelIds: readonly string[]): string[] => {
+      const filtered: string[] = [];
+      for (const panelId of panelIds) {
+        if (!getPanelDef(panelId)) continue;
+        if (!canOpenPanelForAccount(panelId)) continue;
+        if (!filtered.includes(panelId)) filtered.push(panelId);
+      }
+      return filtered;
+    },
+    [canOpenPanelForAccount],
+  );
+
   const openPanelUniversal = useCallback(
     (panelId: string) => {
       if (!panelId) return;
       if (!getPanelDef(panelId)) return;
+      if (!canOpenPanelForAccount(panelId)) return;
       if (workstationEnabled) {
         useWorkstationLayoutStore.getState().openPanelInActiveGroup(panelId);
         return;
       }
       open(panelId);
     },
-    [open, workstationEnabled],
+    [canOpenPanelForAccount, open, workstationEnabled],
   );
 
   const applyWorkstationViewState = useCallback(
     (viewState: WorkstationViewState) => {
-      const panels = [...viewState.panels];
+      const panels = filterPanelsForAccount(viewState.panels);
       if (viewState.activeDocPath && !panels.includes("docs-viewer")) {
         panels.push("docs-viewer");
       }
@@ -193,7 +224,10 @@ export default function DesktopPage({
       if (viewState.activeDocPath) {
         useDocViewerStore.getState().viewDoc(viewState.activeDocPath, viewState.anchor);
       }
-      const focusPanel = viewState.focusPanel ?? (viewState.activeDocPath ? "docs-viewer" : undefined);
+      const requestedFocusPanel = viewState.focusPanel ?? (viewState.activeDocPath ? "docs-viewer" : undefined);
+      const focusPanel = requestedFocusPanel && canOpenPanelForAccount(requestedFocusPanel)
+        ? requestedFocusPanel
+        : panels[0] ?? undefined;
       if (focusPanel && workstationEnabled) {
         const store = useWorkstationLayoutStore.getState();
         const hit = Object.values(store.groups).find((group) => group.panelIds.includes(focusPanel));
@@ -207,8 +241,32 @@ export default function DesktopPage({
         openPanelUniversal(focusPanel);
       }
     },
-    [openPanelUniversal, workstationEnabled],
+    [canOpenPanelForAccount, filterPanelsForAccount, openPanelUniversal, workstationEnabled],
   );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let canceled = false;
+    const applyPolicy = (policy: HelixAccountCapabilityPolicy | null | undefined) => {
+      accountPolicyRef.current = policy ?? HELIX_USER_ACCOUNT_POLICY;
+    };
+    const handlePolicyChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ account_policy?: HelixAccountCapabilityPolicy | null }>).detail;
+      applyPolicy(detail?.account_policy);
+    };
+    window.addEventListener(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT, handlePolicyChange as EventListener);
+    fetchAccountCapabilityPolicy()
+      .then((policy) => {
+        if (!canceled) applyPolicy(policy);
+      })
+      .catch(() => {
+        if (!canceled) applyPolicy(readCachedAccountCapabilityPolicy() ?? HELIX_USER_ACCOUNT_POLICY);
+      });
+    return () => {
+      canceled = true;
+      window.removeEventListener(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT, handlePolicyChange as EventListener);
+    };
+  }, []);
 
   useEffect(() => {
     registerFromManifest(panelRegistry, { allowDefaultOpen: false });
@@ -696,13 +754,13 @@ export default function DesktopPage({
           selectProjects([match.id]);
         }
       }
-      const panels = resolvePanelIds(layout.panels);
+      const panels = filterPanelsForAccount(resolvePanelIds(layout.panels));
       if (panels.includes(NOISE_GENS_PANEL_ID)) {
         autoOpenSuppressRef.current = NOISE_GENS_AUTO_OPEN_SUPPRESS;
       }
       panels.forEach((id) => openPanelUniversal(id));
     },
-    [openPanelUniversal, projects, selectProjects],
+    [filterPanelsForAccount, openPanelUniversal, projects, selectProjects],
   );
 
   const applyEnvironment = useCallback(
@@ -728,28 +786,43 @@ export default function DesktopPage({
   useEffect(() => {
     if (hashAppliedRef.current) return;
     if (typeof window === "undefined") return;
-    const viewState = parseWorkstationViewStateFromUrl(window.location.href);
-    if (
-      !viewState.projectSlug &&
-      viewState.panels.length === 0 &&
-      !viewState.focusPanel &&
-      !viewState.activeDocPath
-    ) {
-      return;
-    }
-    if (viewState.projectSlug) {
-      const match = projects.find((project) => project.hashSlug === viewState.projectSlug);
-      if (!match) {
+    let canceled = false;
+    const restore = async () => {
+      const viewState = parseWorkstationViewStateFromUrl(window.location.href);
+      await fetchAccountCapabilityPolicy()
+        .then((policy) => {
+          accountPolicyRef.current = policy;
+        })
+        .catch(() => {
+          accountPolicyRef.current = readCachedAccountCapabilityPolicy() ?? HELIX_USER_ACCOUNT_POLICY;
+        });
+      if (canceled) return;
+      if (
+        !viewState.projectSlug &&
+        viewState.panels.length === 0 &&
+        !viewState.focusPanel &&
+        !viewState.activeDocPath
+      ) {
         return;
       }
-      selectProjects([match.id]);
-    }
-    urlSyncRestoringRef.current = true;
-    applyWorkstationViewState(viewState);
-    window.setTimeout(() => {
-      urlSyncRestoringRef.current = false;
-    }, 0);
-    hashAppliedRef.current = true;
+      if (viewState.projectSlug) {
+        const match = projects.find((project) => project.hashSlug === viewState.projectSlug);
+        if (!match) {
+          return;
+        }
+        selectProjects([match.id]);
+      }
+      urlSyncRestoringRef.current = true;
+      applyWorkstationViewState(viewState);
+      window.setTimeout(() => {
+        urlSyncRestoringRef.current = false;
+      }, 0);
+      hashAppliedRef.current = true;
+    };
+    void restore();
+    return () => {
+      canceled = true;
+    };
   }, [applyWorkstationViewState, projects, selectProjects]);
 
   useEffect(() => {
@@ -759,11 +832,13 @@ export default function DesktopPage({
       const panelSet = new Set<string>();
       Object.values(layout.groups).forEach((group) => {
         group.panelIds.forEach((panelId) => {
-          if (getPanelDef(panelId)) panelSet.add(panelId);
+          if (getPanelDef(panelId) && canOpenPanelForAccount(panelId)) panelSet.add(panelId);
         });
       });
       const activeGroup = layout.groups[layout.activeGroupId] ?? null;
-      const focusPanel = activeGroup?.activePanelId && getPanelDef(activeGroup.activePanelId)
+      const focusPanel = activeGroup?.activePanelId &&
+        getPanelDef(activeGroup.activePanelId) &&
+        canOpenPanelForAccount(activeGroup.activePanelId)
         ? activeGroup.activePanelId
         : undefined;
       const docState = useDocViewerStore.getState();
@@ -806,7 +881,7 @@ export default function DesktopPage({
       unsubscribeLayout();
       unsubscribeDocs();
     };
-  }, [workstationEnabled]);
+  }, [canOpenPanelForAccount, workstationEnabled]);
 
   useEffect(() => {
     const handleApplyLayout = (event: Event) => {

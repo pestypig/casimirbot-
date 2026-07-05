@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildVoiceClientDebugProjectionFields,
   buildVoicePlaybackReceiptBarrierDebug,
   buildVoicePlaybackReconciliationDebug,
   resolveVoiceTimelineClientBuildStamp,
@@ -125,12 +126,136 @@ describe("ask-voice-diagnostics-export", () => {
       raw_content_included: false,
       output_authority: "playback_observation",
     });
+    expect(exportPayload.voiceAuthorityDebug).toMatchObject({
+      schema: "helix.voice_authority_debug_summary.v1",
+      voice_input_capture: {
+        mic_armed: true,
+        mic_arm_state: "on",
+        voice_input_state: "listening",
+        voice_signal_state: "speech",
+        observation_role: "input_capture_observation",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+      voice_output_playback: {
+        output_path_expected: "audio_graph",
+        current_utterance_path: "direct_element",
+        audio_unlocked: true,
+        audio_graph_attached: false,
+        observation_role: "output_playback_observation",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+      tool_admission: {
+        handoff_event_count: 0,
+        observation_role: "tool_admission_projection",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+      playback_receipt: {
+        receipt_count: 82,
+        latest_receipt_id: "receipt:81",
+        latest_status: "ended",
+        observation_role: "playback_receipt_observation",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+      terminal_answer_authority: {
+        receipts_are_answers: false,
+        playback_claim_requires_client_receipt: true,
+        final_answer_may_report_receipt_only: true,
+        terminal_authority_owner: "completed_solver_path",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      output_authority: "voice_debug_projection",
+    });
     expect(exportPayload.timelineEvents).toHaveLength(160);
     expect(exportPayload.timelineEvents[0].id).toBe("event:2");
   });
 
   it("returns null for missing diagnostics snapshots", () => {
     expect(sanitizeVoiceDiagnosticsForExport(null)).toBeNull();
+  });
+
+  it("builds client debug projection fields with voice authority separation", () => {
+    const projection = buildVoiceClientDebugProjectionFields({
+      nowMs: 999,
+      localPayload: {
+        exportedAtMs: 123,
+        client_voice_debug: {
+          voiceAuthorityDebug: {
+            schema: "helix.voice_authority_debug_summary.v1",
+            voice_input_capture: { observation_role: "input_capture_observation" },
+            voice_output_playback: { observation_role: "output_playback_observation" },
+            tool_admission: { observation_role: "tool_admission_projection" },
+            playback_receipt: { observation_role: "playback_receipt_observation" },
+            terminal_answer_authority: { receipts_are_answers: false },
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          },
+          playbackReceipts: [
+            {
+              receiptId: "receipt-1",
+              status: "delivered",
+            },
+          ],
+          playbackOutput: {
+            expectedPath: "direct_element",
+          },
+          playback: {
+            utteranceId: "utt-1",
+          },
+          voiceCalls: [
+            {
+              id: "call-1",
+              kind: "speak",
+            },
+          ],
+        },
+        unified_timeline: [
+          { channel: "voice_timeline", id: "voice-row" },
+          { channel: "voice_call", id: "call-row" },
+          { channel: "voice_playback_receipt", id: "receipt-row" },
+          { channel: "ask_live", id: "ask-row" },
+        ],
+      },
+    });
+
+    expect(projection).toMatchObject({
+      schema: "helix.client_debug_projection.v1",
+      source: "browser_runtime",
+      captured_at_ms: 123,
+      voice_authority_debug: {
+        schema: "helix.voice_authority_debug_summary.v1",
+        voice_input_capture: { observation_role: "input_capture_observation" },
+        voice_output_playback: { observation_role: "output_playback_observation" },
+        tool_admission: { observation_role: "tool_admission_projection" },
+        playback_receipt: { observation_role: "playback_receipt_observation" },
+        terminal_answer_authority: { receipts_are_answers: false },
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+      voice_playback_receipts: [{ receiptId: "receipt-1", status: "delivered" }],
+      voice_playback_output: { expectedPath: "direct_element" },
+      voice_playback_metrics: { utteranceId: "utt-1" },
+      voice_calls: [{ id: "call-1", kind: "speak" }],
+      unified_timeline_voice_rows: [
+        { channel: "voice_timeline", id: "voice-row" },
+        { channel: "voice_call", id: "call-row" },
+        { channel: "voice_playback_receipt", id: "receipt-row" },
+      ],
+    });
   });
 
   it("builds playback reconciliation from client receipts without mutating terminal answer", () => {

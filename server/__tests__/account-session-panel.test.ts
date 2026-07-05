@@ -1,6 +1,6 @@
 import express from "express";
 import request from "supertest";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { accountSessionRouter } from "../routes/account-session";
 import { discordRouter } from "../routes/discord";
 import { profileIngressRouter } from "../routes/profile-ingress";
@@ -26,11 +26,15 @@ const createApp = (): express.Express => {
 };
 
 describe("account session panel API", () => {
-  beforeEach(() => {
-    resetAccountSessionStore();
+  beforeEach(async () => {
+    await resetAccountSessionStore();
     resetProfileIngressStore();
     resetDiscordSessionStore();
     __resetHelixThreadLedgerStore();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("starts a local profile session without storing passwords", async () => {
@@ -57,6 +61,19 @@ describe("account session panel API", () => {
       },
     });
     expect(JSON.stringify(signIn.body).toLowerCase()).not.toContain("should-not-be-read");
+  });
+
+  it("treats no-cookie session status as user account policy", async () => {
+    const status = await request(createApp()).get("/api/account/session").expect(200);
+
+    expect(status.body).toMatchObject({
+      session: null,
+      account_policy: {
+        account_type: "user",
+        allowed_panels: expect.arrayContaining(["account-session", "docs-viewer", "scientific-calculator"]),
+        locked_panels: expect.arrayContaining(["live-answer-environment", "stage-play-badge-graph"]),
+      },
+    });
   });
 
   it("returns developer and user account policy shape from session status", async () => {
@@ -99,10 +116,31 @@ describe("account session panel API", () => {
       account_policy: {
         schema: "helix.account_capability_policy.v1",
         account_type: "user",
-        max_workstation_permission: "read",
-        locked_panels: expect.arrayContaining(["code-admin", "rag-admin", "document-image-lens"]),
+        max_workstation_permission: "act",
+        allowed_panels: expect.arrayContaining([
+          "account-session",
+          "workstation-clipboard-history",
+          "docs-viewer",
+          "image-lens",
+          "narrator",
+          "scientific-calculator",
+          "agi-task-history",
+          "theory-badge-graph",
+          "workstation-notes",
+          "workstation-storage-map",
+          "workstation-task-manager",
+          "moral-graph",
+        ]),
+        locked_panels: expect.arrayContaining([
+          "code-admin",
+          "rag-admin",
+          "document-image-lens",
+          "live-answer-environment",
+          "situation-room-pipelines",
+          "stage-play-badge-graph",
+        ]),
         locked_features: expect.arrayContaining(["runtime_agent_controls", "workstation_gateway_act"]),
-        allowed_runtime_agents: ["helix"],
+        allowed_runtime_agents: ["codex"],
       },
       session: {
         profile: {
@@ -113,6 +151,23 @@ describe("account session panel API", () => {
     expect(userStatus.body.account_policy.quotas.profile_storage_bytes).toBeLessThan(
       developerStatus.body.account_policy.quotas.profile_storage_bytes,
     );
+  });
+
+  it("does not mint a new developer account from local sign-in in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("HELIX_DEVELOPER_PROFILE_IDS", "");
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/account/session/sign-in")
+      .send({
+        profile_id: "profile:public-local",
+        display_name: "Public Local",
+        account_type: "developer",
+      })
+      .expect(200);
+
+    expect(response.body.session.profile.account_type).toBe("user");
+    expect(response.body.account_policy?.account_type ?? response.body.session.account_policy.account_type).toBe("user");
   });
 
   it("returns and enforces user profile storage quota metadata", async () => {
@@ -158,8 +213,8 @@ describe("account session panel API", () => {
     });
   });
 
-  it("starts a Google web-auth profile session keyed by provider subject", () => {
-    const receipt = signInWebAccountSession({
+  it("starts a Google web-auth profile session keyed by provider subject", async () => {
+    const receipt = await signInWebAccountSession({
       provider: "google",
       provider_subject: "google-sub-123",
       display_name: "DatDamPig",
@@ -187,9 +242,61 @@ describe("account session panel API", () => {
     expect(receipt.session?.profile.profile_id).not.toBe("dan@example.com");
   });
 
+  it("persists account sessions through a fresh app instance when the cookie is retained", async () => {
+    const firstApp = createApp();
+    const signIn = await request(firstApp)
+      .post("/api/account/session/sign-in")
+      .send({
+        profile_id: "profile:persistent-user",
+        display_name: "Persistent User",
+        account_type: "user",
+      })
+      .expect(200);
+    const cookie = signIn.headers["set-cookie"]?.[0];
+    expect(cookie).toContain("helix_session=");
+
+    const restartedApp = createApp();
+    const status = await request(restartedApp)
+      .get("/api/account/session")
+      .set("Cookie", cookie ?? "")
+      .expect(200);
+
+    expect(status.body.session.profile).toMatchObject({
+      profile_id: "profile:persistent-user",
+      display_name: "Persistent User",
+      account_type: "user",
+    });
+  });
+
+  it("revokes a persisted session on sign out", async () => {
+    const app = createApp();
+    const signIn = await request(app)
+      .post("/api/account/session/sign-in")
+      .send({
+        profile_id: "profile:sign-out-user",
+        display_name: "Sign Out User",
+        account_type: "user",
+      })
+      .expect(200);
+    const cookie = signIn.headers["set-cookie"]?.[0] ?? "";
+
+    await request(app)
+      .post("/api/account/session/sign-out")
+      .set("Cookie", cookie)
+      .expect(200);
+
+    const status = await request(createApp())
+      .get("/api/account/session")
+      .set("Cookie", cookie)
+      .expect(200);
+    expect(status.body.session).toBeNull();
+    expect(status.body.account_policy.account_type).toBe("user");
+  });
+
   it("reports usage from the thread ledger and linked Discord commander sessions", async () => {
     const app = createApp();
-    await request(app)
+    const agent = request.agent(app);
+    await agent
       .post("/api/account/session/sign-in")
       .send({ profile_id: "profile:datdampig", display_name: "DatDamPig" })
       .expect(200);
@@ -228,7 +335,7 @@ describe("account session panel API", () => {
       })
       .expect(200);
 
-    const status = await request(app).get("/api/account/session").expect(200);
+    const status = await agent.get("/api/account/session").expect(200);
 
     expect(status.body).toMatchObject({
       ok: true,
@@ -249,12 +356,13 @@ describe("account session panel API", () => {
 
   it("creates a profile ingress token and accepts scoped bearer events as observations", async () => {
     const app = createApp();
-    await request(app)
+    const agent = request.agent(app);
+    await agent
       .post("/api/account/session/sign-in")
       .send({ profile_id: "profile:datdampig", display_name: "DatDamPig" })
       .expect(200);
 
-    const tokenReceipt = await request(app)
+    const tokenReceipt = await agent
       .post("/api/account/profile-ingress/token")
       .send({ label: "Minehut bridge", scopes: ["source_event", "live_environment_event"] })
       .expect(200);
@@ -294,7 +402,7 @@ describe("account session panel API", () => {
       raw_secret_included: false,
       context_policy: "compact_context_pack_only",
     });
-    const status = await request(app).get("/api/account/session").expect(200);
+    const status = await agent.get("/api/account/session").expect(200);
     expect(status.body.profile_ingress_usage).toMatchObject({
       request_count: 2,
       accepted_count: 1,

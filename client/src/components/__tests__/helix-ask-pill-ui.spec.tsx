@@ -1037,7 +1037,7 @@ describe("HelixAskPill mic-first surface contract", () => {
   it("routes finalized voice into active-turn steering before normal Ask dispatch", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     expect(source).toContain("activeAskTurnIdRef.current");
-    expect(source).toContain("type VoiceSteeringReservation");
+    expect(source).toContain("type HelixAskVoiceSteeringReservation as VoiceSteeringReservation");
     expect(source).toContain("buildVoiceSteeringReservation");
     expect(source).toContain("steeringReservation: buildVoiceSteeringReservation()");
     expect(source).toContain("active_turn_completed_before_stt_final");
@@ -1553,7 +1553,7 @@ describe("HelixAskPill mic-first surface contract", () => {
   });
 
   it("keeps rendered-button debug copy bound when the visible final comes from terminal transcript rows", () => {
-    const questionText = "Codex UI gateway smoke 2026-06-29: use scientific-calculator.solve_expression with expression 8*9.";
+    const questionText = "Debug binding check: summarize the terminal transcript result for this turn.";
     const finalText =
       "I cannot claim the requested workstation tool or UI action ran because Helix did not produce a successful observation or action receipt for every gateway request.\n" +
       "Blocked or failed gateway request: scientific-calculator.solve_expression: expression_evaluation_failed.";
@@ -2506,6 +2506,10 @@ describe("HelixAskPill mic-first surface contract", () => {
       path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskActiveTurnListState.ts"),
       "utf8",
     );
+    const completedReplyBattleStateSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskCompletedReplyBattleState.ts"),
+      "utf8",
+    );
     expect(source).toContain("buildHelixTurnTranscriptRows");
     expect(source).toContain("buildHelixContinuousTurnStreamRows");
     expect(source).toContain("buildHelixCausalTurnTraceRows");
@@ -2643,7 +2647,8 @@ describe("HelixAskPill mic-first surface contract", () => {
     );
     expect(hardFailureSource).toContain("terminal_artifact_forbidden_by_route_contract");
     expect(source).toContain("buildReasoningBattleAmbientState");
-    expect(source).toContain("buildReasoningBattleAnswerTint");
+    expect(source).not.toContain("buildReasoningBattleAnswerTint({");
+    expect(completedReplyBattleStateSource).toContain("buildReasoningBattleAnswerTint({");
     expect(source).toContain("buildReasoningBattleBeats");
     expect(source).not.toContain("<HelixAskReasoningBattleStage");
     expect(reasoningMeterSurfaceSource).toContain("<HelixAskReasoningBattleStage");

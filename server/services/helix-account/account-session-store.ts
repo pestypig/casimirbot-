@@ -14,6 +14,7 @@ import {
   HELIX_ACCOUNT_SESSION_SCHEMA,
   HELIX_ACCOUNT_SESSION_STATUS_SCHEMA,
 } from "@shared/helix-account-session";
+import { ensureDatabase, getPool, resetDbClient } from "../../db/client";
 import { getHelixThreadLedgerEvents } from "../helix-thread/ledger";
 import { listDiscordVoiceSessions } from "../situation-room/discord-session-store";
 import {
@@ -25,13 +26,44 @@ import {
   verifyLocalPasswordProfileCredentials,
 } from "./local-password-profile-auth";
 
-let activeSession: HelixAccountSession | null = null;
-const sessionsById = new Map<string, HelixAccountSession>();
+type AccountRow = {
+  profile_id: string;
+  display_name: string;
+  email: string | null;
+  account_type: string;
+  provider: string;
+  provider_subject: string | null;
+  picture_url: string | null;
+  created_at: Date | string;
+  updated_at: Date | string;
+};
+
+type SessionRow = {
+  session_id: string;
+  profile_id: string;
+  status: string;
+  memory_scope: string;
+  account_policy: HelixAccountCapabilityPolicy | string;
+  created_at: Date | string;
+  updated_at: Date | string;
+  expires_at: Date | string | null;
+  display_name: string;
+  email: string | null;
+  account_type: string;
+  provider: string;
+  provider_subject: string | null;
+  picture_url: string | null;
+  account_created_at: Date | string;
+  account_updated_at: Date | string;
+};
 
 const normalize = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
 const nowIso = (): string => new Date().toISOString();
+
+const iso = (value: Date | string | null | undefined): string =>
+  value instanceof Date ? value.toISOString() : normalize(value) || nowIso();
 
 const normalizeAccountType = (value: unknown): HelixAccountType | null => {
   const normalized = normalize(value).toLowerCase();
@@ -46,25 +78,13 @@ const developerProfileIds = (): Set<string> =>
       .filter(Boolean),
   );
 
-const resolveSessionAccountType = (input: {
-  requestedAccountType?: string | null;
-  profileId: string;
-  authMode: "web_auth" | "local_dev_profile" | "local_password_profile";
-  devDefault?: boolean;
-}): HelixAccountType => {
-  const requested = normalizeAccountType(input.requestedAccountType);
-  if (requested && input.authMode === "local_dev_profile") return requested;
-  if (input.authMode === "local_dev_profile") return "developer";
-  if (input.authMode === "local_password_profile" && input.devDefault) return "developer";
-  if (developerProfileIds().has(input.profileId)) return "developer";
-  return "user";
-};
+const isProductionRuntime = (): boolean => normalize(process.env.NODE_ENV).toLowerCase() === "production";
 
 const policyForAccountType = (accountType: HelixAccountType): HelixAccountCapabilityPolicy =>
   buildHelixAccountCapabilityPolicy(accountType);
 
 export function getDefaultAccountCapabilityPolicy(): HelixAccountCapabilityPolicy {
-  return buildHelixAccountCapabilityPolicy("developer");
+  return buildHelixAccountCapabilityPolicy("user");
 }
 
 function buildUsageSummary(): HelixAccountUsageSummary {
@@ -89,6 +109,48 @@ function buildUsageSummary(): HelixAccountUsageSummary {
     estimated_token_count: estimatedTokens,
     window_started_at: events[0]?.ts ?? nowIso(),
     window_ended_at: events.at(-1)?.ts ?? nowIso(),
+  };
+}
+
+function parsePolicy(value: SessionRow["account_policy"], accountType: HelixAccountType): HelixAccountCapabilityPolicy {
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" ? parsed : policyForAccountType(accountType);
+    } catch {
+      return policyForAccountType(accountType);
+    }
+  }
+  return value && typeof value === "object" ? value : policyForAccountType(accountType);
+}
+
+function sessionFromRow(row: SessionRow): HelixAccountSession {
+  const accountType = normalizeAccountType(row.account_type) ?? "user";
+  return {
+    schema: HELIX_ACCOUNT_SESSION_SCHEMA,
+    session_id: row.session_id,
+    profile: {
+      profile_id: row.profile_id,
+      display_name: row.display_name,
+      email: row.email,
+      auth_mode:
+        row.provider === "google"
+          ? "web_auth"
+          : row.provider_subject && row.provider_subject !== row.profile_id
+            ? "local_password_profile"
+            : "local_dev_profile",
+      account_type: accountType,
+      provider: row.provider === "google" ? "google" : "local",
+      provider_subject: row.provider_subject,
+      picture_url: row.picture_url,
+      created_at: iso(row.account_created_at),
+      updated_at: iso(row.account_updated_at),
+    },
+    account_policy: parsePolicy(row.account_policy, accountType),
+    status: row.status === "signed_out" ? "signed_out" : "active",
+    memory_scope: row.memory_scope === "browser_session" ? "browser_session" : "profile",
+    created_at: iso(row.created_at),
+    updated_at: iso(row.updated_at),
   };
 }
 
@@ -124,16 +186,163 @@ function buildLinkedAccounts(session: HelixAccountSession | null): HelixAccountL
     : discordAccounts;
 }
 
-export function getAccountSessionById(sessionId?: string | null): HelixAccountSession | null {
-  const normalized = normalize(sessionId);
-  if (normalized) {
-    return sessionsById.get(normalized) ?? null;
-  }
-  return null;
+async function findAccountByProfileId(profileId: string): Promise<AccountRow | null> {
+  await ensureDatabase();
+  const { rows } = await getPool().query<AccountRow>(
+    `SELECT * FROM helix_accounts WHERE profile_id = $1 AND deleted_at IS NULL`,
+    [profileId],
+  );
+  return rows[0] ?? null;
 }
 
-export function getAccountSessionStatus(sessionId?: string | null): HelixAccountSessionStatus {
-  const session = getAccountSessionById(sessionId) ?? activeSession;
+async function resolveStoredAccountType(input: {
+  profileId: string;
+  requestedAccountType?: string | null;
+  authMode: "web_auth" | "local_dev_profile" | "local_password_profile";
+  devDefault?: boolean;
+}): Promise<HelixAccountType> {
+  const requested = normalizeAccountType(input.requestedAccountType);
+  const existing = await findAccountByProfileId(input.profileId);
+  const existingType = normalizeAccountType(existing?.account_type);
+  if (existingType) return existingType;
+  const envGrantsDeveloper = developerProfileIds().has(input.profileId);
+  if (requested && input.authMode === "local_dev_profile") {
+    if (requested === "developer" && isProductionRuntime() && !envGrantsDeveloper) return "user";
+    return requested;
+  }
+  if (input.authMode === "local_dev_profile") return isProductionRuntime() && !envGrantsDeveloper ? "user" : "developer";
+  if (input.authMode === "local_password_profile" && input.devDefault) return "developer";
+  if (envGrantsDeveloper) return "developer";
+  return "user";
+}
+
+async function upsertAccount(input: {
+  profile_id: string;
+  display_name: string;
+  email?: string | null;
+  account_type: HelixAccountType;
+  provider: "local" | "google";
+  provider_subject?: string | null;
+  picture_url?: string | null;
+}): Promise<AccountRow> {
+  await ensureDatabase();
+  const { rows } = await getPool().query<AccountRow>(
+    `
+      INSERT INTO helix_accounts (
+        profile_id, display_name, email, account_type, provider, provider_subject, picture_url, created_at, updated_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, now(), now())
+      ON CONFLICT (profile_id) DO UPDATE SET
+        display_name = EXCLUDED.display_name,
+        email = COALESCE(EXCLUDED.email, helix_accounts.email),
+        account_type = EXCLUDED.account_type,
+        provider = EXCLUDED.provider,
+        provider_subject = EXCLUDED.provider_subject,
+        picture_url = EXCLUDED.picture_url,
+        deleted_at = NULL,
+        updated_at = now()
+      RETURNING *;
+    `,
+    [
+      input.profile_id,
+      input.display_name,
+      input.email ?? null,
+      input.account_type,
+      input.provider,
+      input.provider_subject ?? input.profile_id,
+      input.picture_url ?? null,
+    ],
+  );
+  const account = rows[0];
+  if (input.provider_subject) {
+    await getPool().query(
+      `
+        INSERT INTO helix_account_linked_providers (
+          provider, provider_subject, profile_id, email, display_name, picture_url, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, now(), now())
+        ON CONFLICT (provider, provider_subject) DO UPDATE SET
+          profile_id = EXCLUDED.profile_id,
+          email = EXCLUDED.email,
+          display_name = EXCLUDED.display_name,
+          picture_url = EXCLUDED.picture_url,
+          updated_at = now();
+      `,
+      [
+        input.provider,
+        input.provider_subject,
+        input.profile_id,
+        input.email ?? null,
+        input.display_name,
+        input.picture_url ?? null,
+      ],
+    );
+  }
+  return account;
+}
+
+async function insertSession(input: {
+  account: AccountRow;
+  account_policy: HelixAccountCapabilityPolicy;
+  memory_scope?: "profile" | "browser_session";
+}): Promise<HelixAccountSession> {
+  const sessionId = `account_session:${crypto.randomUUID()}`;
+  await ensureDatabase();
+  await getPool().query(
+    `
+      INSERT INTO helix_account_sessions (
+        session_id, profile_id, status, memory_scope, account_policy, created_at, updated_at
+      )
+      VALUES ($1, $2, 'active', $3, $4::jsonb, now(), now())
+    `,
+    [
+      sessionId,
+      input.account.profile_id,
+      input.memory_scope ?? "profile",
+      JSON.stringify(input.account_policy),
+    ],
+  );
+  const joined = await getSessionRowById(sessionId);
+  if (!joined) throw new Error("account_session_insert_failed");
+  return sessionFromRow(joined);
+}
+
+async function getSessionRowById(sessionId?: string | null): Promise<SessionRow | null> {
+  const normalized = normalize(sessionId);
+  if (!normalized) return null;
+  await ensureDatabase();
+  const { rows } = await getPool().query<SessionRow>(
+    `
+      SELECT
+        s.*,
+        a.display_name,
+        a.email,
+        a.account_type,
+        a.provider,
+        a.provider_subject,
+        a.picture_url,
+        a.created_at AS account_created_at,
+        a.updated_at AS account_updated_at
+      FROM helix_account_sessions s
+      JOIN helix_accounts a ON a.profile_id = s.profile_id
+      WHERE s.session_id = $1
+        AND s.status = 'active'
+        AND a.deleted_at IS NULL
+        AND (s.expires_at IS NULL OR s.expires_at > now())
+      LIMIT 1;
+    `,
+    [normalized],
+  );
+  return rows[0] ?? null;
+}
+
+export async function getAccountSessionById(sessionId?: string | null): Promise<HelixAccountSession | null> {
+  const row = await getSessionRowById(sessionId);
+  return row ? sessionFromRow(row) : null;
+}
+
+export async function getAccountSessionStatus(sessionId?: string | null): Promise<HelixAccountSessionStatus> {
+  const session = sessionId ? await getAccountSessionById(sessionId) : null;
   const profileId = session?.profile.profile_id ?? null;
   const accountPolicy = session?.account_policy ?? getDefaultAccountCapabilityPolicy();
   return {
@@ -158,18 +367,12 @@ export function getAccountSessionStatus(sessionId?: string | null): HelixAccount
   };
 }
 
-function rememberSession(session: HelixAccountSession): HelixAccountSession {
-  sessionsById.set(session.session_id, session);
-  activeSession = session;
-  return session;
-}
-
-export function signInLocalAccountSession(input: {
+export async function signInLocalAccountSession(input: {
   profile_id?: string | null;
   display_name?: string | null;
   email?: string | null;
   account_type?: string | null;
-}): HelixAccountSessionReceipt {
+}): Promise<HelixAccountSessionReceipt> {
   const profileId = normalize(input.profile_id) || normalize(input.email);
   if (!profileId) {
     return {
@@ -182,34 +385,23 @@ export function signInLocalAccountSession(input: {
       credential_collection_allowed_in_agents: false,
     };
   }
-  const now = nowIso();
-  const accountType = resolveSessionAccountType({
+  const accountType = await resolveStoredAccountType({
     requestedAccountType: input.account_type,
     profileId,
     authMode: "local_dev_profile",
   });
-  const session: HelixAccountSession = {
-    schema: HELIX_ACCOUNT_SESSION_SCHEMA,
-    session_id: `account_session:${crypto.randomUUID()}`,
-    profile: {
-      profile_id: profileId,
-      display_name: normalize(input.display_name) || profileId,
-      email: normalize(input.email) || null,
-      auth_mode: "local_dev_profile",
-      account_type: accountType,
-      provider: "local",
-      provider_subject: profileId,
-      picture_url: null,
-      created_at: now,
-      updated_at: now,
-    },
+  const account = await upsertAccount({
+    profile_id: profileId,
+    display_name: normalize(input.display_name) || profileId,
+    email: normalize(input.email) || null,
+    account_type: accountType,
+    provider: "local",
+    provider_subject: profileId,
+  });
+  const session = await insertSession({
+    account,
     account_policy: policyForAccountType(accountType),
-    status: "active",
-    memory_scope: "profile",
-    created_at: now,
-    updated_at: now,
-  };
-  rememberSession(session);
+  });
   return {
     schema: HELIX_ACCOUNT_SESSION_RECEIPT_SCHEMA,
     ok: true,
@@ -222,10 +414,10 @@ export function signInLocalAccountSession(input: {
   };
 }
 
-export function signInLocalPasswordAccountSession(input: {
+export async function signInLocalPasswordAccountSession(input: {
   username?: string | null;
   password?: string | null;
-}): HelixAccountSessionReceipt {
+}): Promise<HelixAccountSessionReceipt> {
   const verification = verifyLocalPasswordProfileCredentials({
     username: input.username,
     password: input.password,
@@ -247,34 +439,23 @@ export function signInLocalPasswordAccountSession(input: {
       auth_method: "local_password_profile",
     };
   }
-  const now = nowIso();
-  const accountType = resolveSessionAccountType({
+  const accountType = await resolveStoredAccountType({
     profileId: verification.config.profile_id,
     authMode: "local_password_profile",
     devDefault: verification.config.dev_default,
   });
-  const session: HelixAccountSession = {
-    schema: HELIX_ACCOUNT_SESSION_SCHEMA,
-    session_id: `account_session:${crypto.randomUUID()}`,
-    profile: {
-      profile_id: verification.config.profile_id,
-      display_name: verification.config.display_name,
-      email: verification.config.email,
-      auth_mode: "local_password_profile",
-      account_type: accountType,
-      provider: "local",
-      provider_subject: verification.config.username,
-      picture_url: null,
-      created_at: now,
-      updated_at: now,
-    },
+  const account = await upsertAccount({
+    profile_id: verification.config.profile_id,
+    display_name: verification.config.display_name,
+    email: verification.config.email,
+    account_type: accountType,
+    provider: "local",
+    provider_subject: verification.config.username,
+  });
+  const session = await insertSession({
+    account,
     account_policy: policyForAccountType(accountType),
-    status: "active",
-    memory_scope: "profile",
-    created_at: now,
-    updated_at: now,
-  };
-  rememberSession(session);
+  });
   return {
     schema: HELIX_ACCOUNT_SESSION_RECEIPT_SCHEMA,
     ok: true,
@@ -289,13 +470,13 @@ export function signInLocalPasswordAccountSession(input: {
   };
 }
 
-export function signInWebAccountSession(input: {
+export async function signInWebAccountSession(input: {
   provider: "google";
   provider_subject?: string | null;
   display_name?: string | null;
   email?: string | null;
   picture_url?: string | null;
-}): HelixAccountSessionReceipt {
+}): Promise<HelixAccountSessionReceipt> {
   const providerSubject = normalize(input.provider_subject);
   if (!providerSubject) {
     return {
@@ -308,34 +489,24 @@ export function signInWebAccountSession(input: {
       credential_collection_allowed_in_agents: false,
     };
   }
-  const now = nowIso();
   const profileId = `${input.provider}:${providerSubject}`;
-  const accountType = resolveSessionAccountType({
+  const accountType = await resolveStoredAccountType({
     profileId,
     authMode: "web_auth",
   });
-  const session: HelixAccountSession = {
-    schema: HELIX_ACCOUNT_SESSION_SCHEMA,
-    session_id: `account_session:${crypto.randomUUID()}`,
-    profile: {
-      profile_id: profileId,
-      display_name: normalize(input.display_name) || normalize(input.email) || "Google user",
-      email: normalize(input.email) || null,
-      auth_mode: "web_auth",
-      account_type: accountType,
-      provider: input.provider,
-      provider_subject: providerSubject,
-      picture_url: normalize(input.picture_url) || null,
-      created_at: now,
-      updated_at: now,
-    },
+  const account = await upsertAccount({
+    profile_id: profileId,
+    display_name: normalize(input.display_name) || normalize(input.email) || "Google user",
+    email: normalize(input.email) || null,
+    account_type: accountType,
+    provider: input.provider,
+    provider_subject: providerSubject,
+    picture_url: normalize(input.picture_url) || null,
+  });
+  const session = await insertSession({
+    account,
     account_policy: policyForAccountType(accountType),
-    status: "active",
-    memory_scope: "profile",
-    created_at: now,
-    updated_at: now,
-  };
-  rememberSession(session);
+  });
   return {
     schema: HELIX_ACCOUNT_SESSION_RECEIPT_SCHEMA,
     ok: true,
@@ -348,19 +519,20 @@ export function signInWebAccountSession(input: {
   };
 }
 
-export function getAccountCapabilityPolicy(sessionId?: string | null): HelixAccountCapabilityPolicy {
-  const session = getAccountSessionById(sessionId) ?? activeSession;
+export async function getAccountCapabilityPolicy(sessionId?: string | null): Promise<HelixAccountCapabilityPolicy> {
+  const session = sessionId ? await getAccountSessionById(sessionId) : null;
   return session?.account_policy ?? getDefaultAccountCapabilityPolicy();
 }
 
-export function signOutAccountSession(sessionId?: string | null): HelixAccountSessionReceipt {
+export async function signOutAccountSession(sessionId?: string | null): Promise<HelixAccountSessionReceipt> {
   const normalized = normalize(sessionId);
-  const previous = normalized ? sessionsById.get(normalized) ?? null : activeSession;
+  const previous = normalized ? await getAccountSessionById(normalized) : null;
   if (normalized) {
-    sessionsById.delete(normalized);
-  }
-  if (!normalized || activeSession?.session_id === normalized) {
-    activeSession = null;
+    await ensureDatabase();
+    await getPool().query(
+      `UPDATE helix_account_sessions SET status = 'signed_out', updated_at = now() WHERE session_id = $1`,
+      [normalized],
+    );
   }
   return {
     schema: HELIX_ACCOUNT_SESSION_RECEIPT_SCHEMA,
@@ -374,7 +546,15 @@ export function signOutAccountSession(sessionId?: string | null): HelixAccountSe
   };
 }
 
-export function resetAccountSessionStore(): void {
-  activeSession = null;
-  sessionsById.clear();
+export async function resetAccountSessionStore(): Promise<void> {
+  await ensureDatabase();
+  await getPool().query(`DELETE FROM helix_account_events`);
+  await getPool().query(`DELETE FROM helix_account_profile_storage`);
+  await getPool().query(`DELETE FROM helix_account_sessions`);
+  await getPool().query(`DELETE FROM helix_account_linked_providers`);
+  await getPool().query(`DELETE FROM helix_accounts`);
+}
+
+export async function resetAccountSessionStoreAndDb(): Promise<void> {
+  await resetDbClient();
 }

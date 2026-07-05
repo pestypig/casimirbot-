@@ -3049,7 +3049,7 @@ export const DOC_FILE_METADATA: Record<string, DocFileMetadata> = {
   "docs/helix-ask-objective-loop-fallback-elimination-plan.md": {"mtimeMs":1774334238967,"mtimeIso":"2026-03-24T06:37:18.967Z","sizeBytes":6535},
   "docs/helix-ask-objective-loop-primary-execution-targeted-implementation.md": {"mtimeMs":1774371974392,"mtimeIso":"2026-03-24T17:06:14.392Z","sizeBytes":17043},
   "docs/helix-ask-objective-loop-verb-composition-blueprint.md": {"mtimeMs":1774363500545,"mtimeIso":"2026-03-24T14:45:00.545Z","sizeBytes":36553},
-  "docs/helix-ask-provider-capability-contracts.md": {"mtimeMs":1783245086895,"mtimeIso":"2026-07-05T09:51:26.895Z","sizeBytes":44688},
+  "docs/helix-ask-provider-capability-contracts.md": {"mtimeMs":1783272482698,"mtimeIso":"2026-07-05T17:28:02.698Z","sizeBytes":44867},
   "docs/helix-ask-readiness-debug-loop.md": {"mtimeMs":1776806801480,"mtimeIso":"2026-04-21T21:26:41.480Z","sizeBytes":11297},
   "docs/helix-ask-reasoning-ladder-optimization-plan.md": {"mtimeMs":1774300990178,"mtimeIso":"2026-03-23T21:23:10.178Z","sizeBytes":78661},
   "docs/helix-ask-reasoning-ladder-research-report.md": {"mtimeMs":1773970969055,"mtimeIso":"2026-03-20T01:42:49.055Z","sizeBytes":19533},

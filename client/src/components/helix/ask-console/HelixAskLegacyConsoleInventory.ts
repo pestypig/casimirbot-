@@ -22,10 +22,10 @@ export const HELIX_ASK_LEGACY_CONSOLE_ACTIVE_PATH = [
 
 export const HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT = {
   file: "client/src/components/helix/HelixAskPill.tsx",
-  lineCountAtInventory: 25821,
-  exportedComponentStartsAtLine: 7701,
-  liveRenderSliceStartsAtLine: 25633,
-  liveLegacyConsoleViewStartsAtLine: 25633,
+  lineCountAtInventory: 25459,
+  exportedComponentStartsAtLine: 7681,
+  liveRenderSliceStartsAtLine: 25271,
+  liveLegacyConsoleViewStartsAtLine: 25271,
   inventoryReason:
     "The active bridge still imports the whole legacy file, but the visible console render path is concentrated near the bottom and now enters the recrowned legacy console view before composing recrowned ask-console display owners.",
 } as const;
@@ -205,6 +205,13 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     source: "ask-console",
     evidence:
       "The live composer textarea props now run through buildHelixAskComposerTextareaState while draft syncing, paste handling, submit request wiring, input refs, and prompt admission remain in the bridge.",
+  },
+  {
+    key: "composer_prompt_history_navigation",
+    classification: "behavior_sensitive_recrowned_with_parity",
+    source: "ask-console",
+    evidence:
+      "Deterministic prompt-history entry shaping, up/down navigation, draft restoration, and textarea-boundary key admission moved to HelixAskPromptHistory with tests while prompt-history refs, draft mutation, textarea focus, and submit recording remain in the bridge.",
   },
   {
     key: "reply_projection_surface",

@@ -1,4 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import {
+  buildHelixAskHardBackendEntrypointRouteMetadata as buildRecrownedHardBackendEntrypointRouteMetadata,
+} from "@/components/helix/ask-console/HelixAskBackendEntrypointPolicy";
 
 let parseHelixAskQueuedQuestionsInput: typeof import("@/components/helix/HelixAskPill").parseHelixAskQueuedQuestionsInput;
 let buildHelixAskRepliesFromChatSession: typeof import("@/components/helix/HelixAskPill").buildHelixAskRepliesFromChatSession;
@@ -60,7 +63,43 @@ describe("Helix Ask backend entrypoint projection guard", () => {
         "Run scholarly-research.lookup_papers, fetch_full_text, and extract_numeric_parameters for Alcubierre metric energy estimates.",
       ),
     ).toBe(true);
+    expect(
+      requiresHelixAskBackendEntrypoint(
+        "Use the Image Lens region tool on the attached image. Inspect the header/caption area first, then inspect each equation block separately.",
+      ),
+    ).toBe(true);
     expect(requiresHelixAskBackendEntrypoint("What should I cook for dinner tonight?")).toBe(false);
+  });
+
+  it("builds hard backend Ask route metadata for Image Lens region prompts", () => {
+    const prompt =
+      "Use the Image Lens region tool on the attached image. Inspect the header/caption area first, then inspect each equation block separately.";
+    const metadata = buildRecrownedHardBackendEntrypointRouteMetadata({
+      question: prompt,
+      turnId: "ask:image-lens-turn",
+      threadId: "session-image-lens",
+    }) as Record<string, unknown>;
+    const sourceTarget = metadata.source_target_intent as Record<string, unknown>;
+    const mandatoryNextTool = metadata.mandatory_next_tool as Record<string, unknown>;
+
+    expect(metadata.source).toBe("hard_tool_backend_entrypoint");
+    expect(metadata.sourceTarget).toBe("image_lens");
+    expect(metadata.requiredToolFamily).toBe("visual_analysis");
+    expect(sourceTarget).toMatchObject({
+      schema: "helix.ask_source_target_intent.v1",
+      target_source: "image_lens",
+      target_kind: "visual_region_evidence",
+      strength: "hard",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+      precedence_reason: "hard_tool_family_backend_entrypoint_required",
+    });
+    expect(mandatoryNextTool).toMatchObject({
+      tool_name: "visual_analysis.inspect_image_region",
+      selected_capability: "visual_analysis.inspect_image_region",
+      required_tool_family: "visual_analysis",
+    });
   });
 
   it("does not treat tool-like quoted translation payloads as backend tool requests", () => {

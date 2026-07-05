@@ -726,12 +726,13 @@ describe("doc viewer math interaction", () => {
     expect(panelSource).toContain("sourceTextHash: rawMarkdownSourceHash");
     expect(panelSource).toContain("sourceTextCharCount: rawMarkdown.length");
     expect(panelSource).toContain("sourceBindingKey");
-    expect(panelSource).toContain("accountLocale: interfaceLanguage.code");
+    expect(panelSource).toContain("const documentTranslationAccountLocale = interfaceLanguage.bcp47");
+    expect(panelSource).toContain("accountLocale: documentTranslationAccountLocale");
     expect(panelSource).toContain("targetLanguage: documentTranslationTargetLanguage");
     const projectionSnapshotRead = panelSource.match(
       /readDocumentLiveTranslationProjectionSnapshot\(\{[\s\S]*?\n        \}\)/,
     )?.[0] ?? "";
-    expect(projectionSnapshotRead).toContain("locale: interfaceLanguage.code");
+    expect(projectionSnapshotRead).toContain("locale: documentTranslationAccountLocale");
     expect(projectionSnapshotRead).toContain("sourceHash: rawMarkdownSourceHash");
     expect(projectionSnapshotRead).not.toContain("sourceIdentityKey: activeLiveTranslationSourceIdentityKey");
     expect(projectionSnapshotRead).toContain("projectionTarget: HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK");
@@ -757,23 +758,23 @@ describe("doc viewer math interaction", () => {
     const pendingInlineState = panelSource.match(
       /buildPendingDocumentInlineTranslationState\(\{[\s\S]*?\n    \}\);/,
     )?.[0] ?? "";
-    expect(pendingInlineState).toContain("accountLocale: interfaceLanguage.code");
+    expect(pendingInlineState).toContain("accountLocale: documentTranslationAccountLocale");
     expect(pendingInlineState).toContain("targetLanguage: documentTranslationTargetLanguage");
     expect(pendingInlineState).toContain("sourceTextHash: hashDocumentSource(sourceText)");
     const markdownMailEnqueue = panelSource.match(
       /enqueueDocumentMarkdownTranslationMail\(\{[\s\S]*?\n      \}\);/,
     )?.[0] ?? "";
-    expect(markdownMailEnqueue).toContain("locale: interfaceLanguage.code");
+    expect(markdownMailEnqueue).toContain("locale: documentTranslationAccountLocale");
     expect(markdownMailEnqueue).toContain("targetLanguage: documentTranslationTargetLanguage");
-    expect(markdownMailEnqueue).toContain("accountLocale: interfaceLanguage.code");
+    expect(markdownMailEnqueue).toContain("accountLocale: documentTranslationAccountLocale");
     expect(markdownMailEnqueue).toContain("sourceIdentityKey: pendingTranslationState.sourceIdentityKey");
     expect(markdownMailEnqueue).toContain("projectionTarget: HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK");
     const laneSessionControl = panelSource.match(
       /runDocumentMarkdownTranslationLaneSessionControl\(\{[\s\S]*?\n      \}\);/,
     )?.[0] ?? "";
-    expect(laneSessionControl).toContain("locale: interfaceLanguage.code");
+    expect(laneSessionControl).toContain("locale: documentTranslationAccountLocale");
     expect(laneSessionControl).toContain("targetLanguage: documentTranslationTargetLanguage");
-    expect(laneSessionControl).toContain("accountLocale: interfaceLanguage.code");
+    expect(laneSessionControl).toContain("accountLocale: documentTranslationAccountLocale");
     expect(laneSessionControl).toContain("sourceIdentityKey");
     expect(laneSessionControl).toContain("projectionTarget: HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK");
     expect(clientSource).toContain("runCapabilityLaneSessionControl({");
@@ -814,7 +815,7 @@ describe("doc viewer math interaction", () => {
     expect(panelSource).toContain("assistantAnswer: false");
     expect(panelSource).toContain("rawContentIncluded: false");
     expect(panelSource).toContain("targetLanguage: documentTranslationTargetLanguage");
-    expect(panelSource).toContain("accountLocale: interfaceLanguage.code");
+    expect(panelSource).toContain("accountLocale: documentTranslationAccountLocale");
     expect(panelSource).toContain("projectionTarget: HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK");
     expect(panelSource).not.toContain("requestDocumentTranslationUnits");
     expect(clientSource).toContain("/api/helix/stage-play/live-source-mail/document-markdown");

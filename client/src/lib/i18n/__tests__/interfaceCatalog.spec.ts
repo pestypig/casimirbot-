@@ -5,6 +5,7 @@ import { getInterfaceLanguageReadiness, INTERFACE_LANGUAGE_OPTIONS } from "@/lib
 import { createInterfaceTextResolver } from "@/lib/i18n/interfaceText";
 import { enMessages } from "@/lib/i18n/messages/en";
 import { hawMessages } from "@/lib/i18n/messages/haw";
+import { INTERFACE_TARGET_CATALOGS } from "@/lib/i18n/messages/targetCatalogs";
 import {
   INTERFACE_MESSAGE_IDS,
   interfaceSourceMessages,
@@ -40,22 +41,24 @@ describe("interface catalog integrity", () => {
     }
   });
 
-  it("keeps Hawaiian schema-bound and placeholder-compatible while partial", () => {
+  it("keeps target catalogs schema-bound and placeholder-compatible while partial", () => {
     const sourceIds = new Set<InterfaceMessageId>(INTERFACE_MESSAGE_IDS);
-    const hawOption = INTERFACE_LANGUAGE_OPTIONS.find((option) => option.code === "haw");
 
-    expect(hawOption?.translationMode).toBe("procedural_catalog");
-    expect(Object.keys(hawMessages).length).toBeGreaterThan(0);
-    expect(Object.keys(hawMessages).length).toBeLessThanOrEqual(INTERFACE_MESSAGE_IDS.length);
-    expect(hawOption ? getInterfaceLanguageReadiness(hawOption) : "").toBe(
-      `${Object.keys(hawMessages).length}/${INTERFACE_MESSAGE_IDS.length} catalog strings`,
-    );
+    for (const { code, catalog } of INTERFACE_TARGET_CATALOGS) {
+      const option = INTERFACE_LANGUAGE_OPTIONS.find((entry) => entry.code === code);
+      expect(option?.translationMode).toBe("procedural_catalog");
+      expect(Object.keys(catalog).length).toBeLessThanOrEqual(INTERFACE_MESSAGE_IDS.length);
+      expect(option ? getInterfaceLanguageReadiness(option) : "").toBe(
+        `${Object.keys(catalog).length}/${INTERFACE_MESSAGE_IDS.length} catalog strings`,
+      );
 
-    for (const [id, message] of Object.entries(hawMessages)) {
-      expect(sourceIds.has(id as InterfaceMessageId)).toBe(true);
-      expect(message.trim()).not.toBe("");
-      expect(placeholders(message)).toEqual(placeholders(enMessages[id as InterfaceMessageId]));
+      for (const [id, message] of Object.entries(catalog)) {
+        expect(sourceIds.has(id as InterfaceMessageId)).toBe(true);
+        expect(message.trim()).not.toBe("");
+        expect(placeholders(message)).toEqual(placeholders(enMessages[id as InterfaceMessageId]));
+      }
     }
+    expect(Object.keys(hawMessages).length).toBeGreaterThan(0);
   });
 
   it("does not emit fallback debug for unknown IDs without source fallback text", () => {

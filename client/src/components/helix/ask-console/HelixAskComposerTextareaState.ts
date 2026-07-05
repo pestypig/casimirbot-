@@ -9,6 +9,7 @@ export function buildHelixAskComposerTextareaState({
   className,
   placeholder,
   onPaste,
+  onKeyDown,
   onInputValue,
   onSubmitRequested,
 }: HelixAskComposerTextareaStateOptions): HelixAskComposerTextareaState {
@@ -17,6 +18,7 @@ export function buildHelixAskComposerTextareaState({
     className,
     placeholder,
     onPaste,
+    onKeyDown,
     onInputValue,
     onSubmitRequested,
   };

@@ -7,7 +7,7 @@ import { panelRegistry } from "@/lib/desktop/panelRegistry";
 import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
 import { useInterfaceText } from "@/lib/i18n/interfaceText";
 import { getInterfacePanelTitle } from "@/lib/i18n/panelTitles";
-import { isDiscoverableLaunchPanel } from "@/lib/workstation/launchPanelPolicy";
+import { isUserLaunchPanel } from "@/lib/workstation/launchPanelPolicy";
 import {
   HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT,
   fetchAccountCapabilityPolicy,
@@ -40,7 +40,10 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
   const availablePanels = useMemo(
     () =>
       panelRegistry
-        .filter((panel) => !panel.startHidden && isDiscoverableLaunchPanel(String(panel.id)))
+        .filter((panel) =>
+          !panel.startHidden &&
+          (accountPolicy?.account_type === "developer" || isUserLaunchPanel(String(panel.id)))
+        )
         .sort((a, b) => {
           const aReady = a.workstationCapabilities?.v1_job_ready ? 1 : 0;
           const bReady = b.workstationCapabilities?.v1_job_ready ? 1 : 0;
@@ -49,7 +52,7 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
           const bTitle = getInterfacePanelTitle(t, String(b.id), b.title);
           return aTitle.localeCompare(bTitle, undefined, { sensitivity: "base" });
         }),
-    [t],
+    [accountPolicy?.account_type, t],
   );
 
   useEffect(() => {

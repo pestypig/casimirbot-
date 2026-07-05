@@ -13,6 +13,10 @@ import {
   DOCUMENT_IMAGE_REGION_RECEIPT_VERSION,
 } from "@shared/contracts/document-image-region-receipt.v1";
 import {
+  buildScientificEvidencePacket,
+  buildScientificImageEvidenceSidecar,
+} from "@shared/scientific-evidence-adaptor";
+import {
   IMAGE_LENS_REGION_INSPECTION_CAPABILITY,
   IMAGE_LENS_REGION_INSPECTION_OBSERVATION_SCHEMA,
   IMAGE_LENS_REGION_INSPECTION_RECEIPT_SCHEMA,
@@ -50,6 +54,9 @@ const normalizeBbox = (bbox: DocumentImageBboxPxV1): DocumentImageBboxPxV1 => ({
   width: Math.max(1, Math.floor(bbox.width)),
   height: Math.max(1, Math.floor(bbox.height)),
 });
+
+const isDegenerateBbox = (bbox: DocumentImageBboxPxV1): boolean =>
+  bbox.width <= 1 || bbox.height <= 1;
 
 const nonEmpty = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
@@ -123,6 +130,31 @@ const readDataUrlImage = (value: unknown): { mime: string; base64: string } | nu
   return base64 ? { mime, base64 } : null;
 };
 
+const readDataUrlImageDimensions = async (
+  value: unknown,
+): Promise<{ width: number; height: number } | null> => {
+  const dataUrl = readDataUrlImage(value);
+  if (!dataUrl) return null;
+  try {
+    const metadata = await sharp(Buffer.from(dataUrl.base64, "base64"), { failOn: "none" }).metadata();
+    const width = metadata.width ?? 0;
+    const height = metadata.height ?? 0;
+    return width > 1 && height > 1 ? { width, height } : null;
+  } catch {
+    return null;
+  }
+};
+
+const resolveEffectiveBbox = async (request: ImageLensRegionInspectionRequestV1): Promise<DocumentImageBboxPxV1> => {
+  const bbox = normalizeBbox(request.bbox_px);
+  if (!isDegenerateBbox(bbox)) return bbox;
+  const dimensions =
+    await readDataUrlImageDimensions(request.source_image_ref) ??
+    await readDataUrlImageDimensions(request.page_image_ref) ??
+    await readDataUrlImageDimensions(request.crop_image_ref);
+  return dimensions ? { x: 0, y: 0, width: dimensions.width, height: dimensions.height } : bbox;
+};
+
 const cropImageBase64 = async (
   sourceBase64: string,
   bbox: DocumentImageBboxPxV1,
@@ -181,7 +213,7 @@ const buildExtractionPrompt = (request: ImageLensRegionInspectionRequestV1, bbox
 ].filter(Boolean).join("\n");
 
 const parseJsonObjectFromText = (text: string): Record<string, unknown> | null => {
-  const trimmed = text.trim();
+  const trimmed = text.replace(/\u200B/g, "").trim();
   if (!trimmed) return null;
   const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]?.trim();
   const candidates = [
@@ -199,11 +231,60 @@ const parseJsonObjectFromText = (text: string): Record<string, unknown> | null =
   return null;
 };
 
+const decodeJsonStringLiteral = (value: string): string | null => {
+  try {
+    return JSON.parse(`"${value}"`) as string;
+  } catch {
+    return value.replace(/\\n/g, "\n").replace(/\\"/g, "\"").replace(/\\\\/g, "\\");
+  }
+};
+
+const extractLooseJsonString = (text: string, key: string): string | null => {
+  const match = text.match(new RegExp(`"${key}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`, "s"));
+  return match?.[1] ? decodeJsonStringLiteral(match[1]) : null;
+};
+
+const extractLooseLatexCandidate = (text: string): string | null => {
+  const fieldMatch = text.match(/"latex_candidate"\s*:\s*([\s\S]*?)(?:,\s*"uncertainty"|\n\s*}|\s*})/);
+  const raw = fieldMatch?.[1]?.trim();
+  if (!raw) return null;
+  const chunks = [...raw.matchAll(/"((?:\\.|[^"\\])*)"/g)]
+    .map((match) => decodeJsonStringLiteral(match[1] ?? ""))
+    .filter((entry): entry is string => Boolean(entry && entry.trim()));
+  if (chunks.length > 0) return chunks.join("");
+  return extractLooseJsonString(text, "latex_candidate");
+};
+
+const extractLooseUncertainty = (text: string): string[] => {
+  const fieldMatch = text.match(/"uncertainty"\s*:\s*\[([\s\S]*?)\]/);
+  const raw = fieldMatch?.[1];
+  if (!raw) return [];
+  return [...raw.matchAll(/"((?:\\.|[^"\\])*)"/g)]
+    .map((match) => decodeJsonStringLiteral(match[1] ?? ""))
+    .filter((entry): entry is string => Boolean(entry && entry.trim()));
+};
+
+const parseLooseExtractionObjectFromText = (text: string): Record<string, unknown> | null => {
+  const normalized = text.replace(/\u200B/g, "");
+  const objectText = normalized.includes("{") && normalized.includes("}")
+    ? normalized.slice(normalized.indexOf("{"), normalized.lastIndexOf("}") + 1)
+    : normalized;
+  const textCandidate = extractLooseJsonString(objectText, "text_candidate");
+  const latexCandidate = extractLooseLatexCandidate(objectText);
+  const uncertainty = extractLooseUncertainty(objectText);
+  if (!textCandidate && !latexCandidate && uncertainty.length === 0) return null;
+  return {
+    ...(textCandidate ? { text_candidate: textCandidate } : {}),
+    ...(latexCandidate ? { latex_candidate: latexCandidate } : {}),
+    uncertainty,
+  };
+};
+
 const extractionFromVisionText = (
   text: string,
   backendRef: string,
 ): ImageLensRegionExtractionResult => {
-  const parsed = parseJsonObjectFromText(text);
+  const parsed = parseJsonObjectFromText(text) ?? parseLooseExtractionObjectFromText(text);
   const textCandidate = readString(parsed?.text_candidate ?? parsed?.textCandidate) ?? undefined;
   const latexCandidate = readString(parsed?.latex_candidate ?? parsed?.latexCandidate) ?? undefined;
   const tableCandidateRef = readString(parsed?.table_candidate_ref ?? parsed?.tableCandidateRef) ?? undefined;
@@ -475,6 +556,22 @@ const buildReceipt = (input: {
     input.request.parent_region_id,
     documentRegionReceipt.visualSource.frameId,
   ]);
+  const scientificEvidencePacket = buildScientificEvidencePacket({
+    cropRegionId: input.regionId,
+    sourceRefHash: imageHash({ cropImageRef: input.cropImageRef, bbox: input.bbox }),
+    sourceKind,
+    pageNumber: input.request.page_number ?? null,
+    bboxPx: input.bbox,
+    textCandidate: input.extraction.text_candidate ?? null,
+    latexCandidate: input.extraction.latex_candidate ?? null,
+    uncertainty: input.extraction.uncertainty,
+    extractionStatus: input.extraction.extraction_status,
+  });
+  const scientificEvidenceSidecar = buildScientificImageEvidenceSidecar({
+    sidecarId: `${input.evidenceId}:scientific_image_sidecar`,
+    sourceRefHash: scientificEvidencePacket.source_ref_hash,
+    packets: [scientificEvidencePacket],
+  });
   return {
     schema: IMAGE_LENS_REGION_INSPECTION_RECEIPT_SCHEMA,
     capability: IMAGE_LENS_REGION_INSPECTION_CAPABILITY,
@@ -500,6 +597,8 @@ const buildReceipt = (input: {
     parent_region_id: input.request.parent_region_id ?? null,
     detail: input.request.detail ?? "auto",
     document_region_receipt: documentRegionReceipt,
+    scientific_evidence_packet: scientificEvidencePacket,
+    scientific_evidence_sidecar: scientificEvidenceSidecar,
     claim_boundary: {
       cropObservationOnly: true,
       ocrCandidateOnly: true,
@@ -547,7 +646,12 @@ const buildObservationPacket = (input: {
   action: "inspect_image_region",
   status: input.status,
   produced_artifact_refs: input.receipt
-    ? [input.observationRef, input.receipt.evidence_id, input.receipt.region_id]
+    ? [
+        input.observationRef,
+        input.receipt.evidence_id,
+        input.receipt.region_id,
+        input.receipt.scientific_evidence_sidecar?.sidecar_id,
+      ].filter((value): value is string => Boolean(value))
     : [input.observationRef],
   observation_summary: input.summary,
   receipts: input.receipt
@@ -580,6 +684,8 @@ const buildObservationPacket = (input: {
           latex_candidate: input.receipt.latex_candidate ?? null,
           extraction_status: input.receipt.extraction_status,
           uncertainty: input.receipt.uncertainty,
+          scientific_evidence_packet: input.receipt.scientific_evidence_packet,
+          scientific_evidence_sidecar: input.receipt.scientific_evidence_sidecar,
           receipt: input.receipt,
           terminal_eligible: false,
           assistant_answer: false,
@@ -594,18 +700,55 @@ const buildObservationPacket = (input: {
         ? ["ask_user", "repair"]
         : ["repair", "fail_closed"],
   produced_affordances: input.receipt
-    ? [{
-        schema: "helix.workstation_typed_affordance.v1",
-        kind: "image_lens_region_evidence",
-        role: "producer",
-        source_capability: IMAGE_LENS_REGION_INSPECTION_CAPABILITY,
-        artifact_ref: input.receipt.evidence_id,
-        source_refs: input.receipt.source_refs,
-        claim_boundary: "Image Lens crop evidence is observation-only and requires solver re-entry before any answer.",
-        status: "available",
-        assistant_answer: false,
-        raw_content_included: false,
-      }]
+    ? [
+        {
+          schema: "helix.workstation_typed_affordance.v1",
+          kind: "image_lens_region_evidence",
+          role: "producer",
+          source_capability: IMAGE_LENS_REGION_INSPECTION_CAPABILITY,
+          artifact_ref: input.receipt.evidence_id,
+          source_refs: input.receipt.source_refs,
+          claim_boundary: "Image Lens crop evidence is observation-only and requires solver re-entry before any answer.",
+          status: "available",
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        ...(input.receipt.scientific_evidence_packet
+          ? [{
+              schema: "helix.workstation_typed_affordance.v1" as const,
+              kind: "scientific_evidence" as const,
+              role: "producer" as const,
+              source_capability: IMAGE_LENS_REGION_INSPECTION_CAPABILITY,
+              artifact_ref: input.receipt.scientific_evidence_packet.source_ref_hash,
+              source_refs: [input.receipt.evidence_id, input.receipt.scientific_evidence_packet.crop_region_id],
+              claim_boundary: "Scientific evidence packet is typed observation only; branch gates must validate it before graph or calculator handoff.",
+              status: input.receipt.scientific_evidence_packet.admissibility.status === "inadmissible_for_exact_mapping"
+                ? "blocked" as const
+                : "available" as const,
+              assistant_answer: false as const,
+              raw_content_included: false as const,
+            }]
+          : []),
+        ...(input.receipt.scientific_evidence_sidecar
+          ? [{
+              schema: "helix.workstation_typed_affordance.v1" as const,
+              kind: "scientific_evidence" as const,
+              role: "producer" as const,
+              source_capability: IMAGE_LENS_REGION_INSPECTION_CAPABILITY,
+              artifact_ref: input.receipt.scientific_evidence_sidecar.sidecar_id,
+              source_refs: [
+                input.receipt.evidence_id,
+                ...input.receipt.scientific_evidence_sidecar.packet_refs.slice(0, 8),
+              ],
+              claim_boundary: "Scientific image evidence sidecar is transient observation memory; downstream graph/calculator tools must validate admissibility before use.",
+              status: input.receipt.scientific_evidence_sidecar.admissibility.status === "admissible_observation"
+                ? "available" as const
+                : "blocked" as const,
+              assistant_answer: false as const,
+              raw_content_included: false as const,
+            }]
+          : []),
+      ]
     : [],
   consumed_affordances: [],
   typed_handoff_contract: {
@@ -613,7 +756,7 @@ const buildObservationPacket = (input: {
     producer_capability: IMAGE_LENS_REGION_INSPECTION_CAPABILITY,
     consumer_capability: null,
     required_affordance_kinds: ["source_ref"],
-    produced_affordance_kinds: input.receipt ? ["image_lens_region_evidence", "visual_observer_eval"] : [],
+    produced_affordance_kinds: input.receipt ? ["image_lens_region_evidence", "visual_observer_eval", "scientific_evidence"] : [],
     missing_affordance_kinds: input.receipt ? [] : ["source_ref"],
     terminal_eligible: false,
     assistant_answer: false,
@@ -643,7 +786,7 @@ export const runImageLensRegionInspection = async (input: {
     env: input.env,
   });
   const normalizedSourceId = input.request.source_id.trim();
-  const bbox = normalizeBbox(input.request.bbox_px);
+  const bbox = await resolveEffectiveBbox(input.request);
 
   if (!normalizedSourceId) {
     const observationRef = `${turnId}:capability_lane:${IMAGE_LENS_REGION_INSPECTION_CAPABILITY}:${hashShort({ status: "missing_source_id", bbox })}`;
@@ -775,6 +918,8 @@ export const runImageLensRegionInspection = async (input: {
     ...(receipt.latex_candidate ? { latex_candidate: receipt.latex_candidate } : {}),
     extraction_status: receipt.extraction_status,
     uncertainty: receipt.uncertainty,
+    scientific_evidence_packet: receipt.scientific_evidence_packet,
+    scientific_evidence_sidecar: receipt.scientific_evidence_sidecar,
     deterministic: true,
     reentry_required: true,
     terminal_eligible: false,

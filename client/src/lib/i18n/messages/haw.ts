@@ -11,6 +11,11 @@ export const hawMessages = {
   "panel.title.storageMap": "Palapala Waihona",
   "panel.title.taskManager": "Task Manager",
   "workstation.panel.loadingTitle": "Ke hoʻouka nei iā {title}...",
+  "workstation.panel.loadingDetail": "Ke ho\u02bbom\u0101kaukau nei i ka workspace panel",
+  "workstation.panel.notFound": "\u02bbA\u02bbohe panel i loa\u02bba: {panelId}",
+  "workstation.panel.lockedTitle": "Ua laka \u02bbia \u02bbo {title}",
+  "workstation.panel.lockedDescription":
+    "M\u0101lama \u02bbia k\u0113ia hi\u02bbohi\u02bbona workstation no ke \u02bbano ho\u02bbomohala, a i \u02bbole ke k\u016bkulu \u02bbia nei no n\u0101 profile mea ho\u02bbohana.",
   "workstation.panelPicker.open": "Wehe i ka mea koho panel",
   "workstation.panelPicker.title": "Hoʻomaka panel",
   "workstation.path.segment.workspace": "Workstation",

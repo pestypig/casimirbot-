@@ -72,7 +72,7 @@ export async function buildHelixWorkspaceStorageStatus(
     "WORKSPACE_USER_STORAGE_QUOTA_BYTES",
   );
   const effectiveProfileQuota = input.profile_quota_bytes ?? profileQuota;
-  const profileUsage = getProfileStorageUsage(input.profile_id, {
+  const profileUsage = await getProfileStorageUsage(input.profile_id, {
     quota_bytes: effectiveProfileQuota,
   });
   const activeContextPacket = getLatestHelixRollingSessionContextPacket({

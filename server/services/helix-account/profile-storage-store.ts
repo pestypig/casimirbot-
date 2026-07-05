@@ -1,6 +1,4 @@
 import crypto from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
 import type { HelixWorkspaceMemoryArtifact } from "@shared/helix-workspace-memory-registry";
 import {
   HELIX_PROFILE_STORAGE_SNAPSHOT_SCHEMA,
@@ -10,6 +8,7 @@ import {
   type HelixProfileStorageWriteReceipt,
   type HelixProfileStorageWriteRequest,
 } from "@shared/helix-profile-storage";
+import { ensureDatabase, getPool } from "../../db/client";
 
 const DEFAULT_PROFILE_STORAGE_QUOTA_BYTES = 5 * 1024 * 1024;
 const MAX_PROFILE_STORAGE_QUOTA_BYTES = 50 * 1024 * 1024;
@@ -35,55 +34,6 @@ export function getProfileStorageQuotaBytes(): number {
     parseBytes(process.env.WORKSPACE_USER_STORAGE_QUOTA_BYTES);
   if (configured == null) return DEFAULT_PROFILE_STORAGE_QUOTA_BYTES;
   return Math.min(MAX_PROFILE_STORAGE_QUOTA_BYTES, configured);
-}
-
-function profileStoreRoot(): string {
-  const explicit = normalize(process.env.HELIX_PROFILE_STORAGE_DIR);
-  return explicit ? path.resolve(explicit) : path.resolve(process.cwd(), ".cal", "profile-store");
-}
-
-function sanitizeProfileId(profileId: string): string {
-  return profileId.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 96) || "profile";
-}
-
-function profileSnapshotPath(profileId: string): string {
-  return path.join(profileStoreRoot(), `${sanitizeProfileId(profileId)}.snapshot.json`);
-}
-
-function profileEventsPath(profileId: string): string {
-  return path.join(profileStoreRoot(), `${sanitizeProfileId(profileId)}.events.jsonl`);
-}
-
-function sha256(value: string): string {
-  return crypto.createHash("sha256").update(value, "utf8").digest("hex");
-}
-
-function atomicWriteJson(filePath: string, payload: unknown): void {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const tmp = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-  fs.writeFileSync(tmp, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
-  fs.renameSync(tmp, filePath);
-}
-
-function appendProfileStorageEvent(profileId: string, snapshot: HelixProfileStorageSnapshot): void {
-  fs.mkdirSync(path.dirname(profileEventsPath(profileId)), { recursive: true });
-  const entry = {
-    schema: "helix.profile_storage_event.v1",
-    profile_id: profileId,
-    event_type: "snapshot_written",
-    entry_count: snapshot.entries.length,
-    artifact_count: snapshot.artifacts.length,
-    total_entry_bytes: snapshot.total_entry_bytes,
-    entry_hashes: snapshot.entries.map((item) => ({
-      storage_key: item.storage_key,
-      size_bytes: item.size_bytes,
-      sha256: sha256(item.value),
-      artifact_ids: item.artifact_ids,
-    })),
-    raw_profile_content_included: false,
-    ts: snapshot.updated_at ?? nowIso(),
-  };
-  fs.appendFileSync(profileEventsPath(profileId), `${JSON.stringify(entry)}\n`, "utf8");
 }
 
 function normalizeArtifact(
@@ -166,17 +116,43 @@ const resolveQuotaBytes = (quotaBytes?: number | null): number => {
   return getProfileStorageQuotaBytes();
 };
 
-export function readProfileStorageSnapshot(
+async function ensureProfileStorageAccount(profileId: string): Promise<void> {
+  await ensureDatabase();
+  await getPool().query(
+    `
+      INSERT INTO helix_accounts (
+        profile_id, display_name, account_type, provider, provider_subject, created_at, updated_at
+      )
+      VALUES ($1, $1, 'user', 'local', $1, now(), now())
+      ON CONFLICT (profile_id) DO NOTHING;
+    `,
+    [profileId],
+  );
+}
+
+export async function readProfileStorageSnapshot(
   profileId: string,
   options: { quota_bytes?: number | null } = {},
-): HelixProfileStorageSnapshot {
+): Promise<HelixProfileStorageSnapshot> {
   const normalizedProfileId = normalize(profileId);
   const quotaBytes = resolveQuotaBytes(options.quota_bytes);
   if (!normalizedProfileId) return { ...emptySnapshot(""), quota_bytes: quotaBytes };
-  const filePath = profileSnapshotPath(normalizedProfileId);
-  if (!fs.existsSync(filePath)) return { ...emptySnapshot(normalizedProfileId), quota_bytes: quotaBytes };
   try {
-    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8")) as HelixProfileStorageSnapshot;
+    await ensureDatabase();
+    const { rows } = await getPool().query<{ snapshot: HelixProfileStorageSnapshot | string }>(
+      `
+        SELECT snapshot
+        FROM helix_account_profile_storage
+        WHERE profile_id = $1 AND deleted_at IS NULL
+        LIMIT 1;
+      `,
+      [normalizedProfileId],
+    );
+    if (!rows[0]) return { ...emptySnapshot(normalizedProfileId), quota_bytes: quotaBytes };
+    const parsed =
+      typeof rows[0].snapshot === "string"
+        ? JSON.parse(rows[0].snapshot) as HelixProfileStorageSnapshot
+        : rows[0].snapshot;
     if (parsed?.schema !== HELIX_PROFILE_STORAGE_SNAPSHOT_SCHEMA) {
       return { ...emptySnapshot(normalizedProfileId), quota_bytes: quotaBytes };
     }
@@ -192,11 +168,11 @@ export function readProfileStorageSnapshot(
   }
 }
 
-export function writeProfileStorageSnapshot(input: {
+export async function writeProfileStorageSnapshot(input: {
   profile_id: string;
   quota_bytes?: number | null;
   snapshot: HelixProfileStorageWriteRequest;
-}): HelixProfileStorageWriteReceipt {
+}): Promise<HelixProfileStorageWriteReceipt> {
   const quotaBytes = resolveQuotaBytes(input.quota_bytes);
   const profileId = normalize(input.profile_id);
   if (!profileId) {
@@ -246,8 +222,41 @@ export function writeProfileStorageSnapshot(input: {
     updated_at: updatedAt,
     raw_profile_content_included: true,
   };
-  atomicWriteJson(profileSnapshotPath(profileId), snapshot);
-  appendProfileStorageEvent(profileId, snapshot);
+  await ensureProfileStorageAccount(profileId);
+  await getPool().query(
+    `
+      INSERT INTO helix_account_profile_storage (
+        profile_id, snapshot, total_entry_bytes, quota_bytes, updated_at, deleted_at
+      )
+      VALUES ($1, $2::jsonb, $3, $4, now(), NULL)
+      ON CONFLICT (profile_id) DO UPDATE SET
+        snapshot = EXCLUDED.snapshot,
+        total_entry_bytes = EXCLUDED.total_entry_bytes,
+        quota_bytes = EXCLUDED.quota_bytes,
+        updated_at = now(),
+        deleted_at = NULL;
+    `,
+    [profileId, JSON.stringify(snapshot), totalEntryBytes, quotaBytes],
+  );
+  await getPool().query(
+    `
+      INSERT INTO helix_account_events (
+        event_id, profile_id, event_type, payload, created_at
+      )
+      VALUES ($1, $2, 'profile_storage_snapshot_written', $3::jsonb, now());
+    `,
+    [
+      `account_event:${crypto.randomUUID()}`,
+      profileId,
+      JSON.stringify({
+        entry_count: entries.length,
+        artifact_count: artifacts.length,
+        total_entry_bytes: totalEntryBytes,
+        quota_bytes: quotaBytes,
+        raw_profile_content_included: false,
+      }),
+    ],
+  );
   return {
     schema: HELIX_PROFILE_STORAGE_WRITE_RECEIPT_SCHEMA,
     ok: true,
@@ -263,57 +272,60 @@ export function writeProfileStorageSnapshot(input: {
   };
 }
 
-export function getProfileStorageUsage(
+export async function getProfileStorageUsage(
   profileId?: string | null,
   options: { quota_bytes?: number | null } = {},
-): {
+): Promise<{
   profile_id: string | null;
   size_bytes: number;
   quota_bytes: number;
   snapshot_count: number;
   path_ref: string;
   updated_at: string | null;
-} {
+}> {
   const quotaBytes = resolveQuotaBytes(options.quota_bytes);
   const normalizedProfileId = normalize(profileId);
   if (normalizedProfileId) {
-    const snapshot = readProfileStorageSnapshot(normalizedProfileId, { quota_bytes: quotaBytes });
+    const snapshot = await readProfileStorageSnapshot(normalizedProfileId, { quota_bytes: quotaBytes });
     return {
       profile_id: normalizedProfileId,
       size_bytes: snapshot.total_entry_bytes,
       quota_bytes: quotaBytes,
       snapshot_count: snapshot.updated_at ? 1 : 0,
-      path_ref: `profile://local/${sanitizeProfileId(normalizedProfileId)}`,
+      path_ref: `profile://db/${encodeURIComponent(normalizedProfileId)}`,
       updated_at: snapshot.updated_at,
     };
   }
 
-  const root = profileStoreRoot();
-  if (!fs.existsSync(root)) {
+  try {
+    await ensureDatabase();
+    const { rows } = await getPool().query<{ count: string; size_bytes: string | number | null; updated_at: Date | string | null }>(
+      `
+        SELECT
+          count(*)::text AS count,
+          COALESCE(sum(total_entry_bytes), 0) AS size_bytes,
+          max(updated_at) AS updated_at
+        FROM helix_account_profile_storage
+        WHERE deleted_at IS NULL;
+      `,
+    );
+    const row = rows[0];
+    return {
+      profile_id: null,
+      size_bytes: Number(row?.size_bytes ?? 0),
+      quota_bytes: quotaBytes,
+      snapshot_count: Number(row?.count ?? 0),
+      path_ref: "profile://db",
+      updated_at: row?.updated_at instanceof Date ? row.updated_at.toISOString() : normalize(row?.updated_at) || null,
+    };
+  } catch {
     return {
       profile_id: null,
       size_bytes: 0,
       quota_bytes: quotaBytes,
       snapshot_count: 0,
-      path_ref: "profile://local",
+      path_ref: "profile://db",
       updated_at: null,
     };
   }
-  const snapshots = fs.readdirSync(root).filter((file) => file.endsWith(".snapshot.json"));
-  let sizeBytes = 0;
-  let updatedAt: string | null = null;
-  for (const file of snapshots) {
-    const stats = fs.statSync(path.join(root, file));
-    sizeBytes += stats.size;
-    const mtime = stats.mtime.toISOString();
-    if (!updatedAt || mtime > updatedAt) updatedAt = mtime;
-  }
-  return {
-    profile_id: null,
-    size_bytes: sizeBytes,
-    quota_bytes: quotaBytes,
-    snapshot_count: snapshots.length,
-    path_ref: "profile://local",
-    updated_at: updatedAt,
-  };
 }

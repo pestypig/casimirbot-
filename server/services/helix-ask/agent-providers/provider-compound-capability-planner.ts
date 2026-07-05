@@ -1281,6 +1281,25 @@ const buildReadAloudSurfaceRequests = (body: Record<string, unknown>): Record<st
         ? workspaceSnapshot?.activeTranslationBlocks
         : undefined;
   const translatedText = readString(workspaceSnapshot?.active_translation_text ?? workspaceSnapshot?.activeTranslationText);
+  const firstTranslationBlock = Array.isArray(translationBlocks) ? readRecord(translationBlocks[0]) : null;
+  const accountLocale = readString(
+    workspaceSnapshot?.active_translation_account_locale ??
+      workspaceSnapshot?.activeTranslationAccountLocale ??
+      workspaceSnapshot?.account_locale ??
+      workspaceSnapshot?.accountLocale ??
+      firstTranslationBlock?.account_locale ??
+      firstTranslationBlock?.accountLocale ??
+      firstTranslationBlock?.locale,
+  );
+  const targetLanguage = readString(
+    workspaceSnapshot?.active_translation_target_language ??
+      workspaceSnapshot?.activeTranslationTargetLanguage ??
+      workspaceSnapshot?.target_language ??
+      workspaceSnapshot?.targetLanguage ??
+      firstTranslationBlock?.target_language ??
+      firstTranslationBlock?.targetLanguage ??
+      firstTranslationBlock?.locale,
+  );
   const capabilityId = isTranslationSurfacePrompt(prompt)
     ? DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY
     : DOCS_READ_VISIBLE_SURFACE_CAPABILITY;
@@ -1298,6 +1317,8 @@ const buildReadAloudSurfaceRequests = (body: Record<string, unknown>): Record<st
       source_doc_path: activeDocPath ?? undefined,
       text: isTranslationSurfacePrompt(prompt) ? translatedText : undefined,
       translation_blocks: translationBlocks,
+      account_locale: isTranslationSurfacePrompt(prompt) ? accountLocale ?? undefined : undefined,
+      target_language: isTranslationSurfacePrompt(prompt) ? targetLanguage ?? undefined : undefined,
       source_target_intent: {
         source: "helix_compound_capability_dependency_planner",
         target_source: "docs_viewer",
@@ -1315,6 +1336,8 @@ const buildReadAloudSurfaceRequests = (body: Record<string, unknown>): Record<st
         required_receipt_kind: "helix.interim_voice_callout_tool_result.v1",
         focused_panel: activePanel,
         active_doc_path: activeDocPath ?? null,
+        account_locale: isTranslationSurfacePrompt(prompt) ? accountLocale ?? null : null,
+        target_language: isTranslationSurfacePrompt(prompt) ? targetLanguage ?? null : null,
         named_doc_query: namedDocQuery,
         surface_query: query,
       },

@@ -19,6 +19,7 @@ export type HelixAskActionToolbarProps = {
   showRetryVoiceSample?: boolean;
   retryVoiceSampleDisabled?: boolean;
   onRetryVoiceSample: () => void;
+  showVisualCaptureControls?: boolean;
   visualSituationSourceStatus: "idle" | "active" | "requesting" | "error" | string;
   onCaptureVisualSource: () => void;
   visualSituationIncludeAudio: boolean;
@@ -88,6 +89,7 @@ export function HelixAskActionToolbar({
   showRetryVoiceSample = false,
   retryVoiceSampleDisabled = false,
   onRetryVoiceSample,
+  showVisualCaptureControls = true,
   visualSituationSourceStatus,
   onCaptureVisualSource,
   visualSituationIncludeAudio,
@@ -167,36 +169,40 @@ export function HelixAskActionToolbar({
             <RotateCcw className="h-4 w-4" />
           </button>
         ) : null}
-        <button
-          type="button"
-          data-helix-ask-action-item="true"
-          aria-label="Capture visual source for Situation Room"
-          aria-pressed={visualSituationSourceStatus === "active"}
-          title="Capture visual source"
-          className={`${actionButtonBaseClassName} ${readVisualSourceButtonClassName(visualSituationSourceStatus)}`}
-          onClick={onCaptureVisualSource}
-        >
-          <ImageIcon className={`h-4 w-4 ${visualSituationSourceStatus === "active" ? "animate-pulse" : ""}`} />
-        </button>
-        <button
-          type="button"
-          data-helix-ask-action-item="true"
-          aria-label={visualAudioTitle}
-          aria-pressed={visualSituationIncludeAudio}
-          title={visualAudioTitle}
-          className={`${actionButtonBaseClassName} ${readVisualAudioButtonClassName({
-            visualSituationIncludeAudio,
-            displayAudioStatus,
-          })}`}
-          onClick={onToggleVisualAudio}
-          disabled={visualAudioToggleDisabled}
-        >
-          <Headphones
-            className={`h-4 w-4 ${
-              visualSituationIncludeAudio && displayAudioStatus !== "error" ? "animate-pulse" : ""
-            }`}
-          />
-        </button>
+        {showVisualCaptureControls ? (
+          <>
+            <button
+              type="button"
+              data-helix-ask-action-item="true"
+              aria-label="Capture visual source for Situation Room"
+              aria-pressed={visualSituationSourceStatus === "active"}
+              title="Capture visual source"
+              className={`${actionButtonBaseClassName} ${readVisualSourceButtonClassName(visualSituationSourceStatus)}`}
+              onClick={onCaptureVisualSource}
+            >
+              <ImageIcon className={`h-4 w-4 ${visualSituationSourceStatus === "active" ? "animate-pulse" : ""}`} />
+            </button>
+            <button
+              type="button"
+              data-helix-ask-action-item="true"
+              aria-label={visualAudioTitle}
+              aria-pressed={visualSituationIncludeAudio}
+              title={visualAudioTitle}
+              className={`${actionButtonBaseClassName} ${readVisualAudioButtonClassName({
+                visualSituationIncludeAudio,
+                displayAudioStatus,
+              })}`}
+              onClick={onToggleVisualAudio}
+              disabled={visualAudioToggleDisabled}
+            >
+              <Headphones
+                className={`h-4 w-4 ${
+                  visualSituationIncludeAudio && displayAudioStatus !== "error" ? "animate-pulse" : ""
+                }`}
+              />
+            </button>
+          </>
+        ) : null}
         {submitButton}
       </div>
       <button

@@ -16,6 +16,10 @@ import type {
   HelixCapabilityLaneResolveTrace,
 } from "../helix-capability-lane";
 import type { HelixAgentStepObservationPacket } from "../helix-agent-step-observation-packet";
+import type {
+  ScientificEvidencePacketV1,
+  ScientificImageEvidenceSidecarV1,
+} from "../scientific-evidence-adaptor";
 
 export const IMAGE_LENS_REGION_INSPECTION_REQUEST_SCHEMA =
   "image_lens_region_inspection_request/v1" as const;
@@ -107,6 +111,8 @@ export type ImageLensRegionInspectionReceiptV1 = {
   parent_region_id: string | null;
   detail: ImageLensRegionInspectionDetailV1;
   document_region_receipt: DocumentImageRegionReceiptV1;
+  scientific_evidence_packet?: ScientificEvidencePacketV1;
+  scientific_evidence_sidecar?: ScientificImageEvidenceSidecarV1;
   claim_boundary: {
     cropObservationOnly: true;
     ocrCandidateOnly: true;
@@ -142,6 +148,8 @@ export type ImageLensRegionInspectionObservationV1 = {
   latex_candidate?: string;
   extraction_status: ImageLensRegionExtractionStatusV1;
   uncertainty: string[];
+  scientific_evidence_packet?: ScientificEvidencePacketV1;
+  scientific_evidence_sidecar?: ScientificImageEvidenceSidecarV1;
   deterministic: true;
   reentry_required: true;
   terminal_eligible: false;

@@ -17,9 +17,9 @@ const createApp = (): express.Express => {
 };
 
 describe("local password account session", () => {
-  afterEach(() => {
+  afterEach(async () => {
     vi.unstubAllEnvs();
-    resetAccountSessionStore();
+    await resetAccountSessionStore();
   });
 
   it("signs into a local admin profile with a server-side scrypt hash", async () => {

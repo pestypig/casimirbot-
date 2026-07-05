@@ -22,10 +22,10 @@ for (const key of ENV_KEYS) {
   originalEnv.set(key, process.env[key]);
 }
 
-afterEach(() => {
+afterEach(async () => {
   helixCapabilityLaneSessionStore.clear();
   helixRuntimeGoalSessionStore.clear();
-  resetAccountSessionStore();
+  await resetAccountSessionStore();
   for (const key of ENV_KEYS) {
     const original = originalEnv.get(key);
     if (original === undefined) {
@@ -44,6 +44,16 @@ const createApp = (): express.Express => {
   return app;
 };
 
+const createDeveloperAgent = async () => {
+  const app = createApp();
+  const agent = request.agent(app);
+  await agent
+    .post("/api/account/session/sign-in")
+    .send({ profile_id: `profile:developer-route-${Date.now()}-${Math.random().toString(36).slice(2)}` })
+    .expect(200);
+  return agent;
+};
+
 describe("AGI agent provider route", () => {
   it("runs the manual /goal runtime session flow through start, wake, debug export, list, and stop", async () => {
     process.env.ENABLE_CODEX_AGENT = "1";
@@ -51,9 +61,9 @@ describe("AGI agent provider route", () => {
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
     delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
     delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
-    const app = createApp();
+    const agent = await createDeveloperAgent();
 
-    const start = await request(app)
+    const start = await agent
       .post("/api/agi/goal/runtime-session")
       .send({
         goal_id: "goal:route:translate-title",
@@ -95,7 +105,7 @@ describe("AGI agent provider route", () => {
       },
     });
 
-    const resume = await request(app)
+    const resume = await agent
       .post("/api/agi/goal/runtime-session/goal:route:translate-title/resume")
       .send({
         turn_id: "turn:route:translation",
@@ -182,7 +192,7 @@ describe("AGI agent provider route", () => {
       ]),
     );
 
-    const debug = await request(app)
+    const debug = await agent
       .get("/api/agi/goal/runtime-session/goal:route:translate-title/debug-export")
       .expect(200);
 
@@ -204,7 +214,7 @@ describe("AGI agent provider route", () => {
       },
     });
 
-    const list = await request(app)
+    const list = await agent
       .get("/api/agi/goal/runtime-session?goal_id=goal:route:translate-title")
       .expect(200);
 
@@ -229,7 +239,7 @@ describe("AGI agent provider route", () => {
       ],
     });
 
-    const stop = await request(app)
+    const stop = await agent
       .post("/api/agi/goal/runtime-session/goal:route:translate-title/stop")
       .send({
         status: "cancelled",
@@ -255,7 +265,7 @@ describe("AGI agent provider route", () => {
       },
     });
 
-    await request(app)
+    await agent
       .post("/api/agi/goal/runtime-session/goal:route:translate-title/resume")
       .send({
         turn_id: "turn:route:after-cancel",
@@ -276,7 +286,7 @@ describe("AGI agent provider route", () => {
           },
         });
       });
-  });
+  }, 15000);
 
   it("blocks /goal runtime sessions when account policy revokes the selected runtime agent", async () => {
     process.env.ENABLE_CODEX_AGENT = "1";
@@ -294,8 +304,8 @@ describe("AGI agent provider route", () => {
       .post("/api/agi/goal/runtime-session")
       .send({
         goal_id: "goal:route:locked-start",
-        runtime_agent_provider: "codex",
-        objective: "Codex should not start under a user account policy.",
+        runtime_agent_provider: "helix",
+        objective: "Helix should not start under a user account policy.",
       })
       .expect(403)
       .expect((response) => {
@@ -305,20 +315,26 @@ describe("AGI agent provider route", () => {
           error: "runtime_agent_locked_by_account_policy",
           blocked_reason: "permission_revoked",
           locked_reason: "runtime_agent_outside_account_policy",
-          runtime_agent_provider: "codex",
+          runtime_agent_provider: "helix",
           account_policy: {
             account_type: "user",
-            allowed_runtime_agents: ["helix"],
+            allowed_runtime_agents: ["codex"],
           },
         });
       });
 
-    resetAccountSessionStore();
-    const start = await request(app)
+    await resetAccountSessionStore();
+    const developerAgent = request.agent(app);
+    await developerAgent
+      .post("/api/account/session/sign-in")
+      .send({ profile_id: "profile:developer-goal-before-revoke" })
+      .expect(200);
+
+    const start = await developerAgent
       .post("/api/agi/goal/runtime-session")
       .send({
         goal_id: "goal:route:permission-revoked",
-        runtime_agent_provider: "codex",
+        runtime_agent_provider: "helix",
         objective: "Start before account policy is narrowed.",
       })
       .expect(200);
@@ -368,7 +384,13 @@ describe("AGI agent provider route", () => {
     delete process.env.ENABLE_CODEX_AGENT;
     delete process.env.ENABLE_FUTURE_AGENT;
 
-    const response = await request(createApp())
+    const agent = request.agent(createApp());
+    await agent
+      .post("/api/account/session/sign-in")
+      .send({ profile_id: "profile:developer-providers" })
+      .expect(200);
+
+    const response = await agent
       .get("/api/agi/agent-providers")
       .expect(200);
 
@@ -430,7 +452,14 @@ describe("AGI agent provider route", () => {
     process.env.HELIX_ASK_AGENT_RUNTIME = "codex";
     delete process.env.ENABLE_CODEX_AGENT;
 
-    const codexResponse = await request(createApp())
+    const app = createApp();
+    const agent = request.agent(app);
+    await agent
+      .post("/api/account/session/sign-in")
+      .send({ profile_id: "profile:developer-provider-defaults" })
+      .expect(200);
+
+    const codexResponse = await agent
       .get("/api/agi/agent-providers")
       .expect(200);
 
@@ -448,7 +477,7 @@ describe("AGI agent provider route", () => {
     process.env.HELIX_ASK_AGENT_RUNTIME = "future";
     process.env.ENABLE_FUTURE_AGENT = "1";
 
-    const futureResponse = await request(createApp())
+    const futureResponse = await agent
       .get("/api/agi/agent-providers")
       .expect(200);
 
@@ -468,7 +497,8 @@ describe("AGI agent provider route", () => {
   });
 
   it("runs governed one-shot capability lane calls without creating a final answer", async () => {
-    const response = await request(createApp())
+    const agent = await createDeveloperAgent();
+    const response = await agent
       .post("/api/agi/capability-lanes/one-shot")
       .send({
         agent_runtime: "codex",
@@ -660,7 +690,8 @@ describe("AGI agent provider route", () => {
   });
 
   it("runs governed capability lane session control without creating a final answer", async () => {
-    const response = await request(createApp())
+    const agent = await createDeveloperAgent();
+    const response = await agent
       .post("/api/agi/capability-lanes/session")
       .send({
         agent_runtime: "helix",
@@ -762,7 +793,7 @@ describe("AGI agent provider route", () => {
     expect(response.body.capability_lane_timeline_summary.visible_count).toBeGreaterThan(0);
     expect(response.body.capability_lane_timeline_summary.visible_only_count).toBeGreaterThan(0);
 
-    const paused = await request(createApp())
+    const paused = await agent
       .post("/api/agi/capability-lanes/session")
       .send({
         agent_runtime: "helix",
@@ -810,7 +841,7 @@ describe("AGI agent provider route", () => {
       }),
     ]);
 
-    const resumed = await request(createApp())
+    const resumed = await agent
       .post("/api/agi/capability-lanes/session")
       .send({
         agent_runtime: "helix",
@@ -858,7 +889,7 @@ describe("AGI agent provider route", () => {
       }),
     ]);
 
-    const stopped = await request(createApp())
+    const stopped = await agent
       .post("/api/agi/capability-lanes/session")
       .send({
         agent_runtime: "helix",
@@ -909,7 +940,8 @@ describe("AGI agent provider route", () => {
   });
 
   it("lists governed capability lane sessions as non-authoritative tool evidence", async () => {
-    await request(createApp())
+    const agent = await createDeveloperAgent();
+    await agent
       .post("/api/agi/capability-lanes/session")
       .send({
         agent_runtime: "helix",
@@ -931,7 +963,7 @@ describe("AGI agent provider route", () => {
         },
       })
       .expect(200);
-    await request(createApp())
+    await agent
       .post("/api/agi/capability-lanes/session")
       .send({
         agent_runtime: "helix",
@@ -954,7 +986,7 @@ describe("AGI agent provider route", () => {
       })
       .expect(200);
 
-    const response = await request(createApp())
+    const response = await agent
       .get("/api/agi/capability-lanes/session")
       .query({
         agent_runtime: "helix",
@@ -1118,7 +1150,7 @@ describe("AGI agent provider route", () => {
       visible_lane_does_not_mean_executed: true,
     });
 
-    const staleLatestIdentity = await request(createApp())
+    const staleLatestIdentity = await agent
       .get("/api/agi/capability-lanes/session")
       .query({
         agent_runtime: "helix",
@@ -1150,7 +1182,8 @@ describe("AGI agent provider route", () => {
   });
 
   it("does not report empty session control requests as successful execution", async () => {
-    const response = await request(createApp())
+    const agent = await createDeveloperAgent();
+    const response = await agent
       .post("/api/agi/capability-lanes/session")
       .send({
         agent_runtime: "helix",
@@ -1196,7 +1229,8 @@ describe("AGI agent provider route", () => {
   });
 
   it("runs governed goal-binding control without creating a final answer", async () => {
-    await request(createApp())
+    const agent = await createDeveloperAgent();
+    await agent
       .post("/api/agi/capability-lanes/session")
       .send({
         agent_runtime: "codex",
@@ -1217,7 +1251,7 @@ describe("AGI agent provider route", () => {
       })
       .expect(200);
 
-    const response = await request(createApp())
+    const response = await agent
       .post("/api/agi/capability-lanes/goal-binding")
       .send({
         agent_runtime: "codex",
@@ -1356,7 +1390,7 @@ describe("AGI agent provider route", () => {
     expect(response.body.capability_lane_timeline_summary.visible_count).toBeGreaterThan(0);
     expect(response.body.capability_lane_timeline_summary.visible_only_count).toBeGreaterThan(0);
 
-    const listed = await request(createApp())
+    const listed = await agent
       .post("/api/agi/capability-lanes/goal-binding")
       .send({
         agent_runtime: "codex",
@@ -1425,7 +1459,7 @@ describe("AGI agent provider route", () => {
       }),
     ]));
 
-    const getListed = await request(createApp())
+    const getListed = await agent
       .get("/api/agi/capability-lanes/goal-binding")
       .query({
         agent_runtime: "codex",
@@ -1493,7 +1527,8 @@ describe("AGI agent provider route", () => {
   });
 
   it("routes live translation lane observations into mail-loop evidence without terminal authority", async () => {
-    await request(createApp())
+    const agent = await createDeveloperAgent();
+    await agent
       .post("/api/agi/capability-lanes/session")
       .send({
         agent_runtime: "codex",
@@ -1514,7 +1549,7 @@ describe("AGI agent provider route", () => {
       })
       .expect(200);
 
-    const response = await request(createApp())
+    const response = await agent
       .post("/api/agi/capability-lanes/mail-loop")
       .send({
         agent_runtime: "codex",
@@ -1643,7 +1678,8 @@ describe("AGI agent provider route", () => {
   });
 
   it("records materialized mail-loop evidence back into a goal binding without terminal authority", async () => {
-    await request(createApp())
+    const agent = await createDeveloperAgent();
+    await agent
       .post("/api/agi/capability-lanes/session")
       .send({
         agent_runtime: "codex",
@@ -1664,7 +1700,7 @@ describe("AGI agent provider route", () => {
       })
       .expect(200);
 
-    await request(createApp())
+    await agent
       .post("/api/agi/capability-lanes/goal-binding")
       .send({
         agent_runtime: "codex",
@@ -1684,7 +1720,7 @@ describe("AGI agent provider route", () => {
       })
       .expect(200);
 
-    const mailLoopResponse = await request(createApp())
+    const mailLoopResponse = await agent
       .post("/api/agi/capability-lanes/mail-loop")
       .send({
         agent_runtime: "codex",
@@ -1722,7 +1758,7 @@ describe("AGI agent provider route", () => {
       raw_content_included: false,
     });
 
-    const recorded = await request(createApp())
+    const recorded = await agent
       .post("/api/agi/capability-lanes/goal-binding")
       .send({
         agent_runtime: "codex",

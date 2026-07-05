@@ -109,8 +109,8 @@ const readGoalStopPolicy = (value: unknown): Partial<HelixRuntimeGoalStopPolicy>
   return Object.keys(policy).length ? policy : undefined;
 };
 
-agentProvidersRouter.get("/agent-providers", (req: Request, res: Response) => {
-  const accountPolicy = getAccountCapabilityPolicy(readHelixSessionCookie(req.headers.cookie));
+agentProvidersRouter.get("/agent-providers", async (req: Request, res: Response) => {
+  const accountPolicy = await getAccountCapabilityPolicy(readHelixSessionCookie(req.headers.cookie));
   const defaultProvider = resolveDefaultHelixAgentProvider();
   const providers = listHelixAgentProviders();
   const visibleProviders = providers.filter((provider) =>
@@ -189,7 +189,7 @@ agentProvidersRouter.get("/goal/runtime-session/:goalId/debug-export", (req: Req
 
 agentProvidersRouter.post("/goal/runtime-session", async (req: Request, res: Response) => {
   const body = readBodyRecord(req.body);
-  const accountPolicy = getAccountCapabilityPolicy(readHelixSessionCookie(req.headers.cookie));
+  const accountPolicy = await getAccountCapabilityPolicy(readHelixSessionCookie(req.headers.cookie));
   const runtimeAgentProvider = readRuntimeId(body.runtime_agent_provider ?? body.agent_runtime ?? body.agentRuntime);
   const providerAccess = resolveHelixRuntimeAgentAccess(accountPolicy, runtimeAgentProvider);
   if (providerAccess.state !== "available") {
@@ -233,7 +233,7 @@ agentProvidersRouter.post("/goal/runtime-session/:goalId/resume", async (req: Re
   try {
     const session = helixRuntimeGoalSessionStore.getGoalRuntimeSession(req.params.goalId);
     if (!session) throw new Error(`Goal session not found: ${req.params.goalId}`);
-    const accountPolicy = getAccountCapabilityPolicy(readHelixSessionCookie(req.headers.cookie));
+    const accountPolicy = await getAccountCapabilityPolicy(readHelixSessionCookie(req.headers.cookie));
     const providerAccess = resolveHelixRuntimeAgentAccess(accountPolicy, session.runtime_agent_provider);
     if (providerAccess.state !== "available") {
       const blocked = helixRuntimeGoalSessionStore.blockGoalRuntimeSession({
@@ -313,8 +313,8 @@ agentProvidersRouter.post("/goal/runtime-session/:goalId/stop", (req: Request, r
   }
 });
 
-agentProvidersRouter.get("/capability-lanes/session", (req: Request, res: Response) => {
-  const accountPolicy = getAccountCapabilityPolicy(readHelixSessionCookie(req.headers.cookie));
+agentProvidersRouter.get("/capability-lanes/session", async (req: Request, res: Response) => {
+  const accountPolicy = await getAccountCapabilityPolicy(readHelixSessionCookie(req.headers.cookie));
   const laneSessionId = readQueryString(req.query.lane_session_id ?? req.query.laneSessionId);
   const laneId = readQueryString(req.query.lane_id ?? req.query.laneId);
   const agentRuntime = readQueryString(req.query.agent_runtime ?? req.query.agentRuntime);
@@ -411,7 +411,7 @@ agentProvidersRouter.get("/capability-lanes/session", (req: Request, res: Respon
 });
 
 agentProvidersRouter.post("/capability-lanes/one-shot", async (req: Request, res: Response) => {
-  const accountPolicy = getAccountCapabilityPolicy(readHelixSessionCookie(req.headers.cookie));
+  const accountPolicy = await getAccountCapabilityPolicy(readHelixSessionCookie(req.headers.cookie));
   const body = req.body && typeof req.body === "object"
     ? (req.body as Record<string, unknown>)
     : {};
@@ -501,7 +501,7 @@ agentProvidersRouter.post("/capability-lanes/one-shot", async (req: Request, res
 });
 
 agentProvidersRouter.post("/capability-lanes/session", async (req: Request, res: Response) => {
-  const accountPolicy = getAccountCapabilityPolicy(readHelixSessionCookie(req.headers.cookie));
+  const accountPolicy = await getAccountCapabilityPolicy(readHelixSessionCookie(req.headers.cookie));
   const body = req.body && typeof req.body === "object"
     ? (req.body as Record<string, unknown>)
     : {};
@@ -572,7 +572,7 @@ agentProvidersRouter.post("/capability-lanes/session", async (req: Request, res:
 });
 
 agentProvidersRouter.get("/capability-lanes/goal-binding", async (req: Request, res: Response) => {
-  const accountPolicy = getAccountCapabilityPolicy(readHelixSessionCookie(req.headers.cookie));
+  const accountPolicy = await getAccountCapabilityPolicy(readHelixSessionCookie(req.headers.cookie));
   const body = {
     agent_runtime: req.query.agent_runtime ?? req.query.agentRuntime,
   };
@@ -661,7 +661,7 @@ agentProvidersRouter.get("/capability-lanes/goal-binding", async (req: Request, 
 });
 
 agentProvidersRouter.post("/capability-lanes/goal-binding", async (req: Request, res: Response) => {
-  const accountPolicy = getAccountCapabilityPolicy(readHelixSessionCookie(req.headers.cookie));
+  const accountPolicy = await getAccountCapabilityPolicy(readHelixSessionCookie(req.headers.cookie));
   const body = req.body && typeof req.body === "object"
     ? (req.body as Record<string, unknown>)
     : {};
@@ -731,7 +731,7 @@ agentProvidersRouter.post("/capability-lanes/goal-binding", async (req: Request,
 });
 
 agentProvidersRouter.post("/capability-lanes/mail-loop", async (req: Request, res: Response) => {
-  const accountPolicy = getAccountCapabilityPolicy(readHelixSessionCookie(req.headers.cookie));
+  const accountPolicy = await getAccountCapabilityPolicy(readHelixSessionCookie(req.headers.cookie));
   const body = req.body && typeof req.body === "object"
     ? (req.body as Record<string, unknown>)
     : {};
@@ -842,3 +842,4 @@ agentProvidersRouter.post("/capability-lanes/mail-loop", async (req: Request, re
     account_policy: accountPolicy,
   });
 });
+

@@ -31,13 +31,16 @@ describe("Helix Ask attachment commit guard", () => {
     expect(attachmentPayloadSource).toContain("validateHelixAskImageAttachmentForSubmit(attachment)");
   });
 
-  it("blocks visual prompts with stale attachment state before posting the turn", () => {
+  it("does not auto-capture visual context from prompt keywords before posting the turn", () => {
     const source = fs.readFileSync(sourcePath, "utf8");
 
     expect(source).toContain("submittedAttachmentChecks");
     expect(source).toContain("invalidSubmittedAttachment");
-    expect(source).toContain("isHelixAskVisualPrompt(first)");
-    expect(source).toContain("No usable visual evidence is available for this turn.");
+    expect(source).not.toContain("isHelixAskVisualPrompt(first)");
+    expect(source).not.toContain("No usable visual evidence is available for this turn.");
+    expect(source).not.toContain("Visual capture is not available for this account. Attach an image instead.");
+    expect(source).not.toContain("setAskStatus(\"Capturing and analyzing a fresh visual frame...\")");
+    expect(source).not.toContain("const capture = await requestHelixAskVisualFrame()");
   });
 
   it("supports multiple image chips and large-paste text attachment promotion", () => {
@@ -89,18 +92,35 @@ describe("Helix Ask attachment commit guard", () => {
     expect(source).toContain("The pasted text attachment is not available for this turn.");
   });
 
-  it("keeps pasted text attachment prompts out of the visual-input classifier", () => {
+  it("keeps visual prompt classification out of the Helix Ask submit bridge", () => {
     const source = fs.readFileSync(sourcePath, "utf8");
     const attachmentPromptPolicySource = fs.readFileSync(
       path.resolve(process.cwd(), "client/src/lib/helix/ask-attachment-prompt-policy.ts"),
       "utf8",
     );
 
-    expect(source).toContain("isHelixAskVisualPrompt(first)");
+    expect(source).not.toContain("isHelixAskVisualPrompt");
+    expect(source).toContain("const expectsVisualInput = submittedImageAttachments.length > 0 || hasUsableSubmittedVisualEvidence;");
     expect(attachmentPromptPolicySource).toContain("HELIX_ASK_TEXT_ATTACHMENT_PROMPT_PATTERN");
     expect(attachmentPromptPolicySource).toContain("HELIX_ASK_TEXT_ATTACHMENT_PROMPT_PATTERN.test(normalized)");
     expect(attachmentPromptPolicySource).toContain("(?:text|memo|note|document)");
     expect(attachmentPromptPolicySource).toContain("return false;");
+  });
+
+  it("does not treat Image Lens packet handoff prompts as UI visual-capture commands", () => {
+    const source = fs.readFileSync(sourcePath, "utf8");
+    const prompt = [
+      "Now send the extracted Image Lens scientific_evidence_packet into Theory Badge Graph reflection.",
+      "Gate the graph branches by the packet domain and symbol candidates.",
+      "Do not substitute tokamak, plasma, calculator, or unrelated theory formulas unless the Image Lens packet explicitly admits that branch.",
+    ].join("\n");
+
+    expect(prompt).toContain("Image Lens scientific_evidence_packet");
+    expect(source).toContain("buildHelixAskSubmitRunOptionsPayload({");
+    expect(source).toContain("submittedVisualEvidence");
+    expect(source).not.toContain("HELIX_ASK_VISUAL_SURFACE_PROMPT_PATTERN.test(first)");
+    expect(source).not.toContain("isHelixAskVisualPrompt(first)");
+    expect(source).not.toContain("Visual capture is not available for this account. Attach an image instead.");
   });
 
   it("routes pasted-text resume recall through backend conversation memory instead of local shortcuts", () => {
@@ -134,6 +154,10 @@ describe("Helix Ask attachment commit guard", () => {
 
   it("preserves backend-owned recall metadata across queued Ask turns", () => {
     const source = fs.readFileSync(sourcePath, "utf8");
+    const queuedTurnSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskQueuedTurn.ts"),
+      "utf8",
+    );
 
     expect(source).toContain("type QueuedAskTurn =");
     expect(source).toContain("options?: RunAskOptions");
@@ -157,15 +181,15 @@ describe("Helix Ask attachment commit guard", () => {
     expect(source).toContain("readStoredHelixAskContextCompactionResumeFrame()");
     expect(source).toContain("asksForPastedTextResumeFrame && latestContextCompactionResumeFrameForSubmit");
     expect(source).toContain("function buildQueuedAskTurn");
-    expect(source).toContain("backendOwnedPastedTextResumeRecall");
-    expect(source).toContain("context_resume_frame: args.contextResumeFrame");
+    expect(queuedTurnSource).toContain("backendOwnedPastedTextResumeRecall");
+    expect(queuedTurnSource).toContain("context_resume_frame: args.contextResumeFrame");
     expect(source).toContain("contextResumeFrame: contextResumeFrameForQueuedTurn");
-    expect(source).toContain(": baseRouteMetadata");
-    expect(source).toContain("routeMetadata: baseRouteMetadata");
-    expect(source).toContain("bypassWorkstationDispatch: true");
-    expect(source).toContain("forceReasoningDispatch: true");
-    expect(source).toContain("skipContextChooser: true");
-    expect(source).toContain("turnId: \"queued:pasted_text_resume_recall\"");
+    expect(queuedTurnSource).toContain(": baseRouteMetadata");
+    expect(queuedTurnSource).toContain("routeMetadata: baseRouteMetadata");
+    expect(queuedTurnSource).toContain("bypassWorkstationDispatch: true");
+    expect(queuedTurnSource).toContain("forceReasoningDispatch: true");
+    expect(queuedTurnSource).toContain("skipContextChooser: true");
+    expect(queuedTurnSource).toContain("turnId: \"queued:pasted_text_resume_recall\"");
     expect(source).toContain("void runAsk(next.question, next.capsuleIds");
     expect(source).toContain("...(next.options ?? {})");
     expect(source).toContain("buildQueuedAskTurn({");

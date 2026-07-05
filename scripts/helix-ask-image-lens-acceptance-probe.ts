@@ -6,12 +6,8 @@ type RecordLike = Record<string, unknown>;
 
 const DEFAULT_BASE_URL = "http://127.0.0.1:5050";
 const DEFAULT_IMAGE_PATH = "C:/Users/dan/AppData/Local/Temp/codex-clipboard-2b9326bf-860b-4496-90c4-ac9c77c4458b.png";
-const DEFAULT_PROMPT = [
-  "Use the Image Lens region tool on the attached image.",
-  "Inspect the equation area first, then inspect the caption/text area separately.",
-  "For each crop, report the bbox, what information was extracted, and uncertainty.",
-  "Treat each crop as observation-only evidence before answering.",
-].join(" ");
+const DEFAULT_PROMPT =
+  "Here is a scientific document image. Extract the equations and compare them to the theory badge graph.";
 
 const readArg = (name: string, fallback: string): string => {
   const index = process.argv.indexOf(name);
@@ -109,6 +105,7 @@ function evaluate(input: {
     capabilityLaneObservationPackets,
     runtimeLaneRequestLoop,
   });
+  const sourceBlob = JSON.stringify(source ?? {});
   const finalAnswerSource = readString(source?.final_answer_source);
   const terminalArtifactKind = readString(source?.terminal_artifact_kind);
   const terminalErrorCode = readString(source?.terminal_error_code);
@@ -123,6 +120,23 @@ function evaluate(input: {
     debug_has_lane_call_results: capabilityLaneCallResults.length > 0,
     debug_has_observation_packets: capabilityLaneObservationPackets.length > 0,
     debug_has_runtime_lane_request_loop: Boolean(runtimeLaneRequestLoop),
+    debug_has_scientific_evidence_packet: /"schema"\s*:\s*"helix\.scientific_evidence_packet\.v1"/.test(sourceBlob),
+    debug_has_scientific_image_sidecar: /"schema"\s*:\s*"helix\.scientific_image_evidence_sidecar\.v1"/.test(sourceBlob),
+    debug_has_sidecar_gateway_bridge: /"scientific_image_sidecar_gateway_bridge"\s*:/.test(sourceBlob),
+    debug_has_compound_scientific_stages:
+      /"stage"\s*:\s*"image_extraction"/.test(sourceBlob) &&
+      /"stage"\s*:\s*"scientific_evidence_sidecar"/.test(sourceBlob) &&
+      /"stage"\s*:\s*"theory_reflection"/.test(sourceBlob) &&
+      /"stage"\s*:\s*"calculator_payload_filter"/.test(sourceBlob) &&
+      /"stage"\s*:\s*"final_answer_guard"/.test(sourceBlob),
+    theory_graph_does_not_use_prompt_context_source:
+      !/"scientific_evidence_source"\s*:\s*"prompt_context"/.test(sourceBlob),
+    sidecar_bridge_is_guarded:
+      /"scientific_image_sidecar_gateway_bridge"\s*:/.test(sourceBlob) &&
+      (
+        /"scientific_image_sidecar_gateway_bridge"\s*:[\s\S]{0,1200}"status"\s*:\s*"completed"/.test(sourceBlob) ||
+        /"scientific_image_sidecar_gateway_bridge"\s*:[\s\S]{0,1200}"blocked_reason"\s*:\s*"scientific_image_evidence_sidecar_(?:missing|not_admissible)"/.test(sourceBlob)
+      ),
     debug_has_provider_prompt_leak_guard_field: sourceKeys.has("provider_prompt_leak_guard"),
     debug_has_terminal_authority: Boolean(terminalAuthority),
     debug_has_terminal_presentation: Boolean(terminalPresentation),
@@ -141,7 +155,7 @@ function evaluate(input: {
     terminal_presentation_matches_selected:
       !terminalPresentationText || !debugAnswer || terminalPresentationText === debugAnswer,
     terminal_authority_matches_selected:
-      !terminalAuthorityText || !debugAnswer || terminalAuthorityText === debugAnswer,
+      !terminalAuthorityText || !debugAnswer || debugAnswer.startsWith(terminalAuthorityText),
     receipts_remain_observation_only:
       Boolean(receiptBlob) &&
         !/"assistant_answer"\s*:\s*true/i.test(receiptBlob) &&

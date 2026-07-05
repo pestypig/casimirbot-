@@ -235,6 +235,25 @@ export const buildPromptDerivedReadableSurfaceGatewayCallRequests = (
         ? workspaceSnapshot.activeTranslationBlocks
         : undefined;
   const translatedText = readString(workspaceSnapshot?.active_translation_text ?? workspaceSnapshot?.activeTranslationText);
+  const firstTranslationBlock = Array.isArray(translationBlocks) ? readRecord(translationBlocks[0]) : null;
+  const accountLocale = readString(
+    workspaceSnapshot?.active_translation_account_locale ??
+      workspaceSnapshot?.activeTranslationAccountLocale ??
+      workspaceSnapshot?.account_locale ??
+      workspaceSnapshot?.accountLocale ??
+      firstTranslationBlock?.account_locale ??
+      firstTranslationBlock?.accountLocale ??
+      firstTranslationBlock?.locale,
+  );
+  const targetLanguage = readString(
+    workspaceSnapshot?.active_translation_target_language ??
+      workspaceSnapshot?.activeTranslationTargetLanguage ??
+      workspaceSnapshot?.target_language ??
+      workspaceSnapshot?.targetLanguage ??
+      firstTranslationBlock?.target_language ??
+      firstTranslationBlock?.targetLanguage ??
+      firstTranslationBlock?.locale,
+  );
   const calculatorContext =
     readRecord(workspaceSnapshot?.calculator_active_context) ??
     readRecord(workspaceSnapshot?.calculatorActiveContext) ??
@@ -270,6 +289,8 @@ export const buildPromptDerivedReadableSurfaceGatewayCallRequests = (
       selection_kind: selectionKind,
       text: asksTranslate ? translatedText : undefined,
       translation_blocks: translationBlocks,
+      account_locale: asksTranslate ? accountLocale ?? undefined : undefined,
+      target_language: asksTranslate ? targetLanguage ?? undefined : undefined,
       active_context: calculatorContext ?? undefined,
       source_target_intent: {
         source: "helix_prompt_derived_readable_surface",
@@ -285,6 +306,8 @@ export const buildPromptDerivedReadableSurfaceGatewayCallRequests = (
         required_observation_kind: "helix.workstation_readable_surface_observation.v1",
         focused_panel: activePanel,
         active_doc_path: activeDocPath,
+        account_locale: asksTranslate ? accountLocale ?? null : null,
+        target_language: asksTranslate ? targetLanguage ?? null : null,
         selection_required: Boolean(selectionKind),
         narrator_requested: false,
         terminal_eligible: false,

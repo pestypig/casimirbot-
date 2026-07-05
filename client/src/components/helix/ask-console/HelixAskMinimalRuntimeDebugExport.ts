@@ -33,6 +33,11 @@ function coerceText(value: unknown): string {
   }
 }
 
+function isBackendDebugExportEligibleTurnId(value: string): boolean {
+  const trimmed = value.trim();
+  return Boolean(trimmed && (trimmed.startsWith("ask:") || /(?:^|:)ask:[^:]+/i.test(trimmed)));
+}
+
 function readDebugExportRefFromRecord(record: Record<string, unknown> | null): HelixAskMinimalRuntimeDebugExportRef | null {
   if (!record) return null;
   const direct =
@@ -87,11 +92,15 @@ export async function materializeHelixAskMinimalRuntimeDebugCopyText(args: {
   materializeBackendDebugExport?: HelixAskMinimalRuntimeDebugExportMaterializer;
 }): Promise<string> {
   const request = buildHelixAskMinimalRuntimeDebugExportRequest(args.payload);
-  if (!args.payload.isLatest || !args.materializeBackendDebugExport) {
+  if (!args.materializeBackendDebugExport) {
+    return args.payload.debugCopyText;
+  }
+  const turnId = coerceText(request.turnId).trim();
+  if (!args.payload.isLatest && !isBackendDebugExportEligibleTurnId(turnId)) {
     return args.payload.debugCopyText;
   }
   const refTurnId = coerceText(request.debugExportRef?.turn_id).trim();
-  if (refTurnId && refTurnId !== request.turnId) {
+  if (refTurnId && refTurnId !== turnId) {
     return args.payload.debugCopyText;
   }
   try {

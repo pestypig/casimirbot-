@@ -74,10 +74,40 @@ function hasMaterializedBackendEntrypointTerminal(
   return Boolean(readMaterializedBackendEntrypointTerminalText(replyRecord, debugRecord));
 }
 
+function hasBackendEntrypointMaterializationSignal(
+  replyRecord: RecordLike | null,
+  debugRecord: RecordLike | null,
+): boolean {
+  for (const record of [replyRecord, debugRecord]) {
+    if (!record) continue;
+    const terminalAuthority = readAgentLoopAuditRecord(record.terminal_answer_authority);
+    if (terminalAuthority?.server_authoritative === true) return true;
+    const terminalResult = readAgentLoopAuditRecord(record.terminal_result);
+    if (terminalResult?.terminal_authority_ok === true || terminalResult?.route_authority_ok === true) return true;
+    const terminalResults = readAgentLoopAuditArray(record.terminal_results);
+    if (terminalResults.some((entry) => {
+      const result = readAgentLoopAuditRecord(entry);
+      return result?.terminal_authority_ok === true || result?.route_authority_ok === true;
+    })) {
+      return true;
+    }
+    const artifactLedger = readAgentLoopAuditArray(record.current_turn_artifact_ledger);
+    if (artifactLedger.some((entry) => {
+      const artifact = readAgentLoopAuditRecord(entry);
+      const kind = coerceText(artifact?.kind ?? artifact?.artifact_kind ?? artifact?.terminal_artifact_kind).trim();
+      return kind === "workstation_tool_evaluation" || kind === "model_synthesized_answer";
+    })) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function readMaterializedBackendEntrypointTerminalText(
   replyRecord: RecordLike | null,
   debugRecord: RecordLike | null,
 ): string {
+  if (!hasBackendEntrypointMaterializationSignal(replyRecord, debugRecord)) return "";
   const summary =
     readAgentLoopAuditRecord(replyRecord?.resolved_turn_summary) ??
     readAgentLoopAuditRecord(debugRecord?.resolved_turn_summary);

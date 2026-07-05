@@ -78,7 +78,7 @@ export function createGoogleAuthRouter(options: GoogleAuthRouterOptions = {}): R
         });
       }
 
-      const receipt = signInWebAccountSession({
+      const receipt = await signInWebAccountSession({
         provider: "google",
         provider_subject: payload.sub,
         display_name: payload.name ?? payload.email ?? null,
@@ -98,9 +98,9 @@ export function createGoogleAuthRouter(options: GoogleAuthRouterOptions = {}): R
     }
   });
 
-  router.post("/google/sign-out", (req, res) => {
+  router.post("/google/sign-out", async (req, res) => {
     clearHelixSessionCookie(res);
-    res.json(signOutAccountSession(readHelixSessionCookie(req.headers.cookie)));
+    res.json(await signOutAccountSession(readHelixSessionCookie(req.headers.cookie)));
   });
 
   return router;

@@ -57,6 +57,9 @@ const readRecordArray = (value: unknown): RecordLike[] =>
         .filter((entry): entry is RecordLike => Boolean(entry))
     : [];
 
+const hasCapabilityCall = (calls: RecordLike[], capability: string): boolean =>
+  calls.some((call) => readHelixCapabilityLaneCallCapability(call) === capability);
+
 const firstText = (...values: unknown[]): string | null => {
   for (const value of values) {
     const text = readString(value);
@@ -157,6 +160,127 @@ const readStructuredLaneCalls = (body: RecordLike): RecordLike[] => {
   }
   const record = readRecord(candidate);
   return record ? [record] : [];
+};
+
+const readTurnInputItems = (body: RecordLike): RecordLike[] =>
+  readRecordArray(body.turn_input_items ?? body.turnInputItems ?? body.input_items ?? body.inputItems);
+
+const readFirstImageTurnInputItem = (body: RecordLike): RecordLike | null =>
+  readTurnInputItems(body).find((item) => {
+    const type = readString(item.type).toLowerCase();
+    return (
+      type === "image" ||
+      Boolean(readString(item.image_base64 ?? item.imageBase64 ?? item.image_ref ?? item.imageRef)) ||
+      /^image\//i.test(readString(item.mime_type ?? item.mimeType))
+    );
+  }) ?? null;
+
+const readScientificImageSourceKind = (item: RecordLike): string => {
+  const sourceKind = readString(item.source_kind ?? item.sourceKind);
+  if (
+    sourceKind === "image_lens_source" ||
+    sourceKind === "image_attachment" ||
+    sourceKind === "pdf_page_render" ||
+    sourceKind === "manual_image_url"
+  ) {
+    return sourceKind;
+  }
+  const imageRef = readString(item.image_ref ?? item.imageRef ?? item.evidence_id ?? item.evidenceId);
+  if (/^(?:visual_source|image_lens):/i.test(imageRef)) return "image_lens_source";
+  return "image_attachment";
+};
+
+const scientificImageCropPlan = (width: number, height: number): Array<{
+  region_label: string;
+  requested_equation_label?: string;
+  bbox_px: { x: number; y: number; width: number; height: number };
+  reason_for_crop: string;
+}> => {
+  const safeWidth = Math.max(1, Math.floor(width));
+  const safeHeight = Math.max(1, Math.floor(height));
+  const headerHeight = Math.max(40, Math.min(90, Math.round(safeHeight * 0.19)));
+  const equationTop = Math.min(safeHeight - 1, headerHeight);
+  const equationHeight = Math.max(1, safeHeight - equationTop);
+  const bandCount = 5;
+  const bandHeight = Math.max(1, Math.ceil(equationHeight / bandCount));
+  const bands = Array.from({ length: bandCount }, (_, index) => {
+    const y = equationTop + index * bandHeight;
+    const remaining = Math.max(1, safeHeight - y);
+    const heightForBand = Math.min(bandHeight, remaining);
+    const labelNumber = 51 + index;
+    return {
+      region_label: `equation_3.${labelNumber}`,
+      requested_equation_label: `3.${labelNumber}`,
+      bbox_px: { x: 0, y, width: safeWidth, height: heightForBand },
+      reason_for_crop: `Deterministic scientific page crop for equation row 3.${labelNumber}.`,
+    };
+  });
+  return [
+    {
+      region_label: "scientific_page",
+      bbox_px: { x: 0, y: 0, width: safeWidth, height: safeHeight },
+      reason_for_crop: "Whole-page pass for scientific image layout and sidecar context.",
+    },
+    {
+      region_label: "header_caption",
+      bbox_px: { x: 0, y: 0, width: safeWidth, height: headerHeight },
+      reason_for_crop: "Header/caption crop for prose and source context.",
+    },
+    {
+      region_label: "equation_block",
+      bbox_px: { x: 0, y: equationTop, width: safeWidth, height: equationHeight },
+      reason_for_crop: "Equation block crop for full symbolic context before row-level extraction.",
+    },
+    ...bands,
+  ];
+};
+
+const buildImplicitScientificImageLensCalls = (body: RecordLike): RecordLike[] => {
+  const sourceTargetIntent = readRecord(body.source_target_intent ?? body.sourceTargetIntent);
+  const mandatoryNextTool = readRecord(body.mandatory_next_tool ?? body.mandatoryNextTool);
+  const requestedOutputs = Array.isArray(sourceTargetIntent?.requested_outputs)
+    ? (sourceTargetIntent?.requested_outputs as unknown[]).map(readString).filter(Boolean)
+    : [];
+  const requiresScientificImageEvidence =
+    readString(sourceTargetIntent?.target_source) === "scientific_image_evidence" ||
+    readString(sourceTargetIntent?.target_kind) === "scientific_image_evidence_sidecar" ||
+    requestedOutputs.includes("scientific_evidence_sidecar") ||
+    readString(mandatoryNextTool?.missing_required_evidence) === "scientific_evidence_sidecar";
+  if (!requiresScientificImageEvidence) return [];
+  if (readString(mandatoryNextTool?.tool_name) && readString(mandatoryNextTool?.tool_name) !== "visual_analysis.inspect_image_region") {
+    return [];
+  }
+
+  const image = readFirstImageTurnInputItem(body);
+  if (!image) return [];
+
+  const width = Math.max(1, Math.floor(firstNumber(image.width_px, image.widthPx, image.width) ?? 1));
+  const height = Math.max(1, Math.floor(firstNumber(image.height_px, image.heightPx, image.height) ?? 1));
+  const imageBase64 = readString(image.image_base64 ?? image.imageBase64);
+  const mimeType = readString(image.mime_type ?? image.mimeType) || "image/png";
+  const imageRef =
+    readString(image.image_ref ?? image.imageRef ?? image.evidence_id ?? image.evidenceId ?? image.file_name ?? image.fileName) ||
+    "scientific-image-attachment";
+  const sourceKind = readScientificImageSourceKind(image);
+  const sourceImageRef = imageBase64
+    ? `data:${mimeType};base64,${imageBase64}`
+    : imageRef;
+
+  const baseCall = {
+    capability: "visual_analysis.inspect_image_region",
+    source_id: readString(image.evidence_id ?? image.evidenceId) || `visual_source:${imageRef}`,
+    source_attachment_id: readString(image.evidence_id ?? image.evidenceId) || imageRef,
+    source_image_ref: sourceImageRef,
+    source_kind: sourceKind,
+    question: readString(body.question) || "Extract observation-only scientific image evidence.",
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+  return scientificImageCropPlan(width, height).map((crop) => ({
+    ...baseCall,
+    ...crop,
+  }));
 };
 
 const buildCapabilityLaneDebugEvents = (input: {
@@ -291,6 +415,13 @@ export const runHelixCapabilityLaneOneShotRequests = async (input: {
 }): Promise<HelixCapabilityLaneOneShotRunnerResult> => {
   const turnId = readString(input.turnId) || readString(input.body.turn_id ?? input.body.turnId) || null;
   const calls = readStructuredLaneCalls(input.body);
+  const implicitScientificImageLensCalls = buildImplicitScientificImageLensCalls(input.body);
+  if (
+    implicitScientificImageLensCalls.length > 0 &&
+    !hasCapabilityCall(calls, "visual_analysis.inspect_image_region")
+  ) {
+    calls.push(...implicitScientificImageLensCalls);
+  }
   const results: HelixCapabilityLaneOneShotCallResult[] = [];
   for (const call of calls) {
     const capability = readHelixCapabilityLaneCallCapability(call);

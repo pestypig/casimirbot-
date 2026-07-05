@@ -702,12 +702,24 @@ export function debugPayloadMatchesHelixAskLegacyRenderedReply(
   ]
     .map((candidate) => coerceControlText(candidate).trim())
     .filter(Boolean);
+  const expectedTurnMatched = Boolean(
+    expectedTurnId &&
+    turnCandidates.length > 0 &&
+    turnCandidates.some((candidate) => candidate === expectedTurnId),
+  );
   if (
     expectedTurnId &&
     turnCandidates.length > 0 &&
     !turnCandidates.some((candidate) => candidate === expectedTurnId)
   ) {
     return false;
+  }
+  if (
+    expectedTurnMatched &&
+    coerceControlText(parsed.debug_export_source).trim() === "backend_endpoint" &&
+    coerceControlText(parsed.backend_debug_response_status).trim() === "fetched"
+  ) {
+    return true;
   }
   const expectedQuestion = normalizedDebugReplyText(reply.question);
   if (!expectedQuestion) return true;
@@ -742,6 +754,9 @@ export function resolveHelixAskLegacyDebugExportBackendTarget(
     rebuildReason === "invalid_json_payload" ||
     rebuildReason === "rendered_reply" ||
     rebuildReason === "rendered_button_scope";
+  const renderedTurnScopeRebuild =
+    rebuildReason === "rendered_reply" ||
+    rebuildReason === "rendered_button_scope";
   const parsedDebug = readControlRecord(parsedPayload.debug);
   const refCandidates = [
     readBackendDebugRef(parsedPayload.backend_debug_response_ref),
@@ -749,7 +764,10 @@ export function resolveHelixAskLegacyDebugExportBackendTarget(
     readBackendDebugRef(parsedDebug?.backend_debug_response_ref),
     readBackendDebugRef(parsedDebug?.debug_export_ref),
   ].filter((entry): entry is HelixAskLegacyDebugExportBackendRef => Boolean(entry));
-  const activeTurnFallbackRef = !isReplyScopedRebuild && isHelixAskLegacyBackendDebugExportEligibleTurnId(activeTurnId)
+  const activeTurnFallbackRef =
+    (!isReplyScopedRebuild || renderedTurnScopeRebuild) &&
+    refCandidates.length === 0 &&
+    isHelixAskLegacyBackendDebugExportEligibleTurnId(activeTurnId)
     ? {
         endpoint: `/api/agi/ask/turn/${encodeURIComponent(activeTurnId)}/debug-export`,
         turn_id: activeTurnId,

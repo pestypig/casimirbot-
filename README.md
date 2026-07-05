@@ -22,6 +22,7 @@ those lanes without treating any receipt as a final answer by itself.
 | --- | --- | --- |
 | Helix Ask + Live Answer loop | Primary user and agent interface. Handles prompt interpretation, tool admission, evidence re-entry, terminal authority, streamed debug, and the visible answer. | `server/routes/agi.plan.ts`, `docs/helix-ask-agentic-loop-current-overview.md`, `docs/helix-ask-codex-loop-discipline.md`, `npm run helix:ask:regression:light` |
 | Agent runtime adapters | Provider edge for Codex Workstation Mode and future selectable agents. Keeps each runtime's invocation/protocol glue outside Helix Ask policy and workstation truth. | `server/services/helix-ask/agent-providers/`, `server/services/helix-ask/workstation-tool-gateway/`, `shared/helix-agent-runtime.ts`, `docs/helix-ask-codex-loop-discipline.md` |
+| Account-based workstation access | Release boundary for profile sign-in. `developer` accounts see the full development workstation; no-sign-in and `user` accounts get the stable public subset enforced by server policy, with UI locks only as guidance. | `shared/helix-account-session.ts`, `server/services/helix-account/account-session-store.ts`, `server/routes/agi.workstation-tool-gateway.ts`, `AGENTS.md` |
 | Workstation launch panels | User-facing capability surfaces. Launch panels expose docs, calculators, theory maps, stellar/solar simulators, NHM2 panels, notes, process graphs, and runtime diagnostics. | `client/src/pages/desktop.tsx`, `client/src/pages/helix-core.panels.ts`, `docs/helix-desktop-panels.md` |
 | Workstation tool calls | Deterministic actions Helix Ask can request. Tools open panels, inspect docs, search repo evidence, run calculator paths, update notes, build context packs, and return typed observations. | `docs/helix-ask/workstation-tool-contracts/README.md`, `client/src/lib/workstation/panelCapabilities.ts`, `client/src/lib/workstation/panelActionAdapters.ts`, `client/src/store/useWorkstationActionExecutionStore.ts` |
 | Theory congruence network | Canonical math architecture from first principles to laws, derived relations, runtime presets, calculator payloads, evidence refs, and claim boundaries. | `docs/architecture/theory-badge-graph-contract.md`, `shared/theory/helix-theory-badge-graph.ts`, `client/src/components/panels/TheoryBadgeGraphPanel.tsx` |
@@ -35,6 +36,9 @@ Prerequisites:
 - Node.js 20.x
 - npm 10.x
 - Optional: Python 3.11 for some physics and document tooling
+- Optional: a Postgres `DATABASE_URL` for persistent hosted account, job, and
+  workstation data. Without it, selected stores fall back to local or in-memory
+  development behavior.
 
 ```bash
 npm install
@@ -49,6 +53,40 @@ The development server runs Express with Vite middleware. Open:
 Do not start a separate Vite server for normal development; the dev scripts
 already wire the API and UI together. Use `npm run dev` for the default port or
 `npm run dev:agi:5050` for the AGI-enabled 5050 workflow.
+
+### Runtime Commands
+
+Use these commands from the repository root during setup and deployment:
+
+```bash
+npm install
+npm run build
+npm start
+```
+
+For local AGI-enabled development on port 5050:
+
+```bash
+npm install
+npm run dev:agi:5050
+```
+
+For a hosted shell such as Replit, pull the CasimirBot repository as the primary
+app checkout, set the environment variables below, install dependencies, build,
+and start the production server:
+
+```bash
+git pull
+npm install
+npm run build
+npm start
+```
+
+The Codex runtime should be treated as a pinned dependency or sidecar checkout,
+not merged into this app repository. CasimirBot owns the website, database,
+sessions, workstation policy, and Helix Ask routes. Codex runtime integration
+should enter through `server/services/helix-ask/agent-providers/` and the
+workstation gateway, with any external checkout kept ignored and version-pinned.
 
 ### Local Runtime Environment
 
@@ -81,6 +119,50 @@ npm run dev
 `GOOGLE_CLIENT_ID` and `VITE_GOOGLE_CLIENT_ID` should use the same Google OAuth
 Web application client ID. `VITE_GOOGLE_CLIENT_ID` is intentionally exposed to
 the browser; the other key and token values should remain private.
+
+### Hosted Runtime Environment
+
+For Replit or another hosted production server, keep secrets in the host's
+secret manager. Prefer one `DATABASE_URL` instead of separate `PGHOST`,
+`PGUSER`, `PGPASSWORD`, `PGDATABASE`, and `PGPORT` values. Neon Postgres URLs
+should include SSL, usually `sslmode=require`.
+
+Minimum hosted values:
+
+```bash
+DATABASE_URL="postgresql://USER:PASSWORD@HOST/DATABASE?sslmode=require"
+SESSION_SECRET=""
+OPENAI_API_KEY=""
+LLM_HTTP_BASE=""
+ELEVENLABS_API_KEY=""
+
+ENABLE_AGI=1
+ENABLE_ESSENCE=1
+LLM_POLICY=http
+LLM_RUNTIME=http
+HULL_MODE=1
+HULL_ALLOW_HOSTS=
+```
+
+Optional account and integration values:
+
+```bash
+GOOGLE_CLIENT_ID=""
+VITE_GOOGLE_CLIENT_ID=""
+DISCORD_BOT_TOKEN=""
+DISCORD_APPLICATION_ID=""
+```
+
+Do not print or paste real secret values into issue comments, chat logs, or
+agent prompts. Share only redacted forms such as
+`postgresql://USER:****@HOST/DATABASE?sslmode=require`.
+
+Hosted account persistence uses that same `DATABASE_URL`. Account profiles,
+sessions, linked providers, and profile storage snapshots are migrated into the
+`helix_accounts`, `helix_account_sessions`, `helix_account_linked_providers`,
+and `helix_account_profile_storage` tables. Do not add separate `PGHOST` or
+`PGUSER` style settings for this path; `server/db/client.ts` owns the full
+connection string.
 
 ## High-Signal Runs
 

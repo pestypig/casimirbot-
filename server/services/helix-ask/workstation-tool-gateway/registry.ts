@@ -81,6 +81,16 @@ import {
   theoryFrontierConjectureForbiddenClaimNotes,
 } from "@shared/theory/theory-frontier-conjecture-workbench";
 import { runHelixTheoryContextReflectionTool } from "@shared/theory/theory-context-reflection-tool";
+import {
+  buildScientificBranchGate,
+  buildScientificEvidencePacket,
+  buildScientificImageEvidenceSidecar,
+  buildScientificRunTrace,
+  SCIENTIFIC_EVIDENCE_PACKET_SCHEMA,
+  SCIENTIFIC_IMAGE_EVIDENCE_SIDECAR_SCHEMA,
+  type ScientificEvidencePacketV1,
+  type ScientificImageEvidenceSidecarV1,
+} from "@shared/scientific-evidence-adaptor";
 import { runHelixAskCivilizationBoundsTool } from "../../../skills/helix-ask.civilization-bounds-roadmap";
 import type {
   HelixWorkstationGatewayAdmissionRecord,
@@ -344,7 +354,7 @@ const manifestProducesAffordances = (capabilityId: string): HelixWorkstationType
     return ["source_ref", "text_evidence", "citation_evidence", "numeric_value_evidence"];
   }
   if (capabilityId === THEORY_CONTEXT_REFLECTION_CAPABILITY) {
-    return ["theory_context", "calculator_expression_template", "claim_boundary", "source_ref"];
+    return ["theory_context", "scientific_evidence", "calculator_expression_template", "claim_boundary", "source_ref"];
   }
   if (capabilityId === THEORY_FRONTIER_CONJECTURE_CAPABILITY) {
     return ["theory_context", "frontier_candidate", "claim_boundary", "source_ref"];
@@ -934,6 +944,116 @@ const extractCalculatorTemplateVariables = (expression: string): string[] => {
   ));
 };
 
+const readScientificEvidencePacket = (value: unknown): ScientificEvidencePacketV1 | null => {
+  const record = readRecord(value);
+  if (!record || record.schema !== SCIENTIFIC_EVIDENCE_PACKET_SCHEMA) return null;
+  return record as unknown as ScientificEvidencePacketV1;
+};
+
+const readScientificImageEvidenceSidecar = (value: unknown): ScientificImageEvidenceSidecarV1 | null => {
+  const record = readRecord(value);
+  if (!record || record.schema !== SCIENTIFIC_IMAGE_EVIDENCE_SIDECAR_SCHEMA) return null;
+  return record as unknown as ScientificImageEvidenceSidecarV1;
+};
+
+const selectScientificEvidencePacketFromSidecar = (
+  sidecar: ScientificImageEvidenceSidecarV1 | null,
+): ScientificEvidencePacketV1 | null => {
+  if (!sidecar?.packets?.length) return null;
+  if (sidecar.primary_packet_ref) {
+    const byRef = sidecar.packets.find((packet) => {
+      const ref = `${packet.source_ref_hash}#crop=${packet.bbox_px.x},${packet.bbox_px.y},${packet.bbox_px.width},${packet.bbox_px.height}`;
+      return ref === sidecar.primary_packet_ref;
+    });
+    if (byRef) return byRef;
+  }
+  const rank = (packet: ScientificEvidencePacketV1): number => {
+    const admissibility = packet.admissibility.status === "admissible_observation"
+      ? 3
+      : packet.admissibility.status === "unverified_math_observation"
+        ? 2
+        : 1;
+    const extraction = packet.extraction_status === "extracted"
+      ? 3
+      : packet.extraction_status === "partial"
+        ? 2
+        : 1;
+    return admissibility * 100 + extraction * 10 + packet.confidence;
+  };
+  return sidecar.packets.slice().sort((left, right) => rank(right) - rank(left))[0] ?? null;
+};
+
+const buildTheoryReflectionScientificEvidenceInput = (
+  args: Record<string, unknown>,
+  prompt: string,
+): {
+  packet: ScientificEvidencePacketV1 | null;
+  sidecar: ScientificImageEvidenceSidecarV1 | null;
+  source: "sidecar" | "explicit_packet" | "prompt_context" | "none";
+  requireAdmissibleEvidence: boolean;
+} => {
+  const explicitSidecar =
+    readScientificImageEvidenceSidecar(args.scientific_evidence_sidecar) ??
+    readScientificImageEvidenceSidecar(args.scientificEvidenceSidecar) ??
+    readScientificImageEvidenceSidecar(args.image_lens_scientific_evidence_sidecar) ??
+    readScientificImageEvidenceSidecar(args.imageLensScientificEvidenceSidecar);
+  if (explicitSidecar) {
+    return {
+      packet: selectScientificEvidencePacketFromSidecar(explicitSidecar),
+      sidecar: explicitSidecar,
+      source: "sidecar",
+      requireAdmissibleEvidence: true,
+    };
+  }
+  const explicitPacket =
+    readScientificEvidencePacket(args.scientific_evidence_packet) ??
+    readScientificEvidencePacket(args.scientificEvidencePacket) ??
+    readScientificEvidencePacket(args.image_lens_scientific_evidence_packet) ??
+    readScientificEvidencePacket(args.imageLensScientificEvidencePacket);
+  if (explicitPacket) {
+    const sidecar = buildScientificImageEvidenceSidecar({
+      sidecarId: `scientific_image_sidecar:${explicitPacket.source_ref_hash}`,
+      sourceRefHash: explicitPacket.source_ref_hash,
+      packets: [explicitPacket],
+    });
+    return {
+      packet: explicitPacket,
+      sidecar,
+      source: "explicit_packet",
+      requireAdmissibleEvidence: true,
+    };
+  }
+  const textCandidates = [
+    prompt,
+    optionalString(args.conversation_context ?? args.conversationContext),
+    ...readStringArray(args.mentioned_equations ?? args.mentionedEquations),
+    ...readStringArray(args.mentioned_symbols ?? args.mentionedSymbols),
+    ...readStringArray(args.mentioned_domains ?? args.mentionedDomains),
+  ].filter(Boolean);
+  if (!textCandidates.length) {
+    return { packet: null, sidecar: null, source: "none", requireAdmissibleEvidence: false };
+  }
+  const packet = buildScientificEvidencePacket({
+    cropRegionId: "theory_reflection_prompt_context",
+    sourceRefHash: "theory_reflection_prompt_context",
+    sourceKind: "prompt_context",
+    bboxPx: { x: 0, y: 0, width: 1, height: 1 },
+    textCandidate: textCandidates.join("\n"),
+    latexCandidate: null,
+    uncertainty: ["Prompt-context scientific branch gate; not a direct Image Lens crop receipt."],
+    extractionStatus: "partial",
+  });
+  if (packet.primary_domain === "unknown_math") {
+    return { packet: null, sidecar: null, source: "none", requireAdmissibleEvidence: false };
+  }
+  return {
+    packet,
+    sidecar: null,
+    source: "prompt_context",
+    requireAdmissibleEvidence: false,
+  };
+};
+
 const typedAffordance = (input: {
   kind: HelixWorkstationTypedAffordanceKind;
   role: HelixWorkstationTypedAffordance["role"];
@@ -974,6 +1094,18 @@ const buildGatewayProducedAffordances = (input: {
   const baseStatus: HelixWorkstationTypedAffordance["status"] = available ? "available" : "blocked";
   if (input.capabilityId === THEORY_CONTEXT_REFLECTION_CAPABILITY) {
     const payloads = readRecordArray(input.observation.calculator_payloads).slice(0, 12);
+    const branchGate = readRecord(input.observation.scientific_branch_gate);
+    const scientificRunTrace = readRecord(input.observation.scientific_run_trace);
+    const scientificSidecar = readRecord(input.observation.scientific_evidence_sidecar);
+    const gateStatus = cleanString(branchGate?.status);
+    const gateDomain = cleanString(branchGate?.primary_domain);
+    const rejectedPayloadIds = readStringArray(branchGate?.rejected_calculator_payload_ids);
+    const runTraceRef = cleanString(scientificRunTrace?.trace_id);
+    const sidecarRef = cleanString(scientificSidecar?.sidecar_id);
+    const scientificClaimBoundary =
+      gateStatus
+        ? `scientific_branch_gate=${gateStatus}${gateDomain ? ` domain=${gateDomain}` : ""}${rejectedPayloadIds.length ? ` rejected_calculator_payloads=${rejectedPayloadIds.join(",")}` : ""}`
+        : null;
     return [
       typedAffordance({
         kind: "theory_context",
@@ -981,8 +1113,18 @@ const buildGatewayProducedAffordances = (input: {
         capabilityId: input.capabilityId,
         status: baseStatus,
         sourceRefs: readStringArray(input.observation.exact_badge_ids).slice(0, 12),
-        claimBoundary: readStringArray(input.observation.claim_boundary_notes)[0] ?? null,
+        claimBoundary: scientificClaimBoundary ?? readStringArray(input.observation.claim_boundary_notes)[0] ?? null,
       }),
+      ...(branchGate || scientificRunTrace
+        ? [typedAffordance({
+            kind: "scientific_evidence",
+            role: "producer",
+            capabilityId: input.capabilityId,
+            status: gateStatus === "blocked" ? "blocked" : "available",
+            sourceRefs: [sidecarRef, runTraceRef, ...rejectedPayloadIds].filter(Boolean),
+            claimBoundary: scientificClaimBoundary,
+          })]
+        : []),
       ...payloads.map((payload): HelixWorkstationTypedAffordance => {
         const expression = cleanString(payload.expression);
         const requiredInputs = extractCalculatorTemplateVariables(expression);
@@ -1525,6 +1667,8 @@ const buildReadableSurfacePayload = (input: {
   const unitRefs = readStringArray(args.unit_refs ?? args.unitRefs);
   const lineRefs = readStringArray(args.line_refs ?? args.lineRefs);
   const locale = clipObservationText(args.locale ?? args.target_locale ?? args.targetLocale, 80);
+  const accountLocale = clipObservationText(args.account_locale ?? args.accountLocale ?? locale, 80);
+  const targetLanguage = clipObservationText(args.target_language ?? args.targetLanguage ?? locale, 80);
   const observation = {
     schema: READABLE_SURFACE_OBSERVATION_SCHEMA,
     capability_key: input.capabilityId,
@@ -1549,6 +1693,8 @@ const buildReadableSurfacePayload = (input: {
     translation: input.capabilityId === DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY
       ? {
           locale,
+          account_locale: accountLocale,
+          target_language: targetLanguage,
           status: missingReason ? "missing" : "ready",
           blocks: translationBlocks,
           missing_unit_info: readStringArray(args.missing_unit_info ?? args.missingUnitInfo),
@@ -6667,6 +6813,16 @@ export const callWorkstationGatewayCapability = async (
     const args = readArguments(input.arguments);
     const prompt = cleanString(args.prompt ?? args.query ?? args.text);
     const conversationContext = optionalString(args.conversation_context ?? args.conversationContext);
+    const scientificEvidenceInput = buildTheoryReflectionScientificEvidenceInput(args, prompt);
+    const scientificEvidencePacket = scientificEvidenceInput.packet;
+    const scientificEvidenceSidecar = scientificEvidenceInput.sidecar;
+    const requestedMentionedDomains = readStringArray(args.mentioned_domains ?? args.mentionedDomains);
+    const gatedMentionedDomains = scientificEvidencePacket
+      ? Array.from(new Set([
+          ...requestedMentionedDomains,
+          ...scientificEvidencePacket.admissibility.allowed_branch_hints.slice(0, 8),
+        ]))
+      : requestedMentionedDomains;
     const limitRaw = Number(args.limit);
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 12) : undefined;
     const hasPrompt = Boolean(prompt);
@@ -6742,7 +6898,7 @@ export const callWorkstationGatewayCapability = async (
       conversationContext,
       mentionedEquations: readStringArray(args.mentioned_equations ?? args.mentionedEquations),
       mentionedSymbols: readStringArray(args.mentioned_symbols ?? args.mentionedSymbols),
-      mentionedDomains: readStringArray(args.mentioned_domains ?? args.mentionedDomains),
+      mentionedDomains: gatedMentionedDomains,
       limit,
       buildExplanationPlan: args.build_explanation_plan === true || args.buildExplanationPlan === true,
       panelSync: {
@@ -6753,6 +6909,56 @@ export const callWorkstationGatewayCapability = async (
       },
     });
     const reflection = receipt.reflectionV1;
+    const rawCalculatorPayloads = reflection.evidenceForAsk.calculatorPayloads.slice(0, 12).map((payload) => ({
+      badge_id: payload.badgeId,
+      badge_title: payload.badgeTitle,
+      payload_id: payload.payloadId,
+      expression: payload.expression,
+      display_latex: payload.displayLatex,
+      target_variable: payload.targetVariable,
+      claim_boundary_notes: payload.claimBoundaryNotes.slice(0, 4),
+    }));
+    const branchGate = buildScientificBranchGate({
+      evidence: scientificEvidencePacket,
+      prompt,
+      mentionedDomains: gatedMentionedDomains,
+      badgeIds: [
+        ...reflection.overlay.exactBadgeIds,
+        ...reflection.overlay.likelyBadgeIds,
+      ],
+      calculatorPayloads: rawCalculatorPayloads,
+      requireAdmissibleEvidence: scientificEvidenceInput.requireAdmissibleEvidence,
+    });
+    const calculatorPayloads = rawCalculatorPayloads.filter(
+      (payload) => !branchGate.rejected_calculator_payload_ids.includes(payload.payload_id),
+    );
+    const scientificRunTrace = buildScientificRunTrace({
+      turnId,
+      evidence: scientificEvidencePacket,
+      branchGate,
+      reflectedBadgeIds: [
+        ...reflection.overlay.exactBadgeIds,
+        ...reflection.overlay.likelyBadgeIds,
+      ],
+      admittedCalculatorPayloadIds: calculatorPayloads
+        .map((payload) => payload.payload_id)
+        .filter(Boolean),
+    });
+    const scientificClaimBoundaryNotes = [
+      `scientific_branch_gate=${branchGate.status}; domain=${branchGate.primary_domain}; congruence_floor=${branchGate.congruence_grade_floor}`,
+      ...(branchGate.rejected_calculator_payload_ids.length
+        ? [`rejected_calculator_payloads=${branchGate.rejected_calculator_payload_ids.join(",")}`]
+        : []),
+      ...(branchGate.rejected_badge_ids.length
+        ? [`rejected_badges=${branchGate.rejected_badge_ids.join(",")}`]
+        : []),
+      ...(scientificEvidenceSidecar
+        ? [
+            `scientific_image_sidecar=${scientificEvidenceSidecar.sidecar_id}; sidecar_admissibility=${scientificEvidenceSidecar.admissibility.status}; evidence_source=${scientificEvidenceInput.source}`,
+          ]
+        : [`scientific_image_sidecar=missing; evidence_source=${scientificEvidenceInput.source}`]),
+      "final_answer_guard=OCR candidates, graph matches, calculator payloads, and proof/validation must remain separate.",
+    ];
     const observation = {
       schema: THEORY_CONTEXT_REFLECTION_OBSERVATION_SCHEMA,
       capability_key: manifest.capability_id,
@@ -6765,17 +6971,20 @@ export const callWorkstationGatewayCapability = async (
       summary: reflection.evidenceForAsk.summary,
       exact_badge_ids: reflection.overlay.exactBadgeIds.slice(0, 12),
       likely_badge_ids: reflection.overlay.likelyBadgeIds.slice(0, 12),
+      rejected_badge_ids: branchGate.rejected_badge_ids.slice(0, 12),
       highlighted_badge_ids: reflection.overlay.highlightedBadgeIds.slice(0, 12),
-      claim_boundary_notes: reflection.evidenceForAsk.claimBoundaries.slice(0, 8),
-      calculator_payloads: reflection.evidenceForAsk.calculatorPayloads.slice(0, 12).map((payload) => ({
-        badge_id: payload.badgeId,
-        badge_title: payload.badgeTitle,
-        payload_id: payload.payloadId,
-        expression: payload.expression,
-        display_latex: payload.displayLatex,
-        target_variable: payload.targetVariable,
-        claim_boundary_notes: payload.claimBoundaryNotes.slice(0, 4),
-      })),
+      claim_boundary_notes: [
+        ...scientificClaimBoundaryNotes,
+        ...reflection.evidenceForAsk.claimBoundaries,
+      ].slice(0, 12),
+      calculator_payloads: calculatorPayloads,
+      rejected_calculator_payload_ids: branchGate.rejected_calculator_payload_ids,
+      scientific_evidence_packet: scientificEvidencePacket,
+      scientific_evidence_sidecar: scientificEvidenceSidecar,
+      scientific_evidence_source: scientificEvidenceInput.source,
+      scientific_branch_gate: branchGate,
+      scientific_run_trace: scientificRunTrace,
+      congruence_grade_floor: branchGate.congruence_grade_floor,
       recommended_action_ids: receipt.recommendedNextActions.map((action) => action.actionId).slice(0, 12),
       recommended_actions_solve: receipt.recommendedNextActions.some((action) => action.solves === true),
       receipt_schema: receipt.schemaVersion,
@@ -6801,7 +7010,7 @@ export const callWorkstationGatewayCapability = async (
       panelId: "theory-badge-graph",
       action: "reflect_discussion_context",
       status: "succeeded",
-      summary: `Theory Badge Graph reflection produced ${observation.exact_badge_ids.length} exact badge match(es), ${observation.likely_badge_ids.length} likely match(es), and ${observation.claim_boundary_notes.length} claim-boundary note(s).`,
+      summary: `Theory Badge Graph reflection produced ${observation.exact_badge_ids.length} exact badge match(es), ${observation.likely_badge_ids.length} likely match(es), and ${observation.claim_boundary_notes.length} claim-boundary note(s). Scientific branch gate: ${branchGate.status} domain=${branchGate.primary_domain}; rejected calculator payloads=${branchGate.rejected_calculator_payload_ids.length}.`,
       observation,
       producedAffordances,
       consumedAffordances,

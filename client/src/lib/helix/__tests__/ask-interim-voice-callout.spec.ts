@@ -19,6 +19,8 @@ function receiptArtifact(overrides: {
   terminalEligible?: boolean;
   rawContentIncluded?: boolean;
   voicePlaybackKind?: string;
+  reasonCodes?: string[];
+  allowMicOffPlayback?: boolean;
 } = {}) {
   const requestId = overrides.requestId ?? "request-1";
   const receiptId = overrides.receiptId ?? "receipt-1";
@@ -31,6 +33,8 @@ function receiptArtifact(overrides: {
       turnId: overrides.turnId ?? "turn-1",
       requestId,
       voicePlaybackKind: overrides.voicePlaybackKind,
+      reasonCodes: overrides.reasonCodes,
+      allowMicOffPlayback: overrides.allowMicOffPlayback,
       assistant_answer: overrides.assistantAnswer ?? false,
       terminal_eligible: overrides.terminalEligible ?? false,
       raw_content_included: overrides.rawContentIncluded ?? false,
@@ -144,6 +148,7 @@ describe("interim voice callout playback projection", () => {
             receiptId: "helix_interim_voice_callout_receipt:tts-lane",
             utteranceId: "interim_voice:tts-lane",
             voicePlaybackKind: "translation_relay",
+            reasonCodes: ["capability_lane_text_to_speech_speak_text"],
           }),
         },
       },
@@ -164,7 +169,17 @@ describe("interim voice callout playback projection", () => {
       interimVoiceReceiptId: "helix_interim_voice_callout_receipt:tts-lane",
       interimVoiceReceiptKey: "interim_voice:tts-lane",
       interimVoiceCalloutKind: "tool_result",
+      allowMicOffPlayback: true,
     });
+  });
+
+  it("preserves explicit mic-off playback permission from governed handoffs", () => {
+    expect(buildInterimVoiceReceiptPlaybackIntent(receiptArtifact({
+      allowMicOffPlayback: true,
+    }))?.allowMicOffPlayback).toBe(true);
+    expect(buildInterimVoiceReceiptPlaybackIntent(receiptArtifact({
+      allowMicOffPlayback: false,
+    }))?.allowMicOffPlayback).toBe(false);
   });
 
   it("builds governed client handoff debug without answer authority", () => {
@@ -194,6 +209,48 @@ describe("interim voice callout playback projection", () => {
       calloutKind: "tool_result",
       playbackKind: "tool_receipt",
       allowMicOffPlayback: null,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(buildInterimVoiceClientHandoffDebug({
+      intent: intent!,
+      micArmState: "off",
+      voiceMode: "off",
+      outputModeEnabled: false,
+      allowMicOffPlayback: true,
+    })).toMatchObject({
+      micArmed: false,
+      outputModeEnabled: false,
+      outputArmed: true,
+      allowMicOffPlayback: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("does not report speaker output armed from microphone state alone", () => {
+    const intent = buildInterimVoiceReceiptPlaybackIntent(receiptArtifact({
+      allowMicOffPlayback: false,
+      authority: "provisional",
+      requestId: "request-mic-only",
+      receiptId: "receipt-mic-only",
+      utteranceId: "utterance-mic-only",
+    }));
+
+    expect(intent).not.toBeNull();
+    expect(buildInterimVoiceClientHandoffDebug({
+      intent: intent!,
+      micArmState: "on",
+      voiceMode: "off",
+      outputModeEnabled: false,
+      allowMicOffPlayback: false,
+    })).toMatchObject({
+      micArmed: true,
+      outputModeEnabled: false,
+      outputArmed: false,
+      allowMicOffPlayback: false,
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,

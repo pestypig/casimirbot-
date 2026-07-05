@@ -1,6 +1,3 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { HelixWorkspaceMemoryArtifact } from "@shared/helix-workspace-memory-registry";
 import {
@@ -8,9 +5,9 @@ import {
   writeProfileStorageSnapshot,
   getProfileStorageUsage,
 } from "../profile-storage-store";
+import { resetAccountSessionStore } from "../account-session-store";
 
 const originalEnv = { ...process.env };
-let tempDir = "";
 
 const artifact = (id: string, storageKey: string): HelixWorkspaceMemoryArtifact => ({
   schema: "helix.workspace_memory_registry.v1",
@@ -26,23 +23,22 @@ const artifact = (id: string, storageKey: string): HelixWorkspaceMemoryArtifact 
   updated_at: "2026-06-12T12:00:00.000Z",
 });
 
-beforeEach(() => {
-  tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "helix-profile-storage-"));
+beforeEach(async () => {
   process.env = {
     ...originalEnv,
-    HELIX_PROFILE_STORAGE_DIR: tempDir,
     WORKSPACE_PROFILE_STORAGE_QUOTA_BYTES: "4096",
   };
+  await resetAccountSessionStore();
 });
 
-afterEach(() => {
+afterEach(async () => {
   process.env = { ...originalEnv };
-  fs.rmSync(tempDir, { recursive: true, force: true });
+  await resetAccountSessionStore();
 });
 
 describe("local profile storage store", () => {
-  it("writes and reads a profile snapshot with raw content only in the snapshot", () => {
-    const receipt = writeProfileStorageSnapshot({
+  it("writes and reads a profile snapshot with raw content only in the snapshot", async () => {
+    const receipt = await writeProfileStorageSnapshot({
       profile_id: "local:admin",
       snapshot: {
         artifacts: [artifact("helix-chat-session:test", "agi-chat-sessions-v1")],
@@ -65,7 +61,7 @@ describe("local profile storage store", () => {
       raw_profile_content_included: false,
     });
 
-    const snapshot = readProfileStorageSnapshot("local:admin");
+    const snapshot = await readProfileStorageSnapshot("local:admin");
     expect(snapshot.schema).toBe("helix.profile_storage_snapshot.v1");
     expect(snapshot.raw_profile_content_included).toBe(true);
     expect(snapshot.entries[0]?.value).toContain("sessions");
@@ -74,14 +70,10 @@ describe("local profile storage store", () => {
       sync_status: "profile_synced",
       profile_id: "local:admin",
     });
-
-    const eventLog = fs.readFileSync(path.join(tempDir, "local-admin.events.jsonl"), "utf8");
-    expect(eventLog).toContain("snapshot_written");
-    expect(eventLog).not.toContain("\"sessions\"");
   });
 
-  it("rejects snapshots over quota and keeps usage sanitized", () => {
-    const receipt = writeProfileStorageSnapshot({
+  it("rejects snapshots over quota and keeps usage sanitized", async () => {
+    const receipt = await writeProfileStorageSnapshot({
       profile_id: "local:admin",
       snapshot: {
         artifacts: [artifact("helix-chat-session:large", "agi-chat-sessions-v1")],
@@ -101,8 +93,8 @@ describe("local profile storage store", () => {
       error: "profile_storage_quota_exceeded",
       raw_profile_content_included: false,
     });
-    expect(readProfileStorageSnapshot("local:admin").entries).toHaveLength(0);
-    expect(getProfileStorageUsage("local:admin")).toMatchObject({
+    expect((await readProfileStorageSnapshot("local:admin")).entries).toHaveLength(0);
+    expect(await getProfileStorageUsage("local:admin")).toMatchObject({
       profile_id: "local:admin",
       size_bytes: 0,
       quota_bytes: 4096,

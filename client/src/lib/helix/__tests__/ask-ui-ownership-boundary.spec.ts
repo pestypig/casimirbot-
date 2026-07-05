@@ -393,7 +393,11 @@ describe("Helix Ask UI ownership boundaries", () => {
       "isHelixAskPastedTextResumeRecallPrompt",
       "isHelixAskUsePastedTextAttachmentPrompt",
     ]) {
-      expect(pill).toContain(symbol);
+      if (symbol === "isHelixAskVisualPrompt") {
+        expect(pill).not.toContain(symbol);
+      } else {
+        expect(pill).toContain(symbol);
+      }
       expect(map).toContain(symbol);
       expect(attachmentPolicy).toContain(`export function ${symbol}`);
       expect(pill).not.toContain(`const ${symbol} =`);
@@ -788,7 +792,11 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(attachmentCommit).not.toContain("source_target_intent");
     expect(attachmentCommit).not.toContain("visualSituationEvidenceForTurn");
     for (const symbol of ["readVisualEvidenceSummary", "isDiagnosticVisualEvidence"]) {
-      expect(pill).toContain(symbol);
+      if (symbol === "readVisualEvidenceSummary") {
+        expect(pill).not.toContain(symbol);
+      } else {
+        expect(pill).toContain(symbol);
+      }
       expect(map).toContain(symbol);
       expect(visualEvidenceReaders).toContain(`export function ${symbol}`);
       expect(pill).not.toContain(`function ${symbol}`);
@@ -811,7 +819,11 @@ describe("Helix Ask UI ownership boundaries", () => {
       "isHelixAskPastedTextResumeRecallPrompt",
       "isHelixAskUsePastedTextAttachmentPrompt",
     ]) {
-      expect(pill).toContain(symbol);
+      if (symbol === "isHelixAskVisualPrompt") {
+        expect(pill).not.toContain(symbol);
+      } else {
+        expect(pill).toContain(symbol);
+      }
       expect(map).toContain(symbol);
       expect(attachmentPolicy).toContain(`export function ${symbol}`);
       expect(pill).not.toContain(`const ${symbol} =`);
@@ -1619,14 +1631,51 @@ describe("Helix Ask UI ownership boundaries", () => {
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const lexical = read("client/src/lib/helix/ask-voice-continuation-lexical.ts");
     const heldTranscriptPolicy = read("client/src/lib/helix/ask-voice-held-transcript-policy.ts");
+    const turnAssemblyController = read(
+      "client/src/components/helix/ask-console/HelixAskVoiceTurnAssemblyController.ts",
+    );
     const voiceCopy = read("client/src/lib/helix/ask-voice-copy-display.ts");
     const voiceText = read("client/src/lib/helix/ask-voice-text-display.ts");
 
     expect(map).toContain("ask-voice-continuation-lexical.ts");
     expect(map).toContain("ask-voice-held-transcript-policy.ts");
-    expect(map).toContain("transcript lifecycle, queue mutation, active-turn cancellation, and request dispatch remain behavior-sensitive");
+    expect(map).toContain("HelixAskVoiceTurnAssemblyController.ts");
+    expect(map).toContain("voice turn assembly state creation");
+    expect(map).toContain("incoming segment turn-key reuse/new-turn selection");
+    expect(map).toContain("held-transcript recovery/watchdog projection");
+    expect(map).toContain("held-transcript recovery scoring projection");
+    expect(map).toContain("transcript completion/turn-complete scoring projection");
+    expect(map).toContain("held-prefix merge/clear projection");
+    expect(map).toContain("transcript confirmation/admission projection");
+    expect(map).toContain("pending-confirmation policy projection");
+    expect(map).toContain("transcript confirm auto-timer policy projection");
+    expect(map).toContain("auto-dispatch rate-window/governance projection");
+    expect(map).toContain("pending-confirmation merge/update projection");
+    expect(map).toContain("silence/dead-air seal evaluation");
+    expect(turnAssemblyController).toContain("buildHelixAskVoiceAutoDispatchWindowProjection");
+    expect(turnAssemblyController).toContain("buildHelixAskVoiceHeldPrefixMergeProjection");
+    expect(turnAssemblyController).toContain("buildHelixAskVoiceHeldTranscriptRecoveryScoringProjection");
+    expect(turnAssemblyController).toContain("buildHelixAskVoiceTranscriptConfirmationProjection");
+    expect(turnAssemblyController).toContain("buildHelixAskVoiceTranscriptScoringProjection");
+    expect(turnAssemblyController).toContain("buildHelixAskVoiceTurnDraftUpdate");
+    expect(turnAssemblyController).toContain("buildHelixAskVoicePendingConfirmationMergeProjection");
+    expect(turnAssemblyController).toContain("resolveHelixAskVoiceAssemblerTurnKeyForIncomingSegment");
+    expect(turnAssemblyController).toContain("evaluateHelixAskVoiceHeldTranscriptRecovery");
+    expect(turnAssemblyController).toContain("evaluateHelixAskVoiceHeldTranscriptWatchdog");
+    expect(turnAssemblyController).toContain("evaluateHelixAskVoiceTurnSeal");
+    expect(turnAssemblyController).toContain("buildHelixAskVoiceTurnSealUpdate");
     expect(pill).toContain('from "@/lib/helix/ask-voice-continuation-lexical"');
     expect(pill).toContain('from "@/lib/helix/ask-voice-held-transcript-policy"');
+    expect(pill).toContain(
+      'from "@/components/helix/ask-console/HelixAskVoiceTurnAssemblyController"',
+    );
+    expect(pill).toContain("buildHelixAskVoiceAutoDispatchWindowProjection");
+    expect(pill).toContain("buildHelixAskVoiceHeldPrefixMergeProjection");
+    expect(pill).toContain("buildHelixAskVoiceTranscriptConfirmationProjection");
+    expect(pill).toContain("buildHelixAskVoiceTranscriptScoringProjection");
+    expect(pill).not.toContain("evaluateVoiceAutoDispatchGovernance({");
+    expect(pill).not.toContain("shouldMergeVoiceContinuationTurn({");
+    expect(pill).not.toContain("isHighRiskTranslationContext({");
     for (const symbol of [
       "extractIntentTerms",
       "hasDanglingTurnTail",
@@ -1717,6 +1766,9 @@ describe("Helix Ask UI ownership boundaries", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const languagePolicy = read("client/src/lib/helix/ask-voice-language-policy.ts");
+    const turnAssemblyController = read(
+      "client/src/components/helix/ask-console/HelixAskVoiceTurnAssemblyController.ts",
+    );
     const workstationFastPath = read("client/src/lib/helix/ask-workstation-fast-path.ts");
     const procedural = read("client/src/lib/helix/ask-procedural-display.ts");
     const voiceCopy = read("client/src/lib/helix/ask-voice-copy-display.ts");
@@ -1728,7 +1780,6 @@ describe("Helix Ask UI ownership boundaries", () => {
       "inferLanguageTagFromSourceText",
       "resolveVoiceSourceLanguage",
       "resolveVoiceResponseLanguage",
-      "isHighRiskTranslationContext",
     ]) {
       expect(pill).toContain(anchor);
       expect(pill).not.toContain(`const ${anchor} =`);
@@ -1739,6 +1790,13 @@ describe("Helix Ask UI ownership boundaries", () => {
       expect(voiceCopy).not.toContain(anchor);
       expect(valueNormalization).not.toContain(anchor);
     }
+    expect(pill).not.toContain("isHighRiskTranslationContext");
+    expect(turnAssemblyController).toContain("isHighRiskTranslationContext");
+    expect(languagePolicy).toContain("isHighRiskTranslationContext");
+    expect(map).toContain("isHighRiskTranslationContext");
+    expect(procedural).not.toContain("isHighRiskTranslationContext");
+    expect(voiceCopy).not.toContain("isHighRiskTranslationContext");
+    expect(valueNormalization).not.toContain("isHighRiskTranslationContext");
     for (const anchor of [
       "readWorkstationActionArgText",
       "extractCalculatorFastPathExpressionFromPrompt",
@@ -3127,16 +3185,27 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(map).toContain("ask-voice-diagnostics-export.ts");
     expect(map).toContain("Deterministic voice diagnostics export projection");
     expect(map).toContain("client build-stamp fallback formatting");
+    expect(map).toContain("non-terminal voice authority debug summary");
+    expect(map).toContain("input capture, output playback, tool admission, playback receipts, and terminal-answer authority");
     expect(pill).toContain('from "@/lib/helix/ask-voice-diagnostics-export"');
     for (const symbol of [
+      "buildVoiceClientDebugProjectionFields",
       "resolveVoiceTimelineClientBuildStamp",
       "summarizeVoiceSegments",
       "sanitizeVoiceDiagnosticsForExport",
       "buildVoicePlaybackReconciliationDebug",
+      "buildVoicePlaybackReceiptBarrierDebug",
     ]) {
       expect(diagnosticsExport).toContain(`export function ${symbol}`);
       expect(pill).not.toContain(`function ${symbol}`);
     }
+    expect(diagnosticsExport).toContain("buildVoiceAuthorityDebugSummary");
+    expect(diagnosticsExport).toContain("voice_input_capture");
+    expect(diagnosticsExport).toContain("voice_output_playback");
+    expect(diagnosticsExport).toContain("tool_admission");
+    expect(diagnosticsExport).toContain("playback_receipt");
+    expect(diagnosticsExport).toContain("terminal_answer_authority");
+    expect(pill).toContain("client_voice_authority_debug");
     for (const localAnchor of [
       "buildCurrentVoiceDiagnosticsSnapshot",
       "publishVoiceCaptureDiagnosticsSnapshot",
@@ -3296,6 +3365,25 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(playbackRuntime).not.toContain("enqueueVoicePlaybackIntent");
   });
 
+  it("keeps governed voice playback handoff receipts in the recrowned playback tool controller", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const controller = read(
+      "client/src/components/helix/ask-console/HelixAskVoicePlaybackToolController.ts",
+    );
+
+    expect(map).toContain("HelixAskVoicePlaybackToolController.ts");
+    expect(map).toContain("playback receipt ledger/post orchestration");
+    expect(controller).toContain("recordHelixAskVoicePlaybackToolOutcomeReceipt");
+    expect(controller).toContain("buildVoicePlaybackOutcomeReceipt");
+    expect(controller).toContain("appendVoicePlaybackOutcomeReceipt");
+    expect(controller).toContain("postVoicePlaybackOutcomeReceipt");
+    expect(pill).toContain("recordHelixAskVoicePlaybackToolOutcomeReceipt");
+    expect(pill).not.toContain("buildVoicePlaybackOutcomeReceipt({");
+    expect(pill).not.toContain("appendVoicePlaybackOutcomeReceipt(");
+    expect(pill).not.toContain("postVoicePlaybackOutcomeReceipt(");
+  });
+
   it("keeps deterministic voice steering client helpers in the non-React steering owner", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
@@ -3404,6 +3492,9 @@ describe("Helix Ask UI ownership boundaries", () => {
     const commandLanePolicy = read("client/src/lib/helix/ask-voice-command-lane-policy.ts");
     const scoring = read("client/src/lib/helix/ask-voice-turn-scoring.ts");
     const voiceCapture = read("client/src/lib/helix/ask-voice-capture-display.ts");
+    const turnAssemblyController = read(
+      "client/src/components/helix/ask-console/HelixAskVoiceTurnAssemblyController.ts",
+    );
     const extractedOwners = [
       confidence,
       confirmation,
@@ -3415,10 +3506,21 @@ describe("Helix Ask UI ownership boundaries", () => {
       commandLanePolicy,
       scoring,
       voiceCapture,
+      turnAssemblyController,
     ];
 
     expect(map).toContain("Voice capture, STT, confirmation, continuation, and auto-dispatch");
-    expect(map).toContain("mic/STT runtime control");
+    expect(map).toContain("mic/STT browser runtime control");
+    expect(map).toContain("voice turn assembly state creation");
+    expect(map).toContain("incoming segment turn-key reuse/new-turn selection");
+    expect(map).toContain("held-transcript recovery/watchdog projection");
+    expect(map).toContain("held-transcript recovery scoring projection");
+    expect(map).toContain("transcript completion/turn-complete scoring projection");
+    expect(map).toContain("held-prefix merge/clear projection");
+    expect(map).toContain("transcript confirmation/admission projection");
+    expect(map).toContain("auto-dispatch rate-window/governance projection");
+    expect(map).toContain("pending-confirmation merge/update projection");
+    expect(map).toContain("silence/dead-air seal evaluation");
     expect(map).toContain("transcript-confirm policy resolution");
     expect(map).toContain("ask-voice-auto-dispatch-governance.ts");
     for (const recrownedSymbol of [
@@ -3434,6 +3536,36 @@ describe("Helix Ask UI ownership boundaries", () => {
       expect(lexical).not.toContain(recrownedSymbol);
       expect(scoring).not.toContain(recrownedSymbol);
       expect(voiceCapture).not.toContain(recrownedSymbol);
+    }
+    for (const controllerPolicySymbol of [
+      "resolveTranscriptConfirmPolicy",
+      "shouldAutoConfirmTranscriptPrompt",
+    ]) {
+      expect(turnAssemblyController).toContain(controllerPolicySymbol);
+    }
+    for (const controllerSymbol of [
+      "buildHelixAskVoicePendingConfirmationPolicyProjection",
+      "buildHelixAskVoiceTranscriptConfirmAutoPolicyProjection",
+    ]) {
+      expect(turnAssemblyController).toContain(controllerSymbol);
+      expect(pill).toContain(controllerSymbol);
+    }
+    for (const directPolicyCall of [
+      "deriveTranscriptConfidence({",
+      "resolveTranscriptConfirmPolicy({",
+      "shouldAutoConfirmTranscriptPrompt({",
+      "shouldRequireTranscriptConfirmation({",
+      "isHighRiskTranslationContext({",
+      "scoreConversationCompletion({",
+      "scoreVoiceTurnComplete({",
+      "shouldMergeVoiceContinuationTurn({",
+      "shouldMergePendingConfirmationTranscript({",
+      "shouldRecoverHeldTranscriptAfterNoTranscript({",
+      "shouldFlushHeldTranscriptFromWatchdog({",
+      "evaluateVoiceAutoDispatchGovernance({",
+    ]) {
+      expect(pill).not.toContain(directPolicyCall);
+      expect(turnAssemblyController).toContain(directPolicyCall);
     }
     for (const recrownedContinuationSymbol of [
       "shouldMergeVoiceContinuationTurn",

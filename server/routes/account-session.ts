@@ -21,12 +21,12 @@ import {
 
 export const accountSessionRouter = Router();
 
-accountSessionRouter.get("/session", (req, res) => {
-  res.json(getAccountSessionStatus(readHelixSessionCookie(req.headers.cookie)));
+accountSessionRouter.get("/session", async (req, res) => {
+  res.json(await getAccountSessionStatus(readHelixSessionCookie(req.headers.cookie)));
 });
 
-accountSessionRouter.post("/session/sign-in", (req, res) => {
-  const receipt = signInLocalAccountSession({
+accountSessionRouter.post("/session/sign-in", async (req, res) => {
+  const receipt = await signInLocalAccountSession({
     profile_id: typeof req.body?.profile_id === "string" ? req.body.profile_id : null,
     display_name: typeof req.body?.display_name === "string" ? req.body.display_name : null,
     email: typeof req.body?.email === "string" ? req.body.email : null,
@@ -38,8 +38,8 @@ accountSessionRouter.post("/session/sign-in", (req, res) => {
   res.status(receipt.ok ? 200 : 400).json(receipt);
 });
 
-accountSessionRouter.post("/session/password-sign-in", (req, res) => {
-  const receipt = signInLocalPasswordAccountSession({
+accountSessionRouter.post("/session/password-sign-in", async (req, res) => {
+  const receipt = await signInLocalPasswordAccountSession({
     username: typeof req.body?.username === "string" ? req.body.username : null,
     password: typeof req.body?.password === "string" ? req.body.password : null,
   });
@@ -49,13 +49,13 @@ accountSessionRouter.post("/session/password-sign-in", (req, res) => {
   res.status(receipt.ok ? 200 : 401).json(receipt);
 });
 
-accountSessionRouter.post("/session/sign-out", (req, res) => {
+accountSessionRouter.post("/session/sign-out", async (req, res) => {
   clearHelixSessionCookie(res);
-  res.json(signOutAccountSession(readHelixSessionCookie(req.headers.cookie)));
+  res.json(await signOutAccountSession(readHelixSessionCookie(req.headers.cookie)));
 });
 
-accountSessionRouter.get("/profile-storage/snapshot", (req, res) => {
-  const status = getAccountSessionStatus(readHelixSessionCookie(req.headers.cookie));
+accountSessionRouter.get("/profile-storage/snapshot", async (req, res) => {
+  const status = await getAccountSessionStatus(readHelixSessionCookie(req.headers.cookie));
   const profileId = status.session?.profile.profile_id;
   if (!profileId) {
     return res.status(401).json({
@@ -65,13 +65,13 @@ accountSessionRouter.get("/profile-storage/snapshot", (req, res) => {
       raw_profile_content_included: false,
     });
   }
-  return res.status(200).json(readProfileStorageSnapshot(profileId, {
+  return res.status(200).json(await readProfileStorageSnapshot(profileId, {
     quota_bytes: status.account_policy.quotas.profile_storage_bytes,
   }));
 });
 
-accountSessionRouter.post("/profile-storage/snapshot", (req, res) => {
-  const status = getAccountSessionStatus(readHelixSessionCookie(req.headers.cookie));
+accountSessionRouter.post("/profile-storage/snapshot", async (req, res) => {
+  const status = await getAccountSessionStatus(readHelixSessionCookie(req.headers.cookie));
   const profileId = status.session?.profile.profile_id;
   if (!profileId) {
     return res.status(401).json({
@@ -81,7 +81,7 @@ accountSessionRouter.post("/profile-storage/snapshot", (req, res) => {
       raw_profile_content_included: false,
     });
   }
-  const receipt = writeProfileStorageSnapshot({
+  const receipt = await writeProfileStorageSnapshot({
     profile_id: profileId,
     quota_bytes: status.account_policy.quotas.profile_storage_bytes,
     snapshot: {
@@ -92,8 +92,8 @@ accountSessionRouter.post("/profile-storage/snapshot", (req, res) => {
   return res.status(receipt.ok ? 200 : 413).json(receipt);
 });
 
-accountSessionRouter.post("/profile-ingress/token", (req, res) => {
-  const status = getAccountSessionStatus(readHelixSessionCookie(req.headers.cookie));
+accountSessionRouter.post("/profile-ingress/token", async (req, res) => {
+  const status = await getAccountSessionStatus(readHelixSessionCookie(req.headers.cookie));
   const profileId =
     typeof req.body?.profile_id === "string"
       ? req.body.profile_id

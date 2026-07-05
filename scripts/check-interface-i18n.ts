@@ -1,6 +1,6 @@
 import { INTERFACE_LANGUAGE_OPTIONS } from "../client/src/lib/i18n/interfaceLanguage";
-import { hawMessages } from "../client/src/lib/i18n/messages/haw";
 import { enMessages } from "../client/src/lib/i18n/messages/en";
+import { INTERFACE_TARGET_CATALOGS } from "../client/src/lib/i18n/messages/targetCatalogs";
 import {
   INTERFACE_MESSAGE_IDS,
   interfaceSourceMessages,
@@ -34,7 +34,7 @@ function compareArrays(left: string[], right: string[]): boolean {
 }
 
 function auditTargetCatalog(args: {
-  locale: "haw";
+  locale: string;
   catalog: InterfaceTargetCatalog<InterfaceMessageId>;
   source: Record<InterfaceMessageId, string>;
 }): Issue[] {
@@ -110,29 +110,39 @@ for (const id of Object.keys(enMessages)) {
   }
 }
 
-issues.push(
-  ...auditTargetCatalog({
-    locale: "haw",
-    catalog: hawMessages,
-    source: enMessages,
-  }),
-);
-
-const hawReviewed = Object.keys(hawMessages).length;
-const total = INTERFACE_MESSAGE_IDS.length;
-const hawOption = INTERFACE_LANGUAGE_OPTIONS.find((option) => option.code === "haw");
-if (hawOption?.translationMode !== "procedural_catalog") {
-  issues.push({ level: "error", message: "haw option must remain procedural_catalog while partial" });
+for (const { code, catalog } of INTERFACE_TARGET_CATALOGS) {
+  issues.push(
+    ...auditTargetCatalog({
+      locale: code,
+      catalog,
+      source: enMessages,
+    }),
+  );
 }
-if (hawReviewed < total && hawOption?.readiness.toLowerCase().includes("complete")) {
-  issues.push({ level: "error", message: "haw readiness cannot claim complete coverage while catalog is partial" });
+
+const total = INTERFACE_MESSAGE_IDS.length;
+const reviewedByLocale: Record<string, number> = {};
+for (const { code, catalog } of INTERFACE_TARGET_CATALOGS) {
+  const reviewed = Object.keys(catalog).length;
+  reviewedByLocale[code] = reviewed;
+  const option = INTERFACE_LANGUAGE_OPTIONS.find((entry) => entry.code === code);
+  if (!option) {
+    issues.push({ level: "error", message: `${code}: missing language option` });
+    continue;
+  }
+  if (option.translationMode !== "procedural_catalog") {
+    issues.push({ level: "error", message: `${code}: target option must use procedural_catalog` });
+  }
+  if (reviewed < total && option.readiness.toLowerCase().includes("complete")) {
+    issues.push({ level: "error", message: `${code}: readiness cannot claim complete coverage while catalog is partial` });
+  }
 }
 
 const errors = issues.filter((issue) => issue.level === "error");
 const summary = {
   ok: errors.length === 0,
   source_messages: total,
-  haw_catalog_messages: hawReviewed,
+  target_catalog_messages: reviewedByLocale,
   issues,
 };
 

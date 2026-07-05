@@ -29,6 +29,7 @@ export type HelixAskComposerActionToolbarSurfaceProps = {
   showRetryVoiceSample?: boolean;
   retryVoiceSampleDisabled?: boolean;
   onRetryVoiceSample: () => void;
+  showVisualCaptureControls?: boolean;
   visualSituationSourceStatus: string;
   onCaptureVisualSource: () => void;
   visualSituationIncludeAudio: boolean;
@@ -62,6 +63,7 @@ export function HelixAskComposerActionToolbarSurface({
   showRetryVoiceSample = false,
   retryVoiceSampleDisabled = false,
   onRetryVoiceSample,
+  showVisualCaptureControls = true,
   visualSituationSourceStatus,
   onCaptureVisualSource,
   visualSituationIncludeAudio,
@@ -95,6 +97,7 @@ export function HelixAskComposerActionToolbarSurface({
       showRetryVoiceSample={showRetryVoiceSample}
       retryVoiceSampleDisabled={retryVoiceSampleDisabled}
       onRetryVoiceSample={onRetryVoiceSample}
+      showVisualCaptureControls={showVisualCaptureControls}
       visualSituationSourceStatus={visualSituationSourceStatus}
       onCaptureVisualSource={onCaptureVisualSource}
       visualSituationIncludeAudio={visualSituationIncludeAudio}

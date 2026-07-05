@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { speakVoice } from "@/lib/agi/api";
 import { SituationGraphCanvas } from "@/components/workstation/situation-graph/SituationGraphCanvas";
+import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import {
   MinecraftWorldBindingPanel,
   type MinecraftWorldSourceView,
@@ -42,6 +43,10 @@ import {
   getSituationRoomJobRecipe,
   type SituationRoomJobRecipeId,
 } from "@/lib/helix/situation-room-job-recipes";
+import {
+  resolveSituationRoomAccountTargetLanguage,
+  shouldAdoptSituationRoomAccountTargetLanguage,
+} from "@/lib/helix/situation-room-account-language";
 import { cn } from "@/lib/utils";
 import { useSituationRoomStore, type SituationRoomSource } from "@/store/useSituationRoomStore";
 import {
@@ -713,6 +718,12 @@ export default function SituationRoomPipelinesPanel() {
   const dismissStandbyProposal = useSituationStandbyStore((state) => state.dismissProposal);
   const actionExecutions = useWorkstationActionExecutionStore((state) => state.executions);
   const actionExecutionOrder = useWorkstationActionExecutionStore((state) => state.order);
+  const { userSettings } = useHelixStartSettings();
+  const accountTargetLanguage = React.useMemo(
+    () => resolveSituationRoomAccountTargetLanguage(userSettings.interfaceLanguage),
+    [userSettings.interfaceLanguage],
+  );
+  const previousAccountTargetLanguageRef = React.useRef(accountTargetLanguage);
   const [panelPage, setPanelPage] = React.useState<PipelinePanelPage>("setup");
   const [setupIntentId, setSetupIntentId] = React.useState("");
   const [setupMode, setSetupMode] = React.useState<"text_only" | "voice_on_confirm" | "critical_voice" | "direct_address_only">("text_only");
@@ -729,7 +740,7 @@ export default function SituationRoomPipelinesPanel() {
   const [selectedSourceId, setSelectedSourceId] = React.useState<string>("__room__");
   const [selectedJobId, setSelectedJobId] = React.useState<string | undefined>();
   const [jobKind, setJobKind] = React.useState<SituationRoomJobKind>("translate");
-  const [targetLanguage, setTargetLanguage] = React.useState("es");
+  const [targetLanguage, setTargetLanguage] = React.useState(accountTargetLanguage);
   const [nativeLanguage, setNativeLanguage] = React.useState("en");
   const [inputTextPolicy, setInputTextPolicy] =
     React.useState<SituationRoomJobInputTextPolicy>("source_text_preferred");
@@ -773,6 +784,20 @@ export default function SituationRoomPipelinesPanel() {
   const activeLiveAnswerEnvironment = useLiveAnswerEnvironmentStore((state) =>
     selectActiveLiveAnswerEnvironment(state, bindingThreadId.trim() || "helix-ask:desktop"),
   );
+
+  React.useEffect(() => {
+    const previousAccountTargetLanguage = previousAccountTargetLanguageRef.current;
+    setTargetLanguage((currentTargetLanguage) =>
+      shouldAdoptSituationRoomAccountTargetLanguage({
+        currentTargetLanguage,
+        previousAccountTargetLanguage,
+        nextAccountTargetLanguage: accountTargetLanguage,
+      })
+        ? accountTargetLanguage
+        : currentTargetLanguage
+    );
+    previousAccountTargetLanguageRef.current = accountTargetLanguage;
+  }, [accountTargetLanguage]);
   const masterScrollRef = React.useRef<HTMLDivElement | null>(null);
   const masterScrollPinnedRef = React.useRef(true);
   const knownJobIdsRef = React.useRef<Set<string> | null>(null);
@@ -1354,9 +1379,12 @@ export default function SituationRoomPipelinesPanel() {
     (recipeId: SituationRoomJobRecipeId, overrides: Partial<DraftSituationRoomJobSpec["args"]> = {}) => {
       if (!activeRoom) return;
       const recipe = getSituationRoomJobRecipe(recipeId);
-      updateDraft(draftJobFromRecipe(recipe, draftScope, overrides));
+      updateDraft(draftJobFromRecipe(recipe, draftScope, {
+        ...(recipeId === "translate_source" ? { target_language: targetLanguage || accountTargetLanguage } : {}),
+        ...overrides,
+      }));
     },
-    [activeRoom, draftScope, updateDraft],
+    [accountTargetLanguage, activeRoom, draftScope, targetLanguage, updateDraft],
   );
 
   const applyLanguageToDraft = React.useCallback(

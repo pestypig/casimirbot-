@@ -62,6 +62,15 @@ import {
   resolveSelectedHelixAgentRuntime,
 } from "@/lib/helix/ask-agent-runtime-display";
 import {
+  HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT,
+  fetchAccountCapabilityPolicy,
+  readCachedAccountCapabilityPolicy,
+} from "@/lib/workstation/accountCapabilityPolicy";
+import {
+  HELIX_USER_ACCOUNT_POLICY,
+  type HelixAccountCapabilityPolicy,
+} from "@shared/helix-account-session";
+import {
   buildHelixAskConsoleBackendTurnPayloadCore,
   buildHelixAskConsoleContextFiles,
 } from "@/components/helix/ask-console/HelixAskRequestEnvelope";
@@ -262,6 +271,11 @@ import {
   buildHelixAskImageAttachmentsFromFiles,
   selectHelixAskClipboardImageFiles,
 } from "@/components/helix/ask-console/HelixAskImageAttachment";
+import {
+  buildHelixAskPromptHistoryEntries,
+  resolveHelixAskPromptHistoryNavigation,
+  shouldHandleHelixAskPromptHistoryKey,
+} from "@/components/helix/ask-console/HelixAskPromptHistory";
 import {
   applyHelixAskVoiceTimelineVersionError,
   applyHelixAskVoiceTimelineVersionPayload,
@@ -483,7 +497,6 @@ import {
 import {
   inferLanguageTagFromSourceText,
   isEnglishLikeLanguageTag,
-  isHighRiskTranslationContext,
   normalizeVoiceLanguageTag,
   resolveVoiceResponseLanguage,
   resolveVoiceSourceLanguage,
@@ -495,11 +508,9 @@ import {
   HELIX_ASK_PASTED_TEXT_RESUME_RECALL_PROMPT_PATTERN,
   isHelixAskPastedTextResumeRecallPrompt,
   isHelixAskUsePastedTextAttachmentPrompt,
-  isHelixAskVisualPrompt,
 } from "@/lib/helix/ask-attachment-prompt-policy";
 import {
   isDiagnosticVisualEvidence,
-  readVisualEvidenceSummary,
 } from "@/lib/helix/ask-visual-evidence-readers";
 import {
   resolveContextCapsulePalette,
@@ -1077,6 +1088,7 @@ import {
   type VoicePlaybackOutcomeStatus,
 } from "@/lib/helix/voice-capture-diagnostics";
 import {
+  buildVoiceClientDebugProjectionFields,
   buildVoicePlaybackReceiptBarrierDebug,
   buildVoicePlaybackReconciliationDebug,
   resolveVoiceTimelineClientBuildStamp as resolveVoiceTimelineClientBuildStampFromInputs,
@@ -1089,9 +1101,31 @@ import {
   type VoicePlaybackUtteranceIntent,
 } from "@/lib/helix/ask-voice-playback-intent";
 import {
-  appendVoicePlaybackOutcomeReceipt,
-  buildVoicePlaybackOutcomeReceipt,
-  postVoicePlaybackOutcomeReceipt,
+  buildHelixAskVoicePlaybackToolHandoffPlan,
+  executeHelixAskVoicePlaybackToolHandoffPlan,
+  recordHelixAskVoicePlaybackToolOutcomeReceipt,
+} from "@/components/helix/ask-console/HelixAskVoicePlaybackToolController";
+import {
+  buildHelixAskVoiceAutoDispatchWindowProjection,
+  buildHelixAskVoiceHeldPrefixMergeProjection,
+  buildHelixAskVoiceHeldTranscriptRecoveryScoringProjection,
+  buildHelixAskVoicePendingConfirmationMergeProjection,
+  buildHelixAskVoicePendingConfirmationPolicyProjection,
+  buildHelixAskVoiceTranscriptConfirmAutoPolicyProjection,
+  buildHelixAskVoiceTranscriptConfirmationProjection,
+  buildHelixAskVoiceTranscriptScoringProjection,
+  buildHelixAskVoiceTurnDraftUpdate,
+  buildHelixAskVoiceTurnRuntimeStateRefresh,
+  buildHelixAskVoiceTurnSealUpdate,
+  evaluateHelixAskVoiceHeldTranscriptRecovery,
+  evaluateHelixAskVoiceHeldTranscriptWatchdog,
+  evaluateHelixAskVoiceTurnSeal,
+  resolveHelixAskVoiceAssemblerTurnKeyForIncomingSegment,
+  updateHelixAskVoiceTurnAssemblerState,
+  type HelixAskVoiceSteeringReservation as VoiceSteeringReservation,
+  type HelixAskVoiceTurnAssemblerState as VoiceTurnAssemblerState,
+} from "@/components/helix/ask-console/HelixAskVoiceTurnAssemblyController";
+import {
   resolveVoicePlaybackOutcomeStatus,
 } from "@/lib/helix/voice-playback-outcome-client";
 export {
@@ -2131,15 +2165,6 @@ type VoiceSegmentAnalysisAccumulator = {
   rmsDbSum: number;
 };
 
-type VoiceSteeringReservation = {
-  reservationId: string;
-  activeTurnId: string;
-  expectedTurnId: string;
-  timing: "during_reasoning" | "during_tool_call";
-  capturedAtMs: number;
-  activeAtCapture: boolean;
-};
-
 type VoiceConfirmedTurn = {
   id: string;
   traceId: string;
@@ -2220,60 +2245,6 @@ type VoiceTurnRevisionState = {
   pendingDeadlineMs: number | null;
   uiVoiceRevisionMatch: boolean | null;
   lastEventCode: VoiceDivergenceEventCode | null;
-  updatedAtMs: number;
-};
-
-type VoiceTurnAssemblerPhase = "draft" | "sealed";
-
-type VoiceTurnAssemblerState = {
-  turnKey: string;
-  phase: VoiceTurnAssemblerPhase;
-  hlcMs: number;
-  eventSeq: number;
-  transcriptRevision: number;
-  sealedRevision: number;
-  sealToken: string | null;
-  sealedAtMs: number | null;
-  draftTranscript: string;
-  draftRecordedText: string;
-  lastSpeechAtMs: number;
-  hashStableSinceMs: number;
-  currentTranscriptHash: string;
-  sttQueueDepth: number;
-  sttInFlight: boolean;
-  heldPending: boolean;
-  briefSpokenRevision: number;
-  artifactRetryCountByRevision: Record<number, number>;
-  sourceLanguage: string | null;
-  languageDetected: string | null;
-  languageConfidence: number | null;
-  codeMixed: boolean;
-  pivotConfidence: number | null;
-  dispatchState: "auto" | "confirm" | "blocked";
-  langSchemaVersion: string;
-  interpreter: HelixInterpreterArtifact | null;
-  interpreterSchemaVersion: string | null;
-  interpreterStatus:
-    | "ok"
-    | "timeout"
-    | "parse_error"
-    | "provider_error"
-    | "disabled"
-    | "skipped"
-    | null;
-  interpreterConfidence: number | null;
-  interpreterDispatchState: "auto" | "confirm" | "blocked" | null;
-  interpreterConfirmPrompt: string | null;
-  interpreterTermIds: string[];
-  interpreterConceptIds: string[];
-  translated: boolean;
-  sttEngine: string | null;
-  confidence: number;
-  confidenceReason: string | null;
-  completion: CompletionScore;
-  turnComplete: TurnCompleteScore;
-  segmentId: string | null;
-  steeringReservation: VoiceSteeringReservation | null;
   updatedAtMs: number;
 };
 
@@ -5577,6 +5548,28 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
   const projectionBackendEntrypointRequired = requiresHelixAskBackendEntrypoint(
     reply.question ?? coerceText(payload.selectedDebugQuestion).trim() ?? "",
   );
+  const projectionDebugExportRebuildReason = coerceText(payload.debug_export_rebuild_reason).trim();
+  const projectionDebugExportSource = coerceText(payload.debug_export_source).trim();
+  const projectionIsReplyScopedDebug =
+    projectionDebugExportSource === "rendered_reply_dom" ||
+    projectionDebugExportRebuildReason === "rendered_button_scope" ||
+    projectionDebugExportRebuildReason === "rendered_reply" ||
+    projectionDebugExportRebuildReason === "payload_reply_mismatch" ||
+    projectionDebugExportRebuildReason === "empty_payload" ||
+    projectionDebugExportRebuildReason === "invalid_json_payload";
+  const projectionBackendEntrypointMaterialized = Boolean(
+    payload.ask_turn_solver_trace ??
+      debug?.ask_turn_solver_trace ??
+      agentLoop?.ask_turn_solver_trace ??
+      payload.agent_runtime_loop ??
+      debug?.agent_runtime_loop ??
+      agentLoop?.agent_runtime_loop ??
+      payload.canonical_goal_frame ??
+      debug?.canonical_goal_frame ??
+      agentLoop?.canonical_goal_frame ??
+      terminalAuthorityForDebug ??
+      terminalResultForDebug,
+  );
   const projectionBackendEntrypointObserved =
     typeof agentLoop?.ask_entrypoint_observed === "boolean"
       ? agentLoop.ask_entrypoint_observed
@@ -5584,9 +5577,13 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
         ? debug.ask_entrypoint_observed
         : typeof payload.ask_entrypoint_observed === "boolean"
           ? payload.ask_entrypoint_observed
-          : null;
+          : projectionBackendEntrypointRequired
+            ? projectionIsReplyScopedDebug
+              ? null
+              : projectionBackendEntrypointMaterialized
+            : null;
   const projectionBackendEntrypointBlocked =
-    projectionBackendEntrypointRequired && projectionBackendEntrypointObserved === false;
+    projectionBackendEntrypointRequired && projectionBackendEntrypointObserved === false && !projectionIsReplyScopedDebug;
   const effectiveTerminalErrorCode =
     projectionBackendEntrypointBlocked ? HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE : terminalErrorCode;
   const effectiveTerminalArtifactKind = projectionBackendEntrypointBlocked ? "typed_failure" : terminalArtifactKind;
@@ -5763,8 +5760,8 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
   const calculatorPanelStateForDebug = readAgentLoopAuditRecord(
     payload.calculator_panel_state ?? debug?.calculator_panel_state ?? agentLoop?.calculator_panel_state,
   );
-  const debugExportRebuildReason = coerceText(payload.debug_export_rebuild_reason).trim();
-  const debugExportSource = coerceText(payload.debug_export_source).trim();
+  const debugExportRebuildReason = projectionDebugExportRebuildReason;
+  const debugExportSource = projectionDebugExportSource;
   const isReplyScopedDebugProjection =
     debugExportSource === "rendered_reply_dom" ||
     debugExportRebuildReason === "rendered_button_scope" ||
@@ -5818,7 +5815,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
         : typeof payload.ask_entrypoint_observed === "boolean"
           ? payload.ask_entrypoint_observed
           : askEntrypointRequired
-            ? backendDebugRefPresent || backendSolverArtifactPresent
+            ? backendSolverArtifactPresent
             : null;
   const askEntrypointFailureCode =
     coerceText(agentLoop?.ask_entrypoint_failure_code).trim() ||
@@ -5980,6 +5977,9 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     readAgentLoopAuditRecord(payload.backend_debug_response_ref),
     readAgentLoopAuditRecord(debug?.debug_export_ref),
     readAgentLoopAuditRecord(payload.debug_export_ref),
+    buildBackendAskTurnDebugExportRef(canonicalActiveTurnId),
+    buildBackendAskTurnDebugExportRef(activeTurnId),
+    buildBackendAskTurnDebugExportRef(clientActiveTurnId),
   ];
   const matchingBackendDebugRef = advertisedBackendDebugRefCandidates.find((candidate) => {
     if (!candidate) return false;
@@ -6192,6 +6192,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
       agentLoop?.route_reason_code ??
       (coerceText(resolvedTurnSummary?.resolved_route_label).trim() || null),
     backend_debug_response_ref: matchingBackendDebugRef ?? undefined,
+    debug_export_ref: matchingBackendDebugRef ?? undefined,
     debug_export_source: matchingBackendDebugRef
       ? "backend_ref_advertised"
       : "client_projection",
@@ -6212,10 +6213,12 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
   };
   const visibleFinalAnswerForParity = clientProgressPlaceholderExport
     ? ""
-    : coerceText(payload.visible_final_answer).trim() ||
-      coerceText(payload.visibleFinalAnswer).trim() ||
-      selectedFinalAnswer ||
-      "";
+    : projectionBackendEntrypointBlocked || terminalIsTypedFailure
+      ? selectedFinalAnswer || ""
+      : coerceText(payload.visible_final_answer).trim() ||
+        coerceText(payload.visibleFinalAnswer).trim() ||
+        selectedFinalAnswer ||
+        "";
   const selectedFinalAnswerForParity = coerceText(envelopeWithoutHash.selected_final_answer).trim();
   const currentCompoundRunIdForParity = coerceText(calculatorPanelStateForDebug?.current_compound_run_id).trim();
   const visibleCompoundRunIdsForParity = Array.isArray(calculatorPanelStateForDebug?.visible_compound_run_ids)
@@ -6323,44 +6326,30 @@ export type DebugClipboardCopyResult = HelixAskDebugClipboardCopyResult;
 
 const isBackendAskTurnDebugExportEligibleTurnId = isHelixAskLegacyBackendDebugExportEligibleTurnId;
 
+function normalizeBackendAskTurnDebugExportTurnId(value: unknown): string | null {
+  const text = coerceText(value).trim();
+  if (!text) return null;
+  if (text.startsWith("ask:")) return text;
+  const match = text.match(/(?:^|:)(ask:[^:]+)/i);
+  return match?.[1] ?? null;
+}
+
+function buildBackendAskTurnDebugExportRef(value: unknown): Record<string, string> | null {
+  const turnId = normalizeBackendAskTurnDebugExportTurnId(value);
+  if (!turnId || !isBackendAskTurnDebugExportEligibleTurnId(turnId)) return null;
+  return {
+    endpoint: `/api/agi/ask/turn/${encodeURIComponent(turnId)}/debug-export`,
+    turn_id: turnId,
+  };
+}
+
 function buildClientProjectionDebugFields(localPayload: Record<string, unknown>): Record<string, unknown> {
-  const channels = readAgentLoopAuditRecord(localPayload.channels);
   const liveVoiceSnapshot = getVoiceCaptureDiagnosticsSnapshot();
   const liveVoice = liveVoiceSnapshot ? sanitizeVoiceDiagnosticsForExport(liveVoiceSnapshot) : null;
-  const voice =
-    readAgentLoopAuditRecord(localPayload.voice) ??
-    readAgentLoopAuditRecord(channels?.voice) ??
-    readAgentLoopAuditRecord(localPayload.client_voice_debug) ??
-    readAgentLoopAuditRecord(readAgentLoopAuditRecord(localPayload.client_debug_projection)?.voice) ??
-    liveVoice;
-  const unifiedTimeline = Array.isArray(localPayload.unifiedTimeline)
-    ? localPayload.unifiedTimeline
-    : Array.isArray(localPayload.unified_timeline)
-      ? localPayload.unified_timeline
-      : null;
-  const clientProjection: Record<string, unknown> = {
-    schema: "helix.client_debug_projection.v1",
-    source: "browser_runtime",
-    voice: voice ?? null,
-    voice_playback_receipts: voice && Array.isArray(voice.playbackReceipts) ? voice.playbackReceipts : [],
-    voice_playback_output: voice && readAgentLoopAuditRecord(voice.playbackOutput) ? voice.playbackOutput : null,
-    voice_playback_metrics: voice && readAgentLoopAuditRecord(voice.playback) ? voice.playback : null,
-    voice_calls: voice && Array.isArray(voice.voiceCalls) ? voice.voiceCalls : [],
-    captured_at_ms:
-      typeof localPayload.exportedAtMs === "number"
-        ? localPayload.exportedAtMs
-        : typeof localPayload.exported_at_ms === "number"
-          ? localPayload.exported_at_ms
-          : Date.now(),
-  };
-  if (unifiedTimeline) {
-    clientProjection.unified_timeline_voice_rows = unifiedTimeline.filter((row) => {
-      const record = readAgentLoopAuditRecord(row);
-      const channel = coerceText(record?.channel).trim();
-      return channel === "voice_timeline" || channel === "voice_call" || channel === "voice_playback_receipt";
-    });
-  }
-  return clientProjection;
+  return buildVoiceClientDebugProjectionFields({
+    localPayload,
+    liveVoice,
+  });
 }
 
 async function resolveAuthoritativeDebugExportPayload(localPayload: string): Promise<string> {
@@ -6403,9 +6392,19 @@ async function resolveAuthoritativeDebugExportPayload(localPayload: string): Pro
     const askEntrypointRequired = readDebugBoolean(parsed.ask_entrypoint_required) === true;
     const askEntrypointObserved = readDebugBoolean(parsed.ask_entrypoint_observed);
     const askEntrypointFailureCode = coerceText(parsed.ask_entrypoint_failure_code).trim();
+    const parsedDebugExportSource = coerceText(parsed.debug_export_source).trim();
+    const parsedDebugExportRebuildReason = coerceText(parsed.debug_export_rebuild_reason).trim();
+    const parsedReplyScopedDebugProjection =
+      parsedDebugExportSource === "rendered_reply_dom" ||
+      parsedDebugExportRebuildReason === "rendered_button_scope" ||
+      parsedDebugExportRebuildReason === "rendered_reply" ||
+      parsedDebugExportRebuildReason === "payload_reply_mismatch" ||
+      parsedDebugExportRebuildReason === "empty_payload" ||
+      parsedDebugExportRebuildReason === "invalid_json_payload";
     const materializedTerminal = readMaterializedTerminal();
     const backendEntrypointObserved = askEntrypointObserved === true || Boolean(materializedTerminal);
-    const backendEntrypointBlocked = askEntrypointRequired && !backendEntrypointObserved;
+    const backendEntrypointBlocked =
+      askEntrypointRequired && !backendEntrypointObserved && !parsedReplyScopedDebugProjection;
     const projected = {
       ...parsed,
       debug_export_source: status === "not_advertised"
@@ -6446,14 +6445,15 @@ async function resolveAuthoritativeDebugExportPayload(localPayload: string): Pro
   };
   const backendTarget = resolveHelixAskLegacyDebugExportBackendTarget(parsed);
   const activeTurnId = backendTarget.activeTurnId;
-  if (backendTarget.status === "not_advertised") {
+  const synthesizedBackendRef = buildBackendAskTurnDebugExportRef(activeTurnId);
+  if (backendTarget.status === "not_advertised" && !synthesizedBackendRef) {
     return projectionPayload("not_advertised", { backend_debug_response_ref: undefined });
   }
-  const backendRef = backendTarget.backendRef;
+  const backendRef = backendTarget.backendRef ?? synthesizedBackendRef;
   if (backendTarget.status === "turn_mismatch") {
     return projectionPayload("turn_mismatch", { backend_debug_response_ref: backendRef });
   }
-  const endpoint = backendTarget.endpoint;
+  const endpoint = backendTarget.endpoint ?? coerceText(backendRef?.endpoint).trim();
   if (!endpoint) return projectionPayload("not_advertised", { backend_debug_response_ref: undefined });
   try {
     const response = await fetch(endpoint, {
@@ -6512,6 +6512,7 @@ async function resolveAuthoritativeDebugExportPayload(localPayload: string): Pro
       client_projection_payload_hash: hashDebugExportText(localPayload),
       client_debug_projection: clientProjection,
       client_voice_debug: clientProjection.voice,
+      client_voice_authority_debug: clientProjection.voice_authority_debug,
       client_voice_playback_receipts: clientProjection.voice_playback_receipts,
       client_voice_playback_output: clientProjection.voice_playback_output,
       client_voice_playback_metrics: clientProjection.voice_playback_metrics,
@@ -7731,6 +7732,12 @@ export function HelixAskPill({
   const [agentRuntimeProviders, setAgentRuntimeProviders] = useState<HelixAgentRuntimeDescriptor[]>(
     DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS,
   );
+  const [accountCapabilityPolicy, setAccountCapabilityPolicy] = useState<HelixAccountCapabilityPolicy>(() =>
+    readCachedAccountCapabilityPolicy() ?? HELIX_USER_ACCOUNT_POLICY,
+  );
+  const canUseLiveAnswerVisualCaptureControls = !accountCapabilityPolicy.locked_features.includes(
+    "live_answer_visual_capture_controls",
+  );
   const [selectedAgentRuntime, setSelectedAgentRuntime] = useState<HelixAgentRuntimeId>(() =>
     readStoredHelixAskAgentRuntime(),
   );
@@ -7790,27 +7797,45 @@ export function HelixAskPill({
       resizeObserver?.disconnect();
     };
   }, [updateAskActionCarouselEdges]);
+  const refreshAgentRuntimeProviders = useCallback(async () => {
+    const response = await fetch("/api/agi/agent-providers", {
+      headers: { Accept: "application/json" },
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(`agent_providers_unavailable:${response.status}`);
+    const payload = await response.json();
+    const providers = normalizeHelixAgentProvidersResponse(payload);
+    const nextPolicy =
+      payload?.account_policy && typeof payload.account_policy === "object"
+        ? (payload.account_policy as HelixAccountCapabilityPolicy)
+        : null;
+    if (nextPolicy) {
+      setAccountCapabilityPolicy(nextPolicy);
+    }
+    setAgentRuntimeProviders(providers);
+    setSelectedAgentRuntime((current) => {
+      const validated = resolveSelectedHelixAgentRuntime(current, providers);
+      persistHelixAskAgentRuntime(validated);
+      return validated;
+    });
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     const fetchProviders = async () => {
       try {
-        const response = await fetch("/api/agi/agent-providers", {
-          headers: { Accept: "application/json" },
-        });
-        if (!response.ok) throw new Error(`agent_providers_unavailable:${response.status}`);
-        const providers = normalizeHelixAgentProvidersResponse(await response.json());
         if (cancelled) return;
-        setAgentRuntimeProviders(providers);
-        setSelectedAgentRuntime((current) => {
-          const validated = resolveSelectedHelixAgentRuntime(current, providers);
-          persistHelixAskAgentRuntime(validated);
-          return validated;
-        });
+        await refreshAgentRuntimeProviders();
       } catch (error) {
         if (!cancelled) {
           setAgentRuntimeProviders(DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS);
-          setSelectedAgentRuntime("helix");
-          persistHelixAskAgentRuntime("helix");
+          const fallbackRuntime = resolveSelectedHelixAgentRuntime(
+            readStoredHelixAskAgentRuntime(),
+            DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS,
+          );
+          setSelectedAgentRuntime(fallbackRuntime);
+          persistHelixAskAgentRuntime(fallbackRuntime);
         }
       }
     };
@@ -7818,7 +7843,34 @@ export function HelixAskPill({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshAgentRuntimeProviders]);
+  useEffect(() => {
+    let cancelled = false;
+    void fetchAccountCapabilityPolicy()
+      .then((policy) => {
+        if (!cancelled) setAccountCapabilityPolicy(policy);
+      })
+      .catch(() => {
+        if (!cancelled) setAccountCapabilityPolicy(readCachedAccountCapabilityPolicy() ?? HELIX_USER_ACCOUNT_POLICY);
+      });
+    if (typeof window === "undefined") {
+      return () => {
+        cancelled = true;
+      };
+    }
+    const handlePolicyChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ account_policy?: HelixAccountCapabilityPolicy | null }>).detail;
+      setAccountCapabilityPolicy(detail?.account_policy ?? HELIX_USER_ACCOUNT_POLICY);
+      void refreshAgentRuntimeProviders().catch(() => {
+        // Keep the last known provider list; the next account refresh will retry.
+      });
+    };
+    window.addEventListener(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT, handlePolicyChanged);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT, handlePolicyChanged);
+    };
+  }, [refreshAgentRuntimeProviders]);
   const agentRuntimePickerModel = useMemo(
     () =>
       buildHelixAskRuntimePickerModel({
@@ -8227,6 +8279,9 @@ export function HelixAskPill({
   const pendingWorkstationUserInputRef = useRef<PendingWorkstationUserInputRequest | null>(null);
   const pendingWorkstationRequestByTurnIdRef = useRef<Record<string, string>>({});
   const terminalOutcomeByTurnIdRef = useRef<Record<string, HelixTurnTerminalOutcome>>({});
+  const askPromptHistorySubmittedRef = useRef<string[]>([]);
+  const askPromptHistoryCursorRef = useRef<number | null>(null);
+  const askPromptHistoryDraftBeforeNavigationRef = useRef("");
   const [askLiveSessionId, setAskLiveSessionId] = useState<string | null>(null);
   const [askLiveTraceId, setAskLiveTraceId] = useState<string | null>(null);
   const chronologicalAskRepliesForTranscript = useMemo(
@@ -8242,6 +8297,10 @@ export function HelixAskPill({
     [askBusy, askLiveTraceId, chronologicalAskRepliesForState],
   );
   const latestAskReply = chronologicalAskRepliesForTranscript.at(-1) ?? null;
+  const askPromptHistoryEntries = buildHelixAskPromptHistoryEntries({
+    replyQuestions: chronologicalAskRepliesForTranscript.map((reply) => reply.question),
+    submittedPrompts: askPromptHistorySubmittedRef.current,
+  });
   const latestAskReplyId = latestAskReply?.id ?? null;
   useEffect(() => {
     if (!latestAskReply) return;
@@ -10396,98 +10455,30 @@ export function HelixAskPill({
     metrics?: VoicePlaybackMetrics | null;
     error?: string | null;
   }) => {
-    const receipt = buildVoicePlaybackOutcomeReceipt({
-      ...input,
+    recordHelixAskVoicePlaybackToolOutcomeReceipt({
+      receipt: input,
+      currentReceipts: voicePlaybackOutcomeReceiptsRef.current,
       audioUnlocked: voiceAudioUnlockedRef.current,
       playbackPath: voicePlaybackCurrentPathRef.current ?? voicePlaybackLastOutcomePathRef.current,
+      commitReceipts: (next) => {
+        voicePlaybackOutcomeReceiptsRef.current = next;
+        setVoicePlaybackOutcomeReceipts(next);
+      },
     });
-    const next = appendVoicePlaybackOutcomeReceipt(voicePlaybackOutcomeReceiptsRef.current, receipt);
-    voicePlaybackOutcomeReceiptsRef.current = next;
-    setVoicePlaybackOutcomeReceipts(next);
-    postVoicePlaybackOutcomeReceipt(receipt);
   }, []);
-
-  const buildInitialVoiceTurnAssemblerState = useCallback(
-    (turnKey: string): VoiceTurnAssemblerState => {
-      const now = Date.now();
-      return {
-        turnKey,
-        phase: "draft",
-        hlcMs: now,
-        eventSeq: 0,
-        transcriptRevision: 0,
-        sealedRevision: 0,
-        sealToken: null,
-        sealedAtMs: null,
-        draftTranscript: "",
-        draftRecordedText: "",
-        lastSpeechAtMs: now,
-        hashStableSinceMs: now,
-        currentTranscriptHash: "",
-        sttQueueDepth: 0,
-        sttInFlight: false,
-        heldPending: false,
-        briefSpokenRevision: 0,
-        artifactRetryCountByRevision: {},
-        sourceLanguage: null,
-        languageDetected: null,
-        languageConfidence: null,
-        codeMixed: false,
-        pivotConfidence: null,
-        dispatchState: "auto",
-        langSchemaVersion: "helix.lang.v1",
-        interpreter: null,
-        interpreterSchemaVersion: null,
-        interpreterStatus: null,
-        interpreterConfidence: null,
-        interpreterDispatchState: null,
-        interpreterConfirmPrompt: null,
-        interpreterTermIds: [],
-        interpreterConceptIds: [],
-        translated: false,
-        sttEngine: null,
-        confidence: 0,
-        confidenceReason: null,
-        completion: { score: 0, route: "ask_more" },
-        turnComplete: { score: 0, band: "low", reason: "insufficient_pause" },
-        segmentId: null,
-        steeringReservation: null,
-        updatedAtMs: now,
-      };
-    },
-    [],
-  );
 
   const updateVoiceTurnAssemblerState = useCallback(
     (
       turnKey: string,
       updater: (current: VoiceTurnAssemblerState) => VoiceTurnAssemblerState,
     ): VoiceTurnAssemblerState => {
-      const map = voiceTurnAssemblerByTurnKeyRef.current;
-      const current = map[turnKey] ?? buildInitialVoiceTurnAssemblerState(turnKey);
-      const now = Date.now();
-      const nextHlcMs = Math.max(now, current.hlcMs + 1);
-      const nextEventSeq = current.eventSeq + 1;
-      const next = {
-        ...updater(current),
+      return updateHelixAskVoiceTurnAssemblerState(
+        voiceTurnAssemblerByTurnKeyRef.current,
         turnKey,
-        hlcMs: nextHlcMs,
-        eventSeq: nextEventSeq,
-        updatedAtMs: now,
-      };
-      map[turnKey] = next;
-      const keys = Object.keys(map);
-      if (keys.length > 64) {
-        const dropKeys = keys
-          .sort((a, b) => (map[a]?.updatedAtMs ?? 0) - (map[b]?.updatedAtMs ?? 0))
-          .slice(0, keys.length - 64);
-        for (const dropKey of dropKeys) {
-          delete map[dropKey];
-        }
-      }
-      return next;
+        updater,
+      );
     },
-    [buildInitialVoiceTurnAssemblerState],
+    [],
   );
 
   const getVoiceTurnAssemblerState = useCallback((turnKey: string | null | undefined) => {
@@ -12363,125 +12354,26 @@ export function HelixAskPill({
 
   const enqueueInterimVoiceCalloutsFromAskArtifacts = useCallback(
     (artifacts: unknown[]): number => {
-      const intents = collectInterimVoiceCalloutPlaybackIntents({
+      const plan = buildHelixAskVoicePlaybackToolHandoffPlan({
         artifacts,
         spokenReceiptKeys: interimVoiceSpokenReceiptKeysRef.current,
         spokenImmediateAckTurnKeys: interimVoiceSpokenImmediateAckTurnKeysRef.current,
+        micArmState: micArmStateRef.current,
+        voiceMode: missionContextControls.voiceMode ?? null,
+        outputModeEnabled: isMissionVoiceOutputModeEnabled(missionContextControls.voiceMode),
       });
-      const micArmed = micArmStateRef.current === "on";
-      const outputModeEnabled = isMissionVoiceOutputModeEnabled(missionContextControls.voiceMode);
-      const outputArmed = micArmed || outputModeEnabled;
-      let acceptedCount = 0;
-      for (const intent of intents) {
-        const outputStateDebug = buildInterimVoiceClientHandoffDebug({
-          intent,
-          micArmState: micArmStateRef.current,
-          voiceMode: missionContextControls.voiceMode ?? null,
-          outputModeEnabled,
-          allowMicOffPlayback: intent.allowMicOffPlayback ?? null,
-        });
-        pushVoiceChunkTimelineEvent({
-          kind: "interim_voice_handoff_seen",
-          status: "seen",
-          traceId: intent.traceId ?? null,
-          turnKey: intent.turnKey,
-          utteranceId: intent.receiptKey,
-          detail: `interim_voice_handoff_seen:mic=${micArmStateRef.current}:mode=${missionContextControls.voiceMode}:outputArmed=${outputArmed}`,
-          utteranceAuthority: intent.authority ?? null,
-          utteranceSource: intent.source ?? null,
-          debugContext: outputStateDebug,
-        });
-        if (!outputArmed) {
-          const task = mapVoicePlaybackIntentToTask(intent);
-          recordVoicePlaybackOutcomeReceipt({
-            status: "suppressed",
-            utteranceId: task.key,
-            turnKey: intent.turnKey,
-            kind: intent.kind,
-            sourceReceiptId: intent.receiptId,
-            sourceReceiptKey: intent.receiptKey,
-            requestId: intent.requestId,
-            calloutKind: intent.calloutKind,
-            error: `voice_output_not_armed:mic=${micArmStateRef.current}:mode=${missionContextControls.voiceMode}`,
-          });
-          pushVoiceChunkTimelineEvent({
-            kind: "chunk_drop",
-            status: "suppressed",
-            traceId: intent.traceId ?? null,
-            turnKey: intent.turnKey,
-            utteranceId: task.key,
-            detail: `voice_output_not_armed:mic=${micArmStateRef.current}:mode=${missionContextControls.voiceMode}`,
-            utteranceAuthority: intent.authority ?? null,
-            utteranceSource: intent.source ?? null,
-            suppressionCause: "inactive_attempt",
-            authorityRejectStage: "preflight",
-          });
+      return executeHelixAskVoicePlaybackToolHandoffPlan(plan, {
+        emitTimelineEvent: pushVoiceChunkTimelineEvent,
+        recordPlaybackOutcomeReceipt: recordVoicePlaybackOutcomeReceipt,
+        enqueuePlaybackIntent: enqueueVoicePlaybackIntent,
+        markHandoffConsumed: (intent) => {
           interimVoiceSpokenReceiptKeysRef.current.add(intent.receiptKey);
           interimVoiceSpokenReceiptKeysRef.current.add(intent.receiptId);
           if (intent.calloutKind === "immediate_ack") {
             interimVoiceSpokenImmediateAckTurnKeysRef.current.add(intent.turnKey);
           }
-          continue;
-        }
-        pushVoiceChunkTimelineEvent({
-          kind: "interim_voice_enqueue_attempted",
-          status: "attempted",
-          traceId: intent.traceId ?? null,
-          turnKey: intent.turnKey,
-          utteranceId: intent.receiptKey,
-          text: intent.text,
-          detail: `interim_voice_enqueue_attempted:mic=${micArmStateRef.current}:mode=${missionContextControls.voiceMode}:outputArmed=${outputArmed}`,
-          utteranceAuthority: intent.authority ?? null,
-          utteranceSource: intent.source ?? null,
-          debugContext: {
-            ...outputStateDebug,
-            allowMicOffPlayback: intent.allowMicOffPlayback ?? !micArmed,
-          },
-        });
-        const accepted = enqueueVoicePlaybackIntent({
-          ...intent,
-          allowMicOffPlayback: intent.allowMicOffPlayback ?? !micArmed,
-        });
-        if (!accepted) {
-          const task = mapVoicePlaybackIntentToTask(intent);
-          recordVoicePlaybackOutcomeReceipt({
-            status: "suppressed",
-            utteranceId: task.key,
-            turnKey: intent.turnKey,
-            kind: intent.kind,
-            sourceReceiptId: intent.receiptId,
-            sourceReceiptKey: intent.receiptKey,
-            requestId: intent.requestId,
-            calloutKind: intent.calloutKind,
-            error: `interim_voice_enqueue_rejected:mic=${micArmStateRef.current}:mode=${missionContextControls.voiceMode}:outputArmed=${outputArmed}`,
-          });
-          pushVoiceChunkTimelineEvent({
-            kind: "chunk_drop",
-            status: "suppressed",
-            traceId: intent.traceId ?? null,
-            turnKey: intent.turnKey,
-            utteranceId: task.key,
-            detail: `interim_voice_enqueue_rejected:mic=${micArmStateRef.current}:mode=${missionContextControls.voiceMode}:outputArmed=${outputArmed}`,
-            utteranceAuthority: intent.authority ?? null,
-            utteranceSource: intent.source ?? null,
-            suppressionCause: "inactive_attempt",
-            authorityRejectStage: "preflight",
-          });
-          interimVoiceSpokenReceiptKeysRef.current.add(intent.receiptKey);
-          interimVoiceSpokenReceiptKeysRef.current.add(intent.receiptId);
-          if (intent.calloutKind === "immediate_ack") {
-            interimVoiceSpokenImmediateAckTurnKeysRef.current.add(intent.turnKey);
-          }
-          continue;
-        }
-        interimVoiceSpokenReceiptKeysRef.current.add(intent.receiptKey);
-        interimVoiceSpokenReceiptKeysRef.current.add(intent.receiptId);
-        if (intent.calloutKind === "immediate_ack") {
-          interimVoiceSpokenImmediateAckTurnKeysRef.current.add(intent.turnKey);
-        }
-        acceptedCount += 1;
-      }
-      return acceptedCount;
+        },
+      });
     },
     [
       enqueueVoicePlaybackIntent,
@@ -12868,6 +12760,36 @@ export function HelixAskPill({
       });
     });
   }, [addImageAttachmentsFromFiles, addTextPasteAttachment, syncAskDraftValue]);
+  const resetAskPromptHistoryCursor = useCallback(() => {
+    askPromptHistoryCursorRef.current = null;
+    askPromptHistoryDraftBeforeNavigationRef.current = "";
+  }, []);
+  const handleAskPromptHistoryKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const target = event.currentTarget;
+    const direction = shouldHandleHelixAskPromptHistoryKey({
+      key: event.key,
+      altKey: event.altKey,
+      ctrlKey: event.ctrlKey,
+      metaKey: event.metaKey,
+      shiftKey: event.shiftKey,
+      value: target.value,
+      selectionStart: target.selectionStart,
+      selectionEnd: target.selectionEnd,
+    });
+    if (!direction) return;
+    const result = resolveHelixAskPromptHistoryNavigation({
+      direction,
+      entries: askPromptHistoryEntries,
+      cursor: askPromptHistoryCursorRef.current,
+      currentDraft: target.value,
+      draftBeforeNavigation: askPromptHistoryDraftBeforeNavigationRef.current,
+    });
+    if (!result.handled) return;
+    event.preventDefault();
+    askPromptHistoryCursorRef.current = result.cursor;
+    askPromptHistoryDraftBeforeNavigationRef.current = result.draftBeforeNavigation;
+    syncAskDraftValue(result.value, { target, focus: true });
+  }, [askPromptHistoryEntries, syncAskDraftValue]);
 
   const setVoiceWarning = useCallback((code: VoiceCaptureWarningCode, active: boolean) => {
     setVoiceCaptureWarnings((prev) => {
@@ -13876,6 +13798,11 @@ export function HelixAskPill({
   ]);
 
   const handleVisualSituationSourceCapture = useCallback(() => {
+    if (!canUseLiveAnswerVisualCaptureControls) {
+      setAskError("Visual capture is not available for this account.");
+      setAskStatus(null);
+      return;
+    }
     if (visualSituationSourceStatus === "requesting") return;
     if (visualSituationSourceStatus === "active" || visualSituationSourceStatus === "error") {
       setVisualSituationSourceStatus("idle");
@@ -13929,6 +13856,7 @@ export function HelixAskPill({
       });
   }, [
     appendSyntheticLiveEvent,
+    canUseLiveAnswerVisualCaptureControls,
     onOpenPanel,
     requestHelixAskVisualFrame,
     situationRoomId,
@@ -13937,6 +13865,11 @@ export function HelixAskPill({
   ]);
 
   const handleVisualSituationAudioPreferenceToggle = useCallback(() => {
+    if (!canUseLiveAnswerVisualCaptureControls) {
+      setAskError("Tab audio for visual capture is not available for this account.");
+      setAskStatus(null);
+      return;
+    }
     const next = !visualSituationIncludeAudio;
     setVisualSituationIncludeAudio(next);
     syncHelixAskVisualCaptureRoutePreference(next);
@@ -13973,6 +13906,7 @@ export function HelixAskPill({
       });
   }, [
     appendSyntheticLiveEvent,
+    canUseLiveAnswerVisualCaptureControls,
     requestHelixAskVisualFrame,
     situationRoomId,
     stopDisplayAudioCapture,
@@ -14659,41 +14593,36 @@ export function HelixAskPill({
         transcriptConfirmStateRef.current !== null ||
         voiceHeldTranscriptStateRef.current !== null ||
         voiceHeldTranscriptPrefixRef.current.trim().length > 0;
-      const sinceLastSpeechMs =
-        voiceLastSpeechMsRef.current !== null
-          ? Math.max(0, now - voiceLastSpeechMsRef.current)
-          : Number.POSITIVE_INFINITY;
-      const hashStableDwellMs = Math.max(0, now - assemblerState.hashStableSinceMs);
-      const gateOpen = evaluateVoiceTurnSealGate({
-        sinceLastSpeechMs,
+      const sealEvaluation = evaluateHelixAskVoiceTurnSeal({
+        state: assemblerState,
+        nowMs: now,
+        lastSpeechAtMs: voiceLastSpeechMsRef.current,
         sttQueueDepth: queueDepth,
         sttInFlight: inFlight,
         heldPending,
-        hashStableDwellMs,
       });
-      updateVoiceTurnAssemblerState(turnKey, (current) => ({
-        ...current,
-        sttQueueDepth: queueDepth,
-        sttInFlight: inFlight,
-        heldPending,
-        lastSpeechAtMs: voiceLastSpeechMsRef.current ?? current.lastSpeechAtMs,
-      }));
-      if (!gateOpen) return false;
-      if (assemblerState.transcriptRevision <= 0 || !assemblerState.draftTranscript.trim()) {
-        return false;
-      }
+      updateVoiceTurnAssemblerState(turnKey, (current) =>
+        buildHelixAskVoiceTurnRuntimeStateRefresh({
+          current,
+          sttQueueDepth: queueDepth,
+          sttInFlight: inFlight,
+          heldPending,
+          lastSpeechAtMs: voiceLastSpeechMsRef.current,
+        }),
+      );
+      if (!sealEvaluation.canSeal) return false;
       const seededSealToken = preferredSealToken?.trim() || assemblerState.sealToken?.trim();
       const sealToken = seededSealToken || crypto.randomUUID();
-      updateVoiceTurnAssemblerState(turnKey, (current) => ({
-        ...current,
-        phase: "sealed",
-        sealedRevision: current.transcriptRevision,
-        sealToken,
-        sealedAtMs: now,
-        sttQueueDepth: queueDepth,
-        sttInFlight: inFlight,
-        heldPending,
-      }));
+      updateVoiceTurnAssemblerState(turnKey, (current) =>
+        buildHelixAskVoiceTurnSealUpdate({
+          current,
+          sealToken,
+          nowMs: now,
+          sttQueueDepth: queueDepth,
+          sttInFlight: inFlight,
+          heldPending,
+        }),
+      );
       return true;
     };
     try {
@@ -16986,11 +16915,7 @@ export function HelixAskPill({
         }
         return;
       }
-      const nowMs = Date.now();
-      voiceAutoDispatchWindowRef.current = voiceAutoDispatchWindowRef.current.filter(
-        (entryMs) => nowMs - entryMs < HELIX_VOICE_AUTO_DISPATCH_WINDOW_MS,
-      );
-      const governance = evaluateVoiceAutoDispatchGovernance({
+      const autoDispatchWindow = buildHelixAskVoiceAutoDispatchWindowProjection({
         transcript,
         micArmState: micArmStateRef.current,
         confidence: input.confidence,
@@ -17001,10 +16926,13 @@ export function HelixAskPill({
           voiceBargeHoldActiveRef.current === true ||
           voiceSpeechActiveRef.current === true,
         queueDepth: voiceTranscribeQueueRef.current.length + voiceConfirmedTurnQueueRef.current.length,
-        activeDispatchCount: voiceAutoDispatchWindowRef.current.length,
+        currentWindow: voiceAutoDispatchWindowRef.current,
+        windowMs: HELIX_VOICE_AUTO_DISPATCH_WINDOW_MS,
         maxQueueDepth: HELIX_VOICE_TRANSCRIBE_QUEUE_MAX,
         isSimpleConversationTurnCandidate,
       });
+      voiceAutoDispatchWindowRef.current = autoDispatchWindow.nextWindow;
+      const governance = autoDispatchWindow.governance;
       if (!governance.admitted) {
         updateVoiceDecisionBrief({
           baseBrief: "Voice transcript captured as observation only.",
@@ -17053,9 +16981,6 @@ export function HelixAskPill({
         patchVoiceSegmentAttempt(input.segmentId, { dispatch: "suppressed" });
         return;
       }
-      voiceAutoDispatchWindowRef.current = [...voiceAutoDispatchWindowRef.current, nowMs].slice(
-        -HELIX_VOICE_AUTO_DISPATCH_MAX_PER_MINUTE,
-      );
       const recentTurnsForTurn = conversationRecentTurnsRef.current.slice(-6);
       rememberConversationTurn(`user: ${recordedText}`);
       const sessionId = getHelixAskSessionId() ?? undefined;
@@ -17760,26 +17685,24 @@ export function HelixAskPill({
         transcriptConfirmStateRef.current !== null ||
         voiceHeldTranscriptStateRef.current !== null ||
         voiceHeldTranscriptPrefixRef.current.trim().length > 0;
-      const sinceLastSpeechMs =
-        voiceLastSpeechMsRef.current !== null
-          ? Math.max(0, now - voiceLastSpeechMsRef.current)
-          : Number.POSITIVE_INFINITY;
-      const hashStableDwellMs = Math.max(0, now - state.hashStableSinceMs);
-      const gateOpen = evaluateVoiceTurnSealGate({
-        sinceLastSpeechMs,
+      const sealEvaluation = evaluateHelixAskVoiceTurnSeal({
+        state,
+        nowMs: now,
+        lastSpeechAtMs: voiceLastSpeechMsRef.current,
         sttQueueDepth: queueDepth,
         sttInFlight: inFlight,
         heldPending,
-        hashStableDwellMs,
       });
-      updateVoiceTurnAssemblerState(turnKey, (current) => ({
-        ...current,
-        sttQueueDepth: queueDepth,
-        sttInFlight: inFlight,
-        heldPending,
-        lastSpeechAtMs: voiceLastSpeechMsRef.current ?? current.lastSpeechAtMs,
-      }));
-      if (state.phase !== "draft" || !gateOpen) {
+      updateVoiceTurnAssemblerState(turnKey, (current) =>
+        buildHelixAskVoiceTurnRuntimeStateRefresh({
+          current,
+          sttQueueDepth: queueDepth,
+          sttInFlight: inFlight,
+          heldPending,
+          lastSpeechAtMs: voiceLastSpeechMsRef.current,
+        }),
+      );
+      if (!sealEvaluation.canSeal) {
         clearVoiceSealPollTimer();
         if (
           state.phase === "draft" &&
@@ -17804,16 +17727,17 @@ export function HelixAskPill({
         return;
       }
       const sealToken = crypto.randomUUID();
-      updateVoiceTurnAssemblerState(turnKey, (current) => ({
-        ...current,
-        phase: "sealed",
-        sealedRevision,
-        sealToken,
-        sealedAtMs: now,
-        sttQueueDepth: queueDepth,
-        sttInFlight: inFlight,
-        heldPending,
-      }));
+      updateVoiceTurnAssemblerState(turnKey, (current) =>
+        buildHelixAskVoiceTurnSealUpdate({
+          current,
+          sealToken,
+          nowMs: now,
+          sttQueueDepth: queueDepth,
+          sttInFlight: inFlight,
+          heldPending,
+          sealedRevision,
+        }),
+      );
       const sealedTurn: VoiceConfirmedTurn = {
         id: `confirm:${turnKey}:sealed:${sealedRevision}`,
         traceId: turnKey,
@@ -17944,21 +17868,16 @@ export function HelixAskPill({
 
   const resolveVoiceAssemblerTurnKeyForIncomingSegment = useCallback((): string => {
     const currentTurnKey = voiceActiveAssemblerTurnKeyRef.current;
-    if (!currentTurnKey) {
-      const nextTurnKey = `voice:${crypto.randomUUID()}`;
-      voiceActiveAssemblerTurnKeyRef.current = nextTurnKey;
-      updateVoiceTurnAssemblerState(nextTurnKey, (current) => ({
-        ...current,
-        phase: "draft",
-        lastSpeechAtMs: Date.now(),
-      }));
-      suppressSupersededVoiceAttemptsForNewTurn(nextTurnKey);
-      return nextTurnKey;
-    }
     const currentState = getVoiceTurnAssemblerState(currentTurnKey);
-    const activeAttempt = hasActiveVoiceAttemptForTurn(currentTurnKey);
-    if (!currentState || (currentState.phase === "sealed" && !activeAttempt)) {
-      const nextTurnKey = `voice:${crypto.randomUUID()}`;
+    const activeAttempt = currentTurnKey ? hasActiveVoiceAttemptForTurn(currentTurnKey) : false;
+    const nextTurnKey = `voice:${crypto.randomUUID()}`;
+    const decision = resolveHelixAskVoiceAssemblerTurnKeyForIncomingSegment({
+      currentTurnKey,
+      currentState,
+      hasActiveAttemptForCurrentTurn: activeAttempt,
+      nextTurnKey,
+    });
+    if (decision.action === "start_new") {
       voiceActiveAssemblerTurnKeyRef.current = nextTurnKey;
       updateVoiceTurnAssemblerState(nextTurnKey, (current) => ({
         ...current,
@@ -17968,7 +17887,7 @@ export function HelixAskPill({
       suppressSupersededVoiceAttemptsForNewTurn(nextTurnKey);
       return nextTurnKey;
     }
-    return currentTurnKey;
+    return decision.turnKey;
   }, [
     getVoiceTurnAssemblerState,
     hasActiveVoiceAttemptForTurn,
@@ -18009,55 +17928,42 @@ export function HelixAskPill({
       if (!transcript) return null;
       const now = Date.now();
       const assembler = updateVoiceTurnAssemblerState(input.turnKey, (current) => {
-        const mergedTranscript = mergeVoiceTranscriptDraft(current.draftTranscript, transcript);
-        const mergedRecordedText = mergeVoiceTranscriptDraft(
-          current.draftRecordedText || current.draftTranscript,
-          input.recordedText || transcript,
-        );
-        const nextHash = hashVoiceUtteranceKey(mergedTranscript);
-        const hashStableSinceMs =
-          nextHash === current.currentTranscriptHash ? current.hashStableSinceMs : now;
-        return {
-          ...current,
-          phase: "draft",
-          transcriptRevision: current.transcriptRevision + 1,
-          sealToken: null,
-          sealedAtMs: null,
-          draftTranscript: mergedTranscript,
-          draftRecordedText: mergedRecordedText,
-          lastSpeechAtMs: voiceLastSpeechMsRef.current ?? now,
-          hashStableSinceMs,
-          currentTranscriptHash: nextHash,
-          sttQueueDepth: voiceTranscribeQueueRef.current.length,
-          sttInFlight: voiceTranscribeBusyRef.current,
-          heldPending:
-            transcriptConfirmStateRef.current !== null ||
-            voiceHeldTranscriptStateRef.current !== null ||
-            voiceHeldTranscriptPrefixRef.current.trim().length > 0,
+        return buildHelixAskVoiceTurnDraftUpdate({
+          current,
+          transcript,
+          recordedText: input.recordedText,
+          segmentId: input.segmentId,
           sourceLanguage: input.sourceLanguage,
-          languageDetected: input.languageDetected ?? current.languageDetected ?? input.sourceLanguage,
-          languageConfidence: input.languageConfidence ?? current.languageConfidence ?? null,
-          codeMixed: input.codeMixed ?? current.codeMixed,
-          pivotConfidence: input.pivotConfidence ?? current.pivotConfidence ?? null,
-          dispatchState: input.dispatchState ?? current.dispatchState,
-          langSchemaVersion: input.langSchemaVersion ?? current.langSchemaVersion ?? "helix.lang.v1",
-          interpreter: input.interpreter ?? current.interpreter,
-          interpreterSchemaVersion: input.interpreterSchemaVersion ?? current.interpreterSchemaVersion,
-          interpreterStatus: input.interpreterStatus ?? current.interpreterStatus,
-          interpreterConfidence: input.interpreterConfidence ?? current.interpreterConfidence ?? null,
-          interpreterDispatchState: input.interpreterDispatchState ?? current.interpreterDispatchState,
-          interpreterConfirmPrompt: input.interpreterConfirmPrompt ?? current.interpreterConfirmPrompt,
-          interpreterTermIds: input.interpreterTermIds ?? current.interpreterTermIds ?? [],
-          interpreterConceptIds: input.interpreterConceptIds ?? current.interpreterConceptIds ?? [],
+          languageDetected: input.languageDetected,
+          languageConfidence: input.languageConfidence,
+          codeMixed: input.codeMixed,
+          pivotConfidence: input.pivotConfidence,
+          dispatchState: input.dispatchState,
+          langSchemaVersion: input.langSchemaVersion,
+          interpreter: input.interpreter,
+          interpreterSchemaVersion: input.interpreterSchemaVersion,
+          interpreterStatus: input.interpreterStatus,
+          interpreterConfidence: input.interpreterConfidence,
+          interpreterDispatchState: input.interpreterDispatchState,
+          interpreterConfirmPrompt: input.interpreterConfirmPrompt,
+          interpreterTermIds: input.interpreterTermIds,
+          interpreterConceptIds: input.interpreterConceptIds,
           translated: input.translated,
           sttEngine: input.sttEngine,
           confidence: input.confidence,
           confidenceReason: input.confidenceReason,
           completion: input.completion,
           turnComplete: input.turnComplete,
-          segmentId: input.segmentId,
-          steeringReservation: input.steeringReservation ?? current.steeringReservation ?? null,
-        };
+          steeringReservation: input.steeringReservation,
+          nowMs: now,
+          lastSpeechAtMs: voiceLastSpeechMsRef.current,
+          sttQueueDepth: voiceTranscribeQueueRef.current.length,
+          sttInFlight: voiceTranscribeBusyRef.current,
+          heldPending:
+            transcriptConfirmStateRef.current !== null ||
+            voiceHeldTranscriptStateRef.current !== null ||
+            voiceHeldTranscriptPrefixRef.current.trim().length > 0,
+        });
       });
       voiceActiveAssemblerTurnKeyRef.current = input.turnKey;
       // New draft input reopens this turn; allow the latest authoritative final to speak again.
@@ -18132,52 +18038,29 @@ export function HelixAskPill({
         const pendingHeld = voiceHeldTranscriptStateRef.current;
         if (!pendingHeld) return;
         const now = Date.now();
-        const ageMs = Math.max(0, now - pendingHeld.updatedAtMs);
-        const sinceLastSpeechMs =
-          voiceLastSpeechMsRef.current !== null
-            ? Math.max(0, now - voiceLastSpeechMsRef.current)
-            : Number.POSITIVE_INFINITY;
-        const shouldFlushHeld = shouldFlushHeldTranscriptFromWatchdog({
+        const watchdog = evaluateHelixAskVoiceHeldTranscriptWatchdog({
           heldTranscript: pendingHeld.transcript,
           holdReason: pendingHeld.holdReason,
+          updatedAtMs: pendingHeld.updatedAtMs,
+          nowMs: now,
+          lastSpeechAtMs: voiceLastSpeechMsRef.current,
           transcribeQueueLength: voiceTranscribeQueueRef.current.length,
           speechActive: voiceSpeechActiveRef.current,
           transcribeBusy: voiceTranscribeBusyRef.current,
           pendingConfirmation: transcriptConfirmStateRef.current !== null,
-          sinceLastSpeechMs,
-          ageMs,
+          micArmed: micArmStateRef.current === "on",
+          maxAgeMs: VOICE_HELD_TRANSCRIPT_MAX_AGE_MS,
+          recoveryPauseMs: MIC_END_TURN_MS,
         });
-        const expiredTurnComplete = scoreVoiceTurnComplete({
-          transcript: pendingHeld.transcript,
-          pauseMs: Math.max(sinceLastSpeechMs, MIC_END_TURN_MS),
-          stability: 0.92,
-        });
-        const shouldForceFlushExpired =
-          pendingHeld.holdReason === "continuation_hold" &&
-          ageMs >= VOICE_HELD_TRANSCRIPT_MAX_AGE_MS &&
-          voiceTranscribeQueueRef.current.length === 0 &&
-          !voiceSpeechActiveRef.current &&
-          !voiceTranscribeBusyRef.current &&
-          transcriptConfirmStateRef.current === null &&
-          shouldRecoverHeldTranscriptAfterNoTranscript({
-            heldTranscript: pendingHeld.transcript,
-            turnCompleteBand: expiredTurnComplete.band,
-            transcribeQueueLength: voiceTranscribeQueueRef.current.length,
-            speechActive: voiceSpeechActiveRef.current,
-            sinceLastSpeechMs,
-          });
-        if (!shouldFlushHeld && !shouldForceFlushExpired) {
-          if (
-            micArmStateRef.current !== "on" ||
-            ageMs >= VOICE_HELD_TRANSCRIPT_MAX_AGE_MS
-          ) {
+        if (watchdog.action !== "dispatch") {
+          if (watchdog.action === "clear") {
             clearHeldTranscriptState();
             return;
           }
           scheduleHeldTranscriptFlush(pendingHeld);
           return;
         }
-        if (shouldForceFlushExpired) {
+        if (watchdog.shouldForceFlushExpired) {
           markVoiceCheckpoint(
             "dispatch_queued",
             "ok",
@@ -18330,37 +18213,24 @@ export function HelixAskPill({
             voiceSessionLanguageLockRef.current = resolvedSourceLanguage;
           }
           if (!transcript) {
-            const heldTranscript = voiceHeldTranscriptPrefixRef.current.trim();
-            const heldTurnComplete = heldTranscript
-              ? scoreVoiceTurnComplete({
-                  transcript: heldTranscript,
-                  pauseMs: MIC_END_TURN_MS,
-                  stability: 0.92,
-                })
-              : null;
-            const sinceLastSpeechMs =
-              voiceLastSpeechMsRef.current !== null
-                ? Math.max(0, Date.now() - voiceLastSpeechMsRef.current)
-                : Number.POSITIVE_INFINITY;
-            const recoverHeldTranscript =
-              heldTurnComplete !== null &&
-              shouldRecoverHeldTranscriptAfterNoTranscript({
-                heldTranscript,
-                turnCompleteBand: heldTurnComplete.band,
-                transcribeQueueLength: voiceTranscribeQueueRef.current.length,
-                speechActive: voiceSpeechActiveRef.current,
-                sinceLastSpeechMs,
-              });
-            if (recoverHeldTranscript) {
+            const heldRecovery = evaluateHelixAskVoiceHeldTranscriptRecovery({
+              heldTranscript: voiceHeldTranscriptPrefixRef.current,
+              nowMs: Date.now(),
+              lastSpeechAtMs: voiceLastSpeechMsRef.current,
+              transcribeQueueLength: voiceTranscribeQueueRef.current.length,
+              speechActive: voiceSpeechActiveRef.current,
+              pauseMs: MIC_END_TURN_MS,
+            });
+            const heldTranscript = heldRecovery.heldTranscript;
+            if (heldRecovery.recover && heldRecovery.turnComplete !== null) {
               resolveBargeInFromTranscription(true);
               stopReadAloud("barge_in");
               setTranscriptConfirmState(null);
               clearHeldTranscriptState();
-              const recoveredConfidence = deriveTranscriptConfidence({
-                transcript: heldTranscript,
-              });
-              const recoveredCompletion = scoreConversationCompletion({
-                transcript: heldTranscript,
+              const recoveredScoring = buildHelixAskVoiceHeldTranscriptRecoveryScoringProjection({
+                heldTranscript,
+                turnComplete: heldRecovery.turnComplete,
+                minConfidence: VOICE_STT_CONFIRM_THRESHOLD,
                 pauseMs: MIC_END_TURN_MS,
                 stability: 0.92,
               });
@@ -18408,10 +18278,10 @@ export function HelixAskPill({
                     : nextSegment.snrDb ?? null,
                 translated: Boolean(result.translated),
                 translationUncertain: false,
-                confidence: Math.max(VOICE_STT_CONFIRM_THRESHOLD, recoveredConfidence.confidence),
-                confidenceReason: "held_transcript_recovery",
-                completion: recoveredCompletion,
-                turnComplete: heldTurnComplete,
+                confidence: recoveredScoring.confidence,
+                confidenceReason: recoveredScoring.confidenceReason,
+                completion: recoveredScoring.completion,
+                turnComplete: recoveredScoring.turnComplete,
                 sttEngine: result.engine ?? null,
                 needsConfirmation: false,
                 steeringReservation: nextSegment.steeringReservation ?? null,
@@ -18569,30 +18439,19 @@ export function HelixAskPill({
               }));
               continue;
             }
-            const pendingAgeMs = Math.max(
-              0,
-              Date.now() - (pendingConfirmation.createdAtMs ?? Date.now()),
-            );
-            if (
-              shouldMergePendingConfirmationTranscript({
-                pendingTranscript: pendingConfirmation.transcript,
-                nextTranscript: transcript,
-                pendingAgeMs,
-              })
-            ) {
-              const mergedPendingTranscript = mergeVoiceTranscriptDraft(
-                pendingConfirmation.transcript,
-                transcript,
-              );
-              const mergedPendingSourceText = mergeVoiceTranscriptDraft(
-                pendingConfirmation.sourceText?.trim() || pendingConfirmation.transcript,
-                result.source_text?.trim() || transcript,
-              );
-              const mergedPendingConfidence = deriveTranscriptConfidence({
-                transcript: mergedPendingTranscript,
-                providerConfidence: result.confidence ?? null,
-                segments: result.segments,
-              });
+            const pendingMergeProjection = buildHelixAskVoicePendingConfirmationMergeProjection({
+              pendingTranscript: pendingConfirmation.transcript,
+              pendingSourceText: pendingConfirmation.sourceText,
+              pendingCreatedAtMs: pendingConfirmation.createdAtMs,
+              nextTranscript: transcript,
+              nextSourceText: result.source_text,
+              nowMs: Date.now(),
+              pauseMs: MIC_END_TURN_MS,
+              stability: 1,
+            });
+            if (pendingMergeProjection.shouldMerge) {
+              const mergedPendingTranscript = pendingMergeProjection.mergedTranscript;
+              const mergedPendingSourceText = pendingMergeProjection.mergedSourceText;
               const mergedPendingSpeakerId = result.speaker_id ?? nextSegment.speakerId ?? pendingConfirmation.speakerId ?? null;
               const mergedPendingSpeakerConfidence =
                 typeof result.speaker_confidence === "number"
@@ -18606,58 +18465,36 @@ export function HelixAskPill({
                 typeof result.snr_db === "number"
                   ? result.snr_db
                   : nextSegment.snrDb ?? pendingConfirmation.snrDb ?? null;
-              const mergedPendingTranslationUncertain =
-                pendingConfirmation.translationUncertain ||
-                result.translation_uncertain === true ||
-                (Boolean(result.translated || pendingConfirmation.translated) &&
-                  mergedPendingConfidence.confidence < VOICE_STT_TRANSLATION_CONFIRM_THRESHOLD);
-              const mergedPendingLowAudioQuality =
-                nextSegment.lowAudioQuality === true ||
-                isLowAudioQualitySignal({
-                  speechProbability: mergedPendingSpeechProbability,
-                  snrDb: mergedPendingSnrDb,
-                  lowQualitySpeechProbability: voiceNoiseProfile.localGateLowQualitySpeechProbability,
-                  lowQualitySnrDb: voiceNoiseProfile.localGateLowQualitySnrDb,
-                });
-              const mergedPendingDispatchState = pendingConfirmation.dispatchState ?? "confirm";
-              const mergedPendingPivotConfidence =
-                typeof result.pivot_confidence === "number"
-                  ? result.pivot_confidence
-                  : pendingConfirmation.pivotConfidence ?? null;
-              const mergedPendingConfirmPolicy = resolveTranscriptConfirmPolicy({
-                dispatchState: mergedPendingDispatchState,
-                confidence: mergedPendingConfidence.confidence,
-                pivotConfidence: mergedPendingPivotConfidence,
-                translationUncertain: mergedPendingTranslationUncertain,
+              const mergedPendingPolicyProjection = buildHelixAskVoicePendingConfirmationPolicyProjection({
+                transcript: mergedPendingTranscript,
+                providerConfidence: result.confidence ?? null,
+                segments: result.segments,
+                translated: Boolean(result.translated || pendingConfirmation.translated),
+                previousTranslationUncertain: pendingConfirmation.translationUncertain,
+                providerTranslationUncertain: result.translation_uncertain === true,
+                translationConfirmThreshold: VOICE_STT_TRANSLATION_CONFIRM_THRESHOLD,
                 sourceLanguage: resolvedSourceLanguage ?? pendingConfirmation.sourceLanguage ?? null,
                 sourceText: mergedPendingSourceText,
-                translated: Boolean(result.translated || pendingConfirmation.translated),
-                lowAudioQuality: mergedPendingLowAudioQuality,
+                dispatchState: pendingConfirmation.dispatchState ?? "confirm",
+                pivotConfidence:
+                  typeof result.pivot_confidence === "number"
+                    ? result.pivot_confidence
+                    : pendingConfirmation.pivotConfidence ?? null,
+                segmentLowAudioQuality: nextSegment.lowAudioQuality,
+                speechProbability: mergedPendingSpeechProbability,
+                snrDb: mergedPendingSnrDb,
+                lowQualitySpeechProbability: voiceNoiseProfile.localGateLowQualitySpeechProbability,
+                lowQualitySnrDb: voiceNoiseProfile.localGateLowQualitySnrDb,
                 speechActive: voiceSpeechActiveRef.current,
                 queuedSegmentCount: voiceTranscribeQueueRef.current.length,
               });
-              const mergedPendingConfirmPolicyWithoutLiveActivity = resolveTranscriptConfirmPolicy({
-                dispatchState: mergedPendingDispatchState,
-                confidence: mergedPendingConfidence.confidence,
-                pivotConfidence: mergedPendingPivotConfidence,
-                translationUncertain: mergedPendingTranslationUncertain,
-                sourceLanguage: resolvedSourceLanguage ?? pendingConfirmation.sourceLanguage ?? null,
-                sourceText: mergedPendingSourceText,
-                translated: Boolean(result.translated || pendingConfirmation.translated),
-                lowAudioQuality: mergedPendingLowAudioQuality,
-                speechActive: false,
-                queuedSegmentCount: 0,
-              });
-              const mergedPendingCompletion = scoreConversationCompletion({
-                transcript: mergedPendingTranscript,
-                pauseMs: MIC_END_TURN_MS,
-                stability: 1,
-              });
-              const mergedPendingTurnComplete = scoreVoiceTurnComplete({
-                transcript: mergedPendingTranscript,
-                pauseMs: MIC_END_TURN_MS,
-                stability: 1,
-              });
+              const mergedPendingConfirmPolicy = mergedPendingPolicyProjection.confirmPolicy;
+              const mergedPendingConfirmPolicyWithoutLiveActivity =
+                mergedPendingPolicyProjection.confirmPolicyWithoutLiveActivity;
+              const mergedPendingDispatchState = mergedPendingPolicyProjection.dispatchState;
+              const mergedPendingPivotConfidence = mergedPendingPolicyProjection.pivotConfidence;
+              const mergedPendingCompletion = pendingMergeProjection.completion;
+              const mergedPendingTurnComplete = pendingMergeProjection.turnComplete;
               setTranscriptConfirmState({
                 ...pendingConfirmation,
                 createdAtMs: Date.now(),
@@ -18701,9 +18538,9 @@ export function HelixAskPill({
                 speechProbability: mergedPendingSpeechProbability,
                 snrDb: mergedPendingSnrDb,
                 translated: Boolean(result.translated || pendingConfirmation.translated),
-                translationUncertain: mergedPendingTranslationUncertain,
-                confidence: mergedPendingConfidence.confidence,
-                confidenceReason: result.confidence_reason ?? mergedPendingConfidence.reason,
+                translationUncertain: mergedPendingPolicyProjection.translationUncertain,
+                confidence: mergedPendingPolicyProjection.confidence,
+                confidenceReason: result.confidence_reason ?? mergedPendingPolicyProjection.confidenceReason,
                 confirmAutoEligible: voiceConfirmV2Active
                   ? mergedPendingConfirmPolicyWithoutLiveActivity.confirmAutoEligible
                   : pendingConfirmation.confirmAutoEligible ?? false,
@@ -18847,37 +18684,25 @@ export function HelixAskPill({
           } else {
             markVoiceCheckpoint("translated", "idle", "No translation needed.");
           }
-          const heldTranscriptPrefix = voiceHeldTranscriptPrefixRef.current.trim();
           const heldState = voiceHeldTranscriptStateRef.current;
-          const heldAgeMs =
-            heldState !== null ? Math.max(0, Date.now() - heldState.updatedAtMs) : Number.POSITIVE_INFINITY;
-          const canApplyHeldPrefix =
-            heldTranscriptPrefix.length > 0 &&
-            (!heldState ||
-              heldAgeMs <= VOICE_TRANSCRIPTION_BREATH_WINDOW_MS * 2 ||
-              heldAgeMs <= VOICE_TURN_GAMEPLAY_LOOP_MAX_MS ||
-              shouldMergeVoiceContinuationTurn({
-                previousPrompt: heldTranscriptPrefix,
-                nextTranscript: transcript,
-                gapMs: heldAgeMs,
-              }));
-          const mergedTranscript = canApplyHeldPrefix
-            ? mergeVoiceTranscriptDraft(heldTranscriptPrefix, transcript)
-            : transcript;
+          const heldPrefixProjection = buildHelixAskVoiceHeldPrefixMergeProjection({
+            heldTranscriptPrefix: voiceHeldTranscriptPrefixRef.current,
+            heldUpdatedAtMs: heldState?.updatedAtMs ?? null,
+            nextTranscript: transcript,
+            nowMs: Date.now(),
+            breathWindowMs: VOICE_TRANSCRIPTION_BREATH_WINDOW_MS,
+            gameplayLoopMaxMs: VOICE_TURN_GAMEPLAY_LOOP_MAX_MS,
+          });
+          const mergedTranscript = heldPrefixProjection.mergedTranscript;
           if (voiceTurnGameplayLoopStartedAtMsRef.current === null) {
             voiceTurnGameplayLoopStartedAtMsRef.current = Date.now();
           }
           clearHeldTranscriptFlushTimer();
-          if (!canApplyHeldPrefix && heldTranscriptPrefix.length > 0) {
+          if (heldPrefixProjection.shouldClearHeldPrefix) {
             clearHeldTranscriptState();
           } else {
             voiceHeldTranscriptStateRef.current = null;
           }
-          const confidenceMeta = deriveTranscriptConfidence({
-            transcript: mergedTranscript,
-            providerConfidence: result.confidence ?? null,
-            segments: result.segments,
-          });
           const speakerId = result.speaker_id ?? nextSegment.speakerId ?? null;
           const speakerConfidence =
             typeof result.speaker_confidence === "number"
@@ -18910,73 +18735,43 @@ export function HelixAskPill({
               ? Math.max(-0.08, Math.min(0.08, nextSegment.confirmBias ?? 0))
               : 0;
           const confirmThreshold = clamp01(VOICE_STT_CONFIRM_THRESHOLD + speakerConfirmBias);
-          const translationUncertain =
-            result.translation_uncertain === true ||
-            (Boolean(result.translated) &&
-              confidenceMeta.confidence < VOICE_STT_TRANSLATION_CONFIRM_THRESHOLD);
-          const highRiskTranslationContext = isHighRiskTranslationContext({
-            translationUncertain,
+          const confirmationProjection = buildHelixAskVoiceTranscriptConfirmationProjection({
+            transcript: mergedTranscript,
+            providerConfidence: result.confidence ?? null,
+            segments: result.segments,
             translated: Boolean(result.translated),
+            providerTranslationUncertain: result.translation_uncertain === true,
+            translationConfirmThreshold: VOICE_STT_TRANSLATION_CONFIRM_THRESHOLD,
             sourceLanguage: resolvedSourceLanguage,
             sourceText: result.source_text ?? null,
-          });
-          const providerDispatchBlocked = result.dispatch_state === "blocked";
-          const honorProviderDispatchBlock = providerDispatchBlocked && highRiskTranslationContext;
-          const hardMultilangBlock =
-            honorProviderDispatchBlock ||
-            (highRiskTranslationContext &&
-              typeof result.pivot_confidence === "number" &&
-              result.pivot_confidence < 0.68);
-          const needsConfirmation =
-            hardMultilangBlock ||
-            shouldRequireTranscriptConfirmation({
-              confidence: confidenceMeta.confidence,
-              translationUncertain,
-              providerNeedsConfirmation: result.needs_confirmation === true,
-              minConfidence: confirmThreshold,
-            });
-          const effectiveConfirmDispatchState: "auto" | "confirm" | "blocked" =
-            hardMultilangBlock
-              ? "blocked"
-              : needsConfirmation
-                ? "confirm"
-                : result.dispatch_state ?? "auto";
-          const confirmPolicy = resolveTranscriptConfirmPolicy({
-            dispatchState: effectiveConfirmDispatchState,
-            confidence: confidenceMeta.confidence,
+            dispatchState: result.dispatch_state ?? null,
+            providerNeedsConfirmation: result.needs_confirmation === true,
+            confirmThreshold,
+            languageConfidence:
+              typeof result.language_confidence === "number" ? result.language_confidence : null,
             pivotConfidence:
               typeof result.pivot_confidence === "number" ? result.pivot_confidence : null,
-            translationUncertain,
-            sourceLanguage: resolvedSourceLanguage,
-            sourceText: result.source_text ?? null,
-            translated: Boolean(result.translated),
             lowAudioQuality,
             speechActive: voiceSpeechActiveRef.current,
             queuedSegmentCount: voiceTranscribeQueueRef.current.length,
           });
-          const confirmPolicyWithoutLiveActivity = resolveTranscriptConfirmPolicy({
-            dispatchState: effectiveConfirmDispatchState,
-            confidence: confidenceMeta.confidence,
-            pivotConfidence:
-              typeof result.pivot_confidence === "number" ? result.pivot_confidence : null,
-            translationUncertain,
-            sourceLanguage: resolvedSourceLanguage,
-            sourceText: result.source_text ?? null,
-            translated: Boolean(result.translated),
-            lowAudioQuality,
-            speechActive: false,
-            queuedSegmentCount: 0,
-          });
-          const turnComplete = scoreVoiceTurnComplete({
+          const confidenceMeta = {
+            confidence: confirmationProjection.confidence,
+            reason: confirmationProjection.confidenceReason,
+          };
+          const translationUncertain = confirmationProjection.translationUncertain;
+          const hardMultilangBlock = confirmationProjection.hardMultilangBlock;
+          const needsConfirmation = confirmationProjection.needsConfirmation;
+          const effectiveConfirmDispatchState = confirmationProjection.effectiveConfirmDispatchState;
+          const confirmPolicy = confirmationProjection.confirmPolicy;
+          const confirmPolicyWithoutLiveActivity = confirmationProjection.confirmPolicyWithoutLiveActivity;
+          const transcriptScoring = buildHelixAskVoiceTranscriptScoringProjection({
             transcript: mergedTranscript,
             pauseMs: MIC_END_TURN_MS,
             stability: 1,
           });
-          const completion = scoreConversationCompletion({
-            transcript: mergedTranscript,
-            pauseMs: MIC_END_TURN_MS,
-            stability: 1,
-          });
+          const turnComplete = transcriptScoring.turnComplete;
+          const completion = transcriptScoring.completion;
           const hasActiveVoiceReasoningAttempt = reasoningAttemptsRef.current.some(
             (entry) =>
               entry.source === "voice_auto" &&
@@ -19091,19 +18886,7 @@ export function HelixAskPill({
               confidenceReason: result.confidence_reason ?? confidenceMeta.reason,
               confirmAutoEligible: voiceConfirmV2Active
                 ? confirmPolicyWithoutLiveActivity.confirmAutoEligible
-                : (providerConfirmAutoEligible === true ||
-                    shouldAutoConfirmTranscriptPrompt({
-                      dispatchState: effectiveConfirmDispatchState,
-                      confidence: confidenceMeta.confidence,
-                      languageConfidence:
-                        typeof result.language_confidence === "number" ? result.language_confidence : null,
-                      pivotConfidence:
-                        typeof result.pivot_confidence === "number" ? result.pivot_confidence : null,
-                      translationUncertain,
-                      translated: Boolean(result.translated),
-                      sourceLanguage: resolvedSourceLanguage,
-                      sourceText: result.source_text ?? null,
-                    })),
+                : (providerConfirmAutoEligible === true || confirmationProjection.legacyAutoConfirmEligible),
               confirmBlockReason:
                 (voiceConfirmV2Active ? confirmPolicy.confirmBlockReason : null) ??
                 providerConfirmBlockReason,
@@ -19558,52 +19341,25 @@ export function HelixAskPill({
     if (typeof window === "undefined") return;
     if (micArmState !== "on") return;
     if (!transcriptConfirmState) return;
-    const confirmPolicy = resolveTranscriptConfirmPolicy({
+    const autoConfirmPolicyProjection = buildHelixAskVoiceTranscriptConfirmAutoPolicyProjection({
       dispatchState: transcriptConfirmState.dispatchState,
       confidence: transcriptConfirmState.confidence,
+      languageConfidence: transcriptConfirmState.languageConfidence,
       pivotConfidence: transcriptConfirmState.pivotConfidence,
       translationUncertain: transcriptConfirmState.translationUncertain,
       sourceLanguage: transcriptConfirmState.sourceLanguage ?? null,
       sourceText: transcriptConfirmState.sourceText ?? null,
       translated: transcriptConfirmState.translated,
-      lowAudioQuality: isLowAudioQualitySignal({
-        speechProbability: transcriptConfirmState.speechProbability,
-        snrDb: transcriptConfirmState.snrDb,
-        lowQualitySpeechProbability: voiceNoiseProfile.localGateLowQualitySpeechProbability,
-        lowQualitySnrDb: voiceNoiseProfile.localGateLowQualitySnrDb,
-      }),
+      speechProbability: transcriptConfirmState.speechProbability,
+      snrDb: transcriptConfirmState.snrDb,
+      lowQualitySpeechProbability: voiceNoiseProfile.localGateLowQualitySpeechProbability,
+      lowQualitySnrDb: voiceNoiseProfile.localGateLowQualitySnrDb,
       speechActive: voiceSpeechActiveRef.current,
       queuedSegmentCount: voiceTranscribeQueueRef.current.length,
+      confirmV2Active: voiceConfirmV2Active,
     });
-    const confirmPolicyWithoutLiveActivity = resolveTranscriptConfirmPolicy({
-      dispatchState: transcriptConfirmState.dispatchState,
-      confidence: transcriptConfirmState.confidence,
-      pivotConfidence: transcriptConfirmState.pivotConfidence,
-      translationUncertain: transcriptConfirmState.translationUncertain,
-      sourceLanguage: transcriptConfirmState.sourceLanguage ?? null,
-      sourceText: transcriptConfirmState.sourceText ?? null,
-      translated: transcriptConfirmState.translated,
-      lowAudioQuality: isLowAudioQualitySignal({
-        speechProbability: transcriptConfirmState.speechProbability,
-        snrDb: transcriptConfirmState.snrDb,
-        lowQualitySpeechProbability: voiceNoiseProfile.localGateLowQualitySpeechProbability,
-        lowQualitySnrDb: voiceNoiseProfile.localGateLowQualitySnrDb,
-      }),
-      speechActive: false,
-      queuedSegmentCount: 0,
-    });
-    const shouldAutoConfirm = voiceConfirmV2Active
-      ? confirmPolicyWithoutLiveActivity.confirmAutoEligible
-      : shouldAutoConfirmTranscriptPrompt({
-          dispatchState: transcriptConfirmState.dispatchState,
-          confidence: transcriptConfirmState.confidence,
-          languageConfidence: transcriptConfirmState.languageConfidence,
-          pivotConfidence: transcriptConfirmState.pivotConfidence,
-          translationUncertain: transcriptConfirmState.translationUncertain,
-          sourceLanguage: transcriptConfirmState.sourceLanguage ?? null,
-          sourceText: transcriptConfirmState.sourceText ?? null,
-          translated: transcriptConfirmState.translated,
-        });
+    const confirmPolicy = autoConfirmPolicyProjection.confirmPolicy;
+    const shouldAutoConfirm = autoConfirmPolicyProjection.shouldAutoConfirm;
     if (voiceConfirmV2Active && confirmPolicy.confirmBlockReason) {
       markVoiceCheckpoint(
         "confirm_blocked_reason",
@@ -19629,40 +19385,25 @@ export function HelixAskPill({
         return;
       }
       if (voiceConfirmV2Active) {
-        const policy = resolveTranscriptConfirmPolicy({
+        const policyProjection = buildHelixAskVoiceTranscriptConfirmAutoPolicyProjection({
           dispatchState: pending.dispatchState,
           confidence: pending.confidence,
+          languageConfidence: pending.languageConfidence,
           pivotConfidence: pending.pivotConfidence,
           translationUncertain: pending.translationUncertain,
           sourceLanguage: pending.sourceLanguage ?? null,
           sourceText: pending.sourceText ?? null,
           translated: pending.translated,
-          lowAudioQuality: isLowAudioQualitySignal({
-            speechProbability: pending.speechProbability,
-            snrDb: pending.snrDb,
-            lowQualitySpeechProbability: voiceNoiseProfile.localGateLowQualitySpeechProbability,
-            lowQualitySnrDb: voiceNoiseProfile.localGateLowQualitySnrDb,
-          }),
+          speechProbability: pending.speechProbability,
+          snrDb: pending.snrDb,
+          lowQualitySpeechProbability: voiceNoiseProfile.localGateLowQualitySpeechProbability,
+          lowQualitySnrDb: voiceNoiseProfile.localGateLowQualitySnrDb,
           speechActive: voiceSpeechActiveRef.current,
           queuedSegmentCount: voiceTranscribeQueueRef.current.length,
+          confirmV2Active: true,
         });
-        const policyWithoutActivity = resolveTranscriptConfirmPolicy({
-          dispatchState: pending.dispatchState,
-          confidence: pending.confidence,
-          pivotConfidence: pending.pivotConfidence,
-          translationUncertain: pending.translationUncertain,
-          sourceLanguage: pending.sourceLanguage ?? null,
-          sourceText: pending.sourceText ?? null,
-          translated: pending.translated,
-          lowAudioQuality: isLowAudioQualitySignal({
-            speechProbability: pending.speechProbability,
-            snrDb: pending.snrDb,
-            lowQualitySpeechProbability: voiceNoiseProfile.localGateLowQualitySpeechProbability,
-            lowQualitySnrDb: voiceNoiseProfile.localGateLowQualitySnrDb,
-          }),
-          speechActive: false,
-          queuedSegmentCount: 0,
-        });
+        const policy = policyProjection.confirmPolicy;
+        const policyWithoutActivity = policyProjection.confirmPolicyWithoutLiveActivity;
         if (policy.confirmBlockReason) {
           markVoiceCheckpoint(
             "confirm_blocked_reason",
@@ -24425,6 +24166,10 @@ export function HelixAskPill({
         const stripped = stripContextCapsuleTokensFromText(entry);
         return stripped || entry.trim();
       });
+      askPromptHistorySubmittedRef.current = buildHelixAskPromptHistoryEntries({
+        submittedPrompts: [...askPromptHistorySubmittedRef.current, ...normalizedEntries],
+      });
+      resetAskPromptHistoryCursor();
       const asksForPastedTextResumeFrame = normalizedEntries.some((entry) =>
         HELIX_ASK_PASTED_TEXT_RESUME_RECALL_PROMPT_PATTERN.test(entry.trim()),
       );
@@ -24657,9 +24402,12 @@ export function HelixAskPill({
       const submittedAttachmentChecks = buildHelixAskSubmittedAttachmentChecks(submittedAttachments);
       const invalidSubmittedAttachment = selectFirstInvalidHelixAskSubmittedAttachment(submittedAttachmentChecks);
       const submittedImageAttachments = selectHelixAskNativeImageAttachments(submittedAttachments);
-      const expectsVisualInput = isHelixAskVisualPrompt(first);
       let submittedVisualEvidence = visualSituationEvidenceForTurn;
       let submittedVisualCapability: Record<string, unknown> | null = null;
+      const hasUsableSubmittedVisualEvidence = Boolean(
+        submittedVisualEvidence && !isDiagnosticVisualEvidence(submittedVisualEvidence),
+      );
+      const expectsVisualInput = submittedImageAttachments.length > 0 || hasUsableSubmittedVisualEvidence;
       if (!expectsVisualInput) {
         if (submittedVisualEvidence && isDiagnosticVisualEvidence(submittedVisualEvidence)) {
           submittedVisualEvidence = null;
@@ -24676,101 +24424,6 @@ export function HelixAskPill({
           invalidSubmittedAttachment.check?.reason ??
             "Attachment is stale. Reattach it before sending.",
         );
-        setAskStatus(null);
-        if (askInputRef.current) {
-          askInputRef.current.value = first;
-          resizeTextarea();
-        }
-        askDraftRef.current = first;
-        return;
-      }
-      if (
-        submittedImageAttachments.length === 0 &&
-        expectsVisualInput &&
-        (!submittedVisualEvidence || isDiagnosticVisualEvidence(submittedVisualEvidence))
-      ) {
-        setAskStatus("Capturing and analyzing a fresh visual frame...");
-        setVisualSituationSourceStatus("requesting");
-        setVisualSituationSourceError(null);
-        try {
-          const capture = await requestHelixAskVisualFrame();
-          submittedVisualEvidence = capture.visualEvidence;
-          setVisualSituationEvidenceForTurn(capture.visualEvidence);
-          setVisualSituationSourceStatus("active");
-          appendSyntheticLiveEvent({
-            id: `situation:visual:${Date.now()}:${Math.random().toString(36).slice(2)}`,
-            tool: "situation_room",
-            ts: new Date().toISOString(),
-            text: capture.summary,
-            meta: {
-              room_id: situationRoomId,
-              source: "visual_screen_capture",
-              event_type: "visual_frame_captured_for_ask_turn",
-              raw_image_included: false,
-              assistant_answer: false,
-            },
-          });
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          submittedVisualCapability = {
-            schema: "helix.visual_context_capability.v1",
-            source_id: visualSituationSourceIdRef.current,
-            label: visualSituationSourceLabel ?? "Visual screen capture",
-            status: "error",
-            error: message,
-            evidence_available: false,
-            latest_evidence_ref: null,
-            requires_agent_step_selection: true,
-            promotion_policy: "available_tool_not_forced_context",
-            assistant_answer: false,
-            raw_content_included: false,
-          };
-          submittedVisualEvidence = null;
-          setVisualSituationSourceStatus("error");
-          setVisualSituationSourceError(message);
-          setAskError(`Visual capture failed: ${message}`);
-          setAskStatus(null);
-        }
-        if (!submittedVisualEvidence || isDiagnosticVisualEvidence(submittedVisualEvidence)) {
-          const summary = readVisualEvidenceSummary(submittedVisualEvidence);
-          const health = await fetch("/api/agi/situation/visual-provider/health")
-            .then((response) => (response.ok ? response.json() : null))
-            .catch(() => null);
-          const lastError =
-            health && typeof health.last_error === "string" && health.last_error.trim()
-              ? health.last_error.trim()
-              : null;
-          const model =
-            health && typeof health.model === "string" && health.model.trim()
-              ? health.model.trim()
-              : null;
-          const provider =
-            health && typeof health.provider === "string" && health.provider.trim()
-              ? health.provider.trim()
-              : null;
-          const detail = lastError
-            ? `Vision provider ${provider ?? "unknown"}${model ? ` / ${model}` : ""} failed: ${lastError}.`
-            : summary ?? "Vision provider did not return an image description.";
-          submittedVisualCapability = {
-            schema: "helix.visual_context_capability.v1",
-            source_id: visualSituationSourceIdRef.current,
-            label: visualSituationSourceLabel ?? "Visual screen capture",
-            status: "error",
-            error: detail,
-            evidence_available: false,
-            latest_evidence_ref: null,
-            requires_agent_step_selection: true,
-            promotion_policy: "available_tool_not_forced_context",
-            assistant_answer: false,
-            raw_content_included: false,
-          };
-          submittedVisualEvidence = null;
-          setAskError(`${detail} The Ask turn was not submitted with diagnostic-only visual evidence.`);
-          setAskStatus(null);
-        }
-      }
-      if (submittedImageAttachments.length === 0 && expectsVisualInput && !submittedVisualEvidence && !submittedVisualCapability) {
-        setAskError("No usable visual evidence is available for this turn. Capture and analyze a frame, then send again.");
         setAskStatus(null);
         if (askInputRef.current) {
           askInputRef.current.value = first;
@@ -24806,9 +24459,9 @@ export function HelixAskPill({
       appendSyntheticLiveEvent,
       resolveSelectedContextCapsuleIds,
       resolveWorkstationActionFromPendingInput,
-      requestHelixAskVisualFrame,
       requestMoodHint,
       resizeTextarea,
+      resetAskPromptHistoryCursor,
       setActive,
       situationRoomId,
       updateMoodFromText,
@@ -25113,6 +24766,7 @@ export function HelixAskPill({
       triggerAskActionHaptic();
       handleRetainedVoiceTranscriptionRetry();
     },
+    showVisualCaptureControls: canUseLiveAnswerVisualCaptureControls,
     visualSituationSourceStatus,
     onCaptureVisualSource: () => {
       triggerAskActionHaptic();
@@ -25141,10 +24795,13 @@ export function HelixAskPill({
     className: composerViewModel.textareaClassName,
     placeholder: currentPlaceholder,
     onPaste: handleAskPaste,
-    onInputValue: (value, target) =>
+    onKeyDown: handleAskPromptHistoryKeyDown,
+    onInputValue: (value, target) => {
+      resetAskPromptHistoryCursor();
       syncAskDraftValue(value, {
         target,
-      }),
+      });
+    },
     onSubmitRequested: (form) => form?.requestSubmit?.(),
   });
   const attachmentStripState = buildHelixAskAttachmentStripState({

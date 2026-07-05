@@ -1007,6 +1007,14 @@ describe("provider-neutral capability lane one-shot runner", () => {
         text_candidate: "T00 = rho",
         latex_candidate: "T_{00}=\\rho",
         extraction_status: "extracted",
+        scientific_evidence_packet: {
+          schema: "helix.scientific_evidence_packet.v1",
+          primary_domain: "adm_gr",
+          extraction_status: "extracted",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
         claim_boundary: {
           cropObservationOnly: true,
           ocrCandidateOnly: true,
@@ -1054,6 +1062,28 @@ describe("provider-neutral capability lane one-shot runner", () => {
           latex_candidate: "T_{00}=\\rho",
           extraction_status: "extracted",
           uncertainty: ["OCR is candidate-only"],
+          scientific_evidence_packet: expect.objectContaining({
+            schema: "helix.scientific_evidence_packet.v1",
+            primary_domain: "adm_gr",
+            source_image: expect.objectContaining({
+              source_kind: "image_lens_source",
+              page_number: null,
+              raw_ref_included: false,
+            }),
+            crop_region: expect.objectContaining({
+              region_id: expect.stringContaining("image_lens_region:"),
+              bbox_px: { x: 4, y: 8, width: 120, height: 64 },
+              source_ref_hash: expect.stringContaining("sha256:"),
+            }),
+            ocr_text_candidate: "T00 = rho",
+            symbol_candidates: expect.arrayContaining(["T00", "rho"]),
+            admissibility: expect.objectContaining({
+              claim_boundary: "observation_only_not_proof",
+            }),
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          }),
           terminal_eligible: false,
           assistant_answer: false,
           raw_content_included: false,
@@ -1063,7 +1093,7 @@ describe("provider-neutral capability lane one-shot runner", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
-    expect(codex.observation_packets[0]?.produced_affordances).toEqual([
+    expect(codex.observation_packets[0]?.produced_affordances).toEqual(expect.arrayContaining([
       expect.objectContaining({
         kind: "image_lens_region_evidence",
         source_capability: "visual_analysis.inspect_image_region",
@@ -1071,7 +1101,20 @@ describe("provider-neutral capability lane one-shot runner", () => {
         assistant_answer: false,
         raw_content_included: false,
       }),
-    ]);
+      expect.objectContaining({
+        kind: "scientific_evidence",
+        source_capability: "visual_analysis.inspect_image_region",
+        status: "available",
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]));
+    expect(codex.observation_packets[0]?.typed_handoff_contract).toMatchObject({
+      produced_affordance_kinds: expect.arrayContaining(["image_lens_region_evidence", "scientific_evidence"]),
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
     expect(codex.debug_events.map((event) => event.stage)).toEqual([
       "lane_requested",
       "lane_backend_selected",
@@ -1084,6 +1127,145 @@ describe("provider-neutral capability lane one-shot runner", () => {
         extraction_status: "extracted",
       },
     });
+  });
+
+  it("implicitly runs Image Lens for natural scientific image sidecar prompts without bbox wording", async () => {
+    const previousExtractionFixtures = process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([
+      {
+        region_label: "scientific_page",
+        text_candidate: "Bianchi identities as field equations for the Weyl tensor.",
+        latex_candidate: "\\nabla^{AA'}\\psi_{ABCD}=0",
+        extraction_status: "extracted",
+        uncertainty: ["fixture-backed OCR/math candidate"],
+      },
+    ]);
+    try {
+      const result = await runHelixCapabilityLaneOneShotRequests({
+        provider: buildProvider("codex"),
+        body: {
+          turn_id: "turn-provider-neutral-scientific-image-implicit",
+          question: "Here is a scientific document image. Extract the equations and compare them to the theory badge graph.",
+          source_target_intent: {
+            schema: "helix.ask_source_target_intent.v1",
+            target_source: "scientific_image_evidence",
+            target_kind: "scientific_image_evidence_sidecar",
+            requested_outputs: [
+              "image_lens_crop_observation",
+              "scientific_evidence_packet",
+              "scientific_evidence_sidecar",
+              "theory_reflection",
+              "calculator_payload_filter",
+              "typed_failure",
+            ],
+          },
+          mandatory_next_tool: {
+            schema: "helix.mandatory_next_tool.v1",
+            tool_name: "visual_analysis.inspect_image_region",
+            missing_required_evidence: "scientific_evidence_sidecar",
+            terminal_forbidden: true,
+          },
+          turn_input_items: [
+            {
+              type: "image",
+              image_ref: "visual_evidence:scientific-page",
+              image_base64: "test-image",
+              mime_type: "image/png",
+              evidence_id: "visual_evidence:scientific-page",
+              source_kind: "image_lens_source",
+              width_px: 346,
+              height_px: 372,
+              raw_image_included: false,
+            },
+          ],
+        },
+        env: {
+          OPENAI_API_KEY: "test-openai",
+          HELIX_IMAGE_LENS_EXTRACTION_FIXTURES: process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES,
+        } as NodeJS.ProcessEnv,
+      });
+
+      expect(result.requested).toBe(true);
+      expect(result.call_results).toHaveLength(8);
+      const receipts = result.call_results.map((entry) => entry.receipt as Record<string, unknown>);
+      expect(receipts.map((receipt) => receipt.region_label)).toEqual([
+        "scientific_page",
+        "header_caption",
+        "equation_block",
+        "equation_3.51",
+        "equation_3.52",
+        "equation_3.53",
+        "equation_3.54",
+        "equation_3.55",
+      ]);
+      expect(receipts).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            region_label: "header_caption",
+            bbox_px: { x: 0, y: 0, width: 346, height: 71 },
+          }),
+          expect.objectContaining({
+            region_label: "equation_3.51",
+            requested_equation_label: "3.51",
+          }),
+          expect.objectContaining({
+            region_label: "equation_3.55",
+            requested_equation_label: "3.55",
+          }),
+        ]),
+      );
+      expect(result.call_results[0]).toMatchObject({
+        ok: true,
+        capability: "visual_analysis.inspect_image_region",
+        receipt: expect.objectContaining({
+          source_kind: "image_lens_source",
+          source_refs: expect.arrayContaining(["visual_evidence:scientific-page"]),
+          bbox_px: { x: 0, y: 0, width: 346, height: 372 },
+          region_label: "scientific_page",
+          text_candidate: "Bianchi identities as field equations for the Weyl tensor.",
+          latex_candidate: "\\nabla^{AA'}\\psi_{ABCD}=0",
+          extraction_status: "extracted",
+          scientific_evidence_packet: expect.objectContaining({
+            primary_domain: "weyl_bianchi",
+            admissibility: expect.objectContaining({
+              status: "admissible_observation",
+            }),
+          }),
+          scientific_evidence_sidecar: expect.objectContaining({
+            schema: "helix.scientific_image_evidence_sidecar.v1",
+            sidecar_kind: "transient_scientific_image_evidence",
+            admissibility: expect.objectContaining({
+              status: "admissible_observation",
+            }),
+          }),
+        }),
+      });
+      expect(result.observation_packets).toHaveLength(8);
+      expect(result.observation_packets[0]).toMatchObject({
+        capability_key: "visual_analysis.inspect_image_region",
+        status: "succeeded",
+        state_delta: {
+          visual_analysis_region_inspection: {
+            source_id: "visual_evidence:scientific-page",
+            crop_bbox_px: { x: 0, y: 0, width: 346, height: 372 },
+            scientific_evidence_sidecar: expect.objectContaining({
+              memory_classification: expect.objectContaining({
+                memory_kind: "transient_scientific_image_evidence",
+                retrieval_tags: expect.arrayContaining(["scientific_image", "image_lens", "weyl_bianchi"]),
+              }),
+            }),
+          },
+        },
+      });
+      expect(result.debug_projection.capability_lane_reentry_status)
+        .toBe("observation_packet_required_for_provider_reentry");
+    } finally {
+      if (previousExtractionFixtures === undefined) {
+        delete process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+      } else {
+        process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = previousExtractionFixtures;
+      }
+    }
   });
 
   it("marks Image Lens crops without extraction payload as failed observation evidence", async () => {
@@ -1195,10 +1377,12 @@ describe("provider-neutral capability lane one-shot runner", () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
       const fetchBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body ?? "{}"));
       expect(fetchBody.messages[0].content[0].text).toContain("requested_equation_label: 3.51");
+      expect(fetchBody.messages[0].content[0].text).toContain("bbox_px: 0,0,2,2");
       expect(fetchBody.messages[0].content[1].image_url.url).toContain("data:image/png;base64,");
       expect(result.call_results[0]).toMatchObject({
         ok: true,
         receipt: {
+          bbox_px: { x: 0, y: 0, width: 2, height: 2 },
           text_candidate: "delta psi minus nabla psi",
           latex_candidate: "\\delta\\psi - \\nabla\\psi",
           extraction_status: "extracted",
@@ -1222,6 +1406,7 @@ describe("provider-neutral capability lane one-shot runner", () => {
         state_delta: {
           visual_analysis_region_inspection: {
             requested_equation_label: "3.51",
+            crop_bbox_px: { x: 0, y: 0, width: 2, height: 2 },
             text_candidate: "delta psi minus nabla psi",
             latex_candidate: "\\delta\\psi - \\nabla\\psi",
             extraction_status: "extracted",
@@ -1230,6 +1415,119 @@ describe("provider-neutral capability lane one-shot runner", () => {
         },
         terminal_eligible: false,
         assistant_answer: false,
+      });
+    } finally {
+      vi.unstubAllGlobals();
+      if (previousVisionBase === undefined) delete process.env.VISION_HTTP_BASE;
+      else process.env.VISION_HTTP_BASE = previousVisionBase;
+      if (previousVisionKey === undefined) delete process.env.VISION_HTTP_API_KEY;
+      else process.env.VISION_HTTP_API_KEY = previousVisionKey;
+      if (previousVisionModel === undefined) delete process.env.VISION_HTTP_MODEL;
+      else process.env.VISION_HTTP_MODEL = previousVisionModel;
+    }
+  });
+
+  it("expands degenerate Image Lens crop_image_ref data-url bboxes to the image dimensions", async () => {
+    const sourcePng =
+      "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAGElEQVR42mP8z8DwnwEJMDGgAcYBDAwAODsEBkXvxpUAAAAASUVORK5CYII=";
+    const result = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-provider-neutral-image-lens-degenerate-crop-data-url",
+        capability_lane_call: {
+          capability: "visual_analysis.inspect_image_region",
+          source_id: "image-lens-source:crop-data-url",
+          crop_image_ref: `data:image/png;base64,${sourcePng}`,
+          bbox_px: { x: 0, y: 0, width: 1, height: 1 },
+          region_label: "scientific_page",
+        },
+      },
+      env: { OPENAI_API_KEY: "test-openai" } as NodeJS.ProcessEnv,
+    });
+
+    expect(result.call_results[0]).toMatchObject({
+      ok: true,
+      receipt: {
+        bbox_px: { x: 0, y: 0, width: 2, height: 2 },
+      },
+    });
+    expect(result.observation_packets[0]).toMatchObject({
+      status: "succeeded",
+      state_delta: {
+        visual_analysis_region_inspection: {
+          crop_bbox_px: { x: 0, y: 0, width: 2, height: 2 },
+        },
+      },
+    });
+  });
+
+  it("recovers fenced malformed Image Lens JSON into structured text and LaTeX candidates", async () => {
+    const previousVisionBase = process.env.VISION_HTTP_BASE;
+    const previousVisionKey = process.env.VISION_HTTP_API_KEY;
+    const previousVisionModel = process.env.VISION_HTTP_MODEL;
+    const sourcePng =
+      "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAGElEQVR42mP8z8DwnwEJMDGgAcYBDAwAODsEBkXvxpUAAAAASUVORK5CYII=";
+    process.env.VISION_HTTP_BASE = "https://vision-provider.test";
+    process.env.VISION_HTTP_API_KEY = "test-vision-key";
+    process.env.VISION_HTTP_MODEL = "gpt-4o-mini";
+    const malformedExtraction = [
+      "```json",
+      "{",
+      '  "text_candidate": "As in Chapter 2\\\\nfield equations",',
+      '  "latex_candidate":',
+      '    "\\\\( A = B \\\\) (3.51)\\\\n"',
+      '    + "\\\\( C = D \\\\) (3.52)",',
+      '  "uncertainty": ["low readability", "text alignment issues"]',
+      "}",
+      "```",
+    ].join("\n");
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [{
+            message: {
+              content: malformedExtraction,
+            },
+          }],
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      const result = await runHelixCapabilityLaneOneShotRequests({
+        provider: buildProvider("codex"),
+        body: {
+          turn_id: "turn-provider-neutral-image-lens-malformed-json",
+          capability_lane_call: {
+            capability: "visual_analysis.inspect_image_region",
+            source_id: "image-lens-source:malformed-json",
+            source_image_ref: `data:image/png;base64,${sourcePng}`,
+            bbox_px: { x: 0, y: 0, width: 2, height: 2 },
+            region_label: "equation_block",
+          },
+        },
+        env: {
+          OPENAI_API_KEY: "test-openai",
+          HELIX_IMAGE_LENS_EXTRACTION_BACKEND: "vision_http",
+        } as NodeJS.ProcessEnv,
+      });
+
+      expect(result.call_results[0]).toMatchObject({
+        ok: true,
+        receipt: {
+          text_candidate: "As in Chapter 2\\nfield equations",
+          latex_candidate: "\\( A = B \\) (3.51)\\n\\( C = D \\) (3.52)",
+          extraction_status: "extracted",
+          uncertainty: ["low readability", "text alignment issues"],
+        },
+      });
+      expect(result.call_results[0].receipt).not.toMatchObject({
+        text_candidate: expect.stringContaining("```json"),
       });
     } finally {
       vi.unstubAllGlobals();

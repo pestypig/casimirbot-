@@ -184,6 +184,26 @@ const readString = (value: unknown): string =>
 const readRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 
+const readStringArray = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.map(readString).filter(Boolean)
+    : [];
+
+const readScientificImageEvidenceSidecarFromPacket = (
+  packet: HelixAgentStepObservationPacket,
+): Record<string, unknown> | null => {
+  const stateDelta = readRecord(packet.state_delta);
+  const regionInspection = readRecord(stateDelta?.visual_analysis_region_inspection);
+  const receipt = readRecord(regionInspection?.receipt);
+  const candidates = [
+    regionInspection?.scientific_evidence_sidecar,
+    receipt?.scientific_evidence_sidecar,
+  ];
+  return candidates
+    .map(readRecord)
+    .find((sidecar) => readString(sidecar?.schema) === "helix.scientific_image_evidence_sidecar.v1") ?? null;
+};
+
 const readRankedReceiptRef = (...values: unknown[]): string | null => {
   const records = values
     .map(readRecord)
@@ -226,7 +246,7 @@ export const buildCapabilityLaneArtifactLedger = (input: {
   turnId: string;
   packets: HelixAgentStepObservationPacket[];
 }): Array<Record<string, unknown>> =>
-  input.packets.map((packet, index) => {
+  input.packets.flatMap((packet, index) => {
     const stateDelta = readRecord(packet.state_delta);
     const shadowExecution = readRecord(stateDelta?.capability_lane_shadow_execution);
     const inferredLaneId = readString(shadowExecution?.lane_id) ||
@@ -243,7 +263,7 @@ export const buildCapabilityLaneArtifactLedger = (input: {
     const artifactId =
       firstProducedRef ??
       `${input.turnId}:capability_lane_observation:${packet.capability_key}:${index + 1}`;
-    return {
+    const packetArtifact = {
       schema: "helix.current_turn_artifact.v1",
       artifact_id: artifactId,
       producer_item_id: packet.call_id,
@@ -267,6 +287,57 @@ export const buildCapabilityLaneArtifactLedger = (input: {
       terminal_eligible: false,
       raw_content_included: false,
     };
+
+    const scientificSidecar = readScientificImageEvidenceSidecarFromPacket(packet);
+    if (!scientificSidecar) return [packetArtifact];
+
+    const sidecarId =
+      readString(scientificSidecar.sidecar_id) ||
+      `${input.turnId}:scientific_image_evidence_sidecar:${index + 1}`;
+    const memoryClassification = readRecord(scientificSidecar.memory_classification);
+    const admissibility = readRecord(scientificSidecar.admissibility);
+    const sourceRefs = readStringArray(scientificSidecar.packet_refs);
+
+    return [
+      packetArtifact,
+      {
+        schema: "helix.current_turn_artifact.v1",
+        artifact_id: sidecarId,
+        producer_item_id: packet.call_id,
+        kind: "scientific_image_evidence_sidecar",
+        observation_kind: packet.capability_key,
+        turn_id: input.turnId,
+        capability_key: packet.capability_key,
+        lane_id: inferredLaneId,
+        selected_backend_provider: selectedBackendProvider,
+        backend_selection_decision: packet.backend_selection_decision ?? null,
+        lane_execution_status: laneExecutionStatus,
+        sidecar_id: sidecarId,
+        sidecar_kind: readString(scientificSidecar.sidecar_kind) || "transient_scientific_image_evidence",
+        memory_kind: readString(memoryClassification?.memory_kind) || "transient_scientific_image_evidence",
+        retrieval_tags: readStringArray(memoryClassification?.retrieval_tags),
+        suggested_consumers: readStringArray(memoryClassification?.suggested_consumers),
+        source_ref_hash: readString(scientificSidecar.source_ref_hash) || null,
+        source_kind: readString(scientificSidecar.source_kind) || null,
+        packet_count: typeof scientificSidecar.packet_count === "number" ? scientificSidecar.packet_count : null,
+        packet_refs: sourceRefs,
+        crop_regions: Array.isArray(scientificSidecar.crop_regions) ? scientificSidecar.crop_regions : [],
+        primary_packet_ref: readString(scientificSidecar.primary_packet_ref) || null,
+        primary_domain: readString(scientificSidecar.primary_domain) || null,
+        primary_domains: readStringArray(scientificSidecar.primary_domains),
+        extraction_summary: readRecord(scientificSidecar.extraction_summary),
+        admissibility_status: readString(admissibility?.status) || null,
+        admissibility_reasons: readStringArray(admissibility?.reasons),
+        compound_route_stages: Array.isArray(scientificSidecar.compound_route_stages)
+          ? scientificSidecar.compound_route_stages
+          : [],
+        produced_artifact_refs: [sidecarId, ...sourceRefs],
+        payload: scientificSidecar,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+    ];
   });
 
 export const buildCapabilityLaneProviderAdapterReceipts = (input: {

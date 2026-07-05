@@ -54,4 +54,70 @@ describe("ask runtime authority readers", () => {
       terminal_eligible: false,
     });
   });
+
+  it("preserves restricted scientific branch gates when calculators are filtered out", () => {
+    const reflection = extractAskLevelTheoryReflection({
+      workstation_gateway_call_results: [
+        {
+          ok: true,
+          capability_id: "theory-badge-graph.reflect_discussion_context",
+          observation: {
+            schema: "helix.theory_context_reflection_observation.v1",
+            capability_key: "theory-badge-graph.reflect_discussion_context",
+            prompt: "Reflect Image Lens Bianchi/Weyl crop evidence against the graph.",
+            reflection_id: "reflection:weyl-bianchi-gated",
+            summary: "Theory Badge Graph reflection found Weyl/Bianchi context.",
+            exact_badge_ids: ["nhm2.curvature.weyl_bianchi"],
+            likely_badge_ids: ["nhm2.observer.curvature_context"],
+            highlighted_badge_ids: ["nhm2.curvature.weyl_bianchi"],
+            claim_boundary_notes: ["final_answer_guard=OCR candidates and graph matches are not proof."],
+            calculator_payloads: [],
+            rejected_calculator_payload_ids: [
+              "tokamak_thermal_pressure_payload",
+              "tokamak_confinement_energy_payload",
+            ],
+            scientific_evidence_packet: {
+              schema: "helix.scientific_evidence_packet.v1",
+              primary_domain: "weyl_bianchi",
+            },
+            scientific_branch_gate: {
+              schema: "helix.scientific_branch_gate.v1",
+              status: "restricted",
+              primary_domain: "weyl_bianchi",
+              rejected_calculator_payload_ids: [
+                "tokamak_thermal_pressure_payload",
+                "tokamak_confinement_energy_payload",
+              ],
+            },
+            scientific_run_trace: {
+              schema: "helix.scientific_run_trace.v1",
+              trace_id: "scientific_run:test",
+            },
+          },
+        },
+      ],
+    });
+
+    expect(reflection).toMatchObject({
+      reflectionId: "reflection:weyl-bianchi-gated",
+      input: {
+        mentionedDomains: ["weyl_bianchi"],
+      },
+      inferredDomains: [
+        expect.objectContaining({
+          atlasBlockId: "weyl_bianchi",
+          title: "weyl bianchi",
+        }),
+      ],
+      evidenceForAsk: {
+        claimBoundaries: expect.arrayContaining([
+          "scientific_branch_gate=restricted; domain=weyl_bianchi",
+          "rejected_calculator_payloads=tokamak_thermal_pressure_payload,tokamak_confinement_energy_payload",
+          "scientific_run_trace=scientific_run:test",
+        ]),
+        calculatorPayloads: [],
+      },
+      terminal_eligible: false,
+    });
+  });
 });

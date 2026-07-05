@@ -5,18 +5,8 @@ import {
   type InterfaceLanguageCode,
 } from "@/lib/i18n/interfaceLanguage";
 import { pushWorkstationDebugEvent } from "@/lib/helix/workstation-debug";
-import { enMessages } from "@/lib/i18n/messages/en";
-import { hawMessages } from "@/lib/i18n/messages/haw";
-import type {
-  InterfaceMessageId,
-  InterfaceMessageValues,
-  InterfaceTargetCatalog,
-} from "@/lib/i18n/messages/types";
-
-const interfaceMessageCatalogs: Record<InterfaceLanguageCode, InterfaceTargetCatalog<InterfaceMessageId>> = {
-  en: enMessages,
-  haw: hawMessages,
-};
+import { interfaceMessageCatalogs } from "@/lib/i18n/messages/targetCatalogs";
+import type { InterfaceMessageId, InterfaceMessageValues } from "@/lib/i18n/messages/types";
 
 const interpolationPattern = /\{([a-zA-Z0-9_]+)\}/g;
 

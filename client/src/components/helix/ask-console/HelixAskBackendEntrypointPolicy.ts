@@ -15,7 +15,9 @@ type HelixAskBackendEntrypointFamily =
   | "scholarly_research"
   | "live_pipeline"
   | "helix_ask"
-  | "visual_capture";
+  | "visual_capture"
+  | "image_lens"
+  | "scientific_image";
 
 type HelixAskBackendEntrypointFamilyResolution = {
   family: HelixAskBackendEntrypointFamily;
@@ -36,7 +38,13 @@ const HELIX_EVIDENCE_GATE_TRANSFORM_TASK_RE =
 const HELIX_ASK_COMPARE_TRIGGER_RE = /\b(?:compare|contrast|difference|diff|what changed|changed since)\b/i;
 
 const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE =
-  /\b(?:scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\s+viewer|narrator\.[a-z0-9_.-]+|panel[_\s-]?id\s*(?:=|:)\s*narrator|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|scholarly-research\.[a-z0-9_.-]+|scholarly_research\.[a-z0-9_.-]+|scholarly\s+research\s+tool|lookup_papers|fetch_full_text|extract_numeric_parameters|live_env\.[a-z0-9_.-]+|helix_ask\.[a-z0-9_.-]+|image_lens|visual_capture)\b/i;
+  /\b(?:scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\s+viewer|narrator\.[a-z0-9_.-]+|panel[_\s-]?id\s*(?:=|:)\s*narrator|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|scholarly-research\.[a-z0-9_.-]+|scholarly_research\.[a-z0-9_.-]+|scholarly\s+research\s+tool|lookup_papers|fetch_full_text|extract_numeric_parameters|live_env\.[a-z0-9_.-]+|helix_ask\.[a-z0-9_.-]+|image[_\s-]?lens|visual_analysis\.inspect_image_region|visual_capture|scientific\s+(?:document|image|page)|document\s+image|attached\s+image.*(?:equation|latex|theory\s+graph))\b/i;
+
+const HELIX_ASK_SCIENTIFIC_IMAGE_PROMPT_RE =
+  /\b(?:attached\s+image|image|screenshot|document\s+image|scientific\s+(?:document|image|page|paper))\b[\s\S]{0,180}\b(?:equations?|latex|symbols?|scientific\s+text|theory\s+(?:badge\s+)?graph|compare|congruence|reflection)\b/i;
+
+const HELIX_ASK_SCIENTIFIC_IMAGE_REFLECTION_PROMPT_RE =
+  /\b(?:compare|congruence|reflect|reflection|theory\s+(?:badge\s+)?graph|badge\s+graph|calculator(?:\s+payload|\s+handoff)?|payload\s+filter|branch\s+admission|admit\s+(?:a\s+)?branch)\b/i;
 
 const stripQuotedPayloadsForBackendEntrypointPolicy = (text: string): string =>
   text
@@ -177,13 +185,45 @@ export function resolveHelixAskBackendEntrypointFamily(
       requestedOutputs: ["tool_call_eligibility", "procedure_observation", "typed_failure"],
     };
   }
-  if (/\b(?:image_lens|visual_capture)\b/i.test(normalized)) {
+  if (HELIX_ASK_SCIENTIFIC_IMAGE_PROMPT_RE.test(normalized)) {
+    const requestedOutputs = [
+      "tool_call_eligibility",
+      "image_lens_crop_observation",
+      "scientific_evidence_packet",
+      "scientific_evidence_sidecar",
+      ...(HELIX_ASK_SCIENTIFIC_IMAGE_REFLECTION_PROMPT_RE.test(normalized)
+        ? ["theory_reflection", "calculator_payload_filter"]
+        : []),
+      "typed_failure",
+    ];
+    return {
+      family: "scientific_image",
+      sourceTarget: "scientific_image_evidence",
+      targetKind: "scientific_image_evidence_sidecar",
+      requiredToolFamily: "visual_analysis",
+      selectedCapability: "visual_analysis.inspect_image_region",
+      explicitCue: "scientific_image_evidence_sidecar",
+      requestedOutputs,
+    };
+  }
+  if (/\b(?:image[_\s-]?lens|visual_analysis\.inspect_image_region)\b/i.test(normalized)) {
+    return {
+      family: "image_lens",
+      sourceTarget: "image_lens",
+      targetKind: "visual_region_evidence",
+      requiredToolFamily: "visual_analysis",
+      selectedCapability: "visual_analysis.inspect_image_region",
+      explicitCue: "image_lens_region_inspection",
+      requestedOutputs: ["tool_call_eligibility", "image_lens_crop_observation", "scientific_evidence_packet", "typed_failure"],
+    };
+  }
+  if (/\bvisual_capture\b/i.test(normalized)) {
     return {
       family: "visual_capture",
       sourceTarget: "visual_capture",
       targetKind: "visual_capture",
       requiredToolFamily: "visual_capture",
-      selectedCapability: /\bimage_lens\b/i.test(normalized) ? "image_lens.inspect" : "visual_capture.inspect",
+      selectedCapability: "visual_capture.inspect",
       explicitCue: "visual_capture_tool_family",
       requestedOutputs: ["tool_call_eligibility", "visual_frame_evidence", "typed_failure"],
     };
@@ -195,7 +235,7 @@ export function requiresHelixAskBackendEntrypoint(question: string | null | unde
   const normalized = `${question ?? ""}`.trim();
   if (!normalized) return false;
   if (isQuotedTransformOnlyForBackendEntrypointPolicy(normalized)) return false;
-  return HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE.test(normalized);
+  return HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE.test(normalized) || Boolean(resolveHelixAskBackendEntrypointFamily(normalized));
 }
 
 export function shouldUseHelixAskBackendTurnEntrypoint(args: {
@@ -280,7 +320,9 @@ export function buildHelixAskHardBackendEntrypointRouteMetadata(args: {
         selected_capability: family.selectedCapability,
         terminal_forbidden: true,
         reason: "hard tool-family prompt requires backend Ask capability observation before terminal authority",
-        missing_required_evidence: family.requestedOutputs.includes("calculator_receipt")
+        missing_required_evidence: family.requestedOutputs.includes("scientific_evidence_sidecar")
+          ? "scientific_evidence_sidecar"
+          : family.requestedOutputs.includes("calculator_receipt")
           ? "calculator_receipt"
           : "tool_observation",
         blocking_reasons: ["backend_ask_entry_required", "tool_observation_required"],

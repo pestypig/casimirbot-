@@ -116,6 +116,32 @@ describe("Helix Ask agent runtime display", () => {
     expect(resolveNextSelectableHelixAgentRuntime("helix", providers)).toBe("helix");
   });
 
+  it("respects account-policy filtered provider lists from the server", () => {
+    const providers = normalizeHelixAgentProvidersResponse({
+      providers: [
+        {
+          id: "codex",
+          label: "Codex Workstation Mode",
+          enabled: true,
+          experimental: true,
+          supports: { streaming: true, workstationTools: true, codeMutation: true },
+        },
+      ],
+      locked_providers: [
+        {
+          id: "helix",
+          label: "Helix Ask Native",
+          enabled: true,
+          locked: true,
+          locked_reason: "runtime_agent_outside_account_policy",
+        },
+      ],
+    });
+
+    expect(providers.map((provider) => provider.id)).toEqual(["codex"]);
+    expect(resolveSelectedHelixAgentRuntime("helix", providers)).toBe("codex");
+  });
+
   it("cycles only through enabled providers and formats runtime short labels", () => {
     const providers = normalizeHelixAgentProvidersResponse({
       providers: [

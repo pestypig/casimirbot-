@@ -7,16 +7,13 @@ import { HELIX_USER_ACCOUNT_POLICY } from "@shared/helix-account-session";
 import { fetchAccountCapabilityPolicy } from "@/lib/workstation/accountCapabilityPolicy";
 import { WorkstationPanelHost } from "../WorkstationPanelHost";
 
-vi.mock("@/hooks/useHelixStartSettings", () => ({
-  useHelixStartSettings: () => ({
-    userSettings: { interfaceLanguage: "en" },
-  }),
+const testState = vi.hoisted(() => ({
+  interfaceLanguage: "en",
 }));
 
-vi.mock("@/lib/i18n/interfaceText", () => ({
-  useInterfaceText: () => ({
-    t: (_key: string, fallback?: Record<string, unknown>) =>
-      typeof fallback?.title === "string" ? fallback.title : "",
+vi.mock("@/hooks/useHelixStartSettings", () => ({
+  useHelixStartSettings: () => ({
+    userSettings: { interfaceLanguage: testState.interfaceLanguage },
   }),
 }));
 
@@ -24,6 +21,7 @@ describe("WorkstationPanelHost account policy", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    testState.interfaceLanguage = "en";
   });
 
   it("renders a lock screen for locked panel deep links", async () => {
@@ -40,5 +38,22 @@ describe("WorkstationPanelHost account policy", () => {
 
     expect(screen.getByText("Code Admin is locked")).toBeTruthy();
     expect(screen.getByText(/reserved for developer mode/i)).toBeTruthy();
+  });
+
+  it("renders locked panel chrome through the selected interface language", async () => {
+    testState.interfaceLanguage = "haw";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ account_policy: HELIX_USER_ACCOUNT_POLICY }),
+      })),
+    );
+    await fetchAccountCapabilityPolicy();
+
+    render(<WorkstationPanelHost panelId="code-admin" />);
+
+    expect(screen.getByText("Ua laka \u02bbia \u02bbo Code Admin")).toBeTruthy();
+    expect(screen.getByText(/M\u0101lama \u02bbia k\u0113ia hi\u02bbohi\u02bbona workstation/)).toBeTruthy();
   });
 });

@@ -49,11 +49,44 @@ function extractTheoryReflectionFromGatewayObservation(value: unknown): TheoryCo
       claimBoundaryNotes: readStringArray(payload.claim_boundary_notes ?? payload.claimBoundaryNotes),
     }))
     .filter((payload) => payload.badgeId && payload.payloadId && payload.expression);
-  if (calculatorPayloads.length === 0) return null;
   const payloadByBadgeId = new Map(calculatorPayloads.map((payload) => [payload.badgeId, payload]));
   const exactBadgeIds = readStringArray(observation.exact_badge_ids ?? observation.exactBadgeIds).slice(0, 12);
   const likelyBadgeIds = readStringArray(observation.likely_badge_ids ?? observation.likelyBadgeIds).slice(0, 12);
+  if (calculatorPayloads.length === 0 && exactBadgeIds.length === 0 && likelyBadgeIds.length === 0) return null;
+  const scientificBranchGate = readAgentLoopAuditRecord(observation.scientific_branch_gate ?? observation.scientificBranchGate);
+  const scientificEvidencePacket = readAgentLoopAuditRecord(observation.scientific_evidence_packet ?? observation.scientificEvidencePacket);
+  const scientificRunTrace = readAgentLoopAuditRecord(observation.scientific_run_trace ?? observation.scientificRunTrace);
+  const rejectedCalculatorPayloadIds = readStringArray(
+    observation.rejected_calculator_payload_ids ??
+    observation.rejectedCalculatorPayloadIds ??
+    scientificBranchGate?.rejected_calculator_payload_ids,
+  );
+  const scientificClaimBoundaries = [
+    coerceText(scientificBranchGate?.status).trim()
+      ? `scientific_branch_gate=${coerceText(scientificBranchGate?.status).trim()}; domain=${coerceText(scientificBranchGate?.primary_domain).trim()}`
+      : "",
+    rejectedCalculatorPayloadIds.length
+      ? `rejected_calculator_payloads=${rejectedCalculatorPayloadIds.join(",")}`
+      : "",
+    coerceText(scientificRunTrace?.trace_id).trim()
+      ? `scientific_run_trace=${coerceText(scientificRunTrace?.trace_id).trim()}`
+      : "",
+  ].filter(Boolean);
+  const inferredDomains = [
+    coerceText(scientificEvidencePacket?.primary_domain).trim(),
+    coerceText(scientificBranchGate?.primary_domain).trim(),
+  ].filter(Boolean);
+  const inferredDomainRecords = Array.from(new Set(inferredDomains)).map((domain) => ({
+    atlasBlockId: domain,
+    title: domain.replace(/_/g, " "),
+    score: 0.75,
+    reasons: ["Scientific evidence branch gate"],
+  }));
   const allBadgeIds = Array.from(new Set([...exactBadgeIds, ...likelyBadgeIds, ...calculatorPayloads.map((payload) => payload.badgeId)]));
+  const observationClaimBoundaries = [
+    ...scientificClaimBoundaries,
+    ...readStringArray(observation.claim_boundary_notes ?? observation.claimBoundaryNotes),
+  ];
   const matchForBadge = (badgeId: string, index: number) => {
     const payload = payloadByBadgeId.get(badgeId);
     return {
@@ -64,7 +97,7 @@ function extractTheoryReflectionFromGatewayObservation(value: unknown): TheoryCo
       matchedSymbols: payload?.targetVariable ? [payload.targetVariable] : [],
       matchedEquationFamilies: payload?.expression ? [payload.expression] : [],
       matchedRepoPaths: [],
-      claimBoundaryNotes: payload?.claimBoundaryNotes ?? readStringArray(observation.claim_boundary_notes),
+      claimBoundaryNotes: payload?.claimBoundaryNotes?.length ? payload.claimBoundaryNotes : observationClaimBoundaries,
     };
   };
   const exactMatches = (exactBadgeIds.length ? exactBadgeIds : calculatorPayloads.map((payload) => payload.badgeId))
@@ -86,13 +119,13 @@ function extractTheoryReflectionFromGatewayObservation(value: unknown): TheoryCo
       conversationContext: null,
       mentionedEquations: calculatorPayloads.map((payload) => payload.expression),
       mentionedSymbols: calculatorPayloads.map((payload) => payload.targetVariable).filter((value): value is string => Boolean(value)),
-      mentionedDomains: [],
+      mentionedDomains: Array.from(new Set(inferredDomains)),
       source: "helix_ask",
       confidenceMode: "strict_badge_match",
     },
     exactMatches,
     likelyMatches,
-    inferredDomains: [],
+    inferredDomains: inferredDomainRecords,
     overlay: {
       centerBadgeIds: allBadgeIds.slice(0, 3),
       highlightedBadgeIds: highlightedBadgeIds.length ? highlightedBadgeIds : allBadgeIds.slice(0, 8),
@@ -113,7 +146,7 @@ function extractTheoryReflectionFromGatewayObservation(value: unknown): TheoryCo
     },
     evidenceForAsk: {
       summary: coerceText(observation.summary).trim() || "Theory Badge Graph reflection produced formula context.",
-      claimBoundaries: readStringArray(observation.claim_boundary_notes ?? observation.claimBoundaryNotes),
+      claimBoundaries: observationClaimBoundaries,
       calculatorPayloads,
       recommendedNextActions: [],
     },

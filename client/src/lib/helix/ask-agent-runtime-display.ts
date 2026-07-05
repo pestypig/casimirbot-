@@ -129,8 +129,7 @@ export function normalizeHelixAgentProvidersResponse(value: unknown): HelixAgent
   const providers = rawProviders
     .map((entry: unknown) => normalizeHelixAgentProvider(entry))
     .filter((entry: HelixAgentRuntimeDescriptor | null): entry is HelixAgentRuntimeDescriptor => Boolean(entry));
-  const hasHelix = providers.some((provider: HelixAgentRuntimeDescriptor) => provider.id === "helix");
-  return hasHelix ? providers : [...DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS, ...providers];
+  return providers.length > 0 ? providers : DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS;
 }
 
 export function resolveSelectedHelixAgentRuntime(
@@ -140,7 +139,7 @@ export function resolveSelectedHelixAgentRuntime(
   const candidate = isHelixAgentRuntimeId(requested) ? requested : "helix";
   const provider = providers.find((entry: HelixAgentRuntimeDescriptor) => entry.id === candidate);
   if (provider?.enabled) return provider.id;
-  return "helix";
+  return providers.find((entry: HelixAgentRuntimeDescriptor) => entry.enabled)?.id ?? "helix";
 }
 
 export function resolveNextSelectableHelixAgentRuntime(

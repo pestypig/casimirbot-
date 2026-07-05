@@ -13,12 +13,12 @@ function resolveHelixAskRuntimePreferenceStorage(): HelixAskRuntimePreferenceSto
 export function readStoredHelixAskAgentRuntime(
   storage: HelixAskRuntimePreferenceStorage | null = resolveHelixAskRuntimePreferenceStorage(),
 ): HelixAgentRuntimeId {
-  if (!storage) return "helix";
+  if (!storage) return "codex";
   try {
     const value = storage.getItem(HELIX_ASK_AGENT_RUNTIME_STORAGE_KEY);
-    return isHelixAgentRuntimeId(value) ? value : "helix";
+    return isHelixAgentRuntimeId(value) ? value : "codex";
   } catch {
-    return "helix";
+    return "codex";
   }
 }
 

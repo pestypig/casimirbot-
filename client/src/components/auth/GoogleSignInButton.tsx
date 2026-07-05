@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { setSessionUser } from "@/lib/auth/session";
+import { cacheAccountCapabilityPolicy } from "@/lib/workstation/accountCapabilityPolicy";
 
 type GoogleCredentialResponse = {
   credential?: string;
@@ -128,6 +129,7 @@ export function GoogleSignInButton({
             }
 
             const profile = receipt.session.profile;
+            cacheAccountCapabilityPolicy(receipt.session.account_policy ?? receipt.account_policy ?? null);
             setSessionUser({
               username: profile.profile_id,
               name: profile.display_name,

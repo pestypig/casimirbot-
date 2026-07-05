@@ -14,6 +14,10 @@ import type {
   HelixVisibleTranslationTargetBatch,
 } from "./helix-live-translation-lane";
 import type { ImageLensRegionInspectionReceiptV1 } from "./contracts/image-lens-region-inspection.v1";
+import type {
+  ScientificEvidencePacketV1,
+  ScientificImageEvidenceSidecarV1,
+} from "./scientific-evidence-adaptor";
 
 export const HELIX_AGENT_STEP_DECISION_V2_SCHEMA = "helix.agent_step_decision.v2" as const;
 export const HELIX_RUNTIME_TOOL_CALL_V1_SCHEMA = "helix.runtime_tool_call.v1" as const;
@@ -118,6 +122,7 @@ export type HelixWorkstationTypedAffordanceKind =
   | "micro_reasoner_eval"
   | "visual_observer_eval"
   | "image_lens_region_evidence"
+  | "scientific_evidence"
   | "system_status"
   | "ui_projection_receipt";
 
@@ -248,6 +253,8 @@ export type HelixAgentStepObservationPacket = {
       latex_candidate?: string | null;
       extraction_status: ImageLensRegionInspectionReceiptV1["extraction_status"];
       uncertainty: string[];
+      scientific_evidence_packet?: ScientificEvidencePacketV1;
+      scientific_evidence_sidecar?: ScientificImageEvidenceSidecarV1;
       receipt: ImageLensRegionInspectionReceiptV1;
       terminal_eligible: false;
       assistant_answer: false;

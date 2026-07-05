@@ -8,7 +8,7 @@ import { useInterfaceText, type InterfaceTextResolver } from "@/lib/i18n/interfa
 import type { InterfaceMessageId } from "@/lib/i18n/messages/types";
 import { useWorkspaceMemoryRegistryStore } from "@/store/useWorkspaceMemoryRegistryStore";
 import {
-  HELIX_DEVELOPER_ACCOUNT_POLICY,
+  HELIX_USER_ACCOUNT_POLICY,
   type HelixAccountLinkedAccount,
   type HelixAccountSessionStatus,
 } from "@shared/helix-account-session";
@@ -77,7 +77,7 @@ const emptyStatus: HelixAccountSessionStatus = {
   schema: "helix.account_session_status.v1",
   ok: false,
   session: null,
-  account_policy: HELIX_DEVELOPER_ACCOUNT_POLICY,
+  account_policy: HELIX_USER_ACCOUNT_POLICY,
   linked_accounts: [],
   profile_ingress_tokens: [],
   profile_ingress_usage: {
@@ -234,8 +234,8 @@ export default function AccountSessionPanel() {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const fallbackProfileId = "DatDamPig";
-  const [localUsername, setLocalUsername] = React.useState("admin");
-  const [localPassword, setLocalPassword] = React.useState("password");
+  const [localUsername, setLocalUsername] = React.useState("");
+  const [localPassword, setLocalPassword] = React.useState("");
   const [ingressLabel, setIngressLabel] = React.useState("");
   const [newTokenValue, setNewTokenValue] = React.useState<string | null>(null);
   const [discordSessions, setDiscordSessions] = React.useState<DiscordSessionView[]>([]);
@@ -287,6 +287,7 @@ export default function AccountSessionPanel() {
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body?.message ?? `sign-in ${response.status}`);
+      cacheAccountCapabilityPolicy(body?.session?.account_policy ?? body?.account_policy ?? null);
       setLocalPassword("");
       await refresh();
     } catch (err) {
@@ -306,6 +307,7 @@ export default function AccountSessionPanel() {
         { method: "POST" },
       );
       if (!response.ok) throw new Error(`sign-out ${response.status}`);
+      cacheAccountCapabilityPolicy(HELIX_USER_ACCOUNT_POLICY);
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to sign out.");
@@ -360,7 +362,7 @@ export default function AccountSessionPanel() {
 
   const session = status.session;
   const usage = status.usage;
-  const showLocalDevSignIn = import.meta.env.DEV;
+  const showLocalDevSignIn = status.auth_boundary.local_password_profile_available;
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-slate-950 text-slate-100">

@@ -216,6 +216,533 @@ describe("Helix Ask debug export capability lanes", () => {
     expect(presentationFields).not.toContain("SHOULD_NOT_APPEAR_IN_PRESENTATION");
   });
 
+  it("keeps backend-entrypoint failures from exposing projection text as the visible final answer", () => {
+    const projectionText = [
+      "The runtime provider echoed Helix internal capability instructions after Image Lens observations re-entered.",
+      "**caption_text**",
+      "text_candidate: As in Chapter 2 we use the Bianchi identities.",
+      "tokamak.plasma.thermal_pressure_proxy",
+    ].join("\n");
+    const text = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "helix-chat-turn:test:ask:image-lens-backend-required",
+        question: "Use the Image Lens region tool on the attached image. Inspect the equation area first.",
+        content: projectionText,
+      },
+      {
+        selected_final_answer: projectionText,
+        visible_final_answer: projectionText,
+        final_answer_source: "workstation_tool_evaluation",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        ask_entrypoint_required: true,
+        ask_entrypoint_observed: false,
+        ask_entrypoint_failure_code: "backend_ask_entry_required",
+        current_turn_artifact_ledger: [],
+        debug: {
+          turn_id: "ask:image-lens-backend-required",
+        },
+      },
+    );
+
+    const exported = JSON.parse(text) as Record<string, any>;
+    expect(exported.selected_final_answer).toBe(
+      "This prompt requires the backend Ask solver path before a final answer can be shown.",
+    );
+    expect(exported.final_answer_source).toBe("typed_failure");
+    expect(exported.terminal_artifact_kind).toBe("typed_failure");
+    expect(exported.terminal_error_code).toBe("backend_ask_entry_required");
+    expect(exported.ui_debug_parity_harness).toMatchObject({
+      visible_final_answer: exported.selected_final_answer,
+      selected_final_answer: exported.selected_final_answer,
+      ui_answer_equals_selected_final_answer: true,
+    });
+    expect(exported.selected_final_answer).not.toContain("tokamak");
+    expect(exported.ui_debug_parity_harness.visible_final_answer).not.toContain("Bianchi identities");
+  });
+
+  it("preserves rendered Image Lens reply-scoped exports when backend artifacts are not advertised", () => {
+    const finalAnswer = [
+      "The runtime provider echoed Helix internal capability instructions after Image Lens observations re-entered, so I am using only the observation receipts below and not the echoed provider text.",
+      "",
+      "**crop_1**",
+      "- Bbox: x=0, y=0, width=1, height=1",
+      "- Extraction status: failed",
+      "- Extracted information: no text_candidate or latex_candidate was returned for this crop",
+    ].join("\n");
+    const text = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "helix-chat-turn:test:ask:image-lens-rendered-card",
+        question:
+          "Here is a scientific document image. Extract the visible text, equations, equation labels, LaTeX candidates, symbols, bbox/crop refs, confidence, and uncertainty.",
+        content: finalAnswer,
+      },
+      {
+        debug_export_rebuild_reason: "rendered_button_scope",
+        debug_export_source: "rendered_reply_dom",
+        selectedDebugFinalAnswer: finalAnswer,
+        selected_final_answer: finalAnswer,
+        final_answer_source: "provider_image_lens_observation_report",
+        terminal_artifact_kind: "image_lens_observation_report",
+        ask_entrypoint_required: true,
+        backend_debug_response_status: "not_advertised",
+      },
+    );
+
+    const exported = JSON.parse(text) as Record<string, any>;
+    expect(exported.selected_final_answer).toBe(finalAnswer);
+    expect(exported.final_answer_source).toBe("provider_image_lens_observation_report");
+    expect(exported.terminal_artifact_kind).toBe("image_lens_observation_report");
+    expect(exported.terminal_error_code).toBeNull();
+    expect(exported.ask_entrypoint_required).toBe(true);
+    expect(exported.ask_entrypoint_observed).toBeNull();
+    expect(exported.ask_entrypoint_failure_code).toBeNull();
+    expect(exported.debug_export_source).toBe("rendered_reply_dom");
+    expect(exported.selected_final_answer).not.toBe(
+      "This prompt requires the backend Ask solver path before a final answer can be shown.",
+    );
+  });
+
+  it("projects scientific branch gates and run traces without copying OCR text into the compact debug summary", () => {
+    const finalAnswer = [
+      "Theory context reflection answer:",
+      "Theory reflection located discussion context as evidence only: Weyl/Bianchi crop context.",
+      "Scientific evidence guard:",
+      "- Evidence domain: weyl_bianchi; branch gate: restricted; congruence floor: domain_context_match.",
+    ].join("\n");
+    const scientificEvidencePacket = {
+      schema: "helix.scientific_evidence_packet.v1",
+      evidence_type: "image_lens_region_ocr_math",
+      source_ref_hash: "sha256:test-bianchi",
+      source_image: {
+        ref_hash: "sha256:test-bianchi",
+        source_kind: "image_lens_source",
+        page_number: null,
+        raw_ref_included: false,
+      },
+      crop_region_id: "image_lens_region:test-bianchi",
+      crop_region: {
+        region_id: "image_lens_region:test-bianchi",
+        bbox_px: { x: 0, y: 0, width: 346, height: 255 },
+        source_ref_hash: "sha256:test-bianchi",
+      },
+      bbox_px: { x: 0, y: 0, width: 346, height: 255 },
+      ocr_text_candidate: "SECRET_OCR_TEXT_SHOULD_NOT_APPEAR_IN_COMPACT_TRACE",
+      text_candidate: "SECRET_OCR_TEXT_SHOULD_NOT_APPEAR_IN_COMPACT_TRACE",
+      latex_candidate: "\\SECRET_LATEX_SHOULD_NOT_APPEAR_IN_COMPACT_TRACE",
+      symbol_candidates: ["\\nabla", "\\psi"],
+      primary_domain: "weyl_bianchi",
+      uncertainty: ["OCR symbols are uncertain."],
+      extraction_status: "partial",
+      admissibility: {
+        status: "admissible_observation",
+        congruence_grade_floor: "domain_context_match",
+        allowed_branch_hints: ["weyl", "bianchi"],
+        blocked_branch_hints: ["tokamak"],
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const scientificBranchGate = {
+      schema: "helix.scientific_branch_gate.v1",
+      status: "restricted",
+      primary_domain: "weyl_bianchi",
+      congruence_grade_floor: "domain_context_match",
+      rejected_badge_ids: [],
+      rejected_calculator_payload_ids: [
+        "tokamak_thermal_pressure_payload",
+        "tokamak_confinement_energy_payload",
+      ],
+      congruence_assessments: [
+        {
+          target_ref: "tokamak_thermal_pressure_payload",
+          target_kind: "calculator_payload",
+          grade: "false_friend",
+          reasons: ["Target matched a blocked scientific branch hint for this evidence domain."],
+          matched_symbols: [],
+          blocked_by_branch_hint: true,
+        },
+        {
+          target_ref: "weyl.bianchi.curvature_identity",
+          target_kind: "badge",
+          grade: "domain_context_match",
+          reasons: ["Target matched an allowed scientific branch hint without direct symbol overlap."],
+          matched_symbols: [],
+          blocked_by_branch_hint: false,
+        },
+      ],
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const scientificRunTrace = {
+      schema: "helix.scientific_run_trace.v1",
+      trace_id: "scientific_run:test-bianchi",
+      source_ref_hash: "sha256:test-bianchi",
+      primary_domain: "weyl_bianchi",
+      branch_gate_status: "restricted",
+      congruence_grade_floor: "domain_context_match",
+      admitted_calculator_payload_ids: [],
+      rejected_calculator_payload_ids: [
+        "tokamak_thermal_pressure_payload",
+        "tokamak_confinement_energy_payload",
+      ],
+      rejected_badge_ids: [],
+      stages: [
+        {
+          stage: "image_extraction",
+          status: "observed",
+          artifact_refs: ["sha256:test-bianchi#crop=0,0,346,255"],
+          notes: ["Source evidence came from a typed scientific evidence packet."],
+        },
+        {
+          stage: "scientific_evidence_sidecar",
+          status: "admitted",
+          artifact_refs: ["scientific_image_sidecar:test-bianchi"],
+          notes: ["Scientific image sidecar normalized one admissible observation."],
+        },
+        {
+          stage: "theory_reflection",
+          status: "restricted",
+          artifact_refs: [],
+          notes: ["Incompatible calculator payloads were suppressed before handoff."],
+        },
+      ],
+      final_answer_guard: {
+        required_claim_boundary: "observation_ocr_graph_match_not_proof",
+        must_disclose_uncertainty: true,
+        must_disclose_rejections: true,
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const scientificEvidenceSidecar = {
+      schema: "helix.scientific_image_evidence_sidecar.v1",
+      sidecar_id: "scientific_image_sidecar:test-bianchi",
+      sidecar_kind: "transient_scientific_image_evidence",
+      source_ref_hash: "sha256:test-bianchi",
+      source_kind: "image_lens_source",
+      packet_count: 1,
+      packets: [scientificEvidencePacket],
+      packet_refs: ["sha256:test-bianchi#crop=0,0,346,255"],
+      crop_regions: [
+        {
+          crop_region_id: "image_lens_region:test-bianchi",
+          bbox_px: { x: 0, y: 0, width: 346, height: 255 },
+          source_ref_hash: "sha256:test-bianchi",
+          extraction_status: "partial",
+          admissibility_status: "admissible_observation",
+          confidence: 0.7,
+        },
+      ],
+      primary_packet_ref: "sha256:test-bianchi#crop=0,0,346,255",
+      primary_domain: "weyl_bianchi",
+      primary_domains: ["weyl_bianchi"],
+      extraction_summary: {
+        extracted_count: 0,
+        partial_count: 1,
+        failed_count: 0,
+        not_run_count: 0,
+        admissible_count: 1,
+        unverified_count: 0,
+        inadmissible_count: 0,
+        confidence_max: 0.7,
+        confidence_avg: 0.7,
+      },
+      admissibility: {
+        status: "admissible_observation",
+        reasons: ["1 Image Lens scientific evidence packet(s) normalized."],
+        claim_boundary: "observation_only_not_proof",
+      },
+      memory_classification: {
+        memory_kind: "transient_scientific_image_evidence",
+        retrieval_tags: ["scientific_image", "image_lens", "weyl_bianchi"],
+        suggested_consumers: [
+          "visual_analysis.inspect_image_region",
+          "theory-badge-graph.reflect_discussion_context",
+          "scientific-calculator.solve_expression",
+        ],
+        claim_boundary: "observation_only_not_proof",
+      },
+      compound_route_stages: [
+        {
+          stage: "image_extraction",
+          status: "observed",
+          artifact_refs: ["sha256:test-bianchi#crop=0,0,346,255"],
+          notes: ["Image Lens crop observations carry bbox and extraction candidates."],
+        },
+        {
+          stage: "scientific_evidence_sidecar",
+          status: "admitted",
+          artifact_refs: ["scientific_image_sidecar:test-bianchi"],
+          notes: ["Scientific image sidecar normalized one admissible observation."],
+        },
+        {
+          stage: "theory_reflection",
+          status: "candidate",
+          artifact_refs: ["sha256:test-bianchi#crop=0,0,346,255"],
+          notes: ["Theory graph branch admission must consume this sidecar, not prompt text."],
+        },
+        {
+          stage: "calculator_payload_filter",
+          status: "candidate",
+          artifact_refs: [],
+          notes: ["Calculator handoff is blocked unless graph reflection keeps the evidence admissible."],
+        },
+        {
+          stage: "final_answer_guard",
+          status: "restricted",
+          artifact_refs: [],
+          notes: ["Final answers must separate OCR candidates, graph congruence, calculator output, and proof authority."],
+        },
+      ],
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const scientificSidecarGatewayBridge = {
+      schema: "helix.scientific_image_sidecar_gateway_bridge.v1",
+      status: "completed",
+      capability_id: "theory-badge-graph.reflect_discussion_context",
+      result_count: 1,
+      scientific_evidence_sidecar_id: "scientific_image_sidecar:test-bianchi",
+      sidecar_admissibility_status: "admissible_observation",
+      sidecar_primary_domain: "weyl_bianchi",
+      observation_refs: ["theory-reflection:obs:test-bianchi"],
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const text = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "helix-chat-turn:test:ask:scientific-evidence-trace",
+        question: "Use Image Lens Bianchi/Weyl crop evidence in the Theory Badge Graph.",
+        content: finalAnswer,
+      },
+      {
+        selected_final_answer: finalAnswer,
+        final_answer_source: "theory_context_reflection_answer",
+        terminal_artifact_kind: "theory_context_reflection_answer",
+        action_envelope: {
+          workstation_actions: [
+            {
+              panel_id: "theory-badge-graph",
+              action_id: "reflect_discussion_context",
+            },
+          ],
+        },
+        workstation_gateway_call_results: [
+          {
+            ok: true,
+            capability_id: "theory-badge-graph.reflect_discussion_context",
+            observation: {
+              schema: "helix.theory_context_reflection_observation.v1",
+              scientific_evidence_packet: scientificEvidencePacket,
+              scientific_evidence_sidecar: scientificEvidenceSidecar,
+              scientific_branch_gate: scientificBranchGate,
+              scientific_run_trace: scientificRunTrace,
+              calculator_payloads: [],
+              rejected_calculator_payload_ids: scientificBranchGate.rejected_calculator_payload_ids,
+            },
+          },
+        ],
+        terminal_answer_authority: {
+          schema: "helix.turn_terminal_authority.v1",
+          turn_id: "ask:scientific-evidence-trace",
+          terminal_artifact_kind: "theory_context_reflection_answer",
+          final_answer_source: "theory_context_reflection_answer",
+          terminal_text_preview: finalAnswer,
+          server_authoritative: true,
+          terminal_eligible: true,
+          assistant_answer: false,
+        },
+        terminal_presentation: {
+          schema: "helix.terminal_presentation.v1",
+          turn_id: "ask:scientific-evidence-trace",
+          concise_text: finalAnswer,
+          terminal_artifact_kind: "theory_context_reflection_answer",
+          final_answer_source: "theory_context_reflection_answer",
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        debug: {
+          turn_id: "ask:scientific-evidence-trace",
+          runtime_lane_request_loop: {
+            schema: "helix.runtime_agent_lane_request_loop.v1",
+            status: "lane_observation_reentered",
+            scientific_image_sidecar_gateway_bridge: scientificSidecarGatewayBridge,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      },
+    );
+
+    const exported = JSON.parse(text) as Record<string, any>;
+    expect(exported.scientific_evidence_trace).toMatchObject({
+      schema: "helix.scientific_evidence_debug_projection.v1",
+      evidence_packet_count: 1,
+      evidence_sidecar_count: 1,
+      branch_gate_count: 1,
+      run_trace_count: 1,
+      sidecar_gateway_bridge_count: 1,
+      primary_domains: ["weyl_bianchi"],
+      branch_gate_statuses: ["restricted"],
+      congruence_grade_floors: ["domain_context_match"],
+      congruence_assessment_count: 2,
+      congruence_grades: expect.arrayContaining(["false_friend", "domain_context_match"]),
+      false_friend_refs: ["tokamak_thermal_pressure_payload"],
+      congruence_assessments: expect.arrayContaining([
+        expect.objectContaining({
+          target_ref: "tokamak_thermal_pressure_payload",
+          target_kind: "calculator_payload",
+          grade: "false_friend",
+          blocked_by_branch_hint: true,
+        }),
+      ]),
+      source_ref_hashes: ["sha256:test-bianchi"],
+      sidecar_ids: ["scientific_image_sidecar:test-bianchi"],
+      sidecar_admissibility_statuses: ["admissible_observation"],
+      sidecar_memory_kinds: ["transient_scientific_image_evidence"],
+      sidecar_gateway_bridge_statuses: ["completed"],
+      sidecar_gateway_bridge_blocked_reasons: [],
+      sidecar_gateway_bridges: [
+        expect.objectContaining({
+          status: "completed",
+          capability_id: "theory-badge-graph.reflect_discussion_context",
+          result_count: 1,
+          scientific_evidence_sidecar_id: "scientific_image_sidecar:test-bianchi",
+          sidecar_admissibility_status: "admissible_observation",
+          sidecar_primary_domain: "weyl_bianchi",
+          observation_refs: ["theory-reflection:obs:test-bianchi"],
+        }),
+      ],
+      compound_stage_sequence: [
+        "image_extraction",
+        "scientific_evidence_sidecar",
+        "theory_reflection",
+        "calculator_payload_filter",
+        "final_answer_guard",
+      ],
+      sidecars: [
+        expect.objectContaining({
+          sidecar_id: "scientific_image_sidecar:test-bianchi",
+          sidecar_kind: "transient_scientific_image_evidence",
+          admissibility_status: "admissible_observation",
+          memory_classification: expect.objectContaining({
+            memory_kind: "transient_scientific_image_evidence",
+          }),
+          stages: expect.arrayContaining([
+            expect.objectContaining({ stage: "image_extraction", status: "observed" }),
+            expect.objectContaining({ stage: "scientific_evidence_sidecar", status: "admitted" }),
+            expect.objectContaining({ stage: "theory_reflection", status: "candidate" }),
+          ]),
+        }),
+      ],
+      crop_region_ids: ["image_lens_region:test-bianchi"],
+      source_images: [
+        {
+          ref_hash: "sha256:test-bianchi",
+          source_kind: "image_lens_source",
+          page_number: null,
+          raw_ref_included: false,
+        },
+      ],
+      crop_regions: [
+        {
+          region_id: "image_lens_region:test-bianchi",
+          bbox_px: { x: 0, y: 0, width: 346, height: 255 },
+          source_ref_hash: "sha256:test-bianchi",
+        },
+      ],
+      run_trace_ids: ["scientific_run:test-bianchi"],
+      rejected_calculator_payload_ids: expect.arrayContaining([
+        "tokamak_thermal_pressure_payload",
+        "tokamak_confinement_energy_payload",
+      ]),
+      final_answer_guard_required: true,
+      claim_boundary: "observation_ocr_graph_match_not_proof",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(exported.tool_trace_disclosure).toMatchObject({
+      scientific_evidence_trace: expect.objectContaining({
+        schema: "helix.scientific_evidence_debug_projection.v1",
+        run_trace_ids: ["scientific_run:test-bianchi"],
+      }),
+    });
+    const compactTraceText = JSON.stringify({
+      scientific_evidence_trace: exported.scientific_evidence_trace,
+      tool_trace_disclosure: exported.tool_trace_disclosure,
+    });
+    expect(compactTraceText).not.toContain("SECRET_OCR_TEXT_SHOULD_NOT_APPEAR_IN_COMPACT_TRACE");
+    expect(compactTraceText).not.toContain("SECRET_LATEX_SHOULD_NOT_APPEAR_IN_COMPACT_TRACE");
+  });
+
+  it("projects blocked scientific image sidecar gateway bridge audits without a graph observation", () => {
+    const text = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "helix-chat-turn:test:ask:scientific-sidecar-bridge-blocked",
+        question: "Here is a scientific document image. Extract the equations and compare them to the theory graph.",
+        content: "The image evidence sidecar was not admissible, so graph reflection was blocked.",
+      },
+      {
+        selected_final_answer: "The image evidence sidecar was not admissible, so graph reflection was blocked.",
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        debug: {
+          turn_id: "ask:scientific-sidecar-bridge-blocked",
+          runtime_lane_request_loop: {
+            schema: "helix.runtime_agent_lane_request_loop.v1",
+            status: "lane_observation_reentered",
+            scientific_image_sidecar_gateway_bridge: {
+              schema: "helix.scientific_image_sidecar_gateway_bridge.v1",
+              status: "blocked",
+              capability_id: "theory-badge-graph.reflect_discussion_context",
+              result_count: 0,
+              blocked_reason: "scientific_image_evidence_sidecar_not_admissible",
+              scientific_evidence_sidecar_id: "scientific_image_sidecar:blocked",
+              sidecar_admissibility_status: "inadmissible_for_exact_mapping",
+              sidecar_primary_domain: "unknown_math",
+              assistant_answer: false,
+              terminal_eligible: false,
+              raw_content_included: false,
+            },
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      },
+    );
+
+    const exported = JSON.parse(text) as Record<string, any>;
+    expect(exported.scientific_evidence_trace).toMatchObject({
+      schema: "helix.scientific_evidence_debug_projection.v1",
+      evidence_packet_count: 0,
+      evidence_sidecar_count: 0,
+      branch_gate_count: 0,
+      run_trace_count: 0,
+      sidecar_gateway_bridge_count: 1,
+      sidecar_gateway_bridge_statuses: ["blocked"],
+      sidecar_gateway_bridge_blocked_reasons: ["scientific_image_evidence_sidecar_not_admissible"],
+      sidecar_gateway_bridges: [
+        expect.objectContaining({
+          status: "blocked",
+          capability_id: "theory-badge-graph.reflect_discussion_context",
+          result_count: 0,
+          blocked_reason: "scientific_image_evidence_sidecar_not_admissible",
+          scientific_evidence_sidecar_id: "scientific_image_sidecar:blocked",
+          sidecar_admissibility_status: "inadmissible_for_exact_mapping",
+          sidecar_primary_domain: "unknown_math",
+        }),
+      ],
+      output_authority: "scientific_evidence_debug_projection",
+    });
+  });
+
   it("preserves recovered Image Lens terminal authority and lane receipts over stale typed failure projection", () => {
     const recoveredAnswer = [
       "The runtime provider echoed Helix internal capability instructions after Image Lens observations re-entered, so I am using only the observation receipts below and not the echoed provider text.",

@@ -25,6 +25,9 @@ import { Dialog } from "@/components/ui/dialog";
 import { HelixSettingsDialogContent } from "@/components/HelixSettingsDialogContent";
 import { PROFILE_STORAGE_KEY, useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { useHelixSettingsDialog } from "@/hooks/useHelixSettingsDialog";
+import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
+import { useInterfaceText } from "@/lib/i18n/interfaceText";
+import { getInterfacePanelTitle } from "@/lib/i18n/panelTitles";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import { MobileHelixAskDrawer } from "@/components/workstation/mobile/MobileHelixAskDrawer";
@@ -40,7 +43,7 @@ import {
   emitWorkstationActionLiveEvent,
 } from "@/lib/workstation/workstationActionLiveEvents";
 import { maybePostSituationRoomSetupExecutionReceipt } from "@/lib/workstation/setupExecutionReceiptPost";
-import { isDiscoverableLaunchPanel } from "@/lib/workstation/launchPanelPolicy";
+import { isUserLaunchPanel } from "@/lib/workstation/launchPanelPolicy";
 import { resolveHelixAccountPanelAccess } from "@shared/helix-account-session";
 import type { HelixAccountCapabilityPolicy } from "@shared/helix-account-session";
 import {
@@ -60,6 +63,8 @@ export default function MobileStartPage() {
   const { stack, activeId, open, activate, close, closeAll, goHome } = useMobileAppStore();
   const toggleMobileDrawer = useWorkstationLayoutStore((state) => state.toggleMobileDrawer);
   const { userSettings, updateSettings } = useHelixStartSettings();
+  const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const { t } = useInterfaceText(interfaceLanguage.code);
   const {
     settingsOpen,
     settingsTab,
@@ -83,6 +88,10 @@ export default function MobileStartPage() {
     () => stack.find((entry) => entry.panelId === activeId),
     [stack, activeId]
   );
+  const getPanelTitle = useCallback(
+    (panelId: string, fallbackTitle: string) => getInterfacePanelTitle(t, panelId, fallbackTitle),
+    [t],
+  );
 
   const panelOrder = useMemo(
     () => new Map(panelRegistry.map((panel, index) => [panel.id, index])),
@@ -90,7 +99,9 @@ export default function MobileStartPage() {
   );
   const pinnedPanels = useMemo(() => {
     const pinned = panelRegistry.filter(
-      (panel) => panel.pinned || panel.id === "helix-noise-gens"
+      (panel) =>
+        (panel.pinned || panel.id === "helix-noise-gens") &&
+        (accountPolicy?.account_type === "developer" || isUserLaunchPanel(String(panel.id)))
     );
     const unique = new Map<string, (typeof panelRegistry)[number]>();
     pinned.forEach((panel) => unique.set(panel.id, panel));
@@ -99,7 +110,7 @@ export default function MobileStartPage() {
       if (b.id === "helix-noise-gens") return 1;
       return (panelOrder.get(a.id) ?? 0) - (panelOrder.get(b.id) ?? 0);
     });
-  }, [panelOrder]);
+  }, [accountPolicy?.account_type, panelOrder]);
   const pinnedIds = useMemo(
     () => new Set(pinnedPanels.map((panel) => panel.id)),
     [pinnedPanels]
@@ -108,22 +119,27 @@ export default function MobileStartPage() {
     () =>
       panelRegistry.filter((panel) => {
         if (pinnedIds.has(panel.id)) return false;
-        if (accountPolicy?.account_type !== "user") return true;
-        return isDiscoverableLaunchPanel(String(panel.id));
+        if (accountPolicy?.account_type === "developer") return true;
+        return isUserLaunchPanel(String(panel.id));
       }),
     [accountPolicy?.account_type, pinnedIds]
   );
   const launcherPanels = useMemo(
     () =>
       panelRegistry
-        .filter((panel) => !panel.startHidden && isDiscoverableLaunchPanel(String(panel.id)))
+        .filter((panel) =>
+          !panel.startHidden &&
+          (accountPolicy?.account_type === "developer" || isUserLaunchPanel(String(panel.id)))
+        )
         .sort((a, b) => {
           const aReady = a.workstationCapabilities?.v1_job_ready ? 1 : 0;
           const bReady = b.workstationCapabilities?.v1_job_ready ? 1 : 0;
           if (aReady !== bReady) return bReady - aReady;
-          return a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+          const aTitle = getPanelTitle(String(a.id), a.title);
+          const bTitle = getPanelTitle(String(b.id), b.title);
+          return aTitle.localeCompare(bTitle, undefined, { sensitivity: "base" });
         }),
-    [],
+    [accountPolicy?.account_type, getPanelTitle],
   );
 
   const recents = useMemo(
@@ -218,14 +234,15 @@ export default function MobileStartPage() {
   const handleTilePress = (panelId: string) => {
     const panel = panelRegistry.find((p) => p.id === panelId);
     if (!panel) return;
+    const panelTitle = getPanelTitle(String(panel.id), panel.title);
     if (panel.heavy && typeof window !== "undefined") {
       const proceed = window.confirm(
-        `${panel.title} is a heavier panel and may be slower on mobile. Open anyway?`
+        t("mobileStart.confirm.heavyPanel", { title: panelTitle })
       );
       if (!proceed) return;
     }
     if (typeof window !== "undefined" && window.innerWidth <= 520 && stack.length >= MAX_WARN_STACK) {
-      window.alert("Closing older panels to keep performance steady on this device.");
+      window.alert(t("mobileStart.alert.closingOlderPanels"));
     }
     recordPanelActivity(panel.id, "openMobile");
     openPanelUniversal(panelId);
@@ -523,7 +540,7 @@ export default function MobileStartPage() {
               }}
             >
               <Home className="h-4 w-4" />
-              Home
+              {t("mobileStart.nav.home")}
             </button>
             <div className="flex items-center gap-2">
               {mobileWorkstationEnabled ? (
@@ -533,7 +550,7 @@ export default function MobileStartPage() {
                   onClick={() => setShowSwitcher(true)}
                 >
                   <LayoutGrid className="h-4 w-4" />
-                  Panels
+                  {t("mobileStart.nav.panels")}
                 </button>
               ) : null}
               <button
@@ -542,7 +559,7 @@ export default function MobileStartPage() {
                 onClick={() => openSettings("preferences")}
               >
                 <Settings className="h-4 w-4" />
-                <span className="hidden sm:inline">Settings</span>
+                <span className="hidden sm:inline">{t("mobileStart.nav.settings")}</span>
               </button>
               <button
                 className={`inline-flex ${navPrimaryButtonClass}`}
@@ -555,7 +572,7 @@ export default function MobileStartPage() {
                 }}
               >
                 <MessageCircle className="h-4 w-4" />
-                Ask
+                {t("mobileStart.nav.ask")}
               </button>
             </div>
           </header>
@@ -565,7 +582,7 @@ export default function MobileStartPage() {
               <MobilePanelHost
                 key={activeEntry.panelId}
                 panelId={activeEntry.panelId}
-                title={activeEntry.title}
+                title={getPanelTitle(activeEntry.panelId, activeEntry.title)}
                 loader={activeEntry.loader}
                 onHome={() => {
                   goHome();
@@ -579,7 +596,7 @@ export default function MobileStartPage() {
                 <section className={sectionCardClass}>
                   <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-muted-foreground/80">
                     <Pin className="h-4 w-4 text-primary" />
-                    Pinned
+                    {t("mobileStart.section.pinned")}
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                     {pinnedPanels.map((panel) => {
@@ -595,12 +612,12 @@ export default function MobileStartPage() {
                               <Icon className="h-5 w-5" />
                             </div>
                             <span className={pinnedBadgeClass}>
-                              Pin
+                              {t("mobileStart.badge.pin")}
                             </span>
                           </div>
                           <div className="space-y-1">
                             <p className="line-clamp-2 text-sm font-semibold text-foreground">
-                              {panel.title}
+                              {getPanelTitle(String(panel.id), panel.title)}
                             </p>
                             {panel.keywords && panel.keywords.length > 0 && (
                               <p className="line-clamp-1 text-[11px] text-muted-foreground/80">
@@ -617,18 +634,18 @@ export default function MobileStartPage() {
               <section className={sectionCardClass}>
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-base font-semibold text-foreground">Pick a panel</h2>
+                    <h2 className="text-base font-semibold text-foreground">{t("mobileStart.panelPicker.title")}</h2>
                     <p className="text-sm text-muted-foreground/85">
                       {mobileWorkstationEnabled
-                        ? "Tap a tile to open it while keeping Helix Ask available in the drawer."
-                        : "Tap a tile to open it full-screen. Long-press Home to jump between open panels."}
+                        ? t("mobileStart.panelPicker.help.drawer")
+                        : t("mobileStart.panelPicker.help.fullscreen")}
                     </p>
                   </div>
                   <button
                     className={`hidden md:inline-flex ${navButtonClass}`}
                     onClick={() => setLocation("/desktop?desktop=1")}
                   >
-                    Desktop
+                    {t("mobileStart.nav.desktop")}
                   </button>
                 </div>
                 <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
@@ -647,13 +664,15 @@ export default function MobileStartPage() {
                         <div className="flex flex-col items-end gap-1">
                           {panel.heavy && (
                             <span className="inline-flex items-center gap-1 rounded-full border border-primary/45 bg-primary/18 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                              Heavy
+                              {t("mobileStart.badge.heavy")}
                             </span>
                           )}
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <p className="line-clamp-2 text-sm font-semibold text-foreground">{panel.title}</p>
+                        <p className="line-clamp-2 text-sm font-semibold text-foreground">
+                          {getPanelTitle(String(panel.id), panel.title)}
+                        </p>
                         {panel.keywords && panel.keywords.length > 0 && (
                           <p className="line-clamp-1 text-[11px] text-muted-foreground/80">
                             {panel.keywords.slice(0, 2).join(" / ")}
@@ -670,8 +689,8 @@ export default function MobileStartPage() {
                 <section className={sectionCardClass}>
                   <p className="text-sm text-muted-foreground/90">
                     {mobileWorkstationEnabled
-                      ? "No panels are open yet. Tap any tile above or use Panels in the header to launch one."
-                      : "No panels are open yet. Tap any tile above to launch it. Short-tap Home to return here; hold Home to open the task switcher."}
+                      ? t("mobileStart.empty.drawer")
+                      : t("mobileStart.empty.fullscreen")}
                   </p>
                 </section>
               )}
@@ -680,7 +699,9 @@ export default function MobileStartPage() {
                 <section className={sectionCardClass}>
                   <div className="flex items-center gap-2">
                     <Clock3 className="h-4 w-4 text-primary" />
-                    <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground/80">Recent</p>
+                    <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground/80">
+                      {t("mobileStart.section.recent")}
+                    </p>
                   </div>
                   <div className="mt-3 space-y-3">
                     {recents.map((entry) => (
@@ -690,9 +711,13 @@ export default function MobileStartPage() {
                         onClick={() => handleTilePress(entry.panelId)}
                       >
                         <div>
-                          <p className="text-sm font-semibold text-foreground">{entry.title}</p>
+                          <p className="text-sm font-semibold text-foreground">
+                            {getPanelTitle(entry.panelId, entry.title)}
+                          </p>
                           <p className="text-[11px] text-muted-foreground/80">
-                            Opened {new Date(entry.openedAt).toLocaleTimeString()}
+                            {t("mobileStart.recent.opened", {
+                              time: new Date(entry.openedAt).toLocaleTimeString(),
+                            })}
                           </p>
                         </div>
                         <PanelsTopLeft className="h-4 w-4 text-muted-foreground/80" />
@@ -736,7 +761,7 @@ export default function MobileStartPage() {
           onClick={() => openSettings("preferences")}
         >
           <Settings className="h-4 w-4" />
-          Settings
+          {t("mobileStart.nav.settings")}
         </button>
 
         {!mobileWorkstationEnabled && !appViewerOpen && (
@@ -746,7 +771,7 @@ export default function MobileStartPage() {
             type="button"
           >
             <PanelsTopLeft className="h-4 w-4" />
-            Start
+            {t("mobileStart.nav.start")}
           </button>
         )}
 
@@ -763,7 +788,7 @@ export default function MobileStartPage() {
               <div className="flex items-center gap-2">
                 <PanelsTopLeft className="h-4 w-4 text-primary" />
                 <p className="text-sm font-semibold text-foreground">
-                  {mobileWorkstationEnabled ? "Panels" : "Task switcher"}
+                  {mobileWorkstationEnabled ? t("mobileStart.nav.panels") : t("mobileStart.switcher.taskSwitcher")}
                 </p>
               </div>
               <button
@@ -778,7 +803,7 @@ export default function MobileStartPage() {
               {mobileWorkstationEnabled ? (
                 <div className="rounded-xl border border-primary/25 bg-card/74 p-3 text-foreground shadow-[0_20px_60px_hsl(var(--primary)/0.14)]">
                   <p className="mb-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground/80">
-                    Launch panel
+                    {t("mobileStart.switcher.launchPanel")}
                   </p>
                   <button
                     type="button"
@@ -788,7 +813,7 @@ export default function MobileStartPage() {
                       setShowSwitcher(false);
                     }}
                   >
-                    <span>Helix Start Settings</span>
+                    <span>{t("mobileStart.switcher.startSettings")}</span>
                     <Settings className="h-3.5 w-3.5" />
                   </button>
                   <div className="max-h-40 space-y-1 overflow-y-auto">
@@ -806,15 +831,15 @@ export default function MobileStartPage() {
                         >
                           <span className="inline-flex items-center gap-2">
                             {locked ? <Lock className="h-3.5 w-3.5 text-amber-200" aria-hidden="true" /> : null}
-                            <span className="line-clamp-1">{panel.title}</span>
+                            <span className="line-clamp-1">{getPanelTitle(String(panel.id), panel.title)}</span>
                             {panel.workstationCapabilities?.v1_job_ready ? (
                               <span className="rounded border border-emerald-300/40 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-emerald-200">
-                                Job-ready
+                                {t("mobileStart.switcher.jobReady")}
                               </span>
                             ) : null}
                           </span>
                           <span className="ml-2 text-[10px] uppercase tracking-wide text-muted-foreground/80">
-                            {locked ? "Locked" : "Open"}
+                            {locked ? t("mobileStart.switcher.locked") : t("mobileStart.switcher.open")}
                           </span>
                         </button>
                       );
@@ -825,7 +850,7 @@ export default function MobileStartPage() {
 
               {stack.length === 0 && (
                 <div className="rounded-xl border border-primary/25 bg-card/74 px-4 py-3 text-sm text-muted-foreground/85 shadow-[inset_0_0_24px_hsl(var(--primary)/0.08)]">
-                  No panels open. Tap a tile to launch one.
+                  {t("mobileStart.switcher.noPanels")}
                 </div>
               )}
 
@@ -842,9 +867,13 @@ export default function MobileStartPage() {
                       <Icon className="h-5 w-5" />
                     </div>
                     <div className="flex-1">
-                      <p className="line-clamp-1 text-sm font-semibold text-foreground">{entry.title}</p>
+                      <p className="line-clamp-1 text-sm font-semibold text-foreground">
+                        {getPanelTitle(entry.panelId, entry.title)}
+                      </p>
                       <p className="text-[11px] text-muted-foreground/80">
-                        Opened {new Date(entry.openedAt).toLocaleTimeString()}
+                        {t("mobileStart.recent.opened", {
+                          time: new Date(entry.openedAt).toLocaleTimeString(),
+                        })}
                       </p>
                     </div>
                     <button
@@ -858,7 +887,7 @@ export default function MobileStartPage() {
                         setShowSwitcher(false);
                       }}
                     >
-                      {isActive ? "Active" : "Activate"}
+                      {isActive ? t("mobileStart.switcher.active") : t("mobileStart.switcher.activate")}
                     </button>
                     <button
                       className="min-h-[44px] rounded-full p-2 text-foreground/85 transition hover:bg-primary/18 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
@@ -885,13 +914,13 @@ export default function MobileStartPage() {
                     setShowSwitcher(false);
                   }}
                 >
-                  Close all
+                  {t("mobileStart.switcher.closeAll")}
                 </button>
                 <button
                   className="min-h-[44px] rounded-lg border border-primary/60 bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[0_0_20px_hsl(var(--primary)/0.3)] transition hover:bg-primary active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/80 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   onClick={() => setShowSwitcher(false)}
                 >
-                  Done
+                  {t("mobileStart.switcher.done")}
                 </button>
               </div>
             )}

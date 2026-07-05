@@ -71,6 +71,7 @@ export type HelixAskComposerTextareaProps = {
   className: string;
   placeholder: string;
   onPaste?: ClipboardEventHandler<HTMLTextAreaElement>;
+  onKeyDown?: KeyboardEventHandler<HTMLTextAreaElement>;
   onInputValue: (value: string, target: HTMLTextAreaElement) => void;
   onSubmitRequested: (form: HTMLFormElement | null) => void;
 };
@@ -82,6 +83,7 @@ export const HelixAskComposerTextarea = forwardRef<HTMLTextAreaElement, HelixAsk
       className,
       placeholder,
       onPaste,
+      onKeyDown,
       onInputValue,
       onSubmitRequested,
     },
@@ -91,6 +93,8 @@ export const HelixAskComposerTextarea = forwardRef<HTMLTextAreaElement, HelixAsk
       onInputValue(event.currentTarget.value, event.currentTarget);
     };
     const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (event) => {
+      onKeyDown?.(event);
+      if (event.defaultPrevented) return;
       if (event.key !== "Enter" || event.shiftKey) return;
       event.preventDefault();
       onSubmitRequested(event.currentTarget.form);

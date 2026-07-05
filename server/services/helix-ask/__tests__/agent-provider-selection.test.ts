@@ -3924,6 +3924,8 @@ describe("Helix Ask agent provider selection", () => {
       workspace_context_snapshot: {
         activePanel: "docs-viewer",
         activeDocPath: "docs/helix-ask-flow.md",
+        activeTranslationAccountLocale: "es-MX",
+        activeTranslationTargetLanguage: "es",
         activeTranslationBlocks: [{
           unit_id: "unit:flow:1",
           source_text: "Helix Ask flow",
@@ -4200,10 +4202,12 @@ describe("Helix Ask agent provider selection", () => {
     const translateBody = {
       turn_id: "ask:test:translate-visible-surface",
       agent_runtime: "codex",
-      question: "Translate the visible section of this document.",
+      question: "Read the visible already-translated section of this document.",
       workspace_context_snapshot: {
         activePanel: "docs-viewer",
         activeDocPath: "docs/helix-ask-flow.md",
+        activeTranslationAccountLocale: "es-MX",
+        activeTranslationTargetLanguage: "es",
         activeTranslationBlocks: [{
           unit_id: "doc-unit:1",
           source_text: "Original sentence.",
@@ -4225,8 +4229,14 @@ describe("Helix Ask agent provider selection", () => {
       required_observation_kind: "helix.workstation_readable_surface_observation.v1",
       narrator_requested: false,
       terminal_eligible: false,
+      account_locale: "es-MX",
+      target_language: "es",
     });
     expect((translationSurface?.observation as any).text).toBe("Translated sentence.");
+    expect((translationSurface?.observation as any).translation).toMatchObject({
+      account_locale: "es-MX",
+      target_language: "es",
+    });
     expect(translateResults.map((result) => result.capability_id)).not.toContain("live_env.narrator_say");
 
     const summarizeBody = {

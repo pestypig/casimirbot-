@@ -3021,13 +3021,195 @@ const theoryContextPromptText = (payload: Record<string, unknown>): string | nul
   readString(payload.input_text) ??
   readString(readRecord(payload.canonical_goal_frame)?.user_goal_summary);
 
+type ScientificTheoryAnswerGuard = {
+  primaryDomain: string | null;
+  branchGateStatus: string | null;
+  congruenceGradeFloor: string | null;
+  rejectedCalculatorPayloadIds: string[];
+  rejectedBadgeIds: string[];
+  falseFriendRefs: string[];
+  runTraceId: string | null;
+  mustDiscloseUncertainty: boolean;
+  mustDiscloseRejections: boolean;
+};
+
+const mergeScientificTheoryAnswerGuard = (
+  current: ScientificTheoryAnswerGuard,
+  next: Partial<ScientificTheoryAnswerGuard>,
+): ScientificTheoryAnswerGuard => ({
+  primaryDomain: current.primaryDomain ?? next.primaryDomain ?? null,
+  branchGateStatus: current.branchGateStatus ?? next.branchGateStatus ?? null,
+  congruenceGradeFloor: current.congruenceGradeFloor ?? next.congruenceGradeFloor ?? null,
+  rejectedCalculatorPayloadIds: uniqueStrings([
+    ...current.rejectedCalculatorPayloadIds,
+    ...(next.rejectedCalculatorPayloadIds ?? []),
+  ]),
+  rejectedBadgeIds: uniqueStrings([
+    ...current.rejectedBadgeIds,
+    ...(next.rejectedBadgeIds ?? []),
+  ]),
+  falseFriendRefs: uniqueStrings([
+    ...current.falseFriendRefs,
+    ...(next.falseFriendRefs ?? []),
+  ]),
+  runTraceId: current.runTraceId ?? next.runTraceId ?? null,
+  mustDiscloseUncertainty: current.mustDiscloseUncertainty || next.mustDiscloseUncertainty === true,
+  mustDiscloseRejections: current.mustDiscloseRejections || next.mustDiscloseRejections === true,
+});
+
+const extractScientificTheoryAnswerGuard = (
+  payload: Record<string, unknown>,
+  artifacts: ArtifactLike[],
+): ScientificTheoryAnswerGuard | null => {
+  let guard: ScientificTheoryAnswerGuard = {
+    primaryDomain: null,
+    branchGateStatus: null,
+    congruenceGradeFloor: null,
+    rejectedCalculatorPayloadIds: [],
+    rejectedBadgeIds: [],
+    falseFriendRefs: [],
+    runTraceId: null,
+    mustDiscloseUncertainty: false,
+    mustDiscloseRejections: false,
+  };
+  const seen = new WeakSet<object>();
+  const visit = (value: unknown, depth = 0): void => {
+    if (depth > 8) return;
+    if (!value || typeof value !== "object") return;
+    const objectValue = value as object;
+    if (seen.has(objectValue)) return;
+    seen.add(objectValue);
+    const record = readRecord(value);
+    if (!record) {
+      readArray(value).forEach((entry) => visit(entry, depth + 1));
+      return;
+    }
+    const schema = readString(record.schema);
+    if (schema === "helix.scientific_branch_gate.v1") {
+      guard = mergeScientificTheoryAnswerGuard(guard, {
+        primaryDomain: readString(record.primary_domain),
+        branchGateStatus: readString(record.status),
+        congruenceGradeFloor: readString(record.congruence_grade_floor),
+        rejectedCalculatorPayloadIds: readArray(record.rejected_calculator_payload_ids)
+          .map(readString)
+          .filter((entry): entry is string => Boolean(entry)),
+        rejectedBadgeIds: readArray(record.rejected_badge_ids)
+          .map(readString)
+          .filter((entry): entry is string => Boolean(entry)),
+        falseFriendRefs: readArray(record.congruence_assessments)
+          .map(readRecord)
+          .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+          .filter((entry) => readString(entry.grade) === "false_friend")
+          .map((entry) => readString(entry.target_ref))
+          .filter((entry): entry is string => Boolean(entry)),
+      });
+    } else if (schema === "helix.scientific_run_trace.v1") {
+      const finalAnswerGuard = readRecord(record.final_answer_guard);
+      guard = mergeScientificTheoryAnswerGuard(guard, {
+        primaryDomain: readString(record.primary_domain),
+        branchGateStatus: readString(record.branch_gate_status),
+        congruenceGradeFloor: readString(record.congruence_grade_floor),
+        rejectedCalculatorPayloadIds: readArray(record.rejected_calculator_payload_ids)
+          .map(readString)
+          .filter((entry): entry is string => Boolean(entry)),
+        rejectedBadgeIds: readArray(record.rejected_badge_ids)
+          .map(readString)
+          .filter((entry): entry is string => Boolean(entry)),
+        runTraceId: readString(record.trace_id),
+        mustDiscloseUncertainty: finalAnswerGuard?.must_disclose_uncertainty === true,
+        mustDiscloseRejections: finalAnswerGuard?.must_disclose_rejections === true,
+      });
+    } else if (schema === "helix.scientific_evidence_packet.v1") {
+      const admissibility = readRecord(record.admissibility);
+      guard = mergeScientificTheoryAnswerGuard(guard, {
+        primaryDomain: readString(record.primary_domain),
+        congruenceGradeFloor: readString(admissibility?.congruence_grade_floor),
+        mustDiscloseUncertainty: readArray(record.uncertainty).length > 0,
+      });
+    }
+    [
+      record.scientific_branch_gate,
+      record.scientificBranchGate,
+      record.scientific_run_trace,
+      record.scientificRunTrace,
+      record.scientific_evidence_packet,
+      record.scientificEvidencePacket,
+      record.observation,
+      record.artifact_v1,
+      record.payload,
+      record.result,
+      record.evaluation,
+      record.debug,
+    ].forEach((entry) => visit(entry, depth + 1));
+  };
+  visit(payload);
+  artifacts.forEach((artifact) => visit(artifactPayload(artifact), 0));
+  return guard.primaryDomain || guard.branchGateStatus || guard.runTraceId ? guard : null;
+};
+
+const renderScientificTheoryAnswerGuard = (guard: ScientificTheoryAnswerGuard | null): string[] => {
+  if (!guard) return [];
+  const rejected = uniqueStrings([...guard.rejectedCalculatorPayloadIds, ...guard.rejectedBadgeIds]);
+  return [
+    "Scientific evidence guard:",
+    `- Evidence domain: ${guard.primaryDomain ?? "unknown"}; branch gate: ${guard.branchGateStatus ?? "not_reported"}; congruence floor: ${guard.congruenceGradeFloor ?? "not_reported"}.`,
+    ...(guard.falseFriendRefs.length
+      ? [`- False-friend branch refs: ${guard.falseFriendRefs.join(", ")}.`]
+      : []),
+    ...(rejected.length
+      ? [`- Rejected incompatible graph/calculator branch refs: ${rejected.join(", ")}.`]
+      : []),
+    ...(guard.runTraceId ? [`- Run trace: ${guard.runTraceId}.`] : []),
+    "- Claim boundary: OCR/LaTeX candidates and graph matches are observation evidence, not proof or exact equation validation.",
+    "- Final answer boundary: separate observation, OCR candidate, graph match, calculator support, and proof/validation.",
+  ];
+};
+
+const isScientificTheoryAnswerBlocked = (guard: ScientificTheoryAnswerGuard | null): boolean =>
+  guard?.branchGateStatus === "blocked" || guard?.congruenceGradeFloor === "insufficient_evidence";
+
+const renderScientificTheoryAnswerBlocker = (guard: ScientificTheoryAnswerGuard | null): string[] => {
+  if (!guard) return [];
+  const rejected = uniqueStrings([...guard.rejectedCalculatorPayloadIds, ...guard.rejectedBadgeIds]);
+  return [
+    "Scientific evidence blocker:",
+    `- Evidence domain: ${guard.primaryDomain ?? "unknown"}; branch gate: ${guard.branchGateStatus ?? "not_reported"}; congruence floor: ${guard.congruenceGradeFloor ?? "not_reported"}.`,
+    "- Blocker: the available Image Lens evidence is not admissible for exact graph mapping or calculator handoff.",
+    ...(rejected.length
+      ? [`- Suppressed graph/calculator refs: ${rejected.join(", ")}.`]
+      : []),
+    ...(guard.runTraceId ? [`- Run trace: ${guard.runTraceId}.`] : []),
+    "- Claim boundary: no nearby theory badge, analogy, or calculator template may be substituted for the failed evidence.",
+    "- Required next step: collect a readable crop/OCR math observation before making an equation, graph-congruence, or calculator-supported claim.",
+  ];
+};
+
+const applyScientificTheoryAnswerGuard = (
+  text: string,
+  guard: ScientificTheoryAnswerGuard | null,
+): string => {
+  if (!guard) return text;
+  if (isScientificTheoryAnswerBlocked(guard)) {
+    if (/Scientific evidence blocker:/i.test(text)) return text;
+    const blockerLines = renderScientificTheoryAnswerBlocker(guard);
+    return blockerLines.length ? blockerLines.join("\n") : text;
+  }
+  if (/Scientific evidence guard:/i.test(text)) return text;
+  const guardLines = renderScientificTheoryAnswerGuard(guard);
+  return guardLines.length ? [text, ...guardLines].join("\n") : text;
+};
+
 const synthesizeTheoryContextReflectionTerminalText = (input: {
   prompt: string | null;
   evaluationSummary: string | null;
   receiptText: string | null;
+  scientificGuard?: ScientificTheoryAnswerGuard | null;
 }): string => {
   const prompt = input.prompt ?? "";
   const summary = input.evaluationSummary ?? input.receiptText ?? "The theory reflection located relevant graph context.";
+  if (isScientificTheoryAnswerBlocked(input.scientificGuard ?? null)) {
+    return renderScientificTheoryAnswerBlocker(input.scientificGuard ?? null).join("\n");
+  }
   const asksForMainComponents =
     /\b(?:main|major|core|key)\s+(?:components?|parts?|pieces?|elements?)\b/i.test(prompt) ||
     /\bwhat\s+are\s+(?:its|the)\s+(?:components?|parts?|pieces?|elements?)\b/i.test(prompt);
@@ -3045,13 +3227,13 @@ const synthesizeTheoryContextReflectionTerminalText = (input: {
       "- Terminal solver policy: the answer-authority layer that decides which observations can support a final claim and which remain context evidence.",
       `Reflection support: ${summary}`,
       "Boundary: this is graph-grounded explanation. Stronger physical or numeric conclusions still need the relevant calculator, tensor, or runtime receipts.",
-    ].join("\n");
+    ].concat(renderScientificTheoryAnswerGuard(input.scientificGuard ?? null)).join("\n");
   }
   return [
     "Theory context reflection answer:",
     summary,
     "Interpretation: use this reflection as graph/context evidence. It can explain where a concept sits and what follow-up routes are relevant, but any scalar, tensor, runtime, or claim-bearing conclusion still needs the matching tool receipt before it can support a stronger answer.",
-  ].join("\n");
+  ].concat(renderScientificTheoryAnswerGuard(input.scientificGuard ?? null)).join("\n");
 };
 
 const findGoalSatisfyingTheoryContextReflectionArtifact = (
@@ -3078,9 +3260,16 @@ const findGoalSatisfyingTheoryContextReflectionArtifact = (
       .filter((artifact) => artifactKind(artifact) === "theory_context_reflection_answer")
       .map(artifactPayload),
   ].filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const scientificGuard = extractScientificTheoryAnswerGuard(payload, artifacts);
   for (const candidate of existingCandidates) {
     const text = readString(candidate.answer_text) ?? readString(candidate.text);
     if (!text || isStaleWorkspaceFailureText(text)) continue;
+    const guardedText = applyScientificTheoryAnswerGuard(text, scientificGuard);
+    if (guardedText !== text) {
+      candidate.text = guardedText;
+      candidate.answer_text = guardedText;
+      candidate.scientific_final_answer_guard = scientificGuard;
+    }
     const ref = readString(candidate.artifact_id) ?? `${readString(payload.turn_id) ?? "turn"}:theory_context_reflection_answer`;
     return {
       artifact: {
@@ -3089,7 +3278,7 @@ const findGoalSatisfyingTheoryContextReflectionArtifact = (
         payload: candidate,
       },
       kind: "theory_context_reflection_answer",
-      text,
+      text: guardedText,
       ref,
     };
   }
@@ -3109,6 +3298,7 @@ const findGoalSatisfyingTheoryContextReflectionArtifact = (
     prompt: theoryContextPromptText(payload),
     evaluationSummary: workstationToolEvaluationText(evaluation),
     receiptText: artifactText(receipt),
+    scientificGuard,
   });
   if (!text || isStaleWorkspaceFailureText(text)) return null;
   const ref = `${readString(payload.turn_id) ?? "turn"}:theory_context_reflection_answer:from_reflection_observation`;
@@ -3123,6 +3313,7 @@ const findGoalSatisfyingTheoryContextReflectionArtifact = (
     subgoal_observation_refs: supportRefs,
     subgoal_observation_refs_count: supportRefs.length,
     source_families: ["theory_locator"],
+    scientific_final_answer_guard: scientificGuard,
     model_authored: false,
     synthesis_mode: "deterministic_theory_reflection_materializer",
     assistant_answer: false,

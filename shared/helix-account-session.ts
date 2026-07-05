@@ -42,36 +42,36 @@ export type HelixAccountCapabilityPolicy = {
 export type HelixAccountPolicyAccessState = "available" | "locked" | "hidden";
 
 export const HELIX_USER_WORKSTATION_PANEL_IDS = [
-  "docs-viewer",
   "account-session",
-  "workstation-notes",
-  "situation-room-pipelines",
-  "live-answer-environment",
+  "workstation-clipboard-history",
+  "docs-viewer",
   "image-lens",
   "narrator",
-  "workstation-clipboard-history",
-  "workstation-workflow-timeline",
-  "workstation-task-manager",
-  "workstation-storage-map",
   "agi-task-history",
   "scientific-calculator",
   "theory-badge-graph",
+  "workstation-notes",
+  "workstation-storage-map",
+  "workstation-task-manager",
   "moral-graph",
-  "fruition-calculator",
-  "stage-play-badge-graph",
-  "civilization-bounds-roadmap",
-  "mission-ethos",
 ] as const;
 
 export const HELIX_LOCKED_WORKSTATION_PANEL_IDS = [
   "agi-contribution-workbench",
   "agi-essence-console",
+  "civilization-bounds-roadmap",
   "code-admin",
   "document-image-lens",
+  "fruition-calculator",
   "helix-noise-gens",
+  "live-answer-environment",
+  "mission-ethos",
   "mission-ethos-source",
   "needle-world-roadmap",
   "rag-admin",
+  "situation-room-pipelines",
+  "stage-play-badge-graph",
+  "workstation-workflow-timeline",
 ] as const;
 
 export const HELIX_DEVELOPER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
@@ -102,20 +102,50 @@ export const HELIX_DEVELOPER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
 export const HELIX_USER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
   schema: HELIX_ACCOUNT_CAPABILITY_POLICY_SCHEMA,
   account_type: "user",
-  max_workstation_permission: "read",
+  max_workstation_permission: "act",
   allowed_panels: [...HELIX_USER_WORKSTATION_PANEL_IDS],
   locked_panels: [...HELIX_LOCKED_WORKSTATION_PANEL_IDS],
   locked_features: [
     "advanced_helix_ask_controls",
     "developer_workstation_panels",
     "experimental_panels",
+    "live_answer_visual_capture_controls",
     "runtime_agent_controls",
     "workstation_gateway_act",
   ],
-  allowed_runtime_agents: ["helix"],
-  allowed_workstation_capabilities: ["permission:observe", "permission:read"],
+  allowed_runtime_agents: ["codex"],
+  allowed_workstation_capabilities: [
+    "workspace_os.status",
+    "workstation.active_context",
+    "workstation-notes.list_notes",
+    "scientific-calculator.solve_expression",
+    "scientific-calculator.solve_scalar_expression",
+    "scientific-calculator.classify_expression",
+    "scientific-calculator.bind_variables",
+    "scientific-calculator.active_context",
+    "scientific-calculator.read_visible_result",
+    "scientific-calculator.open_panel",
+    "scientific-calculator.focus_panel",
+    "scientific-calculator.show_gateway_solve",
+    "scientific-calculator.prefill_expression",
+    "workstation.readable_surface.observe",
+    "workstation.open_panel",
+    "workstation.focus_panel",
+    "docs-viewer.read_visible_surface",
+    "docs-viewer.read_active_translation",
+    "docs-viewer.open_doc",
+    "docs.search",
+    "scholarly-research.lookup_papers",
+    "scholarly-research.fetch_full_text",
+    "scholarly-research.extract_numeric_parameters",
+    "theory-badge-graph.reflect_discussion_context",
+    "theory-badge-graph.propose_frontier_conjectures",
+    "moral-graph.reflect_context",
+    "moral-graph.reflect_living_substrate_context",
+    "text_to_speech.speak_text",
+    "live_env.narrator_say",
+  ],
   locked_workstation_capabilities: [
-    "permission:act",
     "permission:write",
     "permission:danger",
   ],
@@ -203,7 +233,7 @@ export const resolveHelixAccountPanelAccess = (
 ): { state: HelixAccountPolicyAccessState; reason: string | null } => {
   const normalizedPanelId = panelId.trim();
   if (!normalizedPanelId) return { state: "hidden", reason: "missing_panel_id" };
-  const activePolicy = policy ?? HELIX_DEVELOPER_ACCOUNT_POLICY;
+  const activePolicy = policy ?? HELIX_USER_ACCOUNT_POLICY;
   if (activePolicy.locked_panels.includes(normalizedPanelId)) {
     return { state: "locked", reason: "panel_locked_by_account_policy" };
   }
@@ -222,7 +252,7 @@ export const resolveHelixRuntimeAgentAccess = (
 ): { state: HelixAccountPolicyAccessState; reason: string | null } => {
   const normalizedAgentId = agentRuntimeId.trim();
   if (!normalizedAgentId) return { state: "hidden", reason: "missing_agent_runtime" };
-  const activePolicy = policy ?? HELIX_DEVELOPER_ACCOUNT_POLICY;
+  const activePolicy = policy ?? HELIX_USER_ACCOUNT_POLICY;
   if (
     activePolicy.allowed_runtime_agents.includes("*") ||
     activePolicy.allowed_runtime_agents.includes(normalizedAgentId)
@@ -239,7 +269,7 @@ export const resolveHelixWorkstationCapabilityAccess = (
     permission_profile_required?: HelixWorkstationPermissionProfile | string | null;
   },
 ): { state: HelixAccountPolicyAccessState; reason: string | null } => {
-  const activePolicy = policy ?? HELIX_DEVELOPER_ACCOUNT_POLICY;
+  const activePolicy = policy ?? HELIX_USER_ACCOUNT_POLICY;
   if (activePolicy.locked_workstation_capabilities.includes(input.capability_id)) {
     return { state: "locked", reason: "capability_locked_by_account_policy" };
   }

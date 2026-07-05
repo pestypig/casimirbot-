@@ -8,6 +8,13 @@ import type {
   HelixAgentRuntimeEvent,
 } from "./types";
 import type { HelixAgentStepObservationPacket } from "@shared/helix-agent-step-observation-packet";
+import {
+  buildScientificImageEvidenceSidecar,
+  SCIENTIFIC_EVIDENCE_PACKET_SCHEMA,
+  SCIENTIFIC_IMAGE_EVIDENCE_SIDECAR_SCHEMA,
+  type ScientificEvidencePacketV1,
+  type ScientificImageEvidenceSidecarV1,
+} from "@shared/scientific-evidence-adaptor";
 import type {
   HelixToolFollowupDecision,
   HelixToolLifecycleTrace,
@@ -39,6 +46,7 @@ const SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY = "scholarly-research.fetch_full_text
 const SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY = "scholarly-research.extract_numeric_parameters" as const;
 const MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY = "moral-graph.reflect_living_substrate_context" as const;
 const MORAL_GRAPH_REFLECTION_CAPABILITY = "moral-graph.reflect_context" as const;
+const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context" as const;
 const WORKSTATION_UI_ACTION_RECEIPT_SCHEMA = "helix.workstation_ui_action_receipt.v1" as const;
 const COMPOUND_NORMALIZABLE_CAPABILITIES = new Set<string>([
   "docs.search",
@@ -117,6 +125,66 @@ const readNumber = (value: unknown): number | null => {
 };
 
 const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
+
+const readStringArray = (value: unknown): string[] =>
+  readArray(value).map(readString).filter((entry): entry is string => Boolean(entry));
+
+const readSourceTargetIntentFromBody = (body: Record<string, unknown>): Record<string, unknown> | null =>
+  readRecord(body.source_target_intent) ??
+  readRecord(readRecord(body.route_metadata)?.source_target_intent) ??
+  readRecord(readRecord(body.routeMetadata)?.source_target_intent);
+
+const shouldRunScientificImageTheoryReflectionAfterLane = (body: Record<string, unknown>): boolean => {
+  const sourceTargetIntent = readSourceTargetIntentFromBody(body);
+  const requestedOutputs = readStringArray(sourceTargetIntent?.requested_outputs);
+  return (
+    readString(sourceTargetIntent?.target_source) === "scientific_image_evidence" &&
+    requestedOutputs.includes("scientific_evidence_sidecar") &&
+    requestedOutputs.includes("theory_reflection")
+  );
+};
+
+const readScientificEvidencePacket = (value: unknown): ScientificEvidencePacketV1 | null => {
+  const packet = readRecord(value);
+  return packet?.schema === SCIENTIFIC_EVIDENCE_PACKET_SCHEMA
+    ? (packet as ScientificEvidencePacketV1)
+    : null;
+};
+
+const readScientificImageEvidenceSidecar = (value: unknown): ScientificImageEvidenceSidecarV1 | null => {
+  const sidecar = readRecord(value);
+  return sidecar?.schema === SCIENTIFIC_IMAGE_EVIDENCE_SIDECAR_SCHEMA
+    ? (sidecar as ScientificImageEvidenceSidecarV1)
+    : null;
+};
+
+const scientificSidecarFromLanePacket = (
+  packet: HelixAgentStepObservationPacket,
+): ScientificImageEvidenceSidecarV1 | null => {
+  const stateDelta = readRecord(packet.state_delta);
+  const regionInspection = readRecord(stateDelta?.visual_analysis_region_inspection);
+  return (
+    readScientificImageEvidenceSidecar(regionInspection?.scientific_evidence_sidecar) ??
+    readScientificImageEvidenceSidecar(readRecord(regionInspection?.receipt)?.scientific_evidence_sidecar)
+  );
+};
+
+const buildScientificImageSidecarFromLanePackets = (input: {
+  turnId: string;
+  packets: HelixAgentStepObservationPacket[];
+}): ScientificImageEvidenceSidecarV1 | null => {
+  const packets = input.packets
+    .map(scientificSidecarFromLanePacket)
+    .filter((sidecar): sidecar is ScientificImageEvidenceSidecarV1 => Boolean(sidecar))
+    .flatMap((sidecar) => sidecar.packets)
+    .map(readScientificEvidencePacket)
+    .filter((packet): packet is ScientificEvidencePacketV1 => Boolean(packet));
+  if (packets.length === 0) return null;
+  return buildScientificImageEvidenceSidecar({
+    sidecarId: `${input.turnId}:scientific_image_evidence_sidecar`,
+    packets,
+  });
+};
 
 const buildCodexProviderModelMetadata = (): Record<string, string> => {
   const httpModel = readString(process.env.LLM_HTTP_MODEL);
@@ -376,6 +444,30 @@ const imageDimensionsFromCandidates = (
   };
 };
 
+const isDegenerateImageLensBbox = (value: unknown): boolean => {
+  const bbox = readRecord(value);
+  if (!bbox) return true;
+  const width = readNumber(bbox.width);
+  const height = readNumber(bbox.height);
+  return width === null || height === null || width <= 1 || height <= 1;
+};
+
+const readScientificImageSourceKind = (item: Record<string, unknown> | null): string | null => {
+  if (!item) return null;
+  const sourceKind = readString(item.source_kind ?? item.sourceKind);
+  if (
+    sourceKind === "image_lens_source" ||
+    sourceKind === "image_attachment" ||
+    sourceKind === "pdf_page_render" ||
+    sourceKind === "manual_image_url"
+  ) {
+    return sourceKind;
+  }
+  const imageRef = readString(item.image_ref ?? item.imageRef ?? item.evidence_id ?? item.evidenceId);
+  if (/^(?:visual_source|image_lens):/i.test(imageRef)) return "image_lens_source";
+  return null;
+};
+
 const enrichImageLensRegionCandidateFromBody = (
   body: Record<string, unknown>,
   candidate: Record<string, unknown>,
@@ -407,7 +499,7 @@ const enrichImageLensRegionCandidateFromBody = (
       : `image_attachment:${hashShort(sourceSeed)}`;
   }
   if (!readString(enriched.source_kind ?? enriched.sourceKind)) {
-    enriched.source_kind = "image_attachment";
+    enriched.source_kind = readScientificImageSourceKind(imageItem) ?? "image_attachment";
   }
   if (!readString(enriched.source_image_ref ?? enriched.sourceImageRef)) {
     if (inlineImageRef) {
@@ -416,8 +508,11 @@ const enrichImageLensRegionCandidateFromBody = (
       enriched.source_image_ref = imageRef;
     }
   }
-  if (!readRecord(enriched.bbox_px ?? enriched.bboxPx)) {
-    enriched.bbox_px = { x: 0, y: 0, width: 1, height: 1 };
+  const imageDimensions = imageDimensionsFromBody(body);
+  if (isDegenerateImageLensBbox(enriched.bbox_px ?? enriched.bboxPx)) {
+    enriched.bbox_px = imageDimensions
+      ? { x: 0, y: 0, width: imageDimensions.width, height: imageDimensions.height }
+      : { x: 0, y: 0, width: 1, height: 1 };
   }
   if (enriched.assistant_answer !== false) enriched.assistant_answer = false;
   if (enriched.terminal_eligible !== false) enriched.terminal_eligible = false;
@@ -794,7 +889,7 @@ const shouldRetryCodexCapabilityLaneRequest = (input: {
 const isImageLensCapabilityLanePrompt = (question: string): boolean => {
   const normalized = question.trim().toLowerCase();
   return (
-    /\b(?:image\s+lens|image-lens|attached\s+image|image\s+attachment|visible\s+image|current\s+image|visual_analysis\.inspect_image_region)\b/.test(normalized) &&
+    /\b(?:image\s+lens|image-lens|attached\s+image|image\s+attachment|visible\s+image|current\s+image|scientific\s+(?:document|image|page|paper)|document\s+image|visual_analysis\.inspect_image_region)\b/.test(normalized) &&
     /\b(?:crop|bbox|bounding\s+box|region|area|look\s+closely|inspect|read|ocr|latex|equation|figure)\b/.test(normalized)
   );
 };
@@ -859,6 +954,15 @@ const formatImageLensCropRefForAnswer = (value: unknown): string | null => {
     : cropRef;
 };
 
+const formatImageLensCandidateBlock = (
+  label: "text_candidate" | "latex_candidate",
+  value: string | null,
+): string | null => {
+  if (!value) return null;
+  const fence = label === "latex_candidate" ? "latex" : "text";
+  return [`- ${label}:`, `\`\`\`${fence}`, value.replace(/```/g, "`\u200b``"), "```"].join("\n");
+};
+
 const buildImageLensObservationFallbackAnswer = (input: {
   question: string;
   capabilityLaneCallResults: unknown[];
@@ -886,9 +990,9 @@ const buildImageLensObservationFallbackAnswer = (input: {
     const uncertainty = readArray(receipt.uncertainty)
       .map(readString)
       .filter((entry): entry is string => Boolean(entry));
-    const extractedParts = [
-      textCandidate ? `text_candidate: ${textCandidate}` : null,
-      latexCandidate ? `latex_candidate: ${latexCandidate}` : null,
+    const candidateBlocks = [
+      formatImageLensCandidateBlock("text_candidate", textCandidate),
+      formatImageLensCandidateBlock("latex_candidate", latexCandidate),
     ].filter(Boolean);
 
     return [
@@ -896,11 +1000,9 @@ const buildImageLensObservationFallbackAnswer = (input: {
       `- Bbox: ${bbox}`,
       cropRef ? `- Crop ref: ${cropRef}` : null,
       `- Extraction status: ${extractionStatus}`,
-      `- Extracted information: ${
-        extractedParts.length > 0
-          ? extractedParts.join("; ")
-          : "no text_candidate or latex_candidate was returned for this crop"
-      }`,
+      candidateBlocks.length > 0
+        ? ["- Extracted information:", ...candidateBlocks].join("\n")
+        : "- Extracted information: no text_candidate or latex_candidate was returned for this crop",
       `- Uncertainty: ${uncertainty.length > 0 ? uncertainty.join("; ") : "none returned"}`,
     ].filter(Boolean).join("\n");
   });
@@ -2662,6 +2764,107 @@ export const runExplicitCodexWorkstationGatewayCalls = async (input: {
   });
 };
 
+type ScientificImageTheoryReflectionBridgeResult = {
+  gatewayResults: HelixWorkstationGatewayCallResult[];
+  bridge: Record<string, unknown> | null;
+};
+
+const runScientificImageTheoryReflectionFromLaneSidecar = async (input: {
+  body: Record<string, unknown>;
+  turnId: string;
+  capabilityLaneObservationPackets: HelixAgentStepObservationPacket[];
+  iteration: number;
+}): Promise<ScientificImageTheoryReflectionBridgeResult> => {
+  if (!shouldRunScientificImageTheoryReflectionAfterLane(input.body)) {
+    return { gatewayResults: [], bridge: null };
+  }
+  const sidecar = buildScientificImageSidecarFromLanePackets({
+    turnId: input.turnId,
+    packets: input.capabilityLaneObservationPackets,
+  });
+  if (!sidecar) {
+    return {
+      gatewayResults: [],
+      bridge: {
+        schema: "helix.scientific_image_sidecar_gateway_bridge.v1",
+        status: "blocked",
+        capability_id: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+        result_count: 0,
+        blocked_reason: "scientific_image_evidence_sidecar_missing",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+  }
+  if (sidecar.admissibility.status !== "admissible_observation") {
+    return {
+      gatewayResults: [],
+      bridge: {
+        schema: "helix.scientific_image_sidecar_gateway_bridge.v1",
+        status: "blocked",
+        capability_id: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+        result_count: 0,
+        blocked_reason: "scientific_image_evidence_sidecar_not_admissible",
+        scientific_evidence_sidecar_id: sidecar.sidecar_id,
+        sidecar_admissibility_status: sidecar.admissibility.status,
+        sidecar_primary_domain: sidecar.primary_domain,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+  }
+  const sourceTargetIntent = readSourceTargetIntentFromBody(input.body) ?? {};
+  const question = readQuestion(input.body);
+  const result = await callWorkstationGatewayCapability({
+    agentRuntime: "codex",
+    mode: "read",
+    capabilityId: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+    arguments: {
+      prompt: question,
+      conversation_context: question,
+      scientific_evidence_sidecar: sidecar,
+      source_target_intent: {
+        ...sourceTargetIntent,
+        source: "helix_scientific_image_sidecar_bridge",
+        target_source: "theory_badge_graph",
+        target_kind: "theory_context_reflection",
+        required_observation_kind: "helix.theory_context_reflection_observation.v1",
+        scientific_evidence_sidecar_id: sidecar.sidecar_id,
+        compound_outcome: "scientific_image_evidence_reflection",
+        subgoal_id: "scientific_image_evidence_reflection:theory_reflection",
+        depends_on_capability_id: VISUAL_ANALYSIS_INSPECT_IMAGE_REGION_CAPABILITY,
+        depends_on_artifact_ref: sidecar.sidecar_id,
+        dependency_binding: "scientific_image_sidecar_to_theory_reflection",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    },
+    turnId: input.turnId,
+    iteration: input.iteration,
+  });
+  return {
+    gatewayResults: [result],
+    bridge: {
+      schema: "helix.scientific_image_sidecar_gateway_bridge.v1",
+      status: result.ok === true ? "completed" : "blocked",
+      capability_id: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+      result_count: 1,
+      scientific_evidence_sidecar_id: sidecar.sidecar_id,
+      sidecar_admissibility_status: sidecar.admissibility.status,
+      sidecar_primary_domain: sidecar.primary_domain,
+      observation_refs: result.observation_packet.produced_artifact_refs
+        .map(readString)
+        .filter((ref): ref is string => Boolean(ref)),
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+  };
+};
+
 type CodexProcessResult = {
   stdout: string;
   stderr: string;
@@ -3182,15 +3385,53 @@ export const codexProvider: HelixAgentProvider = {
       env: process.env,
     });
     let capabilityLaneDebugProjection = capabilityLaneContext.debug_projection;
-    const evidenceGatewayCallResults = await runExplicitCodexWorkstationGatewayCalls({
+    let evidenceGatewayCallResults = await runExplicitCodexWorkstationGatewayCalls({
       body: request.body,
       turnId,
     });
+    let runtimeLaneRequestLoop: Record<string, unknown> | null = null;
+    const initialScientificImageBridge = await runScientificImageTheoryReflectionFromLaneSidecar({
+      body: request.body,
+      turnId,
+      capabilityLaneObservationPackets: capabilityLaneContext.observation_packets,
+      iteration: evidenceGatewayCallResults.length + 1,
+    });
+    if (initialScientificImageBridge.bridge) {
+      runtimeLaneRequestLoop = {
+        schema: "helix.runtime_agent_lane_request_loop.v1",
+        legacy_schema: "helix.codex_runtime_lane_request_loop.v1",
+        runtime_provider_adapter: "codex",
+        status: capabilityLaneContext.observation_packets.length > 0
+          ? "lane_observation_reentered"
+          : "lane_request_not_executed",
+        retry: null,
+        requested_by_runtime_provider: false,
+        synthesized_by_helix_policy: true,
+        image_lens_region_candidate_augmented: false,
+        synthesis_reason: "scientific_image_route_metadata_required_sidecar",
+        selected_runtime_agent_provider: "codex",
+        candidate: null,
+        capability_lane_call_results: capabilityLaneDebugProjection.capability_lane_call_results,
+        capability_lane_backend_selections: capabilityLaneDebugProjection.capability_lane_backend_selections,
+        capability_lane_observation_packets: capabilityLaneDebugProjection.capability_lane_observation_packets,
+        capability_lane_reentry_status: capabilityLaneDebugProjection.capability_lane_reentry_status,
+        scientific_image_sidecar_gateway_bridge: initialScientificImageBridge.bridge,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
+    if (initialScientificImageBridge.gatewayResults.length > 0) {
+      evidenceGatewayCallResults = [
+        ...evidenceGatewayCallResults,
+        ...initialScientificImageBridge.gatewayResults,
+      ];
+    }
     const actionReceiptResults = await buildCalculatorPanelActionReceipts({
       turnId,
       gatewayCallResults: evidenceGatewayCallResults,
     });
-    const gatewayCallResults = [
+    let gatewayCallResults = [
       ...evidenceGatewayCallResults,
       ...actionReceiptResults,
     ];
@@ -3208,17 +3449,17 @@ export const codexProvider: HelixAgentProvider = {
       actionReceiptResults,
       gatewayCallResults: evidenceGatewayCallResults,
     });
-    const gatewayObservationPackets = gatewayCallResults.map((result) => result.observation_packet);
-    const normalizedObservationResult = buildCodexNormalizedObservationArtifacts({
+    let gatewayObservationPackets = gatewayCallResults.map((result) => result.observation_packet);
+    let normalizedObservationResult = buildCodexNormalizedObservationArtifacts({
       turnId,
       gatewayCallResults,
     });
-    const normalizedObservationArtifacts = normalizedObservationResult.artifacts;
-    const normalizedObservationPackets = buildNormalizedObservationPacketsFromArtifacts({
+    let normalizedObservationArtifacts = normalizedObservationResult.artifacts;
+    let normalizedObservationPackets = buildNormalizedObservationPacketsFromArtifacts({
       turnId,
       artifacts: normalizedObservationArtifacts,
     });
-    const providerGatewayPacketLedger = buildCurrentTurnArtifactLedgerFromGatewayPackets({
+    let providerGatewayPacketLedger = buildCurrentTurnArtifactLedgerFromGatewayPackets({
       turnId,
       packets: gatewayObservationPackets,
     });
@@ -3227,13 +3468,13 @@ export const codexProvider: HelixAgentProvider = {
       ...providerGatewayPacketLedger,
       ...capabilityLaneContext.artifact_ledger,
     ];
-    const codexCompoundSubgoalLedger = buildCodexCompoundSubgoalLedger({
+    let codexCompoundSubgoalLedger = buildCodexCompoundSubgoalLedger({
       turnId,
       normalizedArtifacts: normalizedObservationArtifacts,
       gatewayCallResults: evidenceGatewayCallResults,
     });
-    const gatewayLifecycleTraces = gatewayCallResults.map((result) => result.tool_lifecycle_trace);
-    const gatewayFollowupDecisions = gatewayCallResults.map((result) => result.tool_followup_decision);
+    let gatewayLifecycleTraces = gatewayCallResults.map((result) => result.tool_lifecycle_trace);
+    let gatewayFollowupDecisions = gatewayCallResults.map((result) => result.tool_followup_decision);
     const initialTranscriptEvents = buildCodexProviderTurnTranscriptEvents({
       turnId,
       providerLabel: codexProvider.label,
@@ -3501,7 +3742,6 @@ export const codexProvider: HelixAgentProvider = {
     if (imageLensRegionCandidateAugmented && !runtimeLaneRequestSynthesized) {
       runtimeLaneRequestSynthesized = runtimeLaneRequestCandidate;
     }
-    let runtimeLaneRequestLoop: Record<string, unknown> | null = null;
     if (runtimeLaneRequestCandidate) {
       const laneRequestBody = buildCodexCapabilityLaneRequestBody(request.body, runtimeLaneRequestCandidate);
       capabilityLaneContext = await buildHelixCapabilityLaneProviderAdapterContext({
@@ -3543,6 +3783,55 @@ export const codexProvider: HelixAgentProvider = {
         assistant_answer: false,
         raw_content_included: false,
       };
+      const postLaneScientificImageBridge = await runScientificImageTheoryReflectionFromLaneSidecar({
+        body: request.body,
+        turnId,
+        capabilityLaneObservationPackets: capabilityLaneContext.observation_packets,
+        iteration: gatewayCallResults.length + 1,
+      });
+      const postLaneScientificImageGatewayResults = postLaneScientificImageBridge.gatewayResults;
+      if (postLaneScientificImageBridge.bridge) {
+        runtimeLaneRequestLoop = {
+          ...runtimeLaneRequestLoop,
+          scientific_image_sidecar_gateway_bridge: postLaneScientificImageBridge.bridge,
+        };
+      }
+      if (postLaneScientificImageGatewayResults.length > 0) {
+        evidenceGatewayCallResults = [
+          ...evidenceGatewayCallResults,
+          ...postLaneScientificImageGatewayResults,
+        ];
+        gatewayCallResults = [
+          ...gatewayCallResults,
+          ...postLaneScientificImageGatewayResults,
+        ];
+        gatewayObservationPackets = gatewayCallResults.map((result) => result.observation_packet);
+        normalizedObservationResult = buildCodexNormalizedObservationArtifacts({
+          turnId,
+          gatewayCallResults,
+        });
+        normalizedObservationArtifacts = normalizedObservationResult.artifacts;
+        normalizedObservationPackets = buildNormalizedObservationPacketsFromArtifacts({
+          turnId,
+          artifacts: normalizedObservationArtifacts,
+        });
+        providerGatewayPacketLedger = buildCurrentTurnArtifactLedgerFromGatewayPackets({
+          turnId,
+          packets: gatewayObservationPackets,
+        });
+        currentTurnArtifactLedger = [
+          ...normalizedObservationArtifacts,
+          ...providerGatewayPacketLedger,
+          ...capabilityLaneContext.artifact_ledger,
+        ];
+        codexCompoundSubgoalLedger = buildCodexCompoundSubgoalLedger({
+          turnId,
+          normalizedArtifacts: normalizedObservationArtifacts,
+          gatewayCallResults: evidenceGatewayCallResults,
+        });
+        gatewayLifecycleTraces = gatewayCallResults.map((result) => result.tool_lifecycle_trace);
+        gatewayFollowupDecisions = gatewayCallResults.map((result) => result.tool_followup_decision);
+      }
       const firstRuntimeLaneRequestCandidate = Array.isArray(runtimeLaneRequestCandidate)
         ? readRecord(runtimeLaneRequestCandidate[0]) ?? null
         : runtimeLaneRequestCandidate;
@@ -3590,6 +3879,13 @@ export const codexProvider: HelixAgentProvider = {
         "",
         "Capability lane observation block after Helix execution:",
         capabilityLaneContext.prompt_observation_block,
+        ...(postLaneScientificImageGatewayResults.length > 0
+          ? [
+              "",
+              "Post-lane workstation gateway observations derived from scientific image sidecar:",
+              JSON.stringify(postLaneScientificImageGatewayResults, null, 2),
+            ]
+          : []),
       ].join("\n");
       result = await runCodexProcess({
         prompt: firstReentryPrompt,
@@ -4024,7 +4320,26 @@ export const codexProvider: HelixAgentProvider = {
       compoundAnswer,
     });
     const compoundTerminalAuthorized = Boolean(compoundTerminalAuthority);
-    const providerTerminalAuthorized = Boolean(providerReentry.terminalAnswerAuthority);
+    const imageLensObservationReportTerminalAuthority =
+      promptLeakRecoveredImageLensAnswer && processOk
+        ? buildHelixTurnTerminalAuthority({
+            thread_id: threadId,
+            turn_id: turnId,
+            route: request.route || "/ask/turn",
+            final_answer_source: "provider_image_lens_observation_report",
+            terminal_artifact_kind: "image_lens_observation_report",
+            terminal_text: gatewayGuardedText,
+            terminal_item_id: `${turnId}:image_lens_observation_report`,
+            terminal_kind: "answer",
+            authority_origin: "image_lens_observation_receipts",
+            server_authoritative: true,
+            terminal_eligible: true,
+            assistant_answer: false,
+          })
+        : null;
+    const providerTerminalAuthorized = Boolean(
+      imageLensObservationReportTerminalAuthority ?? providerReentry.terminalAnswerAuthority,
+    );
     const normalizationFailures = normalizedObservationResult.missingNormalizationFailures;
     const directTerminalAuthority =
       !compoundTerminalAuthorized &&
@@ -4067,14 +4382,21 @@ export const codexProvider: HelixAgentProvider = {
       providerTerminalCandidate: providerReentry.providerTerminalCandidate,
       providerTerminalAuthorityBridge: providerReentry.providerTerminalAuthorityBridge,
       terminalAuthorityCandidateReview: providerReentry.terminalAuthorityCandidateReview,
-      terminalAnswerAuthority: directTerminalAuthority ?? providerReentry.terminalAnswerAuthority,
+      terminalAnswerAuthority:
+        imageLensObservationReportTerminalAuthority ??
+        directTerminalAuthority ??
+        providerReentry.terminalAnswerAuthority,
       finalAnswerSource: compoundTerminalAuthority
         ? "compound_evidence_synthesis_answer"
+        : imageLensObservationReportTerminalAuthority
+          ? "provider_image_lens_observation_report"
         : providerReentry.terminalAnswerAuthority || directTerminalAuthority
           ? "agent_provider_terminal_candidate"
           : null,
       terminalArtifactKind: compoundTerminalAuthority
         ? "compound_evidence_synthesis_answer"
+        : imageLensObservationReportTerminalAuthority
+          ? "image_lens_observation_report"
         : providerReentry.terminalAnswerAuthority || directTerminalAuthority
           ? "agent_provider_terminal_candidate"
           : null,
@@ -4095,11 +4417,15 @@ export const codexProvider: HelixAgentProvider = {
     });
     const finalAnswerSource = compoundTerminalAuthority
       ? "compound_evidence_synthesis_answer"
+      : imageLensObservationReportTerminalAuthority
+        ? "provider_image_lens_observation_report"
       : providerReentry.terminalAnswerAuthority || directTerminalAuthority
         ? "agent_provider_terminal_candidate"
         : null;
     const terminalArtifactKind = compoundTerminalAuthority
       ? "compound_evidence_synthesis_answer"
+      : imageLensObservationReportTerminalAuthority
+        ? "image_lens_observation_report"
       : providerReentry.terminalAnswerAuthority || directTerminalAuthority
         ? "agent_provider_terminal_candidate"
         : null;
@@ -4109,7 +4435,10 @@ export const codexProvider: HelixAgentProvider = {
         ? "authorized_no_gateway_tool_required"
         : providerReentry.terminalAuthorityStatus;
     const terminalAnswerAuthority =
-      compoundTerminalAuthority ?? directTerminalAuthority ?? providerReentry.terminalAnswerAuthority;
+      compoundTerminalAuthority ??
+      imageLensObservationReportTerminalAuthority ??
+      directTerminalAuthority ??
+      providerReentry.terminalAnswerAuthority;
     const capabilityLaneTerminalTimelineEvent = {
       schema: "helix.capability_lane.provider_timeline_event.v1",
       seq: capabilityLaneDebugProjection.capability_lane_turn_timeline.length,
@@ -4170,6 +4499,23 @@ export const codexProvider: HelixAgentProvider = {
             assistant_answer: false,
             raw_content_included: false,
         }
+      : imageLensObservationReportTerminalAuthority
+        ? {
+            schema: "helix.terminal_presentation.v1",
+            turn_id: turnId,
+            concise_text: projectedText,
+            terminal_artifact_kind: "image_lens_observation_report",
+            final_answer_source: "provider_image_lens_observation_report",
+            terminal_authority_ref: readString(imageLensObservationReportTerminalAuthority.terminal_item_id),
+            selected_observation_refs: capabilityLaneContext.observation_packets
+              .flatMap((packet) => readArray(packet.produced_artifact_refs))
+              .map(readString)
+              .filter((ref): ref is string => Boolean(ref)),
+            presentation_policy: "image_lens_observation_report_safe_blocks",
+            helix_style_rewrite_applied: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          }
       : providerReentry.terminalPresentation;
     const railContractProjection = buildCodexProviderRailContractProjection({
       turnId,

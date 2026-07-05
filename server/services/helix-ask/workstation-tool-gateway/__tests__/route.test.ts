@@ -24,13 +24,24 @@ const createApp = (): express.Express => {
   return app;
 };
 
+const createDeveloperAgent = async () => {
+  const app = createApp();
+  const agent = request.agent(app);
+  await agent
+    .post("/api/account/session/sign-in")
+    .send({ profile_id: "profile:developer-gateway-test" })
+    .expect(200);
+  return agent;
+};
+
 describe("AGI workstation tool gateway route", () => {
-  beforeEach(() => {
-    resetAccountSessionStore();
+  beforeEach(async () => {
+    await resetAccountSessionStore();
   });
 
   it("exposes capability manifests over the AGI route", async () => {
-    const response = await request(createApp())
+    const agent = await createDeveloperAgent();
+    const response = await agent
       .get("/api/agi/workstation-tool-gateway/capabilities?agent_runtime=codex&mode=observe")
       .expect(200);
 
@@ -121,7 +132,8 @@ describe("AGI workstation tool gateway route", () => {
   });
 
   it("exposes the same read/observe manifest for a future provider runtime", async () => {
-    const response = await request(createApp())
+    const agent = await createDeveloperAgent();
+    const response = await agent
       .get("/api/agi/workstation-tool-gateway/capabilities?agent_runtime=future-agent&mode=read")
       .expect(200);
 
@@ -157,7 +169,8 @@ describe("AGI workstation tool gateway route", () => {
   });
 
   it("calls workspace_os.status through the gateway route as non-terminal evidence", async () => {
-    const response = await request(createApp())
+    const agent = await createDeveloperAgent();
+    const response = await agent
       .post("/api/agi/workstation-tool-gateway/call")
       .send({
         agent_runtime: "codex",
@@ -192,7 +205,8 @@ describe("AGI workstation tool gateway route", () => {
   });
 
   it("calls scientific-calculator.solve_expression through the gateway route", async () => {
-    const response = await request(createApp())
+    const agent = await createDeveloperAgent();
+    const response = await agent
       .post("/api/agi/workstation-tool-gateway/call")
       .send({
         agent_runtime: "codex",
@@ -233,7 +247,8 @@ describe("AGI workstation tool gateway route", () => {
   });
 
   it("calls workstation.active_context through the gateway route", async () => {
-    const response = await request(createApp())
+    const agent = await createDeveloperAgent();
+    const response = await agent
       .post("/api/agi/workstation-tool-gateway/call")
       .send({
         agent_runtime: "codex",
@@ -280,7 +295,8 @@ describe("AGI workstation tool gateway route", () => {
   });
 
   it("calls read-only capabilities for a future provider through the same admission path", async () => {
-    const response = await request(createApp())
+    const agent = await createDeveloperAgent();
+    const response = await agent
       .post("/api/agi/workstation-tool-gateway/call")
       .send({
         agent_runtime: "future-agent",
@@ -331,7 +347,8 @@ describe("AGI workstation tool gateway route", () => {
   });
 
   it("calls docs-viewer.open_doc through the gateway route as a non-terminal action receipt", async () => {
-    const response = await request(createApp())
+    const agent = await createDeveloperAgent();
+    const response = await agent
       .post("/api/agi/workstation-tool-gateway/call")
       .send({
         agent_runtime: "codex",
@@ -386,7 +403,8 @@ describe("AGI workstation tool gateway route", () => {
   });
 
   it("calls workstation.open_panel through the gateway route as a non-terminal action receipt", async () => {
-    const response = await request(createApp())
+    const agent = await createDeveloperAgent();
+    const response = await agent
       .post("/api/agi/workstation-tool-gateway/call")
       .send({
         agent_runtime: "codex",
@@ -437,7 +455,8 @@ describe("AGI workstation tool gateway route", () => {
   });
 
   it("calls interim voice callout through the gateway route as a host-projected non-terminal receipt", async () => {
-    const response = await request(createApp())
+    const agent = await createDeveloperAgent();
+    const response = await agent
       .post("/api/agi/workstation-tool-gateway/call")
       .send({
         agent_runtime: "codex",
@@ -510,7 +529,8 @@ describe("AGI workstation tool gateway route", () => {
   });
 
   it("returns a typed non-terminal voice receipt block when confirmation is required", async () => {
-    const response = await request(createApp())
+    const agent = await createDeveloperAgent();
+    const response = await agent
       .post("/api/agi/workstation-tool-gateway/call")
       .send({
         agent_runtime: "codex",
@@ -568,7 +588,8 @@ describe("AGI workstation tool gateway route", () => {
   });
 
   it("blocks unknown or mutating future-provider capabilities with typed gateway admission", async () => {
-    const response = await request(createApp())
+    const agent = await createDeveloperAgent();
+    const response = await agent
       .post("/api/agi/workstation-tool-gateway/call")
       .send({
         agent_runtime: "future-agent",
@@ -616,7 +637,8 @@ describe("AGI workstation tool gateway route", () => {
   });
 
   it("calls repo.search through the gateway route as non-terminal evidence", async () => {
-    const response = await request(createApp())
+    const agent = await createDeveloperAgent();
+    const response = await agent
       .post("/api/agi/workstation-tool-gateway/call")
       .send({
         agent_runtime: "codex",
@@ -660,7 +682,8 @@ describe("AGI workstation tool gateway route", () => {
   });
 
   it("calls docs.search through the gateway route as non-terminal evidence", async () => {
-    const response = await request(createApp())
+    const agent = await createDeveloperAgent();
+    const response = await agent
       .post("/api/agi/workstation-tool-gateway/call")
       .send({
         agent_runtime: "codex",
@@ -703,7 +726,30 @@ describe("AGI workstation tool gateway route", () => {
     expect(response.body.observation.hit_count).toBeGreaterThan(0);
   }, 15000);
 
-  it("caps user account capability listing and exposes locked act capabilities", async () => {
+  it("treats anonymous capability listing as user policy", async () => {
+    const response = await request(createApp())
+      .get("/api/agi/workstation-tool-gateway/capabilities?mode=act")
+      .expect(200);
+
+    expect(response.body.account_policy).toMatchObject({
+      account_type: "user",
+      allowed_panels: expect.arrayContaining(["docs-viewer", "scientific-calculator", "moral-graph"]),
+    });
+    expect(response.body.capabilities).toContainEqual(
+      expect.objectContaining({ capability_id: WORKSTATION_OPEN_PANEL_CAPABILITY }),
+    );
+    expect(response.body.capabilities).not.toContainEqual(
+      expect.objectContaining({ capability_id: REPO_SEARCH_CAPABILITY }),
+    );
+    expect(response.body.locked_capabilities).toContainEqual(
+      expect.objectContaining({
+        capability_id: REPO_SEARCH_CAPABILITY,
+        locked_reason: "capability_outside_account_policy",
+      }),
+    );
+  });
+
+  it("filters user account capability listing to the release panel tool set", async () => {
     const app = createApp();
     const agent = request.agent(app);
     await agent
@@ -717,27 +763,26 @@ describe("AGI workstation tool gateway route", () => {
 
     expect(response.body.account_policy).toMatchObject({
       account_type: "user",
-      max_workstation_permission: "read",
+      max_workstation_permission: "act",
     });
     expect(response.body.policy_gate).toMatchObject({
       account_type: "user",
       requested_mode: "act",
-      effective_mode: "read",
-      capped: true,
+      effective_mode: "act",
+      capped: false,
     });
-    expect(response.body.capabilities).not.toContainEqual(
+    expect(response.body.capabilities).toContainEqual(
       expect.objectContaining({ capability_id: WORKSTATION_OPEN_PANEL_CAPABILITY }),
     );
     expect(response.body.locked_capabilities).toContainEqual(
       expect.objectContaining({
-        capability_id: WORKSTATION_OPEN_PANEL_CAPABILITY,
-        permission_profile_required: "act",
-        locked_reason: "capability_permission_exceeds_account_policy",
+        capability_id: REPO_SEARCH_CAPABILITY,
+        locked_reason: "capability_outside_account_policy",
       }),
     );
   });
 
-  it("blocks user account calls to act-only workstation capabilities", async () => {
+  it("blocks user account panel actions when the target panel is outside user policy", async () => {
     const app = createApp();
     const agent = request.agent(app);
     await agent
@@ -755,25 +800,54 @@ describe("AGI workstation tool gateway route", () => {
           panel_id: "code-admin",
         },
       })
-      .expect(400);
+      .expect(403);
 
     expect(response.body).toMatchObject({
       ok: false,
+      error: "account_policy_blocked",
+      blocked_reason: "panel_locked_by_account_policy",
       account_policy: {
         account_type: "user",
-        max_workstation_permission: "read",
+        max_workstation_permission: "act",
       },
       policy_gate: {
         requested_mode: "act",
-        effective_mode: "read",
+        effective_mode: "act",
         capped: true,
       },
-      error: "permission_profile_read_does_not_allow_act",
+    });
+  });
+
+  it("allows user account panel actions when the target panel is in user policy", async () => {
+    const app = createApp();
+    const agent = request.agent(app);
+    await agent
+      .post("/api/account/session/sign-in")
+      .send({ profile_id: "profile:user-allowed-call", account_type: "user" })
+      .expect(200);
+
+    const response = await agent
+      .post("/api/agi/workstation-tool-gateway/call")
+      .send({
+        agent_runtime: "codex",
+        mode: "act",
+        capability_id: WORKSTATION_OPEN_PANEL_CAPABILITY,
+        turn_id: "ask:test:user-gateway-allowed-open",
+        arguments: {
+          panel_id: "workstation-task-manager",
+        },
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      account_policy: {
+        account_type: "user",
+      },
       observation: {
-        schema: "helix.workstation_tool_gateway.permission_blocked.v1",
-        requested_mode: "read",
-        required_permission_profile: "act",
-        status: "blocked",
+        schema: "helix.workstation_ui_action_receipt.v1",
+        panel_id: "workstation-task-manager",
+        status: "succeeded",
       },
     });
   });
@@ -825,11 +899,11 @@ describe("AGI workstation tool gateway route", () => {
 
     expect(response.body.account_policy).toMatchObject({
       account_type: "user",
-      allowed_runtime_agents: ["helix"],
+      allowed_runtime_agents: ["codex"],
     });
-    expect(response.body.providers.map((provider: { id: string }) => provider.id)).toEqual(["helix"]);
+    expect(response.body.providers.map((provider: { id: string }) => provider.id)).toEqual(["codex"]);
     expect(response.body.locked_providers.map((provider: { id: string }) => provider.id)).toEqual(
-      expect.arrayContaining(["codex", "future"]),
+      expect.arrayContaining(["helix", "future"]),
     );
   });
 });

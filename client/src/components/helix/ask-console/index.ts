@@ -1,4 +1,60 @@
 export { HelixAskConsole } from "./HelixAskConsole";
+export {
+  buildHelixAskVoicePlaybackToolHandoffPlan,
+  buildHelixAskVoicePlaybackToolOutputState,
+  executeHelixAskVoicePlaybackToolHandoffPlan,
+  recordHelixAskVoicePlaybackToolOutcomeReceipt,
+} from "./HelixAskVoicePlaybackToolController";
+export type {
+  HelixAskVoicePlaybackToolExecutionDeps,
+  HelixAskVoicePlaybackToolHandoffPlan,
+  HelixAskVoicePlaybackToolHandoffStep,
+  HelixAskVoicePlaybackToolOutcomeReceipt,
+  HelixAskVoicePlaybackToolOutputState,
+  HelixAskVoicePlaybackToolReceiptInput,
+  HelixAskVoicePlaybackToolReceiptRecordResult,
+  HelixAskVoicePlaybackToolTimelineEvent,
+} from "./HelixAskVoicePlaybackToolController";
+export {
+  HELIX_ASK_VOICE_TURN_ASSEMBLER_MAX_ENTRIES,
+  buildHelixAskVoiceAutoDispatchWindowProjection,
+  buildHelixAskVoiceHeldPrefixMergeProjection,
+  buildHelixAskVoiceHeldTranscriptRecoveryScoringProjection,
+  buildHelixAskVoicePendingConfirmationMergeProjection,
+  buildHelixAskVoicePendingConfirmationPolicyProjection,
+  buildHelixAskVoiceTranscriptConfirmAutoPolicyProjection,
+  buildHelixAskVoiceTranscriptConfirmationProjection,
+  buildHelixAskVoiceTranscriptScoringProjection,
+  buildHelixAskVoiceTurnDraftUpdate,
+  buildHelixAskVoiceTurnRuntimeStateRefresh,
+  buildHelixAskVoiceTurnSealUpdate,
+  buildInitialHelixAskVoiceTurnAssemblerState,
+  evaluateHelixAskVoiceHeldTranscriptRecovery,
+  evaluateHelixAskVoiceHeldTranscriptWatchdog,
+  evaluateHelixAskVoiceTurnSeal,
+  resolveHelixAskVoiceAssemblerTurnKeyForIncomingSegment,
+  updateHelixAskVoiceTurnAssemblerState,
+} from "./HelixAskVoiceTurnAssemblyController";
+export type {
+  HelixAskVoiceAssemblerTurnKeyDecision,
+  HelixAskVoiceAutoDispatchWindowProjection,
+  HelixAskVoiceDispatchState,
+  HelixAskVoiceHeldPrefixMergeProjection,
+  HelixAskVoiceHeldTranscriptRecoveryEvaluation,
+  HelixAskVoiceHeldTranscriptRecoveryScoringProjection,
+  HelixAskVoiceHeldTranscriptWatchdogEvaluation,
+  HelixAskVoiceInterpreterStatus,
+  HelixAskVoicePendingConfirmationMergeProjection,
+  HelixAskVoicePendingConfirmationPolicyProjection,
+  HelixAskVoiceSteeringReservation,
+  HelixAskVoiceTranscriptConfirmAutoPolicyProjection,
+  HelixAskVoiceTranscriptConfirmationProjection,
+  HelixAskVoiceTranscriptScoringProjection,
+  HelixAskVoiceTurnAssemblerMap,
+  HelixAskVoiceTurnAssemblerPhase,
+  HelixAskVoiceTurnAssemblerState,
+  HelixAskVoiceTurnSealEvaluation,
+} from "./HelixAskVoiceTurnAssemblyController";
 export { HelixAskConsoleRuntimeShell } from "./HelixAskConsoleRuntimeShell";
 export { HelixAskLegacyConsoleView } from "./HelixAskLegacyConsoleView";
 export { buildHelixAskLegacyConsoleRootState } from "./HelixAskLegacyConsoleRootState";
@@ -43,6 +99,11 @@ export {
   buildHelixAskComposerPlaceholder,
   buildHelixAskComposerViewModel,
 } from "./HelixAskComposer";
+export {
+  buildHelixAskPromptHistoryEntries,
+  resolveHelixAskPromptHistoryNavigation,
+  shouldHandleHelixAskPromptHistoryKey,
+} from "./HelixAskPromptHistory";
 export {
   HELIX_ASK_IMAGE_ATTACHMENT_MAX_BYTES,
   buildHelixAskImageAttachmentFromFile,

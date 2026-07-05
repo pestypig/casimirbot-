@@ -1,5 +1,5 @@
 import type { HelixAccountCapabilityPolicy } from "@shared/helix-account-session";
-import { HELIX_DEVELOPER_ACCOUNT_POLICY } from "@shared/helix-account-session";
+import { HELIX_USER_ACCOUNT_POLICY } from "@shared/helix-account-session";
 
 export const HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT =
   "helix-account-capability-policy-changed";
@@ -27,17 +27,17 @@ export function clearCachedAccountCapabilityPolicy(): void {
 }
 
 export async function fetchAccountCapabilityPolicy(): Promise<HelixAccountCapabilityPolicy> {
-  if (typeof fetch !== "function") return HELIX_DEVELOPER_ACCOUNT_POLICY;
+  if (typeof fetch !== "function") return HELIX_USER_ACCOUNT_POLICY;
   const response = await fetch("/api/account/session", {
     credentials: "include",
     cache: "no-store",
   });
-  if (!response.ok) return cachedPolicy ?? HELIX_DEVELOPER_ACCOUNT_POLICY;
+  if (!response.ok) return cachedPolicy ?? HELIX_USER_ACCOUNT_POLICY;
   const payload = await response.json();
   const policy =
     payload?.account_policy ??
     payload?.session?.account_policy ??
-    HELIX_DEVELOPER_ACCOUNT_POLICY;
+    HELIX_USER_ACCOUNT_POLICY;
   cacheAccountCapabilityPolicy(policy);
   return policy;
 }
