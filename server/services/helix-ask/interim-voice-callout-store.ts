@@ -23,6 +23,7 @@ const MAX_IMMEDIATE_ACK_CHARS = 96;
 const MAX_STEERING_ACK_CHARS = 96;
 const VOICE_STEERING_EVENT_REF_PREFIX = "helix_voice_steering_event:";
 const RECENT_CALLOUT_LIMIT = 120;
+const TEXT_TO_SPEECH_CAPABILITY_LANE_REASON = "capability_lane_text_to_speech_speak_text";
 
 const requestStore = createInterimVoiceCalloutRequestStore({
   limit: RECENT_CALLOUT_LIMIT,
@@ -127,6 +128,13 @@ const normalizePlaybackKind = (
   if (value === "panel_narration" || kind === "panel_narration") return "panel_narration";
   return "tool_receipt";
 };
+
+const isTextToSpeechCapabilityLaneClientHandoff = (
+  request: HelixInterimVoiceCalloutRequestV1,
+): boolean =>
+  request.source === "ask_tool_loop" &&
+  request.kind === "tool_result" &&
+  request.reasonCodes.includes(TEXT_TO_SPEECH_CAPABILITY_LANE_REASON);
 
 const findLatestClientPlaybackOutcomeReceipt = (
   requestId: string,
@@ -296,6 +304,19 @@ export function recordInterimVoiceCalloutRequest(input: {
     source: "helix.interim_voice_callout",
   });
   if (!admission.admitted) {
+    if (isTextToSpeechCapabilityLaneClientHandoff(request)) {
+      return {
+        request,
+        receipt: buildReceipt({
+          request,
+          status: "awaiting_client_playback",
+          utteranceId: `interim_voice:${hashShort([request.requestId, "client_handoff_under_pressure"])}`,
+          message:
+            `Text-to-speech client playback handoff accepted while server TTS admission reported ${admission.reason}; awaiting browser playback receipt.`,
+          blockedReason: admission.reason,
+        }),
+      };
+    }
     return {
       request,
       receipt: retryPolicy.enqueueRetryJob(request, admission.reason),

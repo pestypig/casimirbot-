@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { listWorkstationGatewayCapabilities } from "../../workstation-tool-gateway/registry";
 import { buildHelixAgentRuntimeSelectionTrace } from "../../agent-providers/runtime-debug";
 import { buildHelixAgentProviderAskPayload } from "../../agent-providers/provider-response-projection";
@@ -49,7 +49,26 @@ const body = {
     requested_backend_provider: "google_gemini",
     source_id: "document_markdown:docs/example.md",
     source_hash: "fnv1a32:example",
+    chunkId: "visible-title",
+    chunkIndex: 3,
+    sourceEventId: "visible-source-event:title",
+    sourceEventMs: 1783000039000,
+    nowMs: 1783000040000,
   },
+};
+
+const withRuntimeMemoryGuardDisabled = async <T>(callback: () => Promise<T>): Promise<T> => {
+  const previous = process.env.RUNTIME_MEMORY_GUARD;
+  process.env.RUNTIME_MEMORY_GUARD = "0";
+  try {
+    return await callback();
+  } finally {
+    if (previous === undefined) {
+      delete process.env.RUNTIME_MEMORY_GUARD;
+    } else {
+      process.env.RUNTIME_MEMORY_GUARD = previous;
+    }
+  }
 };
 
 const projectPayload = (provider: HelixAgentProvider, debugProjection: Record<string, unknown>) => {
@@ -217,15 +236,30 @@ describe("provider-neutral capability lane one-shot runner", () => {
     expect(codex.call_results[0]?.observation).toMatchObject({
       source_id: "document_markdown:docs/example.md",
       source_hash: "fnv1a32:example",
+      chunk_id: "visible-title",
+      chunk_index: 3,
+      source_event_id: "visible-source-event:title",
+      source_event_ms: 1783000039000,
+      observed_at_ms: 1783000040000,
     });
     expect(codex.observation_packets[0]?.state_delta).toMatchObject({
       live_translation_chunk: {
         source_id: "document_markdown:docs/example.md",
         source_hash: "fnv1a32:example",
+        chunk_id: "visible-title",
+        chunk_index: 3,
+        source_event_id: "visible-source-event:title",
+        source_event_ms: 1783000039000,
+        observed_at_ms: 1783000040000,
       },
       live_translation_projection_receipt: {
         source_id: "document_markdown:docs/example.md",
         source_hash: "fnv1a32:example",
+        chunk_id: "visible-title",
+        chunk_index: 3,
+        source_event_id: "visible-source-event:title",
+        source_event_ms: 1783000039000,
+        observed_at_ms: 1783000040000,
       },
     });
     expect(helix.debug_events.map((event) => event.stage)).toEqual([
@@ -343,6 +377,429 @@ describe("provider-neutral capability lane one-shot runner", () => {
     expect(debug.capability_lane_reentry_status).toBe("observation_packet_required_for_provider_reentry");
     expect((payload.capability_lane_call_results as Array<Record<string, unknown>>)[0]).toMatchObject({
       capability: "live_translation.translate_text",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("lets a runtime provider pass active doc visible translation context directly to the collector", async () => {
+    const codex = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-visible-context-collector",
+        capability_lane_call: {
+          capability: "workstation_tool_reference.collect_visible_translation_targets",
+          active_doc_visible_translation_context: {
+            schema: "helix.ask.active_doc_visible_translation_context.v1",
+            panel_id: "docs-viewer",
+            doc_path: "docs/research/visible.md",
+            source_hash: "sha256:visible-doc",
+            account_locale: "es-US",
+            target_language: "es",
+            projection_target: "docs_chunk",
+            raw_content_included: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+            reentry_required: true,
+            chunks: [
+              {
+                source_kind: "docs_viewer",
+                panel_id: "docs-viewer",
+                doc_path: "docs/research/visible.md",
+                source_id: "document_markdown:docs/research/visible.md#u0001",
+                source_hash: "sha256:visible-doc",
+                source_text_hash: "sha256:visible-title",
+                source_text_char_count: 15,
+                visible_text: "# Visible title",
+                chunk_id: "u0001",
+                chunk_index: 1,
+                dedupe_key: "document_markdown:docs/research/visible.md::sha256:visible-title::u0001::es-US::es",
+                region_id: "docs-viewer:u0001",
+                projection_target: "docs_chunk",
+                account_locale: "es-US",
+                target_language: "es",
+                assistant_answer: false,
+                terminal_eligible: false,
+                raw_content_included: false,
+                reentry_required: true,
+              },
+            ],
+          },
+        },
+      },
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(codex).toMatchObject({
+      requested: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(codex.call_results).toHaveLength(1);
+    expect(codex.call_results[0]).toMatchObject({
+      ok: true,
+      capability: "workstation_tool_reference.collect_visible_translation_targets",
+      selected_runtime_agent_provider: "codex",
+      target_count: 1,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+      observation: {
+        target_batch: {
+          target_count: 1,
+          raw_content_included: false,
+          terminal_eligible: false,
+          assistant_answer: false,
+          answer_authority: false,
+          targets: [
+            expect.objectContaining({
+              doc_path: "docs/research/visible.md",
+              source_id: "document_markdown:docs/research/visible.md#u0001",
+              source_hash: "sha256:visible-doc",
+              source_text_hash: "sha256:visible-title",
+              source_text_char_count: 15,
+              visible_text: "# Visible title",
+              chunk_id: "u0001",
+              chunk_index: 1,
+              projection_target: "docs_chunk",
+              account_locale: "es-US",
+              target_language: "es",
+              terminal_eligible: false,
+              assistant_answer: false,
+              answer_authority: false,
+              raw_content_included: false,
+              reentry_required: true,
+            }),
+          ],
+        },
+      },
+    });
+    expect(codex.observation_packets[0]).toMatchObject({
+      capability_key: "workstation_tool_reference.collect_visible_translation_targets",
+      state_delta: {
+        visible_translation_target_batch: expect.objectContaining({
+          target_count: 1,
+          raw_content_included: false,
+          terminal_eligible: false,
+          assistant_answer: false,
+          answer_authority: false,
+        }),
+      },
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("executes the provider-neutral visible text collector alias", async () => {
+    const codex = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-visible-text-collector-alias",
+        capability_lane_call: {
+          capability: "workstation.visible_text.collect_translation_targets",
+          active_panel_id: "docs-viewer",
+          doc_path: "docs/research/visible.md",
+          source_hash: "sha256:visible-doc",
+          projection_target: "docs_chunk",
+          account_locale: "es-US",
+          target_language: "es",
+          visible_only: true,
+          max_chunks: 1,
+          visible_text_chunks: [{
+            source_kind: "docs_viewer",
+            visible_text: "# Visible title",
+            chunk_id: "u0001",
+            chunk_index: 1,
+            region_id: "docs-viewer:u0001",
+          }],
+        },
+      },
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(codex).toMatchObject({
+      requested: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(codex.call_results).toHaveLength(1);
+    expect(codex.call_results[0]).toMatchObject({
+      ok: true,
+      lane_id: "workstation_tool_reference",
+      capability: "workstation_tool_reference.collect_visible_translation_targets",
+      selected_runtime_agent_provider: "codex",
+      target_count: 1,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+      observation: {
+        target_batch: {
+          requested_collector_capability: "workstation.visible_text.collect_translation_targets",
+          collector_capability: "workstation_tool_reference.collect_visible_translation_targets",
+          translation_capability_required: "live_translation.translate_text",
+          target_count: 1,
+          targets: [
+            expect.objectContaining({
+              doc_path: "docs/research/visible.md",
+              visible_text: "# Visible title",
+              chunk_id: "u0001",
+              projection_target: "docs_chunk",
+              account_locale: "es-US",
+              target_language: "es",
+              terminal_eligible: false,
+              assistant_answer: false,
+              answer_authority: false,
+              raw_content_included: false,
+              reentry_required: true,
+            }),
+          ],
+          terminal_eligible: false,
+          assistant_answer: false,
+          answer_authority: false,
+          raw_content_included: false,
+        },
+      },
+    });
+    expect(codex.observation_packets[0]).toMatchObject({
+      capability_key: "workstation_tool_reference.collect_visible_translation_targets",
+      state_delta: {
+        visible_translation_target_batch: expect.objectContaining({
+          requested_collector_capability: "workstation.visible_text.collect_translation_targets",
+          collector_capability: "workstation_tool_reference.collect_visible_translation_targets",
+          terminal_eligible: false,
+          assistant_answer: false,
+          answer_authority: false,
+        }),
+      },
+      typed_handoff_contract: expect.objectContaining({
+        consumer_capability: "live_translation.translate_text",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("forwards selected text through the provider-neutral visible text collector alias", async () => {
+    const codex = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-visible-text-selection-collector",
+        capability_lane_call: {
+          capability: "workstation.visible_text.collect_translation_targets",
+          active_panel_id: "docs-viewer",
+          doc_path: "docs/research/visible.md",
+          source_hash: "sha256:visible-doc",
+          account_locale: "es-US",
+          target_language: "es",
+          visible_only: true,
+          max_chunks: 1,
+          selected_text: "Selected text from the current document.",
+          selection_ref: "docs-viewer:selection:u0042",
+        },
+      },
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(codex).toMatchObject({
+      requested: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(codex.call_results).toHaveLength(1);
+    expect(codex.call_results[0]).toMatchObject({
+      ok: true,
+      lane_id: "workstation_tool_reference",
+      capability: "workstation_tool_reference.collect_visible_translation_targets",
+      target_count: 1,
+      observation: {
+        target_batch: {
+          target_count: 1,
+          targets: [
+            expect.objectContaining({
+              source_kind: "selection",
+              doc_path: "docs/research/visible.md",
+              source_id: "document_markdown:docs/research/visible.md#docs-viewer:selection:u0042",
+              visible_text: "Selected text from the current document.",
+              chunk_id: "docs-viewer:selection:u0042",
+              region_id: "docs-viewer:selection:u0042",
+              projection_target: "docs_selection",
+              account_locale: "es-US",
+              target_language: "es",
+              terminal_eligible: false,
+              assistant_answer: false,
+              answer_authority: false,
+              raw_content_included: false,
+              reentry_required: true,
+            }),
+          ],
+          terminal_eligible: false,
+          assistant_answer: false,
+          answer_authority: false,
+          raw_content_included: false,
+        },
+      },
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("forwards hovered text through the provider-neutral visible text collector alias", async () => {
+    const codex = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-visible-text-hover-collector",
+        capability_lane_call: {
+          capability: "workstation.visible_text.collect_translation_targets",
+          active_panel_id: "docs-viewer",
+          doc_path: "docs/research/visible.md",
+          source_hash: "sha256:visible-doc",
+          account_locale: "es-US",
+          target_language: "es",
+          visible_only: true,
+          max_chunks: 1,
+          hover_text: "Hovered text from the current document.",
+          hover_ref: "docs-viewer:hover:u0043",
+        },
+      },
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(codex).toMatchObject({
+      requested: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(codex.call_results).toHaveLength(1);
+    expect(codex.call_results[0]).toMatchObject({
+      ok: true,
+      lane_id: "workstation_tool_reference",
+      capability: "workstation_tool_reference.collect_visible_translation_targets",
+      target_count: 1,
+      observation: {
+        target_batch: {
+          target_count: 1,
+          targets: [
+            expect.objectContaining({
+              source_kind: "hover_region",
+              doc_path: "docs/research/visible.md",
+              source_id: "document_markdown:docs/research/visible.md#docs-viewer:hover:u0043",
+              visible_text: "Hovered text from the current document.",
+              chunk_id: "docs-viewer:hover:u0043",
+              region_id: "docs-viewer:hover:u0043",
+              projection_target: "docs_hover",
+              account_locale: "es-US",
+              target_language: "es",
+              terminal_eligible: false,
+              assistant_answer: false,
+              answer_authority: false,
+              raw_content_included: false,
+              reentry_required: true,
+            }),
+          ],
+          terminal_eligible: false,
+          assistant_answer: false,
+          answer_authority: false,
+          raw_content_included: false,
+        },
+      },
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("forwards visible UI text regions through the provider-neutral collector alias", async () => {
+    const codex = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-visible-ui-region-collector",
+        capability_lane_call: {
+          capability: "workstation.visible_text.collect_translation_targets",
+          active_panel_id: "workstation-shell",
+          source_hash: "sha256:visible-ui",
+          account_locale: "es-US",
+          target_language: "es",
+          visible_only: true,
+          max_chunks: 2,
+          ui_text_regions: [
+            {
+              source_kind: "panel_text",
+              panel_id: "workstation-notes",
+              visible_text: "Workstation notes",
+              region_id: "workstation-notes:title",
+            },
+            {
+              source_kind: "button_label",
+              panel_id: "docs-viewer",
+              label: "Translate selection",
+              id: "docs-viewer:translate-selection",
+            },
+          ],
+        },
+      },
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(codex).toMatchObject({
+      requested: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(codex.call_results).toHaveLength(1);
+    expect(codex.call_results[0]).toMatchObject({
+      ok: true,
+      lane_id: "workstation_tool_reference",
+      capability: "workstation_tool_reference.collect_visible_translation_targets",
+      target_count: 2,
+      observation: {
+        target_batch: {
+          target_count: 2,
+          targets: [
+            expect.objectContaining({
+              source_kind: "panel_text",
+              panel_id: "workstation-notes",
+              source_id: "workstation-shell#workstation-notes:title",
+              visible_text: "Workstation notes",
+              projection_target: "account_language",
+              account_locale: "es-US",
+              target_language: "es",
+              terminal_eligible: false,
+              assistant_answer: false,
+              answer_authority: false,
+              raw_content_included: false,
+              reentry_required: true,
+            }),
+            expect.objectContaining({
+              source_kind: "button_label",
+              panel_id: "docs-viewer",
+              source_id: "workstation-shell#docs-viewer:translate-selection",
+              visible_text: "Translate selection",
+              projection_target: "account_language",
+              terminal_eligible: false,
+              assistant_answer: false,
+              answer_authority: false,
+              raw_content_included: false,
+              reentry_required: true,
+            }),
+          ],
+          terminal_eligible: false,
+          assistant_answer: false,
+          answer_authority: false,
+          raw_content_included: false,
+        },
+      },
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
@@ -515,6 +972,7 @@ describe("provider-neutral capability lane one-shot runner", () => {
         region_kind: "equation",
         text_candidate: "T00 = rho",
         latex_candidate: "T_{00}=\\rho",
+        extraction_status: "extracted",
         uncertainty: ["OCR is candidate-only"],
         requested_backend_provider: "openai_compatible",
       },
@@ -548,6 +1006,7 @@ describe("provider-neutral capability lane one-shot runner", () => {
         bbox_px: { x: 4, y: 8, width: 120, height: 64 },
         text_candidate: "T00 = rho",
         latex_candidate: "T_{00}=\\rho",
+        extraction_status: "extracted",
         claim_boundary: {
           cropObservationOnly: true,
           ocrCandidateOnly: true,
@@ -557,6 +1016,11 @@ describe("provider-neutral capability lane one-shot runner", () => {
           sourceKind: "image_lens_source",
           classification: {
             kind: "equation",
+          },
+          extraction: {
+            textCandidate: "T00 = rho",
+            latexCandidate: "T_{00}=\\rho",
+            status: "candidate",
           },
           claimBoundary: {
             ocrCandidateOnly: true,
@@ -586,6 +1050,10 @@ describe("provider-neutral capability lane one-shot runner", () => {
           page_number: null,
           crop_bbox_px: { x: 4, y: 8, width: 120, height: 64 },
           crop_image_ref: "ephemeral://image/source#crop=4,8,120,64",
+          text_candidate: "T00 = rho",
+          latex_candidate: "T_{00}=\\rho",
+          extraction_status: "extracted",
+          uncertainty: ["OCR is candidate-only"],
           terminal_eligible: false,
           assistant_answer: false,
           raw_content_included: false,
@@ -613,8 +1081,165 @@ describe("provider-neutral capability lane one-shot runner", () => {
     expect(helix.observation_packets[0]?.state_delta).toMatchObject({
       visual_analysis_region_inspection: {
         source_id: "image-lens-source:test",
+        extraction_status: "extracted",
       },
     });
+  });
+
+  it("marks Image Lens crops without extraction payload as failed observation evidence", async () => {
+    const result = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-provider-neutral-image-lens-no-extraction",
+        capability_lane_call: {
+          capability: "visual_analysis.inspect_image_region",
+          source_id: "image-lens-source:no-extraction",
+          source_image_ref: "ephemeral://image/no-extraction",
+          bbox_px: { x: 2, y: 3, width: 40, height: 50 },
+          question: "Read this crop.",
+          reason_for_crop: "The prompt requested a focused visual observation.",
+        },
+      },
+      env: { OPENAI_API_KEY: "test-openai" } as NodeJS.ProcessEnv,
+    });
+
+    expect(result.call_results[0]).toMatchObject({
+      ok: true,
+      receipt: {
+        bbox_px: { x: 2, y: 3, width: 40, height: 50 },
+        extraction_status: "failed",
+        uncertainty: [
+          "No Image Lens OCR/math extraction backend returned text_candidate or latex_candidate for this crop.",
+        ],
+        document_region_receipt: {
+          extraction: {
+            status: "rejected",
+          },
+        },
+      },
+      observation: {
+        extraction_status: "failed",
+        uncertainty: [
+          "No Image Lens OCR/math extraction backend returned text_candidate or latex_candidate for this crop.",
+        ],
+      },
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+    expect(result.observation_packets[0]).toMatchObject({
+      status: "succeeded",
+      observation_summary: expect.stringContaining("extraction_status=failed"),
+      state_delta: {
+        visual_analysis_region_inspection: {
+          extraction_status: "failed",
+          text_candidate: null,
+          latex_candidate: null,
+        },
+      },
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+  });
+
+  it("runs configured Image Lens crops through the vision extraction backend", async () => {
+    const previousVisionBase = process.env.VISION_HTTP_BASE;
+    const previousVisionKey = process.env.VISION_HTTP_API_KEY;
+    const previousVisionModel = process.env.VISION_HTTP_MODEL;
+    const sourcePng =
+      "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAGElEQVR42mP8z8DwnwEJMDGgAcYBDAwAODsEBkXvxpUAAAAASUVORK5CYII=";
+    process.env.VISION_HTTP_BASE = "https://vision-provider.test";
+    process.env.VISION_HTTP_API_KEY = "test-vision-key";
+    process.env.VISION_HTTP_MODEL = "gpt-4o-mini";
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                text_candidate: "delta psi minus nabla psi",
+                latex_candidate: "\\delta\\psi - \\nabla\\psi",
+                uncertainty: ["low source resolution"],
+              }),
+            },
+          }],
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      const result = await runHelixCapabilityLaneOneShotRequests({
+        provider: buildProvider("codex"),
+        body: {
+          turn_id: "turn-provider-neutral-image-lens-vision-backend",
+          capability_lane_call: {
+            capability: "visual_analysis.inspect_image_region",
+            source_id: "image-lens-source:vision-backend",
+            source_image_ref: `data:image/png;base64,${sourcePng}`,
+            bbox_px: { x: 0, y: 0, width: 1, height: 1 },
+            question: "Extract the visible equation.",
+            region_label: "equation_3.51",
+            requested_equation_label: "3.51",
+          },
+        },
+        env: {
+          OPENAI_API_KEY: "test-openai",
+          HELIX_IMAGE_LENS_EXTRACTION_BACKEND: "vision_http",
+        } as NodeJS.ProcessEnv,
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const fetchBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body ?? "{}"));
+      expect(fetchBody.messages[0].content[0].text).toContain("requested_equation_label: 3.51");
+      expect(fetchBody.messages[0].content[1].image_url.url).toContain("data:image/png;base64,");
+      expect(result.call_results[0]).toMatchObject({
+        ok: true,
+        receipt: {
+          text_candidate: "delta psi minus nabla psi",
+          latex_candidate: "\\delta\\psi - \\nabla\\psi",
+          extraction_status: "extracted",
+          uncertainty: ["low source resolution"],
+          document_region_receipt: {
+            extraction: {
+              textCandidate: "delta psi minus nabla psi",
+              latexCandidate: "\\delta\\psi - \\nabla\\psi",
+              status: "candidate",
+            },
+          },
+        },
+        observation: {
+          text_candidate: "delta psi minus nabla psi",
+          latex_candidate: "\\delta\\psi - \\nabla\\psi",
+          extraction_status: "extracted",
+          uncertainty: ["low source resolution"],
+        },
+      });
+      expect(result.observation_packets[0]).toMatchObject({
+        state_delta: {
+          visual_analysis_region_inspection: {
+            requested_equation_label: "3.51",
+            text_candidate: "delta psi minus nabla psi",
+            latex_candidate: "\\delta\\psi - \\nabla\\psi",
+            extraction_status: "extracted",
+            uncertainty: ["low source resolution"],
+          },
+        },
+        terminal_eligible: false,
+        assistant_answer: false,
+      });
+    } finally {
+      vi.unstubAllGlobals();
+      if (previousVisionBase === undefined) delete process.env.VISION_HTTP_BASE;
+      else process.env.VISION_HTTP_BASE = previousVisionBase;
+      if (previousVisionKey === undefined) delete process.env.VISION_HTTP_API_KEY;
+      else process.env.VISION_HTTP_API_KEY = previousVisionKey;
+      if (previousVisionModel === undefined) delete process.env.VISION_HTTP_MODEL;
+      else process.env.VISION_HTTP_MODEL = previousVisionModel;
+    }
   });
 
   it("reports missing Image Lens source as missing input without terminal authority", async () => {
@@ -684,7 +1309,7 @@ describe("provider-neutral capability lane one-shot runner", () => {
   });
 
   it("projects future lane calls and governed TTS receipts as non-terminal observations", async () => {
-    const result = await runHelixCapabilityLaneOneShotRequests({
+    const result = await withRuntimeMemoryGuardDisabled(() => runHelixCapabilityLaneOneShotRequests({
       provider: buildProvider("codex"),
       body: {
         turn_id: "turn-provider-neutral-shadow-lanes",
@@ -708,7 +1333,7 @@ describe("provider-neutral capability lane one-shot runner", () => {
         OPENAI_API_KEY: "test-openai",
         ELEVENLABS_API_KEY: "test-eleven",
       } as NodeJS.ProcessEnv,
-    });
+    }));
 
     expect(result).toMatchObject({
       requested: true,
@@ -856,7 +1481,7 @@ describe("provider-neutral capability lane one-shot runner", () => {
       stage: "lane_observation",
       lane_id: "text_to_speech",
       capability: "text_to_speech.speak_text",
-      status: "completed",
+      status: "pending",
       execution_status: "executed_observation_only",
       terminal_authority_status: "pending_helix_terminal_authority",
       terminal_eligible: false,
@@ -880,7 +1505,7 @@ describe("provider-neutral capability lane one-shot runner", () => {
   });
 
   it("composes STT, translation, and TTS lane calls as re-entered non-terminal observations", async () => {
-    const result = await runHelixCapabilityLaneOneShotRequests({
+    const result = await withRuntimeMemoryGuardDisabled(() => runHelixCapabilityLaneOneShotRequests({
       provider: buildProvider("codex"),
       body: {
         turn_id: "turn-provider-neutral-stt-compose",
@@ -913,8 +1538,9 @@ describe("provider-neutral capability lane one-shot runner", () => {
       },
       env: {
         OPENAI_API_KEY: "test-openai",
+        HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED: "0",
       } as NodeJS.ProcessEnv,
-    });
+    }));
 
     expect(result.call_results.map((entry) => entry.capability)).toEqual([
       "speech_to_text.transcribe_audio",

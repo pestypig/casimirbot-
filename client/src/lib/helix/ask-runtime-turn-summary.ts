@@ -8,6 +8,7 @@ import {
   buildHelixLiveTranslationUiProjections,
   summarizeHelixLiveTranslationUiProjectionTraffic,
 } from "@/lib/helix/live-translation-projection";
+import { resolveHelixAccountLanguageTranslationProjectionHealth } from "@/lib/helix/account-language-translation-health";
 
 type RecordLike = Record<string, unknown>;
 
@@ -34,6 +35,24 @@ function coerceText(value: unknown): string {
   if (typeof value === "string") return value.trim();
   if (typeof value === "number" || typeof value === "boolean") return String(value);
   return "";
+}
+
+function coerceBoolean(value: unknown): boolean | null {
+  if (typeof value === "boolean") return value;
+  const text = coerceText(value).toLowerCase();
+  if (text === "true") return true;
+  if (text === "false") return false;
+  return null;
+}
+
+function serializeCompactMetadata(value: unknown): string {
+  const record = readRecord(value);
+  if (!record) return "";
+  try {
+    return JSON.stringify(record);
+  } catch {
+    return "";
+  }
 }
 
 function readCapabilityLaneReceiptRef(...values: unknown[]): string {
@@ -411,7 +430,7 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
     const fallbackPacket = observationRef
       ? packets.find((candidate) => coerceText(candidate.observation_ref) === observationRef)
       : null;
-    const packetForBackend = packet ?? fallbackPacket;
+    const packetForBackend = packet ?? fallbackPacket ?? null;
     const backendParts = readLanePacketBackendParts(packetForBackend, trace);
     const fallbackState = readRecord(fallbackPacket?.state_delta);
     const status = call.ok === true ? "projected" : coerceText(packet?.status) || "not_projected";
@@ -433,6 +452,7 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
         coerceText(observation?.lane_session_id) ||
         coerceText(chunk?.lane_session_id);
       const sourceId = coerceText(observation?.source_id) || coerceText(chunk?.source_id);
+      const docPath = coerceText(observation?.doc_path) || coerceText(chunk?.doc_path) || coerceText(projectionReceipt?.doc_path);
       const sourceHash =
         coerceText(observation?.source_hash) ||
         coerceText(observation?.sourceHash) ||
@@ -466,6 +486,7 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
         laneSessionId ? `session ${laneSessionId}` : "",
         targetLanguage ? `language ${targetLanguage}` : "",
         sourceId ? `source ${sourceId}` : "",
+        docPath ? `doc path ${docPath}` : "",
         sourceHash ? `source hash ${sourceHash}` : "",
         sourceKind ? `source kind ${sourceKind}` : "",
         sourceTextHash ? `source payload hash ${sourceTextHash}` : "",
@@ -519,11 +540,22 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
     }
 
     if (capability === "workstation_tool_reference.collect_visible_translation_targets") {
+      const targetBatchCandidates = [
+        readRecord(packetState?.visible_translation_target_batch),
+        readRecord(fallbackState?.visible_translation_target_batch),
+        readRecord(observation?.target_batch),
+      ].filter((entry): entry is RecordLike => Boolean(entry));
       const targetBatch =
-        readRecord(packetState?.visible_translation_target_batch) ??
-        readRecord(fallbackState?.visible_translation_target_batch) ??
-        readRecord(observation?.target_batch);
-      const targets = readArray(targetBatch?.targets);
+        targetBatchCandidates.find((entry) => readArray(entry.targets).length > 0) ??
+        targetBatchCandidates[0] ??
+        null;
+      const requestedCollectorCapability = coerceText(targetBatch?.requested_collector_capability);
+      const executedCollectorCapability =
+        coerceText(targetBatch?.collector_capability) ||
+        "workstation_tool_reference.collect_visible_translation_targets";
+      const targets = readArray(targetBatch?.targets)
+        .map(readRecord)
+        .filter((target): target is RecordLike => Boolean(target));
       const targetCount = coerceText(call.target_count) || coerceText(targetBatch?.target_count) || `${targets.length}`;
       const targetLanguage =
         coerceText(targets[0]?.target_language) ||
@@ -533,20 +565,64 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
         coerceText(targets[0]?.projection_target) ||
         coerceText(call.projection_target) ||
         coerceText(observation?.projection_target);
+      const sourceKind = coerceText(targets[0]?.source_kind);
+      const panelId = coerceText(targets[0]?.panel_id);
       const sourceId = coerceText(targets[0]?.source_id);
+      const docPath = coerceText(targets[0]?.doc_path);
       const sourceHash = coerceText(targets[0]?.source_hash);
       const sourceTextHash = coerceText(targets[0]?.source_text_hash);
+      const sourceTextCharCount = coerceText(targets[0]?.source_text_char_count);
       const chunkId = coerceText(targets[0]?.chunk_id);
+      const sourceEventId = coerceText(targets[0]?.source_event_id);
+      const regionId = coerceText(targets[0]?.region_id);
+      const existingObservationRef = coerceText(targets[0]?.existing_observation_ref);
+      const existingReceiptRef =
+        coerceText(targets[0]?.existing_receipt_ref) ||
+        coerceText(targets[0]?.existing_translation_receipt_ref);
+      const existingProjectionStatus = coerceText(targets[0]?.existing_projection_status);
+      const existingFreshnessStatus = coerceText(targets[0]?.existing_freshness_status);
+      const existingTerminalAuthorityStatus = coerceText(targets[0]?.existing_terminal_authority_status);
+      const existingSourceEventMs = coerceText(targets[0]?.existing_source_event_ms);
+      const existingObservedAtMs = coerceText(targets[0]?.existing_observed_at_ms);
+      const collectorAnswerAuthorityFalse =
+        targetBatch?.answer_authority === false || targets[0]?.answer_authority === false;
+      const collectorTerminalEligibleFalse =
+        targetBatch?.terminal_eligible === false || targets[0]?.terminal_eligible === false;
+      const collectorAssistantAnswerFalse =
+        targetBatch?.assistant_answer === false || targets[0]?.assistant_answer === false;
+      const collectorReentryRequiredTrue =
+        targetBatch?.reentry_required === true || targets[0]?.reentry_required === true;
       const pieces = [
         "workstation_tool_reference",
         "visible_translation_targets",
+        requestedCollectorCapability && requestedCollectorCapability !== executedCollectorCapability
+          ? `requested collector ${requestedCollectorCapability}`
+          : "",
+        executedCollectorCapability ? `executed collector ${executedCollectorCapability}` : "",
         targetCount ? `target chunks ${targetCount}` : "",
         targetLanguage ? `target ${targetLanguage}` : "",
         projectionTarget ? `projection ${projectionTarget}` : "",
+        sourceKind ? `source kind ${sourceKind}` : "",
+        panelId ? `panel ${panelId}` : "",
         sourceId ? `source ${sourceId}` : "",
+        docPath ? `doc path ${docPath}` : "",
         sourceHash ? `source hash ${sourceHash}` : "",
         sourceTextHash ? `source text hash ${sourceTextHash}` : "",
+        sourceTextCharCount ? `source text chars ${sourceTextCharCount}` : "",
         chunkId ? `first chunk ${chunkId}` : "",
+        sourceEventId ? `source event ${sourceEventId}` : "",
+        regionId ? `region ${regionId}` : "",
+        existingObservationRef ? `existing observation ${existingObservationRef}` : "",
+        existingReceiptRef ? `existing receipt ${existingReceiptRef}` : "",
+        existingProjectionStatus ? `existing projection ${existingProjectionStatus}` : "",
+        existingFreshnessStatus ? `existing freshness ${existingFreshnessStatus}` : "",
+        existingTerminalAuthorityStatus ? `existing terminal authority ${existingTerminalAuthorityStatus}` : "",
+        existingSourceEventMs ? `existing source event ms ${existingSourceEventMs}` : "",
+        existingObservedAtMs ? `existing observed ${existingObservedAtMs}` : "",
+        collectorAnswerAuthorityFalse ? "answer authority false" : "",
+        collectorTerminalEligibleFalse ? "terminal eligible false" : "",
+        collectorAssistantAnswerFalse ? "assistant answer false" : "",
+        collectorReentryRequiredTrue ? "re-entry required true" : "",
         status,
         observationRef ? `ref ${observationRef}` : "",
         ...backendParts,
@@ -582,6 +658,28 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
     const sourceId =
       coerceText(receipt.source_id) ||
       coerceText(payload?.source_id);
+    const panelId =
+      coerceText(receipt.panel_id) ||
+      coerceText(receipt.panelId) ||
+      coerceText(payload?.panel_id) ||
+      coerceText(payload?.panelId);
+    const regionId =
+      coerceText(receipt.region_id) ||
+      coerceText(receipt.regionId) ||
+      coerceText(payload?.region_id) ||
+      coerceText(payload?.regionId);
+    const bbox =
+      serializeCompactMetadata(receipt.bbox) ||
+      serializeCompactMetadata(receipt.bbox_px) ||
+      serializeCompactMetadata(receipt.bboxPx) ||
+      serializeCompactMetadata(payload?.bbox) ||
+      serializeCompactMetadata(payload?.bbox_px) ||
+      serializeCompactMetadata(payload?.bboxPx);
+    const docPath =
+      coerceText(receipt.doc_path) ||
+      coerceText(receipt.docPath) ||
+      coerceText(payload?.doc_path) ||
+      coerceText(payload?.docPath);
     const sourceHash =
       coerceText(receipt.source_hash) ||
       coerceText(receipt.sourceHash) ||
@@ -618,14 +716,58 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
     const sourceEventMs = coerceText(receipt.source_event_ms) || coerceText(payload?.source_event_ms);
     const observedAtMs = coerceText(receipt.observed_at_ms) || coerceText(payload?.observed_at_ms);
     const freshnessStatus = coerceText(receipt.freshness_status) || coerceText(payload?.freshness_status);
+    const sessionDebugPhase =
+      coerceText(receipt.session_debug_phase) ||
+      coerceText(receipt.sessionDebugPhase) ||
+      coerceText(payload?.session_debug_phase) ||
+      coerceText(payload?.sessionDebugPhase);
+    const sessionObservationStatus =
+      coerceText(receipt.session_observation_status) ||
+      coerceText(receipt.sessionObservationStatus) ||
+      coerceText(payload?.session_observation_status) ||
+      coerceText(payload?.sessionObservationStatus);
+    const terminalAuthorityStatus =
+      coerceText(receipt.terminal_authority_status) ||
+      coerceText(receipt.terminalAuthorityStatus) ||
+      coerceText(payload?.terminal_authority_status) ||
+      coerceText(payload?.terminalAuthorityStatus);
+    const reentryRequired =
+      coerceBoolean(receipt.reentry_required) ??
+      coerceBoolean(receipt.reentryRequired) ??
+      coerceBoolean(payload?.reentry_required) ??
+      coerceBoolean(payload?.reentryRequired);
+    const translatedText =
+      coerceText(receipt.translated_text) ||
+      coerceText(receipt.translatedText) ||
+      coerceText(payload?.translated_text) ||
+      coerceText(payload?.translatedText);
+    const accountLanguageHealth = projectionTarget === "account_language"
+      ? resolveHelixAccountLanguageTranslationProjectionHealth({
+        projectionStatus,
+        translatedText,
+        terminalAuthorityStatus,
+        sessionDebugPhase,
+        sessionObservationStatus,
+        laneSessionId:
+          coerceText(receipt.lane_session_id) ||
+          coerceText(receipt.laneSessionId) ||
+          coerceText(payload?.lane_session_id) ||
+          coerceText(payload?.laneSessionId),
+      })
+      : "";
     const receiptRef = coerceText(receipt.receipt_ref);
     const observationRef = coerceText(receipt.observation_ref) || coerceText(payload?.observation_ref);
     const pieces = [
       capability || "capability_lane_projection",
       projectionStatus ? `projection ${projectionStatus}` : "",
+      accountLanguageHealth ? `account-language health ${accountLanguageHealth}` : "",
       projectionKey ? `projection key ${projectionKey}` : "",
       projectionTarget ? `target ${projectionTarget}` : "",
       sourceId ? `source ${sourceId}` : "",
+      panelId ? `panel ${panelId}` : "",
+      regionId ? `region ${regionId}` : "",
+      bbox ? `bbox ${bbox}` : "",
+      docPath ? `doc path ${docPath}` : "",
       sourceHash ? `source hash ${sourceHash}` : "",
       sourceKind ? `source kind ${sourceKind}` : "",
       sourceTextHash ? `source payload hash ${sourceTextHash}` : "",
@@ -639,6 +781,10 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
       sourceEventMs ? `source event ms ${sourceEventMs}` : "",
       observedAtMs ? `observed ${observedAtMs}` : "",
       freshnessStatus ? `freshness ${freshnessStatus}` : "",
+      sessionDebugPhase ? `session phase ${sessionDebugPhase}` : "",
+      sessionObservationStatus ? `observation status ${sessionObservationStatus}` : "",
+      terminalAuthorityStatus ? `terminal authority ${terminalAuthorityStatus}` : "",
+      reentryRequired !== null ? `re-entry required ${String(reentryRequired)}` : "",
       receiptRef ? `receipt ${receiptRef}` : "",
       observationRef ? `ref ${observationRef}` : "",
       "observation-only",
@@ -657,6 +803,8 @@ function readTranslationProjectionTrafficSummary(record: RecordLike | null, debu
   });
   const summaries = summarizeHelixLiveTranslationUiProjectionTraffic(projections).map((summary) => [
     summary.sourceId,
+    summary.latestDocPath ? `latest doc path ${summary.latestDocPath}` : "",
+    summary.latestBbox ? `latest bbox ${serializeCompactMetadata(summary.latestBbox)}` : "",
     summary.sourceHash ? `source hash ${summary.sourceHash}` : "",
     summary.sourceKind ? `source kind ${summary.sourceKind}` : "",
     summary.latestSourceTextHash ? `latest source payload hash ${summary.latestSourceTextHash}` : "",
@@ -674,6 +822,24 @@ function readTranslationProjectionTrafficSummary(record: RecordLike | null, debu
     summary.latestChunkId ? `latest chunk ${summary.latestChunkId}` : "",
     summary.latestChunkIndex !== null ? `latest index ${summary.latestChunkIndex}` : "",
     summary.latestFreshnessStatus ? `freshness ${summary.latestFreshnessStatus}` : "",
+    summary.projectionTarget === "account_language"
+      ? `account-language health ${resolveHelixAccountLanguageTranslationProjectionHealth({
+        projectionStatus:
+          summary.failedCount > 0
+            ? "failed"
+            : summary.cancelledCount > 0
+              ? "cancelled"
+              : summary.staleCount > 0
+                ? "stale"
+                : summary.projectedCount > 0
+                  ? "projected"
+                  : "",
+        terminalAuthorityStatus: summary.latestTerminalAuthorityStatus,
+        sessionDebugPhase: summary.latestLaneSessionDebugPhase,
+        sessionObservationStatus: summary.latestLaneSessionObservationStatus,
+        laneSessionId: summary.latestLaneSessionId,
+      })}`
+      : "",
     summary.latestObservationRef ? `observation ${summary.latestObservationRef}` : "",
     summary.latestReceiptRef ? `receipt ${summary.latestReceiptRef}` : "",
     "observation-only",
@@ -1325,6 +1491,53 @@ function readLaneTimelineSummary(record: RecordLike | null, debug: RecordLike | 
   return unique.join(" -> ");
 }
 
+function readVisibleTranslationChainSummary(record: RecordLike | null, debug: RecordLike | null): string {
+  const agentLoop = readNestedRecord(record?.agent_runtime_loop, debug?.agent_runtime_loop);
+  const debugExport = readNestedRecord(record?.debug_export, debug?.debug_export);
+  const summary =
+    readNestedRecord(record?.visible_translation_chain_summary, debug?.visible_translation_chain_summary) ??
+    readNestedRecord(agentLoop?.visible_translation_chain_summary, debugExport?.visible_translation_chain_summary);
+  if (!summary) return "";
+
+  const sourceIds = readArray(summary.source_ids).map(coerceText).filter(Boolean).join(", ");
+  const chunkIds = readArray(summary.chunk_ids).map(coerceText).filter(Boolean).join(", ");
+  const sourceKinds = readArray(summary.source_kinds).map(coerceText).filter(Boolean).join(", ");
+  const panelIds = readArray(summary.panel_ids).map(coerceText).filter(Boolean).join(", ");
+  const regionIds = readArray(summary.region_ids).map(coerceText).filter(Boolean).join(", ");
+  const projectionTargets = readArray(summary.projection_targets).map(coerceText).filter(Boolean).join(", ");
+  const targetLanguages = readArray(summary.target_languages).map(coerceText).filter(Boolean).join(", ");
+  const observationRefs = readArray(summary.observation_refs).map(coerceText).filter(Boolean).join(", ");
+  const receiptRefs = readArray(summary.receipt_refs).map(coerceText).filter(Boolean).join(", ");
+  const targetCount = coerceText(summary.collected_target_count);
+  const backendCount = coerceText(summary.backend_selected_count);
+  const receiptCount = coerceText(summary.projection_receipt_count);
+  return [
+    summary.chain_complete === true ? "complete" : "incomplete",
+    summary.collector_requested === true ? "collector requested" : "collector pending",
+    targetCount ? `targets ${targetCount}` : "",
+    summary.translation_requested === true ? "translation requested" : "translation pending",
+    summary.translation_executed === true ? "translation executed" : "translation not executed",
+    backendCount ? `backend selections ${backendCount}` : "",
+    receiptCount ? `projection receipts ${receiptCount}` : "",
+    summary.observation_reentered === true ? "re-entered" : "re-entry pending",
+    summary.terminal_selected === true
+      ? "terminal selected"
+      : summary.terminal_rejected === true
+        ? "terminal rejected"
+        : "terminal pending",
+    sourceIds ? `source ${sourceIds}` : "",
+    chunkIds ? `chunk ${chunkIds}` : "",
+    sourceKinds ? `source kind ${sourceKinds}` : "",
+    panelIds ? `panel ${panelIds}` : "",
+    regionIds ? `region ${regionIds}` : "",
+    projectionTargets ? `projection ${projectionTargets}` : "",
+    targetLanguages ? `target ${targetLanguages}` : "",
+    observationRefs ? `observation ${observationRefs}` : "",
+    receiptRefs ? `receipt ${receiptRefs}` : "",
+    "projection-only, not terminal authority",
+  ].filter(Boolean).join(" | ");
+}
+
 function readTerminalArtifactKind(record: RecordLike | null, debug: RecordLike | null): string {
   const resolved = readNestedRecord(record?.resolved_turn_summary, debug?.resolved_turn_summary);
   const authority = readNestedRecord(record?.terminal_authority, debug?.terminal_authority);
@@ -1348,6 +1561,52 @@ function readDebugExportRef(record: RecordLike | null, debug: RecordLike | null)
   );
 }
 
+function readRuntimeGoalSessionSummary(record: RecordLike | null, debug: RecordLike | null): string {
+  const debugExport = readNestedRecord(record?.debug_export, debug?.debug_export);
+  const session =
+    readNestedRecord(record?.runtime_goal_session, debug?.runtime_goal_session, debugExport?.runtime_goal_session) ??
+    readNestedRecord(record?.goal_session, debug?.goal_session, debugExport?.goal_session);
+  const goalDebug =
+    readNestedRecord(record?.runtime_goal_debug_export, debug?.runtime_goal_debug_export, debugExport?.runtime_goal_debug_export);
+  const command =
+    readNestedRecord(record?.runtime_goal_command, debug?.runtime_goal_command, debugExport?.runtime_goal_command);
+  const goalId =
+    coerceText(session?.goal_id) ||
+    coerceText(goalDebug?.goal_id) ||
+    coerceText(command?.goal_id);
+  if (!goalId) return "";
+  const status = coerceText(session?.status);
+  const runtime = coerceText(session?.runtime_agent_provider) || coerceText(goalDebug?.runtime_agent_provider);
+  const runtimeSession = coerceText(session?.runtime_session_id) || coerceText(goalDebug?.runtime_session_id);
+  const commandKind = coerceText(command?.command);
+  const wake = coerceText(goalDebug?.wake_event_kind);
+  const blocked = coerceText(command?.blocked_reason) || coerceText(record?.blocked_reason) || coerceText(debug?.blocked_reason);
+  const terminalAuthority =
+    coerceText(session?.terminal_authority_status) ||
+    coerceText(goalDebug?.terminal_authority_status);
+  const observations = readArray(session?.latest_observation_refs ?? goalDebug?.observation_refs)
+    .map(coerceText)
+    .filter(Boolean);
+  const receipts = readArray(session?.latest_receipt_refs ?? goalDebug?.receipt_refs)
+    .map(coerceText)
+    .filter(Boolean);
+  return [
+    `goal ${goalId}`,
+    status ? `status ${status}` : "",
+    runtime ? `runtime ${runtime}` : "",
+    runtimeSession ? `session ${runtimeSession}` : "",
+    commandKind ? `command ${commandKind}` : "",
+    wake ? `wake ${wake}` : "",
+    observations[0] ? `observation ${observations[0]}` : "",
+    observations.length > 1 ? `+${observations.length - 1} observations` : "",
+    receipts[0] ? `receipt ${receipts[0]}` : "",
+    receipts.length > 1 ? `+${receipts.length - 1} receipts` : "",
+    terminalAuthority ? `terminal authority ${terminalAuthority}` : "",
+    blocked ? `blocked ${blocked}` : "",
+    "debug export available",
+  ].filter(Boolean).join(" | ");
+}
+
 export function buildHelixAskRuntimeTurnSummary(
   response: unknown,
   providers: HelixAgentRuntimeDescriptor[] = DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS,
@@ -1364,11 +1623,13 @@ export function buildHelixAskRuntimeTurnSummary(
   const tools = readTurnToolSummary(record, debug);
   const projection = readLaneProjectionSummary(record, debug);
   const translationTraffic = readTranslationProjectionTrafficSummary(record, debug);
+  const visibleTranslationChain = readVisibleTranslationChainSummary(record, debug);
   const laneSessions = readLaneSessionSummary(record, debug);
   const laneMail = readLaneMailLoopSummary(record, debug);
   const laneTimeline = readLaneTimelineSummary(record, debug);
   const goalBoundLanes = readGoalBoundLaneSummary(record, debug);
   const goalDispatchReadiness = readGoalDispatchReadinessSummary(record, debug);
+  const runtimeGoal = readRuntimeGoalSessionSummary(record, debug);
   const terminal = readTerminalArtifactKind(record, debug);
   const debugRef = readDebugExportRef(record, debug);
 
@@ -1392,6 +1653,9 @@ export function buildHelixAskRuntimeTurnSummary(
     translationTraffic
       ? { key: "translation_traffic", label: "Translation traffic", value: translationTraffic }
       : null,
+    visibleTranslationChain
+      ? { key: "visible_translation_chain", label: "Visible translation chain", value: visibleTranslationChain }
+      : null,
     laneSessions ? { key: "lane_sessions", label: "Lane sessions", value: laneSessions } : null,
     laneMail ? { key: "lane_mail", label: "Lane mail", value: laneMail } : null,
     laneTimeline ? { key: "lane_timeline", label: "Lane timeline", value: laneTimeline } : null,
@@ -1399,6 +1663,7 @@ export function buildHelixAskRuntimeTurnSummary(
     goalDispatchReadiness
       ? { key: "goal_dispatch_readiness", label: "Goal dispatch readiness", value: goalDispatchReadiness }
       : null,
+    runtimeGoal ? { key: "runtime_goal_session", label: "Runtime goal", value: runtimeGoal } : null,
     terminal ? { key: "terminal_artifact", label: "Terminal artifact", value: terminal } : null,
     debugRef ? { key: "debug_export", label: "Debug export", value: debugRef } : null,
   ].filter((row): row is HelixAskRuntimeTurnSummaryRow => Boolean(row));

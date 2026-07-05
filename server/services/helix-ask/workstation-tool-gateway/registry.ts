@@ -106,6 +106,8 @@ const WORKSTATION_GATEWAY_SCHEMA = "helix.workstation_tool_gateway.v1" as const;
 const WORKSTATION_GATEWAY_MANIFEST_VERSION = "read-observe-act.v1" as const;
 const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context" as const;
 const WORKSTATION_ACTIVE_CONTEXT_OBSERVATION_SCHEMA = "helix.workstation_active_context_observation.v1" as const;
+const WORKSTATION_NOTES_LIST_NOTES_CAPABILITY = "workstation-notes.list_notes" as const;
+const WORKSTATION_NOTES_LIST_OBSERVATION_SCHEMA = "helix.workstation_notes_list_observation.v1" as const;
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression" as const;
 const CALCULATOR_SOLVE_OBSERVATION_SCHEMA = "helix.calculator_solve_observation.v1" as const;
 const CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY = "scientific-calculator.solve_scalar_expression" as const;
@@ -306,6 +308,9 @@ const manifestProducesAffordances = (capabilityId: string): HelixWorkstationType
   if (capabilityId === HELIX_WORKSPACE_OS_STATUS_CAPABILITY) return ["system_status", "source_ref"];
   if (capabilityId === WORKSTATION_ACTIVE_CONTEXT_CAPABILITY || capabilityId === CALCULATOR_ACTIVE_CONTEXT_CAPABILITY) {
     return ["active_surface_ref", "source_ref"];
+  }
+  if (capabilityId === WORKSTATION_NOTES_LIST_NOTES_CAPABILITY) {
+    return ["active_surface_ref", "source_ref", "text_evidence"];
   }
   if (
     capabilityId === READABLE_SURFACE_OBSERVE_CAPABILITY ||
@@ -535,6 +540,92 @@ const uniqueStrings = (values: Array<string | null | undefined>): string[] => {
     result.push(cleaned);
   }
   return result;
+};
+
+const readWorkstationNotesContextRecord = (args: Record<string, unknown>): Record<string, unknown> | null => {
+  const explicitNotesState = readRecord(args.notes_state ?? args.notesState);
+  if (explicitNotesState) return explicitNotesState;
+  const workspaceContext = readRecord(args.workspace_context ?? args.workspaceContext);
+  if (!workspaceContext) return null;
+  return readRecord(
+    workspaceContext.notes_context ??
+    workspaceContext.notesContext ??
+    workspaceContext.workstation_notes ??
+    workspaceContext.workstationNotes ??
+    workspaceContext.notes_state ??
+    workspaceContext.notesState,
+  );
+};
+
+const readBoundedWorkstationNotesList = (args: Record<string, unknown>): Record<string, unknown> => {
+  const notesContext = readWorkstationNotesContextRecord(args);
+  const rawNotes = readRecordArray(args.notes).length > 0
+    ? readRecordArray(args.notes)
+    : readRecordArray(notesContext?.notes);
+  const activeNoteId = optionalString(
+    args.active_note_id ??
+    args.activeNoteId ??
+    notesContext?.active_note_id ??
+    notesContext?.activeNoteId,
+  );
+  const activeNoteTitle = optionalString(
+    args.active_note_title ??
+    args.activeNoteTitle ??
+    notesContext?.active_note_title ??
+    notesContext?.activeNoteTitle,
+  );
+  const requestedNoteId = optionalString(args.note_id ?? args.noteId);
+  const requestedTitle = optionalString(args.title);
+  const normalizedRequestedTitle = requestedTitle?.toLowerCase() ?? null;
+  const normalizedRequestedId = requestedNoteId?.toLowerCase() ?? null;
+  const synthesizedActiveNote = rawNotes.length === 0 && (activeNoteId || activeNoteTitle)
+    ? [{
+        id: activeNoteId,
+        title: activeNoteTitle,
+      }]
+    : [];
+  const sanitized = [...rawNotes, ...synthesizedActiveNote]
+    .slice(0, 50)
+    .map((note, index) => {
+      const id = optionalString(note.id ?? note.note_id ?? note.noteId);
+      const title = optionalString(note.title ?? note.name ?? note.label);
+      const updatedAt = optionalString(note.updated_at ?? note.updatedAt);
+      const createdAt = optionalString(note.created_at ?? note.createdAt);
+      const tags = readStringArray(note.tags).slice(0, 8);
+      return {
+        index,
+        ...(id ? { id } : {}),
+        ...(title ? { title } : {}),
+        ...(updatedAt ? { updated_at: updatedAt } : {}),
+        ...(createdAt ? { created_at: createdAt } : {}),
+        ...(tags.length ? { tags } : {}),
+        active: Boolean((id && activeNoteId && id === activeNoteId) || (title && activeNoteTitle && title === activeNoteTitle)),
+        source_ref: id ? `workstation-notes:${id}` : title ? `workstation-notes:title:${title}` : `workstation-notes:index:${index}`,
+        raw_content_included: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+      };
+    })
+    .filter((note) => Boolean(note.id || note.title));
+  const filtered = sanitized.filter((note) => {
+    if (normalizedRequestedId && String(note.id ?? "").toLowerCase() !== normalizedRequestedId) return false;
+    if (normalizedRequestedTitle && String(note.title ?? "").toLowerCase() !== normalizedRequestedTitle) return false;
+    return true;
+  });
+  const notes = filtered.slice(0, 20);
+  return {
+    notes,
+    note_count: notes.length,
+    total_supplied_note_count: sanitized.length,
+    truncated: filtered.length > notes.length || rawNotes.length > 50,
+    active_note_id: activeNoteId,
+    active_note_title: activeNoteTitle,
+    requested_note_id: requestedNoteId,
+    requested_title: requestedTitle,
+    source_refs: notes.map((note) => String(note.source_ref)).filter(Boolean),
+    omitted_body_fields: ["body", "content", "html", "text", "markdown"],
+    has_context: rawNotes.length > 0 || Boolean(activeNoteId || activeNoteTitle || notesContext),
+  };
 };
 
 const readVariableSourcePlanEntries = (value: unknown): Array<Record<string, unknown>> =>
@@ -1110,14 +1201,25 @@ const readCalculatorNumericBindingEvidence = (value: unknown): Array<{
   source_refs?: string[];
   meaning?: string | null;
 }> =>
-  readRecordArray(value).map((record) => ({
-    symbol: cleanString(record.symbol ?? record.variable ?? record.name),
-    value: typeof record.value === "number" ? record.value : cleanString(record.value ?? record.numeric_value ?? record.result),
-    unit: optionalString(record.unit),
-    dimension_signature: optionalString(record.dimension_signature ?? record.dimension),
-    source_refs: readStringArray(record.source_refs ?? record.sourceRefs ?? record.refs),
-    meaning: optionalString(record.meaning ?? record.quantity),
-  })).filter((entry) => Boolean(entry.symbol));
+  readRecordArray(value).map((record) => {
+    const kind = cleanString(record.kind ?? record.affordance_kind ?? record.type);
+    if (kind && kind !== "numeric_value_evidence") return null;
+    return {
+      symbol: cleanString(record.symbol ?? record.variable ?? record.name),
+      value: typeof record.value === "number" ? record.value : cleanString(record.value ?? record.numeric_value ?? record.result),
+      unit: optionalString(record.unit),
+      dimension_signature: optionalString(record.dimension_signature ?? record.dimension),
+      source_refs: readStringArray(record.source_refs ?? record.sourceRefs ?? record.refs),
+      meaning: optionalString(record.meaning ?? record.quantity),
+    };
+  }).filter((entry): entry is {
+    symbol: string;
+    value: string | number;
+    unit?: string | null;
+    dimension_signature?: string | null;
+    source_refs?: string[];
+    meaning?: string | null;
+  } => Boolean(entry?.symbol));
 
 const readStringRecord = (value: unknown): Record<string, string | null> => {
   const record = readRecord(value);
@@ -1653,6 +1755,44 @@ const workstationActiveContextManifest: HelixWorkstationCapabilityManifest = {
   output_observation_schema: WORKSTATION_ACTIVE_CONTEXT_OBSERVATION_SCHEMA,
   observation_schema: WORKSTATION_ACTIVE_CONTEXT_OBSERVATION_SCHEMA,
   safety_tags: ["read_or_observe", "workstation_context", "active_context", "non_terminal", "no_shell", "no_code_mutation"],
+  assistant_answer: false,
+  raw_content_included: false,
+};
+
+const workstationNotesListManifest: HelixWorkstationCapabilityManifest = {
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: WORKSTATION_NOTES_LIST_NOTES_CAPABILITY,
+  label: "Workstation Notes list notes",
+  description:
+    "Reads a bounded, body-redacted Workstation Notes index supplied by the Ask turn context snapshot or explicit gateway args. It cannot create, open, edit, append, or answer.",
+  panel_id: "workstation-notes",
+  action_id: "list_notes",
+  mode: "read",
+  mutating: false,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: true,
+  terminal_eligible: false,
+  permission_profile_required: "read",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      workspace_context: { type: "object" },
+      notes_state: { type: "object" },
+      notes: { type: "array", items: { type: "object" } },
+      active_note_id: { type: "string" },
+      active_note_title: { type: "string" },
+      note_id: { type: "string" },
+      title: { type: "string" },
+      source_target_intent: { type: "object" },
+    },
+  },
+  output_observation_schema: WORKSTATION_NOTES_LIST_OBSERVATION_SCHEMA,
+  observation_schema: WORKSTATION_NOTES_LIST_OBSERVATION_SCHEMA,
+  safety_tags: ["read_or_observe", "workstation_notes", "note_index", "body_redacted", "non_terminal", "no_shell", "no_code_mutation"],
   assistant_answer: false,
   raw_content_included: false,
 };
@@ -3144,6 +3284,7 @@ const visualObserverReadManifests = [
 const rawCapabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   [workspaceOsStatusManifest.capability_id, workspaceOsStatusManifest],
   [workstationActiveContextManifest.capability_id, workstationActiveContextManifest],
+  [workstationNotesListManifest.capability_id, workstationNotesListManifest],
   [calculatorSolveExpressionManifest.capability_id, calculatorSolveExpressionManifest],
   [calculatorSolveScalarExpressionManifest.capability_id, calculatorSolveScalarExpressionManifest],
   [calculatorClassifyExpressionManifest.capability_id, calculatorClassifyExpressionManifest],
@@ -3423,6 +3564,94 @@ export const callWorkstationGatewayCapability = async (
       assistant_answer: false,
       raw_content_included: false,
       error: hasContext ? undefined : "workstation_active_context_missing",
+    };
+  }
+
+  if (manifest.capability_id === WORKSTATION_NOTES_LIST_NOTES_CAPABILITY) {
+    const args = readArguments(input.arguments);
+    const notesList = readBoundedWorkstationNotesList(args);
+    const hasContext = Boolean(notesList.has_context);
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: hasContext ? "admitted" : "blocked",
+      reason: hasContext ? "read_only_gateway_capability" : "workstation_notes_context_missing",
+      blockedReason: hasContext ? undefined : "workstation_notes_context_missing",
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const observation = {
+      schema: WORKSTATION_NOTES_LIST_OBSERVATION_SCHEMA,
+      capability_key: manifest.capability_id,
+      panel_id: "workstation-notes",
+      action_id: "list_notes",
+      status: hasContext ? "succeeded" : "blocked",
+      blocked_reason: hasContext ? null : "workstation_notes_context_missing",
+      ...notesList,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const producedAffordances = buildGatewayProducedAffordances({
+      capabilityId: manifest.capability_id,
+      observation,
+    });
+    const consumedAffordances = buildGatewayConsumedAffordances({
+      capabilityId: manifest.capability_id,
+      observation,
+    });
+    const summary = hasContext
+      ? `Workstation Notes listed ${notesList.note_count} body-redacted note ref(s).`
+      : "Workstation Notes list was requested but no bounded notes context was supplied.";
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "workstation-notes",
+      action: "list_notes",
+      status: hasContext ? "succeeded" : "blocked",
+      summary,
+      observation,
+      missingRequirements: hasContext ? [] : [{
+        code: "workstation_notes_context_missing",
+        message: "Attach bounded Workstation Notes context or provide a redacted notes index before listing notes.",
+        repair_action: "ask_user",
+      }],
+      producedAffordances,
+      consumedAffordances,
+      requiredAffordanceKinds: manifest.consumes_affordances,
+      producedAffordanceKinds: manifest.produces_affordances,
+      missingAffordanceKinds: hasContext ? [] : manifest.consumes_affordances,
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: hasContext ? undefined : "workstation_notes_context_missing",
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: hasContext,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      produced_affordances: producedAffordances,
+      consumed_affordances: consumedAffordances,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error: hasContext ? undefined : "workstation_notes_context_missing",
     };
   }
 

@@ -22,10 +22,10 @@ export const HELIX_ASK_LEGACY_CONSOLE_ACTIVE_PATH = [
 
 export const HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT = {
   file: "client/src/components/helix/HelixAskPill.tsx",
-  lineCountAtInventory: 26338,
-  exportedComponentStartsAtLine: 7853,
-  liveRenderSliceStartsAtLine: 25866,
-  liveLegacyConsoleViewStartsAtLine: 25881,
+  lineCountAtInventory: 25821,
+  exportedComponentStartsAtLine: 7701,
+  liveRenderSliceStartsAtLine: 25633,
+  liveLegacyConsoleViewStartsAtLine: 25633,
   inventoryReason:
     "The active bridge still imports the whole legacy file, but the visible console render path is concentrated near the bottom and now enters the recrowned legacy console view before composing recrowned ask-console display owners.",
 } as const;
@@ -43,7 +43,70 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     classification: "pure_display_already_recrowned",
     source: "ask-console",
     evidence:
-      "The bottom render slice enters HelixAskLegacyConsoleView, which delegates to HelixAskConsoleRuntimeLayout and composes HelixAskSurfaceFrame, HelixAskSurfaceComposerPanel, HelixAskSurfaceSupplementStack, HelixAskTurnList, and HelixAskDebugDrawer.",
+      "The bottom render slice enters HelixAskLegacyConsoleView, which delegates to HelixAskConsoleRuntimeLayout and composes HelixAskSurfaceFrameSurface, HelixAskSurfaceComposerPanel, HelixAskSurfaceSupplementStack, HelixAskTurnListSurface, and HelixAskDebugDrawer.",
+  },
+  {
+    key: "legacy_console_view_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The active legacy-console view state object now runs through buildHelixAskLegacyConsoleViewState, which packages already-derived top-level display props while reply rendering, refs, debug drawer close mutation, stream lifecycle, copy/debug/read-aloud execution, request transport, route authority, and terminal authority remain in the bridge.",
+  },
+  {
+    key: "legacy_console_root_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The active legacy-console root props now run through buildHelixAskLegacyConsoleRootState, which packages already-derived className and layoutVariant while width/layout derivation, runtime shell selection, request transport, route authority, and terminal authority remain in the bridge.",
+  },
+  {
+    key: "surface_frame_surface_slot",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The active legacy-console frame/chrome slot now runs through HelixAskSurfaceFrameSurface while submit handling, audio-prime interaction handling, width/palette derivation, and offline state remain in the bridge.",
+  },
+  {
+    key: "legacy_console_surface_frame_state_slot",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "HelixAskLegacyConsoleView now owns surface-frame state-to-slot composition while max-width/palette/offline derivation, submit handling, and audio-prime behavior remain in the bridge.",
+  },
+  {
+    key: "surface_frame_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The live surface-frame state object now runs through buildHelixAskSurfaceFrameState, which packages already-derived width, palette, offline, submit, and audio-prime props while width/palette derivation, submit handling, audio-prime behavior, request transport, and voice playback side effects remain in the bridge.",
+  },
+  {
+    key: "legacy_surface_content_state_slot",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "HelixAskLegacyConsoleView now owns legacy surface-content state-to-slot composition through HelixAskLegacySurfaceContent, which instantiates and orders the composer, supplement stack, and reasoning theater while all derived state, callbacks, refs, submit/stop behavior, media behavior, and request transport remain in the bridge.",
+  },
+  {
+    key: "legacy_surface_content_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The live legacy surface-content state object now runs through buildHelixAskLegacySurfaceContentState, which packages the already-derived composer, supplement, and reasoning-theater props while all state derivation, callbacks, refs, submit/stop behavior, media behavior, request transport, route authority, and terminal authority remain in the bridge.",
+  },
+  {
+    key: "legacy_procedural_timeline_slot",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The procedural timeline display handoff runs through HelixAskLegacyProceduralTimelineSlot while terminal-kind selection and terminal authority remain in the bridge.",
+  },
+  {
+    key: "legacy_procedural_timeline_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The obsolete bridge-local renderProceduralTurnTimeline row builder has been moved to HelixAskLegacyProceduralTimelineProjection; it reads already-produced debug/truth-table/runtime records and delegates visible terminal-kind selection back to the bridge.",
   },
   {
     key: "prompt_composer_surface",
@@ -60,25 +123,312 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
       "The action-toolbar composition for runtime picker and submit/stop button moved to HelixAskComposerActionToolbarSurface while haptics, mic toggles, attachment selection, visual/audio source controls, runtime selection behavior, submit/stop behavior, and request submission remain in the bridge.",
   },
   {
+    key: "composer_action_toolbar_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The live composer action-toolbar props now run through buildHelixAskComposerActionToolbarState while haptics, refs, mic/media toggles, runtime selection, submit/stop behavior, and request submission remain in the bridge.",
+  },
+  {
+    key: "legacy_composer_surface_slot",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The live composer slot now runs through HelixAskLegacyComposerSurface, which composes the voice-level monitor, mood avatar, action toolbar, and textarea surfaces while all draft syncing, haptics, mic/media behavior, runtime selection, submit/stop behavior, and request submission remain in the bridge.",
+  },
+  {
+    key: "legacy_composer_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The live composer state object now runs through buildHelixAskLegacyComposerState, which packages already-derived voice-level monitor, mood avatar, action toolbar, textarea, and textarea ref props while draft syncing, haptics, mic/media behavior, runtime selection, submit/stop behavior, and request submission remain in the bridge.",
+  },
+  {
+    key: "reasoning_theater_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The live reasoning-theater state object now runs through buildHelixAskReasoningTheaterState, which packages already-derived busy visibility, palette classes, Mirek field data, status/medal props, meter refs, frontier icon props, and floating action text props while reasoning-state derivation, medal/frontier broken-image mutation, ref lifecycle, stream behavior, request transport, and terminal authority remain in the bridge.",
+  },
+  {
+    key: "reasoning_theater_status_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The live reasoning-theater status and medal strip props now run through buildHelixAskReasoningTheaterStatusState while reasoning label derivation, medal queue mapping inputs, broken-image mutation, stream behavior, request transport, and terminal authority remain in the bridge.",
+  },
+  {
+    key: "reasoning_theater_meter_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The live reasoning-theater meter and frontier props now run through buildHelixAskReasoningTheaterMeterState while beat/ambient derivation, frontier label derivation, refs, broken-image mutation, stream behavior, request transport, and terminal authority remain in the bridge.",
+  },
+  {
+    key: "voice_level_monitor_surface",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The live composer voice-level meter slot now runs through HelixAskVoiceLevelMonitorSurface while voice capture state, signal metrics, refs, and media lifecycle stay in the bridge.",
+  },
+  {
+    key: "voice_level_monitor_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The live composer voice-level meter props now run through buildHelixAskVoiceLevelMonitorState, deriving visibility from supplied mic-arm state while signal metrics, refs, resize measurement, voice capture state, and media lifecycle stay in the bridge.",
+  },
+  {
+    key: "mood_avatar_surface",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The live composer mood-avatar slot now runs through HelixAskMoodAvatarSurface while mood asset selection, broken-image state mutation, palette derivation, and mood updates stay in the bridge.",
+  },
+  {
+    key: "mood_avatar_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The live composer mood-avatar props now run through buildHelixAskMoodAvatarState while mood asset selection, palette derivation, broken-image state mutation, and mood updates stay in the bridge.",
+  },
+  {
+    key: "composer_textarea_surface",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The live composer textarea slot now runs through HelixAskComposerTextareaSurface while draft syncing, paste handling, submit request wiring, input refs, and prompt admission remain in the bridge.",
+  },
+  {
+    key: "composer_textarea_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The live composer textarea props now run through buildHelixAskComposerTextareaState while draft syncing, paste handling, submit request wiring, input refs, and prompt admission remain in the bridge.",
+  },
+  {
     key: "reply_projection_surface",
     classification: "pure_display_already_recrowned",
     source: "ask-console",
     evidence:
-      "The live render slice uses HelixAskReplyTurn for completed turn streams, HelixAskActiveTurnReply for the active turn stream card, HelixAskFinalAnswer, latest-turn binding helpers, and recrowned final-text, reply-event ordering, and fail-context helpers.",
+      "The live render slice uses HelixAskTurnListSurface for the reply lane, HelixAskReplyTurnSurface for completed turn streams, HelixAskActiveTurnReplySurface for the active turn stream slot, HelixAskFinalAnswerSurface for final answer blocks, latest-turn binding helpers, and recrowned final-text, reply-event ordering, and fail-context helpers.",
+  },
+  {
+    key: "final_answer_surface_slot",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The completed-turn final-answer slot now runs through HelixAskFinalAnswerSurface while visible answer selection, source labeling, path-link callbacks, math rendering callbacks, terminal authority, copy/read-aloud targets, and debug payloads stay in the bridge.",
+  },
+  {
+    key: "final_answer_path_text_segments",
+    classification: "pure_display_already_recrowned",
+    source: "lib/helix",
+    evidence:
+      "Final-answer file-path text segmentation moved to splitHelixAskTextPathSegments in ask-answer-rendering.ts, removing the local path regex from HelixAskPill while panel-id resolution, button rendering, and openPanelById side effects stay in the bridge.",
+  },
+  {
+    key: "path_linked_text_surface",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "Final-answer file-path link button rendering now runs through HelixAskPathLinkedTextSurface while path-to-panel resolution, panel registry reads, and openPanelById side effects remain bridge-owned callbacks.",
+  },
+  {
+    key: "legacy_content_renderers",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "Final-answer text/path-link, math-aware content, standalone final-answer renderer callbacks, and plain/response-envelope answer slot render callbacks now run through useHelixAskLegacyContentRenderers while path-to-panel resolution, panel registry reads, openPanelById side effects, envelope selection, calculator-panel affordance decisions, terminal authority, copy/debug/read-aloud targets, and debug payloads remain in the bridge.",
+  },
+  {
+    key: "legacy_answer_envelope_renderer_callbacks",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "HelixAskPill no longer directly renders HelixAskLegacyAnswerEnvelopeSlot for plain or response-envelope replies; it derives the same selected text, section grouping, extension toggle callback, and calculator launch state, then delegates the visible slot rendering to useHelixAskLegacyContentRenderers.",
+  },
+  {
+    key: "final_answer_inline_code_segments",
+    classification: "pure_display_already_recrowned",
+    source: "lib/helix",
+    evidence:
+      "Final-answer inline-code text segmentation moved to splitHelixAskInlineCodeTextSegments in ask-answer-rendering.ts, removing the embedded code-span regex loop from HelixAskPill while React <code> rendering and math/path rendering callbacks stay in the bridge.",
+  },
+  {
+    key: "envelope_sections_surface",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "Envelope section display moved to HelixAskEnvelopeSectionsSurface while envelope answer selection, detail/proof grouping, extension state, calculator-panel affordance decisions, citation normalization, and content rendering callbacks stay in the bridge.",
+  },
+  {
+    key: "envelope_supplement_surface",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "Envelope extension, Details, and Proof disclosure wrappers moved to HelixAskEnvelopeSupplementSurface while extension availability/open state, detail/proof section grouping, citation normalization, content rendering callbacks, and reply-scoped toggle state mutation stay in the bridge.",
+  },
+  {
+    key: "calculator_panel_launch_surface",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The final-answer calculator launch affordance moved to HelixAskCalculatorPanelLaunchSurface while equation-family detection, panel availability checks, and openPanelById side effects stay in the bridge.",
+  },
+  {
+    key: "inline_code_surface",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "Inline code and code-style math token chip rendering moved to HelixAskInlineCodeSurface while math tokenization, inline-code segmentation, code-style classification, and final-answer content ordering stay in the bridge/lib owners.",
+  },
+  {
+    key: "math_html_surface",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "KaTeX math HTML span rendering moved to HelixAskMathHtmlSurface while KaTeX HTML generation, math tokenization, display-mode selection, and error fallback handling stay in the bridge/lib owners.",
+  },
+  {
+    key: "rendered_content_surface",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "Math-aware final-answer content rendering, inline-code segmentation, KaTeX rendering, and inline math/code surface composition now run through HelixAskRenderedContentSurface while path-link panel resolution/opening, final answer selection, envelope selection, calculator-panel affordance decisions, and terminal authority remain in the bridge.",
+  },
+  {
+    key: "legacy_answer_envelope_slot",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "Plain-answer and response-envelope display composition now runs through HelixAskLegacyAnswerEnvelopeSlot, which owns the nested plain answer, envelope answer, final-answer surface, calculator launch affordance, envelope supplement, and envelope section surfaces while answer text selection, section grouping, extension open-state mutation, calculator visibility decisions, panel opening callback ownership, terminal authority, copy/debug/read-aloud targets, and debug payloads remain in the bridge.",
+  },
+  {
+    key: "plain_answer_surface",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The non-envelope plain answer layout moved to HelixAskPlainAnswerSurface while reply content selection, content rendering callbacks, calculator-panel affordance decisions, and openPanelById side effects stay in the bridge.",
+  },
+  {
+    key: "envelope_answer_surface",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The response-envelope answer layout wrapper moved to HelixAskEnvelopeAnswerSurface while final answer node construction, calculator launch construction, supplement construction, answer text selection, and extension state mutation stay in the bridge.",
+  },
+  {
+    key: "turn_list_surface_slot",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The legacy-console reply-list slot, empty-list null state, and active-turn reply node composition now run through HelixAskTurnListSurface while chronological reply selection, active stream row derivation, scroll refs, console debug snapshot construction, and bottom-scroll scheduling stay in the bridge.",
+  },
+  {
+    key: "legacy_console_turn_list_state_slot",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "HelixAskLegacyConsoleView now owns turn-list state-to-slot composition while chronological reply selection, completed reply mapping, active stream row derivation, scroll refs, console debug snapshot construction, latest-turn selection, debug/copy/read-aloud callbacks, and bottom-scroll scheduling remain in the bridge.",
+  },
+  {
+    key: "active_turn_list_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The active-turn list state object now runs through buildHelixAskActiveTurnListState, which packages already-derived active stream rows, ids, refs, status line, debug snapshot, and display callbacks while stream event admission, row derivation, quiet-gap timing, terminal authority, clipboard, fetch, and TTS stay in the bridge.",
+  },
+  {
+    key: "reply_turn_surface_slot",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The completed legacy-console reply slot now runs through HelixAskReplyTurnSurface while latest reply selection, terminal projection, debug payloads, copy/read-aloud callbacks, job link execution, and reply state remain in the bridge.",
+  },
+  {
+    key: "reply_turn_item_surface_slot",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The completed reply item div wrapper moved to HelixAskReplyTurnItemSurface while reply projection, latest-turn selection, terminal projection, debug payloads, copy/read-aloud callbacks, job link execution, and reply state remain in the bridge.",
+  },
+  {
+    key: "completed_reply_turn_surface_slot",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The completed reply item wrapper plus reply-turn surface composition moved to HelixAskCompletedReplyTurnSurface while reply projection, latest-turn selection, terminal projection, debug payloads, copy/read-aloud callbacks, job link execution, and reply state remain in the bridge.",
+  },
+  {
+    key: "legacy_completed_reply_slot_state",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The bridge now passes an already-derived completed-reply turn state object through HelixAskLegacyCompletedReplySlot instead of directly instantiating HelixAskCompletedReplyTurnSurface; reply projection, latest-turn selection, terminal projection, debug payloads, copy/read-aloud callbacks, and job execution remain in the bridge.",
+  },
+  {
+    key: "legacy_completed_reply_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The completed legacy-console reply slot props now run through buildHelixAskLegacyCompletedReplyState, which packages the already-derived reply id and turn state while reply projection, latest-turn selection, terminal projection, debug payload materialization, copy/read-aloud callbacks, job execution, route authority, and terminal authority remain in the bridge.",
+  },
+  {
+    key: "reply_turn_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The completed reply-turn props now run through buildHelixAskReplyTurnState, which packages the already-derived latest flag, card props, and stream props while reply projection, latest-turn selection, terminal projection, debug payload materialization, copy/read-aloud callbacks, job execution, route authority, and terminal authority remain in the bridge.",
+  },
+  {
+    key: "completed_reply_stream_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The completed reply stream props now run through buildHelixAskCompletedReplyStreamState, which packages already-derived stream rows, final-answer display props, provider/model metadata, control labels, and callback references while row derivation, latest-turn selection, terminal projection, debug payload materialization, clipboard/debug/TTS execution, job execution, route authority, and terminal authority remain in the bridge.",
+  },
+  {
+    key: "completed_reply_card_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The completed reply card props now run through buildHelixAskCompletedReplyCardState, which packages already-derived card test id, tint class, context capsule, runtime-goal debug summary, and prompt-ingested flag while reply projection, latest-turn selection, terminal projection, debug payload materialization, copy/read-aloud callbacks, job execution, route authority, and terminal authority remain in the bridge.",
+  },
+  {
+    key: "completed_reply_battle_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The completed reply battle/tint state now runs through buildHelixAskCompletedReplyBattleState, which packages already-derived causal timeline events, live events, and reasoning-theater state into display-only beats, ambient state, and answer tint while event collection, reasoning-theater debug extraction, active theater state, stream behavior, route authority, and terminal authority remain in the bridge.",
   },
   {
     key: "debug_drawer_surface",
     classification: "pure_display_already_recrowned",
     source: "ask-console",
     evidence:
-      "The visible debug drawer slot now runs through HelixAskDebugDrawerSurface while selected debug state, drawer close mutation, debug payload materialization, backend debug-export fetch, clipboard writes, and copied-id timers remain in the bridge.",
+      "The visible debug drawer slot and drawer-state-to-visible-props projection now run through HelixAskDebugDrawerSurface while selected debug state, drawer close mutation, debug payload materialization, backend debug-export fetch, clipboard writes, and copied-id timers remain in the bridge.",
+  },
+  {
+    key: "legacy_console_debug_drawer_state_slot",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "HelixAskLegacyConsoleView now owns debug drawer state-to-slot composition while selected drawer React state, close mutation, debug payload materialization, backend debug-export fetch, clipboard writes, and copied-id timers remain in the bridge.",
   },
   {
     key: "active_turn_reply_surface",
     classification: "pure_display_already_recrowned",
     source: "ask-console",
     evidence:
-      "The in-progress active-turn reply card composition moved to HelixAskActiveTurnReply with the same HelixAskReplyTurn shell, active-turn test ids, disabled debug/copy/read-aloud controls, and no stream state, request, terminal-authority, or side-effect ownership.",
+      "The in-progress active-turn reply card composition moved to HelixAskActiveTurnReply with the same HelixAskReplyTurn shell, active-turn test ids, disabled debug/copy/read-aloud controls, empty-row null rendering, default no-final placeholder rendering, and no stream state, request, terminal-authority, or side-effect ownership.",
+  },
+  {
+    key: "active_turn_reply_surface_slot",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The active legacy-console live-progress reply slot now runs through HelixAskActiveTurnReplySurface via HelixAskTurnListSurface while visible row derivation, active turn ids, quiet-gap status, scroll refs, and stream admission stay in the bridge; the bridge no longer guards this slot with a local empty-row display condition or constructs the active-turn reply node locally.",
   },
   {
     key: "operator_supplement_surface",
@@ -95,6 +445,20 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
       "The conditional goal-pill slot moved to HelixAskGoalPillSurface while goal session state, expansion state, busy/error state, and goal action execution remain in the bridge.",
   },
   {
+    key: "legacy_console_goal_pill_state_slot",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "HelixAskLegacyConsoleView now owns goal-pill state-to-slot composition while goal session state, expansion mutation, busy/error mutation, and goal action execution remain in the bridge.",
+  },
+  {
+    key: "goal_pill_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The visible goal-pill state object now runs through buildHelixAskGoalPillState, which packages the already-owned session, expanded flag, busy/error state, and callbacks while goal session state, expansion mutation, busy/error mutation, goal action execution, request transport, and terminal authority stay in the bridge.",
+  },
+  {
     key: "steering_queue_surface_slot",
     classification: "pure_display_already_recrowned",
     source: "ask-console",
@@ -102,11 +466,137 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
       "The active legacy-console steering-queue slot now runs through HelixAskSteeringQueueSurface, preserving the current empty-slot behavior while queue item state and any future queue toggle mutation stay outside the bridge render seam.",
   },
   {
+    key: "legacy_console_steering_queue_default_slot",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "HelixAskLegacyConsoleView now owns the default empty steering-queue slot composition while queue item derivation, auto-wake checks, and future queue toggle mutation remain outside the view.",
+  },
+  {
     key: "console_supplement_surface",
     classification: "pure_display_already_recrowned",
     source: "ask-console",
     evidence:
       "The visible supplement stack composition moved to HelixAskConsoleSupplementSurface while attachment removal, voice command execution, transcript confirmation, context chooser execution, observer event selection, source capture, audio stop behavior, and context-memory derivation remain in the bridge.",
+  },
+  {
+    key: "console_supplement_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The visible supplement state object now runs through buildHelixAskConsoleSupplementState, which packages already-derived attachment, context capsule, voice status, Situation Room source, confirmation, context chooser, observer lane, and context-memory props while attachment removal, voice command execution, transcript confirmation, context chooser execution, observer event selection, source capture, audio stop behavior, and context-memory derivation remain in the bridge.",
+  },
+  {
+    key: "situation_room_source_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The Situation Room source panel props now run through buildHelixAskSituationRoomSourceState, which packages already-derived visible label/status/error/transcript/audio props while source selection, visual capture, display-audio lifecycle, and stop-audio execution remain in the bridge.",
+  },
+  {
+    key: "situation_room_source_display_derivation",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The Situation Room source visible label/status/count/transcript/audio-active derivation now runs through buildHelixAskSituationRoomSourceDerivedState from supplied snapshots while source lookup refs, source selection, visual capture, display-audio lifecycle, and stop-audio execution remain in the bridge.",
+  },
+  {
+    key: "voice_confirmation_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The voice command and transcript confirmation panel props now run through buildHelixAskVoiceCommandConfirmationState and buildHelixAskTranscriptConfirmationState, which package already-derived visible text/countdown/callback props while command policy, transcript confirmation policy, countdown lifecycle, voice execution, retry execution, and state mutation remain in the bridge.",
+  },
+  {
+    key: "context_chooser_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The context chooser panel props now run through buildHelixAskContextChooserState, which packages already-derived visibility, mode, countdown, and action callbacks while chooser policy, countdown lifecycle, attached/isolated execution, cancellation, and state mutation remain in the bridge. The old attached-workspace-context prompt is retired behind HELIX_ASK_LEGACY_ATTACHED_CONTEXT_CHOOSER_ENABLED and must not be recrowned as active request-context behavior.",
+  },
+  {
+    key: "observer_supplement_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The observer lane and conversation-brief supplement props now run through buildHelixAskObserverSupplementState, which packages already-derived observer visibility, brief text, and event props while timeline selection, observer event derivation, busy-state policy, and observer execution remain in the bridge.",
+  },
+  {
+    key: "context_memory_status_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The context-memory status supplement prop now runs through buildHelixAskContextMemoryStatusState, which packages already-derived context-memory status text while session capsule confidence derivation and memory state ownership remain in the bridge.",
+  },
+  {
+    key: "voice_status_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The voice status supplement props now run through buildHelixAskVoiceStatusState, which packages already-derived voice status label and state while voice capture, transcription, and mic state mutation remain in the bridge.",
+  },
+  {
+    key: "voice_status_label_derivation",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The voice status supplement label now runs through buildHelixAskVoiceStatusDerivedState, which delegates to the pure voice copy display helper from supplied mic/input/error state while voice capture, transcription, mic state mutation, recorder lifecycle, and TTS remain in the bridge.",
+  },
+  {
+    key: "voice_capture_health_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The voice capture health snapshot now runs through buildHelixAskVoiceCaptureHealthState, which packages already-derived voice meter, recorder, warning, checkpoint, and roundtrip fields with an injected timestamp while MediaRecorder setup, mic state mutation, voice capture lifecycle, diagnostics publication, browser audio inspection, and TTS remain in the bridge.",
+  },
+  {
+    key: "voice_capture_diagnostics_base_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The shared voice capture diagnostics base snapshot now runs through buildHelixAskVoiceCaptureDiagnosticsBaseState, which packages already-derived voice health, checkpoint, segment, pending-confirmation, and feature-flag fields while diagnostics publication, playback diagnostics, browser audio inspection, voice capture lifecycle, request transport, and TTS remain in the bridge.",
+  },
+  {
+    key: "voice_feature_flags_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The shared voice diagnostics feature-flag bundle now runs through buildHelixAskVoiceFeatureFlagsState while rollout decisions, command lane policy, local audio gate state, speaker state, diagnostics publication, browser audio inspection, voice capture lifecycle, request transport, and TTS remain in the bridge.",
+  },
+  {
+    key: "voice_timeline_build_info_event_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The visible voice timeline build-info event now runs through buildHelixAskVoiceTimelineBuildInfoEvent while event source admission, chunk/segment/timeline merge policy, fetch/abort lifecycle, diagnostics publication, mic/STT runtime, and TTS stay in the bridge.",
+  },
+  {
+    key: "context_capsule_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The context capsule supplement props now run through buildHelixAskContextCapsuleState, which packages already-derived context capsule preview and auto-applied flag while session capsule derivation and capsule copy behavior remain in the bridge.",
+  },
+  {
+    key: "active_context_capsule_display_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The active context-capsule preview and memory-status display text now run through buildHelixAskActiveContextCapsuleDerivedState, which projects an already-derived session capsule state into visible supplement props while ledger ranking/selection, context capsule session mutation, copy behavior, request transport, route authority, and terminal authority remain in the bridge.",
+  },
+  {
+    key: "attachment_strip_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The attachment strip supplement props now run through buildHelixAskAttachmentStripState, which packages already-derived attachment commit checks and the bridge-owned remove callback while attachment mutation, validation, and request payload shaping stay in their existing owners.",
+  },
+  {
+    key: "supplement_clip_text_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The supplement text-clipping callback now runs through buildHelixAskSupplementClipTextState, which packages the already-imported display trimming callback while the trimming implementation and text normalization remain in lib/helix.",
   },
   {
     key: "reasoning_meter_surface",
@@ -135,6 +625,20 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     source: "ask-console",
     evidence:
       "The active legacy-console error-line slot now runs through HelixAskConsoleErrorLineSurface while askError state mutation, clearing, and request error handling remain in the bridge.",
+  },
+  {
+    key: "console_error_line_state_projection",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The live error-line state object now runs through buildHelixAskConsoleErrorLineState, which packages the already-derived ask error message while request error handling, clearing behavior, state mutation, runtime transport, route authority, and terminal authority remain in the bridge.",
+  },
+  {
+    key: "legacy_console_error_line_message_slot",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "HelixAskLegacyConsoleView now owns errorMessage-to-errorLine slot composition while askError state mutation, clearing, and request error handling remain in the bridge.",
   },
   {
     key: "legacy_chat_persistence_binding",
@@ -184,6 +688,13 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     source: "ask-console",
     evidence:
       "Pasted-text attachment encoding, SHA-256 hashing, metadata materialization, and text turn-input item shaping moved to HelixAskTextAttachment with tests preserving Unicode base64, deterministic filename/id/hash dependency seams, preview trimming, and assistant-answer=false turn-input shape while attachment admission and request-envelope construction remain in the bridge.",
+  },
+  {
+    key: "image_attachment_materialization",
+    classification: "behavior_sensitive_recrowned_with_parity",
+    source: "ask-console",
+    evidence:
+      "Image attachment materialization and clipboard image-file selection moved to HelixAskImageAttachment with tests preserving pasted-image filename fallback, injected base64/object-url seams, image-only admission, 8 MB size limits, and reuse by both file-select and paste handlers while attachment mutation, source admission, request-envelope construction, image-lens execution, and turn submission remain in the bridge.",
   },
   {
     key: "attachment_commit_validation",
@@ -464,6 +975,13 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     source: "lib/helix",
     evidence:
       "Deterministic repo-code evidence prompt detection and context chooser auto-mode classification moved to ask-exploration-policy with tests while context chooser state/countdown, source chooser execution, request submission, route authority, and terminal authority remain in the bridge.",
+  },
+  {
+    key: "legacy_attached_context_chooser_retired",
+    classification: "behavior_sensitive_quarantined",
+    source: "HelixAskPill.tsx",
+    evidence:
+      "The old quick-time event that asked whether to attach current workspace context to reasoning is disabled by HELIX_ASK_LEGACY_ATTACHED_CONTEXT_CHOOSER_ENABLED. Its generic panel/state shape may remain for future quick decisions, but the attached-context policy, countdown auto-run, and request-context mutation are quarantined in the legacy bridge and must not be extracted into the recrowned console.",
   },
   {
     key: "active_turn_stream_membership_admission",

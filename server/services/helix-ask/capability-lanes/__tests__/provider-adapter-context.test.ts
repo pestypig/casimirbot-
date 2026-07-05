@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import type { HelixCapabilityLaneMailLoopDebugSummary } from "@shared/helix-capability-lane-mail-loop";
+import { runtimeMemoryGovernor } from "../../../runtime/runtime-memory-governor";
 import type { HelixAgentProvider } from "../../agent-providers/types";
+import { resetInterimVoiceCalloutsForTest } from "../../interim-voice-callout-store";
 import { createHelixCapabilityLaneGoalBindingStore } from "../goal-binding";
 import { buildHelixCapabilityLaneProviderAdapterContext } from "../provider-adapter-context";
 import { createHelixCapabilityLaneSessionStore } from "../session-manager";
@@ -118,6 +120,11 @@ const mailLoopSummary = (
 });
 
 describe("capability lane provider adapter context", () => {
+  beforeEach(() => {
+    resetInterimVoiceCalloutsForTest();
+    runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
+  });
+
   it("packages one-shot lane execution for any selected runtime provider", async () => {
     const helix = await buildHelixCapabilityLaneProviderAdapterContext({
       provider: buildProvider("helix"),
@@ -310,6 +317,125 @@ describe("capability lane provider adapter context", () => {
     expect(codex.prompt_observation_block).toContain("lane_observation");
     expect(codex.prompt_observation_block).toContain("capability_lane_session_debug_summaries");
     expect(codex.prompt_observation_block).toContain("capability_lane_reentry_status");
+  });
+
+  it("keeps pending text-to-speech playback visible as executed non-terminal evidence", async () => {
+    runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+      memoryReader: () => ({
+        heapUsed: 120 * 1024 * 1024,
+        heapTotal: 512 * 1024 * 1024,
+        rss: 640 * 1024 * 1024,
+        external: 0,
+        arrayBuffers: 0,
+      }),
+      hostMemoryReader: () => ({
+        freeMiB: 16_000,
+        totalMiB: 32_000,
+        freeRatio: 0.5,
+      }),
+    });
+    const context = await buildHelixCapabilityLaneProviderAdapterContext({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-provider-adapter-tts-pending",
+        capability_lane_call: {
+          capability: "text_to_speech.speak_text",
+          text: "governed playback pending",
+          source_observation_ref: "obs:translation-for-tts",
+        },
+      },
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(context.calls_succeeded).toBe(true);
+    expect(context.one_shot.observation_packets[0]).toMatchObject({
+      capability_key: "text_to_speech.speak_text",
+      status: "client_pending",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(context.one_shot.debug_events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        stage: "lane_observation",
+        lane_id: "text_to_speech",
+        capability: "text_to_speech.speak_text",
+        status: "pending",
+        terminal_authority_status: "pending_helix_terminal_authority",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]));
+    expect(context.capability_lane_turn_timeline).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        stage: "lane_observation",
+        lane_id: "text_to_speech",
+        capability_id: "text_to_speech.speak_text",
+        status: "pending",
+        lane_requested: true,
+        lane_executed: true,
+        observation_reentered: false,
+        terminal_authority_status: "pending_helix_terminal_authority",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]));
+  });
+
+  it("projects visible translation collector source identity into provider timeline rows", async () => {
+    const context = await buildHelixCapabilityLaneProviderAdapterContext({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-provider-visible-collector",
+        capability_lane_call: {
+          capability: "workstation_tool_reference.collect_visible_translation_targets",
+          active_panel_id: "docs-viewer",
+          doc_path: "docs/research/nhm2.md",
+          source_hash: "sha256:full-document-hash",
+          projection_target: "docs_chunk",
+          account_locale: "es-US",
+          target_language: "es",
+          visible_only: true,
+          max_chunks: 1,
+          title_text: "NHM2 frontier status",
+        },
+      },
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(context.calls_succeeded).toBe(true);
+    expect(context.capability_lane_turn_timeline).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        schema: "helix.capability_lane.provider_timeline_event.v1",
+        stage: "lane_observation",
+        selected_runtime_agent_provider: "codex",
+        adapter_boundary: "helix_agent_provider_edge",
+        lane_id: "workstation_tool_reference",
+        capability_id: "workstation_tool_reference.collect_visible_translation_targets",
+        lane_requested: true,
+        lane_executed: true,
+        observation_reentered: false,
+        source_id: "document_markdown:docs/research/nhm2.md#visible-chunk-1",
+        doc_path: "docs/research/nhm2.md",
+        source_hash: "sha256:full-document-hash",
+        source_kind: "docs_viewer",
+        source_projection_target: "docs_chunk",
+        account_locale: "es-US",
+        latest_chunk_id: "visible-chunk-1",
+        latest_chunk_index: 0,
+        latest_dedupe_key: expect.stringContaining("visible-chunk-1"),
+        latest_source_event_id: expect.stringContaining("visible-chunk-1"),
+        source_text_hash: expect.stringMatching(/^sha256:/),
+        source_text_char_count: "NHM2 frontier status".length,
+        target_language: "es",
+        terminal_authority_status: "pending_helix_terminal_authority",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]));
   });
 
   it("packages governed lane session lifecycle calls for the selected runtime provider", async () => {

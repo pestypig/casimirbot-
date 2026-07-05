@@ -25,6 +25,7 @@ export type HelixTextToSpeechOneShotRequest = {
   voice?: string | null;
   profile?: string | null;
   locale?: string | null;
+  voice_playback_kind?: "tool_receipt" | "translation_relay" | "narrator_read" | "panel_narration" | null;
   requested_backend_provider?: string | null;
   turn_id?: string | null;
   thread_id?: string | null;
@@ -52,6 +53,11 @@ export type HelixTextToSpeechReceipt = {
   playback_request_ref: string | null;
   client_playback_receipt_ref: string | null;
   audio_bytes_observed: boolean;
+  playback_started: boolean;
+  playback_completed: boolean;
+  playback_failed: boolean;
+  delivered_utterance_id: string | null;
+  client_playback_receipt_status: string | null;
   playback_requested_at_ms: number | null;
   playback_confirmed_at_ms: number | null;
   delivered_at_ms: number | null;
@@ -81,6 +87,7 @@ export type HelixTextToSpeechOneShotResult = {
   observation: HelixTextToSpeechReceipt | null;
   observation_packet: HelixAgentStepObservationPacket;
   artifact_refs: string[];
+  voice_playback_receipt_barrier?: unknown;
   error?: string;
   reentry_required: true;
   terminal_eligible: false;

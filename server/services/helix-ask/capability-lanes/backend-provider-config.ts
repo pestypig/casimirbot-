@@ -54,8 +54,21 @@ const configuredEnvVars = (env: NodeJS.ProcessEnv, names: string[]): string[] =>
 export const textBackendConfigured = (env: NodeJS.ProcessEnv): boolean =>
   hasAnyConfiguredEnvVar(env, ["OPENAI_API_KEY", "LLM_HTTP_BASE", "LLM_HTTP_MODEL"]);
 
+export const LIVE_TRANSLATION_OPENAI_COMPATIBLE_ENV_VARS = [
+  "LIVE_TRANSLATION_OPENAI_API_KEY",
+  "DOC_TRANSLATION_API_KEY",
+  "OPENAI_API_KEY",
+  "LLM_HTTP_API_KEY",
+] as const;
+
+export const liveTranslationOpenAiCompatibleConfigured = (env: NodeJS.ProcessEnv): boolean =>
+  hasAnyConfiguredEnvVar(env, [...LIVE_TRANSLATION_OPENAI_COMPATIBLE_ENV_VARS]);
+
 export const liveTranslationExternalBackendsEnabled = (env: NodeJS.ProcessEnv): boolean =>
-  readBooleanEnv(env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED, false);
+  readBooleanEnv(
+    env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED,
+    liveTranslationOpenAiCompatibleConfigured(env),
+  );
 
 export const HELIX_LANE_BACKEND_SELECTION_POLICY: HelixCapabilityLaneBackendSelectionPolicy = {
   schema: "helix.capability_lane.backend_selection_policy.v1",

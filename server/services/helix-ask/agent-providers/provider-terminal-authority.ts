@@ -87,6 +87,14 @@ const isGatewayObservationReenteredForProviderReasoning = (
   isCalculatorBlockedExpressionObservation(result) ||
   isGatewayRecoveryAffordanceObservation(result);
 
+const isTextToSpeechReceiptObservation = (packet: HelixAgentStepObservationPacket): boolean => {
+  if (packet.capability_key !== "text_to_speech.speak_text") return false;
+  const stateDelta = readRecord(packet.state_delta);
+  const receipt = readRecord(stateDelta?.text_to_speech_receipt);
+  const playbackStatus = readString(receipt?.playback_status);
+  return ["pending", "played", "blocked", "failed"].includes(playbackStatus);
+};
+
 export const buildHelixProviderReasoningReentry = (input: {
   runtime: HelixAgentRuntimeId;
   providerLabel: string;
@@ -104,6 +112,7 @@ export const buildHelixProviderReasoningReentry = (input: {
   const capabilityLaneObservationPackets = input.capabilityLaneObservationPackets ?? [];
   const successfulCapabilityLaneObservationPackets = capabilityLaneObservationPackets.filter((packet) => {
     const status = packet.status.trim().toLowerCase();
+    if (isTextToSpeechReceiptObservation(packet)) return true;
     return status !== "blocked" && status !== "failed" && status !== "missing_input" && status !== "needs_confirmation";
   });
   const capabilityLaneObservationRefs = capabilityLaneObservationPackets.flatMap((packet) => packet.produced_artifact_refs);

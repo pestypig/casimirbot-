@@ -2,13 +2,17 @@ import React, { type ReactNode } from "react";
 import type { ContextCapsuleSummary } from "@shared/helix-context-capsule";
 
 import { HelixAskReplyContextCapsuleCard } from "./HelixAskContextCapsulePreview";
-import { HelixAskReplyStatusFooter } from "./HelixAskFinalExtras";
+import {
+  HelixAskReplyStatusFooter,
+  HelixAskRuntimeGoalProgressPanel,
+} from "./HelixAskFinalExtras";
 
 export type HelixAskReplyCardProps = {
   turnTestId?: string;
   isLatestReply: boolean;
   tintClassName: string;
   contextCapsule?: ContextCapsuleSummary | null;
+  runtimeGoalDebugSummary?: Record<string, unknown> | null;
   promptIngested?: boolean;
   children: ReactNode;
 };
@@ -18,6 +22,7 @@ export function HelixAskReplyCard({
   isLatestReply,
   tintClassName,
   contextCapsule,
+  runtimeGoalDebugSummary,
   promptIngested,
   children,
 }: HelixAskReplyCardProps) {
@@ -33,6 +38,10 @@ export function HelixAskReplyCard({
       <div className="relative">
         <HelixAskReplyContextCapsuleCard capsule={contextCapsule} />
         <div className="space-y-3">{children}</div>
+        <HelixAskRuntimeGoalProgressPanel
+          summary={runtimeGoalDebugSummary}
+          isLatestReply={isLatestReply}
+        />
         <HelixAskReplyStatusFooter visible={isLatestReply} promptIngested={promptIngested} />
       </div>
     </div>

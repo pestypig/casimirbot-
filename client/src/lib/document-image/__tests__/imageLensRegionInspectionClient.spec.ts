@@ -27,6 +27,7 @@ function receiptFixture(): ImageLensRegionInspectionReceiptV1 {
     summary: "Equation candidate crop.",
     text_candidate: "T00 = rho",
     latex_candidate: "T_{00}=\\rho",
+    extraction_status: "extracted",
     uncertainty: ["candidate-only OCR"],
     evidence_id: "evidence:image-lens:test",
     requested_question: "Read the equation.",

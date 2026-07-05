@@ -9,6 +9,83 @@ import {
 import { buildHelixAskRuntimeTurnSummary } from "@/lib/helix/ask-runtime-turn-summary";
 
 describe("Helix Ask turn transcript projection", () => {
+  it("renders a compact visible translation chain summary row from debug export", () => {
+    const reply = {
+      id: "turn-visible-chain-summary",
+      content: "Visible document translation was projected.",
+      debug: {
+        turn_id: "turn-visible-chain-summary",
+        debug_export: {
+          visible_translation_chain_summary: {
+            schema: "helix.visible_translation.chain_summary.v1",
+            collector_requested: true,
+            collector_capability: "workstation_tool_reference.collect_visible_translation_targets",
+            collector_observation_ref: "obs:visible-targets",
+            collected_target_count: 1,
+            translation_requested: true,
+            translation_executed: true,
+            backend_selected_count: 1,
+            projection_receipt_count: 1,
+            observation_reentered: true,
+            terminal_selected: true,
+            terminal_rejected: false,
+            chain_complete: true,
+            projection_is_terminal_authority: false,
+            source_ids: ["document_markdown:docs/current.md"],
+            chunk_ids: ["visible-1"],
+            source_kinds: ["docs_viewer"],
+            panel_ids: ["docs-viewer"],
+            region_ids: ["docs-viewer:visible-1"],
+            target_languages: ["es"],
+            projection_targets: ["docs_chunk"],
+            observation_refs: ["obs:visible-targets", "obs:visible-chain-translation"],
+            receipt_refs: ["receipt:visible-chain-projection"],
+          },
+        },
+      },
+    };
+    const rows = buildHelixTurnTranscriptRows(reply);
+    const summary = buildHelixAskRuntimeTurnSummary(reply);
+
+    const visibleTranslationRow = rows.find((row) => row.label === "Visible Translation");
+
+    expect(visibleTranslationRow).toEqual(
+      expect.objectContaining({
+        label: "Visible Translation",
+        role: "system",
+        status: "completed",
+        text: expect.stringContaining("Visible translation chain complete"),
+        meta: expect.stringContaining("terminal authority terminal_selected_after_reentry"),
+      }),
+    );
+    expect(visibleTranslationRow?.text).toContain("collector requested");
+    expect(visibleTranslationRow?.text).toContain("translation executed");
+    expect(visibleTranslationRow?.text).toContain("source kind docs_viewer");
+    expect(visibleTranslationRow?.text).toContain("panel docs-viewer");
+    expect(visibleTranslationRow?.text).toContain("region docs-viewer:visible-1");
+    expect(visibleTranslationRow?.text).toContain("Projection is not terminal authority.");
+    expect(visibleTranslationRow?.meta).toContain("capability live_translation.translate_text");
+    expect(visibleTranslationRow?.meta).toContain("receipt receipt:visible-chain-projection");
+    expect(visibleTranslationRow?.meta).toContain("source kind docs_viewer");
+    expect(visibleTranslationRow?.meta).toContain("panel docs-viewer");
+    expect(visibleTranslationRow?.meta).toContain("region docs-viewer:visible-1");
+    expect(visibleTranslationRow?.meta).toContain("target es");
+
+    const summaryValue = summary?.rows.find((row) => row.key === "visible_translation_chain")?.value ?? "";
+    expect(summaryValue).toContain("complete");
+    expect(summaryValue).toContain("collector requested");
+    expect(summaryValue).toContain("translation executed");
+    expect(summaryValue).toContain("terminal selected");
+    expect(summaryValue).toContain("source document_markdown:docs/current.md");
+    expect(summaryValue).toContain("chunk visible-1");
+    expect(summaryValue).toContain("source kind docs_viewer");
+    expect(summaryValue).toContain("panel docs-viewer");
+    expect(summaryValue).toContain("region docs-viewer:visible-1");
+    expect(summaryValue).toContain("target es");
+    expect(summaryValue).toContain("receipt receipt:visible-chain-projection");
+    expect(summaryValue).toContain("projection-only, not terminal authority");
+  });
+
   it("projects individual turn transcript records into live-event entries", () => {
     expect(
       buildAskLiveEventFromTurnTranscriptRecord(
@@ -46,6 +123,8 @@ describe("Helix Ask turn transcript projection", () => {
           stepId: "step-1",
           lane: "scientific-calculator.solve_expression",
           capabilityId: null,
+          requestedCapabilityId: null,
+          executedCapabilityId: null,
           laneSessionId: null,
           sessionControlKey: null,
           sourceBindingKey: null,
@@ -82,6 +161,11 @@ describe("Helix Ask turn transcript projection", () => {
           latestFreshnessStatus: null,
           latestProjectionTarget: null,
           targetLanguage: null,
+          existingObservationRef: null,
+          existingReceiptRef: null,
+          existingProjectionStatus: null,
+          existingFreshnessStatus: null,
+          existingTerminalAuthorityStatus: null,
           latestCancelRequested: null,
           laneVisible: null,
           laneRequested: null,
@@ -556,6 +640,48 @@ describe("Helix Ask turn transcript projection", () => {
           },
         ],
         capability_lane_reentry_status: "observation_packet_required_for_provider_reentry",
+        runtime_lane_request_loop: {
+          status: "collector_and_translation_completed",
+          visible_translation_collector_chain: {
+            schema: "helix.runtime_lane_request_loop.visible_translation_collector_chain.v1",
+            requested_collector_capability: "workstation.visible_text.collect_translation_targets",
+            collector_capability: "workstation_tool_reference.collect_visible_translation_targets",
+            translation_capability: "live_translation.translate_text",
+            collector_requested: true,
+            translation_requested: true,
+            collected_target_count: 1,
+            collected_source_kinds: ["docs_viewer", "panel_text"],
+            collected_projection_targets: ["docs_chunk", "account_language"],
+            collected_panel_ids: ["docs-viewer", "workstation-notes"],
+            collector_observation_ref: "ask:lane:collector:obs",
+            collector_batch_ref: "ask:lane:collector:batch",
+            first_collected_source_id: "docs:nhm2",
+            first_collected_doc_path: "docs/research/nhm2.md",
+            first_collected_chunk_id: "chunk-1",
+            first_collected_source_event_id:
+              "visible_translation_source_event:docs/research/nhm2.md:chunk:chunk-1:fnv1a32:source-text:es",
+            first_collected_source_event_ms: 1782860000000,
+            first_collected_observed_at_ms: 1782860000100,
+            first_collected_source_hash: "fnv1a32:doc-hash",
+            first_collected_source_text_hash: "fnv1a32:source-text",
+            first_collected_source_text_char_count: 4096,
+            first_collected_projection_target: "docs_chunk",
+            first_collected_target_language: "es",
+            first_collected_existing_observation_ref: "ask:lane:existing:obs",
+            first_collected_existing_receipt_ref: "ask:lane:existing:receipt",
+            first_collected_existing_projection_status: "projected",
+            first_collected_existing_freshness_status: "fresh",
+            first_collected_existing_terminal_authority_status: "not_terminal_authority",
+            first_collected_existing_source_event_ms: 1782859999000,
+            first_collected_existing_observed_at_ms: 1782859999100,
+            reentry_required: true,
+            translation_observation_ref: "ask:lane:translation:obs",
+            translation_receipt_ref: "ask:lane:translation:obs:projection:receipt",
+            translated_source_kinds: ["docs_viewer"],
+            translated_projection_targets: ["docs_chunk"],
+            projection_receipt_status: "stale",
+          },
+        },
         capability_lane_resolve_traces: [
           {
             schema: "helix.capability_lane_resolve_trace.v1",
@@ -690,6 +816,41 @@ describe("Helix Ask turn transcript projection", () => {
             terminal_eligible: false,
             assistant_answer: false,
             raw_content_included: false,
+            reentry_required: true,
+          },
+          {
+            schema: "helix.live_translation.projection_receipt.v1",
+            receipt_ref: "ask:lane:translation:account-language:pending:receipt",
+            observation_ref: "ask:lane:translation:account-language:pending:obs",
+            projection_key: "account-language:docs-viewer:title:es",
+            lane_id: "live_translation",
+            capability: "live_translation.translate_text",
+            lane_session_id: "lane-session-account-language",
+            selected_backend_provider: "live_translation.local_runtime",
+            projection_target: "account_language",
+            projection_status: "projected",
+            source_id: "workstation-shell#docs-viewer:title",
+            panel_id: "docs-viewer",
+            region_id: "docs-viewer:title",
+            doc_path: "docs/research/nhm2.md",
+            source_hash: "fnv1a32:title",
+            source_kind: "panel_text",
+            account_locale: "es-US",
+            chunk_id: "docs-viewer:title",
+            chunk_index: 0,
+            dedupe_key: "workstation-shell#docs-viewer:title:es",
+            observed_at_ms: 1782860000100,
+            freshness_status: "fresh",
+            target_language: "es",
+            translated_text: null,
+            session_debug_phase: "running:translate_visible_region",
+            session_observation_status: "pending_backend_observation",
+            terminal_authority_status: "pending_helix_terminal_authority",
+            answer_authority: false,
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+            reentry_required: true,
           },
         ],
       },
@@ -697,6 +858,38 @@ describe("Helix Ask turn transcript projection", () => {
 
     const combined = rows.map((row) => `${row.label}: ${row.text} ${row.meta} ${row.status}`).join("\n");
     expect(combined).toContain("Runtime selected: Codex Workstation Mode.");
+    expect(combined).toContain(
+      "Visible Collector: Visible translation collector: workstation.visible_text.collect_translation_targets requested; workstation_tool_reference.collect_visible_translation_targets executed collected source targets before live_translation.translate_text.",
+    );
+    expect(combined).toContain("1 target");
+    expect(combined).toContain("collected source kinds docs_viewer, panel_text");
+    expect(combined).toContain("collected projections docs_chunk, account_language");
+    expect(combined).toContain("panels docs-viewer, workstation-notes");
+    expect(combined).toContain("translated source kinds docs_viewer");
+    expect(combined).toContain("translated projections docs_chunk");
+    expect(combined).toContain("doc docs/research/nhm2.md");
+    expect(combined).toContain("source docs:nhm2");
+    expect(combined).toContain("source hash fnv1a32:doc-hash");
+    expect(combined).toContain("source payload hash fnv1a32:source-text");
+    expect(combined).toContain("source payload chars 4096");
+    expect(combined).toContain(
+      "source event visible_translation_source_event:docs/research/nhm2.md:chunk:chunk-1:fnv1a32:source-text:es",
+    );
+    expect(combined).toContain("source event ms 1782860000000");
+    expect(combined).toContain("observed 1782860000100");
+    expect(combined).toContain("existing observation ask:lane:existing:obs");
+    expect(combined).toContain("existing receipt ask:lane:existing:receipt");
+    expect(combined).toContain("existing projection projected");
+    expect(combined).toContain("existing freshness fresh");
+    expect(combined).toContain("existing terminal authority not_terminal_authority");
+    expect(combined).toContain("existing source event ms 1782859999000");
+    expect(combined).toContain("existing observed 1782859999100");
+    expect(combined).toContain("re-entry required true");
+    expect(combined).toContain("answer authority false");
+    expect(combined).toContain("collector observation ask:lane:collector:obs");
+    expect(combined).toContain("batch ask:lane:collector:batch");
+    expect(combined).toContain("projection receipt stale");
+    expect(combined).toContain("Collector output remains observation-only.");
     expect(combined).toContain("Lane Request: Lane requested: live_translation.translate_text.");
     expect(combined).toContain("Lane Backend: Lane backend selected: selected live_translation.local_runtime");
     expect(combined).toContain("requested google_gemini");
@@ -715,15 +908,71 @@ describe("Helix Ask turn transcript projection", () => {
       "Lane Observation: Lane observation: live_translation.translate_text session lane-session-translation produced Translation observation ready for en -> es.",
     );
     expect(combined).toContain(
-      "Lane Receipt: Lane projection receipt: live_translation.translate_text; projection stale; target docs_chunk; language es; observation ask:lane:translation:obs; receipt ask:lane:translation:obs:projection:receipt; remains observation-only.",
+      "Lane Receipt: Lane projection receipt: live_translation.translate_text; projection stale; target docs_chunk; language es; re-entry required true; observation ask:lane:translation:obs; receipt ask:lane:translation:obs:projection:receipt; remains observation-only.",
     );
     expect(combined).toContain(
       "UI Projection: UI translation projection: status stale; target docs_chunk; language es; source unknown_source; chunk ask:lane:translation:obs; freshness unknown; stale; terminal authority not_terminal_authority; observation ask:lane:translation:obs; receipt ask:lane:translation:obs:projection:receipt; projection-only, not terminal authority.",
     );
+    expect(combined).toContain(
+      "UI Projection: UI translation projection: status projected; account-language health pending; target account_language; language es; source workstation-shell#docs-viewer:title",
+    );
+    expect(combined).toContain("session phase running:translate_visible_region");
+    expect(combined).toContain("observation status pending_backend_observation");
+    expect(combined).toContain("terminal authority pending_helix_terminal_authority");
+    expect(combined).toContain("receipt ask:lane:translation:account-language:pending:receipt; projection-only, not terminal authority.");
     expect(combined).toContain("Lane Re-entry: Lane re-entry: observation packet available for provider reasoning before terminal selection.");
     expect(combined).toContain("Terminal: Terminal selected: agent_provider_terminal_candidate.");
     expect(combined).toContain("Final: The translation observation is available.");
     expect(combined).not.toContain("source text");
+    expect(rows.find((row) => row.label === "Visible Collector")?.text).toContain(
+      "existing source event ms 1782859999000",
+    );
+    expect(rows.find((row) => row.label === "Visible Collector")?.text).toContain(
+      "existing observed 1782859999100",
+    );
+  });
+
+  it("keeps text-to-speech projection receipts out of live-translation UI projection rows", () => {
+    const rows = buildHelixTurnTranscriptRows({
+      id: "reply-codex-tts-receipt",
+      turn_id: "turn-codex-tts-receipt",
+      content: "Playback was blocked.",
+      debug: {
+        turn_id: "turn-codex-tts-receipt",
+        capability_lane_projection_receipts: [
+          {
+            schema: "helix.capability_lane.provider_adapter_receipt.v1",
+            receipt_ref: "ask:lane:tts:obs:receipt",
+            kind: "text_to_speech_playback",
+            status: "blocked",
+            turn_id: "turn-codex-tts-receipt",
+            lane_id: "text_to_speech",
+            capability_key: "text_to_speech.speak_text",
+            observation_ref: "ask:lane:tts:obs",
+            payload: {
+              schema: "helix.text_to_speech.receipt.v1",
+              lane_id: "text_to_speech",
+              capability: "text_to_speech.speak_text",
+              playback_status: "blocked",
+              provider_playback_status: "queued_for_retry",
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+            reentry_required: true,
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
+      },
+    });
+
+    const laneReceiptRows = rows.filter((row) => row.label === "Lane Receipt");
+    const uiProjectionRows = rows.filter((row) => row.label === "UI Projection");
+    expect(laneReceiptRows.some((row) => row.text.includes("text_to_speech.speak_text"))).toBe(true);
+    expect(uiProjectionRows.some((row) => row.text.includes("text_to_speech.speak_text"))).toBe(false);
+    expect(uiProjectionRows.some((row) => row.text.includes("UI translation projection"))).toBe(false);
   });
 
   it("projects capability lane terminal authority rejection after observation re-entry", () => {
@@ -810,6 +1059,7 @@ describe("Helix Ask turn transcript projection", () => {
             terminal_eligible: false,
             assistant_answer: false,
             raw_content_included: false,
+            reentry_required: true,
           },
         ],
       },
@@ -959,6 +1209,54 @@ describe("Helix Ask turn transcript projection", () => {
       meta: expect.stringContaining("terminal authority pending_helix_terminal_authority"),
     });
     expect(rows.map((row) => row.text).join("\n")).not.toContain("stale direct receipt row");
+  });
+
+  it("surfaces runtime goal id, status, provider, and debug availability in the runtime turn summary", () => {
+    const summary = buildHelixAskRuntimeTurnSummary({
+      id: "reply-runtime-goal",
+      turn_id: "turn-runtime-goal",
+      final_answer_source: "runtime_goal_command",
+      terminal_artifact_kind: "runtime_goal_command_result",
+      runtime_goal_command: {
+        command: "wake",
+        goal_id: "goal:test-runtime",
+      },
+      runtime_goal_session: {
+        goal_id: "goal:test-runtime",
+        status: "waiting",
+        runtime_agent_provider: "codex",
+        runtime_session_id: "runtime-session:test-runtime",
+        latest_observation_refs: ["obs:docs-viewer.read_visible_surface:test"],
+        latest_receipt_refs: ["receipt:docs-viewer.read_visible_surface:test"],
+        terminal_authority_status: "authorized",
+      },
+      runtime_goal_debug_export: {
+        goal_id: "goal:test-runtime",
+        runtime_agent_provider: "codex",
+        runtime_session_id: "runtime-session:test-runtime",
+        wake_event_kind: "manual_resume",
+        terminal_authority_status: "authorized",
+      },
+      debug_export: {
+        debug_export_ref: "debug:goal:test-runtime",
+      },
+    });
+
+    const row = summary?.rows.find((entry) => entry.key === "runtime_goal_session");
+    expect(row).toMatchObject({
+      label: "Runtime goal",
+      value: expect.stringContaining("goal goal:test-runtime"),
+    });
+    expect(row?.value).toContain("status waiting");
+    expect(row?.value).toContain("runtime codex");
+    expect(row?.value).toContain("command wake");
+    expect(row?.value).toContain("observation obs:docs-viewer.read_visible_surface:test");
+    expect(row?.value).toContain("terminal authority authorized");
+    expect(row?.value).toContain("debug export available");
+    expect(summary?.rows.find((entry) => entry.key === "debug_export")).toMatchObject({
+      label: "Debug export",
+      value: "debug:goal:test-runtime",
+    });
   });
 
   it("summarizes session-bound live translation chunks in the runtime turn summary", () => {
@@ -1159,6 +1457,8 @@ describe("Helix Ask turn transcript projection", () => {
               projection_key:
                 "docs:hover::fnv1a32:hover-source::docs_hover::fr-CA::hover-1::ask:lane:translation:receipt-only:projection:receipt",
               source_id: "docs:hover",
+              doc_path: "docs/research/hover-source.md",
+              bbox: { x: 20, y: 40, width: 180, height: 36, source: "hover-region" },
               source_hash: "fnv1a32:hover",
               source_kind: "docs",
               source_text_hash: "fnv1a32:hover-source",
@@ -1175,6 +1475,7 @@ describe("Helix Ask turn transcript projection", () => {
             terminal_eligible: false,
             assistant_answer: false,
             raw_content_included: false,
+            reentry_required: true,
           },
         ],
       },
@@ -1188,6 +1489,8 @@ describe("Helix Ask turn transcript projection", () => {
     );
     expect(projection).toContain("target docs_hover");
     expect(projection).toContain("source docs:hover");
+    expect(projection).toContain("doc path docs/research/hover-source.md");
+    expect(projection).toContain('bbox {"x":20,"y":40,"width":180,"height":36,"source":"hover-region"}');
     expect(projection).toContain("source hash fnv1a32:hover");
     expect(projection).toContain("source kind docs");
     expect(projection).toContain("source payload hash fnv1a32:hover-source");
@@ -1199,11 +1502,14 @@ describe("Helix Ask turn transcript projection", () => {
     expect(projection).toContain("source event ms 100");
     expect(projection).toContain("observed 125");
     expect(projection).toContain("freshness fresh");
+    expect(projection).toContain("re-entry required true");
     expect(projection).toContain("receipt ask:lane:translation:receipt-only:projection:receipt");
     expect(projection).toContain("ref ask:lane:translation:receipt-only");
     expect(projection).toContain("observation-only");
     const traffic = summary?.rows.find((row) => row.key === "translation_traffic")?.value ?? "";
     expect(traffic).toContain("docs:hover");
+    expect(traffic).toContain("latest doc path docs/research/hover-source.md");
+    expect(traffic).toContain('latest bbox {"x":20,"y":40,"width":180,"height":36,"source":"hover-region"}');
     expect(traffic).toContain("source hash fnv1a32:hover");
     expect(traffic).toContain("source kind docs");
     expect(traffic).toContain("latest source payload hash fnv1a32:hover-source");
@@ -1600,6 +1906,186 @@ describe("Helix Ask turn transcript projection", () => {
     expect(laneProjection).toContain("execution executed_observation_only");
     expect(laneProjection).toContain("availability dry_run");
     expect(laneProjection).toContain("permission admitted");
+  });
+
+  it("summarizes visible translation collector UI-region targets in the runtime turn summary", () => {
+    const summary = buildHelixAskRuntimeTurnSummary({
+      id: "reply-codex-visible-ui-region-summary",
+      turn_id: "turn-codex-visible-ui-region-summary",
+      content: "The visible UI target was collected.",
+      debug: {
+        turn_id: "turn-codex-visible-ui-region-summary",
+        agent_runtime: "codex",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        capability_lane_call_results: [
+          {
+            schema: "helix.workstation_tool_reference.visible_translation_targets_result.v1",
+            ok: true,
+            capability: "workstation_tool_reference.collect_visible_translation_targets",
+            lane_id: "workstation_tool_reference",
+            target_count: 1,
+            observation_ref: "ask:lane:collector:obs",
+            lane_resolve_trace: {
+              requested_lane: "workstation_tool_reference",
+              selected_backend_provider: "workstation_tool_reference.helix_workstation_gateway",
+              selection_reason: "selected_default_backend_provider_for_shadow_manifest",
+              availability_status: "available",
+              permission_status: "admitted",
+            },
+            observation: {
+              schema: "helix.workstation_tool_reference.visible_translation_targets_observation.v1",
+              observation_ref: "ask:lane:collector:obs",
+              target_batch: {
+                schema: "helix.visible_translation_target_batch.v1",
+                batch_ref: "ask:lane:collector:batch",
+                target_count: 1,
+                requested_collector_capability: "workstation.visible_text.collect_translation_targets",
+                collector_capability: "workstation_tool_reference.collect_visible_translation_targets",
+                targets: [
+                  {
+                    schema: "helix.visible_translation_target.v1",
+                    source_kind: "button_label",
+                    panel_id: "docs-viewer",
+                    doc_path: "docs/current.md",
+                    source_id: "workstation-shell#docs-viewer:translate-button",
+                    source_hash: "sha256:doc-context",
+                    source_text_hash: "fnv1a32:78e3e875",
+                    source_text_char_count: 9,
+                    visible_text: "Translate",
+                    chunk_id: "docs-viewer:translate-button",
+                    source_event_id:
+                      "visible_translation_source_event:docs/current.md:ui:docs-viewer:translate-button:fnv1a32:78e3e875:es",
+                    chunk_index: 0,
+                    region_id: "docs-viewer:translate-button",
+                    dedupe_key: "workstation-shell#docs-viewer:translate-button::es",
+                    projection_target: "account_language",
+                    account_locale: "en-US",
+                    target_language: "es",
+                    existing_observation_ref: "ask:turn:translation:observation:button",
+                    existing_receipt_ref: "ask:turn:translation:receipt:button",
+                    existing_translation_receipt_ref: "ask:turn:translation:receipt:button",
+                    existing_projection_status: "projected",
+                    existing_freshness_status: "fresh",
+                    existing_terminal_authority_status: "not_terminal_authority",
+                    existing_source_event_ms: 1782859999000,
+                    existing_observed_at_ms: 1782859999100,
+                    assistant_answer: false,
+                    terminal_eligible: false,
+                    answer_authority: false,
+                    raw_content_included: false,
+                    reentry_required: true,
+                  },
+                ],
+                terminal_eligible: false,
+                assistant_answer: false,
+                answer_authority: false,
+                raw_content_included: false,
+                reentry_required: true,
+              },
+            },
+            observation_packet: {
+              schema: "helix.agent_step_observation_packet.v1",
+              capability_key: "workstation_tool_reference.collect_visible_translation_targets",
+              status: "succeeded",
+              observation_ref: "ask:lane:collector:obs",
+              state_delta: {
+                visible_translation_target_batch: {
+                  schema: "helix.visible_translation_target_batch.v1",
+                  target_count: 1,
+                  requested_collector_capability: "workstation.visible_text.collect_translation_targets",
+                  collector_capability: "workstation_tool_reference.collect_visible_translation_targets",
+                  targets: [],
+                },
+              },
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
+        capability_lane_projection_receipts: [
+          {
+            schema: "helix.live_translation.projection_receipt.v1",
+            receipt_ref: "ask:turn:translation:receipt:button:pending",
+            observation_ref: "ask:turn:translation:observation:button:pending",
+            projection_key: "account-language:docs-viewer:translate-button:es",
+            lane_id: "live_translation",
+            capability: "live_translation.translate_text",
+            lane_session_id: "lane-session-account-language",
+            selected_backend_provider: "live_translation.local_runtime",
+            projection_target: "account_language",
+            projection_status: "projected",
+            source_id: "workstation-shell#docs-viewer:translate-button",
+            panel_id: "docs-viewer",
+            region_id: "docs-viewer:translate-button",
+            doc_path: "docs/current.md",
+            source_hash: "sha256:doc-context",
+            source_kind: "button_label",
+            source_text_hash: "fnv1a32:78e3e875",
+            source_text_char_count: 9,
+            account_locale: "en-US",
+            chunk_id: "docs-viewer:translate-button",
+            chunk_index: 0,
+            dedupe_key: "workstation-shell#docs-viewer:translate-button::es",
+            observed_at_ms: 1782860000100,
+            freshness_status: "fresh",
+            target_language: "es",
+            translated_text: null,
+            session_debug_phase: "running:translate_visible_region",
+            session_observation_status: "pending_backend_observation",
+            terminal_authority_status: "pending_helix_terminal_authority",
+            answer_authority: false,
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
+      },
+    });
+
+    const laneProjection = summary?.rows.find((row) => row.key === "lane_projection")?.value ?? "";
+    expect(laneProjection).toContain("workstation_tool_reference");
+    expect(laneProjection).toContain("visible_translation_targets");
+    expect(laneProjection).toContain("requested collector workstation.visible_text.collect_translation_targets");
+    expect(laneProjection).toContain("executed collector workstation_tool_reference.collect_visible_translation_targets");
+    expect(laneProjection).toContain("target chunks 1");
+    expect(laneProjection).toContain("target es");
+    expect(laneProjection).toContain("projection account_language");
+    expect(laneProjection).toContain("source kind button_label");
+    expect(laneProjection).toContain("panel docs-viewer");
+    expect(laneProjection).toContain("source workstation-shell#docs-viewer:translate-button");
+    expect(laneProjection).toContain("doc path docs/current.md");
+    expect(laneProjection).toContain("source hash sha256:doc-context");
+    expect(laneProjection).toContain("source text hash fnv1a32:78e3e875");
+    expect(laneProjection).toContain("source text chars 9");
+    expect(laneProjection).toContain("first chunk docs-viewer:translate-button");
+    expect(laneProjection).toContain(
+      "source event visible_translation_source_event:docs/current.md:ui:docs-viewer:translate-button:fnv1a32:78e3e875:es",
+    );
+    expect(laneProjection).toContain("region docs-viewer:translate-button");
+    expect(laneProjection).toContain("existing observation ask:turn:translation:observation:button");
+    expect(laneProjection).toContain("existing receipt ask:turn:translation:receipt:button");
+    expect(laneProjection).toContain("existing projection projected");
+    expect(laneProjection).toContain("existing freshness fresh");
+    expect(laneProjection).toContain("existing terminal authority not_terminal_authority");
+    expect(laneProjection).toContain("existing source event ms 1782859999000");
+    expect(laneProjection).toContain("existing observed 1782859999100");
+    expect(laneProjection).toContain("answer authority false");
+    expect(laneProjection).toContain("terminal eligible false");
+    expect(laneProjection).toContain("assistant answer false");
+    expect(laneProjection).toContain("re-entry required true");
+    expect(laneProjection).toContain("translation still requires live_translation.translate_text");
+    expect(laneProjection).toContain("live_translation.translate_text");
+    expect(laneProjection).toContain("account-language health pending");
+    expect(laneProjection).toContain("projection key account-language:docs-viewer:translate-button:es");
+    expect(laneProjection).toContain("session phase running:translate_visible_region");
+    expect(laneProjection).toContain("observation status pending_backend_observation");
+    expect(laneProjection).toContain("terminal authority pending_helix_terminal_authority");
+    expect(laneProjection).toContain("receipt ask:turn:translation:receipt:button:pending");
+    expect(laneProjection).toContain("ref ask:turn:translation:observation:button:pending");
   });
 
   it("projects canonical capability_lane_turn_timeline rows before falling back to legacy lane arrays", () => {

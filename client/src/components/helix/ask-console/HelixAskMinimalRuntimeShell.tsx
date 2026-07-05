@@ -1,4 +1,4 @@
-import React, { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import React, { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
 import { DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS } from "@/lib/helix/ask-agent-runtime-display";
 import { useAgiChatStore } from "@/store/useAgiChatStore";
@@ -12,6 +12,7 @@ import {
   completeHelixAskMinimalRuntimeTurn,
   createHelixAskMinimalRuntimeInitialState,
   failHelixAskMinimalRuntimeTurn,
+  HELIX_ASK_MINIMAL_RUNTIME_REPLY_LIMIT,
   recordHelixAskMinimalRuntimeStreamEvent,
   resolveHelixAskMinimalRuntimeAnswerText,
   startHelixAskMinimalRuntimeTurn,
@@ -37,6 +38,7 @@ import {
   buildHelixAskRuntimePickerModel,
   HelixAskRuntimePicker,
 } from "./HelixAskRuntimePicker";
+import { useHelixAskRuntimeGoalWakeSubscriptions } from "./HelixAskRuntimeGoalWakeSubscriptions";
 import { HelixAskRuntimeStatusLine } from "./HelixAskStatusLine";
 import {
   HelixAskSurfaceSupplementStack,
@@ -64,6 +66,8 @@ type HelixAskMinimalRuntimeDebugDrawerState = {
   replyId: string;
 };
 
+type RecordLike = Record<string, unknown>;
+
 function hashHelixAskMinimalRuntimeDebugPayload(text: string): string {
   let hash = 0;
   for (let index = 0; index < text.length; index += 1) {
@@ -87,6 +91,9 @@ export function HelixAskMinimalRuntimeShell({
   const [runtimeState, setRuntimeState] = useState(createHelixAskMinimalRuntimeInitialState);
   const [chatSessionId, setChatSessionId] = useState<string | null>(null);
   const [debugDrawer, setDebugDrawer] = useState<HelixAskMinimalRuntimeDebugDrawerState | null>(null);
+  const runtimeRepliesRef = useRef<readonly RecordLike[]>([]);
+  const runtimeGoalWakeInFlightRef = useRef(false);
+  const runtimeGoalWakeLastSubmittedKeyRef = useRef<string | null>(null);
   const hydratedChatSessionRef = useRef<string | null>(null);
   const ensureContextSession = useAgiChatStore((state) => state.ensureContextSession);
   const addChatMessage = useAgiChatStore((state) => state.addMessage);
@@ -108,6 +115,108 @@ export function HelixAskMinimalRuntimeShell({
       },
     };
   }, [controlActions]);
+
+  useEffect(() => {
+    runtimeRepliesRef.current = runtimeState.replies as unknown as readonly RecordLike[];
+  }, [runtimeState.replies]);
+
+  const getMinimalRuntimeSessionId = useCallback(() => {
+    const sessionId = chatSessionId ?? ensureContextSession(props.contextId, "Helix Ask");
+    if (sessionId && sessionId !== chatSessionId) {
+      setChatSessionId(sessionId);
+      setActiveChatSession(sessionId);
+    }
+    return sessionId ?? null;
+  }, [chatSessionId, ensureContextSession, props.contextId, setActiveChatSession]);
+
+  const buildMinimalWorkspaceContextSnapshot = useCallback((sessionId: string | null): RecordLike => {
+    const href = typeof window === "undefined" ? "" : window.location.href;
+    const url = (() => {
+      try {
+        return href ? new URL(href) : null;
+      } catch {
+        return null;
+      }
+    })();
+    const docPath = url?.searchParams.get("doc")?.trim() || null;
+    const focus = url?.searchParams.get("focus")?.trim() || null;
+    const panels = url?.searchParams.get("panels")?.split(",").map((entry) => entry.trim()).filter(Boolean) ?? [];
+    return {
+      schema: "helix.ask.minimal_runtime_workspace_context_snapshot.v1",
+      session_id: sessionId,
+      desktop_url: href,
+      active_panel_id: focus || (panels.includes("docs-viewer") ? "docs-viewer" : null),
+      activePanelId: focus || (panels.includes("docs-viewer") ? "docs-viewer" : null),
+      open_panel_ids: panels,
+      openPanelIds: panels,
+      active_doc_path: docPath,
+      activeDocPath: docPath,
+      doc_context_path: docPath,
+      docContextPath: docPath,
+    };
+  }, []);
+
+  const appendMinimalRuntimeWakeReply = useCallback((reply: RecordLike) => {
+    const turnId =
+      typeof reply.turn_id === "string" && reply.turn_id.trim()
+        ? reply.turn_id.trim()
+        : typeof reply.id === "string" && reply.id.trim()
+          ? reply.id.trim()
+          : `runtime-goal-wake:${Date.now()}`;
+    const content =
+      typeof reply.content === "string" && reply.content.trim()
+        ? reply.content
+        : typeof reply.selected_final_answer === "string" && reply.selected_final_answer.trim()
+          ? reply.selected_final_answer
+          : typeof reply.text === "string" && reply.text.trim()
+            ? reply.text
+            : "Runtime goal wake completed.";
+    const question =
+      typeof reply.question === "string" && reply.question.trim()
+        ? reply.question
+        : "Runtime goal wake: visible source changed";
+    setRuntimeState((state) => ({
+      ...state,
+      askBusy: false,
+      askStatus: "Runtime goal wake completed.",
+      activeTurnId: state.activeTurnId === turnId ? null : state.activeTurnId,
+      activeStartedAtMs: state.activeTurnId === turnId ? null : state.activeStartedAtMs,
+      replies: [
+        ...state.replies.filter((entry) => entry.turn_id !== turnId),
+        {
+          id: turnId,
+          turn_id: turnId,
+          createdAtMs:
+            typeof reply.createdAtMs === "number" && Number.isFinite(reply.createdAtMs)
+              ? reply.createdAtMs
+              : Date.now(),
+          content,
+          question,
+          mode: "observe",
+          result: reply,
+          debug: reply.debug,
+          liveEvents: [],
+        },
+      ].slice(-HELIX_ASK_MINIMAL_RUNTIME_REPLY_LIMIT),
+    }));
+  }, []);
+
+  useHelixAskRuntimeGoalWakeSubscriptions({
+    selectedAgentRuntime: selectedRuntime,
+    askRepliesRef: runtimeRepliesRef,
+    runtimeGoalWakeInFlightRef,
+    runtimeGoalWakeLastSubmittedKeyRef,
+    getHelixAskSessionId: getMinimalRuntimeSessionId,
+    buildWorkspaceContextSnapshot: buildMinimalWorkspaceContextSnapshot,
+    setAskStatus: (status) => {
+      setRuntimeState((state) => ({ ...state, askStatus: status }));
+    },
+    setAskError: (error) => {
+      if (!error) return;
+      setRuntimeState((state) => ({ ...state, askStatus: error }));
+    },
+    appendWakeReply: appendMinimalRuntimeWakeReply,
+  });
 
   const runtimePickerModel = useMemo(
     () =>

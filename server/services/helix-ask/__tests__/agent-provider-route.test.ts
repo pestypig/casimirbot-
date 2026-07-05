@@ -2,12 +2,19 @@ import express from "express";
 import request from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
 import { agentProvidersRouter } from "../../../routes/agi.agent-providers";
+import { accountSessionRouter } from "../../../routes/account-session";
+import { resetAccountSessionStore } from "../../helix-account/account-session-store";
 import { helixCapabilityLaneSessionStore } from "../capability-lanes/session-manager";
+import { helixRuntimeGoalSessionStore } from "../agent-providers/goal-runtime-session";
 
 const ENV_KEYS = [
   "HELIX_ASK_AGENT_RUNTIME",
   "ENABLE_CODEX_AGENT",
   "ENABLE_FUTURE_AGENT",
+  "CODEX_AGENT_FAKE_STDOUT",
+  "CODEX_AGENT_FAKE_EXIT_CODE",
+  "CODEX_AGENT_FAKE_STDOUT_SEQUENCE",
+  "CODEX_AGENT_FAKE_CALL_INDEX",
 ] as const;
 const originalEnv = new Map<string, string | undefined>();
 
@@ -17,6 +24,8 @@ for (const key of ENV_KEYS) {
 
 afterEach(() => {
   helixCapabilityLaneSessionStore.clear();
+  helixRuntimeGoalSessionStore.clear();
+  resetAccountSessionStore();
   for (const key of ENV_KEYS) {
     const original = originalEnv.get(key);
     if (original === undefined) {
@@ -30,11 +39,330 @@ afterEach(() => {
 const createApp = (): express.Express => {
   const app = express();
   app.use(express.json({ limit: "256kb" }));
+  app.use("/api/account", accountSessionRouter);
   app.use("/api/agi", agentProvidersRouter);
   return app;
 };
 
 describe("AGI agent provider route", () => {
+  it("runs the manual /goal runtime session flow through start, wake, debug export, list, and stop", async () => {
+    process.env.ENABLE_CODEX_AGENT = "1";
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Goal progress candidate: translated title evidence is ready.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const app = createApp();
+
+    const start = await request(app)
+      .post("/api/agi/goal/runtime-session")
+      .send({
+        goal_id: "goal:route:translate-title",
+        runtime_agent_provider: "codex",
+        objective: "Keep translating visible document titles to Spanish when manually woken.",
+        allowed_lanes: ["live_translation"],
+        allowed_workstation_tools: ["scientific-calculator.solve_expression"],
+        report_policy: "report_only_failure",
+      })
+      .expect(200);
+
+    expect(start.body).toMatchObject({
+      schema: "helix.runtime_goal.session_start_response.v1",
+      ok: true,
+      session: {
+        goal_id: "goal:route:translate-title",
+        runtime_agent_provider: "codex",
+        status: "waiting",
+        report_policy: "report_only_failure",
+        terminal_eligible: false,
+        assistant_answer: false,
+      },
+      debug_export: {
+        schema: "helix.runtime_goal.debug_export.v1",
+        runtime_provider: "codex",
+        wake_events: [],
+      },
+      runtime_goal_debug_summary: {
+        schema: "helix.runtime_goal.debug_copy_summary.v1",
+        job_title: "Keep translating visible document titles to Spanish when manually woken.",
+        runtime_agent_provider: "codex",
+        session_status: "waiting",
+        requested_observation_or_lane: null,
+        current_progress_summary: null,
+        terminal_authority_status: "not_evaluated",
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+    });
+
+    const resume = await request(app)
+      .post("/api/agi/goal/runtime-session/goal:route:translate-title/resume")
+      .send({
+        turn_id: "turn:route:translation",
+        wake_event_kind: "manual_resume",
+        question: "Continue the goal from the translation observation.",
+        capability_lane_call: {
+          capability: "live_translation.translate_text",
+          text: "Visible Title",
+          source_language: "en",
+          target_language: "es",
+          source_id: "document-title:route-test",
+          source_hash: "fnv1a32:route-title",
+        },
+      })
+      .expect(200);
+
+    expect(resume.body).toMatchObject({
+      schema: "helix.runtime_goal.session_resume_response.v1",
+      ok: true,
+      session: {
+        goal_id: "goal:route:translate-title",
+        runtime_agent_provider: "codex",
+        status: "waiting",
+        terminal_authority_status: "authorized",
+        latest_provider_terminal_candidate_ref: expect.stringContaining("agent_provider_terminal_candidate"),
+      },
+      debug_export: {
+        terminal_authority_status: "authorized",
+        provider_terminal_candidate: {
+          schema: "helix.agent_provider_terminal_candidate.v1",
+          agent_runtime: "codex",
+        },
+        provider_terminal_authority_bridge: {
+          terminal_authority_granted: true,
+          final_answer_source: "agent_provider_terminal_candidate",
+        },
+        terminal_answer_authority: {
+          schema: "helix.turn_terminal_authority.v1",
+          server_authoritative: true,
+        },
+      },
+      runtime_goal_debug_summary: {
+        schema: "helix.runtime_goal.debug_copy_summary.v1",
+        job_title: "Keep translating visible document titles to Spanish when manually woken.",
+        runtime_agent_provider: "codex",
+        session_status: "waiting",
+        requested_observation_or_lane: "live_translation.translate_text",
+        current_progress_summary: expect.any(String),
+        terminal_authority_status: "authorized",
+        latest_observation_refs: expect.arrayContaining([
+          expect.stringContaining("live_translation.translate_text"),
+        ]),
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+    });
+    expect(resume.body.session.latest_observation_refs).toEqual(
+      expect.arrayContaining([expect.stringContaining("live_translation.translate_text")]),
+    );
+    expect(resume.body.debug_export.debug_events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ stage: "wake_received" }),
+        expect.objectContaining({
+          stage: "tool_or_lane_requested",
+          requested_tool_or_lane: "live_translation.translate_text",
+        }),
+        expect.objectContaining({
+          stage: "tool_or_lane_admitted",
+          admitted: true,
+        }),
+        expect.objectContaining({
+          stage: "evidence_reentered",
+          reentry_status: "reentered",
+        }),
+        expect.objectContaining({
+          stage: "runtime_candidate_generated",
+          provider_terminal_candidate_ref: expect.stringContaining("agent_provider_terminal_candidate"),
+        }),
+        expect.objectContaining({
+          stage: "terminal_authority_evaluated",
+          terminal_authority_status: "authorized",
+        }),
+      ]),
+    );
+
+    const debug = await request(app)
+      .get("/api/agi/goal/runtime-session/goal:route:translate-title/debug-export")
+      .expect(200);
+
+    expect(debug.body).toMatchObject({
+      schema: "helix.runtime_goal.debug_export_response.v1",
+      ok: true,
+      goal_id: "goal:route:translate-title",
+      runtime_provider: "codex",
+      runtime_session_id: resume.body.session.runtime_session_id,
+      terminal_authority_status: "authorized",
+      terminal_answer_authority: {
+        server_authoritative: true,
+      },
+      runtime_goal_debug_summary: {
+        schema: "helix.runtime_goal.debug_copy_summary.v1",
+        runtime_agent_provider: "codex",
+        requested_observation_or_lane: "live_translation.translate_text",
+        terminal_authority_status: "authorized",
+      },
+    });
+
+    const list = await request(app)
+      .get("/api/agi/goal/runtime-session?goal_id=goal:route:translate-title")
+      .expect(200);
+
+    expect(list.body).toMatchObject({
+      schema: "helix.runtime_goal.session_list_response.v1",
+      ok: true,
+      goal_session_count: 1,
+      runtime_goal_sessions: [
+        expect.objectContaining({
+          goal_id: "goal:route:translate-title",
+          runtime_agent_provider: "codex",
+        }),
+      ],
+      runtime_goal_debug_summaries: [
+        expect.objectContaining({
+          schema: "helix.runtime_goal.debug_copy_summary.v1",
+          goal_id: "goal:route:translate-title",
+          runtime_agent_provider: "codex",
+          requested_observation_or_lane: "live_translation.translate_text",
+          terminal_authority_status: "authorized",
+        }),
+      ],
+    });
+
+    const stop = await request(app)
+      .post("/api/agi/goal/runtime-session/goal:route:translate-title/stop")
+      .send({
+        status: "cancelled",
+        reason: "user_cancel",
+      })
+      .expect(200);
+
+    expect(stop.body).toMatchObject({
+      schema: "helix.runtime_goal.session_stop_response.v1",
+      ok: true,
+      session: {
+        goal_id: "goal:route:translate-title",
+        status: "cancelled",
+        status_reason: "user_cancel",
+        terminal_authority_status: "blocked",
+      },
+      runtime_goal_debug_summary: {
+        schema: "helix.runtime_goal.debug_copy_summary.v1",
+        goal_id: "goal:route:translate-title",
+        session_status: "cancelled",
+        status_reason: "user_cancel",
+        terminal_authority_status: "blocked",
+      },
+    });
+
+    await request(app)
+      .post("/api/agi/goal/runtime-session/goal:route:translate-title/resume")
+      .send({
+        turn_id: "turn:route:after-cancel",
+        capability_lane_call: {
+          capability: "live_translation.translate_text",
+          text: "Visible Title",
+          target_language: "es",
+        },
+      })
+      .expect(409)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          schema: "helix.runtime_goal.session_resume_response.v1",
+          ok: false,
+          blocked_reason: "goal_not_resumable",
+          session: {
+            status: "cancelled",
+          },
+        });
+      });
+  });
+
+  it("blocks /goal runtime sessions when account policy revokes the selected runtime agent", async () => {
+    process.env.ENABLE_CODEX_AGENT = "1";
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Goal progress candidate.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    const app = createApp();
+    const agent = request.agent(app);
+
+    await agent
+      .post("/api/account/session/sign-in")
+      .send({ profile_id: "profile:user-goal-policy", account_type: "user" })
+      .expect(200);
+
+    await agent
+      .post("/api/agi/goal/runtime-session")
+      .send({
+        goal_id: "goal:route:locked-start",
+        runtime_agent_provider: "codex",
+        objective: "Codex should not start under a user account policy.",
+      })
+      .expect(403)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          schema: "helix.runtime_goal.session_start_response.v1",
+          ok: false,
+          error: "runtime_agent_locked_by_account_policy",
+          blocked_reason: "permission_revoked",
+          locked_reason: "runtime_agent_outside_account_policy",
+          runtime_agent_provider: "codex",
+          account_policy: {
+            account_type: "user",
+            allowed_runtime_agents: ["helix"],
+          },
+        });
+      });
+
+    resetAccountSessionStore();
+    const start = await request(app)
+      .post("/api/agi/goal/runtime-session")
+      .send({
+        goal_id: "goal:route:permission-revoked",
+        runtime_agent_provider: "codex",
+        objective: "Start before account policy is narrowed.",
+      })
+      .expect(200);
+    expect(start.body.session.status).toBe("waiting");
+
+    await agent
+      .post("/api/account/session/sign-in")
+      .send({ profile_id: "profile:user-goal-revoked", account_type: "user" })
+      .expect(200);
+
+    await agent
+      .post("/api/agi/goal/runtime-session/goal:route:permission-revoked/resume")
+      .send({
+        turn_id: "turn:permission-revoked",
+        wake_event_kind: "manual_resume",
+      })
+      .expect(403)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          schema: "helix.runtime_goal.session_resume_response.v1",
+          ok: false,
+          error: "runtime_agent_locked_by_account_policy",
+          blocked_reason: "permission_revoked",
+          locked_reason: "runtime_agent_outside_account_policy",
+          session: {
+            goal_id: "goal:route:permission-revoked",
+            status: "blocked",
+            status_reason: "permission_revoked",
+            terminal_authority_status: "blocked",
+          },
+          debug_export: {
+            session_status: "blocked",
+            terminal_authority_status: "blocked",
+          },
+        });
+        expect(response.body.debug_export.debug_events).toContainEqual(
+          expect.objectContaining({
+            stage: "goal_blocked",
+            reason: "permission_revoked",
+          }),
+        );
+      });
+  });
+
   it("lists provider descriptors and resolves the default through provider availability", async () => {
     delete process.env.HELIX_ASK_AGENT_RUNTIME;
     delete process.env.ENABLE_CODEX_AGENT;

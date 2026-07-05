@@ -8,7 +8,7 @@ export type HelixAskActiveTurnReplyProps = {
   tintClassName: string;
   replyId?: string | null;
   activeTurnId?: string | null;
-  renderFinalAnswer: HelixAskTurnStreamPanelProps["renderFinalAnswer"];
+  renderFinalAnswer?: HelixAskTurnStreamPanelProps["renderFinalAnswer"];
   clipText: HelixAskTurnStreamPanelProps["clipText"];
   readRowClassName: HelixAskTurnStreamPanelProps["readRowClassName"];
   readDotClassName: HelixAskTurnStreamPanelProps["readDotClassName"];
@@ -16,6 +16,7 @@ export type HelixAskActiveTurnReplyProps = {
 };
 
 const noop = () => undefined;
+const renderNoActiveTurnFinalAnswer = () => null;
 
 export function HelixAskActiveTurnReply({
   rows,
@@ -54,7 +55,7 @@ export function HelixAskActiveTurnReply({
         actualAgentProviderLabel: null,
         actualAgentModelLabel: null,
         liveBridgeStatus: null,
-        renderFinalAnswer,
+        renderFinalAnswer: renderFinalAnswer ?? renderNoActiveTurnFinalAnswer,
         clipText,
         readRowClassName,
         readDotClassName,

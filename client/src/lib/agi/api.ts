@@ -10,6 +10,7 @@ import type { ChatSession } from "@shared/agi-chat";
 import type { AgiRefineryRequest } from "@shared/agi-refinery";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
+import type { HelixRuntimeGoalSession } from "@shared/helix-runtime-goal-session";
 import type { HelixAskRouteMetadata } from "@/lib/helix/ask-prompt-launch";
 import type { HelixTurnInputItem } from "@shared/helix-turn-input-item";
 import type { SituationContextPack } from "@shared/helix-situation-context-pack";
@@ -316,6 +317,11 @@ export type LocalAskResponse = {
   terminal_artifact_owner_turn_id?: string | null;
   terminal_result?: Record<string, unknown> | null;
   terminal_results?: unknown[];
+  runtime_goal_command?: Record<string, unknown> | null;
+  runtime_goal_session?: Record<string, unknown> | null;
+  runtime_goal_debug_export?: Record<string, unknown> | null;
+  runtime_goal_wake_candidate?: Record<string, unknown> | null;
+  runtime_goal_wake_admission?: Record<string, unknown> | null;
   debug_export_ref?: Record<string, unknown> | null;
   backend_debug_response_ref?: Record<string, unknown> | null;
   golden_path_runtime?: Record<string, unknown> | null;
@@ -634,6 +640,61 @@ type RunAskTurnPayload = {
   capability_lane_session_call?: Record<string, unknown> | Array<Record<string, unknown>>;
   capabilityLaneSessionCall?: Record<string, unknown> | Array<Record<string, unknown>>;
   signal?: AbortSignal;
+};
+
+export type RuntimeGoalWakeCandidatePayload = {
+  goalId?: string | null;
+  goal_id?: string | null;
+  eventKind?: string;
+  event_kind?: string;
+  sourceKind?: string;
+  source_kind?: string;
+  docPath?: string | null;
+  doc_path?: string | null;
+  activePanelId?: string | null;
+  active_panel_id?: string | null;
+  sourceId?: string | null;
+  source_id?: string | null;
+  sourceHash?: string | null;
+  source_hash?: string | null;
+  sourceLabel?: string | null;
+  source_label?: string | null;
+  reason?: string;
+  dedupeKey?: string;
+  dedupe_key?: string;
+  sourceFreshnessMs?: number | null;
+  source_freshness_ms?: number | null;
+  freshnessStatus?: "fresh" | "stale" | "unknown";
+  freshness_status?: "fresh" | "stale" | "unknown";
+  proposedTool?: string | null;
+  proposed_tool?: string | null;
+  requiresUserVisibleTurn?: boolean;
+  requires_user_visible_turn?: boolean;
+  observedAtMs?: number;
+  observed_at_ms?: number;
+  agentRuntime?: HelixAgentRuntimeId;
+  agent_runtime?: HelixAgentRuntimeId;
+  turnId?: string;
+  turn_id?: string;
+  question?: string;
+  workspaceContextSnapshot?: Record<string, unknown>;
+  workspace_context_snapshot?: Record<string, unknown>;
+  signal?: AbortSignal;
+};
+
+export type RuntimeGoalWakeCandidateResponse = LocalAskResponse & {
+  runtime_goal_wake_candidate?: Record<string, unknown> | null;
+  runtime_goal_wake_admission?: Record<string, unknown> | null;
+};
+
+export type RuntimeGoalActiveSessionResponse = {
+  ok?: boolean;
+  schema?: "helix.runtime_goal.active_session_response.v1" | string;
+  active?: boolean;
+  runtime_goal_session?: HelixRuntimeGoalSession | null;
+  assistant_answer?: false;
+  terminal_eligible?: false;
+  raw_content_included?: false;
 };
 
 export type RunCapabilityLaneSessionControlPayload = {
@@ -2212,6 +2273,74 @@ export async function runAskTurn(payload: RunAskTurnPayload): Promise<LocalAskRe
     signal: payload.signal,
   });
   return normalizeLocalAskResponse(await asJson<unknown>(response));
+}
+
+export async function submitRuntimeGoalWakeCandidate(
+  payload: RuntimeGoalWakeCandidatePayload,
+): Promise<RuntimeGoalWakeCandidateResponse> {
+  const body: Record<string, unknown> = {
+    schema: "helix.runtime_goal.wake_candidate.v1",
+  };
+  const selectedRuntime = payload.agentRuntime ?? payload.agent_runtime;
+  if (selectedRuntime) {
+    body.agentRuntime = selectedRuntime;
+    body.agent_runtime = selectedRuntime;
+  }
+  const goalId = payload.goalId ?? payload.goal_id;
+  if (goalId) body.goal_id = goalId;
+  body.event_kind = payload.eventKind ?? payload.event_kind ?? "visible_source_changed";
+  body.source_kind = payload.sourceKind ?? payload.source_kind ?? "docs_viewer_visible_surface";
+  const docPath = payload.docPath ?? payload.doc_path;
+  if (docPath) body.doc_path = docPath;
+  const activePanelId = payload.activePanelId ?? payload.active_panel_id;
+  if (activePanelId) body.active_panel_id = activePanelId;
+  const sourceId = payload.sourceId ?? payload.source_id;
+  if (sourceId) body.source_id = sourceId;
+  const sourceHash = payload.sourceHash ?? payload.source_hash;
+  if (sourceHash) body.source_hash = sourceHash;
+  const sourceLabel = payload.sourceLabel ?? payload.source_label;
+  if (sourceLabel) body.source_label = sourceLabel;
+  if (payload.reason) body.reason = payload.reason;
+  const dedupeKey = payload.dedupeKey ?? payload.dedupe_key;
+  if (dedupeKey) body.dedupe_key = dedupeKey;
+  const freshness = payload.sourceFreshnessMs ?? payload.source_freshness_ms;
+  if (typeof freshness === "number" && Number.isFinite(freshness)) body.source_freshness_ms = freshness;
+  const freshnessStatus = payload.freshnessStatus ?? payload.freshness_status;
+  if (freshnessStatus) body.freshness_status = freshnessStatus;
+  const proposedTool = payload.proposedTool ?? payload.proposed_tool;
+  if (proposedTool) body.proposed_tool = proposedTool;
+  const requiresVisibleTurn = payload.requiresUserVisibleTurn ?? payload.requires_user_visible_turn;
+  if (typeof requiresVisibleTurn === "boolean") body.requires_user_visible_turn = requiresVisibleTurn;
+  const observedAtMs = payload.observedAtMs ?? payload.observed_at_ms;
+  if (typeof observedAtMs === "number" && Number.isFinite(observedAtMs)) body.observed_at_ms = observedAtMs;
+  const turnId = payload.turnId ?? payload.turn_id;
+  if (turnId) {
+    body.turnId = turnId;
+    body.turn_id = turnId;
+  }
+  if (payload.question?.trim()) body.question = payload.question.trim();
+  const snapshot = payload.workspaceContextSnapshot ?? payload.workspace_context_snapshot;
+  if (snapshot && typeof snapshot === "object") body.workspace_context_snapshot = snapshot;
+  const response = await fetch("/api/agi/runtime-goals/wake-candidate", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(body),
+    signal: payload.signal,
+  });
+  return normalizeLocalAskResponse(await asJson<unknown>(response)) as RuntimeGoalWakeCandidateResponse;
+}
+
+export async function fetchActiveRuntimeGoalSession(): Promise<RuntimeGoalActiveSessionResponse> {
+  const response = await fetch("/api/agi/runtime-goals/active", {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+    },
+  });
+  return await asJson<RuntimeGoalActiveSessionResponse>(response);
 }
 
 export async function runCapabilityLaneOneShot(

@@ -7,7 +7,7 @@ export const READ_ALOUD_SURFACE_OUTCOME = "read_aloud_surface" as const;
 export const isCodexReasoningDependentRequest = (request: Record<string, unknown> | null): boolean => {
   if (!request) return false;
   const outcome = readString(request.compound_outcome);
-  return outcome === RESEARCH_QUANTIFY_REFLECT_OUTCOME;
+  return outcome === RESEARCH_QUANTIFY_REFLECT_OUTCOME || outcome === READ_ALOUD_SURFACE_OUTCOME;
 };
 
 export const shouldAutoExecuteDependentCompoundRequest = (request: Record<string, unknown> | null): boolean =>

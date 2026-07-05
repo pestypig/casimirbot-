@@ -197,6 +197,49 @@ describe("DocViewerPanel taxonomy UI", () => {
     });
   });
 
+  it("auto-enables inline display only after governed ready translation projection exists", () => {
+    const { __testDocViewerTaxonomy } = DocViewerPanelModule;
+
+    expect(__testDocViewerTaxonomy.shouldAutoEnableInlineTranslationProjection({
+      version: 0,
+      translations: {},
+    })).toBe(false);
+    expect(__testDocViewerTaxonomy.shouldAutoEnableInlineTranslationProjection({
+      version: 1,
+      translations: {
+        "visible-chunk-1": {
+          status: "error",
+          error: "translation_projection_source_text_mismatch",
+          observationRef: "obs:visible:error",
+          receiptRef: "receipt:visible:error",
+          source: "capability_lane",
+          contextRole: "tool_evidence",
+          answerAuthority: false,
+          terminalEligible: false,
+          assistantAnswer: false,
+          rawContentIncluded: false,
+        },
+      },
+    })).toBe(false);
+    expect(__testDocViewerTaxonomy.shouldAutoEnableInlineTranslationProjection({
+      version: 2,
+      translations: {
+        "visible-chunk-1": {
+          status: "ready",
+          text: "Titulo visible desde Ask.",
+          observationRef: "obs:visible:ready",
+          receiptRef: "receipt:visible:ready",
+          source: "capability_lane",
+          contextRole: "tool_evidence",
+          answerAuthority: false,
+          terminalEligible: false,
+          assistantAnswer: false,
+          rawContentIncluded: false,
+        },
+      },
+    })).toBe(true);
+  });
+
   it("does not requeue visible translation units whose DOM anchor already has governed projection state", () => {
     const { __testDocViewerTaxonomy } = DocViewerPanelModule;
     const container = document.createElement("div");
@@ -299,6 +342,117 @@ describe("DocViewerPanel taxonomy UI", () => {
     ]);
   });
 
+  it("collects near-viewport translation anchors for Ask visible source context", () => {
+    const { __testDocViewerTaxonomy } = DocViewerPanelModule;
+    const container = document.createElement("div");
+    container.innerHTML = [
+      '<div data-doc-translation-anchor="u-before"></div>',
+      '<div data-doc-translation-anchor="u-heading"></div>',
+      '<div data-doc-translation-anchor="u-skip"></div>',
+      '<div data-doc-translation-anchor="u-body"></div>',
+      '<div data-doc-translation-anchor="u-after"></div>',
+    ].join("");
+    const baseRect = {
+      top: 0,
+      bottom: 0,
+      left: 0,
+      right: 10,
+      width: 10,
+      height: 10,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    };
+    container.getBoundingClientRect = () => ({
+      ...baseRect,
+      top: 100,
+      bottom: 300,
+      height: 200,
+      y: 100,
+    });
+    const tops: Record<string, number> = {
+      "u-before": -80,
+      "u-heading": 120,
+      "u-skip": 150,
+      "u-body": 260,
+      "u-after": 500,
+    };
+    container.querySelectorAll<HTMLElement>("[data-doc-translation-anchor]").forEach((element) => {
+      const top = tops[element.dataset.docTranslationAnchor ?? ""] ?? 0;
+      element.getBoundingClientRect = () => ({
+        ...baseRect,
+        top,
+        bottom: top + 10,
+        y: top,
+      });
+    });
+
+    expect(__testDocViewerTaxonomy.collectNearViewportTranslationUnitIds({
+      container,
+      units: [
+        {
+          unit_id: "u-before",
+          kind: "paragraph",
+          source_markdown: "Before viewport.",
+          translatable: true,
+          protected_spans: [],
+        },
+        {
+          unit_id: "u-heading",
+          kind: "heading",
+          source_markdown: "Visible heading.",
+          translatable: true,
+          protected_spans: [],
+        },
+        {
+          unit_id: "u-skip",
+          kind: "code",
+          source_markdown: "Do not translate code.",
+          translatable: false,
+          protected_spans: [],
+        },
+        {
+          unit_id: "u-body",
+          kind: "paragraph",
+          source_markdown: "Visible body paragraph.",
+          translatable: true,
+          protected_spans: [],
+        },
+        {
+          unit_id: "u-after",
+          kind: "paragraph",
+          source_markdown: "After viewport.",
+          translatable: true,
+          protected_spans: [],
+        },
+      ],
+      maxUnits: 3,
+      maxChars: 80,
+    })).toEqual(["u-heading", "u-body"]);
+
+    expect(__testDocViewerTaxonomy.collectNearViewportTranslationUnitIds({
+      container,
+      units: [
+        {
+          unit_id: "u-heading",
+          kind: "heading",
+          source_markdown: "Visible heading.",
+          translatable: true,
+          protected_spans: [],
+        },
+        {
+          unit_id: "u-body",
+          kind: "paragraph",
+          source_markdown: "Visible body paragraph that exceeds the bounded source budget.",
+          translatable: true,
+          protected_spans: [],
+        },
+      ],
+      maxUnits: 3,
+      maxChars: 24,
+    })).toEqual(["u-heading"]);
+  });
+
   it("shows taxonomy badges in the open document header", () => {
     const { PanelHeader } = DocViewerPanelModule;
 
@@ -343,6 +497,110 @@ describe("DocViewerPanel taxonomy UI", () => {
     expect(headerBadges).toHaveTextContent("Canonical research");
     expect(headerBadges).toHaveTextContent("Calculator-ready");
     expect(headerBadges).toHaveTextContent("Sidecars attached");
+  });
+
+  it("reports visible translation bboxes for account-language header regions", () => {
+    const { PanelHeader } = DocViewerPanelModule;
+    const onVisibleTranslationRegionBboxesChange = vi.fn();
+    const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const regionId = this.dataset.helixVisibleTranslationRegionId;
+      if (regionId === "docs-viewer:title") {
+        return {
+          x: 10,
+          y: 20,
+          width: 300,
+          height: 28,
+          top: 20,
+          left: 10,
+          right: 310,
+          bottom: 48,
+          toJSON: () => ({}),
+        } as DOMRect;
+      }
+      if (regionId === "docs-viewer:translate-button") {
+        return {
+          x: 410,
+          y: 22,
+          width: 90,
+          height: 24,
+          top: 22,
+          left: 410,
+          right: 500,
+          bottom: 46,
+          toJSON: () => ({}),
+        } as DOMRect;
+      }
+      return {
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        toJSON: () => ({}),
+      } as DOMRect;
+    });
+
+    render(
+      <PanelHeader
+        mode="doc"
+        entry={whitepaper}
+        anchor={undefined}
+        isAutoReading={false}
+        autoReadError={null}
+        proceduralStatus={null}
+        readProgress={null}
+        onStopAutoRead={vi.fn()}
+        onShowDirectory={vi.fn()}
+        canRejoinLiveRead={false}
+        onRejoinLiveRead={vi.fn()}
+        translationEligible={true}
+        translationAccountLocale="en"
+        translationTargetLanguage="es"
+        translationSourceId="document_markdown:docs/research/nhm2-current-status-whitepaper-2026-05-02.md"
+        translationSourceHash="fnv1a32:whitepaper"
+        translationSourceTextHash="fnv1a32:whitepaper"
+        translationSourceTextCharCount={1200}
+        translationLaneSessionId={null}
+        inlineTranslationEnabled={false}
+        translationStatus="idle"
+        translationError={null}
+        liveTranslationProjectionSummary={summarizeDocumentLiveTranslationProjectionSnapshot({
+          version: 0,
+          translations: {},
+          laneSessions: {},
+          mailLoops: {},
+          goalBindings: {},
+        })}
+        onVisibleTranslationRegionBboxesChange={onVisibleTranslationRegionBboxesChange}
+        onToggleInlineTranslation={vi.fn()}
+        onToggleInlineTranslationSessionPause={vi.fn()}
+        t={t}
+      />,
+    );
+
+    expect(onVisibleTranslationRegionBboxesChange).toHaveBeenCalledWith({
+      "docs-viewer:title": expect.objectContaining({
+        x: 10,
+        y: 20,
+        width: 300,
+        height: 28,
+        source: "docs-header-title",
+      }),
+      "docs-viewer:translate-button": expect.objectContaining({
+        x: 410,
+        y: 22,
+        width: 90,
+        height: 24,
+        source: "docs-header-translation-button",
+      }),
+    });
+
+    rectSpy.mockRestore();
   });
 
   it("exposes governed translation source payload identity in the open document header", () => {
@@ -749,6 +1007,7 @@ describe("DocViewerPanel taxonomy UI", () => {
       "account_locale_base",
     );
     expect(inlineControl?.getAttribute("data-doc-translation-control-reentry-required")).toBe("true");
+    expect(inlineControl?.getAttribute("data-doc-translation-control-answer-authority")).toBe("false");
     const sessionControl = container.querySelector("[data-doc-translation-session-control='pause-resume']");
     expect(sessionControl?.getAttribute("data-doc-translation-session-control-source-binding-key")).toBe(
       "docs:nhm2::fnv1a32:lane-session::docs_chunk::es-US::es",
@@ -760,6 +1019,7 @@ describe("DocViewerPanel taxonomy UI", () => {
       "docs:nhm2::fnv1a32:lane-session::fnv1a32:lane-session-payload::2048::docs::docs_chunk::es-US::es",
     );
     expect(sessionControl?.getAttribute("data-doc-translation-session-control-reentry-required")).toBe("true");
+    expect(sessionControl?.getAttribute("data-doc-translation-session-control-answer-authority")).toBe("false");
     expect(sessionControl?.getAttribute("data-doc-translation-session-control-language-routing-policy")).toBe(
       "account_locale_base_target",
     );
@@ -778,10 +1038,345 @@ describe("DocViewerPanel taxonomy UI", () => {
     expect(summary?.getAttribute("data-doc-translation-summary-authority-policy")).toBe(
       "projection_only_not_answer_authority",
     );
+    expect(summary?.getAttribute("data-doc-translation-summary-terminal-authority-owner")).toBe("helix");
     expect(summary?.getAttribute("data-doc-translation-summary-governed-projection")).toBe("true");
     expect(summary?.getAttribute("data-doc-translation-summary-terminal-eligible")).toBe("false");
     expect(summary?.getAttribute("data-doc-translation-summary-assistant-answer")).toBe("false");
     expect(summary).toHaveTextContent("Translation ready: projected");
+  });
+
+  it("renders account-language projection text in the translation control without answer authority", () => {
+    const { PanelHeader } = DocViewerPanelModule;
+    const { container } = render(
+      <PanelHeader
+        mode="doc"
+        entry={whitepaper}
+        anchor={undefined}
+        isAutoReading={false}
+        autoReadError={null}
+        proceduralStatus={null}
+        readProgress={null}
+        onStopAutoRead={vi.fn()}
+        onShowDirectory={vi.fn()}
+        canRejoinLiveRead={false}
+        onRejoinLiveRead={vi.fn()}
+        translationEligible={true}
+        translationAccountLocale="es-US"
+        translationTargetLanguage="es"
+        translationSourceId="document_markdown:docs/research/nhm2.md"
+        translationSourceHash="fnv1a32:doc-source"
+        translationSourceTextHash="fnv1a32:source-payload"
+        translationSourceTextCharCount={2048}
+        translationLaneSessionId="lane-session-docs"
+        inlineTranslationEnabled={false}
+        translationStatus="idle"
+        translationError={null}
+        liveTranslationProjectionSummary={summarizeDocumentLiveTranslationProjectionSnapshot({
+          version: 0,
+          translations: {},
+          laneSessions: {},
+          mailLoops: {},
+          goalBindings: {},
+        })}
+        accountLanguageTranslationProjections={[{
+          key: "account-language:docs-viewer:translate-button:es",
+          status: "ready",
+          displayText: "Traducir",
+          projection: null,
+          panelId: "docs-viewer",
+          regionId: "docs-viewer:translate-button",
+          docPath: whitepaper.relativePath,
+          sourceId: "workstation-shell#docs-viewer:translate-button",
+          sourceHash: "fnv1a32:translate-button",
+          sourceKind: "button_label",
+          sourceTextHash: "sha256:translate",
+          sourceTextCharCount: 9,
+          accountLocale: "es-US",
+          targetLanguage: "es",
+          chunkId: "docs-viewer:translate-button",
+          chunkIndex: 0,
+          dedupeKey: "workstation-shell#docs-viewer:translate-button:es",
+          sourceEventId: "ui-region:event-translate",
+          sourceEventMs: 220,
+          observedAtMs: 250,
+          freshnessStatus: "fresh",
+          observationRef: "obs:account-language:translate-button",
+          receiptRef: "receipt:account-language:translate-button",
+          laneSessionId: null,
+          goalBindingId: null,
+          selectedRuntimeAgentProvider: "codex",
+          selectedBackendProvider: "live_translation.local_runtime",
+          terminalAuthorityStatus: "not_terminal_authority",
+          contextRole: "tool_evidence",
+          answerAuthority: false,
+          terminalEligible: false,
+          assistantAnswer: false,
+          rawContentIncluded: false,
+        }]}
+        onToggleInlineTranslation={vi.fn()}
+        onToggleInlineTranslationSessionPause={vi.fn()}
+        t={t}
+      />,
+    );
+
+    const control = container.querySelector("[data-doc-translation-control='inline-account-language']");
+    expect(control).toHaveTextContent("Traducir");
+    expect(control?.getAttribute("data-doc-translation-control-answer-authority")).toBe("false");
+    expect(control?.getAttribute("data-doc-translation-control-reentry-required")).toBe("true");
+    const projectedLabel = container.querySelector(
+      "[data-helix-account-language-translation-region-id='docs-viewer:translate-button']",
+    );
+    expect(projectedLabel).toHaveTextContent("Traducir");
+    expect(projectedLabel?.getAttribute("data-helix-account-language-translation-region-id")).toBe(
+      "docs-viewer:translate-button",
+    );
+    expect(projectedLabel?.getAttribute("data-helix-account-language-translation-observation-ref")).toBe(
+      "obs:account-language:translate-button",
+    );
+    expect(projectedLabel?.getAttribute("data-helix-account-language-translation-receipt-ref")).toBe(
+      "receipt:account-language:translate-button",
+    );
+    expect(projectedLabel?.getAttribute("data-helix-account-language-translation-source-event-id")).toBe(
+      "ui-region:event-translate",
+    );
+    expect(projectedLabel?.getAttribute("data-helix-account-language-translation-source-event-ms")).toBe("220");
+    expect(projectedLabel?.getAttribute("data-helix-account-language-translation-observed-at-ms")).toBe("250");
+    expect(projectedLabel?.getAttribute("data-helix-account-language-translation-answer-authority")).toBe("false");
+    expect(projectedLabel?.getAttribute("data-helix-account-language-translation-terminal-eligible")).toBe("false");
+    expect(projectedLabel?.getAttribute("data-helix-account-language-translation-assistant-answer")).toBe("false");
+    expect(projectedLabel?.getAttribute("data-helix-account-language-translation-raw-content-included")).toBe("false");
+  });
+
+  it("renders account-language projection text in the open document title without answer authority", () => {
+    const { PanelHeader } = DocViewerPanelModule;
+    const { container } = render(
+      <PanelHeader
+        mode="doc"
+        entry={whitepaper}
+        anchor={undefined}
+        isAutoReading={false}
+        autoReadError={null}
+        proceduralStatus={null}
+        readProgress={null}
+        onStopAutoRead={vi.fn()}
+        onShowDirectory={vi.fn()}
+        canRejoinLiveRead={false}
+        onRejoinLiveRead={vi.fn()}
+        translationEligible={true}
+        translationAccountLocale="es-US"
+        translationTargetLanguage="es"
+        translationSourceId="document_markdown:docs/research/nhm2.md"
+        translationSourceHash="fnv1a32:doc-source"
+        translationSourceTextHash="fnv1a32:source-payload"
+        translationSourceTextCharCount={2048}
+        translationLaneSessionId="lane-session-docs"
+        inlineTranslationEnabled={false}
+        translationStatus="idle"
+        translationError={null}
+        liveTranslationProjectionSummary={summarizeDocumentLiveTranslationProjectionSnapshot({
+          version: 0,
+          translations: {},
+          laneSessions: {},
+          mailLoops: {},
+          goalBindings: {},
+        })}
+        accountLanguageTranslationProjections={[{
+          key: "account-language:docs-viewer:title:es",
+          status: "ready",
+          displayText: "Estado actual de NHM2",
+          projection: null,
+          panelId: "docs-viewer",
+          regionId: "docs-viewer:title",
+          docPath: whitepaper.relativePath,
+          sourceId: "workstation-shell#docs-viewer:title",
+          sourceHash: "fnv1a32:title",
+          sourceKind: "panel_text",
+          sourceTextHash: "sha256:title",
+          sourceTextCharCount: whitepaper.title.length,
+          accountLocale: "es-US",
+          targetLanguage: "es",
+          chunkId: "docs-viewer:title",
+          chunkIndex: 0,
+          dedupeKey: "workstation-shell#docs-viewer:title:es",
+          sourceEventId: "ui-region:event-title",
+          sourceEventMs: 230,
+          observedAtMs: 260,
+          freshnessStatus: "fresh",
+          observationRef: "obs:account-language:title",
+          receiptRef: "receipt:account-language:title",
+          laneSessionId: null,
+          goalBindingId: null,
+          selectedRuntimeAgentProvider: "codex",
+          selectedBackendProvider: "live_translation.local_runtime",
+          terminalAuthorityStatus: "not_terminal_authority",
+          contextRole: "tool_evidence",
+          answerAuthority: false,
+          terminalEligible: false,
+          assistantAnswer: false,
+          rawContentIncluded: false,
+        }]}
+        onToggleInlineTranslation={vi.fn()}
+        onToggleInlineTranslationSessionPause={vi.fn()}
+        t={t}
+      />,
+    );
+
+    const titleProjection = container.querySelector(
+      "[data-helix-account-language-translation-region-id='docs-viewer:title']",
+    );
+    expect(titleProjection).toHaveTextContent("Estado actual de NHM2");
+    expect(titleProjection?.getAttribute("data-helix-account-language-translation-role")).toBe(
+      "governed-ui-region-projection",
+    );
+    expect(titleProjection?.getAttribute("data-helix-account-language-translation-source-id")).toBe(
+      "workstation-shell#docs-viewer:title",
+    );
+    expect(titleProjection?.getAttribute("data-helix-account-language-translation-source-kind")).toBe("panel_text");
+    expect(titleProjection?.getAttribute("data-helix-account-language-translation-observation-ref")).toBe(
+      "obs:account-language:title",
+    );
+    expect(titleProjection?.getAttribute("data-helix-account-language-translation-receipt-ref")).toBe(
+      "receipt:account-language:title",
+    );
+    expect(titleProjection?.getAttribute("data-helix-account-language-translation-source-event-id")).toBe(
+      "ui-region:event-title",
+    );
+    expect(titleProjection?.getAttribute("data-helix-account-language-translation-source-event-ms")).toBe("230");
+    expect(titleProjection?.getAttribute("data-helix-account-language-translation-observed-at-ms")).toBe("260");
+    expect(titleProjection?.getAttribute("data-helix-account-language-translation-answer-authority")).toBe("false");
+    expect(titleProjection?.getAttribute("data-helix-account-language-translation-terminal-eligible")).toBe("false");
+    expect(titleProjection?.getAttribute("data-helix-account-language-translation-assistant-answer")).toBe("false");
+    expect(titleProjection?.getAttribute("data-helix-account-language-translation-raw-content-included")).toBe("false");
+  });
+
+  it("renders pending and active account-language projections as inspectable source fallbacks", () => {
+    const { PanelHeader } = DocViewerPanelModule;
+    const { container } = render(
+      <PanelHeader
+        mode="doc"
+        entry={whitepaper}
+        anchor={undefined}
+        isAutoReading={false}
+        autoReadError={null}
+        proceduralStatus={null}
+        readProgress={null}
+        onStopAutoRead={vi.fn()}
+        onShowDirectory={vi.fn()}
+        canRejoinLiveRead={false}
+        onRejoinLiveRead={vi.fn()}
+        translationEligible={true}
+        translationAccountLocale="es-US"
+        translationTargetLanguage="es"
+        translationSourceId="document_markdown:docs/research/nhm2.md"
+        translationSourceHash="fnv1a32:doc-source"
+        translationSourceTextHash="fnv1a32:source-payload"
+        translationSourceTextCharCount={2048}
+        translationLaneSessionId="lane-session-docs"
+        inlineTranslationEnabled={false}
+        translationStatus="idle"
+        translationError={null}
+        liveTranslationProjectionSummary={summarizeDocumentLiveTranslationProjectionSnapshot({
+          version: 0,
+          translations: {},
+          laneSessions: {},
+          mailLoops: {},
+          goalBindings: {},
+        })}
+        accountLanguageTranslationProjections={[
+          {
+            key: "account-language:docs-viewer:title:pending:es",
+            status: "pending",
+            displayText: null,
+            projection: null,
+            panelId: "docs-viewer",
+            regionId: "docs-viewer:title",
+            docPath: whitepaper.relativePath,
+            sourceId: "workstation-shell#docs-viewer:title",
+            sourceHash: "fnv1a32:title",
+            sourceKind: "panel_text",
+            sourceTextHash: "sha256:title",
+            sourceTextCharCount: whitepaper.title.length,
+            accountLocale: "es-US",
+            targetLanguage: "es",
+            chunkId: "docs-viewer:title",
+            chunkIndex: 0,
+            dedupeKey: "workstation-shell#docs-viewer:title:es",
+            sourceEventId: "ui-region:event-title",
+            observedAtMs: 260,
+            freshnessStatus: "fresh",
+            observationRef: "obs:account-language:title:pending",
+            receiptRef: "receipt:account-language:title:pending",
+            laneSessionId: "lane-session-docs",
+            goalBindingId: null,
+            selectedRuntimeAgentProvider: "codex",
+            selectedBackendProvider: "live_translation.local_runtime",
+            terminalAuthorityStatus: "pending_helix_terminal_authority",
+            contextRole: "tool_evidence",
+            answerAuthority: false,
+            terminalEligible: false,
+            assistantAnswer: false,
+            rawContentIncluded: false,
+          },
+          {
+            key: "account-language:docs-viewer:translate-button:active:es",
+            status: "active",
+            displayText: null,
+            projection: null,
+            panelId: "docs-viewer",
+            regionId: "docs-viewer:translate-button",
+            docPath: whitepaper.relativePath,
+            sourceId: "workstation-shell#docs-viewer:translate-button",
+            sourceHash: "fnv1a32:translate-button",
+            sourceKind: "button_label",
+            sourceTextHash: "sha256:translate",
+            sourceTextCharCount: 9,
+            accountLocale: "es-US",
+            targetLanguage: "es",
+            chunkId: "docs-viewer:translate-button",
+            chunkIndex: 0,
+            dedupeKey: "workstation-shell#docs-viewer:translate-button:es",
+            sourceEventId: "ui-region:event-translate",
+            observedAtMs: 270,
+            freshnessStatus: "fresh",
+            observationRef: "obs:account-language:translate-button:active",
+            receiptRef: "receipt:account-language:translate-button:active",
+            laneSessionId: "lane-session-docs",
+            goalBindingId: null,
+            selectedRuntimeAgentProvider: "codex",
+            selectedBackendProvider: "live_translation.local_runtime",
+            terminalAuthorityStatus: "not_terminal_authority",
+            contextRole: "tool_evidence",
+            answerAuthority: false,
+            terminalEligible: false,
+            assistantAnswer: false,
+            rawContentIncluded: false,
+          },
+        ]}
+        onToggleInlineTranslation={vi.fn()}
+        onToggleInlineTranslationSessionPause={vi.fn()}
+        t={t}
+      />,
+    );
+
+    const titleProjection = container.querySelector(
+      "[data-helix-account-language-translation-region-id='docs-viewer:title']",
+    );
+    expect(titleProjection).toHaveTextContent(whitepaper.title);
+    expect(titleProjection?.getAttribute("data-helix-account-language-translation-status")).toBe("pending");
+    expect(titleProjection?.getAttribute("data-helix-account-language-translation-terminal-authority-status")).toBe(
+      "pending_helix_terminal_authority",
+    );
+    expect(titleProjection?.getAttribute("data-helix-account-language-translation-answer-authority")).toBe("false");
+
+    const buttonProjection = container.querySelector(
+      "[data-helix-account-language-translation-region-id='docs-viewer:translate-button']",
+    );
+    expect(buttonProjection).toHaveTextContent("Translate");
+    expect(buttonProjection?.getAttribute("data-helix-account-language-translation-status")).toBe("active");
+    expect(buttonProjection?.getAttribute("data-helix-account-language-translation-lane-session-id")).toBe(
+      "lane-session-docs",
+    );
+    expect(buttonProjection?.getAttribute("data-helix-account-language-translation-terminal-eligible")).toBe("false");
   });
 
   it("keeps failed governed translation projection receipts inspectable in the open document header", () => {
@@ -883,6 +1478,7 @@ describe("DocViewerPanel taxonomy UI", () => {
     expect(summary?.getAttribute("data-doc-translation-summary-authority-policy")).toBe(
       "projection_only_not_answer_authority",
     );
+    expect(summary?.getAttribute("data-doc-translation-summary-terminal-authority-owner")).toBe("helix");
     expect(summary?.getAttribute("data-doc-translation-summary-governed-projection")).toBe("true");
     expect(summary?.getAttribute("data-doc-translation-summary-terminal-eligible")).toBe("false");
     expect(summary?.getAttribute("data-doc-translation-summary-assistant-answer")).toBe("false");
@@ -1011,6 +1607,7 @@ describe("DocViewerPanel taxonomy UI", () => {
       expect(summary?.getAttribute("data-doc-translation-summary-authority-policy")).toBe(
         "projection_only_not_answer_authority",
       );
+      expect(summary?.getAttribute("data-doc-translation-summary-terminal-authority-owner")).toBe("helix");
       expect(summary?.getAttribute("data-doc-translation-summary-governed-projection")).toBe("true");
       expect(summary?.getAttribute("data-doc-translation-summary-terminal-eligible")).toBe("false");
       expect(summary?.getAttribute("data-doc-translation-summary-assistant-answer")).toBe("false");
@@ -1018,6 +1615,104 @@ describe("DocViewerPanel taxonomy UI", () => {
       expect(summary).toHaveTextContent(statusLabel);
     },
   );
+
+  it("shows explicit Ask translation projection status when account-language controls are ineligible", () => {
+    const { PanelHeader } = DocViewerPanelModule;
+    const liveTranslationProjectionSummary = summarizeDocumentLiveTranslationProjectionSnapshot({
+      version: 16,
+      translations: {
+        "visible-chunk-1": {
+          status: "ready",
+          text: "Titulo visible.",
+          observationRef: "ask:visible-title:observation",
+          receiptRef: "ask:visible-title:receipt",
+          selectedRuntimeAgentProvider: "codex",
+          selectedBackendProvider: "live_translation.local_runtime",
+          projectionStatus: "projected",
+          chunkId: "visible-chunk-1",
+          chunkIndex: 0,
+          dedupeKey: "document_markdown:docs/research/nhm2.md:visible-chunk-1:es",
+          sourceEventId: "ask:visible-title:event",
+          sourceEventMs: 700,
+          observedAtMs: 725,
+          freshnessStatus: "fresh",
+          terminalAuthorityStatus: "not_terminal_authority",
+          sourceId: "document_markdown:docs/research/nhm2.md#visible-chunk-1",
+          sourceHash: "sha256:full-document-hash",
+          sourceKind: "docs",
+          sourceTextHash: "sha256:visible-title",
+          sourceTextCharCount: 15,
+          accountLocale: "en",
+          projectionTarget: "docs_chunk",
+          targetLanguage: "es",
+          cancelRequested: false,
+          contextRole: "tool_evidence",
+          source: "capability_lane",
+          answerAuthority: false,
+          terminalEligible: false,
+          assistantAnswer: false,
+          rawContentIncluded: false,
+        } as never,
+      },
+      laneSessions: {},
+      mailLoops: {},
+      goalBindings: {},
+    });
+
+    const { container } = render(
+      <PanelHeader
+        mode="doc"
+        entry={whitepaper}
+        anchor={undefined}
+        isAutoReading={false}
+        autoReadError={null}
+        proceduralStatus={null}
+        readProgress={null}
+        onStopAutoRead={vi.fn()}
+        onShowDirectory={vi.fn()}
+        canRejoinLiveRead={false}
+        onRejoinLiveRead={vi.fn()}
+        translationEligible={false}
+        translationAccountLocale="en"
+        translationTargetLanguage="en"
+        translationSourceId="document_markdown:docs/research/nhm2.md"
+        translationSourceHash="sha256:full-document-hash"
+        translationSourceTextHash="sha256:full-document-hash"
+        translationSourceTextCharCount={2048}
+        translationLaneSessionId="lane-session-docs"
+        inlineTranslationEnabled={true}
+        translationStatus="idle"
+        translationError={null}
+        liveTranslationProjectionSummary={liveTranslationProjectionSummary}
+        onToggleInlineTranslation={vi.fn()}
+        onToggleInlineTranslationSessionPause={vi.fn()}
+        t={t}
+      />,
+    );
+
+    const summary = container.querySelector("[data-doc-translation-summary-version]");
+    expect(summary?.getAttribute("data-doc-translation-summary-version")).toBe("16");
+    expect(summary?.getAttribute("data-doc-translation-summary-display-status")).toBe("ready");
+    expect(summary?.getAttribute("data-doc-translation-summary-renderable")).toBe("true");
+    expect(summary?.getAttribute("data-doc-translation-summary-account-locale")).toBe("en");
+    expect(summary?.getAttribute("data-doc-translation-summary-target-language")).toBe("en");
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-account-locale")).toBe("en");
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-target-language")).toBe("es");
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-selected-runtime-agent-provider")).toBe("codex");
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-selected-backend-provider")).toBe(
+      "live_translation.local_runtime",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-latest-terminal-authority-status")).toBe(
+      "not_terminal_authority",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-authority-policy")).toBe(
+      "projection_only_not_answer_authority",
+    );
+    expect(summary?.getAttribute("data-doc-translation-summary-terminal-authority-owner")).toBe("helix");
+    expect(summary?.getAttribute("data-doc-translation-summary-terminal-eligible")).toBe("false");
+    expect(summary).toHaveTextContent("Translation ready: projected");
+    expect(container.querySelector("[data-doc-translation-control='inline-account-language']")).toBeNull();
+  });
 
   it("computes governed translation source identity for a new document session before receipts exist", () => {
     const { PanelHeader } = DocViewerPanelModule;
@@ -1079,6 +1774,7 @@ describe("DocViewerPanel taxonomy UI", () => {
       "document_markdown:docs/research/nhm2.md::fnv1a32:doc-source::docs_chunk::es-US::es",
     );
     expect(inlineControl?.getAttribute("data-doc-translation-control-reentry-required")).toBe("true");
+    expect(inlineControl?.getAttribute("data-doc-translation-control-answer-authority")).toBe("false");
     expect(inlineControl?.getAttribute("data-doc-translation-control-terminal-eligible")).toBe("false");
     expect(inlineControl?.getAttribute("data-doc-translation-control-assistant-answer")).toBe("false");
   });
@@ -1169,6 +1865,7 @@ describe("DocViewerPanel taxonomy UI", () => {
     expect(inlineControl?.getAttribute("data-doc-translation-control-latest-source-identity-key")).toBe(staleIdentity);
     expect(inlineControl?.getAttribute("data-doc-translation-control-source-identity-key")).toBe(staleIdentity);
     expect(inlineControl?.getAttribute("data-doc-translation-control-reentry-required")).toBe("true");
+    expect(inlineControl?.getAttribute("data-doc-translation-control-answer-authority")).toBe("false");
     expect(inlineControl?.getAttribute("data-doc-translation-control-terminal-eligible")).toBe("false");
     expect(inlineControl?.getAttribute("data-doc-translation-control-assistant-answer")).toBe("false");
   });

@@ -311,6 +311,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     const { planRouter } = await import("./routes/agi.plan");
     const { agentProvidersRouter } = await import("./routes/agi.agent-providers");
     const { workstationToolGatewayRouter } = await import("./routes/agi.workstation-tool-gateway");
+    const { runtimeGoalsRouter } = await import("./routes/agi.runtime-goals");
     const { discordRouter } = await import("./routes/discord");
     const { evalRouter } = await import("./routes/agi.eval");
     const { profileRouter } = await import("./routes/agi.profile");
@@ -337,6 +338,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     app.use("/api/agi/adapter", adapterRouter);
     app.use("/api/agi", agentProvidersRouter);
     app.use("/api/agi", workstationToolGatewayRouter);
+    app.use("/api/agi", runtimeGoalsRouter);
     const enableTraceApi = flagEnabled(process.env.ENABLE_TRACE_API, false);
     if (enableTraceApi) {
       const { traceRouter } = await import("./routes/agi.trace");

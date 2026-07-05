@@ -4,7 +4,7 @@ Maturity: `draft`
 
 Owner surface: workstation dynamic panel catalog
 
-Provider status: panel-owned, not shared provider gateway
+Provider status: panel-owned by default; only explicitly graduated actions are shared provider gateway tools
 
 ## Purpose
 
@@ -25,6 +25,17 @@ unless a shared gateway manifest entry exists for the exact capability.
 
 Dynamic panel action ids must fail closed in provider-mode prompts unless an
 explicit provider gateway contract has graduated the action.
+
+The current graduated exception is:
+
+```txt
+workstation-notes.list_notes
+```
+
+It is read-only, body-redacted, and documented in
+`workstation-notes.list_notes.md`. This exception does not grant provider access
+to neighboring Workstation Notes actions such as create, open, append, rename,
+delete, or set-active.
 
 Blocked prompt shapes include:
 
@@ -84,6 +95,15 @@ surface=dynamic_panel
 provider_availability.codex_workstation=false
 provider_availability.future_provider=false
 gateway_manifest=absent
+```
+
+Graduated dynamic action behavior:
+
+```txt
+capability=workstation-notes.list_notes
+availability=shared_gateway_now
+permission_class=read_observe
+gateway_manifest=present
 ```
 
 Classification rules:

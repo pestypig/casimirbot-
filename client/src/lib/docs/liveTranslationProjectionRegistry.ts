@@ -30,6 +30,7 @@ export type DocumentLiveTranslationProjectionRegistryKey = {
 export type IngestDocumentLiveTranslationProjectionInput = DocumentLiveTranslationProjectionRegistryKey & {
   payload: unknown;
   units: DocumentTranslationUnit[];
+  targetLanguage?: string | null;
   sourceIdentityKey?: string | null;
   sourceTextHash?: string | null;
   sourceTextCharCount?: number | null;
@@ -590,6 +591,28 @@ const sourceHashMatches = (candidate: string | null | undefined, sourceHash: str
   if (!normalizedCandidate && !normalizedSourceHash) return true;
   return normalizedCandidate === normalizedSourceHash;
 };
+
+const docPathMatches = (candidate: unknown, docPath: string): boolean => {
+  const normalizedCandidate = normalizeText(candidate);
+  const normalizedDocPath = normalizeText(docPath);
+  return Boolean(normalizedCandidate && normalizedDocPath && normalizedCandidate === normalizedDocPath);
+};
+
+const sourceIdMatchesDocument = (sourceId: string, docPath: string): boolean => {
+  const docSourceId = documentMarkdownSourceId(docPath);
+  return sourceId === docSourceId || sourceId.startsWith(`${docSourceId}#`);
+};
+
+const sourceIdIsDocumentChunk = (sourceId: string, docPath: string): boolean =>
+  sourceId.startsWith(`${documentMarkdownSourceId(docPath)}#`);
+
+const liveEventMatchesDocumentSource = (input: {
+  meta: Record<string, unknown> | null;
+  sourceId: string;
+  docPath: string;
+}): boolean =>
+  sourceIdMatchesDocument(input.sourceId, input.docPath) ||
+  docPathMatches(input.meta?.docPath ?? input.meta?.doc_path, input.docPath);
 
 const sourceTextIdentityMatches = (
   meta: Record<string, unknown> | null,
@@ -1271,6 +1294,7 @@ export function ingestDocumentLiveTranslationProjection(
     payload: input.payload,
     docPath: input.docPath,
     locale: input.locale,
+    targetLanguage: input.targetLanguage,
     sourceHash: input.sourceHash,
     sourceIdentityKey: input.sourceIdentityKey,
     sourceTextHash: input.sourceTextHash,
@@ -1305,11 +1329,23 @@ export function ingestDocumentLiveTranslationProjectionFromAskLiveEvent(
   const lane = readString(meta?.lane);
   const sourceId = readString(meta?.sourceId ?? meta?.source_id);
   const eventSourceHash = readString(meta?.sourceHash ?? meta?.source_hash);
-  if (!sourceHashMatches(eventSourceHash, input.sourceHash)) {
+  const eventMatchesCurrentDocument = liveEventMatchesDocumentSource({
+    meta,
+    sourceId,
+    docPath: input.docPath,
+  });
+  const sourceHashMatchesCurrentDocument = sourceHashMatches(eventSourceHash, input.sourceHash);
+  const canUseChunkScopedDocumentIdentity =
+    eventMatchesCurrentDocument &&
+    sourceIdIsDocumentChunk(sourceId, input.docPath);
+  if (!sourceHashMatchesCurrentDocument && !canUseChunkScopedDocumentIdentity) {
     return readDocumentLiveTranslationProjectionSnapshot(input);
   }
-  const docSourceId = documentMarkdownSourceId(input.docPath);
-  if (sourceEventType === "lane_session" && lane === "live_translation" && sourceId === docSourceId) {
+  if (
+    sourceEventType === "lane_session" &&
+    lane === "live_translation" &&
+    sourceIdMatchesDocument(sourceId, input.docPath)
+  ) {
     if (!sourceIdentityKeyMatches(meta, input)) {
       return readDocumentLiveTranslationProjectionSnapshot(input);
     }
@@ -1322,7 +1358,11 @@ export function ingestDocumentLiveTranslationProjectionFromAskLiveEvent(
       sourceId,
     });
   }
-  if (sourceEventType === "lane_mail_loop" && lane === "live_translation" && sourceId === docSourceId) {
+  if (
+    sourceEventType === "lane_mail_loop" &&
+    lane === "live_translation" &&
+    sourceIdMatchesDocument(sourceId, input.docPath)
+  ) {
     if (!sourceIdentityKeyMatches(meta, input)) {
       return readDocumentLiveTranslationProjectionSnapshot(input);
     }
@@ -1335,7 +1375,11 @@ export function ingestDocumentLiveTranslationProjectionFromAskLiveEvent(
       sourceId,
     });
   }
-  if (sourceEventType === "lane_goal_binding" && lane === "live_translation" && sourceId === docSourceId) {
+  if (
+    sourceEventType === "lane_goal_binding" &&
+    lane === "live_translation" &&
+    sourceIdMatchesDocument(sourceId, input.docPath)
+  ) {
     if (!sourceIdentityKeyMatches(meta, input)) {
       return readDocumentLiveTranslationProjectionSnapshot(input);
     }
@@ -1351,7 +1395,7 @@ export function ingestDocumentLiveTranslationProjectionFromAskLiveEvent(
   const isProjectionReceiptEvent =
     sourceEventType === "ui_translation_projection" ||
     sourceEventType === "lane_projection_receipt";
-  if (!isProjectionReceiptEvent || lane !== "live_translation" || sourceId !== docSourceId) {
+  if (!isProjectionReceiptEvent || lane !== "live_translation" || !eventMatchesCurrentDocument) {
     return readDocumentLiveTranslationProjectionSnapshot(input);
   }
 
@@ -1360,7 +1404,13 @@ export function ingestDocumentLiveTranslationProjectionFromAskLiveEvent(
     readString(meta?.targetLanguage ?? meta?.target_language) ||
     readString(meta?.latestTargetLanguage ?? meta?.latest_target_language) ||
     normalizeText(input.locale);
-  if (!localeMatches(targetLanguage, input.locale)) {
+  const eventSourceTextHash = readString(meta?.sourceTextHash ?? meta?.source_text_hash);
+  const eventSourceTextCharCount = readNumber(meta?.sourceTextCharCount ?? meta?.source_text_char_count);
+  const isExplicitDocumentProjection =
+    projectionTarget === HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK &&
+    eventMatchesCurrentDocument &&
+    Boolean(targetLanguage);
+  if (!localeMatches(targetLanguage, input.locale) && !isExplicitDocumentProjection) {
     return readDocumentLiveTranslationProjectionSnapshot(input);
   }
   const payload = {
@@ -1405,6 +1455,14 @@ export function ingestDocumentLiveTranslationProjectionFromAskLiveEvent(
         projection_target: projectionTarget,
         projection_status: readString(meta?.projectionStatus ?? meta?.projection_status) || "projected",
         source_id: sourceId,
+        bbox:
+          readRecord(meta?.bbox) ||
+          readRecord(meta?.bbox_px) ||
+          readRecord(meta?.bboxPx) ||
+          null,
+        doc_path:
+          readString(meta?.docPath ?? meta?.doc_path) ||
+          (sourceIdMatchesDocument(sourceId, input.docPath) ? input.docPath : null),
         source_hash: eventSourceHash || normalizeText(input.sourceHash) || null,
         source_kind: normalizeSourceKind(meta?.sourceKind ?? meta?.source_kind),
         account_locale:
@@ -1423,8 +1481,8 @@ export function ingestDocumentLiveTranslationProjectionFromAskLiveEvent(
           readString(meta?.latestFreshnessStatus ?? meta?.latest_freshness_status ?? meta?.freshnessStatus ?? meta?.freshness_status) ||
           "unknown",
         target_language: targetLanguage,
-        source_text_hash: readString(meta?.sourceTextHash ?? meta?.source_text_hash) || null,
-        source_text_char_count: readNumber(meta?.sourceTextCharCount ?? meta?.source_text_char_count),
+        source_text_hash: eventSourceTextHash || null,
+        source_text_char_count: eventSourceTextCharCount,
         translated_text: readString(meta?.translatedText ?? meta?.translated_text) || null,
         cancel_requested: readBoolean(meta?.latestCancelRequested ?? meta?.latest_cancel_requested ?? meta?.cancelRequested ?? meta?.cancel_requested),
         terminal_authority_status: readTerminalAuthorityStatus(
@@ -1443,11 +1501,16 @@ export function ingestDocumentLiveTranslationProjectionFromAskLiveEvent(
     locale: input.locale,
     sourceHash: input.sourceHash,
     sourceIdentityKey: input.sourceIdentityKey,
-    sourceTextHash: input.sourceTextHash,
-    sourceTextCharCount: input.sourceTextCharCount,
+    sourceTextHash: canUseChunkScopedDocumentIdentity
+      ? eventSourceTextHash || input.sourceTextHash
+      : input.sourceTextHash,
+    sourceTextCharCount: canUseChunkScopedDocumentIdentity && eventSourceTextCharCount !== null
+      ? eventSourceTextCharCount
+      : input.sourceTextCharCount,
     projectionTarget,
     units: input.units,
     payload,
+    targetLanguage,
     allowStaleDisplayText: input.allowStaleDisplayText,
   });
 }

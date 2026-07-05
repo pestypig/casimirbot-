@@ -60,6 +60,64 @@ const availableCapabilities = (keys: string[]) => ({
 });
 
 describe("Helix Ask negated/contextual tool admission", () => {
+  it("recognizes capability lane observation packets as admission evidence for actual lane calls", () => {
+    const trace = buildAskTurnSolverTrace({
+      turnId: "ask:test:tts-lane-admission",
+      promptText: "Translate a sentence, then read it aloud.",
+      selectedRoute: "agent_provider",
+      terminalArtifactKind: "agent_provider_terminal_candidate",
+      finalAnswerSource: "agent_provider_terminal_candidate",
+      payload: {
+        turn_id: "ask:test:tts-lane-admission",
+        tool_call_admission_decision: {
+          schema: "helix.tool_call_admission_decision.v1",
+          admitted_tool_families: [],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        current_turn_artifact_ledger: [
+          {
+            schema: "helix.current_turn_artifact.v1",
+            kind: "capability_lane_observation_packet",
+            payload_schema: "helix.agent_step_observation_packet.v1",
+            ref: "ask:test:tts-lane-admission:capability_lane:text_to_speech.speak_text:receipt",
+            capability_key: "text_to_speech.speak_text",
+            status: "blocked",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
+      },
+      loopParityTrace: {
+        actual_tool_calls: [
+          {
+            tool_name: "text_to_speech.speak_text",
+            admitted: false,
+            mutating: false,
+          },
+        ],
+      },
+    });
+
+    expect(trace.tool_admission_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          tool_id: "text_to_speech.speak_text",
+          admitted: true,
+          reason: "actual_tool_call_matched_capability_lane_observation",
+        }),
+      ]),
+    );
+    expect(trace.tool_admission_candidates).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          tool_id: "text_to_speech.speak_text",
+          reason: "actual_tool_call_missing_admission",
+        }),
+      ]),
+    );
+  });
+
   it("does not classify conditional prior-evidence calculator follow-up as an explicit calculator command", () => {
     const promptText =
       "If the previous answer has enough cited unit-bearing values, bind the formula into a numeric expression and run the calculator. Then explain what the result means and what the evidence does not prove.";

@@ -449,11 +449,14 @@ describe("doc viewer math interaction", () => {
     expect(panelSource).toContain("readDocumentLiveTranslationProjectionSnapshot");
     expect(panelSource).toContain("summarizeDocumentLiveTranslationProjectionSnapshot");
     expect(panelSource).toContain("installDocumentLiveTranslationProjectionEventIngestion");
+    expect(panelSource).toContain("const liveTranslationProjectionEligible =");
     expect(panelSource).toContain("sourceHash: rawMarkdownSourceHash");
     expect(panelSource).toContain("allowStaleDisplayText: inlineTranslationEnabled");
     const eventIngestionInstall = panelSource.match(
       /installDocumentLiveTranslationProjectionEventIngestion\(\{[\s\S]*?\n    \}\);/,
     )?.[0] ?? "";
+    expect(panelSource).toContain("if (!currentEntry || !liveTranslationProjectionEligible) return;");
+    expect(panelSource).not.toContain("if (!currentEntry || !translationEligible || translationUnits.length === 0) return;");
     expect(eventIngestionInstall).toContain("sourceHash: rawMarkdownSourceHash");
     expect(eventIngestionInstall).not.toContain("sourceTextHash: rawMarkdownSourceHash");
     expect(eventIngestionInstall).not.toContain("sourceTextCharCount: rawMarkdown.length");
@@ -730,13 +733,15 @@ describe("doc viewer math interaction", () => {
     )?.[0] ?? "";
     expect(projectionSnapshotRead).toContain("locale: interfaceLanguage.code");
     expect(projectionSnapshotRead).toContain("sourceHash: rawMarkdownSourceHash");
-    expect(projectionSnapshotRead).toContain("sourceIdentityKey: activeLiveTranslationSourceIdentityKey");
+    expect(projectionSnapshotRead).not.toContain("sourceIdentityKey: activeLiveTranslationSourceIdentityKey");
     expect(projectionSnapshotRead).toContain("projectionTarget: HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK");
     const projectionEventIngestion = panelSource.match(
       /installDocumentLiveTranslationProjectionEventIngestion\(\{[\s\S]*?\n    \}\);/,
     )?.[0] ?? "";
     expect(projectionEventIngestion).toContain("sourceHash: rawMarkdownSourceHash");
-    expect(projectionEventIngestion).toContain("sourceIdentityKey: activeLiveTranslationSourceIdentityKey");
+    expect(projectionEventIngestion).not.toContain("sourceIdentityKey: activeLiveTranslationSourceIdentityKey");
+    expect(projectionEventIngestion).not.toContain("sourceTextHash: rawMarkdownSourceHash");
+    expect(projectionEventIngestion).not.toContain("sourceTextCharCount: rawMarkdown.length");
     expect(projectionEventIngestion).toContain("projectionTarget: HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK");
     expect(panelSource).toContain("readRecordArray(input.response.capability_lane_turn_timeline)");
     expect(panelSource).toContain("readRecordArray(debug.capability_lane_turn_timeline)");

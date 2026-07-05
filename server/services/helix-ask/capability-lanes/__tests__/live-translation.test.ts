@@ -227,6 +227,79 @@ describe("live_translation.translate_text one-shot lane", () => {
     });
   });
 
+  it("defaults unqualified translation requests to the configured OpenAI-compatible backend", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              translated_text: "El equipo de navegacion esta listo para la proxima ventana de encendido.",
+            }),
+          },
+        },
+      ],
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+
+    const result = await runLiveTranslationTranslateText({
+      provider: buildProvider("codex"),
+      request: request({
+        text: "The navigation team is ready for the next burn window.",
+        source_language: "en",
+        target_language: "es",
+        requested_backend_provider: null,
+      }),
+      turnId: "turn-translation-default-openai-compatible",
+      iteration: 1,
+      env: {
+        LLM_HTTP_API_KEY: "llm-http-key",
+        LLM_HTTP_BASE: "https://translation-provider.test",
+        LLM_HTTP_MODEL: "translation-test-model",
+      } as NodeJS.ProcessEnv,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(url).toBe("https://translation-provider.test/v1/chat/completions");
+    expect(init).toMatchObject({
+      method: "POST",
+      headers: expect.objectContaining({
+        Authorization: "Bearer llm-http-key",
+      }),
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      translated_text: "El equipo de navegacion esta listo para la proxima ventana de encendido.",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(result.lane_resolve_trace).toMatchObject({
+      requested_backend_provider: null,
+      selected_backend_provider: "live_translation.openai_compatible",
+      execution_status: "executed_observation_only",
+      backend_selection_decision: expect.objectContaining({
+        outcome: "default_selected",
+        live_backend_execution_enabled: true,
+        selected_runtime_provider_remains_root: true,
+        backend_provider_becomes_root_agent: false,
+        terminal_authority_owner: "helix",
+        terminal_eligible: false,
+        assistant_answer: false,
+      }),
+    });
+    expect(result.observation).toMatchObject({
+      selected_backend_provider: "live_translation.openai_compatible",
+      deterministic: false,
+      terminal_authority_status: "pending_helix_terminal_authority",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
   it("normalizes OpenAI-compatible provider failures as non-terminal failed receipts", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("provider down", {
       status: 503,
@@ -318,6 +391,10 @@ describe("live_translation.translate_text one-shot lane", () => {
         source_language: "en",
         target_language: "fr",
         source_id: "docs:nhm2:whitepaper",
+        panel_id: "docs-viewer",
+        region_id: "docs-viewer:summary",
+        bbox: { x: 12, y: 24, width: 360, height: 80, source: "docs-visible-region" },
+        doc_path: "docs/research/nhm2.md",
         source_hash: "fnv1a32:whitepaper-v2",
         source_kind: "docs",
         account_locale: "es-US",
@@ -330,6 +407,7 @@ describe("live_translation.translate_text one-shot lane", () => {
       }),
       turnId: "turn-translation-chunk",
       env: {} as NodeJS.ProcessEnv,
+      nowMs: 1783000031000,
     });
 
     expect(result.ok).toBe(true);
@@ -345,6 +423,10 @@ describe("live_translation.translate_text one-shot lane", () => {
       goal_binding_id: "goal-binding-docs-translation",
       goal_binding_key: "goal:docs-translation::goal-binding-docs-translation::lane-session-chunk::live_translation",
       source_id: "docs:nhm2:whitepaper",
+      panel_id: "docs-viewer",
+      region_id: "docs-viewer:summary",
+      bbox: { x: 12, y: 24, width: 360, height: 80, source: "docs-visible-region" },
+      doc_path: "docs/research/nhm2.md",
       source_hash: "fnv1a32:whitepaper-v2",
       source_kind: "docs",
       account_locale: "es-US",
@@ -353,6 +435,7 @@ describe("live_translation.translate_text one-shot lane", () => {
       dedupe_key: "docs:nhm2:whitepaper:chunk-7:fr",
       source_event_id: "docs:nhm2:whitepaper:event-7",
       source_event_ms: 1,
+      observed_at_ms: 1783000031000,
       freshness_status: "stale",
       projection_target: "docs_chunk",
       cancel_requested: false,
@@ -373,6 +456,10 @@ describe("live_translation.translate_text one-shot lane", () => {
         goal_binding_id: "goal-binding-docs-translation",
         goal_binding_key: "goal:docs-translation::goal-binding-docs-translation::lane-session-chunk::live_translation",
         source_id: "docs:nhm2:whitepaper",
+        panel_id: "docs-viewer",
+        region_id: "docs-viewer:summary",
+        bbox: { x: 12, y: 24, width: 360, height: 80, source: "docs-visible-region" },
+        doc_path: "docs/research/nhm2.md",
         source_hash: "fnv1a32:whitepaper-v2",
         source_kind: "docs",
         account_locale: "es-US",
@@ -381,6 +468,7 @@ describe("live_translation.translate_text one-shot lane", () => {
         dedupe_key: "docs:nhm2:whitepaper:chunk-7:fr",
         source_event_id: "docs:nhm2:whitepaper:event-7",
         source_event_ms: 1,
+        observed_at_ms: 1783000031000,
         freshness_status: "stale",
         projection_target: "docs_chunk",
         cancel_requested: false,
@@ -406,6 +494,10 @@ describe("live_translation.translate_text one-shot lane", () => {
       projection_target: "docs_chunk",
       projection_status: "stale",
       source_id: "docs:nhm2:whitepaper",
+      panel_id: "docs-viewer",
+      region_id: "docs-viewer:summary",
+      bbox: { x: 12, y: 24, width: 360, height: 80, source: "docs-visible-region" },
+      doc_path: "docs/research/nhm2.md",
       source_hash: "fnv1a32:whitepaper-v2",
       source_identity_key:
         "docs:nhm2:whitepaper::fnv1a32:whitepaper-v2::sha256:whitepaper-source::9::docs::docs_chunk::es-US::fr",
@@ -416,6 +508,7 @@ describe("live_translation.translate_text one-shot lane", () => {
       dedupe_key: "docs:nhm2:whitepaper:chunk-7:fr",
       source_event_id: "docs:nhm2:whitepaper:event-7",
       source_event_ms: 1,
+      observed_at_ms: 1783000031000,
       freshness_status: "stale",
       target_language: "fr",
       source_text_hash: result.observation?.source_text_hash,
@@ -432,8 +525,8 @@ describe("live_translation.translate_text one-shot lane", () => {
     expect(result.observation_packet.state_delta.live_translation_projection_receipt?.receipt_ref).toContain(
       `${result.observation?.observation_ref}:projection:`,
     );
-    expect(typeof result.observation_packet.state_delta.live_translation_projection_receipt?.observed_at_ms).toBe(
-      "number",
+    expect(result.observation_packet.state_delta.live_translation_projection_receipt?.observed_at_ms).toBe(
+      1783000031000,
     );
   });
 

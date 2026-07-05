@@ -7,7 +7,12 @@ import { appendInterpretationCard, resetInterpretationCardsForTest } from "../se
 import { ensureLiveSituationRunForEnvironment, resetLiveSituationRunsForTest } from "../services/situation-room/live-situation-run-store";
 import { appendLiveSourceChunk, queueLiveSourceAnalysisJob, resetLiveSourceChunkBufferForTest } from "../services/situation-room/live-source-chunk-buffer";
 import { appendObservationJournalEntry, resetObservationJournalForTest } from "../services/situation-room/observation-journal-store";
-import { seedBackendLiveVisualSourceForAskTest, seedBackendLiveVisualSourceSwitchForAskTest } from "../services/situation-room/live-visual-test-harness";
+import {
+  seedBackendLiveVisualSourceForAskTest,
+  seedBackendLiveVisualSourceSwitchForAskTest,
+  seedBackendLiveVisualIdentityGapForAskTest,
+  seedBackendLiveVisualWrongEnvironmentForAskTest,
+} from "../services/situation-room/live-visual-test-harness";
 
 const threadId = "helix-ask:identity-audit";
 const future = "2099-01-01T00:00:00.000Z";
@@ -206,6 +211,49 @@ describe("Helix live source identity audit", () => {
     });
     expect(buildLiveSourceIdentityAudit({ turnId: "turn:wrong-env", threadId }).diagnosis)
       .toBe("fresh_source_wrong_environment");
+  });
+
+  it("diagnoses wrong fresh-source environment from the backend parity seed", () => {
+    seedBackendLiveVisualWrongEnvironmentForAskTest({
+      thread_id: threadId,
+      source_id: "visual_source:wrong-env-harness",
+      now: "2026-05-20T00:01:00.000Z",
+    });
+
+    expect(buildLiveSourceIdentityAudit({ turnId: "turn:wrong-env-harness", threadId }))
+      .toMatchObject({
+        diagnosis: "fresh_source_wrong_environment",
+        identity_ok: false,
+      });
+  });
+
+  it("seeds backend identity-gap scenarios without accidentally satisfying every rail", () => {
+    seedBackendLiveVisualIdentityGapForAskTest({
+      scenario: "live_source_identity_no_field_evaluations",
+      thread_id: threadId,
+      source_id: "visual_source:no-fields-harness",
+      now: "2026-05-20T00:01:00.000Z",
+    });
+
+    expect(buildLiveSourceIdentityAudit({ turnId: "turn:no-fields-harness", threadId }))
+      .toMatchObject({
+        diagnosis: "field_evaluations_missing",
+        identity_ok: false,
+      });
+
+    resetAll();
+    seedBackendLiveVisualIdentityGapForAskTest({
+      scenario: "live_source_identity_stale_interpretation",
+      thread_id: threadId,
+      source_id: "visual_source:stale-interpretation-harness",
+      now: "2026-05-20T00:01:00.000Z",
+    });
+
+    expect(buildLiveSourceIdentityAudit({ turnId: "turn:stale-interpretation-harness", threadId }))
+      .toMatchObject({
+        diagnosis: "interpretations_missing",
+        identity_ok: false,
+      });
   });
 
   it("diagnoses missing SituationRun membership, field evaluations, and interpretations", () => {

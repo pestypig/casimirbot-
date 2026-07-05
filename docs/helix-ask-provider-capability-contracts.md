@@ -9,6 +9,7 @@ not a prompt and it is not a runtime loop. The machine-checkable companion is:
 ```txt
 server/services/helix-ask/provider-agent-capability-contract.ts
 server/services/helix-ask/workstation-tool-gateway/__tests__/provider-capability-contract.test.ts
+docs/helix-ask-codex-workstation-release-readiness.md
 ```
 
 ## Shared Lifecycle
@@ -30,11 +31,69 @@ prompt/tool intent
 Receipts and observations are not answers. UI/debug rows are not answer
 authority. Provider final prose must not be parsed to infer tool execution.
 
+## Runtime Goal Session Validation
+
+Runtime goal sessions are provider-neutral: Helix Native, Codex Workstation
+Mode, and future runtimes must use the same goal/session proof chain:
+
+```txt
+/goal start
+-> durable job brief
+-> /goal wake
+-> admitted workstation observation
+-> evidence re-entry
+-> provider terminal candidate
+-> Helix terminal authority
+-> console/debug projection
+```
+
+The keyed live validation command is:
+
+```txt
+npm run helix:ask:runtime-goal-probe:providers:both
+```
+
+Run it only against a user-started keyed server. It executes Codex and Helix
+runtime goal probes through both JSON and stream Ask routes, then writes a run
+directory under `artifacts/helix-ask-runtime-goal`.
+
+Each run writes `artifact-manifest.json`, which indexes the saved response,
+Debug Copy, stream event, and validation files. The validation must prove:
+
+```txt
+start job title
+start runtime provider
+start console/debug summary
+start-to-wake goal continuity
+runtime session continuity when reported
+wake source identity and freshness
+requested workstation observation/tool
+observation refs
+provider progress summary
+evidence re-entry debug stage
+terminal authority debug stage
+server-authoritative terminal result
+debug-export endpoint continuity
+```
+
+If the keyed server is unavailable or the first live request fails, the probe
+still writes a run directory with `probe-error.json` and `artifact-manifest.json`.
+Treat that as connectivity/keyed-runtime evidence, not as a product validation
+failure. A successful completion proof requires real `start-response.json`,
+`wake-response.json`, `debug-export.json`, and `validation.json` artifacts for
+the JSON route, plus the matching `stream-*` artifacts when stream validation is
+enabled.
+
+This is a focused live proof for runtime-goal continuity. It is not a broad Ask
+smoke suite and should not replace targeted tests for unrelated route,
+capability-lane, or workstation-gateway changes.
+
 ## Availability Labels
 
 | Label | Meaning |
 | --- | --- |
 | `shared_gateway_now` | Exposed through `workstation-tool-gateway/registry.ts` for Helix, Codex, and future providers. |
+| `shared_capability_lane_now` | Exposed through the capability-lane runner for Helix, Codex, and future providers without adding a workstation gateway manifest entry. |
 | `safe_to_graduate_next` | Read/observe capability that can be promoted after bounded observation, debug, and negative-admission tests exist. |
 | `requires_confirmation_contract` | Side-effecting output such as voice; needs explicit affirmative admission, confirmation/playback policy, and receipts. |
 | `helix_native_only` | Helix-owned live-environment behavior that should not be provider-facing until a narrower contract exists. |
@@ -49,6 +108,7 @@ The current provider-shared workstation gateway exposes these capabilities:
 ```txt
 workspace_os.status
 workstation.active_context
+workstation-notes.list_notes
 scientific-calculator.solve_expression
 scientific-calculator.solve_scalar_expression
 scientific-calculator.classify_expression
@@ -74,6 +134,7 @@ scholarly-research.extract_numeric_parameters
 civilization-bounds.reflect_system_bounds
 theory-badge-graph.reflect_discussion_context
 theory-badge-graph.propose_frontier_conjectures
+moral-graph.reflect_context
 moral-graph.reflect_living_substrate_context
 text_to_speech.speak_text
 live_env.request_interim_voice_callout
@@ -118,7 +179,40 @@ live_env.test_visual_observer_profile
 live_env.compare_visual_observer_profiles
 ```
 
-These are non-terminal gateway observations/receipts with:
+## Shared Capability Lanes
+
+These capabilities are provider-shared through the capability-lane runner rather
+than the workstation gateway manifest:
+
+```txt
+live_translation.translate_text
+visual_analysis.inspect_image_region
+visual_analysis.inspect_frame
+```
+
+`live_translation.translate_text` emits
+`helix.live_translation.observation.v1`, a same-turn
+`helix.agent_step_observation_packet.v1`, and optional projection receipts. It
+is observation-only: translated text is evidence for the next model step, not a
+terminal answer. Backend selection stays Helix-owned, external backends execute
+when configured and selected by policy. A configured OpenAI-compatible
+translation key selects that provider by default unless
+`HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED=0` explicitly keeps the lane
+on deterministic local fallback. Final answer authority remains behind evidence
+re-entry plus Helix terminal authority.
+
+`visual_analysis.inspect_image_region` and `visual_analysis.inspect_frame` emit
+Image Lens/visual observations and receipts for already-admitted visual sources.
+They do not grant source admission by lexical mention: quoted, negated,
+historical, future, or screen-visible "inspect" wording must not execute the
+lane. Region/frame output is visual evidence for the next model step, not a
+terminal answer, and must remain behind evidence re-entry plus Helix terminal
+authority. The older `image_lens.inspect` explicit capability remains a
+non-runner alias candidate until an explicit alias-to-lane admission contract is
+added.
+
+The shared gateway capabilities above are non-terminal gateway
+observations/receipts with:
 
 ```txt
 assistant_answer=false
@@ -186,6 +280,7 @@ capability uses:
 | --- | --- |
 | `helix.workspace_os_status_observation.v1` | Workspace/runtime status observations. |
 | `helix.workstation_active_context_observation.v1` | Active workstation focus/context observations. |
+| `helix.workstation_notes_list_observation.v1` | Body-redacted Workstation Notes index observations. |
 | `helix.calculator_solve_observation.v1` | Calculator solve observations. |
 | `helix.calculator_scalar_solve_observation.v1` | Scalar calculator solve observations. |
 | `helix.calculator_expression_classification_observation.v1` | Calculator expression classification observations. |
@@ -201,6 +296,7 @@ capability uses:
 | `helix.scholarly_numeric_parameter_observation.v1` | Scholarly numeric parameter observations with cited values and units. |
 | `helix.civilization_bounds_reflection_observation.v1` | Civilization-bounds reflection observations. |
 | `helix.theory_context_reflection_observation.v1` | Theory badge graph reflection observations. |
+| `helix.moral_graph_reflection_observation.v1` | Moral Graph context reflection observations. |
 | `helix.moral_living_substrate_reflection_observation.v1` | Moral Graph living-substrate reflection observations. |
 | `helix.theory_frontier_conjecture_observation.v1` | Theory badge graph frontier conjecture workbench observations. |
 | `helix.interim_voice_callout_tool_result.v1` | Voice/narrator request receipts and host playback projections. |
@@ -231,9 +327,35 @@ capabilities with non-empty `input_schema.required`:
 | `civilization-bounds.reflect_system_bounds` | `prompt` |
 | `theory-badge-graph.reflect_discussion_context` | `prompt` |
 | `theory-badge-graph.propose_frontier_conjectures` | `prompt` |
+| `moral-graph.reflect_context` | `prompt` |
 | `text_to_speech.speak_text` | `text` |
 | `live_env.request_interim_voice_callout` | `text` |
 | `live_env.narrator_say` | `text` |
+
+## Workstation Notes Read Boundary
+
+`workstation-notes.list_notes` is a graduated read-only dynamic panel action.
+It may list bounded note references from the Ask turn context snapshot or an
+explicit redacted gateway argument. It must not expose note bodies or raw rich
+text fields. The observation schema omits `body`, `content`, `html`, `text`,
+and `markdown`, and keeps:
+
+```txt
+assistant_answer=false
+raw_content_included=false
+terminal_eligible=false
+post_tool_model_step_required=true
+```
+
+Missing notes context blocks with `workstation_notes_context_missing`. The
+mutating Workstation Notes actions remain held back:
+
+```txt
+workstation-notes.append_to_note
+workstation-notes.create_note
+workstation-notes.create
+workstation-notes.open
+```
 
 ## Explicit Route Contracts Not Yet Gateway Manifest IDs
 

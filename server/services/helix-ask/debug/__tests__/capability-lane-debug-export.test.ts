@@ -309,6 +309,16 @@ describe("capability lane debug export fields", () => {
         legacy_schema: "helix.codex_runtime_lane_request_loop.v1",
         runtime_provider_adapter: "codex",
         status: "lane_observation_reentered",
+        visible_translation_collector_chain: {
+          schema: "helix.runtime_lane_request_loop.visible_translation_collector_chain.v1",
+          requested_collector_capability: "workstation.visible_text.collect_translation_targets",
+          collector_capability: "workstation_tool_reference.collect_visible_translation_targets",
+          collector_observation_ref: "obs:visible-targets",
+          first_collected_existing_source_event_ms: 1782859999000,
+          first_collected_existing_observed_at_ms: 1782859999100,
+          collected_existing_source_event_ms: [1782859999000],
+          collected_existing_observed_at_ms: [1782859999100],
+        },
       },
     });
 
@@ -532,6 +542,15 @@ describe("capability lane debug export fields", () => {
       },
       runtime_lane_request_loop: {
         status: "lane_observation_reentered",
+        visible_translation_collector_chain: {
+          requested_collector_capability: "workstation.visible_text.collect_translation_targets",
+          collector_capability: "workstation_tool_reference.collect_visible_translation_targets",
+          collector_observation_ref: "obs:visible-targets",
+          first_collected_existing_source_event_ms: 1782859999000,
+          first_collected_existing_observed_at_ms: 1782859999100,
+          collected_existing_source_event_ms: [1782859999000],
+          collected_existing_observed_at_ms: [1782859999100],
+        },
       },
     });
     expect(fields.capability_lane_timeline_summary.console_state_rows).toEqual(expect.arrayContaining([

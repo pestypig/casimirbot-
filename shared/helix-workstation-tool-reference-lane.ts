@@ -4,7 +4,10 @@ import type {
   HelixCapabilityLaneBackendSelectionDecision,
   HelixCapabilityLaneResolveTrace,
 } from "./helix-capability-lane";
-import type { HelixVisibleTranslationTargetBatch } from "./helix-live-translation-lane";
+import type {
+  HelixVisibleTranslationTargetBatch,
+  HelixVisibleTranslationTargetCollectorCapability,
+} from "./helix-live-translation-lane";
 
 export const HELIX_WORKSTATION_TOOL_REFERENCE_LIST_REQUEST_SCHEMA =
   "helix.workstation_tool_reference.list_request.v1" as const;
@@ -33,6 +36,7 @@ export type HelixWorkstationToolReferenceCapabilitySummary = {
   mode: HelixWorkstationToolReferenceMode;
   permission_profile_required: "observe" | "read" | "act" | "write" | "danger";
   requires_confirmation: boolean;
+  answer_authority: false;
   terminal_eligible: false;
   assistant_answer: false;
   raw_content_included: false;
@@ -66,6 +70,7 @@ export type HelixWorkstationToolReferenceListObservation = {
   capabilities: HelixWorkstationToolReferenceCapabilitySummary[];
   deterministic: true;
   reentry_required: true;
+  answer_authority: false;
   terminal_eligible: false;
   assistant_answer: false;
   raw_content_included: false;
@@ -84,6 +89,7 @@ export type HelixWorkstationToolReferenceListResult = {
   capability_count?: number;
   error?: string;
   reentry_required: true;
+  answer_authority: false;
   terminal_eligible: false;
   assistant_answer: false;
   raw_content_included: false;
@@ -91,18 +97,48 @@ export type HelixWorkstationToolReferenceListResult = {
 
 export type HelixWorkstationToolReferenceVisibleTranslationTargetsRequest = {
   schema: typeof HELIX_WORKSTATION_TOOL_REFERENCE_VISIBLE_TRANSLATION_TARGETS_REQUEST_SCHEMA;
-  capability: "workstation_tool_reference.collect_visible_translation_targets";
+  capability: HelixVisibleTranslationTargetCollectorCapability;
+  requested_collector_capability?: HelixVisibleTranslationTargetCollectorCapability | null;
+  workspace_context_snapshot?: Record<string, unknown> | null;
+  workspaceContextSnapshot?: Record<string, unknown> | null;
+  active_doc_visible_translation_context?: Record<string, unknown> | null;
+  activeDocVisibleTranslationContext?: Record<string, unknown> | null;
+  visible_translation_context?: Record<string, unknown> | null;
+  visibleTranslationContext?: Record<string, unknown> | null;
   active_panel_id?: string | null;
   doc_path?: string | null;
+  source_hash?: string | null;
   projection_target?: string | null;
   account_locale?: string | null;
   target_language?: string | null;
   max_chunks?: number | null;
   visible_only?: boolean | null;
+  selected_text?: string | null;
+  selectedText?: string | null;
+  selection_text?: string | null;
+  selectionText?: string | null;
+  selection_ref?: string | null;
+  selectionRef?: string | null;
+  hover_text?: string | null;
+  hoverText?: string | null;
+  hover_region_text?: string | null;
+  hoverRegionText?: string | null;
+  active_region_text?: string | null;
+  activeRegionText?: string | null;
+  hover_ref?: string | null;
+  hoverRef?: string | null;
+  active_region_ref?: string | null;
+  activeRegionRef?: string | null;
   visible_text?: string | null;
   title_text?: string | null;
   body_text?: string | null;
   visible_text_chunks?: Array<Record<string, unknown>> | null;
+  ui_text_regions?: Array<Record<string, unknown>> | null;
+  uiTextRegions?: Array<Record<string, unknown>> | null;
+  panel_text_regions?: Array<Record<string, unknown>> | null;
+  panelTextRegions?: Array<Record<string, unknown>> | null;
+  visible_ui_text_regions?: Array<Record<string, unknown>> | null;
+  visibleUiTextRegions?: Array<Record<string, unknown>> | null;
   requested_backend_provider?: string | null;
   turn_id?: string | null;
   assistant_answer: false;
@@ -123,6 +159,7 @@ export type HelixWorkstationToolReferenceVisibleTranslationTargetsObservation = 
   target_batch: HelixVisibleTranslationTargetBatch;
   deterministic: true;
   reentry_required: true;
+  answer_authority: false;
   terminal_eligible: false;
   assistant_answer: false;
   raw_content_included: false;
@@ -141,6 +178,7 @@ export type HelixWorkstationToolReferenceVisibleTranslationTargetsResult = {
   target_count?: number;
   error?: string;
   reentry_required: true;
+  answer_authority: false;
   terminal_eligible: false;
   assistant_answer: false;
   raw_content_included: false;

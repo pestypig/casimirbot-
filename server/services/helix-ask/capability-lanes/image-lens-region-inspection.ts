@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import sharp from "sharp";
 import {
   HELIX_AGENT_STEP_OBSERVATION_PACKET_SCHEMA,
   type HelixAgentStepObservationPacket,
@@ -16,6 +17,7 @@ import {
   IMAGE_LENS_REGION_INSPECTION_OBSERVATION_SCHEMA,
   IMAGE_LENS_REGION_INSPECTION_RECEIPT_SCHEMA,
   IMAGE_LENS_REGION_INSPECTION_RESULT_SCHEMA,
+  type ImageLensRegionExtractionStatusV1,
   type ImageLensRegionInspectionDetailV1,
   type ImageLensRegionInspectionObservationV1,
   type ImageLensRegionInspectionReceiptV1,
@@ -27,6 +29,7 @@ import type {
   HelixCapabilityLaneResolveTrace,
 } from "@shared/helix-capability-lane";
 import type { HelixAgentProvider } from "../agent-providers/types";
+import { getVisionProvider, getVisionProviderHealth } from "../../vision/provider";
 import { resolveHelixCapabilityLaneRequest } from "./registry";
 
 const LANE_ID = "visual_analysis" as const;
@@ -56,6 +59,15 @@ const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
 
 const imageHash = (value: unknown): string => `sha256:${hashHex(value)}`;
 
+type ImageLensRegionExtractionResult = {
+  extraction_status: ImageLensRegionExtractionStatusV1;
+  text_candidate?: string;
+  latex_candidate?: string;
+  table_candidate_ref?: string;
+  uncertainty: string[];
+  backend_ref: string | null;
+};
+
 const sourceKindFor = (request: ImageLensRegionInspectionRequestV1): DocumentImageSourceKindV1 =>
   request.source_kind ?? (request.page_number ? "pdf_page_render" : "image_lens_source");
 
@@ -69,6 +81,299 @@ const cropImageRefFor = (request: ImageLensRegionInspectionRequestV1, bbox: Docu
   return `${base}#crop=${bbox.x},${bbox.y},${bbox.width},${bbox.height}`;
 };
 
+const normalizeExtractionStatus = (
+  value: unknown,
+  fallback: ImageLensRegionExtractionStatusV1,
+): ImageLensRegionExtractionStatusV1 => {
+  if (
+    value === "extracted" ||
+    value === "partial" ||
+    value === "failed" ||
+    value === "not_run"
+  ) {
+    return value;
+  }
+  return fallback;
+};
+
+const readRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+
+const readString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim() ? value.trim() : null;
+
+const readStringArray = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.map((entry) => readString(entry)).filter((entry): entry is string => Boolean(entry))
+    : [];
+
+const bboxKey = (bbox: DocumentImageBboxPxV1): string =>
+  `${bbox.x},${bbox.y},${bbox.width},${bbox.height}`;
+
+const readDataUrlImage = (value: unknown): { mime: string; base64: string } | null => {
+  const text = readString(value);
+  if (!text) return null;
+  const withoutFragment = text.split("#")[0] ?? text;
+  const match = withoutFragment.match(/^data:([^;,]+);base64,(.+)$/i);
+  if (!match) return null;
+  const mime = match[1]?.trim() || "image/png";
+  const base64 = (match[2] ?? "").replace(/\s+/g, "");
+  return base64 ? { mime, base64 } : null;
+};
+
+const cropImageBase64 = async (
+  sourceBase64: string,
+  bbox: DocumentImageBboxPxV1,
+): Promise<{ mime: string; base64: string } | null> => {
+  const sourceBuffer = Buffer.from(sourceBase64, "base64");
+  const source = sharp(sourceBuffer, { failOn: "none" });
+  const metadata = await source.metadata();
+  const sourceWidth = metadata.width ?? 0;
+  const sourceHeight = metadata.height ?? 0;
+  if (sourceWidth <= 0 || sourceHeight <= 0) return null;
+  const left = clampNumber(bbox.x, 0, Math.max(0, sourceWidth - 1));
+  const top = clampNumber(bbox.y, 0, Math.max(0, sourceHeight - 1));
+  const width = clampNumber(bbox.width, 1, sourceWidth - left);
+  const height = clampNumber(bbox.height, 1, sourceHeight - top);
+  const crop = await sharp(sourceBuffer, { failOn: "none" })
+    .extract({ left, top, width, height })
+    .png()
+    .toBuffer();
+  return { mime: "image/png", base64: crop.toString("base64") };
+};
+
+const resolveCropImagePayload = async (input: {
+  request: ImageLensRegionInspectionRequestV1;
+  bbox: DocumentImageBboxPxV1;
+  cropImageRef: string;
+}): Promise<{ mime: string; base64: string; source: "crop_image_ref" | "source_image_ref_crop" | "page_image_ref_crop" } | null> => {
+  const cropDataUrl = readDataUrlImage(input.request.crop_image_ref);
+  if (cropDataUrl) return { ...cropDataUrl, source: "crop_image_ref" };
+
+  const sourceDataUrl =
+    readDataUrlImage(input.request.source_image_ref) ??
+    readDataUrlImage(input.cropImageRef);
+  if (sourceDataUrl) {
+    const cropped = await cropImageBase64(sourceDataUrl.base64, input.bbox);
+    return cropped ? { ...cropped, source: "source_image_ref_crop" } : null;
+  }
+
+  const pageDataUrl = readDataUrlImage(input.request.page_image_ref);
+  if (pageDataUrl) {
+    const cropped = await cropImageBase64(pageDataUrl.base64, input.bbox);
+    return cropped ? { ...cropped, source: "page_image_ref_crop" } : null;
+  }
+  return null;
+};
+
+const buildExtractionPrompt = (request: ImageLensRegionInspectionRequestV1, bbox: DocumentImageBboxPxV1): string => [
+  "You are extracting observation-only evidence from one cropped Image Lens region.",
+  "Return only JSON with keys: text_candidate, latex_candidate, uncertainty.",
+  "Use null when a field is not readable. Use uncertainty as an array of short strings.",
+  "For equations or symbolic math, preserve symbols as closely as possible in latex_candidate.",
+  "Do not infer content outside the crop. Do not provide a final answer.",
+  `bbox_px: ${bbox.x},${bbox.y},${bbox.width},${bbox.height}`,
+  request.region_label ? `region_label: ${request.region_label}` : "",
+  request.requested_equation_label ? `requested_equation_label: ${request.requested_equation_label}` : "",
+  request.question ? `crop_question: ${request.question}` : "",
+].filter(Boolean).join("\n");
+
+const parseJsonObjectFromText = (text: string): Record<string, unknown> | null => {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]?.trim();
+  const candidates = [
+    fenced,
+    trimmed,
+    trimmed.slice(trimmed.indexOf("{"), trimmed.lastIndexOf("}") + 1),
+  ].filter((entry): entry is string => Boolean(entry && entry.trim().startsWith("{") && entry.trim().endsWith("}")));
+  for (const candidate of candidates) {
+    try {
+      return readRecord(JSON.parse(candidate));
+    } catch {
+      // Try the next candidate.
+    }
+  }
+  return null;
+};
+
+const extractionFromVisionText = (
+  text: string,
+  backendRef: string,
+): ImageLensRegionExtractionResult => {
+  const parsed = parseJsonObjectFromText(text);
+  const textCandidate = readString(parsed?.text_candidate ?? parsed?.textCandidate) ?? undefined;
+  const latexCandidate = readString(parsed?.latex_candidate ?? parsed?.latexCandidate) ?? undefined;
+  const tableCandidateRef = readString(parsed?.table_candidate_ref ?? parsed?.tableCandidateRef) ?? undefined;
+  const uncertainty = readStringArray(parsed?.uncertainty);
+  const hasCandidate = Boolean(textCandidate || latexCandidate || tableCandidateRef);
+  if (!parsed) {
+    return {
+      extraction_status: "partial",
+      text_candidate: text,
+      uncertainty: ["Vision backend returned non-JSON extraction text; treating it as a text_candidate."],
+      backend_ref: backendRef,
+    };
+  }
+  return {
+    extraction_status: hasCandidate ? (textCandidate && latexCandidate ? "extracted" : "partial") : "failed",
+    ...(textCandidate ? { text_candidate: textCandidate } : {}),
+    ...(latexCandidate ? { latex_candidate: latexCandidate } : {}),
+    ...(tableCandidateRef ? { table_candidate_ref: tableCandidateRef } : {}),
+    uncertainty: uncertainty.length ? uncertainty : hasCandidate ? [] : ["Vision backend returned JSON without text_candidate or latex_candidate."],
+    backend_ref: backendRef,
+  };
+};
+
+const readFixtureExtractionEntries = (env: NodeJS.ProcessEnv | undefined): Record<string, unknown>[] => {
+  const raw = env?.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+  if (!raw?.trim()) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.map(readRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry));
+    }
+    const record = readRecord(parsed);
+    if (!record) return [];
+    const entries = Array.isArray(record.entries) ? record.entries : Array.isArray(record.fixtures) ? record.fixtures : [];
+    return entries.map(readRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  } catch {
+    return [];
+  }
+};
+
+const fixtureMatchesRequest = (
+  fixture: Record<string, unknown>,
+  request: ImageLensRegionInspectionRequestV1,
+  bbox: DocumentImageBboxPxV1,
+  cropImageRef: string,
+): boolean => {
+  const fixtureRegionLabel = readString(fixture.region_label ?? fixture.regionLabel);
+  const fixtureEquationLabel = readString(fixture.requested_equation_label ?? fixture.requestedEquationLabel);
+  const fixtureCropRef = readString(fixture.crop_image_ref ?? fixture.cropImageRef);
+  const fixtureBbox = readString(fixture.bbox_key ?? fixture.bboxKey);
+  const requestRegionLabel = readString(request.region_label);
+  const requestEquationLabel = readString(request.requested_equation_label);
+  return (
+    Boolean(fixtureRegionLabel && requestRegionLabel && fixtureRegionLabel === requestRegionLabel) ||
+    Boolean(fixtureEquationLabel && requestEquationLabel && fixtureEquationLabel === requestEquationLabel) ||
+    Boolean(fixtureCropRef && fixtureCropRef === cropImageRef) ||
+    Boolean(fixtureBbox && fixtureBbox === bboxKey(bbox))
+  );
+};
+
+const extractionFromFixture = (
+  fixture: Record<string, unknown>,
+): ImageLensRegionExtractionResult => {
+  const textCandidate = readString(fixture.text_candidate ?? fixture.textCandidate) ?? undefined;
+  const latexCandidate = readString(fixture.latex_candidate ?? fixture.latexCandidate) ?? undefined;
+  const tableCandidateRef = readString(fixture.table_candidate_ref ?? fixture.tableCandidateRef) ?? undefined;
+  const hasCandidate = Boolean(textCandidate || latexCandidate || tableCandidateRef);
+  return {
+    extraction_status: normalizeExtractionStatus(
+      fixture.extraction_status ?? fixture.extractionStatus,
+      hasCandidate ? (textCandidate && latexCandidate ? "extracted" : "partial") : "failed",
+    ),
+    ...(textCandidate ? { text_candidate: textCandidate } : {}),
+    ...(latexCandidate ? { latex_candidate: latexCandidate } : {}),
+    ...(tableCandidateRef ? { table_candidate_ref: tableCandidateRef } : {}),
+    uncertainty: readStringArray(fixture.uncertainty),
+    backend_ref: readString(fixture.backend_ref ?? fixture.backendRef) ?? "fixture",
+  };
+};
+
+const shouldRunVisionExtractionBackend = (env: NodeJS.ProcessEnv | undefined): boolean => {
+  const mode = (env?.HELIX_IMAGE_LENS_EXTRACTION_BACKEND ?? process.env.HELIX_IMAGE_LENS_EXTRACTION_BACKEND ?? "").trim().toLowerCase();
+  if (mode === "off" || mode === "disabled" || mode === "none" || mode === "fixture") return false;
+  if (process.env.NODE_ENV === "test" && !mode) return false;
+  const health = getVisionProviderHealth();
+  return health.configured && health.can_analyze_inline_image;
+};
+
+const resolveImageLensRegionExtraction = async (input: {
+  request: ImageLensRegionInspectionRequestV1;
+  bbox: DocumentImageBboxPxV1;
+  cropImageRef: string;
+  env?: NodeJS.ProcessEnv;
+}): Promise<ImageLensRegionExtractionResult> => {
+  const requestTextCandidate = readString(input.request.text_candidate) ?? undefined;
+  const requestLatexCandidate = readString(input.request.latex_candidate) ?? undefined;
+  const requestTableCandidateRef = readString(input.request.table_candidate_ref) ?? undefined;
+  const requestUncertainty = input.request.uncertainty ?? [];
+  const hasRequestCandidate = Boolean(requestTextCandidate || requestLatexCandidate || requestTableCandidateRef);
+  if (hasRequestCandidate || input.request.extraction_status) {
+    return {
+      extraction_status: normalizeExtractionStatus(
+        input.request.extraction_status,
+        hasRequestCandidate
+          ? (requestTextCandidate && requestLatexCandidate ? "extracted" : "partial")
+          : "failed",
+      ),
+      ...(requestTextCandidate ? { text_candidate: requestTextCandidate } : {}),
+      ...(requestLatexCandidate ? { latex_candidate: requestLatexCandidate } : {}),
+      ...(requestTableCandidateRef ? { table_candidate_ref: requestTableCandidateRef } : {}),
+      uncertainty: requestUncertainty,
+      backend_ref: "runtime_supplied_candidate",
+    };
+  }
+
+  const fixture = readFixtureExtractionEntries(input.env)
+    .find((entry) => fixtureMatchesRequest(entry, input.request, input.bbox, input.cropImageRef));
+  if (fixture) {
+    return extractionFromFixture(fixture);
+  }
+
+  if (shouldRunVisionExtractionBackend(input.env)) {
+    try {
+      const imagePayload = await resolveCropImagePayload(input);
+      if (!imagePayload) {
+        return {
+          extraction_status: "failed",
+          uncertainty: [
+            "Image Lens OCR/math extraction backend was configured, but no inline crop or source image data was available.",
+          ],
+          backend_ref: "vision_provider",
+        };
+      }
+      const provider = getVisionProvider();
+      const response = await provider.describeImage(
+        imagePayload.base64,
+        imagePayload.mime,
+        buildExtractionPrompt(input.request, input.bbox),
+      );
+      if (response?.trim()) {
+        return extractionFromVisionText(response, `vision_provider:${imagePayload.source}`);
+      }
+      const health = getVisionProviderHealth();
+      return {
+        extraction_status: "failed",
+        uncertainty: [health.last_error || "Vision backend returned no OCR/math extraction payload for this crop."],
+        backend_ref: "vision_provider",
+      };
+    } catch (error) {
+      return {
+        extraction_status: "failed",
+        uncertainty: [
+          error instanceof Error
+            ? `Vision extraction backend failed: ${error.message}`
+            : "Vision extraction backend failed.",
+        ],
+        backend_ref: "vision_provider",
+      };
+    }
+  }
+
+  return {
+    extraction_status: "failed",
+    uncertainty: [
+      "No Image Lens OCR/math extraction backend returned text_candidate or latex_candidate for this crop.",
+    ],
+    backend_ref: null,
+  };
+};
+
 const buildDocumentRegionReceipt = (input: {
   request: ImageLensRegionInspectionRequestV1;
   bbox: DocumentImageBboxPxV1;
@@ -76,6 +381,7 @@ const buildDocumentRegionReceipt = (input: {
   regionId: string;
   generatedAt: string;
   summary: string;
+  extraction: ImageLensRegionExtractionResult;
 }): DocumentImageRegionReceiptV1 => {
   const sourceAttachmentId = sourceAttachmentIdFor(input.request);
   const sourceKind = sourceKindFor(input.request);
@@ -115,15 +421,19 @@ const buildDocumentRegionReceipt = (input: {
       summary: input.summary,
     },
     extraction: {
-      ...(input.request.text_candidate ? { textCandidate: input.request.text_candidate } : {}),
-      ...(input.request.latex_candidate ? { latexCandidate: input.request.latex_candidate } : {}),
-      ...(input.request.table_candidate_ref ? { tableCandidateRef: input.request.table_candidate_ref } : {}),
-      status: "candidate",
+      ...(input.extraction.text_candidate ? { textCandidate: input.extraction.text_candidate } : {}),
+      ...(input.extraction.latex_candidate ? { latexCandidate: input.extraction.latex_candidate } : {}),
+      ...(input.extraction.table_candidate_ref ? { tableCandidateRef: input.extraction.table_candidate_ref } : {}),
+      status:
+        input.extraction.extraction_status === "failed" ||
+        input.extraction.extraction_status === "not_run"
+          ? "rejected"
+          : "candidate",
     },
     locatorAnchor: {
       pageNumber: input.request.page_number ?? null,
       bboxPx: input.bbox,
-      ...(input.request.text_candidate ? { ocrHash: imageHash(input.request.text_candidate) } : {}),
+      ...(input.extraction.text_candidate ? { ocrHash: imageHash(input.extraction.text_candidate) } : {}),
       anchorConfidence: confidence,
     },
     claimBoundary: {
@@ -140,6 +450,7 @@ const buildReceipt = (input: {
   regionId: string;
   evidenceId: string;
   generatedAt: string;
+  extraction: ImageLensRegionExtractionResult;
 }): ImageLensRegionInspectionReceiptV1 => {
   const summary =
     input.request.summary?.trim() ||
@@ -154,6 +465,7 @@ const buildReceipt = (input: {
     regionId: input.regionId,
     generatedAt: input.generatedAt,
     summary,
+    extraction: input.extraction,
   });
   const sourceRefs = uniqueStrings([
     input.request.source_id,
@@ -175,13 +487,16 @@ const buildReceipt = (input: {
     bbox_px: input.bbox,
     source_refs: sourceRefs,
     summary,
-    ...(input.request.text_candidate ? { text_candidate: input.request.text_candidate } : {}),
-    ...(input.request.latex_candidate ? { latex_candidate: input.request.latex_candidate } : {}),
-    ...(input.request.table_candidate_ref ? { table_candidate_ref: input.request.table_candidate_ref } : {}),
-    uncertainty: input.request.uncertainty ?? [],
+    ...(input.extraction.text_candidate ? { text_candidate: input.extraction.text_candidate } : {}),
+    ...(input.extraction.latex_candidate ? { latex_candidate: input.extraction.latex_candidate } : {}),
+    extraction_status: input.extraction.extraction_status,
+    ...(input.extraction.table_candidate_ref ? { table_candidate_ref: input.extraction.table_candidate_ref } : {}),
+    uncertainty: input.extraction.uncertainty,
     evidence_id: input.evidenceId,
     requested_question: input.request.question ?? null,
     reason_for_crop: input.request.reason_for_crop ?? null,
+    ...(input.request.region_label ? { region_label: input.request.region_label } : {}),
+    ...(input.request.requested_equation_label ? { requested_equation_label: input.request.requested_equation_label } : {}),
     parent_region_id: input.request.parent_region_id ?? null,
     detail: input.request.detail ?? "auto",
     document_region_receipt: documentRegionReceipt,
@@ -257,8 +572,14 @@ const buildObservationPacket = (input: {
           crop_region_id: input.receipt.region_id,
           crop_bbox_px: input.receipt.bbox_px,
           crop_image_ref: input.receipt.crop_image_ref,
+          region_label: input.receipt.region_label ?? null,
+          requested_equation_label: input.receipt.requested_equation_label ?? null,
           receipt_ref: input.receipt.evidence_id,
           evidence_id: input.receipt.evidence_id,
+          text_candidate: input.receipt.text_candidate ?? null,
+          latex_candidate: input.receipt.latex_candidate ?? null,
+          extraction_status: input.receipt.extraction_status,
+          uncertainty: input.receipt.uncertainty,
           receipt: input.receipt,
           terminal_eligible: false,
           assistant_answer: false,
@@ -304,13 +625,13 @@ const buildObservationPacket = (input: {
   raw_content_included: false,
 });
 
-export const runImageLensRegionInspection = (input: {
+export const runImageLensRegionInspection = async (input: {
   provider: HelixAgentProvider;
   request: ImageLensRegionInspectionRequestV1;
   turnId?: string | null;
   iteration?: number | null;
   env?: NodeJS.ProcessEnv;
-}): ImageLensRegionInspectionResultV1 => {
+}): Promise<ImageLensRegionInspectionResultV1> => {
   const turnId = input.turnId?.trim() || input.request.turn_id?.trim() || "ask:lane:image_lens";
   const iteration = typeof input.iteration === "number" && Number.isFinite(input.iteration)
     ? Math.max(0, Math.trunc(input.iteration))
@@ -412,13 +733,21 @@ export const runImageLensRegionInspection = (input: {
   })}`;
   const evidenceId = `${turnId}:image_lens_region_inspection:${hashShort({ regionId, cropImageRef })}`;
   const generatedAt = new Date().toISOString();
+  const normalizedRequest = { ...input.request, source_id: normalizedSourceId };
+  const extraction = await resolveImageLensRegionExtraction({
+    request: normalizedRequest,
+    bbox,
+    cropImageRef,
+    env: input.env,
+  });
   const receipt = buildReceipt({
-    request: { ...input.request, source_id: normalizedSourceId },
+    request: normalizedRequest,
     bbox,
     cropImageRef,
     regionId,
     evidenceId,
     generatedAt,
+    extraction,
   });
   const observationRef = `${turnId}:capability_lane:${IMAGE_LENS_REGION_INSPECTION_CAPABILITY}:${hashShort(receipt)}`;
   const observation: ImageLensRegionInspectionObservationV1 = {
@@ -442,6 +771,9 @@ export const runImageLensRegionInspection = (input: {
     receipt_ref: evidenceId,
     evidence_id: evidenceId,
     summary: receipt.summary,
+    ...(receipt.text_candidate ? { text_candidate: receipt.text_candidate } : {}),
+    ...(receipt.latex_candidate ? { latex_candidate: receipt.latex_candidate } : {}),
+    extraction_status: receipt.extraction_status,
     uncertainty: receipt.uncertainty,
     deterministic: true,
     reentry_required: true,
@@ -450,11 +782,11 @@ export const runImageLensRegionInspection = (input: {
     raw_content_included: false,
   };
   const packet = buildObservationPacket({
-    request: { ...input.request, source_id: normalizedSourceId },
+    request: normalizedRequest,
     turnId,
     iteration,
     status: "succeeded",
-    summary: `Image Lens crop observation ready: ${bbox.x},${bbox.y},${bbox.width},${bbox.height}.`,
+    summary: `Image Lens crop observation ready: ${bbox.x},${bbox.y},${bbox.width},${bbox.height}; extraction_status=${receipt.extraction_status}.`,
     observationRef,
     receipt,
     backendSelectionDecision: trace.backend_selection_decision,

@@ -305,6 +305,26 @@ describe("HelixAskMinimalRuntimeShell", () => {
           raw_content_included: false,
         },
       ],
+      runtime_goal_command: {
+        command: "wake",
+        goal_id: "goal:translate-docs",
+      },
+      runtime_goal_session: {
+        goal_id: "goal:translate-docs",
+        status: "waiting",
+        runtime_agent_provider: "codex",
+        runtime_session_id: "runtime-session-translate-docs",
+        latest_observation_refs: ["ask:runtime-provider-summary-turn:visible-doc:obs"],
+        latest_receipt_refs: ["ask:runtime-provider-summary-turn:visible-doc:receipt"],
+        terminal_authority_status: "authorized",
+      },
+      runtime_goal_debug_export: {
+        goal_id: "goal:translate-docs",
+        runtime_agent_provider: "codex",
+        runtime_session_id: "runtime-session-translate-docs",
+        wake_event_kind: "manual_resume",
+        terminal_authority_status: "authorized",
+      },
       terminal_artifact_kind: "workstation_tool_evaluation",
       debug_export_ref: "ask:runtime-provider-summary-turn:debug-export",
       debug: {},
@@ -362,6 +382,16 @@ describe("HelixAskMinimalRuntimeShell", () => {
     expect(summary).toHaveTextContent("observation ask:runtime-provider-summary-turn:live-translation:goal-obs");
     expect(summary).toHaveTextContent("authority pending_helix_terminal_authority");
     expect(summary).toHaveTextContent("observation-only");
+    expect(summary).toHaveTextContent("Runtime goal");
+    expect(summary).toHaveTextContent("status waiting");
+    expect(summary).toHaveTextContent("runtime codex");
+    expect(summary).toHaveTextContent("session runtime-session-translate-docs");
+    expect(summary).toHaveTextContent("command wake");
+    expect(summary).toHaveTextContent("wake manual_resume");
+    expect(summary).toHaveTextContent("observation ask:runtime-provider-summary-turn:visible-doc:obs");
+    expect(summary).toHaveTextContent("receipt ask:runtime-provider-summary-turn:visible-doc:receipt");
+    expect(summary).toHaveTextContent("terminal authority authorized");
+    expect(summary).toHaveTextContent("debug export available");
     expect(summary).toHaveTextContent("workstation_tool_evaluation");
     expect(summary).toHaveTextContent("ask:runtime-provider-summary-turn:debug-export");
   });

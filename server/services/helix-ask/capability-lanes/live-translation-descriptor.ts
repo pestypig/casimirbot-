@@ -1,4 +1,7 @@
-import { hasAnyConfiguredEnvVar } from "./backend-provider-config";
+import {
+  hasAnyConfiguredEnvVar,
+  liveTranslationOpenAiCompatibleConfigured,
+} from "./backend-provider-config";
 import type { HelixCapabilityLaneTemplate } from "./lane-template";
 
 export const liveTranslationLaneTemplate: HelixCapabilityLaneTemplate = {
@@ -47,8 +50,13 @@ export const liveTranslationLaneTemplate: HelixCapabilityLaneTemplate = {
       backend_family: "openai_compatible",
       label: "OpenAI-compatible translation",
       model_or_service_ref: "live_translation_openai_compatible_default",
-      required_env_vars: ["OPENAI_API_KEY", "LLM_HTTP_BASE", "LLM_HTTP_MODEL"],
-      configured: (env) => hasAnyConfiguredEnvVar(env, ["OPENAI_API_KEY", "LLM_HTTP_BASE", "LLM_HTTP_MODEL"]),
+      required_env_vars: [
+        "LIVE_TRANSLATION_OPENAI_API_KEY",
+        "DOC_TRANSLATION_API_KEY",
+        "OPENAI_API_KEY",
+        "LLM_HTTP_API_KEY",
+      ],
+      configured: liveTranslationOpenAiCompatibleConfigured,
       cost_class: "standard",
       latency_class: "interactive",
       privacy_class: "account_provider",
@@ -68,11 +76,23 @@ export const liveTranslationLaneTemplate: HelixCapabilityLaneTemplate = {
           "source_language",
           "requested_backend_provider",
           "chunk_id",
+          "chunk_index",
           "source_id",
+          "panel_id",
+          "region_id",
+          "doc_path",
+          "source_hash",
+          "source_kind",
+          "source_text_hash",
+          "source_text_char_count",
+          "source_event_id",
+          "source_event_ms",
+          "account_locale",
+          "dedupe_key",
           "projection_target",
         ],
         when_to_use:
-          "Use when the user asks to translate provided text, selected content, transcript text, or other text content.",
+          "Use when the user asks to translate provided text, selected content, transcript text, or admitted visible text targets collected by workstation_tool_reference.collect_visible_translation_targets. Preserve collector provenance fields when translating collected targets.",
         when_not_to_use:
           "Do not use docs-viewer.read_active_translation for new translation work; that workstation tool only reads an already-existing translated Docs surface. If source text or target language is missing, ask for clarification.",
         request_shape_hint: {
@@ -82,6 +102,17 @@ export const liveTranslationLaneTemplate: HelixCapabilityLaneTemplate = {
             target_language: "<target language or locale>",
             source_language: "<optional source language>",
             requested_backend_provider: "<optional backend preference; Helix selects the backend>",
+            source_id: "<optional collected source id>",
+            doc_path: "<optional active document path>",
+            source_hash: "<optional document/source hash>",
+            source_text_hash: "<optional source text hash>",
+            source_text_char_count: "<optional source text character count>",
+            source_event_id: "<optional visible source event id>",
+            source_event_ms: "<optional visible source event timestamp>",
+            chunk_id: "<optional collected chunk id>",
+            chunk_index: "<optional collected chunk index>",
+            dedupe_key: "<optional collected dedupe key>",
+            projection_target: "<optional docs_chunk | docs_selection | docs_hover | account_language>",
           },
         },
       },

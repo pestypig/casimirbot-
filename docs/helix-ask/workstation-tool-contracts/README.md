@@ -231,6 +231,7 @@ Each capability contract should define:
 | --- | --- | --- |
 | `workspace_os.status` | [workspace_os.status.md](workspace_os.status.md) | `draft` |
 | `workstation.active_context` | [workstation.active_context.md](workstation.active_context.md) | `draft` |
+| `workstation-notes.list_notes` | [workstation-notes.list_notes.md](workstation-notes.list_notes.md) | `draft` |
 | `scientific-calculator.solve_expression` | [scientific-calculator.solve_expression.md](scientific-calculator.solve_expression.md) | `candidate` |
 | `scientific-calculator.solve_scalar_expression` | [scientific-calculator.solve_expression.md](scientific-calculator.solve_expression.md) | `candidate` |
 | `scientific-calculator.classify_expression` | [scientific-calculator.solve_expression.md](scientific-calculator.solve_expression.md) | `candidate` |
@@ -251,6 +252,7 @@ Each capability contract should define:
 | `repo.search` | [repo.search.md](repo.search.md) | `draft` |
 | `theory-badge-graph.reflect_discussion_context` | [theory-badge-graph.reflect_discussion_context.md](theory-badge-graph.reflect_discussion_context.md) | `candidate` |
 | `theory-badge-graph.propose_frontier_conjectures` | [theory-badge-graph.propose_frontier_conjectures.md](theory-badge-graph.propose_frontier_conjectures.md) | `draft` |
+| `moral-graph.reflect_context` | [moral-graph.reflect_context.md](moral-graph.reflect_context.md) | `draft` |
 | `moral-graph.reflect_living_substrate_context` | [moral-graph.reflect_living_substrate_context.md](moral-graph.reflect_living_substrate_context.md) | `candidate` |
 | `civilization-bounds.reflect_system_bounds` | [civilization-bounds.reflect_system_bounds.md](civilization-bounds.reflect_system_bounds.md) | `candidate` |
 | `scholarly-research.lookup_papers` | [scholarly-research.lookup_papers.md](scholarly-research.lookup_papers.md) | `draft` |
@@ -319,9 +321,9 @@ tested.
 | `live_env.set_audio_preset` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
 | `live_env.bind_workstation_source` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
 | `live_env.unbind_workstation_source` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
-| `live_env.pause_workstation_loop` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
-| `live_env.resume_workstation_loop` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
-| `live_env.set_workstation_loop_state` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
+| `live_env.pause_workstation_loop` | [live_env.workstation_loop_controls.md](live_env.workstation_loop_controls.md) | `blocked_pending_contract` |
+| `live_env.resume_workstation_loop` | [live_env.workstation_loop_controls.md](live_env.workstation_loop_controls.md) | `blocked_pending_contract` |
+| `live_env.set_workstation_loop_state` | [live_env.workstation_loop_controls.md](live_env.workstation_loop_controls.md) | `blocked_pending_contract` |
 | `live_env.repair_loop` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
 | `live_env.repair_workstation_source` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
 | `live_env.update_live_answer_projection` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
@@ -332,10 +334,10 @@ tested.
 | `live_env.spawn_field_worker` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
 | `scientific-calculator.open` | [workstation.explicit_side_effect_boundaries.md](workstation.explicit_side_effect_boundaries.md) | `blocked_pending_contract` |
 | `scientific-calculator.start_equation_live_source` | [workstation.explicit_side_effect_boundaries.md](workstation.explicit_side_effect_boundaries.md) | `blocked_pending_contract` |
-| `workstation-notes.append_to_note` | [workstation.explicit_side_effect_boundaries.md](workstation.explicit_side_effect_boundaries.md) | `blocked_pending_contract` |
-| `workstation-notes.create_note` | [workstation.explicit_side_effect_boundaries.md](workstation.explicit_side_effect_boundaries.md) | `blocked_pending_contract` |
-| `workstation-notes.create` | [workstation.explicit_side_effect_boundaries.md](workstation.explicit_side_effect_boundaries.md) | `blocked_pending_contract` |
-| `workstation-notes.open` | [workstation.explicit_side_effect_boundaries.md](workstation.explicit_side_effect_boundaries.md) | `blocked_pending_contract` |
+| `workstation-notes.append_to_note` | [workstation-notes.side_effect_actions.md](workstation-notes.side_effect_actions.md) | `blocked_pending_contract` |
+| `workstation-notes.create_note` | [workstation-notes.side_effect_actions.md](workstation-notes.side_effect_actions.md) | `blocked_pending_contract` |
+| `workstation-notes.create` | [workstation-notes.side_effect_actions.md](workstation-notes.side_effect_actions.md) | `blocked_pending_contract` |
+| `workstation-notes.open` | [workstation-notes.side_effect_actions.md](workstation-notes.side_effect_actions.md) | `blocked_pending_contract` |
 | `client.read_aloud` | [client.read_aloud.md](client.read_aloud.md) | `client_projection_only` |
 | `workstation.dynamic_panel_actions` | [workstation.dynamic_panel_action_boundaries.md](workstation.dynamic_panel_action_boundaries.md) | `panel_owned_boundary` |
 | `workstation.explicit_route_aliases` | [workstation.explicit_route_alias_boundaries.md](workstation.explicit_route_alias_boundaries.md) | mixed: `shared_gateway_now` with `provider_gateway_alias_target`, or `safe_to_graduate_next` |

@@ -440,6 +440,18 @@ const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
   if (/workspace[-_]os[-_.:]status|workspace_os_status_observation|workspace_status_observation/.test(haystack)) {
     return "workspace_os.status";
   }
+  if (/workstation[-_]notes[-_.:]list[-_]notes|workstation_notes_list_observation|helix\.workstation_notes_list_observation\.v1|note_index|body_redacted/.test(haystack)) {
+    return "workstation-notes.list_notes";
+  }
+  if (/workstation[-_]notes[-_.:]append[-_]to[-_]note|note_update_receipt|append_to_note/.test(haystack)) {
+    return "workstation-notes.append_to_note";
+  }
+  if (/workstation[-_]notes[-_.:]create[-_]note|note_create_receipt|create_note/.test(haystack)) {
+    return "workstation-notes.create_note";
+  }
+  if (/workstation[-_]notes[-_.:]open|note_open_receipt|open_note/.test(haystack)) {
+    return "workstation-notes.open";
+  }
   if (/workspace[-_]directory[-_.:]resolve|workspace_directory_resolution/.test(haystack)) {
     return "workspace-directory.resolve";
   }

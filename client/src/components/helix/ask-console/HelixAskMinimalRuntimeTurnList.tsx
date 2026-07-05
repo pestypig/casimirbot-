@@ -19,6 +19,7 @@ import {
 } from "./HelixAskMinimalRuntimeControls";
 import type { HelixAskMinimalRuntimeReply } from "./HelixAskMinimalRuntimeLifecycle";
 import { HelixAskReplyCard } from "./HelixAskReplyCard";
+import { mergeHelixAskRuntimeGoalDebugFields } from "./HelixAskRuntimeGoalDebugContext";
 import { HelixAskTurnList } from "./HelixAskTurnList";
 import { HelixAskTurnControls } from "./HelixAskTurnControls";
 import { selectHelixAskConsoleWorkstationTraceRows } from "./HelixAskWorkstationTraceRows";
@@ -31,6 +32,7 @@ export type HelixAskMinimalRuntimeTurnView = {
   meta: string | null;
   isLatest: boolean;
   runtimeSummaryRows: HelixAskRuntimeTurnSummaryRow[];
+  runtimeGoalDebugSummary: Record<string, unknown> | null;
   workstationTraceRows: Array<{
     key: string;
     label: string;
@@ -83,6 +85,10 @@ export function buildHelixAskMinimalRuntimeTurnViews(args: {
       status: row.status,
     }));
     const runtimeSummary = buildHelixAskRuntimeTurnSummary(projectionSource, providers);
+    const runtimeGoalDebugSummary = mergeHelixAskRuntimeGoalDebugFields(
+      asRecord(resultRecord?.debug) ?? asRecord(reply.debug),
+      resultRecord ?? asRecord(reply),
+    ).runtime_goal_debug_summary;
     return {
       id: reply.id,
       turnId: reply.turn_id,
@@ -91,6 +97,7 @@ export function buildHelixAskMinimalRuntimeTurnViews(args: {
       meta: [providerLabel, modelLabel].filter(Boolean).join(" | ") || null,
       isLatest: latestReply?.turn_id === reply.turn_id,
       runtimeSummaryRows: runtimeSummary?.rows ?? [],
+      runtimeGoalDebugSummary,
       workstationTraceRows,
     };
   });
@@ -117,6 +124,7 @@ export function HelixAskMinimalRuntimeTurnList({
             turnTestId={view.isLatest ? "helix-ask-minimal-runtime-latest-turn" : undefined}
             isLatestReply={view.isLatest}
             tintClassName="rounded-2xl bg-cyan-400/10"
+            runtimeGoalDebugSummary={view.runtimeGoalDebugSummary}
             promptIngested
           >
             <article className="rounded-2xl border border-cyan-300/15 bg-black/20 px-3 py-3">

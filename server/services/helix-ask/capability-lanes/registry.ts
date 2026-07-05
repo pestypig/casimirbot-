@@ -15,6 +15,7 @@ import {
   backendProvidersFor,
   buildBackendSelectionDecision,
   liveTranslationExternalBackendsEnabled,
+  liveTranslationOpenAiCompatibleConfigured,
   readBooleanEnv,
 } from "./backend-provider-config";
 import { codeTextLaneTemplate } from "./code-text";
@@ -228,6 +229,26 @@ const liveBackendExecutionEnabledFor = (input: {
   liveTranslationExternalBackendsEnabled(input.env) &&
   input.selectedBackend?.provider_id === "live_translation.openai_compatible";
 
+const defaultBackendProviderFor = (input: {
+  template: HelixCapabilityLaneTemplate;
+  backendProviders: HelixCapabilityLaneDescriptor["backend_providers"];
+  env: NodeJS.ProcessEnv;
+}): string | null => {
+  if (
+    input.template.lane_id === "live_translation" &&
+    liveTranslationExternalBackendsEnabled(input.env) &&
+    liveTranslationOpenAiCompatibleConfigured(input.env) &&
+    input.backendProviders.some((provider) =>
+      provider.provider_id === "live_translation.openai_compatible" &&
+      provider.configuration_status === "configured" &&
+      provider.permission_status === "admitted"
+    )
+  ) {
+    return "live_translation.openai_compatible";
+  }
+  return input.template.default_backend_provider ?? input.backendProviders[0]?.provider_id ?? null;
+};
+
 const descriptorFor = (input: {
   template: HelixCapabilityLaneTemplate;
   provider: HelixAgentProvider;
@@ -239,10 +260,11 @@ const descriptorFor = (input: {
     laneStatus: status,
     env: input.env,
   });
-  const defaultBackendProvider =
-    input.template.default_backend_provider ??
-    backendProviders[0]?.provider_id ??
-    null;
+  const defaultBackendProvider = defaultBackendProviderFor({
+    template: input.template,
+    backendProviders,
+    env: input.env,
+  });
   const contracts = laneContractsFor(input.template);
   return {
     schema: "helix.capability_lane.descriptor.v1",

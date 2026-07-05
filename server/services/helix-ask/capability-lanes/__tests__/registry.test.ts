@@ -168,7 +168,7 @@ describe("Helix capability lane registry", () => {
     expect(helix.lanes.find((lane) => lane.lane_id === "live_translation")).toMatchObject({
       status: "dry_run",
       backend_family: "local_runtime",
-      default_backend_provider: "live_translation.local_runtime",
+      default_backend_provider: "live_translation.openai_compatible",
       backend_providers: [
         expect.objectContaining({
           provider_id: "live_translation.local_runtime",
@@ -198,7 +198,12 @@ describe("Helix capability lane registry", () => {
         expect.objectContaining({
           provider_id: "live_translation.openai_compatible",
           configuration_status: "configured",
-          required_env_vars: ["OPENAI_API_KEY", "LLM_HTTP_BASE", "LLM_HTTP_MODEL"],
+          required_env_vars: [
+            "LIVE_TRANSLATION_OPENAI_API_KEY",
+            "DOC_TRANSLATION_API_KEY",
+            "OPENAI_API_KEY",
+            "LLM_HTTP_API_KEY",
+          ],
           configured_env_vars: ["OPENAI_API_KEY"],
           availability_status: "dry_run",
           permission_status: "admitted",
@@ -258,6 +263,30 @@ describe("Helix capability lane registry", () => {
           one_shot_status: "executable",
           session_status: "supported",
           backend_provider_required: true,
+          model_visible_hint: expect.objectContaining({
+            optional_input_fields: expect.arrayContaining([
+              "source_id",
+              "doc_path",
+              "source_hash",
+              "source_text_hash",
+              "source_text_char_count",
+              "source_event_id",
+              "source_event_ms",
+              "chunk_id",
+              "chunk_index",
+              "dedupe_key",
+              "projection_target",
+              "account_locale",
+            ]),
+            when_to_use: expect.stringContaining("Preserve collector provenance fields"),
+            request_shape_hint: {
+              capability_lane_call: expect.objectContaining({
+                capability: "live_translation.translate_text",
+                source_event_id: "<optional visible source event id>",
+                source_event_ms: "<optional visible source event timestamp>",
+              }),
+            },
+          }),
           result_authority: "observation_or_receipt_only",
           reentry_required: true,
           terminal_eligible: false,
@@ -455,7 +484,18 @@ describe("Helix capability lane registry", () => {
             optional_input_fields: expect.arrayContaining([
               "active_panel_id",
               "doc_path",
+              "selected_text",
+              "selection_ref",
+              "hover_text",
+              "hover_ref",
+              "active_region_text",
+              "active_region_ref",
               "visible_text_chunks",
+              "ui_text_regions",
+              "panel_text_regions",
+              "visible_ui_text_regions",
+              "active_doc_visible_translation_context",
+              "workspace_context_snapshot",
               "target_language",
               "requested_backend_provider",
             ]),
@@ -465,6 +505,45 @@ describe("Helix capability lane registry", () => {
               capability_lane_call: expect.objectContaining({
                 capability: "workstation_tool_reference.collect_visible_translation_targets",
                 visible_only: true,
+                active_doc_visible_translation_context:
+                  "workspace_context_snapshot.active_doc_visible_translation_context",
+              }),
+            },
+          }),
+        }),
+        expect.objectContaining({
+          capability_id: "workstation.visible_text.collect_translation_targets",
+          one_shot_status: "executable",
+          backend_provider_required: false,
+          terminal_eligible: false,
+          assistant_answer: false,
+          model_visible_hint: expect.objectContaining({
+            optional_input_fields: expect.arrayContaining([
+              "active_panel_id",
+              "doc_path",
+              "selected_text",
+              "selection_ref",
+              "hover_text",
+              "hover_ref",
+              "active_region_text",
+              "active_region_ref",
+              "visible_text_chunks",
+              "ui_text_regions",
+              "panel_text_regions",
+              "visible_ui_text_regions",
+              "active_doc_visible_translation_context",
+              "workspace_context_snapshot",
+              "target_language",
+              "requested_backend_provider",
+            ]),
+            when_to_use: expect.stringContaining("Provider-neutral alias"),
+            when_not_to_use: expect.stringContaining("live_translation.translate_text"),
+            request_shape_hint: {
+              capability_lane_call: expect.objectContaining({
+                capability: "workstation.visible_text.collect_translation_targets",
+                visible_only: true,
+                active_doc_visible_translation_context:
+                  "workspace_context_snapshot.active_doc_visible_translation_context",
               }),
             },
           }),
@@ -570,7 +649,12 @@ describe("Helix capability lane registry", () => {
     expect(openai).toMatchObject({
       provider_id: "live_translation.openai_compatible",
       configuration_status: "missing",
-      required_env_vars: ["OPENAI_API_KEY", "LLM_HTTP_BASE", "LLM_HTTP_MODEL"],
+      required_env_vars: [
+        "LIVE_TRANSLATION_OPENAI_API_KEY",
+        "DOC_TRANSLATION_API_KEY",
+        "OPENAI_API_KEY",
+        "LLM_HTTP_API_KEY",
+      ],
       configured_env_vars: [],
       availability_status: "unconfigured",
       permission_status: "configuration_missing",
@@ -787,9 +871,47 @@ describe("Helix capability lane registry", () => {
     });
   });
 
+  it("selects the configured OpenAI-compatible translation backend as the default when a provider key is available", () => {
+    const env = {
+      LLM_HTTP_API_KEY: "test-key",
+    } as NodeJS.ProcessEnv;
+    const trace = resolveHelixCapabilityLaneRequest({
+      provider: buildProvider({ id: "codex" }),
+      requestedLane: "live_translation",
+      env,
+    });
+
+    expect(trace).toMatchObject({
+      requested_lane: "live_translation",
+      requested_backend_provider: null,
+      requested_backend_provider_known: false,
+      selected_backend_provider: "live_translation.openai_compatible",
+      backend_selection_decision: expect.objectContaining({
+        outcome: "default_selected",
+        requested_backend_provider: null,
+        selected_backend_provider: "live_translation.openai_compatible",
+        live_backend_execution_enabled: true,
+        selected_runtime_provider_remains_root: true,
+        backend_provider_becomes_root_agent: false,
+        terminal_authority_owner: "helix",
+      }),
+      selection_reason: "selected_default_backend_provider_for_shadow_manifest",
+      cost_class: "standard",
+      latency_class: "interactive",
+      privacy_class: "account_provider",
+      fallback_backend_provider: "live_translation.local_runtime",
+      resolved_backend_provider: "openai_compatible",
+      resolved_model_or_service: "live_translation_openai_compatible_default",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
   it("keeps external translation requests on local fallback when live execution is not enabled", () => {
     const env = {
       OPENAI_API_KEY: "test-key",
+      HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED: "0",
     } as NodeJS.ProcessEnv;
     const openai = resolveHelixCapabilityLaneRequest({
       provider: buildProvider({ id: "codex" }),

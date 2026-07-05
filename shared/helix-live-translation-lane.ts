@@ -20,6 +20,14 @@ export const HELIX_VISIBLE_TRANSLATION_TARGET_SCHEMA =
   "helix.visible_translation_target.v1" as const;
 export const HELIX_VISIBLE_TRANSLATION_TARGET_BATCH_SCHEMA =
   "helix.visible_translation_target_batch.v1" as const;
+export const HELIX_WORKSTATION_TOOL_REFERENCE_VISIBLE_TRANSLATION_TARGETS_CAPABILITY =
+  "workstation_tool_reference.collect_visible_translation_targets" as const;
+export const HELIX_WORKSTATION_VISIBLE_TEXT_TRANSLATION_TARGETS_CAPABILITY =
+  "workstation.visible_text.collect_translation_targets" as const;
+
+export type HelixVisibleTranslationTargetCollectorCapability =
+  | typeof HELIX_WORKSTATION_TOOL_REFERENCE_VISIBLE_TRANSLATION_TARGETS_CAPABILITY
+  | typeof HELIX_WORKSTATION_VISIBLE_TEXT_TRANSLATION_TARGETS_CAPABILITY;
 
 export type HelixVisibleTranslationTargetSourceKind =
   | "docs_viewer"
@@ -29,6 +37,11 @@ export type HelixVisibleTranslationTargetSourceKind =
   | "selection"
   | "hover_region";
 
+export type HelixLiveTranslationTerminalAuthorityStatus =
+  | "not_terminal_authority"
+  | "pending_helix_terminal_authority"
+  | "terminal_authority_rejected";
+
 export type HelixVisibleTranslationTarget = {
   schema: typeof HELIX_VISIBLE_TRANSLATION_TARGET_SCHEMA;
   source_kind: HelixVisibleTranslationTargetSourceKind;
@@ -37,6 +50,10 @@ export type HelixVisibleTranslationTarget = {
   source_id: string;
   source_hash: string;
   source_text_hash: string;
+  source_text_char_count: number;
+  source_event_id: string;
+  source_event_ms: number | null;
+  observed_at_ms: number | null;
   visible_text: string;
   chunk_id: string;
   chunk_index: number;
@@ -46,7 +63,15 @@ export type HelixVisibleTranslationTarget = {
   projection_target: HelixLiveTranslationProjectionTarget;
   account_locale: string | null;
   target_language: string;
+  existing_observation_ref: string | null;
+  existing_receipt_ref: string | null;
   existing_translation_receipt_ref: string | null;
+  existing_projection_status: "projected" | "stale" | "cancelled" | "failed" | null;
+  existing_freshness_status: HelixLiveTranslationChunkFreshnessStatus | null;
+  existing_terminal_authority_status: HelixLiveTranslationTerminalAuthorityStatus | null;
+  existing_source_event_ms: number | null;
+  existing_observed_at_ms: number | null;
+  answer_authority: false;
   assistant_answer: false;
   terminal_eligible: false;
   raw_content_included: false;
@@ -60,8 +85,10 @@ export type HelixVisibleTranslationTargetBatch = {
   targets: HelixVisibleTranslationTarget[];
   visible_only: boolean;
   max_chunks: number;
-  collector_capability: "workstation_tool_reference.collect_visible_translation_targets";
+  requested_collector_capability: HelixVisibleTranslationTargetCollectorCapability | null;
+  collector_capability: typeof HELIX_WORKSTATION_TOOL_REFERENCE_VISIBLE_TRANSLATION_TARGETS_CAPABILITY;
   translation_capability_required: "live_translation.translate_text";
+  answer_authority: false;
   assistant_answer: false;
   terminal_eligible: false;
   raw_content_included: false;
@@ -91,8 +118,14 @@ export type HelixLiveTranslationOneShotRequest = {
   goal_binding_key?: string | null;
   turn_id?: string | null;
   source_id?: string | null;
+  panel_id?: string | null;
+  region_id?: string | null;
+  bbox?: Record<string, unknown> | null;
+  doc_path?: string | null;
   source_hash?: string | null;
   source_kind?: string | null;
+  source_text_hash?: string | null;
+  source_text_char_count?: number | null;
   account_locale?: string | null;
   chunk_id?: string | null;
   chunk_index?: number | null;
@@ -128,6 +161,10 @@ export type HelixLiveTranslationOneShotObservation = {
   source_language: string | null;
   target_language: string;
   source_id: string;
+  panel_id: string | null;
+  region_id: string | null;
+  bbox: Record<string, unknown> | null;
+  doc_path: string | null;
   source_hash: string | null;
   source_kind: string | null;
   account_locale: string | null;
@@ -146,7 +183,7 @@ export type HelixLiveTranslationOneShotObservation = {
   deterministic: boolean;
   confidence: number;
   reentry_required: true;
-  terminal_authority_status: "not_terminal_authority" | "pending_helix_terminal_authority";
+  terminal_authority_status: HelixLiveTranslationTerminalAuthorityStatus;
   terminal_eligible: false;
   assistant_answer: false;
   raw_content_included: false;
@@ -172,6 +209,10 @@ export type HelixLiveTranslationProjectionReceipt = {
   projection_target: HelixLiveTranslationProjectionTarget;
   projection_status: "projected" | "stale" | "cancelled" | "failed";
   source_id: string;
+  panel_id: string | null;
+  region_id: string | null;
+  bbox: Record<string, unknown> | null;
+  doc_path: string | null;
   source_hash: string | null;
   source_kind: string | null;
   account_locale: string | null;
@@ -189,7 +230,7 @@ export type HelixLiveTranslationProjectionReceipt = {
   stale: boolean;
   cancel_requested: boolean;
   reentry_required: true;
-  terminal_authority_status: "not_terminal_authority" | "pending_helix_terminal_authority";
+  terminal_authority_status: HelixLiveTranslationTerminalAuthorityStatus;
   answer_authority: false;
   terminal_eligible: false;
   assistant_answer: false;

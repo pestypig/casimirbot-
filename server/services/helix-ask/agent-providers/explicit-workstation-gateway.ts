@@ -337,7 +337,8 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   if (
     !promptNamedCapabilities.has(TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY) &&
     !promptNamedCapabilities.has(VOICE_INTERIM_CALLOUT_CAPABILITY) &&
-    !promptNamedCapabilities.has(VOICE_NARRATOR_SAY_CAPABILITY)
+    !promptNamedCapabilities.has(VOICE_NARRATOR_SAY_CAPABILITY) &&
+    compoundDependencyCapabilities.size === 0
   ) {
     appendDedupe(requests, seen, buildPromptDerivedVoiceGatewayCallRequests(input.body));
   }

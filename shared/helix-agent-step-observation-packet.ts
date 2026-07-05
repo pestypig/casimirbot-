@@ -9,6 +9,7 @@ import type {
   HelixCapabilityLanePrivacyClass,
 } from "./helix-capability-lane";
 import type {
+  HelixLiveTranslationTerminalAuthorityStatus,
   HelixLiveTranslationProjectionReceipt,
   HelixVisibleTranslationTargetBatch,
 } from "./helix-live-translation-lane";
@@ -182,12 +183,15 @@ export type HelixAgentStepObservationPacket = {
       goal_binding_id?: string | null;
       goal_binding_key?: string | null;
       source_id: string;
+      bbox?: Record<string, unknown> | null;
+      doc_path?: string | null;
       source_hash?: string | null;
       source_kind?: string | null;
       account_locale?: string | null;
       chunk_id: string;
       chunk_index: number | null;
       dedupe_key: string;
+      source_event_id?: string | null;
       source_event_ms: number | null;
       observed_at_ms: number;
       freshness_status: "fresh" | "stale" | "unknown";
@@ -201,6 +205,7 @@ export type HelixAgentStepObservationPacket = {
         | "unknown";
       cancel_requested: boolean;
       observation_ref: string;
+      terminal_authority_status?: HelixLiveTranslationTerminalAuthorityStatus;
       terminal_eligible: false;
       assistant_answer: false;
       raw_content_included: false;
@@ -210,6 +215,7 @@ export type HelixAgentStepObservationPacket = {
     workstation_tool_reference?: {
       gateway_mode?: string | null;
       observation_ref?: string | null;
+      answer_authority?: false;
       terminal_eligible: false;
       assistant_answer: false;
       raw_content_included: false;
@@ -217,6 +223,7 @@ export type HelixAgentStepObservationPacket = {
     speech_to_text_observation?: unknown;
     speech_to_text_live_source_mail_item?: unknown;
     text_to_speech_receipt?: unknown;
+    voice_playback_receipt_barrier?: unknown;
     voice_playback_client_receipt?: unknown;
     visual_analysis_region_inspection?: {
       lane_id: "visual_analysis";
@@ -233,8 +240,14 @@ export type HelixAgentStepObservationPacket = {
         height: number;
       };
       crop_image_ref: string;
+      region_label?: string | null;
+      requested_equation_label?: string | null;
       receipt_ref: string;
       evidence_id: string;
+      text_candidate?: string | null;
+      latex_candidate?: string | null;
+      extraction_status: ImageLensRegionInspectionReceiptV1["extraction_status"];
+      uncertainty: string[];
       receipt: ImageLensRegionInspectionReceiptV1;
       terminal_eligible: false;
       assistant_answer: false;
@@ -270,10 +283,12 @@ export type HelixAgentStepObservationPacket = {
     required_affordance_kinds: HelixWorkstationTypedAffordanceKind[];
     produced_affordance_kinds: HelixWorkstationTypedAffordanceKind[];
     missing_affordance_kinds: HelixWorkstationTypedAffordanceKind[];
+    answer_authority?: false;
     terminal_eligible: false;
     assistant_answer: false;
     raw_content_included: false;
   };
+  answer_authority?: false;
   terminal_eligible: false;
   post_tool_model_step_required: true;
   assistant_answer: false;

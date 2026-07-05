@@ -113,8 +113,38 @@ const readStringArray = (value: unknown): string[] =>
         .filter((entry): entry is string => Boolean(entry))
     : [];
 
+const selectTerminalRecordForRecoveredImageLens = (
+  recovered: boolean,
+  ...values: unknown[]
+): Record<string, unknown> | null => {
+  const records = values
+    .map(asRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  if (!recovered) return records[0] ?? null;
+  return records.find((entry) => {
+    const kind = readString(entry.terminal_artifact_kind);
+    const source = readString(entry.final_answer_source);
+    const text = readString(entry.concise_text) ?? readString(entry.terminal_text_preview);
+    return (
+      kind !== "typed_failure" &&
+      source !== "typed_failure" &&
+      Boolean(text && !/No visual observation receipt was produced/i.test(text))
+    );
+  }) ?? records[0] ?? null;
+};
+
+const readNumberArray = (value: unknown): number[] =>
+  Array.isArray(value)
+    ? value
+        .map(readNumberValue)
+        .filter((entry): entry is number => entry !== null)
+    : [];
+
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.filter((value): value is string => Boolean(value))));
+
+const uniqueNumbers = (values: Array<number | null | undefined>): number[] =>
+  Array.from(new Set(values.filter((value): value is number => Number.isFinite(value))));
 
 const buildCapabilityLaneEvidenceRefs = (record: Record<string, unknown>): string[] =>
   uniqueStrings([
@@ -199,6 +229,123 @@ const normalizeCapabilityLaneEvidenceRecordOrNull = (
 ): Record<string, unknown> | null => {
   const record = asRecord(value);
   return record ? normalizeCapabilityLaneEvidenceRecord(record, fallbackRuntimeAgentProvider) : null;
+};
+
+const buildRuntimeGoalDebugSummaryForExport = (input: {
+  command: Record<string, unknown> | null;
+  session: Record<string, unknown> | null;
+  debugExport: Record<string, unknown> | null;
+}): Record<string, unknown> | null => {
+  if (!input.command && !input.session && !input.debugExport) return null;
+  const debugEvents = readRecordArray(input.debugExport?.debug_events);
+  const providerTerminalCandidate = asRecord(input.debugExport?.provider_terminal_candidate);
+  const terminalAnswerAuthority = asRecord(input.debugExport?.terminal_answer_authority);
+  const jobBrief = asRecord(
+    input.session?.job_brief ??
+      input.debugExport?.runtime_goal_job_brief ??
+      input.debugExport?.job_brief,
+  );
+  const wakePlan = asRecord(
+    input.session?.latest_wake_plan ??
+      input.debugExport?.runtime_goal_wake_plan ??
+      input.debugExport?.wake_plan,
+  );
+  const progressSummary = asRecord(
+    input.session?.latest_progress_summary ??
+      input.debugExport?.runtime_goal_progress_summary ??
+      input.debugExport?.progress_summary,
+  );
+  const wakeEvents = readRecordArray(input.debugExport?.wake_events);
+  const lastWakeEvent = wakeEvents[wakeEvents.length - 1] ?? null;
+  const sourceBinding = asRecord(
+    input.session?.latest_source_binding ??
+      input.debugExport?.runtime_goal_source_binding ??
+      progressSummary?.observed_source ??
+      wakePlan?.current_source_binding ??
+      jobBrief?.source_binding,
+  );
+  const evidenceUsed = asRecord(progressSummary?.evidence_used);
+  return {
+    schema: "helix.runtime_goal.debug_copy_summary.v1",
+    command: readString(input.command?.command),
+    goal_id:
+      readString(input.session?.goal_id) ??
+      readString(input.command?.goal_id) ??
+      readString(input.debugExport?.goal_id),
+    runtime_agent_provider:
+      readString(input.session?.runtime_agent_provider) ??
+      readString(input.debugExport?.runtime_provider),
+    runtime_session_id:
+      readString(input.session?.runtime_session_id) ??
+      readString(input.debugExport?.runtime_session_id),
+    session_status:
+      readString(input.session?.status) ??
+      readString(input.debugExport?.session_status),
+    status_reason: readString(input.session?.status_reason),
+    wake_count: readNumberValue(input.session?.wake_count),
+    last_wake_at:
+      readString(lastWakeEvent?.created_at) ??
+      readString(progressSummary?.created_at) ??
+      readString(input.session?.updated_at),
+    last_wake_event_id:
+      readString(lastWakeEvent?.wake_event_id) ??
+      readString(progressSummary?.wake_event_id) ??
+      readString(wakePlan?.wake_event_id),
+    session_updated_at: readString(input.session?.updated_at),
+    job_title:
+      readString(jobBrief?.user_goal_text) ??
+      readString(progressSummary?.job) ??
+      readString(input.session?.objective),
+    expected_wake_behavior: readString(jobBrief?.expected_wake_behavior),
+    wake_expected_terminal_product: readString(wakePlan?.expected_terminal_product),
+    wake_relevance_reason: readString(wakePlan?.relevance_reason),
+    observed_source_label:
+      readString(sourceBinding?.source_label) ??
+      readString(sourceBinding?.doc_path) ??
+      readString(sourceBinding?.active_panel_id) ??
+      readString(sourceBinding?.source_id),
+    observed_source_kind: readString(sourceBinding?.source_kind),
+    observed_source_doc_path: readString(sourceBinding?.doc_path),
+    requested_observation_or_lane:
+      readString(wakePlan?.requested_observation_or_lane) ??
+      readString(evidenceUsed?.requested_tool_or_lane),
+    current_progress_summary: readString(progressSummary?.current_summary),
+    next_wake_behavior: readString(progressSummary?.next_wake_behavior),
+    terminal_authority_status:
+      readString(input.session?.terminal_authority_status) ??
+      readString(input.debugExport?.terminal_authority_status),
+    latest_observation_refs: uniqueStrings([
+      ...readStringArray(input.session?.latest_observation_refs),
+      ...readStringArray(input.debugExport?.latest_observation_refs),
+      ...readStringArray(input.debugExport?.runtime_goal_observation_refs),
+      ...readStringArray(evidenceUsed?.observation_refs),
+    ]),
+    latest_receipt_refs: uniqueStrings([
+      ...readStringArray(input.session?.latest_receipt_refs),
+      ...readStringArray(input.debugExport?.latest_receipt_refs),
+      ...readStringArray(evidenceUsed?.receipt_refs),
+    ]),
+    provider_terminal_candidate_ref:
+      readString(input.session?.latest_provider_terminal_candidate_ref) ??
+      readString(evidenceUsed?.provider_terminal_candidate_ref) ??
+      readString(providerTerminalCandidate?.candidate_id),
+    provider_terminal_candidate_runtime: readString(providerTerminalCandidate?.agent_runtime),
+    provider_terminal_candidate_label: readString(providerTerminalCandidate?.provider_label),
+    terminal_answer_server_authoritative: readBoolean(terminalAnswerAuthority?.server_authoritative),
+    debug_stage_sequence: debugEvents
+      .map((event) => readString(event.stage))
+      .filter((stage): stage is string => Boolean(stage)),
+    requested_tool_or_lane_sequence: uniqueStrings(
+      debugEvents.map((event) => readString(event.requested_tool_or_lane)),
+    ),
+    evidence_reentered: debugEvents.some((event) => readString(event.stage) === "evidence_reentered"),
+    runtime_candidate_generated: debugEvents.some((event) => readString(event.stage) === "runtime_candidate_generated"),
+    terminal_authority_evaluated: debugEvents.some((event) => readString(event.stage) === "terminal_authority_evaluated"),
+    answer_authority: false,
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
 };
 
 const normalizeCapabilityLaneTimelineStage = (value: unknown): string | null => {
@@ -323,6 +470,24 @@ const buildCapabilityLaneConsoleStateRows = (
     const laneRequested = entry.lane_requested === true;
     const laneExecuted = entry.lane_executed === true;
     const observationReentered = entry.observation_reentered === true;
+    const reentryRequired =
+      readBoolean(entry.reentry_required) ??
+      readBoolean(entry.reentryRequired) ??
+      (
+        !canCarryTerminalAuthority &&
+        (
+          Boolean(readString(entry.observation_ref)) ||
+          Boolean(readString(entry.receipt_ref)) ||
+          Boolean(readString(entry.latest_visible_observation_ref)) ||
+          Boolean(readString(entry.visible_observation_ref)) ||
+          Boolean(readString(entry.latest_visible_receipt_ref)) ||
+          Boolean(readString(entry.visible_receipt_ref)) ||
+          Boolean(readString(entry.latest_evidence_observation_ref)) ||
+          Boolean(readString(entry.evidence_observation_ref)) ||
+          Boolean(readString(entry.latest_evidence_receipt_ref)) ||
+          Boolean(readString(entry.evidence_receipt_ref))
+        )
+      );
     return {
       schema: "helix.capability_lane.console_state_row.v1",
       seq: typeof entry.seq === "number" ? entry.seq : index,
@@ -375,6 +540,10 @@ const buildCapabilityLaneConsoleStateRows = (
       source_text_hash: readString(entry.source_text_hash),
       source_text_char_count: readScalarString(entry.source_text_char_count),
       source_identity_key: normalizeDebugExportSourceIdentityKey(entry.source_identity_key),
+      bbox:
+        asRecord(entry.bbox) ??
+        asRecord(entry.bbox_px) ??
+        asRecord(entry.bboxPx),
       projection_target: normalizeDebugExportProjectionTarget(
         readString(entry.projection_target) ?? readString(entry.source_projection_target),
       ),
@@ -446,6 +615,7 @@ const buildCapabilityLaneConsoleStateRows = (
         false,
       terminal_authority_status: readString(entry.terminal_authority_status) ?? "not_terminal_authority",
       context_role: readCapabilityLaneTimelineContextRole(entry, stage),
+      reentry_required: reentryRequired,
       answer_authority: stage === "terminal_selected" && entry.answer_authority === true,
       terminal_eligible: canCarryTerminalAuthority && entry.terminal_eligible === true,
       assistant_answer: canCarryTerminalAuthority && entry.assistant_answer === true,
@@ -582,6 +752,285 @@ const normalizeCapabilityLaneTimelineSummaryForExport = (
       ? buildCapabilityLaneConsoleStateRows(explicitRows, fallbackRuntimeAgentProvider)
       : derived.console_state_rows,
     visible_lane_does_not_mean_executed: true,
+  };
+};
+
+const readNestedRecord = (value: unknown, keys: string[]): Record<string, unknown> | null => {
+  let cursor: unknown = value;
+  for (const key of keys) {
+    const record = asRecord(cursor);
+    if (!record) return null;
+    cursor = record[key];
+  }
+  return asRecord(cursor);
+};
+
+const readNumberValue = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const readNumberFromRecord = (
+  record: Record<string, unknown> | null,
+  keys: string[],
+): number | null => {
+  if (!record) return null;
+  for (const key of keys) {
+    const value = readNumberValue(record[key]);
+    if (value !== null) return value;
+  }
+  return null;
+};
+
+const readVisibleTranslationTargetRecordsFromCallResult = (
+  result: Record<string, unknown>,
+): Record<string, unknown>[] => {
+  const directTargets = readRecordArray(result.targets);
+  const targetBatchTargets = readRecordArray(readNestedRecord(result, ["target_batch"])?.targets);
+  const observationTargets = readRecordArray(readNestedRecord(result, ["observation", "target_batch"])?.targets);
+  const packetTargets = readRecordArray(
+    readNestedRecord(result, ["observation_packet", "state_delta", "visible_translation_target_batch"])?.targets,
+  );
+  return [
+    ...directTargets,
+    ...targetBatchTargets,
+    ...observationTargets,
+    ...packetTargets,
+  ];
+};
+
+const buildVisibleTranslationChainSummaryForExport = (input: {
+  runtimeLaneRequestLoop: unknown;
+  capabilityLaneTurnTimeline: unknown;
+  capabilityLaneProjectionReceipts: unknown;
+  capabilityLaneCallResults: unknown;
+  capabilityLaneReentryStatus: unknown;
+  capabilityLaneTimelineSummary: Record<string, unknown>;
+}): Record<string, unknown> => {
+  const runtimeLoop = asRecord(input.runtimeLaneRequestLoop);
+  const collectorChain =
+    readNestedRecord(runtimeLoop, ["visible_translation_collector_chain"]) ??
+    readNestedRecord(runtimeLoop, ["runtime_lane_request_loop", "visible_translation_collector_chain"]);
+  const timelineRows = readRecordArray(input.capabilityLaneTurnTimeline);
+  const consoleRows = readRecordArray(input.capabilityLaneTimelineSummary.console_state_rows);
+  const allRows = timelineRows.length > 0 ? timelineRows : consoleRows;
+  const projectionReceipts = readRecordArray(input.capabilityLaneProjectionReceipts);
+  const callResults = readRecordArray(input.capabilityLaneCallResults);
+  const collectorTargetRecords = callResults.flatMap(readVisibleTranslationTargetRecordsFromCallResult);
+  const stageCount = (stage: string): number =>
+    allRows.filter((entry) => normalizeCapabilityLaneTimelineStage(entry.stage) === stage).length;
+  const capabilityMatches = (entry: Record<string, unknown>, pattern: RegExp): boolean =>
+    pattern.test(
+      [
+        readString(entry.capability),
+        readString(entry.capability_id),
+        readString(entry.capability_key),
+        readString(entry.requested_capability_id),
+        readString(entry.executed_capability_id),
+      ].filter(Boolean).join(" "),
+    );
+  const collectorRequested =
+    collectorChain?.collector_requested === true ||
+    allRows.some((entry) =>
+      capabilityMatches(entry, /collect_visible_translation_targets|workstation\.visible_text\.collect_translation_targets/i) &&
+      (entry.lane_requested === true || normalizeCapabilityLaneTimelineStage(entry.stage) === "requested")
+    ) ||
+    callResults.some((entry) => capabilityMatches(entry, /collect_visible_translation_targets|workstation\.visible_text\.collect_translation_targets/i));
+  const translationRequested =
+    collectorChain?.translation_requested === true ||
+    allRows.some((entry) =>
+      capabilityMatches(entry, /live_translation\.translate_text/i) &&
+      (entry.lane_requested === true || normalizeCapabilityLaneTimelineStage(entry.stage) === "requested")
+    ) ||
+    callResults.some((entry) => capabilityMatches(entry, /live_translation\.translate_text/i));
+  const translationExecuted =
+    allRows.some((entry) =>
+      capabilityMatches(entry, /live_translation\.translate_text/i) &&
+      (entry.lane_executed === true || normalizeCapabilityLaneTimelineStage(entry.stage) === "observed")
+    ) ||
+    callResults.some((entry) =>
+      capabilityMatches(entry, /live_translation\.translate_text/i) &&
+      (entry.ok === true || readString(entry.status) === "completed" || readString(entry.status) === "succeeded")
+    );
+  const projectionReceiptCount = Math.max(
+    projectionReceipts.length,
+    stageCount("receipt"),
+    readNumberValue(input.capabilityLaneTimelineSummary.receipt_count) ?? 0,
+  );
+  const observationReentered =
+    readString(input.capabilityLaneReentryStatus) === "observation_packet_required_for_provider_reentry" ||
+    readString(input.capabilityLaneReentryStatus) === "lane_observation_reentered" ||
+    allRows.some((entry) => entry.observation_reentered === true) ||
+    (readNumberValue(input.capabilityLaneTimelineSummary.reentered_count) ?? 0) > 0 ||
+    (readNumberValue(input.capabilityLaneTimelineSummary.observation_reentered_count) ?? 0) > 0;
+  const terminalSelected =
+    stageCount("terminal_selected") > 0 ||
+    (readNumberValue(input.capabilityLaneTimelineSummary.terminal_selected_count) ?? 0) > 0;
+  const terminalRejected =
+    stageCount("terminal_rejected") > 0 ||
+    (readNumberValue(input.capabilityLaneTimelineSummary.terminal_rejected_count) ?? 0) > 0;
+  const collectedTargetCount =
+    readNumberFromRecord(collectorChain, [
+      "collected_target_count",
+      "targets_collected_count",
+      "target_count",
+      "visible_target_count",
+    ]) ??
+    (Array.isArray(collectorChain?.collected_chunk_ids) ? collectorChain.collected_chunk_ids.length : null) ??
+    (Array.isArray(collectorChain?.collected_source_ids) ? collectorChain.collected_source_ids.length : null) ??
+    (collectorTargetRecords.length > 0 ? collectorTargetRecords.length : null);
+  const receiptRefs = uniqueStrings([
+    ...projectionReceipts.map((receipt) => readString(receipt.receipt_ref)),
+    ...allRows.map((entry) => readString(entry.receipt_ref)),
+  ]);
+  const observationRefs = uniqueStrings([
+    readString(collectorChain?.collector_observation_ref),
+    ...projectionReceipts.map((receipt) => readString(receipt.observation_ref)),
+    ...allRows.map((entry) => readString(entry.observation_ref)),
+  ]);
+  const sourceIds = uniqueStrings([
+    ...readStringArray(collectorChain?.collected_source_ids),
+    readString(collectorChain?.first_collected_source_id),
+    ...collectorTargetRecords.map((target) => readString(target.source_id)),
+    ...projectionReceipts.map((receipt) => readString(receipt.source_id)),
+    ...allRows.map((entry) => readString(entry.source_id)),
+  ]);
+  const chunkIds = uniqueStrings([
+    ...readStringArray(collectorChain?.collected_chunk_ids),
+    readString(collectorChain?.first_collected_chunk_id),
+    ...collectorTargetRecords.map((target) => readString(target.chunk_id)),
+    ...projectionReceipts.map((receipt) => readString(receipt.chunk_id)),
+    ...allRows.map((entry) => readString(entry.chunk_id) ?? readString(entry.latest_chunk_id)),
+  ]);
+  const sourceKinds = uniqueStrings([
+    ...readStringArray(collectorChain?.collected_source_kinds),
+    readString(collectorChain?.first_collected_source_kind),
+    ...collectorTargetRecords.map((target) => readString(target.source_kind)),
+    ...projectionReceipts.map((receipt) => readString(receipt.source_kind)),
+    ...allRows.map((entry) => readString(entry.source_kind) ?? readString(entry.latest_source_kind)),
+  ]);
+  const panelIds = uniqueStrings([
+    ...readStringArray(collectorChain?.collected_panel_ids),
+    readString(collectorChain?.first_collected_panel_id),
+    ...collectorTargetRecords.map((target) => readString(target.panel_id)),
+    ...projectionReceipts.map((receipt) => readString(receipt.panel_id)),
+    ...allRows.map((entry) => readString(entry.panel_id) ?? readString(entry.latest_panel_id)),
+  ]);
+  const regionIds = uniqueStrings([
+    ...readStringArray(collectorChain?.collected_region_ids),
+    readString(collectorChain?.first_collected_region_id),
+    ...collectorTargetRecords.map((target) => readString(target.region_id)),
+    ...projectionReceipts.map((receipt) => readString(receipt.region_id)),
+    ...allRows.map((entry) => readString(entry.region_id) ?? readString(entry.latest_region_id)),
+  ]);
+  const targetLanguages = uniqueStrings([
+    ...readStringArray(collectorChain?.collected_target_languages),
+    readString(collectorChain?.first_collected_target_language),
+    ...collectorTargetRecords.map((target) => readString(target.target_language)),
+    ...projectionReceipts.map((receipt) => readString(receipt.target_language)),
+    ...allRows.map((entry) => readString(entry.target_language)),
+  ]);
+  const projectionTargets = uniqueStrings([
+    ...readStringArray(collectorChain?.collected_projection_targets),
+    normalizeDebugExportProjectionTarget(collectorChain?.first_collected_projection_target),
+    ...collectorTargetRecords.map((target) => normalizeDebugExportProjectionTarget(target.projection_target)),
+    ...projectionReceipts.map((receipt) => normalizeDebugExportProjectionTarget(receipt.projection_target)),
+    ...allRows.map((entry) => normalizeDebugExportProjectionTarget(entry.projection_target)),
+  ]);
+  const existingObservationRefs = uniqueStrings([
+    ...readStringArray(collectorChain?.collected_existing_observation_refs),
+    readString(collectorChain?.first_collected_existing_observation_ref),
+    ...collectorTargetRecords.map((target) => readString(target.existing_observation_ref)),
+  ]);
+  const existingReceiptRefs = uniqueStrings([
+    ...readStringArray(collectorChain?.collected_existing_receipt_refs),
+    readString(collectorChain?.first_collected_existing_receipt_ref),
+    ...collectorTargetRecords.map((target) =>
+      readString(target.existing_receipt_ref) ??
+      readString(target.existing_translation_receipt_ref)
+    ),
+  ]);
+  const existingProjectionStatuses = uniqueStrings([
+    ...readStringArray(collectorChain?.collected_existing_projection_statuses),
+    readString(collectorChain?.first_collected_existing_projection_status),
+    ...collectorTargetRecords.map((target) => readString(target.existing_projection_status)),
+  ]);
+  const existingFreshnessStatuses = uniqueStrings([
+    ...readStringArray(collectorChain?.collected_existing_freshness_statuses),
+    readString(collectorChain?.first_collected_existing_freshness_status),
+    ...collectorTargetRecords.map((target) => readString(target.existing_freshness_status)),
+  ]);
+  const existingTerminalAuthorityStatuses = uniqueStrings([
+    ...readStringArray(collectorChain?.collected_existing_terminal_authority_statuses),
+    readString(collectorChain?.first_collected_existing_terminal_authority_status),
+    ...collectorTargetRecords.map((target) => readString(target.existing_terminal_authority_status)),
+  ]);
+  const existingSourceEventMs = uniqueNumbers([
+    ...readNumberArray(collectorChain?.collected_existing_source_event_ms),
+    readNumberValue(collectorChain?.first_collected_existing_source_event_ms),
+    ...collectorTargetRecords.map((target) => readNumberValue(target.existing_source_event_ms)),
+  ]);
+  const existingObservedAtMs = uniqueNumbers([
+    ...readNumberArray(collectorChain?.collected_existing_observed_at_ms),
+    readNumberValue(collectorChain?.first_collected_existing_observed_at_ms),
+    ...collectorTargetRecords.map((target) => readNumberValue(target.existing_observed_at_ms)),
+  ]);
+
+  return {
+    schema: "helix.visible_translation.chain_summary.v1",
+    collector_requested: collectorRequested,
+    collector_capability:
+      readString(collectorChain?.collector_capability) ??
+      readString(collectorChain?.requested_collector_capability) ??
+      null,
+    collector_observation_ref: readString(collectorChain?.collector_observation_ref),
+    collected_target_count: collectedTargetCount ?? 0,
+    translation_requested: translationRequested,
+    translation_executed: translationExecuted,
+    backend_selected_count:
+      stageCount("backend") ||
+      (readNumberValue(input.capabilityLaneTimelineSummary.backend_selected_count) ?? 0),
+    projection_receipt_count: projectionReceiptCount,
+    observation_reentered: observationReentered,
+    terminal_selected: terminalSelected,
+    terminal_rejected: terminalRejected,
+    chain_complete:
+      collectorRequested &&
+      (collectedTargetCount ?? 0) > 0 &&
+      translationRequested &&
+      translationExecuted &&
+      projectionReceiptCount > 0 &&
+      observationReentered &&
+      terminalSelected &&
+      !terminalRejected,
+    source_ids: sourceIds,
+    chunk_ids: chunkIds,
+    source_kinds: sourceKinds,
+    panel_ids: panelIds,
+    region_ids: regionIds,
+    target_languages: targetLanguages,
+    projection_targets: projectionTargets,
+    existing_observation_refs: existingObservationRefs,
+    existing_receipt_refs: existingReceiptRefs,
+    existing_projection_statuses: existingProjectionStatuses,
+    existing_freshness_statuses: existingFreshnessStatuses,
+    existing_terminal_authority_statuses: existingTerminalAuthorityStatuses,
+    existing_source_event_ms: existingSourceEventMs,
+    existing_observed_at_ms: existingObservedAtMs,
+    first_collected_existing_observation_ref: existingObservationRefs[0] ?? null,
+    first_collected_existing_receipt_ref: existingReceiptRefs[0] ?? null,
+    first_collected_existing_projection_status: existingProjectionStatuses[0] ?? null,
+    first_collected_existing_freshness_status: existingFreshnessStatuses[0] ?? null,
+    first_collected_existing_terminal_authority_status: existingTerminalAuthorityStatuses[0] ?? null,
+    first_collected_existing_source_event_ms: existingSourceEventMs[0] ?? null,
+    first_collected_existing_observed_at_ms: existingObservedAtMs[0] ?? null,
+    observation_refs: observationRefs,
+    receipt_refs: receiptRefs,
+    projection_is_terminal_authority: false,
   };
 };
 
@@ -832,6 +1281,14 @@ const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: st
     debug,
     fallbackRuntimeAgentProvider,
   });
+  const runtimeGoalCommand = asRecord(payload.runtime_goal_command ?? debug?.runtime_goal_command);
+  const runtimeGoalSession = asRecord(payload.runtime_goal_session ?? debug?.runtime_goal_session);
+  const runtimeGoalDebugExport = asRecord(payload.runtime_goal_debug_export ?? debug?.runtime_goal_debug_export);
+  const runtimeGoalDebugSummary = buildRuntimeGoalDebugSummaryForExport({
+    command: runtimeGoalCommand,
+    session: runtimeGoalSession,
+    debugExport: runtimeGoalDebugExport,
+  });
   const minimal = {
     schema: payload.schema ?? "helix.ask.debug_export.v1",
     exported_at_ms: payload.exported_at_ms,
@@ -889,6 +1346,10 @@ const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: st
       payload.docs_synthesis_materializer_result ?? debug?.docs_synthesis_materializer_result ?? null,
     terminal_answer_authority: payload.terminal_answer_authority ?? debug?.terminal_answer_authority ?? null,
     terminal_presentation: payload.terminal_presentation ?? debug?.terminal_presentation ?? null,
+    runtime_goal_command: runtimeGoalCommand,
+    runtime_goal_session: runtimeGoalSession,
+    runtime_goal_debug_export: runtimeGoalDebugExport,
+    runtime_goal_debug_summary: runtimeGoalDebugSummary,
     agent_runtime: payload.agent_runtime ?? debug?.agent_runtime ?? null,
     selected_agent_provider: payload.selected_agent_provider ?? debug?.selected_agent_provider ?? null,
     capability_lane_ids: payload.capability_lane_ids ?? debug?.capability_lane_ids ?? null,
@@ -1064,6 +1525,79 @@ const buildVoicePlaybackReconciliationDebug = (input: {
   };
 };
 
+const collectClientVoicePlaybackReceipts = (source: Record<string, unknown>): Record<string, unknown>[] => {
+  const clientProjection = asRecord(source.client_debug_projection);
+  const clientVoice = asRecord(source.client_voice_debug ?? clientProjection?.voice);
+  return [
+    source.client_voice_playback_receipts,
+    clientProjection?.voice_playback_receipts,
+    clientVoice?.playbackReceipts,
+  ]
+    .flatMap((entry) => (Array.isArray(entry) ? entry : []))
+    .map(asRecord)
+    .filter((receipt): receipt is Record<string, unknown> => Boolean(receipt));
+};
+
+const activeVoicePlaybackReceipt = (
+  receipt: Record<string, unknown>,
+  activeTurnId: string,
+): boolean => {
+  if (!activeTurnId) return true;
+  return [
+    receipt.turnKey,
+    receipt.utteranceId,
+    receipt.sourceReceiptId,
+    receipt.sourceReceiptKey,
+    receipt.requestId,
+  ].some((value) => readString(value)?.includes(activeTurnId));
+};
+
+const summarizeClientVoicePlaybackReceipts = (input: {
+  activeTurnId: string | null;
+  source: Record<string, unknown>;
+}): Record<string, unknown> => {
+  const activeTurnId = input.activeTurnId?.trim() ?? "";
+  const receipts = collectClientVoicePlaybackReceipts(input.source)
+    .filter((receipt) => activeVoicePlaybackReceipt(receipt, activeTurnId))
+    .sort((left, right) => (readNumberValue(left.atMs) ?? 0) - (readNumberValue(right.atMs) ?? 0));
+  const latestReceipt = receipts[receipts.length - 1] ?? null;
+  const byStatus = (status: string) => receipts.filter((receipt) => readString(receipt.status) === status);
+  const queuedReceipts = byStatus("queued");
+  const deliveredReceipts = byStatus("delivered");
+  const failedReceipts = [...byStatus("failed"), ...byStatus("cancelled"), ...byStatus("suppressed")];
+  const firstAtMs = (items: Record<string, unknown>[]) => readNumberValue(items[0]?.atMs);
+  const latestAtMs = (items: Record<string, unknown>[]) => readNumberValue(items[items.length - 1]?.atMs);
+  const deliveredUtteranceIds = Array.from(
+    new Set(deliveredReceipts.map((receipt) => readString(receipt.utteranceId)).filter(Boolean)),
+  );
+  const deliveredAtMs = latestAtMs(deliveredReceipts);
+  return {
+    client_playback_receipt_count: receipts.length,
+    latest_client_playback_status: latestReceipt ? readString(latestReceipt.status) : null,
+    playback_started: queuedReceipts.length > 0,
+    playback_completed: deliveredReceipts.length > 0,
+    playback_failed: failedReceipts.length > 0,
+    playback_started_at_ms: firstAtMs(queuedReceipts),
+    playback_completed_at_ms: deliveredAtMs,
+    playback_failed_at_ms: latestAtMs(failedReceipts),
+    delivered_utterance_ids: deliveredUtteranceIds,
+    delivered_utterance_id: deliveredUtteranceIds[deliveredUtteranceIds.length - 1] ?? null,
+    delivered_at_ms: deliveredAtMs,
+    client_playback_receipts: receipts.slice(-5).map((receipt) => ({
+      receiptId: readString(receipt.receiptId),
+      sourceReceiptId: readString(receipt.sourceReceiptId),
+      requestId: readString(receipt.requestId),
+      utteranceId: readString(receipt.utteranceId),
+      status: readString(receipt.status),
+      atMs: readNumberValue(receipt.atMs),
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      output_authority: "playback_observation",
+    })),
+  };
+};
+
 const collectRecordsDeep = (value: unknown, predicate: (record: Record<string, unknown>) => boolean): Record<string, unknown>[] => {
   const results: Record<string, unknown>[] = [];
   const visited = new WeakSet<object>();
@@ -1120,6 +1654,10 @@ const buildVoicePlaybackReceiptBarrierDebug = (input: {
     playback_status: finalStatusMatch?.[1]?.toLowerCase() ?? null,
     receipt_kind: "helix.interim_voice_callout_tool_result.v1",
     observation_refs: observationRefs,
+    ...summarizeClientVoicePlaybackReceipts({
+      activeTurnId: input.activeTurnId,
+      source: input.source,
+    }),
     receipt_observed: observationRefs.length > 0,
     evidence_reentered: reentered,
     terminal_blockers: reentered ? [] : ["voice_playback_receipt_not_reentered"],
@@ -1617,6 +2155,14 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     payload.runtime_lane_request_loop ?? debug?.runtime_lane_request_loop ?? agentLoop?.runtime_lane_request_loop;
   const runtimeLaneRequestRetry =
     payload.runtime_lane_request_retry ?? debug?.runtime_lane_request_retry ?? agentLoop?.runtime_lane_request_retry;
+  const visibleTranslationChainSummary = buildVisibleTranslationChainSummaryForExport({
+    runtimeLaneRequestLoop,
+    capabilityLaneTurnTimeline,
+    capabilityLaneProjectionReceipts,
+    capabilityLaneCallResults,
+    capabilityLaneReentryStatus,
+    capabilityLaneTimelineSummary,
+  });
   const turnTranscriptEvents =
     payload.turn_transcript_events ??
     debug?.turn_transcript_events ??
@@ -1656,6 +2202,20 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
               .filter((artifact) => artifact?.kind === "runtime_continuation_hint")
               .map((artifact) => asRecord(artifact?.payload) ?? artifact)
               .filter(Boolean);
+  const runtimeGoalCommand = asRecord(
+    payload.runtime_goal_command ?? debug?.runtime_goal_command ?? agentLoop?.runtime_goal_command,
+  );
+  const runtimeGoalSession = asRecord(
+    payload.runtime_goal_session ?? debug?.runtime_goal_session ?? agentLoop?.runtime_goal_session,
+  );
+  const runtimeGoalDebugExport = asRecord(
+    payload.runtime_goal_debug_export ?? debug?.runtime_goal_debug_export ?? agentLoop?.runtime_goal_debug_export,
+  );
+  const runtimeGoalDebugSummary = buildRuntimeGoalDebugSummaryForExport({
+    command: runtimeGoalCommand,
+    session: runtimeGoalSession,
+    debugExport: runtimeGoalDebugExport,
+  });
   const receiptArtifact =
     [...ledger]
       .reverse()
@@ -1674,8 +2234,24 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
   const lifecycleEvents = Array.isArray(receipt?.workspace_action_lifecycle_events)
     ? receipt.workspace_action_lifecycle_events
     : [];
-  const terminalPresentation = asRecord(payload.terminal_presentation ?? debug?.terminal_presentation ?? agentLoop?.terminal_presentation);
-  const terminalAuthority = asRecord(payload.terminal_answer_authority ?? debug?.terminal_answer_authority ?? agentLoop?.terminal_answer_authority);
+  const providerPromptLeakGuard = asRecord(
+    payload.provider_prompt_leak_guard ?? debug?.provider_prompt_leak_guard ?? agentLoop?.provider_prompt_leak_guard,
+  );
+  const imageLensPromptLeakRecovered =
+    readString(providerPromptLeakGuard?.status) === "recovered_with_image_lens_observation_report" ||
+    readBoolean(providerPromptLeakGuard?.recovered_with_observation_only_image_lens_report) === true;
+  const terminalPresentation = selectTerminalRecordForRecoveredImageLens(
+    imageLensPromptLeakRecovered,
+    payload.terminal_presentation,
+    debug?.terminal_presentation,
+    agentLoop?.terminal_presentation,
+  );
+  const terminalAuthority = selectTerminalRecordForRecoveredImageLens(
+    imageLensPromptLeakRecovered,
+    payload.terminal_answer_authority,
+    debug?.terminal_answer_authority,
+    agentLoop?.terminal_answer_authority,
+  );
   const calculatorPlannerResult =
     asRecord(payload.calculator_planner_result ?? debug?.calculator_planner_result ?? agentLoop?.calculator_planner_result) ??
     findLedgerPayload(ledger, "calculator_planner_result");
@@ -1723,25 +2299,44 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
         : [];
   const coverageArtifacts = collectCoverageArtifacts(ledger);
   const calculatorPanelState = asRecord(payload.calculator_panel_state ?? debug?.calculator_panel_state ?? agentLoop?.calculator_panel_state);
-  const terminalArtifactKind =
-    readString(agentLoop?.terminal_artifact_kind) ??
-    readString(debug?.terminal_artifact_kind) ??
-    readString(payload.terminal_artifact_kind) ??
-    readString(terminalAuthority?.terminal_artifact_kind) ??
-    null;
-  const finalAnswerSource =
-    readString(agentLoop?.final_answer_source) ??
-    readString(debug?.final_answer_source) ??
-    readString(payload.final_answer_source) ??
-    readString(terminalAuthority?.final_answer_source);
-  const terminalErrorCode =
-    readString(agentLoop?.terminal_error_code) ??
-    readString(debug?.terminal_error_code) ??
-    readString(payload.terminal_error_code);
+  const terminalArtifactKind = imageLensPromptLeakRecovered
+    ? readString(terminalPresentation?.terminal_artifact_kind) ??
+      readString(terminalAuthority?.terminal_artifact_kind) ??
+      readString(debug?.terminal_artifact_kind) ??
+      readString(agentLoop?.terminal_artifact_kind) ??
+      readString(payload.terminal_artifact_kind) ??
+      "agent_provider_terminal_candidate"
+    : readString(agentLoop?.terminal_artifact_kind) ??
+      readString(debug?.terminal_artifact_kind) ??
+      readString(payload.terminal_artifact_kind) ??
+      readString(terminalAuthority?.terminal_artifact_kind) ??
+      null;
+  const finalAnswerSource = imageLensPromptLeakRecovered
+    ? readString(terminalPresentation?.final_answer_source) ??
+      readString(terminalAuthority?.final_answer_source) ??
+      readString(debug?.final_answer_source) ??
+      readString(agentLoop?.final_answer_source) ??
+      readString(payload.final_answer_source) ??
+      "agent_provider_terminal_candidate"
+    : readString(agentLoop?.final_answer_source) ??
+      readString(debug?.final_answer_source) ??
+      readString(payload.final_answer_source) ??
+      readString(terminalAuthority?.final_answer_source);
+  const terminalErrorCode = imageLensPromptLeakRecovered
+    ? null
+    : readString(agentLoop?.terminal_error_code) ??
+      readString(debug?.terminal_error_code) ??
+      readString(payload.terminal_error_code);
   const promptRequiresBackendEntrypoint = requiresBackendEntrypointForDebugExport(
     readString(reply.question) ?? readString(payload.selectedDebugQuestion) ?? "",
   );
   const backendDebugRefPresent = Boolean(asRecord(debug?.debug_export_ref) ?? asRecord(payload.debug_export_ref));
+  const capabilityLaneBackendArtifactPresent = Boolean(
+    readRecordArray(capabilityLaneCallResults).length > 0 ||
+      readRecordArray(capabilityLaneObservationPackets).length > 0 ||
+      readRecordArray(capabilityLaneProjectionReceipts).length > 0 ||
+      asRecord(runtimeLaneRequestLoop),
+  );
   const backendSolverArtifactPresent = Boolean(
     payload.ask_turn_solver_trace ??
       debug?.ask_turn_solver_trace ??
@@ -1751,7 +2346,9 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       agentLoop?.agent_runtime_loop ??
       payload.canonical_goal_frame ??
       debug?.canonical_goal_frame ??
-      agentLoop?.canonical_goal_frame,
+      agentLoop?.canonical_goal_frame ??
+      (capabilityLaneBackendArtifactPresent ? { capability_lane_backend_artifact_present: true } : null) ??
+      (imageLensPromptLeakRecovered ? { provider_prompt_leak_recovered: true } : null),
   );
   const askEntrypointRequired =
     readBoolean(agentLoop?.ask_entrypoint_required) ??
@@ -1863,13 +2460,21 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
         : null);
   const backendEntrypointProjectionBlocked = askEntrypointRequired && askEntrypointObserved === false;
   const effectiveTerminalErrorCode =
-    backendEntrypointProjectionBlocked ? askEntrypointFailureCode : terminalErrorCode ?? askEntrypointFailureCode;
+    imageLensPromptLeakRecovered
+      ? null
+      : backendEntrypointProjectionBlocked
+        ? askEntrypointFailureCode
+        : terminalErrorCode ?? askEntrypointFailureCode;
   const effectiveTerminalArtifactKind =
-    backendEntrypointProjectionBlocked
+    imageLensPromptLeakRecovered
+      ? terminalArtifactKind ?? "agent_provider_terminal_candidate"
+      : backendEntrypointProjectionBlocked
       ? "typed_failure"
       : terminalArtifactKind ?? (effectiveTerminalErrorCode ? "typed_failure" : null);
   const effectiveFinalAnswerSource =
-    backendEntrypointProjectionBlocked
+    imageLensPromptLeakRecovered
+      ? finalAnswerSource ?? "agent_provider_terminal_candidate"
+      : backendEntrypointProjectionBlocked
       ? "typed_failure"
       : finalAnswerSource ?? (effectiveTerminalErrorCode ? "typed_failure" : null);
   const typedFailure = asRecord(payload.typed_failure ?? debug?.typed_failure ?? agentLoop?.typed_failure);
@@ -2034,6 +2639,8 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     runtime_lane_request_contract: runtimeLaneRequestContract,
     runtime_lane_request_loop: runtimeLaneRequestLoop,
     runtime_lane_request_retry: runtimeLaneRequestRetry,
+    provider_prompt_leak_guard: providerPromptLeakGuard,
+    visible_translation_chain_summary: visibleTranslationChainSummary,
     terminal_authority_status:
       payload.terminal_authority_status ??
       debug?.terminal_authority_status ??
@@ -2048,6 +2655,10 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     runtime_intent_packet: runtimeIntentPacket,
     runtime_authority_audit: runtimeAuthorityAudit,
     runtime_continuation_hints: runtimeContinuationHints,
+    runtime_goal_command: runtimeGoalCommand,
+    runtime_goal_session: runtimeGoalSession,
+    runtime_goal_debug_export: runtimeGoalDebugExport,
+    runtime_goal_debug_summary: runtimeGoalDebugSummary,
     current_turn_artifact_ledger: ledger,
     current_turn_events: Array.isArray(agentLoop?.turn_events) ? agentLoop.turn_events : [],
     terminal_answer_authority: terminalAuthority,
@@ -2132,10 +2743,14 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       undefined,
     debug_export_source: asRecord(debug?.debug_export_ref) || asRecord(payload.debug_export_ref)
       ? "backend_ref_advertised"
-      : "client_projection",
+      : backendSolverArtifactPresent || capabilityLaneBackendArtifactPresent || imageLensPromptLeakRecovered
+        ? "embedded_backend_payload"
+        : "client_projection",
     backend_debug_response_status: asRecord(debug?.debug_export_ref) || asRecord(payload.debug_export_ref)
       ? "ref_advertised"
-      : "not_advertised",
+      : backendSolverArtifactPresent || capabilityLaneBackendArtifactPresent || imageLensPromptLeakRecovered
+        ? "embedded_payload"
+        : "not_advertised",
     debug_export_anti_determinism_audit: {
       verdict: "clean",
       checks: [

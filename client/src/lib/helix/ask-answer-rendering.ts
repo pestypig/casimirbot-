@@ -36,6 +36,14 @@ export type HelixAskMathRenderDebug = {
   tokenStatuses: HelixAskMathTokenDebugStatus[];
 };
 
+export type HelixAskPathTextSegment =
+  | { kind: "text"; text: string }
+  | { kind: "path"; text: string; start: number };
+
+export type HelixAskInlineCodeTextSegment =
+  | { kind: "text"; text: string }
+  | { kind: "inline_code"; text: string; start: number };
+
 const HELIX_ASK_MATH_DELIMITERS: ReadonlyArray<{
   openDelimiter: string;
   closeDelimiter: string;
@@ -51,6 +59,9 @@ const HELIX_ASK_BARE_EQUATION_CANDIDATE_RE =
   /[A-Za-z][A-Za-z0-9_]*(?:\([^=\n]{1,24}\))?\s*=\s*[^\n]{3,220}/g;
 const HELIX_ASK_BARE_EQUATION_SIGNAL_RE =
   /(?:[0-9+\-*/^()|]|\b(?:sqrt|frac|integral|int|pi|hbar|delta|gamma|beta|rho|theta|tau|kappa|psi|phi|lambda)\b)/i;
+const HELIX_ASK_PATH_SEGMENT_RE =
+  /(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+\.(?:tsx|ts|jsx|js|md|json|cjs|mjs|py|yml|yaml)/g;
+const HELIX_ASK_INLINE_CODE_SEGMENT_RE = /`([^`\n]+)`/g;
 
 function coerceText(value: unknown): string {
   if (value === null || value === undefined) return "";
@@ -244,6 +255,51 @@ export function parseHelixAskFinalAnswerBulletLine(line: string): string | null 
   const content = bulletMatch[1];
   if (/^\*[^*][\s\S]*\*\*$/.test(content)) return `*${content}`;
   return bulletMatch?.[1] ?? null;
+}
+
+export function splitHelixAskTextPathSegments(content: unknown): HelixAskPathTextSegment[] {
+  const text = coerceText(content);
+  if (!text) return [];
+  const segments: HelixAskPathTextSegment[] = [];
+  let lastIndex = 0;
+  HELIX_ASK_PATH_SEGMENT_RE.lastIndex = 0;
+  for (const match of text.matchAll(HELIX_ASK_PATH_SEGMENT_RE)) {
+    const matchText = match[0] ?? "";
+    const start = match.index ?? -1;
+    if (!matchText || start < 0) continue;
+    if (start > lastIndex) {
+      segments.push({ kind: "text", text: text.slice(lastIndex, start) });
+    }
+    segments.push({ kind: "path", text: matchText, start });
+    lastIndex = start + matchText.length;
+  }
+  if (lastIndex < text.length) {
+    segments.push({ kind: "text", text: text.slice(lastIndex) });
+  }
+  return segments.length ? segments : [{ kind: "text", text }];
+}
+
+export function splitHelixAskInlineCodeTextSegments(content: unknown): HelixAskInlineCodeTextSegment[] {
+  const text = coerceText(content);
+  if (!text) return [];
+  const segments: HelixAskInlineCodeTextSegment[] = [];
+  let cursor = 0;
+  HELIX_ASK_INLINE_CODE_SEGMENT_RE.lastIndex = 0;
+  for (const match of text.matchAll(HELIX_ASK_INLINE_CODE_SEGMENT_RE)) {
+    const full = match[0] ?? "";
+    const body = match[1] ?? "";
+    const start = match.index ?? -1;
+    if (!full || start < 0) continue;
+    if (start > cursor) {
+      segments.push({ kind: "text", text: text.slice(cursor, start) });
+    }
+    segments.push({ kind: "inline_code", text: body, start });
+    cursor = start + full.length;
+  }
+  if (cursor < text.length) {
+    segments.push({ kind: "text", text: text.slice(cursor) });
+  }
+  return segments.length ? segments : [{ kind: "text", text }];
 }
 
 function expandMathTokensWithBareEquations(tokens: HelixAskMathToken[]): HelixAskMathToken[] {

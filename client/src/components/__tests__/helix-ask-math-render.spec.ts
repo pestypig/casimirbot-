@@ -4,6 +4,8 @@ import {
   buildHelixAskMathRenderDebugForText,
   hasHelixAskRenderableMath,
   shouldShowHelixAskCalculatorPanel,
+  splitHelixAskInlineCodeTextSegments,
+  splitHelixAskTextPathSegments,
   tokenizeHelixAskMathTokens,
 } from "@/lib/helix/ask-answer-rendering";
 
@@ -163,5 +165,36 @@ describe("tokenizeHelixAskMathTokens", () => {
       },
     });
     expect(show).toBe(true);
+  });
+});
+
+describe("splitHelixAskTextPathSegments", () => {
+  it("splits file paths from final-answer text without changing surrounding text", () => {
+    expect(splitHelixAskTextPathSegments("See client/src/components/helix/HelixAskPill.tsx for details.")).toEqual([
+      { kind: "text", text: "See " },
+      { kind: "path", text: "client/src/components/helix/HelixAskPill.tsx", start: 4 },
+      { kind: "text", text: " for details." },
+    ]);
+  });
+
+  it("keeps ordinary final-answer text as one text segment", () => {
+    expect(splitHelixAskTextPathSegments("No file path was referenced.")).toEqual([
+      { kind: "text", text: "No file path was referenced." },
+    ]);
+  });
+});
+
+describe("splitHelixAskInlineCodeTextSegments", () => {
+  it("splits inline code spans from final-answer text", () => {
+    expect(splitHelixAskInlineCodeTextSegments("Use `alpha = 0.7` and continue.")).toEqual([
+      { kind: "text", text: "Use " },
+      { kind: "inline_code", text: "alpha = 0.7", start: 4 },
+      { kind: "text", text: " and continue." },
+    ]);
+  });
+
+  it("leaves unmatched or multiline backticks as plain text", () => {
+    const text = "Keep `this\nas plain and `dangling.";
+    expect(splitHelixAskInlineCodeTextSegments(text)).toEqual([{ kind: "text", text }]);
   });
 });

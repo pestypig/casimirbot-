@@ -5,6 +5,7 @@ import path from "node:path";
 import request from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
 import { planRouter } from "../routes/agi.plan";
+import { helixRuntimeGoalSessionStore } from "../services/helix-ask/agent-providers/goal-runtime-session";
 
 const originalEnableCodexAgent = process.env.ENABLE_CODEX_AGENT;
 const originalEnableFutureAgent = process.env.ENABLE_FUTURE_AGENT;
@@ -14,6 +15,7 @@ const originalCodexFakeExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
 const originalCodexBin = process.env.CODEX_BIN;
 
 afterEach(() => {
+  helixRuntimeGoalSessionStore.clear();
   if (originalEnableCodexAgent === undefined) {
     delete process.env.ENABLE_CODEX_AGENT;
   } else {
@@ -1663,4 +1665,324 @@ describe("Helix Ask agent provider route metadata", () => {
       },
     });
   });
+
+  it("streams runtime /goal wake progress with transcript and debug proof for Codex", async () => {
+    process.env.ENABLE_CODEX_AGENT = "1";
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Visible progress: the document says civilization labels are provisional evidence states.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const app = createApp();
+    const start = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        agent_runtime: "codex",
+        turn_id: "ask:test:codex-runtime-goal-stream-start",
+        question: "/goal Keep a cumulative summary of the visible document section.",
+      })
+      .expect(200);
+    const goalId = start.body.runtime_goal_session.goal_id;
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn/stream")
+      .send({
+        agent_runtime: "codex",
+        turn_id: "ask:test:codex-runtime-goal-stream-wake",
+        question: "/goal wake",
+        workspace_context_snapshot: {
+          activePanel: "docs-viewer",
+          active_doc_path: "docs/audits/research/civilization-bounds-nation-procedural-network-fit-2026-06-17.md",
+          active_doc_visible_translation_context: {
+            schema: "helix.ask.active_doc_visible_translation_context.v1",
+            doc_path: "docs/audits/research/civilization-bounds-nation-procedural-network-fit-2026-06-17.md",
+            source_id: "document_markdown:docs/audits/research/civilization-bounds-nation-procedural-network-fit-2026-06-17.md",
+            source_hash: "fnv1a32:stream-visible",
+            chunks: [
+              {
+                visible_text: "The document treats civilization labels as provisional evidence states.",
+                chunk_id: "visible-stream-1",
+              },
+            ],
+          },
+        },
+      })
+      .expect(200);
+
+    const events = parseSseEvents(response.text);
+    const transcriptEvents = events.filter((entry) => entry.event === "turn_transcript_event");
+    const finalEvent = events.find((entry) => entry.event === "turn_final");
+
+    expect(transcriptEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          data: expect.objectContaining({
+            role: "system",
+            type: "runtime_goal_command",
+            lane: "runtime_goal",
+          }),
+        }),
+        expect.objectContaining({
+          data: expect.objectContaining({
+            role: "tool",
+            lane: "runtime_goal",
+            source_event_type: "runtime_goal_debug",
+          }),
+        }),
+        expect.objectContaining({
+          data: expect.objectContaining({
+            role: "agent",
+            type: "terminal_answer",
+            lane: "terminal_authority",
+          }),
+        }),
+      ]),
+    );
+    expect(finalEvent?.data).toMatchObject({
+      ok: true,
+      final_answer_source: "runtime_goal_command",
+      terminal_artifact_kind: "runtime_goal_command_result",
+      runtime_goal_command: {
+        command: "wake",
+        goal_id: goalId,
+      },
+      runtime_goal_session: {
+        goal_id: goalId,
+        runtime_agent_provider: "codex",
+        terminal_authority_status: "authorized",
+      },
+      runtime_goal_job_brief: {
+        user_goal_text: "Keep a cumulative summary of the visible document section.",
+      },
+      runtime_goal_wake_plan: {
+        requested_observation_or_lane: "docs-viewer.read_visible_surface",
+        expected_terminal_product: "job_progress_report",
+      },
+      runtime_goal_progress_summary: {
+        current_summary: "Visible progress: the document says civilization labels are provisional evidence states.",
+        terminal_authority_status: "authorized",
+      },
+      runtime_goal_debug_summary: {
+        schema: "helix.runtime_goal.debug_copy_summary.v1",
+        runtime_agent_provider: "codex",
+        observed_source_doc_path: "docs/audits/research/civilization-bounds-nation-procedural-network-fit-2026-06-17.md",
+        requested_observation_or_lane: "docs-viewer.read_visible_surface",
+        terminal_authority_status: "authorized",
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        route: "/ask/turn/stream",
+        server_authoritative: true,
+      },
+    });
+    expect(String(finalEvent?.data.selected_final_answer)).toContain(
+      "Goal: Keep a cumulative summary of the visible document section.",
+    );
+    expect(String(finalEvent?.data.selected_final_answer)).toContain(
+      "Observed source: docs/audits/research/civilization-bounds-nation-procedural-network-fit-2026-06-17.md",
+    );
+    expect(String(finalEvent?.data.selected_final_answer)).toContain("Evidence used: docs-viewer.read_visible_surface");
+    expect(String(finalEvent?.data.selected_final_answer)).toContain(
+      "Visible progress: the document says civilization labels are provisional evidence states.",
+    );
+    expect(finalEvent?.data.debug_export).toMatchObject({
+      runtime_goal_debug_summary: finalEvent.data.runtime_goal_debug_summary,
+      terminal_answer_authority: {
+        server_authoritative: true,
+      },
+    });
+    const debugExport = await request(app)
+      .get("/api/agi/ask/turn/ask%3Atest%3Acodex-runtime-goal-stream-wake/debug-export")
+      .expect(200);
+    expect(debugExport.body).toMatchObject({
+      ok: true,
+      payload: {
+        active_turn_id: "ask:test:codex-runtime-goal-stream-wake",
+        final_answer_source: "runtime_goal_command",
+        terminal_artifact_kind: "runtime_goal_command_result",
+        runtime_goal_command: {
+          command: "wake",
+          goal_id: goalId,
+        },
+        runtime_goal_session: {
+          goal_id: goalId,
+          runtime_agent_provider: "codex",
+          terminal_authority_status: "authorized",
+        },
+        runtime_goal_debug_summary: finalEvent?.data.runtime_goal_debug_summary,
+        runtime_goal_wake_plan: {
+          requested_observation_or_lane: "docs-viewer.read_visible_surface",
+          expected_terminal_product: "job_progress_report",
+        },
+        runtime_goal_progress_summary: {
+          current_summary: "Visible progress: the document says civilization labels are provisional evidence states.",
+          terminal_authority_status: "authorized",
+        },
+        terminal_answer_authority: {
+          route: "/ask/turn/stream",
+          server_authoritative: true,
+        },
+      },
+    });
+    expect(debugExport.body.payload.runtime_goal_debug_export.debug_events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ stage: "tool_or_lane_requested" }),
+        expect.objectContaining({ stage: "tool_or_lane_admitted" }),
+        expect.objectContaining({ stage: "evidence_reentered" }),
+        expect.objectContaining({ stage: "terminal_authority_evaluated" }),
+      ]),
+    );
+  }, 15_000);
+
+  it("streams runtime /goal wake progress with transcript and debug proof for Helix Native", async () => {
+    const app = createApp();
+    const start = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        agent_runtime: "helix",
+        turn_id: "ask:test:helix-runtime-goal-stream-start",
+        question: "/goal Keep a Helix-native summary of the visible document section.",
+      })
+      .expect(200);
+    const goalId = start.body.runtime_goal_session.goal_id;
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn/stream")
+      .send({
+        agent_runtime: "helix",
+        turn_id: "ask:test:helix-runtime-goal-stream-wake",
+        question: "/goal wake",
+        workspace_context_snapshot: {
+          activePanel: "docs-viewer",
+          active_doc_path: "docs/audits/research/civilization-bounds-nation-procedural-network-fit-2026-06-17.md",
+          active_doc_visible_translation_context: {
+            schema: "helix.ask.active_doc_visible_translation_context.v1",
+            doc_path: "docs/audits/research/civilization-bounds-nation-procedural-network-fit-2026-06-17.md",
+            source_id: "document_markdown:docs/audits/research/civilization-bounds-nation-procedural-network-fit-2026-06-17.md",
+            source_hash: "fnv1a32:stream-visible-helix",
+            chunks: [
+              {
+                visible_text: "Helix should report visible document evidence through the runtime goal progress chain.",
+                chunk_id: "visible-stream-helix-1",
+              },
+            ],
+          },
+        },
+      })
+      .expect(200);
+
+    const events = parseSseEvents(response.text);
+    const transcriptEvents = events.filter((entry) => entry.event === "turn_transcript_event");
+    const finalEvent = events.find((entry) => entry.event === "turn_final");
+
+    expect(transcriptEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          data: expect.objectContaining({
+            role: "system",
+            type: "runtime_goal_command",
+            lane: "runtime_goal",
+          }),
+        }),
+        expect.objectContaining({
+          data: expect.objectContaining({
+            role: "tool",
+            lane: "runtime_goal",
+            source_event_type: "runtime_goal_debug",
+          }),
+        }),
+        expect.objectContaining({
+          data: expect.objectContaining({
+            role: "agent",
+            type: "terminal_answer",
+            lane: "terminal_authority",
+          }),
+        }),
+      ]),
+    );
+    expect(finalEvent?.data).toMatchObject({
+      ok: true,
+      final_answer_source: "runtime_goal_command",
+      terminal_artifact_kind: "runtime_goal_command_result",
+      runtime_goal_command: {
+        command: "wake",
+        goal_id: goalId,
+      },
+      runtime_goal_session: {
+        goal_id: goalId,
+        runtime_agent_provider: "helix",
+        terminal_authority_status: "authorized",
+      },
+      runtime_goal_job_brief: {
+        user_goal_text: "Keep a Helix-native summary of the visible document section.",
+      },
+      runtime_goal_wake_plan: {
+        requested_observation_or_lane: "docs-viewer.read_visible_surface",
+        expected_terminal_product: "job_progress_report",
+      },
+      runtime_goal_debug_summary: {
+        schema: "helix.runtime_goal.debug_copy_summary.v1",
+        runtime_agent_provider: "helix",
+        observed_source_doc_path: "docs/audits/research/civilization-bounds-nation-procedural-network-fit-2026-06-17.md",
+        requested_observation_or_lane: "docs-viewer.read_visible_surface",
+        terminal_authority_status: "authorized",
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        route: "/ask/turn/stream",
+        server_authoritative: true,
+      },
+    });
+    expect(String(finalEvent?.data.selected_final_answer)).toContain(
+      "Goal: Keep a Helix-native summary of the visible document section.",
+    );
+    expect(String(finalEvent?.data.selected_final_answer)).toContain(
+      "Observed source: docs/audits/research/civilization-bounds-nation-procedural-network-fit-2026-06-17.md",
+    );
+    expect(String(finalEvent?.data.selected_final_answer)).toContain("Evidence used: docs-viewer.read_visible_surface");
+    expect(String(finalEvent?.data.runtime_goal_progress_summary?.current_summary ?? "")).toContain(
+      "Helix goal evidence re-entry completed for docs-viewer.read_visible_surface.",
+    );
+    expect(String(finalEvent?.data.runtime_goal_progress_summary?.current_summary ?? "")).toContain(
+      "Objective: Keep a Helix-native summary of the visible document section.",
+    );
+
+    const debugExport = await request(app)
+      .get("/api/agi/ask/turn/ask%3Atest%3Ahelix-runtime-goal-stream-wake/debug-export")
+      .expect(200);
+    expect(debugExport.body).toMatchObject({
+      ok: true,
+      payload: {
+        active_turn_id: "ask:test:helix-runtime-goal-stream-wake",
+        final_answer_source: "runtime_goal_command",
+        terminal_artifact_kind: "runtime_goal_command_result",
+        runtime_goal_command: {
+          command: "wake",
+          goal_id: goalId,
+        },
+        runtime_goal_session: {
+          goal_id: goalId,
+          runtime_agent_provider: "helix",
+          terminal_authority_status: "authorized",
+        },
+        runtime_goal_debug_summary: finalEvent?.data.runtime_goal_debug_summary,
+        terminal_answer_authority: {
+          route: "/ask/turn/stream",
+          server_authoritative: true,
+        },
+      },
+    });
+    expect(debugExport.body.payload.runtime_goal_debug_export.debug_events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ stage: "tool_or_lane_requested" }),
+        expect.objectContaining({ stage: "tool_or_lane_admitted" }),
+        expect.objectContaining({ stage: "evidence_reentered" }),
+        expect.objectContaining({ stage: "terminal_authority_evaluated" }),
+      ]),
+    );
+  }, 15_000);
 });

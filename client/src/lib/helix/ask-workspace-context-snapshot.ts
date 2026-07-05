@@ -93,6 +93,9 @@ export type AskTurnWorkspaceContextSnapshotInput = {
     path: string | null;
     source: string;
   };
+  activeDocVisibleTranslationContext?: Record<string, unknown> | null;
+  accountLanguageTranslationProjections?: Record<string, unknown>[] | null;
+  visibleTranslationProjections?: Record<string, unknown>[] | null;
   situationRoomContext?: unknown;
   situationCaptureContext?: unknown;
   lastUpdatedAtMs: number;
@@ -122,6 +125,156 @@ const readCalculatorDebugEvents = (
         Boolean(event) && typeof event === "object",
       )
     : [];
+
+const readProjectionDocPath = (entry: Record<string, unknown>): string | null => {
+  const value = entry.docPath ?? entry.doc_path;
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+};
+
+const readProjectionString = (entry: Record<string, unknown>, camelKey: string, snakeKey: string): string | null => {
+  const value = entry[camelKey] ?? entry[snakeKey];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+};
+
+const readProjectionNumber = (entry: Record<string, unknown>, camelKey: string, snakeKey: string): number | null => {
+  const value = entry[camelKey] ?? entry[snakeKey];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+};
+
+const mirroredProjectionEvidenceFields = (
+  entry: Record<string, unknown>,
+): Record<string, unknown> => {
+  const stringPairs: Array<[string, string]> = [
+    ["docPath", "doc_path"],
+    ["panelId", "panel_id"],
+    ["regionId", "region_id"],
+    ["sourceId", "source_id"],
+    ["sourceHash", "source_hash"],
+    ["sourceKind", "source_kind"],
+    ["sourceTextHash", "source_text_hash"],
+    ["visibleText", "visible_text"],
+    ["projectionTarget", "projection_target"],
+    ["accountLocale", "account_locale"],
+    ["targetLanguage", "target_language"],
+    ["chunkId", "chunk_id"],
+    ["dedupeKey", "dedupe_key"],
+    ["sourceEventId", "source_event_id"],
+    ["freshnessStatus", "freshness_status"],
+    ["observationRef", "observation_ref"],
+    ["receiptRef", "receipt_ref"],
+  ];
+  const numberPairs: Array<[string, string]> = [
+    ["sourceTextCharCount", "source_text_char_count"],
+    ["chunkIndex", "chunk_index"],
+    ["sourceEventMs", "source_event_ms"],
+    ["observedAtMs", "observed_at_ms"],
+  ];
+  const mirrored: Record<string, unknown> = {};
+  for (const [camelKey, snakeKey] of stringPairs) {
+    const value = readProjectionString(entry, camelKey, snakeKey);
+    if (!value) continue;
+    mirrored[camelKey] = value;
+    mirrored[snakeKey] = value;
+  }
+  for (const [camelKey, snakeKey] of numberPairs) {
+    const value = readProjectionNumber(entry, camelKey, snakeKey);
+    if (value === null) continue;
+    mirrored[camelKey] = value;
+    mirrored[snakeKey] = value;
+  }
+  return mirrored;
+};
+
+const projectionMatchesActiveDoc = (
+  entry: Record<string, unknown>,
+  activeDocPath: string | null,
+): boolean => {
+  const projectionDocPath = readProjectionDocPath(entry);
+  return !activeDocPath || !projectionDocPath || projectionDocPath === activeDocPath;
+};
+
+const normalizeProjectionEvidenceForAskSnapshot = (
+  entry: Record<string, unknown>,
+  defaultProjectionTarget?: string | null,
+): Record<string, unknown> => {
+  const mirrored = mirroredProjectionEvidenceFields(entry);
+  const projectionTarget =
+    readProjectionString(mirrored, "projectionTarget", "projection_target") ||
+    (typeof defaultProjectionTarget === "string" && defaultProjectionTarget.trim()
+      ? defaultProjectionTarget.trim()
+      : null);
+  return {
+    ...entry,
+    ...mirrored,
+    ...(projectionTarget
+      ? {
+        projectionTarget,
+        projection_target: projectionTarget,
+      }
+      : {}),
+    contextRole: "tool_evidence",
+    context_role: "tool_evidence",
+    answerAuthority: false,
+    answer_authority: false,
+    terminalEligible: false,
+    terminal_eligible: false,
+    assistantAnswer: false,
+    assistant_answer: false,
+    rawContentIncluded: false,
+    raw_content_included: false,
+    reentryRequired: true,
+    reentry_required: true,
+  };
+};
+
+const normalizeVisibleTranslationEvidenceRecord = (
+  entry: Record<string, unknown>,
+): Record<string, unknown> => ({
+  ...entry,
+  ...mirroredProjectionEvidenceFields(entry),
+  assistant_answer: false,
+  assistantAnswer: false,
+  terminal_eligible: false,
+  terminalEligible: false,
+  answer_authority: false,
+  answerAuthority: false,
+  raw_content_included: false,
+  rawContentIncluded: false,
+  reentry_required: true,
+  reentryRequired: true,
+});
+
+const normalizeVisibleTranslationEvidenceArray = (
+  value: unknown,
+): Record<string, unknown>[] | undefined => {
+  if (!Array.isArray(value)) return undefined;
+  return value
+    .filter((entry): entry is Record<string, unknown> =>
+      Boolean(entry) && typeof entry === "object" && !Array.isArray(entry)
+    )
+    .map(normalizeVisibleTranslationEvidenceRecord);
+};
+
+const normalizeActiveDocVisibleTranslationContextForAskSnapshot = (
+  value: Record<string, unknown>,
+  activeDocPath: string | null,
+): Record<string, unknown> | null => {
+  const contextDocPath = readProjectionDocPath(value);
+  if (activeDocPath && contextDocPath && contextDocPath !== activeDocPath) return null;
+  const chunks = normalizeVisibleTranslationEvidenceArray(value.chunks);
+  const uiTextRegions = normalizeVisibleTranslationEvidenceArray(value.ui_text_regions ?? value.uiTextRegions);
+  const panelTextRegions = normalizeVisibleTranslationEvidenceArray(value.panel_text_regions ?? value.panelTextRegions);
+  const visibleUiTextRegions = normalizeVisibleTranslationEvidenceArray(
+    value.visible_ui_text_regions ?? value.visibleUiTextRegions,
+  );
+  return normalizeVisibleTranslationEvidenceRecord({
+    ...value,
+    ...(chunks ? { chunks } : {}),
+    ...(uiTextRegions ? { ui_text_regions: uiTextRegions, uiTextRegions } : {}),
+    ...(panelTextRegions ? { panel_text_regions: panelTextRegions, panelTextRegions } : {}),
+    ...(visibleUiTextRegions ? { visible_ui_text_regions: visibleUiTextRegions, visibleUiTextRegions } : {}),
+  });
+};
 
 export function buildAskTurnWorkspaceContextSnapshotFromState(
   input: AskTurnWorkspaceContextSnapshotInput,
@@ -159,6 +312,32 @@ export function buildAskTurnWorkspaceContextSnapshotFromState(
   };
   const currentPath = input.docContext.path;
   const docContextSource = input.docContext.source;
+  const activeDocVisibleTranslationContext =
+    input.activeDocVisibleTranslationContext &&
+    typeof input.activeDocVisibleTranslationContext === "object"
+      ? normalizeActiveDocVisibleTranslationContextForAskSnapshot(
+        input.activeDocVisibleTranslationContext,
+        currentPath,
+      )
+      : null;
+  const accountLanguageTranslationProjections = Array.isArray(input.accountLanguageTranslationProjections)
+    ? input.accountLanguageTranslationProjections
+      .filter((entry): entry is Record<string, unknown> =>
+        Boolean(entry) && typeof entry === "object" && !Array.isArray(entry)
+      )
+      .filter((entry) => projectionMatchesActiveDoc(entry, currentPath))
+      .map((entry) => normalizeProjectionEvidenceForAskSnapshot(entry, "account_language"))
+      .slice(0, 24)
+    : [];
+  const visibleTranslationProjections = Array.isArray(input.visibleTranslationProjections)
+    ? input.visibleTranslationProjections
+      .filter((entry): entry is Record<string, unknown> =>
+        Boolean(entry) && typeof entry === "object" && !Array.isArray(entry)
+      )
+      .filter((entry) => projectionMatchesActiveDoc(entry, currentPath))
+      .map((entry) => normalizeProjectionEvidenceForAskSnapshot(entry))
+      .slice(0, 24)
+    : [];
   const notes = input.notesState.notes ?? {};
   const noteOrder = readNoteOrder(input.notesState);
   const activeNoteId = typeof input.notesState.active_note_id === "string" ? input.notesState.active_note_id : null;
@@ -205,6 +384,18 @@ export function buildAskTurnWorkspaceContextSnapshotFromState(
     doc_context_path: currentPath,
     docContextSource: currentPath ? docContextSource : null,
     doc_context_source: currentPath ? docContextSource : null,
+    activeDocVisibleTranslationContext,
+    active_doc_visible_translation_context: activeDocVisibleTranslationContext,
+    hasActiveDocVisibleTranslationContext: Boolean(activeDocVisibleTranslationContext),
+    has_active_doc_visible_translation_context: Boolean(activeDocVisibleTranslationContext),
+    accountLanguageTranslationProjections,
+    account_language_translation_projections: accountLanguageTranslationProjections,
+    hasAccountLanguageTranslationProjections: accountLanguageTranslationProjections.length > 0,
+    has_account_language_translation_projections: accountLanguageTranslationProjections.length > 0,
+    visibleTranslationProjections,
+    visible_translation_projections: visibleTranslationProjections,
+    hasVisibleTranslationProjections: visibleTranslationProjections.length > 0,
+    has_visible_translation_projections: visibleTranslationProjections.length > 0,
     docContextFailureReason: currentPath
       ? null
       : activePanel === "docs-viewer"

@@ -15,7 +15,11 @@ import {
   type HelixTextToSpeechReceipt,
 } from "@shared/helix-text-to-speech-lane";
 import type { HelixAgentProvider } from "../agent-providers/types";
-import { recordInterimVoiceCalloutRequest } from "../interim-voice-callout-store";
+import {
+  recordInterimVoiceCalloutRequest,
+  waitForInterimVoicePlaybackOutcome,
+} from "../interim-voice-callout-store";
+import { normalizeVoicePlaybackClientStatus } from "../voice-playback/receipt-barrier";
 import { mapInterimVoiceReceiptToTextToSpeechPlaybackStatus } from "../voice-playback/status";
 import { resolveHelixCapabilityLaneRequest } from "./registry";
 
@@ -30,6 +34,28 @@ const normalizeText = (value: unknown): string =>
 const optionalText = (value: unknown): string | null => {
   const text = normalizeText(value);
   return text || null;
+};
+
+const normalizePlaybackKind = (
+  value: unknown,
+  sourceObservationRef: string | null,
+): "tool_receipt" | "translation_relay" | "narrator_read" | "panel_narration" => {
+  const text = normalizeText(value);
+  if (
+    text === "tool_receipt" ||
+    text === "translation_relay" ||
+    text === "narrator_read" ||
+    text === "panel_narration"
+  ) {
+    return text;
+  }
+  return /\btranslation\b/i.test(sourceObservationRef ?? "") ? "translation_relay" : "tool_receipt";
+};
+
+const readTtsClientReceiptWaitMs = (env: NodeJS.ProcessEnv | undefined): number => {
+  const raw = Number(env?.HELIX_TTS_CLIENT_RECEIPT_WAIT_MS ?? env?.HELIX_VOICE_PLAYBACK_RECEIPT_WAIT_MS);
+  if (!Number.isFinite(raw)) return 1_500;
+  return Math.max(0, Math.min(Math.trunc(raw), 8_000));
 };
 
 const packetStatusFor = (
@@ -65,6 +91,8 @@ const buildObservationPacket = (input: {
   summary: string;
   observationRef: string;
   receipt: HelixTextToSpeechReceipt | null;
+  voicePlaybackReceiptBarrier?: Record<string, unknown> | null;
+  voicePlaybackClientReceipt?: Record<string, unknown> | null;
   backendSelectionDecision: HelixCapabilityLaneBackendSelectionDecision;
   missingRequirements?: HelixAgentStepObservationPacket["missing_requirements"];
 }): HelixAgentStepObservationPacket => ({
@@ -91,6 +119,12 @@ const buildObservationPacket = (input: {
   state_delta: input.receipt
     ? {
         text_to_speech_receipt: input.receipt,
+        ...(input.voicePlaybackReceiptBarrier
+          ? { voice_playback_receipt_barrier: input.voicePlaybackReceiptBarrier }
+          : {}),
+        ...(input.voicePlaybackClientReceipt
+          ? { voice_playback_client_receipt: input.voicePlaybackClientReceipt }
+          : {}),
       }
     : {},
   suggested_next_steps:
@@ -134,13 +168,84 @@ const buildObservationPacket = (input: {
   raw_content_included: false,
 });
 
-export const runTextToSpeechSpeakText = (input: {
+const mapClientStatusToTtsPlaybackStatus = (
+  normalizedStatus: string,
+): HelixTextToSpeechReceipt["playback_status"] => {
+  if (normalizedStatus === "delivered") return "played";
+  if (normalizedStatus === "queued") return "pending";
+  if (normalizedStatus === "awaiting_client_receipt") return "pending";
+  if (normalizedStatus === "cancelled" || normalizedStatus === "suppressed") return "failed";
+  return normalizedStatus === "failed" ? "failed" : "blocked";
+};
+
+const buildPlaybackLifecycle = (input: {
+  playbackStatus: HelixTextToSpeechReceipt["playback_status"];
+  clientPlaybackReceiptStatus?: string | null;
+  utteranceId?: string | null;
+}): Pick<
+  HelixTextToSpeechReceipt,
+  | "playback_started"
+  | "playback_completed"
+  | "playback_failed"
+  | "delivered_utterance_id"
+  | "client_playback_receipt_status"
+> => {
+  const clientStatus = optionalText(input.clientPlaybackReceiptStatus);
+  const playbackCompleted = input.playbackStatus === "played";
+  const playbackFailed = input.playbackStatus === "blocked" || input.playbackStatus === "failed";
+  return {
+    playback_started: playbackCompleted || clientStatus === "queued",
+    playback_completed: playbackCompleted,
+    playback_failed: playbackFailed,
+    delivered_utterance_id: playbackCompleted ? optionalText(input.utteranceId) : null,
+    client_playback_receipt_status: clientStatus,
+  };
+};
+
+const applyClientPlaybackReceipt = (input: {
+  receipt: HelixTextToSpeechReceipt;
+  clientReceipt: Record<string, unknown>;
+  nowMs: number;
+}): HelixTextToSpeechReceipt => {
+  const normalizedStatus = normalizeVoicePlaybackClientStatus(input.clientReceipt);
+  const playbackStatus = mapClientStatusToTtsPlaybackStatus(normalizedStatus);
+  const providerPlaybackStatus = optionalText(input.clientReceipt.status) ?? normalizedStatus;
+  const delivery = input.clientReceipt.delivery && typeof input.clientReceipt.delivery === "object" && !Array.isArray(input.clientReceipt.delivery)
+    ? input.clientReceipt.delivery as Record<string, unknown>
+    : null;
+  const utteranceId =
+    optionalText(delivery?.utteranceId) ??
+    optionalText(input.clientReceipt.utteranceId) ??
+    input.receipt.utterance_id;
+  const delivered = playbackStatus === "played";
+  return {
+    ...input.receipt,
+    utterance_id: utteranceId,
+    playback_status: playbackStatus,
+    provider_playback_status: providerPlaybackStatus,
+    client_playback_receipt_ref: optionalText(input.clientReceipt.receiptId) ?? input.receipt.client_playback_receipt_ref,
+    audio_ref: delivered ? utteranceId : input.receipt.audio_ref,
+    audio_bytes_observed: delivered,
+    ...buildPlaybackLifecycle({
+      playbackStatus,
+      clientPlaybackReceiptStatus: providerPlaybackStatus,
+      utteranceId,
+    }),
+    playback_confirmed_at_ms: delivered ? input.nowMs : input.receipt.playback_confirmed_at_ms,
+    delivered_at_ms: delivered ? input.nowMs : input.receipt.delivered_at_ms,
+    playback_error: playbackStatus === "failed" || playbackStatus === "blocked"
+      ? optionalText(delivery?.message) ?? optionalText(input.clientReceipt.message) ?? normalizedStatus
+      : null,
+  };
+};
+
+export const runTextToSpeechSpeakText = async (input: {
   provider: HelixAgentProvider;
   request: HelixTextToSpeechOneShotRequest;
   turnId?: string | null;
   iteration?: number | null;
   env?: NodeJS.ProcessEnv;
-}): HelixTextToSpeechOneShotResult => {
+}): Promise<HelixTextToSpeechOneShotResult> => {
   const turnId = normalizeText(input.turnId) || normalizeText(input.request.turn_id) || "ask:lane:text_to_speech";
   const iteration = typeof input.iteration === "number" && Number.isFinite(input.iteration)
     ? Math.max(0, Math.trunc(input.iteration))
@@ -148,6 +253,7 @@ export const runTextToSpeechSpeakText = (input: {
   const text = normalizeText(input.request.text);
   const threadId = optionalText(input.request.thread_id) ?? "helix-ask:desktop";
   const sourceObservationRef = optionalText(input.request.source_observation_ref);
+  const voicePlaybackKind = normalizePlaybackKind(input.request.voice_playback_kind, sourceObservationRef);
   const voiceProfile = optionalText(input.request.profile) ?? optionalText(input.request.voice);
   const locale = optionalText(input.request.locale);
   const trace = resolveHelixCapabilityLaneRequest({
@@ -213,17 +319,18 @@ export const runTextToSpeechSpeakText = (input: {
     source: "ask_tool_loop",
     kind: "tool_result",
     text,
-    voicePlaybackKind: "tool_receipt",
+    voicePlaybackKind,
     requiresConfirmation: false,
     evidenceRefs: sourceObservationRef ? [sourceObservationRef] : [],
     reasonCodes: ["capability_lane_text_to_speech_speak_text"],
   });
   const playbackStatus = mapInterimVoiceReceiptToTextToSpeechPlaybackStatus(backend.receipt);
+  const backendUtteranceId = backend.receipt.delivery?.utteranceId ?? null;
   const observationRef = `${turnId}:capability_lane:${CAPABILITY_ID}:${hashShort({
     text,
     receiptId: backend.receipt.receiptId,
   })}`;
-  const receipt: HelixTextToSpeechReceipt = {
+  let receipt: HelixTextToSpeechReceipt = {
     schema: HELIX_TEXT_TO_SPEECH_RECEIPT_SCHEMA,
     receipt_ref: `${observationRef}:receipt:${hashShort(backend.receipt.receiptId)}`,
     request_ref: backend.request.requestId,
@@ -235,13 +342,17 @@ export const runTextToSpeechSpeakText = (input: {
     selected_backend_provider: trace.selected_backend_provider,
     selection_reason: trace.selection_reason,
     backend_selection_decision: trace.backend_selection_decision,
-    utterance_id: backend.receipt.delivery?.utteranceId ?? null,
+    utterance_id: backendUtteranceId,
     playback_status: playbackStatus,
     provider_playback_status: backend.receipt.status,
-    audio_ref: playbackStatus === "played" ? backend.receipt.delivery?.utteranceId ?? null : null,
-    playback_request_ref: backend.receipt.delivery?.utteranceId ?? backend.receipt.receiptId ?? null,
+    audio_ref: playbackStatus === "played" ? backendUtteranceId : null,
+    playback_request_ref: backendUtteranceId ?? backend.receipt.receiptId ?? null,
     client_playback_receipt_ref: backend.receipt.status === "delivered" ? backend.receipt.receiptId : null,
     audio_bytes_observed: backend.receipt.delivery?.playbackStatus === "client_confirmed",
+    ...buildPlaybackLifecycle({
+      playbackStatus,
+      utteranceId: backendUtteranceId,
+    }),
     playback_requested_at_ms: null,
     playback_confirmed_at_ms: playbackStatus === "played" ? Date.now() : null,
     delivered_at_ms: playbackStatus === "played" ? Date.now() : null,
@@ -272,22 +383,90 @@ export const runTextToSpeechSpeakText = (input: {
     context_role: "tool_evidence",
     ask_context_policy: "evidence_only",
   };
-  const packetStatus = packetStatusFor(playbackStatus, false);
-  const playbackSummary = playbackStatus === "pending"
-    ? "pending client playback receipt"
-    : playbackStatus;
+  const waitMs = readTtsClientReceiptWaitMs(input.env);
+  let voicePlaybackClientReceipt: Record<string, unknown> | null = null;
+  let voicePlaybackReceiptBarrier: Record<string, unknown> = playbackStatus === "pending"
+    ? {
+        schema: "helix.voice_playback_receipt_barrier.v1",
+        source: "text_to_speech_capability_lane",
+        status: "awaiting_client_receipt",
+        playback_status: "awaiting_client_receipt",
+        request_id: backend.request.requestId,
+        source_receipt_id: backend.receipt.receiptId,
+        waited_ms: 0,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }
+    : {
+        schema: "helix.voice_playback_receipt_barrier.v1",
+        source: "text_to_speech_capability_lane",
+        status: "backend_not_waitable",
+        playback_status: playbackStatus,
+        provider_playback_status: backend.receipt.status,
+        request_id: backend.request.requestId,
+        source_receipt_id: backend.receipt.receiptId,
+        waited_ms: 0,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+  if (playbackStatus === "pending" && waitMs > 0) {
+    const startedAtMs = Date.now();
+    const clientReceipt = await waitForInterimVoicePlaybackOutcome({
+      requestId: backend.request.requestId,
+      sourceReceiptId: backend.receipt.receiptId,
+      timeoutMs: waitMs,
+    });
+    const waitedMs = Math.max(0, Date.now() - startedAtMs);
+    if (clientReceipt) {
+      voicePlaybackClientReceipt = clientReceipt as unknown as Record<string, unknown>;
+      receipt = applyClientPlaybackReceipt({
+        receipt,
+        clientReceipt: voicePlaybackClientReceipt,
+        nowMs: Date.now(),
+      });
+      voicePlaybackReceiptBarrier = {
+        ...voicePlaybackReceiptBarrier,
+        status: "client_receipt_observed",
+        playback_status: receipt.playback_status,
+        provider_playback_status: receipt.provider_playback_status,
+        client_playback_receipt_ref: receipt.client_playback_receipt_ref,
+        utterance_id: receipt.utterance_id,
+        audio_bytes_observed: receipt.audio_bytes_observed,
+        delivered_at_ms: receipt.delivered_at_ms,
+        waited_ms: waitedMs,
+      };
+    } else {
+      voicePlaybackReceiptBarrier = {
+        ...voicePlaybackReceiptBarrier,
+        status: "client_receipt_timeout",
+        playback_status: "awaiting_client_receipt",
+        waited_ms: waitedMs,
+      };
+    }
+  }
+  const finalPlaybackStatus = receipt.playback_status;
+  const finalPacketStatus = packetStatusFor(finalPlaybackStatus, false);
+  const playbackSummary = finalPlaybackStatus === "pending"
+    ? voicePlaybackReceiptBarrier.status === "client_receipt_timeout"
+      ? "awaiting client playback receipt"
+      : "pending client playback receipt"
+    : finalPlaybackStatus;
   const packet = buildObservationPacket({
     turnId,
     iteration,
-    status: packetStatus,
+    status: finalPacketStatus,
     summary: `Text-to-speech ${playbackSummary}; backend receipt ${backend.receipt.receiptId}.`,
     observationRef,
     receipt,
+    voicePlaybackReceiptBarrier,
+    voicePlaybackClientReceipt,
     backendSelectionDecision: trace.backend_selection_decision,
-    missingRequirements: packetStatus === "succeeded" || packetStatus === "client_pending" ? [] : [{
-      code: playbackStatus,
-      message: backend.receipt.delivery?.message ?? `Text-to-speech playback ${playbackStatus}.`,
-      repair_action: playbackStatus === "blocked" ? "repair" : "fail_closed",
+    missingRequirements: finalPacketStatus === "succeeded" || finalPacketStatus === "client_pending" ? [] : [{
+      code: finalPlaybackStatus,
+      message: receipt.playback_error ?? backend.receipt.delivery?.message ?? `Text-to-speech playback ${finalPlaybackStatus}.`,
+      repair_action: finalPlaybackStatus === "blocked" ? "repair" : "fail_closed",
     }],
   });
   packet.state_delta = {
@@ -297,7 +476,7 @@ export const runTextToSpeechSpeakText = (input: {
 
   return {
     schema: HELIX_TEXT_TO_SPEECH_ONE_SHOT_RESULT_SCHEMA,
-    ok: playbackStatus === "pending" || playbackStatus === "played",
+    ok: finalPlaybackStatus === "pending" || finalPlaybackStatus === "played",
     lane_id: "text_to_speech",
     capability: CAPABILITY_ID,
     selected_runtime_agent_provider: input.provider.id,
@@ -306,13 +485,14 @@ export const runTextToSpeechSpeakText = (input: {
       observationRef,
       receiptRef: receipt.receipt_ref,
       status: "executed_observation_only",
-      blockedReason: playbackStatus === "pending" || playbackStatus === "played" ? null : playbackStatus,
+      blockedReason: finalPlaybackStatus === "pending" || finalPlaybackStatus === "played" ? null : finalPlaybackStatus,
     }),
     receipt,
     observation: receipt,
     observation_packet: packet,
     artifact_refs: packet.produced_artifact_refs,
-    ...(playbackStatus === "pending" || playbackStatus === "played" ? {} : { error: playbackStatus }),
+    voice_playback_receipt_barrier: voicePlaybackReceiptBarrier,
+    ...(finalPlaybackStatus === "pending" || finalPlaybackStatus === "played" ? {} : { error: finalPlaybackStatus }),
     reentry_required: true,
     terminal_eligible: false,
     assistant_answer: false,

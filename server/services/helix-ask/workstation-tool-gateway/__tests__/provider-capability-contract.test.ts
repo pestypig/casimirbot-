@@ -40,12 +40,26 @@ const mutatingControlBoundariesContractPath = path.join(
   "workstation-tool-contracts",
   "live_env.mutating_control_boundaries.md",
 );
+const workstationLoopControlsContractPath = path.join(
+  repoRoot,
+  "docs",
+  "helix-ask",
+  "workstation-tool-contracts",
+  "live_env.workstation_loop_controls.md",
+);
 const explicitSideEffectBoundariesContractPath = path.join(
   repoRoot,
   "docs",
   "helix-ask",
   "workstation-tool-contracts",
   "workstation.explicit_side_effect_boundaries.md",
+);
+const workstationNotesSideEffectActionsContractPath = path.join(
+  repoRoot,
+  "docs",
+  "helix-ask",
+  "workstation-tool-contracts",
+  "workstation-notes.side_effect_actions.md",
 );
 const clientReadAloudContractPath = path.join(
   repoRoot,
@@ -86,6 +100,7 @@ const readLiveEnvironmentToolNames = (): string[] => {
 const reviewedSharedProviderGatewayCapabilityIds = [
   "workspace_os.status",
   "workstation.active_context",
+  "workstation-notes.list_notes",
   "scientific-calculator.solve_expression",
   "scientific-calculator.solve_scalar_expression",
   "scientific-calculator.classify_expression",
@@ -111,6 +126,7 @@ const reviewedSharedProviderGatewayCapabilityIds = [
   "civilization-bounds.reflect_system_bounds",
   "theory-badge-graph.reflect_discussion_context",
   "theory-badge-graph.propose_frontier_conjectures",
+  "moral-graph.reflect_context",
   "moral-graph.reflect_living_substrate_context",
   "text_to_speech.speak_text",
   "live_env.request_interim_voice_callout",
@@ -153,6 +169,12 @@ const reviewedSharedProviderGatewayCapabilityIds = [
   "live_env.query_visual_observer_profiles",
   "live_env.test_visual_observer_profile",
   "live_env.compare_visual_observer_profiles",
+] as const;
+
+const reviewedSharedCapabilityLaneClassifications = [
+  "live_translation.translate_text|shared_capability_lane_now|read_observe|capability_lane",
+  "visual_analysis.inspect_frame|shared_capability_lane_now|read_observe|capability_lane",
+  "visual_analysis.inspect_image_region|shared_capability_lane_now|read_observe|capability_lane",
 ] as const;
 
 const reviewedNonSharedProviderCapabilityClassifications = [
@@ -314,7 +336,7 @@ describe("provider-agent capability contract catalog", () => {
 
   it("matches the reviewed non-shared provider capability classification snapshot", () => {
     const current = PROVIDER_AGENT_CAPABILITY_CLASSIFICATIONS
-      .filter((classification) => classification.availability !== "shared_gateway_now")
+      .filter((classification) => !["shared_gateway_now", "shared_capability_lane_now"].includes(classification.availability))
       .map((classification) => [
         classification.capability_id,
         classification.availability,
@@ -324,6 +346,31 @@ describe("provider-agent capability contract catalog", () => {
       .sort();
 
     expect(current).toEqual(reviewedNonSharedProviderCapabilityClassifications);
+  });
+
+  it("matches the reviewed shared capability-lane classification snapshot", () => {
+    const current = PROVIDER_AGENT_CAPABILITY_CLASSIFICATIONS
+      .filter((classification) => classification.availability === "shared_capability_lane_now")
+      .map((classification) => [
+        classification.capability_id,
+        classification.availability,
+        classification.permission_class,
+        classification.surface,
+      ].join("|"))
+      .sort();
+
+    expect(current).toEqual(reviewedSharedCapabilityLaneClassifications);
+    expect(classifyProviderAgentCapability("live_translation.translate_text")).toMatchObject({
+      capability_id: "live_translation.translate_text",
+      surface: "capability_lane",
+      availability: "shared_capability_lane_now",
+      permission_class: "read_observe",
+      provider_availability: {
+        helix_native: true,
+        codex_workstation: true,
+        future_provider: true,
+      },
+    });
   });
 
   it("keeps every shared provider gateway capability inside the non-terminal authority envelope", () => {
@@ -434,7 +481,7 @@ describe("provider-agent capability contract catalog", () => {
       helixNativeProcedureBoundariesContractPath,
     ].map((contractPath) => fs.readFileSync(contractPath, "utf8"));
     const missing = PROVIDER_AGENT_CAPABILITY_CLASSIFICATIONS
-      .filter((classification) => classification.surface !== "workstation_gateway")
+      .filter((classification) => !["workstation_gateway", "capability_lane"].includes(classification.surface))
       .map((classification) => classification.capability_id)
       .filter((capabilityId) => (
         !contractIndex.includes(`\`${capabilityId}\``) &&
@@ -493,6 +540,7 @@ describe("provider-agent capability contract catalog", () => {
   it("documents held-back mutating controls without exposing them through the provider gateway", () => {
     const contractIndex = fs.readFileSync(workstationToolContractReadmePath, "utf8");
     const mutatingControlContract = fs.readFileSync(mutatingControlBoundariesContractPath, "utf8");
+    const workstationLoopControlsContract = fs.readFileSync(workstationLoopControlsContractPath, "utf8");
     const gatewayIds = new Set(
       listWorkstationGatewayCapabilities({
         agentRuntime: "codex",
@@ -522,6 +570,13 @@ describe("provider-agent capability contract catalog", () => {
     for (const capabilityId of heldBackMutatingControls) {
       expect(contractIndex).toContain(`\`${capabilityId}\``);
       expect(mutatingControlContract).toContain(capabilityId);
+      if (
+        capabilityId === "live_env.pause_workstation_loop" ||
+        capabilityId === "live_env.resume_workstation_loop" ||
+        capabilityId === "live_env.set_workstation_loop_state"
+      ) {
+        expect(workstationLoopControlsContract).toContain(capabilityId);
+      }
       expect(gatewayIds.has(capabilityId)).toBe(false);
       expect(classifyProviderAgentCapability(capabilityId)).toMatchObject({
         availability: "blocked_pending_contract",
@@ -532,11 +587,15 @@ describe("provider-agent capability contract catalog", () => {
         },
       });
     }
+    expect(workstationLoopControlsContract).toContain("Do not pause the workstation loop");
+    expect(workstationLoopControlsContract).toContain("`live_env.pause_workstation_loop` appears in the logs");
+    expect(workstationLoopControlsContract).toContain("Query loop health, but don't change the loop state");
   });
 
   it("documents held-back explicit workstation side effects without exposing them through the provider gateway", () => {
     const contractIndex = fs.readFileSync(workstationToolContractReadmePath, "utf8");
     const explicitSideEffectContract = fs.readFileSync(explicitSideEffectBoundariesContractPath, "utf8");
+    const workstationNotesSideEffectContract = fs.readFileSync(workstationNotesSideEffectActionsContractPath, "utf8");
     const gatewayIds = new Set(
       listWorkstationGatewayCapabilities({
         agentRuntime: "codex",
@@ -555,6 +614,9 @@ describe("provider-agent capability contract catalog", () => {
     for (const capabilityId of heldBackExplicitSideEffects) {
       expect(contractIndex).toContain(`\`${capabilityId}\``);
       expect(explicitSideEffectContract).toContain(capabilityId);
+      if (capabilityId.startsWith("workstation-notes.")) {
+        expect(workstationNotesSideEffectContract).toContain(capabilityId);
+      }
       expect(gatewayIds.has(capabilityId)).toBe(false);
       expect(classifyProviderAgentCapability(capabilityId)).toMatchObject({
         availability: "blocked_pending_contract",
@@ -565,6 +627,10 @@ describe("provider-agent capability contract catalog", () => {
         },
       });
     }
+    expect(workstationNotesSideEffectContract).toContain("workstation-notes.create -> workstation-notes.create_note");
+    expect(workstationNotesSideEffectContract).toContain("Do not create a note");
+    expect(workstationNotesSideEffectContract).toContain("`workstation-notes.append_to_note` appears in this document");
+    expect(workstationNotesSideEffectContract).toContain("List my notes, but don't open or edit anything");
   });
 
   it("documents client read-aloud as client-only projection, not a provider voice tool", () => {
@@ -1287,6 +1353,18 @@ describe("provider-agent capability contract catalog", () => {
     for (const action of WORKSTATION_DYNAMIC_TOOL_ACTIONS) {
       const classification = classifyDynamicWorkstationActionForProviderGateway(action);
       expect(classification.capability_id).toBe(buildWorkstationToolName(action.panel_id, action.action_id));
+      if (classification.capability_id === "workstation-notes.list_notes") {
+        expect(classification).toMatchObject({
+          availability: "shared_gateway_now",
+          permission_class: "read_observe",
+          provider_availability: {
+            codex_workstation: true,
+          },
+          required_contract_before_gateway: [],
+        });
+        expect(gatewayIds.has(classification.capability_id)).toBe(true);
+        continue;
+      }
       expect(classification.provider_availability.codex_workstation).toBe(false);
       expect(gatewayIds.has(classification.capability_id)).toBe(false);
       expect(classification.required_contract_before_gateway.length).toBeGreaterThan(0);
@@ -1309,7 +1387,7 @@ describe("provider-agent capability contract catalog", () => {
     expect(missing).toEqual([]);
   });
 
-  it("documents dynamic panel action provider boundaries without indexing them as gateway tools", () => {
+  it("documents dynamic panel action provider boundaries without treating panel visibility as gateway access", () => {
     const contractIndex = fs.readFileSync(workstationToolContractReadmePath, "utf8");
     const dynamicPanelContract = fs.readFileSync(dynamicPanelActionBoundariesContractPath, "utf8");
     const gatewayIds = new Set(
@@ -1322,11 +1400,16 @@ describe("provider-agent capability contract catalog", () => {
     expect(contractIndex).toContain("`workstation.dynamic_panel_actions`");
     expect(dynamicPanelContract).toContain("surface=dynamic_panel");
     expect(dynamicPanelContract).toContain("legacy_dynamic_panel_only");
+    expect(dynamicPanelContract).toContain("workstation-notes.list_notes");
     expect(dynamicPanelContract).toContain("requires_confirmation_contract");
     expect(dynamicPanelContract).toContain("blocked_pending_contract");
 
     for (const action of [...WORKSTATION_DYNAMIC_TOOL_ACTIONS, ...RETIRED_WORKSTATION_DYNAMIC_TOOL_ACTIONS]) {
       const capabilityId = buildWorkstationToolName(action.panel_id, action.action_id);
+      if (capabilityId === "workstation-notes.list_notes") {
+        expect(gatewayIds.has(capabilityId)).toBe(true);
+        continue;
+      }
       expect(gatewayIds.has(capabilityId)).toBe(false);
     }
   });
@@ -1394,7 +1477,7 @@ describe("provider-agent capability contract catalog", () => {
     for (const classification of PROVIDER_AGENT_CAPABILITY_CLASSIFICATIONS) {
       expect(ids.has(classification.capability_id)).toBe(false);
       ids.add(classification.capability_id);
-      if (classification.availability === "shared_gateway_now") {
+      if (["shared_gateway_now", "shared_capability_lane_now"].includes(classification.availability)) {
         expect(classification.provider_availability.codex_workstation).toBe(true);
         expect(classification.required_contract_before_gateway).toEqual([]);
         if (classification.surface === "explicit_contract") {

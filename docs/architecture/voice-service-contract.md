@@ -65,6 +65,12 @@ Interim voice callout controls:
 - Interim callout requests and receipts are tool evidence only: `assistant_answer:false`, `terminal_eligible:false`, `raw_content_included:false`, and `instruction_authority:"none"`.
 - The callout is admitted through the runtime `voice_tts` task class. If admitted, the backend receipt records `awaiting_client_playback` with `playbackStatus:"awaiting_client_receipt"`; this is a browser playback handoff, not proof that audio bytes played.
 - If the voice TTS lane is occupied or under pressure, the receipt records `queued_for_retry` and keeps a short-lived delivery job containing only text, request metadata, evidence refs, retry count, and expiry.
+- The provider-facing `text_to_speech.speak_text` capability lane may use a
+  lightweight browser playback handoff when server-side TTS admission is blocked
+  by heap/RSS pressure. This handoff records `awaiting_client_playback` plus the
+  pressure reason and still requires a later client playback outcome receipt
+  before the agent may claim audio was delivered. Other interim callouts continue
+  to use `queued_for_retry` under pressure.
 - Retry jobs do not hold audio buffers or open HTTP requests. When capacity recovers, the retry produces `awaiting_client_playback` with an `utteranceId`; if capacity does not recover before expiry, the receipt records `expired`.
 - Actual heard-audio confirmation must come from the client playback receipt stream, for example `helix.voice_playback_outcome_receipt.v1` with a delivered outcome. A backend interim callout receipt alone must not be narrated as completed playback.
 - Interim callouts must not contain final-answer text and must not satisfy terminal answer gates. The completed Ask solver path remains the only answer route, and final answer reads must derive from a completed answer snapshot rather than an interim callout.

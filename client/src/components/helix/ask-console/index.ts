@@ -1,6 +1,17 @@
 export { HelixAskConsole } from "./HelixAskConsole";
 export { HelixAskConsoleRuntimeShell } from "./HelixAskConsoleRuntimeShell";
 export { HelixAskLegacyConsoleView } from "./HelixAskLegacyConsoleView";
+export { buildHelixAskLegacyConsoleRootState } from "./HelixAskLegacyConsoleRootState";
+export type {
+  HelixAskLegacyConsoleRootState,
+  HelixAskLegacyConsoleRootStateOptions,
+} from "./HelixAskLegacyConsoleRootState";
+export { buildHelixAskLegacyConsoleViewState } from "./HelixAskLegacyConsoleViewState";
+export { HelixAskLegacyComposerSurface } from "./HelixAskLegacyComposerSurface";
+export { buildHelixAskLegacyComposerState } from "./HelixAskLegacyComposerState";
+export type { HelixAskLegacyComposerStateOptions } from "./HelixAskLegacyComposerState";
+export { HelixAskLegacySurfaceContent } from "./HelixAskLegacySurfaceContent";
+export { buildHelixAskLegacySurfaceContentState } from "./HelixAskLegacySurfaceContentState";
 export { HelixAskMinimalRuntimeShell } from "./HelixAskMinimalRuntimeShell";
 export {
   buildHelixAskMinimalRuntimeTurnViews,
@@ -24,12 +35,20 @@ export {
   buildHelixAskConsoleRuntimeBridgeProps,
 } from "./HelixAskConsoleRuntimeShellProps";
 export { HelixAskComposer } from "./HelixAskComposer";
+export { HelixAskComposerTextareaSurface } from "./HelixAskComposerTextareaSurface";
+export { buildHelixAskComposerTextareaState } from "./HelixAskComposerTextareaState";
 export { HelixAskErrorBoundary } from "./HelixAskErrorBoundary";
 export {
   HELIX_ASK_CONSOLE_MAX_PROMPT_LINES,
   buildHelixAskComposerPlaceholder,
   buildHelixAskComposerViewModel,
 } from "./HelixAskComposer";
+export {
+  HELIX_ASK_IMAGE_ATTACHMENT_MAX_BYTES,
+  buildHelixAskImageAttachmentFromFile,
+  buildHelixAskImageAttachmentsFromFiles,
+  selectHelixAskClipboardImageFiles,
+} from "./HelixAskImageAttachment";
 export { buildHelixAskSubmitAdmission } from "./HelixAskSubmitAdmission";
 export {
   buildHelixAskChatProjectionId,
@@ -84,13 +103,75 @@ export {
 } from "./HelixAskContextCompactionResumeFrameStorage";
 export { HelixAskRuntimePicker } from "./HelixAskRuntimePicker";
 export { buildHelixAskRuntimePickerModel } from "./HelixAskRuntimePicker";
+export {
+  buildHelixAskSituationRoomSourceDerivedState,
+  buildHelixAskSituationRoomSourceState,
+} from "./HelixAskSituationRoomSourceState";
+export { buildHelixAskContextCapsuleState } from "./HelixAskContextCapsuleState";
+export { buildHelixAskActiveContextCapsuleDerivedState } from "./HelixAskContextCapsuleState";
+export type {
+  HelixAskActiveContextCapsuleDerivedState,
+  HelixAskActiveContextCapsuleDerivedStateOptions,
+  HelixAskContextCapsuleState,
+  HelixAskContextCapsuleStateOptions,
+} from "./HelixAskContextCapsuleState";
+export {
+  buildHelixAskTranscriptConfirmationState,
+  buildHelixAskVoiceCommandConfirmationState,
+} from "./HelixAskVoiceConfirmationState";
+export { buildHelixAskVoiceCaptureHealthState } from "./HelixAskVoiceCaptureHealthState";
+export type {
+  HelixAskVoiceCaptureHealthSnapshot,
+  HelixAskVoiceCaptureHealthStateOptions,
+} from "./HelixAskVoiceCaptureHealthState";
+export { buildHelixAskVoiceCaptureDiagnosticsBaseState } from "./HelixAskVoiceCaptureDiagnosticsState";
+export type {
+  HelixAskVoiceCaptureDiagnosticsBaseState,
+  HelixAskVoiceCaptureDiagnosticsBaseStateOptions,
+  HelixAskVoiceCaptureDiagnosticsCheckpointInput,
+  HelixAskVoiceCaptureDiagnosticsPendingConfirmationInput,
+  HelixAskVoiceCaptureDiagnosticsSegmentInput,
+} from "./HelixAskVoiceCaptureDiagnosticsState";
+export {
+  applyHelixAskVoiceTimelineVersionError,
+  applyHelixAskVoiceTimelineVersionPayload,
+  buildHelixAskVoiceTimelineBuildInfoEvent,
+  buildHelixAskVoiceTimelineInitialBuildInfo,
+} from "./HelixAskVoiceTimelineBuildInfo";
+export type {
+  HelixAskVoiceTimelineBuildInfo,
+  HelixAskVoiceTimelineBuildInfoEventOptions,
+} from "./HelixAskVoiceTimelineBuildInfo";
+export {
+  buildHelixAskVoiceStatusDerivedState,
+  buildHelixAskVoiceStatusState,
+} from "./HelixAskVoiceStatusState";
+export { buildHelixAskVoiceFeatureFlagsState } from "./HelixAskVoiceFeatureFlagsState";
+export type {
+  HelixAskVoiceStatusDerivedStateOptions,
+  HelixAskVoiceStatusState,
+  HelixAskVoiceStatusStateOptions,
+} from "./HelixAskVoiceStatusState";
+export type { HelixAskVoiceFeatureFlagsStateOptions } from "./HelixAskVoiceFeatureFlagsState";
 export { HelixAskBusyReasoningPanel } from "./HelixAskBusyReasoningPanel";
 export { HelixAskMoodAvatar } from "./HelixAskMoodAvatar";
+export { HelixAskMoodAvatarSurface } from "./HelixAskMoodAvatarSurface";
+export { buildHelixAskMoodAvatarState } from "./HelixAskMoodAvatarState";
 export { HelixAskActionToolbar } from "./HelixAskActionToolbar";
 export { HelixAskComposerActionToolbarSurface } from "./HelixAskComposerActionToolbarSurface";
+export { buildHelixAskComposerActionToolbarState } from "./HelixAskComposerActionToolbarState";
 export { HelixAskGoalPill } from "./HelixAskGoalPill";
 export { HelixAskGoalPillSurface } from "./HelixAskGoalPillSurface";
+export { buildHelixAskAttachmentStripState } from "./HelixAskAttachmentStripState";
+export type {
+  HelixAskAttachmentStripState,
+  HelixAskAttachmentStripStateOptions,
+} from "./HelixAskAttachmentStripState";
+export { buildHelixAskGoalPillState } from "./HelixAskGoalPillState";
+export type { HelixAskGoalPillStateOptions } from "./HelixAskGoalPillState";
 export { HelixAskProceduralTimeline } from "./HelixAskProceduralTimeline";
+export { HelixAskLegacyProceduralTimelineSlot } from "./HelixAskLegacyProceduralTimelineSlot";
+export { renderHelixAskLegacyProceduralTimeline } from "./HelixAskLegacyProceduralTimelineProjection";
 export { HelixAskConsoleStack } from "./HelixAskConsoleStack";
 export { HelixAskConsoleRuntimeLayout } from "./HelixAskConsoleRuntimeLayout";
 export { HelixAskReasoningAnimationStyles } from "./HelixAskReasoningAnimationStyles";
@@ -99,11 +180,40 @@ export { HelixAskReasoningMeterSurface } from "./HelixAskReasoningMeterSurface";
 export { HelixAskReasoningMirekField } from "./HelixAskReasoningMirekField";
 export { HelixAskReasoningStatusMedalStrip } from "./HelixAskReasoningStatusMedalStrip";
 export { HelixAskReasoningTheaterSurface } from "./HelixAskReasoningTheaterSurface";
+export { buildHelixAskReasoningTheaterState } from "./HelixAskReasoningTheaterState";
+export { buildHelixAskReasoningTheaterMeterState } from "./HelixAskReasoningTheaterMeterState";
+export { buildHelixAskReasoningTheaterStatusState } from "./HelixAskReasoningTheaterStatusState";
+export type { HelixAskReasoningTheaterStateOptions } from "./HelixAskReasoningTheaterState";
+export type { HelixAskReasoningTheaterMeterStateOptions } from "./HelixAskReasoningTheaterMeterState";
+export type { HelixAskReasoningTheaterStatusStateOptions } from "./HelixAskReasoningTheaterStatusState";
 export { HelixAskSurfaceComposerPanel } from "./HelixAskSurfaceComposerPanel";
 export { HelixAskSurfaceFrame } from "./HelixAskSurfaceFrame";
+export { HelixAskSurfaceFrameSurface } from "./HelixAskSurfaceFrameSurface";
+export { buildHelixAskSurfaceFrameState } from "./HelixAskSurfaceFrameState";
+export type { HelixAskSurfaceFrameStateOptions } from "./HelixAskSurfaceFrameState";
 export { HelixAskSurfaceSupplementStack } from "./HelixAskSurfaceSupplementStack";
+export { buildHelixAskSupplementClipTextState } from "./HelixAskSupplementClipTextState";
+export type {
+  HelixAskSupplementClipTextState,
+  HelixAskSupplementClipTextStateOptions,
+} from "./HelixAskSupplementClipTextState";
 export { HelixAskConsoleSupplementSurface } from "./HelixAskConsoleSupplementSurface";
+export { buildHelixAskConsoleSupplementState } from "./HelixAskConsoleSupplementState";
+export type { HelixAskConsoleSupplementStateOptions } from "./HelixAskConsoleSupplementState";
+export { buildHelixAskContextMemoryStatusState } from "./HelixAskContextMemoryStatusState";
+export type {
+  HelixAskContextMemoryStatusState,
+  HelixAskContextMemoryStatusStateOptions,
+} from "./HelixAskContextMemoryStatusState";
+export { buildHelixAskContextChooserState } from "./HelixAskContextChooserState";
+export type { HelixAskContextChooserStateOptions } from "./HelixAskContextChooserState";
+export { buildHelixAskObserverSupplementState } from "./HelixAskObserverSupplementState";
+export type {
+  HelixAskObserverSupplementState,
+  HelixAskObserverSupplementStateOptions,
+} from "./HelixAskObserverSupplementState";
 export { HelixAskTurnList } from "./HelixAskTurnList";
+export { HelixAskTurnListSurface } from "./HelixAskTurnListSurface";
 export { buildHelixAskConsoleAssemblyDebugSnapshot } from "./HelixAskConsoleDiagnostics";
 export type { HelixAskConsoleAssemblyDebugSnapshot } from "./HelixAskConsoleDiagnostics";
 export {
@@ -118,18 +228,75 @@ export {
   createHelixAskLiveTurnDisplayState,
 } from "./HelixAskLiveTurnDisplayStore";
 export type { HelixAskLiveTurnDisplayState } from "./HelixAskLiveTurnDisplayStore";
+export { buildHelixAskActiveTurnListState } from "./HelixAskActiveTurnListState";
+export type { HelixAskActiveTurnListStateOptions } from "./HelixAskActiveTurnListState";
 export { HelixAskReplyCard } from "./HelixAskReplyCard";
 export { HelixAskReplyTurn } from "./HelixAskReplyTurn";
+export { HelixAskCompletedReplyTurnSurface } from "./HelixAskCompletedReplyTurnSurface";
+export { HelixAskLegacyAnswerEnvelopeSlot } from "./HelixAskLegacyAnswerEnvelopeSlot";
+export { HelixAskLegacyCompletedReplySlot } from "./HelixAskLegacyCompletedReplySlot";
+export { buildHelixAskLegacyCompletedReplyState } from "./HelixAskLegacyCompletedReplyState";
+export { buildHelixAskCompletedReplyBattleState } from "./HelixAskCompletedReplyBattleState";
+export { buildHelixAskCompletedReplyCardState } from "./HelixAskCompletedReplyCardState";
+export { buildHelixAskCompletedReplyStreamState } from "./HelixAskCompletedReplyStreamState";
+export { buildHelixAskReplyTurnState } from "./HelixAskReplyTurnState";
+export { HelixAskReplyTurnItemSurface } from "./HelixAskReplyTurnItemSurface";
+export { HelixAskReplyTurnSurface } from "./HelixAskReplyTurnSurface";
 export { HelixAskActiveTurnReply } from "./HelixAskActiveTurnReply";
+export { HelixAskActiveTurnReplySurface } from "./HelixAskActiveTurnReplySurface";
 export {
   hasHelixAskLegacyTerminalMismatch,
   resolveHelixAskLegacyFinalSourceLabel,
   selectHelixAskLegacyFinalAnswerText,
 } from "./HelixAskLegacyFinalTextSelection";
 export { resolveHelixAskLegacyReplyFailContext } from "./HelixAskLegacyReplyDebugContext";
+export {
+  buildHelixAskRuntimeGoalDebugFields,
+  mergeHelixAskRuntimeGoalDebugFields,
+} from "./HelixAskRuntimeGoalDebugContext";
+export type {
+  HelixAskRuntimeGoalDebugFields,
+} from "./HelixAskRuntimeGoalDebugContext";
+export {
+  buildHelixAskRuntimeGoalWakePostDecision,
+  buildHelixAskRuntimeGoalVisibleSurfaceWakeCandidate,
+  buildHelixAskRuntimeGoalVisibleSurfaceWakePostDecision,
+  buildHelixAskRuntimeGoalVisibleSourceWakeCandidate,
+  buildHelixAskRuntimeGoalWakeReply,
+  selectHelixAskActiveRuntimeGoalFromReplies,
+} from "./HelixAskRuntimeGoalWakeEmitter";
+export type {
+  HelixAskRuntimeGoalWakeActiveGoal,
+  HelixAskRuntimeGoalWakePostDecision,
+} from "./HelixAskRuntimeGoalWakeEmitter";
+export { useHelixAskRuntimeGoalWakeSubscriptions } from "./HelixAskRuntimeGoalWakeSubscriptions";
 export { sortHelixAskLegacyReplyEventsChronologically } from "./HelixAskLegacyReplyEventOrder";
 export { HelixAskTurnStreamPanel } from "./HelixAskTurnStreamPanel";
+export { HelixAskCalculatorPanelLaunchSurface } from "./HelixAskCalculatorPanelLaunchSurface";
+export type { HelixAskCalculatorPanelLaunchSurfaceProps } from "./HelixAskCalculatorPanelLaunchSurface";
+export { HelixAskEnvelopeAnswerSurface } from "./HelixAskEnvelopeAnswerSurface";
+export type { HelixAskEnvelopeAnswerSurfaceProps } from "./HelixAskEnvelopeAnswerSurface";
+export { HelixAskEnvelopeSectionsSurface } from "./HelixAskEnvelopeSectionsSurface";
+export type { HelixAskEnvelopeSectionsSurfaceProps } from "./HelixAskEnvelopeSectionsSurface";
+export { HelixAskEnvelopeSupplementSurface } from "./HelixAskEnvelopeSupplementSurface";
+export type { HelixAskEnvelopeSupplementSurfaceProps } from "./HelixAskEnvelopeSupplementSurface";
 export { HelixAskFinalAnswer } from "./HelixAskFinalAnswer";
+export { HelixAskFinalAnswerSurface } from "./HelixAskFinalAnswerSurface";
+export { HelixAskInlineCodeSurface } from "./HelixAskInlineCodeSurface";
+export type { HelixAskInlineCodeSurfaceProps } from "./HelixAskInlineCodeSurface";
+export { HelixAskMathHtmlSurface } from "./HelixAskMathHtmlSurface";
+export type { HelixAskMathHtmlSurfaceProps } from "./HelixAskMathHtmlSurface";
+export { useHelixAskLegacyContentRenderers } from "./HelixAskLegacyContentRenderers";
+export type {
+  HelixAskLegacyContentRenderers,
+  HelixAskLegacyContentRenderersOptions,
+} from "./HelixAskLegacyContentRenderers";
+export { HelixAskPathLinkedTextSurface } from "./HelixAskPathLinkedTextSurface";
+export type { HelixAskPathLinkedTextSurfaceProps } from "./HelixAskPathLinkedTextSurface";
+export { HelixAskPlainAnswerSurface } from "./HelixAskPlainAnswerSurface";
+export type { HelixAskPlainAnswerSurfaceProps } from "./HelixAskPlainAnswerSurface";
+export { HelixAskRenderedContentSurface } from "./HelixAskRenderedContentSurface";
+export type { HelixAskRenderedContentSurfaceProps } from "./HelixAskRenderedContentSurface";
 export { buildHelixAskFinalAnswerBlocks } from "./HelixAskFinalAnswer";
 export {
   HelixAskLiveBridgePillStrip,
@@ -191,7 +358,10 @@ export {
   HelixAskConsoleVoiceStatusSurface,
 } from "./HelixAskConsoleStatusSurfaces";
 export { HelixAskConsoleErrorLineSurface } from "./HelixAskConsoleErrorLineSurface";
+export { buildHelixAskConsoleErrorLineState } from "./HelixAskConsoleErrorLineState";
 export { HelixAskVoiceLevelMonitor } from "./HelixAskVoiceLevelMonitor";
+export { HelixAskVoiceLevelMonitorSurface } from "./HelixAskVoiceLevelMonitorSurface";
+export { buildHelixAskVoiceLevelMonitorState } from "./HelixAskVoiceLevelMonitorState";
 export {
   HelixAskContextChooserPanel,
   HelixAskConversationBriefPanel,
@@ -335,6 +505,13 @@ export type {
   HelixAskConsoleRuntimeShellProps,
 } from "./HelixAskConsoleRuntimeShell";
 export type { HelixAskLegacyConsoleViewProps } from "./HelixAskLegacyConsoleView";
+export type {
+  HelixAskLegacyConsoleViewState,
+  HelixAskLegacyConsoleViewStateOptions,
+} from "./HelixAskLegacyConsoleViewState";
+export type { HelixAskLegacyComposerSurfaceProps } from "./HelixAskLegacyComposerSurface";
+export type { HelixAskLegacySurfaceContentProps } from "./HelixAskLegacySurfaceContent";
+export type { HelixAskLegacySurfaceContentStateOptions } from "./HelixAskLegacySurfaceContentState";
 export type { HelixAskConsoleRequestEnvelope } from "./HelixAskRequestEnvelope";
 export type { HelixAskMinimalRuntimeSubmitPlan } from "./HelixAskMinimalRuntimeSubmitPlan";
 export type { HelixAskMinimalRuntimeShellProps } from "./HelixAskMinimalRuntimeShell";
@@ -363,6 +540,7 @@ export type {
 } from "./HelixAskMinimalRuntimeTransport";
 export type { HelixAskMinimalRuntimeBackendRunnerDeps } from "./HelixAskMinimalRuntimeBackendRunner";
 export type { HelixAskFinalAnswerBlock, HelixAskFinalAnswerProps } from "./HelixAskFinalAnswer";
+export type { HelixAskFinalAnswerSurfaceProps } from "./HelixAskFinalAnswerSurface";
 export type {
   HelixAskLiveBridgePill,
   HelixAskLiveBridgePillStripProps,
@@ -374,9 +552,11 @@ export type {
 export type { HelixAskActiveTurnStreamPanelProps } from "./HelixAskActiveTurnStreamPanel";
 export type {
   HelixAskComposerSubmitMode,
+  HelixAskComposerTextareaProps,
   HelixAskComposerViewModel,
   HelixAskComposerProps,
 } from "./HelixAskComposer";
+export type { HelixAskComposerTextareaSurfaceProps } from "./HelixAskComposerTextareaSurface";
 export type {
   HelixAskSubmitAdmissionDecision,
   HelixAskSubmitAdmissionInput,
@@ -409,8 +589,17 @@ export type {
   HelixAskRuntimePickerModel,
   HelixAskRuntimePickerProps,
 } from "./HelixAskRuntimePicker";
+export type {
+  HelixAskSituationRoomSourceDerivedStateOptions,
+  HelixAskSituationRoomSourceStateOptions,
+} from "./HelixAskSituationRoomSourceState";
+export type {
+  HelixAskTranscriptConfirmationStateOptions,
+  HelixAskVoiceCommandConfirmationStateOptions,
+} from "./HelixAskVoiceConfirmationState";
 export type { HelixAskBusyReasoningPanelProps } from "./HelixAskBusyReasoningPanel";
 export type { HelixAskMoodAvatarProps } from "./HelixAskMoodAvatar";
+export type { HelixAskMoodAvatarSurfaceProps } from "./HelixAskMoodAvatarSurface";
 export type { HelixAskActionToolbarProps } from "./HelixAskActionToolbar";
 export type { HelixAskComposerActionToolbarSurfaceProps } from "./HelixAskComposerActionToolbarSurface";
 export type {
@@ -422,6 +611,7 @@ export type {
   HelixAskProceduralTimelineProps,
   HelixAskProceduralTimelineRow,
 } from "./HelixAskProceduralTimeline";
+export type { HelixAskLegacyProceduralTimelineSlotProps } from "./HelixAskLegacyProceduralTimelineSlot";
 export type { HelixAskConsoleStackProps } from "./HelixAskConsoleStack";
 export type { HelixAskConsoleRuntimeLayoutProps } from "./HelixAskConsoleRuntimeLayout";
 export type { HelixAskReasoningBattleStageProps } from "./HelixAskReasoningBattleStage";
@@ -435,8 +625,10 @@ export type {
 export type { HelixAskReasoningTheaterSurfaceProps } from "./HelixAskReasoningTheaterSurface";
 export type { HelixAskSurfaceComposerPanelProps } from "./HelixAskSurfaceComposerPanel";
 export type { HelixAskSurfaceFrameProps } from "./HelixAskSurfaceFrame";
+export type { HelixAskSurfaceFrameSurfaceProps } from "./HelixAskSurfaceFrameSurface";
 export type { HelixAskSurfaceSupplementStackProps } from "./HelixAskSurfaceSupplementStack";
 export type { HelixAskConsoleSupplementSurfaceProps } from "./HelixAskConsoleSupplementSurface";
+export type { HelixAskTurnListSurfaceProps } from "./HelixAskTurnListSurface";
 export type {
   HelixAskLatestTurnControlTarget,
   HelixAskLatestTurnBinding,
@@ -456,7 +648,15 @@ export type {
   HelixAskLegacyReplyEventTimestampResolver,
 } from "./HelixAskLegacyReplyEventOrder";
 export type { HelixAskReplyTurnProps } from "./HelixAskReplyTurn";
+export type { HelixAskCompletedReplyTurnSurfaceProps } from "./HelixAskCompletedReplyTurnSurface";
+export type { HelixAskLegacyAnswerEnvelopeSlotProps } from "./HelixAskLegacyAnswerEnvelopeSlot";
+export type { HelixAskLegacyCompletedReplySlotProps } from "./HelixAskLegacyCompletedReplySlot";
+export type { HelixAskLegacyCompletedReplyStateOptions } from "./HelixAskLegacyCompletedReplyState";
+export type { HelixAskReplyTurnStateOptions } from "./HelixAskReplyTurnState";
+export type { HelixAskReplyTurnItemSurfaceProps } from "./HelixAskReplyTurnItemSurface";
+export type { HelixAskReplyTurnSurfaceProps } from "./HelixAskReplyTurnSurface";
 export type { HelixAskActiveTurnReplyProps } from "./HelixAskActiveTurnReply";
+export type { HelixAskActiveTurnReplySurfaceProps } from "./HelixAskActiveTurnReplySurface";
 export type {
   HelixAskTurnStreamAnswerTint,
   HelixAskTurnStreamPanelProps,
@@ -487,10 +687,16 @@ export type {
   HelixAskConsoleVoiceStatusSurfaceProps,
 } from "./HelixAskConsoleStatusSurfaces";
 export type { HelixAskConsoleErrorLineSurfaceProps } from "./HelixAskConsoleErrorLineSurface";
+export type { HelixAskConsoleErrorLineStateOptions } from "./HelixAskConsoleErrorLineState";
 export type {
   HelixAskVoiceLevelMonitorProps,
   HelixAskVoiceSignalState,
 } from "./HelixAskVoiceLevelMonitor";
+export type { HelixAskVoiceLevelMonitorSurfaceProps } from "./HelixAskVoiceLevelMonitorSurface";
+export type {
+  HelixAskVoiceLevelMonitorState,
+  HelixAskVoiceLevelMonitorStateOptions,
+} from "./HelixAskVoiceLevelMonitorState";
 export type {
   HelixAskContextChooserPanelProps,
   HelixAskConversationBriefPanelProps,

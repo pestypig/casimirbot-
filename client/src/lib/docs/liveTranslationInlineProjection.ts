@@ -54,6 +54,7 @@ export type DocumentLiveTranslationInlineState = {
   freshnessStatus: string;
   terminalAuthorityStatus: HelixLiveTranslationInlineUnitState["terminalAuthorityStatus"];
   sourceId: string | null;
+  bbox?: Record<string, unknown> | null;
   sourceHash?: string | null;
   sourceKind: string | null;
   sourceTextHash?: string | null;
@@ -106,6 +107,7 @@ export type DocumentInlineTranslationRenderState = {
   freshnessStatus?: string;
   terminalAuthorityStatus?: HelixLiveTranslationInlineUnitState["terminalAuthorityStatus"];
   sourceId?: string | null;
+  bbox?: Record<string, unknown> | null;
   sourceHash?: string | null;
   sourceKind?: string | null;
   sourceTextHash?: string | null;
@@ -148,6 +150,7 @@ export type DocumentInlineTranslationRenderState = {
   suppressedFreshnessStatus?: string | null;
   suppressedTerminalAuthorityStatus?: HelixLiveTranslationInlineUnitState["terminalAuthorityStatus"] | null;
   suppressedSourceId?: string | null;
+  suppressedBbox?: Record<string, unknown> | null;
   suppressedSourceHash?: string | null;
   suppressedSourceKind?: string | null;
   suppressedSourceTextHash?: string | null;
@@ -168,6 +171,7 @@ export type BuildDocumentLiveTranslationInlineStatesInput = {
   payload: unknown;
   docPath: string;
   locale: string;
+  targetLanguage?: string | null;
   sourceHash?: string | null;
   sourceIdentityKey?: string | null;
   sourceTextHash?: string | null;
@@ -199,6 +203,15 @@ export function filterReadyDocumentInlineTranslationRenderStates(
   );
 }
 
+function serializeDocumentInlineTranslationBbox(value: Record<string, unknown> | null | undefined): string | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return null;
+  }
+}
+
 export function buildDocumentInlineTranslationDataAttributes(
   state: DocumentInlineTranslationRenderState,
 ): Record<string, string> {
@@ -226,6 +239,7 @@ export function buildDocumentInlineTranslationDataAttributes(
       ["data-doc-translation-projection-key", projectionKey],
       ["data-doc-translation-server-projection-key", state.serverProjectionKey],
       ["data-doc-translation-authority-policy", "projection_only_not_answer_authority"],
+      ["data-doc-translation-terminal-authority-owner", "helix"],
       ["data-doc-translation-render-status", state.status],
       ["data-doc-translation-display-status", displayStatus],
       ["data-doc-translation-display-status-reason", displayStatusReason],
@@ -271,6 +285,7 @@ export function buildDocumentInlineTranslationDataAttributes(
       ["data-doc-translation-answer-authority", state.answerAuthority === false ? "false" : null],
       ["data-doc-translation-reentry-required", reentryRequired],
       ["data-doc-translation-source-id", state.sourceId],
+      ["data-doc-translation-bbox", serializeDocumentInlineTranslationBbox(state.bbox)],
       ["data-doc-translation-source-hash", state.sourceHash],
       ["data-doc-translation-source-kind", normalizeDocumentInlineTranslationSourceKind(state.sourceKind)],
       ["data-doc-translation-source-text-hash", state.sourceTextHash],
@@ -335,6 +350,7 @@ export function buildDocumentInlineTranslationDataAttributes(
       ["data-doc-translation-suppressed-assistant-answer", suppressedReentryRequired ? "false" : null],
       ["data-doc-translation-suppressed-raw-content-included", suppressedReentryRequired ? "false" : null],
       ["data-doc-translation-suppressed-source-id", state.suppressedSourceId],
+      ["data-doc-translation-suppressed-bbox", serializeDocumentInlineTranslationBbox(state.suppressedBbox)],
       ["data-doc-translation-suppressed-source-hash", state.suppressedSourceHash],
       ["data-doc-translation-suppressed-source-kind", normalizeDocumentInlineTranslationSourceKind(state.suppressedSourceKind)],
       ["data-doc-translation-suppressed-source-text-hash", state.suppressedSourceTextHash],
@@ -634,6 +650,7 @@ export function sameDocumentInlineTranslationRenderState(
     (left.terminalAuthorityStatus ?? "") === (right.terminalAuthorityStatus ?? "") &&
     (left.contextRole ?? "") === (right.contextRole ?? "") &&
     (left.sourceId ?? "") === (right.sourceId ?? "") &&
+    serializeDocumentInlineTranslationBbox(left.bbox) === serializeDocumentInlineTranslationBbox(right.bbox) &&
     (left.sourceHash ?? "") === (right.sourceHash ?? "") &&
     (left.sourceKind ?? "") === (right.sourceKind ?? "") &&
     (left.sourceTextHash ?? "") === (right.sourceTextHash ?? "") &&
@@ -676,6 +693,8 @@ export function sameDocumentInlineTranslationRenderState(
     (left.suppressedTerminalAuthorityStatus ?? "") === (right.suppressedTerminalAuthorityStatus ?? "") &&
     (left.suppressedContextRole ?? "") === (right.suppressedContextRole ?? "") &&
     (left.suppressedSourceId ?? "") === (right.suppressedSourceId ?? "") &&
+    serializeDocumentInlineTranslationBbox(left.suppressedBbox) ===
+      serializeDocumentInlineTranslationBbox(right.suppressedBbox) &&
     (left.suppressedSourceHash ?? "") === (right.suppressedSourceHash ?? "") &&
     (left.suppressedSourceKind ?? "") === (right.suppressedSourceKind ?? "") &&
     (left.suppressedSourceTextHash ?? "") === (right.suppressedSourceTextHash ?? "") &&
@@ -859,6 +878,7 @@ function attachSuppressedProjectionReceipt(
     suppressedTerminalAuthorityStatus: laneState.terminalAuthorityStatus ?? null,
     suppressedContextRole: laneState.contextRole ?? "tool_evidence",
     suppressedSourceId: laneState.sourceId ?? null,
+    ...(laneState.bbox ? { suppressedBbox: laneState.bbox } : {}),
     suppressedSourceHash: laneState.sourceHash ?? null,
     suppressedSourceKind: laneState.sourceKind ?? null,
     ...(laneState.sourceTextHash ? { suppressedSourceTextHash: laneState.sourceTextHash } : {}),
@@ -890,7 +910,7 @@ export function buildDocumentLiveTranslationInlineStates(
     sourceTextHash: input.sourceTextHash,
     sourceTextCharCount: input.sourceTextCharCount,
     projectionTarget,
-    targetLanguage: input.locale,
+    targetLanguage: input.targetLanguage ?? input.locale,
     units: input.units,
     allowStaleDisplayText: input.allowStaleDisplayText,
   });
@@ -941,6 +961,7 @@ export function buildDocumentLiveTranslationInlineStates(
         freshnessStatus: state.freshnessStatus,
         terminalAuthorityStatus: state.terminalAuthorityStatus,
         sourceId: state.sourceId,
+        ...(state.bbox ? { bbox: state.bbox } : {}),
         ...(state.sourceHash ? { sourceHash: state.sourceHash } : {}),
         sourceKind: state.sourceKind,
         ...(state.sourceTextHash ? { sourceTextHash: state.sourceTextHash } : {}),
@@ -1010,6 +1031,7 @@ export function simplifyDocumentLiveTranslationInlineStates(
           freshnessStatus: state.freshnessStatus,
           terminalAuthorityStatus: state.terminalAuthorityStatus,
           sourceId: state.sourceId,
+          ...(state.bbox ? { bbox: state.bbox } : {}),
           ...(state.sourceHash ? { sourceHash: state.sourceHash } : {}),
           sourceKind: state.sourceKind,
           ...(state.sourceTextHash ? { sourceTextHash: state.sourceTextHash } : {}),
@@ -1068,6 +1090,7 @@ export function simplifyDocumentLiveTranslationInlineStates(
           freshnessStatus: state.freshnessStatus,
           terminalAuthorityStatus: state.terminalAuthorityStatus,
           sourceId: state.sourceId,
+          ...(state.bbox ? { bbox: state.bbox } : {}),
           ...(state.sourceHash ? { sourceHash: state.sourceHash } : {}),
           sourceKind: state.sourceKind,
           ...(state.sourceTextHash ? { sourceTextHash: state.sourceTextHash } : {}),

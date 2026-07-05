@@ -113,6 +113,7 @@ export type HelixCapabilityLaneProviderTimelineEvent = {
   evidence_refs?: string[];
   has_observation: boolean;
   source_id?: string | null;
+  doc_path?: string | null;
   source_hash?: string | null;
   source_kind?: string | null;
   source_projection_target?: string | null;
@@ -201,6 +202,16 @@ const readRankedReceiptRef = (...values: unknown[]): string | null => {
   }
 
   return null;
+};
+
+const isObservedTextToSpeechReceiptResult = (result: Record<string, unknown>): boolean => {
+  const capability = readString(result.capability ?? result.capability_id ?? result.capabilityId);
+  if (capability !== "text_to_speech.speak_text") return false;
+  const packet = readRecord(result.observation_packet);
+  const stateDelta = readRecord(packet?.state_delta);
+  const receipt = readRecord(result.receipt) ?? readRecord(stateDelta?.text_to_speech_receipt);
+  const playbackStatus = readString(receipt?.playback_status);
+  return ["pending", "played", "blocked", "failed"].includes(playbackStatus);
 };
 
 const compactKey = (parts: Array<string | null | undefined>): string | null => {
@@ -379,7 +390,10 @@ export const buildCapabilityLaneProviderTimeline = (input: {
       status: event.status,
       lane_visible: false,
       lane_requested: true,
-      lane_executed: event.stage === "lane_observation" && event.status === "completed",
+      lane_executed: event.stage === "lane_observation" && (
+        event.status === "completed" ||
+        event.status === "pending"
+      ),
       observation_reentered: event.stage === "lane_reentered",
       requested_backend_provider: event.requested_backend_provider,
       requested_backend_provider_known: event.requested_backend_provider_known,
@@ -390,6 +404,23 @@ export const buildCapabilityLaneProviderTimeline = (input: {
       receipt_ref: event.receipt_ref,
       latest_event_id: null,
       has_observation: Boolean(event.observation_ref),
+      source_id: event.source_id ?? null,
+      doc_path: event.doc_path ?? null,
+      source_hash: event.source_hash ?? null,
+      source_kind: event.source_kind ?? null,
+      source_projection_target: event.source_projection_target ?? null,
+      account_locale: event.account_locale ?? null,
+      latest_chunk_id: event.latest_chunk_id ?? null,
+      latest_chunk_index: event.latest_chunk_index ?? null,
+      latest_dedupe_key: event.latest_dedupe_key ?? null,
+      latest_source_event_id: event.latest_source_event_id ?? null,
+      latest_source_event_ms: event.latest_source_event_ms ?? null,
+      latest_observed_at_ms: event.latest_observed_at_ms ?? null,
+      latest_freshness_status: event.latest_freshness_status ?? null,
+      source_text_hash: event.source_text_hash ?? null,
+      source_text_char_count: event.source_text_char_count ?? null,
+      target_language: event.target_language ?? null,
+      latest_cancel_requested: event.latest_cancel_requested ?? null,
       terminal_authority_status: event.terminal_authority_status,
       reentry_required: true,
       terminal_eligible: false,
@@ -416,6 +447,7 @@ export const buildCapabilityLaneProviderTimeline = (input: {
       latest_event_id: readString(payload?.source_event_id) || null,
       has_observation: Boolean(receipt.observation_ref),
       source_id: readString(payload?.source_id) || null,
+      doc_path: readString(payload?.doc_path) || null,
       source_hash: readString(payload?.source_hash) || null,
       source_kind: readString(payload?.source_kind) || null,
       source_identity_key: readString(payload?.source_identity_key) || null,
@@ -969,7 +1001,9 @@ export const buildHelixCapabilityLaneProviderAdapterContext = async (input: {
     }, null, 2),
     calls_succeeded:
       (oneShot.call_results.length === 0 ||
-        oneShot.call_results.every((result) => result.ok === true)) &&
+        oneShot.call_results.every((result) =>
+          result.ok === true || isObservedTextToSpeechReceiptResult(result as Record<string, unknown>)
+        )) &&
       sessions.session_results.every((result) => result.ok === true) &&
       goalBindings.goal_binding_results.every((result) => result.ok === true),
     terminal_eligible: false,

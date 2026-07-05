@@ -31,7 +31,8 @@ function receiptFixture(): ImageLensRegionInspectionReceiptV1 {
     bbox_px: { x: 3, y: 4, width: 50, height: 60 },
     source_refs: ["image-lens-source:api", "frame:api"],
     summary: "API crop receipt.",
-    uncertainty: [],
+    extraction_status: "failed",
+    uncertainty: ["No Image Lens OCR/math extraction backend returned text_candidate or latex_candidate for this crop."],
     evidence_id: "evidence:image-lens:api",
     requested_question: "What is in the crop?",
     reason_for_crop: "small subject",
@@ -59,7 +60,7 @@ function receiptFixture(): ImageLensRegionInspectionReceiptV1 {
         summary: "API crop receipt.",
       },
       extraction: {
-        status: "candidate",
+        status: "rejected",
       },
       locatorAnchor: {
         pageNumber: null,

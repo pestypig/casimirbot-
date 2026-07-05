@@ -2,6 +2,752 @@ import { describe, expect, it } from "vitest";
 import { buildHelixDebugExportEnvelopeFromMasterPayload } from "@/lib/agi/debugExport";
 
 describe("Helix Ask debug export capability lanes", () => {
+  it("preserves normal Image Lens crop receipts and terminal presentation in copied debug export", () => {
+    const finalAnswer = [
+      "**equation_area**",
+      "- Bbox: x=10, y=8, width=326, height=238",
+      "- Extraction status: partial",
+      "- Extracted information: latex_candidate: E = mc^2",
+      "- Uncertainty: fixture-backed math OCR candidate",
+      "",
+      "**caption_text**",
+      "- Bbox: x=0, y=0, width=346, height=58",
+      "- Extraction status: candidate",
+      "- Extracted information: text_candidate: As in Chapter 2 we use the Bianchi identities",
+      "- Uncertainty: fixture-backed caption OCR candidate",
+    ].join("\n");
+    const text = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "helix-chat-turn:test:ask:image-lens-normal",
+        question: "Use the Image Lens region tool on the attached image. Inspect the equation area first, then inspect the caption/text area separately.",
+        content: finalAnswer,
+      },
+      {
+        selected_final_answer: finalAnswer,
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        agent_runtime: "codex",
+        capability_lane_call_results: [
+          {
+            capability: "visual_analysis.inspect_image_region",
+            ok: true,
+            receipt: {
+              region_label: "equation_area",
+              bbox_px: { x: 10, y: 8, width: 326, height: 238 },
+              crop_ref: "image-lens://crop/equation-area",
+              crop_image_ref: "data:image/png;base64,SHOULD_NOT_APPEAR_IN_PRESENTATION",
+              latex_candidate: "E = mc^2",
+              extraction_status: "partial",
+              uncertainty: ["fixture-backed math OCR candidate"],
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          {
+            capability: "visual_analysis.inspect_image_region",
+            ok: true,
+            receipt: {
+              region_label: "caption_text",
+              bbox_px: { x: 0, y: 0, width: 346, height: 58 },
+              crop_ref: "image-lens://crop/caption-text",
+              text_candidate: "As in Chapter 2 we use the Bianchi identities",
+              extraction_status: "candidate",
+              uncertainty: ["fixture-backed caption OCR candidate"],
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
+        capability_lane_observation_packets: [
+          {
+            schema: "helix.agent_step_observation_packet.v1",
+            capability_key: "visual_analysis.inspect_image_region",
+            status: "succeeded",
+            observation_ref: "obs:image-lens-equation",
+            produced_artifact_refs: ["obs:image-lens-equation"],
+            state_delta: {
+              visual_analysis_region_inspection: {
+                region_label: "equation_area",
+                bbox_px: { x: 10, y: 8, width: 326, height: 238 },
+                latex_candidate: "E = mc^2",
+                extraction_status: "partial",
+              },
+            },
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          {
+            schema: "helix.agent_step_observation_packet.v1",
+            capability_key: "visual_analysis.inspect_image_region",
+            status: "succeeded",
+            observation_ref: "obs:image-lens-caption",
+            produced_artifact_refs: ["obs:image-lens-caption"],
+            state_delta: {
+              visual_analysis_region_inspection: {
+                region_label: "caption_text",
+                bbox_px: { x: 0, y: 0, width: 346, height: 58 },
+                text_candidate: "As in Chapter 2 we use the Bianchi identities",
+                extraction_status: "candidate",
+              },
+            },
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
+        runtime_lane_request_loop: {
+          schema: "helix.runtime_agent_lane_request_loop.v1",
+          status: "lane_observation_reentered",
+          capability_lane_observation_packets: [
+            {
+              capability_key: "visual_analysis.inspect_image_region",
+              status: "succeeded",
+              observation_ref: "obs:image-lens-equation",
+            },
+            {
+              capability_key: "visual_analysis.inspect_image_region",
+              status: "succeeded",
+              observation_ref: "obs:image-lens-caption",
+            },
+          ],
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        terminal_answer_authority: {
+          schema: "helix.turn_terminal_authority.v1",
+          turn_id: "ask:image-lens-normal",
+          terminal_artifact_kind: "agent_provider_terminal_candidate",
+          final_answer_source: "agent_provider_terminal_candidate",
+          terminal_text_preview: finalAnswer,
+          server_authoritative: true,
+          terminal_eligible: true,
+          assistant_answer: false,
+        },
+        terminal_presentation: {
+          schema: "helix.terminal_presentation.v1",
+          turn_id: "ask:image-lens-normal",
+          concise_text: finalAnswer,
+          terminal_artifact_kind: "agent_provider_terminal_candidate",
+          final_answer_source: "agent_provider_terminal_candidate",
+          presentation_policy: "preserve_provider_text",
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+        debug: {
+          turn_id: "ask:image-lens-normal",
+        },
+      },
+    );
+
+    const exported = JSON.parse(text) as Record<string, any>;
+    expect(exported.selected_final_answer).toBe(finalAnswer);
+    expect(exported.final_answer_source).toBe("agent_provider_terminal_candidate");
+    expect(exported.terminal_artifact_kind).toBe("agent_provider_terminal_candidate");
+    expect(exported.terminal_error_code).toBeNull();
+    expect(exported.debug_export_source).toBe("embedded_backend_payload");
+    expect(exported.backend_debug_response_status).toBe("embedded_payload");
+    expect(exported.provider_prompt_leak_guard).toBeNull();
+    expect(exported.capability_lane_call_results).toHaveLength(2);
+    expect(exported.capability_lane_observation_packets).toHaveLength(2);
+    expect(exported.runtime_lane_request_loop).toMatchObject({
+      status: "lane_observation_reentered",
+    });
+    expect(exported.capability_lane_call_results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          terminal_eligible: false,
+          assistant_answer: false,
+          receipt: expect.objectContaining({
+            region_label: "equation_area",
+            bbox_px: { x: 10, y: 8, width: 326, height: 238 },
+            latex_candidate: "E = mc^2",
+            extraction_status: "partial",
+            terminal_eligible: false,
+            assistant_answer: false,
+          }),
+        }),
+        expect.objectContaining({
+          terminal_eligible: false,
+          assistant_answer: false,
+          receipt: expect.objectContaining({
+            region_label: "caption_text",
+            bbox_px: { x: 0, y: 0, width: 346, height: 58 },
+            text_candidate: "As in Chapter 2 we use the Bianchi identities",
+            extraction_status: "candidate",
+            terminal_eligible: false,
+            assistant_answer: false,
+          }),
+        }),
+      ]),
+    );
+    expect(exported.terminal_presentation).toMatchObject({
+      concise_text: finalAnswer,
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      final_answer_source: "agent_provider_terminal_candidate",
+    });
+    expect(exported.terminal_answer_authority).toMatchObject({
+      terminal_text_preview: finalAnswer,
+      server_authoritative: true,
+    });
+    expect(exported.ui_debug_parity_harness).toMatchObject({
+      visible_final_answer: finalAnswer,
+      selected_final_answer: finalAnswer,
+      ui_answer_equals_selected_final_answer: true,
+      has_terminal_authority: true,
+    });
+    const presentationFields = JSON.stringify({
+      selected_final_answer: exported.selected_final_answer,
+      terminal_presentation: exported.terminal_presentation,
+      terminal_answer_authority: exported.terminal_answer_authority,
+      ui_debug_parity_harness: exported.ui_debug_parity_harness,
+    });
+    expect(presentationFields).not.toContain("data:image");
+    expect(presentationFields).not.toContain("SHOULD_NOT_APPEAR_IN_PRESENTATION");
+  });
+
+  it("preserves recovered Image Lens terminal authority and lane receipts over stale typed failure projection", () => {
+    const recoveredAnswer = [
+      "The runtime provider echoed Helix internal capability instructions after Image Lens observations re-entered, so I am using only the observation receipts below and not the echoed provider text.",
+      "",
+      "**equation_area**",
+      "- Bbox: x=10, y=8, width=326, height=238",
+      "- Crop ref: [inline image/png crop data redacted; ref_hash=sha256:abc123]",
+      "- Extraction status: partial",
+      "- Extracted information: latex_candidate: E = mc^2",
+      "- Uncertainty: fixture-backed math OCR candidate",
+    ].join("\n");
+    const text = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "helix-chat-turn:test:ask:image-lens-recovered",
+        question: "Use the Image Lens region tool on the attached image and inspect the equation area.",
+        content: recoveredAnswer,
+      },
+      {
+        selected_final_answer: "I could not complete that turn.",
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "provider_prompt_leak",
+        terminal_failure_text: "No visual observation receipt was produced for this turn.",
+        debug: {
+          turn_id: "ask:image-lens-recovered",
+          selected_final_answer: recoveredAnswer,
+          final_answer_source: "agent_provider_terminal_candidate",
+          terminal_artifact_kind: "agent_provider_terminal_candidate",
+          provider_prompt_leak_guard: {
+            schema: "helix.provider_prompt_leak_guard.v1",
+            status: "recovered_with_image_lens_observation_report",
+            leaked_marker_detected: true,
+            recovered_with_observation_only_image_lens_report: true,
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          capability_lane_call_results: [
+            {
+              capability: "visual_analysis.inspect_image_region",
+              ok: true,
+              receipt: {
+                region_label: "equation_area",
+                bbox_px: { x: 10, y: 8, width: 326, height: 238 },
+                crop_image_ref: "data:image/png;base64,SHOULD_NOT_APPEAR_IN_PRESENTATION",
+                latex_candidate: "E = mc^2",
+                extraction_status: "partial",
+                uncertainty: ["fixture-backed math OCR candidate"],
+                terminal_eligible: false,
+                assistant_answer: false,
+              },
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          ],
+          capability_lane_observation_packets: [
+            {
+              schema: "helix.agent_step_observation_packet.v1",
+              capability_key: "visual_analysis.inspect_image_region",
+              status: "succeeded",
+              observation_ref: "obs:image-lens-equation",
+              produced_artifact_refs: ["obs:image-lens-equation"],
+              state_delta: {
+                visual_analysis_region_inspection: {
+                  region_label: "equation_area",
+                  latex_candidate: "E = mc^2",
+                  extraction_status: "partial",
+                },
+              },
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          ],
+          capability_lane_reentry_status: "lane_observation_reentered",
+          runtime_lane_request_loop: {
+            schema: "helix.runtime_agent_lane_request_loop.v1",
+            status: "lane_observation_reentered",
+            synthesized_by_helix_policy: false,
+            capability_lane_observation_packets: [
+              {
+                capability_key: "visual_analysis.inspect_image_region",
+                status: "succeeded",
+              },
+            ],
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          terminal_answer_authority: {
+            schema: "helix.turn_terminal_authority.v1",
+            turn_id: "ask:image-lens-recovered",
+            terminal_artifact_kind: "agent_provider_terminal_candidate",
+            final_answer_source: "agent_provider_terminal_candidate",
+            terminal_text_preview: recoveredAnswer,
+            server_authoritative: true,
+            terminal_eligible: true,
+            assistant_answer: false,
+          },
+          terminal_presentation: {
+            schema: "helix.terminal_presentation.v1",
+            turn_id: "ask:image-lens-recovered",
+            concise_text: recoveredAnswer,
+            terminal_artifact_kind: "agent_provider_terminal_candidate",
+            final_answer_source: "agent_provider_terminal_candidate",
+            presentation_policy: "preserve_provider_text",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+        },
+      },
+    );
+
+    const exported = JSON.parse(text) as Record<string, any>;
+    expect(exported.selected_final_answer).toBe(recoveredAnswer);
+    expect(exported.final_answer_source).toBe("agent_provider_terminal_candidate");
+    expect(exported.terminal_artifact_kind).toBe("agent_provider_terminal_candidate");
+    expect(exported.terminal_error_code).toBeNull();
+    expect(exported.debug_export_source).toBe("embedded_backend_payload");
+    expect(exported.backend_debug_response_status).toBe("embedded_payload");
+    expect(exported.provider_prompt_leak_guard).toMatchObject({
+      status: "recovered_with_image_lens_observation_report",
+      recovered_with_observation_only_image_lens_report: true,
+    });
+    expect(exported.capability_lane_call_results).toHaveLength(1);
+    expect(exported.capability_lane_observation_packets).toHaveLength(1);
+    expect(exported.runtime_lane_request_loop).toMatchObject({
+      status: "lane_observation_reentered",
+    });
+    expect(exported.terminal_presentation).toMatchObject({
+      concise_text: recoveredAnswer,
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      final_answer_source: "agent_provider_terminal_candidate",
+    });
+    expect(exported.terminal_answer_authority).toMatchObject({
+      terminal_text_preview: recoveredAnswer,
+      server_authoritative: true,
+    });
+    expect(exported.ui_debug_parity_harness).toMatchObject({
+      visible_final_answer: recoveredAnswer,
+      selected_final_answer: recoveredAnswer,
+      ui_answer_equals_selected_final_answer: true,
+      has_terminal_authority: true,
+    });
+    const presentationFields = JSON.stringify({
+      selected_final_answer: exported.selected_final_answer,
+      terminal_presentation: exported.terminal_presentation,
+      terminal_answer_authority: exported.terminal_answer_authority,
+      ui_debug_parity_harness: exported.ui_debug_parity_harness,
+    });
+    expect(presentationFields).not.toContain("data:image");
+    expect(presentationFields).not.toContain("SHOULD_NOT_APPEAR_IN_PRESENTATION");
+    expect(exported.selected_final_answer).not.toContain("No visual observation receipt was produced");
+  });
+
+  it("includes client playback receipts in the governed voice receipt barrier", () => {
+    const text = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "turn-voice-debug",
+        question: "Read this aloud.",
+        content: "playback_status: awaiting_client_receipt",
+      },
+      {
+        selected_final_answer: "playback_status: awaiting_client_receipt",
+        ask_turn_solver_trace: {
+          capability_result: {
+            requested_capability: "text_to_speech.speak_text",
+            executed_capability: "text_to_speech.speak_text",
+            status: "succeeded",
+            reentered_solver: true,
+            observation_refs: ["turn-voice-debug:capability_lane:text_to_speech.speak_text:1"],
+          },
+        },
+        client_voice_playback_receipts: [
+          {
+            receiptId: "voice-receipt-queued",
+            sourceReceiptId: "turn-voice-debug:capability_lane:text_to_speech.speak_text:1",
+            requestId: "turn-voice-debug:voice-request",
+            utteranceId: "utt-turn-voice-debug",
+            turnKey: "turn-voice-debug",
+            status: "queued",
+            atMs: 200,
+          },
+          {
+            receiptId: "voice-receipt-delivered",
+            sourceReceiptId: "turn-voice-debug:capability_lane:text_to_speech.speak_text:1",
+            requestId: "turn-voice-debug:voice-request",
+            utteranceId: "utt-turn-voice-debug",
+            turnKey: "turn-voice-debug",
+            status: "delivered",
+            atMs: 260,
+          },
+        ],
+      },
+    );
+
+    const exported = JSON.parse(text) as Record<string, any>;
+    expect(exported.voice_playback_receipt_barrier).toMatchObject({
+      schema: "helix.voice_playback_receipt_barrier.v1",
+      requested_capability: "text_to_speech.speak_text",
+      executed_capability: "text_to_speech.speak_text",
+      playback_status: "awaiting_client_receipt",
+      client_playback_receipt_count: 2,
+      latest_client_playback_status: "delivered",
+      playback_started: true,
+      playback_completed: true,
+      playback_failed: false,
+      playback_started_at_ms: 200,
+      playback_completed_at_ms: 260,
+      playback_failed_at_ms: null,
+      delivered_utterance_ids: ["utt-turn-voice-debug"],
+      delivered_utterance_id: "utt-turn-voice-debug",
+      delivered_at_ms: 260,
+      receipt_observed: true,
+      evidence_reentered: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+    expect(exported.voice_playback_receipt_barrier.client_playback_receipts).toEqual([
+      expect.objectContaining({
+        receiptId: "voice-receipt-queued",
+        status: "queued",
+        output_authority: "playback_observation",
+      }),
+      expect.objectContaining({
+        receiptId: "voice-receipt-delivered",
+        status: "delivered",
+        output_authority: "playback_observation",
+      }),
+    ]);
+  });
+
+  it("preserves runtime goal session and debug proof in the client export", () => {
+    const text = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "turn-runtime-goal",
+        question: "/goal wake",
+        content: "I am awake.",
+      },
+      {
+        selected_final_answer: "I am awake.",
+        final_answer_source: "runtime_goal_command",
+        terminal_artifact_kind: "runtime_goal_command_result",
+        runtime_goal_command: {
+          schema: "helix.runtime_goal.command_result.v1",
+          command: "wake",
+          goal_id: "goal:test:debug-copy",
+          blocked_reason: null,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+        runtime_goal_session: {
+          schema: "helix.runtime_goal.session.v1",
+          goal_id: "goal:test:debug-copy",
+          objective: "Keep a running summary of the visible document section.",
+          runtime_agent_provider: "codex",
+          runtime_session_id: "runtime:codex:test-debug-copy",
+          status: "waiting",
+          wake_count: 1,
+          updated_at: "2026-06-29T12:15:00.000Z",
+          job_brief: {
+            schema: "helix.runtime_goal.job_brief.v1",
+            user_goal_text: "Keep a running summary of the visible document section.",
+            expected_wake_behavior:
+              "On wake, inspect admitted workstation evidence and report job progress.",
+          },
+          latest_wake_plan: {
+            schema: "helix.runtime_goal.wake_plan.v1",
+            requested_observation_or_lane: "docs-viewer.read_visible_surface",
+            expected_terminal_product: "job_progress_report",
+            relevance_reason: "Visible document evidence can update the assigned job.",
+          },
+          latest_progress_summary: {
+            schema: "helix.runtime_goal.progress_summary.v1",
+            job: "Keep a running summary of the visible document section.",
+            observed_source: {
+              schema: "helix.runtime_goal.source_binding.v1",
+              source_kind: "docs_viewer_visible_surface",
+              source_label: "docs/current.md",
+              doc_path: "docs/current.md",
+            },
+            evidence_used: {
+              requested_tool_or_lane: "docs-viewer.read_visible_surface",
+              observation_refs: ["obs:visible-surface"],
+              receipt_refs: ["receipt:projection"],
+              provider_terminal_candidate_ref: "candidate:codex",
+            },
+            current_summary: "The visible document now emphasizes governed evidence.",
+            next_wake_behavior: "Waiting for the next /goal wake.",
+            terminal_authority_status: "authorized",
+          },
+          latest_source_binding: {
+            schema: "helix.runtime_goal.source_binding.v1",
+            source_kind: "docs_viewer_visible_surface",
+            source_label: "docs/current.md",
+            doc_path: "docs/current.md",
+          },
+          latest_observation_refs: ["obs:visible-surface"],
+          latest_receipt_refs: ["receipt:projection"],
+          latest_provider_terminal_candidate_ref: "candidate:codex",
+          terminal_authority_status: "authorized",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+        runtime_goal_debug_export: {
+          schema: "helix.runtime_goal.debug_export.v1",
+          goal_id: "goal:test:debug-copy",
+          runtime_provider: "codex",
+          runtime_session_id: "runtime:codex:test-debug-copy",
+          session_status: "waiting",
+          wake_events: [
+            {
+              wake_event_id: "goal-wake:debug-copy",
+              created_at: "2026-06-29T12:15:00.000Z",
+            },
+          ],
+          runtime_goal_job_brief: {
+            schema: "helix.runtime_goal.job_brief.v1",
+            user_goal_text: "Keep a running summary of the visible document section.",
+          },
+          runtime_goal_wake_plan: {
+            schema: "helix.runtime_goal.wake_plan.v1",
+            requested_observation_or_lane: "docs-viewer.read_visible_surface",
+            expected_terminal_product: "job_progress_report",
+          },
+          runtime_goal_progress_summary: {
+            schema: "helix.runtime_goal.progress_summary.v1",
+            current_summary: "The visible document now emphasizes governed evidence.",
+            next_wake_behavior: "Waiting for the next /goal wake.",
+          },
+          runtime_goal_source_binding: {
+            schema: "helix.runtime_goal.source_binding.v1",
+            source_kind: "docs_viewer_visible_surface",
+            source_label: "docs/current.md",
+            doc_path: "docs/current.md",
+          },
+          runtime_goal_observation_refs: ["obs:visible-surface"],
+          runtime_goal_terminal_authority_status: "authorized",
+          latest_observation_refs: ["obs:visible-surface"],
+          latest_receipt_refs: ["receipt:projection"],
+          provider_terminal_candidate: {
+            schema: "helix.agent_provider_terminal_candidate.v1",
+            candidate_id: "candidate:codex",
+            agent_runtime: "codex",
+            provider_label: "Codex Workstation Mode",
+            grounded_in_observation_refs: ["obs:visible-surface"],
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          },
+          terminal_answer_authority: {
+            schema: "helix.turn_terminal_authority.v1",
+            server_authoritative: true,
+            terminal_kind: "answer",
+            final_answer_source: "agent_provider_terminal_candidate",
+          },
+          terminal_authority_status: "authorized",
+          debug_events: [
+            {
+              schema: "helix.runtime_goal.debug_event.v1",
+              stage: "tool_or_lane_requested",
+              status: "completed",
+              requested_tool_or_lane: "docs-viewer.read_visible_surface",
+              observation_refs: [],
+              receipt_refs: [],
+              reentry_status: "not_requested",
+              terminal_authority_status: "not_evaluated",
+            },
+            {
+              schema: "helix.runtime_goal.debug_event.v1",
+              stage: "tool_or_lane_admitted",
+              status: "completed",
+              requested_tool_or_lane: "docs-viewer.read_visible_surface",
+              admitted: true,
+              observation_refs: ["obs:visible-surface"],
+              receipt_refs: ["receipt:projection"],
+              reentry_status: "pending_provider_reentry",
+              terminal_authority_status: "pending_helix_terminal_authority",
+            },
+            {
+              schema: "helix.runtime_goal.debug_event.v1",
+              stage: "evidence_reentered",
+              status: "completed",
+              requested_tool_or_lane: "docs-viewer.read_visible_surface",
+              observation_refs: ["obs:visible-surface"],
+              receipt_refs: ["receipt:projection"],
+              reentry_status: "reentered",
+              terminal_authority_status: "pending_helix_terminal_authority",
+            },
+            {
+              schema: "helix.runtime_goal.debug_event.v1",
+              stage: "runtime_candidate_generated",
+              status: "completed",
+              requested_tool_or_lane: "docs-viewer.read_visible_surface",
+              observation_refs: ["obs:visible-surface"],
+              receipt_refs: ["receipt:projection"],
+              terminal_authority_status: "authorized",
+              provider_terminal_candidate_ref: "candidate:codex",
+            },
+            {
+              schema: "helix.runtime_goal.debug_event.v1",
+              stage: "terminal_authority_evaluated",
+              status: "completed",
+              requested_tool_or_lane: "docs-viewer.read_visible_surface",
+              observation_refs: ["obs:visible-surface"],
+              receipt_refs: ["receipt:projection"],
+              terminal_authority_status: "authorized",
+              reason: "provider_candidate_authorized_after_goal_evidence_reentry",
+            },
+          ],
+          answer_authority: false,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+        turn_transcript_events: [
+          {
+            id: "turn-runtime-goal:runtime-goal-command",
+            role: "system",
+            type: "runtime_goal_command",
+            lane: "runtime_goal",
+            text: "Runtime goal command routed: wake.",
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+          {
+            id: "turn-runtime-goal:runtime-goal-debug",
+            role: "tool",
+            type: "terminal_authority_evaluated",
+            lane: "runtime_goal",
+            text: "Goal goal:test:debug-copy: terminal_authority_evaluated; terminal authority authorized.",
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+          {
+            id: "turn-runtime-goal:runtime-goal-final",
+            role: "agent",
+            type: "terminal_answer",
+            lane: "terminal_authority",
+            text: "I am awake.",
+            assistant_answer: false,
+            terminal_eligible: true,
+          },
+        ],
+      },
+    );
+
+    const exported = JSON.parse(text);
+
+    expect(exported.runtime_goal_command).toMatchObject({
+      command: "wake",
+      goal_id: "goal:test:debug-copy",
+    });
+    expect(exported.runtime_goal_session).toMatchObject({
+      goal_id: "goal:test:debug-copy",
+      runtime_agent_provider: "codex",
+      runtime_session_id: "runtime:codex:test-debug-copy",
+      terminal_authority_status: "authorized",
+    });
+    expect(exported.runtime_goal_debug_summary).toMatchObject({
+      job_title: "Keep a running summary of the visible document section.",
+      observed_source_label: "docs/current.md",
+      observed_source_doc_path: "docs/current.md",
+      requested_observation_or_lane: "docs-viewer.read_visible_surface",
+      current_progress_summary: "The visible document now emphasizes governed evidence.",
+      next_wake_behavior: "Waiting for the next /goal wake.",
+      provider_terminal_candidate_ref: "candidate:codex",
+    });
+    expect(exported.runtime_goal_debug_export).toMatchObject({
+      schema: "helix.runtime_goal.debug_export.v1",
+      runtime_provider: "codex",
+      terminal_authority_status: "authorized",
+    });
+    expect(exported.runtime_goal_debug_export.debug_events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ stage: "tool_or_lane_requested" }),
+        expect.objectContaining({ stage: "tool_or_lane_admitted" }),
+        expect.objectContaining({ stage: "evidence_reentered", reentry_status: "reentered" }),
+        expect.objectContaining({ stage: "runtime_candidate_generated" }),
+        expect.objectContaining({ stage: "terminal_authority_evaluated" }),
+      ]),
+    );
+    expect(exported.runtime_goal_debug_summary).toMatchObject({
+      schema: "helix.runtime_goal.debug_copy_summary.v1",
+      command: "wake",
+      goal_id: "goal:test:debug-copy",
+      runtime_agent_provider: "codex",
+      runtime_session_id: "runtime:codex:test-debug-copy",
+      terminal_authority_status: "authorized",
+      wake_count: 1,
+      last_wake_at: "2026-06-29T12:15:00.000Z",
+      last_wake_event_id: "goal-wake:debug-copy",
+      session_updated_at: "2026-06-29T12:15:00.000Z",
+      evidence_reentered: true,
+      runtime_candidate_generated: true,
+      terminal_authority_evaluated: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+    expect(exported.runtime_goal_debug_summary.latest_observation_refs).toEqual(["obs:visible-surface"]);
+    expect(exported.runtime_goal_debug_summary.latest_receipt_refs).toEqual(["receipt:projection"]);
+    expect(exported.runtime_goal_debug_summary.requested_tool_or_lane_sequence).toEqual([
+      "docs-viewer.read_visible_surface",
+    ]);
+    expect(exported.turn_transcript_events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: "system",
+          type: "runtime_goal_command",
+          lane: "runtime_goal",
+          text: "Runtime goal command routed: wake.",
+        }),
+        expect.objectContaining({
+          role: "tool",
+          type: "terminal_authority_evaluated",
+          lane: "runtime_goal",
+        }),
+        expect.objectContaining({
+          role: "agent",
+          type: "terminal_answer",
+          lane: "terminal_authority",
+          terminal_eligible: true,
+          assistant_answer: false,
+        }),
+      ]),
+    );
+  });
+
   it("preserves capability lane session, mail-loop, and goal-binding evidence in the client export", () => {
     const text = buildHelixDebugExportEnvelopeFromMasterPayload(
       {
@@ -522,6 +1268,17 @@ describe("Helix Ask debug export capability lanes", () => {
         capability_lane_reentry_status: "observation_packet_required_for_provider_reentry",
         runtime_lane_request_loop: {
           status: "lane_observation_reentered",
+          visible_translation_collector_chain: {
+            schema: "helix.runtime_lane_request_loop.visible_translation_collector_chain.v1",
+            requested_collector_capability: "workstation.visible_text.collect_translation_targets",
+            collector_capability: "workstation_tool_reference.collect_visible_translation_targets",
+            collector_requested: true,
+            collector_observation_ref: "obs:visible-targets",
+            first_collected_existing_source_event_ms: 1782859999000,
+            first_collected_existing_observed_at_ms: 1782859999100,
+            collected_existing_source_event_ms: [1782859999000],
+            collected_existing_observed_at_ms: [1782859999100],
+          },
         },
         debug: {
           turn_id: "turn-debug-lanes",
@@ -1079,6 +1836,15 @@ describe("Helix Ask debug export capability lanes", () => {
     });
     expect(exportPayload.runtime_lane_request_loop).toMatchObject({
       status: "lane_observation_reentered",
+      visible_translation_collector_chain: {
+        requested_collector_capability: "workstation.visible_text.collect_translation_targets",
+        collector_capability: "workstation_tool_reference.collect_visible_translation_targets",
+        collector_observation_ref: "obs:visible-targets",
+        first_collected_existing_source_event_ms: 1782859999000,
+        first_collected_existing_observed_at_ms: 1782859999100,
+        collected_existing_source_event_ms: [1782859999000],
+        collected_existing_observed_at_ms: [1782859999100],
+      },
     });
   });
 
@@ -1282,6 +2048,7 @@ describe("Helix Ask debug export capability lanes", () => {
             source_kind: "document_markdown",
             source_text_hash: "fnv1a32:visible-chunk",
             source_text_char_count: 512,
+            bbox: { x: 16, y: 24, width: 320, height: 48, source: "visible-doc-title" },
             source_identity_key:
               "document_markdown:docs/audits/research/civilization.md::fnv1a32:doc-current::fnv1a32:visible-chunk::512::docs::docs_viewer.inline_translation::es-US::es",
             account_locale: "es-US",
@@ -1342,6 +2109,7 @@ describe("Helix Ask debug export capability lanes", () => {
           source_kind: "docs",
           source_text_hash: "fnv1a32:visible-chunk",
           source_text_char_count: "512",
+          bbox: { x: 16, y: 24, width: 320, height: 48, source: "visible-doc-title" },
           source_identity_key:
             "document_markdown:docs/audits/research/civilization.md::fnv1a32:doc-current::fnv1a32:visible-chunk::512::docs::docs_chunk::es-US::es",
           account_locale: "es-US",
@@ -1356,6 +2124,7 @@ describe("Helix Ask debug export capability lanes", () => {
           cancel_requested: false,
           terminal_authority_status: "not_terminal_authority",
           context_role: "tool_evidence",
+          reentry_required: true,
           answer_authority: false,
           terminal_eligible: false,
           assistant_answer: false,
@@ -1366,6 +2135,461 @@ describe("Helix Ask debug export capability lanes", () => {
       latest_visible_receipt_ref_count: 1,
       latest_evidence_observation_ref_count: 1,
       latest_evidence_receipt_ref_count: 1,
+    });
+  });
+
+  it("summarizes visible translation collector to projection to terminal authority chain", () => {
+    const text = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "turn-debug-visible-chain",
+        question: "translate this visible document to Spanish",
+        content: "Visible document translation was projected.",
+      },
+      {
+        selected_final_answer: "Visible document translation was projected.",
+        agent_runtime: "codex",
+        capability_lane_call_results: [
+          {
+            capability: "workstation_tool_reference.collect_visible_translation_targets",
+            ok: true,
+          },
+          {
+            capability: "live_translation.translate_text",
+            ok: true,
+          },
+        ],
+        capability_lane_turn_timeline: [
+          {
+            schema: "helix.capability_lane.provider_timeline_event.v1",
+            seq: 0,
+            stage: "lane_requested",
+            selected_runtime_agent_provider: "codex",
+            adapter_boundary: "helix_agent_provider_edge",
+            lane_id: "workstation_tool_reference",
+            capability_id: "workstation_tool_reference.collect_visible_translation_targets",
+            lane_requested: true,
+            lane_executed: false,
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          {
+            schema: "helix.capability_lane.provider_timeline_event.v1",
+            seq: 1,
+            stage: "lane_requested",
+            selected_runtime_agent_provider: "codex",
+            adapter_boundary: "helix_agent_provider_edge",
+            lane_id: "live_translation",
+            capability_id: "live_translation.translate_text",
+            lane_requested: true,
+            lane_executed: false,
+            target_language: "es",
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          {
+            schema: "helix.capability_lane.provider_timeline_event.v1",
+            seq: 2,
+            stage: "lane_backend_selected",
+            selected_runtime_agent_provider: "codex",
+            adapter_boundary: "helix_agent_provider_edge",
+            lane_id: "live_translation",
+            capability_id: "live_translation.translate_text",
+            selected_backend_provider: "live_translation.local_runtime",
+            backend_selection_reason: "default_local_runtime",
+            lane_requested: true,
+            lane_executed: false,
+            target_language: "es",
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          {
+            schema: "helix.capability_lane.provider_timeline_event.v1",
+            seq: 3,
+            stage: "lane_observation",
+            selected_runtime_agent_provider: "codex",
+            adapter_boundary: "helix_agent_provider_edge",
+            lane_id: "live_translation",
+            capability_id: "live_translation.translate_text",
+            selected_backend_provider: "live_translation.local_runtime",
+            lane_requested: true,
+            lane_executed: true,
+            observation_ref: "obs:visible-chain-translation",
+            receipt_ref: "receipt:visible-chain-projection",
+            projection_target: "docs_chunk",
+            source_id: "document_markdown:docs/current.md",
+            chunk_id: "visible-1",
+            target_language: "es",
+            terminal_authority_status: "pending_helix_terminal_authority",
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          {
+            schema: "helix.capability_lane.provider_timeline_event.v1",
+            seq: 4,
+            stage: "lane_projection_receipt",
+            selected_runtime_agent_provider: "codex",
+            adapter_boundary: "helix_agent_provider_edge",
+            lane_id: "live_translation",
+            capability_id: "live_translation.translate_text",
+            selected_backend_provider: "live_translation.local_runtime",
+            lane_requested: true,
+            lane_executed: true,
+            observation_ref: "obs:visible-chain-translation",
+            receipt_ref: "receipt:visible-chain-projection",
+            projection_target: "docs_chunk",
+            source_id: "document_markdown:docs/current.md",
+            panel_id: "docs-viewer",
+            region_id: "docs-viewer:visible-1",
+            source_hash: "fnv1a32:doc-current",
+            source_kind: "docs_viewer",
+            source_text_hash: "fnv1a32:visible-text",
+            source_text_char_count: 64,
+            chunk_id: "visible-1",
+            target_language: "es",
+            terminal_authority_status: "pending_helix_terminal_authority",
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          {
+            schema: "helix.capability_lane.provider_timeline_event.v1",
+            seq: 5,
+            stage: "lane_reentered",
+            selected_runtime_agent_provider: "codex",
+            adapter_boundary: "helix_agent_provider_edge",
+            lane_id: "live_translation",
+            capability_id: "live_translation.translate_text",
+            observation_reentered: true,
+            observation_ref: "obs:visible-chain-translation",
+            receipt_ref: "receipt:visible-chain-projection",
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          {
+            schema: "helix.capability_lane.provider_timeline_event.v1",
+            seq: 6,
+            stage: "terminal_selected",
+            selected_runtime_agent_provider: "codex",
+            lane_id: "helix_terminal_authority",
+            lane_requested: true,
+            lane_executed: true,
+            observation_reentered: true,
+            observation_ref: "obs:visible-chain-translation",
+            receipt_ref: "receipt:visible-chain-projection",
+            terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+            terminal_eligible: true,
+            assistant_answer: true,
+            raw_content_included: false,
+          },
+        ],
+        capability_lane_projection_receipts: [
+          {
+            schema: "helix.live_translation.projection_receipt.v1",
+            receipt_ref: "receipt:visible-chain-projection",
+            observation_ref: "obs:visible-chain-translation",
+            selected_backend_provider: "live_translation.local_runtime",
+            projection_target: "docs_chunk",
+            source_id: "document_markdown:docs/current.md",
+            source_hash: "fnv1a32:doc-current",
+            source_text_hash: "fnv1a32:visible-text",
+            source_text_char_count: 64,
+            chunk_id: "visible-1",
+            target_language: "es",
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
+        capability_lane_reentry_status: "lane_observation_reentered",
+        runtime_lane_request_loop: {
+          status: "lane_observation_reentered",
+          visible_translation_collector_chain: {
+            schema: "helix.runtime_agent_visible_translation_chain.v1",
+            requested_collector_capability: "workstation.visible_text.collect_translation_targets",
+            collector_capability: "workstation_tool_reference.collect_visible_translation_targets",
+            translation_capability: "live_translation.translate_text",
+            collector_requested: true,
+            translation_requested: true,
+            collector_observation_ref: "obs:visible-targets",
+            collected_target_count: 1,
+            collected_source_ids: ["document_markdown:docs/current.md"],
+            collected_chunk_ids: ["visible-1"],
+            collected_source_kinds: ["docs_viewer"],
+            collected_panel_ids: ["docs-viewer"],
+            collected_region_ids: ["docs-viewer:visible-1"],
+            collected_target_languages: ["es"],
+            collected_projection_targets: ["docs_chunk"],
+          },
+        },
+        debug: {
+          turn_id: "turn-debug-visible-chain",
+        },
+      },
+    );
+
+    const exportPayload = JSON.parse(text) as Record<string, unknown>;
+    expect(exportPayload.visible_translation_chain_summary).toMatchObject({
+      schema: "helix.visible_translation.chain_summary.v1",
+      collector_requested: true,
+      collector_capability: "workstation_tool_reference.collect_visible_translation_targets",
+      collector_observation_ref: "obs:visible-targets",
+      collected_target_count: 1,
+      translation_requested: true,
+      translation_executed: true,
+      backend_selected_count: 1,
+      projection_receipt_count: 1,
+      observation_reentered: true,
+      terminal_selected: true,
+      terminal_rejected: false,
+      chain_complete: true,
+      projection_is_terminal_authority: false,
+      source_ids: ["document_markdown:docs/current.md"],
+      chunk_ids: ["visible-1"],
+      source_kinds: ["docs_viewer"],
+      panel_ids: ["docs-viewer"],
+      region_ids: ["docs-viewer:visible-1"],
+      target_languages: ["es"],
+      projection_targets: ["docs_chunk"],
+      observation_refs: expect.arrayContaining([
+        "obs:visible-targets",
+        "obs:visible-chain-translation",
+      ]),
+      receipt_refs: ["receipt:visible-chain-projection"],
+    });
+  });
+
+  it("derives visible translation target proof from materialized collector call results", () => {
+    const text = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "turn-debug-visible-collector-call-result",
+        question: "translate the visible title to Spanish",
+        content: "Visible target collection is available.",
+      },
+      {
+        selected_final_answer: "Visible target collection is available.",
+        agent_runtime: "codex",
+        capability_lane_call_results: [
+          {
+            schema: "helix.workstation_tool_reference.visible_translation_targets_result.v1",
+            ok: true,
+            capability: "workstation_tool_reference.collect_visible_translation_targets",
+            observation: {
+              schema: "helix.workstation_tool_reference.visible_translation_targets_observation.v1",
+              observation_ref: "obs:visible-targets-from-call-result",
+              target_batch: {
+                schema: "helix.visible_translation_target_batch.v1",
+                target_count: 1,
+                targets: [
+                  {
+                    schema: "helix.visible_translation_target.v1",
+                    source_kind: "panel_text",
+                    panel_id: "docs-viewer",
+                    doc_path: "docs/current.md",
+                    source_id: "workstation-shell#docs-viewer:title",
+                    source_hash: "fnv1a32:doc-current",
+                    source_text_hash: "fnv1a32:title-text",
+                    source_text_char_count: 14,
+                    visible_text: "Current Status",
+                    chunk_id: "docs-viewer:title",
+                    chunk_index: 0,
+                    region_id: "docs-viewer:title",
+                    dedupe_key: "workstation-shell#docs-viewer:title:es",
+                    projection_target: "account_language",
+                    account_locale: "es-US",
+                    target_language: "es",
+                    existing_observation_ref: "obs:existing-title-translation",
+                    existing_receipt_ref: "receipt:existing-title-projection",
+                    existing_projection_status: "ready",
+                    existing_freshness_status: "fresh",
+                    existing_terminal_authority_status: "projection_only",
+                    existing_source_event_ms: 1782860000000,
+                    existing_observed_at_ms: 1782860000100,
+                    assistant_answer: false,
+                    terminal_eligible: false,
+                    raw_content_included: false,
+                    reentry_required: true,
+                  },
+                ],
+              },
+            },
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
+        runtime_lane_request_loop: {
+          status: "collector_observation_reentered",
+          visible_translation_collector_chain: {
+            schema: "helix.runtime_agent_visible_translation_chain.v1",
+            requested_collector_capability: "workstation.visible_text.collect_translation_targets",
+            collector_capability: "workstation_tool_reference.collect_visible_translation_targets",
+            translation_capability: "live_translation.translate_text",
+            collector_requested: true,
+            translation_requested: false,
+            collector_observation_ref: "obs:visible-targets-from-call-result",
+          },
+        },
+        debug: {
+          turn_id: "turn-debug-visible-collector-call-result",
+        },
+      },
+    );
+
+    const exportPayload = JSON.parse(text) as Record<string, unknown>;
+    expect(exportPayload.visible_translation_chain_summary).toMatchObject({
+      schema: "helix.visible_translation.chain_summary.v1",
+      collector_requested: true,
+      collector_capability: "workstation_tool_reference.collect_visible_translation_targets",
+      collector_observation_ref: "obs:visible-targets-from-call-result",
+      collected_target_count: 1,
+      translation_requested: false,
+      translation_executed: false,
+      chain_complete: false,
+      source_ids: ["workstation-shell#docs-viewer:title"],
+      chunk_ids: ["docs-viewer:title"],
+      source_kinds: ["panel_text"],
+      panel_ids: ["docs-viewer"],
+      region_ids: ["docs-viewer:title"],
+      target_languages: ["es"],
+      projection_targets: ["account_language"],
+      existing_observation_refs: ["obs:existing-title-translation"],
+      existing_receipt_refs: ["receipt:existing-title-projection"],
+      existing_projection_statuses: ["ready"],
+      existing_freshness_statuses: ["fresh"],
+      existing_terminal_authority_statuses: ["projection_only"],
+      existing_source_event_ms: [1782860000000],
+      existing_observed_at_ms: [1782860000100],
+      first_collected_existing_observation_ref: "obs:existing-title-translation",
+      first_collected_existing_receipt_ref: "receipt:existing-title-projection",
+      first_collected_existing_projection_status: "ready",
+      first_collected_existing_freshness_status: "fresh",
+      first_collected_existing_terminal_authority_status: "projection_only",
+      first_collected_existing_source_event_ms: 1782860000000,
+      first_collected_existing_observed_at_ms: 1782860000100,
+      projection_is_terminal_authority: false,
+    });
+  });
+
+  it("derives visible translation target proof from observation packet state delta", () => {
+    const text = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "turn-debug-visible-collector-packet",
+        question: "translate the visible document title to Spanish",
+        content: "Visible target packet is available.",
+      },
+      {
+        selected_final_answer: "Visible target packet is available.",
+        agent_runtime: "codex",
+        capability_lane_call_results: [
+          {
+            schema: "helix.workstation_tool_reference.visible_translation_targets_result.v1",
+            ok: true,
+            capability: "workstation_tool_reference.collect_visible_translation_targets",
+            observation_packet: {
+              schema: "helix.agent_step_observation_packet.v1",
+              capability_key: "workstation_tool_reference.collect_visible_translation_targets",
+              status: "succeeded",
+              state_delta: {
+                visible_translation_target_batch: {
+                  schema: "helix.visible_translation_target_batch.v1",
+                  target_count: 1,
+                  targets: [
+                    {
+                      schema: "helix.visible_translation_target.v1",
+                      source_kind: "docs_viewer",
+                      panel_id: "docs-viewer",
+                      doc_path: "docs/current.md",
+                      source_id: "document_markdown:docs/current.md#title",
+                      source_hash: "fnv1a32:doc-current",
+                      source_text_hash: "fnv1a32:title-text",
+                      source_text_char_count: 14,
+                      visible_text: "Current Status",
+                      chunk_id: "docs-current:title",
+                      chunk_index: 0,
+                      region_id: "docs-viewer:title",
+                      dedupe_key: "document_markdown:docs/current.md#title:es",
+                      projection_target: "docs_chunk",
+                      account_locale: "es-US",
+                      target_language: "es",
+                      existing_observation_ref: "obs:packet-existing-title-translation",
+                      existing_receipt_ref: "receipt:packet-existing-title-projection",
+                      existing_projection_status: "stale",
+                      existing_freshness_status: "stale_source",
+                      existing_terminal_authority_status: "projection_only",
+                      existing_source_event_ms: 1782860000200,
+                      existing_observed_at_ms: 1782860000300,
+                      assistant_answer: false,
+                      terminal_eligible: false,
+                      raw_content_included: false,
+                      reentry_required: true,
+                    },
+                  ],
+                },
+              },
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
+        runtime_lane_request_loop: {
+          status: "collector_observation_reentered",
+          visible_translation_collector_chain: {
+            schema: "helix.runtime_agent_visible_translation_chain.v1",
+            requested_collector_capability: "workstation.visible_text.collect_translation_targets",
+            collector_capability: "workstation_tool_reference.collect_visible_translation_targets",
+            translation_capability: "live_translation.translate_text",
+            collector_requested: true,
+            translation_requested: false,
+            collector_observation_ref: "obs:visible-targets-from-packet",
+          },
+        },
+        debug: {
+          turn_id: "turn-debug-visible-collector-packet",
+        },
+      },
+    );
+
+    const exportPayload = JSON.parse(text) as Record<string, unknown>;
+    expect(exportPayload.visible_translation_chain_summary).toMatchObject({
+      schema: "helix.visible_translation.chain_summary.v1",
+      collector_requested: true,
+      collector_capability: "workstation_tool_reference.collect_visible_translation_targets",
+      collector_observation_ref: "obs:visible-targets-from-packet",
+      collected_target_count: 1,
+      translation_requested: false,
+      translation_executed: false,
+      chain_complete: false,
+      source_ids: ["document_markdown:docs/current.md#title"],
+      chunk_ids: ["docs-current:title"],
+      source_kinds: ["docs_viewer"],
+      panel_ids: ["docs-viewer"],
+      region_ids: ["docs-viewer:title"],
+      target_languages: ["es"],
+      projection_targets: ["docs_chunk"],
+      existing_observation_refs: ["obs:packet-existing-title-translation"],
+      existing_receipt_refs: ["receipt:packet-existing-title-projection"],
+      existing_projection_statuses: ["stale"],
+      existing_freshness_statuses: ["stale_source"],
+      existing_terminal_authority_statuses: ["projection_only"],
+      existing_source_event_ms: [1782860000200],
+      existing_observed_at_ms: [1782860000300],
+      first_collected_existing_observation_ref: "obs:packet-existing-title-translation",
+      first_collected_existing_receipt_ref: "receipt:packet-existing-title-projection",
+      first_collected_existing_projection_status: "stale",
+      first_collected_existing_freshness_status: "stale_source",
+      first_collected_existing_terminal_authority_status: "projection_only",
+      first_collected_existing_source_event_ms: 1782860000200,
+      first_collected_existing_observed_at_ms: 1782860000300,
+      projection_is_terminal_authority: false,
     });
   });
 
@@ -1409,8 +2633,8 @@ describe("Helix Ask debug export capability lanes", () => {
               chunk_id: "chunk-current",
               chunk_index: 2,
               dedupe_key: "document_markdown:docs/current.md:chunk-current:es",
-              source_event_id: "docs:event-current",
-              source_event_ms: 300,
+              latest_source_event_id: "docs:event-current",
+              latest_source_event_ms: 300,
               observed_at_ms: 350,
               freshness_status: "fresh",
               answer_authority: true,

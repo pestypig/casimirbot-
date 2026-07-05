@@ -30,6 +30,10 @@ export function resolveDefaultHelixAgentProvider(): HelixAgentProvider {
   return resolveHelixAgentProvider({ body: {} });
 }
 
+export function getHelixAgentProviderById(id: string): HelixAgentProvider | null {
+  return providers.get(id) ?? null;
+}
+
 export function resolveHelixAgentProvider(input: {
   body: Record<string, unknown>;
   headers?: IncomingHttpHeaders;

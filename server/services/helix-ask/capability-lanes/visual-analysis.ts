@@ -45,6 +45,7 @@ export const visualAnalysisLaneTemplate: HelixCapabilityLaneTemplate = {
           "summary",
           "text_candidate",
           "latex_candidate",
+          "extraction_status",
           "table_candidate_ref",
           "uncertainty",
           "requested_backend_provider",

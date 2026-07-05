@@ -18,6 +18,18 @@ import { helixCapabilityLaneSessionStore } from "../services/helix-ask/capabilit
 import { buildHelixCapabilityLaneSessionDebugSummaries } from "../services/helix-ask/capability-lanes/session-summary";
 import { buildHelixCapabilityLaneSessionListTimeline } from "../services/helix-ask/capability-lanes/session-list-timeline";
 import type { HelixLiveTranslationOneShotResult } from "@shared/helix-live-translation-lane";
+import {
+  helixRuntimeGoalSessionStore,
+  type GoalRuntimeSessionResult,
+} from "../services/helix-ask/agent-providers/goal-runtime-session";
+import { buildRuntimeGoalDebugSummary } from "../services/helix-ask/runtime-goal-debug-summary";
+import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
+import type {
+  HelixRuntimeGoalReportPolicy,
+  HelixRuntimeGoalSessionStatus,
+  HelixRuntimeGoalStopPolicy,
+  HelixRuntimeGoalWakeEventKind,
+} from "@shared/helix-runtime-goal-session";
 
 export const agentProvidersRouter = Router();
 
@@ -28,6 +40,73 @@ const readQueryString = (value: unknown): string => {
   if (typeof value === "string") return value.trim();
   if (Array.isArray(value) && typeof value[0] === "string") return value[0].trim();
   return "";
+};
+
+const readStringArray = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.map(readString).filter(Boolean)
+    : typeof value === "string" && value.trim()
+      ? value.split(",").map((entry) => entry.trim()).filter(Boolean)
+      : [];
+
+const readBodyRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+
+const readRuntimeId = (value: unknown): HelixAgentRuntimeId =>
+  readString(value) === "codex" || readString(value) === "future" ? (readString(value) as HelixAgentRuntimeId) : "helix";
+
+const runtimeGoalDebugSummaryFor = (result: GoalRuntimeSessionResult) =>
+  buildRuntimeGoalDebugSummary(result.session, result.debug_export);
+
+const readGoalReportPolicy = (value: unknown): HelixRuntimeGoalReportPolicy | undefined => {
+  const normalized = readString(value);
+  return normalized === "report_only_failure" ||
+    normalized === "report_only_when_asked" ||
+    normalized === "report_summary_every_n_wakes" ||
+    normalized === "report_every_terminal_authorized_result"
+    ? normalized
+    : undefined;
+};
+
+const readGoalWakeEventKind = (value: unknown): HelixRuntimeGoalWakeEventKind | undefined => {
+  const normalized = readString(value);
+  return normalized === "user_message" ||
+    normalized === "visible_context_changed" ||
+    normalized === "document_changed" ||
+    normalized === "account_language_changed" ||
+    normalized === "lane_session_observation" ||
+    normalized === "tool_receipt_ready" ||
+    normalized === "timer" ||
+    normalized === "manual_resume" ||
+    normalized === "failure" ||
+    normalized === "escalation"
+    ? normalized
+    : undefined;
+};
+
+const readGoalStopStatus = (
+  value: unknown,
+): Extract<HelixRuntimeGoalSessionStatus, "completed" | "cancelled" | "failed"> | undefined => {
+  const normalized = readString(value);
+  return normalized === "completed" || normalized === "cancelled" || normalized === "failed"
+    ? normalized
+    : undefined;
+};
+
+const readGoalStopPolicy = (value: unknown): Partial<HelixRuntimeGoalStopPolicy> | undefined => {
+  const record = readBodyRecord(value);
+  const repeatedFailureThreshold = Number(record.repeated_failure_threshold ?? record.repeatedFailureThreshold);
+  const staleSourceMs = Number(record.stale_source_ms ?? record.staleSourceMs);
+  const policy: Partial<HelixRuntimeGoalStopPolicy> = {};
+  if (Number.isFinite(repeatedFailureThreshold) && repeatedFailureThreshold > 0) {
+    policy.repeated_failure_threshold = Math.floor(repeatedFailureThreshold);
+  }
+  if (Number.isFinite(staleSourceMs) && staleSourceMs >= 0) {
+    policy.stale_source_ms = Math.floor(staleSourceMs);
+  }
+  return Object.keys(policy).length ? policy : undefined;
 };
 
 agentProvidersRouter.get("/agent-providers", (req: Request, res: Response) => {
@@ -59,6 +138,179 @@ agentProvidersRouter.get("/agent-providers", (req: Request, res: Response) => {
       defaultProvider.label,
     account_policy: accountPolicy,
   });
+});
+
+agentProvidersRouter.get("/goal/runtime-session", (req: Request, res: Response) => {
+  const goalId = readQueryString(req.query.goal_id ?? req.query.goalId);
+  const sessions = helixRuntimeGoalSessionStore.listGoalRuntimeSessions()
+    .filter((session) => !goalId || session.goal_id === goalId);
+  res.json({
+    schema: "helix.runtime_goal.session_list_response.v1",
+    ok: true,
+    goal_session_count: sessions.length,
+    runtime_goal_sessions: sessions,
+    runtime_goal_debug_summaries: sessions.map((session) => {
+      const debugExport = helixRuntimeGoalSessionStore.buildGoalDebugExport(session.goal_id);
+      return debugExport ? buildRuntimeGoalDebugSummary(session, debugExport) : null;
+    }).filter(Boolean),
+    answer_authority: false,
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  });
+});
+
+agentProvidersRouter.get("/goal/runtime-session/:goalId/debug-export", (req: Request, res: Response) => {
+  const debugExport = helixRuntimeGoalSessionStore.buildGoalDebugExport(req.params.goalId);
+  if (!debugExport) {
+    return res.status(404).json({
+      schema: "helix.runtime_goal.debug_export_response.v1",
+      ok: false,
+      error: "goal_session_not_found",
+      goal_id: req.params.goalId,
+      answer_authority: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  }
+  const session = helixRuntimeGoalSessionStore.getGoalRuntimeSession(req.params.goalId);
+  const runtimeGoalDebugSummary = session
+    ? buildRuntimeGoalDebugSummary(session, debugExport)
+    : null;
+  return res.json({
+    ...debugExport,
+    schema: "helix.runtime_goal.debug_export_response.v1",
+    ok: true,
+    debug_export: debugExport,
+    runtime_goal_debug_summary: runtimeGoalDebugSummary,
+  });
+});
+
+agentProvidersRouter.post("/goal/runtime-session", async (req: Request, res: Response) => {
+  const body = readBodyRecord(req.body);
+  const accountPolicy = getAccountCapabilityPolicy(readHelixSessionCookie(req.headers.cookie));
+  const runtimeAgentProvider = readRuntimeId(body.runtime_agent_provider ?? body.agent_runtime ?? body.agentRuntime);
+  const providerAccess = resolveHelixRuntimeAgentAccess(accountPolicy, runtimeAgentProvider);
+  if (providerAccess.state !== "available") {
+    return res.status(403).json({
+      schema: "helix.runtime_goal.session_start_response.v1",
+      ok: false,
+      error: "runtime_agent_locked_by_account_policy",
+      blocked_reason: "permission_revoked",
+      locked_reason: providerAccess.reason,
+      runtime_agent_provider: runtimeAgentProvider,
+      account_policy: accountPolicy,
+      answer_authority: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  }
+  const result = await helixRuntimeGoalSessionStore.startGoalRuntimeSession({
+    objective: readString(body.objective ?? body.goal ?? body.prompt),
+    runtimeAgentProvider,
+    goalId: readString(body.goal_id ?? body.goalId) || null,
+    runtimeSessionId: readString(body.runtime_session_id ?? body.runtimeSessionId) || null,
+    allowedLanes: readStringArray(body.allowed_lanes ?? body.allowedLanes),
+    allowedWorkstationTools: readStringArray(body.allowed_workstation_tools ?? body.allowedWorkstationTools),
+    stopPolicy: readGoalStopPolicy(body.stop_policy ?? body.stopPolicy),
+    reportPolicy: readGoalReportPolicy(body.report_policy ?? body.reportPolicy),
+  });
+  res.status(result.ok ? 200 : 409).json({
+    schema: "helix.runtime_goal.session_start_response.v1",
+    ...result,
+    runtime_goal_debug_summary: runtimeGoalDebugSummaryFor(result),
+    answer_authority: false,
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  });
+});
+
+agentProvidersRouter.post("/goal/runtime-session/:goalId/resume", async (req: Request, res: Response) => {
+  const body = readBodyRecord(req.body);
+  try {
+    const session = helixRuntimeGoalSessionStore.getGoalRuntimeSession(req.params.goalId);
+    if (!session) throw new Error(`Goal session not found: ${req.params.goalId}`);
+    const accountPolicy = getAccountCapabilityPolicy(readHelixSessionCookie(req.headers.cookie));
+    const providerAccess = resolveHelixRuntimeAgentAccess(accountPolicy, session.runtime_agent_provider);
+    if (providerAccess.state !== "available") {
+      const blocked = helixRuntimeGoalSessionStore.blockGoalRuntimeSession({
+        goalId: req.params.goalId,
+        reason: "permission_revoked",
+      });
+      return res.status(403).json({
+        schema: "helix.runtime_goal.session_resume_response.v1",
+        ...blocked,
+        runtime_goal_debug_summary: runtimeGoalDebugSummaryFor(blocked),
+        error: "runtime_agent_locked_by_account_policy",
+        locked_reason: providerAccess.reason,
+        account_policy: accountPolicy,
+        answer_authority: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      });
+    }
+    const result = await helixRuntimeGoalSessionStore.resumeGoalRuntimeSession({
+      goalId: req.params.goalId,
+      wakeEventKind: readGoalWakeEventKind(body.wake_event_kind ?? body.wakeEventKind),
+      turnId: readString(body.turn_id ?? body.turnId) || null,
+      body,
+    });
+    return res.status(result.ok ? 200 : 409).json({
+      schema: "helix.runtime_goal.session_resume_response.v1",
+      ...result,
+      runtime_goal_debug_summary: runtimeGoalDebugSummaryFor(result),
+      answer_authority: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  } catch (error) {
+    return res.status(404).json({
+      schema: "helix.runtime_goal.session_resume_response.v1",
+      ok: false,
+      error: error instanceof Error ? error.message : "goal_session_not_found",
+      goal_id: req.params.goalId,
+      answer_authority: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  }
+});
+
+agentProvidersRouter.post("/goal/runtime-session/:goalId/stop", (req: Request, res: Response) => {
+  const body = readBodyRecord(req.body);
+  try {
+    const result = helixRuntimeGoalSessionStore.stopGoalRuntimeSession({
+      goalId: req.params.goalId,
+      status: readGoalStopStatus(body.status),
+      reason: readString(body.reason) || null,
+    });
+    return res.json({
+      schema: "helix.runtime_goal.session_stop_response.v1",
+      ...result,
+      runtime_goal_debug_summary: runtimeGoalDebugSummaryFor(result),
+      answer_authority: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  } catch (error) {
+    return res.status(404).json({
+      schema: "helix.runtime_goal.session_stop_response.v1",
+      ok: false,
+      error: error instanceof Error ? error.message : "goal_session_not_found",
+      goal_id: req.params.goalId,
+      answer_authority: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  }
 });
 
 agentProvidersRouter.get("/capability-lanes/session", (req: Request, res: Response) => {

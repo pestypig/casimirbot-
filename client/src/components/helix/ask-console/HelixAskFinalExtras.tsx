@@ -17,6 +17,11 @@ export type HelixAskReplyStatusFooterProps = {
   promptIngested?: boolean;
 };
 
+export type HelixAskRuntimeGoalProgressPanelProps = {
+  summary?: RecordLike | null;
+  isLatestReply: boolean;
+};
+
 export type HelixAskLiveBridgePill = {
   label: string;
   tone: "cyan" | "amber" | "emerald" | "slate";
@@ -38,6 +43,69 @@ export type HelixAskStagePlayActionButtonsProps = {
 
 const readRecord = (value: unknown): RecordLike | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as RecordLike) : null;
+
+const readString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim() ? value.trim() : null;
+
+const readBoolean = (value: unknown): boolean | null =>
+  typeof value === "boolean" ? value : null;
+
+const readStringArray = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string" && entry.trim()).map((entry) => entry.trim())
+    : [];
+
+const formatRefCount = (refs: string[], label: string): string | null =>
+  refs.length > 0 ? `${refs.length} ${label}${refs.length === 1 ? "" : "s"}` : null;
+
+const formatFreshness = (value: unknown): string | null =>
+  typeof value === "number" && Number.isFinite(value)
+    ? `${Math.max(0, Math.round(value))} ms`
+    : null;
+
+const formatTimer = (status: unknown, ms: unknown): string | null => {
+  const statusText = readString(status);
+  if (!statusText) return null;
+  if (typeof ms === "number" && Number.isFinite(ms)) {
+    return `${statusText} (${Math.max(0, Math.round(ms))} ms)`;
+  }
+  return statusText;
+};
+
+const buildRuntimeGoalProgressRows = (summary: RecordLike): Array<{ label: string; value: string }> => {
+  const observationRefs = readStringArray(summary.latest_observation_refs);
+  const receiptRefs = readStringArray(summary.latest_receipt_refs);
+  const serverAuthoritative = readBoolean(summary.terminal_answer_server_authoritative);
+  const refSummary = [
+    formatRefCount(observationRefs, "observation"),
+    formatRefCount(receiptRefs, "receipt"),
+    readString(summary.provider_terminal_candidate_ref) ? "candidate recorded" : null,
+  ].filter(Boolean).join(" | ");
+
+  return [
+    { label: "Goal", value: readString(summary.job_title) ?? readString(summary.goal_id) ?? "Runtime goal" },
+    { label: "Runtime", value: readString(summary.runtime_agent_provider) ?? "runtime provider not reported" },
+    { label: "Status", value: readString(summary.session_status) ?? readString(summary.status_reason) ?? "status not reported" },
+    { label: "Last wake", value: readString(summary.last_wake_at) ?? readString(summary.session_updated_at) ?? "not woken yet" },
+    { label: "Source", value: readString(summary.observed_source_label) ?? readString(summary.observed_source_doc_path) ?? "source not reported" },
+    { label: "Source kind", value: readString(summary.observed_source_kind) ?? "source kind not reported" },
+    { label: "Freshness", value: formatFreshness(summary.observed_source_freshness_ms) ?? "freshness not reported" },
+    { label: "Tool", value: readString(summary.requested_observation_or_lane) ?? "tool/lane not reported" },
+    { label: "Product", value: readString(summary.wake_expected_terminal_product) ?? "terminal product not reported" },
+    { label: "Reason", value: readString(summary.wake_relevance_reason) ?? "wake reason not reported" },
+    { label: "Wake", value: readString(summary.wake_candidate_event_kind) ?? readString(summary.wake_admission_reason) ?? "manual or not reported" },
+    { label: "Admission", value: readString(summary.wake_admission_status) ?? "admission not reported" },
+    { label: "Timer", value: formatTimer(summary.wake_timer_status, summary.wake_timer_ms) ?? "timer policy not reported" },
+    { label: "Progress", value: readString(summary.current_progress_summary) ?? "progress not reported" },
+    { label: "Next", value: readString(summary.next_wake_behavior) ?? readString(summary.session_status) ?? "waiting" },
+    { label: "Authority", value: readString(summary.terminal_authority_status) ?? "authority not reported" },
+    {
+      label: "Server authority",
+      value: serverAuthoritative === null ? "not reported" : serverAuthoritative ? "server-authorized" : "not server-authorized",
+    },
+    { label: "Evidence", value: refSummary || "evidence refs not reported" },
+  ];
+};
 
 export function HelixAskProofTraceDetails({ trace, clipText }: HelixAskProofTraceDetailsProps) {
   const record = readRecord(trace);
@@ -109,6 +177,47 @@ export function HelixAskJobReadyLinkStrip({ links, onRun }: HelixAskJobReadyLink
         );
       })}
     </div>
+  );
+}
+
+export function HelixAskRuntimeGoalProgressPanel({
+  summary,
+  isLatestReply,
+}: HelixAskRuntimeGoalProgressPanelProps) {
+  const record = readRecord(summary);
+  if (!record) return null;
+
+  const terminalStatus = readString(record.terminal_authority_status);
+  const rows = buildRuntimeGoalProgressRows(record);
+
+  return (
+    <section
+      className="mt-3 border-l border-cyan-300/35 bg-cyan-950/10 px-3 py-2 text-xs text-slate-200"
+      data-testid={isLatestReply ? "helix-ask-latest-runtime-goal-progress" : "helix-ask-runtime-goal-progress"}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200">
+          Goal progress
+        </p>
+        {terminalStatus ? (
+          <span className="rounded border border-cyan-300/20 bg-black/20 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.12em] text-cyan-100/80">
+            {terminalStatus}
+          </span>
+        ) : null}
+      </div>
+      <dl className="mt-2 space-y-1.5">
+        {rows.map((row) => (
+          <div key={row.label} className="grid gap-1 sm:grid-cols-[5.5rem_minmax(0,1fr)]">
+            <dt className="text-[10px] uppercase tracking-[0.12em] text-slate-500">
+              {row.label}
+            </dt>
+            <dd className="break-words text-slate-200 [overflow-wrap:anywhere]">
+              {row.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   );
 }
 

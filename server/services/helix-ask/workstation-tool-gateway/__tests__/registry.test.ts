@@ -7,6 +7,7 @@ import {
 import { runtimeMemoryGovernor } from "../../../runtime/runtime-memory-governor";
 
 const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context";
+const WORKSTATION_NOTES_LIST_NOTES_CAPABILITY = "workstation-notes.list_notes";
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression";
 const CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY = "scientific-calculator.solve_scalar_expression";
 const CALCULATOR_CLASSIFY_EXPRESSION_CAPABILITY = "scientific-calculator.classify_expression";
@@ -165,6 +166,23 @@ describe("Helix workstation tool gateway", () => {
         shell_access: false,
         permission_profile_required: "read",
         output_observation_schema: "helix.workstation_active_context_observation.v1",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    );
+    expect(manifest.capabilities).toContainEqual(
+      expect.objectContaining({
+        capability_id: WORKSTATION_NOTES_LIST_NOTES_CAPABILITY,
+        panel_id: "workstation-notes",
+        action_id: "list_notes",
+        mode: "read",
+        mutating: false,
+        code_mutation: false,
+        shell_access: false,
+        requires_source: true,
+        permission_profile_required: "read",
+        output_observation_schema: "helix.workstation_notes_list_observation.v1",
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -810,6 +828,112 @@ describe("Helix workstation tool gateway", () => {
         assistant_answer: false,
         raw_content_included: false,
       },
+    });
+  });
+
+  it("calls workstation-notes.list_notes as a body-redacted non-terminal observation", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: WORKSTATION_NOTES_LIST_NOTES_CAPABILITY,
+      arguments: {
+        notes: [
+          {
+            id: "note-1",
+            title: "Fusion notes",
+            body: "secret body must not pass through",
+            content: "secret content must not pass through",
+            updated_at: "2026-07-04T10:00:00.000Z",
+            tags: ["physics", "draft"],
+          },
+        ],
+        active_note_id: "note-1",
+      },
+      turnId: "ask:test:gateway-notes-list",
+      iteration: 1,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result).toMatchObject({
+      capability_id: WORKSTATION_NOTES_LIST_NOTES_CAPABILITY,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+      observation: {
+        schema: "helix.workstation_notes_list_observation.v1",
+        status: "succeeded",
+        note_count: 1,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+        notes: [
+          expect.objectContaining({
+            id: "note-1",
+            title: "Fusion notes",
+            source_ref: "workstation-notes:note-1",
+            raw_content_included: false,
+            terminal_eligible: false,
+          }),
+        ],
+      },
+      observation_packet: expect.objectContaining({
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+      tool_followup_decision: expect.objectContaining({
+        next_action: "continue_reasoning",
+        terminal_blockers: ["post_tool_model_step_required", "terminal_authority_not_evaluated"],
+        evidence_reentered: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    });
+    expect(JSON.stringify(result.observation)).not.toContain("secret body");
+    expect(JSON.stringify(result.observation)).not.toContain("secret content");
+  });
+
+  it("blocks workstation-notes.list_notes when no bounded notes context was supplied", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: WORKSTATION_NOTES_LIST_NOTES_CAPABILITY,
+      arguments: {},
+      turnId: "ask:test:gateway-notes-list-missing",
+      iteration: 1,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: "workstation_notes_context_missing",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+      gateway_admission: expect.objectContaining({
+        admission_status: "blocked",
+        blocked_reason: "workstation_notes_context_missing",
+      }),
+      observation: {
+        schema: "helix.workstation_notes_list_observation.v1",
+        status: "blocked",
+        blocked_reason: "workstation_notes_context_missing",
+        note_count: 0,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: expect.objectContaining({
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+        missing_requirements: [
+          expect.objectContaining({
+            code: "workstation_notes_context_missing",
+            repair_action: "ask_user",
+          }),
+        ],
+      }),
     });
   });
 
@@ -1864,6 +1988,70 @@ describe("Helix workstation tool gateway", () => {
         raw_content_included: false,
       },
     });
+    expect(result.produced_affordances).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "bound_calculator_expression",
+          status: "blocked",
+          missing_inputs: ["f"],
+        }),
+      ]),
+    );
+  });
+
+  it("does not bind calculator variables from expression-template affordances", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "verify",
+      capabilityId: CALCULATOR_BIND_VARIABLES_CAPABILITY,
+      arguments: {
+        expression: "E = h * f",
+        numeric_value_evidence: [
+          {
+            kind: "calculator_expression_template",
+            symbol: "f",
+            value: "h * f",
+            expression: "E = h * f",
+            source_refs: ["theory-badge:template"],
+          },
+        ],
+      },
+      turnId: "ask:test:gateway-calculator-bind-template-not-numeric",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: CALCULATOR_BIND_VARIABLES_CAPABILITY,
+      error: "missing_variables",
+      observation_packet: {
+        capability_key: CALCULATOR_BIND_VARIABLES_CAPABILITY,
+        action: "bind_variables",
+        status: "blocked",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+        missing_requirements: [
+          expect.objectContaining({
+            code: "missing_variables",
+            required_affordance_kind: "numeric_value_evidence",
+          }),
+        ],
+      },
+      observation: {
+        schema: "helix.calculator_variable_binding_observation.v1",
+        status: "blocked",
+        bound_expression: null,
+        missing_variables: ["f"],
+        blocked_reasons: ["missing_variables"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(result.consumed_affordances).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "numeric_value_evidence", status: "required" }),
+      ]),
+    );
     expect(result.produced_affordances).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

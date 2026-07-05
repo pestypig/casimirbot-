@@ -17,6 +17,93 @@ function readVoiceDiagnosticsBoolean(value: unknown): boolean | null {
   return typeof value === "boolean" ? value : null;
 }
 
+function readVoiceDiagnosticsNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function collectClientVoicePlaybackReceipts(source: Record<string, unknown>): Record<string, unknown>[] {
+  const clientProjection = readVoiceDiagnosticsRecord(source.client_debug_projection);
+  const clientVoice = readVoiceDiagnosticsRecord(source.client_voice_debug ?? clientProjection?.voice);
+  return [
+    source.client_voice_playback_receipts,
+    clientProjection?.voice_playback_receipts,
+    clientVoice?.playbackReceipts,
+  ]
+    .flatMap((entry) => (Array.isArray(entry) ? entry : []))
+    .map((receipt) => readVoiceDiagnosticsRecord(receipt))
+    .filter((receipt): receipt is Record<string, unknown> => Boolean(receipt));
+}
+
+function isActiveVoicePlaybackReceipt(receipt: Record<string, unknown>, activeTurnId: string): boolean {
+  if (!activeTurnId) return true;
+  return [
+    receipt.turnKey,
+    receipt.utteranceId,
+    receipt.sourceReceiptId,
+    receipt.sourceReceiptKey,
+    receipt.requestId,
+  ].some((value) => coerceVoiceDiagnosticsText(value).includes(activeTurnId));
+}
+
+function summarizeClientPlaybackReceipts(input: {
+  source: Record<string, unknown>;
+  activeTurnId: string | null;
+}): Record<string, unknown> {
+  const activeTurnId = input.activeTurnId?.trim() ?? "";
+  const receipts = collectClientVoicePlaybackReceipts(input.source)
+    .filter((receipt) => isActiveVoicePlaybackReceipt(receipt, activeTurnId))
+    .sort((left, right) =>
+      (readVoiceDiagnosticsNumber(left.atMs) ?? 0) - (readVoiceDiagnosticsNumber(right.atMs) ?? 0)
+    );
+  const latestReceipt = receipts[receipts.length - 1] ?? null;
+  const receiptsWithStatus = (status: string) =>
+    receipts.filter((receipt) => coerceVoiceDiagnosticsText(receipt.status).trim() === status);
+  const queuedReceipts = receiptsWithStatus("queued");
+  const deliveredReceipts = receiptsWithStatus("delivered");
+  const failedReceipts = [
+    ...receiptsWithStatus("failed"),
+    ...receiptsWithStatus("cancelled"),
+    ...receiptsWithStatus("suppressed"),
+  ];
+  const firstAtMs = (items: Record<string, unknown>[]) => readVoiceDiagnosticsNumber(items[0]?.atMs) ?? null;
+  const latestAtMs = (items: Record<string, unknown>[]) =>
+    readVoiceDiagnosticsNumber(items[items.length - 1]?.atMs) ?? null;
+  const deliveredUtteranceIds = Array.from(
+    new Set(deliveredReceipts.map((receipt) => coerceVoiceDiagnosticsText(receipt.utteranceId).trim()).filter(Boolean)),
+  );
+  const deliveredAtMs = latestAtMs(deliveredReceipts);
+  return {
+    client_playback_receipt_count: receipts.length,
+    latest_client_playback_status: latestReceipt
+      ? coerceVoiceDiagnosticsText(latestReceipt.status).trim() || null
+      : null,
+    playback_started: queuedReceipts.length > 0,
+    playback_completed: deliveredReceipts.length > 0,
+    playback_failed: failedReceipts.length > 0,
+    playback_started_at_ms: firstAtMs(queuedReceipts),
+    playback_completed_at_ms: deliveredAtMs,
+    playback_failed_at_ms: latestAtMs(failedReceipts),
+    delivered_utterance_ids: deliveredUtteranceIds,
+    delivered_utterance_id: deliveredUtteranceIds[deliveredUtteranceIds.length - 1] ?? null,
+    delivered_at_ms: deliveredAtMs,
+    client_playback_receipts: receipts.slice(-5).map((receipt) => ({
+      receiptId: coerceVoiceDiagnosticsText(receipt.receiptId).trim() || null,
+      sourceReceiptId: coerceVoiceDiagnosticsText(receipt.sourceReceiptId).trim() || null,
+      requestId: coerceVoiceDiagnosticsText(receipt.requestId).trim() || null,
+      utteranceId: coerceVoiceDiagnosticsText(receipt.utteranceId).trim() || null,
+      status: coerceVoiceDiagnosticsText(receipt.status).trim() || null,
+      atMs: readVoiceDiagnosticsNumber(receipt.atMs),
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      output_authority: "playback_observation",
+    })),
+  };
+}
+
 export function resolveVoiceTimelineClientBuildStamp(input: {
   stampedBuild?: string | null;
   isDev: boolean;
@@ -70,15 +157,7 @@ export function buildVoicePlaybackReconciliationDebug(input: {
 }): Record<string, unknown> {
   const clientProjection = readVoiceDiagnosticsRecord(input.source.client_debug_projection);
   const clientVoice = readVoiceDiagnosticsRecord(input.source.client_voice_debug ?? clientProjection?.voice);
-  const receiptSources = [
-    input.source.client_voice_playback_receipts,
-    clientProjection?.voice_playback_receipts,
-    clientVoice?.playbackReceipts,
-  ];
-  const receipts = receiptSources
-    .flatMap((source) => (Array.isArray(source) ? source : []))
-    .map((receipt) => readVoiceDiagnosticsRecord(receipt))
-    .filter((receipt): receipt is Record<string, unknown> => Boolean(receipt));
+  const receipts = collectClientVoicePlaybackReceipts(input.source);
   const receiptKeyForReconciliation = (receipt: Record<string, unknown>): string => {
     const candidates = [
       receipt.receiptId,
@@ -209,6 +288,10 @@ export function buildVoicePlaybackReceiptBarrierDebug(input: {
     playback_status: finalStatusMatch?.[1]?.toLowerCase() ?? null,
     receipt_kind: "helix.interim_voice_callout_tool_result.v1",
     observation_refs: observationRefs,
+    ...summarizeClientPlaybackReceipts({
+      source: input.source,
+      activeTurnId: input.activeTurnId,
+    }),
     receipt_observed: observationRefs.length > 0,
     evidence_reentered: reentered,
     terminal_blockers: reentered ? [] : ["voice_playback_receipt_not_reentered"],

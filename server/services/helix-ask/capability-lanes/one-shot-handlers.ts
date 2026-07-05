@@ -6,6 +6,7 @@ import {
 import type { HelixCapabilityLaneId, HelixCapabilityLaneResolveTrace } from "@shared/helix-capability-lane";
 import {
   HELIX_LIVE_TRANSLATION_ONE_SHOT_REQUEST_SCHEMA,
+  type HelixVisibleTranslationTargetCollectorCapability,
   type HelixLiveTranslationOneShotRequest,
   type HelixLiveTranslationOneShotResult,
 } from "@shared/helix-live-translation-lane";
@@ -103,6 +104,9 @@ const readRecord = (value: unknown): RecordLike | null =>
 
 const readNumber = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const readNowMs = (call: RecordLike): number | null =>
+  readNumber(call.now_ms ?? call.nowMs);
 
 export const readHelixCapabilityLaneCallCapability = (call: RecordLike): string =>
   readString(call.capability ?? call.capability_id ?? call.capabilityId);
@@ -293,14 +297,20 @@ const toLiveTranslationRequest = (
     goal_binding_id: readString(call.goal_binding_id ?? call.goalBindingId) || null,
     goal_binding_key: readString(call.goal_binding_key ?? call.goalBindingKey) || null,
     source_id: readString(call.source_id ?? call.sourceId) || null,
+    panel_id: readString(call.panel_id ?? call.panelId) || null,
+    region_id: readString(call.region_id ?? call.regionId) || null,
+    bbox: readRecord(call.bbox ?? call.bbox_px ?? call.bboxPx),
+    doc_path: readString(call.doc_path ?? call.docPath) || null,
     source_hash: readString(call.source_hash ?? call.sourceHash) || null,
     source_kind: readString(call.source_kind ?? call.sourceKind) || null,
+    source_text_hash: readString(call.source_text_hash ?? call.sourceTextHash) || null,
+    source_text_char_count: readNumber(call.source_text_char_count ?? call.sourceTextCharCount),
     account_locale: readString(call.account_locale ?? call.accountLocale) || null,
     chunk_id: readString(call.chunk_id ?? call.chunkId) || null,
-    chunk_index: typeof call.chunk_index === "number" ? call.chunk_index : null,
+    chunk_index: readNumber(call.chunk_index ?? call.chunkIndex),
     dedupe_key: readString(call.dedupe_key ?? call.dedupeKey) || null,
     source_event_id: readString(call.source_event_id ?? call.sourceEventId) || null,
-    source_event_ms: typeof call.source_event_ms === "number" ? call.source_event_ms : null,
+    source_event_ms: readNumber(call.source_event_ms ?? call.sourceEventMs),
     projection_target: readString(call.projection_target ?? call.projectionTarget) as HelixLiveTranslationOneShotRequest["projection_target"] || null,
     cancel_requested: call.cancel_requested === true || call.cancelRequested === true,
     assistant_answer: false,
@@ -341,6 +351,8 @@ const toTextToSpeechSpeakTextRequest = (
     voice: readString(call.voice) || null,
     profile: readString(call.profile ?? call.voice_profile ?? call.voiceProfile) || null,
     locale: readString(call.locale) || null,
+    voice_playback_kind:
+      readString(call.voice_playback_kind ?? call.voicePlaybackKind) as HelixTextToSpeechOneShotRequest["voice_playback_kind"] || null,
     requested_backend_provider:
       readString(call.requested_backend_provider ?? call.requestedBackendProvider) || null,
     turn_id: readString(call.turn_id ?? call.turnId) || turnId,
@@ -427,6 +439,10 @@ const toImageLensRegionInspectionRequest = (
     question: readString(call.question) || null,
     reason_for_crop:
       readString(call.reason_for_crop ?? call.reasonForCrop) || null,
+    region_label:
+      readString(call.region_label ?? call.regionLabel) || null,
+    requested_equation_label:
+      readString(call.requested_equation_label ?? call.requestedEquationLabel) || null,
     parent_region_id:
       readString(call.parent_region_id ?? call.parentRegionId) || null,
     detail:
@@ -439,6 +455,8 @@ const toImageLensRegionInspectionRequest = (
       readString(call.text_candidate ?? call.textCandidate) || null,
     latex_candidate:
       readString(call.latex_candidate ?? call.latexCandidate) || null,
+    extraction_status:
+      readString(call.extraction_status ?? call.extractionStatus) as ImageLensRegionInspectionRequestV1["extraction_status"] || null,
     table_candidate_ref:
       readString(call.table_candidate_ref ?? call.tableCandidateRef) || null,
     uncertainty: Array.isArray(call.uncertainty)
@@ -474,31 +492,123 @@ const toWorkstationToolReferenceListRequest = (
 const readBoolean = (value: unknown): boolean | null =>
   typeof value === "boolean" ? value : null;
 
+const readVisibleTranslationContext = (call: RecordLike): RecordLike | null =>
+  readRecord(
+    call.active_doc_visible_translation_context ??
+    call.activeDocVisibleTranslationContext ??
+    call.visible_translation_context ??
+    call.visibleTranslationContext,
+  );
+
+const readVisibleTranslationContextChunks = (
+  call: RecordLike,
+  context: RecordLike | null,
+): Array<Record<string, unknown>> | null => {
+  const chunks = Array.isArray(call.visible_text_chunks)
+    ? call.visible_text_chunks
+    : Array.isArray(call.visibleTextChunks)
+      ? call.visibleTextChunks
+      : Array.isArray(context?.chunks)
+        ? context.chunks
+        : null;
+  return chunks as Array<Record<string, unknown>> | null;
+};
+
+const readRecordArray = (value: unknown): Array<Record<string, unknown>> | null =>
+  Array.isArray(value)
+    ? value.filter((entry): entry is Record<string, unknown> =>
+        Boolean(entry) && typeof entry === "object" && !Array.isArray(entry),
+      )
+    : null;
+
+const isVisibleTranslationTargetCollectorCapability = (
+  capability: string,
+): capability is HelixVisibleTranslationTargetCollectorCapability =>
+  capability === "workstation_tool_reference.collect_visible_translation_targets" ||
+  capability === "workstation.visible_text.collect_translation_targets";
+
 const toWorkstationToolReferenceVisibleTranslationTargetsRequest = (
   call: RecordLike,
   turnId: string | null,
 ): HelixWorkstationToolReferenceVisibleTranslationTargetsRequest | null => {
   const capability = readHelixCapabilityLaneCallCapability(call);
-  if (capability !== "workstation_tool_reference.collect_visible_translation_targets") return null;
-  const chunks = Array.isArray(call.visible_text_chunks)
-    ? call.visible_text_chunks
-    : Array.isArray(call.visibleTextChunks)
-      ? call.visibleTextChunks
-      : null;
+  if (!isVisibleTranslationTargetCollectorCapability(capability)) return null;
+  const visibleContext = readVisibleTranslationContext(call);
+  const chunks = readVisibleTranslationContextChunks(call, visibleContext);
   return {
     schema: HELIX_WORKSTATION_TOOL_REFERENCE_VISIBLE_TRANSLATION_TARGETS_REQUEST_SCHEMA,
     capability: "workstation_tool_reference.collect_visible_translation_targets",
-    active_panel_id: readString(call.active_panel_id ?? call.activePanelId) || null,
-    doc_path: readString(call.doc_path ?? call.docPath) || null,
-    projection_target: readString(call.projection_target ?? call.projectionTarget) || null,
-    account_locale: readString(call.account_locale ?? call.accountLocale) || null,
-    target_language: readString(call.target_language ?? call.targetLanguage) || null,
+    requested_collector_capability: capability,
+    active_panel_id:
+      readString(call.active_panel_id ?? call.activePanelId) ||
+      readString(visibleContext?.panel_id ?? visibleContext?.panelId) ||
+      null,
+    doc_path:
+      readString(call.doc_path ?? call.docPath) ||
+      readString(visibleContext?.doc_path ?? visibleContext?.docPath) ||
+      null,
+    source_hash:
+      readString(call.source_hash ?? call.sourceHash) ||
+      readString(visibleContext?.source_hash ?? visibleContext?.sourceHash) ||
+      null,
+    projection_target:
+      readString(call.projection_target ?? call.projectionTarget) ||
+      readString(visibleContext?.projection_target ?? visibleContext?.projectionTarget) ||
+      null,
+    account_locale:
+      readString(call.account_locale ?? call.accountLocale) ||
+      readString(visibleContext?.account_locale ?? visibleContext?.accountLocale) ||
+      null,
+    target_language:
+      readString(call.target_language ?? call.targetLanguage) ||
+      readString(visibleContext?.target_language ?? visibleContext?.targetLanguage) ||
+      null,
     max_chunks: readNumber(call.max_chunks ?? call.maxChunks),
     visible_only: readBoolean(call.visible_only ?? call.visibleOnly),
+    selected_text:
+      readString(
+        call.selected_text ??
+        call.selectedText ??
+        call.selection_text ??
+        call.selectionText,
+      ) || null,
+    selection_ref:
+      readString(call.selection_ref ?? call.selectionRef) || null,
+    hover_text:
+      readString(
+        call.hover_text ??
+        call.hoverText ??
+        call.hover_region_text ??
+        call.hoverRegionText ??
+        call.active_region_text ??
+        call.activeRegionText,
+      ) || null,
+    hover_ref:
+      readString(
+        call.hover_ref ??
+        call.hoverRef ??
+        call.active_region_ref ??
+        call.activeRegionRef,
+      ) || null,
     visible_text: readString(call.visible_text ?? call.visibleText ?? call.text) || null,
     title_text: readString(call.title_text ?? call.titleText) || null,
     body_text: readString(call.body_text ?? call.bodyText) || null,
-    visible_text_chunks: chunks as Array<Record<string, unknown>> | null,
+    visible_text_chunks: chunks,
+    ui_text_regions:
+      readRecordArray(
+        call.ui_text_regions ??
+        call.uiTextRegions ??
+        call.panel_text_regions ??
+        call.panelTextRegions ??
+        call.visible_ui_text_regions ??
+        call.visibleUiTextRegions ??
+        visibleContext?.ui_text_regions ??
+        visibleContext?.uiTextRegions ??
+        visibleContext?.panel_text_regions ??
+        visibleContext?.panelTextRegions ??
+        visibleContext?.visible_ui_text_regions ??
+        visibleContext?.visibleUiTextRegions,
+      ),
     requested_backend_provider:
       readString(call.requested_backend_provider ?? call.requestedBackendProvider) || null,
     turn_id: readString(call.turn_id ?? call.turnId) || turnId,
@@ -529,6 +639,7 @@ const liveTranslationHandler: HelixCapabilityLaneOneShotHandler = {
       turnId: input.turnId,
       iteration: input.iteration,
       env: input.env,
+      nowMs: readNowMs(input.call),
     });
   },
 };
@@ -623,6 +734,7 @@ const workstationToolReferenceHandler: HelixCapabilityLaneOneShotHandler = {
         turnId: input.turnId,
         iteration: input.iteration,
         env: input.env,
+        nowMs: readNowMs(input.call),
       });
     }
     const request = toWorkstationToolReferenceListRequest(input.call, input.turnId);
@@ -640,6 +752,33 @@ const workstationToolReferenceHandler: HelixCapabilityLaneOneShotHandler = {
     return runWorkstationToolReferenceListCapabilities({
       provider: input.provider,
       request,
+      turnId: input.turnId,
+      iteration: input.iteration,
+      env: input.env,
+    });
+  },
+};
+
+const workstationVisibleTextHandler: HelixCapabilityLaneOneShotHandler = {
+  capabilityPrefix: "workstation.visible_text.",
+  laneId: "workstation_tool_reference",
+  run(input) {
+    const visibleTargetsRequest = toWorkstationToolReferenceVisibleTranslationTargetsRequest(input.call, input.turnId);
+    if (visibleTargetsRequest) {
+      return runWorkstationToolReferenceCollectVisibleTranslationTargets({
+        provider: input.provider,
+        request: visibleTargetsRequest,
+        turnId: input.turnId,
+        iteration: input.iteration,
+        env: input.env,
+        nowMs: readNowMs(input.call),
+      });
+    }
+    return buildShadowResult({
+      provider: input.provider,
+      laneId: "workstation_tool_reference",
+      capability: readHelixCapabilityLaneCallCapability(input.call) || "workstation.visible_text.unknown",
+      requestedBackendProvider: readString(input.call.requested_backend_provider ?? input.call.requestedBackendProvider) || null,
       turnId: input.turnId,
       iteration: input.iteration,
       env: input.env,
@@ -701,6 +840,7 @@ export const HELIX_CAPABILITY_LANE_ONE_SHOT_HANDLERS: HelixCapabilityLaneOneShot
   speechToTextHandler,
   textToSpeechHandler,
   visualAnalysisHandler,
+  workstationVisibleTextHandler,
   workstationToolReferenceHandler,
 ];
 

@@ -70,6 +70,7 @@ function buildDocumentInlineTranslationAnchor(
     : {
       "data-doc-translation-governed-projection": "true",
       "data-doc-translation-authority-policy": "projection_only_not_answer_authority",
+      "data-doc-translation-terminal-authority-owner": "helix",
       "data-doc-translation-display-status": "empty",
       "data-doc-translation-display-status-reason": "no_projection_activity",
       "data-doc-translation-render-status": "empty",

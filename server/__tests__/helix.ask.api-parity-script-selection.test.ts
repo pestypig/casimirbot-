@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isApiParityTransportFailure,
   selectApiParityScenarios,
+  seedBodyFor,
 } from "../../scripts/helix-ask-api-parity-probe";
 import {
   API_PARITY_SCENARIOS,
@@ -56,5 +58,39 @@ describe("Helix Ask API parity script scenario selection", () => {
     expect(defaultSelection.scenarios.map((scenario) => scenario.id)).not.toContain(disabledScenario!.id);
     expect(defaultSelection.availableIds).toContain(disabledScenario!.id);
     expect(inclusiveSelection.scenarios.map((scenario) => scenario.id)).toContain(disabledScenario!.id);
+  });
+
+  it("classifies transport failures separately from parity contract failures", () => {
+    expect(isApiParityTransportFailure(new Error("fetch failed"))).toBe(true);
+    expect(isApiParityTransportFailure(new Error("connect ECONNREFUSED 127.0.0.1:5050"))).toBe(true);
+    expect(isApiParityTransportFailure(new Error("terminal_authority_mismatch"))).toBe(false);
+  });
+
+  it("maps wrong-environment live-source parity to the dedicated runtime seed", () => {
+    const scenario = API_PARITY_SCENARIOS.find((entry) => entry.id === "live_source_identity_wrong_environment");
+
+    expect(seedBodyFor(scenario!, "thread:test")).toMatchObject({
+      scenario: "live_source_identity_wrong_environment",
+      thread_id: "thread:test",
+      source_id: "visual_source:live_source_identity_wrong_environment:bound",
+    });
+  });
+
+  it("maps identity-gap live-source parity to dedicated runtime seeds", () => {
+    for (const scenarioId of [
+      "live_source_identity_missing_environment_source",
+      "live_source_identity_no_situation_run",
+      "live_source_identity_no_field_evaluations",
+      "live_source_identity_stale_interpretation",
+    ]) {
+      const scenario = API_PARITY_SCENARIOS.find((entry) => entry.id === scenarioId);
+      const seed = seedBodyFor(scenario!, "thread:test");
+
+      expect(seed).toMatchObject({
+        scenario: scenarioId,
+        thread_id: "thread:test",
+        source_id: `visual_source:${scenarioId}:bound`,
+      });
+    }
   });
 });

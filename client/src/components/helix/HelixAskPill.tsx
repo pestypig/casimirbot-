@@ -8,8 +8,6 @@ import React, {
   type FormEvent,
   type ReactNode,
 } from "react";
-import { renderToString as renderKatexToString } from "katex";
-import "katex/dist/katex.min.css";
 import { Radio } from "lucide-react";
 import { panelRegistry, getPanelDef, type PanelDefinition } from "@/lib/desktop/panelRegistry";
 import {
@@ -120,22 +118,33 @@ import {
   hasSuccessfulWorkstationTerminalTranscriptRows,
   resolveHelixAskConsoleFinalAnswerSourceLabel,
 } from "@/components/helix/ask-console/HelixAskFinalProjection";
-import {
-  HelixAskFinalAnswer,
-} from "@/components/helix/ask-console/HelixAskFinalAnswer";
-import { HelixAskComposerActionToolbarSurface } from "@/components/helix/ask-console/HelixAskComposerActionToolbarSurface";
+import { buildHelixAskAttachmentStripState } from "@/components/helix/ask-console/HelixAskAttachmentStripState";
 import {
   type StagePlayGoalSessionAction,
 } from "@/components/helix/ask-console/HelixAskGoalPill";
-import { HelixAskGoalPillSurface } from "@/components/helix/ask-console/HelixAskGoalPillSurface";
-import { HelixAskMoodAvatar } from "@/components/helix/ask-console/HelixAskMoodAvatar";
-import {
-  HelixAskProceduralTimeline,
-  type HelixAskProceduralTimelineRow,
-} from "@/components/helix/ask-console/HelixAskProceduralTimeline";
-import { HelixAskReplyTurn } from "@/components/helix/ask-console/HelixAskReplyTurn";
-import { HelixAskActiveTurnReply } from "@/components/helix/ask-console/HelixAskActiveTurnReply";
+import { buildHelixAskGoalPillState } from "@/components/helix/ask-console/HelixAskGoalPillState";
+import { buildHelixAskConsoleErrorLineState } from "@/components/helix/ask-console/HelixAskConsoleErrorLineState";
+import { buildHelixAskLegacyComposerState } from "@/components/helix/ask-console/HelixAskLegacyComposerState";
+import { buildHelixAskLegacyConsoleViewState } from "@/components/helix/ask-console/HelixAskLegacyConsoleViewState";
+import { buildHelixAskLegacyConsoleRootState } from "@/components/helix/ask-console/HelixAskLegacyConsoleRootState";
+import { buildHelixAskLegacySurfaceContentState } from "@/components/helix/ask-console/HelixAskLegacySurfaceContentState";
+import { buildHelixAskReasoningTheaterState } from "@/components/helix/ask-console/HelixAskReasoningTheaterState";
+import { buildHelixAskReasoningTheaterMeterState } from "@/components/helix/ask-console/HelixAskReasoningTheaterMeterState";
+import { buildHelixAskReasoningTheaterStatusState } from "@/components/helix/ask-console/HelixAskReasoningTheaterStatusState";
+import { buildHelixAskSurfaceFrameState } from "@/components/helix/ask-console/HelixAskSurfaceFrameState";
+import { HelixAskLegacyCompletedReplySlot } from "@/components/helix/ask-console/HelixAskLegacyCompletedReplySlot";
+import { buildHelixAskLegacyCompletedReplyState } from "@/components/helix/ask-console/HelixAskLegacyCompletedReplyState";
+import { buildHelixAskCompletedReplyBattleState } from "@/components/helix/ask-console/HelixAskCompletedReplyBattleState";
+import { buildHelixAskCompletedReplyCardState } from "@/components/helix/ask-console/HelixAskCompletedReplyCardState";
+import { buildHelixAskCompletedReplyStreamState } from "@/components/helix/ask-console/HelixAskCompletedReplyStreamState";
+import { buildHelixAskReplyTurnState } from "@/components/helix/ask-console/HelixAskReplyTurnState";
+import { useHelixAskLegacyContentRenderers } from "@/components/helix/ask-console/HelixAskLegacyContentRenderers";
 import { resolveHelixAskLegacyReplyFailContext } from "@/components/helix/ask-console/HelixAskLegacyReplyDebugContext";
+import {
+  buildHelixAskRuntimeGoalDebugFields,
+  mergeHelixAskRuntimeGoalDebugFields,
+} from "@/components/helix/ask-console/HelixAskRuntimeGoalDebugContext";
+import { useHelixAskRuntimeGoalWakeSubscriptions } from "@/components/helix/ask-console/HelixAskRuntimeGoalWakeSubscriptions";
 import { sortHelixAskLegacyReplyEventsChronologically } from "@/components/helix/ask-console/HelixAskLegacyReplyEventOrder";
 import {
   hasHelixAskLegacyTerminalMismatch,
@@ -143,16 +152,39 @@ import {
   selectHelixAskLegacyFinalAnswerText,
 } from "@/components/helix/ask-console/HelixAskLegacyFinalTextSelection";
 import { HelixAskLegacyConsoleView } from "@/components/helix/ask-console/HelixAskLegacyConsoleView";
-import { HelixAskReasoningTheaterSurface } from "@/components/helix/ask-console/HelixAskReasoningTheaterSurface";
-import { HelixAskSurfaceComposerPanel } from "@/components/helix/ask-console/HelixAskSurfaceComposerPanel";
-import { HelixAskSurfaceFrame } from "@/components/helix/ask-console/HelixAskSurfaceFrame";
-import { HelixAskConsoleSupplementSurface } from "@/components/helix/ask-console/HelixAskConsoleSupplementSurface";
+import { buildHelixAskConsoleSupplementState } from "@/components/helix/ask-console/HelixAskConsoleSupplementState";
+import {
+  buildHelixAskActiveContextCapsuleDerivedState,
+  buildHelixAskContextCapsuleState,
+} from "@/components/helix/ask-console/HelixAskContextCapsuleState";
+import type { HelixAskContextCapsulePreviewModel } from "@/components/helix/ask-console/HelixAskContextCapsulePreview";
+import { buildHelixAskContextMemoryStatusState } from "@/components/helix/ask-console/HelixAskContextMemoryStatusState";
+import { buildHelixAskContextChooserState } from "@/components/helix/ask-console/HelixAskContextChooserState";
+import { buildHelixAskObserverSupplementState } from "@/components/helix/ask-console/HelixAskObserverSupplementState";
+import { buildHelixAskSupplementClipTextState } from "@/components/helix/ask-console/HelixAskSupplementClipTextState";
 import { selectHelixAskConsoleTurnTranscriptRowsForStream } from "@/components/helix/ask-console/HelixAskWorkstationTraceRows";
 import { buildHelixAskRuntimePickerModel } from "@/components/helix/ask-console/HelixAskRuntimePicker";
+import { buildHelixAskSituationRoomSourceDerivedState } from "@/components/helix/ask-console/HelixAskSituationRoomSourceState";
+import {
+  buildHelixAskTranscriptConfirmationState,
+  buildHelixAskVoiceCommandConfirmationState,
+} from "@/components/helix/ask-console/HelixAskVoiceConfirmationState";
+import {
+  buildHelixAskVoiceCaptureHealthState,
+  type HelixAskVoiceCaptureHealthSnapshot,
+} from "@/components/helix/ask-console/HelixAskVoiceCaptureHealthState";
+import { buildHelixAskVoiceCaptureDiagnosticsBaseState } from "@/components/helix/ask-console/HelixAskVoiceCaptureDiagnosticsState";
+import { buildHelixAskVoiceLevelMonitorState } from "@/components/helix/ask-console/HelixAskVoiceLevelMonitorState";
+import { buildHelixAskVoiceStatusDerivedState } from "@/components/helix/ask-console/HelixAskVoiceStatusState";
+import { buildHelixAskVoiceFeatureFlagsState } from "@/components/helix/ask-console/HelixAskVoiceFeatureFlagsState";
+import { buildHelixAskMoodAvatarState } from "@/components/helix/ask-console/HelixAskMoodAvatarState";
+import { buildHelixAskComposerActionToolbarState } from "@/components/helix/ask-console/HelixAskComposerActionToolbarState";
+import { buildHelixAskComposerTextareaState } from "@/components/helix/ask-console/HelixAskComposerTextareaState";
 import {
   persistHelixAskAgentRuntime,
   readStoredHelixAskAgentRuntime,
 } from "@/components/helix/ask-console/HelixAskRuntimePreference";
+import { readActiveDocVisibleTranslationContext } from "@/lib/docs/visibleTranslationContext";
 import {
   readHelixAskVisualCaptureAudioPreference,
   syncHelixAskVisualCaptureRoutePreference,
@@ -167,7 +199,6 @@ import {
 } from "@/components/helix/ask-console/HelixAskContextCompactionResumeFrameStorage";
 import {
   HELIX_ASK_CONSOLE_MAX_PROMPT_LINES,
-  HelixAskComposerTextarea,
   buildHelixAskComposerViewModel,
 } from "@/components/helix/ask-console/HelixAskComposer";
 import { buildHelixAskSubmitAdmission } from "@/components/helix/ask-console/HelixAskSubmitAdmission";
@@ -187,6 +218,7 @@ import {
   buildHelixAskActiveTurnDisplayViewModel,
   HELIX_ASK_ACTIVE_TURN_QUIET_GAP_TICK_MS,
 } from "@/components/helix/ask-console/HelixAskActiveTurnDisplayViewModel";
+import { buildHelixAskActiveTurnListState } from "@/components/helix/ask-console/HelixAskActiveTurnListState";
 import {
   appendHelixAskLiveTurnDisplayEvent,
   createHelixAskLiveTurnDisplayState,
@@ -196,14 +228,12 @@ import {
   addHelixAskLegacyChatMessage,
   addHelixAskLegacyChatTurnMessages,
 } from "@/components/helix/ask-console/HelixAskLegacyChatPersistenceBinding";
-import { HelixAskDebugDrawerSurface } from "@/components/helix/ask-console/HelixAskDebugDrawerSurface";
 import {
   buildHelixAskDebugDrawerCopyProjection,
   clearHelixAskDebugDrawerForStaleReply,
   type HelixAskDebugClipboardCopyResult,
   type HelixAskDebugExportDrawerState,
 } from "@/components/helix/ask-console/HelixAskDebugDrawerState";
-import { HelixAskTurnList } from "@/components/helix/ask-console/HelixAskTurnList";
 import {
   buildHelixAskAttachmentCommitChecks,
   hasReadyHelixAskAttachmentCommitCheck,
@@ -229,14 +259,16 @@ import {
   type HelixAskTextAttachment,
 } from "@/components/helix/ask-console/HelixAskTextAttachment";
 import {
+  buildHelixAskImageAttachmentsFromFiles,
+  selectHelixAskClipboardImageFiles,
+} from "@/components/helix/ask-console/HelixAskImageAttachment";
+import {
   applyHelixAskVoiceTimelineVersionError,
   applyHelixAskVoiceTimelineVersionPayload,
+  buildHelixAskVoiceTimelineBuildInfoEvent,
   buildHelixAskVoiceTimelineInitialBuildInfo,
   type HelixAskVoiceTimelineBuildInfo,
 } from "@/components/helix/ask-console/HelixAskVoiceTimelineBuildInfo";
-import { HelixAskConsoleErrorLineSurface } from "@/components/helix/ask-console/HelixAskConsoleErrorLineSurface";
-import { HelixAskSteeringQueueSurface } from "@/components/helix/ask-console/HelixAskSteeringQueueSurface";
-import { HelixAskVoiceLevelMonitor } from "@/components/helix/ask-console/HelixAskVoiceLevelMonitor";
 import { buildHelixAskObserverLaneEvents } from "@/components/helix/ask-console/HelixAskObserverLaneEvents";
 import {
   buildHelixAskActiveTimelineFeed,
@@ -274,7 +306,17 @@ import { publishMoralGraphCurrentAnswerFromDebugExport } from "@/store/useMoralG
 import {
   HELIX_ASK_LIVE_EVENT_BUS_EVENT,
   coerceHelixAskLiveEventBusPayload,
+  emitHelixAskLiveEvent,
 } from "@/lib/helix/liveEventsBus";
+import {
+  publishHelixAccountLanguageTranslationProjectionsFromPayload,
+  readHelixAccountLanguageTranslationProjectionContext,
+} from "@/lib/helix/account-language-translation-projection";
+import { buildHelixLiveTranslationProjectionEventPayloads } from "@/lib/helix/live-translation-projection";
+import {
+  publishHelixVisibleTranslationProjectionsFromPayload,
+  readHelixVisibleTranslationProjectionContext,
+} from "@/lib/helix/visible-translation-projection";
 import {
   buildNeedsRetrievalPlanEvent,
   buildObserverFinalizationEvent,
@@ -339,10 +381,8 @@ import {
   buildHelixAskMathRenderDebugForText,
   hasHelixAskRenderableMath,
   isHelixAskEquationFamilyDebug,
-  isLikelyCodeStyleMathToken,
   shouldShowHelixAskCalculatorPanel,
-  tokenizeHelixAskMathTokens,
-  type HelixAskMathToken,
+  splitHelixAskTextPathSegments,
 } from "@/lib/helix/ask-answer-rendering";
 export {
   buildHelixAskMathRenderDebugForText,
@@ -350,6 +390,8 @@ export {
   isHelixAskEquationFamilyDebug,
   isLikelyCodeStyleMathToken,
   shouldShowHelixAskCalculatorPanel,
+  splitHelixAskInlineCodeTextSegments,
+  splitHelixAskTextPathSegments,
   tokenizeHelixAskMathTokens,
 };
 export type {
@@ -460,7 +502,6 @@ import {
   readVisualEvidenceSummary,
 } from "@/lib/helix/ask-visual-evidence-readers";
 import {
-  SESSION_CAPSULE_CONFIDENCE_LABEL,
   resolveContextCapsulePalette,
   stripContextCapsuleTokensFromText,
 } from "@/lib/helix/ask-context-capsule-display";
@@ -507,7 +548,6 @@ import {
   extractAskLevelTheoryReflection,
   hasHelixAskBackendEntrypointTurnId,
   normalizeHelixRuntimeActionKey,
-  readAgentLoopAuditArray,
   readAgentLoopAuditRecord,
   readHelixDecisionCapabilityKeys,
   readHelixGatewayCapabilityKeys,
@@ -910,7 +950,6 @@ import {
   chooseVisibleFinalText,
   isInvalidTerminalAnswerText,
   normalizeTerminalAnswerText,
-  readHelixTopLevelPendingServerRequest,
   readHelixAskFinalAnswerSourceLabel,
   renderLiveAnswerEnvironmentContextPackAnswer,
   renderTypedFailureFallback,
@@ -944,7 +983,6 @@ import {
 import type { StagePlayLiveSourceMailTranscriptEntryV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import {
   resolveHelixVisibleTerminal as resolveHelixVisibleTerminalCore,
-  shouldShowHelixRuntimeStopReason,
 } from "@/lib/helix/resolveHelixVisibleTerminal";
 import {
   mergeVoiceTranscriptDraft,
@@ -1016,7 +1054,6 @@ import {
 import { useWorkstationProcessGraphStore } from "@/store/useWorkstationProcessGraphStore";
 import { useTheoryMapOverlayStore } from "@/store/useTheoryMapOverlayStore";
 import { runScientificSolve } from "@/lib/scientific-calculator/solver";
-import { base64FromFile } from "@/utils/files";
 import type { HelixTurnInputItem } from "@shared/helix-turn-input-item";
 import {
   readMissionContextControls,
@@ -1034,6 +1071,7 @@ import {
   getVoiceCaptureDiagnosticsSnapshot,
   publishVoiceCaptureDiagnosticsSnapshot,
   type VoiceCaptureDiagnosticsSnapshot,
+  type VoiceCaptureWarningCode,
   type VoiceLaneTimelineDebugEvent,
   type VoicePlaybackOutcomeReceipt,
   type VoicePlaybackOutcomeStatus,
@@ -1147,7 +1185,6 @@ import {
   buildReasoningBattleAmbientState,
   buildReasoningBattleBeats,
 } from "@/lib/helix/reasoning-battle-stage";
-import { buildReasoningBattleAnswerTint } from "@/lib/helix/ask-reasoning-battle-display";
 import {
   applyVoicePlaybackTimelineMetaUpdate,
   buildVoicePlaybackTimelineMeta,
@@ -1169,7 +1206,6 @@ import {
   normalizeContextCapsuleId,
   stepContextCapsuleAutomaton,
   type ContextCapsuleAutomaton,
-  type ContextCapsuleConvergence,
   type ContextCapsuleSummary,
 } from "@shared/helix-context-capsule";
 import {
@@ -2052,23 +2088,6 @@ export type HelixTimelineEntry = {
   meta?: Record<string, unknown>;
 };
 
-export type VoiceCaptureWarningCode = "loopback_source" | "flat_signal" | "recorder_stalled";
-
-export type VoiceCaptureHealthSnapshot = {
-  rmsRaw: number;
-  rmsDb: number;
-  peak: number;
-  noiseFloor: number;
-  displayLevel: number;
-  mediaChunkCount: number;
-  mediaBytes: number;
-  chunksPerSecond: number;
-  lastChunkAgeMs: number | null;
-  warnings: VoiceCaptureWarningCode[];
-  pipelineStatus: "idle" | "active" | "attention";
-  lastRoundtripMs: number | null;
-};
-
 type VoiceMeterStats = {
   rmsRaw: number;
   rmsDb: number;
@@ -2731,6 +2750,7 @@ type AskContextChooserState = {
 
 const HELIX_ASK_MAX_ATTACHMENTS = 6;
 const HELIX_ASK_LARGE_PASTE_THRESHOLD_CHARS = 2400;
+const HELIX_ASK_LEGACY_ATTACHED_CONTEXT_CHOOSER_ENABLED = false;
 
 function buildQueuedAskTurn(args: {
   question: string;
@@ -3278,14 +3298,6 @@ type HelixAskConsoleStreamIngressDebug = {
   lastUpdatedAtMs: number | null;
 };
 
-type ContextCapsulePreview = {
-  id: string;
-  loading: boolean;
-  error?: string;
-  summary?: ContextCapsuleSummary;
-  convergence?: ContextCapsuleConvergence;
-};
-
 type HelixAskPillProps = {
   contextId: string;
   className?: string;
@@ -3618,175 +3630,6 @@ function resolveHelixAskVisibleTerminal(value: unknown, fallbackContent?: string
     source: terminal.source,
     backendTerminalText: terminal.backendTerminalText,
   };
-}
-
-function renderProceduralTurnTimeline(reply: HelixAskReply): React.ReactNode {
-  const replyRecord = readAgentLoopAuditRecord(reply);
-  const truthTable = readAgentLoopAuditRecord(reply.debug?.turn_truth_table);
-  const plannerContract = readAgentLoopAuditRecord(reply.debug?.planner_contract);
-  const runtimeSummary = readAgentLoopAuditRecord(reply.debug?.turn_runtime);
-  const agentLoopAudit = readAgentLoopAuditRecord(reply.debug?.agent_loop_audit);
-  const uiDebugParityHarness = readAgentLoopAuditRecord(
-    replyRecord?.ui_debug_parity_harness ?? reply.debug?.ui_debug_parity_harness,
-  );
-  const agentRuntimeLoop = readAgentLoopAuditRecord(
-    replyRecord?.agent_runtime_loop ?? reply.debug?.agent_runtime_loop,
-  );
-  const runtimeIterations = readAgentLoopAuditArray(agentRuntimeLoop?.iterations);
-  const planItems = readAgentLoopAuditArray(truthTable?.plan_items ?? plannerContract?.plan_items);
-  const observations = readAgentLoopAuditArray(truthTable?.runtime_observations ?? runtimeSummary?.observations);
-  const appendedSteps = readAgentLoopAuditArray(runtimeSummary?.appended_steps);
-  const terminal = readAgentLoopAuditRecord(truthTable?.terminal ?? runtimeSummary?.terminal);
-  const selectedTool = readAgentLoopAuditRecord(truthTable?.selected_tool ?? agentLoopAudit?.selected_action);
-  const visibleResolvedTurn = buildVisibleResolvedTurn(reply);
-  const route = visibleResolvedTurn.primary_route_label;
-  const solverController = readAgentLoopAuditRecord(
-    replyRecord?.solver_controller_decision ?? reply.debug?.solver_controller_decision,
-  );
-  const runtimeStopReason =
-    typeof agentRuntimeLoop?.stop_reason === "string" ? agentRuntimeLoop.stop_reason.trim() : "";
-  const visibleAnswer = typeof truthTable?.visible_answer_text === "string" ? truthTable.visible_answer_text : reply.content;
-  const terminalText = typeof terminal?.text === "string" ? terminal.text : "";
-  const parityMatchesVisible =
-    typeof uiDebugParityHarness?.ui_answer_equals_terminal_authority_text === "boolean"
-      ? uiDebugParityHarness.ui_answer_equals_terminal_authority_text
-      : typeof uiDebugParityHarness?.ui_answer_equals_selected_final_answer === "boolean"
-        ? uiDebugParityHarness.ui_answer_equals_selected_final_answer
-        : null;
-  const truthMatchesVisible =
-    parityMatchesVisible ??
-    Boolean(terminalText && visibleAnswer && terminalText.trim() === visibleAnswer.trim());
-  const pendingInput =
-    visibleResolvedTurn.primary_terminal_label === "pending_input" && visibleResolvedTurn.pending_server_request_present
-      ? readHelixTopLevelPendingServerRequest(reply)
-      : null;
-  const visibleTerminalKind = resolveHelixVisibleTerminalKind({
-    reply,
-    terminal,
-    fallback: "final_answer",
-    extraSources: [truthTable, runtimeSummary, agentLoopAudit],
-  });
-  const showRuntimeStopReason = shouldShowHelixRuntimeStopReason({
-    stopReason: runtimeStopReason,
-    finalStatus: replyRecord?.final_status ?? reply.debug?.final_status,
-    terminalErrorCode: visibleResolvedTurn.terminal_error_code,
-    solverDecision: solverController?.decision,
-    terminalKind: visibleTerminalKind,
-  });
-
-  if (!truthTable && runtimeIterations.length === 0 && planItems.length === 0 && observations.length === 0 && !terminal) {
-    return null;
-  }
-
-  const rows: HelixAskProceduralTimelineRow[] = [];
-
-  const runtimeActionLabels: string[] = [];
-
-  runtimeIterations.slice(0, 12).forEach((item, index) => {
-    const record = readAgentLoopAuditRecord(item);
-    const chosenCapability = typeof record?.chosen_capability === "string" ? record.chosen_capability.trim() : "";
-    const executedAction = typeof record?.executed_action_key === "string" ? record.executed_action_key.trim() : "";
-    const actionLabel = executedAction || chosenCapability || String(record?.next_step ?? "model step");
-    const authority = String(record?.decision_authority ?? record?.decision_source ?? "unknown");
-    const producedArtifacts = Array.isArray(record?.produced_artifacts)
-      ? (record.produced_artifacts as unknown[]).map((entry) => String(entry)).filter(Boolean).join(", ")
-      : "";
-    if (executedAction || chosenCapability) runtimeActionLabels.push(executedAction || chosenCapability);
-    rows.push({
-      key: `runtime-${index}`,
-      label: `Runtime ${String(record?.iteration ?? index + 1)}: ${String(record?.next_step ?? "step")}`,
-      detail: `${authority}: ${actionLabel}${producedArtifacts ? ` -> ${producedArtifacts}` : ""}`,
-      status:
-        record?.observation_role === "tool_error" || record?.status === "failed"
-          ? "failed"
-          : record?.next_step === "ask_user"
-            ? "pending_input"
-            : "completed",
-    });
-  });
-
-  if (runtimeIterations.length === 0) {
-    planItems.slice(0, 8).forEach((item, index) => {
-      const record = readAgentLoopAuditRecord(item);
-      const actionLabel = readProceduralActionLabel(record?.action);
-      const lane = String(record?.lane ?? "step");
-      rows.push({
-        key: `plan-${index}`,
-        label: `Plan ${index + 1}: ${lane}`,
-        detail: actionLabel !== "model step" ? actionLabel : clipText(String(record?.title ?? record?.id ?? "planned step"), 140),
-        status: String(record?.status ?? "planned"),
-      });
-    });
-  }
-
-  appendedSteps.slice(0, 6).forEach((item, index) => {
-    const record = readAgentLoopAuditRecord(item);
-    rows.push({
-      key: `append-${index}`,
-      label: `Appended step: ${String(record?.step_id ?? "next_step")}`,
-      detail: `because ${String(record?.reason ?? "the previous observation needed another tool")}`,
-      status: "running",
-    });
-  });
-
-  observations.slice(-10).forEach((item, index) => {
-    const record = readAgentLoopAuditRecord(item);
-    const artifact = readAgentLoopAuditRecord(record?.artifact);
-    const actionLabel = readProceduralActionLabel(artifact);
-    const actualArtifacts = Array.isArray(record?.actual_artifacts)
-      ? (record?.actual_artifacts as unknown[]).map((entry) => String(entry)).filter(Boolean).join(", ")
-      : "";
-    const blockedArtifacts = Array.isArray(record?.blocked_missing_artifacts)
-      ? (record?.blocked_missing_artifacts as unknown[]).map((entry) => String(entry)).filter(Boolean).join(", ")
-      : "";
-    const detail =
-      blockedArtifacts
-        ? `blocked: missing ${blockedArtifacts}`
-        : actualArtifacts
-          ? `observed: ${actualArtifacts}`
-          : actionLabel !== "model step"
-            ? actionLabel
-            : String(record?.step_id ?? "observation");
-    rows.push({
-      key: `observe-${index}`,
-      label: `Observed: ${String(record?.step_id ?? "step")}`,
-      detail,
-      status: String(record?.status ?? "completed"),
-    });
-  });
-
-  if (terminal) {
-    rows.push({
-      key: "terminal",
-      label: `Terminal: ${visibleTerminalKind}`,
-      detail: clipText(
-        String(
-          pendingInput?.prompt ??
-            pendingInput?.text ??
-            terminal.text ??
-            visibleAnswer ??
-            "turn completed",
-        ),
-        160,
-      ),
-      status:
-        visibleTerminalKind === "pending_input"
-          ? "pending_input"
-          : visibleTerminalKind === "canceled"
-            ? "canceled"
-            : "completed",
-    });
-  }
-
-  return (
-    <HelixAskProceduralTimeline
-      rows={rows}
-      truthMatchesVisible={truthMatchesVisible}
-      route={route}
-      toolLabel={runtimeActionLabels[0] ?? (selectedTool ? readProceduralActionLabel(selectedTool) : null)}
-      runtimeStopReason={showRuntimeStopReason ? runtimeStopReason : null}
-    />
-  );
 }
 
 type StagePlayLiveSourceMailTranscriptResponse = {
@@ -4757,6 +4600,9 @@ function buildAskTurnWorkspaceContextSnapshot(sessionId: string | null | undefin
   const notesState = useWorkstationNotesStore.getState();
   const calculatorState = useScientificCalculatorStore.getState();
   const docContext = resolveAskTurnDocViewerSnapshotPath();
+  const activeDocVisibleTranslationContext = readActiveDocVisibleTranslationContext();
+  const accountLanguageTranslationProjections = readHelixAccountLanguageTranslationProjectionContext();
+  const visibleTranslationProjections = readHelixVisibleTranslationProjectionContext();
   const situationRoomState = useSituationRoomStore.getState();
   const situationRoomJobState = useSituationRoomJobStore.getState();
   const situationRoomContext = selectSituationRoomAskContextSnapshot(
@@ -4771,6 +4617,9 @@ function buildAskTurnWorkspaceContextSnapshot(sessionId: string | null | undefin
     notesState,
     calculatorState,
     docContext,
+    activeDocVisibleTranslationContext,
+    accountLanguageTranslationProjections,
+    visibleTranslationProjections,
     situationRoomContext,
     situationCaptureContext,
     lastUpdatedAtMs: Date.now(),
@@ -6653,6 +6502,7 @@ async function resolveAuthoritativeDebugExportPayload(localPayload: string): Pro
       readAgentLoopAuditRecord(parsed.reply?.console_assembly_debug);
     const mergedPayload = {
       ...authoritativePayload,
+      ...mergeHelixAskRuntimeGoalDebugFields(authoritativePayload, parsed),
       debug_export_source: "backend_endpoint",
       backend_debug_response_status: "fetched",
       client_active_turn_id: clientActiveTurnId,
@@ -6966,8 +6816,6 @@ const HELIX_ASK_TURN_CLIENT_WATCHDOG_MS = clampNumber(
   5_000,
   180_000,
 );
-const HELIX_ASK_PATH_REGEX =
-  /(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+\.(?:tsx|ts|jsx|js|md|json|cjs|mjs|py|yml|yaml)/g;
 
 const HELIX_DOC_TOPIC_PATH_HINTS: Array<{ pattern: RegExp; path: string }> = [
   {
@@ -7894,6 +7742,8 @@ export function HelixAskPill({
   const [askAttachments, setAskAttachments] = useState<HelixAskAttachment[]>([]);
   const [askReplies, setAskReplies] = useState<HelixAskReply[]>([]);
   const askRepliesRef = useRef<HelixAskReply[]>([]);
+  const runtimeGoalWakeInFlightRef = useRef(false);
+  const runtimeGoalWakeLastSubmittedKeyRef = useRef<string | null>(null);
   const triggerAskActionHaptic = useCallback(() => {
     try {
       navigator.vibrate?.(12);
@@ -8110,6 +7960,7 @@ export function HelixAskPill({
   const helixAskConsoleStreamIngressDebugRef = useRef<HelixAskConsoleStreamIngressDebug>(
     createHelixAskConsoleStreamIngressDebug(),
   );
+  const emittedLiveTranslationProjectionEventIdsRef = useRef<Set<string>>(new Set());
   const mirekReasoningArtifactRef = useRef<MirekReasoningArtifactV1 | null>(null);
   const mirekObjectiveFingerprintRef = useRef<string | null>(null);
   const situationRoomId = useMemo(() => contextId?.trim() || "helix-room", [contextId]);
@@ -8320,57 +8171,37 @@ export function HelixAskPill({
       return next;
     });
   }, []);
+  const addImageAttachmentsFromFiles = useCallback(async (files: readonly File[]) => {
+    if (files.length === 0) return;
+    const currentCount = askAttachmentsRef.current.length;
+    const slots = Math.max(0, HELIX_ASK_MAX_ATTACHMENTS - currentCount);
+    if (slots <= 0) {
+      setAskError(`Helix Ask supports up to ${HELIX_ASK_MAX_ATTACHMENTS} attachments for one turn.`);
+      return false;
+    }
+    const selected = files.slice(0, slots);
+    const nextAttachments = await buildHelixAskImageAttachmentsFromFiles(selected);
+    if (nextAttachments.length === 0) return false;
+    setAskAttachments((current) => {
+      const next = [...current, ...nextAttachments].slice(0, HELIX_ASK_MAX_ATTACHMENTS);
+      askAttachmentsRef.current = next;
+      return next;
+    });
+    setAskError(files.length > selected.length ? `Only ${slots} attachment slot${slots === 1 ? "" : "s"} remained.` : null);
+    return true;
+  }, []);
   const handleAskImageSelect = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const input = event.currentTarget;
     const files = Array.from(input.files ?? []);
     if (files.length === 0) return;
     try {
-      const currentCount = askAttachmentsRef.current.length;
-      const slots = Math.max(0, HELIX_ASK_MAX_ATTACHMENTS - currentCount);
-      if (slots <= 0) {
-        setAskError(`Helix Ask supports up to ${HELIX_ASK_MAX_ATTACHMENTS} attachments for one turn.`);
-        input.value = "";
-        return;
-      }
-      const selected = files.slice(0, slots);
-      const nextAttachments: HelixAskImageAttachment[] = [];
-      for (const file of selected) {
-        if (!file.type.startsWith("image/")) {
-          setAskError("Please attach image files for this upload path.");
-          continue;
-        }
-        if (file.size > 8 * 1024 * 1024) {
-          setAskError("Image attachments are limited to 8 MB for this Helix Ask path.");
-          continue;
-        }
-        const imageBase64 = await base64FromFile(file);
-        const previewUrl = URL.createObjectURL(file);
-        nextAttachments.push({
-          kind: "image",
-          id: crypto.randomUUID(),
-          fileName: file.name || "attached image",
-          mimeType: file.type || "image/png",
-          sizeBytes: file.size,
-          imageBase64,
-          previewUrl,
-          status: "ready",
-          error: null,
-        });
-      }
-      if (nextAttachments.length > 0) {
-        setAskAttachments((current) => {
-          const next = [...current, ...nextAttachments].slice(0, HELIX_ASK_MAX_ATTACHMENTS);
-          askAttachmentsRef.current = next;
-          return next;
-        });
-        setAskError(files.length > selected.length ? `Only ${slots} attachment slot${slots === 1 ? "" : "s"} remained.` : null);
-      }
+      await addImageAttachmentsFromFiles(files);
       input.value = "";
     } catch (error) {
       setAskError(error instanceof Error ? error.message : "Image attachment failed.");
       input.value = "";
     }
-  }, []);
+  }, [addImageAttachmentsFromFiles]);
   const addTextPasteAttachment = useCallback(async (text: string) => {
     const encoded = new TextEncoder().encode(text);
     if (encoded.byteLength > HELIX_ASK_TEXT_ATTACHMENT_MAX_BYTES) {
@@ -8438,7 +8269,7 @@ export function HelixAskPill({
   const askContextChooserRef = useRef<AskContextChooserState | null>(null);
   const [askContextChooserCountdownSec, setAskContextChooserCountdownSec] = useState<number | null>(null);
   const askContextChooserTimerRef = useRef<number | null>(null);
-  const [contextCapsulePreview, setContextCapsulePreview] = useState<ContextCapsulePreview | null>(null);
+  const [contextCapsulePreview, setContextCapsulePreview] = useState<HelixAskContextCapsulePreviewModel | null>(null);
   const [contextCapsuleDetectedId, setContextCapsuleDetectedId] = useState<string | null>(null);
   const [contextCapsuleSessionLedger, setContextCapsuleSessionLedger] = useState<ContextCapsuleLedgerEntry[]>([]);
   const contextCapsuleSessionLedgerRef = useRef<ContextCapsuleLedgerEntry[]>([]);
@@ -8930,6 +8761,29 @@ export function HelixAskPill({
     helixAskSessionContextRef.current = normalizedContextId || null;
     return helixAskSessionRef.current;
   }, [contextId, ensureContextSession]);
+
+  const appendRuntimeGoalWakeReply = useCallback((replyRecord: Record<string, unknown>) => {
+    const reply = replyRecord as HelixAskReply;
+    setAskReplies((prev) =>
+      appendHelixAskReplyChronologically(
+        prev,
+        reply,
+        HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT,
+      ),
+    );
+  }, []);
+
+  useHelixAskRuntimeGoalWakeSubscriptions({
+    selectedAgentRuntime,
+    askRepliesRef: askRepliesRef as React.MutableRefObject<readonly Record<string, unknown>[]>,
+    runtimeGoalWakeInFlightRef,
+    runtimeGoalWakeLastSubmittedKeyRef,
+    getHelixAskSessionId,
+    buildWorkspaceContextSnapshot: buildAskTurnWorkspaceContextSnapshot,
+    setAskStatus,
+    setAskError,
+    appendWakeReply: appendRuntimeGoalWakeReply,
+  });
 
   useLayoutEffect(() => {
     if (!helixChatStoreHydrated) return;
@@ -10321,161 +10175,19 @@ export function HelixAskPill({
     [onRunWorkstationAction],
   );
 
-  const renderHelixAskTextWithPathLinks = useCallback(
-    (text: string, keyPrefix: string): ReactNode[] => {
-      const parts: ReactNode[] = [];
-      HELIX_ASK_PATH_REGEX.lastIndex = 0;
-      let lastIndex = 0;
-      for (const match of text.matchAll(HELIX_ASK_PATH_REGEX)) {
-        const matchText = match[0];
-        const start = match.index ?? 0;
-        if (start > lastIndex) {
-          parts.push(text.slice(lastIndex, start));
-        }
-        const panelId = resolvePanelIdFromPath(matchText, {
-          docsPanelId: "docs-viewer",
-          hasPanel: (panelId) => Boolean(getPanelDef(panelId)),
-        });
-        if (panelId) {
-          parts.push(
-            <button
-              key={`${keyPrefix}-${matchText}-${start}`}
-              className="text-sky-300 underline underline-offset-2 hover:text-sky-200"
-              onClick={() => openPanelById(panelId)}
-              type="button"
-            >
-              {matchText}
-            </button>,
-          );
-        } else {
-          parts.push(matchText);
-        }
-        lastIndex = start + matchText.length;
-      }
-      if (lastIndex < text.length) {
-        parts.push(text.slice(lastIndex));
-      }
-      return parts.length ? parts : [text];
-    },
-    [openPanelById],
-  );
-
-  const renderHelixAskContent = useCallback(
-    (content: unknown): ReactNode[] => {
-      const text = coerceText(content);
-      if (!text) return [];
-      const renderMathAwareText = (segment: string, keyPrefix: string): ReactNode[] => {
-        const mathTokens = tokenizeHelixAskMathTokens(segment);
-        if (mathTokens.length === 0) return [];
-        if (mathTokens.length === 1 && mathTokens[0]?.kind === "text") {
-          return renderHelixAskTextWithPathLinks(mathTokens[0].text, `${keyPrefix}-plain`);
-        }
-        const segmentParts: ReactNode[] = [];
-        mathTokens.forEach((token, index) => {
-          if (token.kind === "text") {
-            segmentParts.push(...renderHelixAskTextWithPathLinks(token.text, `${keyPrefix}-text-${index}`));
-            return;
-          }
-          if (isLikelyCodeStyleMathToken(token)) {
-            segmentParts.push(
-              <code
-                key={`${keyPrefix}-math-code-${index}`}
-                className="mx-0.5 rounded border border-slate-700 bg-slate-950/70 px-1 py-0.5 font-mono text-[0.9em] text-emerald-200"
-              >
-                {token.text}
-              </code>,
-            );
-            return;
-          }
-          try {
-            const katexHtml = renderKatexToString(token.text, {
-              displayMode: token.displayMode,
-              strict: "ignore",
-              throwOnError: false,
-            });
-            segmentParts.push(
-              <span
-                key={`${keyPrefix}-math-${index}`}
-                className={token.displayMode ? "my-1 block overflow-x-auto text-slate-100" : "inline-block align-middle text-slate-100"}
-                dangerouslySetInnerHTML={{ __html: katexHtml }}
-              />,
-            );
-          } catch {
-            segmentParts.push(`${token.openDelimiter}${token.text}${token.closeDelimiter}`);
-          }
-        });
-        return segmentParts.length ? segmentParts : [segment];
-      };
-      const codeSpanMatches = [...text.matchAll(/`([^`\n]+)`/g)];
-      if (codeSpanMatches.length === 0) return renderMathAwareText(text, "plain");
-      const parts: ReactNode[] = [];
-      let cursor = 0;
-      codeSpanMatches.forEach((match, index) => {
-        const full = match[0] ?? "";
-        const body = match[1] ?? "";
-        const start = match.index ?? -1;
-        if (!full || start < 0) return;
-        if (start > cursor) {
-          parts.push(...renderMathAwareText(text.slice(cursor, start), `pre-code-${index}`));
-        }
-        parts.push(
-          <code
-            key={`inline-code-${index}`}
-            className="mx-0.5 rounded border border-slate-700 bg-slate-950/70 px-1 py-0.5 font-mono text-[0.9em] text-emerald-200"
-          >
-            {body}
-          </code>,
-        );
-        cursor = start + full.length;
-      });
-      if (cursor < text.length) {
-        parts.push(...renderMathAwareText(text.slice(cursor), "post-code"));
-      }
-      return parts.length ? parts : [text];
-    },
-    [renderHelixAskTextWithPathLinks],
-  );
-
-  const renderHelixAskFinalAnswerContent = useCallback(
-    (content: unknown): ReactNode => {
-      const text = coerceText(content);
-      if (!text) return null;
-      return <HelixAskFinalAnswer text={text} renderContent={renderHelixAskContent} />;
-    },
-    [renderHelixAskContent],
-  );
-
-  const renderEnvelopeSections = useCallback(
-    (sections: HelixAskResponseEnvelope["sections"], hideTitle?: string) => {
-      if (!sections || sections.length === 0) return null;
-      const hidden = hideTitle?.toLowerCase();
-      return (
-        <div className="space-y-2">
-          {sections.map((section, index) => (
-            <div key={`${section.title}-${index}`} className="text-sm text-slate-100">
-              {(() => {
-                const title = coerceText(section.title);
-                return title && title.toLowerCase() !== hidden ? (
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
-                    {title}
-                  </p>
-                ) : null;
-              })()}
-              <p className="mt-1 whitespace-pre-wrap leading-relaxed">
-                {renderHelixAskContent(coerceText(section.body))}
-              </p>
-              {section.layer === "proof" && normalizeHelixAskEnvelopeCitations(section.citations).length > 0 ? (
-                <p className="mt-1 text-[11px] text-slate-400">
-                  Sources: {renderHelixAskContent(normalizeHelixAskEnvelopeCitations(section.citations).join(", "))}
-                </p>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      );
-    },
-    [renderHelixAskContent],
-  );
+  const {
+    renderContent: renderHelixAskContent,
+    renderFinalAnswerContent: renderHelixAskFinalAnswerContent,
+    renderPlainAnswerEnvelope: renderHelixAskPlainAnswerEnvelope,
+    renderResponseEnvelope: renderHelixAskResponseEnvelope,
+  } = useHelixAskLegacyContentRenderers({
+    resolvePanelIdForPath: (pathText) =>
+      resolvePanelIdFromPath(pathText, {
+        docsPanelId: "docs-viewer",
+        hasPanel: (panelId) => Boolean(getPanelDef(panelId)),
+      }),
+    onOpenPanel: openPanelById,
+  });
 
   const renderHelixAskEnvelope = useCallback(
     (reply: HelixAskReply) => {
@@ -10487,22 +10199,13 @@ export function HelixAskPill({
           hasRenderableMath: hasHelixAskRenderableMath(plainContent),
           debug: reply.debug,
         });
-        return (
-          <div className="space-y-2">
-            <p className="whitespace-pre-wrap leading-relaxed">
-              {renderHelixAskContent(plainContent)}
-            </p>
-            {hasEquationContent ? (
-              <button
-                type="button"
-                className="text-[10px] uppercase tracking-[0.2em] text-emerald-300 hover:text-emerald-200"
-                onClick={() => openPanelById(HELIX_ASK_EQUATION_CALCULATOR_PANEL_ID)}
-              >
-                Open Calculator Panel
-              </button>
-            ) : null}
-          </div>
-        );
+        return renderHelixAskPlainAnswerEnvelope({
+          content: renderHelixAskContent(plainContent),
+          calculatorLaunch: {
+            visible: hasEquationContent,
+            onOpen: () => openPanelById(HELIX_ASK_EQUATION_CALCULATOR_PANEL_ID),
+          },
+        });
       }
       const envelopeAnswer = coerceText(reply.envelope.answer).trim();
       const fallbackAnswer = coerceText(reply.content).trim();
@@ -10525,81 +10228,41 @@ export function HelixAskPill({
         hasRenderableMath: hasRenderableMathContent,
         debug: reply.debug,
       });
-      return (
-        <div className="space-y-3">
-          {renderHelixAskFinalAnswerContent(answerText)}
-          {hasEquationContent ? (
-            <button
-              type="button"
-              className="text-[10px] uppercase tracking-[0.2em] text-emerald-300 hover:text-emerald-200"
-              onClick={() => openPanelById(HELIX_ASK_EQUATION_CALCULATOR_PANEL_ID)}
-            >
-              Open Calculator Panel
-            </button>
-          ) : null}
-          {extensionAvailable ? (
-            <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
-              <button
-                type="button"
-                className="text-[10px] uppercase tracking-[0.22em] text-slate-400 hover:text-slate-200"
-                onClick={() =>
-                  setAskExtensionOpenByReply((prev) => ({
-                    ...prev,
-                    [reply.id]: !prev[reply.id],
-                  }))
-                }
-              >
-                {extensionOpen ? "Hide Additional Repo Context" : "Expand With Retrieved Evidence"}
-              </button>
-              {extensionOpen ? (
-                <div className="mt-2 space-y-1">
-                  <p className="whitespace-pre-wrap leading-relaxed">
-                    {renderHelixAskContent(extensionBody)}
-                  </p>
-                  {extensionCitations.length > 0 ? (
-                    <p className="text-[11px] text-slate-400">
-                      Sources: {renderHelixAskContent(extensionCitations.join(", "))}
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-          {detailSections.length > 0 ? (
-            <details
-              open={expandDetails}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300"
-            >
-              <summary className="cursor-pointer text-[10px] uppercase tracking-[0.22em] text-slate-400">
-                Details
-              </summary>
-              <div className="mt-2">
-                {renderEnvelopeSections(detailSections, "Details")}
-              </div>
-            </details>
-          ) : null}
-          {proofSections.length > 0 ? (
-            <details
-              open={expandDetails}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300"
-            >
-              <summary className="cursor-pointer text-[10px] uppercase tracking-[0.22em] text-slate-400">
-                Proof
-              </summary>
-              <div className="mt-2">
-                {renderEnvelopeSections(proofSections, "Proof")}
-              </div>
-            </details>
-          ) : null}
-        </div>
-      );
+      return renderHelixAskResponseEnvelope({
+        finalAnswer: {
+          text: answerText,
+          renderContent: renderHelixAskContent,
+        },
+        calculatorLaunch: {
+          visible: hasEquationContent,
+          onOpen: () => openPanelById(HELIX_ASK_EQUATION_CALCULATOR_PANEL_ID),
+        },
+        supplement: {
+          extension: {
+            available: extensionAvailable,
+            open: extensionOpen,
+            body: extensionBody,
+            citations: extensionCitations,
+            onToggle: () =>
+              setAskExtensionOpenByReply((prev) => ({
+                ...prev,
+                [reply.id]: !prev[reply.id],
+              })),
+          },
+          detailSections,
+          proofSections,
+          expandDetails,
+          renderContent: renderHelixAskContent,
+          normalizeCitations: normalizeHelixAskEnvelopeCitations,
+        },
+      });
     },
     [
       askExtensionOpenByReply,
       openPanelById,
-      renderEnvelopeSections,
-      renderHelixAskFinalAnswerContent,
       renderHelixAskContent,
+      renderHelixAskPlainAnswerEnvelope,
+      renderHelixAskResponseEnvelope,
     ],
   );
 
@@ -13178,6 +12841,21 @@ export function HelixAskPill({
   );
 
   const handleAskPaste = useCallback((event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const imageFiles = selectHelixAskClipboardImageFiles(event.clipboardData);
+    if (imageFiles.length > 0) {
+      event.preventDefault();
+      const target = event.currentTarget;
+      const current = target.value.trim();
+      void addImageAttachmentsFromFiles(imageFiles)
+        .then((attached) => {
+          if (!attached || current) return;
+          syncAskDraftValue("Use the attached image.", { target });
+        })
+        .catch((error) => {
+          setAskError(error instanceof Error ? error.message : "Image attachment failed.");
+        });
+      return;
+    }
     const text = event.clipboardData.getData("text/plain");
     if (!text || text.length < HELIX_ASK_LARGE_PASTE_THRESHOLD_CHARS) return;
     event.preventDefault();
@@ -13189,7 +12867,7 @@ export function HelixAskPill({
         target,
       });
     });
-  }, [addTextPasteAttachment, syncAskDraftValue]);
+  }, [addImageAttachmentsFromFiles, addTextPasteAttachment, syncAskDraftValue]);
 
   const setVoiceWarning = useCallback((code: VoiceCaptureWarningCode, active: boolean) => {
     setVoiceCaptureWarnings((prev) => {
@@ -22281,6 +21959,7 @@ export function HelixAskPill({
         dismissAskContextChooser();
       }
       const shouldOfferContextChooser =
+        HELIX_ASK_LEGACY_ATTACHED_CONTEXT_CHOOSER_ENABLED &&
         HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG &&
         !hardBackendEntrypointRequired &&
         !options?.skipContextChooser &&
@@ -23307,6 +22986,7 @@ export function HelixAskPill({
                   ? localResponseRecord.selected_final_answer
                   : terminalResolution.text || null,
               final_answer_source: localResponseRecord.final_answer_source ?? null,
+              ...buildHelixAskRuntimeGoalDebugFields(localResponseRecord),
               final_artifact_scope:
                 typeof localResponseRecord.final_artifact_scope === "string"
                   ? localResponseRecord.final_artifact_scope
@@ -23511,6 +23191,33 @@ export function HelixAskPill({
           updateMoodFromText(responseText);
           requestMoodHint(responseText, { force: true });
           const responseDebugPayload = responseDebugWithClientMode ?? responseDebug;
+          const translationProjectionEventPayloads = buildHelixLiveTranslationProjectionEventPayloads({
+            contextId,
+            traceId,
+            payload: {
+              ...(localResponseForTerminal ? (localResponseForTerminal as unknown as Record<string, unknown>) : {}),
+              debug: responseDebugPayload,
+            },
+          });
+          publishHelixAccountLanguageTranslationProjectionsFromPayload({
+            ...(localResponseForTerminal ? (localResponseForTerminal as unknown as Record<string, unknown>) : {}),
+            debug: responseDebugPayload,
+          });
+          publishHelixVisibleTranslationProjectionsFromPayload({
+            ...(localResponseForTerminal ? (localResponseForTerminal as unknown as Record<string, unknown>) : {}),
+            debug: responseDebugPayload,
+          });
+          if (translationProjectionEventPayloads.length > 0) {
+            const emittedProjectionEventIds = emittedLiveTranslationProjectionEventIdsRef.current;
+            if (emittedProjectionEventIds.size > 500) {
+              emittedProjectionEventIds.clear();
+            }
+            for (const projectionEventPayload of translationProjectionEventPayloads) {
+              if (emittedProjectionEventIds.has(projectionEventPayload.entry.id)) continue;
+              emittedProjectionEventIds.add(projectionEventPayload.entry.id);
+              emitHelixAskLiveEvent(projectionEventPayload);
+            }
+          }
           enqueueInterimVoiceCalloutsFromAskArtifacts([
             localResponseForTerminal,
             responseDebugPayload,
@@ -24394,7 +24101,7 @@ export function HelixAskPill({
         if (remaining <= 0) {
           clearAskContextChooserTimer();
           setAskContextChooserCountdownSec(null);
-          executeAskWithContextMode(askContextChooser.autoContextMode ?? "attached");
+          executeAskWithContextMode(askContextChooser.autoContextMode ?? "isolated");
           return;
         }
         setAskContextChooserCountdownSec(remaining);
@@ -25146,46 +24853,42 @@ export function HelixAskPill({
       ? "relative z-10 mt-4 min-h-0 flex-1 space-y-5 overflow-y-auto pr-2"
       : "relative z-10 mt-4 max-h-[52vh] space-y-5 overflow-y-auto pr-2");
   const chronologicalAskReplies = chronologicalAskRepliesForTranscript;
+  const turnListState = buildHelixAskActiveTurnListState({
+    completedReplyCount: chronologicalAskReplies.length,
+    className: replyListClassNameResolved,
+    onScroll: handleAskReplyListScroll,
+    consoleDebugSnapshot: userSettings.showHelixAskConsoleDebug ? helixAskConsoleDebugSnapshot : null,
+    rows: visibleActiveTurnStreamRows,
+    tintClassName: moodPalette.replyTint,
+    replyId: activeTurnStreamReplyId,
+    activeTurnId: activeAskTurnIdRef.current,
+    activeTraceId: askLiveTraceId,
+    statusLine: activeTurnQuietGapStatusLine,
+    laneRef: activeTurnStreamPanelRef,
+    renderToken: activeTurnStreamScrollToken,
+    renderCommits: activeTurnStreamRenderCommitCountRef.current,
+    bottomRef: askReplyListBottomRef,
+    clipText,
+    readRowClassName: readHelixContinuousTurnStreamRowClass,
+    readDotClassName: readHelixContinuousTurnStreamDotClass,
+    readPillClassName: readLiveAnswerTurnBridgePillClassName,
+  });
+  const goalPillState = buildHelixAskGoalPillState({
+    session: askGoalSession,
+    expanded: askGoalPillExpanded,
+    busyAction: askGoalPillBusyAction,
+    error: askGoalPillError,
+    onToggleExpanded: () => setAskGoalPillExpanded((current) => !current),
+    onAction: handleAskGoalSessionAction,
+  });
+  const errorLineState = buildHelixAskConsoleErrorLineState({
+    message: askError,
+  });
   const transcriptLatestAskReplyId = chronologicalAskReplies.at(-1)?.id ?? latestAskReplyId;
   const currentPlaceholder = composerViewModel.currentPlaceholder;
-  const voiceInputStatusLabel = buildVoiceInputStatusLabel(
-    micArmState,
-    voiceInputState,
-    voiceInputError,
-  );
   const displayAudioSourceSnapshot = displayAudioSourceIdRef.current
     ? situationRoomSourcesById[displayAudioSourceIdRef.current]
     : undefined;
-  const situationTranscriptPreview = useMemo(
-    () =>
-      displayAudioSourceSnapshot?.transcript_preview ??
-      situationRoomState.recentTranscript
-        .slice(-3)
-        .map((segment) => segment.text)
-        .join(" ")
-        .trim(),
-    [displayAudioSourceSnapshot?.transcript_preview, situationRoomState.recentTranscript],
-  );
-  const situationSourceCount = displayAudioSourceSnapshot
-    ? 1
-    : Object.keys(situationRoomState.sources).length;
-  const visualSituationSourceActive = visualSituationSourceStatus === "active";
-  const situationSourceDisplayLabel =
-    visualSituationSourceStatus !== "idle"
-      ? (visualSituationSourceLabel ?? "Visual screen capture")
-      : (displayAudioSourceSnapshot?.label ?? displayAudioCaptureLabel ?? "Display audio");
-  const situationSourceDisplayStatus =
-    visualSituationSourceStatus !== "idle"
-      ? visualSituationSourceStatus
-      : (displayAudioSourceSnapshot?.status ?? displayAudioStatus);
-  const situationSourceDisplayCount =
-    (visualSituationSourceStatus !== "idle" ? 1 : 0) + (displayAudioSourceSnapshot ? 1 : situationSourceCount);
-  const displayAudioActive =
-    (displayAudioStatus === "active" || displayAudioStatus === "transcribing") &&
-    displayAudioSourceSnapshot?.status !== "stopped" &&
-    displayAudioSourceSnapshot?.status !== "error";
-  const showSituationRoomSourcePanel =
-    visualSituationSourceStatus !== "idle" || displayAudioStatus !== "idle" || situationRoomState.recentEvents.length > 0;
   const [voiceCallDiagnostics, setVoiceCallDiagnostics] = useState<VoiceCallDiagnosticSnapshot[]>(() =>
     getVoiceCallDiagnosticsSnapshot(),
   );
@@ -25206,6 +24909,18 @@ export function HelixAskPill({
       : ({
           maxWidth: showTopInputLevelMonitor ? "72rem" : "64rem",
         } as const);
+  const surfaceFrameState = buildHelixAskSurfaceFrameState({
+    maxWidthClassName: maxWidthClass,
+    maxWidthStyle: formMaxWidthStyle,
+    surfaceBorderClassName: moodPalette.surfaceBorder,
+    surfaceTintClassName: moodPalette.surfaceTint,
+    surfaceHaloClassName: moodPalette.surfaceHalo,
+    isOffline,
+    onSubmit: handleAskSubmit,
+    onPrimeInteraction: () => {
+      void primeVoiceAudioPlayback();
+    },
+  });
 
   const refreshVoiceMonitorBounds = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -25294,55 +25009,278 @@ export function HelixAskPill({
     [contextCapsuleSessionLedger],
   );
 
-  const activeContextCapsulePreview = useMemo<ContextCapsulePreview | null>(() => {
-    if (sessionCapsuleState) {
-      return {
-        id: sessionCapsuleState.id,
-        loading: false,
-        summary: sessionCapsuleState.summary,
-        convergence: sessionCapsuleState.summary.convergence,
-      };
-    }
-    return contextCapsulePreview;
-  }, [contextCapsulePreview, sessionCapsuleState]);
-
-  const contextMemoryStatusText = useMemo(() => {
-    if (!sessionCapsuleState) return null;
-    return `Context memory active - ${SESSION_CAPSULE_CONFIDENCE_LABEL[sessionCapsuleState.confidenceBand]}`;
-  }, [sessionCapsuleState]);
+  const activeContextCapsuleDerivedState = useMemo(
+    () =>
+      buildHelixAskActiveContextCapsuleDerivedState({
+        sessionCapsuleState,
+        contextCapsulePreview,
+      }),
+    [contextCapsulePreview, sessionCapsuleState],
+  );
+  const situationRoomSourceState = buildHelixAskSituationRoomSourceDerivedState({
+    visualSituationSourceStatus,
+    visualSituationSourceLabel,
+    visualSituationSourceError,
+    displayAudioStatus,
+    displayAudioError,
+    displayAudioCaptureLabel,
+    displayAudioSourceSnapshot,
+    situationRoomState,
+    onStopDisplayAudio: stopDisplayAudioCapture,
+  });
+  const voiceCommandConfirmationState = buildHelixAskVoiceCommandConfirmationState({
+    visible: !transcriptConfirmState && Boolean(commandConfirmState),
+    actionLabel: commandConfirmState ? describeVoiceCommandAction(commandConfirmState.action) : "",
+    transcript: commandConfirmState?.transcript ?? "",
+    countdownSec: commandConfirmAutoCountdownSec,
+    onAccept: handleCommandConfirmationAccept,
+    onCancel: handleCommandConfirmationCancel,
+  });
+  const transcriptConfirmationState = buildHelixAskTranscriptConfirmationState({
+    visible: Boolean(transcriptConfirmState),
+    transcript: transcriptConfirmState?.transcript ?? "",
+    sourceText: transcriptConfirmState?.sourceText,
+    sourceLanguage: transcriptConfirmState?.sourceLanguage,
+    translationUncertain: transcriptConfirmState?.translationUncertain,
+    countdownSec: transcriptConfirmAutoCountdownSec,
+    onAccept: handleTranscriptConfirmationAccept,
+    onRetry: handleTranscriptConfirmationRetry,
+  });
+  const contextChooserState = buildHelixAskContextChooserState({
+    visible: Boolean(askContextChooser),
+    autoContextMode: askContextChooser?.autoContextMode,
+    countdownSec: askContextChooserCountdownSec,
+    onRunAttached: handleAskContextChooserRunAttached,
+    onRunIsolated: handleAskContextChooserRunIsolated,
+    onCancel: dismissAskContextChooser,
+  });
+  const observerSupplementState = buildHelixAskObserverSupplementState({
+    showObserverLane: userSettings.showHelixAskObserverLane,
+    conversationBriefText: latestConversationBrief?.text,
+    observerLaneVisible: userSettings.showHelixAskObserverLane && (askBusy || observerLaneEvents.length > 0),
+    observerLaneEvents,
+  });
+  const contextMemoryStatusState = buildHelixAskContextMemoryStatusState({
+    contextMemoryStatusText: activeContextCapsuleDerivedState.contextMemoryStatusText,
+  });
+  const voiceStatusSupplementState = buildHelixAskVoiceStatusDerivedState({
+    micArmState,
+    voiceInputState,
+    voiceInputError,
+  });
+  const contextCapsuleState = buildHelixAskContextCapsuleState({
+    contextCapsulePreview: activeContextCapsuleDerivedState.contextCapsulePreview,
+    contextCapsuleAutoApplied: activeContextCapsuleDerivedState.contextCapsuleAutoApplied,
+  });
+  const voiceLevelMonitorState = buildHelixAskVoiceLevelMonitorState({
+    micArmState,
+    maxHeightPx: voiceMonitorMaxHeightPx,
+    level: voiceMonitorLevel,
+    signalState: voiceSignalState,
+    anchorRef: voiceMonitorAnchorRef,
+  });
+  const moodAvatarState = buildHelixAskMoodAvatarState({
+    auraClassName: moodPalette.aura,
+    ringClassName: moodRingClass,
+    moodSrc,
+    moodLabel,
+    onImageError: () => setAskMoodBroken(true),
+  });
+  const actionToolbarState = buildHelixAskComposerActionToolbarState({
+    carouselRef: askActionCarouselRef,
+    imageInputRef: askImageInputRef,
+    canScrollLeft: askActionCarouselEdges.canScrollLeft,
+    canScrollRight: askActionCarouselEdges.canScrollRight,
+    onScrollLeft: () => scrollAskActionCarousel("left"),
+    onScrollRight: () => scrollAskActionCarousel("right"),
+    onImageSelect: handleAskImageSelect,
+    onAttachImage: () => {
+      triggerAskActionHaptic();
+      askImageInputRef.current?.click();
+    },
+    attachDisabled: askBusy,
+    hasReadyAttachment: hasReadyAskAttachment,
+    hasAnyAttachment: askAttachments.length > 0,
+    micEnabled: micArmState === "on",
+    voiceTranscribing: voiceInputState === "transcribing",
+    onToggleMic: () => {
+      triggerAskActionHaptic();
+      handleVoiceInputToggle();
+    },
+    showRetryVoiceSample: Boolean(voiceRetainedTranscriptionRetry),
+    retryVoiceSampleDisabled: micArmState !== "on" || voiceTranscribeBusyRef.current,
+    onRetryVoiceSample: () => {
+      triggerAskActionHaptic();
+      handleRetainedVoiceTranscriptionRetry();
+    },
+    visualSituationSourceStatus,
+    onCaptureVisualSource: () => {
+      triggerAskActionHaptic();
+      handleVisualSituationSourceCapture();
+    },
+    visualSituationIncludeAudio,
+    displayAudioStatus,
+    visualAudioToggleDisabled: visualSituationSourceStatus === "requesting",
+    onToggleVisualAudio: () => {
+      triggerAskActionHaptic();
+      handleVisualSituationAudioPreferenceToggle();
+    },
+    runtimePickerModel: agentRuntimePickerModel,
+    runtimeMenuOpen: agentRuntimeMenuOpen,
+    onRuntimePrimaryClick: handleAgentRuntimeButtonClick,
+    onRuntimeSelect: handleAgentRuntimeSelect,
+    submitViewModel: composerViewModel,
+    onSubmitIntent: () => triggerAskActionHaptic(),
+    onStop: () => {
+      triggerAskActionHaptic();
+      handleStop();
+    },
+  });
+  const textareaState = buildHelixAskComposerTextareaState({
+    ariaDisabled: askBusy,
+    className: composerViewModel.textareaClassName,
+    placeholder: currentPlaceholder,
+    onPaste: handleAskPaste,
+    onInputValue: (value, target) =>
+      syncAskDraftValue(value, {
+        target,
+      }),
+    onSubmitRequested: (form) => form?.requestSubmit?.(),
+  });
+  const attachmentStripState = buildHelixAskAttachmentStripState({
+    attachmentItems: askAttachmentCommitChecks,
+    onRemoveAttachment: removeAskAttachment,
+  });
+  const supplementClipTextState = buildHelixAskSupplementClipTextState({
+    clipText,
+  });
+  const composerState = buildHelixAskLegacyComposerState({
+    voiceLevelMonitor: voiceLevelMonitorState,
+    moodAvatar: moodAvatarState,
+    actionToolbar: actionToolbarState,
+    textarea: textareaState,
+    textareaRef: askInputRef,
+  });
+  const supplementState = buildHelixAskConsoleSupplementState({
+    ...attachmentStripState,
+    ...contextCapsuleState,
+    ...voiceStatusSupplementState,
+    situationRoomSource: situationRoomSourceState,
+    voiceCommandConfirmation: voiceCommandConfirmationState,
+    transcriptConfirmation: transcriptConfirmationState,
+    contextChooser: contextChooserState,
+    ...observerSupplementState,
+    ...contextMemoryStatusState,
+    ...supplementClipTextState,
+  });
+  const reasoningTheaterStatusState = buildHelixAskReasoningTheaterStatusState({
+    stanceBadgeClassName: reasoningTheater
+      ? REASONING_THEATER_STANCE_META[reasoningTheater.stance].badge
+      : "",
+    stanceLabel: reasoningTheater ? REASONING_THEATER_STANCE_META[reasoningTheater.stance].label : "",
+    archetypeLabel: reasoningTheater ? REASONING_THEATER_ARCHETYPE_LABEL[reasoningTheater.archetype] : "",
+    phaseLabel: reasoningTheater ? REASONING_THEATER_PHASE_LABEL[reasoningTheater.phase] : "",
+    certaintyLabel: reasoningTheater
+      ? REASONING_THEATER_CERTAINTY_LABEL[reasoningTheater.certaintyClass]
+      : "",
+    medals: reasoningTheaterMedalQueue.map((medalPulse) => ({
+      token: medalPulse.token,
+      label: REASONING_THEATER_MEDAL_LABEL[medalPulse.medal],
+      assetPath: medalPulse.assetPath,
+      fading: medalPulse.fading,
+      broken: reasoningTheaterMedalBrokenByToken[medalPulse.token] === true,
+    })),
+    latestMedal: latestReasoningTheaterMedal
+      ? {
+          label: REASONING_THEATER_MEDAL_LABEL[latestReasoningTheaterMedal.medal],
+          reason: latestReasoningTheaterMedal.reason,
+        }
+      : null,
+    onMedalImageError: (token, currentSrc) =>
+      setReasoningTheaterMedalBrokenByToken((prev) => {
+        const next = { ...prev, [token]: true };
+        if (currentSrc) {
+          next[currentSrc] = true;
+        }
+        return next;
+      }),
+  });
+  const reasoningTheaterMeterState = buildHelixAskReasoningTheaterMeterState({
+    beats: reasoningBattleBeats,
+    pressurePct: reasoningBattlePressurePct,
+    reducedMotion: prefersReducedMotion,
+    ambient: reasoningBattleAmbientState,
+    stanceBarClassName: reasoningTheater ? REASONING_THEATER_STANCE_META[reasoningTheater.stance].bar : "",
+    meterTargetPct: reasoningTheaterMeterTarget,
+    meterFillRef: reasoningTheaterMeterFillRef,
+    meterPatternRef: reasoningTheaterMeterPatternRef,
+    frontierEnabled: REASONING_THEATER_FRONTIER_ACTIONS_ENABLED,
+    frontierCursorRef: reasoningTheaterFrontierCursorRef,
+    frontierBurstRef: reasoningTheaterFrontierBurstRef,
+    frontierIconRef: reasoningTheaterFrontierIconRef,
+    frontierTextRef: reasoningTheaterFrontierTextRef,
+    frontierParticleRefs: reasoningTheaterFrontierParticleRefs,
+    frontierIconBroken: reasoningTheaterFrontierIconBroken,
+    frontierIconPath: reasoningTheaterFrontierIconPath,
+    frontierIconAlt: `${REASONING_THEATER_FRONTIER_ACTION_LABEL[reasoningTheaterFrontierAction]} frontier action`,
+    onFrontierIconError: (currentSrc) => {
+      setReasoningTheaterFrontierIconBrokenByPath((prev) => {
+        const next = { ...prev };
+        next[reasoningTheaterFrontierIconPath] = true;
+        if (currentSrc) {
+          next[currentSrc] = true;
+        }
+        return next;
+      });
+    },
+    frontierParticles: reasoningTheaterFrontierParticles,
+    floatingActionTexts: reasoningTheaterFloatingActionTexts,
+  });
+  const reasoningTheaterState = buildHelixAskReasoningTheaterState({
+    visible: askBusy,
+    liveBorderClassName: moodPalette.liveBorder,
+    replyTintClassName: moodPalette.replyTint,
+    active: Boolean(reasoningTheater),
+    mirekGrid: mirekReasoningDisplayGrid,
+    fogOpacity: reasoningTheater?.fogOpacity ?? 0,
+    fieldStrength: mirekReasoningFieldStrength,
+    particles: reasoningTheaterParticles,
+    status: reasoningTheaterStatusState,
+    meter: reasoningTheaterMeterState,
+  });
+  const surfaceContentState = buildHelixAskLegacySurfaceContentState({
+    composer: composerState,
+    supplement: supplementState,
+    reasoningTheater: reasoningTheaterState,
+  });
+  const legacyConsoleRootState = buildHelixAskLegacyConsoleRootState({
+    className,
+    layoutVariant,
+  });
+  const legacyConsoleViewState = buildHelixAskLegacyConsoleViewState({
+    ...legacyConsoleRootState,
+    surfaceFrameState,
+    surfaceContentState,
+    goalPillState,
+    errorLineState,
+    turnListState,
+  });
 
   const voiceCaptureCheckpointList = useMemo(
     () => VOICE_CAPTURE_CHECKPOINT_ORDER.map((key) => voiceCaptureCheckpoints[key]),
     [voiceCaptureCheckpoints],
   );
 
-  const voiceCaptureHealth = useMemo<VoiceCaptureHealthSnapshot>(() => {
-    const nowMs = Date.now();
-    const lastChunkAgeMs =
-      voiceRecorderStats.lastChunkAtMs !== null ? Math.max(0, nowMs - voiceRecorderStats.lastChunkAtMs) : null;
-    const hasWarningCheckpoint = voiceCaptureCheckpointList.some(
-      (checkpoint) => checkpoint.status === "warn" || checkpoint.status === "error",
-    );
-    const pipelineStatus =
-      micArmState === "off"
-        ? "idle"
-        : voiceCaptureWarnings.length > 0 || hasWarningCheckpoint
-          ? "attention"
-          : "active";
-    return {
-      rmsRaw: voiceMeterStats.rmsRaw,
-      rmsDb: voiceMeterStats.rmsDb,
-      peak: voiceMeterStats.peak,
-      noiseFloor: voiceMeterStats.noiseFloor,
-      displayLevel: voiceMeterStats.displayLevel,
-      mediaChunkCount: voiceRecorderStats.mediaChunkCount,
-      mediaBytes: voiceRecorderStats.mediaBytes,
-      chunksPerSecond: voiceRecorderStats.chunksPerSecond,
-      lastChunkAgeMs,
+  const voiceCaptureHealth = useMemo<HelixAskVoiceCaptureHealthSnapshot>(() => {
+    return buildHelixAskVoiceCaptureHealthState({
+      micArmState,
+      nowMs: Date.now(),
+      meterStats: voiceMeterStats,
+      recorderStats: voiceRecorderStats,
       warnings: voiceCaptureWarnings,
-      pipelineStatus,
+      checkpointList: voiceCaptureCheckpointList,
       lastRoundtripMs: voiceLastRoundtripMs,
-    };
+    });
   }, [
     micArmState,
     voiceCaptureCheckpointList,
@@ -25351,6 +25289,67 @@ export function HelixAskPill({
     voiceMeterStats,
     voiceRecorderStats,
   ]);
+
+  const voiceFeatureFlagsState = useMemo(
+    () =>
+      buildHelixAskVoiceFeatureFlagsState({
+        confirmV2RolloutEligible: voiceConfirmV2RolloutEligible,
+        confirmV2Active: voiceConfirmV2Active,
+        confirmV2ShadowMode: voiceConfirmV2ShadowMode,
+        commandLaneUiEnabled: voiceCommandLaneUiEnabled,
+        localAudioGateActive: voiceLocalAudioGateActive,
+        sessionSpeakerActive: voiceSessionSpeakerActive,
+        multiSpeakerUiActive: voiceMultiSpeakerUiActive,
+        noisyEnvironmentMode: voiceNoisyEnvironmentMode,
+      }),
+    [
+      voiceCommandLaneUiEnabled,
+      voiceConfirmV2Active,
+      voiceConfirmV2RolloutEligible,
+      voiceConfirmV2ShadowMode,
+      voiceLocalAudioGateActive,
+      voiceMultiSpeakerUiActive,
+      voiceNoisyEnvironmentMode,
+      voiceSessionSpeakerActive,
+    ],
+  );
+
+  const voiceCaptureDiagnosticsBaseState = useMemo(
+    () =>
+      buildHelixAskVoiceCaptureDiagnosticsBaseState({
+        micArmState,
+        voiceInputState,
+        voiceSignalState,
+        voiceMonitorLevel,
+        voiceMonitorThreshold,
+        voiceRecorderMimeType,
+        voiceInputDeviceLabel,
+        voiceTrackMuted,
+        voiceCaptureHealth,
+        warnings: voiceCaptureWarnings,
+        checkpointList: voiceCaptureCheckpointList,
+        checkpointLabels: VOICE_CAPTURE_CHECKPOINT_LABEL,
+        segments: voiceSegmentAttempts,
+        pendingConfirmation: transcriptConfirmState,
+        voiceFeatureFlags: voiceFeatureFlagsState,
+      }),
+    [
+      micArmState,
+      transcriptConfirmState,
+      voiceCaptureCheckpointList,
+      voiceCaptureHealth,
+      voiceCaptureWarnings,
+      voiceFeatureFlagsState,
+      voiceInputDeviceLabel,
+      voiceInputState,
+      voiceMonitorLevel,
+      voiceMonitorThreshold,
+      voiceRecorderMimeType,
+      voiceSegmentAttempts,
+      voiceSignalState,
+      voiceTrackMuted,
+    ],
+  );
 
   const voiceLaneTimelineEvents = useMemo<VoiceLaneTimelineDebugEvent[]>(() => {
     const conversationAndReasoningEvents = [...helixTimeline]
@@ -25467,53 +25466,10 @@ export function HelixAskPill({
       }));
     const chunkEvents = [...voiceChunkTimelineEventsRef.current];
     const buildInfoAtMs = voiceTimelineBuildInfo.fetchedAtMs ?? voiceTimelineBuildEventAtMsRef.current;
-    const buildStatus: VoiceLaneTimelineDebugEvent["status"] =
-      voiceTimelineBuildInfo.error
-        ? "error"
-        : voiceTimelineBuildInfo.serverVersion || voiceTimelineBuildInfo.serverGitSha
-          ? "ok"
-          : "warn";
-    const buildSummary = summarizeVoiceDebugText(
-      [
-        `client:${voiceTimelineBuildInfo.clientBuild}`,
-        voiceTimelineBuildInfo.serverVersion ? `server:${voiceTimelineBuildInfo.serverVersion}` : "server:unknown",
-        voiceTimelineBuildInfo.serverGitSha ? `git:${voiceTimelineBuildInfo.serverGitSha.slice(0, 12)}` : null,
-      ]
-        .filter(Boolean)
-        .join(" | "),
-      260,
-    );
-    const buildDetail = summarizeVoiceDebugText(
-      [
-        `client_mode:${voiceTimelineBuildInfo.clientMode}`,
-        voiceTimelineBuildInfo.serverService ? `service:${voiceTimelineBuildInfo.serverService}` : null,
-        voiceTimelineBuildInfo.serverBuildTime ? `build_time:${voiceTimelineBuildInfo.serverBuildTime}` : null,
-        voiceTimelineBuildInfo.error ? `error:${voiceTimelineBuildInfo.error}` : null,
-      ]
-        .filter(Boolean)
-        .join(" | "),
-      260,
-    );
-    const buildIdToken = [
-      voiceTimelineBuildInfo.clientBuild,
-      voiceTimelineBuildInfo.serverVersion ?? "unknown",
-      voiceTimelineBuildInfo.serverGitSha ?? "nogit",
-    ]
-      .join("-")
-      .replace(/[^a-z0-9._-]+/gi, "-")
-      .slice(0, 120);
-    const buildInfoEvent: VoiceLaneTimelineDebugEvent = {
-      id: `build:${buildIdToken || "snapshot"}`,
+    const buildInfoEvent = buildHelixAskVoiceTimelineBuildInfoEvent({
+      buildInfo: voiceTimelineBuildInfo,
       atMs: buildInfoAtMs,
-      source: "system",
-      kind: "build_info",
-      status: buildStatus,
-      traceId: null,
-      turnKey: null,
-      attemptId: null,
-      text: buildSummary || null,
-      detail: buildDetail || null,
-    };
+    });
     const nonBuildEvents = [...conversationAndReasoningEvents, ...segmentEvents, ...chunkEvents]
       .sort((a, b) => a.atMs - b.atMs)
       .slice(-Math.max(0, HELIX_VOICE_DEBUG_TIMELINE_LIMIT - 1));
@@ -25538,84 +25494,7 @@ export function HelixAskPill({
     }
     return {
       updatedAtMs: Date.now(),
-      micArmState,
-      voiceInputState,
-      voiceSignalState,
-      voiceMonitorLevel,
-      voiceMonitorThreshold,
-      voiceRecorderMimeType,
-      voiceInputDeviceLabel,
-      voiceTrackMuted,
-      rmsRaw: voiceCaptureHealth.rmsRaw,
-      rmsDb: voiceCaptureHealth.rmsDb,
-      peak: voiceCaptureHealth.peak,
-      noiseFloor: voiceCaptureHealth.noiseFloor,
-      chunksPerSecond: voiceCaptureHealth.chunksPerSecond,
-      mediaChunkCount: voiceCaptureHealth.mediaChunkCount,
-      mediaBytes: voiceCaptureHealth.mediaBytes,
-      lastChunkAgeMs: voiceCaptureHealth.lastChunkAgeMs,
-      lastRoundtripMs: voiceCaptureHealth.lastRoundtripMs,
-      warnings: [...voiceCaptureWarnings],
-      checkpoints: voiceCaptureCheckpointList.map((checkpoint) => ({
-        key: checkpoint.key,
-        label: VOICE_CAPTURE_CHECKPOINT_LABEL[checkpoint.key],
-        status: checkpoint.status,
-        message: checkpoint.message,
-        lastAtMs: checkpoint.lastAtMs,
-      })),
-      segments: voiceSegmentAttempts.map((segment) => ({
-        id: segment.id,
-        cutAtMs: segment.cutAtMs,
-        durationMs: segment.durationMs,
-        status: segment.status,
-        sttLatencyMs: segment.sttLatencyMs,
-        transcriptPreview: segment.transcriptPreview,
-        translated: segment.translated,
-        dispatch: segment.dispatch,
-        engine: segment.engine,
-        error: segment.error,
-        speakerId: segment.speakerId ?? null,
-        speakerConfidence: segment.speakerConfidence ?? null,
-        speechProbability: segment.speechProbability ?? null,
-        snrDb: segment.snrDb ?? null,
-        confirmAutoEligible: segment.confirmAutoEligible ?? null,
-        confirmBlockReason: segment.confirmBlockReason ?? null,
-      })),
-      pendingConfirmation: transcriptConfirmState
-        ? {
-            dispatchState: transcriptConfirmState.dispatchState ?? null,
-            needsConfirmation: true,
-            pivotConfidence:
-              typeof transcriptConfirmState.pivotConfidence === "number"
-                ? transcriptConfirmState.pivotConfidence
-                : null,
-            speechProbability:
-              typeof transcriptConfirmState.speechProbability === "number"
-                ? transcriptConfirmState.speechProbability
-                : null,
-            snrDb: typeof transcriptConfirmState.snrDb === "number" ? transcriptConfirmState.snrDb : null,
-            speakerId: transcriptConfirmState.speakerId ?? null,
-            speakerConfidence:
-              typeof transcriptConfirmState.speakerConfidence === "number"
-                ? transcriptConfirmState.speakerConfidence
-                : null,
-            confirmAutoEligible:
-              typeof transcriptConfirmState.confirmAutoEligible === "boolean"
-                ? transcriptConfirmState.confirmAutoEligible
-                : null,
-            confirmBlockReason: transcriptConfirmState.confirmBlockReason ?? null,
-          }
-        : null,
-      voiceFeatureFlags: {
-        confirmV2RolloutEligible: voiceConfirmV2RolloutEligible,
-        confirmV2Active: voiceConfirmV2Active,
-        confirmV2ShadowMode: voiceConfirmV2ShadowMode,
-        commandLaneUiEnabled: voiceCommandLaneUiEnabled,
-        localAudioGateActive: voiceLocalAudioGateActive,
-        sessionSpeakerActive: voiceSessionSpeakerActive,
-        multiSpeakerUiActive: voiceMultiSpeakerUiActive,
-        noisyEnvironmentMode: voiceNoisyEnvironmentMode,
-      },
+      ...voiceCaptureDiagnosticsBaseState,
       playback: null,
       playbackOutput: null,
       playbackReceipts,
@@ -25624,110 +25503,14 @@ export function HelixAskPill({
     };
   }, [
     micArmState,
-    transcriptConfirmState,
     voiceCallDiagnostics,
-    voiceCaptureCheckpointList,
-    voiceCaptureHealth,
-    voiceCaptureWarnings,
-    voiceCommandLaneUiEnabled,
-    voiceConfirmV2Active,
-    voiceConfirmV2RolloutEligible,
-    voiceConfirmV2ShadowMode,
-    voiceInputDeviceLabel,
-    voiceInputState,
-    voiceLocalAudioGateActive,
-    voiceMonitorLevel,
-    voiceMonitorThreshold,
-    voiceMultiSpeakerUiActive,
-    voiceNoisyEnvironmentMode,
-    voiceRecorderMimeType,
-    voiceSegmentAttempts,
-    voiceSessionSpeakerActive,
-    voiceSignalState,
-    voiceTrackMuted,
+    voiceCaptureDiagnosticsBaseState,
   ]);
 
   useEffect(() => {
     publishVoiceCaptureDiagnosticsSnapshot({
       updatedAtMs: Date.now(),
-      micArmState,
-      voiceInputState,
-      voiceSignalState,
-      voiceMonitorLevel,
-      voiceMonitorThreshold,
-      voiceRecorderMimeType,
-      voiceInputDeviceLabel,
-      voiceTrackMuted,
-      rmsRaw: voiceCaptureHealth.rmsRaw,
-      rmsDb: voiceCaptureHealth.rmsDb,
-      peak: voiceCaptureHealth.peak,
-      noiseFloor: voiceCaptureHealth.noiseFloor,
-      chunksPerSecond: voiceCaptureHealth.chunksPerSecond,
-      mediaChunkCount: voiceCaptureHealth.mediaChunkCount,
-      mediaBytes: voiceCaptureHealth.mediaBytes,
-      lastChunkAgeMs: voiceCaptureHealth.lastChunkAgeMs,
-      lastRoundtripMs: voiceCaptureHealth.lastRoundtripMs,
-      warnings: [...voiceCaptureWarnings],
-      checkpoints: voiceCaptureCheckpointList.map((checkpoint) => ({
-        key: checkpoint.key,
-        label: VOICE_CAPTURE_CHECKPOINT_LABEL[checkpoint.key],
-        status: checkpoint.status,
-        message: checkpoint.message,
-        lastAtMs: checkpoint.lastAtMs,
-      })),
-      segments: voiceSegmentAttempts.map((segment) => ({
-        id: segment.id,
-        cutAtMs: segment.cutAtMs,
-        durationMs: segment.durationMs,
-        status: segment.status,
-        sttLatencyMs: segment.sttLatencyMs,
-        transcriptPreview: segment.transcriptPreview,
-        translated: segment.translated,
-        dispatch: segment.dispatch,
-        engine: segment.engine,
-        error: segment.error,
-        speakerId: segment.speakerId ?? null,
-        speakerConfidence: segment.speakerConfidence ?? null,
-        speechProbability: segment.speechProbability ?? null,
-        snrDb: segment.snrDb ?? null,
-        confirmAutoEligible: segment.confirmAutoEligible ?? null,
-        confirmBlockReason: segment.confirmBlockReason ?? null,
-      })),
-      pendingConfirmation: transcriptConfirmState
-        ? {
-            dispatchState: transcriptConfirmState.dispatchState ?? null,
-            needsConfirmation: true,
-            pivotConfidence:
-              typeof transcriptConfirmState.pivotConfidence === "number"
-                ? transcriptConfirmState.pivotConfidence
-                : null,
-            speechProbability:
-              typeof transcriptConfirmState.speechProbability === "number"
-                ? transcriptConfirmState.speechProbability
-                : null,
-            snrDb: typeof transcriptConfirmState.snrDb === "number" ? transcriptConfirmState.snrDb : null,
-            speakerId: transcriptConfirmState.speakerId ?? null,
-            speakerConfidence:
-              typeof transcriptConfirmState.speakerConfidence === "number"
-                ? transcriptConfirmState.speakerConfidence
-                : null,
-            confirmAutoEligible:
-              typeof transcriptConfirmState.confirmAutoEligible === "boolean"
-                ? transcriptConfirmState.confirmAutoEligible
-                : null,
-            confirmBlockReason: transcriptConfirmState.confirmBlockReason ?? null,
-          }
-        : null,
-      voiceFeatureFlags: {
-        confirmV2RolloutEligible: voiceConfirmV2RolloutEligible,
-        confirmV2Active: voiceConfirmV2Active,
-        confirmV2ShadowMode: voiceConfirmV2ShadowMode,
-        commandLaneUiEnabled: voiceCommandLaneUiEnabled,
-        localAudioGateActive: voiceLocalAudioGateActive,
-        sessionSpeakerActive: voiceSessionSpeakerActive,
-        multiSpeakerUiActive: voiceMultiSpeakerUiActive,
-        noisyEnvironmentMode: voiceNoisyEnvironmentMode,
-      },
+      ...voiceCaptureDiagnosticsBaseState,
       playback: voiceAutoSpeakLastMetrics
         ? {
             utteranceId: voiceAutoSpeakLastMetrics.utteranceId,
@@ -25838,304 +25621,20 @@ export function HelixAskPill({
     });
   }, [
     helixTimeline,
-    micArmState,
-    voiceCaptureCheckpointList,
-    voiceCaptureHealth,
-    voiceCaptureWarnings,
-    voiceInputDeviceLabel,
-    voiceInputState,
-    voiceMonitorLevel,
-    voiceMonitorThreshold,
-    voiceRecorderMimeType,
-    voiceSegmentAttempts,
     voiceAutoSpeakLastMetrics,
+    voiceCaptureDiagnosticsBaseState,
     voicePlaybackOutcomeReceipts,
     voiceCallDiagnostics,
     voiceLaneTimelineEvents,
-    voiceSignalState,
     voiceTimelineDebugVersion,
-    voiceTrackMuted,
-    transcriptConfirmState,
-    voiceConfirmV2Active,
-    voiceLocalAudioGateActive,
-    voiceSessionSpeakerActive,
-    voiceMultiSpeakerUiActive,
-    voiceNoisyEnvironmentMode,
   ]);
-
-  const activeTurnStreamPanel = visibleActiveTurnStreamRows.length > 0 ? (
-    <HelixAskActiveTurnReply
-      rows={visibleActiveTurnStreamRows}
-      tintClassName={moodPalette.replyTint}
-      replyId={activeTurnStreamReplyId}
-      activeTurnId={activeAskTurnIdRef.current}
-      renderFinalAnswer={() => null}
-      clipText={clipText}
-      readRowClassName={readHelixContinuousTurnStreamRowClass}
-      readDotClassName={readHelixContinuousTurnStreamDotClass}
-      readPillClassName={readLiveAnswerTurnBridgePillClassName}
-    />
-  ) : null;
 
   return (
     <HelixAskLegacyConsoleView
-      className={className}
-      layoutVariant={layoutVariant}
-      surface={
-        <HelixAskSurfaceFrame
-          maxWidthClassName={maxWidthClass}
-          maxWidthStyle={formMaxWidthStyle}
-          surfaceBorderClassName={moodPalette.surfaceBorder}
-          surfaceTintClassName={moodPalette.surfaceTint}
-          surfaceHaloClassName={moodPalette.surfaceHalo}
-          isOffline={isOffline}
-          onSubmit={handleAskSubmit}
-          onPrimeInteraction={() => {
-            void primeVoiceAudioPlayback();
-          }}
-        >
-          <HelixAskSurfaceComposerPanel
-            voiceLevelMonitor={
-              <HelixAskVoiceLevelMonitor
-                visible={showTopInputLevelMonitor}
-                maxHeightPx={voiceMonitorMaxHeightPx}
-                level={voiceMonitorLevel}
-                signalState={voiceSignalState}
-                anchorRef={voiceMonitorAnchorRef}
-              />
-            }
-            moodAvatar={
-              <HelixAskMoodAvatar
-                auraClassName={moodPalette.aura}
-                ringClassName={moodRingClass}
-                moodSrc={moodSrc}
-                moodLabel={moodLabel}
-                onImageError={() => setAskMoodBroken(true)}
-              />
-            }
-            actionToolbar={
-              <HelixAskComposerActionToolbarSurface
-                carouselRef={askActionCarouselRef}
-                imageInputRef={askImageInputRef}
-                canScrollLeft={askActionCarouselEdges.canScrollLeft}
-                canScrollRight={askActionCarouselEdges.canScrollRight}
-                onScrollLeft={() => scrollAskActionCarousel("left")}
-                onScrollRight={() => scrollAskActionCarousel("right")}
-                onImageSelect={handleAskImageSelect}
-                onAttachImage={() => {
-                  triggerAskActionHaptic();
-                  askImageInputRef.current?.click();
-                }}
-                attachDisabled={askBusy}
-                hasReadyAttachment={hasReadyAskAttachment}
-                hasAnyAttachment={askAttachments.length > 0}
-                micEnabled={micArmState === "on"}
-                voiceTranscribing={voiceInputState === "transcribing"}
-                onToggleMic={() => {
-                  triggerAskActionHaptic();
-                  handleVoiceInputToggle();
-                }}
-                showRetryVoiceSample={Boolean(voiceRetainedTranscriptionRetry)}
-                retryVoiceSampleDisabled={micArmState !== "on" || voiceTranscribeBusyRef.current}
-                onRetryVoiceSample={() => {
-                  triggerAskActionHaptic();
-                  handleRetainedVoiceTranscriptionRetry();
-                }}
-                visualSituationSourceStatus={visualSituationSourceStatus}
-                onCaptureVisualSource={() => {
-                  triggerAskActionHaptic();
-                  handleVisualSituationSourceCapture();
-                }}
-                visualSituationIncludeAudio={visualSituationIncludeAudio}
-                displayAudioStatus={displayAudioStatus}
-                visualAudioToggleDisabled={visualSituationSourceStatus === "requesting"}
-                onToggleVisualAudio={() => {
-                  triggerAskActionHaptic();
-                  handleVisualSituationAudioPreferenceToggle();
-                }}
-                runtimePickerModel={agentRuntimePickerModel}
-                runtimeMenuOpen={agentRuntimeMenuOpen}
-                onRuntimePrimaryClick={handleAgentRuntimeButtonClick}
-                onRuntimeSelect={handleAgentRuntimeSelect}
-                submitViewModel={composerViewModel}
-                onSubmitIntent={() => triggerAskActionHaptic()}
-                onStop={() => {
-                  triggerAskActionHaptic();
-                  handleStop();
-                }}
-              />
-            }
-            textarea={
-              <HelixAskComposerTextarea
-                ariaDisabled={askBusy}
-                className={composerViewModel.textareaClassName}
-                ref={askInputRef}
-                placeholder={currentPlaceholder}
-                onPaste={handleAskPaste}
-                onInputValue={(value, target) =>
-                  syncAskDraftValue(value, {
-                    target,
-                  })
-                }
-                onSubmitRequested={(form) => form?.requestSubmit?.()}
-              />
-            }
-          />
-          <HelixAskConsoleSupplementSurface
-            attachmentItems={askAttachmentCommitChecks}
-            onRemoveAttachment={removeAskAttachment}
-            contextCapsulePreview={activeContextCapsulePreview}
-            contextCapsuleAutoApplied={Boolean(sessionCapsuleState)}
-            voiceStatusLabel={voiceInputStatusLabel}
-            voiceStatusState={voiceInputState}
-            situationRoomSource={{
-              visible: showSituationRoomSourcePanel,
-              label: situationSourceDisplayLabel,
-              status: situationSourceDisplayStatus,
-              sourceCount: situationSourceDisplayCount,
-              visualError: visualSituationSourceError,
-              audioError: displayAudioError,
-              visualSourceActive: visualSituationSourceActive,
-              transcriptPreview: situationTranscriptPreview,
-              displayAudioActive,
-              onStopDisplayAudio: stopDisplayAudioCapture,
-            }}
-            voiceCommandConfirmation={{
-              visible: !transcriptConfirmState && Boolean(commandConfirmState),
-              actionLabel: commandConfirmState ? describeVoiceCommandAction(commandConfirmState.action) : "",
-              transcript: commandConfirmState?.transcript ?? "",
-              countdownSec: commandConfirmAutoCountdownSec,
-              onAccept: handleCommandConfirmationAccept,
-              onCancel: handleCommandConfirmationCancel,
-            }}
-            transcriptConfirmation={{
-              visible: Boolean(transcriptConfirmState),
-              transcript: transcriptConfirmState?.transcript ?? "",
-              sourceText: transcriptConfirmState?.sourceText,
-              sourceLanguage: transcriptConfirmState?.sourceLanguage,
-              translationUncertain: transcriptConfirmState?.translationUncertain,
-              countdownSec: transcriptConfirmAutoCountdownSec,
-              onAccept: handleTranscriptConfirmationAccept,
-              onRetry: handleTranscriptConfirmationRetry,
-            }}
-            contextChooser={{
-              visible: Boolean(askContextChooser),
-              autoContextMode: askContextChooser?.autoContextMode,
-              countdownSec: askContextChooserCountdownSec,
-              onRunAttached: handleAskContextChooserRunAttached,
-              onRunIsolated: handleAskContextChooserRunIsolated,
-              onCancel: dismissAskContextChooser,
-            }}
-            showObserverLane={userSettings.showHelixAskObserverLane}
-            conversationBriefText={latestConversationBrief?.text}
-            observerLaneVisible={userSettings.showHelixAskObserverLane && (askBusy || observerLaneEvents.length > 0)}
-            observerLaneEvents={observerLaneEvents}
-            contextMemoryStatusText={contextMemoryStatusText}
-            clipText={clipText}
-          />
-          <HelixAskReasoningTheaterSurface
-            visible={askBusy}
-            liveBorderClassName={moodPalette.liveBorder}
-            replyTintClassName={moodPalette.replyTint}
-            active={Boolean(reasoningTheater)}
-            mirekGrid={mirekReasoningDisplayGrid}
-            fogOpacity={reasoningTheater?.fogOpacity ?? 0}
-            fieldStrength={mirekReasoningFieldStrength}
-            particles={reasoningTheaterParticles}
-            status={{
-              stanceBadgeClassName: reasoningTheater
-                ? REASONING_THEATER_STANCE_META[reasoningTheater.stance].badge
-                : "",
-              stanceLabel: reasoningTheater ? REASONING_THEATER_STANCE_META[reasoningTheater.stance].label : "",
-              archetypeLabel: reasoningTheater ? REASONING_THEATER_ARCHETYPE_LABEL[reasoningTheater.archetype] : "",
-              phaseLabel: reasoningTheater ? REASONING_THEATER_PHASE_LABEL[reasoningTheater.phase] : "",
-              certaintyLabel: reasoningTheater
-                ? REASONING_THEATER_CERTAINTY_LABEL[reasoningTheater.certaintyClass]
-                : "",
-              medals: reasoningTheaterMedalQueue.map((medalPulse) => ({
-                token: medalPulse.token,
-                label: REASONING_THEATER_MEDAL_LABEL[medalPulse.medal],
-                assetPath: medalPulse.assetPath,
-                fading: medalPulse.fading,
-                broken: reasoningTheaterMedalBrokenByToken[medalPulse.token] === true,
-              })),
-              latestMedal: latestReasoningTheaterMedal
-                ? {
-                    label: REASONING_THEATER_MEDAL_LABEL[latestReasoningTheaterMedal.medal],
-                    reason: latestReasoningTheaterMedal.reason,
-                  }
-                : null,
-              onMedalImageError: (token, currentSrc) =>
-                setReasoningTheaterMedalBrokenByToken((prev) => {
-                  const next = { ...prev, [token]: true };
-                  if (currentSrc) {
-                    next[currentSrc] = true;
-                  }
-                  return next;
-                }),
-            }}
-            meter={{
-              beats: reasoningBattleBeats,
-              pressurePct: reasoningBattlePressurePct,
-              reducedMotion: prefersReducedMotion,
-              ambient: reasoningBattleAmbientState,
-              stanceBarClassName: reasoningTheater ? REASONING_THEATER_STANCE_META[reasoningTheater.stance].bar : "",
-              meterTargetPct: reasoningTheaterMeterTarget,
-              meterFillRef: reasoningTheaterMeterFillRef,
-              meterPatternRef: reasoningTheaterMeterPatternRef,
-              frontierEnabled: REASONING_THEATER_FRONTIER_ACTIONS_ENABLED,
-              frontierCursorRef: reasoningTheaterFrontierCursorRef,
-              frontierBurstRef: reasoningTheaterFrontierBurstRef,
-              frontierIconRef: reasoningTheaterFrontierIconRef,
-              frontierTextRef: reasoningTheaterFrontierTextRef,
-              frontierParticleRefs: reasoningTheaterFrontierParticleRefs,
-              frontierIconBroken: reasoningTheaterFrontierIconBroken,
-              frontierIconPath: reasoningTheaterFrontierIconPath,
-              frontierIconAlt: `${REASONING_THEATER_FRONTIER_ACTION_LABEL[reasoningTheaterFrontierAction]} frontier action`,
-              onFrontierIconError: (currentSrc) => {
-                setReasoningTheaterFrontierIconBrokenByPath((prev) => {
-                  const next = { ...prev };
-                  next[reasoningTheaterFrontierIconPath] = true;
-                  if (currentSrc) {
-                    next[currentSrc] = true;
-                  }
-                  return next;
-                });
-              },
-              frontierParticles: reasoningTheaterFrontierParticles,
-              floatingActionTexts: reasoningTheaterFloatingActionTexts,
-            }}
-          />
-        </HelixAskSurfaceFrame>
-      }
-      goalPill={
-        <HelixAskGoalPillSurface
-          session={askGoalSession}
-          expanded={askGoalPillExpanded}
-          busyAction={askGoalPillBusyAction}
-          error={askGoalPillError}
-          onToggleExpanded={() => setAskGoalPillExpanded((current) => !current)}
-          onAction={handleAskGoalSessionAction}
-        />
-      }
-      steeringQueue={<HelixAskSteeringQueueSurface />}
-      errorLine={<HelixAskConsoleErrorLineSurface message={askError} />}
-      turnList={chronologicalAskReplies.length > 0 || visibleActiveTurnStreamRows.length > 0 ? (
-          <HelixAskTurnList
-            ref={askReplyListRef}
-            className={replyListClassNameResolved}
-            onScroll={handleAskReplyListScroll}
-            consoleDebugSnapshot={userSettings.showHelixAskConsoleDebug ? helixAskConsoleDebugSnapshot : null}
-            activeTurnStreamPanel={activeTurnStreamPanel}
-            activeTurnStreamStatusLine={activeTurnQuietGapStatusLine}
-            activeTurnStreamLaneRef={activeTurnStreamPanelRef}
-            activeTurnStreamLineCount={visibleActiveTurnStreamRows.length}
-            activeTurnStreamTurnId={activeAskTurnIdRef.current}
-            activeTurnStreamTraceId={askLiveTraceId}
-            activeTurnStreamRenderToken={activeTurnStreamScrollToken}
-            activeTurnStreamRenderCommits={activeTurnStreamRenderCommitCountRef.current}
-            bottomRef={askReplyListBottomRef}
-          >
+      {...legacyConsoleViewState}
+      turnListRef={askReplyListRef}
+      turnListContent={
+        <>
           {chronologicalAskReplies.map((reply) => {
             const replyEvents = resolveReplyEvents(reply);
             const replyEventsChronological = sortHelixAskLegacyReplyEventsChronologically(
@@ -26156,6 +25655,10 @@ export function HelixAskPill({
               consoleAssemblyDebug: helixAskConsoleDebugSnapshot,
             });
             const replyDebugRecord = readAgentLoopAuditRecord(reply.debug);
+            const runtimeGoalDebugSummary = mergeHelixAskRuntimeGoalDebugFields(
+              replyDebugRecord,
+              reply as unknown as Record<string, unknown>,
+            ).runtime_goal_debug_summary;
             const agentLoopAudit = readAgentLoopAuditRecord(replyDebugRecord?.agent_loop_audit);
             const runtimeSummary = readAgentLoopAuditRecord(replyDebugRecord?.turn_runtime);
             const visibleResolvedTurn = buildVisibleResolvedTurn(reply);
@@ -26185,25 +25688,10 @@ export function HelixAskPill({
             const stagePlayChatLedgerEvents = buildStagePlayChatLedgerEvents(reply);
             const replyCausalTurnTimeline = readHelixCausalTurnTimeline(reply);
             const replyReasoningTheaterState = coerceReasoningTheaterStateV1(reply.debug?.reasoning_theater_state_v1);
-            const replyBattleBeats = buildReasoningBattleBeats({
+            const completedReplyBattleState = buildHelixAskCompletedReplyBattleState({
               timelineEvents: replyCausalTurnTimeline?.events ?? [],
               liveEvents: replyEventsChronological,
               theaterState: replyReasoningTheaterState,
-            });
-            const replyBattlePressurePct = clampNumber(
-              replyBattleBeats.reduce((total, beat) => total + beat.pressure_delta, 0) * 8 +
-                (replyReasoningTheaterState?.indices.ambiguity_pressure ?? 0) * 28,
-              0,
-              46,
-            );
-            const replyBattleAmbientState = buildReasoningBattleAmbientState({
-              timelineEvents: replyCausalTurnTimeline?.events ?? [],
-              liveEvents: replyEventsChronological,
-              theaterState: replyReasoningTheaterState,
-            });
-            const replyBattleAnswerTint = buildReasoningBattleAnswerTint({
-              beats: replyBattleBeats,
-              ambient: replyBattleAmbientState,
             });
             const chosenVisibleFinalText = chooseVisibleFinalText(reply) || transcriptTerminal.text || reply.content || "";
             const { finalAnswerRawText } = selectHelixAskLegacyFinalAnswerText({
@@ -26256,81 +25744,76 @@ export function HelixAskPill({
               browserAvailable: typeof window !== "undefined",
               readAloudState: readAloudByReply[reply.id] ?? "idle",
             });
+            const completedReplyStreamState = buildHelixAskCompletedReplyStreamState({
+              rows: turnStreamRows,
+              workLogTestId: latestTurnBinding.workLogTestId,
+              questionTestId: latestTurnBinding.questionTestId,
+              finalAnswerTestId: latestTurnBinding.finalAnswerTestId,
+              stagePlayEventCount: stagePlayChatLedgerEvents.length,
+              finalAnswerRawText,
+              finalAnswerSourceLabel: displayedFinalAnswerSourceLabel,
+              backendTerminalAnswer: transcriptTerminal.backendTerminalText,
+              finalAnswerAuthority: finalAnswerPresentation.isDeterministicReceiptFallback
+                ? "receipt_fallback_not_reviewed"
+                : "terminal",
+              replyId: reply.id,
+              activeTurnId: resolveHelixAskReplyDebugTurnId(reply),
+              answerTint: completedReplyBattleState.answerTint,
+              actualAgentProviderLabel,
+              actualAgentModelLabel,
+              liveBridgeStatus: liveAnswerTurnBridge?.status,
+              renderFinalAnswer: () => renderHelixAskFinalAnswerContent(transcriptAnswer),
+              clipText,
+              readRowClassName: readHelixContinuousTurnStreamRowClass,
+              readDotClassName: readHelixContinuousTurnStreamDotClass,
+              readPillClassName: readLiveAnswerTurnBridgePillClassName,
+              onCopyFinal: () => void handleCopyReply(reply, latestTurnBinding.controlTarget.finalAnswerText),
+              onDebugCopy: (event) =>
+                void handleCopyReplyMasterDebug(
+                  reply,
+                  replyMasterEventClockPayload,
+                  event.currentTarget,
+                ),
+              onReadAloud: () => void handleReadAloud(reply, latestTurnBinding.controlTarget.finalAnswerText),
+              showDebugCopy: turnControlViewModel.showDebugCopy,
+              debugCopyDisabled: turnControlViewModel.debugCopyDisabled,
+              copyFinalTestId: turnControlViewModel.copyFinalTestId,
+              debugCopyTestId: turnControlViewModel.debugCopyTestId,
+              readAloudTestId: turnControlViewModel.readAloudTestId,
+              readAloudActive: turnControlViewModel.readAloudActive,
+              readAloudAriaLabel: turnControlViewModel.readAloudAriaLabel,
+              readAloudTitle: turnControlViewModel.readAloudTitle,
+              proofTrace: (replyDebugRecord as Record<string, unknown> | null | undefined)
+                ?.workstation_reasoning_trace,
+              jobReadyLinks,
+              onRunJobReadyLink: runJobReadyLink,
+            });
+            const completedReplyCardState = buildHelixAskCompletedReplyCardState({
+              turnTestId: latestTurnBinding.turnTestId,
+              tintClassName: moodPalette.replyTint,
+              contextCapsule: reply.contextCapsule,
+              runtimeGoalDebugSummary,
+              promptIngested: reply.promptIngested,
+            });
+            const completedReplyState = buildHelixAskLegacyCompletedReplyState({
+              replyId: reply.id,
+              turn: buildHelixAskReplyTurnState({
+                isLatestReply,
+                card: completedReplyCardState,
+                stream: completedReplyStreamState,
+              }),
+            });
             return (
-              <div key={reply.id}>
-                <HelixAskReplyTurn
-                  isLatestReply={isLatestReply}
-                  card={{
-                    turnTestId: latestTurnBinding.turnTestId,
-                    tintClassName: moodPalette.replyTint,
-                    contextCapsule: reply.contextCapsule,
-                    promptIngested: reply.promptIngested,
-                  }}
-                  stream={{
-                    rows: turnStreamRows,
-                    workLogTestId: latestTurnBinding.workLogTestId,
-                    questionTestId: latestTurnBinding.questionTestId,
-                    finalAnswerTestId: latestTurnBinding.finalAnswerTestId,
-                    stagePlayEventCount: stagePlayChatLedgerEvents.length,
-                    finalAnswerRawText,
-                    finalAnswerSourceLabel: displayedFinalAnswerSourceLabel,
-                    backendTerminalAnswer: transcriptTerminal.backendTerminalText,
-                    finalAnswerAuthority: finalAnswerPresentation.isDeterministicReceiptFallback
-                      ? "receipt_fallback_not_reviewed"
-                      : "terminal",
-                    replyId: reply.id,
-                    activeTurnId: resolveHelixAskReplyDebugTurnId(reply),
-                    answerTint: replyBattleAnswerTint,
-                    actualAgentProviderLabel,
-                    actualAgentModelLabel,
-                    liveBridgeStatus: liveAnswerTurnBridge?.status,
-                    renderFinalAnswer: () => renderHelixAskFinalAnswerContent(transcriptAnswer),
-                    clipText,
-                    readRowClassName: readHelixContinuousTurnStreamRowClass,
-                    readDotClassName: readHelixContinuousTurnStreamDotClass,
-                    readPillClassName: readLiveAnswerTurnBridgePillClassName,
-                    onCopyFinal: () => void handleCopyReply(reply, latestTurnBinding.controlTarget.finalAnswerText),
-                    onDebugCopy: (event) =>
-                      void handleCopyReplyMasterDebug(
-                        reply,
-                        replyMasterEventClockPayload,
-                        event.currentTarget,
-                      ),
-                    onReadAloud: () => void handleReadAloud(reply, latestTurnBinding.controlTarget.finalAnswerText),
-                    showDebugCopy: turnControlViewModel.showDebugCopy,
-                    debugCopyDisabled: turnControlViewModel.debugCopyDisabled,
-                    copyFinalTestId: turnControlViewModel.copyFinalTestId,
-                    debugCopyTestId: turnControlViewModel.debugCopyTestId,
-                    readAloudTestId: turnControlViewModel.readAloudTestId,
-                    readAloudActive: turnControlViewModel.readAloudActive,
-                    readAloudAriaLabel: turnControlViewModel.readAloudAriaLabel,
-                    readAloudTitle: turnControlViewModel.readAloudTitle,
-                    proofTrace: (replyDebugRecord as Record<string, unknown> | null | undefined)
-                      ?.workstation_reasoning_trace,
-                    jobReadyLinks,
-                    onRunJobReadyLink: runJobReadyLink,
-                  }}
-                />
-              </div>
+              <HelixAskLegacyCompletedReplySlot
+                key={completedReplyState.replyId}
+                {...completedReplyState}
+              />
             );
             })}
-          </HelixAskTurnList>
-        ) : null}
-      debugDrawer={
-        <HelixAskDebugDrawerSurface
-          drawer={
-            debugExportDrawer
-              ? {
-                  payload: debugExportDrawer.payload,
-                  payloadHash: debugExportDrawer.payloadHash,
-                  readbackMatch: debugExportDrawer.result.readback_match,
-                  replyId: debugExportDrawer.replyId,
-                  onClose: () => setDebugExportDrawer(null),
-                }
-              : null
-          }
-        />
+        </>
       }
+      debugDrawerState={debugExportDrawer}
+      onDebugDrawerClose={() => setDebugExportDrawer(null)}
     />
   );
 }

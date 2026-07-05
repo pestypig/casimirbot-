@@ -39,6 +39,16 @@ export const IMAGE_LENS_REGION_INSPECTION_DETAIL_VALUES = [
 export type ImageLensRegionInspectionDetailV1 =
   (typeof IMAGE_LENS_REGION_INSPECTION_DETAIL_VALUES)[number];
 
+export const IMAGE_LENS_REGION_EXTRACTION_STATUS_VALUES = [
+  "extracted",
+  "partial",
+  "failed",
+  "not_run",
+] as const;
+
+export type ImageLensRegionExtractionStatusV1 =
+  (typeof IMAGE_LENS_REGION_EXTRACTION_STATUS_VALUES)[number];
+
 export type ImageLensRegionInspectionRequestV1 = {
   schema: typeof IMAGE_LENS_REGION_INSPECTION_REQUEST_SCHEMA;
   capability: typeof IMAGE_LENS_REGION_INSPECTION_CAPABILITY;
@@ -53,6 +63,8 @@ export type ImageLensRegionInspectionRequestV1 = {
   crop_image_ref?: string | null;
   question?: string | null;
   reason_for_crop?: string | null;
+  region_label?: string | null;
+  requested_equation_label?: string | null;
   parent_region_id?: string | null;
   detail?: ImageLensRegionInspectionDetailV1 | null;
   region_kind?: DocumentImageRegionKindV1 | null;
@@ -60,6 +72,7 @@ export type ImageLensRegionInspectionRequestV1 = {
   summary?: string | null;
   text_candidate?: string | null;
   latex_candidate?: string | null;
+  extraction_status?: ImageLensRegionExtractionStatusV1 | null;
   table_candidate_ref?: string | null;
   uncertainty?: string[];
   requested_backend_provider?: string | null;
@@ -83,11 +96,14 @@ export type ImageLensRegionInspectionReceiptV1 = {
   summary: string;
   text_candidate?: string;
   latex_candidate?: string;
+  extraction_status: ImageLensRegionExtractionStatusV1;
   table_candidate_ref?: string;
   uncertainty: string[];
   evidence_id: string;
   requested_question: string | null;
   reason_for_crop: string | null;
+  region_label?: string | null;
+  requested_equation_label?: string | null;
   parent_region_id: string | null;
   detail: ImageLensRegionInspectionDetailV1;
   document_region_receipt: DocumentImageRegionReceiptV1;
@@ -122,6 +138,9 @@ export type ImageLensRegionInspectionObservationV1 = {
   receipt_ref: string;
   evidence_id: string;
   summary: string;
+  text_candidate?: string;
+  latex_candidate?: string;
+  extraction_status: ImageLensRegionExtractionStatusV1;
   uncertainty: string[];
   deterministic: true;
   reentry_required: true;
@@ -202,6 +221,9 @@ export function validateImageLensRegionInspectionRequestV1(value: unknown): stri
   if (value.detail !== undefined && value.detail !== null && !includes(IMAGE_LENS_REGION_INSPECTION_DETAIL_VALUES, value.detail)) {
     issues.push(`detail must be one of ${IMAGE_LENS_REGION_INSPECTION_DETAIL_VALUES.join(", ")}`);
   }
+  if (value.extraction_status !== undefined && value.extraction_status !== null && !includes(IMAGE_LENS_REGION_EXTRACTION_STATUS_VALUES, value.extraction_status)) {
+    issues.push(`extraction_status must be one of ${IMAGE_LENS_REGION_EXTRACTION_STATUS_VALUES.join(", ")}`);
+  }
   if (value.page_number !== undefined && value.page_number !== null) {
     if (!isFiniteNumber(value.page_number) || value.page_number < 1) {
       issues.push("page_number must be a positive number when present");
@@ -245,6 +267,9 @@ export function validateImageLensRegionInspectionReceiptV1(value: unknown): stri
   validateBbox("bbox_px", value.bbox_px, issues);
   validateStringArray("source_refs", value.source_refs, issues);
   if (!isNonEmptyString(value.summary)) issues.push("summary must be a non-empty string");
+  if (!includes(IMAGE_LENS_REGION_EXTRACTION_STATUS_VALUES, value.extraction_status)) {
+    issues.push(`extraction_status must be one of ${IMAGE_LENS_REGION_EXTRACTION_STATUS_VALUES.join(", ")}`);
+  }
   validateStringArray("uncertainty", value.uncertainty, issues);
   if (!isNonEmptyString(value.evidence_id)) issues.push("evidence_id must be a non-empty string");
   if (value.detail !== undefined && !includes(IMAGE_LENS_REGION_INSPECTION_DETAIL_VALUES, value.detail)) {

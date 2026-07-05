@@ -141,6 +141,9 @@ const buildCodexProviderModelMetadata = (): Record<string, string> => {
 };
 
 const CODEX_CAPABILITY_LANE_REQUEST_MARKER = "HELIX_CAPABILITY_LANE_REQUEST_JSON:";
+const LIVE_TRANSLATION_TRANSLATE_TEXT_CAPABILITY = "live_translation.translate_text" as const;
+const TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY = "text_to_speech.speak_text" as const;
+const VISUAL_ANALYSIS_INSPECT_IMAGE_REGION_CAPABILITY = "visual_analysis.inspect_image_region" as const;
 
 const stripCodeFence = (value: string): string => {
   const trimmed = value.trim();
@@ -156,7 +159,31 @@ const parseJsonRecord = (value: string): Record<string, unknown> | null => {
   }
 };
 
-const extractCodexCapabilityLaneRequestCandidate = (text: string): Record<string, unknown> | null => {
+const parseJsonValue = (value: string): unknown => {
+  try {
+    return JSON.parse(stripCodeFence(value));
+  } catch {
+    return null;
+  }
+};
+
+const readCapabilityLaneRequestCandidatesFromParsed = (value: unknown): Record<string, unknown>[] => {
+  const record = readRecord(value);
+  const candidate = record && "capability_lane_call" in record
+    ? record.capability_lane_call
+    : record && "capabilityLaneCall" in record
+      ? record.capabilityLaneCall
+      : value;
+  if (Array.isArray(candidate)) {
+    return candidate
+      .map(readRecord)
+      .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  }
+  const candidateRecord = readRecord(candidate);
+  return candidateRecord ? [candidateRecord] : [];
+};
+
+const extractCodexCapabilityLaneRequestCandidates = (text: string): Record<string, unknown>[] => {
   const markerIndex = text.indexOf(CODEX_CAPABILITY_LANE_REQUEST_MARKER);
   if (markerIndex >= 0) {
     const afterMarker = text.slice(markerIndex + CODEX_CAPABILITY_LANE_REQUEST_MARKER.length);
@@ -164,27 +191,574 @@ const extractCodexCapabilityLaneRequestCandidate = (text: string): Record<string
       .split(/\r?\n/)
       .map((line) => line.trim())
       .find((line) => line.length > 0);
-    const marked = firstLine ? parseJsonRecord(firstLine) : null;
-    const markedCall = readRecord(marked?.capability_lane_call ?? marked);
-    if (markedCall) return markedCall;
+    const markedCalls = firstLine
+      ? readCapabilityLaneRequestCandidatesFromParsed(parseJsonValue(firstLine))
+      : [];
+    if (markedCalls.length > 0) return markedCalls;
   }
 
   const fencedJson = text.match(/```json\s*([\s\S]*?)\s*```/i);
-  const fenced = fencedJson?.[1] ? parseJsonRecord(fencedJson[1]) : null;
-  const fencedCall = readRecord(fenced?.capability_lane_call ?? fenced);
-  if (fencedCall) return fencedCall;
+  const fencedCalls = fencedJson?.[1]
+    ? readCapabilityLaneRequestCandidatesFromParsed(parseJsonValue(fencedJson[1]))
+    : [];
+  if (fencedCalls.length > 0) return fencedCalls;
 
-  const whole = parseJsonRecord(text);
-  return readRecord(whole?.capability_lane_call ?? whole);
+  return readCapabilityLaneRequestCandidatesFromParsed(parseJsonValue(text));
+};
+
+const extractCodexCapabilityLaneRequestCandidate = (text: string): Record<string, unknown> | null => {
+  return extractCodexCapabilityLaneRequestCandidates(text)[0] ?? null;
 };
 
 const buildCodexCapabilityLaneRequestBody = (
   body: Record<string, unknown>,
-  candidate: Record<string, unknown>,
+  candidate: Record<string, unknown> | Record<string, unknown>[],
 ): Record<string, unknown> => ({
   ...body,
-  capability_lane_call: candidate,
+  capability_lane_call: enrichCapabilityLaneCandidatesFromBody(body, candidate),
 });
+
+const capabilityLaneCandidateCapability = (candidate: Record<string, unknown> | null): string | null =>
+  readString(candidate?.capability ?? candidate?.capability_id ?? candidate?.capabilityId);
+
+const VISIBLE_TRANSLATION_TARGET_COLLECTOR_CAPABILITY_IDS = new Set([
+  "workstation_tool_reference.collect_visible_translation_targets",
+  "workstation.visible_text.collect_translation_targets",
+]);
+
+const isVisibleTranslationTargetCollectorCandidate = (candidate: Record<string, unknown> | null): boolean =>
+  VISIBLE_TRANSLATION_TARGET_COLLECTOR_CAPABILITY_IDS.has(capabilityLaneCandidateCapability(candidate) ?? "");
+
+const REQUESTED_TARGET_LANGUAGE_BY_NAME: Array<[RegExp, string]> = [
+  [/\bspanish\b|\bespa(?:n|ñ)ol\b/i, "es"],
+  [/\bfrench\b|\bfran(?:c|ç)ais\b/i, "fr"],
+  [/\bgerman\b|\bdeutsch\b/i, "de"],
+  [/\bitalian\b|\bitaliano\b/i, "it"],
+  [/\bportuguese\b|\bportugu[eê]s\b/i, "pt"],
+  [/\bjapanese\b|\bnihongo\b|\b日本語\b/i, "ja"],
+  [/\bkorean\b|\b한국어\b/i, "ko"],
+  [/\bchinese\b|\bmandarin\b|\b中文\b|\b汉语\b|\b漢語\b/i, "zh"],
+  [/\bhawaiian\b|\bhawai(?:ʻ|')?i(?:an)?\b/i, "haw"],
+  [/\benglish\b/i, "en"],
+];
+
+const requestedTargetLanguageFromQuestion = (body: Record<string, unknown>): string | null => {
+  const question = readQuestion(body);
+  if (!/\btranslat(?:e|ion|ed|ing)\b/i.test(question)) return null;
+  for (const [pattern, language] of REQUESTED_TARGET_LANGUAGE_BY_NAME) {
+    if (pattern.test(question)) return language;
+  }
+  const explicitLocale = question.match(/\b(?:to|into|in)\s+([a-z]{2,3}(?:[-_][a-z]{2,4})?)\b/i)?.[1];
+  return explicitLocale ? explicitLocale.toLowerCase().replace("_", "-") : null;
+};
+
+const activeDocVisibleTranslationContextFromBody = (body: Record<string, unknown>): Record<string, unknown> | null => {
+  const workspaceSnapshot = readRecord(body.workspace_context_snapshot ?? body.workspaceContextSnapshot);
+  return readRecord(
+    workspaceSnapshot?.active_doc_visible_translation_context ??
+    workspaceSnapshot?.activeDocVisibleTranslationContext,
+  );
+};
+
+const hasVisibleTranslationCollectorContent = (value: unknown): boolean => {
+  const record = readRecord(value);
+  if (!record) return false;
+  return (
+    readArray(record.chunks).length > 0 ||
+    readArray(record.visible_text_chunks ?? record.visibleTextChunks).length > 0 ||
+    readArray(record.ui_text_regions ?? record.uiTextRegions).length > 0 ||
+    readArray(record.panel_text_regions ?? record.panelTextRegions).length > 0 ||
+    readArray(record.visible_ui_text_regions ?? record.visibleUiTextRegions).length > 0 ||
+    Boolean(
+      readString(record.title_text ?? record.titleText) ||
+      readString(record.body_text ?? record.bodyText) ||
+      readString(record.selected_text ?? record.selectedText) ||
+      readString(record.selection_text ?? record.selectionText) ||
+      readString(record.hover_text ?? record.hoverText) ||
+      readString(record.active_region_text ?? record.activeRegionText),
+    )
+  );
+};
+
+const enrichVisibleTranslationCollectorCandidateFromBody = (
+  body: Record<string, unknown>,
+  candidate: Record<string, unknown>,
+): Record<string, unknown> => {
+  if (!isVisibleTranslationTargetCollectorCandidate(candidate)) return candidate;
+  const requestedTargetLanguage = requestedTargetLanguageFromQuestion(body);
+  const enriched: Record<string, unknown> = { ...candidate };
+  if (
+    requestedTargetLanguage &&
+    !readString(enriched.target_language ?? enriched.targetLanguage)
+  ) {
+    enriched.target_language = requestedTargetLanguage;
+  }
+  const candidateActiveContext =
+    enriched.active_doc_visible_translation_context ?? enriched.activeDocVisibleTranslationContext;
+  const candidateVisibleContext =
+    enriched.visible_translation_context ?? enriched.visibleTranslationContext;
+  if (
+    hasVisibleTranslationCollectorContent(candidateActiveContext) ||
+    hasVisibleTranslationCollectorContent(candidateVisibleContext) ||
+    readArray(enriched.visible_text_chunks ?? enriched.visibleTextChunks).length > 0 ||
+    readArray(enriched.ui_text_regions ?? enriched.uiTextRegions).length > 0 ||
+    readArray(enriched.panel_text_regions ?? enriched.panelTextRegions).length > 0 ||
+    readArray(enriched.visible_ui_text_regions ?? enriched.visibleUiTextRegions).length > 0
+  ) {
+    return enriched;
+  }
+  const visibleTranslationContext = activeDocVisibleTranslationContextFromBody(body);
+  if (!visibleTranslationContext) return enriched;
+  return {
+    ...enriched,
+    active_doc_visible_translation_context: visibleTranslationContext,
+  };
+};
+
+const firstImageTurnInputItemFromBody = (body: Record<string, unknown>): Record<string, unknown> | null => {
+  const items = [
+    ...readArray(body.turn_input_items),
+    ...readArray(body.turnInputItems),
+  ];
+  return items
+    .map(readRecord)
+    .find((item) => readString(item?.type) === "image") ?? null;
+};
+
+const hashShort = (value: unknown): string =>
+  crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 16);
+
+const imageDimensionsFromBody = (body: Record<string, unknown>): { width: number; height: number } | null => {
+  const imageItem = firstImageTurnInputItemFromBody(body);
+  if (!imageItem) return null;
+  const naturalSize = readRecord(imageItem.natural_size ?? imageItem.naturalSize);
+  const size = readRecord(imageItem.size);
+  const width =
+    readNumber(imageItem.width_px ?? imageItem.widthPx) ??
+    readNumber(imageItem.image_width_px ?? imageItem.imageWidthPx) ??
+    readNumber(imageItem.natural_width ?? imageItem.naturalWidth) ??
+    readNumber(imageItem.width) ??
+    readNumber(naturalSize?.width) ??
+    readNumber(size?.width);
+  const height =
+    readNumber(imageItem.height_px ?? imageItem.heightPx) ??
+    readNumber(imageItem.image_height_px ?? imageItem.imageHeightPx) ??
+    readNumber(imageItem.natural_height ?? imageItem.naturalHeight) ??
+    readNumber(imageItem.height) ??
+    readNumber(naturalSize?.height) ??
+    readNumber(size?.height);
+  if (width === null || height === null || width <= 0 || height <= 0) return null;
+  return { width: Math.max(1, Math.round(width)), height: Math.max(1, Math.round(height)) };
+};
+
+const imageDimensionsFromCandidates = (
+  candidates: Record<string, unknown>[],
+): { width: number; height: number } | null => {
+  const bboxes = candidates
+    .map((candidate) => readRecord(candidate.bbox_px ?? candidate.bboxPx))
+    .filter((bbox): bbox is Record<string, unknown> => Boolean(bbox));
+  const maxRight = Math.max(
+    0,
+    ...bboxes.map((bbox) =>
+      (readNumber(bbox.x) ?? 0) + Math.max(0, readNumber(bbox.width) ?? 0),
+    ),
+  );
+  const maxBottom = Math.max(
+    0,
+    ...bboxes.map((bbox) =>
+      (readNumber(bbox.y) ?? 0) + Math.max(0, readNumber(bbox.height) ?? 0),
+    ),
+  );
+  if (maxRight <= 1 && maxBottom <= 1) return null;
+  return {
+    width: Math.max(1, Math.round(maxRight)),
+    height: Math.max(1, Math.round(maxBottom > maxRight * 0.5 ? maxBottom : maxRight * 1.075)),
+  };
+};
+
+const enrichImageLensRegionCandidateFromBody = (
+  body: Record<string, unknown>,
+  candidate: Record<string, unknown>,
+): Record<string, unknown> => {
+  if (capabilityLaneCandidateCapability(candidate) !== VISUAL_ANALYSIS_INSPECT_IMAGE_REGION_CAPABILITY) {
+    return candidate;
+  }
+  const imageItem = firstImageTurnInputItemFromBody(body);
+  const enriched: Record<string, unknown> = { ...candidate };
+  const imageRef = readString(imageItem?.image_ref ?? imageItem?.imageRef);
+  const imageBase64 = readString(imageItem?.image_base64 ?? imageItem?.imageBase64);
+  const imageMimeType = readString(imageItem?.mime_type ?? imageItem?.mimeType) ?? "image/png";
+  const inlineImageRef = imageBase64
+    ? imageBase64.startsWith("data:")
+      ? imageBase64
+      : `data:${imageMimeType};base64,${imageBase64.replace(/\s+/g, "")}`
+    : null;
+  const evidenceId = readString(imageItem?.evidence_id ?? imageItem?.evidenceId);
+  const fileName = readString(imageItem?.file_name ?? imageItem?.fileName);
+  const sourceSeed = evidenceId ?? imageRef ?? fileName ?? (imageBase64 ? `sha256:${hashShort(imageBase64)}` : null);
+  if (!readString(enriched.source_id ?? enriched.sourceId) && sourceSeed) {
+    enriched.source_id = sourceSeed.startsWith("visual_source:")
+      ? sourceSeed
+      : `visual_source:image_attachment:${hashShort(sourceSeed)}`;
+  }
+  if (!readString(enriched.source_attachment_id ?? enriched.sourceAttachmentId) && sourceSeed) {
+    enriched.source_attachment_id = sourceSeed.startsWith("image_attachment:")
+      ? sourceSeed
+      : `image_attachment:${hashShort(sourceSeed)}`;
+  }
+  if (!readString(enriched.source_kind ?? enriched.sourceKind)) {
+    enriched.source_kind = "image_attachment";
+  }
+  if (!readString(enriched.source_image_ref ?? enriched.sourceImageRef)) {
+    if (inlineImageRef) {
+      enriched.source_image_ref = inlineImageRef;
+    } else if (imageRef) {
+      enriched.source_image_ref = imageRef;
+    }
+  }
+  if (!readRecord(enriched.bbox_px ?? enriched.bboxPx)) {
+    enriched.bbox_px = { x: 0, y: 0, width: 1, height: 1 };
+  }
+  if (enriched.assistant_answer !== false) enriched.assistant_answer = false;
+  if (enriched.terminal_eligible !== false) enriched.terminal_eligible = false;
+  return enriched;
+};
+
+const imageLensRequestedEquationLabels = (question: string): string[] => {
+  const labels = new Set<string>();
+  const normalized = question.trim();
+  for (const match of normalized.matchAll(/\((\d+)\.(\d+)\)\s*(?:through|thru|to|-|–|—)\s*\((\d+)\.(\d+)\)/gi)) {
+    const startMajor = Number.parseInt(match[1] ?? "", 10);
+    const startMinor = Number.parseInt(match[2] ?? "", 10);
+    const endMajor = Number.parseInt(match[3] ?? "", 10);
+    const endMinor = Number.parseInt(match[4] ?? "", 10);
+    if (
+      Number.isInteger(startMajor) &&
+      Number.isInteger(startMinor) &&
+      startMajor === endMajor &&
+      Number.isInteger(endMinor) &&
+      endMinor >= startMinor &&
+      endMinor - startMinor <= 12
+    ) {
+      for (let minor = startMinor; minor <= endMinor; minor += 1) {
+        labels.add(`${startMajor}.${minor}`);
+      }
+    }
+  }
+  for (const match of normalized.matchAll(/\((\d+\.\d+)\)/g)) {
+    labels.add(match[1] ?? "");
+  }
+  return Array.from(labels).filter(Boolean);
+};
+
+const imageLensCandidateRegionLabel = (candidate: Record<string, unknown>): string | null =>
+  readString(candidate.region_label ?? candidate.regionLabel ?? candidate.region_id ?? candidate.regionId);
+
+const imageLensCandidateMentionsEquationLabel = (
+  candidate: Record<string, unknown>,
+  label: string,
+): boolean => {
+  const haystack = [
+    imageLensCandidateRegionLabel(candidate),
+    readString(candidate.question),
+    readString(candidate.reason_for_crop ?? candidate.reasonForCrop),
+    readString(candidate.summary),
+  ].filter((entry): entry is string => Boolean(entry)).join(" ");
+  return haystack.includes(label) || haystack.includes(`(${label})`);
+};
+
+const imageLensPromptRequestsCaptionTextCrop = (question: string): boolean =>
+  /\b(?:caption|header|text\s+area|caption\/text|caption\s+text)\b/i.test(question) &&
+  /\b(?:separate|separately|first|then|also|each|area|crop|region)\b/i.test(question);
+
+const buildImageLensCaptionTextCandidate = (
+  body: Record<string, unknown>,
+  question: string,
+  existingCandidates: Record<string, unknown>[],
+): Record<string, unknown> | null => {
+  if (!imageLensPromptRequestsCaptionTextCrop(question)) return null;
+  if (existingCandidates.some((candidate) => /caption|header|text/i.test(imageLensCandidateRegionLabel(candidate) ?? ""))) {
+    return null;
+  }
+  const dimensions =
+    imageDimensionsFromBody(body) ??
+    imageDimensionsFromCandidates(existingCandidates) ??
+    { width: 346, height: 372 };
+  const equationTop = Math.min(
+    dimensions.height,
+    ...existingCandidates
+      .filter((candidate) => /equation|math/i.test([
+        imageLensCandidateRegionLabel(candidate),
+        readString(candidate.question),
+        readString(candidate.reason_for_crop ?? candidate.reasonForCrop),
+      ].filter(Boolean).join(" ")))
+      .map((candidate) => readNumber(readRecord(candidate.bbox_px ?? candidate.bboxPx)?.y) ?? dimensions.height),
+  );
+  const height = Math.max(1, Math.min(
+    dimensions.height,
+    Number.isFinite(equationTop) && equationTop > 8
+      ? Math.round(equationTop)
+      : Math.round(dimensions.height * 0.18),
+  ));
+  return enrichImageLensRegionCandidateFromBody(body, {
+    capability: VISUAL_ANALYSIS_INSPECT_IMAGE_REGION_CAPABILITY,
+    bbox_px: { x: 0, y: 0, width: dimensions.width, height },
+    question,
+    region_label: "caption_text",
+    reason_for_crop: "User requested a separate Image Lens crop for the caption/text area.",
+    detail: "high",
+    region_kind: "caption",
+    summary: "Candidate crop for caption/text area; OCR extraction remains observation-only.",
+    assistant_answer: false,
+    terminal_eligible: false,
+  });
+};
+
+const buildImageLensEquationRegionCandidates = (
+  body: Record<string, unknown>,
+  question: string,
+  existingCandidates: Record<string, unknown>[],
+): Record<string, unknown>[] => {
+  const labels = imageLensRequestedEquationLabels(question);
+  if (labels.length === 0) return [];
+  const explicitMultiRegion =
+    /\b(?:each|separate|separately|multiple|all)\b/i.test(question) ||
+    labels.length > 1;
+  if (!explicitMultiRegion) return [];
+  const dimensions =
+    imageDimensionsFromBody(body) ??
+    imageDimensionsFromCandidates(existingCandidates) ??
+    { width: 346, height: 372 };
+  const headerBottom = Math.max(
+    0,
+    ...existingCandidates
+      .filter((candidate) => /header|caption|top/i.test(imageLensCandidateRegionLabel(candidate) ?? ""))
+      .map((candidate) => {
+        const bbox = readRecord(candidate.bbox_px ?? candidate.bboxPx);
+        return (readNumber(bbox?.y) ?? 0) + Math.max(0, readNumber(bbox?.height) ?? 0);
+      }),
+  );
+  const top = Math.min(dimensions.height - 1, Math.max(headerBottom || Math.round(dimensions.height * 0.18), 0));
+  const usableHeight = Math.max(labels.length, dimensions.height - top);
+  const rowHeight = Math.max(1, Math.ceil(usableHeight / labels.length));
+  return labels
+    .filter((label) => !existingCandidates.some((candidate) => imageLensCandidateMentionsEquationLabel(candidate, label)))
+    .map((label, index) => {
+      const y = Math.min(dimensions.height - 1, top + index * rowHeight);
+      const height = index === labels.length - 1
+        ? Math.max(1, dimensions.height - y)
+        : Math.max(1, Math.min(rowHeight + 4, dimensions.height - y));
+      return enrichImageLensRegionCandidateFromBody(body, {
+        capability: VISUAL_ANALYSIS_INSPECT_IMAGE_REGION_CAPABILITY,
+        bbox_px: { x: 0, y, width: dimensions.width, height },
+        question,
+        region_label: `equation_${label}`,
+        requested_equation_label: label,
+        reason_for_crop: `User requested separate Image Lens extraction for equation (${label}).`,
+        detail: "high",
+        region_kind: "equation",
+        summary: `Candidate crop for equation (${label}); OCR/LaTeX extraction remains observation-only.`,
+        assistant_answer: false,
+        terminal_eligible: false,
+      });
+    });
+};
+
+const augmentImageLensRegionCandidatesForQuestion = (
+  body: Record<string, unknown>,
+  question: string,
+  candidate: Record<string, unknown> | Record<string, unknown>[] | null,
+): Record<string, unknown> | Record<string, unknown>[] | null => {
+  if (!candidate || !isImageLensCapabilityLanePrompt(question)) return candidate;
+  const candidates = (Array.isArray(candidate) ? candidate : [candidate])
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  if (!candidates.some((entry) => capabilityLaneCandidateCapability(entry) === VISUAL_ANALYSIS_INSPECT_IMAGE_REGION_CAPABILITY)) {
+    return candidate;
+  }
+  const captionTextCandidate = buildImageLensCaptionTextCandidate(body, question, candidates);
+  const extraCandidates = buildImageLensEquationRegionCandidates(body, question, candidates);
+  const additions = [captionTextCandidate, ...extraCandidates]
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  if (additions.length === 0) return candidate;
+  return [...candidates, ...additions];
+};
+
+const enrichCapabilityLaneCandidatesFromBody = (
+  body: Record<string, unknown>,
+  candidate: Record<string, unknown> | Record<string, unknown>[],
+): Record<string, unknown> | Record<string, unknown>[] => (
+  Array.isArray(candidate)
+    ? candidate.map((entry) => enrichImageLensRegionCandidateFromBody(body, enrichVisibleTranslationCollectorCandidateFromBody(body, entry)))
+    : enrichImageLensRegionCandidateFromBody(body, enrichVisibleTranslationCollectorCandidateFromBody(body, candidate))
+);
+
+const enrichCapabilityLaneCallsInBody = (body: Record<string, unknown>): Record<string, unknown> => {
+  const candidate = body.capability_lane_call ?? body.capabilityLaneCall;
+  if (Array.isArray(candidate)) {
+    return {
+      ...body,
+      capability_lane_call: enrichCapabilityLaneCandidatesFromBody(
+        body,
+        candidate
+          .map(readRecord)
+          .filter((entry): entry is Record<string, unknown> => Boolean(entry)),
+      ),
+    };
+  }
+  const candidateRecord = readRecord(candidate);
+  if (!candidateRecord) return body;
+  return {
+    ...body,
+    capability_lane_call: enrichCapabilityLaneCandidatesFromBody(body, candidateRecord),
+  };
+};
+
+const visibleTranslationTargetsFromCapabilityLaneDebug = (
+  debugProjection: { capability_lane_call_results?: unknown[] } | null | undefined,
+): Record<string, unknown>[] => {
+  const collectorResult = readRecord(
+    readArray(debugProjection?.capability_lane_call_results).find((entry) =>
+      capabilityLaneCandidateCapability(readRecord(entry)) ===
+        "workstation_tool_reference.collect_visible_translation_targets"
+    ),
+  );
+  const collectorTargetBatch = readVisibleTranslationTargetBatchFromCollectorResult(collectorResult);
+  return readArray(collectorTargetBatch?.targets)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+};
+
+const readVisibleTranslationTargetBatchFromCollectorResult = (
+  collectorResult: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null => {
+  const collectorObservation = readRecord(collectorResult?.observation);
+  const collectorPacket = readRecord(collectorResult?.observation_packet);
+  const collectorPacketStateDelta = readRecord(collectorPacket?.state_delta);
+  return (
+    readRecord(collectorObservation?.target_batch) ??
+    readRecord(collectorPacketStateDelta?.visible_translation_target_batch)
+  );
+};
+
+const candidateHasAny = (candidate: Record<string, unknown>, keys: string[]): boolean =>
+  keys.some((key) => readString(candidate[key]) !== null || readNumber(candidate[key]) !== null);
+
+const enrichLiveTranslationCandidateFromVisibleTarget = (
+  candidate: Record<string, unknown>,
+  target: Record<string, unknown> | null,
+): Record<string, unknown> => {
+  if (capabilityLaneCandidateCapability(candidate) !== LIVE_TRANSLATION_TRANSLATE_TEXT_CAPABILITY || !target) {
+    return candidate;
+  }
+  const enriched = { ...candidate };
+  const copyString = (targetKey: string, candidateKeys: string[], outputKey = candidateKeys[0]) => {
+    if (candidateHasAny(enriched, candidateKeys)) return;
+    const value = readString(target[targetKey]);
+    if (value) enriched[outputKey] = value;
+  };
+  const copyNumber = (targetKey: string, candidateKeys: string[], outputKey = candidateKeys[0]) => {
+    if (candidateHasAny(enriched, candidateKeys)) return;
+    const value = readNumber(target[targetKey]);
+    if (value !== null) enriched[outputKey] = value;
+  };
+  copyString("visible_text", ["text"]);
+  copyString("target_language", ["target_language", "targetLanguage"]);
+  copyString("source_id", ["source_id", "sourceId"]);
+  copyString("panel_id", ["panel_id", "panelId"]);
+  copyString("region_id", ["region_id", "regionId"]);
+  copyString("doc_path", ["doc_path", "docPath"]);
+  copyString("source_hash", ["source_hash", "sourceHash"]);
+  copyString("source_kind", ["source_kind", "sourceKind"]);
+  copyString("source_text_hash", ["source_text_hash", "sourceTextHash"]);
+  copyNumber("source_text_char_count", ["source_text_char_count", "sourceTextCharCount"]);
+  copyString("source_event_id", ["source_event_id", "sourceEventId"]);
+  copyNumber("source_event_ms", ["source_event_ms", "sourceEventMs"]);
+  copyNumber("observed_at_ms", ["now_ms", "nowMs"], "now_ms");
+  copyNumber("observedAtMs", ["now_ms", "nowMs"], "now_ms");
+  copyString("account_locale", ["account_locale", "accountLocale"]);
+  copyString("chunk_id", ["chunk_id", "chunkId"]);
+  copyNumber("chunk_index", ["chunk_index", "chunkIndex"]);
+  copyString("dedupe_key", ["dedupe_key", "dedupeKey"]);
+  copyString("projection_target", ["projection_target", "projectionTarget"]);
+  return enriched;
+};
+
+const visibleTargetMatchesTranslationCandidate = (
+  target: Record<string, unknown>,
+  candidate: Record<string, unknown>,
+): boolean => {
+  const candidateChunkId = readString(candidate.chunk_id ?? candidate.chunkId);
+  if (candidateChunkId && candidateChunkId === readString(target.chunk_id)) return true;
+  const candidateSourceId = readString(candidate.source_id ?? candidate.sourceId);
+  if (candidateSourceId && candidateSourceId === readString(target.source_id)) return true;
+  const candidateText = readString(candidate.text);
+  return Boolean(candidateText && candidateText === readString(target.visible_text));
+};
+
+const enrichLiveTranslationCandidatesFromVisibleTargets = (
+  candidates: Record<string, unknown>[],
+  targets: Record<string, unknown>[],
+): Record<string, unknown>[] => {
+  const usedTargetIndexes = new Set<number>();
+  return candidates.map((candidate, index) => {
+    if (capabilityLaneCandidateCapability(candidate) !== LIVE_TRANSLATION_TRANSLATE_TEXT_CAPABILITY) {
+      return candidate;
+    }
+    const matchedIndex = targets.findIndex((target, targetIndex) =>
+      !usedTargetIndexes.has(targetIndex) && visibleTargetMatchesTranslationCandidate(target, candidate)
+    );
+    const fallbackIndex = matchedIndex >= 0
+      ? matchedIndex
+      : targets.findIndex((_target, targetIndex) => !usedTargetIndexes.has(targetIndex) && targetIndex >= index);
+    const targetIndex = fallbackIndex >= 0
+      ? fallbackIndex
+      : targets.findIndex((_target, targetIndex) => !usedTargetIndexes.has(targetIndex));
+    const target = targetIndex >= 0 ? targets[targetIndex] ?? null : null;
+    if (targetIndex >= 0) usedTargetIndexes.add(targetIndex);
+    return enrichLiveTranslationCandidateFromVisibleTarget(candidate, target);
+  });
+};
+
+const uniqueVisibleTranslationMetadata = (
+  records: Record<string, unknown>[],
+  key: string,
+): string[] => {
+  const values = records
+    .map((record) => readString(record[key]))
+    .filter((value): value is string => Boolean(value));
+  return Array.from(new Set(values));
+};
+
+const visibleTranslationMetadataValues = (
+  records: Record<string, unknown>[],
+  key: string,
+): string[] =>
+  records
+    .map((record) => readString(record[key]))
+    .filter((value): value is string => Boolean(value));
+
+const visibleTranslationNumberMetadataValues = (
+  records: Record<string, unknown>[],
+  key: string,
+): number[] =>
+  records
+    .map((record) => readNumber(record[key]))
+    .filter((value): value is number => value !== null);
+
+const isAffirmativeTranslateAndReadAloudRequest = (question: string): boolean => {
+  const normalized = question.trim().toLowerCase();
+  if (!normalized) return false;
+  if (!/\btranslat(?:e|ion|ed)\b/.test(normalized)) return false;
+  const readAloudCue =
+    /\b(?:read|speak|say|play)\b[\s\S]{0,80}\b(?:aloud|out loud)\b/.test(normalized) ||
+    /\b(?:voice|narrat(?:e|or|ion))\b[\s\S]{0,80}\b(?:translation|translated|it|result)\b/.test(normalized);
+  if (!readAloudCue) return false;
+  const contextualOrNegatedCue =
+    /\b(?:do not|don't|dont|without|not now|later|might|maybe|if|when|before|after)\b[\s\S]{0,100}\b(?:read|speak|say|play|voice|narrat)/.test(normalized) ||
+    /\b(?:read|speak|say|play|voice|narrat)[\s\S]{0,100}\b(?:later|not now|maybe|if|when)\b/.test(normalized);
+  return !contextualOrNegatedCue;
+};
 
 const isCodexMissingTranslationInputClarification = (providerText: string): boolean => {
   const text = providerText.trim().toLowerCase();
@@ -211,8 +785,150 @@ const shouldRetryCodexCapabilityLaneRequest = (input: {
   if (!question) return false;
   return (
     question.startsWith("translate ") ||
-    /\btranslate\b.+\b(to|into)\b/.test(question)
+    /\btranslate\b.+\b(to|into)\b/.test(question) ||
+    /\b(?:image\s+lens|image-lens|attached\s+image|image\s+attachment|visible\s+image|current\s+image|visual_analysis\.inspect_image_region)\b/.test(question) &&
+      /\b(?:crop|bbox|bounding\s+box|region|area|look\s+closely|inspect|read|ocr|latex|equation|figure)\b/.test(question)
   );
+};
+
+const isImageLensCapabilityLanePrompt = (question: string): boolean => {
+  const normalized = question.trim().toLowerCase();
+  return (
+    /\b(?:image\s+lens|image-lens|attached\s+image|image\s+attachment|visible\s+image|current\s+image|visual_analysis\.inspect_image_region)\b/.test(normalized) &&
+    /\b(?:crop|bbox|bounding\s+box|region|area|look\s+closely|inspect|read|ocr|latex|equation|figure)\b/.test(normalized)
+  );
+};
+
+const buildCodexCapabilityLaneRetryInstruction = (question: string): string => {
+  if (isImageLensCapabilityLanePrompt(question)) {
+    return [
+      `Output only ${CODEX_CAPABILITY_LANE_REQUEST_MARKER} followed by compact JSON for ${VISUAL_ANALYSIS_INSPECT_IMAGE_REGION_CAPABILITY}.`,
+      "Required fields: capability, source_id when known, bbox_px, question, reason_for_crop, assistant_answer:false, terminal_eligible:false.",
+      "For explicit multi-region requests, output {\"capability_lane_call\":[...]} with one visual_analysis.inspect_image_region call per requested region.",
+      "If the exact crop is not yet known, request the broadest available image region as observation-only crop evidence; Helix may enrich missing source metadata from the submitted image attachment.",
+    ].join("\n");
+  }
+  return [
+    `Output only ${CODEX_CAPABILITY_LANE_REQUEST_MARKER} followed by compact JSON for live_translation.translate_text.`,
+    "Use the user's source text and target language from the request. If either is missing, ask for clarification instead of emitting a final answer.",
+  ].join("\n");
+};
+
+const providerTextLooksLikeHelixPromptLeak = (text: string): boolean => {
+  const sample = text.slice(0, 12000);
+  return (
+    /model_visible_capability_lane_manifest/i.test(sample) ||
+    /Available Helix workstation gateway capabilities:/i.test(sample) ||
+    /Helix workstation gateway observations already executed for this turn:/i.test(sample) ||
+    /Before giving a final answer, decide whether the user request needs a one-shot capability lane/i.test(sample) ||
+    /Helix request context JSON:/i.test(sample)
+  );
+};
+
+const compactPromptLeakFailureText = [
+  "I could not complete that turn because the runtime provider echoed Helix internal capability instructions instead of returning a valid lane request or final answer.",
+  "No visual observation receipt was produced for this turn.",
+].join("\n");
+
+const promptLeakPreview = "[blocked_prompt_leak_preview]";
+
+const safeProviderPreview = (text: string, maxLength = 1000): string =>
+  providerTextLooksLikeHelixPromptLeak(text) ? promptLeakPreview : text.slice(0, maxLength);
+
+const formatImageLensBbox = (bbox: Record<string, unknown> | null): string => {
+  const x = readNumber(bbox?.x);
+  const y = readNumber(bbox?.y);
+  const width = readNumber(bbox?.width);
+  const height = readNumber(bbox?.height);
+  if (x === undefined || y === undefined || width === undefined || height === undefined) {
+    return "unavailable";
+  }
+  return `x=${x}, y=${y}, width=${width}, height=${height}`;
+};
+
+const formatImageLensCropRefForAnswer = (value: unknown): string | null => {
+  const cropRef = readString(value);
+  if (!cropRef) return null;
+  const dataUrlMatch = cropRef.match(/^data:([^;,]+);base64,/i);
+  if (dataUrlMatch) {
+    const mime = dataUrlMatch[1]?.trim() || "image";
+    return `[inline ${mime} crop data redacted; ref_hash=sha256:${hashShort(cropRef)}]`;
+  }
+  return cropRef.length > 220
+    ? `${cropRef.slice(0, 160)}...[truncated; ref_hash=sha256:${hashShort(cropRef)}]`
+    : cropRef;
+};
+
+const buildImageLensObservationFallbackAnswer = (input: {
+  question: string;
+  capabilityLaneCallResults: unknown[];
+}): string | null => {
+  if (!isImageLensCapabilityLanePrompt(input.question)) return null;
+  const imageLensResults = input.capabilityLaneCallResults
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> =>
+      capabilityLaneCandidateCapability(entry) === VISUAL_ANALYSIS_INSPECT_IMAGE_REGION_CAPABILITY
+    );
+  if (imageLensResults.length === 0) return null;
+
+  const sections = imageLensResults.map((result, index) => {
+    const receipt = readRecord(result.receipt) ?? readRecord(result.observation) ?? result;
+    const label =
+      readString(receipt.region_label) ??
+      readString(receipt.requested_equation_label) ??
+      `crop_${index + 1}`;
+    const bbox = formatImageLensBbox(readRecord(receipt.bbox_px ?? receipt.bboxPx));
+    const cropRef = formatImageLensCropRefForAnswer(receipt.crop_image_ref ?? receipt.cropImageRef);
+    const extractionStatus =
+      readString(receipt.extraction_status ?? receipt.extractionStatus) ?? "not_returned";
+    const textCandidate = readString(receipt.text_candidate ?? receipt.textCandidate);
+    const latexCandidate = readString(receipt.latex_candidate ?? receipt.latexCandidate);
+    const uncertainty = readArray(receipt.uncertainty)
+      .map(readString)
+      .filter((entry): entry is string => Boolean(entry));
+    const extractedParts = [
+      textCandidate ? `text_candidate: ${textCandidate}` : null,
+      latexCandidate ? `latex_candidate: ${latexCandidate}` : null,
+    ].filter(Boolean);
+
+    return [
+      `**${label}**`,
+      `- Bbox: ${bbox}`,
+      cropRef ? `- Crop ref: ${cropRef}` : null,
+      `- Extraction status: ${extractionStatus}`,
+      `- Extracted information: ${
+        extractedParts.length > 0
+          ? extractedParts.join("; ")
+          : "no text_candidate or latex_candidate was returned for this crop"
+      }`,
+      `- Uncertainty: ${uncertainty.length > 0 ? uncertainty.join("; ") : "none returned"}`,
+    ].filter(Boolean).join("\n");
+  });
+
+  return [
+    "The runtime provider echoed Helix internal capability instructions after Image Lens observations re-entered, so I am using only the observation receipts below and not the echoed provider text.",
+    "",
+    sections.join("\n\n"),
+  ].join("\n");
+};
+
+const synthesizeImageLensRegionLaneCandidate = (
+  body: Record<string, unknown>,
+  question: string,
+): Record<string, unknown> | null => {
+  if (!isImageLensCapabilityLanePrompt(question)) return null;
+  if (!firstImageTurnInputItemFromBody(body)) return null;
+  return enrichImageLensRegionCandidateFromBody(body, {
+    capability: VISUAL_ANALYSIS_INSPECT_IMAGE_REGION_CAPABILITY,
+    bbox_px: { x: 0, y: 0, width: 1, height: 1 },
+    question,
+    reason_for_crop: "Explicit Image Lens visual-region prompt with submitted image attachment.",
+    detail: "auto",
+    region_kind: /\bequation\b/i.test(question) ? "equation" : "unknown",
+    summary: "Image Lens attachment region inspection requested; fallback broad crop seed used because provider did not emit a structured bbox.",
+    assistant_answer: false,
+    terminal_eligible: false,
+  });
 };
 
 const buildCurrentTurnArtifactLedgerFromGatewayPackets = (input: {
@@ -1327,6 +2043,7 @@ const applyScholarlyResearchObservationAuthorityGuard = (input: {
 
 const isDeicticCalculatorContextQuestion = (text: string): boolean => {
   if (/\bbackground\s+only\b/i.test(text)) return false;
+  if (isImageLensCapabilityLanePrompt(text)) return false;
   const unquotedText = text.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
   if (/\b(?:not|don'?t|do\s+not)\s+(?:asking\s+about|ask|answer|use|read|explain|interpret|summari[sz]e)\b.{0,80}\b(?:this|current|open|active|visible)\s+(?:calculation|calculator|expression|equation|result|answer)\b/i.test(unquotedText)) return false;
   if (/\b(?:before|after|if|when)\b.{0,80}\b(?:open|focus|use|show)\b.{0,40}\b(?:calculator|calculation|expression|equation|result)\b/i.test(unquotedText)) return false;
@@ -2423,6 +3140,7 @@ export const codexProvider: HelixAgentProvider = {
     const question = readQuestion(request.body);
     const turnId = readTurnId(request.body);
     const threadId = readThreadId(request.body);
+    const capabilityLaneRequestBody = enrichCapabilityLaneCallsInBody(request.body);
     const emittedLiveTranscriptEventIds = new Set<string>();
     const emitCodexNativeRuntimeEvent = (
       _event: HelixAgentRuntimeEvent,
@@ -2459,7 +3177,7 @@ export const codexProvider: HelixAgentProvider = {
     });
     let capabilityLaneContext = await buildHelixCapabilityLaneProviderAdapterContext({
       provider: codexProvider,
-      body: request.body,
+      body: capabilityLaneRequestBody,
       turnId,
       env: process.env,
     });
@@ -2671,8 +3389,10 @@ export const codexProvider: HelixAgentProvider = {
       "For moral_graph_reflection observations, use located_badge_ids, comparison_seed, probability_terrain, procedural_classification, fruition, and claim_boundary_notes as bounded procedural evidence. Explain what the derivation supports and what remains unsupported; do not present a final moral verdict or substitute web/civilization evidence when the Moral Graph observation is missing.",
       "For moral_living_substrate_reflection observations, use procedural_chain transitions to compare present and missing links. Explain what the chain supports conditionally, what remains unsupported, and avoid merely restating matched badge names.",
       "If a scholarly observation includes scholarly_lookup_recovery_affordance, scholarly_full_text_recovery_affordance, scholarly_numeric_recovery_affordance, or recovery_affordances, treat that as non-terminal evidence about a failed or weak retrieval/fetch/extraction. Use it to explain the mismatch, propose a narrower re-query, ask the user, or fail closed; do not claim full-text, numeric extraction, or calculator results from it.",
-      `Before giving a final answer, decide whether the user request needs a one-shot capability lane. If it does and required inputs are present, your entire first response must be ${CODEX_CAPABILITY_LANE_REQUEST_MARKER} followed by compact JSON for exactly one lane call.`,
+      `Before giving a final answer, decide whether the user request needs a one-shot capability lane. If it does and required inputs are present, your entire first response must be ${CODEX_CAPABILITY_LANE_REQUEST_MARKER} followed by compact JSON for the lane call. Use {"capability_lane_call":[...]} only when the user explicitly asks for multiple Image Lens regions or multiple visible translation chunks.`,
       "For translation requests over text/content, you must request live_translation.translate_text instead of answering from memory. Required fields are text and target_language. A direct translation answer before the lane observation is non-compliant.",
+      "For Image Lens, attached-image, or visible-image requests that ask to crop, inspect a region, read an equation, OCR, or report bbox coordinates, request visual_analysis.inspect_image_region before answering. Required fields are source_id when known, bbox_px, question, reason_for_crop, assistant_answer:false, and terminal_eligible:false. For explicit separate/multiple region requests, request one visual_analysis.inspect_image_region call per region.",
+      "If workspace_context_snapshot.active_doc_visible_translation_context is present and the user asks to translate the visible/current document, first request workstation.visible_text.collect_translation_targets and pass active_doc_visible_translation_context: workspace_context_snapshot.active_doc_visible_translation_context when available. The legacy equivalent is workstation_tool_reference.collect_visible_translation_targets. If the user names a target language, include that requested target_language on the collector request even when the visible context has a different default target_language. After Helix returns that collector observation, request live_translation.translate_text for admitted collected chunks; preserve doc_path, source_id, panel_id, region_id, bbox, source_hash, source_text_hash, source_text_char_count, source_event_id, source_event_ms, chunk_id, chunk_index, dedupe_key, projection_target, account_locale, existing_observation_ref, existing_receipt_ref, existing_projection_status, existing_freshness_status, existing_terminal_authority_status, existing_source_event_ms, and existing_observed_at_ms when available. If the collected target has observed_at_ms, pass it as now_ms on live_translation.translate_text so projection receipts keep the collector observation time. Preserve target_language from the collected target unless the user explicitly requested a different target language; in that case use the user-requested target_language.",
       "",
       "User request:",
       question,
@@ -2715,7 +3435,7 @@ export const codexProvider: HelixAgentProvider = {
       result.stdout.trim() ||
       result.stderr.trim() ||
       "Codex runtime did not return output before the provider adapter stopped waiting.";
-    let runtimeLaneRequestCandidate =
+    let runtimeLaneRequestCandidate: Record<string, unknown> | Record<string, unknown>[] | null =
       capabilityLaneContext.observation_packets.length === 0
         ? extractCodexCapabilityLaneRequestCandidate(initialCodexText)
         : null;
@@ -2734,8 +3454,7 @@ export const codexProvider: HelixAgentProvider = {
         "",
         "Your prior response did not follow the capability lane request contract.",
         "For this user request, do not answer directly before lane observation evidence exists.",
-        `Output only ${CODEX_CAPABILITY_LANE_REQUEST_MARKER} followed by compact JSON for live_translation.translate_text.`,
-        "Use the user's source text and target language from the request. If either is missing, ask for clarification instead of emitting a final answer.",
+        buildCodexCapabilityLaneRetryInstruction(question),
         "",
         "Prior non-compliant response:",
         initialCodexText,
@@ -2759,12 +3478,28 @@ export const codexProvider: HelixAgentProvider = {
           ? "runtime_provider_emitted_lane_request"
           : "runtime_provider_did_not_emit_lane_request",
         reason: "initial_provider_response_skipped_required_one_shot_lane_request",
-        prior_response_preview: initialCodexText.slice(0, 1000),
-        retry_response_preview: retryText.slice(0, 1000),
+        prior_response_preview: safeProviderPreview(initialCodexText),
+        retry_response_preview: safeProviderPreview(retryText),
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
       };
+    }
+    let runtimeLaneRequestSynthesized: Record<string, unknown> | Record<string, unknown>[] | null = null;
+    if (!runtimeLaneRequestCandidate) {
+      runtimeLaneRequestSynthesized = synthesizeImageLensRegionLaneCandidate(request.body, question);
+      runtimeLaneRequestCandidate = runtimeLaneRequestSynthesized;
+    }
+    const runtimeLaneRequestBeforeImageLensAugmentation = runtimeLaneRequestCandidate;
+    runtimeLaneRequestCandidate = augmentImageLensRegionCandidatesForQuestion(
+      request.body,
+      question,
+      runtimeLaneRequestCandidate,
+    );
+    const imageLensRegionCandidateAugmented =
+      runtimeLaneRequestCandidate !== runtimeLaneRequestBeforeImageLensAugmentation;
+    if (imageLensRegionCandidateAugmented && !runtimeLaneRequestSynthesized) {
+      runtimeLaneRequestSynthesized = runtimeLaneRequestCandidate;
     }
     let runtimeLaneRequestLoop: Record<string, unknown> | null = null;
     if (runtimeLaneRequestCandidate) {
@@ -2791,6 +3526,13 @@ export const codexProvider: HelixAgentProvider = {
           : "lane_request_not_executed",
         retry: runtimeLaneRequestRetry,
         requested_by_runtime_provider: true,
+        synthesized_by_helix_policy: Boolean(runtimeLaneRequestSynthesized),
+        image_lens_region_candidate_augmented: imageLensRegionCandidateAugmented,
+        synthesis_reason: imageLensRegionCandidateAugmented
+          ? "explicit_image_lens_multi_region_prompt_missing_requested_equation_crops"
+          : runtimeLaneRequestSynthesized
+          ? "explicit_image_lens_region_prompt_with_submitted_image_but_no_runtime_lane_json"
+          : null,
         selected_runtime_agent_provider: "codex",
         candidate: runtimeLaneRequestCandidate,
         capability_lane_call_results: capabilityLaneDebugProjection.capability_lane_call_results,
@@ -2801,11 +3543,47 @@ export const codexProvider: HelixAgentProvider = {
         assistant_answer: false,
         raw_content_included: false,
       };
-      const reentryPrompt = [
+      const firstRuntimeLaneRequestCandidate = Array.isArray(runtimeLaneRequestCandidate)
+        ? readRecord(runtimeLaneRequestCandidate[0]) ?? null
+        : runtimeLaneRequestCandidate;
+      const firstLaneWasVisibleTargetCollector =
+        isVisibleTranslationTargetCollectorCandidate(firstRuntimeLaneRequestCandidate);
+      const firstLaneWasTranslation =
+        capabilityLaneCandidateCapability(firstRuntimeLaneRequestCandidate) === LIVE_TRANSLATION_TRANSLATE_TEXT_CAPABILITY;
+      const firstLaneWasImageLens =
+        capabilityLaneCandidateCapability(firstRuntimeLaneRequestCandidate) === "visual_analysis.inspect_image_region";
+      const firstLaneNeedsSpeechFollowup =
+        firstLaneWasTranslation && isAffirmativeTranslateAndReadAloudRequest(question);
+      const firstReentryPrompt = [
         prompt,
         "",
         "Helix executed the runtime-requested capability lane call above. The result below is observation/receipt evidence, not a final answer by itself.",
-        "Now produce the final answer using only the lane observation when it is relevant. Do not emit another lane request.",
+        firstLaneWasVisibleTargetCollector
+          ? [
+              "If the visible target collection satisfies a translation request, your next response may request one or more live_translation.translate_text lane calls for collected targets.",
+              `To request translation, output only ${CODEX_CAPABILITY_LANE_REQUEST_MARKER} followed by compact JSON.`,
+              "For multiple visible chunks, use {\"capability_lane_call\":[...]} with one live_translation.translate_text call per collected target you want translated.",
+              "Copy source_id, panel_id, region_id, doc_path, source_hash, source_kind, account_locale, chunk_id, chunk_index, dedupe_key, and projection_target from the collected target when available.",
+              "Copy target_language from the collected target unless the user explicitly requested a different target language; if the user requested a different target language, use the user-requested target_language.",
+              "If no collected target is usable, answer with a typed failure or ask for clarification. Do not translate from memory.",
+            ].join("\n")
+          : firstLaneNeedsSpeechFollowup
+            ? [
+                "The original user request also explicitly asked to read/speak/play the translated result aloud.",
+                `If the translation observation contains usable translated_text, your next response must request exactly one ${TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY} lane call.`,
+                `Output only ${CODEX_CAPABILITY_LANE_REQUEST_MARKER} followed by compact JSON.`,
+                "Use text equal to the translated_text from the translation observation and include source_observation_ref when available.",
+                "If no translated_text is usable, answer with a typed failure. Do not claim playback before a text_to_speech receipt re-enters.",
+              ].join("\n")
+            : firstLaneWasImageLens
+              ? [
+                  "Now produce the final answer using only Image Lens extraction evidence that re-entered in the lane observation.",
+                  "For Image Lens crops, bbox/crop receipts alone are not text or equation transcription authority.",
+                  "Only report exact text or LaTeX candidates that appear in text_candidate or latex_candidate fields.",
+                  "For crops with extraction_status failed/not_run and no candidate fields, say no extraction candidate was returned for that crop.",
+                  "Preserve uncertainty notes. Do not emit another lane request.",
+                ].join("\n")
+              : "Now produce the final answer using only the lane observation when it is relevant. Do not emit another lane request.",
         "",
         "Runtime-requested capability lane candidate:",
         JSON.stringify(runtimeLaneRequestCandidate, null, 2),
@@ -2814,11 +3592,315 @@ export const codexProvider: HelixAgentProvider = {
         capabilityLaneContext.prompt_observation_block,
       ].join("\n");
       result = await runCodexProcess({
-        prompt: reentryPrompt,
+        prompt: firstReentryPrompt,
         signal: request.signal,
         turnId,
         onNativeEvent: emitCodexNativeRuntimeEvent,
       });
+      let chainedRuntimeLaneRequestCandidate: Record<string, unknown> | Record<string, unknown>[] | null = null;
+      if (firstLaneWasVisibleTargetCollector) {
+        const firstReentryText = result.stdout.trim() || result.stderr.trim() || "";
+        const candidates = extractCodexCapabilityLaneRequestCandidates(firstReentryText)
+          .filter((candidate) =>
+            capabilityLaneCandidateCapability(candidate) === LIVE_TRANSLATION_TRANSLATE_TEXT_CAPABILITY
+          );
+        if (candidates.length > 0) {
+          const enrichedCandidates = enrichLiveTranslationCandidatesFromVisibleTargets(
+            candidates,
+            visibleTranslationTargetsFromCapabilityLaneDebug(capabilityLaneDebugProjection),
+          );
+          chainedRuntimeLaneRequestCandidate =
+            enrichedCandidates.length === 1 ? enrichedCandidates[0] ?? null : enrichedCandidates;
+        }
+      } else if (firstLaneNeedsSpeechFollowup) {
+        const firstReentryText = result.stdout.trim() || result.stderr.trim() || "";
+        const candidate = extractCodexCapabilityLaneRequestCandidate(firstReentryText);
+        if (capabilityLaneCandidateCapability(candidate) === TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY) {
+          chainedRuntimeLaneRequestCandidate = candidate;
+        } else {
+          const speechRetryPrompt = [
+            firstReentryPrompt,
+            "",
+            "The prior response did not follow the required text-to-speech lane request contract for this explicit read-aloud request.",
+            "Prior non-compliant response:",
+            firstReentryText.slice(0, 4000),
+            "",
+            `Output only ${CODEX_CAPABILITY_LANE_REQUEST_MARKER} followed by compact JSON for ${TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY}.`,
+            "Use text equal to the translated_text from the translation observation and include source_observation_ref when available.",
+          ].join("\n");
+          result = await runCodexProcess({
+            prompt: speechRetryPrompt,
+            signal: request.signal,
+            turnId,
+            onNativeEvent: emitCodexNativeRuntimeEvent,
+          });
+          const retryText = result.stdout.trim() || result.stderr.trim() || "";
+          const retryCandidate = extractCodexCapabilityLaneRequestCandidate(retryText);
+          if (capabilityLaneCandidateCapability(retryCandidate) === TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY) {
+            chainedRuntimeLaneRequestCandidate = retryCandidate;
+          }
+        }
+      }
+      if (chainedRuntimeLaneRequestCandidate) {
+        const chainedLaneCalls = [
+          runtimeLaneRequestCandidate,
+          ...(Array.isArray(chainedRuntimeLaneRequestCandidate)
+            ? chainedRuntimeLaneRequestCandidate
+            : [chainedRuntimeLaneRequestCandidate]),
+        ];
+        const chainedLaneRequestBody = buildCodexCapabilityLaneRequestBody(request.body, chainedLaneCalls);
+        capabilityLaneContext = await buildHelixCapabilityLaneProviderAdapterContext({
+          provider: codexProvider,
+          body: chainedLaneRequestBody,
+          turnId,
+          iteration: 2,
+          env: process.env,
+        });
+        capabilityLaneDebugProjection = capabilityLaneContext.debug_projection;
+        currentTurnArtifactLedger = [
+          ...normalizedObservationArtifacts,
+          ...providerGatewayPacketLedger,
+          ...capabilityLaneContext.artifact_ledger,
+        ];
+        const collectorResult = readRecord(
+          capabilityLaneDebugProjection.capability_lane_call_results.find((entry) =>
+            capabilityLaneCandidateCapability(readRecord(entry)) ===
+              "workstation_tool_reference.collect_visible_translation_targets"
+          ),
+        );
+        const collectorObservation = readRecord(collectorResult?.observation);
+        const collectorTargetBatch = readVisibleTranslationTargetBatchFromCollectorResult(collectorResult);
+        const collectorTargets = readArray(collectorTargetBatch?.targets)
+          .map(readRecord)
+          .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+        const firstCollectedTarget = collectorTargets[0] ?? null;
+        const translationResult = readRecord(
+          capabilityLaneDebugProjection.capability_lane_call_results.find((entry) =>
+            capabilityLaneCandidateCapability(readRecord(entry)) === LIVE_TRANSLATION_TRANSLATE_TEXT_CAPABILITY
+          ),
+        );
+        const translationResults = capabilityLaneDebugProjection.capability_lane_call_results
+          .map(readRecord)
+          .filter((entry): entry is Record<string, unknown> =>
+            capabilityLaneCandidateCapability(entry) === LIVE_TRANSLATION_TRANSLATE_TEXT_CAPABILITY
+          );
+        const textToSpeechResult = readRecord(
+          capabilityLaneDebugProjection.capability_lane_call_results.find((entry) =>
+            capabilityLaneCandidateCapability(readRecord(entry)) === TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY
+          ),
+        );
+        const translationObservation = readRecord(translationResult?.observation);
+        const translationPacket = capabilityLaneContext.observation_packets.find((packet) =>
+          packet.capability_key === LIVE_TRANSLATION_TRANSLATE_TEXT_CAPABILITY
+        );
+        const textToSpeechPacket = capabilityLaneContext.observation_packets.find((packet) =>
+          packet.capability_key === TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY
+        );
+        const translationPacketStateDelta = readRecord(translationPacket?.state_delta);
+        const translationProjectionReceipt = readRecord(
+          translationPacketStateDelta?.live_translation_projection_receipt,
+        );
+        const translationProjectionReceipts = capabilityLaneContext.observation_packets
+          .filter((packet) => packet.capability_key === LIVE_TRANSLATION_TRANSLATE_TEXT_CAPABILITY)
+          .map((packet) => readRecord(readRecord(packet.state_delta)?.live_translation_projection_receipt))
+          .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+        const textToSpeechPacketStateDelta = readRecord(textToSpeechPacket?.state_delta);
+        const textToSpeechReceipt = readRecord(
+          textToSpeechPacketStateDelta?.text_to_speech_receipt,
+        );
+        runtimeLaneRequestLoop = {
+          ...runtimeLaneRequestLoop,
+          status: capabilityLaneContext.observation_packets.length > 0
+            ? "lane_observation_reentered"
+            : "lane_request_not_executed",
+          chained_candidate: chainedRuntimeLaneRequestCandidate,
+          candidate_chain: [
+            runtimeLaneRequestCandidate,
+            ...(Array.isArray(chainedRuntimeLaneRequestCandidate)
+              ? chainedRuntimeLaneRequestCandidate
+              : [chainedRuntimeLaneRequestCandidate]),
+          ],
+          chain_step_count: 1 + (
+            Array.isArray(chainedRuntimeLaneRequestCandidate)
+              ? chainedRuntimeLaneRequestCandidate.length
+              : 1
+          ),
+          capability_lane_call_results: capabilityLaneDebugProjection.capability_lane_call_results,
+          capability_lane_backend_selections: capabilityLaneDebugProjection.capability_lane_backend_selections,
+          capability_lane_observation_packets: capabilityLaneDebugProjection.capability_lane_observation_packets,
+          capability_lane_reentry_status: capabilityLaneDebugProjection.capability_lane_reentry_status,
+          ...(firstLaneWasVisibleTargetCollector
+            ? {
+                visible_translation_collector_chain: {
+                  schema: "helix.runtime_agent_visible_translation_chain.v1",
+                  requested_collector_capability: capabilityLaneCandidateCapability(runtimeLaneRequestCandidate),
+                  collector_capability: "workstation_tool_reference.collect_visible_translation_targets",
+                  translation_capability: LIVE_TRANSLATION_TRANSLATE_TEXT_CAPABILITY,
+                  collector_requested: true,
+                  translation_requested: true,
+                  observation_packet_count: capabilityLaneContext.observation_packets.length,
+                  collected_target_count: collectorTargets.length,
+                  collected_source_kinds:
+                    uniqueVisibleTranslationMetadata(collectorTargets, "source_kind"),
+                  collected_projection_targets:
+                    uniqueVisibleTranslationMetadata(collectorTargets, "projection_target"),
+                  collected_panel_ids:
+                    uniqueVisibleTranslationMetadata(collectorTargets, "panel_id"),
+                  collected_source_ids:
+                    visibleTranslationMetadataValues(collectorTargets, "source_id"),
+                  collected_doc_paths:
+                    uniqueVisibleTranslationMetadata(collectorTargets, "doc_path"),
+                  collected_chunk_ids:
+                    visibleTranslationMetadataValues(collectorTargets, "chunk_id"),
+                  collected_source_event_ids:
+                    visibleTranslationMetadataValues(collectorTargets, "source_event_id"),
+                  collected_target_languages:
+                    uniqueVisibleTranslationMetadata(collectorTargets, "target_language"),
+                  collected_existing_observation_refs:
+                    visibleTranslationMetadataValues(collectorTargets, "existing_observation_ref"),
+                  collected_existing_receipt_refs:
+                    collectorTargets
+                      .map((target) =>
+                        readString(target.existing_receipt_ref) ??
+                        readString(target.existing_translation_receipt_ref)
+                      )
+                      .filter((entry): entry is string => Boolean(entry)),
+                  collected_existing_source_event_ms:
+                    visibleTranslationNumberMetadataValues(collectorTargets, "existing_source_event_ms"),
+                  collected_existing_observed_at_ms:
+                    visibleTranslationNumberMetadataValues(collectorTargets, "existing_observed_at_ms"),
+                  collector_observation_ref:
+                    readString(collectorObservation?.observation_ref) ??
+                    readString(collectorResult?.observation_ref) ??
+                    null,
+                  collector_batch_ref: readString(collectorTargetBatch?.batch_ref) ?? null,
+                  first_collected_source_id: readString(firstCollectedTarget?.source_id) ?? null,
+                  first_collected_doc_path: readString(firstCollectedTarget?.doc_path) ?? null,
+                  first_collected_chunk_id: readString(firstCollectedTarget?.chunk_id) ?? null,
+                  first_collected_source_event_id:
+                    readString(firstCollectedTarget?.source_event_id) ?? null,
+                  first_collected_source_event_ms:
+                    readNumber(firstCollectedTarget?.source_event_ms),
+                  first_collected_observed_at_ms:
+                    readNumber(firstCollectedTarget?.observed_at_ms),
+                  first_collected_source_hash: readString(firstCollectedTarget?.source_hash) ?? null,
+                  first_collected_source_text_hash: readString(firstCollectedTarget?.source_text_hash) ?? null,
+                  first_collected_source_text_char_count:
+                    readNumber(firstCollectedTarget?.source_text_char_count),
+                  first_collected_projection_target:
+                    readString(firstCollectedTarget?.projection_target) ?? null,
+                  first_collected_bbox: readRecord(firstCollectedTarget?.bbox),
+                  first_collected_target_language: readString(firstCollectedTarget?.target_language) ?? null,
+                  first_collected_existing_observation_ref:
+                    readString(firstCollectedTarget?.existing_observation_ref) ?? null,
+                  first_collected_existing_receipt_ref:
+                    readString(firstCollectedTarget?.existing_receipt_ref) ??
+                    readString(firstCollectedTarget?.existing_translation_receipt_ref) ??
+                    null,
+                  first_collected_existing_projection_status:
+                    readString(firstCollectedTarget?.existing_projection_status) ?? null,
+                  first_collected_existing_freshness_status:
+                    readString(firstCollectedTarget?.existing_freshness_status) ?? null,
+                  first_collected_existing_terminal_authority_status:
+                    readString(firstCollectedTarget?.existing_terminal_authority_status) ?? null,
+                  first_collected_existing_source_event_ms:
+                    readNumber(firstCollectedTarget?.existing_source_event_ms),
+                  first_collected_existing_observed_at_ms:
+                    readNumber(firstCollectedTarget?.existing_observed_at_ms),
+                  translation_observation_ref:
+                    readString(translationObservation?.observation_ref) ??
+                    readString(translationResult?.observation_ref) ??
+                    null,
+                  translation_receipt_ref: readString(translationProjectionReceipt?.receipt_ref) ?? null,
+                  translated_chunk_count: translationResults.length,
+                  translated_source_kinds:
+                    uniqueVisibleTranslationMetadata(
+                      translationResults
+                        .map((entry) => readRecord(entry.observation))
+                        .filter((entry): entry is Record<string, unknown> => Boolean(entry)),
+                      "source_kind",
+                    ),
+                  translated_projection_targets:
+                    uniqueVisibleTranslationMetadata(
+                      translationResults
+                        .map((entry) => readRecord(entry.observation))
+                        .filter((entry): entry is Record<string, unknown> => Boolean(entry)),
+                      "projection_target",
+                    ),
+                  translation_observation_refs: translationResults
+                    .map((entry) =>
+                      readString(readRecord(entry.observation)?.observation_ref) ??
+                      readString(entry.observation_ref)
+                    )
+                    .filter((entry): entry is string => Boolean(entry)),
+                  translation_receipt_refs: translationProjectionReceipts
+                    .map((entry) => readString(entry.receipt_ref))
+                    .filter((entry): entry is string => Boolean(entry)),
+                  projection_receipt_status:
+                    readString(translationProjectionReceipt?.projection_status) ??
+                    readString(translationProjectionReceipt?.status) ??
+                    null,
+                  terminal_eligible: false,
+                  assistant_answer: false,
+                  raw_content_included: false,
+                },
+              }
+            : {}),
+          ...(firstLaneNeedsSpeechFollowup
+            ? {
+                translation_text_to_speech_chain: {
+                  schema: "helix.runtime_agent_translation_text_to_speech_chain.v1",
+                  translation_capability: LIVE_TRANSLATION_TRANSLATE_TEXT_CAPABILITY,
+                  speech_capability: TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY,
+                  translation_requested: true,
+                  speech_requested: true,
+                  observation_packet_count: capabilityLaneContext.observation_packets.length,
+                  translation_observation_ref:
+                    readString(translationObservation?.observation_ref) ??
+                    readString(translationResult?.observation_ref) ??
+                    null,
+                  translation_receipt_ref: readString(translationProjectionReceipt?.receipt_ref) ?? null,
+                  speech_observation_ref:
+                    readString(textToSpeechResult?.observation_ref) ??
+                    readString(textToSpeechPacket?.observation_ref) ??
+                    null,
+                  speech_receipt_ref: readString(textToSpeechReceipt?.receipt_ref) ?? null,
+                  playback_status: readString(textToSpeechReceipt?.playback_status) ?? null,
+                  terminal_eligible: false,
+                  assistant_answer: false,
+                  raw_content_included: false,
+                },
+              }
+            : {}),
+        };
+        const chainedReentryPrompt = [
+          prompt,
+          "",
+          firstLaneNeedsSpeechFollowup
+            ? "Helix executed the runtime-requested translation lane call and then the runtime-requested text-to-speech lane call. The results below are observation/receipt evidence, not final answers by themselves."
+            : "Helix executed the visible target collector and then the runtime-requested translation lane call. The results below are observation/receipt evidence, not final answers by themselves.",
+          firstLaneNeedsSpeechFollowup
+            ? "Now produce the final answer using only the translation observation and text-to-speech receipt. Report playback as played only if the receipt proves it; otherwise report the exact pending, blocked, or failed status."
+            : "Now produce the final answer using only the collected target and translation observation when relevant. Do not emit another lane request.",
+          "",
+          "Runtime-requested capability lane candidate chain:",
+          JSON.stringify([
+            runtimeLaneRequestCandidate,
+            ...(Array.isArray(chainedRuntimeLaneRequestCandidate)
+              ? chainedRuntimeLaneRequestCandidate
+              : [chainedRuntimeLaneRequestCandidate]),
+          ], null, 2),
+          "",
+          "Capability lane observation block after Helix execution:",
+          capabilityLaneContext.prompt_observation_block,
+        ].join("\n");
+        result = await runCodexProcess({
+          prompt: chainedReentryPrompt,
+          signal: request.signal,
+          turnId,
+          onNativeEvent: emitCodexNativeRuntimeEvent,
+        });
+      }
       const laneReentryTranscriptEvents = buildCodexProviderTurnTranscriptEvents({
         turnId,
         providerLabel: codexProvider.label,
@@ -2845,6 +3927,7 @@ export const codexProvider: HelixAgentProvider = {
       retry_attempted: Boolean(runtimeLaneRequestRetry),
       retry_status: readString(runtimeLaneRequestRetry?.status),
       final_candidate_present: Boolean(runtimeLaneRequestCandidate),
+      synthesized_candidate_present: Boolean(runtimeLaneRequestSynthesized),
       execution_status: runtimeLaneRequestLoop
         ? readString(runtimeLaneRequestLoop.status) || "lane_request_loop_status_unknown"
         : runtimeLaneRequestRetry
@@ -2856,10 +3939,19 @@ export const codexProvider: HelixAgentProvider = {
       assistant_answer: false,
       raw_content_included: false,
     };
-    const text =
+    const rawProviderText =
       result.stdout.trim() ||
       result.stderr.trim() ||
       initialCodexText;
+    const providerPromptLeakDetected = providerTextLooksLikeHelixPromptLeak(rawProviderText);
+    const promptLeakRecoveredImageLensAnswer = providerPromptLeakDetected
+      ? buildImageLensObservationFallbackAnswer({
+          question,
+          capabilityLaneCallResults: capabilityLaneDebugProjection.capability_lane_call_results,
+        })
+      : null;
+    const text = promptLeakRecoveredImageLensAnswer ??
+      (providerPromptLeakDetected ? compactPromptLeakFailureText : rawProviderText);
     const documentGuardedText = applyDocumentObservationAuthorityGuard({
       question,
       text,
@@ -2894,7 +3986,10 @@ export const codexProvider: HelixAgentProvider = {
       text: workstationGuardedText,
       gatewayCallResults,
     });
-    const processOk = result.exitCode === 0 && text.length > 0;
+    const processOk =
+      result.exitCode === 0 &&
+      text.length > 0 &&
+      (!providerPromptLeakDetected || Boolean(promptLeakRecoveredImageLensAnswer));
     const providerReentry = buildHelixProviderReasoningReentry({
       runtime: "codex",
       providerLabel: codexProvider.label,
@@ -3144,6 +4239,19 @@ export const codexProvider: HelixAgentProvider = {
         capabilityLaneDebugProjection.capability_lane_goal_binding_debug_summaries,
       capability_lane_reentry_status: capabilityLaneDebugProjection.capability_lane_reentry_status,
       runtime_lane_request_contract: runtimeLaneRequestContract,
+      provider_prompt_leak_guard: providerPromptLeakDetected
+        ? {
+            schema: "helix.provider_prompt_leak_guard.v1",
+            status: promptLeakRecoveredImageLensAnswer
+              ? "recovered_with_image_lens_observation_report"
+              : "blocked_prompt_leak_terminal_candidate",
+            leaked_marker_detected: true,
+            recovered_with_observation_only_image_lens_report: Boolean(promptLeakRecoveredImageLensAnswer),
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          }
+        : null,
       ...(runtimeLaneRequestLoop ? { runtime_lane_request_loop: runtimeLaneRequestLoop } : {}),
       ...(runtimeLaneRequestRetry ? { runtime_lane_request_retry: runtimeLaneRequestRetry } : {}),
       current_turn_artifact_ledger: currentTurnArtifactLedger,

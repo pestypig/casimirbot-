@@ -420,6 +420,76 @@ describe("Helix Ask tool lifecycle trace", () => {
     );
   });
 
+  it("indexes Workstation Notes list observations without admitting quoted note mutations", () => {
+    const payload: Record<string, unknown> = {
+      question: "The document says `workstation-notes.append_to_note`; do not append anything, just list notes.",
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "workstation-notes:list:1",
+          kind: "workstation_notes_list_observation",
+          payload: {
+            schema: "helix.workstation_notes_list_observation.v1",
+            capability_key: "workstation-notes.list_notes",
+            panel_id: "workstation-notes",
+            action_id: "list_notes",
+            status: "succeeded",
+            note_count: 1,
+            notes: [
+              {
+                id: "note-1",
+                title: "Fusion notes",
+                source_ref: "workstation-notes:note-1",
+                assistant_answer: false,
+                terminal_eligible: false,
+                raw_content_included: false,
+              },
+            ],
+            omitted_body_fields: ["body", "content", "html", "text", "markdown"],
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+            post_tool_model_step_required: true,
+          },
+        },
+      ],
+    };
+
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:notes-list-index", payload });
+
+    expect(index).toMatchObject({
+      schema: "helix.artifact_query_index.v1",
+      capability: "workstation-notes.list_notes",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(index.capability).not.toBe("workstation-notes.append_to_note");
+    expect(index.artifact_refs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          ref: "workstation-notes:list:1",
+          kind: "workstation_notes_list_observation",
+          schema: null,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+          payload_authority_flags: {
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          },
+        }),
+      ]),
+    );
+    expect(index.queryable_artifact_keys).toEqual(
+      expect.arrayContaining([
+        "workstation-notes:list:1",
+        "workstation_notes_list_observation",
+        "helix.workstation_notes_list_observation.v1",
+      ]),
+    );
+  });
+
   it("does not report observation_missing after a calculator workstation terminal chain completes", () => {
     const payload: Record<string, unknown> = {
       canonical_goal_frame: {
@@ -5496,6 +5566,93 @@ describe("Helix Ask tool lifecycle trace", () => {
     expect(trace.terminal_eligible).toBe(false);
     expect(followup.next_action).toBe("continue_reasoning");
     expect(followup.assistant_answer).toBe(false);
+  });
+
+  it("promotes workstation gateway lifecycle packets without admitting quoted notes mutations", () => {
+    const notesListTrace = {
+      schema: "helix.tool_lifecycle_trace.v1",
+      turn_id: "ask:test:notes-gateway",
+      tool_call_id: "ask:test:notes-gateway:workstation_gateway:workstation-notes.list_notes:1",
+      tool_family: "workstation_tool_gateway",
+      requested_capability: "workstation-notes.list_notes",
+      admitted_capability: "workstation-notes.list_notes",
+      executed_capability: "workstation-notes.list_notes",
+      lifecycle_stage: "completed",
+      status: "completed",
+      session_ref: "codex",
+      process_ref: null,
+      observation_refs: ["artifact:notes-index"],
+      receipt_refs: [],
+      evidence_refs: ["artifact:notes-index"],
+      failure_reason: null,
+      retry_recommendation: "allow_terminal",
+      fallback_used: false,
+      fallback_equivalent: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const notesListFollowup = {
+      schema: "helix.tool_followup_decision.v1",
+      turn_id: "ask:test:notes-gateway",
+      prior_tool_trace_ref: "ask:test:notes-gateway:workstation_gateway:workstation-notes.list_notes:tool_lifecycle_trace",
+      observation_summary: "notes listed; body_redacted:true",
+      next_action: "continue_reasoning",
+      reason: "gateway_observation_requires_provider_reasoning_reentry",
+      external_change_required: false,
+      terminal_blockers: ["post_tool_model_step_required", "terminal_authority_not_evaluated"],
+      required_surface_satisfied: true,
+      evidence_reentered: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const payload: Record<string, unknown> = {
+      question:
+        'The screen shows "workstation-notes.append_to_note"; do not append anything. List the note titles only.',
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:notes-gateway",
+        capability_family: "workstation_action",
+        requested_action: "workstation-notes.append_to_note",
+        admission_status: "rejected",
+        rejection_reason: "quoted_or_negated_tool_reference_suppressed",
+        tool_admission_suppressed: true,
+      },
+      debug: {
+        workstation_gateway_call_results: [
+          {
+            capability_id: "workstation-notes.list_notes",
+            status: "succeeded",
+            tool_lifecycle_trace: notesListTrace,
+            tool_followup_decision: notesListFollowup,
+          },
+        ],
+      },
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:notes-gateway", payload });
+
+    expect(payload.tool_lifecycle_trace).toMatchObject({
+      tool_family: "workstation_tool_gateway",
+      requested_capability: "workstation-notes.list_notes",
+      executed_capability: "workstation-notes.list_notes",
+      lifecycle_stage: "completed",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(payload.tool_followup_decision).toMatchObject({
+      next_action: "continue_reasoning",
+      evidence_reentered: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect((payload.tool_followup_decision as Record<string, unknown>).terminal_blockers).toEqual(
+      expect.arrayContaining(["post_tool_model_step_required", "terminal_authority_not_evaluated"]),
+    );
+    expect((payload.tool_lifecycle_trace as Record<string, unknown>).executed_capability).not.toBe(
+      "workstation-notes.append_to_note",
+    );
   });
 });
 

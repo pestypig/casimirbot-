@@ -41,8 +41,90 @@ const readRecord = (value: unknown): RecordLike | null =>
 const readString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
+const readNumber = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const readBoolean = (value: unknown): boolean | null =>
+  typeof value === "boolean" ? value : null;
+
 const readCapabilityFromResult = (result: HelixCapabilityLaneOneShotCallResult): string =>
   readString(result.capability);
+
+const readRecordArray = (value: unknown): RecordLike[] =>
+  Array.isArray(value)
+    ? value
+        .map((entry) => readRecord(entry))
+        .filter((entry): entry is RecordLike => Boolean(entry))
+    : [];
+
+const firstText = (...values: unknown[]): string | null => {
+  for (const value of values) {
+    const text = readString(value);
+    if (text) return text;
+  }
+  return null;
+};
+
+const firstNumber = (...values: unknown[]): number | null => {
+  for (const value of values) {
+    const number = readNumber(value);
+    if (number !== null) return number;
+  }
+  return null;
+};
+
+const firstBoolean = (...values: unknown[]): boolean | null => {
+  for (const value of values) {
+    const bool = readBoolean(value);
+    if (bool !== null) return bool;
+  }
+  return null;
+};
+
+const buildOneShotDebugSourceMetadata = (
+  result: HelixCapabilityLaneOneShotCallResult,
+  packet: HelixAgentStepObservationPacket | undefined,
+): Record<string, unknown> => {
+  const resultRecord = readRecord(result) ?? {};
+  const observation = readRecord(resultRecord.observation);
+  const packetState = readRecord(packet?.state_delta);
+  const targetBatch =
+    readRecord(observation?.target_batch) ??
+    readRecord(packetState?.visible_translation_target_batch);
+  const firstTarget = readRecordArray(targetBatch?.targets)[0] ?? null;
+  const translationChunk = readRecord(packetState?.live_translation_chunk);
+  const projectionReceipt = readRecord(packetState?.live_translation_projection_receipt);
+  const sources = [firstTarget, translationChunk, projectionReceipt, observation, resultRecord]
+    .filter((entry): entry is RecordLike => Boolean(entry));
+  const readFromSources = (key: string, fallbackKey?: string): unknown[] =>
+    sources.flatMap((source) => [
+      source[key],
+      fallbackKey ? source[fallbackKey] : undefined,
+    ]);
+  return {
+    source_id: firstText(...readFromSources("source_id")),
+    doc_path: firstText(...readFromSources("doc_path")),
+    source_hash: firstText(...readFromSources("source_hash")),
+    source_kind: firstText(...readFromSources("source_kind")),
+    source_text_hash: firstText(...readFromSources("source_text_hash")),
+    source_text_char_count: firstNumber(...readFromSources("source_text_char_count")),
+    source_projection_target:
+      firstText(...readFromSources("projection_target")) ??
+      firstText(...readFromSources("source_projection_target")),
+    account_locale: firstText(...readFromSources("account_locale")),
+    target_language: firstText(...readFromSources("target_language")),
+    latest_chunk_id: firstText(...readFromSources("chunk_id")),
+    latest_chunk_index: firstNumber(...readFromSources("chunk_index")),
+    latest_dedupe_key: firstText(...readFromSources("dedupe_key")),
+    latest_source_event_id: firstText(...readFromSources("source_event_id")),
+    latest_source_event_ms: firstNumber(...readFromSources("source_event_ms")),
+    latest_observed_at_ms: firstNumber(...readFromSources("observed_at_ms")),
+    latest_freshness_status:
+      firstText(...readFromSources("freshness_status")) ??
+      firstText(...readFromSources("projection_status")),
+    latest_cancel_requested: firstBoolean(...readFromSources("cancel_requested")),
+  };
+};
 
 const readReceiptRefFromPacket = (packet: HelixAgentStepObservationPacket | undefined): string | null => {
   const receipt = packet?.receipts.find((entry) => readString(entry.receipt_ref));
@@ -53,8 +135,9 @@ const statusForLaneResult = (
   result: HelixCapabilityLaneOneShotCallResult,
   packet: HelixAgentStepObservationPacket | undefined,
 ): HelixCapabilityLaneDebugEvent["status"] => {
-  if (result.ok === true) return "completed";
   const packetStatus = readString(packet?.status).toLowerCase();
+  if (packetStatus === "client_pending") return "pending";
+  if (result.ok === true) return "completed";
   if (packetStatus === "blocked" || packetStatus === "missing_input" || packetStatus === "needs_confirmation") {
     return "blocked";
   }
@@ -90,6 +173,7 @@ const buildCapabilityLaneDebugEvents = (input: {
     const laneId = readString(result.lane_id) || readString(trace?.requested_lane) || "unknown";
     const status = statusForLaneResult(result, packet);
     const receiptRef = readReceiptRefFromPacket(packet);
+    const sourceMetadata = buildOneShotDebugSourceMetadata(result, packet);
     const base = {
       selected_runtime_agent_provider: input.provider.id,
       lane_id: laneId,
@@ -116,6 +200,7 @@ const buildCapabilityLaneDebugEvents = (input: {
       observation_ref: trace?.observation_ref ?? null,
       result_ref: trace?.result_ref ?? null,
       receipt_ref: receiptRef,
+      ...sourceMetadata,
       reentry_required: true as const,
       terminal_authority_status: "pending_helix_terminal_authority" as const,
       terminal_eligible: false as const,

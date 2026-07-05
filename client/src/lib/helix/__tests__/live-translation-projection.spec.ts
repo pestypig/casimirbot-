@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildHelixLiveTranslationProjectionEventPayloads,
   buildHelixLiveTranslationInlineUnitStates,
   buildHelixLiveTranslationUiProjections,
   selectHelixLiveTranslationUiProjection,
@@ -31,6 +32,99 @@ const inlineMeta = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("Helix live translation UI projection", () => {
+  it("builds non-authoritative live events from Ask projection receipts", () => {
+    const events = buildHelixLiveTranslationProjectionEventPayloads({
+      contextId: "desktop",
+      traceId: "turn-1",
+      nowMs: 5000,
+      payload: {
+        debug: {
+          capability_lane_projection_receipts: [
+            {
+              schema: "helix.live_translation.projection_receipt.v1",
+              receipt_ref: "receipt:docs:1",
+              observation_ref: "obs:docs:1",
+              selected_runtime_agent_provider: "codex",
+              selected_backend_provider: "live_translation.local_runtime",
+              lane_id: "live_translation",
+              capability: "live_translation.translate_text",
+              projection_target: "docs_chunk",
+              projection_status: "projected",
+              source_id: "docs:research/current.md#chunk-1",
+              doc_path: "docs/research/current.md",
+              source_hash: "doc-hash-1",
+              source_kind: "docs",
+              source_text_hash: "source-text-hash-1",
+              source_text_char_count: 42,
+              account_locale: "es-US",
+              chunk_id: "chunk-1",
+              chunk_index: 0,
+              dedupe_key: "docs:research/current.md:chunk-1:es",
+              source_event_id: "event-1",
+              source_event_ms: 1200,
+              observed_at_ms: 1400,
+              freshness_status: "fresh",
+              target_language: "es",
+              translated_text: "Texto traducido.",
+              terminal_authority_status: "not_terminal_authority",
+              answer_authority: false,
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          ],
+        },
+      },
+    });
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      contextId: "desktop",
+      traceId: "turn-1",
+      entry: {
+        id: expect.stringContaining("live_translation_projection:"),
+        text: "Live translation projection receipt recorded.",
+        tool: "live_translation.translate_text",
+        tsMs: 1400,
+        meta: {
+          schema: "helix.live_translation.projection_receipt.v1",
+          source_event_type: "lane_projection_receipt",
+          lane: "live_translation",
+          lane_id: "live_translation",
+          capability: "live_translation.translate_text",
+          projection_target: "docs_chunk",
+          projection_status: "projected",
+          source_id: "docs:research/current.md#chunk-1",
+          doc_path: "docs/research/current.md",
+          source_hash: "doc-hash-1",
+          source_kind: "docs",
+          source_text_hash: "source-text-hash-1",
+          source_text_char_count: 42,
+          account_locale: "es-US",
+          target_language: "es",
+          chunk_id: "chunk-1",
+          chunk_index: 0,
+          dedupe_key: "docs:research/current.md:chunk-1:es",
+          source_event_id: "event-1",
+          source_event_ms: 1200,
+          observed_at_ms: 1400,
+          freshness_status: "fresh",
+          translated_text: "Texto traducido.",
+          observation_ref: "obs:docs:1",
+          receipt_ref: "receipt:docs:1",
+          selected_runtime_agent_provider: "codex",
+          selected_backend_provider: "live_translation.local_runtime",
+          terminal_authority_status: "not_terminal_authority",
+          context_role: "tool_evidence",
+          answer_authority: false,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    });
+  });
+
   it("projects translated chunks from lane projection receipts without terminal authority", () => {
     const projections = buildHelixLiveTranslationUiProjections({
       capability_lane_projection_receipts: [
@@ -46,6 +140,7 @@ describe("Helix live translation UI projection", () => {
           projection_target: "docs_chunk",
           projection_status: "projected",
           source_id: "docs:nhm2",
+          doc_path: "docs/research/nhm2.md",
           source_kind: "docs",
           account_locale: "es-US",
           chunk_id: "chunk-1",
@@ -73,6 +168,7 @@ describe("Helix live translation UI projection", () => {
         status: "projected",
         projectionTarget: "docs_chunk",
         sourceId: "docs:nhm2",
+        docPath: "docs/research/nhm2.md",
         sourceKind: "docs",
         accountLocale: "es-US",
         chunkId: "chunk-1",
@@ -102,6 +198,163 @@ describe("Helix live translation UI projection", () => {
         rawContentIncluded: false,
       },
     ]);
+  });
+
+  it("does not project text-to-speech receipts as live translation UI projections", () => {
+    const projections = buildHelixLiveTranslationUiProjections({
+      capability_lane_projection_receipts: [
+        {
+          schema: "helix.live_translation.projection_receipt.v1",
+          receipt_ref: "receipt:translation:1",
+          observation_ref: "obs:translation:1",
+          lane_id: "live_translation",
+          capability: "live_translation.translate_text",
+          projection_target: "ask_turn",
+          projection_status: "projected",
+          source_id: "ask_turn",
+          source_text_hash: "source-text-hash-1",
+          source_text_char_count: 5,
+          chunk_id: "chunk-translation",
+          target_language: "es",
+          translated_text: "hola",
+          terminal_authority_status: "not_terminal_authority",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        {
+          schema: "helix.capability_lane.provider_adapter_receipt.v1",
+          receipt_ref: "receipt:tts:1",
+          observation_ref: "obs:tts:1",
+          lane_id: "text_to_speech",
+          capability_key: "text_to_speech.speak_text",
+          kind: "text_to_speech_playback",
+          status: "blocked",
+          payload: {
+            schema: "helix.text_to_speech.receipt.v1",
+            lane_id: "text_to_speech",
+            capability: "text_to_speech.speak_text",
+            playback_status: "blocked",
+            provider_playback_status: "queued_for_retry",
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      ],
+    });
+
+    expect(projections).toHaveLength(1);
+    expect(projections[0]).toMatchObject({
+      observationRef: "obs:translation:1",
+      receiptRef: "receipt:translation:1",
+      translatedText: "hola",
+    });
+    expect(projections.some((projection) => projection.observationRef === "obs:tts:1")).toBe(false);
+  });
+
+  it("projects account-language UI region receipts with panel and region identity", () => {
+    const payload = {
+      capability_lane_projection_receipts: [
+        {
+          schema: "helix.live_translation.projection_receipt.v1",
+          receipt_ref: "receipt:account-language:button",
+          observation_ref: "obs:account-language:button",
+          selected_runtime_agent_provider: "codex",
+          selected_backend_provider: "live_translation.local_runtime",
+          lane_id: "live_translation",
+          capability: "live_translation.translate_text",
+          projection_target: "account_language",
+          projection_status: "projected",
+          source_id: "workstation-shell#docs-viewer:translate-button",
+          panel_id: "docs-viewer",
+          region_id: "docs-viewer:translate-button",
+          bbox: { x: 12, y: 24, width: 180, height: 32, source: "account-language-region" },
+          source_kind: "button_label",
+          source_text_hash: "sha256:translate-button",
+          source_text_char_count: 9,
+          account_locale: "es-US",
+          chunk_id: "docs-viewer:translate-button",
+          chunk_index: 2,
+          dedupe_key: "workstation-shell#docs-viewer:translate-button:es",
+          source_event_id: "ui-region:event-1",
+          source_event_ms: 100,
+          observed_at_ms: 150,
+          freshness_status: "fresh",
+          target_language: "es",
+          translated_text: "Traducir",
+          terminal_authority_status: "not_terminal_authority",
+          answer_authority: false,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      ],
+    };
+
+    const projections = buildHelixLiveTranslationUiProjections(payload);
+    expect(projections).toHaveLength(1);
+    expect(projections[0]).toMatchObject({
+      projectionTarget: "account_language",
+      sourceId: "workstation-shell#docs-viewer:translate-button",
+      panelId: "docs-viewer",
+      regionId: "docs-viewer:translate-button",
+      bbox: { x: 12, y: 24, width: 180, height: 32, source: "account-language-region" },
+      sourceKind: "button_label",
+      accountLocale: "es-US",
+      chunkId: "docs-viewer:translate-button",
+      targetLanguage: "es",
+      translatedText: "Traducir",
+      observationRef: "obs:account-language:button",
+      receiptRef: "receipt:account-language:button",
+      terminalAuthorityStatus: "not_terminal_authority",
+      answerAuthority: false,
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+    });
+
+    expect(summarizeHelixLiveTranslationUiProjectionTraffic(projections)).toEqual([
+      expect.objectContaining({
+        sourceId: "workstation-shell#docs-viewer:translate-button",
+        latestPanelId: "docs-viewer",
+        latestRegionId: "docs-viewer:translate-button",
+        latestBbox: { x: 12, y: 24, width: 180, height: 32, source: "account-language-region" },
+        sourceKind: "button_label",
+        projectionTarget: "account_language",
+        accountLocale: "es-US",
+        latestObservationRef: "obs:account-language:button",
+        latestReceiptRef: "receipt:account-language:button",
+        latestTerminalAuthorityStatus: "not_terminal_authority",
+        answerAuthority: false,
+        terminalEligible: false,
+        assistantAnswer: false,
+        rawContentIncluded: false,
+      }),
+    ]);
+
+    expect(buildHelixLiveTranslationProjectionEventPayloads({
+      contextId: "desktop",
+      traceId: "turn-account-language",
+      payload,
+      nowMs: 200,
+    })[0]?.entry.meta).toMatchObject({
+      projection_target: "account_language",
+      source_id: "workstation-shell#docs-viewer:translate-button",
+      panel_id: "docs-viewer",
+      region_id: "docs-viewer:translate-button",
+      bbox: { x: 12, y: 24, width: 180, height: 32, source: "account-language-region" },
+      source_kind: "button_label",
+      account_locale: "es-US",
+      terminal_authority_status: "not_terminal_authority",
+      answer_authority: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
   });
 
   it("treats receipt-only mail-loop projection receipts as inspectable evidence", () => {
@@ -546,6 +799,87 @@ describe("Helix live translation UI projection", () => {
       answerAuthority: false,
       terminalEligible: false,
       assistantAnswer: false,
+    });
+  });
+
+  it("does not let newer cancelled or failed receipts replace ready projection text for the same key", () => {
+    const projections = buildHelixLiveTranslationUiProjections({
+      capability_lane_projection_receipts: [
+        {
+          schema: "helix.live_translation.projection_receipt.v1",
+          receipt_ref: "receipt:docs:ready",
+          observation_ref: "obs:docs:ready",
+          lane_id: "live_translation",
+          capability: "live_translation.translate_text",
+          projection_target: "docs_chunk",
+          projection_status: "projected",
+          source_id: "docs:nhm2",
+          source_hash: "source-hash-1",
+          source_text_hash: "source-text-hash-1",
+          source_text_char_count: 42,
+          chunk_id: "chunk-1",
+          chunk_index: 0,
+          dedupe_key: "docs:nhm2:chunk-1:es",
+          observed_at_ms: 100,
+          freshness_status: "fresh",
+          target_language: "es",
+          translated_text: "Texto listo.",
+        },
+        {
+          schema: "helix.live_translation.projection_receipt.v1",
+          receipt_ref: "receipt:docs:cancelled",
+          observation_ref: "obs:docs:cancelled",
+          lane_id: "live_translation",
+          capability: "live_translation.translate_text",
+          projection_target: "docs_chunk",
+          projection_status: "cancelled",
+          source_id: "docs:nhm2",
+          source_hash: "source-hash-1",
+          source_text_hash: "source-text-hash-1",
+          source_text_char_count: 42,
+          chunk_id: "chunk-1",
+          chunk_index: 0,
+          dedupe_key: "docs:nhm2:chunk-1:es",
+          observed_at_ms: 200,
+          freshness_status: "fresh",
+          target_language: "es",
+          translated_text: null,
+          cancel_requested: true,
+        },
+        {
+          schema: "helix.live_translation.projection_receipt.v1",
+          receipt_ref: "receipt:docs:failed",
+          observation_ref: "obs:docs:failed",
+          lane_id: "live_translation",
+          capability: "live_translation.translate_text",
+          projection_target: "docs_chunk",
+          projection_status: "failed",
+          source_id: "docs:nhm2",
+          source_hash: "source-hash-1",
+          source_text_hash: "source-text-hash-1",
+          source_text_char_count: 42,
+          chunk_id: "chunk-1",
+          chunk_index: 0,
+          dedupe_key: "docs:nhm2:chunk-1:es",
+          observed_at_ms: 300,
+          freshness_status: "failed",
+          target_language: "es",
+          translated_text: null,
+        },
+      ],
+    });
+
+    expect(projections).toHaveLength(1);
+    expect(projections[0]).toMatchObject({
+      status: "projected",
+      translatedText: "Texto listo.",
+      observationRef: "obs:docs:ready",
+      receiptRef: "receipt:docs:ready",
+      observedAtMs: 100,
+      answerAuthority: false,
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
     });
   });
 

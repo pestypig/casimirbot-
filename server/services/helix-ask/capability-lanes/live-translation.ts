@@ -136,6 +136,7 @@ const runOpenAiCompatibleTranslation = async (input: {
     input.env.LIVE_TRANSLATION_OPENAI_API_KEY ||
     input.env.DOC_TRANSLATION_API_KEY ||
     input.env.OPENAI_API_KEY ||
+    input.env.LLM_HTTP_API_KEY ||
     ""
   ).trim();
   const model = (
@@ -243,6 +244,10 @@ const buildLaneObservationPacket = (input: {
     goalBindingId: string | null;
     goalBindingKey: string | null;
     sourceId: string;
+    panelId: string | null;
+    regionId: string | null;
+    bbox: Record<string, unknown> | null;
+    docPath: string | null;
     sourceHash: string | null;
     sourceKind: string | null;
     accountLocale: string | null;
@@ -294,6 +299,10 @@ const buildLaneObservationPacket = (input: {
           goal_binding_id: input.chunk.goalBindingId,
           goal_binding_key: input.chunk.goalBindingKey,
           source_id: input.chunk.sourceId,
+          panel_id: input.chunk.panelId,
+          region_id: input.chunk.regionId,
+          bbox: input.chunk.bbox,
+          doc_path: input.chunk.docPath,
           source_hash: input.chunk.sourceHash,
           source_kind: input.chunk.sourceKind,
           account_locale: input.chunk.accountLocale,
@@ -358,6 +367,10 @@ const buildProjectionReceipt = (input: {
     goalBindingId: string | null;
     goalBindingKey: string | null;
     sourceId: string;
+    panelId: string | null;
+    regionId: string | null;
+    bbox: Record<string, unknown> | null;
+    docPath: string | null;
     sourceHash: string | null;
     sourceKind: string | null;
     accountLocale: string | null;
@@ -416,6 +429,10 @@ const buildProjectionReceipt = (input: {
           ? "stale"
           : "projected",
     source_id: input.chunk.sourceId,
+    panel_id: input.chunk.panelId,
+    region_id: input.chunk.regionId,
+    bbox: input.chunk.bbox,
+    doc_path: input.chunk.docPath,
     source_hash: input.chunk.sourceHash,
     source_kind: input.chunk.sourceKind,
     account_locale: input.chunk.accountLocale,
@@ -464,6 +481,7 @@ export const runLiveTranslationTranslateText = async (input: {
   turnId?: string | null;
   iteration?: number | null;
   env?: NodeJS.ProcessEnv;
+  nowMs?: number | null;
 }): Promise<HelixLiveTranslationOneShotResult> => {
   const env = input.env ?? process.env;
   const turnId = normalizeText(input.turnId) || normalizeText(input.request.turn_id) || "ask:lane:live_translation";
@@ -483,8 +501,17 @@ export const runLiveTranslationTranslateText = async (input: {
   const goalBindingId = normalizeOptionalText(input.request.goal_binding_id);
   const goalBindingKey = normalizeOptionalText(input.request.goal_binding_key);
   const sourceId = normalizeOptionalText(input.request.source_id) ?? "ask_turn";
+  const panelId = normalizeOptionalText(input.request.panel_id);
+  const regionId = normalizeOptionalText(input.request.region_id);
+  const bbox =
+    input.request.bbox && typeof input.request.bbox === "object" && !Array.isArray(input.request.bbox)
+      ? input.request.bbox
+      : null;
+  const docPath = normalizeOptionalText(input.request.doc_path);
   const sourceHash = normalizeOptionalText(input.request.source_hash);
   const sourceKind = normalizeOptionalText(input.request.source_kind);
+  const sourceTextHash = normalizeOptionalText(input.request.source_text_hash) ?? hashShort(text);
+  const sourceTextCharCount = normalizeNonNegativeInteger(input.request.source_text_char_count) ?? text.length;
   const accountLocale = normalizeOptionalText(input.request.account_locale);
   const chunkId = normalizeOptionalText(input.request.chunk_id) ?? hashShort({
     sourceId,
@@ -501,7 +528,7 @@ export const runLiveTranslationTranslateText = async (input: {
   });
   const sourceEventId = normalizeOptionalText(input.request.source_event_id);
   const sourceEventMs = normalizeNonNegativeInteger(input.request.source_event_ms);
-  const observedAtMs = Date.now();
+  const observedAtMs = normalizeNonNegativeInteger(input.nowMs) ?? Date.now();
   const projectionTarget = normalizeProjectionTarget(input.request.projection_target);
   const cancelRequested = input.request.cancel_requested === true;
   const freshnessStatus = freshnessStatusFor({ sourceEventMs, observedAtMs });
@@ -516,6 +543,10 @@ export const runLiveTranslationTranslateText = async (input: {
     goalBindingId,
     goalBindingKey,
     sourceId,
+    panelId,
+    regionId,
+    bbox,
+    docPath,
     sourceHash,
     sourceKind,
     accountLocale,
@@ -563,8 +594,8 @@ export const runLiveTranslationTranslateText = async (input: {
       observationRef,
       chunk,
       targetLanguage,
-      sourceTextHash: hashShort(text),
-      sourceTextCharCount: text.length,
+      sourceTextHash,
+      sourceTextCharCount,
       translatedText: null,
       selectedBackendProvider: trace.selected_backend_provider,
     });
@@ -668,8 +699,8 @@ export const runLiveTranslationTranslateText = async (input: {
       observationRef,
       chunk,
       targetLanguage,
-      sourceTextHash: hashShort(text),
-      sourceTextCharCount: text.length,
+      sourceTextHash,
+      sourceTextCharCount,
       translatedText: null,
       selectedBackendProvider: trace.selected_backend_provider,
     });
@@ -711,6 +742,9 @@ export const runLiveTranslationTranslateText = async (input: {
     targetLanguage,
     sourceLanguage,
     sourceId,
+    panelId,
+    regionId,
+    bbox,
     sourceHash,
     sourceKind,
     accountLocale,
@@ -743,6 +777,10 @@ export const runLiveTranslationTranslateText = async (input: {
     source_language: sourceLanguage,
     target_language: targetLanguage,
     source_id: sourceId,
+    panel_id: panelId,
+    region_id: regionId,
+    bbox,
+    doc_path: docPath,
     source_hash: sourceHash,
     source_kind: sourceKind,
     account_locale: accountLocale,
@@ -755,8 +793,8 @@ export const runLiveTranslationTranslateText = async (input: {
     freshness_status: freshnessStatus,
     projection_target: projectionTarget,
     cancel_requested: false,
-    source_text_hash: hashShort(text),
-    source_text_char_count: text.length,
+    source_text_hash: sourceTextHash,
+    source_text_char_count: sourceTextCharCount,
     translated_text: translatedText,
     deterministic,
     confidence: 0.62,
@@ -778,8 +816,8 @@ export const runLiveTranslationTranslateText = async (input: {
       observationRef,
       chunk,
       targetLanguage,
-      sourceTextHash: hashShort(text),
-      sourceTextCharCount: text.length,
+      sourceTextHash,
+      sourceTextCharCount,
       translatedText,
       selectedBackendProvider: trace.selected_backend_provider,
     }),

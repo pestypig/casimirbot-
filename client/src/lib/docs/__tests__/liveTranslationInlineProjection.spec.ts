@@ -15,6 +15,14 @@ import {
   simplifyDocumentLiveTranslationInlineStates,
 } from "@/lib/docs/liveTranslationInlineProjection";
 import type { DocumentMarkdownTranslationEntry } from "@/lib/docs/documentTranslationClient";
+import { renderDocumentMarkdownWithInlineTranslations } from "@/lib/docs/liveTranslationInlineRenderer";
+import { buildHelixLiveTranslationProjectionReceiptFromProjection } from "@/lib/helix/live-translation-projection";
+import {
+  buildHelixVisibleTranslationProjections,
+  clearHelixVisibleTranslationProjectionContext,
+  publishHelixVisibleTranslationProjectionsFromPayload,
+  readHelixVisibleTranslationProjectionContext,
+} from "@/lib/helix/visible-translation-projection";
 
 const unit = (unitId: string, translatable = true): DocumentTranslationUnit => ({
   unit_id: unitId,
@@ -335,6 +343,7 @@ describe("document live translation inline projection", () => {
       ].join("::"),
       "data-doc-translation-server-projection-key": "server-projection-key-current",
       "data-doc-translation-authority-policy": "projection_only_not_answer_authority",
+      "data-doc-translation-terminal-authority-owner": "helix",
       "data-doc-translation-render-status": "error",
       "data-doc-translation-display-status": "cancelled",
       "data-doc-translation-display-status-reason": "cancelled_projection",
@@ -344,6 +353,10 @@ describe("document live translation inline projection", () => {
       "data-doc-translation-selected-runtime-agent-provider": "codex",
       "data-doc-translation-observation-ref": "obs:docs:u1",
       "data-doc-translation-receipt-ref": "receipt:docs:u1",
+      "data-doc-translation-visible-observation-ref": "obs:docs:u1",
+      "data-doc-translation-visible-receipt-ref": "receipt:docs:u1",
+      "data-doc-translation-evidence-observation-ref": "obs:docs:u1:stale",
+      "data-doc-translation-evidence-receipt-ref": "receipt:docs:u1:stale",
       "data-doc-translation-lane-session-id": "lane-session-docs",
       "data-doc-translation-session-debug-phase": "running:record_observation:observation_recorded",
       "data-doc-translation-session-observation-status": "observation_recorded",
@@ -718,6 +731,97 @@ describe("document live translation inline projection", () => {
         rawContentIncluded: false,
       },
     });
+  });
+
+  it("adapts Ask visible-chunk projection receipts into docs inline translation state", () => {
+    const states = buildDocumentLiveTranslationInlineStates({
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      sourceHash: "source-hash-current-doc",
+      sourceTextHash: "source-text-current",
+      sourceTextCharCount: 19,
+      units: [unit("visible-chunk-1"), unit("visible-chunk-2")],
+      payload: {
+        debug: {
+          capability_lane_projection_receipts: [
+            {
+              schema: "helix.live_translation.projection_receipt.v1",
+              receipt_ref: "ask:visible-title:receipt",
+              observation_ref: "ask:visible-title:observation",
+              selected_runtime_agent_provider: "codex",
+              selected_backend_provider: "live_translation.local_runtime",
+              lane_id: "live_translation",
+              capability: "live_translation.translate_text",
+              projection_target: "docs_chunk",
+              projection_status: "projected",
+              source_id: "document_markdown:docs/research/nhm2.md#visible-chunk-1",
+              bbox: { x: 8, y: 16, width: 260, height: 44, source: "visible-doc-chunk" },
+              doc_path: "docs/research/nhm2.md",
+              source_hash: "source-hash-current-doc",
+              source_kind: "docs_viewer",
+              source_text_hash: "source-text-current",
+              source_text_char_count: 19,
+              account_locale: "es",
+              chunk_id: "visible-chunk-1",
+              chunk_index: 0,
+              dedupe_key: "document_markdown:docs/research/nhm2.md:visible-chunk-1:es",
+              observed_at_ms: 180,
+              freshness_status: "fresh",
+              target_language: "es",
+              translated_text: "Titulo visible desde Ask.",
+              terminal_authority_status: "not_terminal_authority",
+              answer_authority: false,
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          ],
+        },
+      },
+    });
+
+    expect(states).toEqual({
+      "visible-chunk-1": {
+        status: "ready",
+        text: "Titulo visible desde Ask.",
+        observationRef: "ask:visible-title:observation",
+        receiptRef: "ask:visible-title:receipt",
+        projectionStatus: "projected",
+        ...inlineMeta({
+          chunkId: "visible-chunk-1",
+          chunkIndex: 0,
+          dedupeKey: "document_markdown:docs/research/nhm2.md:visible-chunk-1:es",
+          observedAtMs: 180,
+          selectedRuntimeAgentProvider: "codex",
+          selectedBackendProvider: "live_translation.local_runtime",
+          sourceId: "document_markdown:docs/research/nhm2.md#visible-chunk-1",
+          bbox: { x: 8, y: 16, width: 260, height: 44, source: "visible-doc-chunk" },
+          sourceHash: "source-hash-current-doc",
+          sourceKind: "docs",
+          sourceTextHash: "source-text-current",
+          sourceTextCharCount: 19,
+          accountLocale: "es",
+          freshnessStatus: "fresh",
+        }),
+        source: "capability_lane",
+        answerAuthority: false,
+        terminalEligible: false,
+        assistantAnswer: false,
+        rawContentIncluded: false,
+      },
+    });
+    expect(buildDocumentInlineTranslationDataAttributes(states["visible-chunk-1"])).toMatchObject({
+      "data-doc-translation-bbox": JSON.stringify({
+        x: 8,
+        y: 16,
+        width: 260,
+        height: 44,
+        source: "visible-doc-chunk",
+      }),
+      "data-doc-translation-authority-policy": "projection_only_not_answer_authority",
+      "data-doc-translation-answer-authority": "false",
+    });
+    expect(states["visible-chunk-2"]).toBeUndefined();
   });
 
   it("honors source-text scope when adapting governed receipts into docs inline state", () => {
@@ -2233,5 +2337,202 @@ describe("document live translation inline projection", () => {
       current,
       laneStates,
     })).toBe(current);
+  });
+
+  it("converts stored visible docs chunk projections back into non-terminal inline render state", () => {
+    const visibleStates = buildHelixVisibleTranslationProjections({
+      capability_lane_projection_receipts: [
+        {
+          schema: "helix.live_translation.projection_receipt.v1",
+          receipt_ref: "receipt:visible:u1",
+          observation_ref: "obs:visible:u1",
+          lane_id: "live_translation",
+          capability: "live_translation.translate_text",
+          projection_target: "docs_chunk",
+          projection_status: "projected",
+          source_id: "document_markdown:docs/research/nhm2.md",
+          doc_path: "docs/research/nhm2.md",
+          source_hash: "source-hash",
+          source_text_hash: "chunk-source-hash",
+          source_text_char_count: 13,
+          chunk_id: "u0001",
+          chunk_index: 0,
+          translated_text: "Texto visible.",
+          observed_at_ms: 500,
+          target_language: "es",
+          account_locale: "es-US",
+          terminal_authority_status: "not_terminal_authority",
+          selected_backend_provider: "live_translation.local_runtime",
+        },
+      ],
+    });
+
+    const laneStates = buildDocumentLiveTranslationInlineStates({
+      docPath: "docs/research/nhm2.md",
+      locale: "es-US",
+      targetLanguage: "es",
+      sourceHash: "source-hash",
+      units: [unit("u0001")],
+      payload: {
+        capability_lane_projection_receipts: visibleStates.map((state) =>
+          buildHelixLiveTranslationProjectionReceiptFromProjection(state.projection)
+        ),
+      },
+    });
+
+    expect(laneStates.u0001).toMatchObject({
+      status: "ready",
+      text: "Texto visible.",
+      observationRef: "obs:visible:u1",
+      receiptRef: "receipt:visible:u1",
+      projectionStatus: "projected",
+      source: "capability_lane",
+      answerAuthority: false,
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+      terminalAuthorityStatus: "not_terminal_authority",
+    });
+  });
+
+  it("renders merged visible docs chunk projection receipts as governed non-terminal document blocks", () => {
+    clearHelixVisibleTranslationProjectionContext();
+
+    publishHelixVisibleTranslationProjectionsFromPayload({
+      capability_lane_projection_receipts: [
+        {
+          schema: "helix.live_translation.projection_receipt.v1",
+          receipt_ref: "receipt:visible:u1",
+          observation_ref: "obs:visible:u1",
+          lane_id: "live_translation",
+          capability: "live_translation.translate_text",
+          projection_target: "docs_chunk",
+          projection_status: "projected",
+          source_id: "document_markdown:docs/research/nhm2.md",
+          doc_path: "docs/research/nhm2.md",
+          source_hash: "source-hash",
+          source_kind: "docs_viewer",
+          source_text_hash: "chunk-source-hash",
+          source_text_char_count: 13,
+          chunk_id: "u0001",
+          chunk_index: 0,
+          translated_text: "Primer bloque visible.",
+          source_event_id: "visible:event:u1",
+          source_event_ms: 500,
+          observed_at_ms: 550,
+          target_language: "es",
+          account_locale: "es-US",
+          terminal_authority_status: "not_terminal_authority",
+          selected_runtime_agent_provider: "codex",
+          selected_backend_provider: "live_translation.local_runtime",
+          answer_authority: false,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      ],
+    });
+    publishHelixVisibleTranslationProjectionsFromPayload({
+      capability_lane_projection_receipts: [
+        {
+          schema: "helix.live_translation.projection_receipt.v1",
+          receipt_ref: "receipt:visible:u2",
+          observation_ref: "obs:visible:u2",
+          lane_id: "live_translation",
+          capability: "live_translation.translate_text",
+          projection_target: "docs_chunk",
+          projection_status: "projected",
+          source_id: "document_markdown:docs/research/nhm2.md",
+          doc_path: "docs/research/nhm2.md",
+          source_hash: "source-hash",
+          source_kind: "docs_viewer",
+          source_text_hash: "chunk-source-hash",
+          source_text_char_count: 13,
+          chunk_id: "u0002",
+          chunk_index: 1,
+          translated_text: "Segundo bloque visible.",
+          source_event_id: "visible:event:u2",
+          source_event_ms: 600,
+          observed_at_ms: 650,
+          target_language: "es",
+          account_locale: "es-US",
+          terminal_authority_status: "not_terminal_authority",
+          selected_runtime_agent_provider: "codex",
+          selected_backend_provider: "live_translation.local_runtime",
+          answer_authority: false,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      ],
+    });
+
+    const visibleStates = readHelixVisibleTranslationProjectionContext();
+    const laneStates = buildDocumentLiveTranslationInlineStates({
+      docPath: "docs/research/nhm2.md",
+      locale: "es-US",
+      targetLanguage: "es",
+      sourceHash: "source-hash",
+      units: [unit("u0001"), unit("u0002")],
+      payload: {
+        capability_lane_projection_receipts: visibleStates.map((state) =>
+          buildHelixLiveTranslationProjectionReceiptFromProjection(state.projection)
+        ),
+      },
+    });
+    const merged = mergeDocumentLiveTranslationInlineStates({
+      current: {},
+      laneStates,
+    });
+    const html = renderDocumentMarkdownWithInlineTranslations({
+      units: [unit("u0001"), unit("u0002")],
+      translations: merged,
+      loadingText: "Translating",
+      errorText: (reason) => `Translation blocked: ${reason}`,
+      fallbackErrorText: "unknown",
+    });
+
+    expect(visibleStates).toHaveLength(2);
+    expect(merged).toMatchObject({
+      u0001: {
+        status: "ready",
+        text: "Primer bloque visible.",
+        observationRef: "obs:visible:u1",
+        receiptRef: "receipt:visible:u1",
+        sourceEventMs: 500,
+        selectedRuntimeAgentProvider: "codex",
+        selectedBackendProvider: "live_translation.local_runtime",
+        source: "capability_lane",
+        answerAuthority: false,
+        terminalEligible: false,
+        assistantAnswer: false,
+        rawContentIncluded: false,
+      },
+      u0002: {
+        status: "ready",
+        text: "Segundo bloque visible.",
+        observationRef: "obs:visible:u2",
+        receiptRef: "receipt:visible:u2",
+        sourceEventMs: 600,
+        selectedRuntimeAgentProvider: "codex",
+        selectedBackendProvider: "live_translation.local_runtime",
+        source: "capability_lane",
+        answerAuthority: false,
+        terminalEligible: false,
+        assistantAnswer: false,
+        rawContentIncluded: false,
+      },
+    });
+    expect(html).toContain("Primer bloque visible.");
+    expect(html).toContain("Segundo bloque visible.");
+    expect(html).toContain('data-doc-translation-role="governed-inline-projection"');
+    expect(html).toContain('data-doc-translation-authority-policy="projection_only_not_answer_authority"');
+    expect(html).toContain('data-doc-translation-answer-authority="false"');
+    expect(html).toContain('data-doc-translation-terminal-eligible="false"');
+    expect(html).toContain('data-doc-translation-selected-runtime-agent-provider="codex"');
+    expect(html).toContain('data-doc-translation-source-event-ms="500"');
+    expect(html).toContain('data-doc-translation-source-event-ms="600"');
+
+    clearHelixVisibleTranslationProjectionContext();
   });
 });

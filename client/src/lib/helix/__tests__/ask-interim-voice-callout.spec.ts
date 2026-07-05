@@ -129,6 +129,44 @@ describe("interim voice callout playback projection", () => {
     });
   });
 
+  it("collects capability-lane text-to-speech client playback handoffs from observation packets", () => {
+    const artifacts = [
+      {
+        schema: "helix.agent_step_observation_packet.v1",
+        capability_key: "text_to_speech.speak_text",
+        state_delta: {
+          text_to_speech_client_playback_handoff: receiptArtifact({
+            status: "awaiting_client_playback",
+            kind: "tool_result",
+            text: "La traduccion esta lista.",
+            turnId: "turn-tts-lane",
+            requestId: "helix_interim_voice_callout_request:tts-lane",
+            receiptId: "helix_interim_voice_callout_receipt:tts-lane",
+            utteranceId: "interim_voice:tts-lane",
+            voicePlaybackKind: "translation_relay",
+          }),
+        },
+      },
+    ];
+
+    const intents = collectInterimVoiceCalloutPlaybackIntents({ artifacts });
+
+    expect(intents).toHaveLength(1);
+    expect(intents[0]).toMatchObject({
+      kind: "translation_relay",
+      source: "agent_loop",
+      turnKey: "turn-tts-lane",
+      requestId: "helix_interim_voice_callout_request:tts-lane",
+      receiptId: "helix_interim_voice_callout_receipt:tts-lane",
+      receiptKey: "interim_voice:tts-lane",
+      calloutKind: "tool_result",
+      interimVoiceRequestId: "helix_interim_voice_callout_request:tts-lane",
+      interimVoiceReceiptId: "helix_interim_voice_callout_receipt:tts-lane",
+      interimVoiceReceiptKey: "interim_voice:tts-lane",
+      interimVoiceCalloutKind: "tool_result",
+    });
+  });
+
   it("builds governed client handoff debug without answer authority", () => {
     const intent = buildInterimVoiceReceiptPlaybackIntent(receiptArtifact({
       requestId: "request-debug",

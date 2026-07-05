@@ -1050,10 +1050,56 @@ const collectRouteCandidatesForIntent = (payload: RecordLike, selectedRoute: str
   return normalized;
 };
 
+const collectCapabilityLaneObservationCapabilities = (payload: RecordLike): Set<string> => {
+  const capabilities = new Set<string>();
+  const addCapability = (value: unknown) => {
+    const capability = readString(value);
+    if (capability) capabilities.add(capability);
+  };
+  const addPacket = (entry: unknown) => {
+    const record = readRecord(entry);
+    if (!record) return;
+    const nestedPayload = readRecord(record.payload);
+    addCapability(record.capability_key);
+    addCapability(nestedPayload?.capability_key);
+  };
+  const addPacketArray = (value: unknown) => {
+    if (!Array.isArray(value)) return;
+    value.forEach(addPacket);
+  };
+  addPacketArray(payload.capability_lane_observation_packets);
+  const debug = readRecord(payload.debug);
+  addPacketArray(debug?.capability_lane_observation_packets);
+  const agentLoop = readRecord(payload.agent_loop);
+  addPacketArray(agentLoop?.capability_lane_observation_packets);
+  const runtimeLaneRequestLoop = readRecord(payload.runtime_lane_request_loop);
+  addPacketArray(runtimeLaneRequestLoop?.capability_lane_observation_packets);
+  const runtimeLaneRequestRetry = readRecord(payload.runtime_lane_request_retry);
+  addPacketArray(runtimeLaneRequestRetry?.capability_lane_observation_packets);
+  const artifactLedger = Array.isArray(payload.current_turn_artifact_ledger)
+    ? payload.current_turn_artifact_ledger
+    : [];
+  artifactLedger
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is RecordLike => Boolean(entry))
+    .forEach((entry) => {
+      const nestedPayload = readRecord(entry.payload);
+      const kind = readString(entry.kind);
+      const payloadSchema = readString(entry.payload_schema) || readString(nestedPayload?.schema);
+      if (kind !== "capability_lane_observation_packet" && payloadSchema !== "helix.agent_step_observation_packet.v1") {
+        return;
+      }
+      addCapability(entry.capability_key);
+      addCapability(nestedPayload?.capability_key);
+    });
+  return capabilities;
+};
+
 const buildToolAdmissions = (payload: RecordLike, loopTrace: HelixLoopParityTrace | RecordLike | null): HelixAskTurnSolverTrace["tool_admission_candidates"] => {
   const committedRoute = readCommittedAskRoute(payload);
   const admittedFamilies = readStringArray(readRecord(payload.tool_call_admission_decision)?.admitted_tool_families);
   const chosenCapability = readString(readRecord(payload.agent_step_decision)?.chosen_capability);
+  const capabilityLaneObservationCapabilities = collectCapabilityLaneObservationCapabilities(payload);
   const actualCalls = (Array.isArray(loopTrace?.actual_tool_calls) ? loopTrace.actual_tool_calls : [])
     .map((entry) => readRecord(entry))
     .filter((entry): entry is RecordLike => Boolean(entry));
@@ -1084,11 +1130,12 @@ const buildToolAdmissions = (payload: RecordLike, loopTrace: HelixLoopParityTrac
     });
   }
   for (const call of actualCalls) {
-    const toolId = readString(call.tool_id);
+    const toolId = readString(call.tool_id) || readString(call.tool_name) || readString(call.capability);
     const family = readString(call.family) || inferToolFamily(toolId);
     const admittedByFamily = admittedFamilies.includes(family);
     const admittedByChosenCapability = Boolean(chosenCapability && toolId && chosenCapability === toolId);
-    const admitted = call.admitted === true || admittedByFamily || admittedByChosenCapability;
+    const admittedByCapabilityLaneObservation = Boolean(toolId && capabilityLaneObservationCapabilities.has(toolId));
+    const admitted = call.admitted === true || admittedByFamily || admittedByChosenCapability || admittedByCapabilityLaneObservation;
     candidates.set(`tool:${toolId || family}`, {
       tool_family: family,
       tool_id: toolId || undefined,
@@ -1097,6 +1144,8 @@ const buildToolAdmissions = (payload: RecordLike, loopTrace: HelixLoopParityTrac
       reason: admitted
         ? admittedByChosenCapability
           ? "actual_tool_call_matched_agent_step_decision"
+          : admittedByCapabilityLaneObservation
+            ? "actual_tool_call_matched_capability_lane_observation"
           : "actual_tool_call_matched_admission"
         : "actual_tool_call_missing_admission",
     });

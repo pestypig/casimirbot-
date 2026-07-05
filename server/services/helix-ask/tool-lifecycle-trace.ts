@@ -31,6 +31,60 @@ const readStringArray = (value: unknown): string[] =>
 const unique = (values: string[]): string[] =>
   Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 
+const gatewayCallResultsFrom = (payload: RecordLike): RecordLike[] => {
+  const debug = readRecord(payload.debug);
+  return [
+    ...(Array.isArray(payload.workstation_gateway_call_results) ? payload.workstation_gateway_call_results : []),
+    ...(Array.isArray(debug?.workstation_gateway_call_results) ? debug.workstation_gateway_call_results : []),
+  ]
+    .map((entry: unknown) => readRecord(entry))
+    .filter((entry): entry is RecordLike => Boolean(entry));
+};
+
+const latestGatewayLifecycleRecords = (input: {
+  turnId: string;
+  payload: RecordLike;
+}): { trace: HelixToolLifecycleTrace; followup: HelixToolFollowupDecision } | null => {
+  for (const result of [...gatewayCallResultsFrom(input.payload)].reverse()) {
+    const trace = readRecord(result.tool_lifecycle_trace);
+    const followup = readRecord(result.tool_followup_decision);
+    if (
+      readString(trace?.schema) !== HELIX_TOOL_LIFECYCLE_TRACE_SCHEMA ||
+      readString(followup?.schema) !== HELIX_TOOL_FOLLOWUP_DECISION_SCHEMA
+    ) {
+      continue;
+    }
+    if (readString(trace?.tool_family) !== "workstation_tool_gateway") continue;
+    const gatewayTrace = trace as HelixToolLifecycleTrace;
+    const gatewayFollowup = followup as HelixToolFollowupDecision;
+    const normalizedTrace = {
+      ...gatewayTrace,
+      turn_id: input.turnId,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const normalizedFollowup = {
+      ...gatewayFollowup,
+      turn_id: input.turnId,
+      next_action: gatewayFollowup.next_action === "terminal_answer" ? "continue_reasoning" : gatewayFollowup.next_action,
+      terminal_blockers: unique([
+        ...readStringArray(gatewayFollowup.terminal_blockers),
+        "post_tool_model_step_required",
+        "terminal_authority_not_evaluated",
+      ]),
+      evidence_reentered: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    return {
+      trace: normalizedTrace,
+      followup: normalizedFollowup,
+    };
+  }
+  return null;
+};
+
 const artifactLedger = (payload: RecordLike): RecordLike[] =>
   Array.isArray(payload.current_turn_artifact_ledger)
     ? payload.current_turn_artifact_ledger
@@ -437,12 +491,15 @@ export const refreshToolLifecycleRecords = (input: {
   turnId: string;
   payload: RecordLike;
 }): void => {
-  const trace = buildToolLifecycleTrace(input);
+  const gatewayRecords = latestGatewayLifecycleRecords(input);
+  const trace = gatewayRecords?.trace ?? buildToolLifecycleTrace(input);
   input.payload.tool_lifecycle_trace = trace;
-  input.payload.tool_followup_decision = buildToolFollowupDecision({
-    ...input,
-    trace,
-  });
+  input.payload.tool_followup_decision =
+    gatewayRecords?.followup ??
+    buildToolFollowupDecision({
+      ...input,
+      trace,
+    });
   const debug = readRecord(input.payload.debug);
   if (debug) {
     debug.tool_lifecycle_trace = input.payload.tool_lifecycle_trace;

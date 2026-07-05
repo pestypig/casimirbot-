@@ -222,6 +222,8 @@ export const buildModelVisibleCapabilityLaneManifest = (
                       requested_backend_provider: "<optional backend provider preference>",
                       source_binding: {
                         source_id: "<source id>",
+                        panel_id: "<optional workstation panel id>",
+                        region_id: "<optional visible source region id>",
                         source_hash: "<optional source hash>",
                         source_text_hash: "<optional source text hash>",
                         source_text_char_count: "<optional source text character count>",

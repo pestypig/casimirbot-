@@ -15,6 +15,10 @@ const OUT_DIR = process.env.HELIX_ASK_API_PARITY_OUT ?? "artifacts/helix-ask-api
 const TIMEOUT_MS = Math.max(1000, Number(process.env.HELIX_ASK_API_PARITY_TIMEOUT_MS ?? 180_000));
 const INCLUDE_DISABLED = process.env.HELIX_ASK_API_PARITY_INCLUDE_DISABLED === "1";
 const DRY_RUN = process.argv.includes("--dry-run") || process.env.HELIX_ASK_API_PARITY_DRY_RUN === "1";
+const STOP_AFTER_TRANSPORT_FAILURES = Math.max(
+  1,
+  Number(process.env.HELIX_ASK_API_PARITY_STOP_AFTER_TRANSPORT_FAILURES ?? 2),
+);
 const SCENARIO_FILTER = (process.env.HELIX_ASK_API_PARITY_SCENARIOS ?? "")
   .split(",")
   .map((entry) => entry.trim())
@@ -51,6 +55,11 @@ export const selectApiParityScenarios = (
   };
 };
 
+export const isApiParityTransportFailure = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error);
+  return /\b(?:fetch failed|ECONNREFUSED|ECONNRESET|UND_ERR_SOCKET|socket|network|terminated|aborted)\b/i.test(message);
+};
+
 const fetchJson = async <T>(url: string, init?: RequestInit): Promise<T> => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -71,7 +80,7 @@ const fetchJson = async <T>(url: string, init?: RequestInit): Promise<T> => {
   }
 };
 
-const seedBodyFor = (scenario: HelixApiParityScenario, threadId: string): RecordLike | null => {
+export const seedBodyFor = (scenario: HelixApiParityScenario, threadId: string): RecordLike | null => {
   if (scenario.seed === "none") return null;
   if (scenario.seed === "active_run_with_unbound_visual_source") {
     return {
@@ -81,6 +90,31 @@ const seedBodyFor = (scenario: HelixApiParityScenario, threadId: string): Record
       unbound_source_id: `visual_source:${scenario.id}:fresh`,
       bound_scene_text: "A backend-seeded visual capture shows File Explorer open to a research folder.",
       unbound_scene_text: "A fresh visual capture shows the Helix Ask UI with worker-lane debug output.",
+      confidence: 0.82,
+    };
+  }
+  if (scenario.seed === "live_source_identity_wrong_environment") {
+    return {
+      scenario: "live_source_identity_wrong_environment",
+      thread_id: threadId,
+      source_id: `visual_source:${scenario.id}:bound`,
+      scene_text: "A backend-seeded visual capture belongs to a different Live Answer environment.",
+      activity: "Reviewing a visual frame from a different Live Answer environment.",
+      objects: "Mismatched visual source, active environment, stale environment binding",
+      confidence: 0.82,
+    };
+  }
+  if (
+    scenario.seed === "live_source_identity_missing_environment_source" ||
+    scenario.seed === "live_source_identity_no_situation_run" ||
+    scenario.seed === "live_source_identity_no_field_evaluations" ||
+    scenario.seed === "live_source_identity_stale_interpretation"
+  ) {
+    return {
+      scenario: scenario.seed,
+      thread_id: threadId,
+      source_id: `visual_source:${scenario.id}:bound`,
+      scene_text: "A backend-seeded visual capture is present but identity authority is intentionally incomplete.",
       confidence: 0.82,
     };
   }
@@ -225,17 +259,28 @@ const main = async (): Promise<void> => {
   }
 
   const results: RecordLike[] = [];
+  let consecutiveTransportFailures = 0;
+  let stoppedReason: string | null = null;
   for (const scenario of scenarios) {
     try {
       results.push(await runScenario(scenario, runId, outputDir));
+      consecutiveTransportFailures = 0;
     } catch (error) {
+      const transportFailure = isApiParityTransportFailure(error);
+      if (transportFailure) consecutiveTransportFailures += 1;
+      else consecutiveTransportFailures = 0;
       results.push({
         schema: "helix.api_parity_probe_result.v1",
         scenario_id: scenario.id,
         prompt: scenario.prompt,
         procedural_ok: false,
         failures: [error instanceof Error ? error.message : String(error)],
+        transport_failure: transportFailure,
       });
+      if (consecutiveTransportFailures >= STOP_AFTER_TRANSPORT_FAILURES) {
+        stoppedReason = `stopped_after_${consecutiveTransportFailures}_transport_failures`;
+        break;
+      }
     }
   }
 
@@ -243,6 +288,12 @@ const main = async (): Promise<void> => {
     ok: results.every((result) => result.procedural_ok === true),
     run_id: runId,
     output_dir: outputDir,
+    stopped_reason: stoppedReason,
+    selected_scenarios: scenarios.map((scenario) => scenario.id),
+    completed_scenarios: results.map((result) => String(result.scenario_id)),
+    skipped_scenarios: stoppedReason
+      ? scenarios.slice(results.length).map((scenario) => scenario.id)
+      : [],
     results,
   };
   await fs.writeFile(path.join(outputDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);

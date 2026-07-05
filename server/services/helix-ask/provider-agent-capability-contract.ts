@@ -4,6 +4,7 @@ import { listWorkstationGatewayCapabilities } from "./workstation-tool-gateway/r
 
 export type ProviderAgentCapabilityAvailability =
   | "shared_gateway_now"
+  | "shared_capability_lane_now"
   | "safe_to_graduate_next"
   | "requires_confirmation_contract"
   | "helix_native_only"
@@ -22,6 +23,7 @@ export type ProviderAgentCapabilityClassification = {
   surface:
     | "workstation_gateway"
     | "explicit_contract"
+    | "capability_lane"
     | "live_environment"
     | "live_environment_alias"
     | "dynamic_panel"
@@ -138,7 +140,35 @@ const sharedExplicitAlias = (
   notes: input.notes,
 });
 
+const sharedCapabilityLane = (
+  capabilityId: string,
+  input: {
+    permissionClass: ProviderAgentPermissionClass;
+    notes: string;
+  },
+): ProviderAgentCapabilityClassification => ({
+  capability_id: capabilityId,
+  surface: "capability_lane",
+  availability: "shared_capability_lane_now",
+  permission_class: input.permissionClass,
+  provider_availability: sharedProviderAvailability,
+  required_contract_before_gateway: [],
+  notes: input.notes,
+});
+
 export const PROVIDER_AGENT_CAPABILITY_CLASSIFICATIONS: readonly ProviderAgentCapabilityClassification[] = [
+  sharedCapabilityLane("live_translation.translate_text", {
+    permissionClass: "read_observe",
+    notes: "Provider-shared capability lane one-shot. It emits non-terminal translation observations and projection receipts; Helix retains backend selection, evidence re-entry, and terminal authority.",
+  }),
+  sharedCapabilityLane("visual_analysis.inspect_image_region", {
+    permissionClass: "read_observe",
+    notes: "Provider-shared capability lane one-shot for admitted Image Lens crops. It emits non-terminal region receipts and visual evidence; Helix retains source admission, evidence re-entry, and terminal authority.",
+  }),
+  sharedCapabilityLane("visual_analysis.inspect_frame", {
+    permissionClass: "read_observe",
+    notes: "Provider-shared capability lane one-shot for admitted visual frames. It emits non-terminal visual observations; Helix retains source admission, evidence re-entry, and terminal authority.",
+  }),
   ...[
     "repo-code.search_concept",
   ].map((capabilityId) =>
@@ -419,6 +449,18 @@ export const classifyDynamicWorkstationActionForProviderGateway = (
   input: { retired?: boolean } = {},
 ): ProviderAgentCapabilityClassification => {
   const capabilityId = buildWorkstationToolName(action.panel_id, action.action_id);
+  const currentGatewayCapability = currentGatewayCapabilityById.get(capabilityId);
+  if (currentGatewayCapability && input.retired !== true) {
+    return {
+      capability_id: capabilityId,
+      surface: "dynamic_panel",
+      availability: "shared_gateway_now",
+      permission_class: permissionClassForSharedGatewayCapability(currentGatewayCapability),
+      provider_availability: sharedProviderAvailability,
+      required_contract_before_gateway: [],
+      notes: "Dynamic panel action has graduated through the shared workstation gateway manifest; panel visibility alone still does not grant provider access.",
+    };
+  }
   if (input.retired === true || action.panel_id.startsWith("situation-room")) {
     return {
       capability_id: capabilityId,

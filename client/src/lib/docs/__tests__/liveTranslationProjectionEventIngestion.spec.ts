@@ -2,8 +2,9 @@
  * @vitest-environment jsdom
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import type { DocumentTranslationUnit } from "@shared/document-translation";
+import { hashDocumentSource, type DocumentTranslationUnit } from "@shared/document-translation";
 import { HELIX_ASK_LIVE_EVENT_BUS_EVENT } from "@/lib/helix/liveEventsBus";
+import { buildHelixLiveTranslationProjectionEventPayloads } from "@/lib/helix/live-translation-projection";
 import { installDocumentLiveTranslationProjectionEventIngestion } from "@/lib/docs/liveTranslationProjectionEventIngestion";
 import {
   clearDocumentLiveTranslationProjectionRegistry,
@@ -164,6 +165,258 @@ describe("document live translation projection event ingestion", () => {
       assistantAnswer: false,
       rawContentIncluded: false,
     });
+  });
+
+  it("ingests Ask one-shot projection receipts for chunk-scoped document source ids", () => {
+    const target = new EventTarget();
+    const unsubscribe = installDocumentLiveTranslationProjectionEventIngestion({
+      eventTarget: target,
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      sourceHash: "sha256:full-document-hash",
+      units: [unit("visible-chunk-1")],
+    });
+
+    target.dispatchEvent(new CustomEvent(HELIX_ASK_LIVE_EVENT_BUS_EVENT, {
+      detail: {
+        contextId: "helix-ask:desktop",
+        entry: {
+          id: "ask:visible-title:receipt",
+          text: "Ask one-shot visible title projection.",
+          meta: {
+            source_event_type: "lane_projection_receipt",
+            lane: "live_translation",
+            sourceId: "document_markdown:docs/research/nhm2.md#visible-chunk-1",
+            doc_path: "docs/research/nhm2.md",
+            latestProjectionTarget: "docs_chunk",
+            latestChunkId: "visible-chunk-1",
+            latestChunkIndex: 0,
+            latestDedupeKey: "document_markdown:docs/research/nhm2.md:visible-chunk-1:es",
+            latestObservedAtMs: 120,
+            latestFreshnessStatus: "fresh",
+            sourceTextHash: "sha256:visible-title",
+            sourceKind: "docs_viewer",
+            accountLocale: "es",
+            targetLanguage: "es",
+            translatedText: "Titulo visible.",
+            projectionStatus: "projected",
+            receiptRef: "ask:visible-title:receipt",
+            observationRef: "ask:visible-title:observation",
+            selectedBackendProvider: "live_translation.local_runtime",
+            terminalAuthorityStatus: "not_terminal_authority",
+          },
+        },
+      },
+    }));
+
+    const snapshot = readDocumentLiveTranslationProjectionSnapshot({
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      sourceHash: "sha256:full-document-hash",
+    });
+    expect(snapshot.translations["visible-chunk-1"]).toMatchObject({
+      status: "ready",
+      text: "Titulo visible.",
+      sourceId: "document_markdown:docs/research/nhm2.md#visible-chunk-1",
+      sourceHash: "sha256:full-document-hash",
+      sourceKind: "docs",
+      sourceTextHash: "sha256:visible-title",
+      chunkId: "visible-chunk-1",
+      projectionTarget: "docs_chunk",
+      targetLanguage: "es",
+      observationRef: "ask:visible-title:observation",
+      receiptRef: "ask:visible-title:receipt",
+      source: "capability_lane",
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+    });
+
+    target.dispatchEvent(new CustomEvent(HELIX_ASK_LIVE_EVENT_BUS_EVENT, {
+      detail: {
+        contextId: "helix-ask:desktop",
+        entry: {
+          id: "ask:other-doc:receipt",
+          text: "Wrong document projection.",
+          meta: {
+            source_event_type: "lane_projection_receipt",
+            lane: "live_translation",
+            sourceId: "document_markdown:docs/research/other.md#visible-chunk-1",
+            doc_path: "docs/research/other.md",
+            latestProjectionTarget: "docs_chunk",
+            latestChunkId: "visible-chunk-1",
+            targetLanguage: "es",
+            translatedText: "Texto equivocado.",
+            projectionStatus: "projected",
+            receiptRef: "ask:other-doc:receipt",
+          },
+        },
+      },
+    }));
+
+    expect(readDocumentLiveTranslationProjectionSnapshot({
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      sourceHash: "sha256:full-document-hash",
+    }).translations["visible-chunk-1"]?.text).toBe("Titulo visible.");
+
+    unsubscribe();
+  });
+
+  it("ingests projection events built from completed Ask lane receipts", () => {
+    const target = new EventTarget();
+    const unsubscribe = installDocumentLiveTranslationProjectionEventIngestion({
+      eventTarget: target,
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      sourceHash: "sha256:full-document-hash",
+      sourceTextHash: "sha256:full-document-text",
+      sourceTextCharCount: 2048,
+      units: [unit("visible-chunk-1")],
+    });
+    const chunkSourceTextHash = hashDocumentSource("Source visible-chunk-1");
+
+    const [eventPayload] = buildHelixLiveTranslationProjectionEventPayloads({
+      contextId: "helix-ask:desktop",
+      traceId: "turn:visible-translation",
+      nowMs: 200,
+      payload: {
+        debug: {
+          capability_lane_projection_receipts: [
+            {
+              schema: "helix.live_translation.projection_receipt.v1",
+              lane_id: "live_translation",
+              capability: "live_translation.translate_text",
+              projection_target: "docs_chunk",
+              projection_status: "projected",
+              source_id: "document_markdown:docs/research/nhm2.md#visible-chunk-1",
+              doc_path: "docs/research/nhm2.md",
+              bbox: { x: 16, y: 24, width: 320, height: 48, source: "visible-doc-title" },
+              source_hash: "sha256:full-document-hash",
+              source_kind: "docs_viewer",
+              source_text_hash: chunkSourceTextHash,
+              source_text_char_count: "Source visible-chunk-1".length,
+              account_locale: "es",
+              target_language: "es",
+              chunk_id: "visible-chunk-1",
+              chunk_index: 0,
+              dedupe_key: "document_markdown:docs/research/nhm2.md:visible-chunk-1:es",
+              observed_at_ms: 180,
+              freshness_status: "fresh",
+              translated_text: "Titulo visible desde Ask.",
+              observation_ref: "ask:visible-title:observation",
+              receipt_ref: "ask:visible-title:receipt",
+              selected_runtime_agent_provider: "codex",
+              selected_backend_provider: "live_translation.local_runtime",
+              terminal_authority_status: "not_terminal_authority",
+              answer_authority: false,
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          ],
+        },
+      },
+    });
+
+    expect(eventPayload).toBeDefined();
+    target.dispatchEvent(new CustomEvent(HELIX_ASK_LIVE_EVENT_BUS_EVENT, {
+      detail: eventPayload,
+    }));
+
+    const snapshot = readDocumentLiveTranslationProjectionSnapshot({
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      sourceHash: "sha256:full-document-hash",
+    });
+    expect(snapshot.translations["visible-chunk-1"]).toMatchObject({
+      status: "ready",
+      text: "Titulo visible desde Ask.",
+      sourceId: "document_markdown:docs/research/nhm2.md#visible-chunk-1",
+      sourceHash: "sha256:full-document-hash",
+      sourceKind: "docs",
+      sourceTextHash: chunkSourceTextHash,
+      sourceTextCharCount: "Source visible-chunk-1".length,
+      chunkId: "visible-chunk-1",
+      chunkIndex: 0,
+      bbox: { x: 16, y: 24, width: 320, height: 48, source: "visible-doc-title" },
+      projectionTarget: "docs_chunk",
+      targetLanguage: "es",
+      observationRef: "ask:visible-title:observation",
+      receiptRef: "ask:visible-title:receipt",
+      selectedBackendProvider: "live_translation.local_runtime",
+      source: "capability_lane",
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+    });
+
+    unsubscribe();
+  });
+
+  it("ingests explicit Ask document projections even when target language differs from account locale", () => {
+    const target = new EventTarget();
+    const unsubscribe = installDocumentLiveTranslationProjectionEventIngestion({
+      eventTarget: target,
+      docPath: "docs/research/nhm2.md",
+      locale: "en",
+      sourceHash: "sha256:full-document-hash",
+      units: [unit("visible-chunk-1")],
+    });
+
+    target.dispatchEvent(new CustomEvent(HELIX_ASK_LIVE_EVENT_BUS_EVENT, {
+      detail: {
+        contextId: "helix-ask:desktop",
+        entry: {
+          id: "ask:visible-title:receipt",
+          text: "Ask one-shot visible title projection.",
+          meta: {
+            source_event_type: "lane_projection_receipt",
+            lane: "live_translation",
+            sourceId: "document_markdown:docs/research/nhm2.md#visible-chunk-1",
+            doc_path: "docs/research/nhm2.md",
+            latestProjectionTarget: "docs_chunk",
+            latestChunkId: "visible-chunk-1",
+            latestChunkIndex: 0,
+            latestObservedAtMs: 120,
+            latestFreshnessStatus: "fresh",
+            sourceTextHash: "sha256:visible-title",
+            sourceKind: "docs_viewer",
+            accountLocale: "en",
+            targetLanguage: "es",
+            translatedText: "Titulo visible.",
+            projectionStatus: "projected",
+            receiptRef: "ask:visible-title:receipt",
+            observationRef: "ask:visible-title:observation",
+            selectedBackendProvider: "live_translation.local_runtime",
+            terminalAuthorityStatus: "not_terminal_authority",
+          },
+        },
+      },
+    }));
+
+    const snapshot = readDocumentLiveTranslationProjectionSnapshot({
+      docPath: "docs/research/nhm2.md",
+      locale: "en",
+      sourceHash: "sha256:full-document-hash",
+    });
+    expect(snapshot.translations["visible-chunk-1"]).toMatchObject({
+      status: "ready",
+      text: "Titulo visible.",
+      accountLocale: "en",
+      targetLanguage: "es",
+      sourceId: "document_markdown:docs/research/nhm2.md#visible-chunk-1",
+      sourceHash: "sha256:full-document-hash",
+      sourceTextHash: "sha256:visible-title",
+      observationRef: "ask:visible-title:observation",
+      receiptRef: "ask:visible-title:receipt",
+      source: "capability_lane",
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+    });
+
+    unsubscribe();
   });
 
   it("accepts camelCase Ask live-event type metadata for translation projections", () => {

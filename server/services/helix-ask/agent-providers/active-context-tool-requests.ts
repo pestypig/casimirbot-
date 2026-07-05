@@ -147,6 +147,20 @@ export const isContextualSurfaceReadMention = (prompt: string): boolean => {
   );
 };
 
+export const isImageLensVisualRegionPrompt = (prompt: string): boolean => {
+  const unquoted = unquotePrompt(prompt);
+  if (
+    /\b(?:do\s+not|don'?t|dont|without|no\s+need\s+to|not\s+asking\s+to|avoid)\b[\s\S]{0,120}\b(?:image\s+lens|image-lens|attached\s+image|visible\s+image|crop|bbox|visual_analysis\.inspect_image_region)\b/i.test(unquoted)
+  ) {
+    return false;
+  }
+  const namesImageLensOrAttachment =
+    /\b(?:image\s+lens|image-lens|attached\s+image|image\s+attachment|visible\s+image|current\s+image|open\s+image|visual_analysis\.inspect_image_region)\b/i.test(unquoted);
+  const asksForFocusedVisualRegion =
+    /\b(?:crop|bbox|bounding\s+box|region|area|look\s+closely|inspect|read|ocr|latex|equation|figure)\b/i.test(unquoted);
+  return namesImageLensOrAttachment && asksForFocusedVisualRegion;
+};
+
 export const isExistingTranslationSurfaceReadPrompt = (prompt: string): boolean => {
   const unquoted = unquotePrompt(prompt);
   if (
@@ -167,7 +181,6 @@ export const isExistingTranslationSurfaceReadPrompt = (prompt: string): boolean 
     /\b(?:active|current|visible|existing|rendered|shown|displayed)\b[\s\S]{0,80}\b(?:translation\s+surface|translated\s+(?:surface|text|section|block|paragraph|content)|active\s+translation(?:\s+(?:surface|text|section|block|paragraph|content))?)\b/i.test(unquoted) ||
     /\b(?:translation\s+surface|translated\s+(?:surface|text|section|block|paragraph|content)|active\s+translation(?:\s+(?:surface|text|section|block|paragraph|content))?)\b[\s\S]{0,80}\b(?:active|current|visible|existing|rendered|shown|displayed)\b/i.test(unquoted) ||
     /\b(?:translation\s+surface|translated\s+(?:surface|text|section|block|paragraph|content)|active\s+translation(?:\s+(?:surface|text|section|block|paragraph|content))?)\b/i.test(unquoted) ||
-    /\btranslate\b[\s\S]{0,80}\b(?:visible|current|active|shown|displayed)\b[\s\S]{0,80}\b(?:section|block|paragraph|content|document|doc)\b/i.test(unquoted) ||
     /\balready[-\s]+translated\b[\s\S]{0,80}\b(?:surface|text|section|block|paragraph|content)\b/i.test(unquoted) ||
     /\b(?:surface|text|section|block|paragraph|content)\b[\s\S]{0,80}\balready[-\s]+translated\b/i.test(unquoted);
 
@@ -179,6 +192,7 @@ export const buildPromptDerivedReadableSurfaceGatewayCallRequests = (
 ): Record<string, unknown>[] => {
   const prompt = readPrompt(body);
   if (!prompt) return [];
+  if (isImageLensVisualRegionPrompt(prompt)) return [];
   if (hasNegatedSurfaceReadInstruction(prompt) || isContextualSurfaceReadMention(prompt)) return [];
   if (/\b(?:read\s+aloud|speak(?:\s+out\s+loud)?|narrat(?:e|or)|voice\s+(?:read|say|speak)|say\s+out\s+loud)\b/i.test(unquotePrompt(prompt))) {
     return [];

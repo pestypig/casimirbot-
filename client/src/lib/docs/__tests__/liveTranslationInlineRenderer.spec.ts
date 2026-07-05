@@ -26,6 +26,7 @@ describe("document live translation inline renderer", () => {
     expect(rendered).toContain('data-doc-translation-answer-authority="false"');
     expect(rendered).toContain('data-doc-translation-governed-projection="true"');
     expect(rendered).toContain('data-doc-translation-authority-policy="projection_only_not_answer_authority"');
+    expect(rendered).toContain('data-doc-translation-terminal-authority-owner="helix"');
     expect(rendered).toContain('data-doc-translation-display-status="empty"');
     expect(rendered).toContain('data-doc-translation-display-status-reason="no_projection_activity"');
     expect(rendered).toContain('data-doc-translation-render-status="empty"');
@@ -70,6 +71,7 @@ describe("document live translation inline renderer", () => {
           freshnessStatus: "fresh",
           terminalAuthorityStatus: "not_terminal_authority",
           sourceId: "document_markdown:docs/research/nhm2.md",
+          bbox: { x: 16, y: 24, width: 320, height: 48, source: "visible-doc-title" },
           sourceIdentityKey: "document_markdown:docs/research/nhm2.md::source-hash-current",
           laneSessionSourceBindingKey: "docs:nhm2::source-hash-current::docs_chunk::es-US::es",
           laneSessionSourceIdentityKey:
@@ -113,6 +115,7 @@ describe("document live translation inline renderer", () => {
     expect(rendered).toContain('lang="es" dir="auto"');
     expect(rendered).toContain('data-doc-translation-governed-projection="true"');
     expect(rendered).toContain('data-doc-translation-authority-policy="projection_only_not_answer_authority"');
+    expect(rendered).toContain('data-doc-translation-terminal-authority-owner="helix"');
     expect(rendered).toContain('data-doc-translation-render-status="ready"');
     expect(rendered).toContain('data-doc-translation-display-status="ready"');
     expect(rendered).toContain('data-doc-translation-observation-ref="obs:docs:u1"');
@@ -130,6 +133,9 @@ describe("document live translation inline renderer", () => {
     expect(rendered).toContain('data-doc-translation-terminal-eligible="false"');
     expect(rendered).toContain('data-doc-translation-assistant-answer="false"');
     expect(rendered).toContain('data-doc-translation-raw-content-included="false"');
+    expect(rendered).toContain(
+      'data-doc-translation-bbox="{&quot;x&quot;:16,&quot;y&quot;:24,&quot;width&quot;:320,&quot;height&quot;:48,&quot;source&quot;:&quot;visible-doc-title&quot;}"',
+    );
     expect(rendered).toContain('data-doc-translation-chunk-id="u0001"');
     expect(rendered).toContain('data-doc-translation-chunk-index="0"');
     expect(rendered).toContain(
