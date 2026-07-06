@@ -14,6 +14,8 @@ type Issue = {
 };
 
 const placeholderPattern = /\{([a-zA-Z0-9_]+)\}/g;
+const placeholderTranslationPattern =
+  /^(?:Arabi|Deutsch|Espanol|Francais|Hawaiian|Nihongo|Hangugeo|Wolof|Zhongwen):\s|^(?:AR|ES|FR|JA|KO|PT|WO|ZH)\s/;
 
 function placeholders(text: string): string[] {
   return [...text.matchAll(placeholderPattern)].map((match) => match[1]).sort();
@@ -52,6 +54,12 @@ function auditTargetCatalog(args: {
     if (!target.trim()) {
       issues.push({ level: "error", message: `${args.locale}: empty translation for ${id}` });
     }
+    if (/\?{3,}|(?:\?\s*){2,}/.test(target)) {
+      issues.push({ level: "error", message: `${args.locale}: likely mojibake replacement question marks in ${id}` });
+    }
+    if (placeholderTranslationPattern.test(target)) {
+      issues.push({ level: "error", message: `${args.locale}: placeholder-style translation for ${id}` });
+    }
     if (!hasBalancedBraces(target)) {
       issues.push({ level: "error", message: `${args.locale}: invalid brace pattern for ${id}` });
     }
@@ -67,6 +75,12 @@ function auditTargetCatalog(args: {
       issues.push({
         level: "error",
         message: `${args.locale}: ASCII apostrophe found inside Hawaiian word for ${id}; use okina U+02BB when intended`,
+      });
+    }
+    if (id.startsWith("panel.title.") && target === args.source[id]) {
+      issues.push({
+        level: "error",
+        message: `${args.locale}: panel title ${id} is still identical to English source`,
       });
     }
   }
@@ -132,6 +146,9 @@ for (const { code, catalog } of INTERFACE_TARGET_CATALOGS) {
   }
   if (option.translationMode !== "procedural_catalog") {
     issues.push({ level: "error", message: `${code}: target option must use procedural_catalog` });
+  }
+  if (reviewed < total) {
+    issues.push({ level: "error", message: `${code}: missing ${total - reviewed} target messages` });
   }
   if (reviewed < total && option.readiness.toLowerCase().includes("complete")) {
     issues.push({ level: "error", message: `${code}: readiness cannot claim complete coverage while catalog is partial` });

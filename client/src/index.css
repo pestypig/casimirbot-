@@ -149,6 +149,20 @@
     scroll-margin-block: 35vh;
   }
 
+  .doc-read-active-section[data-doc-translation-reticle="loading"] {
+    outline-style: dotted;
+    outline-color: rgba(52, 211, 153, 0.72);
+    background: rgba(5, 150, 105, 0.1);
+    box-shadow: 0 0 0 0.18rem rgba(5, 150, 105, 0.08);
+  }
+
+  .doc-read-active-section[data-doc-translation-reticle="candidate"] {
+    outline-style: dotted;
+    outline-color: rgba(34, 211, 238, 0.58);
+    background: rgba(8, 145, 178, 0.08);
+    box-shadow: 0 0 0 0.18rem rgba(8, 145, 178, 0.06);
+  }
+
   .doc-math-clickable {
     cursor: pointer;
   }

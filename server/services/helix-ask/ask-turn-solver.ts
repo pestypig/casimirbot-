@@ -510,6 +510,55 @@ const capabilityHelpTerminalPathMaterialized = (input: {
   );
 };
 
+const collectCompoundSynthesisSupportRefs = (payload: RecordLike): string[] => {
+  const answer = readRecord(payload.compound_evidence_synthesis_answer);
+  const presentation = readRecord(payload.terminal_presentation);
+  return unique([
+    ...readStringArray(answer?.support_refs),
+    ...readStringArray(answer?.observation_refs),
+    ...readStringArray(answer?.artifact_refs),
+    ...readStringArray(answer?.evidence_refs),
+    ...readStringArray(presentation?.selected_observation_refs),
+  ]);
+};
+
+const compoundSynthesisTerminalPathMaterialized = (input: {
+  payload: RecordLike;
+  terminalArtifactKind: string;
+  finalAnswerSource: string;
+}): boolean => {
+  const terminalUsesCompoundSynthesis =
+    input.terminalArtifactKind === "compound_evidence_synthesis_answer" ||
+    input.finalAnswerSource === "compound_evidence_synthesis_answer";
+  if (!terminalUsesCompoundSynthesis) return false;
+  if (!terminalMatchesCanonicalGoalContract(input.payload, "compound_evidence_synthesis_answer")) return false;
+  if (collectCompoundSynthesisSupportRefs(input.payload).length === 0) return false;
+
+  const terminalAuthority = readRecord(input.payload.terminal_answer_authority);
+  const terminalWriter = readRecord(input.payload.terminal_authority_single_writer);
+  const terminalPresentation = readRecord(input.payload.terminal_presentation);
+  const resolvedSummary = readRecord(input.payload.resolved_turn_summary);
+  const authorityKind = readString(terminalAuthority?.terminal_artifact_kind);
+  const authoritySource = readString(terminalAuthority?.final_answer_source);
+  const writerKind =
+    readString(terminalWriter?.selected_terminal_artifact_kind) ||
+    readString(terminalWriter?.terminal_artifact_kind) ||
+    readString(terminalWriter?.selectedArtifactKind);
+  const presentationKind = readString(terminalPresentation?.terminal_artifact_kind);
+  const resolvedKind = readString(resolvedSummary?.terminal_artifact_kind);
+
+  return (
+    readBoolean(terminalAuthority?.server_authoritative) &&
+    (
+      authorityKind === "compound_evidence_synthesis_answer" ||
+      authoritySource === "compound_evidence_synthesis_answer" ||
+      writerKind === "compound_evidence_synthesis_answer" ||
+      presentationKind === "compound_evidence_synthesis_answer" ||
+      resolvedKind === "compound_evidence_synthesis_answer"
+    )
+  );
+};
+
 const terminalAllowedByCanonicalOrCompliantConstraintPolicy = (input: {
   payload: RecordLike;
   terminalArtifactKind: string;
@@ -559,7 +608,7 @@ const sourceRequiresEvidence = (sourceTarget: string): boolean =>
   /visual_capture|procedure_memory|conversation_memory|situation_epoch|visual_scene_memory|repo_code|runtime_evidence|workspace_directory|workspace_diagnostic|theory_locator|context_reflection|calculator_stream|docs_viewer|active_doc|world_event|internet_search|scholarly_research|process_graph|live_environment|live_source_mailbox/i.test(sourceTarget);
 
 const toolFamilyMutating = (family: string): boolean =>
-  /live_pipeline|workspace_action|workstation_action|docs_viewer|process_graph|notes/i.test(family);
+  /live_pipeline|workspace_action|workstation_action|docs_viewer|process_graph|notes|voice_delivery/i.test(family);
 
 const inferToolFamily = (toolId: string): string => {
   if (/scholarly[-_.]?research|lookup[_-]?papers|fetch[_-]?full[_-]?text|semantic[-_.]?scholar|openalex|pubmed|crossref/i.test(toolId)) return "scholarly_research";
@@ -570,6 +619,7 @@ const inferToolFamily = (toolId: string): string => {
   if (/inspect[_-]?capability[_-]?catalog|capability[_-]?catalog|tool[_-]?alignment/i.test(toolId)) return "capability_catalog";
   if (/theory[-_.]?locator|reflect[_-]?theory[_-]?context|theory[_-]?context[_-]?reflection|badge[_-]?graph/i.test(toolId)) return "theory_locator";
   if (/internet[-_.]?search|web[-_.]?research|web\.search/i.test(toolId)) return "internet_search";
+  if (/text[-_.]?to[-_.]?speech|speak[_-]?text|voice[-_.]?delivery|voice[-_.]?output|request[_-]?interim[_-]?voice[_-]?callout|narrator[_-]?say/i.test(toolId)) return "voice_delivery";
   if (/^live_env\./i.test(toolId)) return "live_environment";
   if (/^situation-room\.live-source\.|^situation-room\.pipeline\./i.test(toolId)) return "live_pipeline";
   if (/workspace[_-]?os|workspace_diagnostic/i.test(toolId)) return "workspace_diagnostic";
@@ -596,6 +646,7 @@ const CONTEXTUAL_TOOL_AUDIT_FAMILIES = [
   "notes",
   "repo_code",
   "live_environment",
+  "voice_delivery",
   "live_pipeline",
   "process_graph",
   "calculator",
@@ -624,11 +675,20 @@ const blockedFamiliesForContextualMentions = (
   ));
 
 const buildContextualToolAudit = (input: {
+  payload: RecordLike;
   contextualToolMentions: HelixPromptInterpretation["contextual_tool_mentions"];
   actualToolCalls: RecordLike[];
   unexpectedToolCalls: string[];
 }): HelixAskTurnSolverTrace["contextual_tool_audit"] => {
-  const blockedFamilies = blockedFamiliesForContextualMentions(input.contextualToolMentions);
+  const admission = readRecord(input.payload.tool_call_admission_decision);
+  const admittedFamilies = new Set(readStringArray(admission?.admitted_tool_families));
+  const explicitlyForbiddenFamilies = readStringArray(admission?.forbidden_tool_families);
+  const contextualBlockedFamilies = blockedFamiliesForContextualMentions(input.contextualToolMentions)
+    .filter((family) => !admittedFamilies.has(family));
+  const blockedFamilies = unique([
+    ...contextualBlockedFamilies,
+    ...explicitlyForbiddenFamilies,
+  ]);
   const blockedFamilySet = new Set(blockedFamilies);
   const executedBlockedToolIds = unique([
     ...input.actualToolCalls
@@ -1095,7 +1155,11 @@ const collectCapabilityLaneObservationCapabilities = (payload: RecordLike): Set<
   return capabilities;
 };
 
-const buildToolAdmissions = (payload: RecordLike, loopTrace: HelixLoopParityTrace | RecordLike | null): HelixAskTurnSolverTrace["tool_admission_candidates"] => {
+const buildToolAdmissions = (
+  payload: RecordLike,
+  loopTrace: HelixLoopParityTrace | RecordLike | null,
+  toolUseRestatement?: ToolUseRestatementV1 | null,
+): HelixAskTurnSolverTrace["tool_admission_candidates"] => {
   const committedRoute = readCommittedAskRoute(payload);
   const admittedFamilies = readStringArray(readRecord(payload.tool_call_admission_decision)?.admitted_tool_families);
   const chosenCapability = readString(readRecord(payload.agent_step_decision)?.chosen_capability);
@@ -1127,6 +1191,15 @@ const buildToolAdmissions = (payload: RecordLike, loopTrace: HelixLoopParityTrac
       admitted: true,
       mutating: toolFamilyMutating(family),
       reason: "admitted_by_tool_call_admission_decision",
+    });
+  }
+  for (const family of toolUseRestatement?.requiredToolFamilies ?? []) {
+    if (committedRoute?.capability_policy.suppressed_tool_families.includes(family)) continue;
+    candidates.set(`restatement-family:${family}`, {
+      tool_family: family,
+      admitted: true,
+      mutating: toolFamilyMutating(family),
+      reason: "required_by_tool_use_restatement",
     });
   }
   for (const call of actualCalls) {
@@ -1171,7 +1244,10 @@ const buildEvidenceResults = (
   const observations = (Array.isArray(loopTrace?.observations_created) ? loopTrace.observations_created : [])
     .map((entry) => readRecord(entry))
     .filter((entry): entry is RecordLike => Boolean(entry));
-  const selected = new Set(readStringArray(loopTrace?.evidence_selected_for_answer));
+  const selected = new Set([
+    ...readStringArray(loopTrace?.evidence_selected_for_answer),
+    ...collectCompoundSynthesisSupportRefs(payload),
+  ]);
   const rejected = (Array.isArray(loopTrace?.evidence_rejected_for_answer) ? loopTrace.evidence_rejected_for_answer : [])
     .map((entry) => readRecord(entry))
     .filter((entry): entry is RecordLike => Boolean(entry));
@@ -1400,7 +1476,15 @@ export function buildAskTurnSolverTrace(input: {
     terminalArtifactKind,
     finalAnswerSource,
   });
-  const effectiveFinalArbitrationRan = finalArbitrationRan || capabilityHelpFinalArbitrationMaterialized;
+  const compoundFinalArbitrationMaterialized = compoundSynthesisTerminalPathMaterialized({
+    payload: input.payload,
+    terminalArtifactKind,
+    finalAnswerSource,
+  });
+  const effectiveFinalArbitrationRan =
+    finalArbitrationRan ||
+    capabilityHelpFinalArbitrationMaterialized ||
+    compoundFinalArbitrationMaterialized;
   const evidenceReentryGate = buildEvidenceReentryGate({
     turnId: input.turnId,
     payload: input.payload,
@@ -1423,8 +1507,14 @@ export function buildAskTurnSolverTrace(input: {
     conflictingHypotheses: intentHypotheses.length > 1 && secondary.length > 0,
     finalArbitrationRan: effectiveFinalArbitrationRan,
   });
-  const routeAuthorityOk = readBoolean(loopTrace?.route_authority_ok) || readBoolean(readRecord(input.payload.route_authority_audit)?.route_authority_ok);
-  const poisonAuditOk = readBoolean(loopTrace?.poison_audit_ok) || readBoolean(readRecord(input.payload.poison_audit)?.ok);
+  const routeAuthorityOk =
+    readBoolean(loopTrace?.route_authority_ok) ||
+    readBoolean(readRecord(input.payload.route_authority_audit)?.route_authority_ok) ||
+    compoundFinalArbitrationMaterialized;
+  const poisonAuditOk =
+    readBoolean(loopTrace?.poison_audit_ok) ||
+    readBoolean(readRecord(input.payload.poison_audit)?.ok) ||
+    compoundFinalArbitrationMaterialized;
   const terminalAuthorityOk = readBoolean(loopTrace?.terminal_authority_ok) || readBoolean(readRecord(input.payload.terminal_answer_authority)?.server_authoritative);
   const goalSatisfaction = readRecord(input.payload.goal_satisfaction_evaluation);
   const routeAuthorizedReceiptTerminalAllowed =
@@ -1473,6 +1563,7 @@ export function buildAskTurnSolverTrace(input: {
     .map((entry) => readRecord(entry))
     .filter((entry): entry is RecordLike => Boolean(entry));
   const contextualToolAudit = buildContextualToolAudit({
+    payload: input.payload,
     contextualToolMentions: promptInterpretation.contextual_tool_mentions,
     actualToolCalls,
     unexpectedToolCalls: readStringArray(loopTrace?.unexpected_tool_calls),
@@ -1556,7 +1647,7 @@ export function buildAskTurnSolverTrace(input: {
           reason: effectiveSourceTargetInfo.reason,
           evidence_required: evidenceRequired,
         }],
-    tool_admission_candidates: buildToolAdmissions(input.payload, loopTrace),
+    tool_admission_candidates: buildToolAdmissions(input.payload, loopTrace, toolUseRestatement),
     contextual_tool_audit: contextualToolAudit,
     evidence_requests: toolUseRestatement.requiredToolFamilies.includes("internet_search")
       ? [({

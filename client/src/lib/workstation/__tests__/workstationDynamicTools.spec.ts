@@ -4,6 +4,7 @@ import {
   mapClientWorkstationDynamicToolCallToAction,
 } from "@/lib/workstation/workstationDynamicTools";
 import { WORKSTATION_V1_PANEL_CAPABILITIES } from "@/lib/workstation/panelCapabilities";
+import { SHARED_INTERFACE_LANGUAGE_CODES } from "@shared/interface-language-codes";
 import { WORKSTATION_DYNAMIC_TOOL_ACTIONS } from "@shared/workstation-dynamic-tools";
 
 const AGENT_CONTINUATION_ACTION_IDS = [
@@ -72,7 +73,7 @@ describe("workstation dynamic tools", () => {
     expect(setLanguage?.inputSchema).toMatchObject({
       required: ["language"],
       properties: {
-        language: { enum: ["en", "haw"] },
+        language: { enum: [...SHARED_INTERFACE_LANGUAGE_CODES] },
       },
     });
 

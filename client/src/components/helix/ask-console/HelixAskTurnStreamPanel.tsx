@@ -2,6 +2,10 @@ import React, { type CSSProperties, type MouseEvent, type ReactNode } from "reac
 
 import type { HelixContinuousTurnStreamRow } from "@/lib/helix/ask-active-turn-stream";
 import { formatHelixAskFinalReceiptMeta } from "@/lib/helix/ask-agent-runtime-display";
+import type {
+  ReadAloudPlaybackState,
+  ReadAloudRegionTrafficState,
+} from "@/lib/helix/ask-read-aloud-display";
 import {
   HelixAskJobReadyLinkStrip,
   HelixAskLiveBridgePillStrip,
@@ -45,7 +49,7 @@ export type HelixAskTurnStreamPanelProps = {
   actualAgentProviderLabel?: string | null;
   actualAgentModelLabel?: string | null;
   liveBridgeStatus?: string | null;
-  renderFinalAnswer: () => ReactNode;
+  renderFinalAnswer: (readAloudTraffic?: ReadAloudRegionTrafficState | null) => ReactNode;
   clipText: (text: string, limit: number) => string;
   readRowClassName: (tone: HelixContinuousTurnStreamRow["tone"]) => string;
   readDotClassName: (tone: HelixContinuousTurnStreamRow["tone"]) => string;
@@ -59,6 +63,8 @@ export type HelixAskTurnStreamPanelProps = {
   debugCopyTestId?: string;
   readAloudTestId?: string;
   readAloudActive?: boolean;
+  readAloudState?: ReadAloudPlaybackState;
+  readAloudTraffic?: ReadAloudRegionTrafficState | null;
   readAloudAriaLabel?: string;
   readAloudTitle?: string;
   proofTrace?: unknown;
@@ -97,6 +103,8 @@ export function HelixAskTurnStreamPanel({
   debugCopyTestId,
   readAloudTestId,
   readAloudActive = false,
+  readAloudState = "idle",
+  readAloudTraffic = null,
   readAloudAriaLabel = "Read aloud",
   readAloudTitle = "Read aloud",
   proofTrace,
@@ -403,7 +411,11 @@ export function HelixAskTurnStreamPanel({
                   ) : null}
                 </div>
                 <div className="mt-1 break-words leading-relaxed">
-                  {isFinalRow ? renderFinalAnswer() : <p className="whitespace-pre-wrap">{visibleText}</p>}
+                  {isFinalRow ? (
+                    renderFinalAnswer(readAloudTraffic)
+                  ) : (
+                    <p className="whitespace-pre-wrap">{visibleText}</p>
+                  )}
                 </div>
                 {capabilityLaneChips.length > 0 ? (
                   <div
@@ -465,6 +477,7 @@ export function HelixAskTurnStreamPanel({
                         question: rows.find((candidate) => candidate.source === "question")?.text ?? null,
                         finalAnswer: finalAnswerRawText,
                         terminalArtifactKind: finalAnswerSourceLabel,
+                        modelPolicyDebugSummary: actualAgentModelLabel,
                       }}
                       showDebugCopy={showDebugCopy}
                       debugCopyDisabled={debugCopyDisabled}
@@ -472,6 +485,7 @@ export function HelixAskTurnStreamPanel({
                       debugCopyTestId={debugCopyTestId}
                       readAloudTestId={readAloudTestId}
                       readAloudActive={readAloudActive}
+                      readAloudState={readAloudState}
                       readAloudAriaLabel={readAloudAriaLabel}
                       readAloudTitle={readAloudTitle}
                     />

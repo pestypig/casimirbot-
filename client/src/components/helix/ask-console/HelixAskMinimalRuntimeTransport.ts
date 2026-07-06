@@ -1,4 +1,5 @@
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
+import type { HelixLanguageModelProfileId } from "@shared/helix-language-model-policy";
 
 import {
   buildHelixAskConsoleBackendTurnPayloadCore,
@@ -10,6 +11,8 @@ export type HelixAskMinimalRuntimeTurnPayload = {
   sessionId?: string;
   agentRuntime: HelixAgentRuntimeId;
   agent_runtime: HelixAgentRuntimeId;
+  languageModelProfile?: HelixLanguageModelProfileId;
+  language_model_profile?: HelixLanguageModelProfileId;
   traceId: string;
   turnId: string;
   maxTokens: number;
@@ -46,6 +49,7 @@ export function buildHelixAskMinimalRuntimeTurnPayload(args: {
   return buildHelixAskConsoleBackendTurnPayloadCore({
     sessionId: args.sessionId,
     agentRuntime: envelope.agent_runtime,
+    languageModelProfile: envelope.language_model_profile,
     traceId: args.traceId,
     turnId: args.turnId,
     maxTokens: args.maxTokens,

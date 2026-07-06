@@ -20,6 +20,7 @@ export type CodexParityAgentSpineClass = (typeof CODEX_PARITY_AGENT_SPINE_CLASSE
 
 export const CODEX_PARITY_AGENT_SPINE_REENTRY_STATUSES = [
   "reentered",
+  "handoff_terminal_allowed",
   "not_reentered",
   "no_observation",
 ] as const;

@@ -1315,6 +1315,88 @@ describe("Helix Ask tool lifecycle trace", () => {
     expect(index.assistant_answer).toBe(false);
   });
 
+  it("treats pending text-to-speech handoff as a terminal-valid voice action without claiming playback completion", () => {
+    const payload: Record<string, unknown> = {
+      active_prompt: "read the last final answer outloud",
+      selected_final_answer:
+        "I sent the last final answer to the text-to-speech lane. Playback is pending on the client side.",
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        server_authoritative: true,
+        terminal_eligible: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        selected_observation_refs: [
+          "ask:test:voice-handoff:capability_lane:text_to_speech.speak_text:pending",
+        ],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "ask:test:voice-handoff:capability_lane:text_to_speech.speak_text:pending",
+          kind: "capability_lane_observation_packet",
+          payload_schema: "helix.agent_step_observation_packet.v1",
+          capability_key: "text_to_speech.speak_text",
+          status: "client_pending",
+          payload: {
+            schema: "helix.agent_step_observation_packet.v1",
+            capability_key: "text_to_speech.speak_text",
+            status: "client_pending",
+            produced_artifact_refs: [
+              "ask:test:voice-handoff:capability_lane:text_to_speech.speak_text:pending",
+            ],
+            state_delta: {
+              text_to_speech_receipt: {
+                schema: "helix.text_to_speech.receipt.v1",
+                playback_status: "awaiting_client_playback",
+                provider_status: "accepted",
+                assistant_answer: false,
+                terminal_eligible: false,
+                raw_content_included: false,
+              },
+            },
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:voice-handoff", payload });
+
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      requested_capability: "text_to_speech.speak_text",
+      selected_capability: "text_to_speech.speak_text",
+      executed_capability: "text_to_speech.speak_text",
+      observation_artifact_kind: "capability_lane_observation_packet",
+      handoff_status: "client_pending",
+      handoff_terminal_allowed: true,
+      reentry_executed: true,
+      reentry_proof_source: "voice_tts_handoff_terminal_allowed",
+      rail_status: "complete",
+      rail_failure_code: null,
+    });
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      requested_capability: "text_to_speech.speak_text",
+      selected_capability: "text_to_speech.speak_text",
+      executed_capability: "text_to_speech.speak_text",
+      reentry_status: "handoff_terminal_allowed",
+      rail_status: "complete",
+      rail_failure_code: null,
+      codex_parity_class: "complete",
+    });
+    expect(payload.selected_final_answer).not.toMatch(/\b(?:played|completed|heard)\b/i);
+  });
+
   it("does not count route selection as progress without execution and observation", () => {
     const payload: Record<string, unknown> = {
       capability_plan: {

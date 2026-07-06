@@ -170,6 +170,104 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
     expect(trace.completed_solver_path).toBe(true);
   });
 
+  it("treats compound synthesis support refs as selected evidence for repo plus theory answers", () => {
+    const repoRef = "turn:compound:repo_code_evidence_observation";
+    const theoryRef = "turn:compound:helix_theory_context_reflection_tool_receipt";
+    const trace = buildAskTurnSolverTrace({
+      turnId: "turn:compound",
+      promptText: "how tell me from the code repo search, how does the locator work for theory badge graph?",
+      selectedRoute: "/ask/turn/stream",
+      terminalArtifactKind: "compound_evidence_synthesis_answer",
+      finalAnswerSource: "compound_evidence_synthesis_answer",
+      payload: {
+        canonical_goal_frame: {
+          schema: "helix.canonical_goal_frame.v1",
+          goal_kind: "agent_provider_gateway_turn",
+          required_terminal_kind: "compound_evidence_synthesis_answer",
+        },
+        route_product_contract: {
+          schema: "helix.route_product_contract.v1",
+          source_target: "agent_provider_gateway_turn",
+          allowed_terminal_artifact_kinds: [
+            "final_answer_draft",
+            "compound_evidence_synthesis_answer",
+            "model_synthesized_answer",
+          ],
+          forbidden_terminal_artifact_kinds: ["tool_receipt"],
+        },
+        terminal_answer_authority: {
+          schema: "helix.turn_terminal_authority.v1",
+          terminal_artifact_kind: "compound_evidence_synthesis_answer",
+          final_answer_source: "compound_evidence_synthesis_answer",
+          server_authoritative: true,
+        },
+        terminal_presentation: {
+          schema: "helix.terminal_presentation.v1",
+          terminal_artifact_kind: "compound_evidence_synthesis_answer",
+          final_answer_source: "compound_evidence_synthesis_answer",
+          selected_observation_refs: [theoryRef, repoRef],
+        },
+        current_turn_artifact_ledger: [
+          {
+            artifact_id: theoryRef,
+            kind: "helix_theory_context_reflection_tool_receipt",
+            payload: { artifact_id: theoryRef, selected_for_answer: true },
+          },
+          {
+            artifact_id: repoRef,
+            kind: "repo_code_evidence_observation",
+            payload: { artifact_id: repoRef, selected_for_answer: true },
+          },
+        ],
+      },
+      loopParityTrace: {
+        actual_tool_calls: [
+          {
+            tool_id: "theory-badge-graph.reflect_discussion_context",
+            family: "theory_locator",
+            admitted: true,
+            mutating: false,
+            result_ref: theoryRef,
+          },
+          {
+            tool_id: "repo.search",
+            family: "repo_code",
+            admitted: true,
+            mutating: false,
+            result_ref: repoRef,
+          },
+        ],
+        observations_created: [
+          { observation_id: theoryRef, source_kind: "theory_locator" },
+          { observation_id: repoRef, source_kind: "repo_code" },
+        ],
+        evidence_selected_for_answer: [],
+        evidence_rejected_for_answer: [],
+        terminal_selection_ran_after_observations: true,
+        terminal_authority_ok: true,
+      },
+    });
+
+    expect(trace.evidence_results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ result_id: theoryRef, selected_for_answer: true }),
+        expect.objectContaining({ result_id: repoRef, selected_for_answer: true }),
+      ]),
+    );
+    expect(trace.evidence_reentry_gate).toMatchObject({
+      completed: true,
+      violation_codes: [],
+      selected_evidence_refs: expect.arrayContaining([theoryRef, repoRef]),
+    });
+    expect(trace.followup_reasoning_gate).toMatchObject({
+      required: true,
+      completed: true,
+    });
+    expect(trace.solver_risk_flags).not.toContain("tool_result_terminal_without_reasoning");
+    expect(trace.solver_risk_flags).not.toContain("missing_followup_reasoning");
+    expect(trace.completed_solver_path).toBe(true);
+  });
+
   it("keeps solver final arbitration aligned with authoritative workstation terminal metadata", () => {
     const payload = {
       ...authorityPayload({

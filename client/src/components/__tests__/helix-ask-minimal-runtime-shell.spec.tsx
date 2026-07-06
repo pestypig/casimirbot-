@@ -19,6 +19,7 @@ import {
 } from "@/components/helix/ask-console/HelixAskVoiceConfirmationPanel";
 import { HelixAskVoiceLevelMonitor } from "@/components/helix/ask-console/HelixAskVoiceLevelMonitor";
 import { HelixAskVoiceStatusPill } from "@/components/helix/ask-console/HelixAskStatusLine";
+import { HELIX_ASK_LANGUAGE_MODEL_PROFILE_STORAGE_KEY } from "@/components/helix/ask-console/HelixAskLanguageModelPreference";
 import type {
   HelixAskMinimalRuntimeControlActions,
   HelixAskMinimalRuntimeControlPayload,
@@ -28,10 +29,41 @@ import { useAgiChatStore } from "@/store/useAgiChatStore";
 afterEach(() => {
   cleanup();
   useAgiChatStore.setState({ sessions: {}, activeId: undefined });
+  window.localStorage.removeItem(HELIX_ASK_LANGUAGE_MODEL_PROFILE_STORAGE_KEY);
   vi.restoreAllMocks();
 });
 
 describe("HelixAskMinimalRuntimeShell", () => {
+  it("submits the selected language model profile from the recrowned minimal shell", async () => {
+    vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue("minimal-shell-language-profile");
+    const runTurn = vi.fn(async (payload) => ({
+      selected_final_answer: "Deep profile received.",
+      turn_id: payload.turnId,
+    }));
+
+    render(<HelixAskMinimalRuntimeShell contextId="ctx" runTurn={runTurn} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Choose Ask AI mode" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: /Deep/ }));
+    fireEvent.change(screen.getByLabelText("Ask Helix"), {
+      target: { value: "Use the strongest reasoning available" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Submit prompt" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Deep profile received.")).toBeTruthy();
+    });
+    expect(runTurn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        languageModelProfile: "deep",
+        language_model_profile: "deep",
+        question: "Use the strongest reasoning available",
+      }),
+      expect.any(Function),
+    );
+    expect(window.localStorage.getItem(HELIX_ASK_LANGUAGE_MODEL_PROFILE_STORAGE_KEY)).toBe("deep");
+  });
+
   it("submits through injected transport and binds latest visible turn controls without HelixAskPill", async () => {
     window.history.pushState({}, "", "/desktop?doc=docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
     vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue("minimal-shell-turn");

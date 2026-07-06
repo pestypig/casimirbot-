@@ -1,4 +1,7 @@
 import type { HelixWorkstationGatewayCallResult } from "../workstation-tool-gateway/types";
+import {
+  detectScholarlyResearchIntent,
+} from "../scholarly-research-intent";
 import { isExistingTranslationSurfaceReadPrompt } from "./active-context-tool-requests";
 
 export const READ_ALOUD_SURFACE_OUTCOME = "read_aloud_surface" as const;
@@ -6,6 +9,7 @@ export const READ_ALOUD_DOC_EXCERPT_OUTCOME = READ_ALOUD_SURFACE_OUTCOME;
 export const INSPECT_REPO_AND_DOC_OUTCOME = "inspect_repo_and_doc" as const;
 export const SUMMARIZE_AND_CALCULATE_OUTCOME = "summarize_and_calculate" as const;
 export const RESEARCH_QUANTIFY_REFLECT_OUTCOME = "research_quantify_reflect" as const;
+export const SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME = "scholarly_research_workflow" as const;
 
 const DOCS_SEARCH_CAPABILITY = "docs.search" as const;
 const READABLE_SURFACE_OBSERVE_CAPABILITY = "workstation.readable_surface.observe" as const;
@@ -424,6 +428,7 @@ const isResearchQuantifyReflectPrompt = (prompt: string, body: Record<string, un
   const wantsQuantify = /\b(?:calculate|compute|estimate|solve|solve_expression|calculator|quantif(?:y|ication)|numeric\s+parameters?|numeric\s+values?|numerical\s+values?|numeric\s+binding|formula\s+binding|bind\s+(?:the\s+)?(?:formula\s+)?variables?|scalar|equation|expression|plug\s+into)\b/i.test(unquoted);
   const wantsReflection = /\b(?:reflect|theory\s+badge\s+graph|theory\s+graph|civilization\s+bounds?|claim\s+boundary|conditions\s+of\s+the\s+civilization|social|energy|material)\b/i.test(unquoted);
   const wantsFullTextNumericChain = hasScholarlyFullTextNumericChainIntent(prompt);
+  if (wantsFullTextNumericChain && !wantsReflection && !hasPriorTheoryEquationAnaphora(prompt, body)) return false;
   return wantsResearch && wantsQuantify && (wantsReflection || wantsFullTextNumericChain || hasPriorTheoryEquationAnaphora(prompt, body));
 };
 
@@ -1220,6 +1225,58 @@ const buildResearchQuantifyReflectRequests = (body: Record<string, unknown>): Re
   return eligible ? selectPrimaryResearchQuantifyRequest(requests) : [];
 };
 
+const buildScholarlyResearchWorkflowRequests = (body: Record<string, unknown>): Record<string, unknown>[] => {
+  const prompt = readPrompt(body);
+  if (!prompt) return [];
+  if (isResearchQuantifyReflectPrompt(prompt, body)) return [];
+  const intent = detectScholarlyResearchIntent(prompt);
+  if (!intent.researchRequested) return [];
+  if (intent.scholarlyIntent.requested_workflow === "metadata_search" || intent.scholarlyIntent.requested_workflow === "doi_lookup") {
+    return [];
+  }
+  const { activePanel, activeDocPath } = readActivePanelAndDoc(body);
+  const chainPlan = intent.plannedScholarlyCapabilityChain;
+  const requestedVariables = requestedFormulaVariablesFromPrompt(prompt);
+  const edges = [
+    { from: `${SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME}:scholarly_evidence`, to: `${SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME}:scholarly_full_text`, binding: "selected_paper_to_full_text" },
+    { from: `${SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME}:scholarly_full_text`, to: `${SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME}:numeric_parameters`, binding: "full_text_to_numeric_values" },
+    { from: `${SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME}:numeric_parameters`, to: `${SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME}:calculator`, binding: "numeric_values_to_calculation" },
+  ];
+  return [{
+    schema: "helix.workstation_gateway.compound_dependency_call_request.v1",
+    derivation_source: "helix_scholarly_workflow_planner",
+    compound_outcome: SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME,
+    subgoal_id: `${SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME}:scholarly_evidence`,
+    capability_id: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+    dependent_capability_id: intent.scholarlyIntent.requires_full_text ? SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY : undefined,
+    mode: "read",
+    arguments: {
+      query: intent.normalizedQuery,
+      mode: intent.mode,
+      scholarly_intent: intent.scholarlyIntent,
+      planned_scholarly_capability_chain: chainPlan,
+      ...(requestedVariables.length > 0 ? { requested_variables: requestedVariables } : {}),
+      allow_scholarly_dependent_chain: intent.scholarlyIntent.requires_full_text,
+      source_target_intent: {
+        ...buildCompoundSourceTargetIntent({
+          outcome: SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME,
+          subgoalId: `${SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME}:scholarly_evidence`,
+          targetSource: "scholarly_research",
+          targetKind: "research_paper_search",
+          requiredObservationKind: "helix.scholarly_research_observation.v1",
+          activePanel,
+          activeDocPath,
+          ordinal: 1,
+          dependencyEdges: edges,
+        }),
+        scholarly_intent: intent.scholarlyIntent,
+        planned_scholarly_capability_chain: chainPlan,
+        terminal_evidence_requirement: intent.scholarlyIntent.terminal_evidence_requirement,
+      },
+    },
+  }];
+};
+
 const buildReadAloudSurfaceRequests = (body: Record<string, unknown>): Record<string, unknown>[] => {
   const prompt = readPrompt(body);
   if (!prompt) return [];
@@ -1413,6 +1470,7 @@ export const buildCompoundCapabilityDependencyGatewayCallRequests = (
   ...buildReadAloudSurfaceRequests(body),
   ...buildInspectRepoAndDocRequests(body),
   ...buildSummarizeAndCalculateRequests(body),
+  ...buildScholarlyResearchWorkflowRequests(body),
   ...buildResearchQuantifyReflectRequests(body),
 ];
 
@@ -2209,7 +2267,73 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
   const dependentCapability =
     readString(input.request.dependent_capability_id) ?? readString(input.request.dependentCapabilityId);
   if (
-    outcome === RESEARCH_QUANTIFY_REFLECT_OUTCOME &&
+    input.result.capability_id === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY &&
+    input.result.ok !== true
+  ) {
+    const requestArgs = readRecord(input.request.arguments);
+    const recoveryAttempt = Number(readString(requestArgs?.scholarly_recovery_attempt) ?? requestArgs?.scholarly_recovery_attempt ?? 0);
+    if (!Number.isFinite(recoveryAttempt) || recoveryAttempt >= 2) return null;
+    const observation = readRecord(input.result.observation);
+    const stateDelta = readRecord(input.result.observation_packet?.state_delta);
+    const evidenceState = readString(observation?.evidence_state) ?? readString(stateDelta?.evidence_state);
+    if (evidenceState !== "lookup_weak_match" && evidenceState !== "lookup_blocked") return null;
+    const currentQuery = readString(observation?.query) ?? readString(requestArgs?.query);
+    const nextAffordances = [
+      ...readArray(observation?.next_affordances),
+      ...readArray(stateDelta?.next_affordances),
+      ...readArray(readRecord(observation?.scholarly_lookup_recovery_affordance)?.next_affordances),
+    ].map(readRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry));
+    const recoveryQueries = [
+      ...nextAffordances.map((entry) => readString(entry.query)).filter((entry): entry is string => Boolean(entry)),
+      ...readArray(readRecord(observation?.scholarly_lookup_recovery_affordance)?.recovery_queries)
+        .map(readString)
+        .filter((entry): entry is string => Boolean(entry)),
+    ];
+    const retryQuery = recoveryQueries.find((query) =>
+      query && query.toLowerCase() !== currentQuery?.toLowerCase()
+    );
+    if (!retryQuery) return null;
+    const scholarlyIntent = readRecord(requestArgs?.scholarly_intent) ?? readRecord(readRecord(input.result.gateway_admission?.source_target_intent)?.scholarly_intent);
+    const plannedScholarlyCapabilityChain = readRecord(requestArgs?.planned_scholarly_capability_chain);
+    return {
+      schema: "helix.workstation_gateway.compound_dependency_bound_call_request.v1",
+      derivation_source: "helix_scholarly_recovery_planner",
+      ...(outcome ? { compound_outcome: outcome } : {}),
+      subgoal_id: `scholarly_recovery:lookup_retry:${recoveryAttempt + 1}`,
+      capability_id: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+      dependent_capability_id: dependentCapability || readString(input.request.dependent_capability_id) || undefined,
+      mode: "read",
+      arguments: {
+        query: retryQuery,
+        mode: readString(requestArgs?.mode) ?? "paper_search",
+        providers: readArray(requestArgs?.providers).length ? readArray(requestArgs?.providers) : undefined,
+        limit: requestArgs?.limit ?? requestArgs?.max_results ?? requestArgs?.maxResults,
+        scholarly_recovery_attempt: recoveryAttempt + 1,
+        previous_scholarly_query: currentQuery ?? null,
+        allow_scholarly_dependent_chain: requestArgs?.allow_scholarly_dependent_chain === true,
+        ...(scholarlyIntent ? { scholarly_intent: scholarlyIntent } : {}),
+        ...(plannedScholarlyCapabilityChain ? { planned_scholarly_capability_chain: plannedScholarlyCapabilityChain } : {}),
+        source_target_intent: {
+          source: "helix_scholarly_recovery_planner",
+          target_source: "scholarly_research",
+          target_kind: "research_paper_search_retry",
+          subgoal_id: `scholarly_recovery:lookup_retry:${recoveryAttempt + 1}`,
+          depends_on_capability_id: input.result.capability_id,
+          dependency_binding: "weak_lookup_to_refined_query",
+          previous_query: currentQuery ?? null,
+          recovery_query: retryQuery,
+          recovery_attempt: recoveryAttempt + 1,
+          required_observation_kind: "helix.scholarly_research_observation.v1",
+          ...(scholarlyIntent ? { scholarly_intent: scholarlyIntent } : {}),
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    };
+  }
+  if (
+    (outcome === RESEARCH_QUANTIFY_REFLECT_OUTCOME || outcome === SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME) &&
     input.result.capability_id === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY &&
     input.result.ok === true
   ) {
@@ -2220,24 +2344,33 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
     const requestArgs = readRecord(input.request.arguments);
     const variableSourcePlan = readRecord(requestArgs?.variable_source_plan);
     const sourceRequirementPlan = readRecord(requestArgs?.source_requirement_plan);
+    const scholarlyIntent = readRecord(requestArgs?.scholarly_intent);
+    const requestedWorkflow = readString(scholarlyIntent?.requested_workflow);
     if (requestArgs?.allow_scholarly_dependent_chain !== true) return null;
     const query = readString(observation?.query) ?? readString(requestArgs?.query) ?? "paper full text";
-    const relevanceGate = attachScholarlyLookupRelevanceGate({
-      result: input.result,
-      papers,
-      query,
-      variableSourcePlan,
-    });
-    const selectedPaper = papers.find((paper) =>
-      readString(paper.result_id) === readString(relevanceGate.selected_result_id)
-    );
-    if (relevanceGate.status !== "satisfied" || !selectedPaper) return null;
+    const selectedPaper = outcome === SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME
+      ? papers[0]
+      : papers.find((paper) =>
+          readString(paper.result_id) === readString(attachScholarlyLookupRelevanceGate({
+            result: input.result,
+            papers,
+            query,
+            variableSourcePlan,
+          }).selected_result_id)
+        );
+    if (!selectedPaper) return null;
     if (!firstPaper) return null;
+    const fullTextSubgoalId = outcome === SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME
+      ? `${SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME}:scholarly_full_text`
+      : `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:scholarly_full_text`;
+    const evidenceSubgoalId = outcome === SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME
+      ? `${SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME}:scholarly_evidence`
+      : `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:scholarly_evidence`;
     return {
       schema: "helix.workstation_gateway.compound_dependency_bound_call_request.v1",
       derivation_source: "helix_compound_capability_dependency_planner",
-      compound_outcome: RESEARCH_QUANTIFY_REFLECT_OUTCOME,
-      subgoal_id: `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:scholarly_full_text`,
+      compound_outcome: outcome,
+      subgoal_id: fullTextSubgoalId,
       capability_id: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
       mode: "read",
       arguments: {
@@ -2245,6 +2378,8 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
         papers,
         paper: selectedPaper,
         paper_result_id: readString(selectedPaper.result_id) ?? paperResultId,
+        ...(scholarlyIntent ? { scholarly_intent: scholarlyIntent } : {}),
+        ...(requestedWorkflow ? { requested_workflow: requestedWorkflow } : {}),
         requested_variables: readArray(requestArgs?.requested_variables)
           .map(readString)
           .filter((entry): entry is string => Boolean(entry)),
@@ -2256,15 +2391,17 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
           source: "helix_compound_capability_dependency_planner",
           target_source: "scholarly_research",
           target_kind: "scholarly_full_text",
-          compound_outcome: RESEARCH_QUANTIFY_REFLECT_OUTCOME,
-          subgoal_id: `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:scholarly_full_text`,
-          depends_on_subgoal_id: `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:scholarly_evidence`,
+          compound_outcome: outcome,
+          subgoal_id: fullTextSubgoalId,
+          depends_on_subgoal_id: evidenceSubgoalId,
           depends_on_capability_id: input.result.capability_id,
           dependency_binding: "source_ref_to_full_text",
           required_observation_kind: "helix.scholarly_full_text_observation.v1",
           required_affordance_kinds: ["source_ref", "citation_evidence"],
           produced_affordance_kind: "text_evidence",
           source_refs: input.result.observation_packet.produced_artifact_refs,
+          ...(scholarlyIntent ? { scholarly_intent: scholarlyIntent } : {}),
+          ...(requestedWorkflow ? { requested_workflow: requestedWorkflow } : {}),
           ...(variableSourcePlan ? { variable_source_plan: variableSourcePlan } : {}),
           ...(sourceRequirementPlan ? { source_requirement_plan: sourceRequirementPlan } : {}),
           terminal_eligible: false,
@@ -2275,7 +2412,7 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
     };
   }
   if (
-    outcome === RESEARCH_QUANTIFY_REFLECT_OUTCOME &&
+    (outcome === RESEARCH_QUANTIFY_REFLECT_OUTCOME || outcome === SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME) &&
     input.result.capability_id === SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY &&
     input.result.ok === true
   ) {
@@ -2283,6 +2420,15 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
     const requestArgs = readRecord(input.request.arguments);
     const variableSourcePlan = readRecord(requestArgs?.variable_source_plan);
     const sourceRequirementPlan = readRecord(requestArgs?.source_requirement_plan);
+    const scholarlyIntent = readRecord(requestArgs?.scholarly_intent);
+    const requestedWorkflow = readString(scholarlyIntent?.requested_workflow) ?? readString(requestArgs?.requested_workflow);
+    if (
+      outcome === SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME &&
+      requestedWorkflow !== "numeric_extraction" &&
+      requestedWorkflow !== "numeric_calculation"
+    ) {
+      return null;
+    }
     const carriedVariables = readArray(requestArgs?.requested_variables)
       .map(readString)
       .filter((entry): entry is string => Boolean(entry));
@@ -2297,14 +2443,16 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
     return {
       schema: "helix.workstation_gateway.compound_dependency_bound_call_request.v1",
       derivation_source: "helix_compound_capability_dependency_planner",
-      compound_outcome: RESEARCH_QUANTIFY_REFLECT_OUTCOME,
-      subgoal_id: `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:numeric_parameters`,
+      compound_outcome: outcome,
+      subgoal_id: `${outcome}:numeric_parameters`,
       capability_id: SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
       mode: "read",
       arguments: {
         requested_variables: requestedVariables,
         full_text_observation: input.result.observation,
         source_ref: input.result.observation_packet.produced_artifact_refs[0],
+        ...(scholarlyIntent ? { scholarly_intent: scholarlyIntent } : {}),
+        ...(requestedWorkflow ? { requested_workflow: requestedWorkflow } : {}),
         ...(variableSourcePlan ? { variable_source_plan: variableSourcePlan } : {}),
         ...(sourceRequirementPlan ? { source_requirement_plan: sourceRequirementPlan } : {}),
         source: "helix_compound_capability_dependency_planner",
@@ -2313,15 +2461,17 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
           source: "helix_compound_capability_dependency_planner",
           target_source: "scholarly_research",
           target_kind: "numeric_parameter_extraction",
-          compound_outcome: RESEARCH_QUANTIFY_REFLECT_OUTCOME,
-          subgoal_id: `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:numeric_parameters`,
-          depends_on_subgoal_id: `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:scholarly_full_text`,
+          compound_outcome: outcome,
+          subgoal_id: `${outcome}:numeric_parameters`,
+          depends_on_subgoal_id: `${outcome}:scholarly_full_text`,
           depends_on_capability_id: input.result.capability_id,
           dependency_binding: "text_evidence_to_numeric_value_evidence",
           required_observation_kind: "helix.scholarly_numeric_parameter_observation.v1",
           required_affordance_kinds: ["text_evidence", "citation_evidence"],
           produced_affordance_kind: "numeric_value_evidence",
           requested_variables: requestedVariables,
+          ...(scholarlyIntent ? { scholarly_intent: scholarlyIntent } : {}),
+          ...(requestedWorkflow ? { requested_workflow: requestedWorkflow } : {}),
           ...(variableSourcePlan ? {
             variable_source_plan: variableSourcePlan,
             source_classes: readArray(variableSourcePlan.entries)

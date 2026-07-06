@@ -1,10 +1,13 @@
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
+import type { HelixLanguageModelProfileId } from "@shared/helix-language-model-policy";
 import type { HelixAskContextBridgeSnapshot } from "./HelixAskContextBridge";
 
 export type HelixAskConsoleRequestEnvelope = {
   question: string;
   agentRuntime: HelixAgentRuntimeId;
   agent_runtime: HelixAgentRuntimeId;
+  languageModelProfile?: HelixLanguageModelProfileId;
+  language_model_profile?: HelixLanguageModelProfileId;
   doc_path?: string;
 };
 
@@ -56,6 +59,7 @@ export function buildHelixAskConsoleContextFiles(args: {
 export function buildHelixAskConsoleRequestEnvelope(args: {
   question: string;
   agentRuntime: HelixAgentRuntimeId;
+  languageModelProfile?: HelixLanguageModelProfileId;
   context: HelixAskContextBridgeSnapshot;
 }): HelixAskConsoleRequestEnvelope {
   const envelope: HelixAskConsoleRequestEnvelope = {
@@ -63,6 +67,10 @@ export function buildHelixAskConsoleRequestEnvelope(args: {
     agentRuntime: args.agentRuntime,
     agent_runtime: args.agentRuntime,
   };
+  if (args.languageModelProfile) {
+    envelope.languageModelProfile = args.languageModelProfile;
+    envelope.language_model_profile = args.languageModelProfile;
+  }
   if (args.context.activeDocPath) envelope.doc_path = args.context.activeDocPath;
   return envelope;
 }
@@ -70,6 +78,7 @@ export function buildHelixAskConsoleRequestEnvelope(args: {
 export function buildHelixAskConsoleBackendTurnPayloadCore(args: {
   sessionId?: string | null;
   agentRuntime: HelixAgentRuntimeId;
+  languageModelProfile?: HelixLanguageModelProfileId;
   traceId: string;
   turnId: string;
   maxTokens: number;
@@ -84,6 +93,12 @@ export function buildHelixAskConsoleBackendTurnPayloadCore(args: {
     sessionId: args.sessionId ?? undefined,
     agentRuntime: args.agentRuntime,
     agent_runtime: args.agentRuntime,
+    ...(args.languageModelProfile
+      ? {
+          languageModelProfile: args.languageModelProfile,
+          language_model_profile: args.languageModelProfile,
+        }
+      : {}),
     traceId: args.traceId,
     turnId: args.turnId,
     maxTokens: args.maxTokens,

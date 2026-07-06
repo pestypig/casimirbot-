@@ -8,6 +8,7 @@ import {
   type HelixScholarlyFullTextObservation,
   type HelixScholarlyFullTextPage,
   type HelixScholarlyFullTextSourceKind,
+  type HelixScholarlyNextAffordance,
   type HelixScholarlyPaperResult,
   type HelixScholarlyPdfVisualCandidate,
 } from "@shared/helix-scholarly-research-observation";
@@ -360,6 +361,30 @@ const pageRefsFor = (input: {
     };
   });
 
+const buildFullTextNextAffordances = (input: {
+  sourceRef?: string;
+  paperResultId?: string;
+  visualCandidates: HelixScholarlyPdfVisualCandidate[];
+  query: string;
+  reason: "page_image_parse_required" | "full_text_unavailable";
+}): HelixScholarlyNextAffordance[] => {
+  if (input.reason === "page_image_parse_required") {
+    return input.visualCandidates.slice(0, 3).map((candidate) => ({
+      capability: "visual_analysis.inspect_image_region",
+      reason: candidate.reason || "page_image_parse_required",
+      source_ref: input.sourceRef ? `${input.sourceRef}/page/${candidate.page}` : undefined,
+      paper_result_id: input.paperResultId,
+      query: input.query,
+    }));
+  }
+  return [{
+    capability: HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+    reason: "full_text_unavailable",
+    paper_result_id: input.paperResultId,
+    query: input.query,
+  }];
+};
+
 export async function runScholarlyFullTextFetch(
   input: RunScholarlyFullTextFetchInput,
 ): Promise<HelixScholarlyFullTextObservation> {
@@ -433,6 +458,25 @@ export async function runScholarlyFullTextFetch(
   if (pages.length > 0 && selectedChunks.length === 0) {
     missingRequirements.push("no_relevant_full_text_chunks_selected");
   }
+  const visualCandidates = buildVisualCandidates({ pages, query });
+  const lowTextPageImageRequired =
+    visualCandidates.some((candidate) => candidate.reason === "low_text_pdf_page_needs_visual_or_ocr_pass") &&
+    selectedChunks.every((chunk) => chunk.text_excerpt.length < 80);
+  const evidenceState = selectedChunks.length > 0 && !lowTextPageImageRequired
+    ? "full_text_usable"
+    : visualCandidates.length > 0
+      ? "page_image_parse_required"
+      : "full_text_unavailable";
+  if (evidenceState === "page_image_parse_required") {
+    missingRequirements.push("page_image_parse_required");
+  }
+  const nextAffordances = buildFullTextNextAffordances({
+    sourceRef: sourcePdfRef,
+    paperResultId: paper?.result_id,
+    visualCandidates,
+    query,
+    reason: evidenceState === "page_image_parse_required" ? "page_image_parse_required" : "full_text_unavailable",
+  });
 
   return {
     schema: HELIX_SCHOLARLY_FULL_TEXT_OBSERVATION_SCHEMA,
@@ -451,9 +495,13 @@ export async function runScholarlyFullTextFetch(
     pages_parsed: pages.length,
     page_text_refs: pageTextRefs,
     selected_chunks: selectedChunks,
-    visual_candidates: buildVisualCandidates({ pages, query }),
+    visual_candidates: visualCandidates,
+    evidence_state: evidenceState,
+    next_affordances: evidenceState === "full_text_usable" ? [] : nextAffordances,
     missing_requirements: unique(missingRequirements),
-    selected_for_answer: selectedChunks.length > 0,
+    selected_for_answer: evidenceState === "full_text_usable",
+    terminal_eligible: false,
+    post_tool_model_step_required: true,
     assistant_answer: false,
     raw_content_included: false,
     context_policy: "compact_context_pack_only",

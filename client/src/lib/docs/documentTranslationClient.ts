@@ -22,6 +22,7 @@ import {
 } from "@/lib/agi/api";
 
 export const DOCUMENT_TRANSLATION_REQUEST_TIMEOUT_MS = 60_000;
+export const DOCUMENT_MARKDOWN_TRANSLATION_CONTRACT_VERSION = "target-language-v2";
 export const DOCUMENT_MARKDOWN_TRANSLATION_PRESET_ID =
   "stage_play_micro_reasoner_prompt_preset:document-translate-haw-inline:v1";
 
@@ -155,6 +156,7 @@ export type DocumentMarkdownTranslationEntry = {
   projectionTarget?: string | null;
   targetLanguage?: string | null;
   accountLocale?: string | null;
+  translationContractVersion?: string | null;
 };
 
 export async function requestDocumentTranslation(
@@ -310,6 +312,7 @@ export async function enqueueDocumentMarkdownTranslationMail(params: {
         locale: params.locale,
         targetLanguage,
         accountLocale,
+        translationContractVersion: DOCUMENT_MARKDOWN_TRANSLATION_CONTRACT_VERSION,
         sourceHash: params.sourceHash,
         sourceTextHash: params.sourceTextHash ?? null,
         sourceTextCharCount: params.sourceTextCharCount ?? null,
@@ -700,6 +703,13 @@ export function extractDocumentMarkdownTranslationsFromRuns(
     );
     const targetLanguage = readFirstString(parsed, ["targetLanguage", "target_language", "locale"]) ?? null;
     const accountLocale = readFirstString(parsed, ["accountLocale", "account_locale", "locale"]) ?? null;
+    const translationContractVersion =
+      readFirstString(parsed, [
+        "translationContractVersion",
+        "translation_contract_version",
+        "documentTranslationContractVersion",
+        "document_translation_contract_version",
+      ]) ?? null;
     const projectionMeta = {
       source: "document_microdeck" as const,
       ...(sourceKind ? { sourceKind } : {}),
@@ -747,6 +757,7 @@ export function extractDocumentMarkdownTranslationsFromRuns(
       ...(projectionTarget ? { projectionTarget } : {}),
       ...(targetLanguage ? { targetLanguage } : {}),
       ...(accountLocale ? { accountLocale } : {}),
+      ...(translationContractVersion ? { translationContractVersion } : {}),
     };
     for (const item of translations) {
       const record = readRecord(item);

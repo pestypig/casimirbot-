@@ -21,12 +21,12 @@ export type HelixWorkstationCapabilityManifest = {
   dynamic_panel_id_arg?: string | null;
   allowed_panel_ids?: string[];
   mode: HelixWorkstationGatewayMode;
-  mutating: false;
+  mutating: boolean;
   code_mutation: false;
   shell_access: false;
   requires_confirmation: boolean;
   requires_source: boolean;
-  terminal_eligible: false;
+  terminal_eligible: boolean;
   permission_profile_required: "observe" | "read" | "act" | "write" | "danger";
   post_tool_model_step_required: true;
   input_schema: Record<string, unknown>;
@@ -93,7 +93,7 @@ export type HelixWorkstationGatewayCallResult = {
   artifact_refs: string[];
   produced_affordances?: HelixWorkstationTypedAffordance[];
   consumed_affordances?: HelixWorkstationTypedAffordance[];
-  terminal_eligible: false;
+  terminal_eligible: boolean;
   post_tool_model_step_required: true;
   assistant_answer: false;
   raw_content_included: false;

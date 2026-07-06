@@ -218,10 +218,26 @@ export function formatHelixAskFinalReceiptMeta(parts: Array<string | null | unde
     .join(" | ");
 }
 
+export function resolveHelixAskLanguageModelPolicySummary(response: unknown): string | null {
+  const record = readRecord(response);
+  const debug = readRecord(record?.debug);
+  const agentLoop = readRecord(record?.agent_loop ?? record?.agentLoop ?? debug?.agent_loop ?? debug?.agentLoop);
+  return (
+    coerceModelMetadataText(record?.language_model_debug_summary) ||
+    coerceModelMetadataText(debug?.language_model_debug_summary) ||
+    coerceModelMetadataText(agentLoop?.language_model_debug_summary) ||
+    coerceModelMetadataText(record?.model_policy_debug_summary) ||
+    coerceModelMetadataText(debug?.model_policy_debug_summary) ||
+    coerceModelMetadataText(agentLoop?.model_policy_debug_summary) ||
+    null
+  );
+}
+
 export function resolveHelixAskActualAgentProviderLabel(
   response: unknown,
   fallbackProviders: HelixAgentRuntimeDescriptor[] = DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS,
 ): string | null {
+  if (resolveHelixAskLanguageModelPolicySummary(response)) return null;
   const record = readRecord(response);
   const debug = readRecord(record?.debug);
   const selectedProvider =
@@ -397,6 +413,8 @@ function collectRuntimeLoopModels(value: unknown): string[] {
 }
 
 export function resolveHelixAskModelUsageLabel(response: unknown): string | null {
+  const languageModelPolicySummary = resolveHelixAskLanguageModelPolicySummary(response);
+  if (languageModelPolicySummary) return languageModelPolicySummary;
   const record = readRecord(response);
   const debug = readRecord(record?.debug);
   const agentLoop = readRecord(record?.agent_loop ?? record?.agentLoop ?? debug?.agent_loop ?? debug?.agentLoop);

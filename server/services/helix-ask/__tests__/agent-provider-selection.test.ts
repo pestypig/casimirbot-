@@ -31,6 +31,7 @@ import {
   runExplicitWorkstationGatewayCalls,
 } from "../agent-providers/explicit-workstation-gateway";
 import { buildCompoundCapabilityDependencyGatewayCallRequests } from "../agent-providers/provider-compound-capability-planner";
+import { extractScholarlyIntent } from "../scholarly-research-intent";
 import { buildHelixProviderReasoningReentry } from "../agent-providers/provider-terminal-authority";
 import { buildArtifactQueryIndex } from "../artifact-query-index";
 import { refreshToolLifecycleRecords } from "../tool-lifecycle-trace";
@@ -146,6 +147,11 @@ describe("Helix Ask agent provider selection", () => {
             requested_capability: "scholarly-research.lookup_papers",
             admission_reason: "admitted",
           },
+          observation: {
+            schema: "helix.scholarly_research_observation.v1",
+            evidence_state: "lookup_usable",
+            selected_for_answer: true,
+          },
         },
         {
           ok: true,
@@ -153,6 +159,11 @@ describe("Helix Ask agent provider selection", () => {
           gateway_admission: {
             requested_capability: "scholarly-research.fetch_full_text",
             admission_reason: "admitted",
+          },
+          observation: {
+            schema: "helix.scholarly_full_text_observation.v1",
+            evidence_state: "full_text_usable",
+            selected_for_answer: true,
           },
         },
         {
@@ -836,8 +847,8 @@ describe("Helix Ask agent provider selection", () => {
         "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
         "<entry>",
         "<id>https://arxiv.org/abs/2606.00001</id>",
-        "<title>Quantum inequalities for warp constraints</title>",
-        "<summary>Bounded abstract about QEI and warp metrics.</summary>",
+        "<title>Current NHM2 document calculate search arXiv quantum inequalities warp constraints QEI margin theory badge civilization bounds paper evidence</title>",
+        "<summary>Scholarly paper evidence summarizes quantum inequalities, warp constraints, QEI margin, theory badge reflection, and civilization bounds.</summary>",
         "<published>2026-06-01T00:00:00Z</published>",
         "<author><name>A. Researcher</name></author>",
         "</entry>",
@@ -856,8 +867,13 @@ describe("Helix Ask agent provider selection", () => {
         capability_id: "scholarly-research.lookup_papers",
         mode: "read",
         arguments: expect.objectContaining({
-          query: body.question,
+          query: "arXiv quantum inequalities warp constraints",
           mode: "paper_search",
+          scholarly_intent: expect.objectContaining({
+            schema: "helix.scholarly_intent.v1",
+            scholarly_query: "arXiv quantum inequalities warp constraints",
+            requested_workflow: "metadata_search",
+          }),
           source_target_intent: expect.objectContaining({
             target_kind: "research_paper_search",
           }),
@@ -884,6 +900,654 @@ describe("Helix Ask agent provider selection", () => {
     )).toBe(true);
   });
 
+  it("extracts scholarly topic and workflow before lookup planning", () => {
+    expect(extractScholarlyIntent(
+      'Search scholarly research papers for "weyl curvature" and summarize the paper evidence.',
+    )).toMatchObject({
+      schema: "helix.scholarly_intent.v1",
+      scholarly_query: "weyl curvature",
+      quoted_topic: "weyl curvature",
+      requested_workflow: "metadata_search",
+      terminal_evidence_requirement: "metadata",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+
+    expect(extractScholarlyIntent(
+      "Find a paper on Weyl curvature in general relativity, fetch full text if available, and summarize only from fetched text.",
+    )).toMatchObject({
+      scholarly_query: "Weyl curvature general relativity",
+      requested_workflow: "full_text_summary",
+      requires_full_text: true,
+      terminal_evidence_requirement: "full_text",
+    });
+
+    expect(extractScholarlyIntent(
+      "Find a scholarly paper with numeric Weyl-curvature invariants for spacetime, extract reported numeric parameters with units, then calculate only if those cited values are available.",
+    )).toMatchObject({
+      scholarly_query: "Weyl-curvature invariants spacetime",
+      requested_workflow: "numeric_calculation",
+      requires_numeric_extraction: true,
+      requires_calculation: true,
+      terminal_evidence_requirement: "calculation_from_numeric_values",
+    });
+  });
+
+  it("plans scholarly full-text and numeric workflows from extracted intent", () => {
+    const fullTextBody = {
+      turn_id: "ask:test:scholarly-full-text-workflow-plan",
+      agent_runtime: "codex",
+      question: "Find a paper on Weyl curvature in general relativity, fetch full text if available, and summarize only from fetched text.",
+    };
+    const fullTextPlan = buildCompoundCapabilityDependencyGatewayCallRequests(fullTextBody);
+    expect(fullTextPlan.map((request) => (request as any).capability_id)).toEqual([
+      "scholarly-research.lookup_papers",
+    ]);
+    expect((fullTextPlan[0] as any).arguments.query).toBe("Weyl curvature general relativity");
+    expect((fullTextPlan[0] as any).arguments.planned_scholarly_capability_chain).toMatchObject({
+      planned_capabilities: [
+        "scholarly-research.lookup_papers",
+        "scholarly-research.fetch_full_text",
+      ],
+      terminal_evidence_requirement: "full_text",
+    });
+
+    const numericBody = {
+      turn_id: "ask:test:scholarly-numeric-workflow-plan",
+      agent_runtime: "codex",
+      question: "Find a scholarly paper with numeric Weyl-curvature invariants for spacetime, extract reported numeric parameters with units, then calculate only if those cited values are available.",
+    };
+    const numericPlan = buildCompoundCapabilityDependencyGatewayCallRequests(numericBody);
+    expect(numericPlan.map((request) => (request as any).capability_id)).toEqual([
+      "scholarly-research.lookup_papers",
+    ]);
+    expect((numericPlan[0] as any).arguments.query).toBe("Weyl-curvature invariants spacetime");
+    expect((numericPlan[0] as any).arguments.planned_scholarly_capability_chain).toMatchObject({
+      planned_capabilities: [
+        "scholarly-research.lookup_papers",
+        "scholarly-research.fetch_full_text",
+        "scholarly-research.extract_numeric_parameters",
+        "scientific-calculator.solve_expression",
+      ],
+      calculator_requires_numeric_evidence: true,
+      terminal_evidence_requirement: "calculation_from_numeric_values",
+    });
+    expect(numericPlan.map((request) => (request as any).capability_id)).not.toContain("scientific-calculator.solve_expression");
+  });
+
+  it("returns scholarly numeric missing instead of terminal_authority_missing for numeric paper prompts without numeric evidence", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "I could not complete that turn.\nCause: terminal_authority_missing.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+        "<entry>",
+        "<id>https://arxiv.org/abs/2209.08283</id>",
+        "<title>Detecting Generated Scientific Papers using an Ensemble of Transformer Models</title>",
+        "<summary>Generated scientific paper detection with transformer models.</summary>",
+        "<published>2022-09-18T00:00:00Z</published>",
+        "<author><name>A. Classifier</name></author>",
+        "</entry>",
+        "</feed>",
+      ].join(""),
+    })) as typeof fetch;
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-numeric-missing-terminal-mode",
+        agent_runtime: "codex",
+        question: "Find a scholarly paper with numeric Weyl-curvature invariants for spacetime, extract reported numeric parameters with units, then calculate only if those cited values are available.",
+      },
+      headers: {},
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.text).toContain("needs numeric values from full-text paper evidence");
+    expect(result.text).not.toContain("terminal_authority_missing");
+    expect((result as any).terminal_artifact_kind).toBe("scholarly_numeric_missing");
+    expect((result.debug as any)?.scholarly_response_mode_selection).toMatchObject({
+      selected_response_mode: "scholarly_numeric_missing",
+      requested_workflow: "numeric_calculation",
+      terminal_evidence_requirement: "calculation_from_numeric_values",
+    });
+    expect((result.debug as any)?.planned_scholarly_capability_chain).toMatchObject({
+      planned_capabilities: expect.arrayContaining([
+        "scholarly-research.lookup_papers",
+        "scholarly-research.fetch_full_text",
+        "scholarly-research.extract_numeric_parameters",
+        "scientific-calculator.solve_expression",
+      ]),
+      calculator_requires_numeric_evidence: true,
+    });
+  });
+
+  it("retries recoverable weak scholarly lookups with a refined original-paper query before terminalizing", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "The first Casimir-effect paper lookup was recovered from metadata evidence.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    const seenUrls: string[] = [];
+    globalThis.fetch = vi.fn(async (url) => {
+      const urlText = String(url);
+      seenUrls.push(urlText);
+      const decoded = decodeURIComponent(urlText);
+      const exactCasimir = /Attraction Between Two Perfectly Conducting Plates|original Casimir effect paper|Kon\. Ned\. Akad\. Wet/i.test(decoded);
+      return {
+        ok: true,
+        status: 200,
+        text: async () => [
+          "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+          "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+          "<entry>",
+          exactCasimir
+            ? "<id>https://arxiv.org/abs/physics/9907001</id>"
+            : "<id>https://arxiv.org/abs/1007.0966</id>",
+          exactCasimir
+            ? "<title>On the Attraction Between Two Perfectly Conducting Plates</title>"
+            : "<title>Numerical methods for computing Casimir interactions</title>",
+          exactCasimir
+            ? "<summary>H. B. G. Casimir's 1948 paper on the attraction between perfectly conducting plates and the Casimir effect.</summary>"
+            : "<summary>Numerical methods for later Casimir interaction calculations.</summary>",
+          exactCasimir
+            ? "<published>1948-01-01T00:00:00Z</published>"
+            : "<published>2010-07-06T00:00:00Z</published>",
+          exactCasimir
+            ? "<author><name>H. B. G. Casimir</name></author>"
+            : "<author><name>Steven G. Johnson</name></author>",
+          "</entry>",
+          "</feed>",
+        ].join(""),
+      };
+    }) as typeof fetch;
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-original-paper-retry",
+        agent_runtime: "codex",
+        question: "find the original research paper of the casimir effect by hendrik casimir",
+      },
+      headers: {},
+    });
+
+    expect(seenUrls.some((url) =>
+      /On%20the%20Attraction%20Between%20Two%20Perfectly%20Conducting%20Plates|On\\+the\\+Attraction\\+Between\\+Two\\+Perfectly\\+Conducting\\+Plates/i.test(url)
+    )).toBe(true);
+    expect((result.debug as any)?.workstation_gateway_call_results?.filter((entry: any) =>
+      entry.capability_id === "scholarly-research.lookup_papers"
+    )).toHaveLength(2);
+    expect(result.ok).toBe(true);
+    expect((result as any).terminal_artifact_kind).toBe("scholarly_metadata_answer");
+    expect(result.text).toContain("On the Attraction Between Two Perfectly Conducting Plates");
+    expect(result.text).toContain("retried after a weak first lookup");
+    expect(result.text).not.toContain("Numerical methods for computing Casimir interactions");
+    expect((result.debug as any)?.scholarly_response_mode_selection).toMatchObject({
+      selected_response_mode: "scholarly_metadata_answer",
+      selected_for_answer: true,
+      evidence_state: "lookup_usable",
+      recovery_attempts: expect.arrayContaining([
+        expect.objectContaining({ evidence_state: "lookup_weak_match", ordinal: 1 }),
+        expect.objectContaining({ evidence_state: "lookup_usable", ordinal: 2 }),
+      ]),
+    });
+  });
+
+  it("does not promote later Casimir papers to answer-grade evidence for original-paper requests", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "The first Casimir-effect paper lookup was recovered from metadata evidence.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+        "<entry>",
+        "<id>https://arxiv.org/abs/physics/9907001</id>",
+        "<title>Casimir effect between two conducting plates</title>",
+        "<summary>A later Physical Review A paper discussing the Casimir effect between two conducting plates.</summary>",
+        "<published>1999-01-01T00:00:00Z</published>",
+        "<author><name>Reza Matloob</name></author>",
+        "</entry>",
+        "<entry>",
+        "<id>https://arxiv.org/abs/1804.00001</id>",
+        "<title>Casimir forces on a bi-anisotropic absorbing magneto-dielectric slab between two parallel conducting plates</title>",
+        "<summary>A later paper on Casimir forces involving conducting plates.</summary>",
+        "<published>2018-01-01T00:00:00Z</published>",
+        "<author><name>Majid Amooshahi</name></author>",
+        "</entry>",
+        "</feed>",
+      ].join(""),
+    })) as typeof fetch;
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-original-paper-rejects-later-casimir",
+        agent_runtime: "codex",
+        question: "ok fetch the first research paper of the Casimir effect by Henrik Casimir",
+      },
+      headers: {},
+    });
+
+    expect(result.ok).toBe(true);
+    expect((result as any).terminal_artifact_kind).not.toBe("scholarly_metadata_answer");
+    expect((result as any).terminal_artifact_kind).toBe("scholarly_recovery_plan");
+    expect(result.text).toContain("asked for full-text evidence");
+    expect(result.text).toContain("Evidence state: lookup_weak_match");
+    expect((result.debug as any)?.scholarly_response_mode_selection).toMatchObject({
+      selected_for_answer: false,
+      evidence_state: "lookup_weak_match",
+      selected_response_mode: "scholarly_recovery_plan",
+    });
+    const lookupCalls = (result.debug as any)?.workstation_gateway_call_results?.filter((entry: any) =>
+      entry.capability_id === "scholarly-research.lookup_papers"
+    );
+    expect(lookupCalls.length).toBeGreaterThanOrEqual(2);
+    expect(lookupCalls.length).toBeLessThanOrEqual(3);
+  });
+
+  it("re-enters prior scholarly metadata evidence for paper follow-up prompts", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Scholarly metadata evidence is available.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+        "<entry>",
+        "<id>https://arxiv.org/abs/2606.00003</id>",
+        "<title>Weyl tensor conformal curvature in general relativity</title>",
+        "<summary>This paper discusses Weyl tensor conformal curvature in general relativity.</summary>",
+        "<published>2026-06-03T00:00:00Z</published>",
+        "<author><name>A. Relativist</name></author>",
+        "</entry>",
+        "</feed>",
+      ].join(""),
+    })) as typeof fetch;
+
+    const threadId = "thread:test:scholarly-followup-metadata";
+    await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-followup-metadata:first",
+        thread_id: threadId,
+        agent_runtime: "codex",
+        question: "Search scholarly research papers for Weyl tensor conformal curvature in general relativity.",
+      },
+      headers: {},
+    });
+
+    process.env.CODEX_AGENT_FAKE_STDOUT =
+      "Using the re-entered prior scholarly metadata: this is a metadata-level paper record, not fetched full text.";
+    const followup = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-followup-metadata:second",
+        thread_id: threadId,
+        agent_runtime: "codex",
+        question: "tell me about the paper you found",
+      },
+      headers: {},
+    });
+
+    expect(followup.ok).toBe(true);
+    expect(followup.text).toContain("metadata-level paper record");
+    expect((followup.debug as any)?.scholarly_followup_evidence_lookup).toMatchObject({
+      status: "found",
+      followup_reference_detected: true,
+    });
+    expect((followup.debug as any)?.evidence_reentry_status).toBe("reentered_prior_scholarly_evidence");
+    expect((followup.debug as any)?.prior_scholarly_evidence_observation_packet).toMatchObject({
+      capability_key: "scholarly-research.prior_evidence_recall",
+      status: "succeeded",
+    });
+    expect((followup as any).terminal_presentation?.selected_observation_refs?.length).toBeGreaterThan(0);
+  });
+
+  it("keeps weak prior scholarly evidence as caveated follow-up context", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Weak Casimir lookup returned nearby candidates only.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+        "<entry>",
+        "<id>https://arxiv.org/abs/physics/9907001</id>",
+        "<title>Casimir effect between two conducting plates</title>",
+        "<summary>A later paper discussing the Casimir effect between two conducting plates.</summary>",
+        "<published>1999-01-01T00:00:00Z</published>",
+        "<author><name>Reza Matloob</name></author>",
+        "</entry>",
+        "</feed>",
+      ].join(""),
+    })) as typeof fetch;
+
+    const threadId = "thread:test:scholarly-followup-weak";
+    await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-followup-weak:first",
+        thread_id: threadId,
+        agent_runtime: "codex",
+        question: "ok fetch the first research paper of the Casimir effect by Henrik Casimir",
+      },
+      headers: {},
+    });
+
+    process.env.CODEX_AGENT_FAKE_STDOUT =
+      "The prior Casimir evidence was exploratory, so I can explain the general Casimir effect but not claim this was the original paper.";
+    const followup = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-followup-weak:second",
+        thread_id: threadId,
+        agent_runtime: "codex",
+        question: "no i mean tell me about the casimir effect that you found the paper for ?",
+      },
+      headers: {},
+    });
+
+    expect(followup.ok).toBe(true);
+    expect(followup.text).toContain("exploratory");
+    expect((followup.debug as any)?.scholarly_followup_evidence_lookup).toMatchObject({
+      status: "found",
+      followup_reference_detected: true,
+    });
+    expect((followup.debug as any)?.prior_scholarly_evidence_memory_record).toMatchObject({
+      evidence_grade: "exploratory",
+    });
+    expect((followup.debug as any)?.evidence_reentry_status).toBe("reentered_prior_scholarly_evidence");
+  });
+
+  it("blocks numeric scholarly follow-ups when prior evidence is metadata-only", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Scholarly metadata evidence is available.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+        "<entry>",
+        "<id>https://arxiv.org/abs/2606.00004</id>",
+        "<title>Casimir effect between conducting plates</title>",
+        "<summary>Metadata about a Casimir effect paper.</summary>",
+        "<published>2026-06-04T00:00:00Z</published>",
+        "<author><name>A. Physicist</name></author>",
+        "</entry>",
+        "</feed>",
+      ].join(""),
+    })) as typeof fetch;
+
+    const threadId = "thread:test:scholarly-followup-numeric";
+    await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-followup-numeric:first",
+        thread_id: threadId,
+        agent_runtime: "codex",
+        question: "Search scholarly research papers for Casimir effect between conducting plates.",
+      },
+      headers: {},
+    });
+
+    process.env.CODEX_AGENT_FAKE_STDOUT = "It measured plate separation of 1 nm.";
+    const followup = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-followup-numeric:second",
+        thread_id: threadId,
+        agent_runtime: "codex",
+        question: "what numbers did it measure?",
+      },
+      headers: {},
+    });
+
+    expect(followup.text).toContain("needs fetched full text and numeric-parameter extraction");
+    expect(followup.text).not.toContain("1 nm");
+    expect((followup as any).terminal_artifact_kind).toBe("scholarly_numeric_missing");
+    expect((followup.debug as any)?.scholarly_response_mode_selection).toMatchObject({
+      selected_response_mode: "scholarly_numeric_missing",
+      selected_for_answer: false,
+    });
+  });
+
+  it("chooses the most recent compatible scholarly record for ambiguous follow-ups with provenance", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "First scholarly metadata evidence is available.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    const threadId = "thread:test:scholarly-followup-ambiguous";
+
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+        "<entry>",
+        "<id>https://arxiv.org/abs/2606.00005</id>",
+        "<title>Weyl tensor conformal curvature in general relativity</title>",
+        "<summary>Metadata about Weyl tensor conformal curvature in general relativity.</summary>",
+        "<published>2026-06-05T00:00:00Z</published>",
+        "<author><name>A. Relativist</name></author>",
+        "</entry>",
+        "</feed>",
+      ].join(""),
+    })) as typeof fetch;
+
+    await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-followup-ambiguous:first",
+        thread_id: threadId,
+        agent_runtime: "codex",
+        question: "Search scholarly research papers for Weyl tensor conformal curvature in general relativity.",
+      },
+      headers: {},
+    });
+
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Second scholarly metadata evidence is available.";
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+        "<entry>",
+        "<id>https://arxiv.org/abs/2606.00006</id>",
+        "<title>Casimir effect between conducting plates</title>",
+        "<summary>Metadata about the Casimir effect between conducting plates.</summary>",
+        "<published>2026-06-06T00:00:00Z</published>",
+        "<author><name>A. Physicist</name></author>",
+        "</entry>",
+        "</feed>",
+      ].join(""),
+    })) as typeof fetch;
+
+    await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-followup-ambiguous:second",
+        thread_id: threadId,
+        agent_runtime: "codex",
+        question: "Search scholarly research papers for Casimir effect between conducting plates.",
+      },
+      headers: {},
+    });
+
+    process.env.CODEX_AGENT_FAKE_STDOUT =
+      "Using the re-entered prior scholarly metadata for the most recent compatible paper.";
+    const followup = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-followup-ambiguous:third",
+        thread_id: threadId,
+        agent_runtime: "codex",
+        question: "tell me about the paper you found",
+      },
+      headers: {},
+    });
+
+    expect(followup.ok).toBe(true);
+    expect(followup.text).toContain("most recent compatible paper");
+    expect((followup.debug as any)?.scholarly_followup_evidence_lookup).toMatchObject({
+      status: "found",
+      candidate_count: 2,
+      resolution_reason: "selected_most_recent_compatible_scholarly_evidence",
+      resolution_confidence: "medium",
+    });
+    expect((followup.debug as any)?.prior_scholarly_evidence_memory_record?.query).toContain("Casimir effect");
+    const candidates = (followup.debug as any)?.prior_evidence_memory_candidates?.candidates ?? [];
+    expect(candidates).toHaveLength(2);
+    expect(candidates.filter((candidate: any) => candidate.selected)).toHaveLength(1);
+    expect(candidates.find((candidate: any) => candidate.selected)?.query).toContain("Casimir effect");
+  });
+
+  it("fails closed for scholarly follow-ups when no prior evidence is recoverable", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "The paper said everything was solved.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-followup-missing",
+        thread_id: "thread:test:scholarly-followup-missing",
+        agent_runtime: "codex",
+        question: "tell me about the paper you found",
+      },
+      headers: {},
+    });
+
+    expect(result.text).toContain("no prior scholarly evidence packet was recoverable");
+    expect(result.text).not.toContain("everything was solved");
+    expect((result as any).terminal_artifact_kind).toBe("scholarly_recovery_plan");
+    expect((result.debug as any)?.scholarly_followup_evidence_lookup).toMatchObject({
+      status: "missing",
+      followup_reference_detected: true,
+    });
+  });
+
+  it("preserves weak scholarly lookup evidence and blocks provider terminal authority", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT =
+      "Scholarly search for weyl curvature returned 1 usable paper result.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+        "<entry>",
+        "<id>https://arxiv.org/abs/2606.00002</id>",
+        "<title>SChuBERT scholarly document chunks for citation prediction</title>",
+        "<summary>BERT encodings for scholarly document quality prediction.</summary>",
+        "<published>2026-06-02T00:00:00Z</published>",
+        "<author><name>A. Metadata</name></author>",
+        "</entry>",
+        "</feed>",
+      ].join(""),
+    })) as typeof fetch;
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-scholarly-weak-lookup-provider-path",
+        agent_runtime: "codex",
+        question: "Search scholarly research papers for weyl curvature and summarize the paper evidence.",
+        workstation_gateway_call: {
+          capability_id: "scholarly-research.lookup_papers",
+          mode: "read",
+          arguments: {
+            query: "weyl curvature",
+            providers: ["arxiv"],
+            limit: 1,
+          },
+        },
+      },
+      headers: {},
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.response_type).toBe("final_answer");
+    expect((result as any).terminal_artifact_kind).toBe("scholarly_exploratory_candidates");
+    expect((result as any).final_answer_source).toBe("scholarly_exploratory_candidates");
+    expect(result.text).toContain("found nearby paper records");
+    expect(result.text).toContain("Best nearby candidates");
+    expect(result.text).toContain("SChuBERT scholarly document chunks for citation prediction");
+    expect(result.text).toContain("Evidence state: lookup_weak_match");
+    expect(result.text).toContain("Suggested refined searches");
+    expect(result.text).not.toContain("returned 1 usable paper result");
+    expect((result.debug as any)?.provider_terminal_authority_bridge).toMatchObject({
+      terminal_authority_status: "blocked_by_observation_state",
+      terminal_authority_granted: false,
+      final_visible_answer_authorized: false,
+      terminal_answer_authority: null,
+    });
+    expect((result.debug as any)?.terminal_presentation).toMatchObject({
+      terminal_artifact_kind: "scholarly_exploratory_candidates",
+      final_answer_source: "scholarly_exploratory_candidates",
+      presentation_policy: "scholarly_response_mode_with_caveats",
+    });
+    expect((result.debug as any)?.scholarly_response_mode_selection).toMatchObject({
+      scholarly_response_mode: "scholarly_exploratory_candidates",
+      selected_response_mode: "scholarly_exploratory_candidates",
+      evidence_state: "lookup_weak_match",
+      selected_for_answer: false,
+      selected_for_exploration: true,
+      terminal_artifact_kind: "scholarly_exploratory_candidates",
+      recovery_query_basis: expect.objectContaining({
+        scholarly_query: expect.stringContaining("Weyl"),
+        strategy: "topic_domain_expansion",
+      }),
+    });
+    expect((result.debug as any)?.scholarly_response_mode_selection?.recovery_queries).toEqual(
+      expect.arrayContaining([
+        "Weyl tensor conformal curvature general relativity",
+        "Weyl curvature tensor differential geometry",
+      ]),
+    );
+    expect((result.debug as any)?.scholarly_response_mode_selection?.recovery_queries?.join("\n"))
+      .not.toContain("summarize the paper evidence");
+    expect((result.debug as any)?.normalized_provider_observation_packets?.[0]).toMatchObject({
+      capability_key: "scholarly-research.lookup_papers",
+      status: "failed",
+      missing_requirements: expect.arrayContaining(["lookup_weak_match"]),
+      state_delta: expect.objectContaining({
+        evidence_state: "lookup_weak_match",
+        selected_for_answer: false,
+        scholarly_response_mode: "scholarly_exploratory_candidates",
+        selected_response_mode: "scholarly_exploratory_candidates",
+        selected_for_exploration: true,
+        allowed_response_modes: expect.arrayContaining([
+          "scholarly_exploratory_candidates",
+          "scholarly_recovery_plan",
+        ]),
+        lookup_relevance_gate: expect.objectContaining({
+          status: "blocked",
+          code: "lookup_weak_match",
+        }),
+      }),
+      suggested_next_steps: expect.arrayContaining(["use_another_tool", "repair"]),
+    });
+  });
+
   it("keeps compound Codex gateway turns from truncating docs, calculator, repo, reflections, web, and papers", async () => {
     process.env.TAVILY_API_KEY = "test-tavily-key";
     process.env.CODEX_AGENT_FAKE_STDOUT = "Compound evidence was available across workstation tools.";
@@ -898,8 +1562,8 @@ describe("Helix Ask agent provider selection", () => {
             "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
             "<entry>",
             "<id>https://arxiv.org/abs/2606.00001</id>",
-            "<title>Quantum inequalities for warp constraints</title>",
-            "<summary>Bounded abstract about QEI and warp metrics.</summary>",
+            "<title>Search arXiv quantum inequalities warp constraints paper evidence</title>",
+            "<summary>Scholarly paper evidence that summarizes quantum inequalities and warp constraints.</summary>",
             "<published>2026-06-01T00:00:00Z</published>",
             "<author><name>A. Researcher</name></author>",
             "</entry>",
@@ -1826,7 +2490,6 @@ describe("Helix Ask agent provider selection", () => {
     const planned = buildCompoundCapabilityDependencyGatewayCallRequests(body);
     expect(planned.map((request) => (request as any).capability_id)).toEqual([
       "scholarly-research.lookup_papers",
-      "scientific-calculator.solve_expression",
     ]);
 
     const results = await runExplicitWorkstationGatewayCalls({
@@ -1842,19 +2505,15 @@ describe("Helix Ask agent provider selection", () => {
       "scientific-calculator.solve_expression",
     ]);
     expect((results[2].gateway_admission.source_target_intent as any)).toMatchObject({
-      source_requirement_plan: {
-        schema: "helix.source_requirement_plan.v1",
-        reentry_requirements: {
-          observation_reentry_required: true,
-          model_followup_required_before_terminal: true,
-        },
+      compound_outcome: "scholarly_research_workflow",
+      requested_workflow: "numeric_calculation",
+      scholarly_intent: {
+        schema: "helix.scholarly_intent.v1",
+        scholarly_query: "magnetic confinement plasma density and temperature values",
+        requested_workflow: "numeric_calculation",
+        terminal_evidence_requirement: "calculation_from_numeric_values",
       },
-      variable_source_plan: {
-        schema: "helix.variable_source_plan.v1",
-        formula_variables: ["n_m3", "T_eV"],
-      },
-      source_classes: expect.arrayContaining(["plasma parameter table", "temperature profile diagnostics"]),
-      extraction_aliases: expect.arrayContaining(["electron density", "electron temperature"]),
+      requested_variables: expect.arrayContaining(["n_m3", "T_eV"]),
     });
     expect((results[2].observation as any)).toMatchObject({
       schema: "helix.scholarly_numeric_parameter_observation.v1",
@@ -2442,6 +3101,65 @@ describe("Helix Ask agent provider selection", () => {
     });
   });
 
+  it("projects Codex interface-language gateway receipts into executable actions and workspace receipts", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "The workstation interface language was set to Hawaiian (`haw`).";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-interface-language-action",
+        agent_runtime: "codex",
+        question: "Set the workstation interface language to Hawaiian.",
+      },
+      headers: {},
+    });
+
+    expect(result.text).toBe("The workstation interface language was set to Hawaiian (`haw`).");
+    expect((result.action_envelope as any)?.governance).toMatchObject({
+      dispatch: "allow",
+      reason: "admitted_mutating_preference_workstation_action",
+      terminal_eligible: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect((result.action_envelope as any)?.workstation_actions).toContainEqual({
+      schema_version: "helix.workstation.action/v1",
+      action: "run_panel_action",
+      panel_id: "account-session",
+      action_id: "set_interface_language",
+      args: {
+        language: "haw",
+      },
+    });
+    expect((result.debug as any)?.current_turn_artifact_ledger).toContainEqual(
+      expect.objectContaining({
+        kind: "workspace_action_receipt",
+        capability_key: "account_session.set_interface_language",
+        payload: expect.objectContaining({
+          schema: "helix.workspace_action_receipt.v1",
+          kind: "workspace_action_receipt",
+          target_id: "account-session",
+          panel_id: "account-session",
+          action_id: "set_interface_language",
+          action_key: "account-session.set_interface_language",
+          language: "haw",
+          workstation_action: expect.objectContaining({
+            action: "run_panel_action",
+            panel_id: "account-session",
+            action_id: "set_interface_language",
+            args: { language: "haw" },
+          }),
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    );
+  });
+
   it("preserves detailed Codex provider answers without Helix shortening or style rewrite", async () => {
     const detailedAnswer = [
       "The calculator observation gives a numeric anchor, but the implication is broader:",
@@ -2947,8 +3665,8 @@ describe("Helix Ask agent provider selection", () => {
         "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
         "<entry>",
         "<id>https://arxiv.org/abs/2606.00001</id>",
-        "<title>Quantum inequalities for warp constraints</title>",
-        "<summary>Bounded abstract about QEI and warp metrics.</summary>",
+        "<title>Current NHM2 document calculate search arXiv quantum inequalities warp constraints QEI margin theory badge civilization bounds paper evidence</title>",
+        "<summary>Scholarly paper evidence summarizes quantum inequalities, warp constraints, QEI margin, theory badge reflection, and civilization bounds.</summary>",
         "<published>2026-06-01T00:00:00Z</published>",
         "<author><name>A. Researcher</name></author>",
         "</entry>",
@@ -4895,6 +5613,129 @@ describe("Helix Ask agent provider selection", () => {
     });
   });
 
+  it("blocks provider terminal authority when scholarly lookup evidence was not selected for answer", () => {
+    const trace = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId: "ask:test:codex-provider-weak-scholarly-candidate",
+      threadId: "thread:test",
+      route: "/ask/turn",
+      gatewayCallResults: [{
+        schema: "helix.workstation_tool_gateway.call_result.v1",
+        manifest_version: "test",
+        ok: false,
+        agent_runtime: "codex",
+        capability_id: "scholarly-research.lookup_papers",
+        mode: "read",
+        gateway_admission: {
+          schema: "helix.workstation_tool_gateway.admission.v1",
+          requested_capability: "scholarly-research.lookup_papers",
+          selected_agent_provider: "codex",
+          permission_profile: "read",
+          admission_status: "admitted",
+          admission_reason: "test",
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        observation_packet: {
+          schema: "helix.agent_step_observation_packet.v1",
+          turn_id: "ask:test:codex-provider-weak-scholarly-candidate",
+          iteration: 1,
+          call_id: "ask:test:codex-provider-weak-scholarly-candidate:scholarly-research.lookup_papers:call",
+          decision_id: "ask:test:codex-provider-weak-scholarly-candidate:scholarly-research.lookup_papers:decision",
+          capability_key: "scholarly-research.lookup_papers",
+          panel_id: "scholarly-research",
+          action: "lookup_papers",
+          status: "failed",
+          produced_artifact_refs: [
+            "ask:test:codex-provider-weak-scholarly-candidate:scholarly-research.lookup_papers",
+          ],
+          observation_summary: "Scholarly research lookup returned weakly matched papers.",
+          receipts: [],
+          missing_requirements: ["lookup_weak_match"],
+          state_delta: {
+            evidence_state: "lookup_weak_match",
+            selected_for_answer: false,
+            lookup_relevance_gate: {
+              status: "blocked",
+              code: "lookup_weak_match",
+            },
+            next_affordances: [{ capability: "scholarly-research.lookup_papers" }],
+          },
+          suggested_next_steps: ["use_another_tool", "repair"],
+          terminal_eligible: false,
+          post_tool_model_step_required: true,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        tool_lifecycle_trace: {} as any,
+        tool_followup_decision: {} as any,
+        observation: {
+          schema: "helix.scholarly_research_observation.v1",
+          evidence_state: "lookup_weak_match",
+          selected_for_answer: false,
+          missing_requirements: ["lookup_weak_match"],
+        },
+        artifact_refs: [
+          "ask:test:codex-provider-weak-scholarly-candidate:scholarly-research.lookup_papers",
+        ],
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+        error: "lookup_weak_match",
+      }],
+      normalizedObservationPackets: [{
+        schema: "helix.agent_step_observation_packet.v1",
+        turn_id: "ask:test:codex-provider-weak-scholarly-candidate",
+        iteration: 1,
+        call_id: "ask:test:codex-provider-weak-scholarly-candidate:normalized:call",
+        decision_id: "ask:test:codex-provider-weak-scholarly-candidate:normalized:decision",
+        capability_key: "scholarly-research.lookup_papers",
+        panel_id: "codex-provider",
+        action: "normalize_provider_gateway_observation",
+        status: "failed",
+        produced_artifact_refs: [
+          "ask:test:codex-provider-weak-scholarly-candidate:codex_normalized:scholarly_research_observation:1",
+        ],
+        observation_summary: "Codex provider gateway result normalized as scholarly_research_observation.",
+        receipts: [],
+        missing_requirements: ["lookup_weak_match"],
+        state_delta: {
+          evidence_state: "lookup_weak_match",
+          selected_for_answer: false,
+        },
+        suggested_next_steps: ["use_another_tool", "repair"],
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      }],
+      providerText: "Scholarly lookup found usable paper evidence.",
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+    });
+
+    expect(trace).toMatchObject({
+      terminalAuthorityCandidateReview: {
+        terminal_authority_status: "blocked_by_observation_state",
+        terminal_authority_granted: false,
+        final_visible_answer_authorized: false,
+        blockers: ["gateway_observation_missing_or_failed"],
+        selected_observation_refs: [],
+      },
+      providerTerminalAuthorityBridge: {
+        route_authority_status: "not_authorized",
+        terminal_authority_granted: false,
+        final_visible_answer_authorized: false,
+        terminal_answer_authority: null,
+      },
+      terminalAnswerAuthority: null,
+      terminalPresentation: null,
+    });
+  });
+
   it("emits Codex provider transcript progress through the stream callback before terminal answer", async () => {
     process.env.CODEX_AGENT_FAKE_STDOUT = "Observed expression: 8*9\nResult: 72";
     const streamedEvents: Record<string, unknown>[] = [];
@@ -5007,6 +5848,159 @@ describe("Helix Ask agent provider selection", () => {
     });
     expect(streamedEvents.some((event) => event.source_event_type === "terminal_answer")).toBe(false);
     expect(result.turn_transcript_events?.some((event) => event.source_event_type === "terminal_answer")).toBe(true);
+  }, 15_000);
+
+  it("resolves read-aloud last final answer to chat history before text-to-speech execution", async () => {
+    resetInterimVoiceCalloutsForTest();
+    runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+      memoryReader: () => ({
+        heapUsed: 120 * 1024 * 1024,
+        heapTotal: 512 * 1024 * 1024,
+        rss: 640 * 1024 * 1024,
+        external: 0,
+        arrayBuffers: 0,
+      }),
+      hostMemoryReader: () => ({
+        freeMiB: 16_000,
+        totalMiB: 32_000,
+        freeRatio: 0.5,
+      }),
+    });
+    process.env.CODEX_AGENT_FAKE_STDOUT = [
+      "HELIX_CAPABILITY_LANE_REQUEST_JSON:",
+      JSON.stringify({
+        capability: "text_to_speech.speak_text",
+        text: "Abstract",
+        assistant_answer: false,
+        terminal_eligible: false,
+      }),
+    ].join("");
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn/stream",
+      body: {
+        turn_id: "ask:test:codex-tts-referent-last-final-answer",
+        question: "ok read last final answer aloud",
+        workspace_context_snapshot: {
+          active_panel: "docs-viewer",
+          active_doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          chat_referent_context: {
+            schema: "helix.ask.chat_referent_context.v1",
+            previous_assistant_final_answer: {
+              role: "assistant",
+              reply_id: "reply-prev",
+              source_ref: "chat.final_answer.previous:reply-prev",
+              text: "Navigation team is ready for the next burn window.",
+            },
+            previous_chat_message: {
+              role: "assistant",
+              message_id: "reply-prev",
+              source_ref: "chat.final_answer.previous:reply-prev",
+              text: "Navigation team is ready for the next burn window.",
+            },
+          },
+        },
+      },
+    });
+
+    const ttsResult = (result.debug as any)?.capability_lane_call_results?.find(
+      (entry: any) => entry?.capability === "text_to_speech.speak_text" || entry?.capability_id === "text_to_speech.speak_text",
+    );
+    const ttsReceipt = (result.debug as any)?.capability_lane_observation_packets?.find(
+      (packet: any) => packet?.capability_key === "text_to_speech.speak_text",
+    )?.state_delta?.text_to_speech_receipt;
+    const playbackHandoff = ttsResult?.observation_packet?.state_delta?.text_to_speech_client_playback_handoff;
+
+    expect((result.debug as any)?.referent_resolution_trace).toMatchObject({
+      referent_phrase: "previous_assistant_final_answer",
+      source_kind: "chat_history",
+      resolved_source_ref: "chat.final_answer.previous:reply-prev",
+      resolution_confidence: "high",
+      tool_argument_source: "referent_resolution:chat_history",
+      raw_content_included: false,
+    });
+    expect((result.debug as any)?.chat_referent_context_presence).toMatchObject({
+      present: true,
+      previous_assistant_final_answer_present: true,
+      previous_assistant_final_answer_ref: "chat.final_answer.previous:reply-prev",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect((result.debug as any)?.runtime_lane_request_loop).toMatchObject({
+      status: "lane_observation_reentered",
+      selected_runtime_agent_provider: "codex",
+      chat_referent_context_presence: expect.objectContaining({
+        present: true,
+        previous_assistant_final_answer_present: true,
+      }),
+    });
+    expect(playbackHandoff?.request?.text).toBe(
+      "Navigation team is ready for the next burn window.",
+    );
+    expect(ttsReceipt).toMatchObject({
+      source_observation_ref: "chat.final_answer.previous:reply-prev",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+  }, 15_000);
+
+  it("synthesizes governed text-to-speech for last final answer when Codex skips the lane JSON", async () => {
+    resetInterimVoiceCalloutsForTest();
+    runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+      memoryReader: () => ({
+        heapUsed: 120 * 1024 * 1024,
+        heapTotal: 512 * 1024 * 1024,
+        rss: 640 * 1024 * 1024,
+        external: 0,
+        arrayBuffers: 0,
+      }),
+      hostMemoryReader: () => ({
+        freeMiB: 16_000,
+        totalMiB: 32_000,
+        freeRatio: 0.5,
+      }),
+    });
+    process.env.CODEX_AGENT_FAKE_STDOUT = "I cannot read it aloud without a resolved last final answer.";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn/stream",
+      body: {
+        turn_id: "ask:test:codex-tts-referent-policy-synthesis",
+        question: "ok read last final answer aloud",
+        workspace_context_snapshot: {
+          chat_referent_context: {
+            schema: "helix.ask.chat_referent_context.v1",
+            previous_assistant_final_answer: {
+              role: "assistant",
+              reply_id: "reply-prev",
+              source_ref: "chat.final_answer.previous:reply-prev",
+              text: "Navigation team is ready for the next burn window.",
+            },
+          },
+        },
+      },
+    });
+
+    const playbackHandoff = (result.debug as any)?.capability_lane_call_results?.find(
+      (entry: any) => entry?.capability === "text_to_speech.speak_text" || entry?.capability_id === "text_to_speech.speak_text",
+    )?.observation_packet?.state_delta?.text_to_speech_client_playback_handoff;
+
+    expect((result.debug as any)?.runtime_lane_request_loop).toMatchObject({
+      status: "lane_observation_reentered",
+      synthesized_by_helix_policy: true,
+      synthesis_reason: "explicit_read_aloud_referent_resolved_without_runtime_lane_json",
+      candidate: expect.objectContaining({
+        capability: "text_to_speech.speak_text",
+        source_observation_ref: "chat.final_answer.previous:reply-prev",
+      }),
+    });
+    expect(playbackHandoff?.request?.text).toBe(
+      "Navigation team is ready for the next burn window.",
+    );
   }, 15_000);
 
   it("streams normalized Codex native event packets without making them terminal authority", async () => {

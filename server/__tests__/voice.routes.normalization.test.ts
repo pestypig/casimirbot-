@@ -62,7 +62,6 @@ describe("voice routes normalization", () => {
 
   beforeEach(() => {
     process.env.TTS_BASE_URL = "http://voice.local";
-    process.env.VOICE_PROXY_DRY_RUN = "0";
     process.env.VOICE_SPEAK_NORMALIZE_ENABLED = "1";
     process.env.VOICE_SPEAK_TARGET_PEAK_DBFS = "-2";
     process.env.VOICE_SPEAK_TARGET_RMS_DBFS = "-16";
@@ -77,7 +76,6 @@ describe("voice routes normalization", () => {
 
   afterEach(() => {
     delete process.env.TTS_BASE_URL;
-    delete process.env.VOICE_PROXY_DRY_RUN;
     delete process.env.VOICE_SPEAK_NORMALIZE_ENABLED;
     delete process.env.VOICE_SPEAK_TARGET_PEAK_DBFS;
     delete process.env.VOICE_SPEAK_TARGET_RMS_DBFS;
@@ -99,7 +97,6 @@ describe("voice routes normalization", () => {
 
   it("returns a no-audio JSON result when speak backend is not configured", async () => {
     delete process.env.TTS_BASE_URL;
-    process.env.VOICE_PROXY_DRY_RUN = "0";
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
@@ -129,8 +126,12 @@ describe("voice routes normalization", () => {
   });
 
   it("accepts translation relay chunk metadata without making it answer authority", async () => {
-    process.env.VOICE_PROXY_DRY_RUN = "1";
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn(async () => {
+      return new Response(Buffer.from("TRANSLATIONAUDIO"), {
+        status: 200,
+        headers: { "content-type": "audio/wav" },
+      });
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const app = await buildApp();
@@ -166,17 +167,52 @@ describe("voice routes normalization", () => {
       })
       .expect(200);
 
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(response.body).toMatchObject({
-      ok: true,
-      dryRun: true,
-      provider: "dry-run",
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(response.headers["content-type"]).toContain("audio/wav");
+    expect(Buffer.isBuffer(response.body)).toBe(true);
+  });
+
+  it("lets user-clicked manual read-aloud with ask trace metadata reach voice transport", async () => {
+    const fetchMock = vi.fn(async () => {
+      return new Response(Buffer.from("MANUALREADALOUD"), {
+        status: 200,
+        headers: { "content-type": "audio/wav" },
+      });
     });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const app = await buildApp();
+    const response = await request(app)
+      .post("/api/voice/speak")
+      .send({
+        text: "Read this final answer.",
+        mode: "briefing",
+        priority: "info",
+        format: "wav",
+        traceId: "ask:manual-read-aloud",
+        missionId: "desktop:mission",
+        eventId: "reply-1",
+        utteranceId: "manual_read_aloud:reply-1",
+        turnKey: "manual:reply-1",
+        chunkKind: "manual_read_aloud",
+        deterministic: true,
+        textCertainty: "reasoned",
+        voiceCertainty: "reasoned",
+      })
+      .expect(200);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(response.headers["content-type"]).toContain("audio/wav");
+    expect(Buffer.isBuffer(response.body)).toBe(true);
   });
 
   it("records recent narrator speech diagnostics without raw spoken text", async () => {
-    process.env.VOICE_PROXY_DRY_RUN = "1";
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn(async () => {
+      return new Response(Buffer.from("NARRATORAUDIO"), {
+        status: 200,
+        headers: { "content-type": "audio/wav" },
+      });
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const app = await buildApp();
@@ -202,7 +238,7 @@ describe("voice routes normalization", () => {
       .query({ narrator: "true", chunkKind: "panel_narration", limit: "5" })
       .expect(200);
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(recent.body).toMatchObject({
       schema: "helix.voice_speak_debug_recent.v1",
       count: 1,
@@ -217,7 +253,7 @@ describe("voice routes normalization", () => {
       eventId,
       chunkKind: "panel_narration",
       narrator: true,
-      outcome: "metadata_response",
+      outcome: "audio_response",
       statusCode: 200,
       textHash: expect.stringMatching(/^sha256:/),
       textLength: "Narrator backend debug probe text.".length,

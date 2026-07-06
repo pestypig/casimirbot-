@@ -3921,13 +3921,14 @@ describe("HelixAskPill mic helper behavior", () => {
 
   it("formats read-aloud as a start-stop toggle", () => {
     expect(shouldStopReadAloudOnButtonPress("idle")).toBe(false);
-    expect(shouldStopReadAloudOnButtonPress("requesting")).toBe(true);
-    expect(shouldStopReadAloudOnButtonPress("playing")).toBe(true);
+    expect(shouldStopReadAloudOnButtonPress("loading")).toBe(true);
+    expect(shouldStopReadAloudOnButtonPress("playing")).toBe(false);
     expect(formatReadAloudButtonLabel("idle")).toBe("Read aloud");
-    expect(formatReadAloudButtonLabel("requesting")).toBe("Stop reading (requesting)");
-    expect(formatReadAloudButtonLabel("playing")).toBe("Stop reading (playing)");
-    expect(formatReadAloudButtonLabel("dry-run")).toBe("Read aloud (dry-run)");
-    expect(formatReadAloudButtonLabel("error")).toBe("Read aloud (error)");
+    expect(formatReadAloudButtonLabel("loading")).toBe("Loading read-aloud");
+    expect(formatReadAloudButtonLabel("playing")).toBe("Pause read-aloud");
+    expect(formatReadAloudButtonLabel("paused")).toBe("Resume read-aloud");
+    expect(formatReadAloudButtonLabel("unavailable")).toBe("Read aloud unavailable");
+    expect(formatReadAloudButtonLabel("error")).toBe("Retry read-aloud");
   });
 
   it("maps manual read-aloud into a final manual voice playback task", () => {

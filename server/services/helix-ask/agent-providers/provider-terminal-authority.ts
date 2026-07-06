@@ -14,8 +14,56 @@ const readRecord = (value: unknown): Record<string, unknown> | null =>
 const readString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
+const readBoolean = (value: unknown): boolean | null =>
+  typeof value === "boolean" ? value : null;
+
 const readArray = (value: unknown): unknown[] =>
   Array.isArray(value) ? value : [];
+
+const SCHOLARLY_GATEWAY_CAPABILITIES = new Set([
+  "scholarly-research.lookup_papers",
+  "scholarly-research.fetch_full_text",
+  "scholarly-research.extract_numeric_parameters",
+]);
+
+const SCHOLARLY_TERMINAL_READY_EVIDENCE_STATES = new Set([
+  "lookup_usable",
+  "full_text_usable",
+  "numeric_evidence_usable",
+  "answer_ready",
+]);
+
+const gatewayCapability = (result: HelixWorkstationGatewayCallResult): string =>
+  result.gateway_admission.requested_capability || result.capability_id;
+
+const isScholarlyGatewayCapability = (result: HelixWorkstationGatewayCallResult): boolean =>
+  SCHOLARLY_GATEWAY_CAPABILITIES.has(gatewayCapability(result));
+
+const scholarlyObservationRecord = (
+  result: HelixWorkstationGatewayCallResult,
+): Record<string, unknown> | null =>
+  readRecord(result.observation) ?? readRecord(result.observation_packet?.state_delta);
+
+const scholarlyEvidenceState = (result: HelixWorkstationGatewayCallResult): string => {
+  const observation = readRecord(result.observation);
+  const stateDelta = readRecord(result.observation_packet?.state_delta);
+  return readString(observation?.evidence_state) || readString(stateDelta?.evidence_state);
+};
+
+const isScholarlyEvidenceSelectedForAnswer = (
+  result: HelixWorkstationGatewayCallResult,
+): boolean => {
+  if (!isScholarlyGatewayCapability(result)) return true;
+  const observation = scholarlyObservationRecord(result);
+  const stateDelta = readRecord(result.observation_packet?.state_delta);
+  const selectedForAnswer =
+    readBoolean(observation?.selected_for_answer) ??
+    readBoolean(stateDelta?.selected_for_answer) ??
+    false;
+  if (!selectedForAnswer) return false;
+  const evidenceState = scholarlyEvidenceState(result);
+  return !evidenceState || SCHOLARLY_TERMINAL_READY_EVIDENCE_STATES.has(evidenceState);
+};
 
 const hasRecoveryAffordanceEvidence = (value: unknown): boolean => {
   const record = readRecord(value);
@@ -32,7 +80,7 @@ const isGatewayRecoveryAffordanceObservation = (
   result: HelixWorkstationGatewayCallResult,
 ): boolean =>
   hasRecoveryAffordanceEvidence(result.observation) ||
-  hasRecoveryAffordanceEvidence(result.observation_packet.state_delta);
+  hasRecoveryAffordanceEvidence(result.observation_packet?.state_delta);
 
 const isScholarlyNumericMissingVariablesObservation = (
   result: HelixWorkstationGatewayCallResult,
@@ -82,18 +130,36 @@ const isCalculatorBlockedExpressionObservation = (
 const isGatewayObservationReenteredForProviderReasoning = (
   result: HelixWorkstationGatewayCallResult,
 ): boolean =>
-  result.ok === true ||
-  isScholarlyNumericMissingVariablesObservation(result) ||
-  isCalculatorBlockedExpressionObservation(result) ||
-  isGatewayRecoveryAffordanceObservation(result);
+  isScholarlyGatewayCapability(result)
+    ? isScholarlyEvidenceSelectedForAnswer(result) && result.ok === true
+    : result.ok === true ||
+      isScholarlyNumericMissingVariablesObservation(result) ||
+      isCalculatorBlockedExpressionObservation(result) ||
+      isGatewayRecoveryAffordanceObservation(result);
 
 const isTextToSpeechReceiptObservation = (packet: HelixAgentStepObservationPacket): boolean => {
   if (packet.capability_key !== "text_to_speech.speak_text") return false;
   const stateDelta = readRecord(packet.state_delta);
   const receipt = readRecord(stateDelta?.text_to_speech_receipt);
   const playbackStatus = readString(receipt?.playback_status);
-  return ["pending", "played", "blocked", "failed"].includes(playbackStatus);
+  return ["pending", "awaiting_client_playback", "awaiting_client_receipt", "played", "blocked", "failed"].includes(
+    playbackStatus,
+  );
 };
+
+const isPendingTextToSpeechHandoffObservation = (packet: HelixAgentStepObservationPacket): boolean => {
+  if (packet.capability_key !== "text_to_speech.speak_text") return false;
+  const stateDelta = readRecord(packet.state_delta);
+  const receipt =
+    readRecord(stateDelta?.text_to_speech_receipt) ??
+    readRecord(stateDelta?.text_to_speech_client_playback_handoff);
+  const status = readString(receipt?.playback_status || receipt?.playbackStatus || packet.status).toLowerCase();
+  return ["client_pending", "pending", "awaiting_client_playback", "awaiting_client_receipt"].includes(status);
+};
+
+const providerTextClaimsVoicePlaybackCompleted = (text: string): boolean =>
+  /\b(?:audio\s+)?(?:played|completed|finished|delivered|heard)\b/i.test(text) ||
+  /\byou\s+(?:heard|should\s+have\s+heard)\b/i.test(text);
 
 export const buildHelixProviderReasoningReentry = (input: {
   runtime: HelixAgentRuntimeId;
@@ -103,6 +169,7 @@ export const buildHelixProviderReasoningReentry = (input: {
   route?: HelixAgentRunRoute | string | null;
   gatewayCallResults: HelixWorkstationGatewayCallResult[];
   capabilityLaneObservationPackets?: HelixAgentStepObservationPacket[];
+  priorEvidenceObservationPackets?: HelixAgentStepObservationPacket[];
   normalizedObservationPackets?: HelixAgentStepObservationPacket[];
   providerText: string;
   ok: boolean;
@@ -110,18 +177,21 @@ export const buildHelixProviderReasoningReentry = (input: {
   goalSatisfied?: boolean;
 }) => {
   const capabilityLaneObservationPackets = input.capabilityLaneObservationPackets ?? [];
+  const priorEvidenceObservationPackets = input.priorEvidenceObservationPackets ?? [];
   const successfulCapabilityLaneObservationPackets = capabilityLaneObservationPackets.filter((packet) => {
     const status = packet.status.trim().toLowerCase();
     if (isTextToSpeechReceiptObservation(packet)) return true;
     return status !== "blocked" && status !== "failed" && status !== "missing_input" && status !== "needs_confirmation";
   });
   const capabilityLaneObservationRefs = capabilityLaneObservationPackets.flatMap((packet) => packet.produced_artifact_refs);
+  const priorEvidenceObservationRefs = priorEvidenceObservationPackets.flatMap((packet) => packet.produced_artifact_refs);
   const successfulCapabilityLaneObservationRefs =
     successfulCapabilityLaneObservationPackets.flatMap((packet) => packet.produced_artifact_refs);
   const gatewayObservationRefs = input.gatewayCallResults.flatMap((result) => result.artifact_refs);
   const observationRefs = [
     ...gatewayObservationRefs,
     ...capabilityLaneObservationRefs,
+    ...priorEvidenceObservationRefs,
   ];
   const successfulGatewayObservationRefs = input.gatewayCallResults
     .filter(isGatewayObservationReenteredForProviderReasoning)
@@ -129,11 +199,13 @@ export const buildHelixProviderReasoningReentry = (input: {
   const successfulObservationRefs = [
     ...successfulGatewayObservationRefs,
     ...successfulCapabilityLaneObservationRefs,
+    ...priorEvidenceObservationRefs,
   ];
   const normalizedObservationPackets =
     input.normalizedObservationPackets ?? [
       ...input.gatewayCallResults.map((result) => result.observation_packet),
       ...capabilityLaneObservationPackets,
+      ...priorEvidenceObservationPackets,
     ];
   const normalizedObservationRefs = Array.from(
     new Set(
@@ -148,7 +220,8 @@ export const buildHelixProviderReasoningReentry = (input: {
   const allCapabilityLaneObservationsSucceeded =
     capabilityLaneObservationPackets.length === 0 ||
     successfulCapabilityLaneObservationPackets.length === capabilityLaneObservationPackets.length;
-  const evidenceSourceCount = input.gatewayCallResults.length + capabilityLaneObservationPackets.length;
+  const evidenceSourceCount =
+    input.gatewayCallResults.length + capabilityLaneObservationPackets.length + priorEvidenceObservationPackets.length;
   const allEvidenceSucceeded = allGatewayCallsSucceeded && allCapabilityLaneObservationsSucceeded;
   const normalizedObservationsReady =
     evidenceSourceCount > 0 &&
@@ -159,10 +232,17 @@ export const buildHelixProviderReasoningReentry = (input: {
   const candidateId = input.ok && input.providerText.trim()
     ? `${input.turnId}:agent_provider_terminal_candidate:${input.runtime}:${sha256(input.providerText).slice(0, 16)}`
     : null;
+  const pendingVoiceHandoffOverclaim = Boolean(
+    candidateId &&
+      capabilityLaneObservationPackets.some(isPendingTextToSpeechHandoffObservation) &&
+      providerTextClaimsVoicePlaybackCompleted(input.providerText),
+  );
   const terminalAuthorityMayUseProviderText =
-    Boolean(candidateId && normalizedObservationsReady && solverAuthoritySatisfied);
+    Boolean(candidateId && normalizedObservationsReady && solverAuthoritySatisfied && !pendingVoiceHandoffOverclaim);
   const terminalAuthorityStatus = terminalAuthorityMayUseProviderText
     ? "authorized_by_helix_provider_candidate_bridge"
+    : candidateId && pendingVoiceHandoffOverclaim
+      ? "blocked_by_voice_playback_overclaim"
     : candidateId && !allEvidenceSucceeded
       ? "blocked_by_observation_state"
       : candidateId && !normalizedObservationsReady
@@ -173,6 +253,8 @@ export const buildHelixProviderReasoningReentry = (input: {
   const terminalAuthorityBlockers = candidateId
     ? terminalAuthorityMayUseProviderText
       ? []
+      : pendingVoiceHandoffOverclaim
+        ? ["voice_playback_completion_not_observed"]
       : !allGatewayCallsSucceeded
         ? ["gateway_observation_missing_or_failed"]
         : !allCapabilityLaneObservationsSucceeded
@@ -219,6 +301,7 @@ export const buildHelixProviderReasoningReentry = (input: {
     normalized_observation_refs: normalizedObservationRefs,
     normalized_observation_packet_count: normalizedObservationPackets.length,
     capability_lane_observation_packet_count: capabilityLaneObservationPackets.length,
+    prior_evidence_observation_packet_count: priorEvidenceObservationPackets.length,
     provider_terminal_candidate_ref: candidateId,
     provider_terminal_candidate_present: Boolean(candidateId),
     post_tool_model_step_required: Boolean(candidateId && !terminalAuthorityMayUseProviderText),
@@ -243,6 +326,7 @@ export const buildHelixProviderReasoningReentry = (input: {
     selected_observation_refs: successfulObservationRefs,
     normalized_observation_refs: normalizedObservationRefs,
     capability_lane_observation_refs: successfulCapabilityLaneObservationRefs,
+    prior_evidence_observation_refs: priorEvidenceObservationRefs,
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,
@@ -291,9 +375,11 @@ export const buildHelixProviderReasoningReentry = (input: {
     successful_gateway_observation_refs: successfulGatewayObservationRefs,
     capability_lane_observation_refs: capabilityLaneObservationRefs,
     successful_capability_lane_observation_refs: successfulCapabilityLaneObservationRefs,
+    prior_evidence_observation_refs: priorEvidenceObservationRefs,
     normalized_observation_refs: normalizedObservationRefs,
     normalized_observation_packet_count: normalizedObservationPackets.length,
     capability_lane_observation_packet_count: capabilityLaneObservationPackets.length,
+    prior_evidence_observation_packet_count: priorEvidenceObservationPackets.length,
     all_gateway_calls_succeeded: allGatewayCallsSucceeded,
     all_capability_lane_observations_succeeded: allCapabilityLaneObservationsSucceeded,
     all_observations_succeeded: allEvidenceSucceeded,

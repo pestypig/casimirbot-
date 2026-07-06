@@ -21,6 +21,7 @@ export type HelixAskSlashCommandCatalogItem = {
   permissionRequired?: HelixWorkstationPermissionProfile;
   runtimeIds?: string[];
   developerOnly?: boolean;
+  generated?: boolean;
 };
 
 export type HelixAskSlashCommandMenuItem = HelixAskSlashCommandCatalogItem & {
@@ -119,6 +120,54 @@ export function listHelixAskSlashCommandCatalog(): HelixAskSlashCommandCatalogIt
   return HELIX_ASK_SLASH_COMMAND_CATALOG.map((item) => ({ ...item }));
 }
 
+function titleCaseCapabilityToken(value: string): string {
+  return value
+    .split(/[-_]+/g)
+    .map((token) => token.trim())
+    .filter(Boolean)
+    .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
+    .join(" ");
+}
+
+function buildHelixAskGeneratedSlashCommandForCapability(
+  capabilityId: string,
+): HelixAskSlashCommandCatalogItem | null {
+  const normalized = capabilityId.trim();
+  if (!normalized || normalized === "*" || normalized.startsWith("permission:")) return null;
+  const parts = normalized.split(".").map((part) => part.trim()).filter(Boolean);
+  if (parts.length === 0) return null;
+  const commandSlug = parts
+    .join("-")
+    .replace(/[^a-z0-9_-]+/gi, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .toLowerCase();
+  if (!commandSlug) return null;
+  const label = parts.map(titleCaseCapabilityToken).join(" ");
+  return {
+    id: `capability:${normalized}`,
+    command: `/${commandSlug}`,
+    label,
+    capabilityId: normalized,
+    description: `Use ${normalized} from the current account capability list.`,
+    insertionText: `Use the ${normalized} capability to `,
+    generated: true,
+  };
+}
+
+export function buildHelixAskSlashCommandCatalogForPolicy(
+  policy: HelixAccountCapabilityPolicy | null | undefined,
+): HelixAskSlashCommandCatalogItem[] {
+  const accountPolicy = policy ?? HELIX_USER_ACCOUNT_POLICY;
+  const curated = listHelixAskSlashCommandCatalog();
+  const curatedCapabilityIds = new Set(curated.map((item) => item.capabilityId));
+  const generated = accountPolicy.allowed_workstation_capabilities
+    .map(buildHelixAskGeneratedSlashCommandForCapability)
+    .filter((item): item is HelixAskSlashCommandCatalogItem => Boolean(item))
+    .filter((item) => !curatedCapabilityIds.has(item.capabilityId));
+  return [...curated, ...generated];
+}
+
 export function buildHelixAskSlashCommandMenuItems(args: {
   accountPolicy?: HelixAccountCapabilityPolicy | null;
   runtime?: HelixAskSlashCommandRuntime | null;
@@ -126,7 +175,7 @@ export function buildHelixAskSlashCommandMenuItems(args: {
 }): HelixAskSlashCommandMenuItem[] {
   const accountPolicy = args.accountPolicy ?? HELIX_USER_ACCOUNT_POLICY;
   const runtimeId = args.runtime?.id?.trim() ?? "";
-  return HELIX_ASK_SLASH_COMMAND_CATALOG
+  return buildHelixAskSlashCommandCatalogForPolicy(accountPolicy)
     .map((item): HelixAskSlashCommandMenuItem => {
       const runtimeAvailable =
         !item.runtimeIds || item.runtimeIds.length === 0 || item.runtimeIds.includes(runtimeId);

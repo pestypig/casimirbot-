@@ -124,6 +124,7 @@ scientific-calculator.show_gateway_solve
 scientific-calculator.prefill_expression
 workstation.open_panel
 workstation.focus_panel
+account_session.set_interface_language
 docs-viewer.open_doc
 repo.search
 docs.search
@@ -211,15 +212,19 @@ authority. The older `image_lens.inspect` explicit capability remains a
 non-runner alias candidate until an explicit alias-to-lane admission contract is
 added.
 
-The shared gateway capabilities above are non-terminal gateway
-observations/receipts with:
+The shared gateway capabilities above are bounded gateway observations/receipts
+with no assistant answer authority and no raw content inclusion:
 
 ```txt
 assistant_answer=false
 raw_content_included=false
-terminal_eligible=false
 post_tool_model_step_required=true
 ```
+
+Most gateway receipts stay `terminal_eligible=false` so evidence can re-enter a
+solver step. The graduated `account_session.set_interface_language` preference
+action is terminal-eligible because its final product is the workstation action
+receipt itself, not a model-written answer.
 
 Shared gateway observations may also expose typed affordance handoff metadata:
 
@@ -318,6 +323,7 @@ capabilities with non-empty `input_schema.required`:
 | `scientific-calculator.prefill_expression` | `expression` |
 | `workstation.open_panel` | `panel_id` |
 | `workstation.focus_panel` | `panel_id` |
+| `account_session.set_interface_language` | `language` |
 | `docs-viewer.open_doc` | `path` |
 | `moral-graph.reflect_living_substrate_context` | `prompt` |
 | `repo.search` | `query` |
@@ -781,6 +787,10 @@ Rules:
 - Other active dynamic actions are `blocked_pending_contract` until promoted.
 - A dynamic action being visible in a panel manifest does not mean Codex or any
   provider agent can execute it.
+- Graduated exceptions are explicit and narrow: `workstation-notes.list_notes`
+  provides body-redacted note metadata, and
+  `account_session.set_interface_language` dispatches only the existing
+  Account & Sessions interface-language preference action for supported codes.
 
 The classification test covers active and retired dynamic action lists from:
 

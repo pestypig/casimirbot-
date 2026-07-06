@@ -434,6 +434,10 @@ const REPO_SEARCH_FALLBACK_MAX_FILE_BYTES = Math.max(
   16 * 1024,
   Number(process.env.HELIX_ASK_REPO_SEARCH_FALLBACK_MAX_FILE_BYTES ?? 1024 * 1024),
 );
+const REPO_SEARCH_PATH_MAX_HITS = Math.max(
+  4,
+  Number(process.env.HELIX_ASK_REPO_SEARCH_PATH_MAX_HITS ?? 24),
+);
 const REPO_SEARCH_FALLBACK_SKIP_DIRS = new Set([
   ".git",
   "node_modules",
@@ -670,6 +674,48 @@ const clipLine = (value: string): string => {
   const trimmed = value.replace(/\r?\n/g, " ").trim();
   if (trimmed.length <= REPO_SEARCH_MAX_LINE_CHARS) return trimmed;
   return `${trimmed.slice(0, REPO_SEARCH_MAX_LINE_CHARS - 3)}...`;
+};
+
+const clipRepoExcerpt = (value: string, maxChars = 1200): string => {
+  const trimmed = value.trim();
+  if (trimmed.length <= maxChars) return trimmed;
+  return `${trimmed.slice(0, maxChars - 3)}...`;
+};
+
+const firstImplementationLineIndex = (lines: string[]): number => {
+  for (let index = 0; index < lines.length; index += 1) {
+    if (/\bexport\s+(?:type|interface|class|function|const)\b/i.test(lines[index] ?? "")) return index;
+  }
+  for (let index = 0; index < lines.length; index += 1) {
+    if (/\b(?:type|interface|class|function|const)\b/i.test(lines[index] ?? "")) return index;
+  }
+  const firstContentLine = lines.findIndex((line) => line.trim().length > 0);
+  return Math.max(0, firstContentLine);
+};
+
+const pathMatchImplementationExcerpt = async (
+  absolutePath: string,
+): Promise<{ line: number; text: string } | null> => {
+  let stat: fs.Stats;
+  try {
+    stat = await fs.promises.stat(absolutePath);
+  } catch {
+    return null;
+  }
+  if (!stat.isFile() || stat.size > REPO_SEARCH_FALLBACK_MAX_FILE_BYTES) return null;
+  let content: string;
+  try {
+    content = await fs.promises.readFile(absolutePath, "utf8");
+  } catch {
+    return null;
+  }
+  if (content.includes("\0")) return null;
+  const lines = content.split(/\r?\n/);
+  const lineIndex = firstImplementationLineIndex(lines);
+  const start = Math.max(0, lineIndex - 4);
+  const end = Math.min(lines.length, lineIndex + 13);
+  const text = clipRepoExcerpt(lines.slice(start, end).join("\n"));
+  return text ? { line: lineIndex + 1, text } : null;
 };
 
 const normalizeRepoPath = (value: string): string =>
@@ -1265,6 +1311,41 @@ const collectFallbackSearchFiles = async (targetPaths: string[]): Promise<{
   return { files, truncated };
 };
 
+const runRepoPathSearch = async (
+  terms: string[],
+  targetPaths: string[],
+): Promise<Pick<RepoSearchResult, "hits" | "truncated">> => {
+  const hits: RepoSearchHit[] = [];
+  const collected = await collectFallbackSearchFiles(targetPaths);
+  const lowerTerms = terms.map((term) => term.toLowerCase());
+  const hitsByTerm = new Map<string, number>();
+
+  for (let termIndex = 0; termIndex < terms.length; termIndex += 1) {
+    const term = terms[termIndex] ?? "";
+    const lowerTerm = lowerTerms[termIndex] ?? "";
+    if (!lowerTerm) continue;
+    for (const absolutePath of collected.files) {
+      if (hits.length >= REPO_SEARCH_PATH_MAX_HITS) {
+        return { hits, truncated: true };
+      }
+      if ((hitsByTerm.get(term) ?? 0) >= REPO_SEARCH_MAX_PER_TERM) break;
+      const filePath = normalizeRepoPath(path.relative(process.cwd(), absolutePath));
+      const lowerPath = filePath.toLowerCase();
+      if (!lowerPath.includes(lowerTerm)) continue;
+      hitsByTerm.set(term, (hitsByTerm.get(term) ?? 0) + 1);
+      const excerpt = await pathMatchImplementationExcerpt(absolutePath);
+      hits.push({
+        filePath,
+        line: excerpt?.line ?? 1,
+        text: excerpt?.text ?? `Path match for repo search term: ${filePath}`,
+        term,
+      });
+    }
+  }
+
+  return { hits, truncated: collected.truncated };
+};
+
 const runNodeFallbackRepoSearch = async (
   terms: string[],
   targetPaths: string[],
@@ -1316,11 +1397,12 @@ const runNodeFallbackRepoSearch = async (
 };
 
 export async function runRepoSearch(plan: RepoSearchPlan): Promise<RepoSearchResult> {
-  const hits: RepoSearchHit[] = [];
-  let truncated = false;
   const stage0Prefilter = await resolveRepoSearchStage0Prefilter(plan);
   const stage0Active = stage0Prefilter.telemetry.used && stage0Prefilter.candidates.length > 0;
   const targetPaths = stage0Active ? stage0Prefilter.candidates : plan.paths;
+  const pathSearch = await runRepoPathSearch(plan.terms, targetPaths);
+  const hits: RepoSearchHit[] = [...pathSearch.hits];
+  let truncated = pathSearch.truncated;
   const rgBin = resolveRipgrepBinary();
   const baseArgs = [
     "--json",
@@ -1356,7 +1438,7 @@ export async function runRepoSearch(plan: RepoSearchPlan): Promise<RepoSearchRes
       if (error?.code === "ENOENT") {
         const fallback = await runNodeFallbackRepoSearch(plan.terms, targetPaths);
         return {
-          hits: fallback.hits,
+          hits: [...hits, ...fallback.hits],
           truncated: truncated || fallback.truncated,
           search_backend: "node_fallback",
           search_backend_bin: null,
@@ -1364,14 +1446,14 @@ export async function runRepoSearch(plan: RepoSearchPlan): Promise<RepoSearchRes
           stage0: applyStage0HitRate(
             stage0Prefilter.telemetry,
             stage0Prefilter.candidates.map((filePath) => ({ filePath })),
-            fallback.hits,
+            [...hits, ...fallback.hits],
           ),
         };
       }
       try {
         const fallback = await runNodeFallbackRepoSearch(plan.terms, targetPaths);
         return {
-          hits: fallback.hits,
+          hits: [...hits, ...fallback.hits],
           truncated: truncated || fallback.truncated,
           search_backend: "node_fallback",
           search_backend_bin: null,
@@ -1379,7 +1461,7 @@ export async function runRepoSearch(plan: RepoSearchPlan): Promise<RepoSearchRes
           stage0: applyStage0HitRate(
             stage0Prefilter.telemetry,
             stage0Prefilter.candidates.map((filePath) => ({ filePath })),
-            fallback.hits,
+            [...hits, ...fallback.hits],
           ),
         };
       } catch {

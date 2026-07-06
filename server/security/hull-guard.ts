@@ -53,10 +53,13 @@ const normalizeHost = (value: string): string => {
 
 export const hullModeEnabled = (): boolean => process.env.HULL_MODE === "1";
 
+export const hullOutboundGuardEnabled = (): boolean =>
+  process.env.HULL_OUTBOUND_GUARD === "1" || process.env.ENABLE_HULL_OUTBOUND_GUARD === "1";
+
 export const getHullAllowList = (): string[] => toPatterns(process.env.HULL_ALLOW_HOSTS);
 
 export function isHullAllowed(target: string): boolean {
-  if (!hullModeEnabled()) {
+  if (!hullOutboundGuardEnabled()) {
     return true;
   }
   const host = normalizeHost(target);
@@ -71,7 +74,7 @@ export function assertHullAllowed(target: string): void {
   if (isHullAllowed(target)) {
     return;
   }
-  const message = `HULL_MODE: blocked outbound to ${target}`;
+  const message = `HULL_OUTBOUND_GUARD: blocked outbound to ${target}`;
   // eslint-disable-next-line no-console
   console.warn(message);
   const error = new Error(message) as NodeJS.ErrnoException & {

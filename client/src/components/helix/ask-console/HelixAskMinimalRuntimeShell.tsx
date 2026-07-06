@@ -1,5 +1,6 @@
 import React, { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
+import type { HelixLanguageModelProfileId } from "@shared/helix-language-model-policy";
 import { DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS } from "@/lib/helix/ask-agent-runtime-display";
 import { useAgiChatStore } from "@/store/useAgiChatStore";
 
@@ -38,6 +39,14 @@ import {
   buildHelixAskRuntimePickerModel,
   HelixAskRuntimePicker,
 } from "./HelixAskRuntimePicker";
+import {
+  buildHelixAskLanguageModelPickerModel,
+  HelixAskLanguageModelPicker,
+} from "./HelixAskLanguageModelPicker";
+import {
+  persistHelixAskLanguageModelProfile,
+  readStoredHelixAskLanguageModelProfile,
+} from "./HelixAskLanguageModelPreference";
 import { useHelixAskRuntimeGoalWakeSubscriptions } from "./HelixAskRuntimeGoalWakeSubscriptions";
 import { HelixAskRuntimeStatusLine } from "./HelixAskStatusLine";
 import {
@@ -87,7 +96,11 @@ export function HelixAskMinimalRuntimeShell({
   const shellProps = buildHelixAskConsoleRuntimeBridgeProps(props);
   const [draft, setDraft] = useState("");
   const [selectedRuntime, setSelectedRuntime] = useState<HelixAgentRuntimeId>("helix");
+  const [selectedLanguageModelProfile, setSelectedLanguageModelProfile] = useState<HelixLanguageModelProfileId>(() =>
+    readStoredHelixAskLanguageModelProfile(),
+  );
   const [runtimeMenuOpen, setRuntimeMenuOpen] = useState(false);
+  const [languageModelMenuOpen, setLanguageModelMenuOpen] = useState(false);
   const [runtimeState, setRuntimeState] = useState(createHelixAskMinimalRuntimeInitialState);
   const [chatSessionId, setChatSessionId] = useState<string | null>(null);
   const [debugDrawer, setDebugDrawer] = useState<HelixAskMinimalRuntimeDebugDrawerState | null>(null);
@@ -226,6 +239,10 @@ export function HelixAskMinimalRuntimeShell({
       }),
     [selectedRuntime],
   );
+  const languageModelPickerModel = useMemo(
+    () => buildHelixAskLanguageModelPickerModel(selectedLanguageModelProfile),
+    [selectedLanguageModelProfile],
+  );
 
   useEffect(() => {
     const sessionId = ensureContextSession(props.contextId, "Helix Ask");
@@ -258,14 +275,31 @@ export function HelixAskMinimalRuntimeShell({
           data-testid="helix-ask-minimal-runtime-shell"
         >
           {visibleSurface?.voiceLevelMonitor}
-          <div className="mb-3 flex justify-end">
+          <div className="mb-3 flex justify-end gap-2">
+            <HelixAskLanguageModelPicker
+              model={languageModelPickerModel}
+              menuOpen={languageModelMenuOpen}
+              onPrimaryClick={() => {
+                setRuntimeMenuOpen(false);
+                setLanguageModelMenuOpen((open) => !open);
+              }}
+              onSelect={(profile) => {
+                setSelectedLanguageModelProfile(profile);
+                persistHelixAskLanguageModelProfile(profile);
+                setLanguageModelMenuOpen(false);
+              }}
+            />
             <HelixAskRuntimePicker
               model={runtimePickerModel}
               menuOpen={runtimeMenuOpen}
-              onPrimaryClick={() => setRuntimeMenuOpen((open) => !open)}
+              onPrimaryClick={() => {
+                setLanguageModelMenuOpen(false);
+                setRuntimeMenuOpen((open) => !open);
+              }}
               onSelect={(runtime) => {
                 setSelectedRuntime(runtime);
                 setRuntimeMenuOpen(false);
+                setLanguageModelMenuOpen(false);
               }}
             />
           </div>
@@ -278,6 +312,7 @@ export function HelixAskMinimalRuntimeShell({
               const submitPlan = buildHelixAskMinimalRuntimeSubmitPlan({
                 draft,
                 selectedRuntime,
+                selectedLanguageModelProfile,
                 desktopUrl: typeof window === "undefined" ? "" : window.location.href,
               });
               if (submitPlan.envelope) {

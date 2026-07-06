@@ -108,12 +108,28 @@ describe("helix ask E68 debug export endpoint", () => {
         question: "Open Scientific Calculator",
         mode: "read",
         debug: true,
+        languageModelProfile: "balanced",
         sessionId: `e68-debug-export-${Date.now()}`,
       })
       .expect(200);
 
     const turnId = turn.body?.turn_id;
     expect(turnId).toBeTruthy();
+    expect(turn.body?.language_model_policy).toMatchObject({
+      requested_profile: "balanced",
+      resolved_profile: "balanced",
+      reasoning_effort: "medium",
+      selection_source: "user_selected",
+      persistence_scope: "session",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(turn.body?.language_model_debug_summary).toContain("AI: Balanced -> Balanced");
+    expect(turn.body?.debug?.language_model_policy).toMatchObject({
+      requested_profile: "balanced",
+      resolved_profile: "balanced",
+    });
     const debugExport = await request(app)
       .get(`/api/agi/ask/turn/${encodeURIComponent(turnId)}/debug-export`)
       .expect(200);
@@ -125,6 +141,20 @@ describe("helix ask E68 debug export endpoint", () => {
     expect(debugExport.body?.payload?.selected_final_answer).toBe(turn.body?.selected_final_answer);
     expect(debugExport.body?.payload?.resolved_turn_summary?.terminal_artifact_kind).toBe(turn.body?.terminal_artifact_kind);
     expect(debugExport.body?.payload?.payload_hash).toEqual(expect.any(String));
+    expect(debugExport.body?.payload?.language_model_policy).toMatchObject({
+      requested_profile: "balanced",
+      resolved_profile: "balanced",
+      resolved_model: expect.any(String),
+      reasoning_effort: "medium",
+      selection_source: "user_selected",
+      persistence_scope: "session",
+      account_policy: "user",
+    });
+    expect(debugExport.body?.payload?.debug?.language_model_policy).toMatchObject({
+      requested_profile: "balanced",
+      resolved_profile: "balanced",
+    });
+    expect(debugExport.body?.payload?.debug?.language_model_debug_summary).toContain("AI: Balanced -> Balanced");
     expect(debugExport.body.payload.payload_hash.length).toBeGreaterThan(12);
     expect(Array.isArray(debugExport.body?.payload?.current_turn_artifact_ledger)).toBe(true);
     expect(debugExport.body?.payload).toHaveProperty("terminal_candidate_rejections");

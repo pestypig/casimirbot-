@@ -606,6 +606,10 @@ type RunAskTurnPayload = {
   question: string;
   agentRuntime?: HelixAgentRuntimeId;
   agent_runtime?: HelixAgentRuntimeId;
+  languageModelProfile?: "auto" | "fast" | "balanced" | "deep";
+  language_model_profile?: "auto" | "fast" | "balanced" | "deep";
+  languageModelOverride?: string;
+  language_model_override?: string;
   goldenPathRuntime?: boolean;
   golden_path_runtime?: boolean;
   sessionId?: string;
@@ -2201,6 +2205,16 @@ const buildRunAskTurnBody = (payload: RunAskTurnPayload): Record<string, unknown
   if (selectedRuntime) {
     body.agentRuntime = selectedRuntime;
     body.agent_runtime = selectedRuntime;
+  }
+  const languageModelProfile = payload.languageModelProfile ?? payload.language_model_profile;
+  if (languageModelProfile) {
+    body.language_model_profile = languageModelProfile;
+    body.languageModelProfile = languageModelProfile;
+  }
+  const languageModelOverride = payload.languageModelOverride ?? payload.language_model_override;
+  if (languageModelOverride?.trim()) {
+    body.language_model_override = languageModelOverride.trim();
+    body.languageModelOverride = languageModelOverride.trim();
   }
   if (typeof payload.goldenPathRuntime === "boolean") body.goldenPathRuntime = payload.goldenPathRuntime;
   if (typeof payload.golden_path_runtime === "boolean") body.golden_path_runtime = payload.golden_path_runtime;

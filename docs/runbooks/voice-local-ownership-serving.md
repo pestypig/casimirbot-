@@ -24,9 +24,8 @@ Default bind:
 - synth: `POST http://127.0.0.1:5051/speak`
 
 ## Wire Helix proxy to local service
-Set these in the Helix app runtime:
+Set this in the Helix app runtime:
 - `TTS_BASE_URL=http://127.0.0.1:5051`
-- `VOICE_PROXY_DRY_RUN=0`
 
 Then restart app server and use `Read aloud` in Helix Ask.
 

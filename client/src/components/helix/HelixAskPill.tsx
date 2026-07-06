@@ -127,6 +127,7 @@ import {
   hasSuccessfulWorkstationTerminalTranscriptRows,
   resolveHelixAskConsoleFinalAnswerSourceLabel,
 } from "@/components/helix/ask-console/HelixAskFinalProjection";
+import { mergeRenderedLanguageModelPolicySummaryIntoDebugExport } from "@/components/helix/ask-console/HelixAskDebugExportModelPolicyProjection";
 import { buildHelixAskAttachmentStripState } from "@/components/helix/ask-console/HelixAskAttachmentStripState";
 import {
   type StagePlayGoalSessionAction,
@@ -598,6 +599,7 @@ import {
 export { shouldBlockStagePlayMailboxWakePromptWithoutRouteMetadata };
 import { humanizeAskLiveEventToken } from "@/lib/helix/ask-display-text";
 import { hash32, stableHelixProjectionHash } from "@/lib/helix/ask-stable-hash";
+import { buildHelixAskChatReferentContextFromSources } from "@/lib/helix/ask-chat-referent-context";
 import {
   readHelixEnvBoolean,
   readHelixEnvEnabledUnlessExactZero,
@@ -628,6 +630,7 @@ import {
   isMissionVoiceOutputModeEnabled,
   resolveInitialMicArmState,
   resolveReadAloudButtonPressAction,
+  resolveReadAloudRegionTrafficState,
   shouldEnableVoiceRollout,
   shouldStopReadAloudOnButtonPress,
   transitionReadAloudState,
@@ -646,6 +649,7 @@ export {
   isMissionVoiceOutputModeEnabled,
   resolveInitialMicArmState,
   resolveReadAloudButtonPressAction,
+  resolveReadAloudRegionTrafficState,
   shouldEnableVoiceRollout,
   shouldStopReadAloudOnButtonPress,
   transitionReadAloudState,
@@ -857,7 +861,6 @@ import {
   VOICE_LOCAL_AUDIO_GATE_MIN_SNR_DB,
   VOICE_LOCAL_AUDIO_GATE_MIN_SPEECH_PROBABILITY,
   deriveVoiceSegmentLocalAnalysis,
-  describeMediaErrorCode,
   getMicRecorderMimeCandidates,
   isFlatVoiceSignal,
   isLikelyLoopbackDeviceLabel,
@@ -1111,7 +1114,10 @@ import {
   type VoicePlaybackUtteranceIntent,
 } from "@/lib/helix/ask-voice-playback-intent";
 import {
+  buildHelixAskVoicePlaybackLifecycleReceiptInput,
+  buildHelixAskVoiceSpeakRequest,
   buildHelixAskVoicePlaybackToolHandoffPlan,
+  classifyHelixAskVoiceSpeakJsonResponse,
   executeHelixAskVoicePlaybackToolHandoffPlan,
   recordHelixAskVoicePlaybackToolOutcomeReceipt,
 } from "@/components/helix/ask-console/HelixAskVoicePlaybackToolController";
@@ -1158,11 +1164,11 @@ import {
   subscribeVoiceCallDiagnostics,
   type VoiceCallDiagnosticSnapshot,
 } from "@/lib/helix/voice-call-diagnostics";
+import type { VoicePlaybackLifecycleDiagnostic } from "@/lib/helix/voice-playback-diagnostics";
 import {
-  createVoicePlaybackLifecycleDiagnostic,
-  updateVoicePlaybackLifecycleDiagnosticFromAudio,
-  type VoicePlaybackLifecycleDiagnostic,
-} from "@/lib/helix/voice-playback-diagnostics";
+  applyHelixAskVoicePlaybackTransportCommand,
+  playHelixAskVoiceAudioBlob,
+} from "@/components/helix/ask-console/HelixAskVoicePlaybackRuntime";
 import {
   advanceReasoningTheaterFrontierTracker,
   clampFrontierMeterPct,
@@ -1294,13 +1300,6 @@ const HELIX_VOICE_LIMITER_KNEE_DB = 1;
 const HELIX_VOICE_LIMITER_RATIO = 20;
 const HELIX_VOICE_LIMITER_ATTACK_S = 0.001;
 const HELIX_VOICE_LIMITER_RELEASE_S = 0.08;
-const VOICE_PLAYBACK_DIRECT_RETRY_DELAY_MS = 120;
-const VOICE_PLAYBACK_GRAPH_FAILURE_STREAK_FOR_BYPASS = 2;
-const VOICE_PLAYBACK_GRAPH_BYPASS_MS = 90_000;
-const VOICE_PLAYBACK_NO_PROGRESS_TIMEOUT_MS = 3_500;
-const VOICE_PLAYBACK_UNKNOWN_DURATION_TIMEOUT_MS = 15_000;
-const VOICE_PLAYBACK_DURATION_TIMEOUT_PAD_MS = 4_000;
-const VOICE_PLAYBACK_DURATION_TIMEOUT_MAX_MS = 60_000;
 const HELIX_VOICE_CONFIRM_V2_ENABLED = readHelixEnvBoolean(
   (import.meta as any)?.env,
   "VITE_HELIX_VOICE_CONFIRM_V2_ENABLED",
@@ -5413,6 +5412,9 @@ export function buildReplyScopedDebugExportFromRenderedButton(
     null;
   const clientTurnId = rendered.clientTurnId || reply.id || null;
   const includeReplyDebug = renderedMatchesReply && backendTurnScopeTrusted;
+  const renderedModelPolicyDebugSummary = coerceText(rendered.modelPolicyDebugSummary).trim();
+  const renderedLanguageModelDebugSummary =
+    /^AI:\s*/i.test(renderedModelPolicyDebugSummary) ? renderedModelPolicyDebugSummary : null;
   return buildHelixDebugExportEnvelopeFromMasterPayload(reply, {
     schema: "helix.ask.master_event_clock.v2",
     exportedAt: new Date().toISOString(),
@@ -5433,6 +5435,12 @@ export function buildReplyScopedDebugExportFromRenderedButton(
       sourceCount: reply.sources?.length ?? 0,
     },
     debug: includeReplyDebug ? reply.debug ?? null : null,
+    language_model_debug_summary:
+      (includeReplyDebug ? replyRecord.language_model_debug_summary ?? replyDebugRecord?.language_model_debug_summary : null) ??
+      renderedLanguageModelDebugSummary,
+    model_policy_debug_summary:
+      (includeReplyDebug ? replyRecord.model_policy_debug_summary ?? replyDebugRecord?.model_policy_debug_summary : null) ??
+      renderedLanguageModelDebugSummary,
     active_prompt: rendered.question ?? reply.question ?? null,
     selected_final_answer: rendered.finalAnswer ?? "",
     final_answer_source:
@@ -5976,6 +5984,20 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     readAgentLoopAuditRecord(debug?.console_assembly_debug) ??
     readAgentLoopAuditRecord(debug?.client_console_assembly_debug) ??
     null;
+  const languageModelPolicyForDebug =
+    readAgentLoopAuditRecord(payload.language_model_policy) ??
+    readAgentLoopAuditRecord(debug?.language_model_policy) ??
+    readAgentLoopAuditRecord(agentLoop?.language_model_policy);
+  const languageModelDebugSummary =
+    coerceText(payload.language_model_debug_summary).trim() ||
+    coerceText(debug?.language_model_debug_summary).trim() ||
+    coerceText(agentLoop?.language_model_debug_summary).trim() ||
+    null;
+  const modelPolicyDebugSummary =
+    coerceText(payload.model_policy_debug_summary).trim() ||
+    coerceText(debug?.model_policy_debug_summary).trim() ||
+    coerceText(agentLoop?.model_policy_debug_summary).trim() ||
+    languageModelDebugSummary;
   const lifecycleEvents = Array.isArray(workspaceActionSource?.workspace_action_lifecycle_events)
     ? workspaceActionSource.workspace_action_lifecycle_events
     : Array.isArray(payload.workspace_action_lifecycle_events)
@@ -6071,6 +6093,15 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     agent_runtime: agentRuntime,
     agent_runtime_selection_trace: agentRuntimeSelectionTrace,
     selected_agent_provider: selectedAgentProvider,
+    language_model_policy: languageModelPolicyForDebug ?? null,
+    language_model_debug_summary: languageModelDebugSummary,
+    model_policy_debug_summary: modelPolicyDebugSummary,
+    debug: {
+      schema: "helix.ask.debug_export_policy_projection.v1",
+      language_model_policy: languageModelPolicyForDebug ?? null,
+      language_model_debug_summary: languageModelDebugSummary,
+      model_policy_debug_summary: modelPolicyDebugSummary,
+    },
     provider_gateway_debug_summary: providerGatewayDebugSummary,
     workstation_gateway_manifest: workstationGatewayManifest,
     workstation_gateway_manifest_version:
@@ -8555,6 +8586,7 @@ export function HelixAskPill({
   const voiceAutoSpeakAbortControllerRef = useRef<AbortController | null>(null);
   const voiceAutoSpeakPendingPlaybackResolverRef = useRef<(() => void) | null>(null);
   const voiceAutoSpeakCancelReasonRef = useRef<VoicePlaybackCancelReason | null>(null);
+  const voicePlaybackTransportPausedRef = useRef(false);
   const voiceAutoSpeakLastMetricsRef = useRef<VoicePlaybackMetrics | null>(null);
   const voicePlaybackOutcomeReceiptsRef = useRef<VoicePlaybackOutcomeReceipt[]>([]);
   const interimVoiceSpokenReceiptKeysRef = useRef<Set<string>>(new Set());
@@ -10401,12 +10433,13 @@ export function HelixAskPill({
             }
           },
         });
-        const exportPayload = boundHelixDebugExportTextForUi(
-          enforceDebugExportMatchesClickedButton({
+        const matchedExportPayload = enforceDebugExportMatchesClickedButton({
             exportPayload: replyScopedAuthoritativePayload,
             clickedButtonScopedPayload: renderedButtonScopedPayload,
             sourceElement,
-          }),
+          });
+        const exportPayload = boundHelixDebugExportTextForUi(
+          mergeRenderedLanguageModelPolicySummaryIntoDebugExport(matchedExportPayload, clickedTurnScope),
         );
         if (typeof window !== "undefined") {
           (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY__?: string }).__HELIX_LAST_UNIFIED_DEBUG_COPY__ = exportPayload;
@@ -10471,6 +10504,38 @@ export function HelixAskPill({
   }) => {
     recordHelixAskVoicePlaybackToolOutcomeReceipt({
       receipt: input,
+      currentReceipts: voicePlaybackOutcomeReceiptsRef.current,
+      audioUnlocked: voiceAudioUnlockedRef.current,
+      playbackPath: voicePlaybackCurrentPathRef.current ?? voicePlaybackLastOutcomePathRef.current,
+      commitReceipts: (next) => {
+        voicePlaybackOutcomeReceiptsRef.current = next;
+        setVoicePlaybackOutcomeReceipts(next);
+      },
+    });
+  }, []);
+
+  const recordManualReadAloudLifecycleReceipt = useCallback((input: {
+    playbackStatus: "queued" | "started" | "paused" | "resumed" | "completed" | "cancelled" | "failed";
+    replyId: string;
+    cancelReason?: string | null;
+    error?: string | null;
+    positionMs?: number | null;
+  }) => {
+    const activeUtterance = voiceAutoSpeakActiveUtteranceRef.current;
+    const utteranceId = activeUtterance?.utteranceId ?? `manual_read_aloud:${input.replyId}`;
+    const turnKey = activeUtterance?.turnKey ?? `manual:${input.replyId}`;
+    recordHelixAskVoicePlaybackToolOutcomeReceipt({
+      receipt: buildHelixAskVoicePlaybackLifecycleReceiptInput({
+        playbackStatus: input.playbackStatus,
+        utteranceId,
+        turnKey,
+        sourceTurnId: turnKey,
+        sourceTextHash: activeUtterance?.text ? `fnv1a32:${hashVoiceUtteranceKey(activeUtterance.text)}` : null,
+        kind: "manual_read_aloud",
+        cancelReason: input.cancelReason ?? null,
+        error: input.error ?? null,
+        positionMs: input.positionMs ?? null,
+      }),
       currentReceipts: voicePlaybackOutcomeReceiptsRef.current,
       audioUnlocked: voiceAudioUnlockedRef.current,
       playbackPath: voicePlaybackCurrentPathRef.current ?? voicePlaybackLastOutcomePathRef.current,
@@ -10860,383 +10925,42 @@ export function HelixAskPill({
   }, [ensureVoicePlaybackAudioGraph, getOrCreateVoicePlaybackElement]);
 
   const playVoiceAudioBlob = useCallback(
-    async (input: { blob: Blob; replyId?: string | null; awaitPlayback?: boolean }): Promise<VoicePlaybackLifecycleDiagnostic> => {
-      const replyId = input.replyId ?? null;
-      if (!voiceAudioUnlockedRef.current) {
-        await primeVoiceAudioPlayback().catch(() => false);
-      }
-      let directFallbackAttempted = false;
-      let directRetryCount = 0;
-      while (true) {
-        const reusePrimaryElement = !directFallbackAttempted && directRetryCount === 0;
-        const audio = reusePrimaryElement ? getOrCreateVoicePlaybackElement() : createVoicePlaybackElement();
-        if (!reusePrimaryElement) {
-          playbackElementRef.current = audio;
-        }
-        const bypassGraph = !directFallbackAttempted
-          ? shouldBypassVoicePlaybackGraph({
-              bypassUntilMs: voicePlaybackGraphBypassUntilMsRef.current,
-              nowMs: Date.now(),
-            })
-          : false;
-        const graphAttached =
-          directFallbackAttempted || bypassGraph
-            ? false
-            : await ensureVoicePlaybackAudioGraph(audio).catch(() => false);
-        if (!directFallbackAttempted && graphAttached) {
-          voicePlaybackGraphAttemptCountRef.current += 1;
-          voicePlaybackGraphFailureStreakRef.current = 0;
-          voicePlaybackGraphBypassUntilMsRef.current = null;
-        }
-        voicePlaybackCurrentPathRef.current = resolveVoicePlaybackAttemptPath({
-          graphAttached,
-          directFallbackAttempted,
-        });
-        const url = URL.createObjectURL(input.blob);
-        audio.muted = false;
-        audio.volume = 1;
-        playbackUrlRef.current = url;
-        playbackReplyIdRef.current = replyId;
-        audio.src = url;
-        audio.load();
-        playbackAudioRef.current = audio;
-        let lifecycleDiagnostic = createVoicePlaybackLifecycleDiagnostic({
-          stage: "audio_response",
-          mimeType: input.blob.type || "application/octet-stream",
-          audioBytes: input.blob.size,
-        });
-        if (replyId) {
-          setReadAloudByReply((prev) => buildReadAloudStateMapTransition(prev, replyId, "audio"));
-        }
-        try {
-          await new Promise<void>((resolve, reject) => {
-            let settled = false;
-            let watchdogId: number | null = null;
-            let playResolvedAtMs: number | null = null;
-            let lastProgressAtMs = Date.now();
-            let lastCurrentTime = 0;
-            let playbackStopResolver: (() => void) | null = null;
-            const getDurationSeconds = () =>
-              Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : null;
-            const cleanupPlaybackHandlers = () => {
-              audio.onended = null;
-              audio.onerror = null;
-              audio.onplaying = null;
-              audio.ontimeupdate = null;
-              audio.onloadedmetadata = null;
-              if (watchdogId !== null && typeof window !== "undefined") {
-                window.clearInterval(watchdogId);
-                watchdogId = null;
-              }
-            };
-            const failWithPlaybackTimeout = (reason: "no_progress" | "duration_exceeded") => {
-              if (settled) return;
-              lifecycleDiagnostic = updateVoicePlaybackLifecycleDiagnosticFromAudio(
-                lifecycleDiagnostic,
-                audio,
-                "error",
-                `voice_audio_playback_timeout:${reason}`,
-              );
-              settled = true;
-              cleanupPlaybackHandlers();
-              if (
-                playbackStopResolver &&
-                voiceAutoSpeakPendingPlaybackResolverRef.current === playbackStopResolver
-              ) {
-                voiceAutoSpeakPendingPlaybackResolverRef.current = null;
-              }
-              if (replyId) {
-                setReadAloudByReply((prev) => buildReadAloudStateMapTransition(prev, replyId, "error"));
-              }
-              if (playbackUrlRef.current === url) {
-                URL.revokeObjectURL(url);
-                playbackUrlRef.current = null;
-              }
-              if (playbackAudioRef.current === audio) {
-                playbackAudioRef.current = null;
-                voicePlaybackLastOutcomePathRef.current = voicePlaybackCurrentPathRef.current;
-                voicePlaybackCurrentPathRef.current = null;
-              }
-              if (playbackReplyIdRef.current === replyId) {
-                playbackReplyIdRef.current = null;
-              }
-              try {
-                audio.pause();
-              } catch {
-                // no-op
-              }
-              audio.src = "";
-              audio.load();
-              reject(new Error(`voice_audio_playback_timeout:${reason}`));
-            };
-            const finalize = (event: "ended" | "error" | "stopped") => {
-              if (settled) return;
-              lifecycleDiagnostic = updateVoicePlaybackLifecycleDiagnosticFromAudio(
-                lifecycleDiagnostic,
-                audio,
-                event === "ended" ? "ended" : event === "stopped" ? "aborted" : "error",
-                event === "error" ? "voice_audio_playback_error" : event === "stopped" ? "voice_audio_playback_stopped" : null,
-              );
-              settled = true;
-              cleanupPlaybackHandlers();
-              if (
-                playbackStopResolver &&
-                voiceAutoSpeakPendingPlaybackResolverRef.current === playbackStopResolver
-              ) {
-                voiceAutoSpeakPendingPlaybackResolverRef.current = null;
-              }
-              if (replyId) {
-                setReadAloudByReply((prev) =>
-                  buildReadAloudStateMapTransition(
-                    prev,
-                    replyId,
-                    event === "ended" ? "ended" : event === "stopped" ? "stop" : "error",
-                  ),
-                );
-              }
-              if (playbackUrlRef.current === url) {
-                URL.revokeObjectURL(url);
-                playbackUrlRef.current = null;
-              }
-              if (playbackAudioRef.current === audio) {
-                playbackAudioRef.current = null;
-                voicePlaybackLastOutcomePathRef.current = voicePlaybackCurrentPathRef.current;
-                voicePlaybackCurrentPathRef.current = null;
-              }
-              if (playbackReplyIdRef.current === replyId) {
-                playbackReplyIdRef.current = null;
-              }
-              if (event === "error") {
-                const playedSeconds = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
-                const durationSeconds =
-                  Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : null;
-                const mediaErrorCode = audio.error?.code ?? null;
-                if (
-                  shouldTreatVoicePlaybackErrorAsEnded({
-                    playedSeconds,
-                    durationSeconds,
-                    directFallbackAttempted,
-                  })
-                ) {
-                  resolve();
-                  return;
-                }
-                const mediaErrorDetail = describeMediaErrorCode(mediaErrorCode);
-                reject(new Error(`voice_audio_playback_error:${mediaErrorDetail}`));
-                return;
-              }
-              resolve();
-            };
-            const resolver = () => finalize("stopped");
-            playbackStopResolver = resolver;
-            voiceAutoSpeakPendingPlaybackResolverRef.current = resolver;
-            audio.onended = () => finalize("ended");
-            audio.onerror = () => finalize("error");
-            audio.onplaying = () => {
-              lifecycleDiagnostic = updateVoicePlaybackLifecycleDiagnosticFromAudio(
-                lifecycleDiagnostic,
-                audio,
-                "playing",
-              );
-              lastProgressAtMs = Date.now();
-            };
-            audio.ontimeupdate = () => {
-              lifecycleDiagnostic = updateVoicePlaybackLifecycleDiagnosticFromAudio(
-                lifecycleDiagnostic,
-                audio,
-                "timeupdate",
-              );
-              const currentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
-              if (currentTime > lastCurrentTime + 0.02) {
-                lastCurrentTime = currentTime;
-                lastProgressAtMs = Date.now();
-              }
-            };
-            audio.onloadedmetadata = () => {
-              lastProgressAtMs = Date.now();
-            };
-            if (typeof window !== "undefined") {
-              watchdogId = window.setInterval(() => {
-                if (settled) return;
-                const now = Date.now();
-                const currentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
-                const durationSeconds = getDurationSeconds();
-                if (audio.ended || (durationSeconds !== null && currentTime >= Math.max(0, durationSeconds - 0.15))) {
-                  finalize("ended");
-                  return;
-                }
-                if (currentTime > lastCurrentTime + 0.02) {
-                  lastCurrentTime = currentTime;
-                  lastProgressAtMs = now;
-                }
-                if (
-                  playResolvedAtMs !== null &&
-                  currentTime < 0.1 &&
-                  now - lastProgressAtMs > VOICE_PLAYBACK_NO_PROGRESS_TIMEOUT_MS
-                ) {
-                  failWithPlaybackTimeout("no_progress");
-                  return;
-                }
-                const durationTimeoutMs =
-                  durationSeconds !== null
-                    ? Math.min(
-                        VOICE_PLAYBACK_DURATION_TIMEOUT_MAX_MS,
-                        Math.max(8_000, durationSeconds * 1_000 + VOICE_PLAYBACK_DURATION_TIMEOUT_PAD_MS),
-                      )
-                    : VOICE_PLAYBACK_UNKNOWN_DURATION_TIMEOUT_MS;
-                if (playResolvedAtMs !== null && now - playResolvedAtMs > durationTimeoutMs) {
-                  failWithPlaybackTimeout("duration_exceeded");
-                }
-              }, 250);
-            }
-            const attemptPlay = async () => {
-              try {
-                lifecycleDiagnostic = updateVoicePlaybackLifecycleDiagnosticFromAudio(
-                  lifecycleDiagnostic,
-                  audio,
-                  "play_requested",
-                );
-                await audio.play();
-                lifecycleDiagnostic = updateVoicePlaybackLifecycleDiagnosticFromAudio(
-                  lifecycleDiagnostic,
-                  audio,
-                  "play_resolved",
-                );
-                playResolvedAtMs = Date.now();
-                lastProgressAtMs = playResolvedAtMs;
-                voiceAudioUnlockedRef.current = true;
-                voicePlaybackLastUnlockFailureRef.current = null;
-              } catch (error) {
-                if (
-                  error instanceof DOMException &&
-                  (error.name === "NotAllowedError" || error.name === "AbortError")
-                ) {
-                  const unlocked = await primeVoiceAudioPlayback();
-                  if (unlocked) {
-                    lifecycleDiagnostic = updateVoicePlaybackLifecycleDiagnosticFromAudio(
-                      lifecycleDiagnostic,
-                      audio,
-                      "play_requested",
-                    );
-                    await audio.play();
-                    lifecycleDiagnostic = updateVoicePlaybackLifecycleDiagnosticFromAudio(
-                      lifecycleDiagnostic,
-                      audio,
-                      "play_resolved",
-                    );
-                    playResolvedAtMs = Date.now();
-                    lastProgressAtMs = playResolvedAtMs;
-                    voiceAudioUnlockedRef.current = true;
-                    voicePlaybackLastUnlockFailureRef.current = null;
-                    return;
-                  }
-                }
-                throw error;
-              }
-            };
-            if (input.awaitPlayback === false) {
-              void attemptPlay()
-                .then(() => resolve())
-                .catch(() => finalize("error"));
-              return;
-            }
-            void attemptPlay().catch((error) => {
-              if (
-                error instanceof DOMException &&
-                (error.name === "NotAllowedError" || error.name === "AbortError")
-              ) {
-                setVoiceInputError("Audio blocked on this device. Tap mic to enable playback.");
-              }
-              finalize("error");
-            });
-          });
-          return lifecycleDiagnostic;
-        } catch (error) {
-          // Mobile Safari can intermittently fail MediaElementSource playback; retry once
-          // with direct element output by discarding the graph-bound element.
-          if (
-            shouldRetryVoicePlaybackWithDirectFallback({
-              graphAttached,
-              directFallbackAttempted,
-            })
-          ) {
-            const nextFailureStreak = voicePlaybackGraphFailureStreakRef.current + 1;
-            voicePlaybackGraphFailureStreakRef.current = nextFailureStreak;
-            if (nextFailureStreak >= VOICE_PLAYBACK_GRAPH_FAILURE_STREAK_FOR_BYPASS) {
-              voicePlaybackGraphBypassUntilMsRef.current = Date.now() + VOICE_PLAYBACK_GRAPH_BYPASS_MS;
-            }
-            directFallbackAttempted = true;
-            voicePlaybackFallbackCountRef.current += 1;
-            voicePlaybackLastFallbackRef.current = {
-              reason: error instanceof Error ? error.message : String(error),
-              atMs: Date.now(),
-            };
-            voicePlaybackCurrentPathRef.current = "direct_fallback";
-            teardownVoicePlaybackAudioGraph();
-            try {
-              audio.pause();
-            } catch {
-              // no-op
-            }
-            audio.onended = null;
-            audio.onerror = null;
-            audio.src = "";
-            audio.load();
-            if (playbackElementRef.current === audio) {
-              if (audio.isConnected) {
-                audio.remove();
-              }
-              playbackElementRef.current = null;
-            }
-            continue;
-          }
-          if (
-            shouldRetryVoicePlaybackDirectAttempt({
-              graphAttached,
-              directFallbackAttempted,
-              directRetryCount,
-            })
-          ) {
-            directRetryCount += 1;
-            voicePlaybackFallbackCountRef.current += 1;
-            voicePlaybackLastFallbackRef.current = {
-              reason: `direct_retry:${error instanceof Error ? error.message : String(error)}`,
-              atMs: Date.now(),
-            };
-            voicePlaybackCurrentPathRef.current = "direct_fallback";
-            await new Promise<void>((resolve) => {
-              setTimeout(resolve, VOICE_PLAYBACK_DIRECT_RETRY_DELAY_MS);
-            });
-            try {
-              audio.pause();
-            } catch {
-              // no-op
-            }
-            audio.onended = null;
-            audio.onerror = null;
-            audio.src = "";
-            audio.load();
-            if (playbackElementRef.current === audio) {
-              if (audio.isConnected) {
-                audio.remove();
-              }
-              playbackElementRef.current = null;
-            }
-            continue;
-          }
-          throw error;
-        }
-      }
-    },
+    async (input: { blob: Blob; replyId?: string | null; awaitPlayback?: boolean }): Promise<VoicePlaybackLifecycleDiagnostic> =>
+      playHelixAskVoiceAudioBlob({
+        ...input,
+        voiceAudioUnlockedRef,
+        voicePlaybackLastUnlockFailureRef,
+        voicePlaybackCurrentPathRef,
+        voicePlaybackLastOutcomePathRef,
+        voicePlaybackGraphAttemptCountRef,
+        voicePlaybackGraphFailureStreakRef,
+        voicePlaybackGraphBypassUntilMsRef,
+        voicePlaybackFallbackCountRef,
+        voicePlaybackLastFallbackRef,
+        voicePlaybackTransportPausedRef,
+        playbackElementRef,
+        playbackUrlRef,
+        playbackReplyIdRef,
+        playbackAudioRef,
+        voiceAutoSpeakPendingPlaybackResolverRef,
+        primeVoiceAudioPlayback,
+        ensureVoicePlaybackAudioGraph,
+        createVoicePlaybackElement,
+        getOrCreateVoicePlaybackElement,
+        teardownVoicePlaybackAudioGraph,
+        setReadAloudByReply,
+        recordManualReadAloudLifecycleReceipt,
+        setVoiceInputError,
+      }),
     [
       primeVoiceAudioPlayback,
       ensureVoicePlaybackAudioGraph,
       createVoicePlaybackElement,
       getOrCreateVoicePlaybackElement,
+      recordManualReadAloudLifecycleReceipt,
       teardownVoicePlaybackAudioGraph,
     ],
   );
-
   const clearVoicePendingPreempt = useCallback(() => {
     const pending = voicePendingPreemptRef.current;
     if (!pending) return;
@@ -11255,6 +10979,7 @@ export function HelixAskPill({
 
   const stopReadAloud = useCallback((reason: VoicePlaybackCancelReason = "manual_stop") => {
     clearVoicePendingPreempt();
+    voicePlaybackTransportPausedRef.current = false;
     voiceBargeHoldActiveRef.current = false;
     voiceBargeHoldTurnKeyRef.current = null;
     voiceBargeHoldStartedAtMsRef.current = null;
@@ -11416,22 +11141,26 @@ export function HelixAskPill({
         setReadAloudByReply((prev) => buildReadAloudStateMapTransition(prev, replyId, "request"));
       }
       try {
-        const response = await speakVoice({
+        const response = await speakVoice(buildHelixAskVoiceSpeakRequest({
           text,
-          mode: "briefing",
-          priority: "info",
           provider: input.provider,
-          voice_profile_id: input.voiceProfileId,
+          voiceProfileId: input.voiceProfileId,
           traceId: input.traceId ?? askLiveTraceId ?? `ask:${crypto.randomUUID()}`,
           missionId: contextId,
           eventId: input.eventId,
           contextTier: missionContextControls.tier,
           sessionState: contextSessionState,
           voiceMode: missionContextControls.voiceMode,
-        });
+          chunkKind: "manual_read_aloud",
+          turnKey: input.markReplyId ? `manual:${input.markReplyId}` : undefined,
+          utteranceId: input.markReplyId ? `manual_read_aloud:${input.markReplyId}` : undefined,
+        }));
         if (response.kind === "json") {
           if (replyId) {
-            const statusEvent = response.status >= 400 ? "error" : "dry-run";
+            const statusEvent = classifyHelixAskVoiceSpeakJsonResponse({
+              status: response.status,
+              payload: response.payload,
+            }).stateEvent;
             setReadAloudByReply((prev) => buildReadAloudStateMapTransition(prev, replyId, statusEvent));
           }
           return "json";
@@ -11510,12 +11239,10 @@ export function HelixAskPill({
       for (let attempt = 1; attempt <= VOICE_CHUNK_SYNTH_MAX_ATTEMPTS; attempt += 1) {
         try {
           const response = await speakVoice(
-            {
+            buildHelixAskVoiceSpeakRequest({
               text: input.chunk.text,
-              mode: "briefing",
-              priority: "info",
               provider: HELIX_VOICE_AUTO_SPEAK_PROVIDER,
-              voice_profile_id: HELIX_VOICE_AUTO_SPEAK_DEFAULT_PROFILE_ID,
+              voiceProfileId: HELIX_VOICE_AUTO_SPEAK_DEFAULT_PROFILE_ID,
               traceId: input.utterance.traceId ?? askLiveTraceId ?? `ask:${crypto.randomUUID()}`,
               // Brief/final auto-speak is chunked; omit missionId to avoid callout rate rails.
               missionId: undefined,
@@ -11536,20 +11263,18 @@ export function HelixAskPill({
                   ].filter((value): value is string => Boolean(value?.trim()))
                 : undefined,
               repoAttributed: isInterimVoicePlaybackUtteranceKind(input.chunk.kind) ? false : undefined,
-            },
+            }),
             { signal: input.signal },
           );
           if (response.kind === "json") {
-            const suppressionReason =
-              (response.payload as { suppression_reason?: string | null }).suppression_reason ??
-              response.payload?.reason ??
-              response.payload?.error ??
-              response.payload?.message ??
-              "voice_auto_speak_json_response";
-            if (response.payload?.suppressed === true || response.status < 400) {
-              throw new Error(`voice_auto_speak_suppressed:${suppressionReason}`);
+            const classification = classifyHelixAskVoiceSpeakJsonResponse({
+              status: response.status,
+              payload: response.payload,
+            });
+            if (classification.stateEvent === "suppressed") {
+              throw new Error(`voice_auto_speak_suppressed:${classification.reason}`);
             }
-            const statusError = new Error(suppressionReason) as Error & {
+            const statusError = new Error(classification.reason) as Error & {
               status?: number;
               retryAfterMs?: number;
             };
@@ -11902,6 +11627,7 @@ export function HelixAskPill({
               utteranceId: utterance.utteranceId,
               chunkIndex: chunk.chunkIndex,
               chunkCount: chunk.chunkCount,
+              text: chunk.text,
             });
             metrics.playbackLifecycle = await playVoiceAudioBlob({
               blob: currentResult.blob,
@@ -11918,6 +11644,7 @@ export function HelixAskPill({
               utteranceId: utterance.utteranceId,
               chunkIndex: chunk.chunkIndex,
               chunkCount: chunk.chunkCount,
+              text: chunk.text,
             });
             if (voiceAutoSpeakCancelReasonRef.current) {
               metrics.cancelReason = metrics.cancelReason ?? voiceAutoSpeakCancelReasonRef.current;
@@ -12003,6 +11730,7 @@ export function HelixAskPill({
                 utteranceId: utterance.utteranceId,
                 chunkIndex: nextChunk.chunkIndex,
                 chunkCount: nextChunk.chunkCount,
+                text: nextChunk.text,
                 detail: "prefetched",
               });
               metrics.playbackLifecycle = await playVoiceAudioBlob({
@@ -12020,6 +11748,7 @@ export function HelixAskPill({
                 utteranceId: utterance.utteranceId,
                 chunkIndex: nextChunk.chunkIndex,
                 chunkCount: nextChunk.chunkCount,
+                text: nextChunk.text,
                 detail: "prefetched",
               });
               if (voiceAutoSpeakCancelReasonRef.current) {
@@ -12105,7 +11834,7 @@ export function HelixAskPill({
               metrics.cancelReason = metrics.cancelReason ?? voiceAutoSpeakCancelReasonRef.current;
               if (utterance.replyId) {
                 setReadAloudByReply((prev) =>
-                  buildReadAloudStateMapTransition(prev, utterance.replyId as string, "dry-run"),
+                  buildReadAloudStateMapTransition(prev, utterance.replyId as string, "suppressed"),
                 );
               }
             } else {
@@ -12563,6 +12292,23 @@ export function HelixAskPill({
         if (heldUtteranceKind === "final") {
           suppressVoiceFinalsForActiveTurns(heldTurnKey);
         }
+        const activeUtterance = voiceAutoSpeakActiveUtteranceRef.current;
+        if (activeUtterance && canPlayVoiceUtteranceWithMicOff(activeUtterance)) {
+          const replyId = activeUtterance.replyId ?? playbackReplyIdRef.current;
+          if (replyId) {
+            void applyHelixAskVoicePlaybackTransportCommand({
+              command: "pause",
+              replyId,
+              voicePlaybackTransportPausedRef,
+              playbackReplyIdRef,
+              playbackAudioRef,
+              setReadAloudByReply,
+              recordManualReadAloudLifecycleReceipt,
+              pauseCancelReason: "barge_in_pause",
+            });
+            return;
+          }
+        }
         stopReadAloud("barge_in");
         return;
       }
@@ -12574,17 +12320,58 @@ export function HelixAskPill({
         voiceBargeTrafficQuietUntilMsRef.current = quietUntilCandidate;
       }
     },
-    [stopReadAloud, suppressVoiceFinalsForActiveTurns],
+    [recordManualReadAloudLifecycleReceipt, stopReadAloud, suppressVoiceFinalsForActiveTurns],
   );
 
   const handleReadAloud = useCallback(
     async (reply: HelixAskReply, textOverride?: string | null) => {
       const currentState = readAloudByReply[reply.id] ?? "idle";
       const initialAction = resolveReadAloudButtonPressAction({ currentState });
+      if (initialAction === "pause") {
+        const handled = await applyHelixAskVoicePlaybackTransportCommand({
+          command: "pause",
+          replyId: reply.id,
+          voicePlaybackTransportPausedRef,
+          playbackReplyIdRef,
+          playbackAudioRef,
+          setReadAloudByReply,
+          recordManualReadAloudLifecycleReceipt,
+        });
+        if (handled) {
+          return;
+        }
+      }
+      if (initialAction === "resume") {
+        const handled = await applyHelixAskVoicePlaybackTransportCommand({
+          command: "resume",
+          replyId: reply.id,
+          voicePlaybackTransportPausedRef,
+          playbackReplyIdRef,
+          playbackAudioRef,
+          setReadAloudByReply,
+          recordManualReadAloudLifecycleReceipt,
+        });
+        if (handled) {
+          return;
+        }
+      }
       if (initialAction === "stop") {
-        voiceAutoSpeakQueueRef.current = filterReadAloudQueueForReply(voiceAutoSpeakQueueRef.current, reply.id);
-        stopReadAloud("manual_stop");
-        setReadAloudByReply((prev) => buildReadAloudStateMapTransition(prev, reply.id, "stop"));
+        await applyHelixAskVoicePlaybackTransportCommand({
+          command: "stop",
+          replyId: reply.id,
+          voicePlaybackTransportPausedRef,
+          playbackReplyIdRef,
+          playbackAudioRef,
+          setReadAloudByReply,
+          recordManualReadAloudLifecycleReceipt,
+          clearQueuedReply: (replyId) => {
+            voiceAutoSpeakQueueRef.current = filterReadAloudQueueForReply(
+              voiceAutoSpeakQueueRef.current,
+              replyId,
+            );
+          },
+          stopReadAloud: () => stopReadAloud("manual_stop"),
+        });
         return;
       }
       const target = buildHelixAskLegacyTurnControlActionPayload({
@@ -12601,6 +12388,10 @@ export function HelixAskPill({
         return;
       }
       setReadAloudByReply((prev) => buildReadAloudStateMapTransition(prev, reply.id, "request"));
+      recordManualReadAloudLifecycleReceipt({
+        playbackStatus: "queued",
+        replyId: reply.id,
+      });
       try {
         await primeVoiceAudioPlayback();
         const accepted = enqueueVoicePlaybackIntent(buildManualReadAloudVoiceIntent({
@@ -12615,7 +12406,15 @@ export function HelixAskPill({
         setReadAloudByReply((prev) => buildReadAloudStateMapTransition(prev, reply.id, "error"));
       }
     },
-    [askLiveTraceId, buildCopyText, enqueueVoicePlaybackIntent, primeVoiceAudioPlayback, readAloudByReply, stopReadAloud],
+    [
+      askLiveTraceId,
+      buildCopyText,
+      enqueueVoicePlaybackIntent,
+      primeVoiceAudioPlayback,
+      readAloudByReply,
+      recordManualReadAloudLifecycleReceipt,
+      stopReadAloud,
+    ],
   );
 
   const clearRetainedVoiceTranscriptionRetry = useCallback(() => {
@@ -12630,19 +12429,21 @@ export function HelixAskPill({
 
   useEffect(() => {
     if (micArmState !== "off") return;
-    voiceAutoSpeakQueueRef.current = [];
-    voiceAutoSpeakActiveUtteranceRef.current = null;
-    voiceAutoSpeakCancelReasonRef.current = "mic_off";
+    voiceAutoSpeakQueueRef.current = voiceAutoSpeakQueueRef.current.filter(canPlayVoiceUtteranceWithMicOff);
+    const activeUtterance = voiceAutoSpeakActiveUtteranceRef.current;
+    const activeAllowsMicOffPlayback = canPlayVoiceUtteranceWithMicOff(activeUtterance);
+    if (!activeAllowsMicOffPlayback) {
+      voiceAutoSpeakActiveUtteranceRef.current = null;
+      voiceAutoSpeakCancelReasonRef.current = "mic_off";
+    }
     voiceSuppressedFinalTurnKeysRef.current.clear();
     voiceBriefSpokenLifecycleByTurnRef.current.clear();
-    interimVoiceSpokenReceiptKeysRef.current.clear();
-    interimVoiceSpokenImmediateAckTurnKeysRef.current.clear();
-    voicePlaybackOutcomeReceiptsRef.current = [];
-    setVoicePlaybackOutcomeReceipts([]);
     voiceQueuedSpeechLatchByTurnRef.current.clear();
-    voiceRunningSpeechLatchByTurnRef.current.clear();
-    voiceTurnRevisionStateRef.current = {};
-    voiceUtteranceTimelineMetaByIdRef.current.clear();
+    if (!activeAllowsMicOffPlayback) {
+      voiceRunningSpeechLatchByTurnRef.current.clear();
+      voiceTurnRevisionStateRef.current = {};
+      voiceUtteranceTimelineMetaByIdRef.current.clear();
+    }
     intentRevisionByTurnKeyRef.current = {};
     voiceTurnAssemblerByTurnKeyRef.current = {};
     voiceActiveAssemblerTurnKeyRef.current = null;
@@ -12655,7 +12456,9 @@ export function HelixAskPill({
     voiceBargeTrafficQuietUntilMsRef.current = null;
     voiceBargeHoldTurnKeyRef.current = null;
     voiceBargeHoldStartedAtMsRef.current = null;
-    stopReadAloud("mic_off");
+    if (!activeAllowsMicOffPlayback) {
+      stopReadAloud("mic_off");
+    }
   }, [
     clearHeldTranscriptState,
     clearRetainedVoiceTranscriptionRetry,
@@ -22384,8 +22187,40 @@ export function HelixAskPill({
             options?.contextMode === "isolated" || repoCodeEvidencePrompt || isolatedMoralGraphAskTurn
               ? "isolated"
               : "attached";
-          const workspaceContextSnapshot =
+          const baseWorkspaceContextSnapshot =
             reasoningContextModeForTurn === "isolated" ? {} : buildAskTurnWorkspaceContextSnapshot(sessionId);
+          const durableAskRepliesForReferents =
+            reasoningContextModeForTurn !== "isolated" && sessionId && helixChatSessions[sessionId]
+              ? buildHelixAskRepliesFromChatSession(helixChatSessions[sessionId])
+              : [];
+          const chatReferentContextBuild =
+            reasoningContextModeForTurn === "isolated"
+              ? null
+              : buildHelixAskChatReferentContextFromSources([
+                  {
+                    source_name: "durable_chat_session",
+                    replies: durableAskRepliesForReferents,
+                  },
+                  {
+                    source_name: "visible_ask_transcript",
+                    replies: chronologicalAskRepliesForTranscript,
+                  },
+                ]);
+          const workspaceContextSnapshot = chatReferentContextBuild?.context
+            ? {
+                ...baseWorkspaceContextSnapshot,
+                chatReferentContext: chatReferentContextBuild.context,
+                chat_referent_context: chatReferentContextBuild.context,
+                chatReferentContextSourceSummary: chatReferentContextBuild.source_summary,
+                chat_referent_context_source_summary: chatReferentContextBuild.source_summary,
+              }
+            : chatReferentContextBuild
+              ? {
+                  ...baseWorkspaceContextSnapshot,
+                  chatReferentContextSourceSummary: chatReferentContextBuild.source_summary,
+                  chat_referent_context_source_summary: chatReferentContextBuild.source_summary,
+                }
+              : baseWorkspaceContextSnapshot;
           const processGraphContextPackForTurn =
             reasoningContextModeForTurn !== "isolated" &&
             (manualDispatchHint || backgroundWorkspaceReasoningLane || preliminaryDispatchPlan.should_dispatch_reasoning)
@@ -25522,6 +25357,11 @@ export function HelixAskPill({
               browserAvailable: typeof window !== "undefined",
               readAloudState: readAloudByReply[reply.id] ?? "idle",
             });
+            const readAloudTraffic = resolveReadAloudRegionTrafficState({
+              replyId: reply.id,
+              readAloudState: turnControlViewModel.readAloudState,
+              events: voiceLaneTimelineEvents,
+            });
             const completedReplyStreamState = buildHelixAskCompletedReplyStreamState({
               rows: turnStreamRows,
               workLogTestId: latestTurnBinding.workLogTestId,
@@ -25540,7 +25380,7 @@ export function HelixAskPill({
               actualAgentProviderLabel,
               actualAgentModelLabel,
               liveBridgeStatus: liveAnswerTurnBridge?.status,
-              renderFinalAnswer: () => renderHelixAskFinalAnswerContent(transcriptAnswer),
+              renderFinalAnswer: (traffic) => renderHelixAskFinalAnswerContent(transcriptAnswer, traffic),
               clipText,
               readRowClassName: readHelixContinuousTurnStreamRowClass,
               readDotClassName: readHelixContinuousTurnStreamDotClass,
@@ -25559,6 +25399,8 @@ export function HelixAskPill({
               debugCopyTestId: turnControlViewModel.debugCopyTestId,
               readAloudTestId: turnControlViewModel.readAloudTestId,
               readAloudActive: turnControlViewModel.readAloudActive,
+              readAloudState: turnControlViewModel.readAloudState,
+              readAloudTraffic,
               readAloudAriaLabel: turnControlViewModel.readAloudAriaLabel,
               readAloudTitle: turnControlViewModel.readAloudTitle,
               proofTrace: (replyDebugRecord as Record<string, unknown> | null | undefined)

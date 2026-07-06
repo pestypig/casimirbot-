@@ -105,6 +105,7 @@ export {
   shouldHandleHelixAskPromptHistoryKey,
 } from "./HelixAskPromptHistory";
 export {
+  buildHelixAskSlashCommandCatalogForPolicy,
   buildHelixAskSlashCommandMenuItems,
   listHelixAskSlashCommandCatalog,
   type HelixAskSlashCommandCatalogItem,
@@ -168,6 +169,11 @@ export {
   readStoredHelixAskAgentRuntime,
 } from "./HelixAskRuntimePreference";
 export {
+  HELIX_ASK_LANGUAGE_MODEL_PROFILE_STORAGE_KEY,
+  persistHelixAskLanguageModelProfile,
+  readStoredHelixAskLanguageModelProfile,
+} from "./HelixAskLanguageModelPreference";
+export {
   HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_STORAGE_KEY,
   HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_SYNC_EVENT,
   readHelixAskVisualCaptureAudioPreference,
@@ -186,6 +192,8 @@ export {
 } from "./HelixAskContextCompactionResumeFrameStorage";
 export { HelixAskRuntimePicker } from "./HelixAskRuntimePicker";
 export { buildHelixAskRuntimePickerModel } from "./HelixAskRuntimePicker";
+export { HelixAskLanguageModelPicker } from "./HelixAskLanguageModelPicker";
+export { buildHelixAskLanguageModelPickerModel } from "./HelixAskLanguageModelPicker";
 export {
   buildHelixAskSituationRoomSourceDerivedState,
   buildHelixAskSituationRoomSourceState,

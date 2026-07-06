@@ -23,6 +23,7 @@ import RagAdminPage from "@/pages/rag-admin";
 import CodeAdminPage from "@/pages/code-admin";
 import DesktopPage from "@/pages/desktop";
 import SignInPage from "@/pages/sign-in";
+import AccountResetPasswordPage from "@/pages/account-reset-password";
 import StarHydrostaticPanel from "@/pages/star-hydrostatic-panel";
 import IdeologyRenderPage from "@/pages/ideology-render";
 import EssenceRenderPage from "@/pages/essence-render";
@@ -173,6 +174,7 @@ function Router() {
       <Route path="/code-admin" component={CodeAdminPage} />
       <Route path="/desktop" component={DesktopRoute} />
       <Route path="/sign-in" component={SignInPage} />
+      <Route path="/account/reset-password" component={AccountResetPasswordPage} />
       <Route path="/ideology-render" component={IdeologyRenderPage} />
       <Route path="/essence-render" component={EssenceRenderPage} />
       <Route path="/agi-refinery" component={AgiRefineryDashboard} />

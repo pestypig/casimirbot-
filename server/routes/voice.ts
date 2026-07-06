@@ -1333,6 +1333,7 @@ const hasInterimVoiceReceiptAuthority = (payload: VoiceRequest): boolean => {
 };
 
 const isDotVoiceRequest = (payload: VoiceRequest): boolean => {
+  if (payload.chunkKind === "manual_read_aloud") return false;
   if (hasDotVoiceAuthorityFields(payload)) return true;
   if (isDotVoiceProfile(payload.voiceProfile) || isDotVoiceProfile(payload.voice_profile_id)) return true;
   if (payload.mode === "callout" && (payload.missionId?.trim() || payload.eventId?.trim())) return true;
@@ -3063,31 +3064,10 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     });
   }
 
-  const dryRun = String(process.env.VOICE_PROXY_DRY_RUN ?? "0").trim() === "1";
   const baseUrl = process.env.TTS_BASE_URL?.trim();
   const requestedVoiceProfile = resolveRequestedVoiceProfile(payload);
   const elevenLabsRequested = isElevenLabsProvider(provider);
   const elevenLabsConfig = elevenLabsRequested ? resolveElevenLabsConfig(requestedVoiceProfile) : null;
-
-  if (dryRun) {
-    writeVoiceLaneBreadcrumb("voice.speak.dry_run", {
-      breadcrumbId,
-      traceId,
-      provider: "dry-run",
-      voiceProfile: requestedVoiceProfile ?? "default",
-    });
-    return res.status(200).json({
-      ok: true,
-      dryRun: true,
-      provider: "dry-run",
-      voiceProfile: requestedVoiceProfile ?? "default",
-      metering: {
-        ...metering,
-        durationMs: payload.durationMs ?? Math.max(250, payload.text.length * 45),
-      },
-      traceId,
-    });
-  }
 
   if (elevenLabsRequested && !elevenLabsConfig) {
     writeVoiceLaneBreadcrumb("voice.speak.no_backend", {

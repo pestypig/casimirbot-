@@ -743,6 +743,9 @@ export const llmHttpHandler: ToolHandler = async (input: any, ctx: any) => {
     messages,
     temperature: Number.isFinite(temperature) ? temperature : 0.2,
     max_tokens: maxTokens,
+    ...(input?.response_format && typeof input.response_format === "object"
+      ? { response_format: input.response_format }
+      : {}),
     stream: false,
   };
   const promptStats = estimatePromptStats(messages, requestBody);

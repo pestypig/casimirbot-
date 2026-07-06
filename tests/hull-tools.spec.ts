@@ -4,6 +4,8 @@ import { shouldRegisterExternalAdapter } from "../server/security/hull-guard";
 describe("hull tool gating", () => {
   beforeEach(() => {
     delete process.env.HULL_MODE;
+    delete process.env.HULL_OUTBOUND_GUARD;
+    delete process.env.ENABLE_HULL_OUTBOUND_GUARD;
     delete process.env.HULL_ALLOW_HOSTS;
   });
 
@@ -12,8 +14,16 @@ describe("hull tool gating", () => {
     expect(gate.allowed).toBe(true);
   });
 
-  it("blocks remote adapters when hull mode is on", () => {
+  it("permits remote adapters when only legacy hull mode is on", () => {
     process.env.HULL_MODE = "1";
+    process.env.HULL_ALLOW_HOSTS = "127.0.0.1,localhost";
+    const gate = shouldRegisterExternalAdapter("https://api.example.com");
+    expect(gate.allowed).toBe(true);
+  });
+
+  it("blocks remote adapters when explicit outbound guard is on", () => {
+    process.env.HULL_MODE = "1";
+    process.env.HULL_OUTBOUND_GUARD = "1";
     process.env.HULL_ALLOW_HOSTS = "127.0.0.1,localhost";
     const gate = shouldRegisterExternalAdapter("https://api.example.com");
     expect(gate.allowed).toBe(false);
@@ -24,6 +34,7 @@ describe("hull tool gating", () => {
 
   it("normalizes scheme-qualified allowlist entries", () => {
     process.env.HULL_MODE = "1";
+    process.env.HULL_OUTBOUND_GUARD = "1";
     process.env.HULL_ALLOW_HOSTS = "https://api.example.com";
     const gate = shouldRegisterExternalAdapter("https://api.example.com");
     expect(gate.allowed).toBe(true);

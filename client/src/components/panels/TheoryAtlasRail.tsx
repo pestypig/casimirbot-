@@ -36,14 +36,14 @@ export default function TheoryAtlasRail({
   const tx = translateText ?? ((text: string) => text);
   return (
     <div
-      aria-label="Theory atlas lenses"
+      aria-label={tx("Theory atlas lenses")}
       className="flex w-9 shrink-0 flex-col items-center gap-2 border-r border-zinc-950 bg-zinc-950 px-1.5 py-2"
     >
       {hasLiveReflection ? (
         <button
           type="button"
-          aria-label="Live answer theory context"
-          title="Latest Ask-level theory reflection. Evidence only, not a solved answer."
+          aria-label={tx("Live answer theory context")}
+          title={tx("Latest Ask-level theory reflection. Evidence only, not a solved answer.")}
           onClick={onSelectLiveReflection}
           className={`flex h-6 w-6 items-center justify-center border-2 bg-emerald-600 text-[11px] font-black text-white shadow ${
             liveReflectionActive
@@ -62,8 +62,8 @@ export default function TheoryAtlasRail({
           <button
             key={block.id}
             type="button"
-            aria-label={`${tx(block.title)} atlas lens`}
-            title={`${tx(block.title)}${planned ? " (planned)" : ""}`}
+            aria-label={`${tx(block.title)} ${tx("atlas lens")}`}
+            title={`${tx(block.title)}${planned ? ` ${tx("(planned)")}` : ""}`}
             onClick={() => onSelectLens(block.id)}
             className={`flex h-6 w-6 items-center justify-center border-2 text-[11px] font-black text-white shadow ${
               active

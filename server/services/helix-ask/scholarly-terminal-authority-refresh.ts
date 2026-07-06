@@ -230,6 +230,7 @@ export function refreshScholarlyTerminalAuthorityAfterMaterialization(input: {
     turn_id: input.turnId,
     answer_text: terminalText,
     text: terminalText,
+    evidence_state: "answer_ready",
     final_answer_draft_ref:
       readAskTurnString(finalAnswerDraft?.artifact_id) ??
       `${input.turnId}:final_answer_draft`,

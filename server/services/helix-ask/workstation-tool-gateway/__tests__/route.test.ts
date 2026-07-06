@@ -738,14 +738,11 @@ describe("AGI workstation tool gateway route", () => {
     expect(response.body.capabilities).toContainEqual(
       expect.objectContaining({ capability_id: WORKSTATION_OPEN_PANEL_CAPABILITY }),
     );
-    expect(response.body.capabilities).not.toContainEqual(
+    expect(response.body.capabilities).toContainEqual(
       expect.objectContaining({ capability_id: REPO_SEARCH_CAPABILITY }),
     );
-    expect(response.body.locked_capabilities).toContainEqual(
-      expect.objectContaining({
-        capability_id: REPO_SEARCH_CAPABILITY,
-        locked_reason: "capability_outside_account_policy",
-      }),
+    expect(response.body.locked_capabilities).not.toContainEqual(
+      expect.objectContaining({ capability_id: REPO_SEARCH_CAPABILITY }),
     );
   });
 
@@ -774,12 +771,59 @@ describe("AGI workstation tool gateway route", () => {
     expect(response.body.capabilities).toContainEqual(
       expect.objectContaining({ capability_id: WORKSTATION_OPEN_PANEL_CAPABILITY }),
     );
-    expect(response.body.locked_capabilities).toContainEqual(
-      expect.objectContaining({
-        capability_id: REPO_SEARCH_CAPABILITY,
-        locked_reason: "capability_outside_account_policy",
-      }),
+    expect(response.body.capabilities).toContainEqual(
+      expect.objectContaining({ capability_id: REPO_SEARCH_CAPABILITY }),
     );
+    expect(response.body.locked_capabilities).not.toContainEqual(
+      expect.objectContaining({ capability_id: REPO_SEARCH_CAPABILITY }),
+    );
+  });
+
+  it("allows user accounts to call repo.search as non-terminal evidence", async () => {
+    const app = createApp();
+    const agent = request.agent(app);
+    await agent
+      .post("/api/account/session/sign-in")
+      .send({ profile_id: "profile:user-repo-search", account_type: "user" })
+      .expect(200);
+
+    const response = await agent
+      .post("/api/agi/workstation-tool-gateway/call")
+      .send({
+        agent_runtime: "codex",
+        mode: "read",
+        capability_id: REPO_SEARCH_CAPABILITY,
+        turn_id: "ask:test:user-gateway-repo-search",
+        arguments: {
+          query: "workspace_os.status",
+          paths: ["server/services/helix-ask"],
+          max_hits: 2,
+        },
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      account_policy: {
+        account_type: "user",
+      },
+      capability_id: REPO_SEARCH_CAPABILITY,
+      observation: {
+        schema: "helix.repo_search_observation.v1",
+        query: "workspace_os.status",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        capability_key: REPO_SEARCH_CAPABILITY,
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(response.body.observation.hit_count).toBeGreaterThan(0);
   });
 
   it("blocks user account panel actions when the target panel is outside user policy", async () => {

@@ -24,8 +24,8 @@ export function HelixAskSurfaceComposerPanel({
           {actionToolbar}
         </div>
         <div className="relative z-[90] min-w-0 overflow-visible">
-          {slashCommandMenu}
           {textarea}
+          {slashCommandMenu}
         </div>
       </div>
     </>

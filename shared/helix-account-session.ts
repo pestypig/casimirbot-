@@ -128,12 +128,14 @@ export const HELIX_USER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
     "scientific-calculator.focus_panel",
     "scientific-calculator.show_gateway_solve",
     "scientific-calculator.prefill_expression",
+    "account_session.set_interface_language",
     "workstation.readable_surface.observe",
     "workstation.open_panel",
     "workstation.focus_panel",
     "docs-viewer.read_visible_surface",
     "docs-viewer.read_active_translation",
     "docs-viewer.open_doc",
+    "repo.search",
     "docs.search",
     "scholarly-research.lookup_papers",
     "scholarly-research.fetch_full_text",
@@ -298,7 +300,8 @@ export type HelixAccountSessionProfile = {
   profile_id: string;
   display_name: string;
   email?: string | null;
-  auth_mode: "web_auth" | "local_dev_profile" | "local_password_profile";
+  email_verified_at?: string | null;
+  auth_mode: "web_auth" | "local_dev_profile" | "local_password_profile" | "password_account";
   account_type?: HelixAccountType;
   provider?: "google" | "local" | null;
   provider_subject?: string | null;
@@ -365,5 +368,6 @@ export type HelixAccountSessionReceipt = {
   error?: string | null;
   raw_password_stored: false;
   credential_collection_allowed_in_agents: false;
-  auth_method?: "web_auth" | "local_dev_profile" | "local_password_profile" | null;
+  auth_method?: "web_auth" | "local_dev_profile" | "local_password_profile" | "password_account" | null;
+  show_password_reset_hint?: boolean;
 };

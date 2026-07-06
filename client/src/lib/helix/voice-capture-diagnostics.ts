@@ -137,6 +137,16 @@ export type VoicePlaybackOutcomeStatus =
   | "cancelled"
   | "suppressed";
 
+export type VoicePlaybackLifecycleReceiptStatus =
+  | "queued"
+  | "started"
+  | "paused"
+  | "resumed"
+  | "completed"
+  | "cancelled"
+  | "failed"
+  | "unknown";
+
 export type VoicePlaybackOutcomeReceipt = {
   schema: "helix.voice_playback_outcome_receipt.v1";
   receiptId: string;
@@ -146,8 +156,14 @@ export type VoicePlaybackOutcomeReceipt = {
   calloutKind: string | null;
   utteranceId: string;
   turnKey: string;
+  source_turn_id: string | null;
+  source_text_hash: string | null;
   kind: VoicePlaybackUtteranceKind;
   status: VoicePlaybackOutcomeStatus;
+  playback_status: VoicePlaybackLifecycleReceiptStatus;
+  chunk_index: number | null;
+  chunk_count: number | null;
+  position_ms: number | null;
   atMs: number;
   providerHeader: string | null;
   profileHeader: string | null;

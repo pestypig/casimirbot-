@@ -946,6 +946,7 @@ export function buildSolverControllerDecision(input: {
   const nonAnswerTerminal = isNonAnswerTerminal(payload);
   const canonicalGoal = readRecord(payload.canonical_goal_frame);
   const solverTrace = readRecord(payload.ask_turn_solver_trace);
+  const evidenceReentryGate = readRecord(solverTrace?.evidence_reentry_gate);
   const committedRoute = readCommittedAskRoute(payload) ?? readCommittedAskRoute(solverTrace);
   const retrievalResult = readRecord(payload.procedure_evidence_retrieval_result ?? solverTrace?.procedure_evidence_retrieval_result);
   const routeAuthority = readRecord(payload.route_authority_audit);
@@ -1132,6 +1133,9 @@ export function buildSolverControllerDecision(input: {
   const modelOnlyAnswerCoverageSupersedesCompoundGate = hasModelOnlyCompoundAnswerCoverage(payload);
   const scholarlyAnswerCoverageSupersedesCompoundGate =
     hasMaterializedScholarlyResearchAnswer(payload, terminalArtifactKind);
+  const evidenceReentryRequiredIncomplete =
+    readBoolean(evidenceReentryGate?.required) === true &&
+    readBoolean(evidenceReentryGate?.completed) === false;
 
   const blockingReasons: HelixSolverControllerBlockingReason[] = [];
   const liveSourcePhaseBlockingReasons: HelixSolverControllerBlockingReason[] = [];
@@ -1282,6 +1286,14 @@ export function buildSolverControllerDecision(input: {
     }
     if (hasIncompleteDocRetrievalCoverage(payload)) {
       pushUnique(blockingReasons, "doc_retrieval_coverage_incomplete");
+    }
+    if (
+      evidenceReentryRequiredIncomplete &&
+      terminalArtifactKind !== "typed_failure" &&
+      !modelDirectAnswerTerminal &&
+      !liveSourceSetupReceiptTerminal
+    ) {
+      pushUnique(blockingReasons, "post_observation_model_decision_missing");
     }
     if (hasIncompleteCompoundPromptCoverageGate(payload)) {
       if (modelOnlyAnswerCoverageSupersedesCompoundGate || scholarlyAnswerCoverageSupersedesCompoundGate) {

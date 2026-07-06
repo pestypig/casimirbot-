@@ -14,6 +14,13 @@ import { useWorkspaceMemoryRegistryStore } from "@/store/useWorkspaceMemoryRegis
 const PROFILE_SYNC_INTERVAL_MS = 12000;
 const PROFILE_SYNC_DEBOUNCE_MS = 1200;
 const DESKTOP_LAYOUT_STORAGE_KEY = "desktop-windows-v2";
+const LIVE_SOURCE_ENDPOINT_STORAGE_KEY = "helix.worldEventSourceEndpoint";
+const LIVE_SOURCE_LABEL_STORAGE_KEY = "helix.worldEventSourceLabel";
+const VISUAL_CAPTURE_ROUTE_STORAGE_KEY = "helix.liveAnswer.visualCaptureRoutes.v1";
+const FRUITION_CALCULATOR_STORAGE_KEY = "fruition-calculator:v1";
+export const HELIX_PROFILE_STORAGE_ATTACH_CONSENT_EVENT =
+  "helix-profile-storage-attach-consent";
+const PROFILE_ATTACH_CONSENT_KEY_PREFIX = "helix.profileStorage.attachConsent:";
 
 const byteLength = (value: string): number => {
   if (typeof TextEncoder !== "undefined") {
@@ -38,6 +45,55 @@ const safeLocalStorageSet = (key: string, value: string): boolean => {
     return false;
   }
 };
+
+const safeLocalStorageRemove = (key: string): boolean => {
+  try {
+    window.localStorage.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export function profileStorageAttachConsentKey(profileId: string): string {
+  return `${PROFILE_ATTACH_CONSENT_KEY_PREFIX}${profileId}`;
+}
+
+export function isProfileStorageAttachConsentGranted(profileId: string | null | undefined): boolean {
+  if (!profileId?.trim()) return false;
+  return safeLocalStorageGet(profileStorageAttachConsentKey(profileId.trim())) === "1";
+}
+
+export function grantProfileStorageAttachConsent(profileId: string | null | undefined): boolean {
+  if (!profileId?.trim()) return false;
+  const granted = safeLocalStorageSet(profileStorageAttachConsentKey(profileId.trim()), "1");
+  if (granted) {
+    window.dispatchEvent(new CustomEvent(HELIX_PROFILE_STORAGE_ATTACH_CONSENT_EVENT, {
+      detail: { profileId: profileId.trim(), granted: true },
+    }));
+  }
+  return granted;
+}
+
+export function revokeProfileStorageAttachConsent(profileId: string | null | undefined): boolean {
+  if (!profileId?.trim()) return false;
+  const revoked = safeLocalStorageRemove(profileStorageAttachConsentKey(profileId.trim()));
+  if (revoked) {
+    window.dispatchEvent(new CustomEvent(HELIX_PROFILE_STORAGE_ATTACH_CONSENT_EVENT, {
+      detail: { profileId: profileId.trim(), granted: false },
+    }));
+  }
+  return revoked;
+}
+
+export function shouldSaveProfileStorageSnapshot(input: {
+  profileId: string | null | undefined;
+  registry: HelixWorkspaceMemoryRegistrySnapshot;
+}): boolean {
+  if (!input.profileId?.trim()) return false;
+  if (!isProfileStorageAttachConsentGranted(input.profileId)) return false;
+  return profileEligibleArtifacts(input.registry, input.profileId.trim()).length > 0;
+}
 
 async function fetchAccountStatus(signal?: AbortSignal): Promise<HelixAccountSessionStatus | null> {
   const response = await fetch("/api/account/session", { signal });
@@ -66,6 +122,67 @@ function syntheticDesktopLayoutArtifact(profileId: string): HelixWorkspaceMemory
   };
 }
 
+function syntheticLinkedSourceArtifacts(profileId: string): HelixWorkspaceMemoryArtifact[] {
+  const updatedAt = new Date().toISOString();
+  return [
+    {
+      key: LIVE_SOURCE_ENDPOINT_STORAGE_KEY,
+      artifact_id: "linked-source:live-answer-world-event-endpoint",
+      title: "Live answer world-event endpoint",
+    },
+    {
+      key: LIVE_SOURCE_LABEL_STORAGE_KEY,
+      artifact_id: "linked-source:live-answer-world-event-label",
+      title: "Live answer world-event label",
+    },
+    {
+      key: VISUAL_CAPTURE_ROUTE_STORAGE_KEY,
+      artifact_id: "linked-source:live-answer-visual-capture-routes",
+      title: "Live answer visual capture routes",
+    },
+  ].flatMap((entry): HelixWorkspaceMemoryArtifact[] => {
+    const value = safeLocalStorageGet(entry.key);
+    if (value == null || value.trim() === "") return [];
+    return [{
+      schema: "helix.workspace_memory_registry.v1",
+      artifact_id: entry.artifact_id,
+      artifact_type: "linked_source",
+      owner_scope: "profile",
+      storage_backend: "localStorage",
+      sync_status: "profile_synced",
+      profile_id: profileId,
+      chat_session_id: null,
+      title: entry.title,
+      storage_key: entry.key,
+      path_ref: `storage://localStorage/${entry.key}`,
+      size_bytes: byteLength(value),
+      quota_bytes: null,
+      updated_at: updatedAt,
+    }];
+  });
+}
+
+function syntheticRememberedProcedureArtifacts(profileId: string): HelixWorkspaceMemoryArtifact[] {
+  const value = safeLocalStorageGet(FRUITION_CALCULATOR_STORAGE_KEY);
+  if (value == null || value.trim() === "") return [];
+  return [{
+    schema: "helix.workspace_memory_registry.v1",
+    artifact_id: "remembered-procedure:fruition-calculator",
+    artifact_type: "remembered_procedure",
+    owner_scope: "profile",
+    storage_backend: "localStorage",
+    sync_status: "profile_synced",
+    profile_id: profileId,
+    chat_session_id: null,
+    title: "Fruition procedure expressions",
+    storage_key: FRUITION_CALCULATOR_STORAGE_KEY,
+    path_ref: `storage://localStorage/${FRUITION_CALCULATOR_STORAGE_KEY}`,
+    size_bytes: byteLength(value),
+    quota_bytes: null,
+    updated_at: new Date().toISOString(),
+  }];
+}
+
 function profileEligibleArtifacts(
   registry: HelixWorkspaceMemoryRegistrySnapshot,
   profileId: string,
@@ -84,10 +201,15 @@ function profileEligibleArtifacts(
       updated_at: artifact.updated_at || new Date().toISOString(),
     }));
   const desktopLayout = syntheticDesktopLayoutArtifact(profileId);
-  return desktopLayout ? [...artifacts, desktopLayout] : artifacts;
+  return [
+    ...artifacts,
+    ...(desktopLayout ? [desktopLayout] : []),
+    ...syntheticLinkedSourceArtifacts(profileId),
+    ...syntheticRememberedProcedureArtifacts(profileId),
+  ];
 }
 
-function buildProfileStoragePayload(
+export function buildProfileStoragePayload(
   registry: HelixWorkspaceMemoryRegistrySnapshot,
   profileId: string,
 ): { entries: HelixProfileStorageEntry[]; artifacts: HelixWorkspaceMemoryArtifact[] } {
@@ -179,6 +301,7 @@ export function useProfileStorageSync(): void {
     state.buildRegistrySnapshot(),
   );
   const [profileId, setProfileId] = React.useState<string | null>(null);
+  const [attachConsentTick, setAttachConsentTick] = React.useState(0);
   const loadedProfileRef = React.useRef<string | null>(null);
   const lastPayloadRef = React.useRef<string>("");
 
@@ -201,6 +324,12 @@ export function useProfileStorageSync(): void {
   }, []);
 
   React.useEffect(() => {
+    const handleConsent = () => setAttachConsentTick((tick) => tick + 1);
+    window.addEventListener(HELIX_PROFILE_STORAGE_ATTACH_CONSENT_EVENT, handleConsent);
+    return () => window.removeEventListener(HELIX_PROFILE_STORAGE_ATTACH_CONSENT_EVENT, handleConsent);
+  }, []);
+
+  React.useEffect(() => {
     if (!profileId || loadedProfileRef.current === profileId) return;
     const controller = new AbortController();
     loadedProfileRef.current = profileId;
@@ -216,6 +345,7 @@ export function useProfileStorageSync(): void {
 
   React.useEffect(() => {
     if (!profileId) return;
+    if (!shouldSaveProfileStorageSnapshot({ profileId, registry: registrySnapshot })) return;
     const payload = buildProfileStoragePayload(registrySnapshot, profileId);
     const comparable = JSON.stringify({
       profileId,
@@ -252,5 +382,5 @@ export function useProfileStorageSync(): void {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [profileId, registrySnapshot]);
+  }, [attachConsentTick, profileId, registrySnapshot]);
 }

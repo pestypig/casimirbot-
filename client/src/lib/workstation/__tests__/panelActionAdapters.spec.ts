@@ -15,6 +15,7 @@ import { useWorkstationProcessGraphStore } from "@/store/useWorkstationProcessGr
 import { useTheoryMapOverlayStore } from "@/store/useTheoryMapOverlayStore";
 import { useTheoryBadgeGraphPanelStore } from "@/store/useTheoryBadgeGraphPanelStore";
 import { isScientificCalculatorStepTraceArtifactV1 } from "@shared/contracts/scientific-calculator-step-schema.v1";
+import { SHARED_INTERFACE_LANGUAGE_CODES } from "@shared/interface-language-codes";
 import { isTheoryBadgePlaybackArtifactV1 } from "@shared/contracts/theory-badge-playback.v1";
 import { isTheoryCalculatorLoadoutV1 } from "@shared/contracts/theory-calculator-loadout.v1";
 import { isTheoryContextReflectionV1 } from "@shared/contracts/theory-context-reflection.v1";
@@ -405,14 +406,14 @@ describe("panelActionAdapters", () => {
     });
   });
 
-  it("sets interface language through the account-session workstation action", () => {
+  it("sets Wolof interface language through the account-session workstation action", () => {
     const opened: string[] = [];
     setWorkstationDebugEnabled(true);
     const result = executeHelixPanelAction(
       {
         panel_id: "account-session",
         action_id: "set_interface_language",
-        args: { language: "haw" },
+        args: { language: "wo" },
       },
       {
         openPanel: (panelId) => opened.push(`open:${panelId}`),
@@ -425,7 +426,7 @@ describe("panelActionAdapters", () => {
     expect(result.ok).toBe(true);
     expect(opened).toEqual(["open:account-session", "focus:account-session"]);
     expect(JSON.parse(window.localStorage.getItem("helix-start-settings") ?? "{}")).toMatchObject({
-      interfaceLanguage: "haw",
+      interfaceLanguage: "wo",
     });
     expect(result.artifact).toMatchObject({
       kind: "workspace_action_receipt",
@@ -434,8 +435,8 @@ describe("panelActionAdapters", () => {
       action_id: "set_interface_language",
       status: "completed",
       preference_key: "interfaceLanguage",
-      language: "haw",
-      bcp47: "haw",
+      language: "wo",
+      bcp47: "wo",
       translation_mode: "procedural_catalog",
       assistant_answer: false,
     });
@@ -443,8 +444,8 @@ describe("panelActionAdapters", () => {
       channel: "account_session",
       action: "interface_language.changed",
       detail: {
-        language: "haw",
-        bcp47: "haw",
+        language: "wo",
+        bcp47: "wo",
       },
     });
   });
@@ -467,7 +468,7 @@ describe("panelActionAdapters", () => {
       action_id: "set_interface_language",
       status: "failed",
       reason: "unsupported_language",
-      supported_languages: ["en", "haw"],
+      supported_languages: [...SHARED_INTERFACE_LANGUAGE_CODES],
     });
   });
 

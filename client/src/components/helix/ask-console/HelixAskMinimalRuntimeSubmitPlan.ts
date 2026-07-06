@@ -1,4 +1,5 @@
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
+import type { HelixLanguageModelProfileId } from "@shared/helix-language-model-policy";
 
 import {
   buildHelixAskContextBridgeSnapshot,
@@ -22,6 +23,7 @@ export type HelixAskMinimalRuntimeSubmitPlan = {
 export function buildHelixAskMinimalRuntimeSubmitPlan(args: {
   draft: string;
   selectedRuntime: HelixAgentRuntimeId;
+  selectedLanguageModelProfile?: HelixLanguageModelProfileId;
   desktopUrl?: string | null;
 }): HelixAskMinimalRuntimeSubmitPlan {
   const admission = buildHelixAskSubmitAdmission({
@@ -40,6 +42,7 @@ export function buildHelixAskMinimalRuntimeSubmitPlan(args: {
       ? buildHelixAskConsoleRequestEnvelope({
           question: admission.firstEntry,
           agentRuntime: args.selectedRuntime,
+          languageModelProfile: args.selectedLanguageModelProfile,
           context,
         })
       : null,

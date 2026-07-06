@@ -1,7 +1,11 @@
 import { getInterfaceCatalogReviewedCount } from "@/lib/i18n/messages/targetCatalogs";
 import { INTERFACE_MESSAGE_IDS } from "@/lib/i18n/messages/types";
+import {
+  SHARED_INTERFACE_LANGUAGE_CODES,
+  type SharedInterfaceLanguageCode,
+} from "@shared/interface-language-codes";
 
-export type InterfaceLanguageCode = "en" | "haw" | "es" | "fr" | "de" | "pt" | "ja" | "ko" | "zh" | "ar";
+export type InterfaceLanguageCode = SharedInterfaceLanguageCode;
 
 export type InterfaceLanguageTranslationMode = "source" | "procedural_catalog";
 
@@ -119,10 +123,20 @@ export const INTERFACE_LANGUAGE_OPTIONS: InterfaceLanguageOption[] = [
     translationMode: "procedural_catalog",
     readiness: "Catalog shell; English fallback observable",
   },
+  {
+    code: "wo",
+    label: "Wolof",
+    nativeLabel: "Wolof làkk",
+    bcp47: "wo",
+    writingSystem: "Latn",
+    direction: "ltr",
+    translationMode: "procedural_catalog",
+    readiness: "Catalog shell; English fallback observable",
+  },
 ];
 
 const interfaceLanguageCodes = new Set<InterfaceLanguageCode>(
-  INTERFACE_LANGUAGE_OPTIONS.map((option) => option.code),
+  SHARED_INTERFACE_LANGUAGE_CODES,
 );
 
 export function normalizeInterfaceLanguageCode(value: unknown): InterfaceLanguageCode {

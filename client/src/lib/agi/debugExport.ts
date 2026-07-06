@@ -1181,7 +1181,18 @@ const summarizeDebugArtifactsForExport = (value: unknown): Record<string, unknow
   return entries.slice(0, 40).map((entry, index) => {
     const record = asRecord(entry) ?? {};
     const payload = asRecord(record.payload);
-    const text = readString(payload?.text) ?? readString(payload?.answer_text) ?? readString(payload?.summary);
+    const firstHit = Array.isArray(payload?.hits) ? asRecord(payload.hits[0]) : null;
+    const text =
+      readString(payload?.text_preview) ??
+      readString(record.text_preview) ??
+      readString(payload?.terminal_text_preview) ??
+      readString(record.terminal_text_preview) ??
+      readString(payload?.text) ??
+      readString(payload?.answer_text) ??
+      readString(payload?.summary) ??
+      readString(firstHit?.text) ??
+      readString(firstHit?.snippet) ??
+      readString(firstHit?.excerpt);
     return {
       artifact_id: readString(record.artifact_id) ?? `artifact:${index}`,
       kind: readString(record.kind),
@@ -1268,6 +1279,9 @@ const copyRailCriticalDebugFields = (
     "agent_step_decision",
     "agent_step_loop",
     "calculator_tool_answer_support",
+    "language_model_policy",
+    "language_model_debug_summary",
+    "model_policy_debug_summary",
   ].forEach((key) => assign(key, source[key] ?? debug?.[key]));
   const ledger = source.current_turn_artifact_ledger ?? debug?.current_turn_artifact_ledger;
   if (Array.isArray(ledger)) target.current_turn_artifact_ledger = summarizeDebugArtifactsForExport(ledger);
@@ -1306,6 +1320,11 @@ const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: st
     session: runtimeGoalSession,
     debugExport: runtimeGoalDebugExport,
   });
+  const languageModelPolicy = payload.language_model_policy ?? debug?.language_model_policy ?? null;
+  const languageModelDebugSummary =
+    payload.language_model_debug_summary ?? debug?.language_model_debug_summary ?? null;
+  const modelPolicyDebugSummary =
+    payload.model_policy_debug_summary ?? debug?.model_policy_debug_summary ?? languageModelDebugSummary;
   const minimal = {
     schema: payload.schema ?? "helix.ask.debug_export.v1",
     exported_at_ms: payload.exported_at_ms,
@@ -1344,6 +1363,9 @@ const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: st
     helix_docs_synthesis_bridge_version:
       payload.helix_docs_synthesis_bridge_version ?? debug?.helix_docs_synthesis_bridge_version ?? null,
     language_contract: payload.language_contract ?? debug?.language_contract ?? null,
+    language_model_policy: languageModelPolicy,
+    language_model_debug_summary: languageModelDebugSummary,
+    model_policy_debug_summary: modelPolicyDebugSummary,
     response_language: payload.response_language ?? debug?.response_language ?? null,
     source_language: payload.source_language ?? debug?.source_language ?? null,
     language_detected: payload.language_detected ?? debug?.language_detected ?? null,
@@ -1407,6 +1429,9 @@ const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: st
     debug: {
       schema: "helix.ask.debug_export_minimal_debug.v1",
       language_contract: payload.language_contract ?? debug?.language_contract ?? null,
+      language_model_policy: languageModelPolicy,
+      language_model_debug_summary: languageModelDebugSummary,
+      model_policy_debug_summary: modelPolicyDebugSummary,
       response_language: payload.response_language ?? debug?.response_language ?? null,
       source_language: payload.source_language ?? debug?.source_language ?? null,
       language_detected: payload.language_detected ?? debug?.language_detected ?? null,
@@ -1566,6 +1591,7 @@ const activeVoicePlaybackReceipt = (
     receipt.sourceReceiptId,
     receipt.sourceReceiptKey,
     receipt.requestId,
+    receipt.source_turn_id,
   ].some((value) => readString(value)?.includes(activeTurnId));
 };
 
@@ -1606,6 +1632,12 @@ const summarizeClientVoicePlaybackReceipts = (input: {
       requestId: readString(receipt.requestId),
       utteranceId: readString(receipt.utteranceId),
       status: readString(receipt.status),
+      playback_status: readString(receipt.playback_status),
+      source_turn_id: readString(receipt.source_turn_id) ?? readString(receipt.turnKey),
+      source_text_hash: readString(receipt.source_text_hash),
+      chunk_index: readNumberValue(receipt.chunk_index),
+      chunk_count: readNumberValue(receipt.chunk_count),
+      position_ms: readNumberValue(receipt.position_ms),
       atMs: readNumberValue(receipt.atMs),
       assistant_answer: false,
       terminal_eligible: false,
@@ -2251,6 +2283,19 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
   const selectedAgentProvider = asRecord(
     payload.selected_agent_provider ?? debug?.selected_agent_provider ?? agentLoop?.selected_agent_provider,
   );
+  const languageModelPolicy =
+    asRecord(payload.language_model_policy ?? debug?.language_model_policy ?? agentLoop?.language_model_policy) ??
+    null;
+  const languageModelDebugSummary =
+    readString(payload.language_model_debug_summary) ??
+    readString(debug?.language_model_debug_summary) ??
+    readString(agentLoop?.language_model_debug_summary) ??
+    null;
+  const modelPolicyDebugSummary =
+    readString(payload.model_policy_debug_summary) ??
+    readString(debug?.model_policy_debug_summary) ??
+    readString(agentLoop?.model_policy_debug_summary) ??
+    languageModelDebugSummary;
   const providerGatewayDebugSummary = asRecord(
     payload.provider_gateway_debug_summary ??
       debug?.provider_gateway_debug_summary ??
@@ -2860,6 +2905,15 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     agent_runtime: agentRuntime,
     agent_runtime_selection_trace: agentRuntimeSelectionTrace,
     selected_agent_provider: selectedAgentProvider,
+    language_model_policy: languageModelPolicy,
+    language_model_debug_summary: languageModelDebugSummary,
+    model_policy_debug_summary: modelPolicyDebugSummary,
+    debug: {
+      schema: "helix.ask.debug_export_policy_projection.v1",
+      language_model_policy: languageModelPolicy,
+      language_model_debug_summary: languageModelDebugSummary,
+      model_policy_debug_summary: modelPolicyDebugSummary,
+    },
     provider_gateway_debug_summary: providerGatewayDebugSummary,
     workstation_gateway_manifest: workstationGatewayManifest,
     workstation_gateway_manifest_version:

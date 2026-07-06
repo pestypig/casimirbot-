@@ -136,7 +136,7 @@ const jobRows = [
   },
 ];
 
-function mockFetch(accountStatus = statusBody) {
+function mockFetch(accountStatus: Record<string, any> = statusBody) {
   return vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     if (url.startsWith("/api/account/session")) {
@@ -178,7 +178,6 @@ describe("AccountSessionPanel interface language", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Moʻokāki a me nā kau")).toBeInTheDocument();
-      expect(screen.getByText("ʻŌlelo")).toBeInTheDocument();
       expect(screen.getByText("ʻŌlelo no ke alo")).toBeInTheDocument();
     });
     expect(screen.getByRole("combobox")).toHaveValue("haw");
@@ -203,7 +202,7 @@ describe("AccountSessionPanel interface language", () => {
     });
 
     expect(screen.getByText(/kau wale nō/)).toBeInTheDocument();
-    expect(screen.getByText(/local dev profile/)).toBeInTheDocument();
+    expect(screen.getByText(/dev/)).toBeInTheDocument();
     expect(screen.getAllByText(/kūloko/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/hoʻopili ʻia/).length).toBeGreaterThan(0);
     expect(screen.getByText(/mea nānā/)).toBeInTheDocument();
@@ -239,5 +238,49 @@ describe("AccountSessionPanel interface language", () => {
       expect(screen.getByRole("combobox")).toHaveValue("en");
     });
     window.removeEventListener("helix:interface-language-changed", handleLanguageChanged);
+  });
+
+  it("shows a simple password reset button after repeated failed sign-in attempts", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith("/api/account/session/account-sign-in")) {
+        return new Response(JSON.stringify({
+          ok: false,
+          message: "Sign-in failed. Check your email and password.",
+          error: "invalid_password_account_credentials",
+          show_password_reset_hint: true,
+        }), { status: 401, headers: { "Content-Type": "application/json" } });
+      }
+      if (url.startsWith("/api/account/session/password-reset/request")) {
+        return new Response(JSON.stringify({
+          ok: true,
+          message: "If a workstation profile exists for that email, a password reset link has been sent.",
+          token_value_shown_once: false,
+          token_value: null,
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      return mockFetch()(input);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AccountSessionPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Save to a profile")).toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "user@example.com" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "wrong password" } });
+    const signInButtons = screen.getAllByRole("button", { name: "Sign in" });
+    fireEvent.click(signInButtons[signInButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Send reset link to my email" })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Send reset link to my email" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("If a workstation profile exists for that email, a password reset link has been sent.")).toBeInTheDocument();
+    });
   });
 });

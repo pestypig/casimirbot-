@@ -813,6 +813,37 @@ describe("askLocal lane parity default", () => {
     });
   });
 
+  it("serializes runAskTurn language model policy controls outside prompt text", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          text: "Model policy accepted.",
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await runAskTurn({
+      question: "Implement the runtime agent handoff.",
+      languageModelProfile: "deep",
+      languageModelOverride: "gpt-5.5-pro",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const body = JSON.parse(String(requestInit.body ?? "{}")) as Record<string, any>;
+    expect(body.question).toBe("Implement the runtime agent handoff.");
+    expect(body.question).not.toContain("gpt-5.5-pro");
+    expect(body.language_model_profile).toBe("deep");
+    expect(body.languageModelProfile).toBe("deep");
+    expect(body.language_model_override).toBe("gpt-5.5-pro");
+    expect(body.languageModelOverride).toBe("gpt-5.5-pro");
+  });
+
   it("serializes runAskTurn capability lane calls without embedding them in prompt text", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(

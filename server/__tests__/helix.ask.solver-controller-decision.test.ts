@@ -2009,4 +2009,85 @@ describe("helix ask solver controller decision", () => {
     expect(decision.blocking_reasons).toContain("capability_lifecycle_incomplete");
     expect(decision.typed_failure_code).toBe("capability_admitted_not_dispatched");
   });
+
+  it("blocks provider terminal candidates when required evidence re-entry is incomplete", () => {
+    const turnId = "ask:scholarly-reentry-missing";
+    const observationRef = `${turnId}:workstation_gateway:scholarly-research.lookup_papers:observation`;
+    const payload = {
+      active_prompt: "Search scholarly research for weyl curvature",
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        turn_id: turnId,
+        goal_kind: "agent_provider_gateway_turn",
+        requested_capability: "scholarly-research.lookup_papers",
+        required_terminal_kind: "agent_provider_terminal_candidate",
+        source: "codex_provider_workstation_gateway_projection",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      route_reason_code: "agent_provider_gateway_turn",
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      final_answer_source: "agent_provider_terminal_candidate",
+      selected_final_answer: "Scholarly search returned weakly matched papers.",
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        turn_id: turnId,
+        route: "/ask/turn/stream",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        final_answer_source: "agent_provider_terminal_candidate",
+        server_authoritative: true,
+      },
+      poison_audit: { schema: "helix.turn_poison_audit.v1", ok: true, violations: [] },
+      route_authority_audit: { schema: "helix.route_authority_audit.v1", route_authority_ok: true },
+      ask_turn_solver_trace: {
+        schema: "helix.ask_turn_solver_trace.v1",
+        turn_id: turnId,
+        completed_solver_path: false,
+        evidence_reentry_gate: {
+          schema: "helix.evidence_reentry_gate.v1",
+          turn_id: turnId,
+          required: true,
+          completed: false,
+          selected_evidence_refs: [],
+          violation_codes: ["source_observation_terminal_without_selection"],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      goal_satisfaction_evaluation: satisfiedGoal("agent_provider_gateway_turn", "agent_provider_terminal_candidate"),
+      terminal_equivalence_harness_result: terminalEquivalenceOk,
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: observationRef,
+          turn_id: turnId,
+          kind: "scholarly_research_observation",
+          payload: {
+            schema: "helix.scholarly_research_observation.v1",
+            artifact_id: observationRef,
+            capability: "scholarly-research.lookup_papers",
+            selected_for_answer: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    const decision = buildSolverControllerDecision({
+      turnId,
+      finalRoute: "/ask/turn/stream",
+      payload,
+      turnIdIntegrityAudit: buildTurnIdIntegrityAudit({ turnId, payload }),
+      finalRouteReconciliation: buildFinalRouteReconciliation({
+        turnId,
+        finalRoute: "/ask/turn/stream",
+        payload,
+      }),
+    });
+
+    expect(decision.decision).toBe("fail_closed");
+    expect(decision.blocking_reasons).toContain("post_observation_model_decision_missing");
+    expect(decision.blocking_reasons).toContain("solver_path_incomplete");
+    expect(decision.typed_failure_code).toBe("post_observation_model_decision_missing");
+  });
 });

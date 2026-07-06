@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Search } from "lucide-react";
 
 import type { HelixAskSlashCommandMenuItem } from "./HelixAskSlashCommandCatalog";
@@ -15,13 +16,40 @@ export function HelixAskSlashCommandMenu({
   onSelect,
   onHoverIndex,
 }: HelixAskSlashCommandMenuProps) {
-  if (!state.open) return null;
-  return (
+  const anchorRef = useRef<HTMLSpanElement | null>(null);
+  const [portalStyle, setPortalStyle] = useState<React.CSSProperties | null>(null);
+
+  useLayoutEffect(() => {
+    if (!state.open || typeof window === "undefined") {
+      setPortalStyle(null);
+      return;
+    }
+    const updatePosition = () => {
+      const anchor = anchorRef.current;
+      if (!anchor) return;
+      const rect = anchor.getBoundingClientRect();
+      setPortalStyle({
+        left: rect.left,
+        top: rect.bottom + 8,
+        width: Math.max(rect.width, 320),
+      });
+    };
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [state.items.length, state.open, state.query]);
+
+  const menu = state.open && portalStyle && typeof document !== "undefined" ? (
     <div
-      className="pointer-events-auto absolute left-0 right-0 top-full z-[120] mt-2 max-h-72 overflow-hidden rounded-lg border border-white/12 bg-slate-950 shadow-2xl shadow-black/60 ring-1 ring-cyan-300/20"
+      className="pointer-events-auto fixed z-[2147483000] max-h-72 overflow-hidden rounded-lg border border-white/12 bg-slate-950 shadow-2xl shadow-black/60 ring-1 ring-cyan-300/20"
       data-testid="helix-ask-slash-command-menu"
       role="listbox"
       aria-label="Ask slash commands"
+      style={portalStyle}
     >
       <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2 text-xs text-slate-400">
         <Search className="h-3.5 w-3.5 text-cyan-200/80" />
@@ -79,5 +107,17 @@ export function HelixAskSlashCommandMenu({
         )}
       </div>
     </div>
+  ) : null;
+
+  return (
+    <>
+      <span
+        aria-hidden="true"
+        className="block h-0 w-full"
+        data-testid="helix-ask-slash-command-anchor"
+        ref={anchorRef}
+      />
+      {menu ? createPortal(menu, document.body) : null}
+    </>
   );
 }

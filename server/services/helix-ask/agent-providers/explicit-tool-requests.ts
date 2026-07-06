@@ -14,6 +14,7 @@ export const CALCULATOR_SOLVE_ALIAS_CAPABILITIES = [
 ] as const;
 export const CALCULATOR_ACTIVE_CONTEXT_CAPABILITY = "scientific-calculator.active_context" as const;
 export const WORKSPACE_OS_STATUS_CAPABILITY = HELIX_WORKSPACE_OS_STATUS_CAPABILITY;
+export const ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY = "account_session.set_interface_language" as const;
 export const REPO_SEARCH_CAPABILITY = "repo.search" as const;
 export const REPO_SEARCH_ALIAS_CAPABILITIES = [
   "repo-code.search_concept",
@@ -98,6 +99,7 @@ export const VISUAL_OBSERVER_TEST_PROFILE_CAPABILITY = "live_env.test_visual_obs
 export const VISUAL_OBSERVER_COMPARE_PROFILES_CAPABILITY = "live_env.compare_visual_observer_profiles" as const;
 export const PROMPT_NAMED_CAPABILITIES = [
   WORKSPACE_OS_STATUS_CAPABILITY,
+  ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY,
   DOCS_SEARCH_CAPABILITY,
   DOCS_OPEN_DOC_CAPABILITY,
   ...DOCS_SEARCH_ALIAS_CAPABILITIES,

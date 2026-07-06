@@ -431,6 +431,16 @@ const firstUsefulLineIndex = (lines: string[], terms: string[]): number => {
   return Math.max(0, lines.findIndex((line) => line.trim().length > 0));
 };
 
+const firstImplementationLineIndex = (lines: string[]): number => {
+  for (let index = 0; index < lines.length; index += 1) {
+    if (/\bexport\s+(?:type|interface|class|function|const)\b/i.test(lines[index] ?? "")) return index;
+  }
+  for (let index = 0; index < lines.length; index += 1) {
+    if (/\b(?:type|interface|class|function|const)\b/i.test(lines[index] ?? "")) return index;
+  }
+  return Math.max(0, lines.findIndex((line) => line.trim().length > 0));
+};
+
 const buildPathHintHits = async (input: {
   repoRoot: string;
   files: string[];
@@ -449,7 +459,7 @@ const buildPathHintHits = async (input: {
     const text = await readSearchableFile(input.repoRoot, filePath);
     if (!text) continue;
     const lines = text.split(/\r?\n/);
-    const lineIndex = firstUsefulLineIndex(lines, input.terms);
+    const lineIndex = firstImplementationLineIndex(lines);
     if (lineIndex < 0) continue;
     hits.push({
       filePath,

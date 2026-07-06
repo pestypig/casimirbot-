@@ -92,6 +92,7 @@ function isActiveVoicePlaybackReceipt(receipt: Record<string, unknown>, activeTu
     receipt.sourceReceiptId,
     receipt.sourceReceiptKey,
     receipt.requestId,
+    receipt.source_turn_id,
   ].some((value) => coerceVoiceDiagnosticsText(value).includes(activeTurnId));
 }
 
@@ -142,6 +143,15 @@ function summarizeClientPlaybackReceipts(input: {
       requestId: coerceVoiceDiagnosticsText(receipt.requestId).trim() || null,
       utteranceId: coerceVoiceDiagnosticsText(receipt.utteranceId).trim() || null,
       status: coerceVoiceDiagnosticsText(receipt.status).trim() || null,
+      playback_status: coerceVoiceDiagnosticsText(receipt.playback_status).trim() || null,
+      source_turn_id:
+        coerceVoiceDiagnosticsText(receipt.source_turn_id).trim() ||
+        coerceVoiceDiagnosticsText(receipt.turnKey).trim() ||
+        null,
+      source_text_hash: coerceVoiceDiagnosticsText(receipt.source_text_hash).trim() || null,
+      chunk_index: readVoiceDiagnosticsNumber(receipt.chunk_index),
+      chunk_count: readVoiceDiagnosticsNumber(receipt.chunk_count),
+      position_ms: readVoiceDiagnosticsNumber(receipt.position_ms),
       atMs: readVoiceDiagnosticsNumber(receipt.atMs),
       assistant_answer: false,
       terminal_eligible: false,
@@ -512,8 +522,14 @@ export function sanitizeVoiceDiagnosticsForExport(
           calloutKind: receipt.calloutKind,
           utteranceId: receipt.utteranceId,
           turnKey: receipt.turnKey,
+          source_turn_id: receipt.source_turn_id,
+          source_text_hash: receipt.source_text_hash,
           kind: receipt.kind,
           status: receipt.status,
+          playback_status: receipt.playback_status,
+          chunk_index: receipt.chunk_index,
+          chunk_count: receipt.chunk_count,
+          position_ms: receipt.position_ms,
           atMs: receipt.atMs,
           providerHeader: receipt.providerHeader,
           profileHeader: receipt.profileHeader,

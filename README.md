@@ -107,9 +107,9 @@ $env:ENABLE_AGI="1"
 $env:ENABLE_ESSENCE="1"
 $env:LLM_POLICY="http"
 $env:LLM_RUNTIME="http"
-$env:HULL_MODE="1"
-$env:HULL_ALLOW_HOSTS=""
-$env:LLM_HTTP_BASE=""
+$env:HULL_MODE="0"
+$env:HULL_OUTBOUND_GUARD="0"
+$env:LLM_HTTP_BASE="https://api.openai.com"
 $env:OPENAI_API_KEY=""
 $env:ELEVENLABS_API_KEY=""
 
@@ -133,15 +133,15 @@ Minimum hosted values:
 DATABASE_URL="postgresql://USER:PASSWORD@HOST/DATABASE?sslmode=require"
 SESSION_SECRET=""
 OPENAI_API_KEY=""
-LLM_HTTP_BASE=""
+LLM_HTTP_BASE="https://api.openai.com"
 ELEVENLABS_API_KEY=""
 
 ENABLE_AGI=1
 ENABLE_ESSENCE=1
 LLM_POLICY=http
 LLM_RUNTIME=http
-HULL_MODE=1
-HULL_ALLOW_HOSTS=
+HULL_MODE=0
+HULL_OUTBOUND_GUARD=0
 ```
 
 Optional account and integration values:
@@ -341,6 +341,41 @@ Current panel families include:
 
 Panel registration lives in `client/src/pages/helix-core.panels.ts`. Desktop
 window registration is described in `docs/helix-desktop-panels.md`.
+
+### Workstation Interface Language Contract
+
+Account language changes are catalog-driven for static workstation UI. When a
+panel adds or changes visible text, classify each string before it ships:
+
+- Static catalog UI: panel titles, tabs, buttons, menus, presets, tooltips,
+  empty states, fixed explanations, badge-card labels, and graph background
+  labels belong in `client/src/lib/i18n/messages/source.ts` and every target
+  catalog under `client/src/lib/i18n/messages/`.
+- Dynamic translatable content: document excerpts, generated answers, retrieved
+  evidence, runtime graph facts, and user-authored content should stay outside
+  the static catalog and use translate-on-demand paths with provenance.
+- Approved exact tokens: product names, math symbols, metric keys, IDs, and
+  developer labels may remain exact only when the coverage/audit rules classify
+  them as intentional.
+
+New panels or new panel regions should also update
+`scripts/audit-workstation-language-coverage.ts` so the workstation audit knows
+which files contain static UI and which generated text is intentionally dynamic.
+
+Before treating panel language coverage as complete, run:
+
+```bash
+npm run i18n:check
+npm run --silent i18n:coverage
+npm run i18n:workstation:audit
+npx vitest run client/src/lib/i18n/__tests__/interfaceCatalog.spec.ts --pool=forks
+```
+
+The target state is: every target catalog has the same source IDs, coverage
+reports `missingStrings: 0`, non-approved `exactEnglishStrings: 0`, the
+workstation audit reports `unresolvedStaticUi: 0`, and any remaining dynamic
+text is deliberately handled by translate-on-demand instead of hardcoded panel
+copy.
 
 ### Workstation Tool Calls
 
@@ -551,8 +586,9 @@ Common controls:
 | `LLM_HTTP_BASE` | HTTP model endpoint base URL when using an HTTP runtime. |
 | `OPENAI_API_KEY` | Optional provider key for OpenAI-backed model calls. |
 | `ELEVENLABS_API_KEY` | Optional provider key for voice delivery. |
-| `HULL_MODE` | Enables hull/runtime modes used by some physics panels. |
-| `HULL_ALLOW_HOSTS` | Host allowlist for hull/runtime integrations. |
+| `HULL_MODE` | Legacy hull/runtime posture flag. It does not block outbound LLM or translation calls by itself. |
+| `HULL_OUTBOUND_GUARD` | Optional explicit outbound allowlist guard. Set to `1` only when you want host allowlist enforcement. |
+| `HULL_ALLOW_HOSTS` | Host allowlist used only when `HULL_OUTBOUND_GUARD=1`. |
 | `PUMP_DRIVER` | Selects the pump driver; defaults to the mock driver. |
 | `PUMP_LOG` | Logs pump duty updates when set to `1`. |
 

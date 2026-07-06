@@ -181,6 +181,7 @@ describe("stage play micro-reasoner prompt presets", () => {
       sourceId: "document_markdown:docs/example.md",
       sourceKind: "document_markdown",
     });
+    const packetComposerPrompt = prompts.find((prompt) => prompt.role === "packet_composer");
     const rejectedAudio = applyStagePlayMicroReasonerPromptPreset({
       presetId: "stage_play_micro_reasoner_prompt_preset:document-translate-haw-inline:v1",
       sourceIds: ["audio_transcript:docs"],
@@ -199,8 +200,13 @@ describe("stage play micro-reasoner prompt presets", () => {
       outputPolicy: "inline_document_translation",
       promptedRoles: ["claim_extractor", "observation_classifier", "packet_composer"],
     });
-    expect(prompts.find((prompt) => prompt.role === "packet_composer")?.promptId)
+    expect(packetComposerPrompt?.promptId)
       .toBe("stage_play_micro_reasoner_prompt:document-translate-haw-inline:packet_composer:v1");
+    expect(packetComposerPrompt?.title).toBe("Document Translate To Target Language Inline");
+    expect(packetComposerPrompt?.template).toContain("target_language");
+    expect(packetComposerPrompt?.template).toContain("Generate inline translation candidates in target_language");
+    expect(packetComposerPrompt?.template).not.toContain("Generate Hawaiian");
+    expect(packetComposerPrompt?.template).not.toContain('"locale": "haw"');
     expect(rejectedAudio).toBeNull();
     expect(rejectedVisual).toBeNull();
   });

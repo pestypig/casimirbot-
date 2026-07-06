@@ -9,6 +9,7 @@ import {
   buildScientificEvidencePacket,
   buildScientificImageEvidenceSidecar,
 } from "@shared/scientific-evidence-adaptor";
+import { SHARED_INTERFACE_LANGUAGE_CODES } from "@shared/interface-language-codes";
 
 const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context";
 const WORKSTATION_NOTES_LIST_NOTES_CAPABILITY = "workstation-notes.list_notes";
@@ -26,6 +27,7 @@ const CALCULATOR_PREFILL_EXPRESSION_CAPABILITY = "scientific-calculator.prefill_
 const CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY = "scientific-calculator.show_gateway_solve";
 const WORKSTATION_OPEN_PANEL_CAPABILITY = "workstation.open_panel";
 const WORKSTATION_FOCUS_PANEL_CAPABILITY = "workstation.focus_panel";
+const ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY = "account_session.set_interface_language";
 const DOCS_OPEN_DOC_CAPABILITY = "docs-viewer.open_doc";
 const REPO_SEARCH_CAPABILITY = "repo.search";
 const DOCS_SEARCH_CAPABILITY = "docs.search";
@@ -733,6 +735,126 @@ describe("Helix workstation tool gateway", () => {
       post_tool_model_step_required: true,
       assistant_answer: false,
       raw_content_included: false,
+    });
+  });
+
+  it("lists and calls account_session.set_interface_language as a governed preference action", async () => {
+    const manifest = listWorkstationGatewayCapabilities({
+      agentRuntime: "codex",
+      mode: "act",
+    });
+
+    expect(manifest.capabilities).toContainEqual(
+      expect.objectContaining({
+        capability_id: ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY,
+        panel_id: "account-session",
+        action_id: "set_interface_language",
+        mode: "act",
+        mutating: true,
+        code_mutation: false,
+        shell_access: false,
+        requires_confirmation: false,
+        permission_profile_required: "act",
+        terminal_eligible: true,
+        output_observation_schema: "helix.workstation_ui_action_receipt.v1",
+        input_schema: expect.objectContaining({
+          required: ["language"],
+          properties: expect.objectContaining({
+            language: { type: "string", enum: [...SHARED_INTERFACE_LANGUAGE_CODES] },
+          }),
+        }),
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    );
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "act",
+      capabilityId: ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY,
+      arguments: { language: "haw" },
+      turnId: "ask:test:gateway-interface-language",
+      iteration: 1,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY,
+      terminal_eligible: true,
+      gateway_admission: {
+        admission_status: "admitted",
+        permission_profile: "act",
+      },
+      observation: {
+        schema: "helix.workstation_ui_action_receipt.v1",
+        status: "succeeded",
+        dispatch_status: "admitted",
+        panel_id: "account-session",
+        action_id: "set_interface_language",
+        preference_key: "interfaceLanguage",
+        language: "haw",
+        terminal_artifact_kind: "workspace_action_receipt",
+        terminal_eligible: true,
+        workstation_action: {
+          schema_version: "helix.workstation.action/v1",
+          action: "run_panel_action",
+          panel_id: "account-session",
+          action_id: "set_interface_language",
+          args: { language: "haw" },
+        },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      tool_followup_decision: expect.objectContaining({
+        next_action: "terminal_answer",
+        terminal_blockers: [],
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    });
+  });
+
+  it("rejects unsupported account_session.set_interface_language codes with a typed failure", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "act",
+      capabilityId: ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY,
+      arguments: { language: "zz" },
+      turnId: "ask:test:gateway-interface-language-unsupported",
+      iteration: 1,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY,
+      error: "unsupported_interface_language",
+      terminal_eligible: false,
+      gateway_admission: {
+        admission_status: "blocked",
+        blocked_reason: "unsupported_interface_language",
+      },
+      observation: {
+        schema: "helix.workstation_ui_action_receipt.v1",
+        status: "blocked",
+        dispatch_status: "blocked",
+        language: null,
+        requested_language: "zz",
+        workstation_action: null,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: expect.objectContaining({
+        status: "blocked",
+        terminal_eligible: false,
+        missing_requirements: [
+          expect.objectContaining({
+            code: "unsupported_interface_language",
+            rejected_expression: "zz",
+            repair_action: "ask_user",
+          }),
+        ],
+      }),
     });
   });
 
@@ -2815,12 +2937,123 @@ describe("Helix workstation tool gateway", () => {
       observation: {
         schema: "helix.repo_search_observation.v1",
         query: "workspace_os.status",
+        query_quality: expect.objectContaining({
+          status: "accepted",
+          meaningful_terms: ["workspace_os.status"],
+        }),
+        repo_relevance_gate: expect.objectContaining({
+          status: "passed",
+          matched_terms: ["workspace_os.status"],
+        }),
+        evidence_state: "repo_evidence_usable",
+        selected_for_answer: true,
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
       },
     });
     expect((result.observation as { hit_count?: number }).hit_count).toBeGreaterThan(0);
+  });
+
+  it("finds Theory Badge Graph locator code with a focused repo.search query", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: REPO_SEARCH_CAPABILITY,
+      arguments: {
+        query: "theory badge graph locator",
+        query_terms: [
+          "Theory Badge Graph reflection produced",
+          "theory-badge-overlap-locator",
+          "theory-context-reflection-tool",
+          "runHelixTheoryContextReflectionTool",
+          "reflect_discussion_context",
+          "located_badge_ids",
+        ],
+        source_target_intent: {
+          query_derivation: {
+            schema: "helix.repo_search_query_derivation.v1",
+            source: "test",
+            derived_query: "theory badge graph locator",
+            derived_terms: [
+              "theory-badge-overlap-locator",
+              "theory-context-reflection-tool",
+              "runHelixTheoryContextReflectionTool",
+            ],
+            rejected_terms: ["how"],
+          },
+        },
+        paths: ["shared/theory", "server/services/helix-ask", "docs"],
+        max_hits: 8,
+      },
+      turnId: "ask:test:gateway-repo-search-theory-badge-locator",
+      iteration: 3,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      observation_packet: {
+        status: "succeeded",
+        state_delta: expect.objectContaining({
+          repo_relevance_gate: expect.objectContaining({
+            status: "passed",
+          }),
+          evidence_state: "repo_evidence_usable",
+          selected_for_answer: true,
+          query_derivation: expect.objectContaining({
+            schema: "helix.repo_search_query_derivation.v1",
+            derived_query: "theory badge graph locator",
+            rejected_terms: ["how"],
+          }),
+          support_refs: expect.arrayContaining([
+            expect.stringMatching(/shared\/theory\/theory-badge-overlap-locator\.ts:L\d+/),
+            expect.stringMatching(/shared\/theory\/theory-context-reflection-tool\.ts:L\d+/),
+          ]),
+        }),
+      },
+      observation: {
+        schema: "helix.repo_search_observation.v1",
+        query: "theory badge graph locator",
+        terms: expect.arrayContaining([
+          "Theory Badge Graph reflection produced",
+          "theory-badge-overlap-locator",
+          "theory-context-reflection-tool",
+          "runHelixTheoryContextReflectionTool",
+          "reflect_discussion_context",
+        ]),
+        query_quality: expect.objectContaining({
+          status: "accepted",
+          meaningful_terms: expect.arrayContaining(["theory", "badge", "graph", "locator"]),
+        }),
+        query_derivation: expect.objectContaining({
+          schema: "helix.repo_search_query_derivation.v1",
+          derived_query: "theory badge graph locator",
+          rejected_terms: ["how"],
+        }),
+        repo_relevance_gate: expect.objectContaining({
+          status: "passed",
+          matched_terms: expect.arrayContaining(["theory", "badge"]),
+          relevance_score: expect.any(Number),
+        }),
+        evidence_state: "repo_evidence_usable",
+        selected_for_answer: true,
+        repair_attempts: [],
+        support_refs: expect.arrayContaining([
+          expect.stringMatching(/shared\/theory\/theory-badge-overlap-locator\.ts:L\d+/),
+          expect.stringMatching(/shared\/theory\/theory-context-reflection-tool\.ts:L\d+/),
+        ]),
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    const filePaths = (result.observation as { file_paths?: string[] }).file_paths ?? [];
+    expect(filePaths).toEqual(expect.arrayContaining([
+      "shared/theory/theory-badge-overlap-locator.ts",
+      "shared/theory/theory-context-reflection-tool.ts",
+    ]));
+    const hits = (result.observation as { hits?: Array<{ text?: string }> }).hits ?? [];
+    expect(hits.some((hit) => (hit.text ?? "").length > 180)).toBe(true);
   });
 
   it("falls back to bounded Node repo search when ripgrep is unavailable", async () => {
@@ -2924,6 +3157,143 @@ describe("Helix workstation tool gateway", () => {
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
+    });
+  });
+
+  it("blocks generic repo.search stopword queries before they can satisfy evidence", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: REPO_SEARCH_CAPABILITY,
+      arguments: {
+        query: "how",
+        max_hits: 3,
+      },
+      turnId: "ask:test:gateway-repo-search-generic-blocked",
+      iteration: 3,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: "query_too_broad",
+      gateway_admission: {
+        admission_status: "blocked",
+        blocked_reason: "query_too_broad",
+      },
+      observation_packet: {
+        status: "blocked",
+        state_delta: expect.objectContaining({
+          query_quality: expect.objectContaining({
+            status: "blocked",
+            code: "query_too_broad",
+            meaningful_terms: [],
+          }),
+          repo_relevance_gate: expect.objectContaining({
+            status: "blocked",
+            code: "query_too_broad",
+          }),
+          evidence_state: "repo_query_blocked",
+          selected_for_answer: false,
+        }),
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.repo_search_observation.v1",
+        query: "how",
+        status: "blocked",
+        blocked_reason: "query_too_broad",
+        query_quality: expect.objectContaining({
+          status: "blocked",
+          meaningful_terms: [],
+        }),
+        repo_relevance_gate: expect.objectContaining({
+          status: "blocked",
+          code: "query_too_broad",
+        }),
+        evidence_state: "repo_query_blocked",
+        selected_for_answer: false,
+        repair_attempts: [
+          expect.objectContaining({
+            status: "blocked",
+            reason: "query_too_broad",
+          }),
+        ],
+        support_refs: [],
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  });
+
+  it("marks accepted repo.search queries with no relevant hits as repairable low-relevance evidence", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: REPO_SEARCH_CAPABILITY,
+      arguments: {
+        query: "zzznomatch raretoken",
+        paths: ["server/services/helix-ask"],
+        max_hits: 3,
+      },
+      turnId: "ask:test:gateway-repo-search-low-relevance",
+      iteration: 3,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      observation_packet: {
+        status: "succeeded",
+        missing_requirements: [
+          expect.objectContaining({
+            code: "no_repo_search_hits",
+            repair_action: "repair",
+          }),
+        ],
+        state_delta: expect.objectContaining({
+          repo_relevance_gate: expect.objectContaining({
+            status: "blocked",
+            code: "no_repo_search_hits",
+            relevance_score: 0,
+          }),
+          evidence_state: "repo_evidence_low_relevance",
+          selected_for_answer: false,
+          repair_attempts: [
+            expect.objectContaining({
+              status: "retry_recommended",
+              reason: "no_repo_search_hits",
+              repair_queries: ["zzznomatch raretoken"],
+            }),
+          ],
+        }),
+      },
+      observation: {
+        schema: "helix.repo_search_observation.v1",
+        query: "zzznomatch raretoken",
+        query_quality: expect.objectContaining({
+          status: "accepted",
+          meaningful_terms: ["zzznomatch", "raretoken"],
+        }),
+        repo_relevance_gate: expect.objectContaining({
+          status: "blocked",
+          code: "no_repo_search_hits",
+        }),
+        evidence_state: "repo_evidence_low_relevance",
+        selected_for_answer: false,
+        next_affordances: [
+          expect.objectContaining({
+            capability: REPO_SEARCH_CAPABILITY,
+            reason: "no_repo_search_hits",
+            repair_queries: ["zzznomatch raretoken"],
+          }),
+        ],
+        support_refs: [],
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
     });
   });
 
@@ -3329,6 +3699,8 @@ describe("Helix workstation tool gateway", () => {
         query: "quantum inequalities warp drive",
         providers_considered: ["arxiv"],
         providers_called: ["arxiv"],
+        evidence_state: "lookup_usable",
+        next_affordances: [],
         selected_for_answer: true,
         status: "succeeded",
         terminal_eligible: false,
@@ -3359,6 +3731,103 @@ describe("Helix workstation tool gateway", () => {
     });
     expect(calledUrls).toHaveLength(1);
     expect(calledUrls.some((url) => /internet-search|search_web|tavily|serpapi|google/i.test(url))).toBe(false);
+  });
+
+  it("marks weak scholarly lookup results as recovery evidence instead of selected answer evidence", async () => {
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+        "<entry>",
+        "<id>https://arxiv.org/abs/2606.00009</id>",
+        "<title>SChuBERT: Scholarly Document Chunks with BERT-encoding boost Citation Count Prediction</title>",
+        "<summary>This paper studies scholarly document quality and citation prediction with BERT.</summary>",
+        "<published>2026-06-01T00:00:00Z</published>",
+        "<author><name>A. Bibliometrics Researcher</name></author>",
+        "</entry>",
+        "</feed>",
+      ].join(""),
+    })) as typeof fetch;
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+      arguments: {
+        query: "weyl curvature",
+        providers: ["arxiv"],
+        limit: 1,
+      },
+      turnId: "ask:test:gateway-scholarly-weak-lookup",
+      iteration: 6,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+      observation_packet: {
+        capability_key: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+        action: "lookup_papers",
+        status: "failed",
+        state_delta: {
+          evidence_state: "lookup_weak_match",
+          next_affordances: expect.arrayContaining([
+            expect.objectContaining({
+              capability: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+              reason: "lookup_weak_match",
+            }),
+          ]),
+          scholarly_lookup_recovery_affordance: expect.objectContaining({
+            schema: "helix.scholarly_lookup_recovery_affordance.v1",
+            reason: "lookup_weak_match",
+          }),
+        },
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+      },
+      observation: {
+        schema: "helix.scholarly_research_observation.v1",
+        query: "weyl curvature",
+        evidence_state: "lookup_weak_match",
+        selected_for_answer: false,
+        missing_requirements: ["lookup_weak_match"],
+        lookup_relevance_gate: {
+          schema: "helix.scholarly_lookup_relevance_gate.v1",
+          status: "blocked",
+          code: "lookup_weak_match",
+        },
+        scholarly_lookup_recovery_affordance: {
+          schema: "helix.scholarly_lookup_recovery_affordance.v1",
+          reason: "lookup_weak_match",
+          recommended_next_capability: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+          terminal_eligible: false,
+          post_tool_model_step_required: true,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      error: "lookup_weak_match",
+    });
+    const observation = result.observation as {
+      next_affordances?: Array<{ capability?: string; query?: string; reason?: string }>;
+      scholarly_lookup_recovery_affordance?: { recovery_queries?: string[] };
+    };
+    expect(observation.next_affordances).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        capability: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+        reason: "lookup_weak_match",
+        query: expect.stringMatching(/Weyl tensor|weyl curvature/i),
+      }),
+    ]));
+    expect(observation.scholarly_lookup_recovery_affordance?.recovery_queries).toEqual(
+      expect.arrayContaining([expect.stringMatching(/Weyl tensor conformal curvature/i)]),
+    );
   });
 
   it("returns missing scholarly provider evidence as an observation, not proof", async () => {
@@ -3415,6 +3884,13 @@ describe("Helix workstation tool gateway", () => {
         providers_considered: ["arxiv"],
         providers_called: ["arxiv"],
         papers: [],
+        evidence_state: "lookup_blocked",
+        next_affordances: expect.arrayContaining([
+          expect.objectContaining({
+            capability: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+            reason: "lookup_blocked",
+          }),
+        ]),
         missing_requirements: ["arxiv_http_429", "no_scholarly_results_returned"],
         selected_for_answer: false,
         status: "failed",
@@ -3474,6 +3950,8 @@ describe("Helix workstation tool gateway", () => {
         capability_key: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
         source_kind: "html",
         pages_parsed: 1,
+        evidence_state: "full_text_usable",
+        next_affordances: [],
         selected_for_answer: true,
         context_policy: "compact_context_pack_only",
         terminal_eligible: false,
@@ -3485,6 +3963,75 @@ describe("Helix workstation tool gateway", () => {
     const observation = result.observation as { selected_chunks?: Array<{ text_excerpt?: string; citation_ref?: string }> };
     expect(observation.selected_chunks?.[0]?.text_excerpt).toContain("electron density");
     expect(observation.selected_chunks?.[0]?.citation_ref).toBe("paper#page=1");
+  });
+
+  it("classifies low-text page evidence as page-image parse required instead of usable full text", async () => {
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: (name: string) => name.toLowerCase() === "content-type" ? "text/html" : null },
+      arrayBuffer: async () => new TextEncoder().encode("<html><body>Fig. 1</body></html>").buffer,
+    })) as typeof fetch;
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      arguments: {
+        query: "equation figure page evidence",
+        source_url: "https://example.test/scanned.pdf",
+      },
+      turnId: "ask:test:gateway-scholarly-full-text-image-required",
+      iteration: 8,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      observation_packet: {
+        capability_key: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+        action: "fetch_full_text",
+        status: "failed",
+        state_delta: {
+          evidence_state: "page_image_parse_required",
+          next_affordances: expect.arrayContaining([
+            expect.objectContaining({
+              capability: "visual_analysis.inspect_image_region",
+            }),
+          ]),
+        },
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+      },
+      observation: {
+        schema: "helix.scholarly_full_text_observation.v1",
+        source_kind: "html",
+        evidence_state: "page_image_parse_required",
+        selected_for_answer: false,
+        missing_requirements: expect.arrayContaining(["page_image_parse_required"]),
+        visual_candidates: [
+          expect.objectContaining({
+            page: 1,
+            reason: "low_text_pdf_page_needs_visual_or_ocr_pass",
+          }),
+        ],
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      error: expect.stringMatching(/no_relevant_full_text_chunks_selected|page_image_parse_required/),
+    });
+    const observation = result.observation as {
+      next_affordances?: Array<{ capability?: string; source_ref?: string; reason?: string }>;
+    };
+    expect(observation.next_affordances).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        capability: "visual_analysis.inspect_image_region",
+        reason: "low_text_pdf_page_needs_visual_or_ocr_pass",
+        source_ref: expect.stringContaining("/page/1"),
+      }),
+    ]));
   });
 
   it("blocks scholarly full-text fetch when the paper identity has no fetchable source", async () => {
@@ -3595,6 +4142,14 @@ describe("Helix workstation tool gateway", () => {
         schema: "helix.scholarly_numeric_parameter_observation.v1",
         capability_key: SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
         requested_variables: ["n_m3", "T_eV", "B_T"],
+        evidence_state: "numeric_evidence_missing",
+        next_affordances: [
+          expect.objectContaining({
+            capability: SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
+            reason: "numeric_evidence_missing",
+            variables: ["B_T"],
+          }),
+        ],
         missing_variables: ["B_T"],
         scholarly_numeric_recovery_affordance: {
           schema: "helix.scholarly_numeric_recovery_affordance.v1",
@@ -3650,6 +4205,14 @@ describe("Helix workstation tool gateway", () => {
       schema: "helix.variable_source_plan.v1",
     });
     expect(result.observation_packet.state_delta).toMatchObject({
+      evidence_state: "numeric_evidence_missing",
+      next_affordances: [
+        expect.objectContaining({
+          capability: SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
+          reason: "numeric_evidence_missing",
+          variables: ["B_T"],
+        }),
+      ],
       scholarly_numeric_recovery_affordance: expect.objectContaining({
         schema: "helix.scholarly_numeric_recovery_affordance.v1",
         missing_variables: ["B_T"],
@@ -3691,6 +4254,9 @@ describe("Helix workstation tool gateway", () => {
       observation_packet: {
         action: "extract_numeric_parameters",
         status: "succeeded",
+        state_delta: {
+          evidence_state: "numeric_evidence_usable",
+        },
         terminal_eligible: false,
         post_tool_model_step_required: true,
         assistant_answer: false,
@@ -3698,6 +4264,8 @@ describe("Helix workstation tool gateway", () => {
       },
       observation: {
         schema: "helix.scholarly_numeric_parameter_observation.v1",
+        evidence_state: "numeric_evidence_usable",
+        next_affordances: [],
         missing_variables: [],
         selected_for_answer: true,
       },

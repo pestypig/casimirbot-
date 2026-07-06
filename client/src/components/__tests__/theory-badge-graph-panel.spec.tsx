@@ -25,6 +25,7 @@ function renderPanel() {
 }
 
 afterEach(() => {
+  localStorage.clear();
   useScientificCalculatorStore.setState({
     currentLatex: "",
     lastTheoryLoadout: null,
@@ -34,6 +35,20 @@ afterEach(() => {
 });
 
 describe("TheoryBadgeGraphPanel", () => {
+  it("renders static graph chrome through the selected account language", async () => {
+    localStorage.setItem("helix-start-settings", JSON.stringify({ interfaceLanguage: "de" }));
+
+    renderPanel();
+
+    expect(await screen.findByTestId("theory-achievement-map-scrollport")).toBeTruthy();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Theorieatlas-Linsen")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Relativitaetsgeschichte Atlaslinse" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Herauszoomen" })).toBeTruthy();
+    });
+  });
+
   it("renders the achievement map and loads a payload into the scientific calculator", async () => {
     renderPanel();
 

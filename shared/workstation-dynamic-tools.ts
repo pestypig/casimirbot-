@@ -3,6 +3,7 @@ import {
   type HelixWorkstationAffordance,
   type HelixWorkstationAffordanceFamily,
 } from "./helix-workstation-affordance";
+import { SHARED_INTERFACE_LANGUAGE_CODES } from "./interface-language-codes";
 
 export type WorkstationDynamicToolRisk = "low" | "medium" | "high";
 
@@ -1389,7 +1390,7 @@ function argSchema(arg: string): Record<string, unknown> {
   if (arg === "lane") return { enum: ["audio", "speaker_identity", "transcript", "translation", "context", "command", "voice_output"] };
   if (arg === "attachment_policy") return { enum: ["manual_only"] };
   if (arg === "context_injection") return { enum: ["explicit_attachment_only"] };
-  if (arg === "language") return { enum: ["en", "haw"] };
+  if (arg === "language") return { enum: [...SHARED_INTERFACE_LANGUAGE_CODES] };
   if (arg === "source_family") return { enum: ["minecraft_world", "calculator_stream", "physics_simulation", "browser_audio", "screen_summary", "manual_debug"] };
   if (arg === "modality") return { enum: ["visual_frame", "audio_transcript", "world_event", "environment_state", "environment_affordance", "procedure_graph", "calculator_stream", "simulation_stream"] };
   if (arg === "capture_mode") return { enum: ["interval", "manual", "salience_triggered", "push", "on_change"] };

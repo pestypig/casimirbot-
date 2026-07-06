@@ -1454,6 +1454,11 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
     payload.request_user_input_count = poisonAudit.artifact_role_counts.request_user_input;
     if (payload.debug && typeof payload.debug === "object") {
       const debug = payload.debug as Record<string, unknown>;
+      if (payload.language_model_policy && typeof payload.language_model_policy === "object" && !Array.isArray(payload.language_model_policy)) {
+        debug.language_model_policy = payload.language_model_policy;
+        debug.language_model_debug_summary = payload.language_model_debug_summary ?? debug.language_model_debug_summary;
+        debug.model_policy_debug_summary = payload.model_policy_debug_summary ?? debug.model_policy_debug_summary;
+      }
       debug.resolved_turn_summary = debug.resolved_turn_summary ?? resolvedTurnSummary;
       debug.terminal_answer_authority = payload.terminal_answer_authority;
       debug.poison_audit = payload.poison_audit;
@@ -1513,6 +1518,11 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
       debug.terminal_error_code = payload.terminal_error_code ?? null;
       debug.terminal_presentation = payload.terminal_presentation;
       debug.terminal_answer_authority = payload.terminal_answer_authority;
+      if (payload.language_model_policy && typeof payload.language_model_policy === "object" && !Array.isArray(payload.language_model_policy)) {
+        debug.language_model_policy = payload.language_model_policy;
+        debug.language_model_debug_summary = payload.language_model_debug_summary ?? debug.language_model_debug_summary;
+        debug.model_policy_debug_summary = payload.model_policy_debug_summary ?? debug.model_policy_debug_summary;
+      }
     }
     attachHelixAskReasoningTheaterStateToPayloadDebug(payload);
     const debugExport = rememberHelixDebugExportEnvelope({

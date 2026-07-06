@@ -146,10 +146,21 @@ const negativeConstraintPatterns = [
   /\bwithout\s+(?:pressing|starting|changing|executing)\b/i,
   /\b(?:open|run|click|start|stop|set|change|update|repair|refresh)\s+nothing\b/i,
   /\b(?:do\s+not|don't|without|never)\b[\s\S]{0,80}\b(?:open|run|click|start|stop|set|change|update|repair|refresh|call|execute|write|create|modify|mutate)\b/i,
+  /\b(?:do\s+not|don't|dont|without|never|not\s+now|no\s+need\s+to|avoid|stop)\b[\s\S]{0,120}\b(?:read|speak|say|play|narrat(?:e|or)|voice)\b[\s\S]{0,80}\b(?:aloud|out\s*loud|outload|outloud|to\s+me)?\b/i,
   /\b(?:haven't|have not|didn't|did not|not)\b[\s\S]{0,80}\b(?:started|run|opened|clicked|set|changed|updated|called|executed)\b/i,
 ];
 
 const contextualRules: ContextualRule[] = [
+  {
+    verb_or_cue: "voice_delivery",
+    reason: "future",
+    pattern: /\b(?:later|eventually|hypothetically|would|could|might|if|when|before|after|earlier|previously|historically)\b[\s\S]{0,160}\b(?:read|speak|say|play|narrat(?:e|or)|voice)\b[\s\S]{0,80}\b(?:aloud|out\s*loud|outload|outloud|to\s+me)\b/i,
+  },
+  {
+    verb_or_cue: "voice_delivery",
+    reason: "negated",
+    pattern: /\b(?:do\s+not|don't|dont|without|never|not\s+now|no\s+need\s+to|avoid|stop)\b[\s\S]{0,120}\b(?:read|speak|say|play|narrat(?:e|or)|voice)\b[\s\S]{0,80}\b(?:aloud|out\s*loud|outload|outloud|to\s+me)?\b/i,
+  },
   {
     verb_or_cue: "interval_cadence",
     reason: "negated",
@@ -234,6 +245,12 @@ const contextualRules: ContextualRule[] = [
 
 const commandRules: CommandRule[] = [
   {
+    action_family: "voice_delivery",
+    pattern: /\b(?:read|speak|say|play|narrat(?:e|or)|voice)\b[\s\S]{0,120}\b(?:aloud|out\s*loud|outload|outloud|to\s+me)\b/i,
+    confidence: 0.9,
+    reason: "affirmative voice or text-to-speech delivery command",
+  },
+  {
     action_family: "live_env.start_agent_goal_session",
     pattern: /\b(?:call\s+live_env\.start_agent_goal_session|(?:start|create|begin|set\s+up|setup|launch)\s+(?:an?\s+)?(?:agent\s+)?goal(?:\s+session)?\b[\s\S]{0,80}\b(?:objective|to|for|with\s+objective|work\s+until|monitor|track|refactor|implement|test|debug|fix|wire|build)\b)/i,
     confidence: 0.9,
@@ -268,6 +285,7 @@ const contextualMentionOverlapsCommand = (
     const cue = mention.verb_or_cue.toLowerCase();
     return normalized.includes(cue) ||
       (cue === "interval_cadence" && /\b(?:interval|cadence|rate|every\s+\d)/i.test(commandText)) ||
+      (cue === "voice_delivery" && /\b(?:read|speak|say|play|narrat(?:e|or)|voice)\b[\s\S]{0,120}\b(?:aloud|out\s*loud|outload|outloud|to\s+me)\b/i.test(commandText)) ||
       (cue === "open_run" && /\b(?:open|run)\b/i.test(commandText));
   });
 };

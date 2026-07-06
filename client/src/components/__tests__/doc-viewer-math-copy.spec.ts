@@ -712,6 +712,7 @@ describe("doc viewer math interaction", () => {
     expect(panelSource).toContain("t(\"docsViewer.translation.pauseSession\")");
     expect(panelSource).toContain("t(\"docsViewer.translation.resumeSession\")");
     expect(panelSource).toContain("storedInlineTranslationSessionMatchesScope");
+    expect(panelSource).toContain('DOC_INLINE_TRANSLATION_SESSION_PREFIX = "casimir.docs.inlineTranslation.v2"');
     expect(panelSource).toContain("if (session.sourceHash && session.sourceHash !== scope.sourceHash) return false");
     expect(panelSource).toContain("if (scope.sourceIdentityKey && session.sourceIdentityKey !== scope.sourceIdentityKey) return false");
     expect(panelSource).toContain("if (!scope.sourceIdentityKey && session.sourceIdentityKey) return false");
@@ -719,6 +720,11 @@ describe("doc viewer math interaction", () => {
     expect(panelSource).toContain("session.sourceTextCharCount !== scope.sourceTextCharCount");
     expect(panelSource).toContain("if (session.accountLocale && session.accountLocale !== scope.accountLocale) return false");
     expect(panelSource).toContain("if (session.targetLanguage && session.targetLanguage !== scope.targetLanguage) return false");
+    expect(panelSource).toContain("if (entry.accountLocale && entry.accountLocale !== documentTranslationAccountLocale) continue");
+    expect(panelSource).toContain("if (entry.targetLanguage && entry.targetLanguage !== documentTranslationTargetLanguage) continue");
+    expect(panelSource).toContain("entry.translationContractVersion !== DOCUMENT_MARKDOWN_TRANSLATION_CONTRACT_VERSION");
+    expect(panelSource).toContain("const hasEntryLanguageBinding = Boolean(entry.accountLocale || entry.targetLanguage)");
+    expect(panelSource).toContain("if (!hasEntryLanguageBinding && !entry.sourceIdentityKey) continue");
     expect(panelSource).toContain("readStoredInlineTranslationSession(activeTranslationScopeKey, {");
     expect(panelSource).toContain("writeStoredInlineTranslationSession(activeTranslationScopeKey, {");
     expect(panelSource).toContain("sourceHash: rawMarkdownSourceHash");
@@ -761,6 +767,8 @@ describe("doc viewer math interaction", () => {
     expect(pendingInlineState).toContain("accountLocale: documentTranslationAccountLocale");
     expect(pendingInlineState).toContain("targetLanguage: documentTranslationTargetLanguage");
     expect(pendingInlineState).toContain("sourceTextHash: hashDocumentSource(sourceText)");
+    expect(pendingInlineState).toContain("sourceIdentityKey: activeLiveTranslationSourceIdentityKey");
+    expect(pendingInlineState).toContain("latestSourceIdentityKey: activeLiveTranslationSourceIdentityKey");
     const markdownMailEnqueue = panelSource.match(
       /enqueueDocumentMarkdownTranslationMail\(\{[\s\S]*?\n      \}\);/,
     )?.[0] ?? "";
@@ -788,14 +796,33 @@ describe("doc viewer math interaction", () => {
       join(process.cwd(), "client/src/lib/docs/liveTranslationInlineRenderer.ts"),
       "utf8",
     );
+    const cssSource = readFileSync(join(process.cwd(), "client/src/index.css"), "utf8");
     expect(panelSource).toContain("renderDocumentMarkdownWithInlineTranslations({");
     expect(inlineRendererSource).toContain("buildDocumentInlineTranslationDataAttributes(state)");
+    expect(inlineRendererSource).toContain('source_markdown}\\n\\n${anchor}');
+    expect(inlineRendererSource).toContain('.join("\\n\\n")');
     expect(inlineRendererSource).toContain('`${name}="${escapeHtml(value)}"`');
+    expect(panelSource).toContain("activeInlineTranslationReticleTargetRef");
+    expect(panelSource).toContain("findActiveInlineTranslationReticleTarget({");
+    expect(panelSource).toContain("translationReticleViewportTick");
+    expect(panelSource).toContain("scheduleInlineTranslationReticleRefresh()");
+    expect(panelSource).toContain("collectVisibleTranslationUnitIds({");
+    expect(panelSource).toContain("clearDocTranslationReticleTarget");
+    expect(panelSource).toContain("reticleTarget.element.classList.add(DOC_AUTO_READ_ACTIVE_CLASS)");
+    expect(panelSource).toContain('setAttribute("data-doc-translation-reticle", reticleTarget.status)');
+    expect(panelSource).toContain('status: "candidate" | "loading"');
+    expect(panelSource).toContain('setAttribute("data-doc-translation-reticle-unit-id", reticleTarget.unitId)');
+    expect(panelSource).toContain('element.getAttribute("data-doc-read-active") !== "true"');
+    expect(panelSource).toContain("adoptedTranslation");
+    expect(panelSource).toContain("window.setTimeout(() => void requestVisibleInlineTranslations(), DOC_TRANSLATION_SCAN_DEBOUNCE_MS)");
+    expect(cssSource).toContain('.doc-read-active-section[data-doc-translation-reticle="candidate"]');
+    expect(cssSource).toContain('.doc-read-active-section[data-doc-translation-reticle="loading"]');
+    expect(cssSource).toContain("outline-style: dotted");
     expect(panelSource).toContain("type DocumentInlineTranslationRenderState");
     expect(panelSource).toContain("type InlineTranslationState = DocumentInlineTranslationRenderState");
     expect(panelSource).toContain("documentMarkdownTranslationEntryToInlineRenderState(entry)");
     expect(panelSource).toContain("documentMarkdownSourceId(currentEntry.relativePath)");
-    expect(panelSource).toContain("DOC_TRANSLATION_MAX_UNITS_PER_CHUNK = 3");
+    expect(panelSource).toContain("DOC_TRANSLATION_MAX_UNITS_PER_CHUNK = 1");
     expect(panelSource).toContain("DOC_TRANSLATION_MAX_CHARS_PER_CHUNK = 2200");
     expect(panelSource).toContain("documentTranslationChunkInFlightRef");
     expect(panelSource).toContain("const chunkId = `doc-inline:${rawMarkdownSourceHash}:${targetIds.join(\",\")}`");

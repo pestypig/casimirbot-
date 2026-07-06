@@ -482,6 +482,102 @@ describe("helix ask pill E68 debug export envelope", () => {
     );
   });
 
+  it("preserves language model policy metadata for normal final answers", () => {
+    const languageModelPolicy = {
+      schema: "helix.language_model_policy.v1",
+      requested_profile: "auto",
+      resolved_profile: "deep",
+      resolved_model: "gpt-5.5",
+      reasoning_effort: "high",
+      persistence: "turn-local",
+    };
+    const payload = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "ask:model-policy-normal",
+        question: "Summarize this document.",
+        content: "Model policy visible.",
+        debug: {},
+      } as any,
+      {
+        selected_final_answer: "Model policy visible.",
+        final_answer_source: "final_answer_draft",
+        terminal_artifact_kind: "model_synthesized_answer",
+        language_model_policy: languageModelPolicy,
+        language_model_debug_summary: "AI: Auto -> Deep | gpt-5.5 | reasoning: high | turn-local",
+        model_policy_debug_summary: "AI: Auto -> Deep | gpt-5.5 | reasoning: high | turn-local",
+        debug: {
+          turn_id: "ask:model-policy-normal",
+          language_model_policy: languageModelPolicy,
+          language_model_debug_summary: "AI: Auto -> Deep | gpt-5.5 | reasoning: high | turn-local",
+          model_policy_debug_summary: "AI: Auto -> Deep | gpt-5.5 | reasoning: high | turn-local",
+        },
+      },
+    );
+    const parsed = JSON.parse(payload);
+
+    expect(parsed.language_model_policy).toMatchObject(languageModelPolicy);
+    expect(parsed.language_model_debug_summary).toBe(
+      "AI: Auto -> Deep | gpt-5.5 | reasoning: high | turn-local",
+    );
+    expect(parsed.model_policy_debug_summary).toBe(
+      "AI: Auto -> Deep | gpt-5.5 | reasoning: high | turn-local",
+    );
+    expect(parsed.debug.language_model_policy).toMatchObject(languageModelPolicy);
+    expect(parsed.debug.language_model_debug_summary).toBe(
+      "AI: Auto -> Deep | gpt-5.5 | reasoning: high | turn-local",
+    );
+    expect(parsed.debug.model_policy_debug_summary).toBe(
+      "AI: Auto -> Deep | gpt-5.5 | reasoning: high | turn-local",
+    );
+  });
+
+  it("preserves language model policy metadata for typed failures", () => {
+    const languageModelPolicy = {
+      schema: "helix.language_model_policy.v1",
+      requested_profile: "fast",
+      resolved_profile: "fast",
+      resolved_model: "gpt-4.1-mini",
+      reasoning_effort: "low",
+      persistence: "turn-local",
+    };
+    const payload = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "ask:model-policy-failure",
+        question: "Search the internet for current news.",
+        content: "I cannot claim the requested workstation tool or UI action ran.",
+        debug: {},
+      } as any,
+      {
+        selected_final_answer: "I cannot claim the requested workstation tool or UI action ran.",
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "tavily_requires_TAVILY_API_KEY",
+        language_model_policy: languageModelPolicy,
+        language_model_debug_summary: "AI: Fast -> Fast | gpt-4.1-mini | reasoning: low | turn-local",
+        model_policy_debug_summary: "AI: Fast -> Fast | gpt-4.1-mini | reasoning: low | turn-local",
+        debug: {
+          turn_id: "ask:model-policy-failure",
+          language_model_policy: languageModelPolicy,
+          language_model_debug_summary: "AI: Fast -> Fast | gpt-4.1-mini | reasoning: low | turn-local",
+          model_policy_debug_summary: "AI: Fast -> Fast | gpt-4.1-mini | reasoning: low | turn-local",
+        },
+      },
+    );
+    const parsed = JSON.parse(payload);
+
+    expect(parsed.final_answer_source).toBe("typed_failure");
+    expect(parsed.terminal_artifact_kind).toBe("typed_failure");
+    expect(parsed.terminal_error_code).toBe("tavily_requires_TAVILY_API_KEY");
+    expect(parsed.language_model_policy).toMatchObject(languageModelPolicy);
+    expect(parsed.language_model_debug_summary).toBe(
+      "AI: Fast -> Fast | gpt-4.1-mini | reasoning: low | turn-local",
+    );
+    expect(parsed.debug.language_model_policy).toMatchObject(languageModelPolicy);
+    expect(parsed.debug.language_model_debug_summary).toBe(
+      "AI: Fast -> Fast | gpt-4.1-mini | reasoning: low | turn-local",
+    );
+  });
+
   it("exports backend selected_final_answer for model-synthesized final drafts instead of concise presentation text", () => {
     const longSelected =
       "Long model-authored synthesis: curvature is encoded by the metric and Riemann tensor, matter enters through stress-energy, and free fall follows geodesics while tidal forces reveal curvature.";

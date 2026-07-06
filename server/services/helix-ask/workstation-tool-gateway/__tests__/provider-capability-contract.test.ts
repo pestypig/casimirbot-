@@ -116,6 +116,7 @@ const reviewedSharedProviderGatewayCapabilityIds = [
   "scientific-calculator.prefill_expression",
   "workstation.open_panel",
   "workstation.focus_panel",
+  "account_session.set_interface_language",
   "docs-viewer.open_doc",
   "repo.search",
   "docs.search",
@@ -373,7 +374,7 @@ describe("provider-agent capability contract catalog", () => {
     });
   });
 
-  it("keeps every shared provider gateway capability inside the non-terminal authority envelope", () => {
+  it("keeps every shared provider gateway capability inside the bounded authority envelope", () => {
     const gatewayCapabilities = listWorkstationGatewayCapabilities({
       agentRuntime: "codex",
       mode: "act",
@@ -381,10 +382,11 @@ describe("provider-agent capability contract catalog", () => {
 
     expect(gatewayCapabilities.length).toBeGreaterThan(0);
     for (const capability of gatewayCapabilities) {
+      const terminalEligible = capability.capability_id === "account_session.set_interface_language";
       expect(capability, capability.capability_id).toMatchObject({
         code_mutation: false,
         shell_access: false,
-        terminal_eligible: false,
+        terminal_eligible: terminalEligible,
         post_tool_model_step_required: true,
         assistant_answer: false,
         raw_content_included: false,
@@ -398,7 +400,11 @@ describe("provider-agent capability contract catalog", () => {
       });
       expect(capability.output_observation_schema, capability.capability_id).toEqual(expect.any(String));
       expect(capability.output_observation_schema.trim(), capability.capability_id).not.toBe("");
-      expect(capability.safety_tags, capability.capability_id).toContain("non_terminal");
+      if (terminalEligible) {
+        expect(capability.safety_tags, capability.capability_id).toContain("workspace_action_receipt");
+      } else {
+        expect(capability.safety_tags, capability.capability_id).toContain("non_terminal");
+      }
       expect(capability.safety_tags, capability.capability_id).toContain("no_shell");
       expect(capability.safety_tags, capability.capability_id).toContain("no_code_mutation");
     }
@@ -1353,10 +1359,16 @@ describe("provider-agent capability contract catalog", () => {
     for (const action of WORKSTATION_DYNAMIC_TOOL_ACTIONS) {
       const classification = classifyDynamicWorkstationActionForProviderGateway(action);
       expect(classification.capability_id).toBe(buildWorkstationToolName(action.panel_id, action.action_id));
-      if (classification.capability_id === "workstation-notes.list_notes") {
+      if (
+        classification.capability_id === "workstation-notes.list_notes" ||
+        classification.capability_id === "account_session.set_interface_language"
+      ) {
+        const expectedPermissionClass = classification.capability_id === "workstation-notes.list_notes"
+          ? "read_observe"
+          : "mutating_control";
         expect(classification).toMatchObject({
           availability: "shared_gateway_now",
-          permission_class: "read_observe",
+          permission_class: expectedPermissionClass,
           provider_availability: {
             codex_workstation: true,
           },
@@ -1406,7 +1418,7 @@ describe("provider-agent capability contract catalog", () => {
 
     for (const action of [...WORKSTATION_DYNAMIC_TOOL_ACTIONS, ...RETIRED_WORKSTATION_DYNAMIC_TOOL_ACTIONS]) {
       const capabilityId = buildWorkstationToolName(action.panel_id, action.action_id);
-      if (capabilityId === "workstation-notes.list_notes") {
+      if (capabilityId === "workstation-notes.list_notes" || capabilityId === "account_session.set_interface_language") {
         expect(gatewayIds.has(capabilityId)).toBe(true);
         continue;
       }

@@ -6,6 +6,7 @@ import {
 } from "./HelixAskLegacyAnswerEnvelopeSlot";
 import { HelixAskPathLinkedTextSurface } from "./HelixAskPathLinkedTextSurface";
 import { HelixAskRenderedContentSurface } from "./HelixAskRenderedContentSurface";
+import type { ReadAloudRegionTrafficState } from "@/lib/helix/ask-read-aloud-display";
 
 type HelixAskLegacyPlainAnswerEnvelopeRenderInput = Omit<
   Extract<HelixAskLegacyAnswerEnvelopeSlotProps, { kind: "plain" }>,
@@ -25,7 +26,10 @@ export type HelixAskLegacyContentRenderersOptions = {
 export type HelixAskLegacyContentRenderers = {
   renderTextWithPathLinks: (text: string, keyPrefix: string) => ReactNode;
   renderContent: (content: unknown) => ReactNode;
-  renderFinalAnswerContent: (content: unknown) => ReactNode;
+  renderFinalAnswerContent: (
+    content: unknown,
+    readAloudTraffic?: ReadAloudRegionTrafficState | null,
+  ) => ReactNode;
   renderPlainAnswerEnvelope: (input: HelixAskLegacyPlainAnswerEnvelopeRenderInput) => ReactNode;
   renderResponseEnvelope: (input: HelixAskLegacyResponseEnvelopeRenderInput) => ReactNode;
 };
@@ -73,7 +77,7 @@ export function useHelixAskLegacyContentRenderers({
   );
 
   const renderFinalAnswerContent = useCallback(
-    (content: unknown): ReactNode => {
+    (content: unknown, readAloudTraffic?: ReadAloudRegionTrafficState | null): ReactNode => {
       const text = coerceHelixAskLegacyContentText(content);
       if (!text) return null;
       return (
@@ -82,6 +86,7 @@ export function useHelixAskLegacyContentRenderers({
           finalAnswer={{
             text,
             renderContent,
+            readAloudTraffic,
           }}
         />
       );

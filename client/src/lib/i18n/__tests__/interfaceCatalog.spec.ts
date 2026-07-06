@@ -56,7 +56,13 @@ describe("interface catalog integrity", () => {
       for (const [id, message] of Object.entries(catalog)) {
         expect(sourceIds.has(id as InterfaceMessageId)).toBe(true);
         expect(message.trim()).not.toBe("");
+        expect(message, `${code} ${id} should not contain mojibake question marks`).not.toMatch(/\?{3,}|(?:\?\s*){2,}/);
         expect(placeholders(message)).toEqual(placeholders(enMessages[id as InterfaceMessageId]));
+        if (id.startsWith("panel.title.")) {
+          expect(message, `${code} ${id} should not be identical to English`).not.toBe(
+            enMessages[id as InterfaceMessageId],
+          );
+        }
       }
     }
     expect(Object.keys(hawMessages).length).toBeGreaterThan(0);

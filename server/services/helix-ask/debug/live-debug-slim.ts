@@ -642,6 +642,11 @@ export const createHelixAskLiveDebugSlimBuilder = (
       full_debug_export_ref: payload.debug_export_ref ?? debug.debug_export_ref ?? null,
       full_debug_export_payload_hash: payload.debug_export_payload_hash ?? debug.debug_export_payload_hash ?? null,
       language_contract: payload.language_contract ?? debug.language_contract ?? null,
+      language_model_policy: payload.language_model_policy ?? debug.language_model_policy ?? null,
+      language_model_debug_summary:
+        payload.language_model_debug_summary ?? debug.language_model_debug_summary ?? null,
+      model_policy_debug_summary:
+        payload.model_policy_debug_summary ?? debug.model_policy_debug_summary ?? null,
       source_language: payload.source_language ?? debug.source_language ?? null,
       language_detected: payload.language_detected ?? debug.language_detected ?? null,
       language_confidence: payload.language_confidence ?? debug.language_confidence ?? null,

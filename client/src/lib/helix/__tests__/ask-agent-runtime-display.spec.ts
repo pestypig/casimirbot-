@@ -5,6 +5,7 @@ import {
   formatHelixAgentRuntimeShortLabel,
   normalizeHelixAgentProvidersResponse,
   resolveHelixAskActualAgentProviderLabel,
+  resolveHelixAskLanguageModelPolicySummary,
   resolveHelixAskModelUsageLabel,
   resolveHelixAgentRuntimePrimaryButtonDecision,
   resolveHelixAgentRuntimeSelectDecision,
@@ -258,6 +259,41 @@ describe("Helix Ask agent runtime display", () => {
         },
       }),
     ).toBe("Model: gpt-5-codex");
+  });
+
+  it("prefers language model policy summaries over provider/model fallback labels", () => {
+    const response = {
+      agent_runtime: "codex",
+      selected_agent_provider: {
+        id: "codex",
+        label: "Codex Workstation Mode",
+        model: "gpt-4o-mini",
+      },
+      language_model_debug_summary: "AI: Auto -> Deep | gpt-5.5 | reasoning: high | turn-local",
+    };
+
+    expect(resolveHelixAskLanguageModelPolicySummary(response)).toBe(
+      "AI: Auto -> Deep | gpt-5.5 | reasoning: high | turn-local",
+    );
+    expect(resolveHelixAskActualAgentProviderLabel(response)).toBeNull();
+    expect(resolveHelixAskModelUsageLabel(response)).toBe(
+      "AI: Auto -> Deep | gpt-5.5 | reasoning: high | turn-local",
+    );
+  });
+
+  it("falls back to provider and runtime model labels only when language model policy is absent", () => {
+    const response = {
+      agent_runtime: "codex",
+      selected_agent_provider: {
+        id: "codex",
+        label: "Codex Workstation Mode",
+        model: "gpt-4o-mini",
+      },
+    };
+
+    expect(resolveHelixAskLanguageModelPolicySummary(response)).toBeNull();
+    expect(resolveHelixAskActualAgentProviderLabel(response)).toBe("Provider: Codex Workstation Mode");
+    expect(resolveHelixAskModelUsageLabel(response)).toBe("Model: gpt-4o-mini");
   });
 
   it("labels models from Codex agent runtime loop metadata", () => {

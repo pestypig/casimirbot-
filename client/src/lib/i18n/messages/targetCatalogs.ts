@@ -9,6 +9,7 @@ import { jaMessages } from "@/lib/i18n/messages/ja";
 import { koMessages } from "@/lib/i18n/messages/ko";
 import { ptMessages } from "@/lib/i18n/messages/pt";
 import type { InterfaceMessageId, InterfaceTargetCatalog } from "@/lib/i18n/messages/types";
+import { woMessages } from "@/lib/i18n/messages/wo";
 import { zhMessages } from "@/lib/i18n/messages/zh";
 
 export const interfaceMessageCatalogs = {
@@ -22,6 +23,7 @@ export const interfaceMessageCatalogs = {
   ko: koMessages,
   zh: zhMessages,
   ar: arMessages,
+  wo: woMessages,
 } satisfies Record<InterfaceLanguageCode, InterfaceTargetCatalog<InterfaceMessageId>>;
 
 export const INTERFACE_TARGET_CATALOGS = Object.entries(interfaceMessageCatalogs)

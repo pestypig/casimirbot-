@@ -10,10 +10,11 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function watermarkWords(cell: MoralGraphBiomeScaleCell): string[] {
+function watermarkWords(cell: MoralGraphBiomeScaleCell, translateText: (text: string) => string): string[] {
   return cell.label
     .split("/")
     .map((part: string) => part.trim())
+    .map((part: string) => translateText(part))
     .filter(Boolean);
 }
 
@@ -27,14 +28,22 @@ function watermarkGrid(cell: MoralGraphBiomeScaleCell, columnStep: number, rowSt
   };
 }
 
-export function MoralGraphCellWatermarks({ cells, zoom = 1 }: { cells: MoralGraphBiomeScaleCell[]; zoom?: number }) {
+export function MoralGraphCellWatermarks({
+  cells,
+  zoom = 1,
+  translateText = (text: string) => text,
+}: {
+  cells: MoralGraphBiomeScaleCell[];
+  zoom?: number;
+  translateText?: (text: string) => string;
+}) {
   const fontSize = Number(clamp(BASE_WATERMARK_FONT_SIZE / Math.max(zoom, 0.22), BASE_WATERMARK_FONT_SIZE, MAX_WATERMARK_FONT_SIZE).toFixed(2));
   const columnStep = Math.max(WATERMARK_COLUMN_STEP, fontSize * 8.8);
   const rowStep = Math.max(WATERMARK_ROW_STEP, fontSize * 3.8);
   return (
     <div className="pointer-events-none absolute inset-0 z-0" data-testid="moral-graph-cell-watermarks" aria-hidden="true">
       {cells.map((cell: MoralGraphBiomeScaleCell) => {
-        const words = watermarkWords(cell);
+        const words = watermarkWords(cell, translateText);
         const grid = watermarkGrid(cell, columnStep, rowStep);
         return (
           <div

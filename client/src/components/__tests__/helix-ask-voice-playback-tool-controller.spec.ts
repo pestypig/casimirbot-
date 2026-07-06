@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildHelixAskVoicePlaybackLifecycleReceiptInput,
+  buildHelixAskVoiceSpeakRequest,
   buildHelixAskVoicePlaybackToolHandoffPlan,
   buildHelixAskVoicePlaybackToolOutputState,
+  classifyHelixAskVoiceSpeakJsonResponse,
   executeHelixAskVoicePlaybackToolHandoffPlan,
   recordHelixAskVoicePlaybackToolOutcomeReceipt,
   type HelixAskVoicePlaybackToolOutcomeReceipt,
   type HelixAskVoicePlaybackToolTimelineEvent,
 } from "@/components/helix/ask-console/HelixAskVoicePlaybackToolController";
 import type { VoicePlaybackOutcomeReceipt } from "@/lib/helix/voice-capture-diagnostics";
+import type { VoicePlaybackLifecycleReceiptStatus } from "@/lib/helix/voice-capture-diagnostics";
 
 function ttsHandoff(overrides: {
   allowMicOffPlayback?: boolean;
@@ -42,6 +46,59 @@ function ttsHandoff(overrides: {
 }
 
 describe("HelixAskVoicePlaybackToolController", () => {
+  it("builds manual read-aloud as a governed voice speak request, not a legacy browser fallback", () => {
+    expect(buildHelixAskVoiceSpeakRequest({
+      text: "Read this final answer.",
+      provider: "elevenlabs",
+      voiceProfileId: "voice-default",
+      traceId: "ask:trace",
+      missionId: "desktop:mission",
+      eventId: "reply-1",
+      contextTier: "tier1",
+      sessionState: "idle",
+      voiceMode: "normal",
+      utteranceId: "manual_read_aloud:reply-1",
+      chunkKind: "manual_read_aloud",
+      turnKey: "manual:reply-1",
+    })).toEqual({
+      text: "Read this final answer.",
+      mode: "briefing",
+      priority: "info",
+      provider: "elevenlabs",
+      voice_profile_id: "voice-default",
+      traceId: "ask:trace",
+      missionId: "desktop:mission",
+      eventId: "reply-1",
+      contextTier: "tier1",
+      sessionState: "idle",
+      voiceMode: "normal",
+      utteranceId: "manual_read_aloud:reply-1",
+      chunkKind: "manual_read_aloud",
+      turnKey: "manual:reply-1",
+      deterministic: true,
+      textCertainty: "reasoned",
+      voiceCertainty: "reasoned",
+    });
+  });
+
+  it("classifies voice speak JSON responses without exposing dry-run as read-aloud UX state", () => {
+    expect(classifyHelixAskVoiceSpeakJsonResponse({
+      status: 200,
+      payload: { ok: true, dryRun: true },
+    })).toEqual({
+      stateEvent: "suppressed",
+      reason: "voice_proxy_dry_run",
+    });
+
+    expect(classifyHelixAskVoiceSpeakJsonResponse({
+      status: 200,
+      payload: { ok: true, suppressed: true, reason: "voice_unavailable" },
+    })).toEqual({
+      stateEvent: "error",
+      reason: "voice_unavailable",
+    });
+  });
+
   it("separates microphone input state from governed TTS output permission", () => {
     expect(buildHelixAskVoicePlaybackToolOutputState({
       micArmState: "off",
@@ -299,5 +356,58 @@ describe("HelixAskVoicePlaybackToolController", () => {
     });
     expect(committed).toEqual([[result.receipt]]);
     expect(posted).toEqual([result.receipt]);
+  });
+
+  it("builds non-terminal lifecycle receipts for transport state changes", () => {
+    const playbackStatuses: VoicePlaybackLifecycleReceiptStatus[] = [
+      "queued",
+      "started",
+      "paused",
+      "resumed",
+      "completed",
+      "cancelled",
+      "failed",
+    ];
+    const lifecycleReceipts = playbackStatuses.map((playbackStatus) =>
+      buildHelixAskVoicePlaybackLifecycleReceiptInput({
+        playbackStatus,
+        utteranceId: "manual_read_aloud:reply-1",
+        turnKey: "manual:reply-1",
+        sourceTurnId: "turn:reply-1",
+        sourceTextHash: "sha256:reply-text",
+        kind: "manual_read_aloud",
+        cancelReason: playbackStatus === "cancelled" ? "user_stop" : null,
+        chunkIndex: 1,
+        chunkCount: 3,
+        positionMs: 750,
+      }),
+    );
+
+    expect(lifecycleReceipts.map((receipt) => receipt.playbackStatus)).toEqual([
+      "queued",
+      "started",
+      "paused",
+      "resumed",
+      "completed",
+      "cancelled",
+      "failed",
+    ]);
+    expect(lifecycleReceipts.map((receipt) => receipt.status)).toEqual([
+      "queued",
+      "queued",
+      "queued",
+      "queued",
+      "delivered",
+      "cancelled",
+      "failed",
+    ]);
+    expect(lifecycleReceipts[5]).toMatchObject({
+      cancelReason: "user_stop",
+      sourceTurnId: "turn:reply-1",
+      sourceTextHash: "sha256:reply-text",
+      chunkIndex: 1,
+      chunkCount: 3,
+      positionMs: 750,
+    });
   });
 });

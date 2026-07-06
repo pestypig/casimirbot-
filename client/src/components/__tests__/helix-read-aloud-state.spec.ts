@@ -65,12 +65,14 @@ beforeAll(async () => {
 
 describe("transitionReadAloudState", () => {
   it("covers deterministic playback state transitions", () => {
-    expect(transitionReadAloudState("idle", "request")).toBe("requesting");
-    expect(transitionReadAloudState("requesting", "audio")).toBe("playing");
-    expect(transitionReadAloudState("requesting", "dry-run")).toBe("dry-run");
-    expect(transitionReadAloudState("requesting", "error")).toBe("error");
-    expect(transitionReadAloudState("playing", "ended")).toBe("idle");
-    expect(transitionReadAloudState("playing", "stop")).toBe("idle");
+    expect(transitionReadAloudState("idle", "request")).toBe("loading");
+    expect(transitionReadAloudState("loading", "audio")).toBe("playing");
+    expect(transitionReadAloudState("loading", "suppressed")).toBe("unavailable");
+    expect(transitionReadAloudState("loading", "error")).toBe("error");
+    expect(transitionReadAloudState("playing", "pause")).toBe("paused");
+    expect(transitionReadAloudState("paused", "resume")).toBe("resuming");
+    expect(transitionReadAloudState("playing", "ended")).toBe("completed");
+    expect(transitionReadAloudState("playing", "stop")).toBe("cancelled");
   });
 });
 

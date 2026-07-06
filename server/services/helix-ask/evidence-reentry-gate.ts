@@ -174,8 +174,8 @@ const collectRepoEvidenceRefs = (input: {
   finalAnswerSource: string;
 }): string[] => {
   const terminalUsesRepoEvidence =
-    /repo_code_evidence_answer|repo_entity_definition/i.test(input.terminalArtifactKind) ||
-    /repo_code_evidence_answer|repo_entity_definition/i.test(input.finalAnswerSource);
+    /repo_code_evidence_answer|repo_entity_definition|compound_evidence_synthesis_answer/i.test(input.terminalArtifactKind) ||
+    /repo_code_evidence_answer|repo_entity_definition|compound_evidence_synthesis_answer/i.test(input.finalAnswerSource);
   if (!terminalUsesRepoEvidence) return [];
   const ledger = Array.isArray(input.payload.current_turn_artifact_ledger)
     ? input.payload.current_turn_artifact_ledger
@@ -186,6 +186,26 @@ const collectRepoEvidenceRefs = (input: {
     .filter((entry) => readString(entry.kind) === "repo_code_evidence_observation")
     .map((entry) => readString(entry.artifact_id))
     .filter(Boolean);
+};
+
+const collectCompoundSynthesisEvidenceRefs = (input: {
+  payload: RecordLike;
+  terminalArtifactKind: string;
+  finalAnswerSource: string;
+}): string[] => {
+  const terminalUsesCompoundSynthesis =
+    input.terminalArtifactKind === "compound_evidence_synthesis_answer" ||
+    input.finalAnswerSource === "compound_evidence_synthesis_answer";
+  if (!terminalUsesCompoundSynthesis) return [];
+  const answer = readRecord(input.payload.compound_evidence_synthesis_answer);
+  const presentation = readRecord(input.payload.terminal_presentation);
+  return unique([
+    ...readStringArray(answer?.support_refs),
+    ...readStringArray(answer?.observation_refs),
+    ...readStringArray(answer?.artifact_refs),
+    ...readStringArray(answer?.evidence_refs),
+    ...readStringArray(presentation?.selected_observation_refs),
+  ]);
 };
 
 const collectDocsViewerEvidenceRefs = (input: {
@@ -543,6 +563,11 @@ export function buildEvidenceReentryGate(input: {
       finalAnswerSource: input.finalAnswerSource,
     }),
     ...collectConversationMemoryEvidenceRefs(input.payload),
+    ...collectCompoundSynthesisEvidenceRefs({
+      payload: input.payload,
+      terminalArtifactKind: input.terminalArtifactKind,
+      finalAnswerSource: input.finalAnswerSource,
+    }),
     ...collectRepoEvidenceRefs({
       payload: input.payload,
       terminalArtifactKind: input.terminalArtifactKind,

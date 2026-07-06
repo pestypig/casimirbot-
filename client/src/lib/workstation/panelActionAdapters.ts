@@ -4,6 +4,7 @@ import { getPanelDef } from "@/lib/desktop/panelRegistry";
 import type { SettingsTab } from "@/hooks/useHelixStartSettings";
 import { pushWorkstationDebugEvent } from "@/lib/helix/workstation-debug";
 import { writeInterfaceLanguagePreference } from "@/lib/i18n/interfaceLanguagePreference";
+import { SHARED_INTERFACE_LANGUAGE_CODES } from "@shared/interface-language-codes";
 import {
   SCIENTIFIC_CALCULATOR_DRAFT_KEY,
   dispatchScientificCalculatorMathPicked,
@@ -2883,7 +2884,7 @@ export function executeHelixPanelAction(
           raw_content_included: false,
           reason: writeResult.reason,
           language: writeResult.language,
-          supported_languages: ["en", "haw"],
+          supported_languages: [...SHARED_INTERFACE_LANGUAGE_CODES],
         },
       };
     }

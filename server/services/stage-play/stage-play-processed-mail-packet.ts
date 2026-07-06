@@ -346,6 +346,7 @@ type DocumentMarkdownVisibleUnitsPayload = {
   locale: string;
   targetLanguage: string;
   accountLocale: string;
+  translationContractVersion: string | null;
   projectionTarget: string;
   freshnessStatus: string;
   units: DocumentMarkdownVisibleUnit[];
@@ -376,7 +377,7 @@ const readDocumentMarkdownVisibleUnitsPayload = (
               : [],
         }))
         .filter((unit: DocumentMarkdownVisibleUnit) => unit.unit_id.length > 0);
-  const locale = readStringFromJson(parsed, "locale") ?? "haw";
+  const locale = readStringFromJson(parsed, "locale") ?? "und";
   return {
     docPath: readStringFromJson(parsed, "doc_path") ?? readStringFromJson(parsed, "docPath"),
     sourceHash: readStringFromJson(parsed, "source_hash") ?? readStringFromJson(parsed, "sourceHash"),
@@ -427,6 +428,9 @@ const readDocumentMarkdownVisibleUnitsPayload = (
     locale,
     targetLanguage: readStringFromJson(parsed, "target_language") ?? readStringFromJson(parsed, "targetLanguage") ?? locale,
     accountLocale: readStringFromJson(parsed, "account_locale") ?? readStringFromJson(parsed, "accountLocale") ?? locale,
+    translationContractVersion:
+      readStringFromJson(parsed, "translation_contract_version") ??
+      readStringFromJson(parsed, "translationContractVersion"),
     projectionTarget: readStringFromJson(parsed, "projection_target") ?? readStringFromJson(parsed, "projectionTarget") ?? HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
     freshnessStatus: readStringFromJson(parsed, "freshness_status") ?? readStringFromJson(parsed, "freshnessStatus") ?? "fresh",
     units,
@@ -567,6 +571,7 @@ const buildDocumentInlineTranslationOutput = (input: {
     locale,
     targetLanguage,
     accountLocale,
+    translationContractVersion: visible.translationContractVersion,
     projectionTarget: visible.projectionTarget,
     projectionStatus,
     freshnessStatus: visible.freshnessStatus,
@@ -647,6 +652,7 @@ const defaultPromptedMicroReasonerExecutor: StagePlayPromptedMicroReasonerExecut
     model: process.env.STAGE_PLAY_MICRO_REASONER_LLM_MODEL ?? process.env.LLM_HTTP_MODEL ?? "gpt-4o-mini",
     temperature: Number(process.env.STAGE_PLAY_MICRO_REASONER_LLM_TEMPERATURE ?? 0.1),
     max_tokens: Number(input.maxOutputTokens ?? process.env.STAGE_PLAY_MICRO_REASONER_LLM_MAX_TOKENS ?? 420),
+    response_format: { type: "json_object" },
     messages: [
       {
         role: "system",

@@ -102,6 +102,7 @@ describe("document translation MicroDeck output parsing", () => {
       locale: "haw",
       targetLanguage: "haw",
       accountLocale: "haw",
+      translationContractVersion: "target-language-v2",
       sourceTextHash: "fnv1a32:text-payload",
       sourceTextCharCount: "Example Heading".length,
       laneSessionId: "lane-session-docs",
@@ -737,6 +738,7 @@ describe("document translation MicroDeck output parsing", () => {
       projectionTarget: "docs_viewer_inline",
       targetLanguage: "haw",
       accountLocale: "haw",
+      translationContractVersion: "target-language-v2",
       translations: [
         { unit_id: "u0001", translated_markdown: "Translated heading" },
         { unit_id: "u0002", translated_markdown: "Kikokikona unuhi" },
@@ -793,6 +795,7 @@ describe("document translation MicroDeck output parsing", () => {
         projectionTarget: "docs_chunk",
         targetLanguage: "haw",
         accountLocale: "haw",
+        translationContractVersion: "target-language-v2",
       },
       {
         unitId: "u0002",
@@ -839,6 +842,7 @@ describe("document translation MicroDeck output parsing", () => {
         projectionTarget: "docs_chunk",
         targetLanguage: "haw",
         accountLocale: "haw",
+        translationContractVersion: "target-language-v2",
       },
     ]);
   });
@@ -940,7 +944,7 @@ describe("document translation MicroDeck output parsing", () => {
         ...baseRun,
         status: "failed",
         deckPresetId: "stage_play_micro_reasoner_prompt_preset:document-translate-haw-inline:v1",
-        deckPresetTitle: "Document Markdown Translate To Hawaiian",
+        deckPresetTitle: "Document Markdown Translate To Target Language",
         deckExecutionMode: "uses_prior_outputs",
         outputPreview,
       },
@@ -984,7 +988,7 @@ describe("document translation MicroDeck output parsing", () => {
         ...baseRun,
         status: "completed",
         deckPresetId: "stage_play_micro_reasoner_prompt_preset:document-translate-haw-inline:v1",
-        deckPresetTitle: "Document Markdown Translate To Hawaiian",
+        deckPresetTitle: "Document Markdown Translate To Target Language",
         deckExecutionMode: "baseline_fallback",
         deckProductRole: true,
         outputPreview,

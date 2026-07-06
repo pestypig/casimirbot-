@@ -1,5 +1,6 @@
 import React, { type MouseEvent } from "react";
-import { Bug, Copy, Volume2 } from "lucide-react";
+import { AlertCircle, Bug, Copy, Loader2, Pause, Play, RotateCcw, Volume2 } from "lucide-react";
+import type { ReadAloudPlaybackState } from "@/lib/helix/ask-read-aloud-display";
 
 export type HelixAskTurnControlsProps = {
   onCopyFinal: () => void;
@@ -11,6 +12,7 @@ export type HelixAskTurnControlsProps = {
     question?: string | null;
     finalAnswer?: string | null;
     terminalArtifactKind?: string | null;
+    modelPolicyDebugSummary?: string | null;
   } | null;
   showDebugCopy?: boolean;
   debugCopyDisabled?: boolean;
@@ -18,8 +20,18 @@ export type HelixAskTurnControlsProps = {
   debugCopyTestId?: string;
   readAloudTestId?: string;
   readAloudActive?: boolean;
+  readAloudState?: ReadAloudPlaybackState;
   readAloudAriaLabel?: string;
   readAloudTitle?: string;
+};
+
+const ReadAloudIcon = ({ state }: { state: ReadAloudPlaybackState }) => {
+  if (state === "loading" || state === "resuming") return <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />;
+  if (state === "playing") return <Pause className="h-3.5 w-3.5" aria-hidden />;
+  if (state === "paused") return <Play className="h-3.5 w-3.5" aria-hidden />;
+  if (state === "error" || state === "unavailable") return <AlertCircle className="h-3.5 w-3.5" aria-hidden />;
+  if (state === "completed") return <RotateCcw className="h-3.5 w-3.5" aria-hidden />;
+  return <Volume2 className="h-3.5 w-3.5" aria-hidden />;
 };
 
 export function HelixAskTurnControls({
@@ -33,6 +45,7 @@ export function HelixAskTurnControls({
   debugCopyTestId,
   readAloudTestId,
   readAloudActive = false,
+  readAloudState = "idle",
   readAloudAriaLabel = "Read aloud",
   readAloudTitle = "Read aloud",
 }: HelixAskTurnControlsProps) {
@@ -42,6 +55,7 @@ export function HelixAskTurnControls({
     "data-turn-control-question": debugScope?.question ?? undefined,
     "data-turn-control-final-answer": debugScope?.finalAnswer ?? undefined,
     "data-turn-control-terminal-artifact-kind": debugScope?.terminalArtifactKind ?? undefined,
+    "data-turn-control-model-policy-debug-summary": debugScope?.modelPolicyDebugSummary ?? undefined,
   };
 
   return (
@@ -75,6 +89,7 @@ export function HelixAskTurnControls({
           data-debug-copy-question={debugScope?.question ?? undefined}
           data-debug-copy-final-answer={debugScope?.finalAnswer ?? undefined}
           data-debug-copy-terminal-artifact-kind={debugScope?.terminalArtifactKind ?? undefined}
+          data-debug-copy-model-policy-debug-summary={debugScope?.modelPolicyDebugSummary ?? undefined}
         >
           <Bug className="h-3.5 w-3.5" aria-hidden />
         </button>
@@ -90,9 +105,10 @@ export function HelixAskTurnControls({
         aria-label={readAloudAriaLabel}
         title={readAloudTitle}
         data-testid={readAloudTestId}
+        data-read-aloud-state={readAloudState}
         {...turnScopeAttributes}
       >
-        <Volume2 className="h-3.5 w-3.5" aria-hidden />
+        <ReadAloudIcon state={readAloudState} />
       </button>
     </div>
   );

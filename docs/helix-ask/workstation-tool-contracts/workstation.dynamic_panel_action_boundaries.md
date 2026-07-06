@@ -30,12 +30,15 @@ The current graduated exception is:
 
 ```txt
 workstation-notes.list_notes
+account_session.set_interface_language
 ```
 
-It is read-only, body-redacted, and documented in
-`workstation-notes.list_notes.md`. This exception does not grant provider access
-to neighboring Workstation Notes actions such as create, open, append, rename,
-delete, or set-active.
+`workstation-notes.list_notes` is read-only, body-redacted, and documented in
+`workstation-notes.list_notes.md`. `account_session.set_interface_language` is a
+narrow preference-only action that dispatches the existing
+`account-session.set_interface_language` workstation action for supported
+interface language codes. These exceptions do not grant provider access to
+neighboring panel actions.
 
 Blocked prompt shapes include:
 
@@ -104,6 +107,12 @@ capability=workstation-notes.list_notes
 availability=shared_gateway_now
 permission_class=read_observe
 gateway_manifest=present
+
+capability=account_session.set_interface_language
+availability=shared_gateway_now
+permission_class=mutating_control
+gateway_manifest=present
+terminal_artifact_kind=workspace_action_receipt
 ```
 
 Classification rules:

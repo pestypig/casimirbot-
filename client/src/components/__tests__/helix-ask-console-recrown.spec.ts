@@ -48,7 +48,10 @@ import {
   HELIX_ASK_CONSOLE_HERO_REPLY_LIST_CLASS_NAME,
   buildHelixAskConsoleRuntimeBridgeProps,
 } from "@/components/helix/ask-console/HelixAskConsoleRuntimeShellProps";
-import { buildHelixAskFinalAnswerBlocks } from "@/components/helix/ask-console/HelixAskFinalAnswer";
+import {
+  buildHelixAskFinalAnswerBlocks,
+  resolveHelixAskFinalAnswerReadAloudBlockKey,
+} from "@/components/helix/ask-console/HelixAskFinalAnswer";
 import { HelixAskRuntimeGoalProgressPanel } from "@/components/helix/ask-console/HelixAskFinalExtras";
 import {
   buildHelixAskContextBridgeSnapshot,
@@ -2708,6 +2711,33 @@ describe("Helix Ask Console recrown boundary", () => {
       activeTurnId: null,
       clientTurnId: null,
     });
+    const modelPolicyDebugSummary = "AI: Auto -> Fast | gpt-5.4-mini | reasoning: low | turn-local";
+    const modelPolicyDebugButton = {
+      innerText: "",
+      textContent: "",
+      parentElement: null,
+      getAttribute: (name: string) => {
+        if (name === "data-debug-copy-active-turn-id" || name === "data-turn-control-active-turn-id") return "ask:model-policy";
+        if (name === "data-debug-copy-client-turn-id" || name === "data-turn-control-client-turn-id") return "reply-model-policy";
+        if (name === "data-debug-copy-question" || name === "data-turn-control-question") return "policy question";
+        if (name === "data-debug-copy-final-answer" || name === "data-turn-control-final-answer") return "policy answer";
+        if (
+          name === "data-debug-copy-model-policy-debug-summary" ||
+          name === "data-turn-control-model-policy-debug-summary"
+        ) {
+          return modelPolicyDebugSummary;
+        }
+        return null;
+      },
+      querySelector: () => null,
+    } as unknown as HTMLElement;
+    expect(extractHelixAskLegacyClickedTurnDebugScope(modelPolicyDebugButton)).toMatchObject({
+      question: "policy question",
+      finalAnswer: "policy answer",
+      activeTurnId: "ask:model-policy",
+      clientTurnId: "reply-model-policy",
+      modelPolicyDebugSummary,
+    });
     const scopedLatestDebugPayload = JSON.stringify({
       active_turn_id: "ask:latest-visible",
       client_active_turn_id: "reply-visible",
@@ -3240,15 +3270,16 @@ describe("Helix Ask Console recrown boundary", () => {
       debugCopyTestId: "helix-ask-latest-debug-copy",
       readAloudTestId: "helix-ask-latest-read-aloud",
       readAloudActive: true,
-      readAloudAriaLabel: "Stop reading",
-      readAloudTitle: "Stop reading (playing)",
+      readAloudState: "playing",
+      readAloudAriaLabel: "Pause read-aloud",
+      readAloudTitle: "Pause read-aloud",
     });
 
     expect(buildHelixAskLegacyTurnControlViewModel({
       latestTurnBinding,
       showDebugCopy: false,
       browserAvailable: true,
-      readAloudState: "dry-run",
+      readAloudState: "unavailable",
     })).toEqual({
       showDebugCopy: false,
       debugCopyDisabled: false,
@@ -3256,8 +3287,9 @@ describe("Helix Ask Console recrown boundary", () => {
       debugCopyTestId: "helix-ask-latest-debug-copy",
       readAloudTestId: "helix-ask-latest-read-aloud",
       readAloudActive: false,
-      readAloudAriaLabel: "Read aloud",
-      readAloudTitle: "Read aloud (dry-run)",
+      readAloudState: "unavailable",
+      readAloudAriaLabel: "Read aloud unavailable",
+      readAloudTitle: "Read aloud unavailable",
     });
 
     const oldTurnBinding = buildHelixAskLatestTurnBinding({
@@ -3277,6 +3309,7 @@ describe("Helix Ask Console recrown boundary", () => {
       debugCopyTestId: undefined,
       readAloudTestId: undefined,
       readAloudActive: false,
+      readAloudState: "idle",
       readAloudAriaLabel: "Read aloud",
       readAloudTitle: "Read aloud",
     });
@@ -3515,6 +3548,35 @@ describe("Helix Ask Console recrown boundary", () => {
     }
   });
 
+  it("projects read-aloud chunk traffic as a non-authoritative final-answer reticle", () => {
+    const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const turnStreamPanel = read("client/src/components/helix/ask-console/HelixAskTurnStreamPanel.tsx");
+    const finalAnswerSource = read("client/src/components/helix/ask-console/HelixAskFinalAnswer.tsx");
+    const readAloudDisplay = read("client/src/lib/helix/ask-read-aloud-display.ts");
+
+    expect(readAloudDisplay).toContain("export function resolveReadAloudRegionTrafficState");
+    expect(readAloudDisplay).toContain("chunk_synth_start");
+    expect(readAloudDisplay).toContain("chunk_play_start");
+    expect(readAloudDisplay).toContain("READ_ALOUD_COMPLETED_CHUNK_TRAFFIC_LINGER_MS");
+    expect(readAloudDisplay).toContain("chunkText");
+    expect(legacyPill).toContain("resolveReadAloudRegionTrafficState({");
+    expect(legacyPill).toContain("events: voiceLaneTimelineEvents");
+    expect(legacyPill).toContain("readAloudTraffic");
+    expect(legacyPill).toContain("text: chunk.text");
+    expect(legacyPill).toContain("text: nextChunk.text");
+    expect(turnStreamPanel).toContain("renderFinalAnswer(readAloudTraffic)");
+    expect(turnStreamPanel).not.toContain("HelixAskReadAloudRegionReticle");
+    expect(finalAnswerSource).toContain("resolveHelixAskFinalAnswerReadAloudBlockKey");
+    expect(finalAnswerSource).toContain("HelixAskReadAloudBlockReticle");
+    expect(finalAnswerSource).toContain("border-2 border-dotted");
+    expect(finalAnswerSource).toContain("data-helix-read-aloud-region-state");
+    expect(finalAnswerSource).toContain("data-helix-read-aloud-chunk-index");
+    expect(finalAnswerSource).toContain("data-helix-read-aloud-chunk-count");
+    expect(turnStreamPanel).not.toContain("speechSynthesis");
+    expect(turnStreamPanel).not.toContain("AudioContext");
+    expect(turnStreamPanel).not.toContain("fetch(");
+  });
+
   it("owns final-answer block rendering policy without UI clipping", () => {
     const longLine = `Long answer: ${"0123456789abcdef".repeat(320)}`;
 
@@ -3549,6 +3611,18 @@ describe("Helix Ask Console recrown boundary", () => {
         isSectionHeader: false,
       },
     ]);
+    expect(resolveHelixAskFinalAnswerReadAloudBlockKey(
+      buildHelixAskFinalAnswerBlocks("Summary:\n- NHM2 remains bounded.\n\nDone."),
+      {
+        active: true,
+        phase: "reading",
+        label: "Reading aloud",
+        detail: "chunk 2/3",
+        chunkIndex: 1,
+        chunkCount: 3,
+        chunkText: "NHM2 remains bounded.",
+      },
+    )).toBe("final-answer-bullet-1");
 
     const finalAnswerSource = read("client/src/components/helix/ask-console/HelixAskFinalAnswer.tsx");
     expect(finalAnswerSource).toContain("buildHelixAskFinalAnswerBlocks");
@@ -4490,6 +4564,9 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(promptHistory).not.toContain("runAskTurn");
     expect(promptHistory).not.toContain("fetch(");
     expect(slashCommandCatalog).toContain("export function buildHelixAskSlashCommandMenuItems");
+    expect(slashCommandCatalog).toContain("export function buildHelixAskSlashCommandCatalogForPolicy");
+    expect(slashCommandCatalog).toContain("buildHelixAskGeneratedSlashCommandForCapability");
+    expect(slashCommandCatalog).toContain("allowed_workstation_capabilities");
     expect(slashCommandCatalog).toContain("resolveHelixWorkstationCapabilityAccess");
     expect(slashCommandInsertion).toContain("export function resolveHelixAskSlashCommandTrigger");
     expect(slashCommandInsertion).toContain("export function insertHelixAskSlashCommandPrompt");
@@ -4497,6 +4574,10 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(slashCommandMenuState).toContain("export function resolveHelixAskSlashCommandMenuKey");
     expect(slashCommandMenu).toContain("export function HelixAskSlashCommandMenu");
     expect(slashCommandMenu).toContain('data-testid="helix-ask-slash-command-menu"');
+    expect(slashCommandMenu).toContain("createPortal(menu, document.body)");
+    expect(slashCommandMenu).toContain('data-testid="helix-ask-slash-command-anchor"');
+    expect(slashCommandMenu).toContain("getBoundingClientRect()");
+    expect(slashCommandMenu).toContain("z-[2147483000]");
     for (const slashOwner of [
       slashCommandCatalog,
       slashCommandInsertion,
@@ -5438,6 +5519,7 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(buildHelixAskMinimalRuntimeSubmitPlan({
       draft: "  summarize current doc  ",
       selectedRuntime: "codex",
+      selectedLanguageModelProfile: "deep",
       desktopUrl: "http://127.0.0.1:1498/desktop?doc=docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
     })).toEqual({
       admission: {
@@ -5457,6 +5539,8 @@ describe("Helix Ask Console recrown boundary", () => {
         question: "summarize current doc",
         agentRuntime: "codex",
         agent_runtime: "codex",
+        languageModelProfile: "deep",
+        language_model_profile: "deep",
         doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
       },
     });
@@ -5489,6 +5573,7 @@ describe("Helix Ask Console recrown boundary", () => {
     const submitPlan = buildHelixAskMinimalRuntimeSubmitPlan({
       draft: "  summarize current doc  ",
       selectedRuntime: "codex",
+      selectedLanguageModelProfile: "deep",
       desktopUrl: "http://127.0.0.1:1498/desktop?doc=docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
     });
     expect(startHelixAskMinimalRuntimeTurn({
@@ -5581,6 +5666,7 @@ describe("Helix Ask Console recrown boundary", () => {
     const submitPlan = buildHelixAskMinimalRuntimeSubmitPlan({
       draft: "  summarize current doc  ",
       selectedRuntime: "codex",
+      selectedLanguageModelProfile: "deep",
       desktopUrl: "http://127.0.0.1:1498/desktop?doc=docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
     });
     const payload = buildHelixAskMinimalRuntimeTurnPayload({
@@ -5594,6 +5680,8 @@ describe("Helix Ask Console recrown boundary", () => {
       sessionId: "session-1",
       agentRuntime: "codex",
       agent_runtime: "codex",
+      languageModelProfile: "deep",
+      language_model_profile: "deep",
       traceId: "ask:test-turn",
       turnId: "ask:test-turn",
       maxTokens: 8192,
@@ -5642,6 +5730,9 @@ describe("Helix Ask Console recrown boundary", () => {
   it("wraps backend stream transport with fallback for the minimal runtime shell", async () => {
     const payload = {
       agentRuntime: "codex" as const,
+      agent_runtime: "codex" as const,
+      languageModelProfile: "fast" as const,
+      language_model_profile: "fast" as const,
       traceId: "ask:test-turn",
       turnId: "ask:test-turn",
       maxTokens: 8192,
@@ -6338,6 +6429,29 @@ describe("Helix Ask Console recrown boundary", () => {
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     expect(legacyPill).toContain("buildHelixAskRepliesFromChatSessionProjection");
     expect(legacyPill).not.toContain("STAGE_PLAY_MAIL_WAKE_PROMPT_PATTERNS");
+  });
+
+  it("moves manual read-aloud playback lifecycle ownership into the recrowned runtime", () => {
+    const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const playbackRuntime = read(
+      "client/src/components/helix/ask-console/HelixAskVoicePlaybackRuntime.ts",
+    );
+
+    expect(legacyPill).toContain("playHelixAskVoiceAudioBlob({");
+    expect(legacyPill).toContain("applyHelixAskVoicePlaybackTransportCommand({");
+    expect(legacyPill).toContain("recordManualReadAloudLifecycleReceipt");
+    expect(legacyPill).not.toContain("audio.onplaying =");
+    expect(legacyPill).not.toContain("watchdogId = window.setInterval");
+    expect(legacyPill).not.toContain("VOICE_PLAYBACK_NO_PROGRESS_TIMEOUT_MS");
+    expect(legacyPill).not.toContain("manual_read_aloud_resume_failed");
+
+    expect(playbackRuntime).toContain("export async function playHelixAskVoiceAudioBlob");
+    expect(playbackRuntime).toContain("export async function applyHelixAskVoicePlaybackTransportCommand");
+    expect(playbackRuntime).toContain("audio.onplaying =");
+    expect(playbackRuntime).toContain("watchdogId = window.setInterval");
+    expect(playbackRuntime).toContain("VOICE_PLAYBACK_NO_PROGRESS_TIMEOUT_MS");
+    expect(playbackRuntime).toContain("manual_read_aloud_resume_failed");
+    expect(playbackRuntime).toContain("recordManualReadAloudLifecycleReceipt");
   });
 
   it("owns pure reply lifecycle ordering while state mutation stays in the bridge", () => {

@@ -69,6 +69,7 @@ import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { useDynamicTextTranslations } from "@/hooks/useDynamicTextTranslations";
 import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
 import { useInterfaceText, type InterfaceTextResolver } from "@/lib/i18n/interfaceText";
+import type { InterfaceMessageId } from "@/lib/i18n/messages/types";
 import {
   STARSIM_STELLAR_EVOLUTION_STAGES,
   type StarSimStellarEvolutionStage,
@@ -164,12 +165,299 @@ function collectAtlasPresetTexts(target: string[], entries: Array<{
   }
 }
 
+const THEORY_GRAPH_DYNAMIC_UI_TEXTS = [
+  "Formal",
+  "Quantum",
+  "Nuclear",
+  "Atomic",
+  "Molecular",
+  "Biophysical",
+  "Device / Lab",
+  "Engineering",
+  "Planetary",
+  "Stellar",
+  "Galactic",
+  "Boundary",
+  "Foundation",
+  "Relativity History",
+  "Atomic Spectroscopy",
+  "Astrochemistry",
+  "Prebiotic Biophysics",
+  "Evolutionary Biophysics",
+  "Solar",
+  "Casimir",
+  "NHM2",
+  "QEI Stress Energy",
+  "Tokamak Plasma",
+  "Galactic Dynamics",
+  "Curvature Collapse",
+  "Claim Boundary",
+  "General",
+  "Theory atlas lenses",
+  "Live answer theory context",
+  "Latest Ask-level theory reflection. Evidence only, not a solved answer.",
+  "atlas lens",
+  "(planned)",
+  "Atlas",
+  "active",
+  "seed",
+  "planned",
+  "first principle",
+  "law",
+  "derived relation",
+  "model",
+  "simulation specific",
+  "diagnostic gate",
+  "claim boundary",
+  "Mapped Badges",
+  "Scalar Payloads",
+  "Runtime Actions",
+  "Select",
+  "Use",
+  "Clear",
+  "Object Binding",
+  "Cavity Binding",
+  "Observation Binding",
+  "Diagnostic Binding",
+  "Plasma Binding",
+  "Dynamics Binding",
+  "Benchmark Binding",
+  "object binding",
+  "observation binding",
+  "mapped badges",
+  "scalar loadouts",
+  "StarSim",
+  "Stellar Evolution",
+  "Cosmic",
+  "Distance Ladder",
+  "Surface & Spectrum",
+  "Cavities",
+  "Warp / GR",
+  "NHM2 Diagnostics",
+  "QEI",
+  "Stress-Energy",
+  "Tokamak",
+  "Plasma",
+  "Dynamics",
+  "Curvature",
+  "Collapse",
+  "birth",
+  "main sequence",
+  "old age",
+  "death",
+  "remnant",
+  "local",
+  "spectrum",
+  "standard candle",
+  "cosmology",
+  "static",
+  "budget",
+  "mode",
+  "magnetic",
+  "radiation",
+  "flare",
+  "gr",
+  "geometry",
+  "source",
+  "diagnostic",
+  "units",
+  "qei",
+  "gate",
+  "pressure",
+  "power",
+  "precursor",
+  "flux",
+  "map",
+  "velocity",
+  "rotation",
+  "null model",
+  "curvature",
+  "collapse",
+  "uncertainty",
+  "runtime",
+  "Theory Seed Atlas frontier diagnostics",
+  "fit",
+  "congruence",
+  "evidence",
+  "Seed Atlas",
+  "candidates",
+  "evidence refs",
+  "strong local fit",
+  "moderate local fit",
+  "weak cross domain fit",
+  "missing region suspected",
+  "off manifold",
+  "Discussion context zone, not proof",
+  "Theory badge graph zoom controls",
+  "Zoom in",
+  "Zoom in (+)",
+  "Zoom out",
+  "Zoom out (-)",
+  "Runtime/reference stage. No scalar calculator payload.",
+  "Runtime/reference rung. No scalar calculator payload.",
+  "Runtime/reference context. No scalar calculator payload.",
+  "Tensor/reference context. No scalar calculator payload.",
+  "Gate/reference context. No scalar calculator payload.",
+  "Runtime/null-model context. No scalar calculator payload.",
+  "Runtime/benchmark context. No scalar calculator payload.",
+  "Pick a lifecycle stage to light the matching theory badges.",
+  "Pick a ladder rung to light the matching theory badges.",
+  "Pick a solar observation to light matching spectrum badges.",
+  "Pick a cavity group to light Casimir source-context badges.",
+  "Pick a GR/NHM2 group to light diagnostic theory badges.",
+  "Pick a QEI/stress group to light diagnostic badges.",
+  "Pick a tokamak group to light plasma diagnostic badges.",
+  "Pick a galactic group to light map and rotation-control badges.",
+  "Pick a curvature/collapse group to light benchmark badges.",
+  "No seeded badges yet. This lens still acts as a locator hint.",
+  "No scalar calculator payloads seeded for this block yet.",
+];
+
+const THEORY_GRAPH_STATIC_UI_TEXT_IDS: Partial<Record<string, InterfaceMessageId>> = {
+  "Relativity history rows do not validate NHM2, warp feasibility, or a physical propulsion mechanism.": "theoryBadgeGraph.ui.relativityRowsDoNotValidateNhm2WarpOrPropulsion",
+  "Lorentz-FitzGerald contraction is historical context before Einsteinian spacetime interpretation.": "theoryBadgeGraph.ui.lorentzFitzGeraldContractionHistoricalContext",
+  "No single experiment is represented as a one-step proof of special relativity.": "theoryBadgeGraph.ui.noSingleExperimentOneStepProofSpecialRelativity",
+  "The experiment chain constrains instantaneous-light, Galilean light-speed addition, and simple aether-drift models.": "theoryBadgeGraph.ui.experimentChainConstrainsInstantaneousLight",
+  "Retrieves the experiment chain and boundary; no NHM2 or warp validation is implied.": "theoryBadgeGraph.ui.retrievesExperimentChainAndBoundaryNoNhm2OrWarpValidation",
+  "Locate relativity history constraints": "theoryBadgeGraph.ui.locateRelativityHistoryConstraints",
+  "Speed of Light Constant": "theoryBadgeGraph.ui.speedOfLightConstant",
+  "Relativity History Constraint Boundary": "theoryBadgeGraph.ui.relativityHistoryConstraintBoundary",
+  "Lorentz Transformation Context": "theoryBadgeGraph.ui.lorentzTransformationContext",
+  "Lorentz-FitzGerald Length Contraction Context": "theoryBadgeGraph.ui.lorentzFitzGeraldLengthContractionContext",
+  "Trouton-Noble Torque Null": "theoryBadgeGraph.ui.troutonNobleTorqueNull",
+  "Michelson-Morley Aether-Drift Null": "theoryBadgeGraph.ui.michelsonMorleyAetherDriftNull",
+  "Fizeau Flowing-Water Drag": "theoryBadgeGraph.ui.fizeauFlowingWaterDrag",
+  "Foucault Medium-Speed Constraint": "theoryBadgeGraph.ui.foucaultMediumSpeedConstraint",
+  "Fizeau Toothed-Wheel Terrestrial c": "theoryBadgeGraph.ui.fizeauToothedWheelTerrestrialC",
+  "Bradley Stellar Aberration": "theoryBadgeGraph.ui.bradleyStellarAberration",
+  "Romer Io Light-Time Delay": "theoryBadgeGraph.ui.romerIoLightTimeDelay",
+  "Romer Io eclipse timing, Bradley stellar aberration, Fizeau and Foucault light-speed measurements, moving-water drag, Michelson-Morley and Trouton-Noble null constraints, Lorentz contraction, and Lorentz transform context.": "theoryBadgeGraph.ui.relativityHistoryDescription",
+  "Curvature / Collapse": "theoryBadgeGraph.ui.curvatureCollapseSlash",
+  "QEI / Stress-Energy": "theoryBadgeGraph.ui.qeiStressEnergySlash",
+  "NHM2 Full Solve": "theoryBadgeGraph.ui.nhm2FullSolve",
+  "Warp / GR / NHM2": "theoryBadgeGraph.ui.warpGrNhm2",
+  "Casimir Cavities": "theoryBadgeGraph.ui.casimirCavities",
+  "Solar Surface & Spectrum": "theoryBadgeGraph.ui.solarSurfaceSpectrum",
+  "Cosmic Distance Ladder": "theoryBadgeGraph.ui.cosmicDistanceLadder",
+  "Astrochemistry / Prebiotic Coherence": "theoryBadgeGraph.ui.astrochemistryPrebioticCoherence",
+  "Formal": "theoryBadgeGraph.ui.formal",
+  "Quantum": "theoryBadgeGraph.ui.quantum",
+  "Nuclear": "theoryBadgeGraph.ui.nuclear",
+  "Atomic": "theoryBadgeGraph.ui.atomic",
+  "Molecular": "theoryBadgeGraph.ui.molecular",
+  "Biophysical": "theoryBadgeGraph.ui.biophysical",
+  "Device / Lab": "theoryBadgeGraph.ui.deviceLab",
+  "Engineering": "theoryBadgeGraph.ui.engineering",
+  "Planetary": "theoryBadgeGraph.ui.planetary",
+  "Stellar": "theoryBadgeGraph.ui.stellar",
+  "Galactic": "theoryBadgeGraph.ui.galactic",
+  "Boundary": "theoryBadgeGraph.ui.boundary",
+  "Foundation": "theoryBadgeGraph.ui.foundation",
+  "Relativity History": "theoryBadgeGraph.ui.relativityHistory",
+  "Atomic Spectroscopy": "theoryBadgeGraph.ui.atomicSpectroscopy",
+  "Astrochemistry": "theoryBadgeGraph.ui.astrochemistry",
+  "Prebiotic Biophysics": "theoryBadgeGraph.ui.prebioticBiophysics",
+  "Evolutionary Biophysics": "theoryBadgeGraph.ui.evolutionaryBiophysics",
+  "Solar": "theoryBadgeGraph.ui.solar",
+  "Casimir": "theoryBadgeGraph.ui.casimir",
+  "NHM2": "theoryBadgeGraph.ui.nhm2",
+  "QEI Stress Energy": "theoryBadgeGraph.ui.qeiStressEnergy",
+  "Tokamak Plasma": "theoryBadgeGraph.ui.tokamakPlasma",
+  "Galactic Dynamics": "theoryBadgeGraph.ui.galacticDynamics",
+  "Curvature Collapse": "theoryBadgeGraph.ui.curvatureCollapse",
+  "Claim Boundary": "theoryBadgeGraph.ui.claimBoundaryTitle",
+  "General": "theoryBadgeGraph.ui.general",
+  "StarSim": "theoryBadgeGraph.ui.starSim",
+  "Stellar Evolution": "theoryBadgeGraph.ui.stellarEvolution",
+  "Cosmic": "theoryBadgeGraph.ui.cosmic",
+  "Distance Ladder": "theoryBadgeGraph.ui.distanceLadder",
+  "Surface & Spectrum": "theoryBadgeGraph.ui.surfaceSpectrum",
+  "Cavities": "theoryBadgeGraph.ui.cavities",
+  "Warp / GR": "theoryBadgeGraph.ui.warpGr",
+  "NHM2 Diagnostics": "theoryBadgeGraph.ui.nhm2Diagnostics",
+  "QEI": "theoryBadgeGraph.ui.qei",
+  "Stress-Energy": "theoryBadgeGraph.ui.stressEnergy",
+  "Tokamak": "theoryBadgeGraph.ui.tokamak",
+  "Plasma": "theoryBadgeGraph.ui.plasma",
+  "Dynamics": "theoryBadgeGraph.ui.dynamics",
+  "Curvature": "theoryBadgeGraph.ui.curvature",
+  "Collapse": "theoryBadgeGraph.ui.collapse",
+  "Theory atlas lenses": "theoryBadgeGraph.ui.theoryAtlasLenses",
+  "Live answer theory context": "theoryBadgeGraph.ui.liveAnswerTheoryContext",
+  "Latest Ask-level theory reflection. Evidence only, not a solved answer.": "theoryBadgeGraph.ui.latestAskLevelTheoryReflectionEvidenceOnlyNotASolvedAnswer",
+  "atlas lens": "theoryBadgeGraph.ui.atlasLens",
+  "(planned)": "theoryBadgeGraph.ui.planned",
+  "Atlas": "theoryBadgeGraph.ui.atlas",
+  "active": "theoryBadgeGraph.ui.active",
+  "seed": "theoryBadgeGraph.ui.seed",
+  "planned": "theoryBadgeGraph.ui.planned2",
+  "first principle": "theoryBadgeGraph.ui.firstPrinciple",
+  "law": "theoryBadgeGraph.ui.law",
+  "derived relation": "theoryBadgeGraph.ui.derivedRelation",
+  "model": "theoryBadgeGraph.ui.model",
+  "simulation specific": "theoryBadgeGraph.ui.simulationSpecific",
+  "diagnostic gate": "theoryBadgeGraph.ui.diagnosticGate",
+  "claim boundary": "theoryBadgeGraph.ui.claimBoundary",
+  "Mapped Badges": "theoryBadgeGraph.ui.mappedBadges",
+  "Scalar Payloads": "theoryBadgeGraph.ui.scalarPayloads",
+  "Runtime Actions": "theoryBadgeGraph.ui.runtimeActions",
+  "Select": "theoryBadgeGraph.ui.select",
+  "Use": "theoryBadgeGraph.ui.use",
+  "Clear": "theoryBadgeGraph.ui.clear",
+  "Object Binding": "theoryBadgeGraph.ui.objectBinding",
+  "Cavity Binding": "theoryBadgeGraph.ui.cavityBinding",
+  "Observation Binding": "theoryBadgeGraph.ui.observationBinding",
+  "Diagnostic Binding": "theoryBadgeGraph.ui.diagnosticBinding",
+  "Plasma Binding": "theoryBadgeGraph.ui.plasmaBinding",
+  "Dynamics Binding": "theoryBadgeGraph.ui.dynamicsBinding",
+  "Benchmark Binding": "theoryBadgeGraph.ui.benchmarkBinding",
+  "object binding": "theoryBadgeGraph.ui.objectBinding2",
+  "observation binding": "theoryBadgeGraph.ui.observationBinding2",
+  "mapped badges": "theoryBadgeGraph.ui.mappedBadges2",
+  "scalar loadouts": "theoryBadgeGraph.ui.scalarLoadouts",
+  "Theory Seed Atlas frontier diagnostics": "theoryBadgeGraph.ui.theorySeedAtlasFrontierDiagnostics",
+  "fit": "theoryBadgeGraph.ui.fit",
+  "congruence": "theoryBadgeGraph.ui.congruence",
+  "evidence": "theoryBadgeGraph.ui.evidence",
+  "Seed Atlas": "theoryBadgeGraph.ui.seedAtlas",
+  "candidates": "theoryBadgeGraph.ui.candidates",
+  "evidence refs": "theoryBadgeGraph.ui.evidenceRefs",
+  "strong local fit": "theoryBadgeGraph.ui.strongLocalFit",
+  "moderate local fit": "theoryBadgeGraph.ui.moderateLocalFit",
+  "weak cross domain fit": "theoryBadgeGraph.ui.weakCrossDomainFit",
+  "missing region suspected": "theoryBadgeGraph.ui.missingRegionSuspected",
+  "off manifold": "theoryBadgeGraph.ui.offManifold",
+  "Discussion context zone, not proof": "theoryBadgeGraph.ui.discussionContextZoneNotProof",
+  "Theory badge graph zoom controls": "theoryBadgeGraph.ui.theoryBadgeGraphZoomControls",
+  "Zoom in": "theoryBadgeGraph.ui.zoomIn",
+  "Zoom in (+)": "theoryBadgeGraph.ui.zoomInPlus",
+  "Zoom out": "theoryBadgeGraph.ui.zoomOut",
+  "Zoom out (-)": "theoryBadgeGraph.ui.zoomOut2",
+  "Runtime/reference stage. No scalar calculator payload.": "theoryBadgeGraph.ui.runtimeReferenceStageNoScalarCalculatorPayload",
+  "Runtime/reference rung. No scalar calculator payload.": "theoryBadgeGraph.ui.runtimeReferenceRungNoScalarCalculatorPayload",
+  "Runtime/reference context. No scalar calculator payload.": "theoryBadgeGraph.ui.runtimeReferenceContextNoScalarCalculatorPayload",
+  "Tensor/reference context. No scalar calculator payload.": "theoryBadgeGraph.ui.tensorReferenceContextNoScalarCalculatorPayload",
+  "Gate/reference context. No scalar calculator payload.": "theoryBadgeGraph.ui.gateReferenceContextNoScalarCalculatorPayload",
+  "Runtime/null-model context. No scalar calculator payload.": "theoryBadgeGraph.ui.runtimeNullModelContextNoScalarCalculatorPayload",
+  "Runtime/benchmark context. No scalar calculator payload.": "theoryBadgeGraph.ui.runtimeBenchmarkContextNoScalarCalculatorPayload",
+  "Pick a lifecycle stage to light the matching theory badges.": "theoryBadgeGraph.ui.pickALifecycleStageToLightTheMatchingTheoryBadges",
+  "Pick a ladder rung to light the matching theory badges.": "theoryBadgeGraph.ui.pickALadderRungToLightTheMatchingTheoryBadges",
+  "Pick a solar observation to light matching spectrum badges.": "theoryBadgeGraph.ui.pickASolarObservationToLightMatchingSpectrumBadges",
+  "Pick a cavity group to light Casimir source-context badges.": "theoryBadgeGraph.ui.pickACavityGroupToLightCasimirSourceContextBadges",
+  "Pick a GR/NHM2 group to light diagnostic theory badges.": "theoryBadgeGraph.ui.pickAGrNhm2GroupToLightDiagnosticTheoryBadges",
+  "Pick a QEI/stress group to light diagnostic badges.": "theoryBadgeGraph.ui.pickAQeiStressGroupToLightDiagnosticBadges",
+  "Pick a tokamak group to light plasma diagnostic badges.": "theoryBadgeGraph.ui.pickATokamakGroupToLightPlasmaDiagnosticBadges",
+  "Pick a galactic group to light map and rotation-control badges.": "theoryBadgeGraph.ui.pickAGalacticGroupToLightMapAndRotationControlBadges",
+  "Pick a curvature/collapse group to light benchmark badges.": "theoryBadgeGraph.ui.pickACurvatureCollapseGroupToLightBenchmarkBadges",
+  "No seeded badges yet. This lens still acts as a locator hint.": "theoryBadgeGraph.ui.noSeededBadgesYetThisLensStillActsAsALocatorHint",
+  "No scalar calculator payloads seeded for this block yet.": "theoryBadgeGraph.ui.noScalarCalculatorPayloadsSeededForThisBlockYet",
+};
+
 function hasRuntimeReferenceEquation(badge: TheoryBadgeV1): boolean {
   return badge.equations.some((equation: TheoryBadgeEquationV1) =>
     RUNTIME_REFERENCE_OPERATOR_KINDS.some((operatorKind) => operatorKind === equation.operatorKind),
   );
 }
-
 function uniqueSorted(values: string[]): string[] {
   return Array.from(new Set(values)).sort((a: string, b: string) => a.localeCompare(b));
 }
@@ -287,12 +575,14 @@ function SelectFilter({
   value,
   options,
   onChange,
+  translateText = (text: string) => text,
 }: {
   label: string;
   allLabel: string;
   value: string;
   options: string[];
   onChange: (value: string) => void;
+  translateText?: (text: string) => string;
 }) {
   return (
     <label className="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
@@ -305,7 +595,7 @@ function SelectFilter({
         <option value="all">{allLabel}</option>
         {options.map((option: string) => (
           <option key={option} value={option}>
-            {labelize(option)}
+            {translateText(labelize(option))}
           </option>
         ))}
       </select>
@@ -347,10 +637,10 @@ function BadgeButton({
       </div>
       <div className="mt-2 flex flex-wrap gap-1">
         <Badge variant="outline" className="border-slate-700 text-[10px] text-slate-300">
-          {labelize(badge.level)}
+          {translateText(labelize(badge.level))}
         </Badge>
         <Badge variant="outline" className="border-slate-700 text-[10px] text-slate-300">
-          {labelize(badge.status)}
+          {translateText(labelize(badge.status))}
         </Badge>
       </div>
     </button>
@@ -410,7 +700,7 @@ function RelatedBadgeRow({
       <div className="flex items-center justify-between gap-2">
         <span className="font-semibold text-slate-100">{related ? translateText(related.title) : relatedId}</span>
         <Badge variant="outline" className="border-slate-700 text-[10px] text-slate-300">
-          {labelize(edge.relation)}
+          {translateText(labelize(edge.relation))}
         </Badge>
       </div>
       <div className="mt-1 text-slate-400">{translateText(edge.label)}</div>
@@ -476,9 +766,9 @@ function Inspector({
           </div>
           <div className="flex flex-col items-start gap-2 sm:items-end">
             <div className="flex flex-wrap gap-1">
-              <Badge className="bg-cyan-900/80 text-cyan-50">{labelize(badge.level)}</Badge>
+              <Badge className="bg-cyan-900/80 text-cyan-50">{translateText(labelize(badge.level))}</Badge>
               <Badge variant="outline" className="border-slate-700 text-slate-300">
-                {labelize(badge.status)}
+                {translateText(labelize(badge.status))}
               </Badge>
             </div>
             <Button
@@ -524,16 +814,16 @@ function Inspector({
                 {equation.computableExpression ? (
                   <div className="mt-1 font-mono text-xs text-slate-400">{equation.computableExpression}</div>
                 ) : null}
-                <div className="mt-2 flex flex-wrap gap-1">
-                  <Badge variant="outline" className="border-slate-700 text-[10px] text-slate-300">
-                    {labelize(equation.role)}
-                  </Badge>
-                  {equation.operatorKind ? (
+                  <div className="mt-2 flex flex-wrap gap-1">
                     <Badge variant="outline" className="border-slate-700 text-[10px] text-slate-300">
-                      {labelize(equation.operatorKind)}
+                      {translateText(labelize(equation.role))}
                     </Badge>
-                  ) : null}
-                </div>
+                    {equation.operatorKind ? (
+                      <Badge variant="outline" className="border-slate-700 text-[10px] text-slate-300">
+                        {translateText(labelize(equation.operatorKind))}
+                      </Badge>
+                    ) : null}
+                  </div>
               </div>
             ))}
           </div>
@@ -583,7 +873,7 @@ function Inspector({
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <LoadPayloadButton badge={badge} payload={payload} t={t} />
                     <Badge variant="outline" className="border-slate-700 text-[10px] text-slate-300">
-                      {labelize(payload.preferredAction)}
+                      {translateText(labelize(payload.preferredAction))}
                     </Badge>
                   </div>
                 </div>
@@ -603,7 +893,7 @@ function Inspector({
               <div key={`${source.kind}-${source.path ?? source.id ?? index}`} className="rounded-md border border-slate-800 bg-slate-900/50 p-2 text-xs text-slate-300">
                 <div className="flex items-center gap-2">
                   <ExternalLink className="h-3.5 w-3.5 text-slate-500" />
-                  <span className="font-semibold">{labelize(source.kind)}</span>
+                  <span className="font-semibold">{translateText(labelize(source.kind))}</span>
                 </div>
                 <div className="mt-1 font-mono text-slate-400">{source.path ?? source.id}</div>
                 {source.note ? <div className="mt-1 text-slate-500">{translateText(source.note)}</div> : null}
@@ -1327,24 +1617,7 @@ export default function TheoryBadgeGraphPanel() {
     collectAtlasPresetTexts(texts, TOKAMAK_PLASMA_GROUPS);
     collectAtlasPresetTexts(texts, GALACTIC_DYNAMICS_GROUPS);
     collectAtlasPresetTexts(texts, CURVATURE_COLLAPSE_GROUPS);
-    [
-      "Runtime/reference stage. No scalar calculator payload.",
-      "Runtime/reference rung. No scalar calculator payload.",
-      "Runtime/reference context. No scalar calculator payload.",
-      "Runtime/null-model context. No scalar calculator payload.",
-      "Runtime/benchmark context. No scalar calculator payload.",
-      "Pick a lifecycle stage to light the matching theory badges.",
-      "Pick a ladder rung to light the matching theory badges.",
-      "Pick a solar observation to light matching spectrum badges.",
-      "Pick a cavity group to light Casimir source-context badges.",
-      "Pick a GR/NHM2 group to light diagnostic theory badges.",
-      "Pick a QEI/stress group to light diagnostic badges.",
-      "Pick a tokamak group to light plasma diagnostic badges.",
-      "Pick a galactic group to light map and rotation-control badges.",
-      "Pick a curvature/collapse group to light benchmark badges.",
-      "No seeded badges yet. This lens still acts as a locator hint.",
-      "No scalar calculator payloads seeded for this block yet.",
-    ].forEach((text) => pushDynamicText(texts, text));
+    THEORY_GRAPH_DYNAMIC_UI_TEXTS.forEach((text) => pushDynamicText(texts, text));
     return texts;
   }, [atlasLens?.claimBoundaryNotes, filteredBadges, graph, selectedBadge, selectedBadgeIds]);
 
@@ -1355,6 +1628,15 @@ export default function TheoryBadgeGraphPanel() {
     texts: dynamicTranslationTexts,
     enabled: interfaceLanguage.code !== "en",
   });
+  const translateTheoryGraphText = useMemo(() => {
+    return (text: string) => {
+      const catalogId = THEORY_GRAPH_STATIC_UI_TEXT_IDS[text];
+      if (!catalogId) return translateDynamicText(text);
+      const catalogText = t(catalogId);
+      if (interfaceLanguage.code !== "en" && catalogText === text) return translateDynamicText(text);
+      return catalogText;
+    };
+  }, [interfaceLanguage.code, t, translateDynamicText]);
 
   const manualSelectionActive = selectedBadgeIds.length > 0 || Boolean(selectedId);
   const highlightedBadgeIds =
@@ -2494,7 +2776,7 @@ export default function TheoryBadgeGraphPanel() {
           }
           onSelectLiveReflection={selectLiveAnswerContext}
           onSelectLens={selectAtlasLens}
-          translateText={translateDynamicText}
+          translateText={translateTheoryGraphText}
         />
         <div
           data-testid="theory-atlas-lens-overlay"
@@ -2506,7 +2788,7 @@ export default function TheoryBadgeGraphPanel() {
             stages={STARSIM_STELLAR_EVOLUTION_STAGES}
             selectedStageId={selectedEvolutionStageId}
             selectedObjectBindingId={selectedObjectBindingId}
-            translateText={translateDynamicText}
+            translateText={translateTheoryGraphText}
             onSelectStage={selectEvolutionStage}
             onSelectObjectBinding={selectStarSimObjectBinding}
             onClearObjectBinding={clearStarSimBindingSelection}
@@ -2519,7 +2801,7 @@ export default function TheoryBadgeGraphPanel() {
             rungs={COSMIC_DISTANCE_LADDER_RUNGS}
             selectedRungId={selectedCosmicRungId}
             selectedObjectBindingId={selectedCosmicObjectBindingId}
-            translateText={translateDynamicText}
+            translateText={translateTheoryGraphText}
             onSelectRung={selectCosmicDistanceRung}
             onSelectObjectBinding={selectCosmicObjectBinding}
             onClearObjectBinding={clearCosmicBindingSelection}
@@ -2532,7 +2814,7 @@ export default function TheoryBadgeGraphPanel() {
             groups={SOLAR_SPECTRUM_OBSERVATION_GROUPS}
             selectedGroupId={selectedSolarGroupId}
             selectedObjectBindingId={selectedSolarObjectBindingId}
-            translateText={translateDynamicText}
+            translateText={translateTheoryGraphText}
             onSelectGroup={selectSolarSpectrumGroup}
             onSelectObjectBinding={selectSolarObjectBinding}
             onClearObjectBinding={clearSolarBindingSelection}
@@ -2545,7 +2827,7 @@ export default function TheoryBadgeGraphPanel() {
             groups={CASIMIR_CAVITY_GROUPS}
             selectedGroupId={selectedCasimirGroupId}
             selectedObjectBindingId={selectedCasimirObjectBindingId}
-            translateText={translateDynamicText}
+            translateText={translateTheoryGraphText}
             onSelectGroup={selectCasimirCavityGroup}
             onSelectObjectBinding={selectCasimirObjectBinding}
             onClearObjectBinding={clearCasimirBindingSelection}
@@ -2558,7 +2840,7 @@ export default function TheoryBadgeGraphPanel() {
             groups={WARP_GR_NHM2_GROUPS}
             selectedGroupId={selectedWarpGroupId}
             selectedObjectBindingId={selectedWarpObjectBindingId}
-            translateText={translateDynamicText}
+            translateText={translateTheoryGraphText}
             onSelectGroup={selectWarpGrNhm2Group}
             onSelectObjectBinding={selectWarpObjectBinding}
             onClearObjectBinding={clearWarpBindingSelection}
@@ -2571,7 +2853,7 @@ export default function TheoryBadgeGraphPanel() {
             groups={QEI_STRESS_ENERGY_GROUPS}
             selectedGroupId={selectedQeiGroupId}
             selectedObjectBindingId={selectedQeiObjectBindingId}
-            translateText={translateDynamicText}
+            translateText={translateTheoryGraphText}
             onSelectGroup={selectQeiStressEnergyGroup}
             onSelectObjectBinding={selectQeiObjectBinding}
             onClearObjectBinding={clearQeiBindingSelection}
@@ -2584,7 +2866,7 @@ export default function TheoryBadgeGraphPanel() {
             groups={TOKAMAK_PLASMA_GROUPS}
             selectedGroupId={selectedTokamakGroupId}
             selectedObjectBindingId={selectedTokamakObjectBindingId}
-            translateText={translateDynamicText}
+            translateText={translateTheoryGraphText}
             onSelectGroup={selectTokamakPlasmaGroup}
             onSelectObjectBinding={selectTokamakObjectBinding}
             onClearObjectBinding={clearTokamakBindingSelection}
@@ -2597,7 +2879,7 @@ export default function TheoryBadgeGraphPanel() {
             groups={GALACTIC_DYNAMICS_GROUPS}
             selectedGroupId={selectedGalacticGroupId}
             selectedObjectBindingId={selectedGalacticObjectBindingId}
-            translateText={translateDynamicText}
+            translateText={translateTheoryGraphText}
             onSelectGroup={selectGalacticDynamicsGroup}
             onSelectObjectBinding={selectGalacticObjectBinding}
             onClearObjectBinding={clearGalacticBindingSelection}
@@ -2610,7 +2892,7 @@ export default function TheoryBadgeGraphPanel() {
             groups={CURVATURE_COLLAPSE_GROUPS}
             selectedGroupId={selectedCurvatureGroupId}
             selectedObjectBindingId={selectedCurvatureObjectBindingId}
-            translateText={translateDynamicText}
+            translateText={translateTheoryGraphText}
             onSelectGroup={selectCurvatureCollapseGroup}
             onSelectObjectBinding={selectCurvatureObjectBinding}
             onClearObjectBinding={clearCurvatureBindingSelection}
@@ -2634,7 +2916,7 @@ export default function TheoryBadgeGraphPanel() {
             graph={graph}
             block={activeAtlasBlock}
             lens={atlasLens}
-            translateText={translateDynamicText}
+            translateText={translateTheoryGraphText}
             onSelectBadge={selectBadge}
             onLoadPayload={loadCalculatorPayload}
           />
@@ -2668,7 +2950,7 @@ export default function TheoryBadgeGraphPanel() {
                   frontierTrace={null}
                   routeBadgeLabels={routeBadgeLabels}
                   activeAtlasLensId={rememberedAtlasLensId}
-                  translateText={translateDynamicText}
+                  translateText={translateTheoryGraphText}
                   onSelectBadge={selectBadge}
                   onClearSelection={() => {
                     setSelectedBadgeId(null);
@@ -2757,6 +3039,7 @@ export default function TheoryBadgeGraphPanel() {
             value={subject}
             options={subjects}
             onChange={setSubject}
+            translateText={translateTheoryGraphText}
           />
           <SelectFilter
             label={t("theoryBadgeGraph.filter.level")}
@@ -2764,6 +3047,7 @@ export default function TheoryBadgeGraphPanel() {
             value={level}
             options={levels}
             onChange={setLevel}
+            translateText={translateTheoryGraphText}
           />
           <SelectFilter
             label={t("theoryBadgeGraph.filter.status")}
@@ -2771,6 +3055,7 @@ export default function TheoryBadgeGraphPanel() {
             value={status}
             options={statuses}
             onChange={setStatus}
+            translateText={translateTheoryGraphText}
           />
         </div>
       </div>
@@ -2786,7 +3071,7 @@ export default function TheoryBadgeGraphPanel() {
               {groupedBadges.map((group: { level: TheoryBadgeLevel; badges: TheoryBadgeV1[] }) => (
                 <section key={group.level}>
                   <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {labelize(group.level)}
+                    {translateTheoryGraphText(labelize(group.level))}
                   </div>
                   <div className="space-y-2">
                     {group.badges.map((badge: TheoryBadgeV1) => (
@@ -2796,7 +3081,7 @@ export default function TheoryBadgeGraphPanel() {
                         selected={badge.id === selectedId}
                         onSelect={() => selectBadge(badge.id)}
                         calculatorLoadableLabel={t("theoryBadgeGraph.badge.calculatorLoadable")}
-                        translateText={translateDynamicText}
+                        translateText={translateTheoryGraphText}
                       />
                     ))}
                   </div>
@@ -2820,7 +3105,7 @@ export default function TheoryBadgeGraphPanel() {
               onLoadTheoryRun={loadSelectedTheoryRun}
               onClearPlayback={playbackStore.clearPlayback}
               t={t}
-              translateText={translateDynamicText}
+              translateText={translateTheoryGraphText}
             />
           </div>
         </div>

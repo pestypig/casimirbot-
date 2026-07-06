@@ -3,6 +3,7 @@ import {
   HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
   HELIX_SCHOLARLY_NUMERIC_PARAMETER_OBSERVATION_SCHEMA,
   type HelixScholarlyFullTextObservation,
+  type HelixScholarlyNextAffordance,
   type HelixScholarlyNumericParameterEvidence,
   type HelixScholarlyNumericParameterObservation,
   type HelixScholarlyRejectedNumericCandidate,
@@ -273,6 +274,23 @@ const extractOneVariable = (
   return { parameter: null, rejected };
 };
 
+const buildNumericNextAffordances = (input: {
+  missingVariables: string[];
+  requestedVariables: string[];
+  sourceRef: string | null;
+  usable: boolean;
+}): HelixScholarlyNextAffordance[] => {
+  if (input.usable) return [];
+  return [{
+    capability: HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
+    reason: input.missingVariables.length > 0
+      ? "numeric_evidence_missing"
+      : "numeric_text_evidence_required",
+    source_ref: input.sourceRef ?? undefined,
+    variables: input.missingVariables.length > 0 ? input.missingVariables : input.requestedVariables,
+  }];
+};
+
 export function runScholarlyNumericParameterExtraction(
   input: RunScholarlyNumericParameterExtractionInput,
 ): HelixScholarlyNumericParameterObservation {
@@ -315,6 +333,8 @@ export function runScholarlyNumericParameterExtraction(
     ...(readString(paperRecord?.arxiv_id) ? { arxiv_id: readString(paperRecord?.arxiv_id) ?? undefined } : {}),
     ...(readString(paperRecord?.url) ?? fullText?.source_url ? { url: readString(paperRecord?.url) ?? fullText?.source_url } : {}),
   };
+  const sourceRef = input.sourceRef ?? fullText?.artifact_id ?? null;
+  const selectedForAnswer = parameters.length > 0 && missingVariables.length === 0;
 
   return {
     schema: HELIX_SCHOLARLY_NUMERIC_PARAMETER_OBSERVATION_SCHEMA,
@@ -322,14 +342,21 @@ export function runScholarlyNumericParameterExtraction(
     turn_id: input.turnId,
     capability: HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
     capability_key: HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
-    source_ref: input.sourceRef ?? fullText?.artifact_id ?? null,
+    source_ref: sourceRef,
     paper,
     requested_variables: requestedVariables,
     parameters,
     missing_variables: missingVariables,
     rejected_candidates: rejectedCandidates.slice(0, 24),
+    evidence_state: selectedForAnswer ? "numeric_evidence_usable" : "numeric_evidence_missing",
+    next_affordances: buildNumericNextAffordances({
+      missingVariables,
+      requestedVariables,
+      sourceRef,
+      usable: selectedForAnswer,
+    }),
     missing_requirements: uniqueStrings(missingRequirements),
-    selected_for_answer: parameters.length > 0 && missingVariables.length === 0,
+    selected_for_answer: selectedForAnswer,
     extraction_mode: extractionMode,
     terminal_eligible: false,
     post_tool_model_step_required: true,

@@ -1909,6 +1909,10 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
       readQueryString(body.projectionTarget) ??
       readQueryString(body.projection_target) ??
       HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK;
+    const translationContractVersion =
+      readQueryString(body.translationContractVersion) ??
+      readQueryString(body.translation_contract_version) ??
+      null;
     const sourceId =
       readQueryString(body.sourceId) ??
       readQueryString(body.source_id) ??
@@ -2029,6 +2033,7 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
       locale,
       target_language: targetLanguage,
       account_locale: accountLocale,
+      translation_contract_version: translationContractVersion,
       projection_target: projectionTarget,
       freshness_status: "fresh",
       traffic: {

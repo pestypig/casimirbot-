@@ -79,6 +79,14 @@ const TERMINAL_RECEIPT_KINDS = new Set([
   "docs_viewer_receipt",
 ]);
 
+const TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY = "text_to_speech.speak_text" as const;
+const VOICE_TTS_HANDOFF_STATUSES = new Set([
+  "client_pending",
+  "pending",
+  "awaiting_client_playback",
+  "awaiting_client_receipt",
+]);
+
 const readRecord = (value: unknown): RecordLike | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as RecordLike) : null;
 
@@ -192,6 +200,8 @@ const artifactKindTokens = (artifact: RecordLike): string[] => {
   return unique([
     readString(artifact.kind),
     readString(artifact.schema),
+    readString(artifact.payload_kind),
+    readString(artifact.payload_schema),
     readString(payload?.kind),
     readString(payload?.schema),
     readString(payload?.type),
@@ -237,6 +247,7 @@ const isModelAnswerCapability = (capability: unknown): boolean => {
   return (
     normalized === "model_direct_answer" ||
     normalized === "model_answer" ||
+    normalized === "model_only" ||
     normalized === "direct_answer" ||
     normalized === "final_answer" ||
     normalized === "answer"
@@ -269,6 +280,7 @@ const preferConcreteCapability = (
 ): string | null => {
   const candidateCapability = readString(candidate);
   if (!candidateCapability) return concreteCapability;
+  if (concreteCapability && isModelAnswerCapability(candidateCapability)) return concreteCapability;
   if (concreteCapability && isGenericPlannerCapability(candidateCapability)) return concreteCapability;
   return candidateCapability;
 };
@@ -427,6 +439,9 @@ const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
   }
   if (/helix_ask[-_.:]inspect_capability_catalog|capability_catalog_observation|capability_registry|helix\.capability_catalog_observation\.v1/.test(haystack)) {
     return "helix_ask.inspect_capability_catalog";
+  }
+  if (/text_to_speech\.speak_text|text_to_speech_speak_text|capability_lane:text_to_speech\.speak_text|voice_delivery/.test(haystack)) {
+    return TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY;
   }
   if (/situation[-_]room[-_.:]describe[-_]visual[-_]capture|situation_context_pack|helix\.situation_context_pack\.v1|visual_capture|image_lens/.test(haystack)) {
     return "situation-room.describe_visual_capture";
@@ -717,6 +732,12 @@ const artifactSearchText = (artifact: RecordLike): string => {
     readString(artifact.schema),
     readString(artifact.producer_item_id),
     readString(artifact.source_scope),
+    readString(artifact.payload_kind),
+    readString(artifact.payload_schema),
+    readString(artifact.tool_name),
+    readString(artifact.capability),
+    readString(artifact.capability_key),
+    readString(artifact.status),
     readString(payload?.kind),
     readString(payload?.schema),
     readString(payload?.type),
@@ -769,6 +790,9 @@ const artifactSupportsCapabilityObservation = (artifact: RecordLike, capability:
   ) {
     return /capability_registry|capability_catalog_observation|helix\.capability_catalog_observation\.v1|workstation_tool_alignment|toolchain_matrix|tool_regression_matrix/.test(text);
   }
+  if (normalizedCapability === "text_to_speech_speak_text") {
+    return /text_to_speech\.speak_text|text_to_speech_speak_text|voice_delivery|capability_lane_observation_packet|helix\.agent_step_observation_packet\.v1/.test(text);
+  }
   if (normalizedCapability === "image_lens_inspect" || normalizedCapability === "situation_room_describe_visual_capture") {
     return /situation_context_pack|helix\.situation_context_pack\.v1|situation[-_]room[-_.:]describe[-_]visual[-_]capture|visual_capture|image_lens/.test(text);
   }
@@ -800,6 +824,44 @@ const artifactSupportsCapabilityObservation = (artifact: RecordLike, capability:
     return text.includes(normalizedCapability) || /stage_play|live_source|mail_packet|mailbox|live_env/.test(text);
   }
   return text.includes(normalizedCapability);
+};
+
+const textToSpeechReceiptRecord = (artifact: RecordLike): RecordLike | null => {
+  const payload = artifactPayload(artifact);
+  const stateDelta = readRecord(artifact.state_delta) ?? readRecord(payload?.state_delta);
+  return (
+    readRecord(stateDelta?.text_to_speech_receipt) ??
+    readRecord(stateDelta?.text_to_speech_client_playback_handoff) ??
+    readRecord(artifact.text_to_speech_receipt) ??
+    readRecord(payload?.text_to_speech_receipt) ??
+    readRecord(artifact.receipt) ??
+    readRecord(payload?.receipt)
+  );
+};
+
+const readTextToSpeechHandoffStatus = (artifact: RecordLike | null): string | null => {
+  if (!artifact) return null;
+  const payload = artifactPayload(artifact);
+  const receipt = textToSpeechReceiptRecord(artifact);
+  const status = firstString(
+    artifact.status,
+    payload?.status,
+    receipt?.status,
+    receipt?.playback_status,
+    receipt?.playbackStatus,
+    receipt?.provider_status,
+    receipt?.providerStatus,
+  )?.toLowerCase() ?? null;
+  return status && VOICE_TTS_HANDOFF_STATUSES.has(status) ? status : null;
+};
+
+const isTextToSpeechHandoffObservation = (
+  artifact: RecordLike | null,
+  capability: string | null,
+): boolean => {
+  if (!artifact || !normalizedEqual(capability, TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY)) return false;
+  if (!artifactSupportsCapabilityObservation(artifact, TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY)) return false;
+  return Boolean(readTextToSpeechHandoffStatus(artifact));
 };
 
 const artifactDisplayKind = (artifact: RecordLike): string | null =>
@@ -1221,6 +1283,7 @@ const buildToolTurnChainAudit = (input: {
   const requestedCapability = firstString(
     admission?.requested_capability,
     capabilityPlan?.requested_capability,
+    input.capability,
   );
   const requestedCapabilityContract = explicitCapabilityContractForCapability(requestedCapability);
   const operationalTrace = readRecord(input.payload.operational_capability_trace);
@@ -1371,6 +1434,15 @@ const buildToolTurnChainAudit = (input: {
   const visibleTerminalProjection = visibleTerminalEvidence(input.payload);
   const authorityTerminal = authorityTerminalEvidence.kind;
   const visibleTerminal = visibleTerminalProjection.kind;
+  const textToSpeechHandoffStatus =
+    isTextToSpeechHandoffObservation(observationArtifact, executedCapability ?? selectedCapability ?? requestedCapability)
+      ? readTextToSpeechHandoffStatus(observationArtifact)
+      : null;
+  const textToSpeechHandoffTerminalAllowed = Boolean(
+    textToSpeechHandoffStatus &&
+      authorityTerminalEvidence.proven &&
+      visibleTerminalProjection.proven,
+  );
   const visibleTerminalUnproven = Boolean(visibleTerminal && !visibleTerminalProjection.proven);
   const staleDebugMirrors = staleTerminalDebugMirrors(input.payload, authorityTerminal);
   const finalDraftRef = finalAnswerDraftRef(input.payload, input.artifacts);
@@ -1530,9 +1602,9 @@ const buildToolTurnChainAudit = (input: {
                       ? requestedCapability
                         ? "required_observation_missing"
                         : "observation_missing"
-                      : observationRef && !reentryExecuted
+                      : observationRef && !reentryExecuted && !textToSpeechHandoffTerminalAllowed
                         ? "observation_not_reentered"
-                        : expectedReentry && !reentryExecuted
+                        : expectedReentry && !reentryExecuted && !textToSpeechHandoffTerminalAllowed
                           ? "reentry_step_not_executed"
                           : draftNeedsSupport && supportCount === 0
                             ? "support_refs_missing"
@@ -1591,11 +1663,15 @@ const buildToolTurnChainAudit = (input: {
     policy_rejection_reason: toolExecutionRejected ? rejectedToolExecutionTexts(input.payload, input.artifacts).find(Boolean) ?? null : null,
     observation_artifact_kind: observationArtifactKind,
     observation_ref: observationRef,
+    handoff_status: textToSpeechHandoffStatus,
+    handoff_terminal_allowed: textToSpeechHandoffTerminalAllowed,
     required_terminal_kind: requiredTerminal,
     expected_reentry_capability: expectedReentry,
-    reentry_executed: reentryExecuted,
-    reentry_proof_source: reentryProofSource,
-    reentry_proven: reentryExecuted,
+    reentry_executed: reentryExecuted || textToSpeechHandoffTerminalAllowed,
+    reentry_proof_source: textToSpeechHandoffTerminalAllowed
+      ? "voice_tts_handoff_terminal_allowed"
+      : reentryProofSource,
+    reentry_proven: reentryExecuted || textToSpeechHandoffTerminalAllowed,
     final_answer_draft_ref: finalDraftRef,
     support_refs_count: supportCount,
     materialized_terminal_artifact_kind: materializedTerminal,
@@ -2444,11 +2520,13 @@ const buildCodexParityAgentSpineRailTable = (input: {
       typeof input.audit.observed_artifact_supports_requested_capability === "boolean"
         ? input.audit.observed_artifact_supports_requested_capability
         : null,
-    reentry_status: input.audit.reentry_executed === true
-      ? "reentered"
-      : readString(input.audit.observation_ref)
-        ? "not_reentered"
-        : "no_observation",
+    reentry_status: input.audit.handoff_terminal_allowed === true
+      ? "handoff_terminal_allowed"
+      : input.audit.reentry_executed === true
+        ? "reentered"
+        : readString(input.audit.observation_ref)
+          ? "not_reentered"
+          : "no_observation",
     reentry_proof_source: readNullableString(input.audit.reentry_proof_source),
     reentry_proven: input.audit.reentry_proven === true,
     goal_satisfaction: normalizeGoalSatisfaction(input.payload),
@@ -2909,6 +2987,7 @@ export const buildArtifactQueryIndex = (input: {
   const requestedCapability = firstString(
     admission?.requested_capability,
     capabilityPlan?.requested_capability,
+    capability,
   );
   const requestedCapabilityContract = explicitCapabilityContractForCapability(requestedCapability);
   const requestedCapabilityCompoundSubgoal = compoundSubgoalLedger.find((entry) =>

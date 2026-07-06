@@ -8,6 +8,7 @@ import {
 import type { HelixPromptInterpretation } from "./prompt-interpretation";
 import type { HelixIntentArbitration } from "./intent-arbitration";
 import { applyCompoundTerminalPolicy } from "./compound-terminal-policy";
+import { buildToolUseRestatement } from "./internet-search-intent";
 
 type RecordLike = Record<string, unknown>;
 
@@ -86,6 +87,7 @@ export const inferCommittedRouteToolFamily = (capabilityId: string): string => {
   if (/docs[_-]?viewer|docs-viewer|doc[_-]?viewer/i.test(capabilityId)) return "docs_viewer";
   if (/scholarly[-_.]?research|lookup[_-]?papers|fetch[_-]?full[_-]?text|semantic[-_.]?scholar|openalex|pubmed|crossref/i.test(capabilityId)) return "scholarly_research";
   if (/internet[-_.]?search|web[-_.]?research|web\.search/i.test(capabilityId)) return "internet_search";
+  if (/text[-_.]?to[-_.]?speech|speak[_-]?text|voice[-_.]?delivery|voice[-_.]?output|request[_-]?interim[_-]?voice[_-]?callout|narrator[_-]?say/i.test(capabilityId)) return "voice_delivery";
   if (/scientific[-_.]?calculator|calculator|calculate|compute|solve/i.test(capabilityId)) return "scientific_calculator";
   if (/^live_env\./i.test(capabilityId)) return "live_environment";
   if (/^situation-room\.live-source\.|^situation-room\.pipeline\./i.test(capabilityId)) return "live_pipeline";
@@ -263,6 +265,7 @@ export function buildCommittedAskRoute(input: {
   }
 
   const route = readRouteSource(input.payload);
+  const toolUseRestatement = buildToolUseRestatement(input.promptText);
   const routeContract = readRecord(input.payload.route_product_contract);
   const rawGoal = readCanonicalGoal(input.payload);
   const contextualSuppressionPresent =
@@ -312,7 +315,10 @@ export function buildCommittedAskRoute(input: {
   const allowedTerminalKinds = compoundPolicy.allowed;
   const forbiddenTerminalKinds = compoundPolicy.forbidden;
   const suppressedFamilies = suppressedFamiliesFromPayload(input.payload, input.promptInterpretation);
-  const allowedFamilies = allowedFamiliesFromPayload(input.payload, route.sourceTarget)
+  const allowedFamilies = unique([
+    ...allowedFamiliesFromPayload(input.payload, route.sourceTarget),
+    ...toolUseRestatement.requiredToolFamilies,
+  ])
     .filter((family) => !suppressedFamilies.includes(family));
   const requiredFamily = familyForSourceTarget(route.sourceTarget);
   const negativeConstraints = input.promptInterpretation?.negative_constraints ?? [];

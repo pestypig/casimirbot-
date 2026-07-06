@@ -13,6 +13,8 @@ import { ensureDatabase, getPool } from "../../db/client";
 const DEFAULT_PROFILE_STORAGE_QUOTA_BYTES = 5 * 1024 * 1024;
 const MAX_PROFILE_STORAGE_QUOTA_BYTES = 50 * 1024 * 1024;
 const MAX_ENTRY_BYTES = 2 * 1024 * 1024;
+const ENCRYPTION_ALGORITHM = "aes-256-gcm";
+const ENCRYPTED_SNAPSHOT_PREFIX = "v1";
 
 const normalize = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
@@ -34,6 +36,82 @@ export function getProfileStorageQuotaBytes(): number {
     parseBytes(process.env.WORKSPACE_USER_STORAGE_QUOTA_BYTES);
   if (configured == null) return DEFAULT_PROFILE_STORAGE_QUOTA_BYTES;
   return Math.min(MAX_PROFILE_STORAGE_QUOTA_BYTES, configured);
+}
+
+function resolveProfileStorageEncryptionKey(): {
+  key: Buffer;
+  key_id: string;
+} {
+  const configured = normalize(process.env.HELIX_PROFILE_STORAGE_ENCRYPTION_KEY);
+  if (configured) {
+    const decoded = Buffer.from(configured, "base64url");
+    const key = decoded.length >= 32
+      ? decoded.subarray(0, 32)
+      : crypto.createHash("sha256").update(configured).digest();
+    return {
+      key,
+      key_id: `env:${crypto.createHash("sha256").update(key).digest("base64url").slice(0, 12)}`,
+    };
+  }
+  if (normalize(process.env.NODE_ENV).toLowerCase() === "production") {
+    throw new Error("profile_storage_encryption_key_missing");
+  }
+  return {
+    key: crypto.createHash("sha256").update("casimirbot-local-profile-storage-dev-key").digest(),
+    key_id: "dev-local",
+  };
+}
+
+function encryptProfileStorageSnapshot(snapshot: HelixProfileStorageSnapshot): {
+  encrypted_snapshot: string;
+  encryption_key_id: string;
+  encryption_algorithm: string;
+} {
+  const { key, key_id } = resolveProfileStorageEncryptionKey();
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, key, iv);
+  const plaintext = Buffer.from(JSON.stringify(snapshot), "utf8");
+  const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return {
+    encrypted_snapshot: [
+      ENCRYPTED_SNAPSHOT_PREFIX,
+      iv.toString("base64url"),
+      tag.toString("base64url"),
+      encrypted.toString("base64url"),
+    ].join(":"),
+    encryption_key_id: key_id,
+    encryption_algorithm: ENCRYPTION_ALGORITHM,
+  };
+}
+
+function decryptProfileStorageSnapshot(encryptedSnapshot: string): HelixProfileStorageSnapshot | null {
+  const parts = encryptedSnapshot.split(":");
+  if (parts.length !== 4 || parts[0] !== ENCRYPTED_SNAPSHOT_PREFIX) return null;
+  const [, ivEncoded, tagEncoded, encryptedEncoded] = parts;
+  const { key } = resolveProfileStorageEncryptionKey();
+  const decipher = crypto.createDecipheriv(
+    ENCRYPTION_ALGORITHM,
+    key,
+    Buffer.from(ivEncoded, "base64url"),
+  );
+  decipher.setAuthTag(Buffer.from(tagEncoded, "base64url"));
+  const decrypted = Buffer.concat([
+    decipher.update(Buffer.from(encryptedEncoded, "base64url")),
+    decipher.final(),
+  ]);
+  return JSON.parse(decrypted.toString("utf8")) as HelixProfileStorageSnapshot;
+}
+
+function sanitizeSnapshotForStorage(snapshot: HelixProfileStorageSnapshot): HelixProfileStorageSnapshot {
+  return {
+    ...snapshot,
+    entries: snapshot.entries.map((entry) => ({
+      ...entry,
+      value: "",
+    })),
+    raw_profile_content_included: true,
+  };
 }
 
 function normalizeArtifact(
@@ -139,9 +217,12 @@ export async function readProfileStorageSnapshot(
   if (!normalizedProfileId) return { ...emptySnapshot(""), quota_bytes: quotaBytes };
   try {
     await ensureDatabase();
-    const { rows } = await getPool().query<{ snapshot: HelixProfileStorageSnapshot | string }>(
+    const { rows } = await getPool().query<{
+      snapshot: HelixProfileStorageSnapshot | string;
+      encrypted_snapshot: string | null;
+    }>(
       `
-        SELECT snapshot
+        SELECT snapshot, encrypted_snapshot
         FROM helix_account_profile_storage
         WHERE profile_id = $1 AND deleted_at IS NULL
         LIMIT 1;
@@ -149,10 +230,13 @@ export async function readProfileStorageSnapshot(
       [normalizedProfileId],
     );
     if (!rows[0]) return { ...emptySnapshot(normalizedProfileId), quota_bytes: quotaBytes };
-    const parsed =
+    const parsed = rows[0].encrypted_snapshot
+      ? decryptProfileStorageSnapshot(rows[0].encrypted_snapshot)
+      : (
       typeof rows[0].snapshot === "string"
         ? JSON.parse(rows[0].snapshot) as HelixProfileStorageSnapshot
-        : rows[0].snapshot;
+        : rows[0].snapshot
+      );
     if (parsed?.schema !== HELIX_PROFILE_STORAGE_SNAPSHOT_SCHEMA) {
       return { ...emptySnapshot(normalizedProfileId), quota_bytes: quotaBytes };
     }
@@ -222,21 +306,56 @@ export async function writeProfileStorageSnapshot(input: {
     updated_at: updatedAt,
     raw_profile_content_included: true,
   };
+  let encrypted: {
+    encrypted_snapshot: string;
+    encryption_key_id: string;
+    encryption_algorithm: string;
+  };
+  try {
+    encrypted = encryptProfileStorageSnapshot(snapshot);
+  } catch {
+    return {
+      schema: HELIX_PROFILE_STORAGE_WRITE_RECEIPT_SCHEMA,
+      ok: false,
+      profile_id: profileId,
+      entry_count: entries.length,
+      artifact_count: artifacts.length,
+      total_entry_bytes: totalEntryBytes,
+      quota_bytes: quotaBytes,
+      updated_at: null,
+      error: "profile_storage_encryption_unavailable",
+      message: "Profile storage encryption is not configured.",
+      raw_profile_content_included: false,
+    };
+  }
+  const sanitizedSnapshot = sanitizeSnapshotForStorage(snapshot);
   await ensureProfileStorageAccount(profileId);
   await getPool().query(
     `
       INSERT INTO helix_account_profile_storage (
-        profile_id, snapshot, total_entry_bytes, quota_bytes, updated_at, deleted_at
+        profile_id, snapshot, encrypted_snapshot, encryption_key_id, encryption_algorithm,
+        total_entry_bytes, quota_bytes, updated_at, deleted_at
       )
-      VALUES ($1, $2::jsonb, $3, $4, now(), NULL)
+      VALUES ($1, $2::jsonb, $3, $4, $5, $6, $7, now(), NULL)
       ON CONFLICT (profile_id) DO UPDATE SET
         snapshot = EXCLUDED.snapshot,
+        encrypted_snapshot = EXCLUDED.encrypted_snapshot,
+        encryption_key_id = EXCLUDED.encryption_key_id,
+        encryption_algorithm = EXCLUDED.encryption_algorithm,
         total_entry_bytes = EXCLUDED.total_entry_bytes,
         quota_bytes = EXCLUDED.quota_bytes,
         updated_at = now(),
         deleted_at = NULL;
     `,
-    [profileId, JSON.stringify(snapshot), totalEntryBytes, quotaBytes],
+    [
+      profileId,
+      JSON.stringify(sanitizedSnapshot),
+      encrypted.encrypted_snapshot,
+      encrypted.encryption_key_id,
+      encrypted.encryption_algorithm,
+      totalEntryBytes,
+      quotaBytes,
+    ],
   );
   await getPool().query(
     `
@@ -268,6 +387,44 @@ export async function writeProfileStorageSnapshot(input: {
     updated_at: updatedAt,
     error: null,
     message: "Profile storage snapshot saved.",
+    raw_profile_content_included: false,
+  };
+}
+
+export async function deleteProfileStorageSnapshot(profileId: string): Promise<HelixProfileStorageWriteReceipt> {
+  const normalizedProfileId = normalize(profileId);
+  const quotaBytes = getProfileStorageQuotaBytes();
+  if (!normalizedProfileId) {
+    return {
+      schema: HELIX_PROFILE_STORAGE_WRITE_RECEIPT_SCHEMA,
+      ok: false,
+      profile_id: null,
+      entry_count: 0,
+      artifact_count: 0,
+      total_entry_bytes: 0,
+      quota_bytes: quotaBytes,
+      updated_at: null,
+      error: "missing_profile_id",
+      message: "A profile session is required before profile storage can be deleted.",
+      raw_profile_content_included: false,
+    };
+  }
+  await ensureDatabase();
+  await getPool().query(
+    `UPDATE helix_account_profile_storage SET deleted_at = now(), updated_at = now() WHERE profile_id = $1`,
+    [normalizedProfileId],
+  );
+  return {
+    schema: HELIX_PROFILE_STORAGE_WRITE_RECEIPT_SCHEMA,
+    ok: true,
+    profile_id: normalizedProfileId,
+    entry_count: 0,
+    artifact_count: 0,
+    total_entry_bytes: 0,
+    quota_bytes: quotaBytes,
+    updated_at: nowIso(),
+    error: null,
+    message: "Profile storage snapshot deleted.",
     raw_profile_content_included: false,
   };
 }

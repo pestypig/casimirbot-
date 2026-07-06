@@ -189,7 +189,7 @@ export function extractAskLevelTheoryReflection(value: unknown): TheoryContextRe
 }
 
 export function normalizeHelixRuntimeActionKey(value: unknown): string {
-  return coerceText(value).trim().toLowerCase().replace(/[/:]+/g, ".").replace(/\s+/g, "_");
+  return coerceText(value).trim().toLowerCase().replace(/[/:]+/g, ".").replace(/[-\s]+/g, "_");
 }
 
 export function readHelixDecisionCapabilityKeys(value: unknown): string[] {

@@ -131,6 +131,7 @@ export function MoralGraphBiomeMap({
   hoveredNode,
   zoom = 1,
   probabilityByNodeId,
+  translateText = (text: string) => text,
   onClearSelection,
   onToggleNode,
   onHoverNode,
@@ -143,6 +144,7 @@ export function MoralGraphBiomeMap({
   hoveredNode: MoralGraphNode | null;
   zoom?: number;
   probabilityByNodeId?: Record<string, number>;
+  translateText?: (text: string) => string;
   onClearSelection?: () => void;
   onToggleNode: (id: string, node: MoralGraphNode) => void;
   onHoverNode: (id: string | null) => void;
@@ -171,8 +173,8 @@ export function MoralGraphBiomeMap({
           style={{ left: lane.x - 14, width: lane.width + 28, height: graph.height - 24 }}
         >
           <div className="border-b border-zinc-700/70 bg-zinc-950/75 px-2 py-1.5">
-            <div className="truncate text-[10px] font-semibold uppercase text-zinc-100">{lane.label}</div>
-            <div className="truncate text-[9px] text-zinc-500">{lane.summary}</div>
+            <div className="truncate text-[10px] font-semibold uppercase text-zinc-100">{translateText(lane.label)}</div>
+            <div className="truncate text-[9px] text-zinc-500">{translateText(lane.summary)}</div>
           </div>
         </section>
       ))}
@@ -184,11 +186,11 @@ export function MoralGraphBiomeMap({
           style={{ top: lane.y + 26 }}
         >
           <span className="absolute -top-3 left-10 rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-zinc-400">
-            {lane.label}
+            {translateText(lane.label)}
           </span>
         </div>
       ))}
-      <MoralGraphCellWatermarks cells={graph.cells} zoom={zoom} />
+      <MoralGraphCellWatermarks cells={graph.cells} zoom={zoom} translateText={translateText} />
       <svg className="pointer-events-none absolute inset-0" width={graph.width} height={graph.height}>
         <defs>
           <marker id="moral-graph-biome-arrow" markerHeight="7" markerWidth="7" orient="auto" refX="6" refY="3.5">
@@ -247,7 +249,7 @@ export function MoralGraphBiomeMap({
                   ? `0 0 0 ${Math.max(2, Math.round(placementProbability * 9))}px rgba(34,211,238,0.28)`
                   : undefined,
             }}
-            aria-label={node.label}
+            aria-label={translateText(node.label)}
             onMouseEnter={() => onHoverNode(node.id)}
             onMouseLeave={() => onHoverNode(null)}
             onFocus={() => onHoverNode(node.id)}
@@ -275,28 +277,28 @@ export function MoralGraphBiomeMap({
           className="pointer-events-none absolute z-50 max-w-[280px] rounded border border-cyan-700/70 bg-zinc-950/95 p-2 text-xs text-zinc-200 shadow-2xl shadow-cyan-950/40"
           style={{ left: Math.min(graph.width - 300, hoveredNode.x + 62), top: Math.max(12, hoveredNode.y - 8) }}
         >
-          <div className="font-semibold text-zinc-50">{hoveredNode.label}</div>
+          <div className="font-semibold text-zinc-50">{translateText(hoveredNode.label)}</div>
           <div className="mt-0.5 font-mono text-[10px] text-zinc-500">{hoveredNode.id}</div>
           <div className="mt-1 font-mono text-[11px] leading-snug text-cyan-100">
-            {hoveredNode.proceduralExpression}
+            {translateText(hoveredNode.proceduralExpression)}
           </div>
           <div className="mt-1 grid grid-cols-2 gap-1 text-[10px] text-zinc-300">
-            <span>{labelize(hoveredNode.biome)}</span>
-            <span>{labelize(hoveredNode.scaleBand)}</span>
-            <span>{labelize(hoveredNode.cadence)}</span>
-            <span>{labelize(hoveredNode.maturity)}</span>
+            <span>{translateText(labelize(hoveredNode.biome))}</span>
+            <span>{translateText(labelize(hoveredNode.scaleBand))}</span>
+            <span>{translateText(labelize(hoveredNode.cadence))}</span>
+            <span>{translateText(labelize(hoveredNode.maturity))}</span>
           </div>
-          {hoveredNode.actionEffect ? <div className="mt-1 text-zinc-300">{hoveredNode.actionEffect}</div> : null}
+          {hoveredNode.actionEffect ? <div className="mt-1 text-zinc-300">{translateText(hoveredNode.actionEffect)}</div> : null}
           <div className="mt-2 flex flex-wrap gap-1">
             <Badge variant="outline" className="border-zinc-700 text-[10px] text-zinc-300">
-              {labelize(hoveredNode.actionManifestation)}
+              {translateText(labelize(hoveredNode.actionManifestation))}
             </Badge>
             <Badge variant="outline" className="border-cyan-700 text-[10px] text-cyan-200">
-              {labelize(hoveredNode.biomeReason)}
+              {translateText(labelize(hoveredNode.biomeReason))}
             </Badge>
             {(hoveredNode.tags ?? []).slice(0, 2).map((tag: string) => (
               <Badge key={tag} variant="outline" className="border-zinc-700 text-[10px] text-zinc-300">
-                {labelize(tag)}
+                {translateText(labelize(tag))}
               </Badge>
             ))}
           </div>

@@ -1050,6 +1050,7 @@ export type StagePlayDocumentInlineTranslationOutputV1 = {
   locale: string;
   targetLanguage: string;
   accountLocale: string;
+  translationContractVersion?: string | null;
   projectionTarget: HelixDocumentLiveTranslationProjectionTarget;
   projectionStatus: "projected" | "stale" | "failed" | "cancelled";
   freshnessStatus: string;

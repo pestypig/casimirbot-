@@ -3,7 +3,6 @@ import {
   ChevronDown,
   FileImage,
   Image as ImageIcon,
-  Link,
   Plus,
   RotateCcw,
   Scissors,
@@ -65,10 +64,6 @@ function parseNumber(value: string, fallback: number): number {
 
 function formatPercent(value: number): string {
   return `${Math.max(0, Math.min(100, value)).toFixed(2)}%`;
-}
-
-function buildImageSourceId(value: string): string {
-  return `image-lens:${hashDocumentImageString(value).replace("fnv1a32:", "")}`;
 }
 
 function openLiveAnswerPanel(): void {
@@ -180,7 +175,6 @@ export default function ImageLensPanel() {
   const { t } = useInterfaceText(interfaceLanguage.code);
   const initialStatusMessage = t("imageLens.status.initial");
   const initialStatusRef = useRef(initialStatusMessage);
-  const [urlDraft, setUrlDraft] = useState("");
   const [sourceKind, setSourceKind] = useState<DocumentImageSourceKindV1>("manual_image_url");
   const [pageDraft, setPageDraft] = useState("1");
   const [kind, setKind] = useState<DocumentImageRegionKindV1>("unknown");
@@ -239,26 +233,9 @@ export default function ImageLensPanel() {
     };
   }, [clampedCrop, naturalSize]);
 
-  const loadUrl = () => {
-    const trimmed = urlDraft.trim();
-    if (!trimmed) {
-      setStatusMessage(t("imageLens.status.missingImage"));
-      return;
-    }
-    const pageNumber = sourceKind === "pdf_page_render" ? Math.max(1, Math.floor(parseNumber(pageDraft, 1))) : null;
-    setSourceImage({
-      sourceImageUrl: trimmed,
-      sourceAttachmentId: buildImageSourceId(trimmed),
-      sourceKind,
-      pageNumber,
-    });
-    setStatusMessage(t("imageLens.status.imageLoaded"));
-  };
-
   const loadFile = (file: File | null) => {
     if (!file) return;
     const objectUrl = URL.createObjectURL(file);
-    setUrlDraft(objectUrl);
     setSourceKind("image_attachment");
     setSourceImage({
       sourceImageUrl: objectUrl,
@@ -413,62 +390,27 @@ export default function ImageLensPanel() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-slate-950 text-slate-100" data-testid="image-lens-panel">
-      <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
-        <div className="flex items-center gap-2 text-sm font-semibold">
-          <FileImage className="h-4 w-4 text-cyan-200" />
-          {t("imageLens.header.title")}
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setAdvancedOpen((value: boolean) => !value)}
-            className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10"
-          >
-            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
-            {t("imageLens.action.advanced")}
-          </button>
-          <button
-            type="button"
-            onClick={clearReceipts}
-            className="inline-flex items-center gap-1 rounded border border-rose-400/40 bg-rose-500/10 px-2 py-1 text-xs text-rose-100 hover:bg-rose-500/20"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            {t("imageLens.action.clear")}
-          </button>
-        </div>
-      </div>
-
-      <div className="border-b border-white/10 bg-black/20 p-3">
-        <div className="flex flex-wrap items-end gap-2">
-          <label className="min-w-[260px] flex-1 text-xs text-slate-300">
-            {t("imageLens.input.imageUrl")}
-            <input
-              value={urlDraft}
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) => setUrlDraft(event.target.value)}
-              className="mt-1 w-full rounded border border-white/10 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none focus:border-cyan-400/60"
-              placeholder={t("imageLens.input.urlPlaceholder")}
-            />
-          </label>
-          <button
-            type="button"
-            onClick={loadUrl}
-            className="inline-flex items-center gap-1 rounded border border-cyan-400/40 bg-cyan-500/10 px-2 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/20"
-          >
-            <Link className="h-3.5 w-3.5" />
-            {t("imageLens.action.loadUrl")}
-          </button>
+      <div className="border-b border-white/10 bg-slate-950/95 px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="mr-auto flex min-w-0 items-center gap-2 text-sm font-semibold">
+            <FileImage className="h-4 w-4 shrink-0 text-cyan-200" />
+            <span className="truncate">{t("imageLens.header.title")}</span>
+          </div>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center gap-1 rounded border border-slate-500/50 bg-slate-800 px-2 py-1.5 text-xs text-slate-100 hover:bg-slate-700"
+            aria-label={t("imageLens.action.chooseFile")}
+            title={t("imageLens.action.chooseFile")}
+            className="inline-flex h-8 items-center gap-1 rounded border border-slate-500/50 bg-slate-800 px-2 text-xs text-slate-100 hover:bg-slate-700"
           >
             <Plus className="h-3.5 w-3.5" />
-            {t("imageLens.action.chooseFile")}
+            <span className="hidden sm:inline">{t("imageLens.action.chooseFile")}</span>
           </button>
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
+            aria-label={t("imageLens.action.chooseImageFileAria")}
             className="sr-only"
             onChange={(event: React.ChangeEvent<HTMLInputElement>) => loadFile(event.currentTarget.files?.[0] ?? null)}
           />
@@ -476,43 +418,68 @@ export default function ImageLensPanel() {
             type="button"
             onClick={sendFrameToLiveAnswer}
             disabled={!hasVisualInput || !naturalSize}
-            className="inline-flex items-center gap-1 rounded border border-emerald-400/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-100 hover:bg-emerald-500/20 disabled:opacity-50"
+            aria-label={t("imageLens.action.sendCropFrame")}
+            title={t("imageLens.action.sendCropFrame")}
+            className="inline-flex h-8 items-center gap-1 rounded border border-emerald-400/40 bg-emerald-500/10 px-2 text-xs font-medium text-emerald-100 hover:bg-emerald-500/20 disabled:opacity-50"
           >
             <Scissors className="h-3.5 w-3.5" />
-            {t("imageLens.action.sendCropFrame")}
+            <span className="hidden sm:inline">{t("imageLens.action.sendCropFrame")}</span>
           </button>
           <button
             type="button"
             onClick={useFullImage}
             disabled={!naturalSize}
-            className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-slate-200 hover:bg-white/10 disabled:opacity-50"
+            aria-label={t("imageLens.action.fullImage")}
+            title={t("imageLens.action.fullImage")}
+            className="inline-flex h-8 items-center gap-1 rounded border border-white/10 bg-white/5 px-2 text-xs text-slate-200 hover:bg-white/10 disabled:opacity-50"
           >
             <RotateCcw className="h-3.5 w-3.5" />
-            {t("imageLens.action.fullImage")}
+            <span className="hidden md:inline">{t("imageLens.action.fullImage")}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setAdvancedOpen((value: boolean) => !value)}
+            aria-label={t("imageLens.action.advanced")}
+            title={t("imageLens.action.advanced")}
+            className="inline-flex h-8 items-center gap-1 rounded border border-white/10 bg-white/5 px-2 text-xs text-slate-200 hover:bg-white/10"
+          >
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
+            <span className="hidden md:inline">{t("imageLens.action.advanced")}</span>
+          </button>
+          <button
+            type="button"
+            onClick={clearReceipts}
+            aria-label={t("imageLens.action.clear")}
+            title={t("imageLens.action.clear")}
+            className="inline-flex h-8 items-center gap-1 rounded border border-rose-400/40 bg-rose-500/10 px-2 text-xs text-rose-100 hover:bg-rose-500/20"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            <span className="hidden md:inline">{t("imageLens.action.clear")}</span>
           </button>
         </div>
-        <p className="mt-2 text-[11px] leading-relaxed text-slate-400">{statusMessage}</p>
-        {liveSourceActive ? (
-          <p className="mt-1 text-[11px] leading-relaxed text-cyan-100">
-            {t("imageLens.liveSource.note", { sourceId: liveSource?.sourceId ?? "unknown" })}
-          </p>
-        ) : null}
-        {lastSentFrame ? (
-          <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-emerald-400/30 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-100">
-            <span className="min-w-0 flex-1 truncate">
+        <div className="mt-1 flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] leading-5">
+          <span className="min-w-0 flex-1 truncate text-slate-400">{statusMessage}</span>
+          {liveSourceActive ? (
+            <span className="truncate text-cyan-100">
+              {t("imageLens.liveSource.note", { sourceId: liveSource?.sourceId ?? "unknown" })}
+            </span>
+          ) : null}
+          {lastSentFrame ? (
+            <span className="inline-flex min-w-0 items-center gap-2 truncate rounded border border-emerald-400/30 bg-emerald-500/10 px-2 text-emerald-100">
               {t("imageLens.sent.source", { sourceId: lastSentFrame.sourceId })}
               {lastSentFrame.evidenceId ? t("imageLens.sent.evidence", { evidenceId: lastSentFrame.evidenceId }) : ""}
+              <button
+                type="button"
+                onClick={openLiveAnswerPanel}
+                title={t("imageLens.action.openLiveAnswer")}
+                className="inline-flex h-5 items-center gap-1 rounded border border-emerald-300/40 px-1.5 hover:bg-emerald-500/20"
+              >
+                <ImageIcon className="h-3 w-3" />
+                <span className="hidden sm:inline">{t("imageLens.action.openLiveAnswer")}</span>
+              </button>
             </span>
-            <button
-              type="button"
-              onClick={openLiveAnswerPanel}
-              className="inline-flex items-center gap-1 rounded border border-emerald-300/40 px-2 py-1 text-[11px] hover:bg-emerald-500/20"
-            >
-              <ImageIcon className="h-3.5 w-3.5" />
-              {t("imageLens.action.openLiveAnswer")}
-            </button>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </div>
 
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden">

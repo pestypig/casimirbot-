@@ -245,6 +245,7 @@ Each capability contract should define:
 | `scientific-calculator.focus_panel` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
 | `scientific-calculator.show_gateway_solve` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
 | `scientific-calculator.prefill_expression` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
+| `account_session.set_interface_language` | [workstation.dynamic_panel_action_boundaries.md](workstation.dynamic_panel_action_boundaries.md) | `draft` |
 | `workstation.open_panel` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
 | `workstation.focus_panel` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
 | `docs-viewer.open_doc` | [docs-viewer.open_doc.md](docs-viewer.open_doc.md) | `draft` |

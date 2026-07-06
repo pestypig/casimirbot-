@@ -19,6 +19,7 @@ const PANEL_TITLE_MESSAGES: Record<string, InterfaceMessageId> = {
   "live-answer-environment": "panel.title.liveAnswer",
   "helix-luma": "panel.title.lumaLab",
   "mission-ethos": "panel.title.missionEthos",
+  "moral-graph": "panel.title.moralGraph",
   "mission-ethos-source": "panel.title.missionEthosSource",
   narrator: "panel.title.narrator",
   "potato-threshold-lab": "panel.title.potatoThresholdLab",

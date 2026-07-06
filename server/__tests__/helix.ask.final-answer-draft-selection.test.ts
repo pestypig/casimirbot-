@@ -2612,6 +2612,7 @@ describe("final_answer_draft terminal selection", () => {
     expect(payload.scholarly_research_answer).toMatchObject({
       schema: "helix.scholarly_research_answer.v1",
       text: draftText,
+      evidence_state: "answer_ready",
       support_refs: expect.arrayContaining([lookupRef, fullTextRef]),
     });
   });
@@ -2698,6 +2699,7 @@ describe("final_answer_draft terminal selection", () => {
     expect(payload.scholarly_research_answer).toMatchObject({
       schema: "helix.scholarly_research_answer.v1",
       answer_text: result.visible_text,
+      evidence_state: "answer_ready",
       citations: [
         {
           label: "Hawking Radiation As Tunneling",

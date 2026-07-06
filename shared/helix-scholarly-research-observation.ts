@@ -34,6 +34,109 @@ export type HelixScholarlyResearchIntentMode =
   | "reference_lookup"
   | "bibliography_repair";
 
+export type HelixScholarlyRequestedWorkflow =
+  | "metadata_search"
+  | "doi_lookup"
+  | "full_text_summary"
+  | "numeric_extraction"
+  | "numeric_calculation"
+  | "bibliography_repair";
+
+export type HelixScholarlyTerminalEvidenceRequirement =
+  | "metadata"
+  | "full_text"
+  | "numeric_values"
+  | "calculation_from_numeric_values";
+
+export type HelixScholarlyIntent = {
+  schema: "helix.scholarly_intent.v1";
+  original_prompt: string;
+  scholarly_query: string;
+  quoted_topic?: string;
+  requested_workflow: HelixScholarlyRequestedWorkflow;
+  requested_outputs: string[];
+  requires_full_text: boolean;
+  requires_numeric_extraction: boolean;
+  requires_calculation: boolean;
+  terminal_evidence_requirement: HelixScholarlyTerminalEvidenceRequirement;
+  query_normalization_reasons: string[];
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
+export type HelixScholarlyCapabilityChainPlan = {
+  schema: "helix.scholarly_capability_chain_plan.v1";
+  requested_workflow: HelixScholarlyRequestedWorkflow;
+  planned_capabilities: string[];
+  terminal_evidence_requirement: HelixScholarlyTerminalEvidenceRequirement;
+  calculator_requires_numeric_evidence: boolean;
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
+export type HelixScholarlyEvidenceState =
+  | "lookup_usable"
+  | "lookup_weak_match"
+  | "lookup_blocked"
+  | "full_text_usable"
+  | "full_text_unavailable"
+  | "page_image_parse_required"
+  | "numeric_evidence_usable"
+  | "numeric_evidence_missing"
+  | "answer_ready"
+  | "answer_blocked";
+
+export type HelixScholarlyResponseMode =
+  | "scholarly_metadata_answer"
+  | "scholarly_exploratory_candidates"
+  | "scholarly_recovery_plan"
+  | "scholarly_full_text_answer"
+  | "scholarly_parse_required"
+  | "scholarly_numeric_binding"
+  | "scholarly_numeric_missing";
+
+export type HelixScholarlyResponseModeSelection = {
+  schema: "helix.scholarly_response_mode_selection.v1";
+  scholarly_response_mode: HelixScholarlyResponseMode;
+  allowed_response_modes: HelixScholarlyResponseMode[];
+  selected_response_mode: HelixScholarlyResponseMode;
+  evidence_state: HelixScholarlyEvidenceState | string | null;
+  selected_for_answer: boolean;
+  selected_for_exploration: boolean;
+  candidate_relevance_reasons: unknown[];
+  rejected_candidate_reasons: unknown[];
+  next_affordances: unknown[];
+  recovery_queries?: string[];
+  missing_requirements?: string[];
+  terminal_artifact_kind: string;
+  terminal_eligible?: boolean;
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
+export type HelixScholarlyNextAffordance = {
+  capability: string;
+  reason: string;
+  query?: string;
+  source_ref?: string;
+  paper_result_id?: string;
+  variables?: string[];
+};
+
+export type HelixScholarlyRecoveryAffordance = {
+  schema: string;
+  reason: string;
+  recommended_next_capability?: string;
+  next_affordances?: HelixScholarlyNextAffordance[];
+  recovery_queries?: string[];
+  recovery_query_basis?: Record<string, unknown>;
+  terminal_eligible: false;
+  post_tool_model_step_required?: true;
+  assistant_answer: false;
+  raw_content_included: false;
+  [key: string]: unknown;
+};
+
 export type HelixScholarlyPaperIdentifier = {
   doi?: string;
   arxiv_id?: string;
@@ -84,8 +187,16 @@ export type HelixScholarlyResearchObservation = {
   providers_called: HelixScholarlyResearchProvider[];
   evidence_refs: HelixScholarlyEvidenceRef[];
   papers: HelixScholarlyPaperResult[];
+  evidence_state: HelixScholarlyEvidenceState;
+  next_affordances: HelixScholarlyNextAffordance[];
+  lookup_relevance_gate?: Record<string, unknown>;
+  scholarly_lookup_recovery_affordance?: HelixScholarlyRecoveryAffordance;
+  recovery_query_basis?: Record<string, unknown>;
+  recovery_affordances?: HelixScholarlyRecoveryAffordance[];
   missing_requirements: string[];
   selected_for_answer: boolean;
+  terminal_eligible: false;
+  post_tool_model_step_required: true;
   assistant_answer: false;
   raw_content_included: false;
 };
@@ -141,8 +252,14 @@ export type HelixScholarlyFullTextObservation = {
   page_text_refs: HelixScholarlyFullTextPage[];
   selected_chunks: HelixScholarlyFullTextChunk[];
   visual_candidates: HelixScholarlyPdfVisualCandidate[];
+  evidence_state: HelixScholarlyEvidenceState;
+  next_affordances: HelixScholarlyNextAffordance[];
+  scholarly_full_text_recovery_affordance?: HelixScholarlyRecoveryAffordance;
+  recovery_affordances?: HelixScholarlyRecoveryAffordance[];
   missing_requirements: string[];
   selected_for_answer: boolean;
+  terminal_eligible: false;
+  post_tool_model_step_required: true;
   assistant_answer: false;
   raw_content_included: false;
   context_policy: "compact_context_pack_only";
@@ -190,6 +307,10 @@ export type HelixScholarlyNumericParameterObservation = {
   parameters: HelixScholarlyNumericParameterEvidence[];
   missing_variables: string[];
   rejected_candidates: HelixScholarlyRejectedNumericCandidate[];
+  evidence_state: HelixScholarlyEvidenceState;
+  next_affordances: HelixScholarlyNextAffordance[];
+  scholarly_numeric_recovery_affordance?: HelixScholarlyRecoveryAffordance;
+  recovery_affordances?: HelixScholarlyRecoveryAffordance[];
   missing_requirements: string[];
   selected_for_answer: boolean;
   extraction_mode?: "requested_variables" | "open_supported_parameters";

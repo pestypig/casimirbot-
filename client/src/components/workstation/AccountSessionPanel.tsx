@@ -14,6 +14,11 @@ import {
 } from "@shared/helix-account-session";
 import type { HelixProfileIngressTokenSummary } from "@shared/helix-profile-ingress";
 import { cacheAccountCapabilityPolicy } from "@/lib/workstation/accountCapabilityPolicy";
+import {
+  grantProfileStorageAttachConsent,
+  isProfileStorageAttachConsentGranted,
+  revokeProfileStorageAttachConsent,
+} from "@/lib/workstation/profileStorageSync";
 
 type DiscordSessionView = {
   session_id: string;
@@ -152,6 +157,8 @@ const artifactTypeMessages = {
   workstation_layout: "account.display.artifactType.workstationLayout",
   workstation_session_draft: "account.display.artifactType.workstationSessionDraft",
   workstation_panel_scroll: "account.display.artifactType.workstationPanelScroll",
+  linked_source: "account.display.artifactType.linkedSource",
+  remembered_procedure: "account.display.artifactType.rememberedProcedure",
 } satisfies DisplayMessageMap;
 
 const ownerScopeMessages = {
@@ -234,8 +241,15 @@ export default function AccountSessionPanel() {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const fallbackProfileId = "DatDamPig";
-  const [localUsername, setLocalUsername] = React.useState("");
-  const [localPassword, setLocalPassword] = React.useState("");
+  const [accountEmail, setAccountEmail] = React.useState("");
+  const [accountDisplayName, setAccountDisplayName] = React.useState("");
+  const [accountPassword, setAccountPassword] = React.useState("");
+  const [accountMode, setAccountMode] = React.useState<"sign-in" | "sign-up">("sign-in");
+  const [resetToken, setResetToken] = React.useState("");
+  const [accountActionToken, setAccountActionToken] = React.useState<string | null>(null);
+  const [showPasswordResetHint, setShowPasswordResetHint] = React.useState(false);
+  const [accountRecoveryMessage, setAccountRecoveryMessage] = React.useState<string | null>(null);
+  const [profileAttachConsentGranted, setProfileAttachConsentGranted] = React.useState(false);
   const [ingressLabel, setIngressLabel] = React.useState("");
   const [newTokenValue, setNewTokenValue] = React.useState<string | null>(null);
   const [discordSessions, setDiscordSessions] = React.useState<DiscordSessionView[]>([]);
@@ -276,26 +290,124 @@ export default function AccountSessionPanel() {
     return () => window.clearInterval(timer);
   }, [refresh]);
 
-  const signIn = React.useCallback(async () => {
+  const submitPasswordAccount = React.useCallback(async () => {
     setLoading(true);
     setError(null);
+    setAccountRecoveryMessage(null);
     try {
-      const response = await fetch("/api/account/session/password-sign-in", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: localUsername, password: localPassword }),
-      });
+      const response = await fetch(
+        accountMode === "sign-up"
+          ? "/api/account/session/sign-up"
+          : "/api/account/session/account-sign-in",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: accountEmail,
+            password: accountPassword,
+            display_name: accountDisplayName,
+          }),
+        },
+      );
       const body = await response.json();
-      if (!response.ok) throw new Error(body?.message ?? `sign-in ${response.status}`);
+      if (!response.ok) {
+        setShowPasswordResetHint(Boolean(body?.show_password_reset_hint));
+        throw new Error(body?.message ?? `account ${response.status}`);
+      }
       cacheAccountCapabilityPolicy(body?.session?.account_policy ?? body?.account_policy ?? null);
-      setLocalPassword("");
+      setAccountPassword("");
+      setShowPasswordResetHint(false);
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to sign in to local profile.");
+      setError(err instanceof Error ? err.message : "Failed to open profile.");
     } finally {
       setLoading(false);
     }
-  }, [localPassword, localUsername, refresh]);
+  }, [accountDisplayName, accountEmail, accountMode, accountPassword, refresh]);
+
+  const requestEmailVerification = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setAccountActionToken(null);
+    try {
+      const response = await fetch("/api/account/session/email-verification/request", { method: "POST" });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.message ?? `verify ${response.status}`);
+      setAccountActionToken(body.token_value ?? null);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to request email verification.");
+    } finally {
+      setLoading(false);
+    }
+  }, [refresh]);
+
+  const confirmEmailVerification = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/account/session/email-verification/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token_value: resetToken }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.message ?? `verify ${response.status}`);
+      setResetToken("");
+      setAccountActionToken(null);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to verify email.");
+    } finally {
+      setLoading(false);
+    }
+  }, [refresh, resetToken]);
+
+  const requestPasswordReset = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setAccountActionToken(null);
+    setAccountRecoveryMessage(null);
+    try {
+      const response = await fetch("/api/account/session/password-reset/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: accountEmail }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.message ?? `reset ${response.status}`);
+      setAccountActionToken(body.token_value ?? null);
+      setAccountRecoveryMessage(body?.message ?? "If a profile exists for that email, a reset link has been sent.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to request password reset.");
+    } finally {
+      setLoading(false);
+    }
+  }, [accountEmail]);
+
+  const confirmPasswordReset = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/account/session/password-reset/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token_value: resetToken, password: accountPassword }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.message ?? `reset ${response.status}`);
+      setAccountPassword("");
+      setResetToken("");
+      setAccountActionToken(null);
+      setShowPasswordResetHint(false);
+      setAccountRecoveryMessage("Password reset complete. Sign in with the new password.");
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to reset password.");
+    } finally {
+      setLoading(false);
+    }
+  }, [accountPassword, refresh, resetToken]);
 
   const signOut = React.useCallback(async () => {
     setLoading(true);
@@ -315,6 +427,58 @@ export default function AccountSessionPanel() {
       setLoading(false);
     }
   }, [refresh, status.session?.profile.auth_mode]);
+
+  const exportProfileStorage = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/account/profile-storage/export");
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.message ?? `export ${response.status}`);
+      const blob = new Blob([JSON.stringify(body, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `helix-profile-export-${Date.now()}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to export profile data.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const deleteProfileStorage = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/account/profile-storage/snapshot", { method: "DELETE" });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.message ?? `delete storage ${response.status}`);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete saved profile data.");
+    } finally {
+      setLoading(false);
+    }
+  }, [refresh]);
+
+  const deleteProfile = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/account/profile", { method: "DELETE" });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.message ?? `delete profile ${response.status}`);
+      cacheAccountCapabilityPolicy(HELIX_USER_ACCOUNT_POLICY);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete profile.");
+    } finally {
+      setLoading(false);
+    }
+  }, [refresh]);
 
   const createIngressToken = React.useCallback(async () => {
     setLoading(true);
@@ -362,30 +526,75 @@ export default function AccountSessionPanel() {
 
   const session = status.session;
   const usage = status.usage;
-  const showLocalDevSignIn = status.auth_boundary.local_password_profile_available;
+
+  React.useEffect(() => {
+    setProfileAttachConsentGranted(isProfileStorageAttachConsentGranted(session?.profile.profile_id));
+  }, [session?.profile.profile_id]);
+
+  const attachThisBrowser = React.useCallback(() => {
+    if (!session?.profile.profile_id) return;
+    grantProfileStorageAttachConsent(session.profile.profile_id);
+    setProfileAttachConsentGranted(true);
+  }, [session?.profile.profile_id]);
+
+  const detachThisBrowser = React.useCallback(() => {
+    if (!session?.profile.profile_id) return;
+    revokeProfileStorageAttachConsent(session.profile.profile_id);
+    setProfileAttachConsentGranted(false);
+  }, [session?.profile.profile_id]);
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-slate-950 text-slate-100">
       <header className="border-b border-white/10 px-4 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 text-sm font-semibold text-white">
               <UserCircle className="h-4 w-4 text-cyan-300" />
               {t("account.header.title")}
             </div>
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-400">
               {t("account.header.description")}
             </p>
           </div>
           <button
             type="button"
             onClick={refresh}
-            className="rounded border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-200 hover:bg-white/10"
+            className="h-9 shrink-0 rounded border border-white/10 bg-white/5 px-3 text-xs text-slate-200 hover:bg-white/10"
           >
             {loading ? t("account.action.loading") : t("account.action.refresh")}
           </button>
         </div>
+        <label className="mt-3 flex min-w-0 items-center gap-2 rounded border border-white/10 bg-slate-900/70 px-2 py-1.5 text-xs text-slate-300">
+          <Languages className="h-3.5 w-3.5 shrink-0 text-cyan-300" />
+          <span className="shrink-0 whitespace-nowrap">{interfaceText.t("account.language.interfaceLabel")}</span>
+          <select
+            value={interfaceLanguage.code}
+            onChange={(event) => {
+              const nextLanguage = getInterfaceLanguageOption(event.target.value).code;
+              updateSettings({ interfaceLanguage: nextLanguage });
+              writeInterfaceLanguagePreference(nextLanguage, "account_session_panel");
+            }}
+            aria-label={interfaceText.t("account.language.interfaceLabel")}
+            className="h-8 min-w-0 flex-1 rounded border border-white/15 bg-slate-950 px-2 text-xs text-white outline-none focus:border-cyan-400"
+          >
+            {INTERFACE_LANGUAGE_OPTIONS.map((option) => (
+              <option key={option.code} value={option.code}>
+                {t("account.language.optionReadiness", {
+                  label: option.label,
+                  nativeLabel: option.nativeLabel,
+                  readiness: getInterfaceLanguageReadiness(option),
+                })}
+              </option>
+            ))}
+          </select>
+        </label>
         {error ? <p className="mt-2 text-xs text-rose-300">{error}</p> : null}
+        {accountActionToken ? (
+          <div className="mt-2 rounded border border-amber-300/30 bg-amber-400/10 p-2 text-xs text-amber-100">
+            <div className="font-medium">{t("account.ingress.tokenShownOnce")}</div>
+            <div className="mt-1 break-all font-mono text-[11px]">{accountActionToken}</div>
+          </div>
+        ) : null}
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
@@ -400,6 +609,23 @@ export default function AccountSessionPanel() {
                 <p className="font-medium text-white">{session.profile.display_name}</p>
                 <p className="break-all text-xs text-slate-400">{session.profile.profile_id}</p>
                 {session.profile.email ? <p className="break-all text-xs text-slate-500">{session.profile.email}</p> : null}
+                {session.profile.auth_mode === "password_account" ? (
+                  <div className="rounded border border-white/10 bg-slate-950/60 p-2 text-xs">
+                    <div className="font-medium text-slate-200">
+                      {session.profile.email_verified_at ? t("account.profile.emailVerified") : t("account.profile.emailNotVerified")}
+                    </div>
+                    {!session.profile.email_verified_at ? (
+                      <button
+                        type="button"
+                        onClick={requestEmailVerification}
+                        disabled={loading}
+                        className="mt-2 rounded border border-cyan-400/40 bg-cyan-500/15 px-2 py-1 text-cyan-100 hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {t("account.profile.requestVerificationToken")}
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <span className="rounded bg-white/5 px-2 py-1">
                     {t("account.session.statusValue", { status: displayMappedValue(t, session.status, sessionStatusMessages) })}
@@ -426,43 +652,130 @@ export default function AccountSessionPanel() {
                   {t("account.session.signOut")}
                 </button>
               </div>
-            ) : showLocalDevSignIn ? (
+            ) : (
               <div className="mt-3 space-y-3">
-                <label className="block text-xs text-slate-300">
-                  {t("account.signIn.username")}
-                  <input
-                    value={localUsername}
-                    onChange={(event) => setLocalUsername(event.target.value)}
-                    autoComplete="username"
-                    className="mt-1 w-full rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400"
-                  />
-                </label>
-                <label className="block text-xs text-slate-300">
-                  {t("account.signIn.password")}
-                  <input
-                    type="password"
-                    value={localPassword}
-                    onChange={(event) => setLocalPassword(event.target.value)}
-                    autoComplete="current-password"
-                    className="mt-1 w-full rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400"
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={signIn}
-                  disabled={!localUsername.trim() || !localPassword || loading}
-                  className="inline-flex items-center gap-2 rounded border border-cyan-400/40 bg-cyan-500/15 px-3 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/25"
-                >
-                  <LogIn className="h-3.5 w-3.5" />
-                  {t("account.signIn.submit")}
-                </button>
-                <p className="text-[11px] text-slate-500">
-                  {t("account.signIn.devNote", {
-                    defaultCredentialsNote: status.auth_boundary.local_password_profile_dev_default
-                      ? t("account.signIn.defaultCredentialsNote")
-                      : "",
-                  })}
-                </p>
+                <div className="rounded border border-cyan-400/20 bg-cyan-500/10 p-3">
+                  <div className="mb-2 flex items-center gap-2 text-xs font-medium text-cyan-100">
+                    <LogIn className="h-3.5 w-3.5" />
+                    {t("account.profile.saveToProfile")}
+                  </div>
+                  <div className="mb-3 grid grid-cols-2 gap-1 rounded border border-white/10 bg-slate-950/60 p-1 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setAccountMode("sign-in")}
+                      className={`rounded px-2 py-1 ${accountMode === "sign-in" ? "bg-cyan-500/20 text-cyan-100" : "text-slate-300 hover:bg-white/10"}`}
+                    >
+                      {t("account.signIn.submit")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAccountMode("sign-up")}
+                      className={`rounded px-2 py-1 ${accountMode === "sign-up" ? "bg-cyan-500/20 text-cyan-100" : "text-slate-300 hover:bg-white/10"}`}
+                    >
+                      {t("account.profile.create")}
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-xs text-slate-300">
+                      {t("account.profile.email")}
+                      <input
+                        type="email"
+                        value={accountEmail}
+                        onChange={(event) => setAccountEmail(event.target.value)}
+                        autoComplete="email"
+                        className="mt-1 w-full rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400"
+                      />
+                    </label>
+                    {accountMode === "sign-up" ? (
+                      <label className="block text-xs text-slate-300">
+                        {t("account.profile.displayName")}
+                        <input
+                          value={accountDisplayName}
+                          onChange={(event) => setAccountDisplayName(event.target.value)}
+                          autoComplete="name"
+                          className="mt-1 w-full rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400"
+                        />
+                      </label>
+                    ) : null}
+                    <label className="block text-xs text-slate-300">
+                      {t("account.signIn.password")}
+                      <input
+                        type="password"
+                        value={accountPassword}
+                        onChange={(event) => setAccountPassword(event.target.value)}
+                        autoComplete={accountMode === "sign-up" ? "new-password" : "current-password"}
+                        className="mt-1 w-full rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={submitPasswordAccount}
+                      disabled={!accountEmail.trim() || !accountPassword || loading}
+                      className="inline-flex items-center gap-2 rounded border border-cyan-400/40 bg-cyan-500/15 px-3 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <LogIn className="h-3.5 w-3.5" />
+                      {accountMode === "sign-up" ? t("account.profile.createProfile") : t("account.signIn.submit")}
+                    </button>
+                    {showPasswordResetHint && accountMode === "sign-in" ? (
+                      <div className="rounded border border-amber-300/30 bg-amber-400/10 p-2 text-xs text-amber-100">
+                        <div className="font-medium">{t("account.signIn.trouble")}</div>
+                        <button
+                          type="button"
+                          onClick={requestPasswordReset}
+                          disabled={!accountEmail.trim() || loading}
+                          className="mt-2 rounded border border-amber-200/40 bg-amber-300/10 px-2 py-1 text-xs text-amber-50 hover:bg-amber-300/20 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {t("account.signIn.sendResetLink")}
+                        </button>
+                      </div>
+                    ) : null}
+                    {accountRecoveryMessage ? (
+                      <p className="text-[11px] text-emerald-300">{accountRecoveryMessage}</p>
+                    ) : null}
+                    <p className="text-[11px] text-slate-500">
+                      {t("account.profile.serverSideNote")}
+                    </p>
+                    <div className="border-t border-cyan-200/10 pt-2">
+                      <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-100/80">
+                        {t("account.profile.accountRecovery")}
+                      </div>
+                      <label className="block text-xs text-slate-300">
+                        {t("account.profile.token")}
+                        <input
+                          value={resetToken}
+                          onChange={(event) => setResetToken(event.target.value)}
+                          className="mt-1 w-full rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400"
+                        />
+                      </label>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={requestPasswordReset}
+                          disabled={!accountEmail.trim() || loading}
+                          className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {t("account.profile.requestReset")}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={confirmPasswordReset}
+                          disabled={!resetToken.trim() || !accountPassword || loading}
+                          className="rounded border border-cyan-400/40 bg-cyan-500/15 px-2 py-1 text-xs text-cyan-100 hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {t("account.profile.resetPassword")}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={confirmEmailVerification}
+                          disabled={!resetToken.trim() || loading}
+                          className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {t("account.profile.verifyEmail")}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 <div className="border-t border-white/10 pt-3">
                   <p className="mb-2 text-xs text-slate-400">
                     {t("account.signIn.googleProfileNote")}
@@ -470,54 +783,10 @@ export default function AccountSessionPanel() {
                   <GoogleSignInButton redirectTarget={null} onSignedIn={refresh} />
                 </div>
               </div>
-            ) : (
-              <div className="mt-3 space-y-3">
-                <p className="text-xs text-slate-400">
-                  {t("account.guest.description")}
-                </p>
-                <div className="rounded border border-cyan-400/20 bg-cyan-500/10 p-3">
-                  <div className="mb-2 flex items-center gap-2 text-xs font-medium text-cyan-100">
-                    <LogIn className="h-3.5 w-3.5" />
-                    {t("account.guest.saveProfileTitle")}
-                  </div>
-                  <GoogleSignInButton redirectTarget={null} onSignedIn={refresh} />
-                </div>
-              </div>
             )}
           </section>
 
           <div className="space-y-3">
-            <section className="rounded-lg border border-white/10 bg-black/20 p-3">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
-                <Languages className="h-3.5 w-3.5" />
-                {interfaceText.t("account.language.title")}
-              </div>
-              <div className="mt-3 max-w-sm">
-                <label className="block text-xs text-slate-300">
-                  {interfaceText.t("account.language.interfaceLabel")}
-                  <select
-                    value={interfaceLanguage.code}
-                    onChange={(event) => {
-                      const nextLanguage = getInterfaceLanguageOption(event.target.value).code;
-                      updateSettings({ interfaceLanguage: nextLanguage });
-                      writeInterfaceLanguagePreference(nextLanguage, "account_session_panel");
-                    }}
-                    className="mt-1 h-9 w-full rounded border border-white/15 bg-slate-900 px-2 text-sm text-white outline-none focus:border-cyan-400"
-                  >
-                    {INTERFACE_LANGUAGE_OPTIONS.map((option) => (
-                      <option key={option.code} value={option.code}>
-                        {t("account.language.optionReadiness", {
-                          label: option.label,
-                          nativeLabel: option.nativeLabel,
-                          readiness: getInterfaceLanguageReadiness(option),
-                        })}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            </section>
-
             <details className="group rounded-lg border border-white/10 bg-black/20 p-3">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
                 <span>{t("account.usage.title")}</span>
@@ -568,13 +837,69 @@ export default function AccountSessionPanel() {
         </section>
 
         <section className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
-            <Database className="h-3.5 w-3.5" />
-            {t("account.memory.title")}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+              <Database className="h-3.5 w-3.5" />
+              {t("account.memory.title")}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={exportProfileStorage}
+                disabled={!session || loading}
+                className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {t("account.memory.export")}
+              </button>
+              <button
+                type="button"
+                onClick={deleteProfileStorage}
+                disabled={!session || loading}
+                className="rounded border border-rose-400/30 bg-rose-500/10 px-2 py-1 text-xs text-rose-100 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {t("account.memory.deleteSaves")}
+              </button>
+              <button
+                type="button"
+                onClick={deleteProfile}
+                disabled={!session || loading}
+                className="rounded border border-rose-400/30 bg-rose-500/10 px-2 py-1 text-xs text-rose-100 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {t("account.memory.deleteProfile")}
+              </button>
+            </div>
           </div>
           <p className="mt-2 text-xs text-slate-400">
             {t("account.memory.description")}
           </p>
+          {session ? (
+            <div className="mt-3 rounded border border-white/10 bg-slate-950/60 p-3 text-xs">
+              <div className="font-medium text-slate-200">
+                {profileAttachConsentGranted ? t("account.memory.browserAttached") : t("account.memory.browserNotAttached")}
+              </div>
+              <p className="mt-1 text-slate-500">
+                {t("account.memory.attachDescription")}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={attachThisBrowser}
+                  disabled={profileAttachConsentGranted || loading}
+                  className="rounded border border-cyan-400/40 bg-cyan-500/15 px-2 py-1 text-xs text-cyan-100 hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {t("account.memory.attachThisBrowser")}
+                </button>
+                <button
+                  type="button"
+                  onClick={detachThisBrowser}
+                  disabled={!profileAttachConsentGranted || loading}
+                  className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {t("account.memory.stopAttaching")}
+                </button>
+              </div>
+            </div>
+          ) : null}
           <div className="mt-3 grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
             <Metric label={t("account.memory.artifacts")} value={memoryRegistrySnapshot.artifacts.length} />
             <Metric label={t("account.memory.profileReady")} value={memoryRegistrySnapshot.profile_ready_artifact_count} />

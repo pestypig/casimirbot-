@@ -20,6 +20,7 @@ const envKeys = [
   "LLM_HTTP_BREAKER_COOLDOWN_MS",
   "LLM_HTTP_RETRY_BACKOFF_MS",
   "HULL_MODE",
+  "HULL_OUTBOUND_GUARD",
 ] as const;
 
 describe("llm.http safeguards", () => {
@@ -50,12 +51,30 @@ describe("llm.http safeguards", () => {
     expect(breaker.remaining_ms).toBeGreaterThan(0);
   });
 
-  it("keeps Hull allowlist enforcement on HTTP path", async () => {
+  it("does not let legacy Hull mode block the HTTP path by itself", async () => {
     process.env.HULL_MODE = "1";
     process.env.LLM_HTTP_BASE = "https://api.openai.com";
     process.env.OPENAI_API_KEY = "k";
+    process.env.LLM_HTTP_RETRY_COUNT = "0";
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: "ok" } }] }),
+    } as Response) as unknown as typeof fetch;
+    __setLlmHttpFetchForTests(fetchMock);
 
-    await expect(llmHttpHandler({ prompt: "a" }, {})).rejects.toThrow(/HULL_MODE: blocked outbound/);
+    await expect(llmHttpHandler({ prompt: "a" }, {})).resolves.toMatchObject({
+      text: "ok",
+    });
+  });
+
+  it("keeps explicit Hull outbound guard allowlist enforcement on HTTP path", async () => {
+    process.env.HULL_MODE = "1";
+    process.env.HULL_OUTBOUND_GUARD = "1";
+    process.env.LLM_HTTP_BASE = "https://api.openai.com";
+    process.env.OPENAI_API_KEY = "k";
+
+    await expect(llmHttpHandler({ prompt: "a" }, {})).rejects.toThrow(/HULL_OUTBOUND_GUARD: blocked outbound/);
   });
 
   it("returns deterministic provider metadata and correlation headers on success", async () => {
@@ -69,13 +88,22 @@ describe("llm.http safeguards", () => {
     } as Response) as unknown as typeof fetch;
     __setLlmHttpFetchForTests(fetchMock);
 
-    const result = (await llmHttpHandler(
-      { prompt: "a", traceId: "t1", sessionId: "s1", tenantId: "tenant-7" },
+  const result = (await llmHttpHandler(
+      {
+        prompt: "a",
+        traceId: "t1",
+        sessionId: "s1",
+        tenantId: "tenant-7",
+        response_format: { type: "json_object" },
+      },
       {},
     )) as Record<string, unknown>;
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [, init] = fetchMock.mock.calls[0] ?? [];
+    expect(JSON.parse(String((init as RequestInit)?.body))).toMatchObject({
+      response_format: { type: "json_object" },
+    });
     expect((init as RequestInit)?.headers).toMatchObject({
       "X-Trace-Id": "t1",
       "X-Session-Id": "s1",

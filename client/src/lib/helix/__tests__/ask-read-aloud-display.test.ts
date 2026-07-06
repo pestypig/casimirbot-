@@ -11,7 +11,10 @@ import {
   isMissionVoiceOutputModeEnabled,
   resolveInitialMicArmState,
   resolveReadAloudButtonPressAction,
+  resolveReadAloudRegionTrafficState,
   shouldEnableVoiceRollout,
+  shouldPauseReadAloudOnButtonPress,
+  shouldResumeReadAloudOnButtonPress,
   shouldStopReadAloudOnButtonPress,
   transitionReadAloudState,
 } from "../ask-read-aloud-display";
@@ -26,12 +29,15 @@ describe("ask read-aloud display helpers", () => {
   });
 
   it("maps playback events to read-aloud UI state", () => {
-    expect(transitionReadAloudState("idle", "request")).toBe("requesting");
-    expect(transitionReadAloudState("requesting", "audio")).toBe("playing");
-    expect(transitionReadAloudState("requesting", "dry-run")).toBe("dry-run");
-    expect(transitionReadAloudState("requesting", "error")).toBe("error");
-    expect(transitionReadAloudState("playing", "ended")).toBe("idle");
-    expect(transitionReadAloudState("playing", "stop")).toBe("idle");
+    expect(transitionReadAloudState("idle", "request")).toBe("loading");
+    expect(transitionReadAloudState("loading", "audio")).toBe("playing");
+    expect(transitionReadAloudState("loading", "suppressed")).toBe("unavailable");
+    expect(transitionReadAloudState("loading", "error")).toBe("error");
+    expect(transitionReadAloudState("playing", "pause")).toBe("paused");
+    expect(transitionReadAloudState("paused", "resume")).toBe("resuming");
+    expect(transitionReadAloudState("resuming", "resumed")).toBe("playing");
+    expect(transitionReadAloudState("playing", "ended")).toBe("completed");
+    expect(transitionReadAloudState("playing", "stop")).toBe("cancelled");
   });
 
   it("projects read-aloud state-map updates without mutating the current map", () => {
@@ -41,7 +47,7 @@ describe("ask read-aloud display helpers", () => {
     } as const;
 
     expect(buildReadAloudStateMapTransition(current, "reply-1", "request")).toEqual({
-      "reply-1": "requesting",
+      "reply-1": "loading",
       "reply-2": "playing",
     });
     expect(current).toEqual({
@@ -58,21 +64,120 @@ describe("ask read-aloud display helpers", () => {
 
   it("formats read-aloud button labels from display state only", () => {
     expect(shouldStopReadAloudOnButtonPress("idle")).toBe(false);
-    expect(shouldStopReadAloudOnButtonPress("requesting")).toBe(true);
-    expect(shouldStopReadAloudOnButtonPress("playing")).toBe(true);
+    expect(shouldStopReadAloudOnButtonPress("loading")).toBe(true);
+    expect(shouldStopReadAloudOnButtonPress("resuming")).toBe(true);
+    expect(shouldPauseReadAloudOnButtonPress("playing")).toBe(true);
+    expect(shouldResumeReadAloudOnButtonPress("paused")).toBe(true);
     expect(formatReadAloudButtonLabel("idle")).toBe("Read aloud");
-    expect(formatReadAloudButtonLabel("requesting")).toBe("Stop reading (requesting)");
-    expect(formatReadAloudButtonLabel("playing")).toBe("Stop reading (playing)");
-    expect(formatReadAloudButtonLabel("dry-run")).toBe("Read aloud (dry-run)");
-    expect(formatReadAloudButtonLabel("error")).toBe("Read aloud (error)");
+    expect(formatReadAloudButtonLabel("loading")).toBe("Loading read-aloud");
+    expect(formatReadAloudButtonLabel("playing")).toBe("Pause read-aloud");
+    expect(formatReadAloudButtonLabel("paused")).toBe("Resume read-aloud");
+    expect(formatReadAloudButtonLabel("unavailable")).toBe("Read aloud unavailable");
+    expect(formatReadAloudButtonLabel("error")).toBe("Retry read-aloud");
+    expect(formatReadAloudButtonLabel("unavailable")).not.toMatch(/dry-run/i);
   });
 
   it("resolves manual read-aloud button actions without owning playback", () => {
-    expect(resolveReadAloudButtonPressAction({ currentState: "requesting" })).toBe("stop");
-    expect(resolveReadAloudButtonPressAction({ currentState: "playing" })).toBe("stop");
+    expect(resolveReadAloudButtonPressAction({ currentState: "loading" })).toBe("stop");
+    expect(resolveReadAloudButtonPressAction({ currentState: "playing" })).toBe("pause");
+    expect(resolveReadAloudButtonPressAction({ currentState: "paused" })).toBe("resume");
     expect(resolveReadAloudButtonPressAction({ currentState: "idle", hasText: false })).toBe("error");
-    expect(resolveReadAloudButtonPressAction({ currentState: "dry-run", hasText: true })).toBe("request");
-    expect(resolveReadAloudButtonPressAction({ currentState: "error", hasText: null })).toBe("request");
+    expect(resolveReadAloudButtonPressAction({ currentState: "unavailable", hasText: true })).toBe("retry");
+    expect(resolveReadAloudButtonPressAction({ currentState: "error", hasText: null })).toBe("retry");
+  });
+
+  it("projects read-aloud chunk traffic for the active reply region", () => {
+    const events = [
+      {
+        atMs: 100,
+        kind: "chunk_synth_start",
+        replyId: "reply-1",
+        chunkIndex: 0,
+        chunkCount: 3,
+        text: "Summary:",
+      },
+      {
+        atMs: 120,
+        kind: "chunk_play_start",
+        replyId: "reply-2",
+        chunkIndex: 0,
+        chunkCount: 2,
+      },
+      {
+        atMs: 140,
+        kind: "chunk_play_start",
+        replyId: "reply-1",
+        chunkIndex: 1,
+        chunkCount: 3,
+        text: "The navigation team is ready.",
+      },
+    ];
+
+    expect(resolveReadAloudRegionTrafficState({
+      replyId: "reply-1",
+      readAloudState: "loading",
+      events,
+    })).toMatchObject({
+      active: true,
+      phase: "loading",
+      label: "Loading read-aloud",
+      detail: "chunk 1/3",
+      chunkIndex: 0,
+      chunkCount: 3,
+      chunkText: "Summary:",
+    });
+    expect(resolveReadAloudRegionTrafficState({
+      replyId: "reply-1",
+      readAloudState: "playing",
+      events,
+    })).toMatchObject({
+      active: true,
+      phase: "reading",
+      label: "Reading aloud",
+      detail: "chunk 2/3",
+      chunkIndex: 1,
+      chunkCount: 3,
+      chunkText: "The navigation team is ready.",
+    });
+    expect(resolveReadAloudRegionTrafficState({
+      replyId: "reply-1",
+      readAloudState: "idle",
+      events,
+    })).toBeNull();
+  });
+
+  it("keeps the last completed chunk visible briefly for UI confirmation", () => {
+    const events = [
+      {
+        atMs: 1_000,
+        kind: "chunk_play_end",
+        replyId: "reply-1",
+        chunkIndex: 1,
+        chunkCount: 2,
+        text: "The second sentence was just read.",
+      },
+    ];
+
+    expect(resolveReadAloudRegionTrafficState({
+      replyId: "reply-1",
+      readAloudState: "completed",
+      events,
+      nowMs: 4_000,
+      completedChunkLingerMs: 5_000,
+    })).toMatchObject({
+      active: true,
+      phase: "completed",
+      label: "Read-aloud completed",
+      detail: "chunk 2/2",
+      chunkText: "The second sentence was just read.",
+    });
+    expect(resolveReadAloudRegionTrafficState({
+      replyId: "reply-1",
+      readAloudState: "completed",
+      events,
+      nowMs: 7_000,
+      completedChunkLingerMs: 5_000,
+    })).toBeNull();
   });
 
   it("filters queued read-aloud utterances for the clicked reply", () => {

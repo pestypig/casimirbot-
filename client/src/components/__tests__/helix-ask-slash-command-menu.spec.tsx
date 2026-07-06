@@ -10,6 +10,7 @@ import {
 } from "@shared/helix-account-session";
 import { HelixAskSlashCommandMenu } from "@/components/helix/ask-console/HelixAskSlashCommandMenu";
 import {
+  buildHelixAskSlashCommandCatalogForPolicy,
   buildHelixAskSlashCommandMenuItems,
 } from "@/components/helix/ask-console/HelixAskSlashCommandCatalog";
 import {
@@ -41,6 +42,32 @@ describe("Helix Ask slash command menu", () => {
     expect(developerItems.some((item) => item.command === "/situation")).toBe(true);
   });
 
+  it("generates commands from the active account capability list", () => {
+    const policy = {
+      ...HELIX_USER_ACCOUNT_POLICY,
+      allowed_workstation_capabilities: [
+        ...HELIX_USER_ACCOUNT_POLICY.allowed_workstation_capabilities,
+        "repo.search",
+      ],
+    };
+    const catalog = buildHelixAskSlashCommandCatalogForPolicy(policy);
+    expect(catalog.find((item) => item.capabilityId === "repo.search")).toMatchObject({
+      command: "/repo-search",
+      label: "Repo Search",
+      generated: true,
+      insertionText: "Use the repo.search capability to ",
+    });
+
+    const items = buildHelixAskSlashCommandMenuItems({
+      accountPolicy: policy,
+      runtime: { id: "codex", label: "Codex Workstation Mode" },
+    });
+    expect(items.find((item) => item.capabilityId === "repo.search")).toMatchObject({
+      command: "/repo-search",
+      accessState: "available",
+    });
+  });
+
   it("filters commands and tracks keyboard navigation without executing tools", () => {
     const items = buildHelixAskSlashCommandMenuItems({
       accountPolicy: HELIX_USER_ACCOUNT_POLICY,
@@ -52,7 +79,7 @@ describe("Helix Ask slash command menu", () => {
       items,
       selectedIndex: 0,
     });
-    expect(state.items).toHaveLength(1);
+    expect(state.items.length).toBeGreaterThan(1);
     expect(state.selectedItem?.command).toBe("/calculator");
     expect(
       resolveHelixAskSlashCommandMenuKey({
@@ -126,13 +153,15 @@ describe("Helix Ask slash command menu", () => {
       />,
     );
 
+    expect(screen.getByTestId("helix-ask-slash-command-anchor")).toBeTruthy();
     const menu = screen.getByTestId("helix-ask-slash-command-menu");
     expect(menu).toBeTruthy();
-    expect(menu.className).toContain("top-full");
-    expect(menu.className).toContain("mt-2");
+    expect(menu.parentElement).toBe(document.body);
+    expect(menu.className).toContain("fixed");
     expect(menu.className).toContain("pointer-events-auto");
-    expect(menu.className).toContain("z-[120]");
+    expect(menu.className).toContain("z-[2147483000]");
     expect(menu.className).toContain("bg-slate-950");
+    expect(menu.className).not.toContain("absolute");
     expect(menu.className).not.toContain("bottom-full");
     expect(menu.className).not.toContain("bg-slate-950/95");
     expect(screen.getByText("/calculator")).toBeTruthy();

@@ -8,6 +8,7 @@ import { HelixAskEnvelopeSectionsSurface } from "./HelixAskEnvelopeSectionsSurfa
 import { HelixAskEnvelopeSupplementSurface } from "./HelixAskEnvelopeSupplementSurface";
 import { HelixAskFinalAnswerSurface } from "./HelixAskFinalAnswerSurface";
 import { HelixAskPlainAnswerSurface } from "./HelixAskPlainAnswerSurface";
+import type { ReadAloudRegionTrafficState } from "@/lib/helix/ask-read-aloud-display";
 
 type HelixAskEnvelopeSection = NonNullable<HelixAskResponseEnvelope["sections"]>[number];
 
@@ -29,6 +30,7 @@ type HelixAskLegacyAnswerEnvelopeSlotFinalProps = {
   finalAnswer: {
     text: string;
     renderContent: HelixAskLegacyAnswerContentRenderer;
+    readAloudTraffic?: ReadAloudRegionTrafficState | null;
   };
 };
 
@@ -37,6 +39,7 @@ type HelixAskLegacyAnswerEnvelopeSlotEnvelopeProps = {
   finalAnswer: {
     text: string;
     renderContent: HelixAskLegacyAnswerContentRenderer;
+    readAloudTraffic?: ReadAloudRegionTrafficState | null;
   };
   calculatorLaunch: HelixAskLegacyAnswerCalculatorLaunchState;
   supplement: {
@@ -81,6 +84,7 @@ export function HelixAskLegacyAnswerEnvelopeSlot(props: HelixAskLegacyAnswerEnve
       <HelixAskFinalAnswerSurface
         text={props.finalAnswer.text}
         renderContent={props.finalAnswer.renderContent}
+        readAloudTraffic={props.finalAnswer.readAloudTraffic}
       />
     );
   }
@@ -100,6 +104,7 @@ export function HelixAskLegacyAnswerEnvelopeSlot(props: HelixAskLegacyAnswerEnve
         <HelixAskFinalAnswerSurface
           text={props.finalAnswer.text}
           renderContent={props.finalAnswer.renderContent}
+          readAloudTraffic={props.finalAnswer.readAloudTraffic}
         />
       }
       calculatorLaunch={

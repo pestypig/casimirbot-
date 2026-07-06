@@ -40,6 +40,22 @@ describe("document live translation inline renderer", () => {
     expect(rendered).not.toContain("doc-generated-translation");
   });
 
+  it("keeps markdown block boundaries around inline translation anchors", () => {
+    const rendered = renderDocumentMarkdownWithInlineTranslations({
+      units: [
+        unit("u0001", "First source paragraph."),
+        unit("u0002", "## Source subtitle"),
+      ],
+      translations: {},
+      loadingText: "Translating...",
+      errorText: (reason) => `Could not translate: ${reason}`,
+      fallbackErrorText: "translation failed",
+    });
+
+    expect(rendered).toContain("First source paragraph.\n\n<div");
+    expect(rendered).toContain('</div>\n\n## Source subtitle');
+  });
+
   it("renders governed translation projection separately from source text with non-authority metadata", () => {
     const rendered = renderDocumentMarkdownWithInlineTranslations({
       units: [

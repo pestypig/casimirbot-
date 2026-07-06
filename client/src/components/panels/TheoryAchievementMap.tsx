@@ -154,10 +154,10 @@ function labelizeBiomeToken(value: string): string {
     .replace(/\b\w/g, (letter: string) => letter.toUpperCase());
 }
 
-function chunkWatermarkLabel(chunk: TheoryBiomeChunkV1): string {
-  return `${BAND_LABELS[chunk.dominantScaleBand]} / ${
-    DOMAIN_LABELS[chunk.dominantDomainKey] ?? labelizeBiomeToken(chunk.dominantDomainKey)
-  }`;
+function chunkWatermarkLabel(chunk: TheoryBiomeChunkV1, translateText: (text: string) => string): string {
+  return `${translateText(BAND_LABELS[chunk.dominantScaleBand])} / ${translateText(
+    DOMAIN_LABELS[chunk.dominantDomainKey] ?? labelizeBiomeToken(chunk.dominantDomainKey),
+  )}`;
 }
 
 function chunkWordmarkClipId(chunk: TheoryBiomeChunkV1): string {
@@ -588,7 +588,7 @@ export default function TheoryAchievementMap({
                       fontWeight={800}
                       letterSpacing={0}
                     >
-                      {BAND_LABELS[band]}
+                      {tx(BAND_LABELS[band])}
                     </text>
                   </g>
                 );
@@ -617,7 +617,7 @@ export default function TheoryAchievementMap({
                         fontWeight={700}
                         letterSpacing={0}
                       >
-                        {chunk.dominantDomainKey} / {chunk.badgeIds.length}
+                        {tx(DOMAIN_LABELS[chunk.dominantDomainKey] ?? labelizeBiomeToken(chunk.dominantDomainKey))} / {chunk.badgeIds.length}
                       </text>
                     ) : null}
                   </g>
@@ -625,7 +625,7 @@ export default function TheoryAchievementMap({
               })}
               <g data-testid="theory-biome-cell-wordmarks" aria-hidden="true">
                 {layout.biome.chunks.map((chunk: TheoryBiomeChunkV1) => {
-                  const label = chunkWatermarkLabel(chunk);
+                  const label = chunkWatermarkLabel(chunk, tx);
                   return (
                     <g key={`${chunk.id}:wordmarks`} clipPath={`url(#${chunkWordmarkClipId(chunk)})`}>
                       {chunkWatermarkTiles(chunk, label, wordmarkFontSize).map((tile) => (
@@ -678,7 +678,7 @@ export default function TheoryAchievementMap({
             />
             {frontierOverlay ? (
               <svg
-                aria-label="Theory Seed Atlas frontier diagnostics"
+                aria-label={tx("Theory Seed Atlas frontier diagnostics")}
                 className="pointer-events-none absolute inset-0"
                 data-testid="theory-seed-atlas-overlay"
                 data-overall-fit-class={frontierOverlay.diagnostics.overallFitClass}
@@ -741,11 +741,11 @@ export default function TheoryAchievementMap({
                       >
                         <title>
                           {[
-                            fitClassLabel(region.fitClass),
-                            `fit ${region.certainty.toFixed(2)}`,
-                            `congruence ${region.localCongruence.toFixed(2)}`,
-                            `evidence ${region.evidenceReadiness.toFixed(2)}`,
-                            ...region.missingStructureHints.slice(0, 3),
+                            tx(fitClassLabel(region.fitClass)),
+                            `${tx("fit")} ${region.certainty.toFixed(2)}`,
+                            `${tx("congruence")} ${region.localCongruence.toFixed(2)}`,
+                            `${tx("evidence")} ${region.evidenceReadiness.toFixed(2)}`,
+                            ...region.missingStructureHints.slice(0, 3).map((hint: string) => tx(hint)),
                           ].join(" | ")}
                         </title>
                         <ellipse
@@ -793,7 +793,7 @@ export default function TheoryAchievementMap({
                           fontWeight={800}
                           letterSpacing={0}
                         >
-                          {fitClassLabel(region.fitClass)}
+                          {tx(fitClassLabel(region.fitClass))}
                         </text>
                       </g>
                     ))}
@@ -827,8 +827,8 @@ export default function TheoryAchievementMap({
                       >
                         <title>
                           {[
-                            path.relation,
-                            path.transformKind,
+                            tx(path.relation),
+                            tx(path.transformKind),
                             `${path.fromBadgeId} -> ${path.toBadgeId}`,
                           ].join(" | ")}
                         </title>
@@ -842,8 +842,8 @@ export default function TheoryAchievementMap({
                   fontWeight={700}
                   letterSpacing={0}
                 >
-                  Seed Atlas / {fitClassLabel(frontierOverlay.diagnostics.overallFitClass)} / candidates{" "}
-                  {frontierOverlay.candidateRegions.length} / evidence refs{" "}
+                  {tx("Seed Atlas")} / {tx(fitClassLabel(frontierOverlay.diagnostics.overallFitClass))} / {tx("candidates")}{" "}
+                  {frontierOverlay.candidateRegions.length} / {tx("evidence refs")}{" "}
                   {frontierOverlay.replay.evidenceReferenceCount}
                 </text>
                 <text
@@ -873,9 +873,9 @@ export default function TheoryAchievementMap({
                 <g
                   key={region.id}
                   data-testid="discussion-soft-region"
-                  aria-label="Discussion context zone, not proof"
+                  aria-label={tx("Discussion context zone, not proof")}
                 >
-                  <title>Discussion context zone, not proof</title>
+                  <title>{tx("Discussion context zone, not proof")}</title>
                   <ellipse
                     cx={geometry.cx}
                     cy={geometry.cy}
@@ -894,7 +894,7 @@ export default function TheoryAchievementMap({
                     fontWeight={700}
                     letterSpacing={0}
                   >
-                    {region.label}
+                    {tx(region.label)}
                   </text>
                 </g>
               );
@@ -1030,12 +1030,12 @@ export default function TheoryAchievementMap({
       </div>
       <div
         className="pointer-events-auto absolute bottom-4 right-4 z-20 grid gap-2"
-        aria-label="Theory badge graph zoom controls"
+        aria-label={tx("Theory badge graph zoom controls")}
       >
         <button
           type="button"
-          aria-label="Zoom in"
-          title="Zoom in (+)"
+          aria-label={tx("Zoom in")}
+          title={tx("Zoom in (+)")}
           onClick={zoomIn}
           disabled={zoom >= zoomBounds.max - 0.001}
           className="flex h-10 w-10 items-center justify-center border border-zinc-500 bg-zinc-950/90 text-2xl font-semibold leading-none text-zinc-100 shadow-lg transition hover:border-cyan-300 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-45"
@@ -1044,8 +1044,8 @@ export default function TheoryAchievementMap({
         </button>
         <button
           type="button"
-          aria-label="Zoom out"
-          title="Zoom out (-)"
+          aria-label={tx("Zoom out")}
+          title={tx("Zoom out (-)")}
           onClick={zoomOut}
           disabled={zoom <= zoomBounds.min + 0.001}
           className="flex h-10 w-10 items-center justify-center border border-zinc-500 bg-zinc-950/90 text-2xl font-semibold leading-none text-zinc-100 shadow-lg transition hover:border-cyan-300 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-45"

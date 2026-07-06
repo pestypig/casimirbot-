@@ -2,6 +2,11 @@ import { isWorkspaceOsStatusPrompt, workspaceOsStatusReasonCodes } from "../work
 import { detectInternetSearchIntent } from "../internet-search-intent";
 import { detectScholarlyResearchIntent } from "../scholarly-research-intent";
 import {
+  SHARED_INTERFACE_LANGUAGE_CODES,
+  type SharedInterfaceLanguageCode,
+} from "@shared/interface-language-codes";
+import {
+  ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY,
   CALCULATOR_SOLVE_ALIAS_CAPABILITIES,
   CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
   CIVILIZATION_BOUNDS_REFLECTION_ALIAS_CAPABILITIES,
@@ -120,6 +125,67 @@ export const cleanNamedCapabilityArgumentText = (value: string | null | undefine
   return cleaned && cleaned.length <= 240 ? cleaned : null;
 };
 
+const interfaceLanguageAliases: Record<SharedInterfaceLanguageCode, readonly string[]> = {
+  en: ["en", "english"],
+  haw: ["haw", "hawaiian", "olelo hawaii", "ʻōlelo hawaiʻi", "olelo hawaiian"],
+  es: ["es", "spanish", "espanol", "español"],
+  fr: ["fr", "french", "francais", "français"],
+  de: ["de", "german", "deutsch"],
+  pt: ["pt", "portuguese", "portugues", "português", "brazilian portuguese"],
+  ja: ["ja", "japanese", "nihongo"],
+  ko: ["ko", "korean", "hanguk"],
+  zh: ["zh", "chinese", "simplified chinese", "mandarin"],
+  ar: ["ar", "arabic"],
+  wo: ["wo", "wolof"],
+};
+
+const normalizeInterfaceLanguageText = (value: string): string =>
+  value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[ʻ'`]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+const readInterfaceLanguageCodeFromText = (value: string): SharedInterfaceLanguageCode | null => {
+  const normalized = normalizeInterfaceLanguageText(value);
+  const tokens = new Set(normalized.split(/\s+/).filter(Boolean));
+  for (const code of SHARED_INTERFACE_LANGUAGE_CODES) {
+    if (tokens.has(code)) return code;
+  }
+  for (const code of SHARED_INTERFACE_LANGUAGE_CODES) {
+    for (const alias of interfaceLanguageAliases[code]) {
+      const normalizedAlias = normalizeInterfaceLanguageText(alias);
+      if (normalized === normalizedAlias || normalized.includes(normalizedAlias)) return code;
+    }
+  }
+  return null;
+};
+
+const hasContextualInterfaceLanguageActionMention = (prompt: string): boolean => {
+  const unquoted = unquotePrompt(prompt);
+  return (
+    /\b(?:do\s+not|don't|dont|without|no\s+need\s+to|not\s+asking\s+to|avoid|should\s+not)\b[\s\S]{0,120}\b(?:interface|ui|workstation|account|session)?\s*language\b/i.test(unquoted) ||
+    /\b(?:text|sentence|phrase|quote|screen|page|button|label|ui)\b[\s\S]{0,140}\b(?:says|shows|reads|contains|mentions|labeled|labelled|called|named)\b[\s\S]{0,140}\b(?:interface|ui|workstation|account|session)?\s*language\b/i.test(unquoted) ||
+    /\b(?:future|later|eventually|hypothetically|if|when|after|before|would|could|might)\b[\s\S]{0,160}\b(?:set|switch|change|update|use)\b[\s\S]{0,120}\b(?:interface|ui|workstation|account|session)?\s*language\b/i.test(unquoted)
+  );
+};
+
+const extractInterfaceLanguageActionCode = (prompt: string): SharedInterfaceLanguageCode | null => {
+  if (hasContextualInterfaceLanguageActionMention(prompt)) return null;
+  const unquoted = unquotePrompt(prompt);
+  const hasAffirmativeLanguageAction =
+    /\b(?:set|switch|change|update|use)\b[\s\S]{0,120}\b(?:interface|ui|workstation|account|session)?\s*language\b/i.test(unquoted) ||
+    /\b(?:set|switch|change|update|use)\b[\s\S]{0,120}\b(?:interface|ui|workstation)\b[\s\S]{0,120}\b(?:to|into)\b/i.test(unquoted) ||
+    (
+      hasPromptNamedCapability(prompt, ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY) &&
+      !hasNegatedToolInstruction(prompt, promptNamedCapabilityPattern(ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY))
+    );
+  if (!hasAffirmativeLanguageAction) return null;
+  return readInterfaceLanguageCodeFromText(unquoted);
+};
+
 export const hasContextualTheoryReflectionMention = (prompt: string): boolean => {
   const unquoted = unquotePrompt(prompt);
   return (
@@ -233,6 +299,19 @@ export const buildPromptNamedCapabilityGatewayCallRequests = (
         target_source: "workspace_os",
         target_kind: "workspace_status",
         reason_codes: ["prompt_named_capability"],
+      },
+    });
+  }
+
+  const requestedInterfaceLanguage = extractInterfaceLanguageActionCode(prompt);
+  if (requestedInterfaceLanguage) {
+    addNamedRequest(ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY, "act", {
+      language: requestedInterfaceLanguage,
+      source_target_intent: {
+        target_source: "account_session",
+        target_kind: "interface_language_preference",
+        explicit_cues: ["affirmative_interface_language_action"],
+        preference_key: "interfaceLanguage",
       },
     });
   }
@@ -969,12 +1048,29 @@ export const buildPromptDerivedMoralGraphReflectionGatewayCallRequests = (
 export const extractRepoSearchQueryFromPrompt = (prompt: string): string | null => {
   if (hasNegatedToolInstruction(prompt, /\b(?:repo|repository|code|source|implementation|search)\b/i)) return null;
   const unquoted = unquotePrompt(prompt);
+  const cleanQuery = (value: string | null | undefined): string | null => {
+    const normalized = value
+      ?.replace(/\b(?:the|a|an)\b/gi, " ")
+      .replace(/[.,;:!?)]*$/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    return normalized && normalized.length >= 3 ? normalized : null;
+  };
+  const implementationQuestion = unquoted.match(
+    /\b(?:repo|repository|codebase|source|code|implementation)\b[\s\S]{0,180}\b(?:how\s+does|how\s+is|where\s+is|what\s+does)\s+(?:the\s+)?([A-Za-z][A-Za-z0-9_. -]{2,80}?)(?:\s+(?:work|implemented|defined|handled|locate|match(?:es)?|score(?:s)?))?(?:\s+(?:for|in|on|of)\s+(?:the\s+)?([A-Za-z][A-Za-z0-9_. -]{2,80}))?(?:[?.!]|$)/i,
+  );
+  if (implementationQuestion) {
+    const subject = cleanQuery(implementationQuestion[1]);
+    const context = cleanQuery(implementationQuestion[2]);
+    const query = cleanQuery([context, subject].filter(Boolean).join(" "));
+    if (query) return query;
+  }
   const exact =
     unquoted.match(/\b(?:search|grep|look\s+(?:in|through)|find)\s+(?:the\s+)?(?:repo|repository|codebase|source|code)\s+(?:for|about)\s+([A-Za-z0-9_.:/\\-]{3,80})/i)?.[1] ??
     unquoted.match(/\b(?:repo|repository|codebase|source|code)\s+(?:search|grep)\s+(?:for|about)\s+([A-Za-z0-9_.:/\\-]{3,80})/i)?.[1] ??
     unquoted.match(/\b(?:find|locate)\s+([A-Za-z0-9_.:/\\-]{3,80})\s+in\s+(?:the\s+)?(?:repo|repository|codebase|source|code)\b/i)?.[1] ??
     null;
-  if (exact) return exact.replace(/[.,;:!?)]*$/g, "").trim();
+  if (exact) return cleanQuery(exact);
   if (!/\b(?:repo|repository|codebase|source|implementation|where\s+(?:is|are).+\b(?:implemented|defined|handled))\b/i.test(unquoted)) {
     return null;
   }
@@ -982,11 +1078,33 @@ export const extractRepoSearchQueryFromPrompt = (prompt: string): string | null 
   const normalizedFallback = fallback?.trim() ?? null;
   if (
     normalizedFallback &&
-    /^(?:search|grep|look|find|locate|show|tell|use|check|inspect|scan)$/i.test(normalizedFallback)
+    /^(?:search|grep|look|find|locate|show|tell|use|check|inspect|scan|how|what|where|why|from|code|repo|repository|source|implementation)$/i.test(normalizedFallback)
   ) {
     return null;
   }
   return normalizedFallback;
+};
+
+const buildRepoSearchPromptQueryTerms = (query: string): string[] => {
+  const terms = query
+    .toLowerCase()
+    .split(/[^a-z0-9_.:/-]+/i)
+    .map((term) => term.trim())
+    .filter((term) => term.length >= 3);
+  const normalized = query.toLowerCase();
+  if (/\btheory\b/.test(normalized) && /\bbadge\b/.test(normalized) && /\bgraph\b/.test(normalized) && /\blocator|locate|located|match|reflection\b/.test(normalized)) {
+    terms.unshift(
+      "Theory Badge Graph reflection produced",
+      "theory-context-reflection-tool",
+      "theory-badge-overlap-locator",
+      "runHelixTheoryContextReflectionTool",
+      "reflect_discussion_context",
+      "located_badge_ids",
+      "exact_badge_ids",
+      "likely_badge_ids",
+    );
+  }
+  return Array.from(new Set(terms)).slice(0, 12);
 };
 
 export const hasAffirmativeRepoSearchIntent = (prompt: string): boolean => {
@@ -1058,6 +1176,7 @@ export const buildPromptDerivedRepoSearchGatewayCallRequests = (
   if (hasExplicitScholarlyFullTextNumericChainIntent(prompt)) return [];
   const query = extractRepoSearchQueryFromPrompt(prompt);
   if (!query && !hasAffirmativeRepoSearchIntent(prompt)) return [];
+  const queryTerms = query ? buildRepoSearchPromptQueryTerms(query) : [];
   return [{
     schema: "helix.workstation_gateway.prompt_derived_repo_search_call_request.v1",
     derivation_source: "helix_prompt_derived_repo_search",
@@ -1065,11 +1184,25 @@ export const buildPromptDerivedRepoSearchGatewayCallRequests = (
     mode: "read",
     arguments: {
       ...(query ? { query } : {}),
+      ...(queryTerms.length > 0 ? { query_terms: queryTerms } : {}),
       source_target_intent: {
         source: "helix_prompt_derived_repo_search",
         target_source: "repo_code",
         target_kind: "repo_search",
-        ...(query ? { query } : { blocked_reason: "missing_query" }),
+        ...(query ? {
+          query,
+          query_terms: queryTerms,
+          query_derivation: {
+            schema: "helix.repo_search_query_derivation.v1",
+            source: "prompt_named_tool_request",
+            prompt_snippet: prompt.slice(0, 240),
+            derived_query: query,
+            derived_terms: queryTerms,
+            rejected_terms: ["how"],
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        } : { blocked_reason: "missing_query" }),
       },
     },
   }];
@@ -1120,6 +1253,8 @@ export const buildPromptDerivedScholarlyResearchGatewayCallRequests = (
     arguments: {
       query: intent.normalizedQuery,
       mode: intent.mode,
+      scholarly_intent: intent.scholarlyIntent,
+      planned_scholarly_capability_chain: intent.plannedScholarlyCapabilityChain,
       source_target_intent: {
         source: "helix_prompt_derived_scholarly_research",
         target_source: "scholarly_research",
@@ -1131,6 +1266,9 @@ export const buildPromptDerivedScholarlyResearchGatewayCallRequests = (
         doi: intent.doi,
         arxiv_id: intent.arxivId,
         full_text_requested: intent.fullTextRequested,
+        scholarly_intent: intent.scholarlyIntent,
+        planned_scholarly_capability_chain: intent.plannedScholarlyCapabilityChain,
+        terminal_evidence_requirement: intent.scholarlyIntent.terminal_evidence_requirement,
       },
     },
   }];

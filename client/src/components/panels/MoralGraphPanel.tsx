@@ -18,10 +18,202 @@ import ProbabilityTerrainOverlay from "@/components/graphs/ProbabilityTerrainOve
 import MoralGraphBiomeMap from "@/components/panels/moral-graph/MoralGraphBiomeMap";
 import { buildMoralGraphBiomeScaleViewModel } from "@/lib/moral-graph/biomeScaleViewModel";
 import { buildMoralGraphSelectionTraceViewModel } from "@/lib/moral-graph/selectionTraceViewModel";
+import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
+import { useDynamicTextTranslations } from "@/hooks/useDynamicTextTranslations";
+import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
+import { useInterfaceText } from "@/lib/i18n/interfaceText";
+import type { InterfaceMessageId } from "@/lib/i18n/messages/types";
 
 const MORAL_GRAPH_MAX_ZOOM = 1.35;
 const MORAL_GRAPH_MIN_ZOOM_FLOOR = 0.22;
 const MORAL_GRAPH_ZOOM_STEP = 1.22;
+
+const MORAL_GRAPH_STATIC_UI_TEXT_IDS: Partial<Record<string, InterfaceMessageId>> = {
+  "Flux evidence is not agency evidence; it only supplies possible substrate conditions.": "moralGraph.domain.fluxEvidenceIsNotAgencyEvidence",
+  "It keeps Moral Graph from mistaking physical flux for agency while still preserving the procedural origin of possible action.": "moralGraph.domain.fluxBeforeActionWhyItMatters",
+  "Treat the earliest action-like substrate as matter and energy flow through a non-equilibrium condition.": "moralGraph.domain.fluxBeforeActionPlainMeaning",
+  "Flux Before Action": "moralGraph.domain.fluxBeforeAction",
+  "Objective Bindings": "moralGraph.ui.objectiveBindings",
+  "MoralGraph": "moralGraph.ui.moralgraph",
+  "Subject": "moralGraph.ui.subject",
+  "objective binding": "moralGraph.ui.objectiveBinding",
+  "is assembled from primitive design-language badges.": "moralGraph.ui.isAssembledFromPrimitiveDesignLanguageBadges",
+  "Objective state": "moralGraph.ui.objectiveState",
+  "Load to Fruition Calculator": "moralGraph.ui.loadToFruitionCalculator",
+  "Bindings": "moralGraph.ui.bindings",
+  "primitive to subject": "moralGraph.ui.primitiveToSubject",
+  "Activated lenses": "moralGraph.ui.activatedLenses",
+  "prompt state": "moralGraph.ui.promptState",
+  "Badge procedure": "moralGraph.ui.badgeProcedure",
+  "Safeguards": "moralGraph.ui.safeguards",
+  "gate edges": "moralGraph.ui.gateEdges",
+  "Possible tensions": "moralGraph.ui.possibleTensions",
+  "zone": "moralGraph.ui.zone",
+  "Claim boundaries": "moralGraph.ui.claimBoundaries",
+  "diagnostic only": "moralGraph.ui.diagnosticOnly",
+  "Procedural trace": "moralGraph.ui.proceduralTrace",
+  "Authority boundary": "moralGraph.ui.authorityBoundary",
+  "evidence only": "moralGraph.ui.evidenceOnly",
+  "Admission state:": "moralGraph.ui.admissionState",
+  "auto /": "moralGraph.ui.auto",
+  "ask user /": "moralGraph.ui.askUser",
+  "blocked": "moralGraph.ui.blocked",
+  "Evidence refs:": "moralGraph.ui.evidenceRefs",
+  "Recommended next step:": "moralGraph.ui.recommendedNextStep",
+  "/ Display policy:": "moralGraph.ui.displayPolicy",
+  "Ask user": "moralGraph.ui.askUser2",
+  "Blocked": "moralGraph.ui.blocked2",
+  "Evidence only": "moralGraph.ui.evidenceOnly2",
+  "character.": "moralGraph.ui.character",
+  "weights activated badges =>": "moralGraph.ui.weightsActivatedBadges",
+  "No character preset comparison is attached to this graph view.": "moralGraph.ui.noCharacterPresetComparisonIsAttachedToThisGraphView",
+  "Current answer": "moralGraph.ui.currentAnswer",
+  "Final answer block": "moralGraph.ui.finalAnswerBlock",
+  "Source": "moralGraph.ui.source",
+  "Route": "moralGraph.ui.route",
+  "Prompt": "moralGraph.ui.prompt",
+  "Activated nodes": "moralGraph.ui.activatedNodes",
+  "Tool trace": "moralGraph.ui.toolTrace",
+  "No structured trace steps were captured for this answer block.": "moralGraph.ui.noStructuredTraceStepsWereCapturedForThisAnswerBlock",
+  "The block is a visualization of the Ask terminal answer and its MoralGraph evidence path.": "moralGraph.ui.theBlockIsAVisualizationOfTheAskTerminalAnswer",
+  "empty": "moralGraph.ui.empty",
+  "No MoralGraph Ask answer has been captured yet. Run a MoralGraph prompt, then copy or open the debug export to publish the current answer block.": "moralGraph.ui.noMoralgraphAskAnswerHasBeenCapturedYetRunA",
+  "MoralGraph objective lenses": "moralGraph.ui.moralgraphObjectiveLenses",
+  "Probability Terrain": "moralGraph.ui.probabilityTerrain",
+  "Placement certainty": "moralGraph.ui.placementCertainty",
+  "H(post)=": "moralGraph.ui.hPost",
+  "bits / gain=": "moralGraph.ui.bitsGain",
+  "bits": "moralGraph.ui.bits",
+  "Moral graph zoom controls": "moralGraph.ui.moralGraphZoomControls",
+  "Zoom out": "moralGraph.ui.zoomOut",
+  "Zoom in": "moralGraph.ui.zoomIn",
+  "Wisdom": "moralGraph.ui.wisdom",
+  "Character": "moralGraph.ui.character2",
+  "Answer": "moralGraph.ui.answer",
+  "Wisdom objective binding lens": "moralGraph.ui.wisdomObjectiveBindingLens",
+  "Character objective binding lens": "moralGraph.ui.characterObjectiveBindingLens",
+  "Current answer binding lens": "moralGraph.ui.currentAnswerBindingLens",
+  "A modeled figure is a subject binding: active badges, constraints, and procedural trace stay together.": "moralGraph.ui.aModeledFigureIsASubjectBindingActiveBadgesConstraints",
+  "The current answer is a read-only block: final draft, tool receipt, activated nodes, and authority boundary stay together.": "moralGraph.ui.theCurrentAnswerIsAReadOnlyBlockFinalDraft",
+  "Wisdom is the subject binding: objective state, constraints, selected badges, and procedural trace stay together.": "moralGraph.ui.wisdomIsTheSubjectBindingObjectiveStateConstraintsSelectedBadges",
+  "No procedure role mapped.": "moralGraph.ui.noProcedureRoleMapped",
+  "No procedural expression mapped.": "moralGraph.ui.noProceduralExpressionMapped",
+  "No preset path is available for the selected badge.": "moralGraph.ui.noPresetPathIsAvailableForTheSelectedBadge",
+  "No deterministic lens badge is active.": "moralGraph.ui.noDeterministicLensBadgeIsActive",
+  "Select a mapped badge to inspect how it contributes to the procedural action.": "moralGraph.ui.selectAMappedBadgeToInspectHowItContributesTo",
+  "No nearby safeguard badge is active.": "moralGraph.ui.noNearbySafeguardBadgeIsActive",
+  "No possible tension zone is flagged.": "moralGraph.ui.noPossibleTensionZoneIsFlagged",
+  "No missing check listed.": "moralGraph.ui.noMissingCheckListed",
+  "Missing check:": "moralGraph.ui.missingCheck",
+  "No outer objective badge selected": "moralGraph.ui.noOuterObjectiveBadgeSelected",
+  "Select a badge to inspect its objective role.": "moralGraph.ui.selectABadgeToInspectItsObjectiveRole",
+  "none": "moralGraph.ui.none",
+  "unknown": "moralGraph.ui.unknown",
+  "diagnostic_only": "moralGraph.ui.diagnosticOnly2",
+  "no character binding": "moralGraph.ui.noCharacterBinding",
+  "No final answer text captured in the debug export.": "moralGraph.ui.noFinalAnswerTextCapturedInTheDebugExport",
+  "No prompt captured.": "moralGraph.ui.noPromptCaptured",
+  "The answer block captured node ids but no display labels.": "moralGraph.ui.theAnswerBlockCapturedNodeIdsButNoDisplayLabels",
+  "tool receipt": "moralGraph.ui.toolReceipt",
+  "nodes": "moralGraph.ui.nodes",
+  "Conditions": "moralGraph.domain.conditions",
+  "Boundary": "moralGraph.domain.boundary",
+  "Sensing": "moralGraph.domain.sensing",
+  "Maintenance": "moralGraph.domain.maintenance",
+  "Action": "moralGraph.domain.action",
+  "Coordination": "moralGraph.domain.coordination",
+  "Mandate": "moralGraph.domain.mandate",
+  "Frontier": "moralGraph.domain.frontier",
+  "Objective": "moralGraph.domain.objective",
+  "Source/sink gradients, flux, compartments, and concentration before organism boundary.": "moralGraph.domain.conditionsSummary",
+  "Living system boundary and entropy exposure before obligation.": "moralGraph.domain.substrateBoundarySummary",
+  "State discrimination before judgment.": "moralGraph.domain.sensingSummary",
+  "Perturbation response and viable-range maintenance.": "moralGraph.domain.maintenanceSummary",
+  "Valence, affordance, actuation, feedback, memory, prediction, and choice before mandate.": "moralGraph.domain.actionSummary",
+  "Single-cell through multicellular and social coordination.": "moralGraph.domain.coordinationSummary",
+  "Late-stage procedural badges, safeguards, and action gates.": "moralGraph.domain.mandateSummary",
+  "Theory bridge context only; never final-answer authority.": "moralGraph.domain.frontierSummary",
+  "Perspective projection through activated badges.": "moralGraph.domain.characterSummary",
+  "Fruition and objective-binding views downstream of trace evidence.": "moralGraph.domain.objectiveSummary",
+  "Missing checks, overclaim blockers, and evidence limits.": "moralGraph.domain.claimBoundarySummary",
+  "Molecular": "moralGraph.domain.molecular",
+  "Cellular": "moralGraph.domain.cellular",
+  "Organism": "moralGraph.domain.organism",
+  "Group": "moralGraph.domain.group",
+  "Institution": "moralGraph.domain.institution",
+  "Civilization": "moralGraph.domain.civilization",
+  "pre boundary conditions": "moralGraph.domain.preBoundaryConditions",
+  "substrate boundary": "moralGraph.domain.substrateBoundary",
+  "substrate sensing": "moralGraph.domain.substrateSensing",
+  "maintenance response": "moralGraph.domain.maintenanceResponse",
+  "action selection": "moralGraph.domain.actionSelection",
+  "coordination scale": "moralGraph.domain.coordinationScale",
+  "mandate authority": "moralGraph.domain.mandateAuthority",
+  "frontier mechanism": "moralGraph.domain.frontierMechanism",
+  "character trace": "moralGraph.domain.characterTrace",
+  "objective binding": "moralGraph.ui.objectiveBinding",
+  "claim boundary": "moralGraph.domain.claimBoundary",
+  "fast local": "moralGraph.domain.fastLocal",
+  "regulated": "moralGraph.domain.regulated",
+  "adaptive": "moralGraph.domain.adaptive",
+  "coordinated": "moralGraph.domain.coordinated",
+  "delayed": "moralGraph.domain.delayed",
+  "long horizon": "moralGraph.domain.longHorizon",
+  "substrate": "moralGraph.domain.substrate",
+  "procedural": "moralGraph.domain.procedural",
+  "derived": "moralGraph.domain.derived",
+  "boundary": "moralGraph.domain.boundaryLower",
+  "conditioning": "moralGraph.domain.conditioning",
+  "flux": "moralGraph.domain.flux",
+  "concentrating": "moralGraph.domain.concentrating",
+  "sensing": "moralGraph.domain.sensingLower",
+  "maintaining": "moralGraph.domain.maintaining",
+  "responding": "moralGraph.domain.responding",
+  "valuing": "moralGraph.domain.valuing",
+  "affording": "moralGraph.domain.affording",
+  "actuating": "moralGraph.domain.actuating",
+  "learning": "moralGraph.domain.learning",
+  "remembering": "moralGraph.domain.remembering",
+  "predicting": "moralGraph.domain.predicting",
+  "choosing": "moralGraph.domain.choosing",
+  "communicating": "moralGraph.domain.communicating",
+  "reciprocating": "moralGraph.domain.reciprocating",
+  "coordinating": "moralGraph.domain.coordinating",
+  "mandating": "moralGraph.domain.mandating",
+  "judging": "moralGraph.domain.judging",
+  "blocking": "moralGraph.domain.blocking",
+  "character projection": "moralGraph.domain.characterProjection",
+  "living substrate principle": "moralGraph.domain.livingSubstratePrinciple",
+  "character perspective trace": "moralGraph.domain.characterPerspectiveTrace",
+  "objective binding downstream of evidence": "moralGraph.domain.objectiveBindingDownstreamOfEvidence",
+  "claim boundary or blocked action": "moralGraph.domain.claimBoundaryOrBlockedAction",
+  "recommended action or safeguard": "moralGraph.domain.recommendedActionOrSafeguard",
+  "procedural observation badge": "moralGraph.domain.proceduralObservationBadge",
+  "maintenance or revision badge": "moralGraph.domain.maintenanceOrRevisionBadge",
+  "coordination badge": "moralGraph.domain.coordinationBadge",
+  "procedural moral badge fallback": "moralGraph.domain.proceduralMoralBadgeFallback",
+  "Wisdom First Principles": "moralGraph.domain.wisdomFirstPrinciples",
+  "Objective binding assembled from living-substrate and procedural wisdom badges.": "moralGraph.domain.objectiveBindingAssembledFromLivingSubstrate",
+  "Root principle": "moralGraph.domain.rootPrinciple",
+  "Exact MoralGraph lens match": "moralGraph.domain.exactMoralGraphLensMatch",
+  "Likely MoralGraph lens match": "moralGraph.domain.likelyMoralGraphLensMatch",
+  "Inferred outer-edge lens": "moralGraph.domain.inferredOuterEdgeLens",
+  "Activated trait path": "moralGraph.domain.activatedTraitPath",
+  "Missing check keeps the reflection diagnostic.": "moralGraph.domain.missingCheckKeepsTheReflectionDiagnostic",
+  "Sovereign Ambition Profile": "moralGraph.domain.sovereignAmbitionProfile",
+};
+
+function moralGraphCatalogId(text: string): InterfaceMessageId | undefined {
+  return MORAL_GRAPH_STATIC_UI_TEXT_IDS[text];
+}
+
+function pushMoralGraphDynamicText(target: string[], value: unknown) {
+  if (typeof value !== "string") return;
+  const text = value.trim();
+  if (!text || /^[A-Z0-9_./:-]+$/.test(text)) return;
+  target.push(text);
+}
+
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -262,6 +454,7 @@ function ObjectiveBindingRail({
   selectedNodes,
   onSelectNode,
   onLoadFruition,
+  translateText,
 }: {
   activeLensId: MoralObjectiveLensId;
   reflection: IdeologyContextReflectionV1;
@@ -274,7 +467,9 @@ function ObjectiveBindingRail({
   selectedNodes: MoralGraphNode[];
   onSelectNode: (id: string) => void;
   onLoadFruition: () => void;
+  translateText: (text: string) => string;
 }) {
+  const mg = translateText;
   const activeLensIds = Array.from(new Set([
     ...reflection.matches.exact.map((match) => match.nodeId),
     ...reflection.matches.likely.map((match) => match.nodeId),
@@ -299,8 +494,8 @@ function ObjectiveBindingRail({
   const firstAction = admission.actions[0] ?? null;
   const selectedProcedure = selectedNode?.proceduralRole
     ? `${labelize(selectedNode.proceduralRole)} ${selectedNode.procedureOperator ? `-> ${labelize(selectedNode.procedureOperator)}` : ""}`
-    : "No procedure role mapped.";
-  const selectedProcedureExpression = selectedNode?.proceduralExpression ?? "No procedural expression mapped.";
+    : mg("No procedure role mapped.");
+  const selectedProcedureExpression = selectedNode?.proceduralExpression ?? mg("No procedural expression mapped.");
   const combinationOutcome = selectedCombinationOutcome(selectedNodes);
   const combinationExpression = selectedCombinationExpression(selectedNodes);
   const activeLens = MORAL_OBJECTIVE_LENSES.find((lens) => lens.id === activeLensId) ?? MORAL_OBJECTIVE_LENSES[0];
@@ -310,23 +505,23 @@ function ObjectiveBindingRail({
       className="pointer-events-auto absolute bottom-3 left-9 top-3 z-30 flex w-64 shrink-0 flex-col border border-zinc-800 bg-zinc-950/95 text-zinc-100 shadow-2xl"
     >
       <div className="border-b border-zinc-800 p-2.5">
-        <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Objective Bindings</div>
-        <h2 className="mt-0.5 text-base font-semibold leading-tight">MoralGraph {activeLens.label}</h2>
+        <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">{mg("Objective Bindings")}</div>
+        <h2 className="mt-0.5 text-base font-semibold leading-tight">{mg("MoralGraph")} {mg(activeLens.label)}</h2>
         <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-400">
           {activeLensId === "character"
-            ? "A modeled figure is a subject binding: active badges, constraints, and procedural trace stay together."
+            ? mg("A modeled figure is a subject binding: active badges, constraints, and procedural trace stay together.")
             : activeLensId === "answer"
-              ? "The current answer is a read-only block: final draft, tool receipt, activated nodes, and authority boundary stay together."
-              : "Wisdom is the subject binding: objective state, constraints, selected badges, and procedural trace stay together."}
+              ? mg("The current answer is a read-only block: final draft, tool receipt, activated nodes, and authority boundary stay together.")
+              : mg("Wisdom is the subject binding: objective state, constraints, selected badges, and procedural trace stay together.")}
         </p>
       </div>
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
         {activeLensId === "wisdom" ? (
           <>
-            <BindingBox title="Subject" label="objective binding" tone="slate" activeNodeIds={[reflection.graph.rootId]} onSelectNode={onSelectNode}>
-              {labelize(reflection.graph.rootId)} is assembled from primitive design-language badges.
+            <BindingBox title={mg("Subject")} label={mg("objective binding")} tone="slate" activeNodeIds={[reflection.graph.rootId]} onSelectNode={onSelectNode}>
+              {labelize(reflection.graph.rootId)} {mg("is assembled from primitive design-language badges.")}
             </BindingBox>
-            <BindingBox title="Objective state" label={labelize(fruition.result.posture)} tone="violet">
+            <BindingBox title={mg("Objective state")} label={labelize(fruition.result.posture)} tone="violet">
               <div className="space-y-1">
                 <div className="text-[11px] opacity-80">{fruition.result.label}</div>
                 <button
@@ -334,26 +529,26 @@ function ObjectiveBindingRail({
                   onClick={onLoadFruition}
                   className="mt-2 w-full rounded border border-violet-500/70 bg-violet-950/70 px-2 py-1 text-left text-[10px] font-semibold uppercase tracking-wide text-violet-100 hover:border-violet-200"
                 >
-                  Load to Fruition Calculator
+                  {mg("Load to Fruition Calculator")}
                 </button>
               </div>
             </BindingBox>
-            <BindingBox title="Bindings" label="primitive to subject" tone="emerald" activeNodeIds={presetPath} onSelectNode={onSelectNode}>
+            <BindingBox title={mg("Bindings")} label={mg("primitive to subject")} tone="emerald" activeNodeIds={presetPath} onSelectNode={onSelectNode}>
               {presetPath.length > 0
                 ? presetPath.map((nodeId) => labelize(nodeId)).join(" -> ")
-                : "No preset path is available for the selected badge."}
+                : mg("No preset path is available for the selected badge.")}
             </BindingBox>
-            <BindingBox title="Activated lenses" label="prompt state" tone="cyan" activeNodeIds={activeLensIds} onSelectNode={onSelectNode}>
+            <BindingBox title={mg("Activated lenses")} label={mg("prompt state")} tone="cyan" activeNodeIds={activeLensIds} onSelectNode={onSelectNode}>
               {activeLensIds.length > 0
                 ? reflection.matches.inferred_lenses.concat(reflection.matches.exact, reflection.matches.likely).slice(0, 3).map((match) => match.label).join(" / ")
-                : "No deterministic lens badge is active."}
+                : mg("No deterministic lens badge is active.")}
             </BindingBox>
-            <BindingBox title="Badge procedure" label={selectedNode?.proceduralRole ? labelize(selectedNode.proceduralRole) : "unmapped"} tone="cyan">
+            <BindingBox title={mg("Badge procedure")} label={selectedNode?.proceduralRole ? labelize(selectedNode.proceduralRole) : "unmapped"} tone="cyan">
               <div className="space-y-1">
                 <div className="font-mono text-[10px] leading-snug text-cyan-100">{selectedProcedureExpression}</div>
                 <div className="text-[11px] opacity-80">{selectedProcedure}</div>
                 <div className="text-[11px] opacity-80">
-                  {selectedNode?.actionEffect ?? "Select a mapped badge to inspect how it contributes to the procedural action."}
+                  {selectedNode?.actionEffect ?? mg("Select a mapped badge to inspect how it contributes to the procedural action.")}
                 </div>
                 {selectedNode?.evidenceNeeds?.length ? (
                   <div className="text-[11px] opacity-80">Needs: {selectedNode.evidenceNeeds.map(labelize).join(", ")}</div>
@@ -364,36 +559,36 @@ function ObjectiveBindingRail({
               </div>
             </BindingBox>
             <BindingBox
-              title="Safeguards"
-              label="gate edges"
+              title={mg("Safeguards")}
+              label={mg("gate edges")}
               tone="amber"
               activeNodeIds={(reflection.action_gate_warnings ?? []).map((warning) => warning.gateId)}
               onSelectNode={onSelectNode}
             >
               {(reflection.action_gate_warnings ?? []).length > 0
                 ? (reflection.action_gate_warnings ?? []).map((warning) => warning.requiredCheck ?? warning.warning).join(", ")
-                : "No nearby safeguard badge is active."}
+                : mg("No nearby safeguard badge is active.")}
             </BindingBox>
             <div className="grid grid-cols-2 gap-2">
-              <BindingBox title="Possible tensions" label="zone" tone="violet">
+              <BindingBox title={mg("Possible tensions")} label={mg("zone")} tone="violet">
                 {reflection.tensions?.length
                   ? reflection.tensions.map((tension) => tension.description).join(" ")
-                  : "No possible tension zone is flagged."}
+                  : mg("No possible tension zone is flagged.")}
               </BindingBox>
               <BindingBox
-                title="Claim boundaries"
-                label="diagnostic only"
+                title={mg("Claim boundaries")}
+                label={mg("diagnostic only")}
                 tone="rose"
                 activeNodeIds={missingChecks.map((item) => `missing:${item}`)}
                 onSelectNode={onSelectNode}
               >
                 {missingChecks.length > 0
-                  ? missingChecks.map((item) => `Missing check: ${labelize(item)}`).join(" | ")
-                  : "No missing check listed."}
+                  ? missingChecks.map((item) => `${mg("Missing check:")} ${labelize(item)}`).join(" | ")
+                  : mg("No missing check listed.")}
               </BindingBox>
             </div>
             <BindingBox
-              title="Procedural trace"
+              title={mg("Procedural trace")}
               label={`${selectedNodes.length} badge${selectedNodes.length === 1 ? "" : "s"}`}
               tone="emerald"
               activeNodeIds={selectedNodes.map((node) => node.id)}
@@ -405,30 +600,30 @@ function ObjectiveBindingRail({
                 <div className="font-mono text-[10px] leading-snug text-violet-100">{fruition.expression}</div>
               </div>
             </BindingBox>
-            <BindingBox title="Authority boundary" label="evidence only" tone="slate">
+            <BindingBox title={mg("Authority boundary")} label={mg("evidence only")} tone="slate">
               <div className="space-y-1">
                 <div className="text-xs font-semibold">
-                  {selectedNode ? selectedNode.label : "No outer objective badge selected"}
+                  {selectedNode ? selectedNode.label : mg("No outer objective badge selected")}
                 </div>
                 <div className="text-[11px] opacity-80">
-                  {selectedNode?.summary ?? "Select a badge to inspect its objective role."}
+                  {selectedNode?.summary ?? mg("Select a badge to inspect its objective role.")}
                 </div>
                 <div className="text-[11px] opacity-80">
-                  Admission state: {admission.summary.autoCount} auto / {admission.summary.askUserCount} ask user / {admission.summary.blockedCount} blocked
+                  {mg("Admission state:")} {admission.summary.autoCount} {mg("auto /")} {admission.summary.askUserCount} {mg("ask user /")} {admission.summary.blockedCount} {mg("blocked")}
                 </div>
                 <div className="truncate text-[11px] opacity-80">
-                  Evidence refs: {(admission.evidenceRefs ?? []).length > 0 ? admission.evidenceRefs?.join(", ") : "none"}
+                  {mg("Evidence refs:")} {(admission.evidenceRefs ?? []).length > 0 ? admission.evidenceRefs?.join(", ") : mg("none")}
                 </div>
                 <div className="text-[11px] opacity-80">
-                  Recommended next step: {firstAction ? firstAction.label : "none"}
+                  {mg("Recommended next step:")} {firstAction ? firstAction.label : mg("none")}
                 </div>
                 <div className="text-[11px] opacity-80">
-                  Risk: {labelize(firstAction?.risk ?? "unknown")} / Display policy: {labelize(firstAction?.display_policy ?? "diagnostic_only")}
+                  Risk: {labelize(firstAction?.risk ?? mg("unknown"))} {mg("/ Display policy:")} {labelize(firstAction?.display_policy ?? mg("diagnostic_only"))}
                 </div>
                 <div className="flex flex-wrap gap-1 text-[10px]">
-                  {askUserActions.length > 0 ? <span className="rounded border border-amber-600 px-1.5 py-0.5 text-amber-100">Ask user</span> : null}
-                  {blockedActions.length > 0 ? <span className="rounded border border-rose-600 px-1.5 py-0.5 text-rose-100">Blocked</span> : null}
-                  <span className="rounded border border-cyan-700 px-1.5 py-0.5 text-cyan-100">Evidence only</span>
+                  {askUserActions.length > 0 ? <span className="rounded border border-amber-600 px-1.5 py-0.5 text-amber-100">{mg("Ask user")}</span> : null}
+                  {blockedActions.length > 0 ? <span className="rounded border border-rose-600 px-1.5 py-0.5 text-rose-100">{mg("Blocked")}</span> : null}
+                  <span className="rounded border border-cyan-700 px-1.5 py-0.5 text-cyan-100">{mg("Evidence only")}</span>
                 </div>
               </div>
             </BindingBox>
@@ -436,7 +631,7 @@ function ObjectiveBindingRail({
         ) : null}
         {activeLensId === "character" && characterComparison ? (
           <BindingBox
-            title="Subject"
+            title={mg("Subject")}
             label={characterDisplayLabel(characterComparison.characterId)}
             tone="amber"
             activeNodeIds={[
@@ -450,18 +645,18 @@ function ObjectiveBindingRail({
                 {characterDisplayLabel(characterComparison.characterId)}
               </div>
               <div className="rounded border border-amber-500/50 bg-amber-950/40 p-2">
-                <div className="text-[9px] font-semibold uppercase tracking-wide text-amber-200">Objective state</div>
+                <div className="text-[9px] font-semibold uppercase tracking-wide text-amber-200">{mg("Objective state")}</div>
                 <div className="text-[11px] opacity-90">{characterComparison.behavioralHypothesis.likelyChoice}</div>
               </div>
               <div className="rounded border border-amber-500/40 bg-black/20 p-2">
-                <div className="text-[9px] font-semibold uppercase tracking-wide text-amber-200">Bindings</div>
+                <div className="text-[9px] font-semibold uppercase tracking-wide text-amber-200">{mg("Bindings")}</div>
                 <div className="font-mono text-[10px] leading-snug text-amber-100">
-                  character.{proceduralToken(characterComparison.characterId)} weights activated badges =&gt;{" "}
+                  {mg("character.")}{proceduralToken(characterComparison.characterId)} {mg("weights activated badges =>")}{" "}
                   {labelize(characterComparison.predictedPosture)}
                 </div>
                 {characterComparison.matchedRules.slice(0, 3).map((rule) => (
                   <div key={rule.id} className="mt-1 text-[10px] opacity-80">
-                    {labelize(rule.id)} -&gt; {labelize(rule.posture)} ({rule.confidence.toFixed(2)})
+                    {labelize(rule.id)} {"->"} {labelize(rule.posture)} ({rule.confidence.toFixed(2)})
                   </div>
                 ))}
               </div>
@@ -473,7 +668,7 @@ function ObjectiveBindingRail({
                 ))}
               </div>
               <div className="rounded border border-rose-500/40 bg-black/20 p-2">
-                <div className="text-[9px] font-semibold uppercase tracking-wide text-rose-200">Authority boundary</div>
+                <div className="text-[9px] font-semibold uppercase tracking-wide text-rose-200">{mg("Authority boundary")}</div>
                 <div className="text-[11px] opacity-80">
                   Missing: {characterComparison.behavioralHypothesis.missingEvidence.map(labelize).join(", ")}
                 </div>
@@ -482,14 +677,14 @@ function ObjectiveBindingRail({
           </BindingBox>
         ) : null}
         {activeLensId === "character" && !characterComparison ? (
-          <BindingBox title="Subject" label="no character binding" tone="amber">
-            No character preset comparison is attached to this graph view.
+          <BindingBox title={mg("Subject")} label={mg("no character binding")} tone="amber">
+            {mg("No character preset comparison is attached to this graph view.")}
           </BindingBox>
         ) : null}
         {activeLensId === "answer" && currentAnswer ? (
           <>
             <BindingBox
-              title="Current answer"
+              title={mg("Current answer")}
               label={currentAnswer.terminalArtifactKind}
               tone="cyan"
               activeNodeIds={currentAnswer.activatedNodeIds}
@@ -497,43 +692,43 @@ function ObjectiveBindingRail({
             >
               <div className="space-y-2">
                 <div className="rounded border border-cyan-500/50 bg-cyan-950/40 p-2">
-                  <div className="text-[9px] font-semibold uppercase tracking-wide text-cyan-200">Final answer block</div>
+                  <div className="text-[9px] font-semibold uppercase tracking-wide text-cyan-200">{mg("Final answer block")}</div>
                   <div className="mt-1 max-h-28 overflow-y-auto whitespace-pre-wrap pr-1 text-[11px] leading-relaxed text-cyan-50">
-                    {currentAnswer.finalAnswer || "No final answer text captured in the debug export."}
+                    {currentAnswer.finalAnswer || mg("No final answer text captured in the debug export.")}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-[10px]">
                   <div className="rounded border border-cyan-500/35 bg-black/20 p-1.5">
-                    <div className="uppercase tracking-wide text-cyan-200">Source</div>
+                    <div className="uppercase tracking-wide text-cyan-200">{mg("Source")}</div>
                     <div className="mt-0.5 font-mono text-cyan-50">{currentAnswer.finalAnswerSource}</div>
                   </div>
                   <div className="rounded border border-cyan-500/35 bg-black/20 p-1.5">
-                    <div className="uppercase tracking-wide text-cyan-200">Route</div>
+                    <div className="uppercase tracking-wide text-cyan-200">{mg("Route")}</div>
                     <div className="mt-0.5 font-mono text-cyan-50">{currentAnswer.route}</div>
                   </div>
                 </div>
                 <div className="rounded border border-cyan-500/35 bg-black/20 p-2">
-                  <div className="text-[9px] font-semibold uppercase tracking-wide text-cyan-200">Prompt</div>
+                  <div className="text-[9px] font-semibold uppercase tracking-wide text-cyan-200">{mg("Prompt")}</div>
                   <div className="mt-1 max-h-16 overflow-y-auto text-[11px] leading-relaxed opacity-85">
-                    {currentAnswer.prompt || "No prompt captured."}
+                    {currentAnswer.prompt || mg("No prompt captured.")}
                   </div>
                 </div>
               </div>
             </BindingBox>
             <BindingBox
-              title="Activated nodes"
-              label={`${currentAnswer.activatedNodeIds.length} nodes`}
+              title={mg("Activated nodes")}
+              label={`${currentAnswer.activatedNodeIds.length} ${mg("nodes")}`}
               tone="emerald"
               activeNodeIds={currentAnswer.activatedNodeIds}
               onSelectNode={onSelectNode}
             >
               {currentAnswer.activatedLabels.length > 0
                 ? currentAnswer.activatedLabels.slice(0, 6).map(labelize).join(" / ")
-                : "The answer block captured node ids but no display labels."}
+                : mg("The answer block captured node ids but no display labels.")}
             </BindingBox>
             <BindingBox
-              title="Tool trace"
-              label={currentAnswer.toolReceiptRef ?? "tool receipt"}
+              title={mg("Tool trace")}
+              label={currentAnswer.toolReceiptRef ?? mg("tool receipt")}
               tone="violet"
               activeNodeIds={currentAnswer.pathToRoot}
               onSelectNode={onSelectNode}
@@ -547,14 +742,14 @@ function ObjectiveBindingRail({
                     </div>
                   ))
                 ) : (
-                  <div>No structured trace steps were captured for this answer block.</div>
+                  <div>{mg("No structured trace steps were captured for this answer block.")}</div>
                 )}
               </div>
             </BindingBox>
-            <BindingBox title="Authority boundary" label="evidence only" tone={currentAnswer.agentExecutable ? "rose" : "slate"}>
+            <BindingBox title={mg("Authority boundary")} label={mg("evidence only")} tone={currentAnswer.agentExecutable ? "rose" : "slate"}>
               <div className="space-y-1">
                 <div className="text-[11px] opacity-80">
-                  The block is a visualization of the Ask terminal answer and its MoralGraph evidence path.
+                  {mg("The block is a visualization of the Ask terminal answer and its MoralGraph evidence path.")}
                 </div>
                 <div className="font-mono text-[10px]">
                   evidence_only={String(currentAnswer.evidenceOnly)} agent_executable={String(currentAnswer.agentExecutable)}
@@ -567,8 +762,8 @@ function ObjectiveBindingRail({
           </>
         ) : null}
         {activeLensId === "answer" && !currentAnswer ? (
-          <BindingBox title="Current answer" label="empty" tone="cyan">
-            No MoralGraph Ask answer has been captured yet. Run a MoralGraph prompt, then copy or open the debug export to publish the current answer block.
+          <BindingBox title={mg("Current answer")} label={mg("empty")} tone="cyan">
+            {mg("No MoralGraph Ask answer has been captured yet. Run a MoralGraph prompt, then copy or open the debug export to publish the current answer block.")}
           </BindingBox>
         ) : null}
       </div>
@@ -587,6 +782,9 @@ export function MoralGraphPanel({
   locator?: MoralBadgeLocatorV1;
   characterComparison?: CharacterSituationComparisonV1;
 }) {
+  const { userSettings } = useHelixStartSettings();
+  const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const { t } = useInterfaceText(interfaceLanguage.code);
   const scrollportRef = useRef<HTMLDivElement | null>(null);
   const pendingZoomRef = useRef<{ center: { x: number; y: number }; zoom: number } | null>(null);
   const [mapZoom, setMapZoom] = useState(1);
@@ -595,6 +793,57 @@ export function MoralGraphPanel({
   const graph = useMemo(
     () => buildMoralGraphBiomeScaleViewModel({ reflection, admission, fruition, characterComparison }),
     [admission, characterComparison, fruition, reflection],
+  );
+  const dynamicTranslationTexts = useMemo(() => {
+    const texts: string[] = [];
+    for (const lane of graph.biomeLanes) {
+      pushMoralGraphDynamicText(texts, lane.label);
+      pushMoralGraphDynamicText(texts, lane.summary);
+    }
+    for (const lane of graph.scaleLanes) {
+      pushMoralGraphDynamicText(texts, lane.label);
+    }
+    for (const cell of graph.cells) {
+      pushMoralGraphDynamicText(texts, cell.label);
+    }
+    for (const edge of graph.edges) {
+      pushMoralGraphDynamicText(texts, edge.label);
+    }
+    for (const node of graph.nodes) {
+      pushMoralGraphDynamicText(texts, node.label);
+      pushMoralGraphDynamicText(texts, node.summary);
+      pushMoralGraphDynamicText(texts, node.proceduralExpression);
+      pushMoralGraphDynamicText(texts, node.proceduralRole);
+      pushMoralGraphDynamicText(texts, node.procedureOperator);
+      pushMoralGraphDynamicText(texts, node.actionEffect);
+      pushMoralGraphDynamicText(texts, node.actionManifestation.replace(/_/g, " "));
+      pushMoralGraphDynamicText(texts, node.biomeReason);
+      pushMoralGraphDynamicText(texts, node.biome.replace(/_/g, " "));
+      pushMoralGraphDynamicText(texts, node.scaleBand.replace(/_/g, " "));
+      pushMoralGraphDynamicText(texts, node.cadence.replace(/_/g, " "));
+      pushMoralGraphDynamicText(texts, node.maturity.replace(/_/g, " "));
+      for (const tag of node.tags ?? []) pushMoralGraphDynamicText(texts, tag.replace(/[_-]/g, " "));
+      for (const need of node.evidenceNeeds ?? []) pushMoralGraphDynamicText(texts, need);
+      for (const refusal of node.refusesAuthority ?? []) pushMoralGraphDynamicText(texts, refusal);
+    }
+    return texts;
+  }, [graph]);
+  const { translate: translateDynamicText } = useDynamicTextTranslations({
+    locale: interfaceLanguage.bcp47,
+    docPath: "workstation/moral-graph",
+    title: "Moral Graph",
+    texts: dynamicTranslationTexts,
+    enabled: interfaceLanguage.code !== "en",
+  });
+  const mg = useCallback(
+    (text: string) => {
+      const catalogId = moralGraphCatalogId(text);
+      if (!catalogId) return translateDynamicText(text);
+      const catalogText = t(catalogId);
+      if (interfaceLanguage.code !== "en" && catalogText === text) return translateDynamicText(text);
+      return catalogText;
+    },
+    [interfaceLanguage.code, t, translateDynamicText],
   );
   const currentAnswer = useMoralGraphCurrentAnswerStore((store) => store.currentAnswerBlock);
   const loadFruitionExpression = useFruitionCalculatorStore((store) => store.loadExpression);
@@ -752,7 +1001,7 @@ export function MoralGraphPanel({
       <div className="flex min-w-0 flex-1 flex-col bg-zinc-900">
         <div className="relative min-h-0 flex-1 overflow-hidden bg-zinc-900">
           <div
-            aria-label="MoralGraph objective lenses"
+            aria-label={mg("MoralGraph objective lenses")}
             className="absolute bottom-0 left-0 top-0 z-40 flex w-9 shrink-0 flex-col items-center gap-2 border-r border-zinc-950 bg-zinc-950 px-1.5 py-2"
           >
             {MORAL_OBJECTIVE_LENSES.map((lens) => {
@@ -761,8 +1010,8 @@ export function MoralGraphPanel({
                 <button
                   key={lens.id}
                   type="button"
-                  aria-label={lens.title}
-                  title={lens.title}
+                  aria-label={mg(lens.title)}
+                  title={mg(lens.title)}
                   onClick={() => {
                     setActiveObjectiveLensId(lens.id);
                     setObjectiveBindingsOpen((open) => (active ? false : true));
@@ -791,6 +1040,7 @@ export function MoralGraphPanel({
               selectedNodes={selectedNodes}
               onSelectNode={addNodeToSelection}
               onLoadFruition={loadToFruitionCalculator}
+              translateText={mg}
             />
           ) : null}
           <div
@@ -824,6 +1074,7 @@ export function MoralGraphPanel({
                   hoveredNode={hoveredNode}
                   zoom={mapZoom}
                   probabilityByNodeId={probabilityTerrain?.candidateProbabilityById}
+                  translateText={mg}
                   onHoverNode={(id) => setHoveredNodeId(id)}
                   onClearSelection={clearUserSelection}
                   onToggleNode={(id, node) => {
@@ -856,14 +1107,14 @@ export function MoralGraphPanel({
                     data-testid="moral-graph-probability-terrain"
                     className="pointer-events-none absolute right-4 top-4 z-30 max-w-[300px] border border-cyan-400/40 bg-zinc-950/90 p-3 text-xs text-cyan-50 shadow-2xl shadow-cyan-950/30"
                   >
-                    <div className="font-semibold uppercase tracking-[0.12em] text-cyan-200">Probability Terrain</div>
+                    <div className="font-semibold uppercase tracking-[0.12em] text-cyan-200">{mg("Probability Terrain")}</div>
                     <div className="mt-1 text-zinc-300">
-                      Placement certainty {(probabilityTerrain.placementCertainty * 100).toFixed(1)}% /{" "}
+                      {mg("Placement certainty")} {(probabilityTerrain.placementCertainty * 100).toFixed(1)}% /{" "}
                       {labelize(probabilityTerrain.uncertaintyMode)}
                     </div>
                     <div className="mt-1 font-mono text-[10px] text-zinc-400">
-                      H(post)={probabilityTerrain.posteriorEntropyBits.toFixed(3)} bits / gain=
-                      {probabilityTerrain.informationGainBits.toFixed(3)} bits
+                      {mg("H(post)=")}{probabilityTerrain.posteriorEntropyBits.toFixed(3)} {mg("bits / gain=")}
+                      {probabilityTerrain.informationGainBits.toFixed(3)} {mg("bits")}
                     </div>
                     {probabilityTerrain.dominantSemanticChunkId ? (
                       <div className="mt-1 truncate text-[10px] text-zinc-500">
@@ -876,13 +1127,13 @@ export function MoralGraphPanel({
             </div>
           </div>
           <div
-            aria-label="Moral graph zoom controls"
+            aria-label={mg("Moral graph zoom controls")}
             className="pointer-events-auto absolute bottom-4 right-4 z-50 flex gap-2"
           >
             <button
               type="button"
-              aria-label="Zoom out"
-              title="Zoom out"
+              aria-label={mg("Zoom out")}
+              title={mg("Zoom out")}
               onClick={zoomOut}
               disabled={mapZoom <= zoomBounds.min + 0.001}
               className="flex h-10 w-10 items-center justify-center border border-zinc-500 bg-zinc-950/90 text-2xl font-semibold leading-none text-zinc-100 shadow-lg transition hover:border-cyan-300 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-45"
@@ -891,8 +1142,8 @@ export function MoralGraphPanel({
             </button>
             <button
               type="button"
-              aria-label="Zoom in"
-              title="Zoom in"
+              aria-label={mg("Zoom in")}
+              title={mg("Zoom in")}
               onClick={zoomIn}
               disabled={mapZoom >= zoomBounds.max - 0.001}
               className="flex h-10 w-10 items-center justify-center border border-zinc-500 bg-zinc-950/90 text-2xl font-semibold leading-none text-zinc-100 shadow-lg transition hover:border-cyan-300 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-45"

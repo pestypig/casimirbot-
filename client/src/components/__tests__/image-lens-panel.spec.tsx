@@ -11,12 +11,24 @@ import { useVisualSourceCaptureStore } from "@/store/useVisualSourceCaptureStore
 
 const initialRegionState = useDocumentImageRegionStore.getState();
 const initialVisualState = useVisualSourceCaptureStore.getState();
-const TEST_IMAGE_URL = "data:image/png;base64,iVBORw0KGgo=";
+const TEST_IMAGE_DATA_URL = "data:image/png;base64,iVBORw0KGgo=";
+const TEST_IMAGE_FILE = new File(["test-image"], "test-image.png", { type: "image/png" });
+
+function loadLocalImage() {
+  const input = document.querySelector('input[type="file"]') as HTMLInputElement | null;
+  expect(input).toBeTruthy();
+  fireEvent.change(input!, { target: { files: [TEST_IMAGE_FILE] } });
+}
 
 beforeEach(() => {
   useDocumentImageRegionStore.setState(initialRegionState, true);
   useVisualSourceCaptureStore.setState(initialVisualState, true);
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+  Object.defineProperty(URL, "createObjectURL", {
+    configurable: true,
+    writable: true,
+    value: vi.fn(() => TEST_IMAGE_DATA_URL),
+  });
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.includes("/api/agi/situation/visual-frame/latest")) {
@@ -74,6 +86,8 @@ describe("ImageLensPanel", () => {
 
     expect(screen.getByText("Image Lens")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Choose image file" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Image URL")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /load url/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /open live answer/i })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("LaTeX candidate")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("x")).not.toBeInTheDocument();
@@ -87,8 +101,7 @@ describe("ImageLensPanel", () => {
       render(<ImageLensPanel />);
       expect(screen.queryByRole("button", { name: /open live answer/i })).not.toBeInTheDocument();
 
-      fireEvent.change(screen.getByLabelText("Image URL"), { target: { value: TEST_IMAGE_URL } });
-      fireEvent.click(screen.getByRole("button", { name: /load url/i }));
+      loadLocalImage();
       const image = await screen.findByAltText("Image source");
       Object.defineProperty(image, "naturalWidth", { value: 200, configurable: true });
       Object.defineProperty(image, "naturalHeight", { value: 100, configurable: true });
@@ -113,8 +126,7 @@ describe("ImageLensPanel", () => {
     try {
       render(<ImageLensPanel />);
 
-      fireEvent.change(screen.getByLabelText("Image URL"), { target: { value: TEST_IMAGE_URL } });
-      fireEvent.click(screen.getByRole("button", { name: /load url/i }));
+      loadLocalImage();
 
       const image = await screen.findByAltText("Image source");
       Object.defineProperty(image, "naturalWidth", { value: 200, configurable: true });

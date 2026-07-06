@@ -24,6 +24,7 @@ import {
   type DocManifestEntry,
 } from "@/lib/docs/docManifest";
 import {
+  DOCUMENT_MARKDOWN_TRANSLATION_CONTRACT_VERSION,
   documentMarkdownSourceId,
   enqueueDocumentMarkdownTranslationMail,
   extractDocumentMarkdownTranslationsFromRuns,
@@ -101,6 +102,7 @@ import {
 import {
   HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
   HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_HOVER,
+  HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_SELECTION,
 } from "@shared/helix-live-translation-projection-target";
 
 type Translate = InterfaceTextResolver["t"];
@@ -114,8 +116,8 @@ type DocBadge = {
   tone: DocBadgeTone;
 };
 
-const DOC_INLINE_TRANSLATION_SESSION_PREFIX = "casimir.docs.inlineTranslation.v1";
-const DOC_TRANSLATION_MAX_UNITS_PER_CHUNK = 3;
+const DOC_INLINE_TRANSLATION_SESSION_PREFIX = "casimir.docs.inlineTranslation.v2";
+const DOC_TRANSLATION_MAX_UNITS_PER_CHUNK = 1;
 const DOC_TRANSLATION_MAX_CHARS_PER_CHUNK = 2200;
 const DOC_TRANSLATION_SCAN_DEBOUNCE_MS = 360;
 const DOC_VIEWER_TITLE_TRANSLATION_SOURCE_ID = "workstation-shell#docs-viewer:title";
@@ -492,10 +494,13 @@ export function DocViewerPanel() {
     hoverRef: string;
     bbox: HelixVisibleTranslationRegionBbox | null;
   } | null>(null);
+  const [translationReticleViewportTick, setTranslationReticleViewportTick] = React.useState(0);
   const rememberPanelScroll = useWorkstationSessionMemoryStore((state) => state.rememberPanelScroll);
   const readPanelScroll = useWorkstationSessionMemoryStore((state) => state.readPanelScroll);
   const contentRef = React.useRef<HTMLDivElement | null>(null);
   const activeReadTargetRef = React.useRef<HTMLElement | null>(null);
+  const activeInlineTranslationReticleTargetRef = React.useRef<HTMLElement | null>(null);
+  const translationReticleRefreshFrameRef = React.useRef<number | null>(null);
   const modeRef = React.useRef(mode);
   const followLiveReadRef = React.useRef(followLiveRead);
   const liveReadChunkRef = React.useRef<string | null>(null);
@@ -1104,6 +1109,70 @@ export function DocViewerPanel() {
     rawMarkdownSourceHash,
   ]);
 
+  const scheduleInlineTranslationReticleRefresh = React.useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (translationReticleRefreshFrameRef.current !== null) return;
+    translationReticleRefreshFrameRef.current = window.requestAnimationFrame(() => {
+      translationReticleRefreshFrameRef.current = null;
+      setTranslationReticleViewportTick((tick) => tick + 1);
+    });
+  }, []);
+
+  React.useEffect(() => {
+    return () => {
+      if (translationReticleRefreshFrameRef.current !== null && typeof window !== "undefined") {
+        window.cancelAnimationFrame(translationReticleRefreshFrameRef.current);
+      }
+      translationReticleRefreshFrameRef.current = null;
+    };
+  }, []);
+
+  React.useLayoutEffect(() => {
+    const clearTranslationReticle = () => {
+      clearDocTranslationReticleTarget(activeInlineTranslationReticleTargetRef.current);
+      activeInlineTranslationReticleTargetRef.current = null;
+    };
+    if (!inlineTranslationEnabled || mode !== "doc" || !rawMarkdownSourceHash) {
+      clearTranslationReticle();
+      return;
+    }
+    const container = contentRef.current;
+    if (!container) {
+      clearTranslationReticle();
+      return;
+    }
+    const reticleTarget = findActiveInlineTranslationReticleTarget({
+      container,
+      units: translationUnits,
+      translations: inlineTranslations,
+      inFlightIds: inFlightTranslationUnitIdsRef.current,
+      sourceHash: rawMarkdownSourceHash,
+      sourceIdentityKey: activeLiveTranslationSourceIdentityKey,
+      maxUnits: DOC_TRANSLATION_MAX_UNITS_PER_CHUNK,
+      maxChars: DOC_TRANSLATION_MAX_CHARS_PER_CHUNK,
+    });
+    if (!reticleTarget) {
+      clearTranslationReticle();
+      return;
+    }
+    if (activeInlineTranslationReticleTargetRef.current !== reticleTarget.element) {
+      clearDocTranslationReticleTarget(activeInlineTranslationReticleTargetRef.current);
+    }
+    reticleTarget.element.classList.add(DOC_AUTO_READ_ACTIVE_CLASS);
+    reticleTarget.element.setAttribute("data-doc-translation-reticle", reticleTarget.status);
+    reticleTarget.element.setAttribute("data-doc-translation-reticle-unit-id", reticleTarget.unitId);
+    activeInlineTranslationReticleTargetRef.current = reticleTarget.element;
+  }, [
+    activeHtml,
+    activeLiveTranslationSourceIdentityKey,
+    inlineTranslationEnabled,
+    inlineTranslations,
+    mode,
+    rawMarkdownSourceHash,
+    translationReticleViewportTick,
+    translationUnits,
+  ]);
+
   React.useEffect(() => {
     if (!liveTranslationProjectionEligible) return;
     if (liveTranslationProjectionSnapshot.version <= 0) return;
@@ -1287,6 +1356,8 @@ export function DocViewerPanel() {
       sourceHash: rawMarkdownSourceHash,
       sourceTextHash: hashDocumentSource(sourceText),
       sourceTextCharCount: sourceText.length,
+      sourceIdentityKey: activeLiveTranslationSourceIdentityKey,
+      latestSourceIdentityKey: activeLiveTranslationSourceIdentityKey,
       chunkId,
       chunkIndex,
       laneSessionId,
@@ -1374,7 +1445,7 @@ export function DocViewerPanel() {
     translationUnits,
   ]);
 
-  const applyCompletedDocumentMicroDeckTranslations = React.useCallback(async (signal?: AbortSignal) => {
+  const applyCompletedDocumentMicroDeckTranslations = React.useCallback(async (signal?: AbortSignal): Promise<boolean> => {
     if (
       !inlineTranslationEnabled ||
       !translationEligible ||
@@ -1382,7 +1453,7 @@ export function DocViewerPanel() {
       !activeTranslationScopeKey ||
       !rawMarkdownSourceHash
     ) {
-      return;
+      return false;
     }
     const sourceId = documentMarkdownSourceId(currentEntry.relativePath);
     const runs = await readDocumentMarkdownMicroDeckRuns({
@@ -1394,8 +1465,9 @@ export function DocViewerPanel() {
     const translationByUnitId = new Map(
       extractDocumentMarkdownTranslationsFromRuns(runs).map((entry) => [entry.unitId, entry] as const),
     );
-    if (!translationByUnitId.size) return;
+    if (!translationByUnitId.size) return false;
     const translatableUnitIds = new Set(translationUnits.filter((unit) => unit.translatable).map((unit) => unit.unit_id));
+    let adoptedTranslation = false;
     setInlineTranslations((current) => {
       let changed = false;
       const next = { ...current };
@@ -1403,17 +1475,33 @@ export function DocViewerPanel() {
         if (!translatableUnitIds.has(unitId)) continue;
         if (entry.docPath && entry.docPath !== currentEntry.relativePath) continue;
         if (entry.sourceHash && entry.sourceHash !== rawMarkdownSourceHash) continue;
+        if (entry.accountLocale && entry.accountLocale !== documentTranslationAccountLocale) continue;
+        if (entry.targetLanguage && entry.targetLanguage !== documentTranslationTargetLanguage) continue;
+        if (entry.translationContractVersion !== DOCUMENT_MARKDOWN_TRANSLATION_CONTRACT_VERSION) continue;
+        const hasEntryLanguageBinding = Boolean(entry.accountLocale || entry.targetLanguage);
+        if (
+          !hasEntryLanguageBinding &&
+          entry.sourceIdentityKey &&
+          activeLiveTranslationSourceIdentityKey &&
+          entry.sourceIdentityKey !== activeLiveTranslationSourceIdentityKey
+        ) continue;
+        if (!hasEntryLanguageBinding && !entry.sourceIdentityKey) continue;
         const nextState = documentMarkdownTranslationEntryToInlineRenderState(entry);
         if (sameDocumentInlineTranslationRenderState(next[unitId], nextState)) continue;
         next[unitId] = nextState;
         inFlightTranslationUnitIdsRef.current.delete(unitId);
         changed = true;
       }
+      adoptedTranslation = changed;
       return changed ? next : current;
     });
+    return adoptedTranslation;
   }, [
     activeTranslationScopeKey,
+    activeLiveTranslationSourceIdentityKey,
     currentEntry,
+    documentTranslationAccountLocale,
+    documentTranslationTargetLanguage,
     inlineTranslationEnabled,
     rawMarkdownSourceHash,
     translationEligible,
@@ -1429,7 +1517,10 @@ export function DocViewerPanel() {
       if (polling) return;
       polling = true;
       try {
-        await applyCompletedDocumentMicroDeckTranslations(controller.signal);
+        const adoptedTranslation = await applyCompletedDocumentMicroDeckTranslations(controller.signal);
+        if (adoptedTranslation && !controller.signal.aborted) {
+          window.setTimeout(() => void requestVisibleInlineTranslations(), DOC_TRANSLATION_SCAN_DEBOUNCE_MS);
+        }
       } catch (err) {
         if (!isAbortError(err)) {
           console.warn("Document Markdown translation polling failed", err);
@@ -1448,6 +1539,7 @@ export function DocViewerPanel() {
     applyCompletedDocumentMicroDeckTranslations,
     hasLoadingInlineTranslations,
     inlineTranslationEnabled,
+    requestVisibleInlineTranslations,
   ]);
 
   const scheduleVisibleInlineTranslationScan = React.useCallback(() => {
@@ -1483,9 +1575,15 @@ export function DocViewerPanel() {
         quietMs: 450,
         timeoutMs: 1800,
       });
+      scheduleInlineTranslationReticleRefresh();
       scheduleVisibleInlineTranslationScan();
     },
-    [docScrollMemoryKey, rememberPanelScroll, scheduleVisibleInlineTranslationScan],
+    [
+      docScrollMemoryKey,
+      rememberPanelScroll,
+      scheduleInlineTranslationReticleRefresh,
+      scheduleVisibleInlineTranslationScan,
+    ],
   );
 
   React.useEffect(() => {
@@ -3277,6 +3375,8 @@ function buildPendingDocumentInlineTranslationState(args: {
   sourceHash: string;
   sourceTextHash: string;
   sourceTextCharCount: number;
+  sourceIdentityKey?: string | null;
+  latestSourceIdentityKey?: string | null;
   chunkId: string;
   chunkIndex: number;
   laneSessionId?: string | null;
@@ -3285,6 +3385,7 @@ function buildPendingDocumentInlineTranslationState(args: {
 }): InlineTranslationState {
   const sourceKind = "docs";
   const projectionTarget = HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK;
+  const sourceIdentityKey = args.sourceIdentityKey ?? buildDocumentTranslationSourceIdentityKey(args);
   return {
     status: "loading",
     observationRef: null,
@@ -3305,7 +3406,8 @@ function buildPendingDocumentInlineTranslationState(args: {
     freshnessStatus: "pending",
     terminalAuthorityStatus: "not_terminal_authority",
     sourceId: args.sourceId,
-    sourceIdentityKey: buildDocumentTranslationSourceIdentityKey(args),
+    sourceIdentityKey,
+    latestSourceIdentityKey: args.latestSourceIdentityKey ?? sourceIdentityKey,
     sourceHash: args.sourceHash,
     sourceKind,
     sourceTextHash: args.sourceTextHash,
@@ -3458,6 +3560,71 @@ function collectVisibleTranslationUnitIds(args: {
     if (visibleIds.length >= maxUnits) break;
   }
   return visibleIds;
+}
+
+function findActiveInlineTranslationReticleTarget(args: {
+  container: HTMLDivElement;
+  units: DocumentTranslationUnit[];
+  translations: Record<string, InlineTranslationState>;
+  inFlightIds: Set<string>;
+  sourceHash: string;
+  sourceIdentityKey?: string | null;
+  maxUnits: number;
+  maxChars: number;
+}): { element: HTMLElement; unitId: string; status: "candidate" | "loading" } | null {
+  const markers = Array.from(
+    args.container.querySelectorAll<HTMLElement>("[data-doc-translation-anchor]"),
+  );
+  const containerRect = args.container.getBoundingClientRect();
+  const loadingTargets: Array<{ element: HTMLElement; unitId: string; nearViewport: boolean }> = [];
+  for (const marker of markers) {
+    const unitId = marker.dataset.docTranslationAnchor;
+    if (!unitId || args.translations[unitId]?.status !== "loading") continue;
+    const element = findInlineTranslationSourceElementForAnchor(marker);
+    if (!element) continue;
+    const rect = element.getBoundingClientRect();
+    loadingTargets.push({
+      element,
+      unitId,
+      nearViewport: rect.bottom >= containerRect.top && rect.top <= containerRect.bottom,
+    });
+  }
+  const selectedLoading = loadingTargets.find((target) => target.nearViewport) ?? loadingTargets[0];
+  if (selectedLoading) {
+    return { element: selectedLoading.element, unitId: selectedLoading.unitId, status: "loading" };
+  }
+  const candidateUnitId = collectVisibleTranslationUnitIds({
+    container: args.container,
+    units: args.units,
+    translations: args.translations,
+    inFlightIds: args.inFlightIds,
+    sourceHash: args.sourceHash,
+    sourceIdentityKey: args.sourceIdentityKey,
+    maxUnits: args.maxUnits,
+    maxChars: args.maxChars,
+  })[0];
+  if (!candidateUnitId) return null;
+  const candidateMarker = markers.find((marker) => marker.dataset.docTranslationAnchor === candidateUnitId);
+  const candidateElement = candidateMarker ? findInlineTranslationSourceElementForAnchor(candidateMarker) : null;
+  return candidateElement ? { element: candidateElement, unitId: candidateUnitId, status: "candidate" } : null;
+}
+
+function findInlineTranslationSourceElementForAnchor(anchor: HTMLElement): HTMLElement | null {
+  let element = anchor.previousElementSibling;
+  while (element instanceof HTMLElement) {
+    if (!element.classList.contains("doc-generated-translation")) return element;
+    element = element.previousElementSibling;
+  }
+  return null;
+}
+
+function clearDocTranslationReticleTarget(element: HTMLElement | null): void {
+  if (!element) return;
+  element.removeAttribute("data-doc-translation-reticle");
+  element.removeAttribute("data-doc-translation-reticle-unit-id");
+  if (element.getAttribute("data-doc-read-active") !== "true") {
+    element.classList.remove(DOC_AUTO_READ_ACTIVE_CLASS);
+  }
 }
 
 function collectNearViewportTranslationUnitIds(args: {

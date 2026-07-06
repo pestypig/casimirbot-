@@ -1,5 +1,7 @@
 import {
   formatReadAloudButtonLabel,
+  shouldPauseReadAloudOnButtonPress,
+  shouldResumeReadAloudOnButtonPress,
   shouldStopReadAloudOnButtonPress,
   type ReadAloudPlaybackState,
 } from "@/lib/helix/ask-read-aloud-display";
@@ -71,6 +73,7 @@ export type HelixAskLegacyClickedTurnDebugScope = {
   question?: string | null;
   finalAnswer?: string | null;
   terminalArtifactKind?: string | null;
+  modelPolicyDebugSummary?: string | null;
   activeTurnId?: string | null;
   clientTurnId?: string | null;
 };
@@ -113,7 +116,8 @@ export type HelixAskLegacyTurnControlViewModel = {
   debugCopyTestId?: HelixAskLatestTurnBinding["debugCopyTestId"];
   readAloudTestId?: HelixAskLatestTurnBinding["readAloudTestId"];
   readAloudActive: boolean;
-  readAloudAriaLabel: "Read aloud" | "Stop reading";
+  readAloudState: ReadAloudPlaybackState;
+  readAloudAriaLabel: string;
   readAloudTitle: string;
 };
 
@@ -152,7 +156,11 @@ export function buildHelixAskLegacyTurnControlViewModel(args: {
   readAloudState?: ReadAloudPlaybackState | null;
 }): HelixAskLegacyTurnControlViewModel {
   const readAloudState = args.readAloudState ?? "idle";
-  const readAloudActive = shouldStopReadAloudOnButtonPress(readAloudState);
+  const readAloudActive =
+    shouldStopReadAloudOnButtonPress(readAloudState) ||
+    shouldPauseReadAloudOnButtonPress(readAloudState) ||
+    shouldResumeReadAloudOnButtonPress(readAloudState);
+  const readAloudTitle = formatReadAloudButtonLabel(readAloudState);
   return {
     showDebugCopy: args.showDebugCopy,
     debugCopyDisabled: !args.browserAvailable,
@@ -160,8 +168,9 @@ export function buildHelixAskLegacyTurnControlViewModel(args: {
     debugCopyTestId: args.latestTurnBinding.debugCopyTestId,
     readAloudTestId: args.latestTurnBinding.readAloudTestId,
     readAloudActive,
-    readAloudAriaLabel: readAloudActive ? "Stop reading" : "Read aloud",
-    readAloudTitle: formatReadAloudButtonLabel(readAloudState),
+    readAloudState,
+    readAloudAriaLabel: readAloudTitle,
+    readAloudTitle,
   };
 }
 
@@ -471,7 +480,16 @@ export function extractHelixAskLegacyClickedTurnDebugScope(
   const scopedTerminalArtifactKind = coerceControlText(
     readTurnScopeAttribute("data-turn-control-terminal-artifact-kind", "data-debug-copy-terminal-artifact-kind"),
   ).trim();
-  if (scopedQuestion || scopedFinalAnswer || scopedActiveTurnId || scopedClientTurnId) {
+  const scopedModelPolicyDebugSummary = coerceControlText(
+    readTurnScopeAttribute("data-turn-control-model-policy-debug-summary", "data-debug-copy-model-policy-debug-summary"),
+  ).trim();
+  if (
+    scopedQuestion ||
+    scopedFinalAnswer ||
+    scopedActiveTurnId ||
+    scopedClientTurnId ||
+    scopedModelPolicyDebugSummary
+  ) {
     const ancestorScope = extractHelixAskLegacyClickedTurnDebugScopeFromAncestor(sourceElement);
     const ancestorQuestion = normalizedDebugReplyText(ancestorScope?.question);
     const ancestorFinalAnswer = normalizedDebugReplyText(ancestorScope?.finalAnswer);
@@ -491,6 +509,7 @@ export function extractHelixAskLegacyClickedTurnDebugScope(
       question: scopedQuestion || null,
       finalAnswer: scopedFinalAnswer || null,
       terminalArtifactKind: scopedTerminalArtifactKind || null,
+      modelPolicyDebugSummary: scopedModelPolicyDebugSummary || null,
       activeTurnId: scopedActiveTurnId || null,
       clientTurnId: scopedClientTurnId || null,
     };

@@ -64,6 +64,71 @@ const buildTestProvider = (id: "helix" | "codex"): HelixAgentProvider => ({
 });
 
 describe("explicit workstation gateway derived calls", () => {
+  it("admits affirmative interface-language preference prompts onto the account-session gateway action", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question: "Set the workstation interface language to Hawaiian.",
+      },
+    });
+
+    expect(requests).toEqual([
+      expect.objectContaining({
+        capability_id: "account_session.set_interface_language",
+        mode: "act",
+        arguments: expect.objectContaining({
+          language: "haw",
+          source_target_intent: expect.objectContaining({
+            target_source: "account_session",
+            target_kind: "interface_language_preference",
+            preference_key: "interfaceLanguage",
+          }),
+        }),
+      }),
+    ]);
+  });
+
+  it("admits other supported interface language names from affirmative prompts", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question: "Switch the UI language to Spanish.",
+      },
+    });
+
+    expect(requests).toEqual([
+      expect.objectContaining({
+        capability_id: "account_session.set_interface_language",
+        mode: "act",
+        arguments: expect.objectContaining({
+          language: "es",
+        }),
+      }),
+    ]);
+  });
+
+  it("does not admit contextual, negated, future, or screen-visible interface language mentions", () => {
+    const prompts = [
+      "Do not set the workstation interface language to Hawaiian.",
+      "Before I switch the UI language to Spanish, explain the setting.",
+      "The screen label says set interface language to Hawaiian.",
+      "In the future we might change the account language to French.",
+      "What does account_session.set_interface_language mean?",
+    ];
+
+    for (const question of prompts) {
+      expect(readWorkstationGatewayCallRequestsForTurn({
+        includePlannerDerived: true,
+        body: {
+          agent_runtime: "codex",
+          question,
+        },
+      })).toEqual([]);
+    }
+  });
+
   it("materializes retained current-document context even when another panel is focused", () => {
     const requests = buildActiveDocsContextWorkstationGatewayCallRequests({
       question: "From this current document, summarize the main claim boundary.",
@@ -1257,6 +1322,46 @@ describe("explicit workstation gateway derived calls", () => {
         }),
       ]);
     }
+  });
+
+  it("derives a focused repo query for implementation how-questions", () => {
+    const requests = buildPromptDerivedRepoSearchGatewayCallRequests({
+      agent_runtime: "codex",
+      question: "how tell me from the code repo search, how does the locator work for theory badge graph?",
+    });
+
+    expect(requests).toEqual([
+      expect.objectContaining({
+        capability_id: "repo.search",
+        mode: "read",
+        arguments: expect.objectContaining({
+          query: "theory badge graph locator",
+          query_terms: expect.arrayContaining([
+            "Theory Badge Graph reflection produced",
+            "theory-badge-overlap-locator",
+            "theory-context-reflection-tool",
+            "runHelixTheoryContextReflectionTool",
+            "reflect_discussion_context",
+            "located_badge_ids",
+          ]),
+          source_target_intent: expect.objectContaining({
+            query: "theory badge graph locator",
+            query_derivation: expect.objectContaining({
+              schema: "helix.repo_search_query_derivation.v1",
+              derived_query: "theory badge graph locator",
+              derived_terms: expect.arrayContaining([
+                "theory-badge-overlap-locator",
+                "theory-context-reflection-tool",
+                "runHelixTheoryContextReflectionTool",
+              ]),
+              rejected_terms: ["how"],
+              assistant_answer: false,
+              raw_content_included: false,
+            }),
+          }),
+        }),
+      }),
+    ]);
   });
 
   it("keeps underspecified affirmative repo search as an explicit blocked-capable request", () => {

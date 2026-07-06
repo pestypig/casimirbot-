@@ -188,6 +188,19 @@ const isCompactLiveSourceMailboxHandoff = (promptText: string): boolean =>
     /\bstructured\s+mailbox\s+route\s+metadata\b/i.test(promptText)
   );
 
+const hasAffirmativeVoiceReadAloudCue = (promptText: string): boolean => {
+  const prompt = promptText.trim();
+  if (!prompt) return false;
+  const unquoted = prompt.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
+  if (
+    /\b(?:do\s+not|don't|dont|without|not\s+now|no\s+need\s+to|avoid|stop)\b[\s\S]{0,120}\b(?:read|speak|say|play|narrat|voice)\b/i.test(unquoted) ||
+    /\b(?:later|eventually|hypothetically|would|could|might|if|when|before|after|earlier|previously|historically)\b[\s\S]{0,160}\b(?:read|speak|say|play|narrat|voice)\b/i.test(unquoted)
+  ) {
+    return false;
+  }
+  return /\b(?:read|speak|say|play|narrat(?:e|or)|voice)\b[\s\S]{0,120}\b(?:aloud|out\s*loud|outload|outloud|to\s+me)\b/i.test(unquoted);
+};
+
 export const buildToolUseRestatement = (promptText: string): ToolUseRestatementV1 => {
   const prompt = promptText.trim();
   const compactLiveSourceMailboxHandoff = isCompactLiveSourceMailboxHandoff(prompt);
@@ -201,6 +214,7 @@ export const buildToolUseRestatement = (promptText: string): ToolUseRestatementV
   const quotedOrContextualMentions = extractQuotedOrContextualMentions(prompt);
   const suppressed = compactLiveSourceMailboxHandoff || negativeConstraints.length > 0 || isSuppliedTextOnlyTask(prompt);
   const requiresDocsViewer = !suppressed && hasAffirmativeDocsViewerSearchCue(prompt);
+  const requiresVoiceDelivery = !suppressed && hasAffirmativeVoiceReadAloudCue(prompt);
   const freshnessRequired = !suppressed && (explicitProviderCue || currentWebCue || timeSensitiveCue || currentAffairsCue);
   const currentAffairsRequired = !suppressed && currentAffairsCue;
   const localSourceScope = hasLocalWorkspaceScopeCue(prompt) || hasLocalObservationScopeCue(prompt);
@@ -228,6 +242,7 @@ export const buildToolUseRestatement = (promptText: string): ToolUseRestatementV
     requiredToolFamilies: [
       ...(requiresDocsViewer ? ["docs_viewer" as const] : []),
       ...(requiresInternet ? ["internet_search" as const] : []),
+      ...(requiresVoiceDelivery ? ["voice_delivery" as const] : []),
     ],
     ...(minimumEvidencePlan ? { minimumEvidencePlan } : {}),
     negativeConstraints,

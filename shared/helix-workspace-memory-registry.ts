@@ -7,7 +7,9 @@ export type HelixWorkspaceMemoryArtifactType =
   | "helix_chat_layout"
   | "workstation_layout"
   | "workstation_session_draft"
-  | "workstation_panel_scroll";
+  | "workstation_panel_scroll"
+  | "linked_source"
+  | "remembered_procedure";
 
 export type HelixWorkspaceMemoryOwnerScope =
   | "browser_guest"

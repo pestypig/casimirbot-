@@ -43,6 +43,56 @@ const buildLanePacket = () => ({
   raw_content_included: false,
 });
 
+const buildPendingTextToSpeechPacket = () => ({
+  schema: HELIX_AGENT_STEP_OBSERVATION_PACKET_SCHEMA,
+  turn_id: "turn-voice-authority",
+  iteration: 0,
+  call_id: "turn-voice-authority:capability_lane:text_to_speech.speak_text:call",
+  decision_id: "turn-voice-authority:capability_lane:text_to_speech.speak_text:decision",
+  capability_key: "text_to_speech.speak_text",
+  panel_id: "capability_lane",
+  action: "speak_text",
+  status: "client_pending" as const,
+  produced_artifact_refs: ["ask:lane:voice:pending-handoff"],
+  observation_summary: "Text-to-speech request accepted; browser playback receipt is pending.",
+  receipts: [
+    {
+      receipt_ref: "ask:lane:voice:pending-handoff",
+      kind: "text_to_speech_handoff",
+      status: "awaiting_client_playback",
+    },
+  ],
+  missing_requirements: [],
+  state_delta: {
+    text_to_speech_receipt: {
+      schema: "helix.text_to_speech.receipt.v1",
+      playback_status: "awaiting_client_playback",
+      provider_status: "accepted",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    },
+  },
+  suggested_next_steps: [],
+  produced_affordances: [],
+  consumed_affordances: [],
+  typed_handoff_contract: {
+    schema: "helix.workstation_typed_handoff_contract.v1",
+    producer_capability: "text_to_speech.speak_text",
+    consumer_capability: null,
+    required_affordance_kinds: [],
+    produced_affordance_kinds: ["voice_playback_receipt"],
+    missing_affordance_kinds: [],
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  },
+  terminal_eligible: false,
+  post_tool_model_step_required: true,
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
 const buildScholarlyNumericObservationResult = () => ({
   schema: "helix.workstation_tool_gateway.call_result.v1",
   manifest_version: "test",
@@ -402,7 +452,71 @@ describe("provider terminal authority for capability lanes", () => {
     });
   });
 
-  it("allows Codex terminal candidates after scholarly numeric missing-variable observations re-enter reasoning", () => {
+  it("allows pending text-to-speech handoff terminal text that does not claim playback completion", () => {
+    const packet = buildPendingTextToSpeechPacket();
+    const result = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId: "turn-voice-authority",
+      threadId: "thread-voice-authority",
+      route: "/ask/turn",
+      gatewayCallResults: [],
+      capabilityLaneObservationPackets: [packet],
+      normalizedObservationPackets: [packet],
+      providerText: "I sent it to the text-to-speech lane. Playback is pending on the client side.",
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+    });
+
+    expect(result.providerReasoningReentry).toMatchObject({
+      status: "completed",
+      evidence_reentered: true,
+      post_tool_model_step_required: false,
+    });
+    expect(result.terminalAuthorityCandidateReview).toMatchObject({
+      terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+      terminal_authority_granted: true,
+      blockers: [],
+      selected_observation_refs: ["ask:lane:voice:pending-handoff"],
+    });
+    expect(result.terminalAnswerAuthority).toMatchObject({
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      terminal_eligible: true,
+    });
+  });
+
+  it("blocks pending text-to-speech handoff terminal text that claims playback completed", () => {
+    const packet = buildPendingTextToSpeechPacket();
+    const result = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId: "turn-voice-authority-overclaim",
+      threadId: "thread-voice-authority-overclaim",
+      route: "/ask/turn",
+      gatewayCallResults: [],
+      capabilityLaneObservationPackets: [packet],
+      normalizedObservationPackets: [packet],
+      providerText: "The audio played and completed.",
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+    });
+
+    expect(result.providerReasoningReentry).toMatchObject({
+      status: "pending_helix_solver_reentry",
+      evidence_reentered: false,
+      post_tool_model_step_required: true,
+    });
+    expect(result.terminalAuthorityCandidateReview).toMatchObject({
+      terminal_authority_status: "blocked_by_voice_playback_overclaim",
+      terminal_authority_granted: false,
+      blockers: ["voice_playback_completion_not_observed"],
+    });
+    expect(result.terminalAnswerAuthority).toBeNull();
+  });
+
+  it("blocks Codex terminal candidates after scholarly numeric missing-variable recovery observations", () => {
     const gatewayResult = buildScholarlyNumericObservationResult();
     const result = buildHelixProviderReasoningReentry({
       runtime: "codex",
@@ -425,9 +539,9 @@ describe("provider terminal authority for capability lanes", () => {
       assistant_answer: false,
     });
     expect(result.providerReasoningReentry).toMatchObject({
-      status: "completed",
-      evidence_reentered: true,
-      post_tool_model_step_required: false,
+      status: "pending_helix_solver_reentry",
+      evidence_reentered: false,
+      post_tool_model_step_required: true,
       terminal_eligible: false,
       assistant_answer: false,
     });
@@ -439,23 +553,18 @@ describe("provider terminal authority for capability lanes", () => {
       },
     });
     expect(result.terminalAuthorityCandidateReview).toMatchObject({
-      terminal_authority_granted: true,
-      blockers: [],
-      selected_observation_refs: ["ask:scholarly:numeric:missing-vars"],
+      terminal_authority_granted: false,
+      blockers: expect.arrayContaining(["gateway_observation_missing_or_failed"]),
     });
     expect(result.providerTerminalAuthorityBridge).toMatchObject({
-      all_gateway_calls_succeeded: true,
-      terminal_authority_granted: true,
-      final_answer_source: "agent_provider_terminal_candidate",
-      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      terminal_authority_granted: false,
+      final_answer_source: null,
+      terminal_artifact_kind: null,
     });
-    expect(result.terminalAnswerAuthority).toMatchObject({
-      terminal_artifact_kind: "agent_provider_terminal_candidate",
-      server_authoritative: true,
-    });
+    expect(result.terminalAnswerAuthority).toBeNull();
   });
 
-  it("allows Codex terminal candidates after scholarly full-text recovery evidence re-enters reasoning", () => {
+  it("blocks Codex terminal candidates after scholarly full-text recovery observations", () => {
     const gatewayResult = buildScholarlyFullTextRecoveryResult();
     const result = buildHelixProviderReasoningReentry({
       runtime: "codex",
@@ -472,20 +581,19 @@ describe("provider terminal authority for capability lanes", () => {
     });
 
     expect(result.providerReasoningReentry).toMatchObject({
-      status: "completed",
-      evidence_reentered: true,
-      post_tool_model_step_required: false,
+      status: "pending_helix_solver_reentry",
+      evidence_reentered: false,
+      post_tool_model_step_required: true,
     });
     expect(result.terminalAuthorityCandidateReview).toMatchObject({
-      terminal_authority_granted: true,
-      blockers: [],
-      selected_observation_refs: ["ask:scholarly:full-text:recovery"],
+      terminal_authority_granted: false,
+      blockers: expect.arrayContaining(["gateway_observation_missing_or_failed"]),
     });
     expect(result.providerTerminalAuthorityBridge).toMatchObject({
-      all_gateway_calls_succeeded: true,
-      terminal_authority_granted: true,
-      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_authority_granted: false,
+      final_answer_source: null,
     });
+    expect(result.terminalAnswerAuthority).toBeNull();
   });
 
   it("allows Codex terminal candidates after calculator expression blocks re-enter reasoning", () => {

@@ -91,6 +91,10 @@ import {
   type ScientificEvidencePacketV1,
   type ScientificImageEvidenceSidecarV1,
 } from "@shared/scientific-evidence-adaptor";
+import {
+  SHARED_INTERFACE_LANGUAGE_CODES,
+  type SharedInterfaceLanguageCode,
+} from "@shared/interface-language-codes";
 import { runHelixAskCivilizationBoundsTool } from "../../../skills/helix-ask.civilization-bounds-roadmap";
 import type {
   HelixWorkstationGatewayAdmissionRecord,
@@ -139,6 +143,7 @@ const CALCULATOR_FOCUS_PANEL_CAPABILITY = "scientific-calculator.focus_panel" as
 const CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY = "scientific-calculator.show_gateway_solve" as const;
 const WORKSTATION_OPEN_PANEL_CAPABILITY = "workstation.open_panel" as const;
 const WORKSTATION_FOCUS_PANEL_CAPABILITY = "workstation.focus_panel" as const;
+const ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY = "account_session.set_interface_language" as const;
 const WORKSTATION_UI_ACTION_RECEIPT_SCHEMA = "helix.workstation_ui_action_receipt.v1" as const;
 const REPO_SEARCH_CAPABILITY = "repo.search" as const;
 const REPO_SEARCH_OBSERVATION_SCHEMA = "helix.repo_search_observation.v1" as const;
@@ -375,6 +380,7 @@ const manifestProducesAffordances = (capabilityId: string): HelixWorkstationType
     capabilityId === CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY ||
     capabilityId === WORKSTATION_OPEN_PANEL_CAPABILITY ||
     capabilityId === WORKSTATION_FOCUS_PANEL_CAPABILITY ||
+    capabilityId === ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY ||
     capabilityId === DOCS_OPEN_DOC_CAPABILITY
   ) {
     return ["ui_projection_receipt", "source_ref"];
@@ -478,6 +484,14 @@ const readBoolean = (value: unknown, fallback = false): boolean => {
 const readFiniteNumber = (value: unknown): number | null => {
   const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
   return Number.isFinite(parsed) ? parsed : null;
+};
+
+const readInterfaceLanguageCode = (value: unknown): SharedInterfaceLanguageCode | null => {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase().replace("_", "-").split("-")[0];
+  return (SHARED_INTERFACE_LANGUAGE_CODES as readonly string[]).includes(normalized)
+    ? (normalized as SharedInterfaceLanguageCode)
+    : null;
 };
 
 const readCivilizationLayerMode = (value: unknown): CivilizationLayerModeV1 | undefined => {
@@ -1754,8 +1768,267 @@ const readCompoundReadAloudResolvedDocsPath = (
 const clipRepoSearchHit = (hit: RepoSearchHit): RepoSearchHit => ({
   ...hit,
   filePath: hit.filePath.replace(/\\/g, "/"),
-  text: hit.text.length > 180 ? `${hit.text.slice(0, 177)}...` : hit.text,
+  text: hit.text.length > 1200 ? `${hit.text.slice(0, 1197)}...` : hit.text,
 });
+
+const REPO_SEARCH_QUERY_STOPWORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "are",
+  "code",
+  "does",
+  "for",
+  "from",
+  "how",
+  "implementation",
+  "in",
+  "is",
+  "it",
+  "of",
+  "repo",
+  "repository",
+  "search",
+  "source",
+  "tell",
+  "the",
+  "this",
+  "what",
+  "where",
+  "why",
+  "work",
+]);
+
+const repoSearchQueryTokens = (query: string): string[] =>
+  Array.from(
+    new Set(
+      query
+        .toLowerCase()
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
+        .split(/[^a-z0-9_.:/-]+/i)
+        .map((token) => token.trim().replace(/^[._:/-]+|[._:/-]+$/g, ""))
+        .filter((token) => token.length >= 3 && !REPO_SEARCH_QUERY_STOPWORDS.has(token)),
+    ),
+  ).slice(0, 12);
+
+const repoSearchHasCodeIdentifierSignal = (query: string): boolean =>
+  /[._:/-]/.test(query) || /[a-z][A-Z]/.test(query);
+
+const buildRepoSearchQueryQuality = (query: string): {
+  schema: "helix.repo_search_query_quality.v1";
+  status: "accepted" | "blocked";
+  code: string | null;
+  query: string;
+  meaningful_terms: string[];
+  score: number;
+  repair_queries: string[];
+  assistant_answer: false;
+  raw_content_included: false;
+} => {
+  const meaningfulTerms = repoSearchQueryTokens(query);
+  const hasCodeSignal = repoSearchHasCodeIdentifierSignal(query);
+  const accepted = meaningfulTerms.length >= 2 || (meaningfulTerms.length === 1 && hasCodeSignal);
+  const score = Math.min(1, (meaningfulTerms.length / 4) + (hasCodeSignal ? 0.35 : 0));
+  return {
+    schema: "helix.repo_search_query_quality.v1",
+    status: accepted ? "accepted" : "blocked",
+    code: accepted ? null : "query_too_broad",
+    query,
+    meaningful_terms: meaningfulTerms,
+    score,
+    repair_queries: accepted ? [] : [],
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+const buildRepoSearchRelevanceGate = (input: {
+  query: string;
+  queryQuality: ReturnType<typeof buildRepoSearchQueryQuality>;
+  hits: RepoSearchHit[];
+  resultError?: string;
+}): {
+  schema: "helix.repo_search_relevance_gate.v1";
+  status: "passed" | "blocked";
+  code: string | null;
+  query: string;
+  query_quality_score: number;
+  meaningful_terms: string[];
+  matched_terms: string[];
+  hit_count: number;
+  relevant_hit_count: number;
+  relevance_score: number;
+  repair_queries: string[];
+  assistant_answer: false;
+  raw_content_included: false;
+} => {
+  const terms = input.queryQuality.meaningful_terms;
+  if (input.resultError) {
+    return {
+      schema: "helix.repo_search_relevance_gate.v1",
+      status: "blocked",
+      code: input.resultError,
+      query: input.query,
+      query_quality_score: input.queryQuality.score,
+      meaningful_terms: terms,
+      matched_terms: [],
+      hit_count: input.hits.length,
+      relevant_hit_count: 0,
+      relevance_score: 0,
+      repair_queries: [],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+  if (input.queryQuality.status === "blocked") {
+    return {
+      schema: "helix.repo_search_relevance_gate.v1",
+      status: "blocked",
+      code: input.queryQuality.code ?? "query_too_broad",
+      query: input.query,
+      query_quality_score: input.queryQuality.score,
+      meaningful_terms: terms,
+      matched_terms: [],
+      hit_count: input.hits.length,
+      relevant_hit_count: 0,
+      relevance_score: 0,
+      repair_queries: input.queryQuality.repair_queries,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+  const matchedTerms = terms.filter((term) =>
+    input.hits.some((hit) =>
+      `${hit.filePath} ${hit.text} ${hit.term}`.toLowerCase().includes(term),
+    ),
+  );
+  const relevantHitCount = input.hits.filter((hit) => {
+    const haystack = `${hit.filePath} ${hit.text} ${hit.term}`.toLowerCase();
+    return terms.some((term) => haystack.includes(term));
+  }).length;
+  const requiredMatches = Math.min(2, Math.max(1, terms.length));
+  const relevanceScore = terms.length > 0 ? matchedTerms.length / terms.length : 0;
+  const passed = input.hits.length > 0 && matchedTerms.length >= requiredMatches;
+  return {
+    schema: "helix.repo_search_relevance_gate.v1",
+    status: passed ? "passed" : "blocked",
+    code: passed ? null : input.hits.length === 0 ? "no_repo_search_hits" : "repo_search_low_relevance",
+    query: input.query,
+    query_quality_score: input.queryQuality.score,
+    meaningful_terms: terms,
+    matched_terms: matchedTerms,
+    hit_count: input.hits.length,
+    relevant_hit_count: relevantHitCount,
+    relevance_score: relevanceScore,
+    repair_queries: passed ? [] : terms.length > 0 ? [terms.join(" ")] : [],
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+const rankRepoSearchHitForQuery = (hit: RepoSearchHit, meaningfulTerms: string[]): number => {
+  const normalizedPath = hit.filePath.replace(/\\/g, "/").toLowerCase();
+  const haystack = `${normalizedPath} ${hit.text} ${hit.term}`.toLowerCase();
+  const matchedTerms = meaningfulTerms.filter((term) => haystack.includes(term));
+  const pathMatchedTerms = meaningfulTerms.filter((term) => normalizedPath.includes(term));
+  const exactPathPhrase = meaningfulTerms.length > 1 && normalizedPath.includes(meaningfulTerms.join("-"));
+  return (
+    matchedTerms.length * 10 +
+    pathMatchedTerms.length * 6 +
+    (exactPathPhrase ? 12 : 0) +
+    (normalizedPath.startsWith("shared/theory/") ? 16 : 0) +
+    (normalizedPath.startsWith("server/services/helix-ask/workstation-tool-gateway/") ? 14 : 0) +
+    (normalizedPath.startsWith("server/services/helix-ask/") ? 10 : 0) +
+    (normalizedPath.startsWith("shared/contracts/") ? -4 : 0) +
+    (/\b(?:shared|server|client|docs)\//.test(normalizedPath) ? 1 : 0)
+  );
+};
+
+const rankRepoSearchHitsForQuery = (
+  hits: RepoSearchHit[],
+  meaningfulTerms: string[],
+): RepoSearchHit[] =>
+  hits
+    .map((hit, index) => ({
+      hit,
+      index,
+      score: rankRepoSearchHitForQuery(hit, meaningfulTerms),
+    }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map((entry) => entry.hit);
+
+const selectRepoSearchHitsForQuery = (
+  rankedHits: RepoSearchHit[],
+  maxHits: number,
+  priorityTerms: string[],
+): RepoSearchHit[] => {
+  const selected: RepoSearchHit[] = [];
+  const selectedKeys = new Set<string>();
+  const addHit = (hit: RepoSearchHit): void => {
+    const key = `${hit.filePath}:${hit.line}:${hit.term}`;
+    if (selectedKeys.has(key) || selected.length >= maxHits) return;
+    selectedKeys.add(key);
+    selected.push(hit);
+  };
+  for (const term of priorityTerms) {
+    const normalizedTerm = term.toLowerCase();
+    const hit = rankedHits.find((candidate) =>
+      candidate.term.toLowerCase() === normalizedTerm ||
+      `${candidate.filePath} ${candidate.text}`.toLowerCase().includes(normalizedTerm),
+    );
+    if (hit) addHit(hit);
+    if (selected.length >= maxHits) return selected;
+  }
+  for (const hit of rankedHits) {
+    addHit(hit);
+    if (selected.length >= maxHits) break;
+  }
+  return selected;
+};
+
+const readRepoSearchTermHints = (value: unknown): string[] =>
+  readArray(value)
+    .map((entry) => cleanString(entry))
+    .filter((entry): entry is string => Boolean(entry))
+    .slice(0, 12);
+
+const repoSearchTheoryBadgeGraphExecutionTerms = (query: string): string[] => {
+  const normalized = query.toLowerCase();
+  const mentionsTheoryBadgeGraph =
+    /\btheory\b/.test(normalized) && /\bbadge\b/.test(normalized) && /\bgraph\b/.test(normalized);
+  const mentionsLocator =
+    /\blocator|locate|located|match|reflection|reflect_discussion_context\b/.test(normalized);
+  if (!mentionsTheoryBadgeGraph || !mentionsLocator) return [];
+  return [
+    "Theory Badge Graph reflection produced",
+    "theory-badge-overlap-locator",
+    "theory-context-reflection-tool",
+    "runHelixTheoryContextReflectionTool",
+    "reflect_discussion_context",
+    "located_badge_ids",
+    "exact_badge_ids",
+    "likely_badge_ids",
+  ];
+};
+
+const buildRepoSearchExecutionTerms = (input: {
+  query: string;
+  queryQuality: ReturnType<typeof buildRepoSearchQueryQuality> | null;
+  termHints: string[];
+}): string[] =>
+  Array.from(new Set([
+    input.query,
+    ...repoSearchTheoryBadgeGraphExecutionTerms(input.query),
+    ...input.termHints,
+    ...(input.queryQuality?.meaningful_terms ?? []).sort((a, b) => b.length - a.length),
+  ])).slice(0, 12);
+
+const buildRepoSearchSupportRefs = (hits: RepoSearchHit[]): string[] =>
+  Array.from(new Set(
+    hits
+      .map((hit) => `${hit.filePath.replace(/\\/g, "/")}:L${hit.line}`)
+      .filter(Boolean),
+  )).slice(0, 24);
 
 const buildAdmission = (input: {
   capabilityId: string;
@@ -1785,6 +2058,7 @@ const buildGatewayTrace = (input: {
   admission: HelixWorkstationGatewayAdmissionRecord;
   observationPacket: HelixAgentStepObservationPacket;
   error?: string;
+  terminalEligible?: boolean;
 }): {
   tool_lifecycle_trace: HelixToolLifecycleTrace;
   tool_followup_decision: HelixToolFollowupDecision;
@@ -1793,6 +2067,7 @@ const buildGatewayTrace = (input: {
   const completed = status === "succeeded";
   const failed = status === "failed";
   const blocked = !failed && (status === "blocked" || input.admission.admission_status === "blocked");
+  const terminalEligible = input.terminalEligible === true && completed;
   const traceRef = `${input.turnId}:workstation_gateway:${input.capabilityId}:tool_lifecycle_trace`;
   const observationRefs = input.observationPacket.produced_artifact_refs;
   const retryRecommendation = blocked
@@ -1800,7 +2075,9 @@ const buildGatewayTrace = (input: {
     : failed
       ? "retry_same_tool"
       : "allow_terminal";
-  const nextAction = blocked
+  const nextAction = terminalEligible
+    ? "terminal_answer"
+    : blocked
     ? "ask_user"
     : failed
       ? "retry"
@@ -1824,7 +2101,7 @@ const buildGatewayTrace = (input: {
     retry_recommendation: retryRecommendation,
     fallback_used: false,
     fallback_equivalent: false,
-    terminal_eligible: false,
+    terminal_eligible: terminalEligible,
     assistant_answer: false,
     raw_content_included: false,
   };
@@ -1834,13 +2111,15 @@ const buildGatewayTrace = (input: {
     prior_tool_trace_ref: traceRef,
     observation_summary: input.observationPacket.observation_summary,
     next_action: nextAction,
-    reason: blocked
+    reason: terminalEligible
+      ? "gateway_receipt_satisfies_control_action"
+      : blocked
       ? input.admission.blocked_reason ?? "gateway_call_blocked"
       : failed
         ? input.error ?? "gateway_call_failed"
         : "gateway_observation_requires_provider_reasoning_reentry",
     external_change_required: false,
-    terminal_blockers: ["post_tool_model_step_required", "terminal_authority_not_evaluated"],
+    terminal_blockers: terminalEligible ? [] : ["post_tool_model_step_required", "terminal_authority_not_evaluated"],
     required_surface_satisfied: completed,
     evidence_reentered: false,
     assistant_answer: false,
@@ -2409,6 +2688,50 @@ const workstationFocusPanelManifest = makeWorkstationPanelActionManifest(
   WORKSTATION_FOCUS_PANEL_CAPABILITY,
   "focus_panel",
 );
+
+const accountSessionSetInterfaceLanguageManifest: HelixWorkstationCapabilityManifest = {
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY,
+  label: "Account Session set interface language",
+  description:
+    "Requests a governed workstation preference action to change the interface language through the Account & Sessions panel. It only writes the browser/workstation language preference.",
+  panel_id: "account-session",
+  action_id: "set_interface_language",
+  mode: "act",
+  mutating: true,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: false,
+  terminal_eligible: true,
+  permission_profile_required: "act",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["language"],
+    properties: {
+      language: { type: "string", enum: [...SHARED_INTERFACE_LANGUAGE_CODES] },
+      interface_language: { type: "string", enum: [...SHARED_INTERFACE_LANGUAGE_CODES] },
+      interfaceLanguage: { type: "string", enum: [...SHARED_INTERFACE_LANGUAGE_CODES] },
+      reason: { type: "string" },
+      source_target_intent: { type: "object" },
+    },
+  },
+  output_observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
+  observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
+  safety_tags: [
+    "mutating_preference_action",
+    "account_session",
+    "interface_language",
+    "workspace_action_receipt",
+    "no_external_transmission",
+    "no_shell",
+    "no_code_mutation",
+  ],
+  assistant_answer: false,
+  raw_content_included: false,
+};
 
 const docsOpenDocManifest: HelixWorkstationCapabilityManifest = {
   schema: "helix.workstation_tool_gateway.capability.v1",
@@ -3457,6 +3780,7 @@ const rawCapabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   [calculatorPrefillExpressionManifest.capability_id, calculatorPrefillExpressionManifest],
   [workstationOpenPanelManifest.capability_id, workstationOpenPanelManifest],
   [workstationFocusPanelManifest.capability_id, workstationFocusPanelManifest],
+  [accountSessionSetInterfaceLanguageManifest.capability_id, accountSessionSetInterfaceLanguageManifest],
   [docsOpenDocManifest.capability_id, docsOpenDocManifest],
   [repoSearchManifest.capability_id, repoSearchManifest],
   [docsSearchManifest.capability_id, docsSearchManifest],
@@ -4763,6 +5087,107 @@ export const callWorkstationGatewayCapability = async (
     };
   }
 
+  if (manifest.capability_id === ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY) {
+    const args = readArguments(input.arguments);
+    const requestedLanguage = args.language ?? args.interface_language ?? args.interfaceLanguage;
+    const language = readInterfaceLanguageCode(requestedLanguage);
+    const hasLanguage = Boolean(language);
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: hasLanguage ? "admitted" : "blocked",
+      reason: hasLanguage ? "mutating_workstation_preference_action" : "unsupported_interface_language",
+      blockedReason: hasLanguage ? undefined : "unsupported_interface_language",
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const workstationAction = hasLanguage
+      ? {
+          schema_version: "helix.workstation.action/v1",
+          action: "run_panel_action",
+          panel_id: "account-session",
+          action_id: "set_interface_language",
+          args: {
+            language,
+          },
+        }
+      : null;
+    const observation = {
+      schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
+      capability_key: manifest.capability_id,
+      action_kind: "run_panel_action",
+      panel_id: "account-session",
+      action_id: "set_interface_language",
+      status: hasLanguage ? "succeeded" : "blocked",
+      dispatch_status: hasLanguage ? "admitted" : "blocked",
+      preference_key: "interfaceLanguage",
+      language,
+      requested_language: typeof requestedLanguage === "string" ? requestedLanguage : null,
+      supported_language_codes: [...SHARED_INTERFACE_LANGUAGE_CODES],
+      workstation_action: workstationAction,
+      terminal_artifact_kind: "workspace_action_receipt",
+      terminal_eligible: hasLanguage,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "account-session",
+      action: "set_interface_language",
+      status: hasLanguage ? "succeeded" : "blocked",
+      summary: hasLanguage
+        ? `Account Session interface language action admitted for ${language}.`
+        : "Account Session interface language action was blocked because the language code is unsupported.",
+      observation,
+      missingRequirements: hasLanguage ? [] : [{
+        code: "unsupported_interface_language",
+        message: "Provide a supported interface language code.",
+        repair_action: "ask_user",
+        rejected_expression: typeof requestedLanguage === "string" ? requestedLanguage : null,
+      }],
+      producedAffordances: buildGatewayProducedAffordances({
+        capabilityId: manifest.capability_id,
+        observation,
+      }),
+      producedAffordanceKinds: manifest.produces_affordances,
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: hasLanguage ? undefined : "unsupported_interface_language",
+      terminalEligible: hasLanguage,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: hasLanguage,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      produced_affordances: buildGatewayProducedAffordances({
+        capabilityId: manifest.capability_id,
+        observation,
+      }),
+      terminal_eligible: hasLanguage,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error: hasLanguage ? undefined : "unsupported_interface_language",
+    };
+  }
+
   if (manifest.capability_id === DOCS_OPEN_DOC_CAPABILITY) {
     const args = readArguments(input.arguments);
     const path = readDocsActionPath(args.path ?? args.doc_path ?? args.target);
@@ -4855,10 +5280,16 @@ export const callWorkstationGatewayCapability = async (
     const query = normalizeRepoSearchQuery(args.query);
     const paths = readRepoSearchPaths(args.paths);
     const maxHits = readRepoSearchMaxHits(args.max_hits ?? args.maxHits);
+    const sourceTargetIntent = readRecord(args.source_target_intent);
+    const queryDerivation = readRecord(sourceTargetIntent?.query_derivation);
+    const termHints = readRepoSearchTermHints(args.query_terms ?? args.terms ?? sourceTargetIntent?.query_terms);
+    const queryQuality = query ? buildRepoSearchQueryQuality(query) : null;
     const blockedReason = !query
       ? "missing_query"
-      : query.length < 3 || !/[a-z0-9_./-]/i.test(query)
-        ? "query_too_broad"
+      : queryQuality?.status === "blocked"
+        ? queryQuality.code ?? "query_too_broad"
+        : query.length < 3 || !/[a-z0-9_./-]/i.test(query)
+          ? "query_too_broad"
         : null;
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
@@ -4871,16 +5302,45 @@ export const callWorkstationGatewayCapability = async (
     });
 
     if (blockedReason) {
+      const blockedRelevanceGate = query && queryQuality
+        ? buildRepoSearchRelevanceGate({
+            query,
+            queryQuality,
+            hits: [],
+            resultError: blockedReason,
+          })
+        : null;
       const observation = {
         schema: REPO_SEARCH_OBSERVATION_SCHEMA,
         capability_key: manifest.capability_id,
         query: query || null,
+        terms: query ? [query] : [],
         paths,
         hits: [],
         hit_count: 0,
+        file_paths: [],
+        evidence_observations: [],
         truncated: false,
         status: "blocked",
         blocked_reason: blockedReason,
+        ...(queryDerivation ? { query_derivation: queryDerivation } : {}),
+        query_quality: queryQuality,
+        repo_relevance_gate: blockedRelevanceGate,
+        evidence_state: "repo_query_blocked",
+        selected_for_answer: false,
+        repair_attempts: [{
+          status: "blocked",
+          reason: blockedReason,
+          repair_queries: blockedRelevanceGate?.repair_queries ?? queryQuality?.repair_queries ?? [],
+        }],
+        support_refs: [],
+        next_affordances: [{
+          capability: manifest.capability_id,
+          reason: blockedReason,
+          ...(query ? { query } : {}),
+          repair_queries: blockedRelevanceGate?.repair_queries ?? queryQuality?.repair_queries ?? [],
+        }],
+        missing_requirements: [blockedReason],
         terminal_eligible: false,
         post_tool_model_step_required: true,
         assistant_answer: false,
@@ -4901,6 +5361,22 @@ export const callWorkstationGatewayCapability = async (
           repair_action: "ask_user",
         }],
       });
+      observationPacket.state_delta = {
+        ...observationPacket.state_delta,
+        ...(queryDerivation ? { query_derivation: queryDerivation } : {}),
+        query_quality: queryQuality,
+        ...(blockedRelevanceGate ? { repo_relevance_gate: blockedRelevanceGate } : {}),
+        evidence_state: observation.evidence_state,
+        selected_for_answer: observation.selected_for_answer,
+        repair_attempts: observation.repair_attempts,
+        support_refs: observation.support_refs,
+        next_affordances: observation.next_affordances,
+      };
+      observationPacket.suggested_next_steps = Array.from(new Set([
+        ...observationPacket.suggested_next_steps,
+        "repair",
+        "ask_user",
+      ]));
       const trace = buildGatewayTrace({
         turnId,
         capabilityId: manifest.capability_id,
@@ -4930,9 +5406,14 @@ export const callWorkstationGatewayCapability = async (
       };
     }
 
+    const searchTerms = buildRepoSearchExecutionTerms({
+      query,
+      queryQuality,
+      termHints,
+    });
     const result = await runRepoSearch({
       rawQuestion: query,
-      terms: [query],
+      terms: searchTerms,
       paths,
       explicit: true,
       reason: "workstation_gateway_repo_search",
@@ -4940,8 +5421,31 @@ export const callWorkstationGatewayCapability = async (
       intentDomain: "repo",
       topicTags: [],
     });
-    const hits = result.hits.slice(0, maxHits).map(clipRepoSearchHit);
+    const rankedHits = rankRepoSearchHitsForQuery(
+      result.hits,
+      searchTerms,
+    );
+    const hits = selectRepoSearchHitsForQuery(rankedHits, maxHits, searchTerms).map(clipRepoSearchHit);
     const truncated = result.truncated || result.hits.length > hits.length;
+    const repoRelevanceGate = buildRepoSearchRelevanceGate({
+      query,
+      queryQuality: queryQuality ?? buildRepoSearchQueryQuality(query),
+      hits,
+      resultError: result.error,
+    });
+    const repoEvidenceUsable = repoRelevanceGate.status === "passed";
+    const supportRefs = buildRepoSearchSupportRefs(hits);
+    const repairAttempts = repoEvidenceUsable ? [] : [{
+      status: "retry_recommended",
+      reason: repoRelevanceGate.code ?? "repo_search_low_relevance",
+      repair_queries: repoRelevanceGate.repair_queries,
+    }];
+    const nextAffordances = repoEvidenceUsable ? [] : [{
+      capability: manifest.capability_id,
+      reason: repoRelevanceGate.code ?? "repo_search_low_relevance",
+      query,
+      repair_queries: repoRelevanceGate.repair_queries,
+    }];
     const evidence = formatRepoSearchEvidence(
       {
         ...result,
@@ -4958,7 +5462,7 @@ export const callWorkstationGatewayCapability = async (
       schema: REPO_SEARCH_OBSERVATION_SCHEMA,
       capability_key: manifest.capability_id,
       query,
-      terms: [query],
+      terms: searchTerms,
       paths,
       hits,
       hit_count: hits.length,
@@ -4970,6 +5474,15 @@ export const callWorkstationGatewayCapability = async (
       search_backend_bin: result.search_backend_bin,
       search_backend_reason: result.search_backend_reason,
       status: result.error ? "failed" : "succeeded",
+      ...(queryDerivation ? { query_derivation: queryDerivation } : {}),
+      query_quality: queryQuality,
+      repo_relevance_gate: repoRelevanceGate,
+      evidence_state: repoEvidenceUsable ? "repo_evidence_usable" : "repo_evidence_low_relevance",
+      selected_for_answer: repoEvidenceUsable,
+      repair_attempts: repairAttempts,
+      support_refs: supportRefs,
+      next_affordances: nextAffordances,
+      missing_requirements: repoEvidenceUsable ? [] : [repoRelevanceGate.code ?? "repo_search_low_relevance"],
       terminal_eligible: false,
       post_tool_model_step_required: true,
       assistant_answer: false,
@@ -4992,8 +5505,32 @@ export const callWorkstationGatewayCapability = async (
             message: "Repo search could not complete; retry with a narrower query or available repo path.",
             repair_action: "repair",
           }]
-        : [],
+        : repoEvidenceUsable
+          ? []
+          : [{
+              code: repoRelevanceGate.code ?? "repo_search_low_relevance",
+              message: "Repo search completed, but the returned hits were not relevant enough to support the answer.",
+              repair_action: "repair",
+            }]
     });
+    observationPacket.state_delta = {
+      ...observationPacket.state_delta,
+      ...(queryDerivation ? { query_derivation: queryDerivation } : {}),
+      query_quality: queryQuality,
+      repo_relevance_gate: repoRelevanceGate,
+      evidence_state: observation.evidence_state,
+      selected_for_answer: observation.selected_for_answer,
+      repair_attempts: repairAttempts,
+      support_refs: supportRefs,
+      ...(nextAffordances.length > 0 ? { next_affordances: nextAffordances } : {}),
+    };
+    if (!repoEvidenceUsable) {
+      observationPacket.suggested_next_steps = Array.from(new Set([
+        ...observationPacket.suggested_next_steps,
+        "use_another_tool",
+        "repair",
+      ]));
+    }
     const trace = buildGatewayTrace({
       turnId,
       capabilityId: manifest.capability_id,
@@ -6181,6 +6718,8 @@ export const callWorkstationGatewayCapability = async (
     const providers = readScholarlyResearchProviders(args.providers);
     const scholarlyMode = readScholarlyResearchMode(args.mode);
     const limit = readExternalSearchLimit(args.limit ?? args.max_results ?? args.maxResults);
+    const scholarlyIntent = readRecord(args.scholarly_intent);
+    const plannedScholarlyCapabilityChain = readRecord(args.planned_scholarly_capability_chain);
     const blockedReason = !query
       ? "missing_query"
       : query.length < 3 || !/[a-z0-9]/i.test(query)
@@ -6203,10 +6742,18 @@ export const callWorkstationGatewayCapability = async (
         capability: manifest.capability_id,
         query: query || null,
         intent: scholarlyMode ?? "paper_search",
+        ...(scholarlyIntent ? { scholarly_intent: scholarlyIntent } : {}),
+        ...(plannedScholarlyCapabilityChain ? { planned_scholarly_capability_chain: plannedScholarlyCapabilityChain } : {}),
         providers_considered: providers,
         providers_called: [],
         evidence_refs: [],
         papers: [],
+        evidence_state: "lookup_blocked",
+        next_affordances: [{
+          capability: manifest.capability_id,
+          reason: blockedReason,
+          query: query || undefined,
+        }],
         missing_requirements: [blockedReason],
         selected_for_answer: false,
         status: "blocked",
@@ -6271,6 +6818,8 @@ export const callWorkstationGatewayCapability = async (
     const observation = {
       ...searchObservation,
       capability_key: manifest.capability_id,
+      ...(scholarlyIntent ? { scholarly_intent: scholarlyIntent } : {}),
+      ...(plannedScholarlyCapabilityChain ? { planned_scholarly_capability_chain: plannedScholarlyCapabilityChain } : {}),
       status: searchObservation.selected_for_answer ? "succeeded" : "failed",
       terminal_eligible: false,
       post_tool_model_step_required: true,
@@ -6296,6 +6845,28 @@ export const callWorkstationGatewayCapability = async (
             repair_action: "repair" as const,
           })),
     });
+    observationPacket.state_delta = {
+      ...observationPacket.state_delta,
+      evidence_state: searchObservation.evidence_state,
+      ...(scholarlyIntent ? { scholarly_intent: scholarlyIntent } : {}),
+      ...(plannedScholarlyCapabilityChain ? { planned_scholarly_capability_chain: plannedScholarlyCapabilityChain } : {}),
+      ...(searchObservation.recovery_query_basis ? { recovery_query_basis: searchObservation.recovery_query_basis } : {}),
+      ...(searchObservation.next_affordances.length > 0 ? { next_affordances: searchObservation.next_affordances } : {}),
+      ...(searchObservation.scholarly_lookup_recovery_affordance ? {
+        scholarly_lookup_recovery_affordance: searchObservation.scholarly_lookup_recovery_affordance,
+        recovery_affordances: [
+          ...readArray(observationPacket.state_delta?.recovery_affordances),
+          searchObservation.scholarly_lookup_recovery_affordance,
+        ],
+      } : {}),
+    };
+    if (!searchObservation.selected_for_answer && searchObservation.next_affordances.length > 0) {
+      observationPacket.suggested_next_steps = Array.from(new Set([
+        ...observationPacket.suggested_next_steps,
+        "use_another_tool",
+        "repair",
+      ]));
+    }
     const error = searchObservation.selected_for_answer
       ? undefined
       : searchObservation.missing_requirements[0] ?? "no_scholarly_results_returned";
@@ -6385,6 +6956,13 @@ export const callWorkstationGatewayCapability = async (
         page_text_refs: [],
         selected_chunks: [],
         visual_candidates: [],
+        evidence_state: "full_text_unavailable",
+        next_affordances: [{
+          capability: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+          reason: blockedReason,
+          query,
+          paper_result_id: paperResultId ?? undefined,
+        }],
         missing_requirements: [blockedReason],
         scholarly_full_text_recovery_affordance: fullTextRecoveryAffordance,
         recovery_affordances: [fullTextRecoveryAffordance],
@@ -6418,6 +6996,8 @@ export const callWorkstationGatewayCapability = async (
       });
       observationPacket.state_delta = {
         ...observationPacket.state_delta,
+        evidence_state: observation.evidence_state,
+        next_affordances: observation.next_affordances,
         scholarly_full_text_recovery_affordance: fullTextRecoveryAffordance,
         recovery_affordances: [
           ...readArray(observationPacket.state_delta?.recovery_affordances),
@@ -6495,6 +7075,18 @@ export const callWorkstationGatewayCapability = async (
       requiredAffordanceKinds: manifest.consumes_affordances,
       producedAffordanceKinds: manifest.produces_affordances,
     });
+    observationPacket.state_delta = {
+      ...observationPacket.state_delta,
+      evidence_state: fullTextObservation.evidence_state,
+      ...(fullTextObservation.next_affordances.length > 0 ? { next_affordances: fullTextObservation.next_affordances } : {}),
+    };
+    if (!fullTextObservation.selected_for_answer && fullTextObservation.next_affordances.length > 0) {
+      observationPacket.suggested_next_steps = Array.from(new Set([
+        ...observationPacket.suggested_next_steps,
+        "use_another_tool",
+        "repair",
+      ]));
+    }
     const error = fullTextObservation.selected_for_answer ? undefined : fullTextObservation.missing_requirements[0] ?? "scholarly_full_text_unavailable";
     const trace = buildGatewayTrace({ turnId, capabilityId: manifest.capability_id, agentRuntime, admission, observationPacket, error });
     return {
@@ -6556,6 +7148,13 @@ export const callWorkstationGatewayCapability = async (
           parameters: [],
           missing_variables: extractionMode === "open_supported_parameters" ? [] : requestedVariables,
           rejected_candidates: [],
+          evidence_state: "numeric_evidence_missing",
+          next_affordances: [{
+            capability: manifest.capability_id,
+            reason: blockedReason,
+            source_ref: sourceRef ?? undefined,
+            variables: requestedVariables,
+          }],
           missing_requirements: [blockedReason],
           variable_source_plan: variableSourcePlan,
           selected_for_answer: false,
@@ -6632,6 +7231,8 @@ export const callWorkstationGatewayCapability = async (
     if (numericRecoveryAffordance) {
       observationPacket.state_delta = {
         ...observationPacket.state_delta,
+        evidence_state: numericObservation.evidence_state,
+        next_affordances: readArray((numericObservation as Record<string, unknown>).next_affordances),
         scholarly_numeric_recovery_affordance: numericRecoveryAffordance,
         recovery_affordances: [
           ...readArray(observationPacket.state_delta?.recovery_affordances),
@@ -6643,6 +7244,11 @@ export const callWorkstationGatewayCapability = async (
         "use_another_tool",
         "ask_user",
       ]));
+    } else {
+      observationPacket.state_delta = {
+        ...observationPacket.state_delta,
+        evidence_state: numericObservation.evidence_state,
+      };
     }
     const error = numericObservation.selected_for_answer ? undefined : numericObservation.missing_requirements[0] ?? "missing_requested_numeric_variables";
     const trace = buildGatewayTrace({ turnId, capabilityId: manifest.capability_id, agentRuntime, admission, observationPacket, error });

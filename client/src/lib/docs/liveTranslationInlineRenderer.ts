@@ -22,7 +22,7 @@ export function renderDocumentMarkdownWithInlineTranslations(
       if (!unit.translatable) return unit.source_markdown;
       const state = input.translations[unit.unit_id];
       const anchor = buildDocumentInlineTranslationAnchor(unit.unit_id, state);
-      if (!state) return `${unit.source_markdown}\n${anchor}`;
+      if (!state) return `${unit.source_markdown}\n\n${anchor}`;
       const projectionAttrs = Object.entries(buildDocumentInlineTranslationDataAttributes(state))
         .map(([name, value]) => `${name}="${escapeHtml(value)}"`)
         .join(" ");
@@ -36,15 +36,15 @@ export function renderDocumentMarkdownWithInlineTranslations(
         `data-doc-translation-role="governed-inline-projection" ` +
         `data-doc-translation-answer-authority="false"`;
       if (state.status === "loading") {
-        return `${unit.source_markdown}\n${anchor}\n<div class="${projectionClassName}" ${projectionBaseAttrs}${projectionAttributes}>${escapeHtml(input.loadingText)}</div>`;
+        return `${unit.source_markdown}\n\n${anchor}\n\n<div class="${projectionClassName}" ${projectionBaseAttrs}${projectionAttributes}>${escapeHtml(input.loadingText)}</div>`;
       }
       if (state.status === "error") {
-        return `${unit.source_markdown}\n${anchor}\n<div class="${projectionClassName}" ${projectionBaseAttrs}${projectionAttributes}>${escapeHtml(input.errorText(state.error ?? input.fallbackErrorText))}</div>`;
+        return `${unit.source_markdown}\n\n${anchor}\n\n<div class="${projectionClassName}" ${projectionBaseAttrs}${projectionAttributes}>${escapeHtml(input.errorText(state.error ?? input.fallbackErrorText))}</div>`;
       }
       const translatedText = formatDocumentInlineTranslationText(state.text ?? "");
-      return `${unit.source_markdown}\n${anchor}\n<div class="${projectionClassName}" ${projectionBaseAttrs}${projectionAttributes}>${escapeHtml(translatedText).replace(/\n/g, "<br />")}</div>`;
+      return `${unit.source_markdown}\n\n${anchor}\n\n<div class="${projectionClassName}" ${projectionBaseAttrs}${projectionAttributes}>${escapeHtml(translatedText).replace(/\n/g, "<br />")}</div>`;
     })
-    .join("\n");
+    .join("\n\n");
 }
 
 function buildDocumentInlineTranslationLanguageAttributes(

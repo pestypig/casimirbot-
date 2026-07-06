@@ -1,8 +1,24 @@
 import { describe, expect, it } from "vitest";
 
-import { extractAskLevelTheoryReflection } from "../ask-runtime-authority-readers";
+import {
+  extractAskLevelTheoryReflection,
+  normalizeHelixRuntimeActionKey,
+  readHelixWorkstationActionRuntimeKeys,
+} from "../ask-runtime-authority-readers";
 
 describe("ask runtime authority readers", () => {
+  it("matches account-session workstation actions to account_session gateway capability authority", () => {
+    expect(normalizeHelixRuntimeActionKey("account-session.set_interface_language")).toBe(
+      "account_session.set_interface_language",
+    );
+    expect(readHelixWorkstationActionRuntimeKeys({
+      action: "run_panel_action",
+      panel_id: "account-session",
+      action_id: "set_interface_language",
+      args: { language: "haw" },
+    })).toContain("account_session.set_interface_language");
+  });
+
   it("extracts theory formula context from Codex gateway observations", () => {
     const reflection = extractAskLevelTheoryReflection({
       workstation_gateway_call_results: [
