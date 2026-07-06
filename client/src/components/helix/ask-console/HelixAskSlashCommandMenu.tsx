@@ -18,7 +18,7 @@ export function HelixAskSlashCommandMenu({
   if (!state.open) return null;
   return (
     <div
-      className="absolute bottom-full left-0 right-0 z-40 mb-2 max-h-72 overflow-hidden rounded-lg border border-white/12 bg-slate-950/95 shadow-2xl shadow-black/40 ring-1 ring-cyan-300/10 backdrop-blur"
+      className="pointer-events-auto absolute left-0 right-0 top-full z-[120] mt-2 max-h-72 overflow-hidden rounded-lg border border-white/12 bg-slate-950 shadow-2xl shadow-black/60 ring-1 ring-cyan-300/20"
       data-testid="helix-ask-slash-command-menu"
       role="listbox"
       aria-label="Ask slash commands"

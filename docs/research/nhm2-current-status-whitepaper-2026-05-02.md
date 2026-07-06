@@ -586,6 +586,12 @@ The next-tier physical-pass campaign target is now machine-readable as `nhm2_tim
 
 The June 18 dynamic-evidence sidecars are still useful because they show the blocker trail that had to be retired: missing switching conservation, missing dynamic/effective geometry receipts, missing averaged source tensor provenance, missing full regional tensor components, sample-count mismatch, off-diagonal shear falsification, and projected-momentum current-profile rejection. Those rows should now be read as historical frontier diagnostics, not the current campaign state.
 
+<!-- helix-doc-equation-action/v1 id=nhm2-time-dependent-source-campaign-gate -->
+
+\[
+\mathrm{Campaign}_{td}=I_{source}\land C_{switch}\land C_{freq}\land G_{dyn/eff}\land T_{\mu\nu}^{regional}\land EC_{obs}\land QEI\land S_{stability}.
+\]
+
 The June 19 local generated campaign frontier moves the status from campaign-blocked to diagnostic campaign-admissible for `stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1`. The matching `nhm2_time_dependent_source_campaign/v1` artifact records `campaignPass = true`, `sourceIndependencePass = true`, `switchingConservationPass = true`, `frequencyConvergencePass = true`, `dynamicGeometryAgreementPass = true`, `fullRegionalTensorClosurePass = true`, `observerFamilyPass = true`, `qeiReceiptsPass = true`, `stabilityPass = true`, and `firstBlocker = none`. This is a significant evidence-state change: the campaign can now judge a coherent lower-alpha profile without reporting a current campaign blocker.
 
 The interpretation remains strict. The campaign pass is a diagnostic, artifact-scoped result for a local generated campaign chain. It does not prove that a macroscopic Casimir/material system physically realizes the source tensor, does not certify a route ETA, does not validate propulsion or transport, does not certify a warp speed, and does not replace independent reproduction or external physical validation. The next scientific question is whether this diagnostic campaign pass survives stricter material, provenance, observer-optimizer, conservation, and reproducibility review without widening its claim boundary.
@@ -659,6 +665,12 @@ The congruence policy treats it as proxy-only. It never satisfies CL0-CL4 by its
 The QST lane is now also tagged by the representation-space boundary `qst_proxy_to_adm_metric_boundary`. That tag preserves the machinery-room rhyme with projective quantum state space while blocking `QST_PROXY` from becoming a metric-equivalence lane, stress-energy source, wormhole inventory, or local photon-production model.
 
 `ER_EPR_STAGE1` is a sidecar quantum-spacetime simulation lane. It is not part of the NHM2 source mechanism, not part of the tile-effective stress-energy closure path, and not a propulsion validation layer. Its purpose is to test whether controlled toy-dual models can produce model-internal ER=EPR-like observables under strict null controls.
+
+<!-- helix-doc-equation-action/v1 id=nhm2-qst-er-epr-stage1-sidecar-boundary -->
+
+\[
+\mathrm{QST}_{proxy}=ER\_EPR\_STAGE1\land ER\_EPR\_TINY\_SYK\land \neg ADM_{\rm metric}\land \neg T_{\mu\nu}^{source}\land \neg Claim_{NHM2}.
+\]
 
 The current solver path supports raw telemetry normalization through `ER_EPR_STAGE1_SOLVER_ADAPTER_V1` and adds a tiny two-sided SYK-like backend under `ER_EPR_TINY_SYK_EXACT_DIAG_V1`. The backend constructs tested Majorana operators, builds a seeded q=4 Hamiltonian, evolves a controlled two-sided toy protocol, and emits raw telemetry for the existing Stage 1 evaluator.
 
@@ -954,6 +966,8 @@ The same expected target calculation gives:
 
 For `0p7000`, the calculation is:
 
+<!-- helix-doc-equation-action/v1 id=nhm2-0p7000-candidate-metric-profile-spec -->
+
 \[
 \tau=0.7000\times137755965.9171795=96429176.1420256\ {\rm s},
 \]
@@ -1094,6 +1108,12 @@ Natario zero expansion remains a useful morphology constraint, but it is not a s
 ### 7.4 0p7000 diagnostic campaign frontier
 
 `stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1` is the current local generated diagnostic campaign frontier. Its clocking relation is `tau = 0.7T`, its subjective efficiency proxy is `1.4285714285714286`, and the profile-frontier sidecar records `fastestAdmissibleAlpha = 0.7`, `campaignPass = true`, `profileCampaignFrontierComplete = true`, `admissibleDiagnosticCandidateCount = 2`, and `firstBlocker = null`.
+
+<!-- helix-doc-equation-action/v1 id=nhm2-0p7000-profile-campaign-frontier -->
+
+\[
+\mathrm{Frontier}_{0p7000}=Profile_{0p7000}\land Manifest_{campaign}\land Campaign_{pass}\land Locks_{closed}.
+\]
 
 The correct interpretation is not "transport validated." The row is a diagnostic campaign-admissible profile under the current local generated artifact chain. Physical viability, route ETA, propulsion, transport, speed authority, material-source proof, and external validation remain outside the claim.
 

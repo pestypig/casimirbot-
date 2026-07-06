@@ -65,6 +65,10 @@ import { useTheoryBadgePlaybackStore } from "@/store/useTheoryBadgePlaybackStore
 import { useTheoryCompoundRunStore } from "@/store/useTheoryCompoundRunStore";
 import { useTheoryMapOverlayStore } from "@/store/useTheoryMapOverlayStore";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
+import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
+import { useDynamicTextTranslations } from "@/hooks/useDynamicTextTranslations";
+import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
+import { useInterfaceText, type InterfaceTextResolver } from "@/lib/i18n/interfaceText";
 import {
   STARSIM_STELLAR_EVOLUTION_STAGES,
   type StarSimStellarEvolutionStage,
@@ -134,6 +138,30 @@ const RUNTIME_REFERENCE_OPERATOR_KINDS = [
 
 function labelize(value: string) {
   return value.replace(/_/g, " ");
+}
+
+function pushDynamicText(target: string[], value: unknown) {
+  if (typeof value !== "string") return;
+  const text = value.trim();
+  if (!text || /^[A-Z0-9_./:-]+$/.test(text)) return;
+  target.push(text);
+}
+
+function collectAtlasPresetTexts(target: string[], entries: Array<{
+  title?: string;
+  description?: string;
+  objectClass?: string;
+  objectBindings?: Array<{ label?: string; description?: string }>;
+}>) {
+  for (const entry of entries) {
+    pushDynamicText(target, entry.title);
+    pushDynamicText(target, entry.description);
+    pushDynamicText(target, entry.objectClass);
+    for (const binding of entry.objectBindings ?? []) {
+      pushDynamicText(target, binding.label);
+      pushDynamicText(target, binding.description);
+    }
+  }
 }
 
 function hasRuntimeReferenceEquation(badge: TheoryBadgeV1): boolean {
@@ -255,11 +283,13 @@ function placementCertaintyFromReflection(
 
 function SelectFilter({
   label,
+  allLabel,
   value,
   options,
   onChange,
 }: {
   label: string;
+  allLabel: string;
   value: string;
   options: string[];
   onChange: (value: string) => void;
@@ -272,7 +302,7 @@ function SelectFilter({
         onChange={(event: React.ChangeEvent<HTMLSelectElement>) => onChange(event.target.value)}
         className="h-9 rounded-md border border-slate-800 bg-slate-950 px-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-cyan-500"
       >
-        <option value="all">All</option>
+        <option value="all">{allLabel}</option>
         {options.map((option: string) => (
           <option key={option} value={option}>
             {labelize(option)}
@@ -287,10 +317,14 @@ function BadgeButton({
   badge,
   selected,
   onSelect,
+  calculatorLoadableLabel,
+  translateText,
 }: {
   badge: TheoryBadgeV1;
   selected: boolean;
   onSelect: () => void;
+  calculatorLoadableLabel: string;
+  translateText: (text: string) => string;
 }) {
   return (
     <button
@@ -304,11 +338,11 @@ function BadgeButton({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="truncate text-sm font-semibold">{badge.title}</div>
-          <div className="mt-1 line-clamp-2 text-xs text-slate-400">{badge.plainMeaning}</div>
+          <div className="truncate text-sm font-semibold">{translateText(badge.title)}</div>
+          <div className="mt-1 line-clamp-2 text-xs text-slate-400">{translateText(badge.plainMeaning)}</div>
         </div>
         {badge.calculatorPayloads.length > 0 ? (
-          <Calculator className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" aria-label="Calculator loadable" />
+          <Calculator className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" aria-label={calculatorLoadableLabel} />
         ) : null}
       </div>
       <div className="mt-2 flex flex-wrap gap-1">
@@ -323,7 +357,15 @@ function BadgeButton({
   );
 }
 
-function LoadPayloadButton({ badge, payload }: { badge: TheoryBadgeV1; payload: TheoryBadgeCalculatorPayloadV1 }) {
+function LoadPayloadButton({
+  badge,
+  payload,
+  t,
+}: {
+  badge: TheoryBadgeV1;
+  payload: TheoryBadgeCalculatorPayloadV1;
+  t: InterfaceTextResolver["t"];
+}) {
   return (
     <Button
       type="button"
@@ -339,7 +381,7 @@ function LoadPayloadButton({ badge, payload }: { badge: TheoryBadgeV1; payload: 
       className="gap-2"
     >
       <Calculator className="h-4 w-4" />
-      Load to Calculator
+      {t("theoryBadgeGraph.action.loadToCalculator")}
     </Button>
   );
 }
@@ -349,11 +391,13 @@ function RelatedBadgeRow({
   selectedId,
   byId,
   onSelect,
+  translateText,
 }: {
   edge: TheoryBadgeEdgeV1;
   selectedId: string;
   byId: Map<string, TheoryBadgeV1>;
   onSelect: (id: string) => void;
+  translateText: (text: string) => string;
 }) {
   const relatedId = edge.from === selectedId ? edge.to : edge.from;
   const related = byId.get(relatedId);
@@ -364,12 +408,12 @@ function RelatedBadgeRow({
       className="w-full rounded-md border border-slate-800 bg-slate-950/70 p-2 text-left text-xs text-slate-300 hover:border-slate-600"
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="font-semibold text-slate-100">{related?.title ?? relatedId}</span>
+        <span className="font-semibold text-slate-100">{related ? translateText(related.title) : relatedId}</span>
         <Badge variant="outline" className="border-slate-700 text-[10px] text-slate-300">
           {labelize(edge.relation)}
         </Badge>
       </div>
-      <div className="mt-1 text-slate-400">{edge.label}</div>
+      <div className="mt-1 text-slate-400">{translateText(edge.label)}</div>
     </button>
   );
 }
@@ -383,6 +427,8 @@ function Inspector({
   onLoadTheoryRun,
   onClearPlayback,
   playbackStatus,
+  t,
+  translateText,
 }: {
   badge: TheoryBadgeV1 | null;
   graph: TheoryBadgeGraphV1 | undefined;
@@ -392,6 +438,8 @@ function Inspector({
   onLoadTheoryRun: () => void;
   onClearPlayback: () => void;
   playbackStatus: "idle" | "running" | "complete" | "failed";
+  t: InterfaceTextResolver["t"];
+  translateText: (text: string) => string;
 }) {
   const byId = useMemo(
     () =>
@@ -411,7 +459,9 @@ function Inspector({
   if (!badge) {
     return (
       <Card className="border-slate-800 bg-slate-950/80">
-        <CardContent className="p-6 text-sm text-slate-400">Select a badge to inspect its theory payload.</CardContent>
+        <CardContent className="p-6 text-sm text-slate-400">
+          {t("theoryBadgeGraph.empty.selectBadge")}
+        </CardContent>
       </Card>
     );
   }
@@ -421,7 +471,7 @@ function Inspector({
       <CardHeader className="border-b border-slate-800 pb-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <CardTitle className="text-lg text-slate-50">{badge.title}</CardTitle>
+            <CardTitle className="text-lg text-slate-50">{translateText(badge.title)}</CardTitle>
             <div className="mt-1 text-xs text-slate-400">{badge.id}</div>
           </div>
           <div className="flex flex-col items-start gap-2 sm:items-end">
@@ -439,7 +489,7 @@ function Inspector({
               className="gap-2 bg-cyan-700 text-white hover:bg-cyan-600"
             >
               <Play className="h-4 w-4" />
-              Run Path to Badge
+              {t("theoryBadgeGraph.action.runPath")}
             </Button>
             <Button
               type="button"
@@ -449,20 +499,24 @@ function Inspector({
               className="gap-2 border-cyan-700 text-cyan-100 hover:bg-cyan-950/50"
             >
               <Calculator className="h-4 w-4" />
-              Load Theory Run
+              {t("theoryBadgeGraph.action.loadTheoryRun")}
             </Button>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-5 p-4">
         <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Meaning</h3>
-          <p className="mt-1 text-sm text-slate-200">{badge.plainMeaning}</p>
-          <p className="mt-2 text-sm text-slate-400">{badge.whyItMatters}</p>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            {t("theoryBadgeGraph.inspector.meaning")}
+          </h3>
+          <p className="mt-1 text-sm text-slate-200">{translateText(badge.plainMeaning)}</p>
+          <p className="mt-2 text-sm text-slate-400">{translateText(badge.whyItMatters)}</p>
         </section>
 
         <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Equations</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            {t("theoryBadgeGraph.inspector.equations")}
+          </h3>
           <div className="mt-2 space-y-2">
             {badge.equations.map((equation: TheoryBadgeEquationV1) => (
               <div key={equation.id} className="rounded-md border border-slate-800 bg-slate-900/50 p-3">
@@ -486,7 +540,9 @@ function Inspector({
         </section>
 
         <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Units</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            {t("theoryBadgeGraph.inspector.units")}
+          </h3>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {badge.units.length > 0 ? (
               badge.units.map((unit: TheoryBadgeUnitV1) => (
@@ -498,22 +554,26 @@ function Inspector({
                 </div>
               ))
             ) : (
-              <div className="text-sm text-slate-500">No unit-bearing scalar in this badge.</div>
+              <div className="text-sm text-slate-500">{t("theoryBadgeGraph.empty.noUnits")}</div>
             )}
           </div>
         </section>
 
         <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Assumptions</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            {t("theoryBadgeGraph.inspector.assumptions")}
+          </h3>
           <ul className="mt-2 space-y-1 text-sm text-slate-300">
             {badge.assumptions.map((assumption: string) => (
-              <li key={assumption}>- {assumption}</li>
+              <li key={assumption}>- {translateText(assumption)}</li>
             ))}
           </ul>
         </section>
 
         <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Calculator Payloads</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            {t("theoryBadgeGraph.inspector.calculatorPayloads")}
+          </h3>
           <div className="mt-2 space-y-2">
             {badge.calculatorPayloads.length > 0 ? (
               badge.calculatorPayloads.map((payload: TheoryBadgeCalculatorPayloadV1) => (
@@ -521,7 +581,7 @@ function Inspector({
                   <div className="font-mono text-sm text-cyan-100">{payload.displayLatex}</div>
                   <div className="mt-1 font-mono text-xs text-slate-400">{payload.expression}</div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <LoadPayloadButton badge={badge} payload={payload} />
+                    <LoadPayloadButton badge={badge} payload={payload} t={t} />
                     <Badge variant="outline" className="border-slate-700 text-[10px] text-slate-300">
                       {labelize(payload.preferredAction)}
                     </Badge>
@@ -529,13 +589,15 @@ function Inspector({
                 </div>
               ))
             ) : (
-              <div className="text-sm text-slate-500">No scalar calculator payload for this badge yet.</div>
+              <div className="text-sm text-slate-500">{t("theoryBadgeGraph.empty.noCalculatorPayload")}</div>
             )}
           </div>
         </section>
 
         <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Source Refs</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            {t("theoryBadgeGraph.inspector.sourceRefs")}
+          </h3>
           <div className="mt-2 space-y-2">
             {badge.sourceRefs.map((source: TheoryBadgeSourceRefV1, index: number) => (
               <div key={`${source.kind}-${source.path ?? source.id ?? index}`} className="rounded-md border border-slate-800 bg-slate-900/50 p-2 text-xs text-slate-300">
@@ -544,28 +606,32 @@ function Inspector({
                   <span className="font-semibold">{labelize(source.kind)}</span>
                 </div>
                 <div className="mt-1 font-mono text-slate-400">{source.path ?? source.id}</div>
-                {source.note ? <div className="mt-1 text-slate-500">{source.note}</div> : null}
+                {source.note ? <div className="mt-1 text-slate-500">{translateText(source.note)}</div> : null}
               </div>
             ))}
           </div>
         </section>
 
         <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Related Badges</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            {t("theoryBadgeGraph.inspector.relatedBadges")}
+          </h3>
           <div className="mt-2 space-y-2">
             {relatedEdges.length > 0 ? (
               relatedEdges.map((edge: TheoryBadgeEdgeV1) => (
-                <RelatedBadgeRow key={edge.id} edge={edge} selectedId={badge.id} byId={byId} onSelect={onSelect} />
+                <RelatedBadgeRow key={edge.id} edge={edge} selectedId={badge.id} byId={byId} onSelect={onSelect} translateText={translateText} />
               ))
             ) : (
-              <div className="text-sm text-slate-500">No related edges for this badge.</div>
+              <div className="text-sm text-slate-500">{t("theoryBadgeGraph.empty.noRelatedEdges")}</div>
             )}
           </div>
         </section>
 
         <section>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Path Playback</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              {t("theoryBadgeGraph.playback.title")}
+            </h3>
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
@@ -576,7 +642,7 @@ function Inspector({
                 className="gap-2 border-slate-700"
               >
                 <Copy className="h-4 w-4" />
-                Copy Playback JSON
+                {t("theoryBadgeGraph.action.copyPlaybackJson")}
               </Button>
               <Button
                 type="button"
@@ -587,7 +653,7 @@ function Inspector({
                 className="gap-2 border-slate-700"
               >
                 <Copy className="h-4 w-4" />
-                Copy Playback Markdown
+                {t("theoryBadgeGraph.action.copyPlaybackMarkdown")}
               </Button>
               <Button
                 type="button"
@@ -598,18 +664,18 @@ function Inspector({
                 className="gap-2 text-slate-300"
               >
                 <Trash2 className="h-4 w-4" />
-                Clear Playback
+                {t("theoryBadgeGraph.action.clearPlayback")}
               </Button>
             </div>
           </div>
           {playback ? (
             <div className="mt-3 space-y-2">
               <div className="grid gap-2 text-xs text-slate-400 sm:grid-cols-5">
-                <div>Badges: {playback.summary.badgeCount}</div>
-                <div>Payloads: {playback.summary.payloadCount}</div>
-                <div>Solved: {playback.summary.solvedCount}</div>
-                <div>Skipped: {playback.summary.skippedCount}</div>
-                <div>Failed: {playback.summary.failedCount}</div>
+                <div>{t("theoryBadgeGraph.playback.badges", { count: playback.summary.badgeCount })}</div>
+                <div>{t("theoryBadgeGraph.playback.payloads", { count: playback.summary.payloadCount })}</div>
+                <div>{t("theoryBadgeGraph.playback.solved", { count: playback.summary.solvedCount })}</div>
+                <div>{t("theoryBadgeGraph.playback.skipped", { count: playback.summary.skippedCount })}</div>
+                <div>{t("theoryBadgeGraph.playback.failed", { count: playback.summary.failedCount })}</div>
               </div>
               {playback.steps.map((step: TheoryBadgePlaybackStepV1) => (
                 <div key={step.id} className={`rounded-md border p-3 text-sm ${statusClass(step.status)}`}>
@@ -640,7 +706,7 @@ function Inspector({
             </div>
           ) : (
             <div className="mt-2 rounded-md border border-slate-800 bg-slate-900/50 p-3 text-sm text-slate-500">
-              No playback run yet.
+              {t("theoryBadgeGraph.empty.noPlayback")}
             </div>
           )}
         </section>
@@ -655,6 +721,9 @@ export default function TheoryBadgeGraphPanel() {
   const [subject, setSubject] = useState("all");
   const [level, setLevel] = useState("all");
   const [status, setStatus] = useState("all");
+  const { userSettings } = useHelixStartSettings();
+  const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const { t } = useInterfaceText(interfaceLanguage.code);
   const selectedId = useTheoryBadgeGraphPanelStore((state) => state.selectedBadgeId);
   const selectedBadgeIds = useTheoryBadgeGraphPanelStore((state) => state.selectedBadgeIds);
   const viewport = useTheoryBadgeGraphPanelStore((state) => state.viewport);
@@ -1213,6 +1282,79 @@ export default function TheoryBadgeGraphPanel() {
     selectedWarpGroupId,
     selectedWarpObjectBindingId,
   ]);
+
+  const dynamicTranslationTexts = useMemo(() => {
+    const texts: string[] = [];
+    for (const badge of graph?.badges ?? []) {
+      pushDynamicText(texts, badge.title);
+    }
+    for (const badge of filteredBadges.slice(0, 80)) {
+      pushDynamicText(texts, badge.plainMeaning);
+    }
+    if (selectedBadge) {
+      pushDynamicText(texts, selectedBadge.title);
+      pushDynamicText(texts, selectedBadge.plainMeaning);
+      pushDynamicText(texts, selectedBadge.whyItMatters);
+      for (const assumption of selectedBadge.assumptions) pushDynamicText(texts, assumption);
+      for (const source of selectedBadge.sourceRefs) pushDynamicText(texts, source.note);
+      for (const edge of graph?.edges ?? []) {
+        if (edge.from === selectedBadge.id || edge.to === selectedBadge.id) pushDynamicText(texts, edge.label);
+      }
+    }
+    for (const badgeId of selectedBadgeIds) {
+      const badge = graph?.badges.find((item: TheoryBadgeV1) => item.id === badgeId);
+      if (!badge) continue;
+      pushDynamicText(texts, badge.title);
+      pushDynamicText(texts, badge.plainMeaning);
+    }
+    const atlas = graph ? buildHelixPhysicsAtlasV1({ graph }) : null;
+    for (const block of atlas?.blocks ?? []) {
+      pushDynamicText(texts, block.title);
+      pushDynamicText(texts, block.description);
+      for (const note of block.claimBoundaryNotes) pushDynamicText(texts, note);
+      for (const action of block.runtimeActions) {
+        pushDynamicText(texts, action.label);
+        pushDynamicText(texts, action.note);
+      }
+    }
+    for (const note of atlasLens?.claimBoundaryNotes ?? []) pushDynamicText(texts, note);
+    collectAtlasPresetTexts(texts, STARSIM_STELLAR_EVOLUTION_STAGES);
+    collectAtlasPresetTexts(texts, COSMIC_DISTANCE_LADDER_RUNGS);
+    collectAtlasPresetTexts(texts, SOLAR_SPECTRUM_OBSERVATION_GROUPS);
+    collectAtlasPresetTexts(texts, CASIMIR_CAVITY_GROUPS);
+    collectAtlasPresetTexts(texts, WARP_GR_NHM2_GROUPS);
+    collectAtlasPresetTexts(texts, QEI_STRESS_ENERGY_GROUPS);
+    collectAtlasPresetTexts(texts, TOKAMAK_PLASMA_GROUPS);
+    collectAtlasPresetTexts(texts, GALACTIC_DYNAMICS_GROUPS);
+    collectAtlasPresetTexts(texts, CURVATURE_COLLAPSE_GROUPS);
+    [
+      "Runtime/reference stage. No scalar calculator payload.",
+      "Runtime/reference rung. No scalar calculator payload.",
+      "Runtime/reference context. No scalar calculator payload.",
+      "Runtime/null-model context. No scalar calculator payload.",
+      "Runtime/benchmark context. No scalar calculator payload.",
+      "Pick a lifecycle stage to light the matching theory badges.",
+      "Pick a ladder rung to light the matching theory badges.",
+      "Pick a solar observation to light matching spectrum badges.",
+      "Pick a cavity group to light Casimir source-context badges.",
+      "Pick a GR/NHM2 group to light diagnostic theory badges.",
+      "Pick a QEI/stress group to light diagnostic badges.",
+      "Pick a tokamak group to light plasma diagnostic badges.",
+      "Pick a galactic group to light map and rotation-control badges.",
+      "Pick a curvature/collapse group to light benchmark badges.",
+      "No seeded badges yet. This lens still acts as a locator hint.",
+      "No scalar calculator payloads seeded for this block yet.",
+    ].forEach((text) => pushDynamicText(texts, text));
+    return texts;
+  }, [atlasLens?.claimBoundaryNotes, filteredBadges, graph, selectedBadge, selectedBadgeIds]);
+
+  const { translate: translateDynamicText } = useDynamicTextTranslations({
+    locale: interfaceLanguage.bcp47,
+    docPath: "workstation/theory-badge-graph",
+    title: "Theory Badge Graph",
+    texts: dynamicTranslationTexts,
+    enabled: interfaceLanguage.code !== "en",
+  });
 
   const manualSelectionActive = selectedBadgeIds.length > 0 || Boolean(selectedId);
   const highlightedBadgeIds =
@@ -2352,6 +2494,7 @@ export default function TheoryBadgeGraphPanel() {
           }
           onSelectLiveReflection={selectLiveAnswerContext}
           onSelectLens={selectAtlasLens}
+          translateText={translateDynamicText}
         />
         <div
           data-testid="theory-atlas-lens-overlay"
@@ -2363,6 +2506,7 @@ export default function TheoryBadgeGraphPanel() {
             stages={STARSIM_STELLAR_EVOLUTION_STAGES}
             selectedStageId={selectedEvolutionStageId}
             selectedObjectBindingId={selectedObjectBindingId}
+            translateText={translateDynamicText}
             onSelectStage={selectEvolutionStage}
             onSelectObjectBinding={selectStarSimObjectBinding}
             onClearObjectBinding={clearStarSimBindingSelection}
@@ -2375,6 +2519,7 @@ export default function TheoryBadgeGraphPanel() {
             rungs={COSMIC_DISTANCE_LADDER_RUNGS}
             selectedRungId={selectedCosmicRungId}
             selectedObjectBindingId={selectedCosmicObjectBindingId}
+            translateText={translateDynamicText}
             onSelectRung={selectCosmicDistanceRung}
             onSelectObjectBinding={selectCosmicObjectBinding}
             onClearObjectBinding={clearCosmicBindingSelection}
@@ -2387,6 +2532,7 @@ export default function TheoryBadgeGraphPanel() {
             groups={SOLAR_SPECTRUM_OBSERVATION_GROUPS}
             selectedGroupId={selectedSolarGroupId}
             selectedObjectBindingId={selectedSolarObjectBindingId}
+            translateText={translateDynamicText}
             onSelectGroup={selectSolarSpectrumGroup}
             onSelectObjectBinding={selectSolarObjectBinding}
             onClearObjectBinding={clearSolarBindingSelection}
@@ -2399,6 +2545,7 @@ export default function TheoryBadgeGraphPanel() {
             groups={CASIMIR_CAVITY_GROUPS}
             selectedGroupId={selectedCasimirGroupId}
             selectedObjectBindingId={selectedCasimirObjectBindingId}
+            translateText={translateDynamicText}
             onSelectGroup={selectCasimirCavityGroup}
             onSelectObjectBinding={selectCasimirObjectBinding}
             onClearObjectBinding={clearCasimirBindingSelection}
@@ -2411,6 +2558,7 @@ export default function TheoryBadgeGraphPanel() {
             groups={WARP_GR_NHM2_GROUPS}
             selectedGroupId={selectedWarpGroupId}
             selectedObjectBindingId={selectedWarpObjectBindingId}
+            translateText={translateDynamicText}
             onSelectGroup={selectWarpGrNhm2Group}
             onSelectObjectBinding={selectWarpObjectBinding}
             onClearObjectBinding={clearWarpBindingSelection}
@@ -2423,6 +2571,7 @@ export default function TheoryBadgeGraphPanel() {
             groups={QEI_STRESS_ENERGY_GROUPS}
             selectedGroupId={selectedQeiGroupId}
             selectedObjectBindingId={selectedQeiObjectBindingId}
+            translateText={translateDynamicText}
             onSelectGroup={selectQeiStressEnergyGroup}
             onSelectObjectBinding={selectQeiObjectBinding}
             onClearObjectBinding={clearQeiBindingSelection}
@@ -2435,6 +2584,7 @@ export default function TheoryBadgeGraphPanel() {
             groups={TOKAMAK_PLASMA_GROUPS}
             selectedGroupId={selectedTokamakGroupId}
             selectedObjectBindingId={selectedTokamakObjectBindingId}
+            translateText={translateDynamicText}
             onSelectGroup={selectTokamakPlasmaGroup}
             onSelectObjectBinding={selectTokamakObjectBinding}
             onClearObjectBinding={clearTokamakBindingSelection}
@@ -2447,6 +2597,7 @@ export default function TheoryBadgeGraphPanel() {
             groups={GALACTIC_DYNAMICS_GROUPS}
             selectedGroupId={selectedGalacticGroupId}
             selectedObjectBindingId={selectedGalacticObjectBindingId}
+            translateText={translateDynamicText}
             onSelectGroup={selectGalacticDynamicsGroup}
             onSelectObjectBinding={selectGalacticObjectBinding}
             onClearObjectBinding={clearGalacticBindingSelection}
@@ -2459,6 +2610,7 @@ export default function TheoryBadgeGraphPanel() {
             groups={CURVATURE_COLLAPSE_GROUPS}
             selectedGroupId={selectedCurvatureGroupId}
             selectedObjectBindingId={selectedCurvatureObjectBindingId}
+            translateText={translateDynamicText}
             onSelectGroup={selectCurvatureCollapseGroup}
             onSelectObjectBinding={selectCurvatureObjectBinding}
             onClearObjectBinding={clearCurvatureBindingSelection}
@@ -2482,6 +2634,7 @@ export default function TheoryBadgeGraphPanel() {
             graph={graph}
             block={activeAtlasBlock}
             lens={atlasLens}
+            translateText={translateDynamicText}
             onSelectBadge={selectBadge}
             onLoadPayload={loadCalculatorPayload}
           />
@@ -2490,9 +2643,9 @@ export default function TheoryBadgeGraphPanel() {
         <div className="flex min-w-0 flex-1 flex-col bg-zinc-900">
           <div className="relative min-h-0 flex-1 overflow-hidden bg-zinc-900">
             {isLoading ? (
-              <div className="p-4 text-sm text-zinc-200">Loading theory badge graph...</div>
+              <div className="p-4 text-sm text-zinc-200">{t("theoryBadgeGraph.loading")}</div>
             ) : error ? (
-              <div className="p-4 text-sm text-red-200">Theory badge graph failed to load.</div>
+              <div className="p-4 text-sm text-red-200">{t("theoryBadgeGraph.error.load")}</div>
             ) : graph ? (
               <>
                 <TheoryAchievementMap
@@ -2515,6 +2668,7 @@ export default function TheoryBadgeGraphPanel() {
                   frontierTrace={null}
                   routeBadgeLabels={routeBadgeLabels}
                   activeAtlasLensId={rememberedAtlasLensId}
+                  translateText={translateDynamicText}
                   onSelectBadge={selectBadge}
                   onClearSelection={() => {
                     setSelectedBadgeId(null);
@@ -2543,22 +2697,22 @@ export default function TheoryBadgeGraphPanel() {
       <div className="border-b border-slate-800 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-xl font-semibold">Theory Badge Graph</h2>
+            <h2 className="text-xl font-semibold">{t("theoryBadgeGraph.header.title")}</h2>
             <p className="mt-1 text-sm text-slate-400">
-              Physics theory badges, unit signatures, assumptions, artifact-backed runs, and scalar loadouts.
+              {t("theoryBadgeGraph.header.description")}
             </p>
           </div>
           <div className="flex flex-col items-start gap-2 sm:items-end">
             {graph ? (
               <div className="flex flex-wrap gap-2 text-xs text-slate-300">
                 <Badge variant="outline" className="border-slate-700">
-                  {graph.summary.badgeCount} badges
+                  {t("theoryBadgeGraph.summary.badges", { count: graph.summary.badgeCount })}
                 </Badge>
                 <Badge variant="outline" className="border-slate-700">
-                  {graph.summary.edgeCount} edges
+                  {t("theoryBadgeGraph.summary.edges", { count: graph.summary.edgeCount })}
                 </Badge>
                 <Badge variant="outline" className="border-slate-700">
-                  {graph.summary.calculatorLoadableCount} calculator loadouts
+                  {t("theoryBadgeGraph.summary.calculatorLoadouts", { count: graph.summary.calculatorLoadableCount })}
                 </Badge>
               </div>
             ) : null}
@@ -2570,7 +2724,7 @@ export default function TheoryBadgeGraphPanel() {
                 onClick={() => setViewMode("map")}
                 className="h-8"
               >
-                Achievement Map
+                {t("theoryBadgeGraph.view.achievementMap")}
               </Button>
               <Button
                 type="button"
@@ -2579,34 +2733,52 @@ export default function TheoryBadgeGraphPanel() {
                 onClick={() => setViewMode("list")}
                 className="h-8"
               >
-                Inspector List
+                {t("theoryBadgeGraph.view.inspectorList")}
               </Button>
             </div>
           </div>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-[minmax(220px,1fr)_180px_180px_180px]">
           <label className="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-            Search
+            {t("theoryBadgeGraph.filter.search")}
             <div className="relative">
               <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-slate-500" />
               <Input
                 value={query}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) => setQuery(event.target.value)}
-                placeholder="Badge, symbol, subject"
+                placeholder={t("theoryBadgeGraph.filter.searchPlaceholder")}
                 className="h-9 border-slate-800 bg-slate-950 pl-8 text-slate-100 placeholder:text-slate-600"
               />
             </div>
           </label>
-          <SelectFilter label="Subject" value={subject} options={subjects} onChange={setSubject} />
-          <SelectFilter label="Level" value={level} options={levels} onChange={setLevel} />
-          <SelectFilter label="Status" value={status} options={statuses} onChange={setStatus} />
+          <SelectFilter
+            label={t("theoryBadgeGraph.filter.subject")}
+            allLabel={t("theoryBadgeGraph.filter.all")}
+            value={subject}
+            options={subjects}
+            onChange={setSubject}
+          />
+          <SelectFilter
+            label={t("theoryBadgeGraph.filter.level")}
+            allLabel={t("theoryBadgeGraph.filter.all")}
+            value={level}
+            options={levels}
+            onChange={setLevel}
+          />
+          <SelectFilter
+            label={t("theoryBadgeGraph.filter.status")}
+            allLabel={t("theoryBadgeGraph.filter.all")}
+            value={status}
+            options={statuses}
+            onChange={setStatus}
+          />
         </div>
       </div>
 
       {isLoading ? (
-        <div className="p-4 text-sm text-slate-400">Loading theory badge graph...</div>
+        <div className="p-4 text-sm text-slate-400">{t("theoryBadgeGraph.loading")}</div>
       ) : error ? (
-        <div className="p-4 text-sm text-red-300">Theory badge graph failed to load.</div>
+        <div className="p-4 text-sm text-red-300">{t("theoryBadgeGraph.error.load")}</div>
       ) : (
         <div className="grid min-h-0 flex-1 gap-4 overflow-hidden p-4 lg:grid-cols-[360px_minmax(0,1fr)]">
           <div className="min-h-0 overflow-y-auto pr-1">
@@ -2623,6 +2795,8 @@ export default function TheoryBadgeGraphPanel() {
                         badge={badge}
                         selected={badge.id === selectedId}
                         onSelect={() => selectBadge(badge.id)}
+                        calculatorLoadableLabel={t("theoryBadgeGraph.badge.calculatorLoadable")}
+                        translateText={translateDynamicText}
                       />
                     ))}
                   </div>
@@ -2630,7 +2804,7 @@ export default function TheoryBadgeGraphPanel() {
               ))}
               {groupedBadges.length === 0 ? (
                 <div className="rounded-md border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-500">
-                  No badges match the current filters.
+                  {t("theoryBadgeGraph.empty.noMatches")}
                 </div>
               ) : null}
             </div>
@@ -2645,6 +2819,8 @@ export default function TheoryBadgeGraphPanel() {
               onRunPlayback={() => selectedBadge && runPathToBadge(selectedBadge.id)}
               onLoadTheoryRun={loadSelectedTheoryRun}
               onClearPlayback={playbackStore.clearPlayback}
+              t={t}
+              translateText={translateDynamicText}
             />
           </div>
         </div>

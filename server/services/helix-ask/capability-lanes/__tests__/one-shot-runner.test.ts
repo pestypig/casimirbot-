@@ -1252,7 +1252,10 @@ describe("provider-neutral capability lane one-shot runner", () => {
             schema: "helix.scientific_image_evidence_sidecar.v1",
             sidecar_kind: "transient_scientific_image_evidence",
             admissibility: expect.objectContaining({
-              status: "admissible_observation",
+              status: "unverified_math_observation",
+            }),
+            exact_equation_summary: expect.objectContaining({
+              promoted_row_count: 0,
             }),
           }),
         }),
@@ -1396,6 +1399,12 @@ describe("provider-neutral capability lane one-shot runner", () => {
       observed_equation_labels: expect.arrayContaining(["3.53"]),
       label_match_status: "matched",
       exact_equation_admissibility: "admissible_for_exact_equation",
+      exact_row_promotion: expect.objectContaining({ status: "promoted" }),
+      row_quality_diagnostics: expect.objectContaining({
+        row_contains_requested_label: true,
+        row_contains_multiple_equation_like_lines: false,
+        needs_higher_resolution_source: false,
+      }),
       quality_flags: [],
       retry_debug: expect.objectContaining({ retry_count: 0 }),
     });
@@ -1416,6 +1425,10 @@ describe("provider-neutral capability lane one-shot runner", () => {
       observed_equation_labels: expect.arrayContaining(["2.52"]),
       label_match_status: "mismatched",
       exact_equation_admissibility: "inadmissible_for_exact_equation",
+      exact_row_promotion: expect.objectContaining({
+        status: "rejected",
+        reasons: expect.arrayContaining(["label_match_status:mismatched"]),
+      }),
       admissibility: expect.objectContaining({ status: "inadmissible_for_exact_mapping" }),
       quality_flags: expect.arrayContaining(["mismatched_equation_label", "row_crop_contains_page_prose_or_invented_formalism"]),
       retry_debug: expect.objectContaining({ retry_count: 1 }),
@@ -1437,9 +1450,72 @@ describe("provider-neutral capability lane one-shot runner", () => {
     expect(corrupted).toMatchObject({
       label_match_status: "matched",
       exact_equation_admissibility: "partial_candidate",
+      exact_row_promotion: expect.objectContaining({ status: "partial" }),
       quality_flags: expect.arrayContaining(["mojibake_or_corrupted_symbol_text", "ellipsized_or_truncated_equation", "malformed_latex_candidate"]),
     });
     expect(corrupted.uncertainty.join("\n")).toContain("corrupted symbols");
+
+    const multiLineMatched = buildScientificEvidencePacket({
+      cropRegionId: "equation_3.52",
+      sourceRefHash: "test-source",
+      sourceKind: "image_lens_source",
+      bboxPx: { x: 0, y: 128, width: 346, height: 59 },
+      requestedEquationLabel: "3.52",
+      regionLabel: "equation_3.52",
+      textCandidate: "36 \\gamma_1 + 7\\phi_2 (3.52)\n3(\\delta\\phi_1 - \\delta\\phi_2) = 0",
+      latexCandidate: "36 \\gamma_1 + 7\\phi_2 \\tag{3.52}\n3(\\delta\\phi_1 - \\delta\\phi_2) = 0",
+      extractionStatus: "extracted",
+      uncertainty: [],
+    });
+    expect(multiLineMatched).toMatchObject({
+      label_match_status: "matched",
+      exact_equation_admissibility: "partial_candidate",
+      exact_row_promotion: expect.objectContaining({
+        status: "partial",
+        reasons: expect.arrayContaining(["row_crop_contains_multiple_equation_lines"]),
+      }),
+      row_quality_diagnostics: expect.objectContaining({
+        row_contains_multiple_equation_like_lines: true,
+      }),
+      admissibility: expect.objectContaining({ status: "unverified_math_observation" }),
+      quality_flags: expect.arrayContaining(["row_crop_contains_multiple_equation_lines"]),
+    });
+
+    const textOnlyLabel = buildScientificEvidencePacket({
+      cropRegionId: "equation_3.55",
+      sourceRefHash: "test-source",
+      sourceKind: "image_lens_source",
+      bboxPx: { x: 0, y: 305, width: 346, height: 56 },
+      requestedEquationLabel: "3.55",
+      regionLabel: "equation_3.55",
+      textCandidate: "-(\\phi^1\\gamma^1 - \\rho_{\\phi\\phi}) = 0 (3.55)",
+      latexCandidate: "-(\\phi^1\\gamma^1 - \\rho_{\\phi\\phi}) = 0",
+      extractionStatus: "extracted",
+      uncertainty: [],
+    });
+    expect(textOnlyLabel).toMatchObject({
+      label_match_status: "matched",
+      exact_equation_admissibility: "partial_candidate",
+      exact_row_promotion: expect.objectContaining({ status: "partial" }),
+      quality_flags: expect.arrayContaining(["requested_label_missing_from_latex_candidate"]),
+    });
+
+    const contextFormalism = buildScientificEvidencePacket({
+      cropRegionId: "scientific_page",
+      sourceRefHash: "test-source",
+      sourceKind: "image_lens_source",
+      bboxPx: { x: 0, y: 0, width: 346, height: 361 },
+      regionLabel: "scientific_page",
+      textCandidate: "In the Penrose-Walker formalism they may be written:",
+      latexCandidate: "\\nabla^\\mu\\psi_\\nu=0",
+      extractionStatus: "partial",
+      uncertainty: [],
+    });
+    expect(contextFormalism).toMatchObject({
+      evidence_role: "context_only",
+      admissibility: expect.objectContaining({ status: "unverified_math_observation" }),
+      quality_flags: expect.arrayContaining(["context_crop_contains_unverified_formalism_prose", "partial_extraction_status"]),
+    });
   });
 
   it("derives planned scientific image crop dimensions from attached image bytes when width metadata is missing", async () => {
@@ -1587,6 +1663,73 @@ describe("provider-neutral capability lane one-shot runner", () => {
       terminal_eligible: false,
       assistant_answer: false,
     });
+  });
+
+  it("fails Image Lens source materialization before filing a scientific sidecar", async () => {
+    const previousVisionBase = process.env.VISION_HTTP_BASE;
+    const previousVisionKey = process.env.VISION_HTTP_API_KEY;
+    const previousVisionModel = process.env.VISION_HTTP_MODEL;
+    process.env.VISION_HTTP_BASE = "https://vision-provider.test";
+    process.env.VISION_HTTP_API_KEY = "test-vision-key";
+    process.env.VISION_HTTP_MODEL = "gpt-4o-mini";
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      const result = await runHelixCapabilityLaneOneShotRequests({
+        provider: buildProvider("codex"),
+        body: {
+          turn_id: "turn-provider-neutral-image-lens-source-materialization-missing",
+          capability_lane_call: {
+            capability: "visual_analysis.inspect_image_region",
+            source_id: "image-lens-source:missing-bytes",
+            source_image_ref: "ephemeral://image/missing-bytes",
+            bbox_px: { x: 0, y: 0, width: 346, height: 361 },
+            question: "Extract scientific document image evidence.",
+            region_label: "scientific_page",
+            reason_for_crop: "Scientific document image evidence extraction.",
+          },
+        },
+        env: {
+          OPENAI_API_KEY: "test-openai",
+          HELIX_IMAGE_LENS_EXTRACTION_BACKEND: "vision_http",
+        } as NodeJS.ProcessEnv,
+      });
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(result.call_results[0]).toMatchObject({
+        ok: false,
+        error: "image_lens_source_image_data_missing",
+        receipt: null,
+        observation: null,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      });
+      expect(result.observation_packets[0]).toMatchObject({
+        status: "missing_input",
+        observation_summary: expect.stringContaining("could not materialize source image data"),
+        missing_requirements: [
+          expect.objectContaining({
+            code: "missing_inline_crop_or_source_image_data",
+            repair_action: "provide_inline_image_source_or_crop",
+          }),
+        ],
+        state_delta: {},
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      });
+      expect(JSON.stringify(result.observation_packets[0])).not.toContain("scientific_image_sidecar");
+    } finally {
+      vi.unstubAllGlobals();
+      if (previousVisionBase === undefined) delete process.env.VISION_HTTP_BASE;
+      else process.env.VISION_HTTP_BASE = previousVisionBase;
+      if (previousVisionKey === undefined) delete process.env.VISION_HTTP_API_KEY;
+      else process.env.VISION_HTTP_API_KEY = previousVisionKey;
+      if (previousVisionModel === undefined) delete process.env.VISION_HTTP_MODEL;
+      else process.env.VISION_HTTP_MODEL = previousVisionModel;
+    }
   });
 
   it("runs configured Image Lens crops through the vision extraction backend", async () => {

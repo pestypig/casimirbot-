@@ -1146,7 +1146,8 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).not.toContain("<HelixAskLegacyComposerSurface");
     expect(source).not.toContain("<HelixAskSurfaceComposerPanel");
     expect(legacyComposerSurfaceSource).toContain("<HelixAskSurfaceComposerPanel");
-    expect(surfaceComposerSource).toContain('className="flex flex-col gap-2 px-4 py-3"');
+    expect(surfaceComposerSource).toContain('className="relative z-[80] flex flex-col gap-2 px-4 py-3"');
+    expect(surfaceComposerSource).toContain('className="relative z-[90] min-w-0 overflow-visible"');
     expect(surfaceComposerSource).toContain("{actionToolbar}");
     expect(surfaceComposerSource).toContain("{textarea}");
     expect(source).not.toContain("<HelixAskComposerActionToolbarSurface");

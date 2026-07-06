@@ -809,7 +809,7 @@ export default function ScientificCalculatorPanel() {
                         </div>
                         <div className="grid gap-1 md:grid-cols-2">
                           <div>artifacts: {row.runtimeReceiptV1.outputs.artifacts.length}</div>
-                          <div>missing signals: {row.runtimeReceiptV1.outputs.missingSignals.length}</div>
+                          <div>{t("scientificCalculator.runtime.missingSignals")}: {row.runtimeReceiptV1.outputs.missingSignals.length}</div>
                           <div>gates: {Object.keys(row.runtimeReceiptV1.outputs.gates).length}</div>
                           <div>promotion: {row.runtimeReceiptV1.claimBoundary.promotionAllowed ? "allowed" : "blocked"}</div>
                         </div>
@@ -843,7 +843,7 @@ export default function ScientificCalculatorPanel() {
                         <div className="grid gap-1 md:grid-cols-2">
                           <div>scope: {row.runtimeRunRequestV1.requestedScope}</div>
                           <div>stage: {row.runtimeRunRequestV1.heartbeat.stage ?? "n/a"}</div>
-                          <div>artifacts expected: {row.runtimeRunRequestV1.outputArtifactGlobs.length}</div>
+                          <div>{t("scientificCalculator.runtime.artifactsExpected")}: {row.runtimeRunRequestV1.outputArtifactGlobs.length}</div>
                           <div>promotion: {row.runtimeRunRequestV1.claimBoundary.promotionAllowed ? "allowed" : "blocked"}</div>
                         </div>
                         {row.runtimeRunRequestV1.heartbeat.message ? (
@@ -877,7 +877,7 @@ export default function ScientificCalculatorPanel() {
                           <div className="mt-2 space-y-1">
                             {row.sweepRunV1.rateProjections.map((projection) => (
                               <div key={`${row.id}:projection:${projection.kind}:${projection.outputSymbol}`}>
-                                {projection.kind}: {projection.outputSymbol} mean {formatSweepNumber(projection.aggregate.mean)}
+                                {projection.kind}: {projection.outputSymbol} {t("scientificCalculator.runtime.mean")} {formatSweepNumber(projection.aggregate.mean)}
                                 {projection.unit ? ` ${projection.unit}` : ""}
                               </div>
                             ))}
@@ -957,7 +957,7 @@ export default function ScientificCalculatorPanel() {
                   {item.runtimeReceiptV1 ? (
                     <div className="mt-2 grid gap-1 rounded border border-violet-900/60 bg-violet-950/20 p-2 text-[11px] text-violet-100 md:grid-cols-2">
                       <div>channel: {item.runtimeReceiptV1.outputSummary.dominantFusionChannel ?? "-"}</div>
-                      <div>fusion zone: {item.runtimeReceiptV1.outputSummary.fusionZoneMode ?? "-"}</div>
+                      <div>{t("scientificCalculator.runtime.fusionZone")}: {item.runtimeReceiptV1.outputSummary.fusionZoneMode ?? "-"}</div>
                       <div>active: {String(item.runtimeReceiptV1.outputSummary.fusionActive ?? "-")}</div>
                       <div>tunneling: {String(item.runtimeReceiptV1.outputSummary.tunnelingRequired ?? "-")}</div>
                       <div>qst: {item.runtimeReceiptV1.outputSummary.qstRole ?? "-"}</div>
@@ -1128,7 +1128,7 @@ export default function ScientificCalculatorPanel() {
         </div>
         <div className="rounded-md border border-slate-800 bg-slate-950/50 p-2 text-xs" data-testid="scientific-calculator-intake">
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <div className="text-[10px] uppercase tracking-wide text-slate-500">Equation intake</div>
+            <div className="text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.intake.title")}</div>
             <Badge variant="outline" className="border-slate-700 text-slate-200">
               parse: {intakeClassification.parse_status}
             </Badge>
@@ -1137,17 +1137,17 @@ export default function ScientificCalculatorPanel() {
             </Badge>
             {intakeClassification.blocked_reasons.length > 0 ? (
               <Badge variant="outline" className="border-amber-800/70 text-amber-100">
-                blocked
+                {t("scientificCalculator.intake.blocked")}
               </Badge>
             ) : (
               <Badge variant="outline" className="border-emerald-800/70 text-emerald-100">
-                route ready
+                {t("scientificCalculator.intake.routeReady")}
               </Badge>
             )}
           </div>
           <div className="grid gap-2 lg:grid-cols-3">
             <div className="rounded border border-slate-800 bg-slate-900/50 p-2">
-              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Routes</div>
+              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.intake.routes")}</div>
               <div className="flex flex-wrap gap-1">
                 {intakeClassification.possible_routes.map((route) => (
                   <Badge key={`route:${route}`} variant="outline" className="border-slate-700 text-[10px] text-slate-300">
@@ -1157,7 +1157,7 @@ export default function ScientificCalculatorPanel() {
               </div>
             </div>
             <div className="rounded border border-slate-800 bg-slate-900/50 p-2">
-              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Symbols</div>
+              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.intake.symbols")}</div>
               {intakeClassification.detected_symbols.length > 0 ? (
                 <div className="flex flex-wrap gap-1">
                   {intakeClassification.detected_symbols.map((symbol) => (
@@ -1167,11 +1167,11 @@ export default function ScientificCalculatorPanel() {
                   ))}
                 </div>
               ) : (
-                <div className="text-[11px] text-slate-500">none</div>
+                <div className="text-[11px] text-slate-500">{t("scientificCalculator.common.none")}</div>
               )}
             </div>
             <div className="rounded border border-slate-800 bg-slate-900/50 p-2">
-              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Blocked by</div>
+              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.intake.blockedBy")}</div>
               {intakeClassification.blocked_reasons.length > 0 ? (
                 <div className="space-y-1 text-[11px] text-amber-100">
                   {intakeClassification.blocked_reasons.map((reason) => (
@@ -1179,17 +1179,17 @@ export default function ScientificCalculatorPanel() {
                   ))}
                 </div>
               ) : (
-                <div className="text-[11px] text-slate-500">none</div>
+                <div className="text-[11px] text-slate-500">{t("scientificCalculator.common.none")}</div>
               )}
             </div>
           </div>
           {intakeClassification.missing_variables.length > 0 ? (
             <div className="mt-2 rounded border border-amber-900/60 bg-amber-950/20 p-2 text-[11px] text-amber-100">
-              Missing bindings: {intakeClassification.missing_variables.join(", ")}
+              {t("scientificCalculator.intake.missingBindings", { variables: intakeClassification.missing_variables.join(", ") })}
             </div>
           ) : null}
           <div className="mt-2 rounded border border-slate-800 bg-slate-900/50 p-2">
-            <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Variable binder</div>
+            <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.intake.variableBinder")}</div>
             {intakeClassification.detected_symbols.length > 0 ? (
               <div className="grid gap-1">
                 {intakeClassification.detected_symbols.map((symbol) => {
@@ -1208,7 +1208,7 @@ export default function ScientificCalculatorPanel() {
                 })}
               </div>
             ) : (
-              <div className="text-[11px] text-slate-500">No variables detected.</div>
+              <div className="text-[11px] text-slate-500">{t("scientificCalculator.intake.noVariables")}</div>
             )}
           </div>
         </div>
@@ -1429,7 +1429,10 @@ export default function ScientificCalculatorPanel() {
                   <div className="rounded border border-slate-800 bg-slate-950/50 p-2">
                     <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.result.assumptions")}</div>
                     <div className="font-mono text-slate-200">
-                      domain={lastArtifactV1.request.assumptions.domain}; angle={lastArtifactV1.request.assumptions.angleMode}
+                      {t("scientificCalculator.result.assumptionSummary", {
+                        domain: lastArtifactV1.request.assumptions.domain,
+                        angle: lastArtifactV1.request.assumptions.angleMode,
+                      })}
                     </div>
                   </div>
                   <div className="rounded border border-slate-800 bg-slate-950/50 p-2">

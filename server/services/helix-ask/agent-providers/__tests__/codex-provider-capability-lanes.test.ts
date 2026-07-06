@@ -1,10 +1,24 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { codexProvider } from "../codex-provider";
 
 describe("Codex provider capability lane adapter", () => {
+  const previousLiveTranslationExternalBackends = process.env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED;
+
+  beforeEach(() => {
+    process.env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED = "false";
+  });
+
+  afterEach(() => {
+    if (previousLiveTranslationExternalBackends === undefined) {
+      delete process.env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED;
+    } else {
+      process.env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED = previousLiveTranslationExternalBackends;
+    }
+  });
+
   it("surfaces configured LLM model metadata for UI receipts", async () => {
     const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
     const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
@@ -138,91 +152,108 @@ describe("Codex provider capability lane adapter", () => {
   });
 
   it("enriches bare visible document collector calls from the workspace snapshot", async () => {
-    const result = await codexProvider.runTurn({
-      runtime: "codex",
-      route: "/ask/turn",
-      body: {
-        turn_id: "turn-codex-visible-doc-context-enrichment",
-        question: "Translate this visible document to Spanish.",
-        workspace_context_snapshot: {
-          active_doc_visible_translation_context: {
-            schema: "helix.ask.active_doc_visible_translation_context.v1",
-            panel_id: "docs-viewer",
-            doc_path: "docs/current.md",
-            source_id: "document_markdown:docs/current.md",
-            source_hash: "sha256:doc-context",
-            account_locale: "en-US",
-            target_language: "es",
-            projection_target: "docs_chunk",
-            chunks: [{
-              source_kind: "docs_viewer",
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    process.env.CODEX_AGENT_FAKE_STDOUT = "The visible document target was collected.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-visible-doc-context-enrichment",
+          question: "Translate this visible document to Spanish.",
+          workspace_context_snapshot: {
+            active_doc_visible_translation_context: {
+              schema: "helix.ask.active_doc_visible_translation_context.v1",
               panel_id: "docs-viewer",
               doc_path: "docs/current.md",
-              source_id: "document_markdown:docs/current.md#u0001",
+              source_id: "document_markdown:docs/current.md",
               source_hash: "sha256:doc-context",
-              source_text_hash: "sha256:doc-context-text",
-              source_text_char_count: 26,
-              visible_text: "The visible document text.",
-              chunk_id: "u0001",
-              chunk_index: 1,
-              dedupe_key: "document_markdown:docs/current.md::u0001::es",
-              region_id: "docs-viewer:u0001",
+              account_locale: "en-US",
+              target_language: "es",
               projection_target: "docs_chunk",
-              assistant_answer: false,
-              terminal_eligible: false,
-              answer_authority: false,
-              reentry_required: true,
-            }],
+              chunks: [{
+                source_kind: "docs_viewer",
+                panel_id: "docs-viewer",
+                doc_path: "docs/current.md",
+                source_id: "document_markdown:docs/current.md#u0001",
+                source_hash: "sha256:doc-context",
+                source_text_hash: "sha256:doc-context-text",
+                source_text_char_count: 26,
+                visible_text: "The visible document text.",
+                chunk_id: "u0001",
+                chunk_index: 1,
+                dedupe_key: "document_markdown:docs/current.md::u0001::es",
+                region_id: "docs-viewer:u0001",
+                projection_target: "docs_chunk",
+                assistant_answer: false,
+                terminal_eligible: false,
+                answer_authority: false,
+                reentry_required: true,
+              }],
+            },
+          },
+          capability_lane_call: {
+            capability: "workstation_tool_reference.collect_visible_translation_targets",
+            visible_only: true,
+            max_chunks: 12,
           },
         },
-        capability_lane_call: {
-          capability: "workstation_tool_reference.collect_visible_translation_targets",
-          visible_only: true,
-          max_chunks: 12,
-        },
-      },
-    });
-    const debug = result.debug as Record<string, unknown>;
-    const results = debug.capability_lane_call_results as Array<Record<string, unknown>>;
-    const collector = results.find((entry) =>
-      entry.capability === "workstation_tool_reference.collect_visible_translation_targets"
-    );
-    const targetBatch = collector?.observation &&
-      typeof collector.observation === "object" &&
-      "target_batch" in collector.observation
-      ? (collector.observation.target_batch as Record<string, unknown>)
-      : null;
-    const targets = Array.isArray(targetBatch?.targets)
-      ? targetBatch.targets as Array<Record<string, unknown>>
-      : [];
+      });
+      const debug = result.debug as Record<string, unknown>;
+      const results = debug.capability_lane_call_results as Array<Record<string, unknown>>;
+      const collector = results.find((entry) =>
+        entry.capability === "workstation_tool_reference.collect_visible_translation_targets"
+      );
+      const targetBatch = collector?.observation &&
+        typeof collector.observation === "object" &&
+        "target_batch" in collector.observation
+        ? (collector.observation.target_batch as Record<string, unknown>)
+        : null;
+      const targets = Array.isArray(targetBatch?.targets)
+        ? targetBatch.targets as Array<Record<string, unknown>>
+        : [];
 
-    expect(collector).toMatchObject({
-      ok: true,
-      target_count: 1,
-      terminal_eligible: false,
-      assistant_answer: false,
-      raw_content_included: false,
-    });
-    expect(targetBatch).toMatchObject({
-      terminal_eligible: false,
-      assistant_answer: false,
-      answer_authority: false,
-      raw_content_included: false,
-    });
-    expect(targets[0]).toMatchObject({
-      doc_path: "docs/current.md",
-      source_id: "document_markdown:docs/current.md#u0001",
-      source_hash: "sha256:doc-context",
-      source_text_hash: "sha256:doc-context-text",
-      visible_text: "The visible document text.",
-      chunk_id: "u0001",
-      projection_target: "docs_chunk",
-      target_language: "es",
-      terminal_eligible: false,
-      assistant_answer: false,
-      answer_authority: false,
-      raw_content_included: false,
-    });
+      expect(collector).toMatchObject({
+        ok: true,
+        target_count: 1,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      });
+      expect(targetBatch).toMatchObject({
+        terminal_eligible: false,
+        assistant_answer: false,
+        answer_authority: false,
+        raw_content_included: false,
+      });
+      expect(targets[0]).toMatchObject({
+        doc_path: "docs/current.md",
+        source_id: "document_markdown:docs/current.md#u0001",
+        source_hash: "sha256:doc-context",
+        source_text_hash: "sha256:doc-context-text",
+        visible_text: "The visible document text.",
+        chunk_id: "u0001",
+        projection_target: "docs_chunk",
+        target_language: "es",
+        terminal_eligible: false,
+        assistant_answer: false,
+        answer_authority: false,
+        raw_content_included: false,
+      });
+    } finally {
+      if (previousStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      }
+      if (previousExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      }
+    }
   }, 15_000);
 
   it("enriches context-carried account-language UI region collector calls from the workspace snapshot", async () => {
@@ -353,181 +384,215 @@ describe("Codex provider capability lane adapter", () => {
   }, 15_000);
 
   it("preserves explicit user target language when enriching visible document collector calls", async () => {
-    const result = await codexProvider.runTurn({
-      runtime: "codex",
-      route: "/ask/turn",
-      body: {
-        turn_id: "turn-codex-visible-doc-target-language-override",
-        question: "Translate this visible document to Spanish.",
-        workspace_context_snapshot: {
-          active_doc_visible_translation_context: {
-            schema: "helix.ask.active_doc_visible_translation_context.v1",
-            panel_id: "docs-viewer",
-            doc_path: "docs/current.md",
-            source_id: "document_markdown:docs/current.md",
-            source_hash: "sha256:doc-context",
-            account_locale: "en-US",
-            target_language: "en",
-            projection_target: "docs_chunk",
-            chunks: [{
-              source_kind: "docs_viewer",
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    process.env.CODEX_AGENT_FAKE_STDOUT = "The visible document target was collected.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-visible-doc-target-language-override",
+          question: "Translate this visible document to Spanish.",
+          workspace_context_snapshot: {
+            active_doc_visible_translation_context: {
+              schema: "helix.ask.active_doc_visible_translation_context.v1",
               panel_id: "docs-viewer",
               doc_path: "docs/current.md",
-              source_id: "document_markdown:docs/current.md#u0001",
+              source_id: "document_markdown:docs/current.md",
               source_hash: "sha256:doc-context",
-              source_text_hash: "sha256:doc-context-text",
-              source_text_char_count: 26,
-              visible_text: "The visible document text.",
-              chunk_id: "u0001",
-              chunk_index: 1,
-              dedupe_key: "document_markdown:docs/current.md::u0001::en",
-              region_id: "docs-viewer:u0001",
+              account_locale: "en-US",
+              target_language: "en",
               projection_target: "docs_chunk",
-              assistant_answer: false,
-              terminal_eligible: false,
-              answer_authority: false,
-              reentry_required: true,
-            }],
+              chunks: [{
+                source_kind: "docs_viewer",
+                panel_id: "docs-viewer",
+                doc_path: "docs/current.md",
+                source_id: "document_markdown:docs/current.md#u0001",
+                source_hash: "sha256:doc-context",
+                source_text_hash: "sha256:doc-context-text",
+                source_text_char_count: 26,
+                visible_text: "The visible document text.",
+                chunk_id: "u0001",
+                chunk_index: 1,
+                dedupe_key: "document_markdown:docs/current.md::u0001::en",
+                region_id: "docs-viewer:u0001",
+                projection_target: "docs_chunk",
+                assistant_answer: false,
+                terminal_eligible: false,
+                answer_authority: false,
+                reentry_required: true,
+              }],
+            },
+          },
+          capability_lane_call: {
+            capability: "workstation_tool_reference.collect_visible_translation_targets",
+            visible_only: true,
+            max_chunks: 12,
           },
         },
-        capability_lane_call: {
-          capability: "workstation_tool_reference.collect_visible_translation_targets",
-          visible_only: true,
-          max_chunks: 12,
-        },
-      },
-    });
-    const debug = result.debug as Record<string, unknown>;
-    const results = debug.capability_lane_call_results as Array<Record<string, unknown>>;
-    const collector = results.find((entry) =>
-      entry.capability === "workstation_tool_reference.collect_visible_translation_targets"
-    );
-    const targetBatch = collector?.observation &&
-      typeof collector.observation === "object" &&
-      "target_batch" in collector.observation
-      ? (collector.observation.target_batch as Record<string, unknown>)
-      : null;
-    const targets = Array.isArray(targetBatch?.targets)
-      ? targetBatch.targets as Array<Record<string, unknown>>
-      : [];
+      });
+      const debug = result.debug as Record<string, unknown>;
+      const results = debug.capability_lane_call_results as Array<Record<string, unknown>>;
+      const collector = results.find((entry) =>
+        entry.capability === "workstation_tool_reference.collect_visible_translation_targets"
+      );
+      const targetBatch = collector?.observation &&
+        typeof collector.observation === "object" &&
+        "target_batch" in collector.observation
+        ? (collector.observation.target_batch as Record<string, unknown>)
+        : null;
+      const targets = Array.isArray(targetBatch?.targets)
+        ? targetBatch.targets as Array<Record<string, unknown>>
+        : [];
 
-    expect(collector).toMatchObject({
-      ok: true,
-      target_count: 1,
-      terminal_eligible: false,
-      assistant_answer: false,
-      raw_content_included: false,
-    });
-    expect(targetBatch).toMatchObject({
-      terminal_eligible: false,
-      assistant_answer: false,
-      answer_authority: false,
-      raw_content_included: false,
-    });
-    expect(targets[0]).toMatchObject({
-      doc_path: "docs/current.md",
-      source_id: "document_markdown:docs/current.md#u0001",
-      target_language: "es",
-      terminal_eligible: false,
-      assistant_answer: false,
-      answer_authority: false,
-      raw_content_included: false,
-    });
+      expect(collector).toMatchObject({
+        ok: true,
+        target_count: 1,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      });
+      expect(targetBatch).toMatchObject({
+        terminal_eligible: false,
+        assistant_answer: false,
+        answer_authority: false,
+        raw_content_included: false,
+      });
+      expect(targets[0]).toMatchObject({
+        doc_path: "docs/current.md",
+        source_id: "document_markdown:docs/current.md#u0001",
+        target_language: "es",
+        terminal_eligible: false,
+        assistant_answer: false,
+        answer_authority: false,
+        raw_content_included: false,
+      });
+    } finally {
+      if (previousStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      }
+      if (previousExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      }
+    }
   }, 15_000);
 
   it("enriches provider-neutral visible text collector alias calls from the workspace snapshot", async () => {
-    const result = await codexProvider.runTurn({
-      runtime: "codex",
-      route: "/ask/turn",
-      body: {
-        turn_id: "turn-codex-visible-text-alias-context-enrichment",
-        question: "Translate this visible document to Spanish.",
-        workspace_context_snapshot: {
-          active_doc_visible_translation_context: {
-            schema: "helix.ask.active_doc_visible_translation_context.v1",
-            panel_id: "docs-viewer",
-            doc_path: "docs/current.md",
-            source_id: "document_markdown:docs/current.md",
-            source_hash: "sha256:doc-context",
-            account_locale: "en-US",
-            target_language: "en",
-            projection_target: "docs_chunk",
-            chunks: [{
-              source_kind: "docs_viewer",
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Collector alias executed.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-visible-text-alias-context-enrichment",
+          question: "Translate this visible document to Spanish.",
+          workspace_context_snapshot: {
+            active_doc_visible_translation_context: {
+              schema: "helix.ask.active_doc_visible_translation_context.v1",
               panel_id: "docs-viewer",
               doc_path: "docs/current.md",
-              source_id: "document_markdown:docs/current.md#u0001",
+              source_id: "document_markdown:docs/current.md",
               source_hash: "sha256:doc-context",
-              source_text_hash: "sha256:doc-context-text",
-              source_text_char_count: 26,
-              visible_text: "The visible document text.",
-              chunk_id: "u0001",
-              chunk_index: 1,
-              dedupe_key: "document_markdown:docs/current.md::u0001::en",
-              region_id: "docs-viewer:u0001",
+              account_locale: "en-US",
+              target_language: "en",
               projection_target: "docs_chunk",
-              existing_observation_ref: "ask:turn:visible:observation:1",
-              existing_receipt_ref: "ask:turn:visible:receipt:1",
-              existing_projection_status: "projected",
-              existing_freshness_status: "fresh",
-              existing_terminal_authority_status: "not_terminal_authority",
-              assistant_answer: false,
-              terminal_eligible: false,
-              answer_authority: false,
-              raw_content_included: false,
-              reentry_required: true,
-            }],
+              chunks: [{
+                source_kind: "docs_viewer",
+                panel_id: "docs-viewer",
+                doc_path: "docs/current.md",
+                source_id: "document_markdown:docs/current.md#u0001",
+                source_hash: "sha256:doc-context",
+                source_text_hash: "sha256:doc-context-text",
+                source_text_char_count: 26,
+                visible_text: "The visible document text.",
+                chunk_id: "u0001",
+                chunk_index: 1,
+                dedupe_key: "document_markdown:docs/current.md::u0001::en",
+                region_id: "docs-viewer:u0001",
+                projection_target: "docs_chunk",
+                existing_observation_ref: "ask:turn:visible:observation:1",
+                existing_receipt_ref: "ask:turn:visible:receipt:1",
+                existing_projection_status: "projected",
+                existing_freshness_status: "fresh",
+                existing_terminal_authority_status: "not_terminal_authority",
+                assistant_answer: false,
+                terminal_eligible: false,
+                answer_authority: false,
+                raw_content_included: false,
+                reentry_required: true,
+              }],
+            },
+          },
+          capability_lane_call: {
+            capability: "workstation.visible_text.collect_translation_targets",
+            visible_only: true,
+            max_chunks: 12,
           },
         },
-        capability_lane_call: {
-          capability: "workstation.visible_text.collect_translation_targets",
-          visible_only: true,
-          max_chunks: 12,
-        },
-      },
-    });
-    const debug = result.debug as Record<string, unknown>;
-    const results = debug.capability_lane_call_results as Array<Record<string, unknown>>;
-    const collector = results.find((entry) =>
-      entry.capability === "workstation_tool_reference.collect_visible_translation_targets"
-    );
-    const targetBatch = collector?.observation &&
-      typeof collector.observation === "object" &&
-      "target_batch" in collector.observation
-      ? (collector.observation.target_batch as Record<string, unknown>)
-      : null;
-    const targets = Array.isArray(targetBatch?.targets)
-      ? targetBatch.targets as Array<Record<string, unknown>>
-      : [];
+      });
+      const debug = result.debug as Record<string, unknown>;
+      const results = debug.capability_lane_call_results as Array<Record<string, unknown>>;
+      const collector = results.find((entry) =>
+        entry.capability === "workstation_tool_reference.collect_visible_translation_targets"
+      );
+      const targetBatch = collector?.observation &&
+        typeof collector.observation === "object" &&
+        "target_batch" in collector.observation
+        ? (collector.observation.target_batch as Record<string, unknown>)
+        : null;
+      const targets = Array.isArray(targetBatch?.targets)
+        ? targetBatch.targets as Array<Record<string, unknown>>
+        : [];
 
-    expect(collector).toMatchObject({
-      ok: true,
-      target_count: 1,
-      terminal_eligible: false,
-      assistant_answer: false,
-      raw_content_included: false,
-    });
-    expect(targetBatch).toMatchObject({
-      terminal_eligible: false,
-      assistant_answer: false,
-      answer_authority: false,
-      raw_content_included: false,
-    });
-    expect(targets[0]).toMatchObject({
-      doc_path: "docs/current.md",
-      source_id: "document_markdown:docs/current.md#u0001",
-      target_language: "es",
-      existing_observation_ref: "ask:turn:visible:observation:1",
-      existing_receipt_ref: "ask:turn:visible:receipt:1",
-      existing_translation_receipt_ref: "ask:turn:visible:receipt:1",
-      existing_projection_status: "projected",
-      existing_freshness_status: "fresh",
-      existing_terminal_authority_status: "not_terminal_authority",
-      terminal_eligible: false,
-      assistant_answer: false,
-      answer_authority: false,
-      raw_content_included: false,
-    });
+      expect(collector).toMatchObject({
+        ok: true,
+        target_count: 1,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      });
+      expect(targetBatch).toMatchObject({
+        terminal_eligible: false,
+        assistant_answer: false,
+        answer_authority: false,
+        raw_content_included: false,
+      });
+      expect(targets[0]).toMatchObject({
+        doc_path: "docs/current.md",
+        source_id: "document_markdown:docs/current.md#u0001",
+        target_language: "es",
+        existing_observation_ref: "ask:turn:visible:observation:1",
+        existing_receipt_ref: "ask:turn:visible:receipt:1",
+        existing_translation_receipt_ref: "ask:turn:visible:receipt:1",
+        existing_projection_status: "projected",
+        existing_freshness_status: "fresh",
+        existing_terminal_authority_status: "not_terminal_authority",
+        terminal_eligible: false,
+        assistant_answer: false,
+        answer_authority: false,
+        raw_content_included: false,
+      });
+    } finally {
+      if (previousStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      }
+      if (previousExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      }
+    }
   }, 15_000);
 
   it("retries a noncompliant direct translation answer before executing the lane", async () => {
@@ -2064,7 +2129,7 @@ describe("Codex provider capability lane adapter", () => {
           status: "blocked",
           capability_id: "theory-badge-graph.reflect_discussion_context",
           result_count: 0,
-          blocked_reason: "scientific_image_evidence_sidecar_not_admissible",
+          blocked_reason: "scientific_image_exact_row_promotion_missing",
           sidecar_admissibility_status: "inadmissible_for_exact_mapping",
         },
       });
@@ -2147,19 +2212,24 @@ describe("Codex provider capability lane adapter", () => {
       const gatewayResults = debug.workstation_gateway_call_results as Array<Record<string, any>>;
 
       expect(result).toMatchObject({
-        ok: true,
-        answer: "No image evidence sidecar was available, so graph reflection was blocked.",
+        ok: false,
+        response_type: "final_failure",
+        final_status: "final_failure",
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
       });
+      expect(result.answer).toContain("could not retrieve the prior scientific image evidence sidecar");
       expect(debug.capability_lane_call_results ?? []).toEqual([]);
       expect(gatewayResults.some((entry) =>
         entry.capability_id === "theory-badge-graph.reflect_discussion_context"
       )).toBe(false);
       expect(debug.runtime_lane_request_loop).toMatchObject({
+        status: "prior_scientific_image_sidecar_lookup_failed",
         scientific_image_sidecar_gateway_bridge: {
           status: "blocked",
           capability_id: "theory-badge-graph.reflect_discussion_context",
           result_count: 0,
-          blocked_reason: "scientific_image_evidence_sidecar_missing",
+          blocked_reason: "scientific_image_evidence_sidecar_lookup_failed",
         },
       });
     } finally {
@@ -2177,6 +2247,515 @@ describe("Codex provider capability lane adapter", () => {
         delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
       } else {
         process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      }
+      if (previousExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      }
+    }
+  });
+
+  it("re-enters the latest scientific image sidecar but blocks Theory Badge Graph without promoted exact rows", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    const previousExtractionFixtures = process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        "The Image Lens evidence sidecar was filed.",
+        "The prior scientific image sidecar was re-entered, but exact graph reflection was blocked.",
+      ],
+    });
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([
+      {
+        region_label: "scientific_page",
+        text_candidate: "Bianchi identities as field equations for the Weyl tensor.",
+        latex_candidate: "\\nabla^{AA'}\\psi_{ABCD}=0",
+        extraction_status: "extracted",
+        uncertainty: ["fixture-backed OCR/math candidate"],
+      },
+      ...["3.51", "3.52", "3.53", "3.54", "3.55"].map((label) => ({
+        region_label: `equation_${label}`,
+        requested_equation_label: label,
+        text_candidate: `Bianchi Weyl equation row \\nabla^\\mu \\psi_\\nu - D_\\nu S_\\phi = 0 (${label})`,
+        latex_candidate: `\\nabla^\\mu \\psi_\\nu - D_\\nu S_\\phi = 0 \\tag{${label}}`,
+        extraction_status: "extracted",
+        uncertainty: ["fixture-backed labeled equation row"],
+      })),
+    ]);
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-image-continuation-source",
+          session_id: "session-codex-scientific-image-continuation",
+          question: "Use Image Lens on this scientific page and file the extracted equations as evidence.",
+          workspace_context_snapshot: {
+            activePanel: "image-lens",
+          },
+          capability_lane_call: {
+            capability: "visual_analysis.inspect_image_region",
+            region_label: "scientific_page",
+            bbox_px: { x: 0, y: 0, width: 346, height: 361 },
+            question: "Extract the scientific equation evidence from the page.",
+            reason_for_crop: "The whole page contains the equation rows.",
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+          turn_input_items: [
+            {
+              type: "image",
+              image_ref: "visual_evidence:scientific-image-continuation",
+              image_base64: "test-image",
+              mime_type: "image/png",
+              file_name: "scientific-page.png",
+              evidence_id: "visual_evidence:scientific-image-continuation",
+              width_px: 346,
+              height_px: 372,
+              raw_image_included: false,
+            },
+          ],
+        },
+      });
+
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-image-continuation-reflect",
+          session_id: "session-codex-scientific-image-continuation",
+          question: "Now compare this image and the previous Image Lens result against the Theory Badge Graph and report whether calculator payloads are admissible.",
+          workspace_context_snapshot: {
+            activePanel: "theory-badge-graph",
+          },
+        },
+      });
+      const debug = result.debug as Record<string, any>;
+      const gatewayResults = debug.workstation_gateway_call_results as Array<Record<string, any>>;
+      const theoryResult = gatewayResults.find((entry) =>
+        entry.capability_id === "theory-badge-graph.reflect_discussion_context"
+      );
+
+      expect(result).toMatchObject({
+        ok: true,
+        answer: "The prior scientific image sidecar was re-entered, but exact graph reflection was blocked.",
+      });
+      expect(debug.scientific_image_evidence_continuation_lookup).toMatchObject({
+        status: "found",
+        source: "current_turn_sidecar",
+        sidecar_id: expect.stringContaining("turn-codex-scientific-image-continuation-source:"),
+      });
+      expect(debug.runtime_lane_request_loop).toMatchObject({
+        status: "prior_scientific_image_sidecar_reentered",
+        scientific_image_sidecar_gateway_bridge: {
+          status: "blocked",
+          bridge_source: "prior_turn_sidecar",
+          capability_id: "theory-badge-graph.reflect_discussion_context",
+          blocked_reason: "scientific_image_exact_row_promotion_missing",
+        },
+      });
+      expect(theoryResult).toBeUndefined();
+      expect(debug.current_turn_artifact_ledger).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          kind: "scientific_image_evidence_sidecar",
+          source_scope: "prior_turn_context",
+          sidecar_id: expect.stringContaining("turn-codex-scientific-image-continuation-source:"),
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        }),
+      ]));
+    } finally {
+      if (previousStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      }
+      if (previousStdoutSequence === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      }
+      if (previousCallIndex === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      } else {
+        process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      }
+      if (previousExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      }
+      if (previousExtractionFixtures === undefined) {
+        delete process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+      } else {
+        process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = previousExtractionFixtures;
+      }
+    }
+  });
+
+  it("retries a partial exact equation row from prior Image Lens sidecar before graph reflection", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    const previousExtractionFixtures = process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        "The partial row sidecar was filed.",
+        "The retried scientific image sidecar was reflected.",
+      ],
+    });
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([
+      {
+        bbox_key: "0,305,346,56",
+        text_candidate: "partial row candidate (3.55)\nsecond equation-like line",
+        latex_candidate: "\\nabla_\\mu \\psi_\\nu = 0 \\tag{3.55}\n\\Delta \\phi = 0",
+        extraction_status: "partial",
+        uncertainty: ["fixture initial partial row"],
+      },
+      {
+        region_label: "retry_equation_3.55",
+        text_candidate: "Bianchi Weyl exact row nabla_mu psi_nu equals zero (3.55)",
+        latex_candidate: "\\nabla_\\mu \\psi_\\nu = 0 \\tag{3.55}",
+        extraction_status: "extracted",
+        uncertainty: [],
+      },
+    ]);
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-image-retry-source",
+          session_id: "session-codex-scientific-image-retry",
+          question: "Use Image Lens on this exact equation row and file the extracted equation evidence.",
+          capability_lane_call: {
+            capability: "visual_analysis.inspect_image_region",
+            region_label: "equation_3.55",
+            requested_equation_label: "3.55",
+            bbox_px: { x: 0, y: 305, width: 346, height: 56 },
+            question: "Extract equation row 3.55.",
+            reason_for_crop: "Exact row extraction.",
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+          turn_input_items: [{
+            type: "image",
+            image_ref: "visual_evidence:scientific-image-retry",
+            image_base64: "test-image",
+            mime_type: "image/png",
+            evidence_id: "visual_evidence:scientific-image-retry",
+            width_px: 346,
+            height_px: 372,
+            raw_image_included: false,
+          }],
+        },
+      });
+
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-image-retry-reflect",
+          session_id: "session-codex-scientific-image-retry",
+          question: "Now compare the extracted equations against the Theory Badge Graph and report calculator payload admissibility.",
+        },
+      });
+      const debug = result.debug as Record<string, any>;
+      const retry = debug.scientific_image_evidence_retry as Record<string, any>;
+      const bridge = debug.runtime_lane_request_loop?.scientific_image_sidecar_gateway_bridge;
+
+      expect(result.ok).toBe(true);
+      expect(retry).toMatchObject({
+        status: "completed",
+        retry_candidate_count: 2,
+        source_material_recovered: true,
+        final_sidecar_admissibility: "admissible_observation",
+      });
+      expect(retry.retry_candidates[0]).toMatchObject({
+        requested_equation_label: "3.55",
+        retry_variant: "padded_row",
+        original_bbox_px: { x: 0, y: 305, width: 346, height: 56 },
+        retry_bbox_px: { x: 0, y: 301, width: 346, height: 64 },
+        retry_bbox_lineage: expect.arrayContaining([
+          expect.objectContaining({ stage: "original", bbox_px: { x: 0, y: 305, width: 346, height: 56 } }),
+          expect.objectContaining({ stage: "retry", bbox_px: { x: 0, y: 301, width: 346, height: 64 } }),
+        ]),
+      });
+      expect(retry.final_exact_equation_summary.admissible_row_count).toBeGreaterThanOrEqual(1);
+      expect(retry.final_exact_equation_summary.promoted_row_count).toBeGreaterThanOrEqual(1);
+      expect(bridge).toMatchObject({
+        status: "completed",
+        bridge_source: "prior_turn_sidecar",
+        sidecar_admissibility_status: "admissible_observation",
+      });
+    } finally {
+      if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      else process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      if (previousStdoutSequence === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      else process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      if (previousCallIndex === undefined) delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      else process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      if (previousExitCode === undefined) delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      else process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      if (previousExtractionFixtures === undefined) delete process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+      else process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = previousExtractionFixtures;
+    }
+  });
+
+  it("fails closed when prior sidecar retry needs source material that was not retained", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    const previousExtractionFixtures = process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        "The partial row sidecar was filed.",
+        "This model-only retry answer must not be used.",
+      ],
+    });
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([{
+      bbox_key: "0,305,346,56",
+      text_candidate: "partial row candidate (3.55)\nsecond equation-like line",
+      latex_candidate: "\\nabla_\\mu \\psi_\\nu = 0 \\tag{3.55}\n\\Delta \\phi = 0",
+      extraction_status: "partial",
+      uncertainty: ["fixture initial partial row"],
+    }]);
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-image-retry-missing-source",
+          session_id: "session-codex-scientific-image-retry-missing-source",
+          question: "Use Image Lens on this exact equation row and file the extracted equation evidence.",
+          capability_lane_call: {
+            capability: "visual_analysis.inspect_image_region",
+            region_label: "equation_3.55",
+            requested_equation_label: "3.55",
+            bbox_px: { x: 0, y: 305, width: 346, height: 56 },
+            question: "Extract equation row 3.55.",
+            reason_for_crop: "Exact row extraction.",
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+          turn_input_items: [{
+            type: "image",
+            image_ref: "ephemeral://image/retry-missing-source",
+            evidence_id: "visual_evidence:retry-missing-source",
+            width_px: 346,
+            height_px: 372,
+            raw_image_included: false,
+          }],
+        },
+      });
+
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-image-retry-missing-source-reflect",
+          session_id: "session-codex-scientific-image-retry-missing-source",
+          question: "Now compare the extracted equations against the Theory Badge Graph.",
+        },
+      });
+      const debug = result.debug as Record<string, any>;
+
+      expect(result).toMatchObject({
+        ok: false,
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+      });
+      expect(result.answer).toContain("exact-row retry requires the original image source bytes");
+      expect(result.answer).not.toContain("model-only retry answer");
+      expect(debug.fail_reason).toBe("scientific_image_retry_source_materialization_missing");
+      expect(debug.scientific_image_evidence_retry).toMatchObject({
+        status: "source_materialization_missing",
+        source_material_recovered: false,
+      });
+      expect((debug.workstation_gateway_call_results as Array<Record<string, any>>).some((entry) =>
+        entry.capability_id === "theory-badge-graph.reflect_discussion_context"
+      )).toBe(false);
+    } finally {
+      if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      else process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      if (previousStdoutSequence === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      else process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      if (previousCallIndex === undefined) delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      else process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      if (previousExitCode === undefined) delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      else process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      if (previousExtractionFixtures === undefined) delete process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+      else process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = previousExtractionFixtures;
+    }
+  });
+
+  it("keeps calculator payloads blocked when Image Lens retry remains partial", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    const previousExtractionFixtures = process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        "The partial row sidecar was filed.",
+        "The still-partial scientific image sidecar was reflected.",
+      ],
+    });
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([
+      {
+        bbox_key: "0,305,346,56",
+        text_candidate: "partial row candidate (3.55)\nsecond equation-like line",
+        latex_candidate: "\\nabla_\\mu \\psi_\\nu = 0 \\tag{3.55}\n\\Delta \\phi = 0",
+        extraction_status: "partial",
+        uncertainty: ["fixture initial partial row"],
+      },
+      {
+        region_label: "retry_equation_3.55",
+        text_candidate: "partial retry row (3.55)\nsecond equation-like line",
+        latex_candidate: "\\nabla_\\mu \\psi_\\nu = 0 \\tag{3.55}\n\\Delta \\phi = 0",
+        extraction_status: "partial",
+        uncertainty: ["fixture retry still partial"],
+      },
+    ]);
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-image-retry-still-partial",
+          session_id: "session-codex-scientific-image-retry-still-partial",
+          question: "Use Image Lens on this exact equation row and file the extracted equation evidence.",
+          capability_lane_call: {
+            capability: "visual_analysis.inspect_image_region",
+            region_label: "equation_3.55",
+            requested_equation_label: "3.55",
+            bbox_px: { x: 0, y: 305, width: 346, height: 56 },
+            question: "Extract equation row 3.55.",
+            reason_for_crop: "Exact row extraction.",
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+          turn_input_items: [{
+            type: "image",
+            image_ref: "visual_evidence:scientific-image-retry-still-partial",
+            image_base64: "test-image",
+            mime_type: "image/png",
+            evidence_id: "visual_evidence:scientific-image-retry-still-partial",
+            width_px: 346,
+            height_px: 372,
+            raw_image_included: false,
+          }],
+        },
+      });
+
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-image-retry-still-partial-reflect",
+          session_id: "session-codex-scientific-image-retry-still-partial",
+          question: "Now compare the extracted equations against the Theory Badge Graph and report calculator payload admissibility.",
+        },
+      });
+      const debug = result.debug as Record<string, any>;
+      const bridge = debug.runtime_lane_request_loop?.scientific_image_sidecar_gateway_bridge;
+
+      expect(result.ok).toBe(true);
+      expect(debug.scientific_image_evidence_retry).toMatchObject({
+        status: "completed",
+        source_material_recovered: true,
+        final_sidecar_admissibility: "unverified_math_observation",
+        retry_failure_class: "exact_row_promotion_not_available",
+      });
+      expect(debug.scientific_image_evidence_retry.final_exact_equation_summary.partial_row_count).toBeGreaterThanOrEqual(1);
+      expect(bridge).toMatchObject({
+        status: "blocked",
+        blocked_reason: "scientific_image_exact_row_promotion_missing",
+        sidecar_admissibility_status: "unverified_math_observation",
+      });
+    } finally {
+      if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      else process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      if (previousStdoutSequence === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      else process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      if (previousCallIndex === undefined) delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      else process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      if (previousExitCode === undefined) delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      else process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      if (previousExtractionFixtures === undefined) delete process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+      else process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = previousExtractionFixtures;
+    }
+  });
+
+  it.each([
+    [
+      "extracted image evidence",
+      "Now compare the extracted image evidence against the Theory Badge Graph.",
+    ],
+    [
+      "extracted equations",
+      "Now compare the extracted equations against the Theory Badge Graph.",
+    ],
+  ])("fails closed instead of model-only answering when a %s continuation sidecar is missing", async (_label, question) => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    process.env.CODEX_AGENT_FAKE_STDOUT = "This model-only answer must not be used.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: `turn-codex-scientific-image-continuation-missing-${String(_label).replace(/\W+/g, "-")}`,
+          session_id: `session-codex-scientific-image-continuation-missing-${String(_label).replace(/\W+/g, "-")}`,
+          question,
+        },
+      });
+      const debug = result.debug as Record<string, any>;
+
+      expect(result).toMatchObject({
+        ok: false,
+        response_type: "final_failure",
+        final_status: "final_failure",
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+      });
+      expect(result.answer).toContain("could not retrieve the prior scientific image evidence sidecar");
+      expect(result.answer).not.toContain("model-only answer");
+      expect(debug.fail_reason).toBe("scientific_image_evidence_sidecar_lookup_failed");
+      expect(debug.scientific_image_evidence_continuation_lookup).toMatchObject({
+        status: "missing",
+      });
+      expect(debug.runtime_lane_request_loop).toMatchObject({
+        status: "prior_scientific_image_sidecar_lookup_failed",
+        scientific_image_sidecar_gateway_bridge: {
+          status: "blocked",
+          blocked_reason: "scientific_image_evidence_sidecar_lookup_failed",
+        },
+      });
+    } finally {
+      if (previousStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
       }
       if (previousExitCode === undefined) {
         delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
@@ -2261,6 +2840,12 @@ describe("Codex provider capability lane adapter", () => {
         response_type: "final_answer",
       });
       expect(result.answer).toContain("**equation_area**");
+      expect(result.answer).toContain("- Label match: not_applicable");
+      expect(result.answer).toContain("- Exact equation admissibility: partial_candidate");
+      expect(result.answer).toContain("- Quality flags: partial_extraction_status");
+      expect(result.answer).toContain("- Exact row promotion: not_applicable; reasons: context_crop_not_exact_equation_row");
+      expect(result.answer).toContain("- Row/source diagnostics: requested_label=n/a, multiple_lines=false, needs_higher_resolution_source=false");
+      expect(result.answer).toContain("- Sidecar exact rows: admissible=0, promoted=0, partial=0, rejected=0");
       expect(result.answer).toContain("- latex_candidate:\n```latex\nE = mc^2\n```");
       expect(result.answer).toContain("**caption_text**");
       expect(result.answer).toContain("- text_candidate:\n```text\nAs in Chapter 2 we use the Bianchi identities...\n```");

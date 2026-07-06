@@ -4150,6 +4150,17 @@ describe("Helix workstation tool gateway", () => {
   });
 
   it("includes calculator payload expressions in theory badge reflection observations", async () => {
+    const scientificEvidence = buildScientificEvidencePacket({
+      cropRegionId: "image_lens_region:test-tokamak-calculator-payloads",
+      sourceRefHash: "sha256:test-tokamak-calculator-payloads",
+      bboxPx: { x: 0, y: 0, width: 300, height: 80 },
+      requestedEquationLabel: "3.1",
+      regionLabel: "equation_3.1",
+      textCandidate: "Tokamak plasma thermal pressure p_Pa = n_m3*T_eV*e_charge and W_th = P_loss*tau_E. (3.1)",
+      latexCandidate: "p_{Pa}=n_{m3}T_{eV}e,\\quad W_{th}=P_{loss}\\tau_E \\tag{3.1}",
+      uncertainty: [],
+      extractionStatus: "extracted",
+    });
     const result = await callWorkstationGatewayCapability({
       agentRuntime: "codex",
       mode: "read",
@@ -4157,6 +4168,7 @@ describe("Helix workstation tool gateway", () => {
       arguments: {
         prompt:
           "What equation from the theory badge graph can be solved in the calculator for tokamak thermal pressure and confinement time?",
+        scientific_evidence_packet: scientificEvidence,
         mentioned_symbols: ["p_Pa", "n_m3", "T_eV", "W_th", "P_loss", "tau_E"],
         mentioned_domains: ["tokamak plasma"],
         limit: 8,
@@ -4277,7 +4289,7 @@ describe("Helix workstation tool gateway", () => {
     });
     expect(observation.scientific_branch_gate).toMatchObject({
       schema: "helix.scientific_branch_gate.v1",
-      status: "restricted",
+      status: "blocked",
       primary_domain: "weyl_bianchi",
       rejected_calculator_payload_ids: expect.arrayContaining([
         "tokamak_thermal_pressure_payload",
@@ -4291,13 +4303,13 @@ describe("Helix workstation tool gateway", () => {
         expect.objectContaining({
           target_ref: "tokamak_thermal_pressure_payload",
           target_kind: "calculator_payload",
-          grade: "false_friend",
+          grade: "insufficient_evidence",
           blocked_by_branch_hint: true,
         }),
         expect.objectContaining({
           target_ref: "tokamak_confinement_energy_payload",
           target_kind: "calculator_payload",
-          grade: "false_friend",
+          grade: "insufficient_evidence",
           blocked_by_branch_hint: true,
         }),
       ]),
@@ -4305,7 +4317,7 @@ describe("Helix workstation tool gateway", () => {
     expect(observation.scientific_run_trace).toMatchObject({
       schema: "helix.scientific_run_trace.v1",
       primary_domain: "weyl_bianchi",
-      branch_gate_status: "restricted",
+      branch_gate_status: "blocked",
       rejected_calculator_payload_ids: expect.arrayContaining([
         "tokamak_thermal_pressure_payload",
         "tokamak_confinement_energy_payload",
@@ -4319,7 +4331,7 @@ describe("Helix workstation tool gateway", () => {
     });
     expect(observation.claim_boundary_notes).toEqual(
       expect.arrayContaining([
-        expect.stringContaining("scientific_branch_gate=restricted"),
+        expect.stringContaining("scientific_branch_gate=blocked"),
         expect.stringContaining("rejected_calculator_payloads=tokamak_thermal_pressure_payload"),
       ]),
     );
@@ -4341,11 +4353,11 @@ describe("Helix workstation tool gateway", () => {
       expect.arrayContaining([
         expect.objectContaining({
           kind: "scientific_evidence",
-          claim_boundary: expect.stringContaining("scientific_branch_gate=restricted"),
+          claim_boundary: expect.stringContaining("scientific_branch_gate=blocked"),
         }),
       ]),
     );
-    expect(result.observation_packet.observation_summary).toContain("Scientific branch gate: restricted");
+    expect(result.observation_packet.observation_summary).toContain("Scientific branch gate: blocked");
   });
 
   it("blocks calculator handoff when explicit Image Lens evidence failed exact mapping", async () => {
@@ -4747,7 +4759,8 @@ describe("Helix workstation tool gateway", () => {
     expect(result.ok).toBe(true);
     expect(observation.scientific_evidence_source).toBe("sidecar");
     expect(observation.scientific_evidence_packet).toMatchObject({
-      confidence: 0.55,
+      confidence: 0.47,
+      quality_flags: expect.arrayContaining(["partial_extraction_status"]),
       admissibility: expect.objectContaining({
         status: "unverified_math_observation",
       }),
@@ -4834,8 +4847,10 @@ describe("Helix workstation tool gateway", () => {
       cropRegionId: "image_lens_region:test-tokamak",
       sourceRefHash: "sha256:test-tokamak",
       bboxPx: { x: 0, y: 0, width: 300, height: 80 },
-      textCandidate: "Tokamak plasma beta uses p_Pa = n_m3*T_eV*e_charge and W_th = P_loss*tau_E.",
-      latexCandidate: "p_{Pa}=n_{m3}T_{eV}e,\\quad W_{th}=P_{loss}\\tau_E",
+      requestedEquationLabel: "3.1",
+      regionLabel: "equation_3.1",
+      textCandidate: "Tokamak plasma beta uses p_Pa = n_m3*T_eV*e_charge and W_th = P_loss*tau_E. (3.1)",
+      latexCandidate: "p_{Pa}=n_{m3}T_{eV}e,\\quad W_{th}=P_{loss}\\tau_E \\tag{3.1}",
       uncertainty: [],
       extractionStatus: "extracted",
     });

@@ -73,6 +73,7 @@ type ImageLensRegionExtractionResult = {
   table_candidate_ref?: string;
   uncertainty: string[];
   backend_ref: string | null;
+  materialization_error_code?: "missing_inline_crop_or_source_image_data";
 };
 
 const sourceKindFor = (request: ImageLensRegionInspectionRequestV1): DocumentImageSourceKindV1 =>
@@ -416,6 +417,7 @@ const resolveImageLensRegionExtraction = async (input: {
             "Image Lens OCR/math extraction backend was configured, but no inline crop or source image data was available.",
           ],
           backend_ref: "vision_provider",
+          materialization_error_code: "missing_inline_crop_or_source_image_data",
         };
       }
       const provider = getVisionProvider();
@@ -562,6 +564,7 @@ const buildReceipt = (input: {
     sourceKind,
     pageNumber: input.request.page_number ?? null,
     bboxPx: input.bbox,
+    sourceDimensionsPx: input.request.source_dimensions_px ?? null,
     textCandidate: input.extraction.text_candidate ?? null,
     latexCandidate: input.extraction.latex_candidate ?? null,
     uncertainty: input.extraction.uncertainty,
@@ -599,6 +602,8 @@ const buildReceipt = (input: {
     observed_equation_labels: scientificEvidencePacket.observed_equation_labels,
     label_match_status: scientificEvidencePacket.label_match_status,
     exact_equation_admissibility: scientificEvidencePacket.exact_equation_admissibility,
+    row_quality_diagnostics: scientificEvidencePacket.row_quality_diagnostics,
+    exact_row_promotion: scientificEvidencePacket.exact_row_promotion,
     evidence_role: scientificEvidencePacket.evidence_role,
     quality_flags: scientificEvidencePacket.quality_flags,
     quality_rejection_reasons: scientificEvidencePacket.quality_rejection_reasons,
@@ -696,6 +701,8 @@ const buildObservationPacket = (input: {
           observed_equation_labels: input.receipt.observed_equation_labels ?? [],
           label_match_status: input.receipt.label_match_status ?? null,
           exact_equation_admissibility: input.receipt.exact_equation_admissibility ?? null,
+          row_quality_diagnostics: input.receipt.row_quality_diagnostics ?? null,
+          exact_row_promotion: input.receipt.exact_row_promotion ?? null,
           evidence_role: input.receipt.evidence_role ?? null,
           quality_flags: input.receipt.quality_flags ?? [],
           quality_rejection_reasons: input.receipt.quality_rejection_reasons ?? [],
@@ -899,6 +906,52 @@ export const runImageLensRegionInspection = async (input: {
     cropImageRef,
     env: input.env,
   });
+  if (extraction.materialization_error_code === "missing_inline_crop_or_source_image_data") {
+    const observationRef = `${turnId}:capability_lane:${IMAGE_LENS_REGION_INSPECTION_CAPABILITY}:${hashShort({
+      status: "missing_inline_crop_or_source_image_data",
+      sourceId: normalizedSourceId,
+      bbox,
+      cropImageRef,
+    })}`;
+    const packet = buildObservationPacket({
+      request: normalizedRequest,
+      turnId,
+      iteration,
+      status: "missing_input",
+      summary: `Image Lens region inspection could not materialize source image data for crop ${bbox.x},${bbox.y},${bbox.width},${bbox.height}.`,
+      observationRef,
+      receipt: null,
+      backendSelectionDecision: trace.backend_selection_decision,
+      missingRequirements: [{
+        code: "missing_inline_crop_or_source_image_data",
+        message: "visual_analysis.inspect_image_region requires inline crop_image_ref, source_image_ref, or page_image_ref image data before OCR/math extraction can run.",
+        repair_action: "provide_inline_image_source_or_crop",
+      }],
+    });
+    return {
+      schema: IMAGE_LENS_REGION_INSPECTION_RESULT_SCHEMA,
+      ok: false,
+      lane_id: LANE_ID,
+      capability: IMAGE_LENS_REGION_INSPECTION_CAPABILITY,
+      selected_runtime_agent_provider: input.provider.id,
+      lane_resolve_trace: withExecutionTrace({
+        trace,
+        observationRef,
+        receiptRef: null,
+        status: "not_executed_shadow_only",
+        blockedReason: "missing_inline_crop_or_source_image_data",
+      }),
+      observation: null,
+      observation_packet: packet,
+      receipt: null,
+      artifact_refs: packet.produced_artifact_refs,
+      error: "image_lens_source_image_data_missing",
+      reentry_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
   const receipt = buildReceipt({
     request: normalizedRequest,
     bbox,
@@ -937,6 +990,8 @@ export const runImageLensRegionInspection = async (input: {
     observed_equation_labels: receipt.observed_equation_labels,
     label_match_status: receipt.label_match_status,
     exact_equation_admissibility: receipt.exact_equation_admissibility,
+    row_quality_diagnostics: receipt.row_quality_diagnostics,
+    exact_row_promotion: receipt.exact_row_promotion,
     evidence_role: receipt.evidence_role,
     quality_flags: receipt.quality_flags,
     quality_rejection_reasons: receipt.quality_rejection_reasons,

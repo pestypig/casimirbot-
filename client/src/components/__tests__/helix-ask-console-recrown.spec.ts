@@ -4522,7 +4522,8 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(composerPanel).toContain("{actionToolbar}");
     expect(composerPanel).toContain("{slashCommandMenu}");
     expect(composerPanel).toContain("{textarea}");
-    expect(composerPanel).toContain('className="flex flex-col gap-2 px-4 py-3"');
+    expect(composerPanel).toContain('className="relative z-[80] flex flex-col gap-2 px-4 py-3"');
+    expect(composerPanel).toContain('className="relative z-[90] min-w-0 overflow-visible"');
     expect(composerPanel).not.toContain("triggerAskActionHaptic");
     expect(composerPanel).not.toContain("handleAskImageSelect");
     expect(composerPanel).not.toContain("handleVoiceInputToggle");

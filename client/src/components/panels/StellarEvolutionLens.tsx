@@ -39,6 +39,7 @@ export default function StellarEvolutionLens({
   stages,
   selectedStageId,
   selectedObjectBindingId,
+  translateText,
   onSelectStage,
   onSelectObjectBinding,
   onClearObjectBinding,
@@ -48,11 +49,13 @@ export default function StellarEvolutionLens({
   stages: StarSimStellarEvolutionStage[];
   selectedStageId: StarSimStellarEvolutionStageId | null;
   selectedObjectBindingId: string | null;
+  translateText?: (text: string) => string;
   onSelectStage: (stage: StarSimStellarEvolutionStage) => void;
   onSelectObjectBinding: (stage: StarSimStellarEvolutionStage, bindingId: string) => void;
   onClearObjectBinding: () => void;
   onLoadPayload: (badgeId: string, payloadId: string) => void;
 }) {
+  const tx = translateText ?? ((text: string) => text);
   const selectedStage = stages.find((stage) => stage.id === selectedStageId) ?? null;
   const selectedBinding = selectedStage?.objectBindings.find((binding) => binding.id === selectedObjectBindingId) ?? null;
   const badgesById = new Map(graph.badges.map((badge) => [badge.id, badge]));
@@ -79,15 +82,15 @@ export default function StellarEvolutionLens({
                     <button
                       key={stage.id}
                       type="button"
-                      aria-label={`Select ${stage.title}`}
+                      aria-label={`Select ${tx(stage.title)}`}
                       onClick={() => onSelectStage(stage)}
                       className={`w-full border px-2 py-1.5 text-left text-xs shadow ${stageColorClass(
                         stage.colorClass,
                         selected,
                       )}`}
                     >
-                      <span className="block font-semibold">{stage.title}</span>
-                      <span className="mt-0.5 block text-[10px] opacity-75">{stage.objectClass}</span>
+                      <span className="block font-semibold">{tx(stage.title)}</span>
+                      <span className="mt-0.5 block text-[10px] opacity-75">{tx(stage.objectClass)}</span>
                     </button>
                   );
                 })}
@@ -98,7 +101,7 @@ export default function StellarEvolutionLens({
       <div className="border-t border-zinc-800 p-2">
         {selectedStage ? (
           <div className="space-y-2">
-            <div className="text-xs font-semibold text-zinc-100">{selectedStage.title}</div>
+            <div className="text-xs font-semibold text-zinc-100">{tx(selectedStage.title)}</div>
             <div className="text-[11px] text-zinc-400">
               {selectedStage.theoryBadgeIds.length} mapped badges / {selectedStage.calculatorPayloadRefs.length} scalar loadouts
             </div>
@@ -122,7 +125,7 @@ export default function StellarEvolutionLens({
                     <button
                       key={binding.id}
                       type="button"
-                      aria-label={`Use ${binding.label} object binding`}
+                      aria-label={`Use ${tx(binding.label)} object binding`}
                       onClick={() => onSelectObjectBinding(selectedStage, binding.id)}
                       className={`w-full border px-2 py-1.5 text-left text-[11px] ${
                         selected
@@ -130,8 +133,8 @@ export default function StellarEvolutionLens({
                           : "border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-cyan-700"
                       }`}
                     >
-                      <span className="block font-semibold">{binding.label}</span>
-                      <span className="mt-0.5 block text-[10px] opacity-75">{binding.description}</span>
+                      <span className="block font-semibold">{tx(binding.label)}</span>
+                      <span className="mt-0.5 block text-[10px] opacity-75">{tx(binding.description)}</span>
                     </button>
                   );
                 })}
@@ -156,12 +159,12 @@ export default function StellarEvolutionLens({
             </div>
             {selectedStage.calculatorPayloadRefs.length === 0 ? (
               <div className="border border-zinc-800 bg-zinc-900 px-2 py-2 text-[11px] text-zinc-500">
-                Runtime/reference stage. No scalar calculator payload.
+                {tx("Runtime/reference stage. No scalar calculator payload.")}
               </div>
             ) : null}
           </div>
         ) : (
-          <div className="text-[11px] text-zinc-500">Pick a lifecycle stage to light the matching theory badges.</div>
+          <div className="text-[11px] text-zinc-500">{tx("Pick a lifecycle stage to light the matching theory badges.")}</div>
         )}
       </div>
     </aside>

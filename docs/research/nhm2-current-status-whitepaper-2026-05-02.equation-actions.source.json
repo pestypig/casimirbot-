@@ -746,6 +746,195 @@
       ]
     },
     {
+      "equationId": "nhm2-frozen-447-material-evidence-gate",
+      "label": "Frozen 447-layer material-evidence gate",
+      "aliases": [
+        "Coupon_admit = A_topology and N_layer=447 and f_support=0.26 and f_lost=0.08",
+        "nhm2_447_layer_topology_optimized_lattice_tin_v1",
+        "frozen 447-layer material evidence gate"
+      ],
+      "actions": [
+        {
+          "actionId": "open-frozen-447-material-evidence-gate",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open frozen 447-layer material gate",
+          "badgeIds": [
+            "nhm2.experimental.layer_stack_mechanical_receipt",
+            "nhm2.experimental.layer_stack_support_fraction_sweep",
+            "nhm2.experimental.layer_stack_architecture_loop",
+            "nhm2.experimental.full_apparatus_receipt_loop",
+            "nhm2.experimental.tile_source_physical_validation_plan",
+            "casimir.material.lifshitz_receipt",
+            "nhm2.experimental.full_apparatus_tensor",
+            "nhm2.claim_boundary.physical_viability_locked",
+            "nhm2.claim_boundary.transport_locked"
+          ],
+          "preferredBadgeId": "nhm2.experimental.tile_source_physical_validation_plan",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": ["theory-badge-graph"],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "The frozen 447-layer coupon gate is an evidence-admission and architecture-compatibility gate, not material validation, source proof, physical viability, transport, propulsion, route, or speed authority."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "A generic TiN coupon cannot stand in for the frozen 447-layer topology-optimized architecture.",
+        "Architecture identity, layer count, support fraction, lost active area, topology receipt, deposition receipt, stress map, adhesion protocol, and coupon population remain evidence-admission requirements.",
+        "Passing this gate would not by itself validate the material source or NHM2 transport."
+      ]
+    },
+    {
+      "equationId": "nhm2-qst-er-epr-stage1-sidecar-boundary",
+      "label": "QST ER_EPR_STAGE1 sidecar boundary",
+      "aliases": [
+        "ER_EPR_STAGE1",
+        "ER_EPR_STAGE1_SOLVER_ADAPTER_V1",
+        "ER_EPR_TINY_SYK_EXACT_DIAG_V1",
+        "qst_proxy_to_adm_metric_boundary"
+      ],
+      "actions": [
+        {
+          "actionId": "open-qst-er-epr-stage1-boundary",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open QST proxy boundary",
+          "badgeIds": [
+            "nhm2.claim_boundary.diagnostic_only",
+            "nhm2.formal.claim_locks_closed",
+            "nhm2.claim_boundary.physical_viability_locked",
+            "nhm2.claim_boundary.transport_locked"
+          ],
+          "preferredBadgeId": "nhm2.claim_boundary.diagnostic_only",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.claim_boundary",
+          "openPanels": ["theory-badge-graph"],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "The ER/EPR sidecar is a model-internal QST proxy lane; it is not an ADM metric lane, stress-energy source, wormhole inventory, or NHM2 validation layer."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "QST proxy telemetry does not validate NHM2.",
+        "Tiny SYK-like solver rows remain model-internal and cannot bypass source-to-geometry, observer, QEI, conservation, causality, reproducibility, or claim gates."
+      ]
+    },
+    {
+      "equationId": "nhm2-0p7000-candidate-metric-profile-spec",
+      "label": "0p7000 candidate metric profile spec",
+      "aliases": [
+        "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+        "nhm2_candidate_metric_profile_spec/v1",
+        "alphaCenterline = 0.7",
+        "tau = alpha_centerline * T_coordinate"
+      ],
+      "actions": [
+        {
+          "actionId": "open-0p7000-candidate-metric-profile-spec",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open 0p7000 profile spec",
+          "badgeIds": [
+            "nhm2.clock.centerline_tau_alpha_T",
+            "nhm2.clock.twin_paradox_trip_clocking",
+            "nhm2.geometry.lapse_shift_profile",
+            "nhm2.dynamic.time_dependent_source_campaign",
+            "nhm2.formal.diagnostic_campaign_admissible",
+            "nhm2.claim_boundary.expected_clocking_not_route_result",
+            "nhm2.claim_boundary.physical_viability_locked",
+            "nhm2.claim_boundary.transport_locked"
+          ],
+          "preferredBadgeId": "nhm2.dynamic.time_dependent_source_campaign",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": ["theory-badge-graph"],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "The 0p7000 profile spec is a diagnostic clocking/profile governance row; it is not route ETA, speed, transport, propulsion, physical viability, or material-source proof."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "The 0p7000 profile has fresh local generated campaign artifacts, but claim locks remain closed.",
+        "Clocking quantities describe ship-clock accumulation under a bounded lapse schedule, not route dynamics or speed."
+      ]
+    },
+    {
+      "equationId": "nhm2-time-dependent-source-campaign-gate",
+      "label": "Time-dependent source campaign gate",
+      "aliases": [
+        "nhm2_time_dependent_source_campaign/v1",
+        "sourceIndependencePass and switchingConservationPass and frequencyConvergencePass",
+        "dynamicGeometryAgreementPass and fullRegionalTensorClosurePass and observerFamilyPass and qeiReceiptsPass and stabilityPass"
+      ],
+      "actions": [
+        {
+          "actionId": "open-time-dependent-source-campaign-gate",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open time-dependent campaign gate",
+          "badgeIds": [
+            "nhm2.dynamic.time_dependent_source_campaign",
+            "nhm2.source.component_authority_ledger",
+            "nhm2.source.same_basis_tensor_authority",
+            "nhm2.closure.coupled_pass_candidate",
+            "nhm2.closure.regional_tensor_pass_path_harness",
+            "nhm2.qei.worldline_dossier",
+            "nhm2.energy_condition.observer_robust_gate",
+            "nhm2.formal.diagnostic_campaign_admissible",
+            "nhm2.claim_boundary.physical_viability_locked",
+            "nhm2.claim_boundary.transport_locked"
+          ],
+          "preferredBadgeId": "nhm2.dynamic.time_dependent_source_campaign",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": ["theory-badge-graph"],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "A time-dependent campaign pass is diagnostic and artifact-scoped; it is not material-source proof, physical viability, route ETA, transport, propulsion, or speed authority."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "The campaign gate records a coherent local artifact chain only.",
+        "External reproduction, material credibility, stricter observer optimization, conservation, stability, and physical receipts remain downstream review requirements."
+      ]
+    },
+    {
+      "equationId": "nhm2-0p7000-profile-campaign-frontier",
+      "label": "0p7000 profile campaign frontier",
+      "aliases": [
+        "nhm2_profile_campaign_frontier/v1",
+        "nhm2_campaign_profile_run_manifest/v1",
+        "fastestAdmissibleAlpha = 0.7",
+        "profileCampaignFrontierComplete = true",
+        "firstBlocker = null"
+      ],
+      "actions": [
+        {
+          "actionId": "open-0p7000-profile-campaign-frontier",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open 0p7000 campaign frontier",
+          "badgeIds": [
+            "nhm2.dynamic.time_dependent_source_campaign",
+            "nhm2.formal.certificate_hashes_pinned",
+            "nhm2.formal.lean_certificate",
+            "nhm2.formal.diagnostic_campaign_admissible",
+            "nhm2.formal.claim_locks_closed",
+            "nhm2.experimental.physical_viability_campaign",
+            "nhm2.claim_boundary.physical_viability_locked",
+            "nhm2.claim_boundary.transport_locked"
+          ],
+          "preferredBadgeId": "nhm2.formal.diagnostic_campaign_admissible",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": ["theory-badge-graph"],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "The 0p7000 frontier is a diagnostic campaign-admissible profile and run-manifest result only; physical, route, transport, propulsion, material-source, speed, and external-validation claims remain locked."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Profile frontier completion is not physical viability.",
+        "The campaign manifest governs generated local evidence and does not replace independent reproduction or experimental receipts."
+      ]
+    },
+    {
       "equationId": "nhm2-physical-evidence-campaign-ladder",
       "label": "NHM2 physical evidence campaign ladder",
       "aliases": [

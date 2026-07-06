@@ -109,4 +109,34 @@ describe("Helix Ask prompt history navigation", () => {
       }),
     ).toBeNull();
   });
+
+  it("keeps arrows in history navigation mode after the first recalled prompt", () => {
+    expect(
+      shouldHandleHelixAskPromptHistoryKey({
+        key: "ArrowUp",
+        historyBrowsingActive: true,
+        value: "hello\nworld",
+        selectionStart: 11,
+        selectionEnd: 11,
+      }),
+    ).toBe("previous");
+    expect(
+      shouldHandleHelixAskPromptHistoryKey({
+        key: "ArrowDown",
+        historyBrowsingActive: true,
+        value: "hello\nworld",
+        selectionStart: 0,
+        selectionEnd: 0,
+      }),
+    ).toBe("next");
+    expect(
+      shouldHandleHelixAskPromptHistoryKey({
+        key: "ArrowLeft",
+        historyBrowsingActive: true,
+        value: "hello",
+        selectionStart: 5,
+        selectionEnd: 5,
+      }),
+    ).toBeNull();
+  });
 });

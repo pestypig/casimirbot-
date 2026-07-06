@@ -19,6 +19,8 @@ import {
 import { speakVoice } from "@/lib/agi/api";
 import { SituationGraphCanvas } from "@/components/workstation/situation-graph/SituationGraphCanvas";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
+import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
+import { useInterfaceText, type InterfaceTextResolver } from "@/lib/i18n/interfaceText";
 import {
   MinecraftWorldBindingPanel,
   type MinecraftWorldSourceView,
@@ -607,6 +609,7 @@ function JobCard({
   onStop,
   onSave,
   onAttach,
+  t,
 }: {
   job: SituationRoomJob;
   selected: boolean;
@@ -615,6 +618,7 @@ function JobCard({
   onStop: () => void;
   onSave: () => void;
   onAttach: () => void;
+  t: InterfaceTextResolver["t"];
 }) {
   return (
     <article
@@ -628,12 +632,15 @@ function JobCard({
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-white">{job.title}</p>
             <p className="mt-1 text-[11px] text-slate-400">
-              {job.kind} / outputs {job.output_ids.length}
+              {t("situationRoom.jobCard.summary", { kind: job.kind, count: job.output_ids.length })}
             </p>
             {job.kind === "translate" ? (
               <p className="mt-1 text-[11px] text-slate-500">
-                target {job.target_language ?? "target"} / input {job.input_text_policy} / output{" "}
-                {job.output_render_policy}
+                {t("situationRoom.jobCard.translateSummary", {
+                  target: job.target_language ?? t("situationRoom.jobCard.targetFallback"),
+                  input: job.input_text_policy,
+                  output: job.output_render_policy,
+                })}
               </p>
             ) : null}
           </div>
@@ -650,7 +657,7 @@ function JobCard({
           className="inline-flex items-center gap-1 rounded border border-cyan-400/35 bg-cyan-500/10 px-2 py-1 text-xs text-cyan-100 hover:bg-cyan-500/20"
         >
           <Play className="h-3.5 w-3.5" />
-          Run
+          {t("situationRoom.action.run")}
         </button>
         <button
           type="button"
@@ -658,7 +665,7 @@ function JobCard({
           className="inline-flex items-center gap-1 rounded border border-slate-400/35 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10"
         >
           <PauseCircle className="h-3.5 w-3.5" />
-          Stop
+          {t("situationRoom.action.stop")}
         </button>
         <button
           type="button"
@@ -666,7 +673,7 @@ function JobCard({
           className="inline-flex items-center gap-1 rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10"
         >
           <Link2 className="h-3.5 w-3.5" />
-          Attach
+          {t("situationRoom.action.attach")}
         </button>
         <button
           type="button"
@@ -674,7 +681,7 @@ function JobCard({
           className="inline-flex items-center gap-1 rounded border border-emerald-400/35 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-100 hover:bg-emerald-500/20"
         >
           <Save className="h-3.5 w-3.5" />
-          Save
+          {t("situationRoom.action.save")}
         </button>
       </div>
     </article>
@@ -719,9 +726,26 @@ export default function SituationRoomPipelinesPanel() {
   const actionExecutions = useWorkstationActionExecutionStore((state) => state.executions);
   const actionExecutionOrder = useWorkstationActionExecutionStore((state) => state.order);
   const { userSettings } = useHelixStartSettings();
+  const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const { t } = useInterfaceText(interfaceLanguage.code);
   const accountTargetLanguage = React.useMemo(
     () => resolveSituationRoomAccountTargetLanguage(userSettings.interfaceLanguage),
     [userSettings.interfaceLanguage],
+  );
+  const pipelinePageLabels = React.useMemo<Record<PipelinePanelPage, string>>(
+    () => ({
+      setup: t("situationRoom.page.build"),
+      constructs: t("situationRoom.page.liveJobs"),
+      sources: t("situationRoom.page.sources"),
+      output: t("situationRoom.page.outputs"),
+      runtime: t("situationRoom.page.debug"),
+      jobs: t("situationRoom.page.runs"),
+      graph: t("situationRoom.page.graph"),
+      recipes: t("situationRoom.page.graphRecipes"),
+      capabilities: t("situationRoom.page.capabilities"),
+      inputs: t("situationRoom.page.inputs"),
+    }),
+    [t],
   );
   const previousAccountTargetLanguageRef = React.useRef(accountTargetLanguage);
   const [panelPage, setPanelPage] = React.useState<PipelinePanelPage>("setup");
@@ -1893,28 +1917,7 @@ export default function SituationRoomPipelinesPanel() {
     else if (panelPage === "recipes") setPanelPage("graph");
   };
 
-  const pageTitle =
-    panelPage === "setup"
-      ? "Build"
-      : panelPage === "constructs"
-        ? "Live Jobs"
-      : panelPage === "sources"
-        ? "Sources"
-        : panelPage === "output"
-          ? "Outputs"
-      : panelPage === "graph"
-      ? "Situation Graph"
-      : panelPage === "recipes"
-        ? "Graph Recipes"
-        : panelPage === "capabilities"
-          ? "Capabilities"
-          : panelPage === "runtime"
-            ? "Debug Trace"
-      : panelPage === "inputs"
-        ? "Pipeline Inputs"
-      : panelPage === "jobs"
-          ? "Runs"
-          : "Output";
+  const pageTitle = pipelinePageLabels[panelPage];
   const pageIcon =
     panelPage === "setup" || panelPage === "constructs" || panelPage === "sources" || panelPage === "graph" || panelPage === "recipes" || panelPage === "capabilities" || panelPage === "runtime" || panelPage === "inputs" ? <Workflow className="h-4 w-4 text-cyan-300" /> : panelPage === "jobs" ? <ListChecks className="h-4 w-4 text-cyan-300" /> : <ScrollText className="h-4 w-4 text-cyan-300" />;
 
@@ -1927,7 +1930,7 @@ export default function SituationRoomPipelinesPanel() {
               type="button"
               onClick={goBack}
               className="inline-flex h-8 w-8 items-center justify-center rounded border border-white/15 bg-white/5 text-slate-200 hover:bg-white/10"
-              aria-label="Back"
+              aria-label={t("situationRoom.nav.back")}
             >
               <ArrowLeft className="h-4 w-4" />
             </button>
@@ -1936,7 +1939,7 @@ export default function SituationRoomPipelinesPanel() {
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-white">{pageTitle}</p>
             <p className="truncate text-[11px] text-slate-500">
-              {activeRoom?.title ?? "No room"} / {selectedSource?.label ?? "whole room"}
+              {activeRoom?.title ?? t("situationRoom.nav.noRoom")} / {selectedSource?.label ?? t("situationRoom.nav.wholeRoom")}
               {selectedJob ? ` / ${selectedJob.title}` : ""}
             </p>
           </div>
@@ -1953,12 +1956,12 @@ export default function SituationRoomPipelinesPanel() {
                 panelPage === page ? "bg-cyan-500/20 text-cyan-100" : "text-slate-400 hover:bg-white/5 hover:text-slate-200",
               )}
             >
-              {PIPELINE_PANEL_PAGE_LABELS[page]}
+              {pipelinePageLabels[page]}
             </button>
           ))}
           <details className="relative">
             <summary className="cursor-pointer list-none rounded px-2 py-1 text-slate-400 hover:bg-white/5 hover:text-slate-200">
-              Advanced
+              {t("situationRoom.nav.advanced")}
             </summary>
             <div className="absolute right-0 z-20 mt-2 w-44 rounded border border-white/10 bg-slate-950 p-1 shadow-xl">
               {(["jobs", "graph", "recipes", "capabilities", "inputs"] as PipelinePanelPage[]).map((page) => (
@@ -1971,7 +1974,7 @@ export default function SituationRoomPipelinesPanel() {
                     panelPage === page ? "bg-cyan-500/20 text-cyan-100" : "text-slate-400 hover:bg-white/5 hover:text-slate-200",
                   )}
                 >
-                  {PIPELINE_PANEL_PAGE_LABELS[page]}
+                  {pipelinePageLabels[page]}
                 </button>
               ))}
             </div>
@@ -1985,12 +1988,12 @@ export default function SituationRoomPipelinesPanel() {
             <section className="rounded-lg border border-cyan-300/25 bg-slate-950/80 p-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase text-cyan-200">Create Live Job</p>
+                  <p className="text-[11px] font-semibold uppercase text-cyan-200">{t("situationRoom.createLiveJob.eyebrow")}</p>
                   <p className="mt-1 text-lg font-semibold text-white">
-                    Assemble a Situation Room live job
+                    {t("situationRoom.createLiveJob.title")}
                   </p>
                   <p className="mt-1 text-xs text-slate-400">
-                    {activeRoom?.title ?? "No active room"} / {sourceLabelForConstruct(selectedSource)}
+                    {activeRoom?.title ?? t("situationRoom.createLiveJob.noActiveRoom")} / {sourceLabelForConstruct(selectedSource)}
                   </p>
                 </div>
                 <button
@@ -2000,13 +2003,13 @@ export default function SituationRoomPipelinesPanel() {
                   className="inline-flex items-center gap-2 rounded border border-cyan-400/40 bg-cyan-500/10 px-3 py-2 text-sm font-semibold text-cyan-100 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <Plus className="h-4 w-4" />
-                  Create Live Job
+                  {t("situationRoom.createLiveJob.eyebrow")}
                 </button>
               </div>
 
               <div className="mt-4 grid gap-3 lg:grid-cols-[0.85fr_1.15fr]">
                 <div className="rounded-lg border border-white/10 bg-black/20 p-3">
-                  <p className="text-[10px] font-semibold uppercase text-slate-500">Purpose</p>
+                  <p className="text-[10px] font-semibold uppercase text-slate-500">{t("situationRoom.createLiveJob.purpose")}</p>
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     {CONSTRUCT_PURPOSE_OPTIONS.map((purpose) => (
                       <button
@@ -2033,7 +2036,7 @@ export default function SituationRoomPipelinesPanel() {
                 <div className="rounded-lg border border-white/10 bg-black/20 p-3">
                   <div className="grid gap-3 md:grid-cols-2">
                     <label className="block">
-                      <span className="text-[10px] font-semibold uppercase text-slate-500">Source class</span>
+                      <span className="text-[10px] font-semibold uppercase text-slate-500">{t("situationRoom.createLiveJob.sourceClass")}</span>
                       <select
                         value={constructSource}
                         onChange={(event) => setConstructSource(event.target.value as ConstructBuilderSource)}
@@ -2045,7 +2048,7 @@ export default function SituationRoomPipelinesPanel() {
                       </select>
                     </label>
                     <label className="block md:col-span-2">
-                      <span className="text-[10px] font-semibold uppercase text-slate-500">Operating Prompt</span>
+                      <span className="text-[10px] font-semibold uppercase text-slate-500">{t("situationRoom.createLiveJob.operatingPrompt")}</span>
                       <textarea
                         value={constructOperatingPrompt}
                         onChange={(event) => setConstructOperatingPrompt(event.target.value)}
@@ -2053,11 +2056,11 @@ export default function SituationRoomPipelinesPanel() {
                         className="mt-2 w-full resize-y rounded border border-cyan-300/25 bg-slate-900 px-3 py-2 text-sm leading-5 text-slate-100 outline-none focus:border-cyan-300/60"
                       />
                       <p className="mt-1 text-[11px] text-slate-500">
-                        This is the visible job rule. It guides live outputs without changing Helix Ask final-answer authority.
+                        {t("situationRoom.createLiveJob.operatingPromptHelp")}
                       </p>
                     </label>
                     <label className="block">
-                      <span className="text-[10px] font-semibold uppercase text-slate-500">Recipe</span>
+                      <span className="text-[10px] font-semibold uppercase text-slate-500">{t("situationRoom.createLiveJob.recipe")}</span>
                       <select
                         value={constructRecipeId}
                         onChange={(event) => setConstructRecipeId(event.target.value as ConstructBuilderRecipeId)}
@@ -2069,7 +2072,7 @@ export default function SituationRoomPipelinesPanel() {
                       </select>
                     </label>
                     <label className="block">
-                      <span className="text-[10px] font-semibold uppercase text-slate-500">Output</span>
+                      <span className="text-[10px] font-semibold uppercase text-slate-500">{t("situationRoom.createLiveJob.output")}</span>
                       <select
                         value={constructOutput}
                         onChange={(event) => setConstructOutput(event.target.value as ConstructBuilderOutput)}
@@ -2081,18 +2084,23 @@ export default function SituationRoomPipelinesPanel() {
                       </select>
                     </label>
                     <div>
-                      <p className="text-[10px] font-semibold uppercase text-slate-500">Selected evidence</p>
+                      <p className="text-[10px] font-semibold uppercase text-slate-500">{t("situationRoom.createLiveJob.selectedEvidence")}</p>
                       <div className="mt-2 rounded border border-white/10 bg-slate-950/70 px-2 py-2">
-                        <p className="truncate text-sm text-slate-100">{selectedSource?.label ?? "Whole room"}</p>
+                        <p className="truncate text-sm text-slate-100">{selectedSource?.label ?? t("situationRoom.nav.wholeRoom")}</p>
                         <p className="mt-1 text-[11px] text-slate-500">
-                          {constructSourceIds.length} source{constructSourceIds.length === 1 ? "" : "s"} bound
+                          {t(
+                            constructSourceIds.length === 1
+                              ? "situationRoom.createLiveJob.sourceBoundSingular"
+                              : "situationRoom.createLiveJob.sourceBoundPlural",
+                            { count: constructSourceIds.length },
+                          )}
                         </p>
                       </div>
                     </div>
                   </div>
 
                   <div className="mt-3">
-                    <p className="text-[10px] font-semibold uppercase text-slate-500">Policies</p>
+                    <p className="text-[10px] font-semibold uppercase text-slate-500">{t("situationRoom.createLiveJob.policies")}</p>
                     <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
                       {CONSTRUCT_POLICY_OPTIONS.map((policy) => (
                         <label
@@ -2132,9 +2140,9 @@ export default function SituationRoomPipelinesPanel() {
             <section className="rounded-lg border border-cyan-300/20 bg-cyan-500/5 p-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase text-cyan-200">Route setup</p>
+                  <p className="text-[11px] font-semibold uppercase text-cyan-200">{t("situationRoom.routeSetup.title")}</p>
                   <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-300">
-                    Tell Helix Ask what you want. This panel shows the current route, missing setup fields, and delegated tool receipts; live products move to Output once setup is running.
+                    {t("situationRoom.routeSetup.description")}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -2143,21 +2151,21 @@ export default function SituationRoomPipelinesPanel() {
                     onClick={() => setPanelPage("sources")}
                     className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10"
                   >
-                    Sources
+                    {t("situationRoom.page.sources")}
                   </button>
                   <button
                     type="button"
                     onClick={() => setPanelPage("output")}
                     className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10"
                   >
-                    Output
+                    {t("situationRoom.page.outputs")}
                   </button>
                   <button
                     type="button"
                     onClick={() => setPanelPage("runtime")}
                     className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10"
                   >
-                    Debug
+                    {t("situationRoom.page.debug")}
                   </button>
                 </div>
               </div>
@@ -2165,12 +2173,14 @@ export default function SituationRoomPipelinesPanel() {
                 <div className="rounded-lg border border-white/10 bg-slate-950/70 p-3">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="text-[10px] uppercase text-slate-500">Setup proposal</p>
-                      <p className="mt-1 text-base font-semibold text-white">{setupIntent?.title ?? "No route selected"}</p>
+                      <p className="text-[10px] uppercase text-slate-500">{t("situationRoom.routeSetup.proposal")}</p>
+                      <p className="mt-1 text-base font-semibold text-white">
+                        {setupIntent?.title ?? t("situationRoom.routeSetup.noRoute")}
+                      </p>
                       <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-400">{setupObjective}</p>
                     </div>
                     <span className="rounded border border-white/15 bg-black/20 px-2 py-1 text-[10px] uppercase text-slate-400">
-                      {setupIntent ? "proposal loaded" : "waiting for Helix Ask"}
+                      {setupIntent ? t("situationRoom.routeSetup.proposalLoaded") : t("situationRoom.routeSetup.waitingForHelixAsk")}
                     </span>
                   </div>
                   <div className="mt-3 grid gap-2 md:grid-cols-3">
@@ -2185,10 +2195,10 @@ export default function SituationRoomPipelinesPanel() {
                       )}
                     >
                       <p className={cn("text-[10px] uppercase", !setupIntent ? "text-slate-500" : setupMissingFields.length ? "text-red-200" : "text-emerald-200")}>
-                        Readiness
+                        {t("situationRoom.routeSetup.readiness")}
                       </p>
                       <p className={cn("mt-1 text-xs", !setupIntent ? "text-slate-300" : setupMissingFields.length ? "text-red-100" : "text-emerald-100")}>
-                        {!setupIntent ? "No setup proposal" : setupMissingFields.length ? setupMissingFields.join(", ") : "Ready"}
+                        {!setupIntent ? t("situationRoom.routeSetup.noProposal") : setupMissingFields.length ? setupMissingFields.join(", ") : t("situationRoom.routeSetup.ready")}
                       </p>
                     </div>
                     <div
@@ -2199,19 +2209,30 @@ export default function SituationRoomPipelinesPanel() {
                           : "border-white/10 bg-black/20",
                       )}
                     >
-                      <p className="text-[10px] uppercase text-slate-500">Source</p>
+                      <p className="text-[10px] uppercase text-slate-500">{t("situationRoom.routeSetup.source")}</p>
                       <p
                         className={cn(
                           "mt-1 truncate text-xs",
                           setupIntent && setupNeedsExistingSource && setupActualSourceIds.length === 0 ? "text-red-100" : "text-slate-200",
                         )}
                       >
-                        {!setupIntent ? "Pending proposal" : setupActualSourceIds.length ? setupActualSourceIds.join(", ") : "Missing"}
+                        {!setupIntent
+                          ? t("situationRoom.routeSetup.pendingProposal")
+                          : setupActualSourceIds.length
+                            ? setupActualSourceIds.join(", ")
+                            : t("situationRoom.routeSetup.missing")}
                       </p>
                     </div>
                     <div className="rounded border border-white/10 bg-black/20 p-2">
-                      <p className="text-[10px] uppercase text-slate-500">Delegated tools</p>
-                      <p className="mt-1 text-xs text-slate-200">{setupToolActions.length} action{setupToolActions.length === 1 ? "" : "s"}</p>
+                      <p className="text-[10px] uppercase text-slate-500">{t("situationRoom.routeSetup.delegatedTools")}</p>
+                      <p className="mt-1 text-xs text-slate-200">
+                        {t(
+                          setupToolActions.length === 1
+                            ? "situationRoom.routeSetup.actionCountSingular"
+                            : "situationRoom.routeSetup.actionCountPlural",
+                          { count: setupToolActions.length },
+                        )}
+                      </p>
                     </div>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -2221,39 +2242,50 @@ export default function SituationRoomPipelinesPanel() {
                       disabled={!setupIntent || !setupCanStart}
                       className="rounded border border-cyan-300/40 bg-cyan-500/15 px-3 py-2 text-xs font-semibold text-cyan-50 hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-45"
                     >
-                      {!setupIntent ? "Waiting for setup proposal" : setupMissingFields.length ? "Missing required fields" : setupIntent?.actionLabel ?? "Start"}
+                      {!setupIntent
+                        ? t("situationRoom.routeSetup.waitingForSetup")
+                        : setupMissingFields.length
+                          ? t("situationRoom.routeSetup.missingRequired")
+                          : setupIntent?.actionLabel ?? t("situationRoom.routeSetup.start")}
                     </button>
                     <button
                       type="button"
                       onClick={() => setPanelPage("sources")}
                       className="rounded border border-white/15 bg-white/5 px-3 py-2 text-xs text-slate-200 hover:bg-white/10"
                     >
-                      Sources
+                      {t("situationRoom.page.sources")}
                     </button>
                     <button
                       type="button"
                       onClick={() => setPanelPage("output")}
                       className="rounded border border-white/15 bg-white/5 px-3 py-2 text-xs text-slate-200 hover:bg-white/10"
                     >
-                      Output
+                      {t("situationRoom.page.outputs")}
                     </button>
                     <button
                       type="button"
                       onClick={() => setPanelPage("runtime")}
                       className="rounded border border-white/15 bg-white/5 px-3 py-2 text-xs text-slate-200 hover:bg-white/10"
                     >
-                      Debug
+                      {t("situationRoom.page.debug")}
                     </button>
                   </div>
                 </div>
                 <div className="rounded-lg border border-white/10 bg-slate-950/70 p-3">
-                  <p className="text-[10px] uppercase text-slate-500">Latest setup receipt</p>
+                  <p className="text-[10px] uppercase text-slate-500">{t("situationRoom.routeSetup.latestReceipt")}</p>
                   <p className={cn("mt-2 text-xs leading-5", setupStatus ? "text-emerald-100" : "text-slate-400")}>
-                    {setupStatus ?? (!setupIntent ? "No active proposal yet. Use Helix Ask to describe the workflow; saved templates live under Advanced." : setupMissingFields.length ? `Waiting for ${setupMissingFields.join(", ")}.` : "Ready to start this route.")}
+                    {setupStatus ??
+                      (!setupIntent
+                        ? t("situationRoom.routeSetup.noActiveProposal")
+                        : setupMissingFields.length
+                          ? t("situationRoom.routeSetup.waitingForFields", { fields: setupMissingFields.join(", ") })
+                          : t("situationRoom.routeSetup.readyToStart"))}
                   </p>
                   <div className="mt-3 rounded border border-white/10 bg-black/20 p-2">
-                    <p className="text-[10px] uppercase text-slate-500">Policy</p>
-                    <p className="mt-1 text-xs text-slate-200">{setupMode} / compact context only / command lane disabled</p>
+                    <p className="text-[10px] uppercase text-slate-500">{t("situationRoom.routeSetup.policy")}</p>
+                    <p className="mt-1 text-xs text-slate-200">
+                      {t("situationRoom.routeSetup.policyValue", { mode: setupMode })}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -2261,11 +2293,11 @@ export default function SituationRoomPipelinesPanel() {
 
             <details className="rounded-lg border border-white/10 bg-black/20 p-3">
               <summary className="cursor-pointer text-xs font-semibold text-slate-200">
-                Advanced setup
+                {t("situationRoom.advancedSetup.title")}
               </summary>
               <div className="mt-3 space-y-4">
                 <section>
-                  <p className="text-[11px] font-semibold uppercase text-slate-500">Route templates</p>
+                  <p className="text-[11px] font-semibold uppercase text-slate-500">{t("situationRoom.advancedSetup.routeTemplates")}</p>
                 <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                   {setupIntents.map((intent) => (
                     <div
@@ -2289,12 +2321,12 @@ export default function SituationRoomPipelinesPanel() {
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-sm font-semibold">{intent.title}</p>
                         <span className="rounded border border-white/15 bg-black/20 px-1.5 py-0.5 text-[9px] uppercase text-slate-400">
-                          {intent.custom ? "custom" : "route"}
+                          {intent.custom ? t("situationRoom.advancedSetup.customBadge") : t("situationRoom.advancedSetup.routeBadge")}
                         </span>
                       </div>
                       <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-400">{intent.description}</p>
                       <p className="mt-2 text-[10px] text-slate-500">
-                        Route preview: {intent.kind.replace(/_/g, " ")}
+                        {t("situationRoom.advancedSetup.routePreview", { kind: intent.kind.replace(/_/g, " ") })}
                       </p>
                       </button>
                       {intent.custom ? (
@@ -2303,7 +2335,7 @@ export default function SituationRoomPipelinesPanel() {
                           onClick={() => handleDeleteCustomRoute(intent.id)}
                           className="mt-2 rounded border border-red-400/30 bg-red-500/10 px-2 py-1 text-[10px] text-red-100 hover:bg-red-500/20"
                         >
-                          Delete
+                          {t("situationRoom.action.delete")}
                         </button>
                       ) : null}
                     </div>
@@ -2312,42 +2344,42 @@ export default function SituationRoomPipelinesPanel() {
                 </section>
                 <details className="mt-3 rounded-lg border border-white/10 bg-slate-950/70 p-3">
                   <summary className="cursor-pointer text-xs font-semibold text-slate-200">
-                    Create a custom route card
+                    {t("situationRoom.advancedSetup.createCustomRoute")}
                   </summary>
                   <div className="mt-3 grid gap-2 md:grid-cols-2">
                     <label className="block">
-                      <span className="text-[10px] uppercase text-slate-500">Title</span>
+                      <span className="text-[10px] uppercase text-slate-500">{t("situationRoom.advancedSetup.field.title")}</span>
                       <input
                         value={customRouteDraft.title}
                         onChange={(event) => setCustomRouteDraft((draft) => ({ ...draft, title: event.target.value }))}
                         className="mt-1 w-full rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none"
-                        placeholder="My live review route"
+                        placeholder={t("situationRoom.advancedSetup.placeholder.title")}
                       />
                     </label>
                     <label className="block">
-                      <span className="text-[10px] uppercase text-slate-500">Route kind</span>
+                      <span className="text-[10px] uppercase text-slate-500">{t("situationRoom.advancedSetup.field.routeKind")}</span>
                       <select
                         value={customRouteDraft.kind}
                         onChange={(event) => setCustomRouteDraft((draft) => ({ ...draft, kind: event.target.value as PipelineSetupIntentKind }))}
                         className="mt-1 w-full rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none"
                       >
-                        <option value="live_workstation_pipeline">Live workstation pipeline</option>
-                        <option value="live_answer_environment">Live answer environment</option>
-                        <option value="source_job">Source job</option>
-                        <option value="situation_graph">Situation graph</option>
+                        <option value="live_workstation_pipeline">{t("situationRoom.advancedSetup.kind.liveWorkstationPipeline")}</option>
+                        <option value="live_answer_environment">{t("situationRoom.advancedSetup.kind.liveAnswerEnvironment")}</option>
+                        <option value="source_job">{t("situationRoom.advancedSetup.kind.sourceJob")}</option>
+                        <option value="situation_graph">{t("situationRoom.advancedSetup.kind.situationGraph")}</option>
                       </select>
                     </label>
                     <label className="block md:col-span-2">
-                      <span className="text-[10px] uppercase text-slate-500">Objective used by the route</span>
+                      <span className="text-[10px] uppercase text-slate-500">{t("situationRoom.advancedSetup.field.objective")}</span>
                       <input
                         value={customRouteDraft.objective}
                         onChange={(event) => setCustomRouteDraft((draft) => ({ ...draft, objective: event.target.value }))}
                         className="mt-1 w-full rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none"
-                        placeholder="Watch this source and keep a compact comparison live."
+                        placeholder={t("situationRoom.advancedSetup.placeholder.objective")}
                       />
                     </label>
                     <label className="block">
-                      <span className="text-[10px] uppercase text-slate-500">Required source family</span>
+                      <span className="text-[10px] uppercase text-slate-500">{t("situationRoom.advancedSetup.field.requiredSourceFamily")}</span>
                       <select
                         value={customRouteDraft.sourceFamily}
                         onChange={(event) => setCustomRouteDraft((draft) => ({ ...draft, sourceFamily: event.target.value }))}
@@ -2361,21 +2393,21 @@ export default function SituationRoomPipelinesPanel() {
                       </select>
                     </label>
                     <label className="block">
-                      <span className="text-[10px] uppercase text-slate-500">Transform summary</span>
+                      <span className="text-[10px] uppercase text-slate-500">{t("situationRoom.advancedSetup.field.transformSummary")}</span>
                       <input
                         value={customRouteDraft.transformSummary}
                         onChange={(event) => setCustomRouteDraft((draft) => ({ ...draft, transformSummary: event.target.value }))}
                         className="mt-1 w-full rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none"
-                        placeholder="window summary -> comparison"
+                        placeholder={t("situationRoom.advancedSetup.placeholder.transformSummary")}
                       />
                     </label>
                     <label className="block md:col-span-2">
-                      <span className="text-[10px] uppercase text-slate-500">Output summary</span>
+                      <span className="text-[10px] uppercase text-slate-500">{t("situationRoom.advancedSetup.field.outputSummary")}</span>
                       <input
                         value={customRouteDraft.outputSummary}
                         onChange={(event) => setCustomRouteDraft((draft) => ({ ...draft, outputSummary: event.target.value }))}
                         className="mt-1 w-full rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none"
-                        placeholder="Live card plus Situation Room trace"
+                        placeholder={t("situationRoom.advancedSetup.placeholder.outputSummary")}
                       />
                     </label>
                   </div>
@@ -2384,11 +2416,11 @@ export default function SituationRoomPipelinesPanel() {
                     onClick={handleCreateCustomRoute}
                     className="mt-3 rounded border border-cyan-300/35 bg-cyan-500/10 px-3 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/20"
                   >
-                    Save route card
+                    {t("situationRoom.advancedSetup.saveRouteCard")}
                   </button>
                 </details>
                 <section className="rounded-lg border border-white/10 bg-slate-950/70 p-3">
-                  <p className="text-[11px] font-semibold uppercase text-slate-500">Source requirements</p>
+                  <p className="text-[11px] font-semibold uppercase text-slate-500">{t("situationRoom.advancedSetup.sourceRequirements")}</p>
                   <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1fr]">
                     <div
                       className={cn(
@@ -2398,9 +2430,11 @@ export default function SituationRoomPipelinesPanel() {
                           : "border-white/10 bg-black/20",
                       )}
                     >
-                      <p className="text-xs font-semibold text-white">{setupIntent?.title ?? "Workflow"}</p>
+                      <p className="text-xs font-semibold text-white">{setupIntent?.title ?? t("situationRoom.advancedSetup.workflowFallback")}</p>
                       <p className="mt-1 text-[11px] text-slate-400">
-                        Required source family: {setupIntent?.sourceFamilies.join(", ") || "manual / custom"}
+                        {t("situationRoom.advancedSetup.requiredSourceFamilyValue", {
+                          families: setupIntent?.sourceFamilies.join(", ") || t("situationRoom.advancedSetup.manualCustom"),
+                        })}
                       </p>
                       <p
                         className={cn(
@@ -2408,17 +2442,19 @@ export default function SituationRoomPipelinesPanel() {
                           setupNeedsExistingSource && setupActualSourceIds.length === 0 ? "text-red-100" : "text-slate-500",
                         )}
                       >
-                        Current source ids: {setupActualSourceIds.length ? setupActualSourceIds.join(", ") : "missing"}
+                        {t("situationRoom.advancedSetup.currentSourceIds", {
+                          ids: setupActualSourceIds.length ? setupActualSourceIds.join(", ") : t("situationRoom.routeSetup.missing"),
+                        })}
                       </p>
                     </div>
                     <label className="block rounded border border-white/10 bg-black/20 p-3">
-                      <span className="text-[10px] uppercase text-slate-500">Room/source selection</span>
+                      <span className="text-[10px] uppercase text-slate-500">{t("situationRoom.advancedSetup.roomSourceSelection")}</span>
                       <select
                         value={selectedSourceId}
                         onChange={(event) => setSelectedSourceId(event.target.value)}
                         className="mt-2 w-full rounded border border-white/15 bg-slate-900 px-2 py-2 text-xs text-slate-100 outline-none"
                       >
-                        <option value="__room__">Whole active room</option>
+                        <option value="__room__">{t("situationRoom.advancedSetup.wholeActiveRoom")}</option>
                         {activeSources.map((source) => (
                           <option key={source.source_id} value={source.source_id}>
                             {source.label} ({source.capture_source})
@@ -2430,11 +2466,13 @@ export default function SituationRoomPipelinesPanel() {
                 </section>
 
                 <section className="rounded-lg border border-white/10 bg-slate-950/70 p-3">
-                <p className="text-[11px] font-semibold uppercase text-slate-500">Transform</p>
+                <p className="text-[11px] font-semibold uppercase text-slate-500">{t("situationRoom.advancedSetup.transform")}</p>
                 <div className="mt-3 rounded border border-white/10 bg-black/20 p-3">
-                  <p className="text-sm font-semibold text-white">{setupIntent?.transformSummary ?? "No transform selected"}</p>
+                  <p className="text-sm font-semibold text-white">
+                    {setupIntent?.transformSummary ?? t("situationRoom.advancedSetup.noTransformSelected")}
+                  </p>
                   <p className="mt-1 text-xs leading-5 text-slate-400">
-                    Deterministic reducers and model-reviewed windows are recorded as validation/toolObservation artifacts. They do not become assistant answers unless the user starts a normal Ask turn.
+                    {t("situationRoom.advancedSetup.transformHelp")}
                   </p>
                   {setupIntent?.recipe ? (
                     <div className="mt-3 grid gap-2 md:grid-cols-2">
@@ -2452,46 +2490,46 @@ export default function SituationRoomPipelinesPanel() {
               </section>
 
                 <section className="rounded-lg border border-white/10 bg-slate-950/70 p-3">
-                <p className="text-[11px] font-semibold uppercase text-slate-500">Output</p>
+                <p className="text-[11px] font-semibold uppercase text-slate-500">{t("situationRoom.createLiveJob.output")}</p>
                 <div className="mt-3 grid gap-3 md:grid-cols-3">
                   <div className="rounded border border-cyan-300/20 bg-cyan-500/10 p-3">
-                    <p className="text-xs font-semibold text-cyan-50">Primary product</p>
+                    <p className="text-xs font-semibold text-cyan-50">{t("situationRoom.advancedSetup.primaryProduct")}</p>
                     <p className="mt-1 text-[11px] text-cyan-100/80">{setupIntent?.outputSummary}</p>
                   </div>
                   <div className="rounded border border-white/10 bg-slate-950/70 p-3">
-                    <p className="text-xs font-semibold text-white">Helix Ask context</p>
-                    <p className="mt-1 text-[11px] text-slate-400">Compact context pack only. Raw logs/audio/transcripts stay out by default.</p>
+                    <p className="text-xs font-semibold text-white">{t("situationRoom.advancedSetup.helixAskContext")}</p>
+                    <p className="mt-1 text-[11px] text-slate-400">{t("situationRoom.advancedSetup.helixAskContextHelp")}</p>
                   </div>
                   <div className="rounded border border-white/10 bg-slate-950/70 p-3">
-                    <p className="text-xs font-semibold text-white">Debug</p>
-                    <p className="mt-1 text-[11px] text-slate-400">Deltas, receipts, source windows, and append decisions remain in Advanced/Runtime views.</p>
+                    <p className="text-xs font-semibold text-white">{t("situationRoom.page.debug")}</p>
+                    <p className="mt-1 text-[11px] text-slate-400">{t("situationRoom.advancedSetup.debugHelp")}</p>
                   </div>
                 </div>
               </section>
 
                 <section className="rounded-lg border border-white/10 bg-slate-950/70 p-3">
-                <p className="text-[11px] font-semibold uppercase text-slate-500">Policy</p>
+                <p className="text-[11px] font-semibold uppercase text-slate-500">{t("situationRoom.routeSetup.policy")}</p>
                 <div className="mt-3 grid gap-3 md:grid-cols-3">
                   <label className="block rounded border border-white/10 bg-slate-950/70 p-3">
-                    <span className="text-[10px] uppercase text-slate-500">Delivery mode</span>
+                    <span className="text-[10px] uppercase text-slate-500">{t("situationRoom.advancedSetup.deliveryMode")}</span>
                     <select
                       value={setupMode}
                       onChange={(event) => setSetupMode(event.target.value as typeof setupMode)}
                       className="mt-2 w-full rounded border border-white/15 bg-slate-900 px-2 py-2 text-xs text-slate-100 outline-none"
                     >
-                      <option value="text_only">Text only</option>
-                      <option value="voice_on_confirm">Voice on confirm</option>
-                      <option value="critical_voice">Critical voice</option>
-                      <option value="direct_address_only">Direct address only</option>
+                      <option value="text_only">{t("situationRoom.advancedSetup.delivery.textOnly")}</option>
+                      <option value="voice_on_confirm">{t("situationRoom.advancedSetup.delivery.voiceOnConfirm")}</option>
+                      <option value="critical_voice">{t("situationRoom.advancedSetup.delivery.criticalVoice")}</option>
+                      <option value="direct_address_only">{t("situationRoom.advancedSetup.delivery.directAddressOnly")}</option>
                     </select>
                   </label>
                   <div className="rounded border border-white/10 bg-slate-950/70 p-3">
-                    <p className="text-[10px] uppercase text-slate-500">Context policy</p>
-                    <p className="mt-2 text-xs text-slate-300">compact_context_pack_only</p>
+                    <p className="text-[10px] uppercase text-slate-500">{t("situationRoom.advancedSetup.contextPolicy")}</p>
+                    <p className="mt-2 text-xs text-slate-300">{t("situationRoom.advancedSetup.compactContextPackOnly")}</p>
                   </div>
                   <div className="rounded border border-white/10 bg-slate-950/70 p-3">
-                    <p className="text-[10px] uppercase text-slate-500">Command lane</p>
-                    <p className="mt-2 text-xs text-slate-300">disabled</p>
+                    <p className="text-[10px] uppercase text-slate-500">{t("situationRoom.advancedSetup.commandLane")}</p>
+                    <p className="mt-2 text-xs text-slate-300">{t("situationRoom.advancedSetup.disabled")}</p>
                   </div>
                 </div>
               </section>
@@ -2499,9 +2537,9 @@ export default function SituationRoomPipelinesPanel() {
                 <section className="rounded-lg border border-white/10 bg-slate-950/70 p-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase text-slate-500">Tool plan preview</p>
+                    <p className="text-[11px] font-semibold uppercase text-slate-500">{t("situationRoom.advancedSetup.toolPlanPreview")}</p>
                     <p className="mt-1 text-xs text-slate-400">
-                      These are the same workstation actions Helix Ask can emit as dynamic tool calls.
+                      {t("situationRoom.advancedSetup.toolPlanHelp")}
                     </p>
                   </div>
                   <button
@@ -2510,23 +2548,28 @@ export default function SituationRoomPipelinesPanel() {
                     disabled={!setupIntent || !setupCanStart}
                     className="rounded border border-cyan-300/40 bg-cyan-500/15 px-3 py-2 text-xs font-semibold text-cyan-50 hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-45"
                   >
-                    {setupIntent?.actionLabel ?? "Start"}
+                    {setupIntent?.actionLabel ?? t("situationRoom.routeSetup.start")}
                   </button>
                 </div>
                 {setupMissingFields.length ? (
                   <div className="mt-3 rounded border border-red-400/40 bg-red-500/10 px-3 py-2 text-xs text-red-100">
-                    Missing required field{setupMissingFields.length === 1 ? "" : "s"}: {setupMissingFields.join(", ")}.
+                    {t(
+                      setupMissingFields.length === 1
+                        ? "situationRoom.advancedSetup.missingFieldSingular"
+                        : "situationRoom.advancedSetup.missingFieldPlural",
+                      { fields: setupMissingFields.join(", ") },
+                    )}
                   </div>
                 ) : (
                   <div className="mt-3 rounded border border-emerald-400/25 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-100">
-                    Required fields are ready. Start will dispatch the workstation actions below.
+                    {t("situationRoom.advancedSetup.requiredFieldsReady")}
                   </div>
                 )}
                 <div className="mt-3 rounded border border-white/10 bg-slate-950/80 p-3">
                   <p className="text-sm font-semibold text-white">{setupIntent?.title}</p>
                   <p className="mt-1 text-xs text-slate-400">{setupObjective}</p>
                   <p className="mt-2 text-[11px] text-slate-500">
-                    The prompt stays the source of intent. The route below is the current tool plan projection, not a final assistant answer.
+                    {t("situationRoom.advancedSetup.promptAuthority")}
                   </p>
                   <pre className="mt-3 max-h-72 overflow-auto rounded border border-white/10 bg-black/40 p-3 text-[10px] leading-5 text-slate-200">
                     {JSON.stringify(setupToolActions, null, 2)}
@@ -2550,10 +2593,18 @@ export default function SituationRoomPipelinesPanel() {
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase text-slate-500">Live Job Workbench</p>
-                  <p className="mt-1 text-lg font-semibold text-white">Visible Situation Room live jobs</p>
+                  <p className="text-[11px] font-semibold uppercase text-slate-500">{t("situationRoom.liveJobs.workbench")}</p>
+                  <p className="mt-1 text-lg font-semibold text-white">{t("situationRoom.liveJobs.title")}</p>
                   <p className="mt-1 text-xs text-slate-400">
-                    {activeRoom?.title ?? "No active room"} / {liveJobCards.length} live job{liveJobCards.length === 1 ? "" : "s"}
+                    {t(
+                      liveJobCards.length === 1
+                        ? "situationRoom.liveJobs.roomSummarySingular"
+                        : "situationRoom.liveJobs.roomSummaryPlural",
+                      {
+                        room: activeRoom?.title ?? t("situationRoom.createLiveJob.noActiveRoom"),
+                        count: liveJobCards.length,
+                      },
+                    )}
                   </p>
                 </div>
                 <button
@@ -2562,7 +2613,7 @@ export default function SituationRoomPipelinesPanel() {
                   className="inline-flex items-center gap-2 rounded border border-cyan-400/35 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/20"
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  Build
+                  {t("situationRoom.page.build")}
                 </button>
               </div>
 
@@ -2591,15 +2642,17 @@ export default function SituationRoomPipelinesPanel() {
                           </div>
                           <div className="mt-3 grid gap-2 text-[11px] sm:grid-cols-2">
                             <div className="rounded border border-white/10 bg-black/20 px-2 py-1.5">
-                              <span className="text-slate-500">Voice</span>
+                              <span className="text-slate-500">{t("situationRoom.liveJobs.voice")}</span>
                               <p className="mt-0.5 text-slate-200">
-                                {voicePolicyLabel(job.voicePolicy)} / {spoken && confirmPresent ? "spoken yes" : "no audio spoken"}
+                                {voicePolicyLabel(job.voicePolicy)} / {spoken && confirmPresent ? t("situationRoom.liveJobs.spokenYes") : t("situationRoom.liveJobs.noAudioSpoken")}
                               </p>
                             </div>
                             <div className="rounded border border-white/10 bg-black/20 px-2 py-1.5">
-                              <span className="text-slate-500">Authority</span>
+                              <span className="text-slate-500">{t("situationRoom.liveJobs.authority")}</span>
                               <p className="mt-0.5 text-slate-200">
-                                {authorityPolicyLabel(job.authority)} / Helix Ask final answers
+                                {t("situationRoom.liveJobs.authoritySummary", {
+                                  authority: authorityPolicyLabel(job.authority),
+                                })}
                               </p>
                             </div>
                           </div>
@@ -2616,7 +2669,7 @@ export default function SituationRoomPipelinesPanel() {
                             }}
                             className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10"
                           >
-                            Edit Prompt
+                            {t("situationRoom.liveJobs.editPrompt")}
                           </button>
                           <button
                             type="button"
@@ -2624,7 +2677,7 @@ export default function SituationRoomPipelinesPanel() {
                             disabled={!job.constructIds.length || constructSourceIds.length === 0}
                             className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
                           >
-                            Attach Source
+                            {t("situationRoom.liveJobs.attachSource")}
                           </button>
                           <button
                             type="button"
@@ -2633,7 +2686,7 @@ export default function SituationRoomPipelinesPanel() {
                             className="inline-flex items-center gap-1 rounded border border-emerald-400/35 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-100 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-45"
                           >
                             <Play className="h-3.5 w-3.5" />
-                            Start
+                            {t("situationRoom.routeSetup.start")}
                           </button>
                           <button
                             type="button"
@@ -2642,7 +2695,7 @@ export default function SituationRoomPipelinesPanel() {
                             className="inline-flex items-center gap-1 rounded border border-slate-400/35 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
                           >
                             <Square className="h-3.5 w-3.5" />
-                            Stop
+                            {t("situationRoom.action.stop")}
                           </button>
                           <button
                             type="button"
@@ -2651,7 +2704,7 @@ export default function SituationRoomPipelinesPanel() {
                             className="inline-flex items-center gap-1 rounded border border-cyan-400/35 bg-cyan-500/10 px-2 py-1 text-xs text-cyan-100 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-45"
                           >
                             <Volume2 className="h-3.5 w-3.5" />
-                            Confirm Speak
+                            {t("situationRoom.liveJobs.confirmSpeak")}
                           </button>
                         </div>
                       </article>
@@ -2666,7 +2719,10 @@ export default function SituationRoomPipelinesPanel() {
                         <div className="min-w-0">
                           <p className="truncate text-base font-semibold text-white">{selectedLiveJob.name}</p>
                           <p className="mt-1 text-[11px] text-slate-500">
-                            {selectedLiveJob.contract?.selected_recipe ?? "draft recipe"} / updated {formatClock(selectedLiveJob.updatedAt)}
+                            {t("situationRoom.liveJobs.selectedRecipeUpdated", {
+                              recipe: selectedLiveJob.contract?.selected_recipe ?? t("situationRoom.liveJobs.draftRecipe"),
+                              updatedAt: formatClock(selectedLiveJob.updatedAt),
+                            })}
                           </p>
                         </div>
                         <div className="flex flex-wrap gap-2 text-[10px]">
@@ -2674,7 +2730,7 @@ export default function SituationRoomPipelinesPanel() {
                             {selectedLiveJob.status}
                           </span>
                           <span className="rounded border border-cyan-400/40 bg-cyan-500/10 px-2 py-0.5 text-cyan-100">
-                            voice {voicePolicyLabel(selectedLiveJob.voicePolicy)}
+                            {t("situationRoom.liveJobs.voicePolicy", { policy: voicePolicyLabel(selectedLiveJob.voicePolicy) })}
                           </span>
                           <span className="rounded border border-white/15 bg-white/5 px-2 py-0.5 text-slate-200">
                             {authorityPolicyLabel(selectedLiveJob.authority)}
@@ -2683,7 +2739,7 @@ export default function SituationRoomPipelinesPanel() {
                       </div>
 
                       <label className="block">
-                        <span className="text-[10px] font-semibold uppercase text-slate-500">Operating Prompt</span>
+                        <span className="text-[10px] font-semibold uppercase text-slate-500">{t("situationRoom.createLiveJob.operatingPrompt")}</span>
                         <textarea
                           value={liveJobPromptDraft}
                           onChange={(event) => setLiveJobPromptDraft(event.target.value)}
@@ -2698,62 +2754,62 @@ export default function SituationRoomPipelinesPanel() {
                           className="inline-flex items-center gap-1 rounded border border-emerald-400/35 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-100 hover:bg-emerald-500/20"
                         >
                           <Save className="h-3.5 w-3.5" />
-                          Save Prompt
+                          {t("situationRoom.liveJobs.savePrompt")}
                         </button>
                         <button
                           type="button"
                           onClick={() => setPanelPage("runtime")}
                           className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10"
                         >
-                          Diagnose
+                          {t("situationRoom.liveJobs.diagnose")}
                         </button>
                       </div>
 
                       <div className="grid gap-3 md:grid-cols-2">
                         <div className="rounded border border-white/10 bg-black/20 p-3">
-                          <p className="text-[10px] font-semibold uppercase text-slate-500">Compiled Policy</p>
+                          <p className="text-[10px] font-semibold uppercase text-slate-500">{t("situationRoom.liveJobs.compiledPolicy")}</p>
                           <dl className="mt-2 space-y-1 text-xs">
                             <div className="flex justify-between gap-3">
-                              <dt className="text-slate-500">interruptions</dt>
+                              <dt className="text-slate-500">{t("situationRoom.liveJobs.interruptions")}</dt>
                               <dd className="text-right text-slate-200">{selectedLiveJob.contract?.compiled_policy.interruption_policy ?? "policy_triggered"}</dd>
                             </div>
                             <div className="flex justify-between gap-3">
-                              <dt className="text-slate-500">threshold</dt>
+                              <dt className="text-slate-500">{t("situationRoom.liveJobs.threshold")}</dt>
                               <dd className="text-right text-slate-200">{selectedLiveJob.contract?.compiled_policy.evidence_threshold ?? "observed"}</dd>
                             </div>
                             <div className="flex justify-between gap-3">
-                              <dt className="text-slate-500">cadence</dt>
+                              <dt className="text-slate-500">{t("situationRoom.liveJobs.cadence")}</dt>
                               <dd className="text-right text-slate-200">{selectedLiveJob.contract?.compiled_policy.cadence ?? "event_driven"}</dd>
                             </div>
                             <div className="flex justify-between gap-3">
-                              <dt className="text-slate-500">callouts</dt>
+                              <dt className="text-slate-500">{t("situationRoom.liveJobs.callouts")}</dt>
                               <dd className="text-right text-slate-200">{selectedLiveJob.contract?.compiled_policy.callout_style ?? "short"}</dd>
                             </div>
                           </dl>
                         </div>
                         <div className="rounded border border-white/10 bg-black/20 p-3">
-                          <p className="text-[10px] font-semibold uppercase text-slate-500">Voice Boundary</p>
+                          <p className="text-[10px] font-semibold uppercase text-slate-500">{t("situationRoom.liveJobs.voiceBoundary")}</p>
                           <p className="mt-2 text-xs text-slate-200">
                             {selectedLiveJob.observation?.policy_state.spoken === true &&
                             selectedLiveJob.observation.policy_state.confirm_speak_receipt_present === true
-                              ? "Spoken audio is receipt-confirmed."
-                              : "Voice proposal only. No audio has been spoken."}
+                              ? t("situationRoom.liveJobs.spokenReceiptConfirmed")
+                              : t("situationRoom.liveJobs.voiceProposalOnly")}
                           </p>
                           <p className="mt-1 text-[11px] text-slate-500">
-                            Dottie callouts are witness outputs. Helix Ask remains the answer surface.
+                            {t("situationRoom.liveJobs.dottieBoundary")}
                           </p>
                         </div>
                       </div>
 
                       <div className="grid gap-3 md:grid-cols-2">
                         <div className="rounded border border-white/10 bg-black/20 p-3">
-                          <p className="text-[10px] font-semibold uppercase text-slate-500">Sources</p>
+                          <p className="text-[10px] font-semibold uppercase text-slate-500">{t("situationRoom.page.sources")}</p>
                           <div className="mt-2 space-y-2">
                             {selectedLiveJob.sources.map((source) => (
                               <div key={`${source.source_kind}:${source.binding_id ?? "none"}`} className="flex items-center justify-between gap-3 rounded border border-white/10 bg-slate-950/80 px-2 py-1.5 text-xs">
                                 <div className="min-w-0">
                                   <p className="truncate text-slate-200">{source.source_kind}</p>
-                                  <p className="truncate text-[10px] text-slate-500">{source.binding_id ?? source.missing_reason ?? "no binding"}</p>
+                                  <p className="truncate text-[10px] text-slate-500">{source.binding_id ?? source.missing_reason ?? t("situationRoom.liveJobs.noBinding")}</p>
                                 </div>
                                 <span className={cn("shrink-0 rounded border px-2 py-0.5 text-[10px]", sourceRequirementTone(source.status))}>
                                   {source.status}
@@ -2763,7 +2819,7 @@ export default function SituationRoomPipelinesPanel() {
                           </div>
                         </div>
                         <div className="rounded border border-white/10 bg-black/20 p-3">
-                          <p className="text-[10px] font-semibold uppercase text-slate-500">Outputs</p>
+                          <p className="text-[10px] font-semibold uppercase text-slate-500">{t("situationRoom.page.outputs")}</p>
                           <div className="mt-2 space-y-2">
                             {selectedLiveJob.outputs.map((output) => (
                               <div key={output.output_kind} className="flex items-center justify-between gap-3 rounded border border-white/10 bg-slate-950/80 px-2 py-1.5 text-xs">
@@ -2778,9 +2834,9 @@ export default function SituationRoomPipelinesPanel() {
                       </div>
 
                       <div className="rounded border border-white/10 bg-black/20 p-3">
-                        <p className="text-[10px] font-semibold uppercase text-slate-500">Diagnostics</p>
+                        <p className="text-[10px] font-semibold uppercase text-slate-500">{t("situationRoom.liveJobs.diagnostics")}</p>
                         {selectedLiveJob.diagnostics.length === 0 ? (
-                          <p className="mt-2 text-xs text-slate-400">No blocking diagnostics in the latest contract.</p>
+                          <p className="mt-2 text-xs text-slate-400">{t("situationRoom.liveJobs.noBlockingDiagnostics")}</p>
                         ) : (
                           <div className="mt-2 space-y-2">
                             {selectedLiveJob.diagnostics.map((diagnostic) => (
@@ -2791,12 +2847,12 @@ export default function SituationRoomPipelinesPanel() {
                           </div>
                         )}
                         <p className="mt-3 rounded border border-white/10 bg-slate-950/80 px-2 py-1.5 text-xs text-slate-300">
-                          Last observation: {selectedLiveJob.lastObservation}
+                          {t("situationRoom.liveJobs.lastObservation", { observation: selectedLiveJob.lastObservation })}
                         </p>
                       </div>
                     </div>
                   ) : (
-                    <p className="text-sm text-slate-400">No live job selected.</p>
+                    <p className="text-sm text-slate-400">{t("situationRoom.liveJobs.noneSelected")}</p>
                   )}
                 </section>
               </div>
@@ -2808,11 +2864,16 @@ export default function SituationRoomPipelinesPanel() {
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase text-slate-500">Underlying constructs</p>
-                  <p className="mt-1 text-sm font-semibold text-white">Receipt-backed parts</p>
+                  <p className="text-[11px] font-semibold uppercase text-slate-500">{t("situationRoom.liveJobs.underlyingConstructs")}</p>
+                  <p className="mt-1 text-sm font-semibold text-white">{t("situationRoom.liveJobs.receiptBackedParts")}</p>
                 </div>
                 <span className="rounded border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] uppercase text-slate-400">
-                  {constructCards.length} construct{constructCards.length === 1 ? "" : "s"}
+                  {t(
+                    constructCards.length === 1
+                      ? "situationRoom.liveJobs.constructCountSingular"
+                      : "situationRoom.liveJobs.constructCountPlural",
+                    { count: constructCards.length },
+                  )}
                 </span>
               </div>
               <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -2829,15 +2890,15 @@ export default function SituationRoomPipelinesPanel() {
                     </div>
                     <div className="mt-3 space-y-2 text-xs">
                       <div className="flex items-center justify-between gap-3">
-                        <span className="text-slate-500">source</span>
+                        <span className="text-slate-500">{t("situationRoom.routeSetup.source")}</span>
                         <span className="truncate text-slate-200">{construct.source}</span>
                       </div>
                       <div className="flex items-center justify-between gap-3">
-                        <span className="text-slate-500">output</span>
+                        <span className="text-slate-500">{t("situationRoom.createLiveJob.output")}</span>
                         <span className="truncate text-slate-200">{construct.output}</span>
                       </div>
                       <div className="flex items-center justify-between gap-3">
-                        <span className="text-slate-500">authority</span>
+                        <span className="text-slate-500">{t("situationRoom.liveJobs.authority")}</span>
                         <span className="truncate text-slate-200">{construct.authority}</span>
                       </div>
                     </div>
@@ -2857,12 +2918,12 @@ export default function SituationRoomPipelinesPanel() {
           <section className="shrink-0 border-b border-white/10 bg-slate-950/80 px-4 py-3">
             <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase text-slate-500">Room and source selection</p>
+                <p className="text-[11px] font-semibold uppercase text-slate-500">{t("situationRoom.sources.title")}</p>
                 <p className="mt-1 truncate text-sm text-slate-200">
-                  {activeRoom?.title ?? "No active room"} / {selectedSource?.label ?? "whole room"}
+                  {activeRoom?.title ?? t("situationRoom.nav.noRoom")} / {selectedSource?.label ?? t("situationRoom.advancedSetup.wholeActiveRoom")}
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  Pick the room/source first. Room-scoped workflows and outputs are available from here.
+                  {t("situationRoom.sources.description")}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -2872,21 +2933,21 @@ export default function SituationRoomPipelinesPanel() {
                   disabled={!activeRoom}
                   className="rounded border border-cyan-400/35 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-45"
                 >
-                  Room workflows
+                  {t("situationRoom.sources.roomWorkflows")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setPanelPage("output")}
                   className="rounded border border-white/15 bg-white/5 px-3 py-2 text-xs text-slate-200 hover:bg-white/10"
                 >
-                  View output
+                  {t("situationRoom.sources.viewOutput")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setPanelPage("runtime")}
                   className="rounded border border-white/15 bg-white/5 px-3 py-2 text-xs text-slate-200 hover:bg-white/10"
                 >
-                  Debug
+                  {t("situationRoom.sources.debug")}
                 </button>
               </div>
             </div>
@@ -2917,15 +2978,15 @@ export default function SituationRoomPipelinesPanel() {
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase text-slate-500">Graph Recipes</p>
-                  <p className="mt-1 text-xs text-slate-400">Recipes expand into visible nodes, manual-only jobs, and typed execution receipts.</p>
+                  <p className="text-[11px] font-semibold uppercase text-slate-500">{t("situationRoom.graphRecipes.title")}</p>
+                  <p className="mt-1 text-xs text-slate-400">{t("situationRoom.graphRecipes.description")}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setPanelPage("capabilities")}
                   className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10"
                 >
-                  Capabilities
+                  {t("situationRoom.graphRecipes.capabilities")}
                 </button>
               </div>
               <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
@@ -2940,7 +3001,7 @@ export default function SituationRoomPipelinesPanel() {
                     <p className="truncate text-sm font-semibold text-white">{recipe.title}</p>
                     <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-400">{recipe.description}</p>
                     <p className="mt-2 text-[10px] text-slate-500">
-                      {recipe.nodes.length} nodes / {recipe.required_bindings.length} required bindings
+                      {t("situationRoom.graphRecipes.requirements", { nodes: recipe.nodes.length, bindings: recipe.required_bindings.length })}
                     </p>
                   </button>
                 ))}
@@ -2954,7 +3015,7 @@ export default function SituationRoomPipelinesPanel() {
         <main className="min-h-0 flex-1 overflow-y-auto p-4">
           <div className="mx-auto max-w-5xl">
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
-              <p className="text-[11px] font-semibold uppercase text-slate-500">Capability Registry</p>
+              <p className="text-[11px] font-semibold uppercase text-slate-500">{t("situationRoom.capabilities.title")}</p>
               <div className="mt-3 grid gap-2 md:grid-cols-2">
                 {HELIX_GRAPH_CAPABILITIES.map((capability) => (
                   <div key={capability.capability_id} className="rounded-lg border border-white/10 bg-slate-950/70 p-3">
@@ -2983,35 +3044,35 @@ export default function SituationRoomPipelinesPanel() {
         <main className="min-h-0 flex-1 overflow-y-auto p-4">
           <div className="mx-auto max-w-5xl space-y-4">
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
-              <p className="text-[11px] font-semibold uppercase text-slate-500">Runtime Receipts</p>
+              <p className="text-[11px] font-semibold uppercase text-slate-500">{t("situationRoom.runtime.title")}</p>
               <div className="mt-3 grid gap-2 sm:grid-cols-3">
                 <div className="rounded border border-white/10 bg-slate-950/70 p-3">
-                  <p className="text-[10px] uppercase text-slate-500">Graph</p>
+                  <p className="text-[10px] uppercase text-slate-500">{t("situationRoom.runtime.graph")}</p>
                   <p className="mt-1 text-xl font-semibold text-white">{activeGraph ? 1 : 0}</p>
                 </div>
                 <div className="rounded border border-white/10 bg-slate-950/70 p-3">
-                  <p className="text-[10px] uppercase text-slate-500">Nodes</p>
+                  <p className="text-[10px] uppercase text-slate-500">{t("situationRoom.runtime.nodes")}</p>
                   <p className="mt-1 text-xl font-semibold text-white">{activeGraph?.nodes.length ?? 0}</p>
                 </div>
                 <div className="rounded border border-white/10 bg-slate-950/70 p-3">
-                  <p className="text-[10px] uppercase text-slate-500">Edges</p>
+                  <p className="text-[10px] uppercase text-slate-500">{t("situationRoom.runtime.edges")}</p>
                   <p className="mt-1 text-xl font-semibold text-white">{activeGraph?.edges.length ?? 0}</p>
                 </div>
               </div>
               <p className="mt-3 text-xs text-slate-400">
-                Monitor and execution receipts are observations only. Graph runtime does not start capture, inject transcript context, or grant command authority.
+                {t("situationRoom.runtime.receiptBoundary")}
               </p>
             </section>
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase text-slate-500">Workstation Action Trace</p>
+                  <p className="text-[11px] font-semibold uppercase text-slate-500">{t("situationRoom.runtime.actionTrace")}</p>
                   <p className="mt-1 text-xs text-slate-400">
-                    These are receipt-backed action executions from Helix Ask or panel controls. Completed means receipt or state proof was observed.
+                    {t("situationRoom.runtime.actionTraceDescription")}
                   </p>
                 </div>
                 <span className="rounded border border-white/15 px-2 py-0.5 text-[10px] uppercase text-slate-400">
-                  receipt-backed
+                  {t("situationRoom.runtime.receiptBacked")}
                 </span>
               </div>
               <div className="mt-3">
@@ -3022,9 +3083,9 @@ export default function SituationRoomPipelinesPanel() {
               <section className="rounded-lg border border-white/10 bg-black/20 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase text-slate-500">Live Job Contract Debug</p>
+                    <p className="text-[11px] font-semibold uppercase text-slate-500">{t("situationRoom.runtime.liveJobContractDebug")}</p>
                     <p className="mt-1 text-xs text-slate-400">
-                      Raw contract and observation for the selected live job. These are observations, not terminal answers.
+                      {t("situationRoom.runtime.liveJobContractDescription")}
                     </p>
                   </div>
                   <span className={cn("rounded border px-2 py-0.5 text-[10px]", liveJobStatusTone(selectedLiveJob.status))}>
@@ -3044,9 +3105,9 @@ export default function SituationRoomPipelinesPanel() {
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase text-slate-500">Standby Salience</p>
+                  <p className="text-[11px] font-semibold uppercase text-slate-500">{t("situationRoom.standby.title")}</p>
                   <p className="mt-1 text-xs text-slate-400">
-                    Standby reducers emit typed receipts and proposals; they do not run Helix Ask reasoning.
+                    {t("situationRoom.standby.description")}
                   </p>
                 </div>
                 <select
@@ -3057,7 +3118,7 @@ export default function SituationRoomPipelinesPanel() {
                     setStandbyMode(activeRoom.room_id, activeGraph?.graph_id ?? null, event.target.value as SituationStandbyMode);
                   }}
                   className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none disabled:opacity-45"
-                  aria-label="Standby mode"
+                  aria-label={t("situationRoom.standby.mode")}
                 >
                   {STANDBY_MODE_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -3073,7 +3134,7 @@ export default function SituationRoomPipelinesPanel() {
                   disabled={!activeRoom}
                   className="rounded border border-cyan-400/35 bg-cyan-500/10 px-2 py-1 text-xs text-cyan-100 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-45"
                 >
-                  Test direct address
+                  {t("situationRoom.standby.testDirectAddress")}
                 </button>
                 <button
                   type="button"
@@ -3081,7 +3142,7 @@ export default function SituationRoomPipelinesPanel() {
                   disabled={!activeRoom}
                   className="rounded border border-amber-400/35 bg-amber-500/10 px-2 py-1 text-xs text-amber-100 hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-45"
                 >
-                  Test risk signal
+                  {t("situationRoom.standby.testRiskSignal")}
                 </button>
                 <button
                   type="button"
@@ -3089,34 +3150,37 @@ export default function SituationRoomPipelinesPanel() {
                   disabled={!activeRoom}
                   className="rounded border border-emerald-400/35 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-100 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-45"
                 >
-                  Test goal cue
+                  {t("situationRoom.standby.testGoalCue")}
                 </button>
               </div>
               <div className="mt-3 grid gap-3 lg:grid-cols-3">
                 <div className="rounded border border-white/10 bg-slate-950/70 p-3">
-                  <p className="text-[10px] uppercase text-slate-500">State projection</p>
+                  <p className="text-[10px] uppercase text-slate-500">{t("situationRoom.standby.stateProjection")}</p>
                   <p className="mt-1 text-xs text-slate-300">
                     {activeStandbyProjection
-                      ? `${activeStandbyProjection.window.event_count} signal(s), ${activeStandbyProjection.recent_facts.length} fact(s)`
-                      : "No standby signals yet."}
+                      ? t("situationRoom.standby.signalSummary", {
+                          signals: activeStandbyProjection.window.event_count,
+                          facts: activeStandbyProjection.recent_facts.length,
+                        })
+                      : t("situationRoom.standby.noSignals")}
                   </p>
                   {activeStandbyProjection?.world_state ? (
                     <p className="mt-1 text-[11px] text-slate-500">
-                      health risk: {String(Boolean(activeStandbyProjection.world_state.health_risk))}
+                      {t("situationRoom.standby.healthRisk", { value: String(Boolean(activeStandbyProjection.world_state.health_risk)) })}
                     </p>
                   ) : null}
                 </div>
                 <div className="rounded border border-white/10 bg-slate-950/70 p-3">
-                  <p className="text-[10px] uppercase text-slate-500">Goal hypotheses</p>
+                  <p className="text-[10px] uppercase text-slate-500">{t("situationRoom.standby.goalHypotheses")}</p>
                   {activeStandbyGoals.length === 0 ? (
-                    <p className="mt-1 text-xs text-slate-500">None yet.</p>
+                    <p className="mt-1 text-xs text-slate-500">{t("situationRoom.common.noneYet")}</p>
                   ) : (
                     <div className="mt-2 space-y-2">
                       {activeStandbyGoals.slice(-3).map((goal) => (
                         <div key={goal.hypothesis_id} className="rounded border border-emerald-400/20 bg-emerald-500/10 p-2">
                           <p className="text-xs font-semibold text-emerald-100">{goal.goal_label}</p>
                           <p className="text-[11px] text-emerald-100/75">
-                            {goal.status} / confidence {goal.confidence.toFixed(2)}
+                            {t("situationRoom.standby.goalConfidence", { status: goal.status, confidence: goal.confidence.toFixed(2) })}
                           </p>
                         </div>
                       ))}
@@ -3124,9 +3188,9 @@ export default function SituationRoomPipelinesPanel() {
                   )}
                 </div>
                 <div className="rounded border border-white/10 bg-slate-950/70 p-3">
-                  <p className="text-[10px] uppercase text-slate-500">Interjection proposals</p>
+                  <p className="text-[10px] uppercase text-slate-500">{t("situationRoom.standby.interjectionProposals")}</p>
                   {activeStandbyProposals.length === 0 ? (
-                    <p className="mt-1 text-xs text-slate-500">None pending.</p>
+                    <p className="mt-1 text-xs text-slate-500">{t("situationRoom.common.nonePending")}</p>
                   ) : (
                     <div className="mt-2 space-y-2">
                       {activeStandbyProposals.slice(-3).map((proposal) => (
@@ -3134,14 +3198,14 @@ export default function SituationRoomPipelinesPanel() {
                           <p className="text-xs text-cyan-50">{proposal.text}</p>
                           <div className="mt-2 flex gap-2">
                             <button type="button" className="rounded border border-cyan-300/35 px-2 py-1 text-[11px] text-cyan-100">
-                              Confirm
+                              {t("situationRoom.standby.confirm")}
                             </button>
                             <button
                               type="button"
                               onClick={() => dismissStandbyProposal(proposal.proposal_id)}
                               className="rounded border border-white/15 px-2 py-1 text-[11px] text-slate-200"
                             >
-                              Dismiss
+                              {t("situationRoom.standby.dismiss")}
                             </button>
                           </div>
                         </div>
@@ -3161,9 +3225,9 @@ export default function SituationRoomPipelinesPanel() {
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase text-slate-500">Helix Thread Binding</p>
+                  <p className="text-[11px] font-semibold uppercase text-slate-500">{t("situationRoom.threadBinding.title")}</p>
                   <p className="mt-1 text-xs text-slate-400">
-                    Attach salient standby receipts to Helix Ask as tool observations. This does not start model turns or enable Minecraft actions.
+                    {t("situationRoom.threadBinding.description")}
                   </p>
                 </div>
                 <span
@@ -3174,12 +3238,12 @@ export default function SituationRoomPipelinesPanel() {
                       : "border-white/15 text-slate-400",
                   )}
                 >
-                  {activeThreadBinding ? "attached to Helix Ask" : "observe-only"}
+                  {activeThreadBinding ? t("situationRoom.threadBinding.attached") : t("situationRoom.threadBinding.observeOnly")}
                 </span>
               </div>
               <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
                 <label className="block">
-                  <span className="text-[10px] uppercase text-slate-500">Thread id</span>
+                  <span className="text-[10px] uppercase text-slate-500">{t("situationRoom.threadBinding.threadId")}</span>
                   <input
                     value={bindingThreadId}
                     onChange={(event) => setBindingThreadId(event.target.value)}
@@ -3188,7 +3252,7 @@ export default function SituationRoomPipelinesPanel() {
                   />
                 </label>
                 <label className="block">
-                  <span className="text-[10px] uppercase text-slate-500">World id</span>
+                  <span className="text-[10px] uppercase text-slate-500">{t("situationRoom.threadBinding.worldId")}</span>
                   <input
                     value={bindingWorldId}
                     onChange={(event) => setBindingWorldId(event.target.value)}
@@ -3203,7 +3267,7 @@ export default function SituationRoomPipelinesPanel() {
                     disabled={!activeRoom || bindingBusy}
                     className="rounded border border-cyan-400/35 bg-cyan-500/10 px-2 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-45"
                   >
-                    Attach room
+                    {t("situationRoom.threadBinding.attachRoom")}
                   </button>
                   <button
                     type="button"
@@ -3211,7 +3275,7 @@ export default function SituationRoomPipelinesPanel() {
                     disabled={!activeRoom || bindingBusy}
                     className="rounded border border-emerald-400/35 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-100 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-45"
                   >
-                    Attach Minecraft source
+                    {t("situationRoom.threadBinding.attachMinecraftSource")}
                   </button>
                   <button
                     type="button"
@@ -3219,7 +3283,7 @@ export default function SituationRoomPipelinesPanel() {
                     disabled={!activeRoom || !activeGraph || bindingBusy}
                     className="rounded border border-violet-400/35 bg-violet-500/10 px-2 py-1.5 text-xs text-violet-100 hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-45"
                   >
-                    Attach graph
+                    {t("situationRoom.threadBinding.attachGraph")}
                   </button>
                   <button
                     type="button"
@@ -3227,21 +3291,21 @@ export default function SituationRoomPipelinesPanel() {
                     disabled={!activeThreadBinding || bindingBusy}
                     className="rounded border border-white/15 bg-white/5 px-2 py-1.5 text-xs text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
                   >
-                    Detach
+                    {t("situationRoom.threadBinding.detach")}
                   </button>
                 </div>
               </div>
               <div className="mt-3 grid gap-2 sm:grid-cols-3">
                 <div className="rounded border border-white/10 bg-slate-950/70 p-2">
-                  <p className="text-[10px] uppercase text-slate-500">Source</p>
+                  <p className="text-[10px] uppercase text-slate-500">{t("situationRoom.threadBinding.source")}</p>
                   <p className="mt-1 break-all text-xs text-slate-300">{minecraftSourceId}</p>
                 </div>
                 <div className="rounded border border-white/10 bg-slate-950/70 p-2">
-                  <p className="text-[10px] uppercase text-slate-500">Append policy</p>
+                  <p className="text-[10px] uppercase text-slate-500">{t("situationRoom.threadBinding.appendPolicy")}</p>
                   <p className="mt-1 text-xs text-slate-300">{activeThreadBinding?.append_policy ?? "salient_only"}</p>
                 </div>
                 <div className="rounded border border-white/10 bg-slate-950/70 p-2">
-                  <p className="text-[10px] uppercase text-slate-500">Last append status</p>
+                  <p className="text-[10px] uppercase text-slate-500">{t("situationRoom.threadBinding.lastAppendStatus")}</p>
                   <p className={cn("mt-1 text-xs", bindingStatus?.ok === false ? "text-rose-200" : "text-slate-300")}>
                     {bindingStatus?.message ?? (activeThreadBinding ? `thread ${activeThreadBinding.thread_id}` : "no_thread_context")}
                   </p>
@@ -3249,24 +3313,28 @@ export default function SituationRoomPipelinesPanel() {
               </div>
               {activeThreadBinding ? (
                 <p className="mt-2 break-all text-[10px] text-slate-500">
-                  binding {activeThreadBinding.binding_id} / {activeThreadBinding.binding_kind} / mode {activeThreadBinding.mode}
+                  {t("situationRoom.threadBinding.bindingSummary", {
+                    binding: activeThreadBinding.binding_id,
+                    kind: activeThreadBinding.binding_kind,
+                    mode: activeThreadBinding.mode,
+                  })}
                 </p>
               ) : null}
             </section>
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase text-slate-500">Minecraft / World Events</p>
+                  <p className="text-[11px] font-semibold uppercase text-slate-500">{t("situationRoom.worldEvents.title")}</p>
                   <p className="mt-1 text-xs text-slate-400">
-                    World plugin signals are runtime observations; they do not start Helix turns or run game actions.
+                    {t("situationRoom.worldEvents.description")}
                   </p>
                 </div>
                 <span className="rounded border border-white/15 px-2 py-0.5 text-[10px] uppercase text-slate-400">
-                  {activeWorldSignals.length} event(s)
+                  {t("situationRoom.worldEvents.eventCount", { count: activeWorldSignals.length })}
                 </span>
               </div>
               {activeWorldSignals.length === 0 ? (
-                <p className="mt-3 text-xs text-slate-500">No Minecraft or world-event signals in this graph yet.</p>
+                <p className="mt-3 text-xs text-slate-500">{t("situationRoom.worldEvents.empty")}</p>
               ) : (
                 <div className="mt-3 space-y-2">
                   {activeWorldSignals.slice(-5).reverse().map((signal) => (
@@ -3277,7 +3345,7 @@ export default function SituationRoomPipelinesPanel() {
                           {signal.actor ?? signal.source_id ?? "world"}
                         </span>
                       </div>
-                      <p className="mt-1 text-xs text-slate-300">{signal.text ?? "World event received."}</p>
+                      <p className="mt-1 text-xs text-slate-300">{signal.text ?? t("situationRoom.worldEvents.received")}</p>
                       <p className="mt-1 break-all text-[10px] text-slate-500">
                         {signal.evidence_refs.length > 0 ? signal.evidence_refs.join(", ") : signal.signal_id}
                       </p>
@@ -3287,9 +3355,9 @@ export default function SituationRoomPipelinesPanel() {
               )}
             </section>
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
-              <p className="text-[11px] font-semibold uppercase text-slate-500">Salience Receipt Rail</p>
+              <p className="text-[11px] font-semibold uppercase text-slate-500">{t("situationRoom.salience.title")}</p>
               {activeStandbyReceipts.length === 0 ? (
-                <p className="mt-2 text-xs text-slate-500">No salience decisions yet.</p>
+                <p className="mt-2 text-xs text-slate-500">{t("situationRoom.salience.empty")}</p>
               ) : (
                 <div className="mt-3 space-y-2">
                   {activeStandbyReceipts.slice(-6).reverse().map((receipt) => (
@@ -3297,7 +3365,7 @@ export default function SituationRoomPipelinesPanel() {
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-xs font-semibold text-white">{receipt.reason}</p>
                         <span className="rounded border border-white/15 px-2 py-0.5 text-[10px] text-slate-300">
-                          {receipt.priority} / notify {String(receipt.should_notify_helix)}
+                          {t("situationRoom.salience.notifySummary", { priority: receipt.priority, notify: String(receipt.should_notify_helix) })}
                         </span>
                       </div>
                       <p className="mt-1 text-xs text-slate-300">{receipt.summary}</p>
@@ -3315,10 +3383,10 @@ export default function SituationRoomPipelinesPanel() {
         <main className="min-h-0 flex-1 overflow-y-auto p-4">
           <div className="mx-auto grid max-w-5xl gap-4 lg:grid-cols-2">
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
-              <p className="mb-2 text-[11px] font-semibold uppercase text-slate-500">Rooms</p>
+              <p className="mb-2 text-[11px] font-semibold uppercase text-slate-500">{t("situationRoom.inputs.rooms")}</p>
               <div className="space-y-2">
                 {roomList.length === 0 ? (
-                  <p className="text-xs text-slate-500">No situation rooms yet.</p>
+                  <p className="text-xs text-slate-500">{t("situationRoom.inputs.noRooms")}</p>
                 ) : (
                   roomList.map((room) => (
                     <button
@@ -3334,7 +3402,9 @@ export default function SituationRoomPipelinesPanel() {
                     >
                       <p className="truncate text-sm font-medium">{room.title}</p>
                       <p className="mt-1 text-[11px] text-slate-400">
-                        {room.source_ids.length} source{room.source_ids.length === 1 ? "" : "s"}
+                        {room.source_ids.length === 1
+                          ? t("situationRoom.inputs.sourceCountSingular", { count: room.source_ids.length })
+                          : t("situationRoom.inputs.sourceCountPlural", { count: room.source_ids.length })}
                       </p>
                     </button>
                   ))
@@ -3343,7 +3413,7 @@ export default function SituationRoomPipelinesPanel() {
             </section>
 
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
-              <p className="mb-2 text-[11px] font-semibold uppercase text-slate-500">Sources</p>
+              <p className="mb-2 text-[11px] font-semibold uppercase text-slate-500">{t("situationRoom.inputs.sources")}</p>
               <div className="space-y-2">
                 <button
                   type="button"
@@ -3355,8 +3425,8 @@ export default function SituationRoomPipelinesPanel() {
                       : "border-white/10 text-slate-200 hover:bg-white/5",
                   )}
                 >
-                  <p className="text-sm font-medium">Whole room</p>
-                  <p className="mt-1 text-[11px] text-slate-400">Route all selected room evidence into a job.</p>
+                  <p className="text-sm font-medium">{t("situationRoom.inputs.wholeRoom")}</p>
+                  <p className="mt-1 text-[11px] text-slate-400">{t("situationRoom.inputs.wholeRoomDescription")}</p>
                 </button>
                 {activeSources.map((source) => (
                   <button
@@ -3372,7 +3442,7 @@ export default function SituationRoomPipelinesPanel() {
                   >
                     <p className="truncate text-sm font-medium">{source.label}</p>
                     <p className="mt-1 text-[11px] text-slate-400">
-                      {source.status} / chunks {source.chunk_index}
+                      {t("situationRoom.inputs.sourceStatus", { status: source.status, chunks: source.chunk_index })}
                     </p>
                   </button>
                 ))}
@@ -3383,7 +3453,7 @@ export default function SituationRoomPipelinesPanel() {
                 disabled={!activeRoom}
                 className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded border border-cyan-400/40 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-100 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-45"
               >
-                Continue to jobs
+                {t("situationRoom.inputs.continueToJobs")}
               </button>
             </section>
           </div>
@@ -3395,13 +3465,13 @@ export default function SituationRoomPipelinesPanel() {
           <div className="mx-auto max-w-5xl space-y-4">
             <details className="rounded-lg border border-white/10 bg-black/20 p-3">
               <summary className="cursor-pointer list-none text-xs font-semibold text-slate-200">
-                Advanced workflow creation
+                {t("situationRoom.jobs.advancedWorkflowCreation")}
                 <span className="ml-2 text-[11px] font-normal text-slate-500">
-                  recipes, prompt drafting, and manual job options
+                  {t("situationRoom.jobs.advancedWorkflowDescription")}
                 </span>
               </summary>
               <div className="mt-3">
-              <p className="text-[11px] font-semibold uppercase text-slate-500">Recipes</p>
+              <p className="text-[11px] font-semibold uppercase text-slate-500">{t("situationRoom.jobs.recipes")}</p>
               <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 {SITUATION_ROOM_JOB_RECIPES.map((recipe) => (
                   <button
@@ -3429,7 +3499,7 @@ export default function SituationRoomPipelinesPanel() {
                   onKeyDown={(event) => {
                     if (event.key === "Enter") handleNaturalLanguageDraft();
                   }}
-                  placeholder="What should this source/job do?"
+                  placeholder={t("situationRoom.jobs.promptPlaceholder")}
                   className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none"
                 />
                 <button
@@ -3439,7 +3509,7 @@ export default function SituationRoomPipelinesPanel() {
                   className="inline-flex items-center justify-center gap-1 rounded border border-cyan-400/40 bg-cyan-500/10 px-2 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <Sparkles className="h-3.5 w-3.5" />
-                  Draft
+                  {t("situationRoom.jobs.draft")}
                 </button>
               </div>
 
@@ -3449,11 +3519,16 @@ export default function SituationRoomPipelinesPanel() {
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-white">{draft.title}</p>
                       <p className="mt-1 text-[11px] text-cyan-100/80">
-                        Scope: {draft.source_ids.length > 0 ? selectedSource?.label ?? draft.source_ids.join(", ") : "whole room"} / attachment manual only
+                          {t("situationRoom.jobs.scopeSummary", {
+                            scope: draft.source_ids.length > 0 ? selectedSource?.label ?? draft.source_ids.join(", ") : t("situationRoom.inputs.wholeRoom"),
+                          })}
                       </p>
                       {draft.kind === "translate" ? (
                         <p className="mt-1 text-[11px] text-slate-300">
-                          Target: {labelSituationRoomLanguage(draft.args.target_language)} / output {draft.args.output_render_policy ?? "target_language"}
+                          {t("situationRoom.jobs.targetSummary", {
+                            language: labelSituationRoomLanguage(draft.args.target_language),
+                            output: draft.args.output_render_policy ?? "target_language",
+                          })}
                         </p>
                       ) : null}
                     </div>
@@ -3464,7 +3539,7 @@ export default function SituationRoomPipelinesPanel() {
                       className="inline-flex items-center justify-center gap-1 rounded border border-cyan-300/45 bg-cyan-400/15 px-2 py-1.5 text-xs text-cyan-50 hover:bg-cyan-400/25 disabled:cursor-not-allowed disabled:opacity-45"
                     >
                       <Plus className="h-3.5 w-3.5" />
-                      Create Job
+                      {t("situationRoom.jobs.createJob")}
                     </button>
                   </div>
                   {draft.missing_slots.includes("target_language") ? (
@@ -3486,7 +3561,7 @@ export default function SituationRoomPipelinesPanel() {
                         onKeyDown={(event) => {
                           if (event.key === "Enter" && customLanguage.trim()) applyLanguageToDraft(customLanguage.trim());
                         }}
-                        placeholder="Custom"
+                        placeholder={t("situationRoom.jobs.customLanguage")}
                         className="w-24 rounded border border-white/15 bg-slate-950 px-2 py-1 text-[11px] text-slate-100 outline-none"
                       />
                     </div>
@@ -3500,7 +3575,7 @@ export default function SituationRoomPipelinesPanel() {
                 onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
               >
                 <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-xs font-semibold text-slate-200">
-                  Advanced
+                  {t("situationRoom.jobs.advanced")}
                   <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", advancedOpen ? "rotate-180" : "")} />
                 </summary>
                 <div className="border-t border-white/10 p-3">
@@ -3510,22 +3585,22 @@ export default function SituationRoomPipelinesPanel() {
                         <option key={option.kind} value={option.kind}>{option.label}</option>
                       ))}
                     </select>
-                    <input value={targetLanguage} onChange={(event) => setTargetLanguage(event.target.value)} disabled={jobKind !== "translate"} className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none disabled:opacity-45" aria-label="Target language" />
-                    <input value={nativeLanguage} onChange={(event) => setNativeLanguage(event.target.value)} className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none" aria-label="Native language" />
+                    <input value={targetLanguage} onChange={(event) => setTargetLanguage(event.target.value)} disabled={jobKind !== "translate"} className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none disabled:opacity-45" aria-label={t("situationRoom.jobs.targetLanguage")} />
+                    <input value={nativeLanguage} onChange={(event) => setNativeLanguage(event.target.value)} className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none" aria-label={t("situationRoom.jobs.nativeLanguage")} />
                     <button type="button" onClick={handleCreateJob} disabled={!activeRoom} className="inline-flex items-center justify-center gap-1 rounded border border-cyan-400/40 bg-cyan-500/10 px-2 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-45">
                       <Plus className="h-3.5 w-3.5" />
-                      Create
+                      {t("situationRoom.jobs.create")}
                     </button>
                   </div>
                   <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
-                    <select value={inputTextPolicy} onChange={(event) => setInputTextPolicy(event.target.value as SituationRoomJobInputTextPolicy)} disabled={jobKind !== "translate"} className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none disabled:opacity-45" aria-label="Translation input text policy">
+                    <select value={inputTextPolicy} onChange={(event) => setInputTextPolicy(event.target.value as SituationRoomJobInputTextPolicy)} disabled={jobKind !== "translate"} className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none disabled:opacity-45" aria-label={t("situationRoom.jobs.translationInputPolicy")}>
                       {INPUT_TEXT_POLICY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>Input: {option.label}</option>
+                        <option key={option.value} value={option.value}>{t("situationRoom.jobs.inputOption", { label: option.label })}</option>
                       ))}
                     </select>
-                    <select value={outputRenderPolicy} onChange={(event) => setOutputRenderPolicy(event.target.value as SituationRoomJobOutputRenderPolicy)} disabled={jobKind !== "translate"} className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none disabled:opacity-45" aria-label="Translation output render policy">
+                    <select value={outputRenderPolicy} onChange={(event) => setOutputRenderPolicy(event.target.value as SituationRoomJobOutputRenderPolicy)} disabled={jobKind !== "translate"} className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none disabled:opacity-45" aria-label={t("situationRoom.jobs.translationOutputPolicy")}>
                       {OUTPUT_RENDER_POLICY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>Output: {option.label}</option>
+                        <option key={option.value} value={option.value}>{t("situationRoom.jobs.outputOption", { label: option.label })}</option>
                       ))}
                     </select>
                   </div>
@@ -3536,17 +3611,17 @@ export default function SituationRoomPipelinesPanel() {
 
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
               <div className="mb-3 flex items-center justify-between gap-3">
-                <p className="text-[11px] font-semibold uppercase text-slate-500">Active workflows</p>
+                <p className="text-[11px] font-semibold uppercase text-slate-500">{t("situationRoom.jobs.activeWorkflows")}</p>
                 {selectedJob ? (
                   <button type="button" onClick={() => { masterScrollPinnedRef.current = true; setPanelPage("output"); }} className="inline-flex items-center gap-1 rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10">
                     <ScrollText className="h-3.5 w-3.5" />
-                    View output
+                    {t("situationRoom.sources.viewOutput")}
                   </button>
                 ) : null}
               </div>
               {activeJobs.length === 0 ? (
                 <div className="flex min-h-[180px] items-center justify-center rounded-lg border border-dashed border-white/15 px-6 text-center text-sm text-slate-400">
-                  Create a job to process selected room evidence. Job outputs stay separate until attached or saved.
+                  {t("situationRoom.jobs.empty")}
                 </div>
               ) : (
                 <div className="grid gap-3 xl:grid-cols-2">
@@ -3565,6 +3640,7 @@ export default function SituationRoomPipelinesPanel() {
                       onStop={() => stopJob(job.job_id)}
                       onSave={() => saveJobAsNote(job.job_id)}
                       onAttach={() => attachJobToHelixAsk(job.job_id)}
+                      t={t}
                     />
                   ))}
                 </div>
@@ -3581,26 +3657,26 @@ export default function SituationRoomPipelinesPanel() {
               <div>
                 <div className="flex items-center gap-2 text-sm font-semibold text-white">
                   <ScrollText className="h-4 w-4 text-cyan-300" />
-                  {selectedJob ? selectedJob.title : "Master Scroll"}
+                  {selectedJob ? selectedJob.title : t("situationRoom.output.masterScroll")}
                 </div>
                 <p className="mt-1 text-[11px] text-slate-400">
                   {selectedJob
-                    ? "Job-relative raw evidence and derived outputs, sorted by timestamp and provenance."
-                    : "Raw transcript events and derived job outputs, sorted by timestamp and provenance."}
+                    ? t("situationRoom.output.jobDescription")
+                    : t("situationRoom.output.masterDescription")}
                 </p>
               </div>
               {selectedJob ? (
                 <div className="flex flex-wrap gap-2">
                   <button type="button" onClick={() => setSelectedJobId(ALL_OUTPUT_JOB_ID)} className="inline-flex items-center gap-1 rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10">
-                    All output
+                    {t("situationRoom.output.allOutput")}
                   </button>
                   <button type="button" onClick={() => { masterScrollPinnedRef.current = true; void processJobNowAsync(selectedJob.job_id); }} className="inline-flex items-center gap-1 rounded border border-cyan-400/35 bg-cyan-500/10 px-2 py-1 text-xs text-cyan-100 hover:bg-cyan-500/20">
                     <Play className="h-3.5 w-3.5" />
-                    Run
+                    {t("situationRoom.action.run")}
                   </button>
                   <button type="button" onClick={() => attachJobToHelixAsk(selectedJob.job_id)} className="inline-flex items-center gap-1 rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10">
                     <Link2 className="h-3.5 w-3.5" />
-                    Attach
+                    {t("situationRoom.action.attach")}
                   </button>
                   <button
                     type="button"
@@ -3609,11 +3685,11 @@ export default function SituationRoomPipelinesPanel() {
                     className="inline-flex items-center gap-1 rounded border border-violet-300/35 bg-violet-500/10 px-2 py-1 text-xs text-violet-100 hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     {isReadingOutput ? <Square className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
-                    {isReadingOutput ? "Stop" : "Read aloud"}
+                    {isReadingOutput ? t("situationRoom.action.stop") : t("situationRoom.output.readAloud")}
                   </button>
                   <button type="button" onClick={() => saveJobAsNote(selectedJob.job_id)} className="inline-flex items-center gap-1 rounded border border-emerald-400/35 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-100 hover:bg-emerald-500/20">
                     <Save className="h-3.5 w-3.5" />
-                    Save
+                    {t("situationRoom.action.save")}
                   </button>
                 </div>
               ) : null}
@@ -3622,8 +3698,11 @@ export default function SituationRoomPipelinesPanel() {
               <p className={cn("mt-2 text-[11px]", readOutputError ? "text-rose-300" : "text-violet-200")}>
                 {readOutputError ??
                   (readOutputProgress
-                    ? `Reading job output ${readOutputProgress.chunkIndex}/${readOutputProgress.chunkCount}`
-                    : "Reading job output...")}
+                    ? t("situationRoom.output.readingProgress", {
+                        chunk: readOutputProgress.chunkIndex,
+                        chunks: readOutputProgress.chunkCount,
+                      })
+                    : t("situationRoom.output.reading"))}
               </p>
             ) : null}
           </div>
@@ -3632,13 +3711,13 @@ export default function SituationRoomPipelinesPanel() {
           </div>
           <div ref={masterScrollRef} onScroll={handleMasterScroll} className="min-h-0 flex-1 overflow-y-auto p-3">
             {focusedMasterScroll.length === 0 ? (
-              <p className="text-xs text-slate-500">No raw or derived events for this job yet.</p>
+              <p className="text-xs text-slate-500">{t("situationRoom.output.noEvents")}</p>
             ) : (
               <div className="mx-auto max-w-4xl space-y-2">
                 {focusedMasterScroll.map((row) => (
                   <div key={row.id} className="rounded border border-white/10 bg-black/20 px-3 py-2">
                     <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400">
-                      <span>{row.kind === "derived" ? "derived" : "raw"} / {row.event_type}</span>
+                      <span>{row.kind === "derived" ? t("situationRoom.output.derived") : t("situationRoom.output.raw")} / {row.event_type}</span>
                       <span>{formatClock(row.ts)}</span>
                     </div>
                     <p className="mt-1 text-xs font-medium text-slate-100">{row.label}</p>
@@ -3646,9 +3725,12 @@ export default function SituationRoomPipelinesPanel() {
                     {row.kind === "derived" ? (
                       <>
                         <p className="mt-1 text-[10px] text-slate-500">
-                          language {String(row.output.meta.output_language ?? row.output.meta.target_language ?? "n/a")} / {String(row.output.meta.output_render_policy ?? "target_language")}
+                          {t("situationRoom.output.languageSummary", {
+                            language: String(row.output.meta.output_language ?? row.output.meta.target_language ?? "n/a"),
+                            policy: String(row.output.meta.output_render_policy ?? "target_language"),
+                          })}
                         </p>
-                        <p className="mt-1 break-all text-[10px] text-slate-500">from {row.output.derived_from_event_ids.join(", ")}</p>
+                        <p className="mt-1 break-all text-[10px] text-slate-500">{t("situationRoom.output.fromEvents", { events: row.output.derived_from_event_ids.join(", ") })}</p>
                       </>
                     ) : null}
                   </div>
@@ -3658,7 +3740,7 @@ export default function SituationRoomPipelinesPanel() {
           </div>
           <div className="shrink-0 border-t border-white/10 p-3 text-[11px] text-slate-500">
             <FileText className="mr-1 inline h-3.5 w-3.5" />
-            Job output is visible here but only reaches Helix Ask when explicitly attached.
+            {t("situationRoom.output.attachBoundary")}
           </div>
         </main>
       ) : (
@@ -3667,9 +3749,9 @@ export default function SituationRoomPipelinesPanel() {
             <section className="rounded-lg border border-cyan-300/20 bg-cyan-500/5 p-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase text-cyan-200">Live output</p>
+                  <p className="text-[11px] font-semibold uppercase text-cyan-200">{t("situationRoom.output.liveOutput")}</p>
                   <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-300">
-                    This is the product side of the Situation Room: Live Answers renders construct evidence through output bindings, alongside pipeline outputs and selected-room job results. Setup controls stay in Setup and source-specific workflow creation starts from Sources.
+                    {t("situationRoom.output.liveDescription")}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -3678,7 +3760,7 @@ export default function SituationRoomPipelinesPanel() {
                     onClick={() => setPanelPage("sources")}
                     className="rounded border border-white/15 bg-white/5 px-3 py-2 text-xs text-slate-200 hover:bg-white/10"
                   >
-                    Sources
+                    {t("situationRoom.page.sources")}
                   </button>
                   <button
                     type="button"
@@ -3686,22 +3768,22 @@ export default function SituationRoomPipelinesPanel() {
                     disabled={!activeRoom}
                     className="rounded border border-cyan-400/35 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-45"
                   >
-                    Room workflows
+                    {t("situationRoom.sources.roomWorkflows")}
                   </button>
                 </div>
               </div>
               <div className="mt-3 grid gap-2 sm:grid-cols-3">
                 <div className="rounded border border-white/10 bg-slate-950/70 p-3">
-                  <p className="text-[10px] uppercase text-slate-500">Room</p>
-                  <p className="mt-1 truncate text-sm font-semibold text-white">{activeRoom?.title ?? "No active room"}</p>
+                  <p className="text-[10px] uppercase text-slate-500">{t("situationRoom.output.room")}</p>
+                  <p className="mt-1 truncate text-sm font-semibold text-white">{activeRoom?.title ?? t("situationRoom.nav.noRoom")}</p>
                 </div>
                 <div className="rounded border border-white/10 bg-slate-950/70 p-3">
-                  <p className="text-[10px] uppercase text-slate-500">Live Answer binding</p>
+                  <p className="text-[10px] uppercase text-slate-500">{t("situationRoom.output.liveAnswerBinding")}</p>
                   <p className="mt-1 truncate text-sm font-semibold text-white">{activeLiveAnswerEnvironmentId ?? "planned"}</p>
                 </div>
                 <div className="rounded border border-white/10 bg-slate-950/70 p-3">
-                  <p className="text-[10px] uppercase text-slate-500">Selected source</p>
-                  <p className="mt-1 truncate text-sm font-semibold text-white">{selectedSource?.label ?? "whole room"}</p>
+                  <p className="text-[10px] uppercase text-slate-500">{t("situationRoom.output.selectedSource")}</p>
+                  <p className="mt-1 truncate text-sm font-semibold text-white">{selectedSource?.label ?? t("situationRoom.inputs.wholeRoom")}</p>
                 </div>
               </div>
             </section>
@@ -3709,9 +3791,9 @@ export default function SituationRoomPipelinesPanel() {
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase text-slate-500">Construct outputs</p>
+                  <p className="text-[11px] font-semibold uppercase text-slate-500">{t("situationRoom.output.constructOutputs")}</p>
                   <p className="mt-1 text-xs text-slate-400">
-                    Live Answers is an output surface. Voice proposals are separate from spoken audio.
+                    {t("situationRoom.output.constructDescription")}
                   </p>
                 </div>
                 <button
@@ -3719,7 +3801,7 @@ export default function SituationRoomPipelinesPanel() {
                   onClick={() => setPanelPage("constructs")}
                   className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10"
                 >
-                  Live Jobs
+                  {t("situationRoom.page.liveJobs")}
                 </button>
               </div>
               <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -3732,12 +3814,12 @@ export default function SituationRoomPipelinesPanel() {
                   </div>
                 ))}
                 <div className="rounded border border-cyan-400/25 bg-cyan-500/10 p-3">
-                  <p className="text-xs font-semibold text-cyan-100">Voice proposal</p>
+                  <p className="text-xs font-semibold text-cyan-100">{t("situationRoom.output.voiceProposal")}</p>
                   <p className="mt-1 text-[11px] text-cyan-100/80">
                     {selectedLiveJob?.observation?.policy_state.spoken === true &&
                     selectedLiveJob.observation.policy_state.confirm_speak_receipt_present === true
-                      ? "Confirmed spoken receipt present."
-                      : "No audio spoken. Confirmation required before speech."}
+                      ? t("situationRoom.output.spokenReceiptPresent")
+                      : t("situationRoom.output.noAudioSpoken")}
                   </p>
                 </div>
               </div>
@@ -3750,9 +3832,9 @@ export default function SituationRoomPipelinesPanel() {
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase text-slate-500">Room job outputs</p>
+                  <p className="text-[11px] font-semibold uppercase text-slate-500">{t("situationRoom.output.roomJobOutputs")}</p>
                   <p className="mt-1 text-xs text-slate-400">
-                    These are selected-room workflow outputs. Open a job for its evidence scroll, attach it to Helix Ask, or save it as a note.
+                    {t("situationRoom.output.roomJobDescription")}
                   </p>
                 </div>
                 <button
@@ -3761,12 +3843,12 @@ export default function SituationRoomPipelinesPanel() {
                   disabled={!activeRoom}
                   className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
                 >
-                  Manage workflows
+                  {t("situationRoom.output.manageWorkflows")}
                 </button>
               </div>
               {activeJobs.length === 0 ? (
                 <div className="flex min-h-[140px] items-center justify-center rounded-lg border border-dashed border-white/15 px-6 text-center text-sm text-slate-400">
-                  No room workflows have produced output yet. Pick a source, then create or run a room workflow.
+                  {t("situationRoom.output.noRoomOutputs")}
                 </div>
               ) : (
                 <div className="grid gap-3 xl:grid-cols-2">
@@ -3785,6 +3867,7 @@ export default function SituationRoomPipelinesPanel() {
                       onStop={() => stopJob(job.job_id)}
                       onSave={() => saveJobAsNote(job.job_id)}
                       onAttach={() => attachJobToHelixAsk(job.job_id)}
+                      t={t}
                     />
                   ))}
                 </div>

@@ -37,6 +37,7 @@ export default function CosmicDistanceLadderLens({
   rungs,
   selectedRungId,
   selectedObjectBindingId,
+  translateText,
   onSelectRung,
   onSelectObjectBinding,
   onClearObjectBinding,
@@ -46,11 +47,13 @@ export default function CosmicDistanceLadderLens({
   rungs: CosmicDistanceLadderRung[];
   selectedRungId: CosmicDistanceLadderRungId | null;
   selectedObjectBindingId: string | null;
+  translateText?: (text: string) => string;
   onSelectRung: (rung: CosmicDistanceLadderRung) => void;
   onSelectObjectBinding: (rung: CosmicDistanceLadderRung, bindingId: string) => void;
   onClearObjectBinding: () => void;
   onLoadPayload: (badgeId: string, payloadId: string) => void;
 }) {
+  const tx = translateText ?? ((text: string) => text);
   const selectedRung = rungs.find((rung) => rung.id === selectedRungId) ?? null;
   const selectedBinding = selectedRung?.objectBindings.find((binding) => binding.id === selectedObjectBindingId) ?? null;
   const badgesById = new Map(graph.badges.map((badge) => [badge.id, badge]));
@@ -77,15 +80,15 @@ export default function CosmicDistanceLadderLens({
                     <button
                       key={rung.id}
                       type="button"
-                      aria-label={`Select ${rung.title}`}
+                      aria-label={`Select ${tx(rung.title)}`}
                       onClick={() => onSelectRung(rung)}
                       className={`w-full border px-2 py-1.5 text-left text-xs shadow ${bandClass(
                         rung.band,
                         selected,
                       )}`}
                     >
-                      <span className="block font-semibold">{rung.title}</span>
-                      <span className="mt-0.5 block text-[10px] opacity-75">{rung.description}</span>
+                      <span className="block font-semibold">{tx(rung.title)}</span>
+                      <span className="mt-0.5 block text-[10px] opacity-75">{tx(rung.description)}</span>
                     </button>
                   );
                 })}
@@ -96,7 +99,7 @@ export default function CosmicDistanceLadderLens({
       <div className="border-t border-zinc-800 p-2">
         {selectedRung ? (
           <div className="space-y-2">
-            <div className="text-xs font-semibold text-zinc-100">{selectedRung.title}</div>
+            <div className="text-xs font-semibold text-zinc-100">{tx(selectedRung.title)}</div>
             <div className="text-[11px] text-zinc-400">
               {selectedRung.theoryBadgeIds.length} mapped badges / {selectedRung.calculatorPayloadRefs.length} scalar loadouts
             </div>
@@ -120,7 +123,7 @@ export default function CosmicDistanceLadderLens({
                     <button
                       key={binding.id}
                       type="button"
-                      aria-label={`Use ${binding.label} object binding`}
+                      aria-label={`Use ${tx(binding.label)} object binding`}
                       onClick={() => onSelectObjectBinding(selectedRung, binding.id)}
                       className={`w-full border px-2 py-1.5 text-left text-[11px] ${
                         selected
@@ -128,8 +131,8 @@ export default function CosmicDistanceLadderLens({
                           : "border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-cyan-700"
                       }`}
                     >
-                      <span className="block font-semibold">{binding.label}</span>
-                      <span className="mt-0.5 block text-[10px] opacity-75">{binding.description}</span>
+                      <span className="block font-semibold">{tx(binding.label)}</span>
+                      <span className="mt-0.5 block text-[10px] opacity-75">{tx(binding.description)}</span>
                     </button>
                   );
                 })}
@@ -154,12 +157,12 @@ export default function CosmicDistanceLadderLens({
             </div>
             {selectedRung.calculatorPayloadRefs.length === 0 ? (
               <div className="border border-zinc-800 bg-zinc-900 px-2 py-2 text-[11px] text-zinc-500">
-                Runtime/reference rung. No scalar calculator payload.
+                {tx("Runtime/reference rung. No scalar calculator payload.")}
               </div>
             ) : null}
           </div>
         ) : (
-          <div className="text-[11px] text-zinc-500">Pick a ladder rung to light the matching theory badges.</div>
+          <div className="text-[11px] text-zinc-500">{tx("Pick a ladder rung to light the matching theory badges.")}</div>
         )}
       </div>
     </aside>

@@ -18,12 +18,12 @@ export function HelixAskSurfaceComposerPanel({
   return (
     <>
       {voiceLevelMonitor}
-      <div className="flex flex-col gap-2 px-4 py-3">
+      <div className="relative z-[80] flex flex-col gap-2 px-4 py-3">
         <div className="flex flex-wrap items-center gap-3">
           {moodAvatar}
           {actionToolbar}
         </div>
-        <div className="relative min-w-0">
+        <div className="relative z-[90] min-w-0 overflow-visible">
           {slashCommandMenu}
           {textarea}
         </div>

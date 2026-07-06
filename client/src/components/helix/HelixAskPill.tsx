@@ -12835,12 +12835,20 @@ export function HelixAskPill({
   }, [closeAskSlashCommandMenu, resetAskPromptHistoryCursor, syncAskDraftValue]);
   const handleAskPromptHistoryKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const target = event.currentTarget;
+    if (
+      askPromptHistoryCursorRef.current !== null &&
+      (event.key === "ArrowLeft" || event.key === "ArrowRight" || event.key === "Escape")
+    ) {
+      resetAskPromptHistoryCursor();
+      return;
+    }
     const direction = shouldHandleHelixAskPromptHistoryKey({
       key: event.key,
       altKey: event.altKey,
       ctrlKey: event.ctrlKey,
       metaKey: event.metaKey,
       shiftKey: event.shiftKey,
+      historyBrowsingActive: askPromptHistoryCursorRef.current !== null,
       value: target.value,
       selectionStart: target.selectionStart,
       selectionEnd: target.selectionEnd,
@@ -12858,7 +12866,7 @@ export function HelixAskPill({
     askPromptHistoryCursorRef.current = result.cursor;
     askPromptHistoryDraftBeforeNavigationRef.current = result.draftBeforeNavigation;
     syncAskDraftValue(result.value, { target, focus: true });
-  }, [askPromptHistoryEntries, syncAskDraftValue]);
+  }, [askPromptHistoryEntries, resetAskPromptHistoryCursor, syncAskDraftValue]);
   const handleAskComposerKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (askSlashCommandMenuState.open) {
       const keyResult = resolveHelixAskSlashCommandMenuKey({

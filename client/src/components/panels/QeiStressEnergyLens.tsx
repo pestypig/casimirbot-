@@ -36,6 +36,7 @@ export default function QeiStressEnergyLens({
   groups,
   selectedGroupId,
   selectedObjectBindingId,
+  translateText,
   onSelectGroup,
   onSelectObjectBinding,
   onClearObjectBinding,
@@ -45,11 +46,13 @@ export default function QeiStressEnergyLens({
   groups: QeiStressEnergyGroup[];
   selectedGroupId: QeiStressEnergyGroupId | null;
   selectedObjectBindingId: string | null;
+  translateText?: (text: string) => string;
   onSelectGroup: (group: QeiStressEnergyGroup) => void;
   onSelectObjectBinding: (group: QeiStressEnergyGroup, bindingId: string) => void;
   onClearObjectBinding: () => void;
   onLoadPayload: (badgeId: string, payloadId: string) => void;
 }) {
+  const tx = translateText ?? ((text: string) => text);
   const selectedGroup = groups.find((group) => group.id === selectedGroupId) ?? null;
   const selectedBinding = selectedGroup?.objectBindings.find((binding) => binding.id === selectedObjectBindingId) ?? null;
   const badgesById = new Map(graph.badges.map((badge) => [badge.id, badge]));
@@ -76,15 +79,15 @@ export default function QeiStressEnergyLens({
                     <button
                       key={group.id}
                       type="button"
-                      aria-label={`Select ${group.title}`}
+                      aria-label={`Select ${tx(group.title)}`}
                       onClick={() => onSelectGroup(group)}
                       className={`w-full border px-2 py-1.5 text-left text-xs shadow ${bandClass(
                         group.band,
                         selected,
                       )}`}
                     >
-                      <span className="block font-semibold">{group.title}</span>
-                      <span className="mt-0.5 block text-[10px] opacity-75">{group.description}</span>
+                      <span className="block font-semibold">{tx(group.title)}</span>
+                      <span className="mt-0.5 block text-[10px] opacity-75">{tx(group.description)}</span>
                     </button>
                   );
                 })}
@@ -95,7 +98,7 @@ export default function QeiStressEnergyLens({
       <div className="border-t border-zinc-800 p-2">
         {selectedGroup ? (
           <div className="space-y-2">
-            <div className="text-xs font-semibold text-zinc-100">{selectedGroup.title}</div>
+            <div className="text-xs font-semibold text-zinc-100">{tx(selectedGroup.title)}</div>
             <div className="text-[11px] text-zinc-400">
               {selectedGroup.theoryBadgeIds.length} mapped badges / {selectedGroup.calculatorPayloadRefs.length} scalar loadouts
             </div>
@@ -119,7 +122,7 @@ export default function QeiStressEnergyLens({
                     <button
                       key={binding.id}
                       type="button"
-                      aria-label={`Use ${binding.label} object binding`}
+                      aria-label={`Use ${tx(binding.label)} object binding`}
                       onClick={() => onSelectObjectBinding(selectedGroup, binding.id)}
                       className={`w-full border px-2 py-1.5 text-left text-[11px] ${
                         selected
@@ -127,8 +130,8 @@ export default function QeiStressEnergyLens({
                           : "border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-cyan-700"
                       }`}
                     >
-                      <span className="block font-semibold">{binding.label}</span>
-                      <span className="mt-0.5 block text-[10px] opacity-75">{binding.description}</span>
+                      <span className="block font-semibold">{tx(binding.label)}</span>
+                      <span className="mt-0.5 block text-[10px] opacity-75">{tx(binding.description)}</span>
                     </button>
                   );
                 })}
@@ -158,7 +161,7 @@ export default function QeiStressEnergyLens({
             ) : null}
           </div>
         ) : (
-          <div className="text-[11px] text-zinc-500">Pick a QEI/stress group to light diagnostic badges.</div>
+          <div className="text-[11px] text-zinc-500">{tx("Pick a QEI/stress group to light diagnostic badges.")}</div>
         )}
       </div>
     </aside>

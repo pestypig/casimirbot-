@@ -63,6 +63,7 @@ export type ImageLensRegionInspectionRequestV1 = {
   source_image_ref?: string | null;
   page_number?: number | null;
   page_image_ref?: string | null;
+  source_dimensions_px?: { width: number; height: number } | null;
   bbox_px: DocumentImageBboxPxV1;
   crop_image_ref?: string | null;
   question?: string | null;
@@ -111,6 +112,8 @@ export type ImageLensRegionInspectionReceiptV1 = {
   observed_equation_labels?: string[];
   label_match_status?: ScientificEvidencePacketV1["label_match_status"];
   exact_equation_admissibility?: ScientificEvidencePacketV1["exact_equation_admissibility"];
+  row_quality_diagnostics?: ScientificEvidencePacketV1["row_quality_diagnostics"];
+  exact_row_promotion?: ScientificEvidencePacketV1["exact_row_promotion"];
   evidence_role?: ScientificEvidencePacketV1["evidence_role"];
   quality_flags?: string[];
   quality_rejection_reasons?: string[];
@@ -158,6 +161,8 @@ export type ImageLensRegionInspectionObservationV1 = {
   observed_equation_labels?: string[];
   label_match_status?: ScientificEvidencePacketV1["label_match_status"];
   exact_equation_admissibility?: ScientificEvidencePacketV1["exact_equation_admissibility"];
+  row_quality_diagnostics?: ScientificEvidencePacketV1["row_quality_diagnostics"];
+  exact_row_promotion?: ScientificEvidencePacketV1["exact_row_promotion"];
   evidence_role?: ScientificEvidencePacketV1["evidence_role"];
   quality_flags?: string[];
   quality_rejection_reasons?: string[];

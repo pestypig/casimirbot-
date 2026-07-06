@@ -54,6 +54,7 @@ type TheoryAchievementMapProps = {
   failedBadgeIds: string[];
   rippleBadgeIds: string[];
   heatByBadgeId: Record<string, number>;
+  translateText?: (text: string) => string;
   probabilityTerrain?: ProbabilityTerrainV1;
   frontierTrace?: TheoryFrontierVectorFieldTraceV1 | null;
   routeBadgeLabels?: Record<string, {
@@ -343,6 +344,7 @@ export default function TheoryAchievementMap({
   failedBadgeIds,
   rippleBadgeIds,
   heatByBadgeId,
+  translateText,
   probabilityTerrain,
   frontierTrace = null,
   routeBadgeLabels = {},
@@ -354,6 +356,7 @@ export default function TheoryAchievementMap({
   viewport,
   onViewportChange,
 }: TheoryAchievementMapProps) {
+  const tx = translateText ?? ((text: string) => text);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const restoredRef = useRef(false);
   const pendingZoomRef = useRef<{ center: { x: number; y: number }; zoom: number } | null>(null);
@@ -981,7 +984,7 @@ export default function TheoryAchievementMap({
                   top: node.y,
                   boxShadow: theoryBadgeGlowShadow(visualState, activeAtlasGlow),
                 }}
-                aria-label={badge.title}
+                aria-label={tx(badge.title)}
                 aria-describedby={tooltipId}
                 disabled={visualState.unavailable}
                 onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
@@ -1014,7 +1017,7 @@ export default function TheoryAchievementMap({
                   data-testid="theory-badge-tooltip"
                   className="pointer-events-none absolute left-1/2 top-[calc(100%+8px)] z-30 grid min-w-48 max-w-72 -translate-x-1/2 gap-1 border border-slate-500 bg-slate-950 px-3 py-2 text-left normal-case text-slate-100 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
                 >
-                  <span className="text-xs font-semibold leading-snug text-slate-50">{badge.title}</span>
+                  <span className="text-xs font-semibold leading-snug text-slate-50">{tx(badge.title)}</span>
                   {expression ? (
                     <span className="font-mono text-[11px] font-medium leading-snug text-cyan-100">{expression}</span>
                   ) : null}

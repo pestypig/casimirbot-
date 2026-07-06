@@ -60,6 +60,11 @@ const RUNTIME_ARTIFACT_BADGE_IDS = new Set([
   "casimir.material.lifshitz_receipt",
   "casimir.geometry.beyond_pfa_validity",
   "nhm2.natario.invariant_audit",
+  "nhm2.dynamic.time_dependent_source_campaign",
+  "nhm2.formal.diagnostic_campaign_admissible",
+  "nhm2.experimental.tile_source_physical_validation_plan",
+  "nhm2.experimental.physical_viability_campaign",
+  "nhm2.experimental.theory_solve_roadmap",
 ]);
 
 export function getDocEquationActionManifest(docPath?: string | null): DocEquationActionManifestV1 | null {

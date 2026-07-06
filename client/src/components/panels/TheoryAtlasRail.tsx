@@ -24,13 +24,16 @@ export default function TheoryAtlasRail({
   liveReflectionActive,
   onSelectLiveReflection,
   onSelectLens,
+  translateText,
 }: {
   activeLensId: TheoryAtlasLensId | null;
   hasLiveReflection?: boolean;
   liveReflectionActive?: boolean;
   onSelectLiveReflection?: () => void;
   onSelectLens: (lensId: TheoryAtlasLensId) => void;
+  translateText?: (text: string) => string;
 }) {
+  const tx = translateText ?? ((text: string) => text);
   return (
     <div
       aria-label="Theory atlas lenses"
@@ -59,8 +62,8 @@ export default function TheoryAtlasRail({
           <button
             key={block.id}
             type="button"
-            aria-label={`${block.title} atlas lens`}
-            title={`${block.title}${planned ? " (planned)" : ""}`}
+            aria-label={`${tx(block.title)} atlas lens`}
+            title={`${tx(block.title)}${planned ? " (planned)" : ""}`}
             onClick={() => onSelectLens(block.id)}
             className={`flex h-6 w-6 items-center justify-center border-2 text-[11px] font-black text-white shadow ${
               active

@@ -28,15 +28,18 @@ export default function PhysicsAtlasBlockLens({
   graph,
   block,
   lens,
+  translateText,
   onSelectBadge,
   onLoadPayload,
 }: {
   graph: TheoryBadgeGraphV1;
   block: PhysicsAtlasBlockV1;
   lens: PhysicsAtlasLensResult;
+  translateText?: (text: string) => string;
   onSelectBadge: (badgeId: string) => void;
   onLoadPayload: (badgeId: string, payloadId: string) => void;
 }) {
+  const tx = translateText ?? ((text: string) => text);
   const badgesById = new Map(graph.badges.map((badge: TheoryBadgeV1) => [badge.id, badge]));
   const primaryBadges = block.primaryBadgeIds
     .map((badgeId: string) => badgesById.get(badgeId))
@@ -55,13 +58,13 @@ export default function PhysicsAtlasBlockLens({
         <div className="flex items-center justify-between gap-2">
           <div>
             <div className="text-xs font-bold uppercase tracking-wide text-cyan-200">{block.glyph} Atlas</div>
-            <div className="text-sm font-semibold">{block.title}</div>
+            <div className="text-sm font-semibold">{tx(block.title)}</div>
           </div>
           <span className={`border px-1.5 py-0.5 text-[10px] font-bold uppercase ${statusClass(block.status)}`}>
             {block.status}
           </span>
         </div>
-        <p className="mt-2 text-[11px] leading-snug text-zinc-400">{block.description}</p>
+        <p className="mt-2 text-[11px] leading-snug text-zinc-400">{tx(block.description)}</p>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
@@ -75,17 +78,17 @@ export default function PhysicsAtlasBlockLens({
                 <button
                   key={badge.id}
                   type="button"
-                  aria-label={`Select ${badge.title}`}
+                  aria-label={`Select ${tx(badge.title)}`}
                   onClick={() => onSelectBadge(badge.id)}
                   className="w-full border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-left text-xs text-zinc-200 hover:border-cyan-500"
                 >
-                  <span className="block font-semibold">{badge.title}</span>
+                  <span className="block font-semibold">{tx(badge.title)}</span>
                   <span className="mt-0.5 block text-[10px] text-zinc-500">{labelize(badge.level)}</span>
                 </button>
               ))
             ) : (
               <div className="border border-zinc-800 bg-zinc-900 px-2 py-2 text-[11px] text-zinc-500">
-                No seeded badges yet. This lens still acts as a locator hint.
+                {tx("No seeded badges yet. This lens still acts as a locator hint.")}
               </div>
             )}
           </div>
@@ -109,7 +112,7 @@ export default function PhysicsAtlasBlockLens({
               ))
             ) : (
               <div className="border border-zinc-800 bg-zinc-900 px-2 py-2 text-[11px] text-zinc-500">
-                No scalar calculator payloads seeded for this block yet.
+                {tx("No scalar calculator payloads seeded for this block yet.")}
               </div>
             )}
           </div>
@@ -123,8 +126,8 @@ export default function PhysicsAtlasBlockLens({
             <div className="space-y-1">
               {block.runtimeActions.map((action) => (
                 <div key={`${action.actionId}-${action.badgeId ?? action.label}`} className="border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-[11px] text-zinc-400">
-                  <div className="font-semibold text-zinc-200">{action.label}</div>
-                  <div className="mt-0.5">{action.note}</div>
+                  <div className="font-semibold text-zinc-200">{tx(action.label)}</div>
+                  <div className="mt-0.5">{tx(action.note)}</div>
                 </div>
               ))}
             </div>
@@ -137,7 +140,7 @@ export default function PhysicsAtlasBlockLens({
         <div className="mt-1 space-y-1 text-[11px] text-zinc-400">
           {(lens.claimBoundaryNotes.length > 0 ? lens.claimBoundaryNotes : block.claimBoundaryNotes).slice(0, 4).map((note) => (
             <div key={note} className="border border-zinc-800 bg-zinc-900 px-2 py-1">
-              {note}
+              {tx(note)}
             </div>
           ))}
         </div>

@@ -93,6 +93,7 @@ export function shouldHandleHelixAskPromptHistoryKey(args: {
   ctrlKey?: boolean;
   metaKey?: boolean;
   shiftKey?: boolean;
+  historyBrowsingActive?: boolean;
   value: string;
   selectionStart: number;
   selectionEnd: number;
@@ -100,6 +101,9 @@ export function shouldHandleHelixAskPromptHistoryKey(args: {
   if (args.altKey || args.ctrlKey || args.metaKey || args.shiftKey) return null;
   if (args.key !== "ArrowUp" && args.key !== "ArrowDown") return null;
   if (args.selectionStart !== args.selectionEnd) return null;
+  if (args.historyBrowsingActive) {
+    return args.key === "ArrowUp" ? "previous" : "next";
+  }
   if (args.key === "ArrowUp") {
     const currentLineStart = args.value.lastIndexOf("\n", Math.max(0, args.selectionStart - 1)) + 1;
     return currentLineStart === 0 ? "previous" : null;

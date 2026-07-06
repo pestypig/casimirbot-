@@ -126,7 +126,15 @@ describe("Helix Ask slash command menu", () => {
       />,
     );
 
-    expect(screen.getByTestId("helix-ask-slash-command-menu")).toBeTruthy();
+    const menu = screen.getByTestId("helix-ask-slash-command-menu");
+    expect(menu).toBeTruthy();
+    expect(menu.className).toContain("top-full");
+    expect(menu.className).toContain("mt-2");
+    expect(menu.className).toContain("pointer-events-auto");
+    expect(menu.className).toContain("z-[120]");
+    expect(menu.className).toContain("bg-slate-950");
+    expect(menu.className).not.toContain("bottom-full");
+    expect(menu.className).not.toContain("bg-slate-950/95");
     expect(screen.getByText("/calculator")).toBeTruthy();
     expect(screen.getByText(/Solve or inspect a mathematical expression/)).toBeTruthy();
 
