@@ -2990,6 +2990,12 @@ export const buildArtifactQueryIndex = (input: {
     capability,
   );
   const requestedCapabilityContract = explicitCapabilityContractForCapability(requestedCapability);
+  const requestedToolFamilyContract = requestedCapabilityContract
+    ? null
+    : resolveToolFamilyContract({
+        toolName: requestedCapability,
+        toolFamily: requestedCapability,
+      });
   const requestedCapabilityCompoundSubgoal = compoundSubgoalLedger.find((entry) =>
     normalizedEqual(readNullableString(entry.requested_capability), requestedCapability) ||
     normalizedEqual(readNullableString(entry.runtime_capability), requestedCapability)
@@ -3006,11 +3012,17 @@ export const buildArtifactQueryIndex = (input: {
     ? compoundSubgoalRequiredObservationKinds
     : requestedCapabilityContract?.required_observation_kinds.length
     ? requestedCapabilityContract.required_observation_kinds
+    : requestedToolFamilyContract?.requiredObservationKinds.length
+    ? requestedToolFamilyContract.requiredObservationKinds
     : contract?.requiredObservationKinds ?? [];
   const requiredObservationCoverageMode = compoundSubgoalRequiredObservationKinds.length
     ? "any"
     : requestedCapabilityContract
     ? explicitObservationCoverageMode(requestedCapabilityContract.capability)
+    : requestedToolFamilyContract?.requiredObservationKinds.includes("live_environment_tool_observation")
+    ? "any"
+    : requestedToolFamilyContract
+    ? "all"
     : contract?.requiredObservationKinds.includes("live_environment_tool_observation")
     ? "any"
     : "all";

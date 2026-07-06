@@ -465,6 +465,44 @@ const liveEnvExactContract = (input: {
 
 export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
   ...Object.values(TOOL_FAMILY_DEFAULT_CONTRACTS),
+  liveEnvExactContract({
+    toolName: "live_pipeline",
+    authority: "control_receipt",
+    mutating: true,
+    requiredObservationKinds: [
+      "live_pipeline_receipt",
+      "visual_producer_cadence_receipt",
+      "tool_observation",
+    ],
+    allowedTerminalKinds: [
+      "live_pipeline_receipt",
+      "visual_producer_cadence_receipt",
+      "workstation_tool_evaluation",
+      ...evidenceOnlyTerminalKinds,
+    ],
+    aliases: [
+      "live-pipeline",
+      "live_pipeline_control",
+      "live-source.set_rate",
+      "situation-room.live-source.set_rate",
+      "set_rate",
+    ],
+  }),
+  contract({
+    toolName: "runtime_evidence",
+    toolFamily: "capability_catalog",
+    authority: "evidence_only",
+    mutating: false,
+    requiredObservationKinds: ["capability_registry"],
+    allowedTerminalKinds: ["capability_help_summary", ...evidenceOnlyTerminalKinds],
+    requiredReentry: true,
+    requiresGoalSatisfaction: true,
+    aliases: [
+      "runtime-evidence",
+      "runtime evidence",
+      "runtime_debug_evidence",
+    ],
+  }),
   contract({
     toolName: "live_env.query_micro_reasoner_presets",
     toolFamily: "live_source_mail",
