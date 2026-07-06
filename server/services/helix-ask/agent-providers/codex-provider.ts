@@ -985,6 +985,19 @@ const buildImageLensObservationFallbackAnswer = (input: {
     const cropRef = formatImageLensCropRefForAnswer(receipt.crop_image_ref ?? receipt.cropImageRef);
     const extractionStatus =
       readString(receipt.extraction_status ?? receipt.extractionStatus) ?? "not_returned";
+    const evidencePacket = readRecord(receipt.scientific_evidence_packet ?? receipt.scientificEvidencePacket);
+    const scientificSidecar = readRecord(receipt.scientific_evidence_sidecar ?? receipt.scientificEvidenceSidecar);
+    const exactSummary = readRecord(scientificSidecar?.exact_equation_summary);
+    const observedEquationLabels = readArray(receipt.observed_equation_labels ?? evidencePacket?.observed_equation_labels)
+      .map(readString)
+      .filter((entry): entry is string => Boolean(entry));
+    const labelMatchStatus =
+      readString(receipt.label_match_status ?? evidencePacket?.label_match_status) ?? "not_returned";
+    const exactEquationAdmissibility =
+      readString(receipt.exact_equation_admissibility ?? evidencePacket?.exact_equation_admissibility) ?? "not_returned";
+    const qualityFlags = readArray(receipt.quality_flags ?? evidencePacket?.quality_flags)
+      .map(readString)
+      .filter((entry): entry is string => Boolean(entry));
     const textCandidate = readString(receipt.text_candidate ?? receipt.textCandidate);
     const latexCandidate = readString(receipt.latex_candidate ?? receipt.latexCandidate);
     const uncertainty = readArray(receipt.uncertainty)
@@ -1000,6 +1013,12 @@ const buildImageLensObservationFallbackAnswer = (input: {
       `- Bbox: ${bbox}`,
       cropRef ? `- Crop ref: ${cropRef}` : null,
       `- Extraction status: ${extractionStatus}`,
+      `- Label match: ${labelMatchStatus}${observedEquationLabels.length ? `; observed labels: ${observedEquationLabels.join(", ")}` : ""}`,
+      `- Exact equation admissibility: ${exactEquationAdmissibility}`,
+      `- Quality flags: ${qualityFlags.length > 0 ? qualityFlags.join(", ") : "none"}`,
+      exactSummary
+        ? `- Sidecar exact rows: admissible=${readNumber(exactSummary.admissible_row_count) ?? 0}, partial=${readNumber(exactSummary.partial_row_count) ?? 0}, rejected=${readNumber(exactSummary.rejected_row_count) ?? 0}`
+        : null,
       candidateBlocks.length > 0
         ? ["- Extracted information:", ...candidateBlocks].join("\n")
         : "- Extracted information: no text_candidate or latex_candidate was returned for this crop",

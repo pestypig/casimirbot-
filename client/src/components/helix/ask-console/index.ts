@@ -105,6 +105,28 @@ export {
   shouldHandleHelixAskPromptHistoryKey,
 } from "./HelixAskPromptHistory";
 export {
+  buildHelixAskSlashCommandMenuItems,
+  listHelixAskSlashCommandCatalog,
+  type HelixAskSlashCommandCatalogItem,
+  type HelixAskSlashCommandMenuItem,
+  type HelixAskSlashCommandRuntime,
+} from "./HelixAskSlashCommandCatalog";
+export {
+  insertHelixAskSlashCommandPrompt,
+  resolveHelixAskSlashCommandTrigger,
+  type HelixAskSlashCommandTrigger,
+} from "./HelixAskSlashCommandInsertion";
+export {
+  buildHelixAskSlashCommandMenuState,
+  filterHelixAskSlashCommandMenuItems,
+  resolveHelixAskSlashCommandMenuKey,
+  type HelixAskSlashCommandMenuState,
+} from "./HelixAskSlashCommandMenuState";
+export {
+  HelixAskSlashCommandMenu,
+  type HelixAskSlashCommandMenuProps,
+} from "./HelixAskSlashCommandMenu";
+export {
   HELIX_ASK_IMAGE_ATTACHMENT_MAX_BYTES,
   buildHelixAskImageAttachmentFromFile,
   buildHelixAskImageAttachmentsFromFiles,

@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import sharp from "sharp";
 import { listWorkstationGatewayCapabilities } from "../../workstation-tool-gateway/registry";
 import { buildHelixAgentRuntimeSelectionTrace } from "../../agent-providers/runtime-debug";
 import { buildHelixAgentProviderAskPayload } from "../../agent-providers/provider-response-projection";
 import type { HelixAgentProvider } from "../../agent-providers/types";
 import { runHelixCapabilityLaneOneShotRequests } from "../one-shot-runner";
+import { buildScientificEvidencePacket } from "../../../../../shared/scientific-evidence-adaptor";
 import { resetStagePlayLiveSourceMailboxForTest } from "../../../stage-play/stage-play-live-source-mailbox-store";
 import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../../../stage-play/stage-play-live-source-mail-wake-store";
 
@@ -1139,6 +1141,21 @@ describe("provider-neutral capability lane one-shot runner", () => {
         extraction_status: "extracted",
         uncertainty: ["fixture-backed OCR/math candidate"],
       },
+      ...[
+        "header_caption",
+        "equation_block",
+        "equation_3.51",
+        "equation_3.52",
+        "equation_3.53",
+        "equation_3.54",
+        "equation_3.55",
+      ].map((region_label) => ({
+        region_label,
+        text_candidate: `${region_label} text`,
+        latex_candidate: `${region_label} latex`,
+        extraction_status: "partial",
+        uncertainty: ["fixture-backed planned crop"],
+      })),
     ]);
     try {
       const result = await runHelixCapabilityLaneOneShotRequests({
@@ -1268,6 +1285,253 @@ describe("provider-neutral capability lane one-shot runner", () => {
     }
   });
 
+  it("adds planned scientific image companion crops when an explicit whole-page Image Lens call exists", async () => {
+    const previousExtractionFixtures = process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([
+      ...[
+        "scientific_page",
+        "header_caption",
+        "equation_block",
+        "equation_3.51",
+        "equation_3.52",
+        "equation_3.53",
+        "equation_3.54",
+        "equation_3.55",
+      ].map((region_label) => ({
+        region_label,
+        text_candidate: `${region_label} text`,
+        latex_candidate: `${region_label} latex`,
+        extraction_status: "partial",
+        uncertainty: ["fixture-backed planned crop"],
+      })),
+    ]);
+    try {
+      const result = await runHelixCapabilityLaneOneShotRequests({
+        provider: buildProvider("codex"),
+        body: {
+          turn_id: "turn-provider-neutral-scientific-image-explicit-plus-plan",
+          question: "Here is a scientific document image. Extract the visible equations as evidence only.",
+          source_target_intent: {
+            schema: "helix.ask_source_target_intent.v1",
+            target_source: "scientific_image_evidence",
+            target_kind: "scientific_image_evidence_sidecar",
+            requested_outputs: ["scientific_evidence_sidecar"],
+          },
+          mandatory_next_tool: {
+            schema: "helix.mandatory_next_tool.v1",
+            tool_name: "visual_analysis.inspect_image_region",
+            missing_required_evidence: "scientific_evidence_sidecar",
+            terminal_forbidden: true,
+          },
+          capability_lane_call: {
+            capability: "visual_analysis.inspect_image_region",
+            source_id: "visual_evidence:scientific-page",
+            source_attachment_id: "visual_evidence:scientific-page",
+            source_image_ref: "test-image",
+            source_kind: "image_lens_source",
+            bbox_px: { x: 0, y: 0, width: 346, height: 372 },
+            region_label: "scientific_page",
+            question: "Extract the whole page first.",
+          },
+          turn_input_items: [
+            {
+              type: "image",
+              image_ref: "visual_evidence:scientific-page",
+              image_base64: "test-image",
+              mime_type: "image/png",
+              evidence_id: "visual_evidence:scientific-page",
+              source_kind: "image_lens_source",
+              width_px: 346,
+              height_px: 372,
+            },
+          ],
+        },
+        env: {
+          OPENAI_API_KEY: "test-openai",
+          HELIX_IMAGE_LENS_EXTRACTION_FIXTURES: process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES,
+        } as NodeJS.ProcessEnv,
+      });
+
+      expect(result.call_results).toHaveLength(8);
+      expect(result.call_results.map((entry) => entry.receipt?.region_label)).toEqual([
+        "scientific_page",
+        "header_caption",
+        "equation_block",
+        "equation_3.51",
+        "equation_3.52",
+        "equation_3.53",
+        "equation_3.54",
+        "equation_3.55",
+      ]);
+      expect(result.observation_packets).toHaveLength(8);
+      expect(result.call_results[1].receipt).toMatchObject({
+        region_label: "header_caption",
+        bbox_px: { x: 0, y: 0, width: 346, height: 71 },
+      });
+    } finally {
+      if (previousExtractionFixtures === undefined) {
+        delete process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+      } else {
+        process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = previousExtractionFixtures;
+      }
+    }
+  });
+
+  it("classifies exact equation crop labels and local OCR quality risks", () => {
+    const matched = buildScientificEvidencePacket({
+      cropRegionId: "equation_3.53",
+      sourceRefHash: "test-source",
+      sourceKind: "image_lens_source",
+      bboxPx: { x: 0, y: 187, width: 346, height: 59 },
+      requestedEquationLabel: "3.53",
+      regionLabel: "equation_3.53",
+      textCandidate: "3(\\nabla_a \\Phi_b)D_c - S_c\\Phi_b = 0 (3.53)",
+      latexCandidate: "3(\\nabla_a \\Phi_b)D_c - S_c\\Phi_b = 0 \\tag{3.53}",
+      extractionStatus: "extracted",
+      uncertainty: [],
+    });
+    expect(matched).toMatchObject({
+      evidence_role: "exact_equation_candidate",
+      requested_equation_label: "3.53",
+      observed_equation_labels: expect.arrayContaining(["3.53"]),
+      label_match_status: "matched",
+      exact_equation_admissibility: "admissible_for_exact_equation",
+      quality_flags: [],
+      retry_debug: expect.objectContaining({ retry_count: 0 }),
+    });
+
+    const mismatched = buildScientificEvidencePacket({
+      cropRegionId: "equation_3.52",
+      sourceRefHash: "test-source",
+      sourceKind: "image_lens_source",
+      bboxPx: { x: 0, y: 128, width: 346, height: 59 },
+      requestedEquationLabel: "3.52",
+      regionLabel: "equation_3.52",
+      textCandidate: "As in Chapter 2 the invented formalism may be written: \\Delta\\psi = 0 (2.52)",
+      latexCandidate: "\\Delta\\psi = 0 \\tag{2.52}",
+      extractionStatus: "extracted",
+      uncertainty: [],
+    });
+    expect(mismatched).toMatchObject({
+      observed_equation_labels: expect.arrayContaining(["2.52"]),
+      label_match_status: "mismatched",
+      exact_equation_admissibility: "inadmissible_for_exact_equation",
+      admissibility: expect.objectContaining({ status: "inadmissible_for_exact_mapping" }),
+      quality_flags: expect.arrayContaining(["mismatched_equation_label", "row_crop_contains_page_prose_or_invented_formalism"]),
+      retry_debug: expect.objectContaining({ retry_count: 1 }),
+    });
+    expect(mismatched.uncertainty.join("\n")).toContain("local_quality_gate");
+
+    const corrupted = buildScientificEvidencePacket({
+      cropRegionId: "equation_3.54",
+      sourceRefHash: "test-source",
+      sourceKind: "image_lens_source",
+      bboxPx: { x: 0, y: 246, width: 346, height: 59 },
+      requestedEquationLabel: "3.54",
+      regionLabel: "equation_3.54",
+      textCandidate: "\\ abla_{\\mu} Î¨ ... (3.54)",
+      latexCandidate: "\\ abla_{\\mu} \\Psi \\ldots \\tag{3.54}",
+      extractionStatus: "extracted",
+      uncertainty: [],
+    });
+    expect(corrupted).toMatchObject({
+      label_match_status: "matched",
+      exact_equation_admissibility: "partial_candidate",
+      quality_flags: expect.arrayContaining(["mojibake_or_corrupted_symbol_text", "ellipsized_or_truncated_equation", "malformed_latex_candidate"]),
+    });
+    expect(corrupted.uncertainty.join("\n")).toContain("corrupted symbols");
+  });
+
+  it("derives planned scientific image crop dimensions from attached image bytes when width metadata is missing", async () => {
+    const previousExtractionFixtures = process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+    const sourcePng = (await sharp({
+      create: {
+        width: 20,
+        height: 100,
+        channels: 4,
+        background: { r: 255, g: 255, b: 255, alpha: 1 },
+      },
+    }).png().toBuffer()).toString("base64");
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([
+      ...[
+        "scientific_page",
+        "header_caption",
+        "equation_block",
+        "equation_3.51",
+        "equation_3.52",
+        "equation_3.53",
+        "equation_3.54",
+        "equation_3.55",
+      ].map((region_label) => ({
+        region_label,
+        text_candidate: `${region_label} text`,
+        extraction_status: "partial",
+        uncertainty: ["fixture-backed planned crop"],
+      })),
+    ]);
+    try {
+      const result = await runHelixCapabilityLaneOneShotRequests({
+        provider: buildProvider("codex"),
+        body: {
+          turn_id: "turn-provider-neutral-scientific-image-byte-dimensions",
+          question: "Here is a scientific document image. Extract the visible equations as evidence only.",
+          source_target_intent: {
+            schema: "helix.ask_source_target_intent.v1",
+            target_source: "scientific_image_evidence",
+            target_kind: "scientific_image_evidence_sidecar",
+            requested_outputs: ["scientific_evidence_sidecar"],
+          },
+          mandatory_next_tool: {
+            schema: "helix.mandatory_next_tool.v1",
+            tool_name: "visual_analysis.inspect_image_region",
+            missing_required_evidence: "scientific_evidence_sidecar",
+            terminal_forbidden: true,
+          },
+          capability_lane_call: {
+            capability: "visual_analysis.inspect_image_region",
+            source_id: "visual_evidence:scientific-page",
+            source_attachment_id: "visual_evidence:scientific-page",
+            source_image_ref: `data:image/png;base64,${sourcePng}`,
+            source_kind: "image_lens_source",
+            bbox_px: { x: 0, y: 0, width: 20, height: 100 },
+            region_label: "scientific_page",
+            question: "Extract the whole page first.",
+          },
+          turn_input_items: [
+            {
+              type: "image",
+              image_ref: "visual_evidence:scientific-page",
+              image_base64: sourcePng,
+              mime_type: "image/png",
+              evidence_id: "visual_evidence:scientific-page",
+              source_kind: "image_lens_source",
+            },
+          ],
+        },
+        env: {
+          OPENAI_API_KEY: "test-openai",
+          HELIX_IMAGE_LENS_EXTRACTION_FIXTURES: process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES,
+        } as NodeJS.ProcessEnv,
+      });
+
+      expect(result.call_results).toHaveLength(8);
+      expect(result.call_results[1].receipt).toMatchObject({
+        region_label: "header_caption",
+        bbox_px: { x: 0, y: 0, width: 20, height: 40 },
+      });
+      expect(result.call_results[2].receipt).toMatchObject({
+        region_label: "equation_block",
+        bbox_px: { x: 0, y: 40, width: 20, height: 60 },
+      });
+    } finally {
+      if (previousExtractionFixtures === undefined) {
+        delete process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+      } else {
+        process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = previousExtractionFixtures;
+      }
+    }
+  });
+
   it("marks Image Lens crops without extraction payload as failed observation evidence", async () => {
     const result = await runHelixCapabilityLaneOneShotRequests({
       provider: buildProvider("codex"),
@@ -1290,9 +1554,10 @@ describe("provider-neutral capability lane one-shot runner", () => {
       receipt: {
         bbox_px: { x: 2, y: 3, width: 40, height: 50 },
         extraction_status: "failed",
-        uncertainty: [
+        uncertainty: expect.arrayContaining([
           "No Image Lens OCR/math extraction backend returned text_candidate or latex_candidate for this crop.",
-        ],
+          expect.stringContaining("local_quality_gate"),
+        ]),
         document_region_receipt: {
           extraction: {
             status: "rejected",
@@ -1301,9 +1566,10 @@ describe("provider-neutral capability lane one-shot runner", () => {
       },
       observation: {
         extraction_status: "failed",
-        uncertainty: [
+        uncertainty: expect.arrayContaining([
           "No Image Lens OCR/math extraction backend returned text_candidate or latex_candidate for this crop.",
-        ],
+          expect.stringContaining("local_quality_gate"),
+        ]),
       },
       terminal_eligible: false,
       assistant_answer: false,
@@ -1386,7 +1652,7 @@ describe("provider-neutral capability lane one-shot runner", () => {
           text_candidate: "delta psi minus nabla psi",
           latex_candidate: "\\delta\\psi - \\nabla\\psi",
           extraction_status: "extracted",
-          uncertainty: ["low source resolution"],
+          uncertainty: expect.arrayContaining(["low source resolution", expect.stringContaining("local_quality_gate")]),
           document_region_receipt: {
             extraction: {
               textCandidate: "delta psi minus nabla psi",
@@ -1399,7 +1665,7 @@ describe("provider-neutral capability lane one-shot runner", () => {
           text_candidate: "delta psi minus nabla psi",
           latex_candidate: "\\delta\\psi - \\nabla\\psi",
           extraction_status: "extracted",
-          uncertainty: ["low source resolution"],
+          uncertainty: expect.arrayContaining(["low source resolution", expect.stringContaining("local_quality_gate")]),
         },
       });
       expect(result.observation_packets[0]).toMatchObject({
@@ -1410,7 +1676,7 @@ describe("provider-neutral capability lane one-shot runner", () => {
             text_candidate: "delta psi minus nabla psi",
             latex_candidate: "\\delta\\psi - \\nabla\\psi",
             extraction_status: "extracted",
-            uncertainty: ["low source resolution"],
+            uncertainty: expect.arrayContaining(["low source resolution", expect.stringContaining("local_quality_gate")]),
           },
         },
         terminal_eligible: false,

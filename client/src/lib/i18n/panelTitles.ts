@@ -29,6 +29,7 @@ const PANEL_TITLE_MESSAGES: Record<string, InterfaceMessageId> = {
   "situation-room-pipelines": "panel.title.situationRoom",
   "situation-room-sources": "panel.title.situationRoom",
   "stage-play-badge-graph": "panel.title.stagePlayBadgeGraph",
+  "theory-badge-graph": "panel.title.theoryBadgeGraph",
   "star-coherence": "panel.title.starCoherence",
   "star-hydrostatic": "panel.title.starHydrostatic",
   "star-watcher": "panel.title.starWatcher",

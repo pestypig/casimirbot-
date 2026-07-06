@@ -277,6 +277,16 @@ import {
   shouldHandleHelixAskPromptHistoryKey,
 } from "@/components/helix/ask-console/HelixAskPromptHistory";
 import {
+  HelixAskSlashCommandMenu,
+  buildHelixAskSlashCommandMenuItems,
+  buildHelixAskSlashCommandMenuState,
+  insertHelixAskSlashCommandPrompt,
+  resolveHelixAskSlashCommandMenuKey,
+  resolveHelixAskSlashCommandTrigger,
+  type HelixAskSlashCommandMenuItem,
+  type HelixAskSlashCommandTrigger,
+} from "@/components/helix/ask-console";
+import {
   applyHelixAskVoiceTimelineVersionError,
   applyHelixAskVoiceTimelineVersionPayload,
   buildHelixAskVoiceTimelineBuildInfoEvent,
@@ -8282,6 +8292,10 @@ export function HelixAskPill({
   const askPromptHistorySubmittedRef = useRef<string[]>([]);
   const askPromptHistoryCursorRef = useRef<number | null>(null);
   const askPromptHistoryDraftBeforeNavigationRef = useRef("");
+  const [askSlashCommandOpen, setAskSlashCommandOpen] = useState(false);
+  const [askSlashCommandQuery, setAskSlashCommandQuery] = useState("");
+  const [askSlashCommandSelectedIndex, setAskSlashCommandSelectedIndex] = useState(0);
+  const askSlashCommandTriggerRef = useRef<HelixAskSlashCommandTrigger | null>(null);
   const [askLiveSessionId, setAskLiveSessionId] = useState<string | null>(null);
   const [askLiveTraceId, setAskLiveTraceId] = useState<string | null>(null);
   const chronologicalAskRepliesForTranscript = useMemo(
@@ -12760,10 +12774,65 @@ export function HelixAskPill({
       });
     });
   }, [addImageAttachmentsFromFiles, addTextPasteAttachment, syncAskDraftValue]);
+  const askSlashCommandItems = useMemo(
+    () =>
+      buildHelixAskSlashCommandMenuItems({
+        accountPolicy: accountCapabilityPolicy,
+        runtime: {
+          id: selectedAgentRuntime,
+          label: agentRuntimePickerModel.selectedLabel,
+        },
+      }),
+    [accountCapabilityPolicy, agentRuntimePickerModel.selectedLabel, selectedAgentRuntime],
+  );
+  const askSlashCommandMenuState = buildHelixAskSlashCommandMenuState({
+    open: askSlashCommandOpen,
+    query: askSlashCommandQuery,
+    items: askSlashCommandItems,
+    selectedIndex: askSlashCommandSelectedIndex,
+  });
+  const closeAskSlashCommandMenu = useCallback(() => {
+    askSlashCommandTriggerRef.current = null;
+    setAskSlashCommandOpen(false);
+    setAskSlashCommandQuery("");
+    setAskSlashCommandSelectedIndex(0);
+  }, []);
+  const updateAskSlashCommandMenuFromTextarea = useCallback((target: HTMLTextAreaElement) => {
+    const trigger = resolveHelixAskSlashCommandTrigger({
+      value: target.value,
+      selectionStart: target.selectionStart,
+      selectionEnd: target.selectionEnd,
+    });
+    askSlashCommandTriggerRef.current = trigger;
+    if (!trigger) {
+      setAskSlashCommandOpen(false);
+      setAskSlashCommandQuery("");
+      setAskSlashCommandSelectedIndex(0);
+      return;
+    }
+    setAskSlashCommandOpen(true);
+    setAskSlashCommandQuery(trigger.query);
+    setAskSlashCommandSelectedIndex(0);
+  }, []);
   const resetAskPromptHistoryCursor = useCallback(() => {
     askPromptHistoryCursorRef.current = null;
     askPromptHistoryDraftBeforeNavigationRef.current = "";
   }, []);
+  const insertAskSlashCommandMenuItem = useCallback((item: HelixAskSlashCommandMenuItem) => {
+    const target = askInputRef.current;
+    const currentValue = target?.value ?? askDraftRef.current;
+    const insertion = insertHelixAskSlashCommandPrompt({
+      value: currentValue,
+      trigger: askSlashCommandTriggerRef.current,
+      insertionText: item.insertionText,
+    });
+    closeAskSlashCommandMenu();
+    resetAskPromptHistoryCursor();
+    syncAskDraftValue(insertion.value, { target, focus: true });
+    if (target) {
+      target.setSelectionRange(insertion.cursor, insertion.cursor);
+    }
+  }, [closeAskSlashCommandMenu, resetAskPromptHistoryCursor, syncAskDraftValue]);
   const handleAskPromptHistoryKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const target = event.currentTarget;
     const direction = shouldHandleHelixAskPromptHistoryKey({
@@ -12790,6 +12859,40 @@ export function HelixAskPill({
     askPromptHistoryDraftBeforeNavigationRef.current = result.draftBeforeNavigation;
     syncAskDraftValue(result.value, { target, focus: true });
   }, [askPromptHistoryEntries, syncAskDraftValue]);
+  const handleAskComposerKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (askSlashCommandMenuState.open) {
+      const keyResult = resolveHelixAskSlashCommandMenuKey({
+        key: event.key,
+        open: askSlashCommandMenuState.open,
+        selectedIndex: askSlashCommandMenuState.selectedIndex,
+        itemCount: askSlashCommandMenuState.items.length,
+      });
+      if (keyResult.handled) {
+        event.preventDefault();
+        if (keyResult.action === "close") {
+          closeAskSlashCommandMenu();
+          return;
+        }
+        if (keyResult.action === "select") {
+          setAskSlashCommandSelectedIndex(keyResult.selectedIndex);
+          return;
+        }
+        if (keyResult.action === "insert" && askSlashCommandMenuState.selectedItem) {
+          insertAskSlashCommandMenuItem(askSlashCommandMenuState.selectedItem);
+          return;
+        }
+      }
+    }
+    handleAskPromptHistoryKeyDown(event);
+  }, [
+    askSlashCommandMenuState.items.length,
+    askSlashCommandMenuState.open,
+    askSlashCommandMenuState.selectedIndex,
+    askSlashCommandMenuState.selectedItem,
+    closeAskSlashCommandMenu,
+    handleAskPromptHistoryKeyDown,
+    insertAskSlashCommandMenuItem,
+  ]);
 
   const setVoiceWarning = useCallback((code: VoiceCaptureWarningCode, active: boolean) => {
     setVoiceCaptureWarnings((prev) => {
@@ -24170,6 +24273,7 @@ export function HelixAskPill({
         submittedPrompts: [...askPromptHistorySubmittedRef.current, ...normalizedEntries],
       });
       resetAskPromptHistoryCursor();
+      closeAskSlashCommandMenu();
       const asksForPastedTextResumeFrame = normalizedEntries.some((entry) =>
         HELIX_ASK_PASTED_TEXT_RESUME_RECALL_PROMPT_PATTERN.test(entry.trim()),
       );
@@ -24449,6 +24553,7 @@ export function HelixAskPill({
       cancelMoodHint,
       cancelPendingWorkstationRequestForTurnTransition,
       clearAskAttachments,
+      closeAskSlashCommandMenu,
       clearMoodTimer,
       getHelixAskSessionId,
       getPanelDef,
@@ -24795,12 +24900,13 @@ export function HelixAskPill({
     className: composerViewModel.textareaClassName,
     placeholder: currentPlaceholder,
     onPaste: handleAskPaste,
-    onKeyDown: handleAskPromptHistoryKeyDown,
+    onKeyDown: handleAskComposerKeyDown,
     onInputValue: (value, target) => {
       resetAskPromptHistoryCursor();
       syncAskDraftValue(value, {
         target,
       });
+      updateAskSlashCommandMenuFromTextarea(target);
     },
     onSubmitRequested: (form) => form?.requestSubmit?.(),
   });
@@ -24817,6 +24923,13 @@ export function HelixAskPill({
     actionToolbar: actionToolbarState,
     textarea: textareaState,
     textareaRef: askInputRef,
+    slashCommandMenu: (
+      <HelixAskSlashCommandMenu
+        state={askSlashCommandMenuState}
+        onHoverIndex={setAskSlashCommandSelectedIndex}
+        onSelect={insertAskSlashCommandMenuItem}
+      />
+    ),
   });
   const supplementState = buildHelixAskConsoleSupplementState({
     ...attachmentStripState,

@@ -4482,14 +4482,16 @@ describe("Helix workstation tool gateway", () => {
 
   it("consumes scientific image sidecars for Theory Badge Graph branch gating", async () => {
     const scientificEvidence = buildScientificEvidencePacket({
-      cropRegionId: "image_lens_region:test-sidecar-bianchi",
+      cropRegionId: "equation_3.51",
       sourceRefHash: "sha256:test-sidecar-bianchi",
       sourceKind: "image_attachment",
       bboxPx: { x: 0, y: 70, width: 346, height: 65 },
+      requestedEquationLabel: "3.51",
+      regionLabel: "equation_3.51",
       textCandidate:
-        "As in Chapter 2 we use the Bianchi identities as field equations for the Weyl tensor.",
+        "Bianchi identities for the Weyl tensor: \\nabla^\\mu \\psi_\\nu - D_\\nu S_\\phi = 0 (3.51)",
       latexCandidate:
-        "\\nabla^\\mu \\psi_\\nu - D_\\nu S_\\phi = 0",
+        "\\nabla^\\mu \\psi_\\nu - D_\\nu S_\\phi = 0 \\tag{3.51}",
       uncertainty: [],
       extractionStatus: "extracted",
     });
@@ -4530,8 +4532,9 @@ describe("Helix workstation tool gateway", () => {
       admissibility: expect.objectContaining({ status: "admissible_observation" }),
     });
     expect(observation.scientific_evidence_packet).toMatchObject({
-      crop_region_id: "image_lens_region:test-sidecar-bianchi",
+      crop_region_id: "equation_3.51",
       primary_domain: "weyl_bianchi",
+      exact_equation_admissibility: "admissible_for_exact_equation",
     });
     expect(observation.scientific_branch_gate).toMatchObject({
       status: "restricted",
@@ -4550,6 +4553,83 @@ describe("Helix workstation tool gateway", () => {
       expect.arrayContaining([
         expect.stringContaining("scientific_image_sidecar=scientific_image_sidecar:test-sidecar-bianchi"),
         expect.stringContaining("evidence_source=sidecar"),
+      ]),
+    );
+  });
+
+  it("blocks exact theory reflection when a scientific image sidecar has no admissible exact equation row", async () => {
+    const contextEvidence = buildScientificEvidencePacket({
+      cropRegionId: "scientific_page",
+      sourceRefHash: "sha256:test-sidecar-context-only",
+      sourceKind: "image_attachment",
+      bboxPx: { x: 0, y: 0, width: 346, height: 361 },
+      regionLabel: "scientific_page",
+      textCandidate:
+        "As in Chapter 2 we use the Bianchi identities as field equations for the Weyl tensor.",
+      latexCandidate:
+        "\\nabla^\\mu \\psi_\\nu - D_\\nu S_\\phi = 0",
+      uncertainty: [],
+      extractionStatus: "extracted",
+    });
+    const mislabeledRow = buildScientificEvidencePacket({
+      cropRegionId: "equation_3.52",
+      sourceRefHash: "sha256:test-sidecar-context-only",
+      sourceKind: "image_attachment",
+      bboxPx: { x: 0, y: 128, width: 346, height: 59 },
+      requestedEquationLabel: "3.52",
+      regionLabel: "equation_3.52",
+      textCandidate: "\\Delta\\psi_0 - D_\\phi = 0 (2.52)",
+      latexCandidate: "\\Delta\\psi_0 - D_\\phi = 0 \\tag{2.52}",
+      uncertainty: [],
+      extractionStatus: "extracted",
+    });
+    const sidecar = buildScientificImageEvidenceSidecar({
+      sidecarId: "scientific_image_sidecar:test-sidecar-context-only",
+      packets: [contextEvidence, mislabeledRow],
+    });
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+      arguments: {
+        prompt:
+          "Here is a scientific document image. Use the extracted equations for exact Theory Badge Graph congruence.",
+        scientific_evidence_sidecar: sidecar,
+        mentioned_symbols: ["Weyl", "\\nabla", "\\psi"],
+        mentioned_domains: ["weyl bianchi"],
+        limit: 8,
+      },
+      turnId: "ask:test:gateway-theory-reflection-scientific-image-sidecar-no-exact-row",
+      iteration: 16,
+    });
+    const observation = result.observation as {
+      scientific_evidence_sidecar?: Record<string, any>;
+      scientific_branch_gate?: Record<string, any>;
+      rejected_calculator_payload_ids?: string[];
+      calculator_payloads?: Array<Record<string, unknown>>;
+      claim_boundary_notes?: string[];
+    };
+
+    expect(result.ok).toBe(true);
+    expect(observation.scientific_evidence_sidecar).toMatchObject({
+      exact_equation_summary: expect.objectContaining({
+        admissible_row_count: 0,
+        rejected_row_count: 1,
+        observed_labels: expect.arrayContaining(["2.52"]),
+      }),
+    });
+    expect(observation.scientific_branch_gate).toMatchObject({
+      status: "blocked",
+      congruence_grade_floor: "insufficient_evidence",
+      notes: expect.arrayContaining([
+        expect.stringContaining("insufficient_exact_equation_evidence"),
+      ]),
+    });
+    expect(observation.calculator_payloads ?? []).toEqual([]);
+    expect(observation.claim_boundary_notes).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("exact_equation_rows=admissible:0"),
       ]),
     );
   });

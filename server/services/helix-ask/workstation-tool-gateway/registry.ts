@@ -960,6 +960,12 @@ const selectScientificEvidencePacketFromSidecar = (
   sidecar: ScientificImageEvidenceSidecarV1 | null,
 ): ScientificEvidencePacketV1 | null => {
   if (!sidecar?.packets?.length) return null;
+  const admissibleExactRow = sidecar.packets.find(
+    (packet) =>
+      packet.evidence_role === "exact_equation_candidate" &&
+      packet.exact_equation_admissibility === "admissible_for_exact_equation",
+  );
+  if (admissibleExactRow) return admissibleExactRow;
   if (sidecar.primary_packet_ref) {
     const byRef = sidecar.packets.find((packet) => {
       const ref = `${packet.source_ref_hash}#crop=${packet.bbox_px.x},${packet.bbox_px.y},${packet.bbox_px.width},${packet.bbox_px.height}`;
@@ -973,12 +979,17 @@ const selectScientificEvidencePacketFromSidecar = (
       : packet.admissibility.status === "unverified_math_observation"
         ? 2
         : 1;
+    const exactEquation = packet.exact_equation_admissibility === "admissible_for_exact_equation"
+      ? 3
+      : packet.exact_equation_admissibility === "partial_candidate"
+        ? 2
+        : 1;
     const extraction = packet.extraction_status === "extracted"
       ? 3
       : packet.extraction_status === "partial"
         ? 2
         : 1;
-    return admissibility * 100 + extraction * 10 + packet.confidence;
+    return exactEquation * 1000 + admissibility * 100 + extraction * 10 + packet.confidence;
   };
   return sidecar.packets.slice().sort((left, right) => rank(right) - rank(left))[0] ?? null;
 };
@@ -6920,6 +6931,7 @@ export const callWorkstationGatewayCapability = async (
     }));
     const branchGate = buildScientificBranchGate({
       evidence: scientificEvidencePacket,
+      sidecar: scientificEvidenceSidecar,
       prompt,
       mentionedDomains: gatedMentionedDomains,
       badgeIds: [
@@ -6955,6 +6967,7 @@ export const callWorkstationGatewayCapability = async (
       ...(scientificEvidenceSidecar
         ? [
             `scientific_image_sidecar=${scientificEvidenceSidecar.sidecar_id}; sidecar_admissibility=${scientificEvidenceSidecar.admissibility.status}; evidence_source=${scientificEvidenceInput.source}`,
+            `exact_equation_rows=admissible:${scientificEvidenceSidecar.exact_equation_summary.admissible_row_count}; partial:${scientificEvidenceSidecar.exact_equation_summary.partial_row_count}; rejected:${scientificEvidenceSidecar.exact_equation_summary.rejected_row_count}`,
           ]
         : [`scientific_image_sidecar=missing; evidence_source=${scientificEvidenceInput.source}`]),
       "final_answer_guard=OCR candidates, graph matches, calculator payloads, and proof/validation must remain separate.",

@@ -24,6 +24,18 @@ export const SCIENTIFIC_CONGRUENCE_GRADE_VALUES = [
 
 export type ScientificCongruenceGradeV1 = (typeof SCIENTIFIC_CONGRUENCE_GRADE_VALUES)[number];
 
+export type ScientificExactEquationAdmissibilityV1 =
+  | "admissible_for_exact_equation"
+  | "partial_candidate"
+  | "inadmissible_for_exact_equation";
+
+export type ScientificEquationLabelMatchStatusV1 =
+  | "not_applicable"
+  | "matched"
+  | "missing_observed_label"
+  | "mismatched"
+  | "ambiguous";
+
 export type ScientificEvidencePacketV1 = {
   schema: typeof SCIENTIFIC_EVIDENCE_PACKET_SCHEMA;
   evidence_type: "image_lens_region_ocr_math";
@@ -41,6 +53,18 @@ export type ScientificEvidencePacketV1 = {
     source_ref_hash: string;
   };
   bbox_px: { x: number; y: number; width: number; height: number };
+  evidence_role: "context_only" | "exact_equation_candidate";
+  requested_equation_label: string | null;
+  observed_equation_labels: string[];
+  label_match_status: ScientificEquationLabelMatchStatusV1;
+  exact_equation_admissibility: ScientificExactEquationAdmissibilityV1;
+  quality_flags: string[];
+  quality_rejection_reasons: string[];
+  retry_debug: {
+    retry_count: number;
+    best_candidate_reason: string;
+    retry_reasons: string[];
+  };
   ocr_text_candidate: string | null;
   text_candidate: string | null;
   latex_candidate: string | null;
@@ -81,6 +105,10 @@ export type ScientificImageEvidenceSidecarV1 = {
     source_ref_hash: string;
     extraction_status: ScientificEvidencePacketV1["extraction_status"];
     admissibility_status: ScientificEvidencePacketV1["admissibility"]["status"];
+    exact_equation_admissibility?: ScientificExactEquationAdmissibilityV1;
+    requested_equation_label?: string | null;
+    observed_equation_labels?: string[];
+    label_match_status?: ScientificEquationLabelMatchStatusV1;
     confidence: number;
   }>;
   primary_packet_ref: string | null;
@@ -96,6 +124,15 @@ export type ScientificImageEvidenceSidecarV1 = {
     inadmissible_count: number;
     confidence_max: number;
     confidence_avg: number;
+  };
+  exact_equation_summary: {
+    admissible_row_count: number;
+    partial_row_count: number;
+    rejected_row_count: number;
+    context_only_count: number;
+    requested_labels: string[];
+    observed_labels: string[];
+    rejected_reasons: string[];
   };
   admissibility: {
     status: "admissible_observation" | "unverified_math_observation" | "inadmissible_for_exact_mapping";
@@ -185,6 +222,8 @@ type CandidateInput = {
   latexCandidate?: string | null;
   uncertainty?: string[] | null;
   extractionStatus?: ScientificEvidencePacketV1["extraction_status"];
+  requestedEquationLabel?: string | null;
+  regionLabel?: string | null;
   cropRegionId: string;
   sourceRefHash: string;
   sourceKind?: ScientificEvidencePacketV1["source_image"]["source_kind"] | null;
@@ -239,6 +278,107 @@ const normalizeScore = (score: number): number => Math.max(0, Math.min(1, Number
 
 const unique = (values: string[]): string[] => Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 
+const normalizeEquationLabel = (value: string): string => value.trim().replace(/^[^\d]*/, "").replace(/[^\d.'a-z-]+$/i, "");
+
+export function extractObservedEquationLabels(input: string): string[] {
+  const labels = [
+    ...Array.from(input.matchAll(/\\tag\{([^}]+)\}/g)).map((match) => match[1]),
+    ...Array.from(input.matchAll(/\((\d+\.\d+(?:[a-z']+)?)\)/gi)).map((match) => match[1]),
+  ].map(normalizeEquationLabel);
+  return unique(labels).slice(0, 12);
+}
+
+const isExactEquationRegion = (input: CandidateInput): boolean =>
+  Boolean(input.requestedEquationLabel?.trim()) || /^equation[_-]?\d+\.\d+/i.test(input.regionLabel ?? "");
+
+const scientificEvidenceRole = (input: CandidateInput): ScientificEvidencePacketV1["evidence_role"] =>
+  isExactEquationRegion(input) ? "exact_equation_candidate" : "context_only";
+
+const classifyLabelMatch = (
+  requestedEquationLabel: string | null,
+  observedEquationLabels: string[],
+): ScientificEquationLabelMatchStatusV1 => {
+  if (!requestedEquationLabel) return "not_applicable";
+  if (!observedEquationLabels.length) return "missing_observed_label";
+  if (observedEquationLabels.includes(requestedEquationLabel)) return "matched";
+  return observedEquationLabels.length > 1 ? "ambiguous" : "mismatched";
+};
+
+const detectScientificQualityFlags = (input: {
+  text: string;
+  latex: string;
+  evidenceRole: ScientificEvidencePacketV1["evidence_role"];
+  requestedEquationLabel: string | null;
+  observedEquationLabels: string[];
+  labelMatchStatus: ScientificEquationLabelMatchStatusV1;
+  extractionStatus: ScientificEvidencePacketV1["extraction_status"];
+  hasCandidate: boolean;
+}): string[] => {
+  const flags: string[] = [];
+  const combined = `${input.text}\n${input.latex}`;
+  const textLines = input.text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const latexLines = input.latex.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (!input.hasCandidate || input.extractionStatus === "failed" || input.extractionStatus === "not_run") {
+    flags.push("no_ocr_or_latex_candidate");
+  }
+  if (input.extractionStatus === "partial") {
+    flags.push("partial_extraction_status");
+  }
+  if (/\b(?:formalism|scenario)\b/i.test(combined)) {
+    flags.push(input.evidenceRole === "exact_equation_candidate"
+      ? "row_crop_contains_page_prose_or_invented_formalism"
+      : "context_crop_contains_unverified_formalism_prose");
+  }
+  if (input.evidenceRole === "exact_equation_candidate") {
+    if (input.labelMatchStatus === "missing_observed_label") flags.push("missing_requested_equation_label");
+    if (input.labelMatchStatus === "mismatched") flags.push("mismatched_equation_label");
+    if (input.labelMatchStatus === "ambiguous") flags.push("ambiguous_equation_label");
+    if (input.requestedEquationLabel && input.labelMatchStatus === "matched" && input.latex && !input.latex.includes(input.requestedEquationLabel)) {
+      flags.push("requested_label_missing_from_latex_candidate");
+    }
+    if (textLines.length > 1 || latexLines.length > 1) {
+      flags.push("row_crop_contains_multiple_equation_lines");
+    }
+  }
+  if (/[�]|Ã|Â|Î|Ï|ð|Ø|Ù|\\\s+abla|\\nabla\s*[;,\]]/i.test(combined)) flags.push("mojibake_or_corrupted_symbol_text");
+  const ellipsisCount = (combined.match(/(?:\.\.\.|…|\\ldots|\\cdots)/g) ?? []).length;
+  if (ellipsisCount > 0) flags.push("ellipsized_or_truncated_equation");
+  if (input.latex && /(?:\\\s+abla|\\\[|\]\]|\{\s*\}|_\s*$|\\begin\{[^}]+$|\$[^$]*$)/.test(input.latex)) {
+    flags.push("malformed_latex_candidate");
+  }
+  if (input.evidenceRole === "exact_equation_candidate" && input.text.length > 600) {
+    flags.push("row_crop_too_broad_for_exact_equation");
+  }
+  return unique(flags);
+};
+
+const qualityFlagReason = (flag: string): string => {
+  switch (flag) {
+    case "no_ocr_or_latex_candidate": return "No OCR text or LaTeX candidate was returned.";
+    case "missing_requested_equation_label": return "The requested equation label was not observed in the crop.";
+    case "mismatched_equation_label": return "The observed equation label does not match the requested crop label.";
+    case "ambiguous_equation_label": return "Multiple observed equation labels make this crop ambiguous for exact use.";
+    case "row_crop_contains_page_prose_or_invented_formalism": return "The exact row crop contains page-level prose or likely invented formalism text.";
+    case "context_crop_contains_unverified_formalism_prose": return "The context crop contains unverified formalism prose that may be OCR/model invention.";
+    case "partial_extraction_status": return "The extraction backend marked this crop as partial.";
+    case "requested_label_missing_from_latex_candidate": return "The requested equation label was observed in text but not preserved in the LaTeX candidate.";
+    case "row_crop_contains_multiple_equation_lines": return "The exact row crop contains multiple equation-like lines and is not a clean single-row extraction.";
+    case "mojibake_or_corrupted_symbol_text": return "The OCR/LaTeX candidate contains corrupted symbols or mojibake.";
+    case "ellipsized_or_truncated_equation": return "The equation candidate is ellipsized or visibly truncated.";
+    case "malformed_latex_candidate": return "The LaTeX candidate is malformed.";
+    case "row_crop_too_broad_for_exact_equation": return "The row crop is too broad to treat as one exact equation row.";
+    default: return flag.replace(/_/g, " ");
+  }
+};
+
+const buildRetryDebug = (qualityFlags: string[]): ScientificEvidencePacketV1["retry_debug"] => ({
+  retry_count: qualityFlags.length ? 1 : 0,
+  best_candidate_reason: qualityFlags.length
+    ? "quality_flags_require_padded_or_contrast_normalized_retry_before_exact_use"
+    : "initial_candidate_has_no_local_quality_retry_trigger",
+  retry_reasons: qualityFlags,
+});
+
 const evidencePacketRef = (packet: ScientificEvidencePacketV1): string =>
   `${packet.source_ref_hash}#crop=${packet.bbox_px.x},${packet.bbox_px.y},${packet.bbox_px.width},${packet.bbox_px.height}`;
 
@@ -269,7 +409,9 @@ export function extractScientificSymbolCandidates(input: string): string[] {
 }
 
 export function buildScientificEvidencePacket(input: CandidateInput): ScientificEvidencePacketV1 {
-  const text = [input.textCandidate, input.latexCandidate].filter(Boolean).join("\n");
+  const textCandidate = input.textCandidate?.trim() || null;
+  const latexCandidate = input.latexCandidate?.trim() || null;
+  const text = [textCandidate, latexCandidate].filter(Boolean).join("\n");
   const symbolCandidates = extractScientificSymbolCandidates(text);
   const scored = SCIENTIFIC_EVIDENCE_DOMAIN_VALUES
     .filter((domain) => domain !== "unknown_math")
@@ -292,16 +434,43 @@ export function buildScientificEvidencePacket(input: CandidateInput): Scientific
   }));
   const primaryDomain = (scored[0]?.domain ?? "unknown_math") as ScientificEvidenceDomainV1;
   const status = input.extractionStatus ?? "not_run";
-  const hasCandidate = Boolean(input.textCandidate?.trim() || input.latexCandidate?.trim());
+  const hasCandidate = Boolean(textCandidate || latexCandidate);
+  const requestedEquationLabel = input.requestedEquationLabel ? normalizeEquationLabel(input.requestedEquationLabel) : null;
+  const observedEquationLabels = extractObservedEquationLabels(text);
+  const labelMatchStatus = classifyLabelMatch(requestedEquationLabel, observedEquationLabels);
+  const evidenceRole = scientificEvidenceRole(input);
+  const qualityFlags = detectScientificQualityFlags({
+    text: textCandidate ?? "",
+    latex: latexCandidate ?? "",
+    evidenceRole,
+    requestedEquationLabel,
+    observedEquationLabels,
+    labelMatchStatus,
+    extractionStatus: status,
+    hasCandidate,
+  });
+  const qualityRejectionReasons = qualityFlags.map(qualityFlagReason);
+  const forcedUncertainty = unique([
+    ...(input.uncertainty ?? []),
+    ...qualityRejectionReasons.map((reason) => `local_quality_gate: ${reason}`),
+  ]);
+  const exactEquationAdmissibility: ScientificExactEquationAdmissibilityV1 =
+    evidenceRole === "context_only"
+      ? "partial_candidate"
+      : !hasCandidate || status === "failed" || status === "not_run" || labelMatchStatus === "mismatched" || labelMatchStatus === "ambiguous"
+        ? "inadmissible_for_exact_equation"
+        : labelMatchStatus === "matched" && qualityFlags.length === 0 && status === "extracted"
+          ? "admissible_for_exact_equation"
+          : "partial_candidate";
   const confidence =
     primaryDomain === "unknown_math" || !hasCandidate || status === "failed" || status === "not_run"
       ? 0
-      : normalizeScore(Math.min(0.9, 0.35 + Math.min(topScore, 6) / 10));
+      : normalizeScore(Math.max(0, Math.min(0.9, 0.35 + Math.min(topScore, 6) / 10 - qualityFlags.length * 0.08)));
   const branchHints = DOMAIN_BRANCH_HINTS[primaryDomain];
   const admissibilityStatus =
-    !hasCandidate || status === "failed" || status === "not_run"
+    !hasCandidate || status === "failed" || status === "not_run" || exactEquationAdmissibility === "inadmissible_for_exact_equation"
       ? "inadmissible_for_exact_mapping"
-      : confidence <= 0.55
+      : confidence <= 0.55 || qualityFlags.length > 0 || (evidenceRole === "exact_equation_candidate" && exactEquationAdmissibility === "partial_candidate")
         ? "unverified_math_observation"
         : "admissible_observation";
   return {
@@ -321,16 +490,24 @@ export function buildScientificEvidencePacket(input: CandidateInput): Scientific
       source_ref_hash: input.sourceRefHash,
     },
     bbox_px: input.bboxPx,
-    ocr_text_candidate: input.textCandidate?.trim() || null,
-    text_candidate: input.textCandidate?.trim() || null,
-    latex_candidate: input.latexCandidate?.trim() || null,
+    evidence_role: evidenceRole,
+    requested_equation_label: requestedEquationLabel,
+    observed_equation_labels: observedEquationLabels,
+    label_match_status: labelMatchStatus,
+    exact_equation_admissibility: exactEquationAdmissibility,
+    quality_flags: qualityFlags,
+    quality_rejection_reasons: qualityRejectionReasons,
+    retry_debug: buildRetryDebug(qualityFlags),
+    ocr_text_candidate: textCandidate,
+    text_candidate: textCandidate,
+    latex_candidate: latexCandidate,
     symbol_candidates: symbolCandidates,
     domain_candidates: domainCandidates.length
       ? domainCandidates
       : [{ domain: "unknown_math", score: 1, reasons: ["No supported scientific domain cues found."] }],
     primary_domain: primaryDomain,
     confidence,
-    uncertainty: input.uncertainty ?? [],
+    uncertainty: forcedUncertainty,
     extraction_status: status,
     admissibility: {
       status: admissibilityStatus,
@@ -362,6 +539,11 @@ export function buildScientificImageEvidenceSidecar(input: {
   const admissibleCount = packets.filter((packet) => packet.admissibility.status === "admissible_observation").length;
   const unverifiedCount = packets.filter((packet) => packet.admissibility.status === "unverified_math_observation").length;
   const inadmissibleCount = packets.filter((packet) => packet.admissibility.status === "inadmissible_for_exact_mapping").length;
+  const exactRows = packets.filter((packet) => packet.evidence_role === "exact_equation_candidate");
+  const admissibleExactRowCount = exactRows.filter((packet) => packet.exact_equation_admissibility === "admissible_for_exact_equation").length;
+  const partialExactRowCount = exactRows.filter((packet) => packet.exact_equation_admissibility === "partial_candidate").length;
+  const rejectedExactRowCount = exactRows.filter((packet) => packet.exact_equation_admissibility === "inadmissible_for_exact_equation").length;
+  const exactRejectedReasons = unique(exactRows.flatMap((packet) => packet.quality_rejection_reasons));
   const confidenceMax = normalizeScore(Math.max(0, ...packets.map((packet) => packet.confidence)));
   const confidenceAvg = normalizeScore(
     packets.length ? packets.reduce((sum, packet) => sum + packet.confidence, 0) / packets.length : 0,
@@ -413,6 +595,10 @@ export function buildScientificImageEvidenceSidecar(input: {
       source_ref_hash: packet.source_ref_hash,
       extraction_status: packet.extraction_status,
       admissibility_status: packet.admissibility.status,
+      exact_equation_admissibility: packet.exact_equation_admissibility,
+      requested_equation_label: packet.requested_equation_label,
+      observed_equation_labels: packet.observed_equation_labels,
+      label_match_status: packet.label_match_status,
       confidence: packet.confidence,
     })),
     primary_packet_ref: primaryPacketRef,
@@ -428,6 +614,15 @@ export function buildScientificImageEvidenceSidecar(input: {
       inadmissible_count: inadmissibleCount,
       confidence_max: confidenceMax,
       confidence_avg: confidenceAvg,
+    },
+    exact_equation_summary: {
+      admissible_row_count: admissibleExactRowCount,
+      partial_row_count: partialExactRowCount,
+      rejected_row_count: rejectedExactRowCount,
+      context_only_count: packets.filter((packet) => packet.evidence_role === "context_only").length,
+      requested_labels: unique(exactRows.map((packet) => packet.requested_equation_label ?? "")),
+      observed_labels: unique(exactRows.flatMap((packet) => packet.observed_equation_labels)),
+      rejected_reasons: exactRejectedReasons,
     },
     admissibility: {
       status,
@@ -459,6 +654,7 @@ export function buildScientificImageEvidenceSidecar(input: {
         notes: [
           "Image Lens crop observations carry bbox, crop refs, text candidates, LaTeX candidates, symbols, uncertainty, and provenance.",
           `extracted=${extractedCount}; partial=${partialCount}; failed=${failedCount}; not_run=${notRunCount}.`,
+          `exact_rows_admissible=${admissibleExactRowCount}; partial=${partialExactRowCount}; rejected=${rejectedExactRowCount}.`,
         ],
       },
       {
@@ -471,7 +667,12 @@ export function buildScientificImageEvidenceSidecar(input: {
         stage: "theory_reflection",
         status: status === "admissible_observation" ? "candidate" : "blocked",
         artifact_refs: primaryPacketRef ? [primaryPacketRef] : [],
-        notes: ["Theory graph branch admission must consume this sidecar, not prompt text."],
+        notes: [
+          "Theory graph branch admission must consume this sidecar, not prompt text.",
+          admissibleExactRowCount > 0
+            ? "At least one exact equation row is admissible for exact comparison."
+            : "No exact equation row is admissible; theory reflection must remain context-only or restricted.",
+        ],
       },
       {
         stage: "calculator_payload_filter",
@@ -570,6 +771,7 @@ const buildScientificCongruenceAssessment = (input: {
 
 export function buildScientificBranchGate(input: {
   evidence?: ScientificEvidencePacketV1 | null;
+  sidecar?: ScientificImageEvidenceSidecarV1 | null;
   prompt: string;
   mentionedDomains?: string[];
   badgeIds?: string[];
@@ -588,6 +790,9 @@ export function buildScientificBranchGate(input: {
   });
   const evidence = input.evidence ?? promptEvidence;
   const branchHints = evidence.admissibility;
+  const exactSummary = input.sidecar?.exact_equation_summary ?? null;
+  const exactEvidenceRequired = Boolean(input.sidecar) && input.requireAdmissibleEvidence === true;
+  const insufficientExactEquationEvidence = exactEvidenceRequired && (exactSummary?.admissible_row_count ?? 0) < 1;
   const promptContextEvidence = isPromptContextScientificEvidence(evidence);
   const directImageEvidenceRequired =
     SCIENTIFIC_IMAGE_EVIDENCE_PROMPT_RE.test(input.prompt) ||
@@ -606,6 +811,7 @@ export function buildScientificBranchGate(input: {
     (explicitEvidenceSupplied &&
       (evidence.primary_domain === "unknown_math" || evidence.admissibility.status === "inadmissible_for_exact_mapping")) ||
     (input.requireAdmissibleEvidence === true && evidence.admissibility.status !== "admissible_observation") ||
+    insufficientExactEquationEvidence ||
     (directImageEvidenceRequired && promptContextEvidence);
   if (hardEvidenceBlock) {
     const rejectedBadgeIds = unique(input.badgeIds ?? []);
@@ -644,6 +850,12 @@ export function buildScientificBranchGate(input: {
         "Image Lens evidence was not replaced by prompt context.",
         ...(input.requireAdmissibleEvidence === true && evidence.admissibility.status !== "admissible_observation"
           ? ["Strict scientific image sidecar gating requires admissible Image Lens evidence before graph or calculator handoff."]
+          : []),
+        ...(insufficientExactEquationEvidence
+          ? [
+              "insufficient_exact_equation_evidence: no Image Lens equation row crop is admissible for exact comparison.",
+              `Exact equation rows: admissible=${exactSummary?.admissible_row_count ?? 0}; partial=${exactSummary?.partial_row_count ?? 0}; rejected=${exactSummary?.rejected_row_count ?? 0}.`,
+            ]
           : []),
         ...(promptContextEvidence ? ["Prompt-context fallback packets cannot admit graph or calculator branches for source-targeted image prompts."] : []),
         ...(rejectedCalculatorPayloadIds.length ? ["Calculator payloads were suppressed because exact mapping evidence is missing."] : []),
@@ -715,6 +927,7 @@ export function buildScientificBranchGate(input: {
     notes: [
       `Scientific branch gate detected ${evidence.primary_domain}.`,
       ...(branchHints.status === "admissible_observation" ? [] : [`Evidence admissibility is ${branchHints.status}.`]),
+      ...(exactSummary ? [`Exact equation rows: admissible=${exactSummary.admissible_row_count}; partial=${exactSummary.partial_row_count}; rejected=${exactSummary.rejected_row_count}.`] : []),
       ...(rejectedCalculatorPayloadIds.length ? ["Incompatible calculator payloads were suppressed before handoff."] : []),
       ...(rejectedBadgeIds.length ? ["Incompatible badge ids were marked rejected before synthesis."] : []),
     ],

@@ -8,6 +8,7 @@ export const hawMessages = {
   "panel.title.narrator": "Narrator",
   "panel.title.scientificCalculator": "Scientific Calculator",
   "panel.title.stagePlayBadgeGraph": "Stage Play Badge Graph",
+  "panel.title.theoryBadgeGraph": "Pakuhi Badge Kumumana\u02bbo",
   "panel.title.storageMap": "Palapala Waihona",
   "panel.title.taskManager": "Task Manager",
   "workstation.panel.loadingTitle": "Ke hoʻouka nei iā {title}...",

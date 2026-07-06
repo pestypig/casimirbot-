@@ -840,6 +840,10 @@ describe("Helix Ask Console recrown boundary", () => {
       "HelixAskComposerTextareaSurface.tsx",
       "HelixAskComposerTextareaState.ts",
       "HelixAskPromptHistory.ts",
+      "HelixAskSlashCommandCatalog.ts",
+      "HelixAskSlashCommandInsertion.ts",
+      "HelixAskSlashCommandMenu.tsx",
+      "HelixAskSlashCommandMenuState.ts",
       "HelixAskLegacyComposerSurface.tsx",
       "HelixAskLegacyComposerState.ts",
       "HelixAskLegacySurfaceContent.tsx",
@@ -1372,7 +1376,7 @@ describe("Helix Ask Console recrown boundary", () => {
       bridgeReplacementReady: false,
       liveDayToDaySliceCount: 1,
       pureDisplayRecrownedSliceCount: 86,
-      behaviorSensitiveRecrownedWithParitySliceCount: 63,
+      behaviorSensitiveRecrownedWithParitySliceCount: 64,
       behaviorSensitiveQuarantinedSliceCount: 5,
       unknownTrapDoorSliceCount: 1,
     });
@@ -4401,6 +4405,10 @@ describe("Helix Ask Console recrown boundary", () => {
     const actionToolbarState = read("client/src/components/helix/ask-console/HelixAskComposerActionToolbarState.ts");
     const textareaState = read("client/src/components/helix/ask-console/HelixAskComposerTextareaState.ts");
     const promptHistory = read("client/src/components/helix/ask-console/HelixAskPromptHistory.ts");
+    const slashCommandCatalog = read("client/src/components/helix/ask-console/HelixAskSlashCommandCatalog.ts");
+    const slashCommandInsertion = read("client/src/components/helix/ask-console/HelixAskSlashCommandInsertion.ts");
+    const slashCommandMenu = read("client/src/components/helix/ask-console/HelixAskSlashCommandMenu.tsx");
+    const slashCommandMenuState = read("client/src/components/helix/ask-console/HelixAskSlashCommandMenuState.ts");
     const composerPanel = read("client/src/components/helix/ask-console/HelixAskSurfaceComposerPanel.tsx");
 
     expect(legacyPill).toContain("const composerState = buildHelixAskLegacyComposerState({");
@@ -4423,6 +4431,10 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(legacyPill).toContain("syncAskDraftValue");
     expect(legacyPill).toContain("handleAskPromptHistoryKeyDown");
     expect(legacyPill).toContain("resolveHelixAskPromptHistoryNavigation({");
+    expect(legacyPill).toContain("buildHelixAskSlashCommandMenuItems({");
+    expect(legacyPill).toContain("insertAskSlashCommandMenuItem");
+    expect(legacyPill).toContain("slashCommandMenu: (");
+    expect(legacyPill).not.toContain("const HELIX_ASK_SLASH_COMMAND_CATALOG");
     expect(legacyPill).not.toContain('<div className="flex flex-col gap-2 px-4 py-3">');
 
     expect(legacyComposerSurface).toContain("export function HelixAskLegacyComposerSurface");
@@ -4431,7 +4443,9 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(legacyComposerSurface).toContain("<HelixAskMoodAvatarSurface {...moodAvatar}");
     expect(legacyComposerSurface).toContain("<HelixAskComposerActionToolbarSurface {...actionToolbar}");
     expect(legacyComposerSurface).toContain("<HelixAskComposerTextareaSurface {...textarea} ref={textareaRef} />");
+    expect(legacyComposerSurface).toContain("slashCommandMenu={slashCommandMenu}");
     expect(legacyComposerState).toContain("export function buildHelixAskLegacyComposerState");
+    expect(legacyComposerState).toContain("slashCommandMenu");
     expect(legacyComposerState).not.toContain("triggerAskActionHaptic");
     expect(legacyComposerState).not.toContain("handleAskImageSelect");
     expect(legacyComposerState).not.toContain("handleVoiceInputToggle");
@@ -4475,12 +4489,38 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(promptHistory).not.toContain("setSelectionRange");
     expect(promptHistory).not.toContain("runAskTurn");
     expect(promptHistory).not.toContain("fetch(");
+    expect(slashCommandCatalog).toContain("export function buildHelixAskSlashCommandMenuItems");
+    expect(slashCommandCatalog).toContain("resolveHelixWorkstationCapabilityAccess");
+    expect(slashCommandInsertion).toContain("export function resolveHelixAskSlashCommandTrigger");
+    expect(slashCommandInsertion).toContain("export function insertHelixAskSlashCommandPrompt");
+    expect(slashCommandMenuState).toContain("export function buildHelixAskSlashCommandMenuState");
+    expect(slashCommandMenuState).toContain("export function resolveHelixAskSlashCommandMenuKey");
+    expect(slashCommandMenu).toContain("export function HelixAskSlashCommandMenu");
+    expect(slashCommandMenu).toContain('data-testid="helix-ask-slash-command-menu"');
+    for (const slashOwner of [
+      slashCommandCatalog,
+      slashCommandInsertion,
+      slashCommandMenu,
+      slashCommandMenuState,
+    ]) {
+      expect(slashOwner).not.toContain("@/components/helix/HelixAskPill");
+      expect(slashOwner).not.toContain("@/store/");
+      expect(slashOwner).not.toContain("runAskTurn");
+      expect(slashOwner).not.toContain("requestSubmit");
+      expect(slashOwner).not.toContain("navigator.clipboard");
+      expect(slashOwner).not.toContain("speechSynthesis");
+      expect(slashOwner).not.toContain("terminal_authority");
+    }
+    expect(slashCommandMenu).not.toContain("fetch(");
+    expect(slashCommandInsertion).not.toContain("fetch(");
+    expect(slashCommandMenuState).not.toContain("fetch(");
     expect(legacyComposerSurface).not.toContain("runAskTurn");
     expect(legacyComposerSurface).not.toContain("fetch(");
     expect(composerPanel).toContain("export function HelixAskSurfaceComposerPanel");
     expect(composerPanel).toContain("{voiceLevelMonitor}");
     expect(composerPanel).toContain("{moodAvatar}");
     expect(composerPanel).toContain("{actionToolbar}");
+    expect(composerPanel).toContain("{slashCommandMenu}");
     expect(composerPanel).toContain("{textarea}");
     expect(composerPanel).toContain('className="flex flex-col gap-2 px-4 py-3"');
     expect(composerPanel).not.toContain("triggerAskActionHaptic");

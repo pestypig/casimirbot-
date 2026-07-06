@@ -108,6 +108,13 @@ export type ImageLensRegionInspectionReceiptV1 = {
   reason_for_crop: string | null;
   region_label?: string | null;
   requested_equation_label?: string | null;
+  observed_equation_labels?: string[];
+  label_match_status?: ScientificEvidencePacketV1["label_match_status"];
+  exact_equation_admissibility?: ScientificEvidencePacketV1["exact_equation_admissibility"];
+  evidence_role?: ScientificEvidencePacketV1["evidence_role"];
+  quality_flags?: string[];
+  quality_rejection_reasons?: string[];
+  retry_debug?: ScientificEvidencePacketV1["retry_debug"];
   parent_region_id: string | null;
   detail: ImageLensRegionInspectionDetailV1;
   document_region_receipt: DocumentImageRegionReceiptV1;
@@ -148,6 +155,13 @@ export type ImageLensRegionInspectionObservationV1 = {
   latex_candidate?: string;
   extraction_status: ImageLensRegionExtractionStatusV1;
   uncertainty: string[];
+  observed_equation_labels?: string[];
+  label_match_status?: ScientificEvidencePacketV1["label_match_status"];
+  exact_equation_admissibility?: ScientificEvidencePacketV1["exact_equation_admissibility"];
+  evidence_role?: ScientificEvidencePacketV1["evidence_role"];
+  quality_flags?: string[];
+  quality_rejection_reasons?: string[];
+  retry_debug?: ScientificEvidencePacketV1["retry_debug"];
   scientific_evidence_packet?: ScientificEvidencePacketV1;
   scientific_evidence_sidecar?: ScientificImageEvidenceSidecarV1;
   deterministic: true;

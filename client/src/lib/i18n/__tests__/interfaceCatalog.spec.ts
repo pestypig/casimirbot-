@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { getInterfaceLanguageReadiness, INTERFACE_LANGUAGE_OPTIONS } from "@/lib/i18n/interfaceLanguage";
 import { createInterfaceTextResolver } from "@/lib/i18n/interfaceText";
+import { getInterfacePanelTitle } from "@/lib/i18n/panelTitles";
 import { enMessages } from "@/lib/i18n/messages/en";
 import { hawMessages } from "@/lib/i18n/messages/haw";
 import { INTERFACE_TARGET_CATALOGS } from "@/lib/i18n/messages/targetCatalogs";
@@ -81,5 +82,16 @@ describe("interface catalog integrity", () => {
     expect(resolver.t("account.usage.threads")).toBe("Nā thread");
 
     expect(getWorkstationDebugSnapshot().events).toHaveLength(0);
+  });
+
+  it("routes representative workstation panel titles through the interface catalog", () => {
+    const resolver = createInterfaceTextResolver("haw");
+
+    expect(getInterfacePanelTitle(resolver.t, "account-session", "Account & Sessions")).toBe(
+      "Mo\u02bbok\u0101ki a me n\u0101 kau",
+    );
+    expect(getInterfacePanelTitle(resolver.t, "theory-badge-graph", "Theory Badge Graph")).toBe(
+      "Pakuhi Badge Kumumana\u02bbo",
+    );
   });
 });

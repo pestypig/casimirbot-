@@ -1849,6 +1849,14 @@ describe("Codex provider capability lane adapter", () => {
         extraction_status: "extracted",
         uncertainty: ["fixture-backed OCR/math candidate"],
       },
+      ...["3.51", "3.52", "3.53", "3.54", "3.55"].map((label) => ({
+        region_label: `equation_${label}`,
+        requested_equation_label: label,
+        text_candidate: `Bianchi Weyl equation row \\nabla^\\mu \\psi_\\nu - D_\\nu S_\\phi = 0 (${label})`,
+        latex_candidate: `\\nabla^\\mu \\psi_\\nu - D_\\nu S_\\phi = 0 \\tag{${label}}`,
+        extraction_status: "extracted",
+        uncertainty: ["fixture-backed labeled equation row"],
+      })),
     ]);
     process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";

@@ -5,6 +5,7 @@ export type HelixAskSurfaceComposerPanelProps = {
   moodAvatar: ReactNode;
   actionToolbar: ReactNode;
   textarea: ReactNode;
+  slashCommandMenu?: ReactNode;
 };
 
 export function HelixAskSurfaceComposerPanel({
@@ -12,6 +13,7 @@ export function HelixAskSurfaceComposerPanel({
   moodAvatar,
   actionToolbar,
   textarea,
+  slashCommandMenu = null,
 }: HelixAskSurfaceComposerPanelProps) {
   return (
     <>
@@ -21,7 +23,10 @@ export function HelixAskSurfaceComposerPanel({
           {moodAvatar}
           {actionToolbar}
         </div>
-        {textarea}
+        <div className="relative min-w-0">
+          {slashCommandMenu}
+          {textarea}
+        </div>
       </div>
     </>
   );

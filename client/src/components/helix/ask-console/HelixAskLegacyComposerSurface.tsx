@@ -1,4 +1,5 @@
 import type { Ref } from "react";
+import type { ReactNode } from "react";
 
 import {
   HelixAskComposerActionToolbarSurface,
@@ -24,6 +25,7 @@ export type HelixAskLegacyComposerSurfaceProps = {
   actionToolbar: HelixAskComposerActionToolbarSurfaceProps;
   textarea: HelixAskComposerTextareaSurfaceProps;
   textareaRef?: Ref<HTMLTextAreaElement>;
+  slashCommandMenu?: ReactNode;
 };
 
 export function HelixAskLegacyComposerSurface({
@@ -32,6 +34,7 @@ export function HelixAskLegacyComposerSurface({
   actionToolbar,
   textarea,
   textareaRef,
+  slashCommandMenu,
 }: HelixAskLegacyComposerSurfaceProps) {
   return (
     <HelixAskSurfaceComposerPanel
@@ -39,6 +42,7 @@ export function HelixAskLegacyComposerSurface({
       moodAvatar={<HelixAskMoodAvatarSurface {...moodAvatar} />}
       actionToolbar={<HelixAskComposerActionToolbarSurface {...actionToolbar} />}
       textarea={<HelixAskComposerTextareaSurface {...textarea} ref={textareaRef} />}
+      slashCommandMenu={slashCommandMenu}
     />
   );
 }

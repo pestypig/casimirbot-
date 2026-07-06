@@ -1,3 +1,4 @@
+import sharp from "sharp";
 import type { HelixAgentStepObservationPacket } from "@shared/helix-agent-step-observation-packet";
 import type {
   HelixCapabilityLaneBackendSelectionSummary,
@@ -59,6 +60,15 @@ const readRecordArray = (value: unknown): RecordLike[] =>
 
 const hasCapabilityCall = (calls: RecordLike[], capability: string): boolean =>
   calls.some((call) => readHelixCapabilityLaneCallCapability(call) === capability);
+
+const callRegionLabel = (call: RecordLike): string =>
+  readString(call.region_label ?? call.regionLabel);
+
+const callEquationLabel = (call: RecordLike): string =>
+  readString(call.requested_equation_label ?? call.requestedEquationLabel);
+
+const plannedCropKey = (call: RecordLike): string =>
+  callRegionLabel(call) || (callEquationLabel(call) ? `equation:${callEquationLabel(call)}` : "");
 
 const firstText = (...values: unknown[]): string | null => {
   for (const value of values) {
@@ -190,6 +200,18 @@ const readScientificImageSourceKind = (item: RecordLike): string => {
   return "image_attachment";
 };
 
+const readImageDimensionsFromBase64 = async (base64: string): Promise<{ width: number; height: number } | null> => {
+  if (!base64.trim()) return null;
+  try {
+    const metadata = await sharp(Buffer.from(base64.replace(/\s+/g, ""), "base64"), { failOn: "none" }).metadata();
+    const width = metadata.width ?? 0;
+    const height = metadata.height ?? 0;
+    return width > 1 && height > 1 ? { width, height } : null;
+  } catch {
+    return null;
+  }
+};
+
 const scientificImageCropPlan = (width: number, height: number): Array<{
   region_label: string;
   requested_equation_label?: string;
@@ -198,7 +220,7 @@ const scientificImageCropPlan = (width: number, height: number): Array<{
 }> => {
   const safeWidth = Math.max(1, Math.floor(width));
   const safeHeight = Math.max(1, Math.floor(height));
-  const headerHeight = Math.max(40, Math.min(90, Math.round(safeHeight * 0.19)));
+  const headerHeight = Math.min(safeHeight, Math.max(1, Math.max(40, Math.min(90, Math.round(safeHeight * 0.19)))));
   const equationTop = Math.min(safeHeight - 1, headerHeight);
   const equationHeight = Math.max(1, safeHeight - equationTop);
   const bandCount = 5;
@@ -235,7 +257,7 @@ const scientificImageCropPlan = (width: number, height: number): Array<{
   ];
 };
 
-const buildImplicitScientificImageLensCalls = (body: RecordLike): RecordLike[] => {
+const buildImplicitScientificImageLensCalls = async (body: RecordLike): Promise<RecordLike[]> => {
   const sourceTargetIntent = readRecord(body.source_target_intent ?? body.sourceTargetIntent);
   const mandatoryNextTool = readRecord(body.mandatory_next_tool ?? body.mandatoryNextTool);
   const requestedOutputs = Array.isArray(sourceTargetIntent?.requested_outputs)
@@ -254,9 +276,10 @@ const buildImplicitScientificImageLensCalls = (body: RecordLike): RecordLike[] =
   const image = readFirstImageTurnInputItem(body);
   if (!image) return [];
 
-  const width = Math.max(1, Math.floor(firstNumber(image.width_px, image.widthPx, image.width) ?? 1));
-  const height = Math.max(1, Math.floor(firstNumber(image.height_px, image.heightPx, image.height) ?? 1));
   const imageBase64 = readString(image.image_base64 ?? image.imageBase64);
+  const imageDimensions = await readImageDimensionsFromBase64(imageBase64);
+  const width = Math.max(1, Math.floor(firstNumber(image.width_px, image.widthPx, image.width) ?? imageDimensions?.width ?? 1));
+  const height = Math.max(1, Math.floor(firstNumber(image.height_px, image.heightPx, image.height) ?? imageDimensions?.height ?? 1));
   const mimeType = readString(image.mime_type ?? image.mimeType) || "image/png";
   const imageRef =
     readString(image.image_ref ?? image.imageRef ?? image.evidence_id ?? image.evidenceId ?? image.file_name ?? image.fileName) ||
@@ -415,12 +438,21 @@ export const runHelixCapabilityLaneOneShotRequests = async (input: {
 }): Promise<HelixCapabilityLaneOneShotRunnerResult> => {
   const turnId = readString(input.turnId) || readString(input.body.turn_id ?? input.body.turnId) || null;
   const calls = readStructuredLaneCalls(input.body);
-  const implicitScientificImageLensCalls = buildImplicitScientificImageLensCalls(input.body);
-  if (
-    implicitScientificImageLensCalls.length > 0 &&
-    !hasCapabilityCall(calls, "visual_analysis.inspect_image_region")
-  ) {
-    calls.push(...implicitScientificImageLensCalls);
+  const implicitScientificImageLensCalls = await buildImplicitScientificImageLensCalls(input.body);
+  if (implicitScientificImageLensCalls.length > 0) {
+    const existingImageLensCalls = calls.filter(
+      (call) => readHelixCapabilityLaneCallCapability(call) === "visual_analysis.inspect_image_region",
+    );
+    if (existingImageLensCalls.length === 0) {
+      calls.push(...implicitScientificImageLensCalls);
+    } else {
+      const existingKeys = new Set(existingImageLensCalls.map(plannedCropKey).filter(Boolean));
+      const companionCalls = implicitScientificImageLensCalls.filter((call) => {
+        const key = plannedCropKey(call);
+        return key && !existingKeys.has(key);
+      });
+      calls.push(...companionCalls);
+    }
   }
   const results: HelixCapabilityLaneOneShotCallResult[] = [];
   for (const call of calls) {

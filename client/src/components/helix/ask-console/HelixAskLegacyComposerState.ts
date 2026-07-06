@@ -8,6 +8,7 @@ export function buildHelixAskLegacyComposerState({
   actionToolbar,
   textarea,
   textareaRef,
+  slashCommandMenu,
 }: HelixAskLegacyComposerStateOptions): HelixAskLegacyComposerSurfaceProps {
   return {
     voiceLevelMonitor,
@@ -15,5 +16,6 @@ export function buildHelixAskLegacyComposerState({
     actionToolbar,
     textarea,
     textareaRef,
+    slashCommandMenu,
   };
 }

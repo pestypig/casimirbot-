@@ -22,10 +22,10 @@ export const HELIX_ASK_LEGACY_CONSOLE_ACTIVE_PATH = [
 
 export const HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT = {
   file: "client/src/components/helix/HelixAskPill.tsx",
-  lineCountAtInventory: 25459,
-  exportedComponentStartsAtLine: 7681,
-  liveRenderSliceStartsAtLine: 25271,
-  liveLegacyConsoleViewStartsAtLine: 25271,
+  lineCountAtInventory: 25591,
+  exportedComponentStartsAtLine: 7712,
+  liveRenderSliceStartsAtLine: 25403,
+  liveLegacyConsoleViewStartsAtLine: 25403,
   inventoryReason:
     "The active bridge still imports the whole legacy file, but the visible console render path is concentrated near the bottom and now enters the recrowned legacy console view before composing recrowned ask-console display owners.",
 } as const;
@@ -212,6 +212,13 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     source: "ask-console",
     evidence:
       "Deterministic prompt-history entry shaping, up/down navigation, draft restoration, and textarea-boundary key admission moved to HelixAskPromptHistory with tests while prompt-history refs, draft mutation, textarea focus, and submit recording remain in the bridge.",
+  },
+  {
+    key: "composer_slash_command_discovery",
+    classification: "behavior_sensitive_recrowned_with_parity",
+    source: "ask-console",
+    evidence:
+      "Deterministic slash-command catalog shaping, account-policy filtering, menu state/key projection, visible menu rendering, and slash-token prompt insertion moved to HelixAskSlashCommand* owners with tests while draft mutation, textarea focus, open/query refs, selected runtime/account-policy state, and submit behavior remain in the bridge.",
   },
   {
     key: "reply_projection_surface",

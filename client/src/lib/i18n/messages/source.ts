@@ -176,6 +176,13 @@ export const interfaceSourceMessages = {
     context: "Panel tab, desktop window title, taskbar, and panel launcher.",
     screenshotSurface: "workstation",
   },
+  "panel.title.theoryBadgeGraph": {
+    id: "panel.title.theoryBadgeGraph",
+    defaultMessage: "Theory Badge Graph",
+    description: "Desktop/workstation chrome title for the Theory Badge Graph panel.",
+    context: "Panel tab, desktop window title, taskbar, and panel launcher.",
+    screenshotSurface: "workstation",
+  },
   "panel.title.situationRoom": {
     id: "panel.title.situationRoom",
     defaultMessage: "Situation Room",
