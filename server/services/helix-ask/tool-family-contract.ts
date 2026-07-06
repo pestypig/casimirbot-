@@ -1538,7 +1538,7 @@ const normalizeFamily = (value: unknown): ToolFamily | null => {
   if (/docs?[-.:]?viewer|active[-.:]?doc|document/.test(normalized)) return "docs_viewer";
   if (/visual[-.:]?capture|image[-.:]?lens|situation-room\.describe-visual-capture/.test(normalized)) return "visual_capture";
   if (/workstation|workspace[-.:]?action|workspace[-.:]?panel|panel-control|click-or-activate-control/.test(normalized)) return "workstation";
-  if (/live[-.:]?environment|live[-.:]?env|live[-.:]?answer[-.:]?environment|stage[-.:]?play[-.:]?reflection[-.:]?result/.test(normalized)) return "live_environment";
+  if (/live[-.:]?environment|live[-.:]?env|live[-.:]?answer[-.:]?environment|live[-.:]?source[-.:]?set[-.:]?rate|set[-.:]?rate|stage[-.:]?play[-.:]?reflection[-.:]?result/.test(normalized)) return "live_environment";
   if (/live[-.:]?source[-.:]?mail|mailbox|read-processed-live-source-mail|process-live-source-mail|reflect-live-source-mail-loop|mail-loop-causality|processed-mail-loop/.test(normalized)) return "live_source_mail";
   if (/record-live-source-mail-decision|live[-.:]?source[-.:]?decision/.test(normalized)) return "live_source_decision";
   if (/voice[-.:]?delivery|voice[-.:]?output|request-interim-voice-callout|callout/.test(normalized)) return "voice_delivery";
@@ -1551,7 +1551,7 @@ const normalizeFamily = (value: unknown): ToolFamily | null => {
   ) return "context_reflection";
   if (/civilization[-.:]?bounds|civilization[-.:]?scenario|civilization[-.:]?roadmap|reflect-civilization-bounds/.test(normalized)) return "civilization_bounds";
   if (
-    /capability[-.:]?catalog|capability[-.:]?help|what[-.:]?tools[-.:]?are[-.:]?available|inspect-capability-catalog|workstation[-.:]?tool[-.:]?alignment|toolchain[-.:]?matrix|tool[-.:]?regression[-.:]?matrix/.test(
+    /runtime[-.:]?evidence|capability[-.:]?catalog|capability[-.:]?help|what[-.:]?tools[-.:]?are[-.:]?available|inspect-capability-catalog|workstation[-.:]?tool[-.:]?alignment|toolchain[-.:]?matrix|tool[-.:]?regression[-.:]?matrix/.test(
       normalized,
     )
   ) return "capability_catalog";
