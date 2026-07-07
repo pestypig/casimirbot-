@@ -59,6 +59,9 @@ const ENV_KEYS = [
   "CODEX_AGENT_FAKE_NATIVE_EVENT_JSONL",
   "CODEX_AGENT_FAKE_STDERR",
   "CODEX_AGENT_FAKE_EXIT_CODE",
+  "HELIX_IMAGE_LENS_EXTRACTION_FIXTURES",
+  "HELIX_IMAGE_LENS_EXTRACTION_BACKEND",
+  "PDFTOPPM_BIN",
   "TAVILY_API_KEY",
 ] as const;
 const originalEnv = new Map<string, string | undefined>();
@@ -1326,6 +1329,671 @@ describe("Helix Ask agent provider selection", () => {
     });
   });
 
+  it("allows metadata-only Theory Badge Graph relevance with caveats and no equations", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Scholarly metadata evidence is available.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+        "<entry>",
+        "<id>https://arxiv.org/abs/2606.00006</id>",
+        "<title>Weyl tensor conformal curvature in general relativity</title>",
+        "<summary>   </summary>",
+        "<published>2026-06-06T00:00:00Z</published>",
+        "<author><name>A. Relativist</name></author>",
+        "</entry>",
+        "</feed>",
+      ].join(""),
+    })) as typeof fetch;
+
+    const threadId = "thread:test:scholarly-followup-theory-metadata-only";
+    await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-followup-theory-metadata-only:first",
+        thread_id: threadId,
+        agent_runtime: "codex",
+        question: "Search scholarly research papers for Weyl tensor conformal curvature in general relativity.",
+      },
+      headers: {},
+    });
+
+    process.env.CODEX_AGENT_FAKE_STDOUT =
+      "Metadata-level relevance only: this title can be reflected to the Theory Badge Graph as a possible Weyl/conformal-curvature literature node, but no equations were extracted.";
+    const followup = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-followup-theory-metadata-only:second",
+        thread_id: threadId,
+        agent_runtime: "codex",
+        question: "Reflect this paper's relevance to the Theory Badge Graph, but only use the evidence level you actually have.",
+      },
+      headers: {},
+    });
+
+    expect(followup.ok).toBe(true);
+    expect(followup.text).toContain("can be reflected to the Theory Badge Graph");
+    expect(followup.text).toContain("Evidence depth: metadata_lookup");
+    expect(followup.text).toContain("No scientific evidence packet is materialized");
+    expect(followup.text).toContain("Do not treat this as proof");
+    expect((followup.debug as any)?.scholarly_evidence_escalation_plan).toMatchObject({
+      selected_evidence_depth: "metadata_lookup",
+      evidence_depth_reason: "request_can_be_answered_as_metadata_level_relevance_with_caveats",
+      full_text_fetch_status: "not_requested",
+      pdf_render_status: "not_requested",
+      theory_badge_graph_reflection_ref: expect.stringContaining("artifact://scholarly-theory-badge-graph-reflection/"),
+    });
+    expect((followup.debug as any)?.scholarly_response_mode_selection?.theory_badge_graph_reflection_candidate).toMatchObject({
+      schema: "helix.scholarly_theory_badge_graph_reflection_candidate.v1",
+      strongest_materialized_evidence_depth: "metadata_lookup",
+      evidence_maturity: "metadata_only",
+      graph_ingestion_status: "candidate_only",
+      claim_boundary: expect.objectContaining({
+        metadataOnly: true,
+        notProofAuthority: true,
+      }),
+    });
+  });
+
+  it("allows abstract-level Theory Badge Graph relevance while exposing scholarly evidence depth", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Scholarly metadata evidence is available.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+        "<entry>",
+        "<id>https://arxiv.org/abs/2606.00007</id>",
+        "<title>Weyl tensor conformal curvature in general relativity</title>",
+        "<summary>Metadata about Weyl tensor conformal curvature in general relativity.</summary>",
+        "<published>2026-06-07T00:00:00Z</published>",
+        "<author><name>A. Relativist</name></author>",
+        "</entry>",
+        "</feed>",
+      ].join(""),
+    })) as typeof fetch;
+
+    const threadId = "thread:test:scholarly-followup-theory-depth";
+    await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-followup-theory-depth:first",
+        thread_id: threadId,
+        agent_runtime: "codex",
+        question: "Search scholarly research papers for Weyl tensor conformal curvature in general relativity.",
+      },
+      headers: {},
+    });
+
+    process.env.CODEX_AGENT_FAKE_STDOUT =
+      "Metadata-level relevance only: this paper can be reflected to the Theory Badge Graph as a possible Weyl/conformal-curvature literature node, but no equations were extracted.";
+    const followup = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-followup-theory-depth:second",
+        thread_id: threadId,
+        agent_runtime: "codex",
+        question: "Reflect this paper's relevance to the Theory Badge Graph, but only use the evidence level you actually have.",
+      },
+      headers: {},
+    });
+
+    expect(followup.ok).toBe(true);
+    expect(followup.text).toContain("can be reflected to the Theory Badge Graph");
+    expect(followup.text).toContain("Evidence depth: abstract_or_snippet");
+    expect(followup.text).toContain("No scientific evidence packet is materialized");
+    expect(followup.text).toContain("Do not treat this as proof");
+    expect((followup.debug as any)?.scholarly_followup_evidence_lookup).toMatchObject({
+      status: "found",
+      followup_reference_detected: true,
+    });
+    expect((followup.debug as any)?.scholarly_evidence_escalation_plan).toMatchObject({
+      selected_evidence_depth: "abstract_or_snippet",
+      evidence_depth_reason: "request_can_use_provider_abstract_or_snippet_with_caveats",
+      full_text_fetch_status: "not_requested",
+      pdf_render_status: "not_requested",
+      theory_badge_graph_reflection_ref: expect.stringContaining("artifact://scholarly-theory-badge-graph-reflection/"),
+    });
+    expect((followup.debug as any)?.scholarly_response_mode_selection?.theory_badge_graph_reflection_candidate).toMatchObject({
+      schema: "helix.scholarly_theory_badge_graph_reflection_candidate.v1",
+      strongest_materialized_evidence_depth: "abstract_or_snippet",
+      evidence_maturity: "provider_abstract_or_snippet",
+      graph_ingestion_status: "candidate_only",
+      claim_boundary: expect.objectContaining({
+        abstractOrSnippetOnly: true,
+        notProofAuthority: true,
+      }),
+    });
+  });
+
+  it("prioritizes scholarly follow-up projection over active document and Theory Badge Graph compound synthesis", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Scholarly metadata evidence is available.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+        "<entry>",
+        "<id>https://arxiv.org/abs/2606.00010</id>",
+        "<title>Weyl tensor conformal curvature in general relativity</title>",
+        "<summary>Abstract evidence about Weyl tensor conformal curvature in general relativity.</summary>",
+        "<published>2026-06-10T00:00:00Z</published>",
+        "<author><name>A. Relativist</name></author>",
+        "</entry>",
+        "</feed>",
+      ].join(""),
+    })) as typeof fetch;
+
+    const threadId = "thread:test:scholarly-followup-preempts-doc-theory";
+    await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-followup-preempts-doc-theory:first",
+        thread_id: threadId,
+        agent_runtime: "codex",
+        question: "Search scholarly research papers for Weyl tensor conformal curvature in general relativity.",
+      },
+      headers: {},
+    });
+
+    process.env.CODEX_AGENT_FAKE_STDOUT = [
+      "Based on the available evidence, this paper is relevant to the Theory Badge Graph only at a diagnostic / mapping level.",
+      "The active document is the NHM2 whitepaper and the reflection found 0 exact badge matches and 12 likely matches.",
+    ].join("\n");
+    const followup = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-followup-preempts-doc-theory:second",
+        thread_id: threadId,
+        agent_runtime: "codex",
+        question: "Reflect this paper's relevance to the Theory Badge Graph, but only use the evidence level you actually have.",
+        workstation_gateway_calls: [
+          {
+            capability_id: "docs.search",
+            mode: "read",
+            arguments: {
+              query: "physical viability locked out",
+              paths: ["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"],
+              max_hits: 2,
+            },
+          },
+          {
+            capability_id: "theory-badge-graph.reflect_discussion_context",
+            mode: "read",
+            arguments: {
+              prompt: "Reflect NHM2 current status whitepaper diagnostic claim boundaries against the Theory Badge Graph.",
+              mentioned_domains: ["NHM2", "claim boundaries"],
+              build_explanation_plan: true,
+              limit: 4,
+            },
+          },
+        ],
+      },
+      headers: {},
+    });
+
+    expect(followup.ok).toBe(true);
+    expect(followup.text).toContain("Weyl tensor conformal curvature in general relativity");
+    expect(followup.text).toContain("Evidence depth: abstract_or_snippet");
+    expect(followup.text).toContain("No scientific evidence packet is materialized");
+    expect(followup.text).not.toContain("active document is the NHM2 whitepaper");
+    expect((followup as any).terminal_artifact_kind).toBe("scholarly_metadata_answer");
+    expect((followup as any).final_answer_source).toBe("scholarly_metadata_answer");
+    expect((followup.debug as any)?.provider_gateway_debug_summary).toMatchObject({
+      terminal_authority_result: "authorized_by_scholarly_response_mode",
+      final_answer_source: "scholarly_metadata_answer",
+      terminal_artifact_kind: "scholarly_metadata_answer",
+    });
+    expect((followup.debug as any)?.compound_evidence_synthesis_answer).toMatchObject({
+      schema: "helix.compound_evidence_synthesis_answer.v1",
+    });
+    expect((followup.debug as any)?.terminal_presentation).toMatchObject({
+      terminal_artifact_kind: "scholarly_metadata_answer",
+      final_answer_source: "scholarly_metadata_answer",
+      presentation_policy: "scholarly_response_mode_with_caveats",
+    });
+    expect((followup.debug as any)?.scholarly_evidence_escalation_plan).toMatchObject({
+      selected_evidence_depth: "abstract_or_snippet",
+      theory_badge_graph_reflection_ref: expect.stringContaining("artifact://scholarly-theory-badge-graph-reflection/"),
+    });
+  });
+
+  it("keeps missing scholarly follow-up recovery from terminalizing as document graph compound synthesis", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = [
+      "I cannot answer from the paper I found earlier because no prior scholarly evidence packet was recoverable for this turn.",
+      "Ask me to rerun the scholarly lookup, provide a DOI/arXiv id, or refer to a specific paper title so Helix can create bounded paper evidence first.",
+    ].join("\n");
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-followup-missing-preempts-doc-theory",
+        thread_id: "thread:test:scholarly-followup-missing-preempts-doc-theory",
+        agent_runtime: "codex",
+        question: "Reflect this paper's relevance to the Theory Badge Graph, but only use the evidence level you actually have.",
+        workstation_gateway_calls: [
+          {
+            capability_id: "docs.search",
+            mode: "read",
+            arguments: {
+              query: "physical viability locked out",
+              paths: ["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"],
+              max_hits: 2,
+            },
+          },
+          {
+            capability_id: "theory-badge-graph.reflect_discussion_context",
+            mode: "read",
+            arguments: {
+              prompt: "Reflect NHM2 current status whitepaper diagnostic claim boundaries against the Theory Badge Graph.",
+              mentioned_domains: ["NHM2", "claim boundaries"],
+              build_explanation_plan: true,
+              limit: 4,
+            },
+          },
+        ],
+      },
+      headers: {},
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.text).toContain("no prior scholarly evidence packet was recoverable");
+    expect((result as any).terminal_artifact_kind).toBe("scholarly_recovery_plan");
+    expect((result as any).final_answer_source).toBe("scholarly_recovery_plan");
+    expect((result.debug as any)?.provider_gateway_debug_summary).toMatchObject({
+      terminal_authority_result: "authorized_by_scholarly_response_mode",
+      final_answer_source: "scholarly_recovery_plan",
+      terminal_artifact_kind: "scholarly_recovery_plan",
+    });
+    expect((result.debug as any)?.compound_evidence_synthesis_answer).toMatchObject({
+      schema: "helix.compound_evidence_synthesis_answer.v1",
+    });
+    expect((result.debug as any)?.terminal_presentation).toMatchObject({
+      terminal_artifact_kind: "scholarly_recovery_plan",
+      final_answer_source: "scholarly_recovery_plan",
+      presentation_policy: "scholarly_response_mode_with_caveats",
+    });
+    expect((result.debug as any)?.scholarly_response_mode_selection).toMatchObject({
+      selected_response_mode: "scholarly_recovery_plan",
+      missing_requirements: expect.arrayContaining(["prior_scholarly_evidence_packet_unavailable"]),
+    });
+  });
+
+  it("blocks equation and scientific packet follow-ups when prior scholarly evidence is metadata-only", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Scholarly metadata evidence is available.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+        "<entry>",
+        "<id>https://arxiv.org/abs/2606.00008</id>",
+        "<title>Casimir effect between conducting plates</title>",
+        "<summary>Metadata about a Casimir effect paper.</summary>",
+        "<published>2026-06-08T00:00:00Z</published>",
+        "<author><name>A. Physicist</name></author>",
+        "</entry>",
+        "</feed>",
+      ].join(""),
+    })) as typeof fetch;
+
+    const threadId = "thread:test:scholarly-followup-equation-packet";
+    await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-followup-equation-packet:first",
+        thread_id: threadId,
+        agent_runtime: "codex",
+        question: "Search scholarly research papers for Casimir effect between conducting plates.",
+      },
+      headers: {},
+    });
+
+    process.env.CODEX_AGENT_FAKE_STDOUT = "The paper equation is F = hbar c pi^2 A / 240 a^4 and I made a scientific evidence packet.";
+    const followup = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-followup-equation-packet:second",
+        thread_id: threadId,
+        agent_runtime: "codex",
+        question: "Use that paper's equations and put them in a scientific evidence packet for the Theory Badge Graph.",
+      },
+      headers: {},
+    });
+
+    expect(followup.ok).toBe(true);
+    expect(followup.text).toContain("needs deeper paper evidence");
+    expect(followup.text).toContain("Requested evidence depth: scientific_evidence_packet");
+    expect(followup.text).toContain("equation_extraction_refs_missing");
+    expect(followup.text).not.toContain("F = hbar");
+    expect((followup as any).terminal_artifact_kind).toBe("scholarly_evidence_escalation_missing");
+    expect((followup.debug as any)?.scholarly_response_mode_selection).toMatchObject({
+      selected_response_mode: "scholarly_evidence_escalation_missing",
+      selected_for_answer: false,
+    });
+    expect((followup.debug as any)?.scholarly_evidence_escalation_plan).toMatchObject({
+      selected_evidence_depth: "scientific_evidence_packet",
+      full_text_fetch_status: "required",
+      pdf_render_status: "required",
+      scientific_evidence_packet_ref: null,
+    });
+    expect((followup.debug as any)?.scholarly_response_mode_selection?.theory_badge_graph_reflection_candidate).toMatchObject({
+      strongest_materialized_evidence_depth: "abstract_or_snippet",
+      evidence_maturity: "provider_abstract_or_snippet",
+      scientific_evidence_packet_ref: null,
+      claim_boundary: expect.objectContaining({
+        scientificPacketMaterialized: false,
+        notProofAuthority: true,
+      }),
+    });
+  });
+
+  it("routes prior scholarly PDF page-image affordances through Image Lens for equation extraction", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Scholarly full-text fetch needs page-image parsing.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_BACKEND = "fixture";
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify({
+      entries: [{
+        region_label: "scholarly_pdf_page_1_equation_pass",
+        text_candidate: "The scanned page defines the plate force equation.",
+        latex_candidate: "F = -\\frac{\\pi^2 \\hbar c A}{240 a^4}",
+        extraction_status: "extracted",
+        uncertainty: ["fixture OCR for scholarly PDF page"],
+      }],
+    });
+    const scannedPdfBase64 = [
+      "JVBERi0xLjMKJZOMi54gUmVwb3J0TGFiIEdlbmVyYXRlZCBQREYgZG9jdW1lbnQgKG9wZW5zb3VyY2UpCjEgMCBvYmoKPDwKL0YxIDIgMCBSCj4+CmVuZG9iagoyIDAgb2JqCjw8Ci9CYXNlRm9udCAvSGVsdmV0aWNhIC9FbmNvZGluZyAvV2luQW5zaUVuY29kaW5nIC9OYW1lIC9GMSAvU3VidHlwZSAvVHlwZTEgL1R5cGUgL0ZvbnQKPj4KZW5kb2JqCjMgMCBvYmoKPDwKL0NvbnRlbnRzIDcgMCBSIC9NZWRpYUJveCBbIDAgMCAyMDAgMjAwIF0gL1BhcmVudCA2IDAgUiAvUmVzb3VyY2VzIDw8Ci9Gb250IDEgMCBSIC9Qcm9jU2V0IFsgL1BERiAvVGV4dCAvSW1hZ2VCIC9JbWFnZUMgL0ltYWdlSSBdCj4+IC9Sb3RhdGUgMCAvVHJhbnMgPDwKCj4+IAogIC9UeXBlIC9QYWdlCj4+CmVuZG9iago0IDAgb2JqCjw8Ci9QYWdlTW9kZSAvVXNlTm9uZSAvUGFnZXMgNiAwIFIgL1R5cGUgL0NhdGFsb2cKPj4KZW5kb2JqCjUgMCBvYmoKPDwKL0F1dGhvciAoYW5vbnltb3VzKSAvQ3JlYXRpb25EYXRlIChEOjIwMjYwNzA2MjAzODEyLTA0JzAwJykgL0NyZWF0b3IgKGFub255bW91cykgL0tleXdvcmRzICgpIC9Nb2REYXRlIChEOjIwMjYwNzA2MjAzODEyLTA0JzAwJykgL1Byb2R1Y2VyIChSZXBvcnRMYWIgUERGIExpYnJhcnkgLSBcKG9wZW5zb3VyY2VcKSkgCiAgL1N1YmplY3QgKHVuc3BlY2lmaWVkKSAvVGl0bGUgKHVudGl0bGVkKSAvVHJhcHBlZCAvRmFsc2UKPj4KZW5kb2JqCjYgMCBvYmoKPDwKL0NvdW50IDEgL0tpZHMgWyAzIDAgUiBdIC9UeXBlIC9QYWdlcwo+PgplbmRvYmoKNyAwIG9iago8PAovRmlsdGVyIFsgL0FTQ0lJODVEZWNvZGUgL0ZsYXRlRGVjb2RlIF0gL0xlbmd0aCA5NQo+PgpzdHJlYW0KR2FwUWgwRT1GLDBVXEgzVFxwTllUXlFLaz90Yz5JUCw7VyNVMV4yM2loUEVNXz9DVzRLSVNoWyZrMyc0K2g3cHVET0thOCRBT3VWK14jLXE9cy5BYD5RQzBNJjlSfj5lbmRzdHJlYW0KZW5kb2JqCnhyZWYKMCA4CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDA2MSAwMDAwIG4gCjAwMDAwMDAwOTIgMDAwMDAgbiAKMDAwMDAwMDE5OSAwMDAwMCBuIAowMDAwMDAwMzkyIDAwMDAwIG4gCjAwMDAwMDA0NjAgMDAwMDAgbiAKMDAwMDAwMDcyMSAwMDAwMCBuIAowMDAwMDAwNzgwIDAwMDAwIG4gCnRyYWlsZXIKPDwKL0lEIApbPGIzMGQzOTU0ZWFiODI4YTFmMGNhN2I1ZjZhODVmMTExPjxiMzBkMzk1NGVhYjgyOGExZjBjYTdiNWY2YTg1ZjExMT5dCiUgUmVwb3J0TGFiIGdlbmVyYXRlZCBQREYgZG9jdW1lbnQgLS0gZGlnZXN0IChvcGVuc291cmNlKQoKL0luZm8gNSAwIFIKL1Jvb3QgNCAwIFIKL1NpemUgOAo+PgpzdGFydHhyZWYKOTY0CiUlRU9GCg==",
+    ].join("");
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("export.arxiv.org")) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => [
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+            "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+            "<entry>",
+            "<id>https://arxiv.org/abs/2606.00009</id>",
+            "<title>Scanned Casimir Equation Plate Evidence</title>",
+            "<summary>This paper has a scanned equation figure for Casimir plate evidence.</summary>",
+            "<published>2026-06-09T00:00:00Z</published>",
+            "<author><name>A. Scanner</name></author>",
+            "</entry>",
+            "</feed>",
+          ].join(""),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: (name: string) => name.toLowerCase() === "content-type" ? "application/pdf" : null },
+        arrayBuffer: async () => {
+          const bytes = Buffer.from(scannedPdfBase64, "base64");
+          return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+        },
+      };
+    }) as typeof fetch;
+
+    const threadId = "thread:test:scholarly-followup-page-image-required";
+    await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-followup-page-image-required:first",
+        thread_id: threadId,
+        agent_runtime: "codex",
+        question: "Find a scholarly paper for scanned Casimir equation plate evidence, fetch full text if available, and summarize only from fetched text.",
+      },
+      headers: {},
+    });
+
+    process.env.CODEX_AGENT_FAKE_STDOUT =
+      "Using the re-entered Image Lens page evidence: the extracted equation candidate is page-grounded and observation-only.";
+    const followup = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-followup-page-image-required:second",
+        thread_id: threadId,
+        agent_runtime: "codex",
+        question: "Extract equations from that paper for the Theory Badge Graph.",
+      },
+      headers: {},
+    });
+
+    expect(followup.ok).toBe(true);
+    expect(followup.text).toContain("Using the re-entered Image Lens page evidence");
+    expect(followup.text).not.toContain("F = invented");
+    expect((followup.debug as any)?.prior_scholarly_evidence_memory_record).toMatchObject({
+      evidence_state: "page_image_parse_required",
+      page_image_affordance_refs: expect.arrayContaining([
+        expect.stringContaining("/page/1"),
+      ]),
+    });
+    expect((followup.debug as any)?.runtime_lane_request_loop).toMatchObject({
+      status: "lane_observation_reentered",
+      synthesized_by_helix_policy: true,
+      synthesis_reason: "prior_scholarly_pdf_page_affordance_requires_image_lens_parse",
+      candidate: {
+        source_kind: "pdf_page_render",
+        page_number: 1,
+        page_image_ref: expect.stringMatching(/^data:image\/png;base64,/),
+        scholarly_page_image_artifact_ref: expect.stringContaining("artifact://scholarly-pdf-page-image/"),
+      },
+    });
+    expect((followup.debug as any)?.capability_lane_observation_packets).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        capability_key: "visual_analysis.inspect_image_region",
+        status: "succeeded",
+      }),
+    ]));
+    expect((followup.debug as any)?.scholarly_evidence_escalation_plan).toMatchObject({
+      selected_evidence_depth: "page_image_parse",
+      current_evidence_state: "page_image_parse_required",
+      full_text_fetch_status: "unavailable",
+      pdf_render_status: "available",
+      theory_badge_graph_reflection_ref: expect.stringContaining("artifact://scholarly-theory-badge-graph-reflection/"),
+      equation_extraction_refs: expect.arrayContaining([
+        expect.stringMatching(/#crop=\d+,\d+,\d+,\d+$/),
+      ]),
+      scientific_evidence_packet_ref: expect.stringContaining("scientific_image_sidecar"),
+    });
+    expect((followup.debug as any)?.scholarly_response_mode_selection?.theory_badge_graph_reflection_candidate).toMatchObject({
+      strongest_materialized_evidence_depth: "scientific_evidence_packet",
+      evidence_maturity: "normalized_scientific_evidence",
+      scientific_evidence_packet_ref: expect.stringContaining("scientific_image_sidecar"),
+      provenance_refs: expect.arrayContaining([
+        expect.stringContaining("scientific_image_sidecar"),
+      ]),
+      claim_boundary: expect.objectContaining({
+        pageGroundedExtraction: true,
+        scientificPacketMaterialized: true,
+        notProofAuthority: true,
+      }),
+    });
+  });
+
+  it("escalates current-turn scholarly PDF affordances into Image Lens when asked to show the science", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT =
+      "I found an accessible PDF, rendered pages 1-3, extracted the main equation candidates, and created a scientific evidence packet.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_BACKEND = "fixture";
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify({
+      entries: [{
+        region_label: "scholarly_pdf_page_1_equation_pass",
+        text_candidate: "The rendered PDF page shows the parallel-plate Casimir force law.",
+        latex_candidate: "F = -\\frac{\\pi^2 \\hbar c A}{240 a^4}",
+        extraction_status: "extracted",
+        uncertainty: ["fixture OCR for current-turn scholarly PDF page"],
+      }],
+    });
+    const scannedPdfBase64 = [
+      "JVBERi0xLjMKJZOMi54gUmVwb3J0TGFiIEdlbmVyYXRlZCBQREYgZG9jdW1lbnQgKG9wZW5zb3VyY2UpCjEgMCBvYmoKPDwKL0YxIDIgMCBSCj4+CmVuZG9iagoyIDAgb2JqCjw8Ci9CYXNlRm9udCAvSGVsdmV0aWNhIC9FbmNvZGluZyAvV2luQW5zaUVuY29kaW5nIC9OYW1lIC9GMSAvU3VidHlwZTEgL1R5cGUgL0ZvbnQKPj4KZW5kb2JqCjMgMCBvYmoKPDwKL0NvbnRlbnRzIDcgMCBSIC9NZWRpYUJveCBbIDAgMCAyMDAgMjAwIF0gL1BhcmVudCA2IDAgUiAvUmVzb3VyY2VzIDw8Ci9Gb250IDEgMCBSIC9Qcm9jU2V0IFsgL1BERiAvVGV4dCAvSW1hZ2VCIC9JbWFnZUMgL0ltYWdlSSBdCj4+IC9Sb3RhdGUgMCAvVHJhbnMgPDwKCj4+IAogIC9UeXBlIC9QYWdlCj4+CmVuZG9iago0IDAgb2JqCjw8Ci9QYWdlTW9kZSAvVXNlTm9uZSAvUGFnZXMgNiAwIFIgL1R5cGUgL0NhdGFsb2cKPj4KZW5kb2JqCjUgMCBvYmoKPDwKL0F1dGhvciAoYW5vbnltb3VzKSAvQ3JlYXRpb25EYXRlIChEOjIwMjYwNzA2MjAzODEyLTA0JzAwJykgL0NyZWF0b3IgKGFub255bW91cykgL0tleXdvcmRzICgpIC9Nb2REYXRlIChEOjIwMjYwNzA2MjAzODEyLTA0JzAwJykgL1Byb2R1Y2VyIChSZXBvcnRMYWIgUERGIExpYnJhcnkgLSBcKG9wZW5zb3VyY2VcKSkgCiAgL1N1YmplY3QgKHVuc3BlY2lmaWVkKSAvVGl0bGUgKHVudGl0bGVkKSAvVHJhcHBlZCAvRmFsc2UKPj4KZW5kb2JqCjYgMCBvYmoKPDwKL0NvdW50IDEgL0tpZHMgWyAzIDAgUiBdIC9UeXBlIC9QYWdlcwo+PgplbmRvYmoKNyAwIG9iago8PAovRmlsdGVyIFsgL0FTQ0lJODVEZWNvZGUgL0ZsYXRlRGVjb2RlIF0gL0xlbmd0aCA5NQo+PgpzdHJlYW0KR2FwUWgwRT1GLDBVXEgzVFxwTllUXlFLaz90Yz5JUCw7VyNVMV4yM2loUEVNXz9DVzRLSVNoWyZrMyc0K2g3cHVET0thOCRBT3VWK14jLXE9cy5BYD5RQzBNJjlSfj5lbmRzdHJlYW0KZW5kb2JqCnhyZWYKMCA4CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDA2MSAwMDAwIG4gCjAwMDAwMDAwOTIgMDAwMDAgbiAKMDAwMDAwMDE5OSAwMDAwMCBuIAowMDAwMDAwMzkyIDAwMDAwIG4gCjAwMDAwMDA0NjAgMDAwMDAgbiAKMDAwMDAwMDcyMSAwMDAwMCBuIAowMDAwMDAwNzgwIDAwMDAwIG4gCnRyYWlsZXIKPDwKL0lEIApbPGIzMGQzOTU0ZWFiODI4YTFmMGNhN2I1ZjZhODVmMTExPjxiMzBkMzk1NGVhYjgyOGExZjBjYTdiNWY2YTg1ZjExMT5dCiUgUmVwb3J0TGFiIGdlbmVyYXRlZCBQREYgZG9jdW1lbnQgLS0gZGlnZXN0IChvcGVuc291cmNlKQoKL0luZm8gNSAwIFIKL1Jvb3QgNCAwIFIKL1NpemUgOAo+PgpzdGFydHhyZWYKOTY0CiUlRU9GCg==",
+    ].join("");
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("export.arxiv.org")) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => [
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+            "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+            "<entry>",
+            "<id>https://arxiv.org/abs/2606.00010</id>",
+            "<title>Casimir effect between conducting plates scanned equation evidence</title>",
+            "<summary>This paper studies the Casimir effect between conducting plates and includes equation evidence.</summary>",
+            "<published>2026-06-10T00:00:00Z</published>",
+            "<author><name>A. Current Scanner</name></author>",
+            "</entry>",
+            "</feed>",
+          ].join(""),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: (name: string) => name.toLowerCase() === "content-type" ? "application/pdf" : null },
+        arrayBuffer: async () => {
+          const bytes = Buffer.from(scannedPdfBase64, "base64");
+          return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+        },
+      };
+    }) as typeof fetch;
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:current-turn-scholarly-show-science",
+        thread_id: "thread:test:current-turn-scholarly-show-science",
+        agent_runtime: "codex",
+        question: "Find a paper on the Casimir effect between conducting plates and show me the science.",
+      },
+      headers: {},
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.text).toContain("I found an accessible PDF");
+    expect((result.debug as any)?.runtime_lane_request_loop).toMatchObject({
+      status: "lane_observation_reentered",
+      synthesized_by_helix_policy: true,
+      synthesis_reason: "current_turn_scholarly_pdf_page_affordance_requires_image_lens_parse",
+      candidate: {
+        source_kind: "pdf_page_render",
+        scholarly_evidence_source: "current",
+        page_image_ref: expect.stringMatching(/^data:image\/png;base64,/),
+      },
+    });
+    expect((result.debug as any)?.current_turn_scholarly_deep_evidence_record).toMatchObject({
+      evidence_state: "page_image_parse_required",
+      source_capability_id: "scholarly-research.fetch_full_text",
+      source_pdf_ref: expect.stringContaining("artifact://scholarly-pdf/"),
+      cache_path: expect.stringContaining("scholarly-pdfs"),
+    });
+    expect((result.debug as any)?.scholarly_evidence_escalation_plan).toMatchObject({
+      selected_evidence_depth: "page_image_parse",
+      pdf_render_status: "available",
+      page_image_observation_refs: expect.arrayContaining([
+        expect.stringContaining("visual_analysis.inspect_image_region"),
+      ]),
+      equation_extraction_refs: expect.arrayContaining([
+        expect.stringMatching(/#crop=\d+,\d+,\d+,\d+$/),
+      ]),
+      scientific_evidence_packet_ref: expect.stringContaining("scientific_image_sidecar"),
+    });
+  });
+
+  it("fails science extraction with exact no-PDF wording when DOI landing page has no accessible PDF", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Metadata found.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("export.arxiv.org")) {
+        return { ok: true, status: 200, text: async () => "<?xml version=\"1.0\"?><feed xmlns=\"http://www.w3.org/2005/Atom\"></feed>" };
+      }
+      if (url.includes("api.openalex.org")) {
+        return { ok: false, status: 429, json: async () => ({}) };
+      }
+      if (url.includes("api.crossref.org")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            message: {
+              items: [{
+                title: ["Casimir effect between conducting plates metadata only"],
+                DOI: "10.5555/no-pdf-casimir",
+                URL: "https://doi.org/10.5555/no-pdf-casimir",
+                author: [{ given: "M.", family: "Metadata" }],
+                published: { "date-parts": [[2026]] },
+                "container-title": ["Metadata Journal"],
+              }],
+            },
+          }),
+        };
+      }
+      if (url.includes("api.semanticscholar.org")) {
+        return { ok: false, status: 429, json: async () => ({}) };
+      }
+      if (url.includes("doi.org/10.5555/no-pdf-casimir")) {
+        const bytes = new TextEncoder().encode("<html><body><p>Publisher landing page without a PDF link.</p></body></html>");
+        return {
+          ok: true,
+          status: 200,
+          headers: { get: (name: string) => name.toLowerCase() === "content-type" ? "text/html" : null },
+          arrayBuffer: async () => bytes.buffer,
+        };
+      }
+      return { ok: false, status: 404, json: async () => ({}), text: async () => "" };
+    }) as typeof fetch;
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-show-science-no-pdf",
+        thread_id: "thread:test:scholarly-show-science-no-pdf",
+        agent_runtime: "codex",
+        question: "Find a paper on the Casimir effect between conducting plates and show me the science.",
+      },
+      headers: {},
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.text).toBe("I found metadata and abstracts, but no accessible PDF/full text. I can’t extract equations yet.");
+    expect((result.debug as any)?.runtime_lane_request_loop).toBeNull();
+    expect((result.debug as any)?.scholarly_response_mode_selection).toMatchObject({
+      selected_response_mode: "scholarly_evidence_escalation_missing",
+      terminal_artifact_kind: "scholarly_evidence_escalation_missing",
+      missing_requirements: expect.arrayContaining([
+        "doi_landing_pdf_not_found",
+        "accessible_pdf_or_full_text_required",
+        "equation_extraction_refs_missing",
+      ]),
+    });
+  });
+
   it("chooses the most recent compatible scholarly record for ambiguous follow-ups with provenance", async () => {
     process.env.CODEX_AGENT_FAKE_STDOUT = "First scholarly metadata evidence is available.";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
@@ -1417,6 +2085,31 @@ describe("Helix Ask agent provider selection", () => {
     expect(candidates).toHaveLength(2);
     expect(candidates.filter((candidate: any) => candidate.selected)).toHaveLength(1);
     expect(candidates.find((candidate: any) => candidate.selected)?.query).toContain("Casimir effect");
+
+    process.env.CODEX_AGENT_FAKE_STDOUT =
+      "I resolved that follow-up to the re-entered prior Casimir paper record.";
+    const provenanceFollowup = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-followup-ambiguous:fourth",
+        thread_id: threadId,
+        agent_runtime: "codex",
+        question: "Which prior paper record did you resolve that follow-up to?",
+      },
+      headers: {},
+    });
+
+    expect(provenanceFollowup.ok).toBe(true);
+    expect(provenanceFollowup.text).toContain("prior Casimir paper record");
+    expect((provenanceFollowup.debug as any)?.scholarly_followup_evidence_lookup).toMatchObject({
+      status: "found",
+      candidate_count: 2,
+      resolution_reason: "selected_most_recent_compatible_scholarly_evidence",
+    });
+    expect((provenanceFollowup.debug as any)?.prior_scholarly_evidence_memory_record?.query).toContain("Casimir effect");
+    expect((provenanceFollowup.debug as any)?.evidence_reentry_status).toBe("reentered_prior_scholarly_evidence");
+    expect((provenanceFollowup as any).terminal_presentation?.selected_observation_refs?.length).toBeGreaterThan(0);
   });
 
   it("fails closed for scholarly follow-ups when no prior evidence is recoverable", async () => {

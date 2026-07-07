@@ -1,16 +1,21 @@
 /* @vitest-environment jsdom */
 
+import React from "react";
+import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HelixWorkspaceMemoryRegistrySnapshot } from "@shared/helix-workspace-memory-registry";
 import {
   buildProfileStoragePayload,
+  getProfileStorageSyncStatus,
   grantProfileStorageAttachConsent,
   HELIX_PROFILE_STORAGE_ATTACH_CONSENT_EVENT,
   isProfileStorageAttachConsentGranted,
   profileStorageAttachConsentKey,
   revokeProfileStorageAttachConsent,
   shouldSaveProfileStorageSnapshot,
+  useProfileStorageSync,
 } from "../profileStorageSync";
+import { useWorkspaceMemoryRegistryStore } from "@/store/useWorkspaceMemoryRegistryStore";
 
 const profileId = "user:test-profile";
 const emptyRegistry = (): HelixWorkspaceMemoryRegistrySnapshot => ({
@@ -42,9 +47,17 @@ const registryWithProfileCandidate = (): HelixWorkspaceMemoryRegistrySnapshot =>
 });
 
 afterEach(() => {
+  cleanup();
   window.localStorage.clear();
+  useWorkspaceMemoryRegistryStore.setState({ artifacts: {} });
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
+
+function ProfileStorageSyncHarness() {
+  useProfileStorageSync();
+  return null;
+}
 
 describe("profile storage sync consent", () => {
   it("does not save browser-local profile candidates until attach consent is granted", () => {
@@ -169,5 +182,86 @@ describe("profile storage sync consent", () => {
         artifact_ids: ["remembered-procedure:fruition-calculator"],
       }),
     ]));
+  });
+
+  it("keeps a browser-local pending sync queue when profile backup fails and clears it after retry", async () => {
+    vi.useFakeTimers();
+    window.localStorage.setItem("agi-chat-sessions-v1", JSON.stringify([{ id: "chat:test" }]));
+    useWorkspaceMemoryRegistryStore.getState().upsertArtifact({
+      artifact_id: "artifact:chat",
+      artifact_type: "helix_chat_session",
+      owner_scope: "browser_guest",
+      storage_backend: "localStorage",
+      sync_status: "profile_candidate",
+      profile_id: null,
+      chat_session_id: "chat:test",
+      title: "Browser chat",
+      storage_key: "agi-chat-sessions-v1",
+      updated_at: "2026-07-06T12:00:00.000Z",
+    });
+    grantProfileStorageAttachConsent(profileId);
+
+    let failBackup = true;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/account/session") {
+        return new Response(JSON.stringify({
+          session: { profile: { profile_id: profileId } },
+          account_policy: {},
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (url === "/api/account/profile-storage/snapshot" && init?.method === "POST") {
+        if (failBackup) {
+          return new Response(JSON.stringify({ ok: false, message: "Server unavailable." }), {
+            status: 503,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify({ ok: true, message: "Saved." }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (url === "/api/account/profile-storage/snapshot") {
+        return new Response(JSON.stringify({
+          schema: "helix.profile_storage_snapshot.v1",
+          profile_id: profileId,
+          storage_backend: "profile_server",
+          entries: [],
+          artifacts: [],
+          total_entry_bytes: 0,
+          quota_bytes: 1024,
+          updated_at: null,
+          raw_profile_content_included: true,
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      return new Response(JSON.stringify({}), { status: 404, headers: { "Content-Type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(React.createElement(ProfileStorageSyncHarness));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+
+    expect(getProfileStorageSyncStatus(profileId)).toMatchObject({
+      pending: true,
+      pendingEntryCount: 1,
+      lastError: "Server unavailable.",
+    });
+
+    failBackup = false;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(13_500);
+    });
+
+    expect(getProfileStorageSyncStatus(profileId)).toMatchObject({
+      pending: false,
+      pendingEntryCount: 0,
+      lastError: null,
+    });
   });
 });

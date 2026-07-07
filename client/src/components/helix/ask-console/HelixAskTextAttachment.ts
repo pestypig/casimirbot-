@@ -19,8 +19,19 @@ export type HelixAskTextAttachmentMaterializationDeps = {
   digestSha256Hex?: (value: string) => Promise<string>;
 };
 
-export const HELIX_ASK_TEXT_ATTACHMENT_MAX_BYTES = 128 * 1024;
+export const HELIX_ASK_TEXT_ATTACHMENT_MAX_BYTES = 1024 * 1024;
+export const HELIX_ASK_TEXT_ATTACHMENT_MAX_LABEL = "1 MB";
+export const HELIX_ASK_TEXT_ATTACHMENT_TOO_LARGE_MESSAGE =
+  `Pasted text attachments are limited to ${HELIX_ASK_TEXT_ATTACHMENT_MAX_LABEL} for this Helix Ask path.`;
 export const HELIX_ASK_TEXT_ATTACHMENT_PREVIEW_CHARS = 1200;
+
+export function getHelixAskTextAttachmentSizeBytes(text: string): number {
+  return new TextEncoder().encode(text).byteLength;
+}
+
+export function getHelixAskTextAttachmentTooLargeReason(sizeBytes: number): string | null {
+  return sizeBytes > HELIX_ASK_TEXT_ATTACHMENT_MAX_BYTES ? HELIX_ASK_TEXT_ATTACHMENT_TOO_LARGE_MESSAGE : null;
+}
 
 export function base64FromText(value: string): string {
   const bytes = new TextEncoder().encode(value);
@@ -44,7 +55,7 @@ export async function buildHelixAskTextAttachmentFromText(
   text: string,
   deps: HelixAskTextAttachmentMaterializationDeps = {},
 ): Promise<HelixAskTextAttachment> {
-  const encoded = new TextEncoder().encode(text);
+  const sizeBytes = getHelixAskTextAttachmentSizeBytes(text);
   const now = deps.now?.() ?? new Date();
   const stamp = now.toISOString().replace(/[:.]/g, "-");
   const randomUUID = deps.randomUUID ?? (() => crypto.randomUUID());
@@ -54,7 +65,7 @@ export async function buildHelixAskTextAttachmentFromText(
     id: randomUUID(),
     fileName: `pasted-text-${stamp}.txt`,
     mimeType: "text/plain",
-    sizeBytes: encoded.byteLength,
+    sizeBytes,
     contentBase64: base64FromText(text),
     contentSha256: await digestSha256Hex(text),
     preview: text.trim().slice(0, HELIX_ASK_TEXT_ATTACHMENT_PREVIEW_CHARS),

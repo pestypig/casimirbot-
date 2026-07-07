@@ -21,6 +21,7 @@ export type ScholarlyFullTextFetchResponse = {
   headers?: { get: (name: string) => string | null };
   arrayBuffer?: () => Promise<ArrayBuffer>;
   text?: () => Promise<string>;
+  json?: () => Promise<unknown>;
 };
 
 export type ScholarlyFullTextFetch = (
@@ -133,6 +134,26 @@ const isLikelyPdfBytes = (bytes: Uint8Array): boolean => {
 const isLikelyPdfUrl = (url: string): boolean =>
   /\.pdf(?:[?#].*)?$/i.test(url) || /arxiv\.org\/pdf\//i.test(url);
 
+const absolutizeUrl = (href: string, baseUrl: string): string | null => {
+  try {
+    return new URL(href, baseUrl).toString();
+  } catch {
+    return null;
+  }
+};
+
+const sniffPdfUrlFromHtml = (html: string, baseUrl: string): string | null => {
+  const candidates = [
+    ...Array.from(html.matchAll(/href\s*=\s*["']([^"']+\.pdf(?:[?#][^"']*)?)["']/gi)).map((match) => match[1]),
+    ...Array.from(html.matchAll(/(?:content|data-pdf-url|data-download-url)\s*=\s*["']([^"']+\.pdf(?:[?#][^"']*)?)["']/gi)).map((match) => match[1]),
+  ];
+  for (const candidate of candidates) {
+    const absolute = absolutizeUrl(candidate, baseUrl);
+    if (absolute && /^https?:\/\//i.test(absolute)) return absolute;
+  }
+  return null;
+};
+
 const stripHtml = (value: string): string =>
   value
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
@@ -147,6 +168,82 @@ const stripHtml = (value: string): string =>
 
 const decodeTextBytes = (bytes: Uint8Array): string =>
   new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+
+const responseJson = async (response: ScholarlyFullTextFetchResponse): Promise<unknown | null> => {
+  if (response.json) return await response.json();
+  if (!response.text) return null;
+  try {
+    return JSON.parse(await response.text());
+  } catch {
+    return null;
+  }
+};
+
+const configuredOpenAccessFallbackUrls = async (input: {
+  doi: string | null;
+  query: string;
+  fetchImpl: ScholarlyFullTextFetch;
+  missingRequirements: string[];
+}): Promise<string[]> => {
+  const urls: string[] = [];
+  const doi = input.doi?.trim() || null;
+  const unpaywallEmail = readString(process.env.UNPAYWALL_EMAIL);
+  if (doi && unpaywallEmail) {
+    try {
+      const response = await input.fetchImpl(
+        `https://api.unpaywall.org/v2/${encodeURIComponent(doi)}?email=${encodeURIComponent(unpaywallEmail)}`,
+        { headers: fetchHeaders() },
+      );
+      if (response.ok) {
+        const record = readRecord(await responseJson(response));
+        const bestLocation = readRecord(record?.best_oa_location);
+        urls.push(
+          ...[
+            readString(bestLocation?.url_for_pdf),
+            readString(bestLocation?.url_for_landing_page),
+            readString(bestLocation?.url),
+          ].filter((entry): entry is string => Boolean(entry)),
+        );
+      } else {
+        input.missingRequirements.push(`unpaywall_http_${response.status}`);
+      }
+    } catch (error) {
+      input.missingRequirements.push(`unpaywall_request_failed:${error instanceof Error ? error.message : "unknown"}`);
+    }
+  } else if (doi) {
+    input.missingRequirements.push("unpaywall_requires_doi_and_UNPAYWALL_EMAIL");
+  }
+
+  const coreApiKey = readString(process.env.CORE_API_KEY);
+  if (coreApiKey) {
+    try {
+      const coreQuery = doi ? `doi:${doi}` : input.query;
+      const response = await input.fetchImpl(
+        `https://api.core.ac.uk/v3/search/works?q=${encodeURIComponent(coreQuery)}&limit=3`,
+        { headers: { ...fetchHeaders(), Authorization: `Bearer ${coreApiKey}` } },
+      );
+      if (response.ok) {
+        const results = readArray(readRecord(await responseJson(response))?.results).map(readRecord);
+        for (const result of results) {
+          if (!result) continue;
+          urls.push(
+            ...[
+              readString(result.downloadUrl),
+              readString(result.url),
+            ].filter((entry): entry is string => Boolean(entry)),
+          );
+        }
+      } else {
+        input.missingRequirements.push(`core_http_${response.status}`);
+      }
+    } catch (error) {
+      input.missingRequirements.push(`core_request_failed:${error instanceof Error ? error.message : "unknown"}`);
+    }
+  } else {
+    input.missingRequirements.push("core_requires_CORE_API_KEY");
+  }
+  return unique(urls.filter((url) => /^https?:\/\//i.test(url)));
+};
 
 const selectPaper = (input: RunScholarlyFullTextFetchInput): HelixScholarlyPaperResult | null => {
   if (input.paper) return input.paper;
@@ -168,13 +265,14 @@ export const resolveScholarlyFullTextUrl = (
 ): string | null => {
   if (!paper) return null;
   const identifiers = paper.identifiers;
-  if (identifiers.pdf_url) return identifiers.pdf_url;
   if (identifiers.arxiv_id) return `https://arxiv.org/pdf/${identifiers.arxiv_id}.pdf`;
   if (identifiers.url && /arxiv\.org\/abs\//i.test(identifiers.url)) {
     return identifiers.url.replace(/\/abs\//i, "/pdf/").replace(/(?:\.pdf)?$/i, ".pdf");
   }
+  if (identifiers.pdf_url) return identifiers.pdf_url;
   if (identifiers.full_text_url) return identifiers.full_text_url;
   if (identifiers.url && isLikelyPdfUrl(identifiers.url)) return identifiers.url;
+  if (identifiers.doi) return `https://doi.org/${identifiers.doi}`;
   return null;
 };
 
@@ -425,20 +523,115 @@ export async function runScholarlyFullTextFetch(
           cachePath = persisted.path;
           extraction = await extractPdfTextImpl(bytes, { maxPages });
         } else if (contentType.includes("html") || contentType.includes("text") || /<html|<!doctype html/i.test(decodeTextBytes(bytes).slice(0, 2000))) {
-          sourceKind = contentType.includes("html") ? "html" : "unknown";
-          const text = contentType.includes("html") ? stripHtml(decodeTextBytes(bytes)) : decodeTextBytes(bytes);
-          const sourceHash = hashBuffer(bytes);
-          sourcePdfRef = `artifact://scholarly-full-text/${sourceHash}`;
-          extraction = {
-            totalPages: 1,
-            pages: [{ page: 1, text: normalizeWhitespace(text) }],
-          };
+          const decoded = decodeTextBytes(bytes);
+          const sniffedPdfUrl = sniffPdfUrlFromHtml(decoded, sourceUrl);
+          const sourceIsDoiLanding = /doi\.org\//i.test(sourceUrl);
+          if (sniffedPdfUrl) {
+            try {
+              const pdfResponse = await fetchImpl(sniffedPdfUrl, { headers: fetchHeaders() });
+              if (pdfResponse.ok && pdfResponse.arrayBuffer) {
+                const pdfBytes = new Uint8Array(await pdfResponse.arrayBuffer());
+                const pdfContentType = pdfResponse.headers?.get("content-type")?.toLowerCase() ?? "";
+                if (isLikelyPdfBytes(pdfBytes) || pdfContentType.includes("pdf") || isLikelyPdfUrl(sniffedPdfUrl)) {
+                  sourceKind = "pdf";
+                  cacheIntegrityHash = hashBuffer(pdfBytes);
+                  const persisted = input.cachePdf === false
+                    ? { ref: `artifact://scholarly-pdf/${cacheIntegrityHash}.pdf` }
+                    : await persistPdfBytes({ bytes: pdfBytes, hash: cacheIntegrityHash, cacheRoot: input.cacheRoot });
+                  sourcePdfRef = persisted.ref;
+                  cachePath = persisted.path;
+                  extraction = await extractPdfTextImpl(pdfBytes, { maxPages });
+                } else {
+                  missingRequirements.push("doi_landing_pdf_link_was_not_pdf");
+                }
+              } else {
+                missingRequirements.push(`doi_landing_pdf_http_${pdfResponse.status}`);
+              }
+            } catch (error) {
+              missingRequirements.push(`doi_landing_pdf_request_failed:${error instanceof Error ? error.message : "unknown"}`);
+            }
+          }
+          if (!sourcePdfRef && sourceIsDoiLanding) {
+            missingRequirements.push("doi_landing_pdf_not_found");
+          }
+          if (!sourcePdfRef && !sourceIsDoiLanding) {
+            sourceKind = contentType.includes("html") ? "html" : "unknown";
+            const text = contentType.includes("html") ? stripHtml(decoded) : decoded;
+            const sourceHash = hashBuffer(bytes);
+            sourcePdfRef = `artifact://scholarly-full-text/${sourceHash}`;
+            extraction = {
+              totalPages: 1,
+              pages: [{ page: 1, text: normalizeWhitespace(text) }],
+            };
+          }
         } else {
           missingRequirements.push("source_was_not_pdf_html_or_text");
         }
       }
     } catch (error) {
       missingRequirements.push(`full_text_request_failed:${error instanceof Error ? error.message : "unknown"}`);
+    }
+  }
+
+  if (!sourcePdfRef) {
+    const doi = paper?.identifiers.doi ?? null;
+    const fallbackUrls = await configuredOpenAccessFallbackUrls({
+      doi,
+      query,
+      fetchImpl,
+      missingRequirements,
+    });
+    for (const fallbackUrl of fallbackUrls) {
+      if (sourcePdfRef) break;
+      try {
+        const response = await fetchImpl(fallbackUrl, { headers: fetchHeaders() });
+        if (!response.ok || !response.arrayBuffer) {
+          missingRequirements.push(`open_access_fallback_http_${response.status}`);
+          continue;
+        }
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        const contentType = response.headers?.get("content-type")?.toLowerCase() ?? "";
+        const looksText = contentType.includes("html") || contentType.includes("text");
+        const looksPdf = isLikelyPdfBytes(bytes) || contentType.includes("pdf") || (!looksText && isLikelyPdfUrl(fallbackUrl));
+        if (looksPdf) {
+          sourceKind = "pdf";
+          cacheIntegrityHash = hashBuffer(bytes);
+          const persisted = input.cachePdf === false
+            ? { ref: `artifact://scholarly-pdf/${cacheIntegrityHash}.pdf` }
+            : await persistPdfBytes({ bytes, hash: cacheIntegrityHash, cacheRoot: input.cacheRoot });
+          sourcePdfRef = persisted.ref;
+          cachePath = persisted.path;
+          extraction = await extractPdfTextImpl(bytes, { maxPages });
+          break;
+        }
+        if (contentType.includes("html") || contentType.includes("text") || /<html|<!doctype html/i.test(decodeTextBytes(bytes).slice(0, 2000))) {
+          const decoded = decodeTextBytes(bytes);
+          const sniffedPdfUrl = sniffPdfUrlFromHtml(decoded, fallbackUrl);
+          if (!sniffedPdfUrl) continue;
+          const pdfResponse = await fetchImpl(sniffedPdfUrl, { headers: fetchHeaders() });
+          if (!pdfResponse.ok || !pdfResponse.arrayBuffer) {
+            missingRequirements.push(`open_access_fallback_pdf_http_${pdfResponse.status}`);
+            continue;
+          }
+          const pdfBytes = new Uint8Array(await pdfResponse.arrayBuffer());
+          const pdfContentType = pdfResponse.headers?.get("content-type")?.toLowerCase() ?? "";
+          if (!isLikelyPdfBytes(pdfBytes) && !pdfContentType.includes("pdf") && !isLikelyPdfUrl(sniffedPdfUrl)) {
+            missingRequirements.push("open_access_fallback_pdf_link_was_not_pdf");
+            continue;
+          }
+          sourceKind = "pdf";
+          cacheIntegrityHash = hashBuffer(pdfBytes);
+          const persisted = input.cachePdf === false
+            ? { ref: `artifact://scholarly-pdf/${cacheIntegrityHash}.pdf` }
+            : await persistPdfBytes({ bytes: pdfBytes, hash: cacheIntegrityHash, cacheRoot: input.cacheRoot });
+          sourcePdfRef = persisted.ref;
+          cachePath = persisted.path;
+          extraction = await extractPdfTextImpl(pdfBytes, { maxPages });
+          break;
+        }
+      } catch (error) {
+        missingRequirements.push(`open_access_fallback_request_failed:${error instanceof Error ? error.message : "unknown"}`);
+      }
     }
   }
 

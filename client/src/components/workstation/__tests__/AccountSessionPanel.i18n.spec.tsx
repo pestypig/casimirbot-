@@ -202,13 +202,9 @@ describe("AccountSessionPanel interface language", () => {
     });
 
     expect(screen.getByText(/kau wale nō/)).toBeInTheDocument();
-    expect(screen.getByText(/dev/)).toBeInTheDocument();
     expect(screen.getAllByText(/kūloko/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/hoʻopili ʻia/).length).toBeGreaterThan(0);
     expect(screen.getByText(/mea nānā/)).toBeInTheDocument();
-    expect(screen.getAllByText(/Helix Ask desktop/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/ke holo nei/)).toBeInTheDocument();
-    expect(screen.getByText(/ʻaʻohe lumi/)).toBeInTheDocument();
     expect(screen.getAllByText(/ʻaʻohe/).length).toBeGreaterThan(0);
 
     expect(screen.queryByText(/local_dev_profile/)).not.toBeInTheDocument();
@@ -238,6 +234,43 @@ describe("AccountSessionPanel interface language", () => {
       expect(screen.getByRole("combobox")).toHaveValue("en");
     });
     window.removeEventListener("helix:interface-language-changed", handleLanguageChanged);
+  });
+
+  it("keeps refresh loading state from disabling account actions or changing button text", async () => {
+    let releaseStatus = () => {};
+    const pendingStatus = new Promise<void>((resolve) => {
+      releaseStatus = resolve;
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/account/session")) {
+        await pendingStatus;
+        return new Response(JSON.stringify(statusBody), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (url.startsWith("/api/discord/sessions")) {
+        return new Response(JSON.stringify({ sessions: [] }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (url.startsWith("/api/agi/situation")) {
+        return new Response(JSON.stringify({ archives: [], jobs: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({}), { status: 404, headers: { "Content-Type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AccountSessionPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Loading..." })).toHaveTextContent("Refresh");
+    });
+    expect(screen.getAllByRole("button", { name: "Sign in" }).some((button) => !button.hasAttribute("disabled"))).toBe(true);
+
+    releaseStatus();
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Refresh" })).toHaveTextContent("Refresh");
+    });
   });
 
   it("shows a simple password reset button after repeated failed sign-in attempts", async () => {

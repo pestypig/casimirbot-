@@ -50,7 +50,9 @@ import {
 } from "@/components/helix/ask-console/HelixAskConsoleRuntimeShellProps";
 import {
   buildHelixAskFinalAnswerBlocks,
+  HelixAskFinalAnswer,
   resolveHelixAskFinalAnswerReadAloudBlockKey,
+  resolveHelixAskFinalAnswerReadAloudBlockKeys,
 } from "@/components/helix/ask-console/HelixAskFinalAnswer";
 import { HelixAskRuntimeGoalProgressPanel } from "@/components/helix/ask-console/HelixAskFinalExtras";
 import {
@@ -3550,6 +3552,9 @@ describe("Helix Ask Console recrown boundary", () => {
 
   it("projects read-aloud chunk traffic as a non-authoritative final-answer reticle", () => {
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const readAloudTrafficState = read(
+      "client/src/components/helix/ask-console/HelixAskReadAloudTrafficState.ts",
+    );
     const turnStreamPanel = read("client/src/components/helix/ask-console/HelixAskTurnStreamPanel.tsx");
     const finalAnswerSource = read("client/src/components/helix/ask-console/HelixAskFinalAnswer.tsx");
     const readAloudDisplay = read("client/src/lib/helix/ask-read-aloud-display.ts");
@@ -3558,16 +3563,25 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(readAloudDisplay).toContain("chunk_synth_start");
     expect(readAloudDisplay).toContain("chunk_play_start");
     expect(readAloudDisplay).toContain("READ_ALOUD_COMPLETED_CHUNK_TRAFFIC_LINGER_MS");
+    expect(readAloudDisplay).toContain("\"preloading\"");
     expect(readAloudDisplay).toContain("chunkText");
-    expect(legacyPill).toContain("resolveReadAloudRegionTrafficState({");
+    expect(readAloudTrafficState).toContain("export function buildHelixAskReadAloudTrafficState");
+    expect(readAloudTrafficState).toContain("resolveReadAloudRegionTrafficState(input)");
+    expect(legacyPill).toContain("buildHelixAskReadAloudTrafficState({");
+    expect(legacyPill).not.toContain("resolveReadAloudRegionTrafficState({");
     expect(legacyPill).toContain("events: voiceLaneTimelineEvents");
     expect(legacyPill).toContain("readAloudTraffic");
     expect(legacyPill).toContain("text: chunk.text");
     expect(legacyPill).toContain("text: nextChunk.text");
+    expect(legacyPill).toContain('utterance.kind === "manual_read_aloud"');
+    expect(legacyPill).toContain("replyId: utterance.replyId ?? null");
     expect(turnStreamPanel).toContain("renderFinalAnswer(readAloudTraffic)");
     expect(turnStreamPanel).not.toContain("HelixAskReadAloudRegionReticle");
     expect(finalAnswerSource).toContain("resolveHelixAskFinalAnswerReadAloudBlockKey");
     expect(finalAnswerSource).toContain("HelixAskReadAloudBlockReticle");
+    expect(finalAnswerSource).toContain("HelixAskReadAloudInlineReticle");
+    expect(finalAnswerSource).toContain("readAloudTraffic.regions");
+    expect(finalAnswerSource).toContain("border-violet-200/85");
     expect(finalAnswerSource).toContain("border-2 border-dotted");
     expect(finalAnswerSource).toContain("data-helix-read-aloud-region-state");
     expect(finalAnswerSource).toContain("data-helix-read-aloud-chunk-index");
@@ -3585,6 +3599,12 @@ describe("Helix Ask Console recrown boundary", () => {
         kind: "line",
         key: "final-answer-line-0",
         text: longLine,
+        segments: [
+          {
+            key: "final-answer-line-0-segment-0",
+            text: longLine,
+          },
+        ],
         isSectionHeader: false,
       },
     ]);
@@ -3593,12 +3613,24 @@ describe("Helix Ask Console recrown boundary", () => {
         kind: "line",
         key: "final-answer-line-0",
         text: "Summary:",
+        segments: [
+          {
+            key: "final-answer-line-0-segment-0",
+            text: "Summary:",
+          },
+        ],
         isSectionHeader: true,
       },
       {
         kind: "bullet",
         key: "final-answer-bullet-1",
         text: "NHM2 remains bounded.",
+        segments: [
+          {
+            key: "final-answer-bullet-1-segment-0",
+            text: "NHM2 remains bounded.",
+          },
+        ],
       },
       {
         kind: "blank",
@@ -3608,9 +3640,31 @@ describe("Helix Ask Console recrown boundary", () => {
         kind: "line",
         key: "final-answer-line-3",
         text: "Done.",
+        segments: [
+          {
+            key: "final-answer-line-3-segment-0",
+            text: "Done.",
+          },
+        ],
         isSectionHeader: false,
       },
     ]);
+    expect(buildHelixAskFinalAnswerBlocks(
+      "I cannot answer from the paper I found earlier because no prior scholarly evidence packet was recoverable for this turn. Ask me to rerun the scholarly lookup, provide a DOI/arXiv id, or refer to a specific paper title so Helix can create bounded paper evidence first.",
+    )[0]).toMatchObject({
+      kind: "line",
+      key: "final-answer-line-0",
+      segments: [
+        {
+          key: "final-answer-line-0-segment-0",
+          text: "I cannot answer from the paper I found earlier because no prior scholarly evidence packet was recoverable for this turn.",
+        },
+        {
+          key: "final-answer-line-0-segment-1",
+          text: "Ask me to rerun the scholarly lookup, provide a DOI/arXiv id, or refer to a specific paper title so Helix can create bounded paper evidence first.",
+        },
+      ],
+    });
     expect(resolveHelixAskFinalAnswerReadAloudBlockKey(
       buildHelixAskFinalAnswerBlocks("Summary:\n- NHM2 remains bounded.\n\nDone."),
       {
@@ -3622,7 +3676,155 @@ describe("Helix Ask Console recrown boundary", () => {
         chunkCount: 3,
         chunkText: "NHM2 remains bounded.",
       },
-    )).toBe("final-answer-bullet-1");
+    )).toBe("final-answer-bullet-1-segment-0");
+    expect(resolveHelixAskFinalAnswerReadAloudBlockKey(
+      buildHelixAskFinalAnswerBlocks("First section is loading. Second section waits."),
+      {
+        active: true,
+        phase: "loading",
+        label: "Loading read-aloud",
+        detail: null,
+        chunkIndex: null,
+        chunkCount: null,
+        chunkText: null,
+      },
+    )).toBe("final-answer-line-0-segment-0");
+    expect(resolveHelixAskFinalAnswerReadAloudBlockKey(
+      buildHelixAskFinalAnswerBlocks("First section is playing. Second section waits."),
+      {
+        active: true,
+        phase: "reading",
+        label: "Reading aloud",
+        detail: null,
+        chunkIndex: null,
+        chunkCount: null,
+        chunkText: null,
+      },
+    )).toBeNull();
+    expect(resolveHelixAskFinalAnswerReadAloudBlockKeys(
+      buildHelixAskFinalAnswerBlocks("First section is bundled. Second section is bundled."),
+      {
+        active: true,
+        phase: "reading",
+        label: "Reading aloud",
+        detail: "chunk 1/1",
+        chunkIndex: 0,
+        chunkCount: 1,
+        chunkText: "First section is bundled. Second section is bundled.",
+      },
+    )).toEqual([
+      "final-answer-line-0-segment-0",
+      "final-answer-line-0-segment-1",
+    ]);
+    const bundledChunkReadAloudMarkup = renderToStaticMarkup(
+      React.createElement(HelixAskFinalAnswer, {
+        text: "First section is bundled. Second section is bundled.",
+        readAloudTraffic: {
+          active: true,
+          phase: "reading",
+          label: "Reading aloud",
+          detail: "chunk 1/1",
+          chunkIndex: 0,
+          chunkCount: 1,
+          chunkText: "First section is bundled. Second section is bundled.",
+        },
+      }),
+    );
+    expect(bundledChunkReadAloudMarkup.match(/data-testid="helix-ask-read-aloud-region-reticle"/g)?.length).toBe(2);
+    expect(bundledChunkReadAloudMarkup).toContain(">First section is bundled.<");
+    expect(bundledChunkReadAloudMarkup).toContain(">Second section is bundled.<");
+    const multiRegionReadAloudMarkup = renderToStaticMarkup(
+      React.createElement(HelixAskFinalAnswer, {
+        text: "The first sentence is being read. The second sentence is being prepared.",
+        readAloudTraffic: {
+          active: true,
+          phase: "reading",
+          label: "Reading aloud",
+          detail: "chunk 1/2",
+          chunkIndex: 0,
+          chunkCount: 2,
+          chunkText: "The first sentence is being read.",
+          regions: [
+            {
+              active: true,
+              phase: "reading",
+              label: "Reading aloud",
+              detail: "chunk 1/2",
+              chunkIndex: 0,
+              chunkCount: 2,
+              chunkText: "The first sentence is being read.",
+            },
+            {
+              active: true,
+              phase: "preloading",
+              label: "Preloading next read-aloud chunk",
+              detail: "chunk 2/2",
+              chunkIndex: 1,
+              chunkCount: 2,
+              chunkText: "The second sentence is being prepared.",
+            },
+          ],
+        },
+      }),
+    );
+    expect(multiRegionReadAloudMarkup.match(/data-testid="helix-ask-read-aloud-region-reticle"/g)?.length).toBe(2);
+    expect(multiRegionReadAloudMarkup).toContain("data-helix-read-aloud-region-state=\"reading\"");
+    expect(multiRegionReadAloudMarkup).toContain("data-helix-read-aloud-region-state=\"preloading\"");
+    expect(multiRegionReadAloudMarkup).toContain("The first sentence is being read.");
+    expect(multiRegionReadAloudMarkup).toContain("The second sentence is being prepared.");
+    const loadingReadAloudMarkup = renderToStaticMarkup(
+      React.createElement(HelixAskFinalAnswer, {
+        text: "First section is loading. Second section waits.",
+        readAloudTraffic: {
+          active: true,
+          phase: "loading",
+          label: "Loading read-aloud",
+          detail: null,
+          chunkIndex: null,
+          chunkCount: null,
+          chunkText: null,
+        },
+      }),
+    );
+    expect(loadingReadAloudMarkup.match(/data-testid="helix-ask-read-aloud-region-reticle"/g)?.length).toBe(1);
+    expect(loadingReadAloudMarkup).toContain("data-helix-read-aloud-region-state=\"loading\"");
+    expect(loadingReadAloudMarkup).toContain(">First section is loading.<");
+    expect(loadingReadAloudMarkup).not.toContain("Loading read-aloudFirst section is loading. Second section waits.");
+    const metadataLessReadingMarkup = renderToStaticMarkup(
+      React.createElement(HelixAskFinalAnswer, {
+        text: "First section is playing. Second section waits.",
+        readAloudTraffic: {
+          active: true,
+          phase: "reading",
+          label: "Reading aloud",
+          detail: null,
+          chunkIndex: null,
+          chunkCount: null,
+          chunkText: null,
+        },
+      }),
+    );
+    expect(metadataLessReadingMarkup).not.toContain("data-testid=\"helix-ask-read-aloud-region-reticle\"");
+    expect(metadataLessReadingMarkup).not.toContain("data-helix-read-aloud-region-state=\"reading\"");
+    expect(metadataLessReadingMarkup).toContain("First section is playing.");
+    expect(metadataLessReadingMarkup).toContain("Second section waits.");
+    const unresolvedReadAloudMarkup = renderToStaticMarkup(
+      React.createElement(HelixAskFinalAnswer, {
+        text: "No chunk metadata was available.",
+        readAloudTraffic: {
+          active: true,
+          phase: "paused",
+          label: "Read-aloud paused",
+          detail: null,
+          chunkIndex: null,
+          chunkCount: null,
+          chunkText: null,
+        },
+      }),
+    );
+    expect(unresolvedReadAloudMarkup).not.toContain("data-testid=\"helix-ask-read-aloud-region-reticle\"");
+    expect(unresolvedReadAloudMarkup).not.toContain("data-helix-read-aloud-region-state=\"paused\"");
+    expect(unresolvedReadAloudMarkup).toContain("No chunk metadata was available.");
 
     const finalAnswerSource = read("client/src/components/helix/ask-console/HelixAskFinalAnswer.tsx");
     expect(finalAnswerSource).toContain("buildHelixAskFinalAnswerBlocks");

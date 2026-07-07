@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  HELIX_ASK_TEXT_ATTACHMENT_MAX_BYTES,
+  HELIX_ASK_TEXT_ATTACHMENT_MAX_LABEL,
   HELIX_ASK_TEXT_ATTACHMENT_PREVIEW_CHARS,
+  getHelixAskTextAttachmentSizeBytes,
+  getHelixAskTextAttachmentTooLargeReason,
   base64FromText,
   buildHelixAskTextAttachmentFromText,
   buildHelixAskTextAttachmentTurnInputItem,
@@ -33,6 +37,27 @@ describe("Helix Ask text attachment materialization", () => {
     expect(attachment.contentBase64).toBe(base64FromText(text));
     expect(attachment.preview).toHaveLength(HELIX_ASK_TEXT_ATTACHMENT_PREVIEW_CHARS);
     expect(attachment.preview).toBe("x".repeat(HELIX_ASK_TEXT_ATTACHMENT_PREVIEW_CHARS));
+  });
+
+  it("accepts pasted text larger than the old 128 KB inline-paste ceiling", async () => {
+    const text = "x".repeat(160 * 1024);
+    const attachment = await buildHelixAskTextAttachmentFromText(text, {
+      now: () => new Date("2026-07-01T10:15:30.123Z"),
+      randomUUID: () => "attachment-large-text",
+      digestSha256Hex: async () => "sha:large",
+    });
+
+    expect(attachment.status).toBe("ready");
+    expect(attachment.sizeBytes).toBe(160 * 1024);
+    expect(getHelixAskTextAttachmentTooLargeReason(attachment.sizeBytes)).toBeNull();
+  });
+
+  it("keeps an explicit upper bound for pasted-text attachment materialization", () => {
+    expect(HELIX_ASK_TEXT_ATTACHMENT_MAX_BYTES).toBe(1024 * 1024);
+    expect(HELIX_ASK_TEXT_ATTACHMENT_MAX_LABEL).toBe("1 MB");
+    expect(getHelixAskTextAttachmentSizeBytes("abc")).toBe(3);
+    expect(getHelixAskTextAttachmentTooLargeReason(HELIX_ASK_TEXT_ATTACHMENT_MAX_BYTES)).toBeNull();
+    expect(getHelixAskTextAttachmentTooLargeReason(HELIX_ASK_TEXT_ATTACHMENT_MAX_BYTES + 1)).toContain("1 MB");
   });
 
   it("projects text attachments into turn input items without exposing assistant-answer authority", () => {

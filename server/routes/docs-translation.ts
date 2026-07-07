@@ -21,7 +21,7 @@ const DEFAULT_OPENAI_BASE = "https://api.openai.com";
 const DEFAULT_MODEL = "gpt-4o-mini";
 const MAX_TRANSLATION_UNITS = Number.parseInt(process.env.DOC_TRANSLATION_MAX_UNITS ?? "80", 10);
 const MAX_TRANSLATION_CHARS = Number.parseInt(process.env.DOC_TRANSLATION_MAX_CHARS ?? "12000", 10);
-const MAX_VISIBLE_TRANSLATION_UNITS = Number.parseInt(process.env.DOC_TRANSLATION_VISIBLE_MAX_UNITS ?? "8", 10);
+const MAX_VISIBLE_TRANSLATION_UNITS = Number.parseInt(process.env.DOC_TRANSLATION_VISIBLE_MAX_UNITS ?? "80", 10);
 const TRANSLATION_TIMEOUT_MS = Number.parseInt(process.env.DOC_TRANSLATION_TIMEOUT_MS ?? "55000", 10);
 
 docsTranslationRouter.post("/translate", async (req, res) => {
@@ -276,7 +276,7 @@ async function requestTranslations(params: {
           {
             role: "system",
             content:
-              "Translate technical Markdown units from English into the requested locale. Preserve Markdown structure, code spans, math, URLs, API paths, file paths, product names, and every protected span exactly. Return only JSON.",
+              "Translate technical Markdown units from English into the requested locale. Preserve Markdown structure, code spans, math, URLs, API paths, file paths, product names, unit_id values, and every protected span exactly. Return only compact JSON with a translations array. Do not omit translatable units.",
           },
           {
             role: "user",
@@ -306,7 +306,7 @@ async function requestTranslations(params: {
     });
     if (!response.ok) {
       const text = await response.text().catch(() => "");
-      throw new Error(`Provider returned ${response.status}${text ? `: ${text.slice(0, 400)}` : ""}`);
+      throw new Error(formatProviderError(response.status, text));
     }
     body = (await response.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
@@ -324,21 +324,22 @@ async function requestTranslations(params: {
     throw new Error("Provider response did not include translated content.");
   }
   const parsed = parseTranslationJson(content);
-  const translations = Array.isArray(parsed.translations) ? parsed.translations : [];
-  return Object.fromEntries(
-    translations
-      .filter(
-        (item): item is { unit_id: string; translated_markdown: string } =>
-          item &&
-          typeof item.unit_id === "string" &&
-          typeof item.translated_markdown === "string",
-      )
-      .map((item) => [item.unit_id, item.translated_markdown]),
-  );
+  const translations = normalizeTranslationEntries(parsed.translations);
+  return Object.fromEntries(translations.map((item) => [item.unit_id, item.translated_markdown]));
 }
 
 function isAbortError(error: unknown): boolean {
   return Boolean(error && typeof error === "object" && "name" in error && error.name === "AbortError");
+}
+
+function formatProviderError(status: number, body: string): string {
+  if (status === 401 || status === 403) {
+    return `Provider returned ${status}: translation credentials were rejected.`;
+  }
+  const sanitized = body
+    .replace(/sk-[A-Za-z0-9_\-*]+/g, "[redacted-api-key]")
+    .replace(/Bearer\s+[A-Za-z0-9._\-*]+/gi, "Bearer [redacted]");
+  return `Provider returned ${status}${sanitized ? `: ${sanitized.slice(0, 400)}` : ""}`;
 }
 
 function isDocumentTranslationUnit(value: unknown): value is DocumentTranslationUnit {
@@ -368,8 +369,46 @@ function selectUnitsForTranslation(units: DocumentTranslationUnit[]): DocumentTr
   return selected;
 }
 
-function parseTranslationJson(content: string): { translations?: unknown[] } {
+function parseTranslationJson(content: string): { translations?: unknown } {
   const trimmed = content.trim();
   const fenced = trimmed.match(/^```(?:json)?\s*([^]*?)\s*```$/i);
-  return JSON.parse(fenced ? fenced[1] : trimmed) as { translations?: unknown[] };
+  return JSON.parse(fenced ? fenced[1] : trimmed) as { translations?: unknown };
+}
+
+function normalizeTranslationEntries(value: unknown): Array<{ unit_id: string; translated_markdown: string }> {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (!item || typeof item !== "object") return null;
+        const record = item as Record<string, unknown>;
+        const unitId = typeof record.unit_id === "string"
+          ? record.unit_id
+          : typeof record.id === "string"
+            ? record.id
+            : "";
+        const translatedMarkdown = typeof record.translated_markdown === "string"
+          ? record.translated_markdown
+          : typeof record.translated_text === "string"
+            ? record.translated_text
+            : typeof record.translation === "string"
+              ? record.translation
+              : typeof record.text === "string"
+                ? record.text
+                : "";
+        return unitId && translatedMarkdown
+          ? { unit_id: unitId, translated_markdown: translatedMarkdown }
+          : null;
+      })
+      .filter((item): item is { unit_id: string; translated_markdown: string } => item !== null);
+  }
+  if (value && typeof value === "object") {
+    return Object.entries(value as Record<string, unknown>)
+      .map(([unitId, translation]) =>
+        typeof translation === "string" && translation.trim()
+          ? { unit_id: unitId, translated_markdown: translation }
+          : null,
+      )
+      .filter((item): item is { unit_id: string; translated_markdown: string } => item !== null);
+  }
+  return [];
 }

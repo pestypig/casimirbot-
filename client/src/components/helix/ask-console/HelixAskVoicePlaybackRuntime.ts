@@ -3,6 +3,10 @@ import {
   type ReadAloudPlaybackStateByReply,
 } from "@/lib/helix/ask-read-aloud-display";
 import {
+  clearHelixAskReadAloudPlaybackProjectionForReply,
+  type HelixAskReadAloudPlaybackProjectionByReply,
+} from "./HelixAskReadAloudPlaybackProjection";
+import {
   shouldRetryVoicePlaybackDirectAttempt,
   shouldRetryVoicePlaybackWithDirectFallback,
   shouldTreatVoicePlaybackErrorAsEnded,
@@ -65,6 +69,11 @@ export type HelixAskVoicePlaybackRuntimeInput = {
   setReadAloudByReply: (
     updater: (prev: ReadAloudPlaybackStateByReply) => ReadAloudPlaybackStateByReply,
   ) => void;
+  setReadAloudProjectionByReply?: (
+    updater: (
+      prev: HelixAskReadAloudPlaybackProjectionByReply,
+    ) => HelixAskReadAloudPlaybackProjectionByReply,
+  ) => void;
   recordManualReadAloudLifecycleReceipt: (
     input: HelixAskVoicePlaybackRuntimeLifecycleReceiptInput,
   ) => void;
@@ -81,6 +90,11 @@ export type HelixAskVoicePlaybackTransportCommandInput = {
   playbackAudioRef: MutableRef<HTMLAudioElement | null>;
   setReadAloudByReply: (
     updater: (prev: ReadAloudPlaybackStateByReply) => ReadAloudPlaybackStateByReply,
+  ) => void;
+  setReadAloudProjectionByReply?: (
+    updater: (
+      prev: HelixAskReadAloudPlaybackProjectionByReply,
+    ) => HelixAskReadAloudPlaybackProjectionByReply,
   ) => void;
   recordManualReadAloudLifecycleReceipt: (
     input: HelixAskVoicePlaybackRuntimeLifecycleReceiptInput,
@@ -150,6 +164,9 @@ export async function applyHelixAskVoicePlaybackTransportCommand(
   input.stopReadAloud?.();
   input.setReadAloudByReply((prev) =>
     buildReadAloudStateMapTransition(prev, input.replyId, "stop"),
+  );
+  input.setReadAloudProjectionByReply?.((prev) =>
+    clearHelixAskReadAloudPlaybackProjectionForReply(prev, input.replyId),
   );
   input.recordManualReadAloudLifecycleReceipt({
     playbackStatus: "cancelled",

@@ -161,7 +161,8 @@ type ScholarlyResponseMode =
   | "scholarly_full_text_answer"
   | "scholarly_parse_required"
   | "scholarly_numeric_binding"
-  | "scholarly_numeric_missing";
+  | "scholarly_numeric_missing"
+  | "scholarly_evidence_escalation_missing";
 
 const scholarlyAllowedResponseModesForEvidenceState = (
   evidenceState: string | null,
@@ -252,6 +253,7 @@ const shouldRunScientificImageTheoryReflectionAfterLane = (body: Record<string, 
 const asksForScientificImageTheoryContinuation = (body: Record<string, unknown>): boolean => {
   if (hasCurrentTurnImageInput(body)) return false;
   const question = readQuestion(body);
+  if (isScholarlyFollowupReferencePrompt(question)) return false;
   const sourceTargetIntent = readSourceTargetIntentFromBody(body);
   const requestedOutputs = readStringArray(sourceTargetIntent?.requested_outputs);
   const sourceTargetRequestsTheory =
@@ -304,9 +306,18 @@ type ScholarlyFollowupEvidenceMemoryRecord = {
   evidence_grade: "answer_grade" | "exploratory" | "rejected" | "full_text_unavailable" | "numeric_missing";
   paper_count: number;
   papers: Array<Record<string, unknown>>;
+  abstract_or_snippet_refs: string[];
   missing_requirements: string[];
   next_affordances: unknown[];
   observation_refs: string[];
+  source_pdf_ref: string | null;
+  cache_path: string | null;
+  page_text_refs: string[];
+  page_image_affordance_refs: string[];
+  page_image_observation_refs: string[];
+  equation_evidence_refs: string[];
+  scientific_evidence_packet_refs: string[];
+  theory_badge_graph_reflection_refs: string[];
   provider_gateway_packet_refs: string[];
   source_result_error: string | null;
   assistant_answer: false;
@@ -343,13 +354,13 @@ type ScholarlyFollowupEvidenceLookup = {
 const scholarlyFollowupEvidenceMemory = new Map<string, ScholarlyFollowupEvidenceMemoryRecord[]>();
 
 const SCHOLARLY_FOLLOWUP_REFERENCE_PATTERN =
-  /\b(?:what\s+you\s+found|you\s+found|found\s+(?:the\s+)?paper|paper\s+you\s+found|papers?\s+you\s+found|that\s+paper|the\s+paper|this\s+paper|those\s+papers|the\s+casimir\s+paper|that\s+result|the\s+result|what\s+(?:did|does)\s+it\s+(?:measure|show|say)|what\s+numbers\s+did\s+it\s+measure|tell\s+me\s+about\s+(?:it|that|the\s+one))\b/i;
+  /\b(?:what\s+you\s+found|you\s+found|found\s+(?:the\s+)?paper|paper\s+you\s+found|papers?\s+you\s+found|that\s+paper|the\s+paper|this\s+paper|those\s+papers|the\s+casimir\s+paper|that\s+result|the\s+result|prior\s+paper\s+record|which\s+prior\s+paper\s+record|which\s+(?:paper|record|result)\s+did\s+you\s+resolve|resolved?\s+(?:that|the)\s+follow-?up|that\s+follow-?up|what\s+(?:did|does)\s+it\s+(?:measure|show|say)|what\s+numbers\s+did\s+it\s+measure|tell\s+me\s+about\s+(?:it|that|the\s+one)|(?:reflect|use|extract|put)\s+(?:this|that|the)\s+paper|(?:this|that|the)\s+paper'?s\s+(?:relevance|equations?|formulas?|formulae?))\b/i;
 
 const isScholarlyFollowupReferencePrompt = (question: string): boolean => {
   const unquoted = question.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
   if (detectScholarlyResearchIntent(unquoted).researchRequested) return false;
   if (!SCHOLARLY_FOLLOWUP_REFERENCE_PATTERN.test(unquoted)) return false;
-  return /\b(?:paper|papers|research|scholarly|casimir|doi|arxiv|found|result|measure|measured|numbers?|effect|it|those)\b/i.test(unquoted);
+  return /\b(?:paper|papers|record|research|scholarly|casimir|doi|arxiv|found|result|resolve|resolved|follow-?up|prior|measure|measured|numbers?|effect|it|those|relevance|equations?|formulas?|formulae?|theory\s+badge\s+graph|scientific\s+evidence\s+packet)\b/i.test(unquoted);
 };
 
 const scholarlyEvidenceMemoryKeysForBody = (body: Record<string, unknown>): string[] =>
@@ -373,6 +384,7 @@ const compactScholarlyPaperForMemory = (paper: Record<string, unknown>): Record<
       .filter((entry) => Boolean(entry.name)),
     year: readNumber(paper.year),
     venue: readString(paper.venue),
+    abstract: readString(paper.abstract),
     identifiers: {
       doi: readString(identifiers?.doi),
       arxiv_id: readString(identifiers?.arxiv_id),
@@ -385,6 +397,48 @@ const compactScholarlyPaperForMemory = (paper: Record<string, unknown>): Record<
     confidence: readString(paper.confidence),
   };
 };
+
+const sourceRefsFromAffordances = (affordances: unknown[]): string[] =>
+  uniqueStrings(affordances
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    .map((entry) => readString(entry.source_ref))
+    .filter((entry): entry is string => Boolean(entry)));
+
+const abstractOrSnippetRefsFromPapers = (papers: Array<Record<string, unknown>>): string[] =>
+  uniqueStrings(papers.flatMap((paper) => {
+    const abstract = readString(paper.abstract);
+    if (!abstract) return [];
+    const resultId = readString(paper.result_id) ?? readString(paper.title) ?? "paper";
+    return [`scholarly-abstract-or-snippet:${hashScientificImageSourceShort([resultId, abstract])}`];
+  }));
+
+const pageTextRefsFromObservation = (observation: Record<string, unknown> | null): string[] =>
+  uniqueStrings(readArray(observation?.page_text_refs)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    .map((entry) => readString(entry.text_ref))
+    .filter((entry): entry is string => Boolean(entry)));
+
+const equationEvidenceRefsFromObservation = (observation: Record<string, unknown> | null): string[] => {
+  const chunkRefs = readArray(observation?.selected_chunks)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    .filter((entry) => /[A-Za-z0-9_{}]\s*=\s*[A-Za-z0-9_{}]/.test(readString(entry.text_excerpt) ?? ""))
+    .flatMap((entry) => [readString(entry.source_text_ref), readString(entry.citation_ref)]);
+  const numericRefs = readArray(observation?.parameters)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    .map((entry) => readString(entry.evidence_ref));
+  return uniqueStrings([...chunkRefs, ...numericRefs].filter((entry): entry is string => Boolean(entry)));
+};
+
+const pageImageObservationRefsFromObservation = (observation: Record<string, unknown> | null): string[] =>
+  uniqueStrings([
+    ...readStringArray(observation?.page_image_observation_refs),
+    ...readStringArray(observation?.image_observation_refs),
+    ...readStringArray(observation?.packet_refs),
+  ].filter((entry) => /\b(?:page-image|pdf-page|image_lens|visual|ocr|crop|region)\b/i.test(entry)));
 
 const scholarlyEvidenceGrade = (input: {
   capabilityId: string;
@@ -429,6 +483,17 @@ const scholarlyMemoryRecordFromGatewayResult = (input: {
   const keys = scholarlyEvidenceMemoryKeysForBody(input.body);
   if (keys.length === 0) return null;
   const sourceCapabilityId = input.result.gateway_admission.requested_capability || input.result.capability_id;
+  const nextAffordances = [
+    ...readArray(observation.next_affordances),
+    ...readArray(stateDelta?.next_affordances),
+    ...readArray(readRecord(observation.scholarly_lookup_recovery_affordance)?.next_affordances),
+    ...readArray(readRecord(observation.scholarly_full_text_recovery_affordance)?.next_affordances),
+    ...readArray(readRecord(observation.scholarly_numeric_recovery_affordance)?.next_affordances),
+  ];
+  const pageImageAffordanceRefs = sourceRefsFromAffordances(nextAffordances)
+    .filter((ref) => /\/page\/\d+|pdf-page|page-image|image_lens|visual/i.test(ref));
+  const pageImageObservationRefs = pageImageObservationRefsFromObservation(observation);
+  const equationEvidenceRefs = equationEvidenceRefsFromObservation(observation);
   return {
     schema: "helix.scholarly_followup_evidence_memory_record.v1",
     memory_id: `${input.turnId}:scholarly_followup_memory:${hashScientificImageSourceShort([sourceCapabilityId, observationRefs, evidenceState, papers.map((paper) => paper.result_id)])}`,
@@ -449,18 +514,21 @@ const scholarlyMemoryRecordFromGatewayResult = (input: {
     }),
     paper_count: papers.length,
     papers,
+    abstract_or_snippet_refs: abstractOrSnippetRefsFromPapers(papers),
     missing_requirements: uniqueStrings([
       ...readStringArray(observation.missing_requirements),
       ...readStringArray(stateDelta?.missing_requirements),
     ]),
-    next_affordances: [
-      ...readArray(observation.next_affordances),
-      ...readArray(stateDelta?.next_affordances),
-      ...readArray(readRecord(observation.scholarly_lookup_recovery_affordance)?.next_affordances),
-      ...readArray(readRecord(observation.scholarly_full_text_recovery_affordance)?.next_affordances),
-      ...readArray(readRecord(observation.scholarly_numeric_recovery_affordance)?.next_affordances),
-    ],
+    next_affordances: nextAffordances,
     observation_refs: observationRefs,
+    source_pdf_ref: readString(observation.source_pdf_ref),
+    cache_path: readString(observation.cache_path),
+    page_text_refs: pageTextRefsFromObservation(observation),
+    page_image_affordance_refs: pageImageAffordanceRefs,
+    page_image_observation_refs: pageImageObservationRefs,
+    equation_evidence_refs: equationEvidenceRefs,
+    scientific_evidence_packet_refs: readStringArray(observation.scientific_evidence_packet_refs),
+    theory_badge_graph_reflection_refs: readStringArray(observation.theory_badge_graph_reflection_refs),
     provider_gateway_packet_refs: input.result.observation_packet.produced_artifact_refs,
     source_result_error: readString(input.result.error),
     assistant_answer: false,
@@ -499,6 +567,68 @@ const rememberScholarlyEvidenceFromGatewayResults = (input: {
   return records;
 };
 
+const selectCurrentTurnScholarlyDeepEvidenceRecord = (input: {
+  records: ScholarlyFollowupEvidenceMemoryRecord[];
+  question: string;
+}): ScholarlyFollowupEvidenceMemoryRecord | null => {
+  if (!isScholarlyVisualEscalationQuestion(input.question) && scholarlyFollowupRequestedModes(input.question).length === 0) {
+    return null;
+  }
+  const ranked = input.records
+    .filter((record) =>
+      record.evidence_state === "full_text_usable" ||
+      record.evidence_state === "page_image_parse_required" ||
+      record.source_pdf_ref ||
+      record.cache_path ||
+      record.page_image_affordance_refs.length > 0
+    )
+    .sort((left, right) => {
+      const depth = (record: ScholarlyFollowupEvidenceMemoryRecord): number =>
+        record.evidence_state === "page_image_parse_required"
+          ? 5
+          : record.evidence_state === "full_text_usable"
+            ? 4
+            : record.source_pdf_ref || record.cache_path
+              ? 3
+              : record.page_text_refs.length > 0
+                ? 2
+                : 1;
+      return depth(right) - depth(left) || right.stored_at_ms - left.stored_at_ms;
+    });
+  return ranked[0] ?? null;
+};
+
+const buildCurrentTurnScholarlyEvidenceLookup = (
+  record: ScholarlyFollowupEvidenceMemoryRecord | null,
+): ScholarlyFollowupEvidenceLookup | null => {
+  if (!record) return null;
+  return {
+    schema: "helix.scholarly_followup_evidence_lookup.v1",
+    status: "found",
+    lookup_keys: record.thread_keys,
+    followup_reference_detected: true,
+    candidate_count: 1,
+    candidate_summaries: [{
+      memory_id: record.memory_id,
+      prior_turn_id: record.turn_id,
+      query: record.query,
+      evidence_state: record.evidence_state,
+      evidence_grade: record.evidence_grade,
+      terminal_artifact_kind: record.terminal_artifact_kind,
+      score: 100,
+      selected: true,
+    }],
+    selected_memory_id: record.memory_id,
+    selected_prior_turn_id: record.turn_id,
+    resolution_reason: "current_turn_scholarly_full_text_or_page_image_affordance",
+    resolution_confidence: "high",
+    memory_source: "session_scholarly_evidence_cache",
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
 const recordTextForScholarlyMemory = (record: ScholarlyFollowupEvidenceMemoryRecord): string =>
   [
     record.query,
@@ -530,8 +660,19 @@ const scoreScholarlyMemoryForQuestion = (
     : record.evidence_grade === "exploratory"
       ? 3
       : 1;
+  const asksForDeepPaperEvidence =
+    /\b(?:equations?|formulae?|formulas?|numeric|numerical|parameters?|values?|full[-\s]?text|pdf|page\s+images?|figures?|tables?|scientific\s+evidence\s+packet)\b/i.test(question);
+  const depthBoost = asksForDeepPaperEvidence
+    ? record.evidence_state === "numeric_evidence_usable"
+      ? 10
+      : record.evidence_state === "full_text_usable" || record.evidence_state === "page_image_parse_required"
+        ? 8
+        : record.source_capability_id === SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY
+          ? 5
+          : 0
+    : 0;
   const recencyBoost = Math.max(0, Math.min(4, Math.floor((Date.now() - record.stored_at_ms) / -60_000) + 4));
-  return tokenHits * 2 + gradeBoost + recencyBoost;
+  return tokenHits * 2 + gradeBoost + depthBoost + recencyBoost;
 };
 
 const lookupScholarlyFollowupEvidence = (body: Record<string, unknown>): {
@@ -649,9 +790,18 @@ const buildScholarlyFollowupMemoryArtifact = (input: {
     terminal_artifact_kind: input.record.terminal_artifact_kind,
     papers: input.record.papers,
     paper_count: input.record.paper_count,
+    abstract_or_snippet_refs: input.record.abstract_or_snippet_refs,
     missing_requirements: input.record.missing_requirements,
     next_affordances: input.record.next_affordances,
     prior_observation_refs: input.record.observation_refs,
+    source_pdf_ref: input.record.source_pdf_ref,
+    cache_path: input.record.cache_path,
+    page_text_refs: input.record.page_text_refs,
+    page_image_affordance_refs: input.record.page_image_affordance_refs,
+    page_image_observation_refs: input.record.page_image_observation_refs,
+    equation_evidence_refs: input.record.equation_evidence_refs,
+    scientific_evidence_packet_refs: input.record.scientific_evidence_packet_refs,
+    theory_badge_graph_reflection_refs: input.record.theory_badge_graph_reflection_refs,
     provider_gateway_packet_refs: input.record.provider_gateway_packet_refs,
     followup_referent_resolution: input.lookup,
     observation_role: "prior_scholarly_evidence_not_assistant_answer",
@@ -2148,6 +2298,104 @@ const synthesizeImageLensRegionLaneCandidate = (
   });
 };
 
+const scholarlyPageNumberFromRef = (ref: string): number | null => {
+  const match = ref.match(/\/page\/(\d+)|[#?&]page=(\d+)/i);
+  const parsed = Number(match?.[1] ?? match?.[2]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+const resolvePdftoppmCommand = (): string =>
+  readString(process.env.PDFTOPPM_BIN) ?? "pdftoppm";
+
+const renderScholarlyPdfPageImageDataUrl = (input: {
+  cachePath: string | null;
+  pageNumber: number;
+  memoryId: string;
+}): { dataUrl: string; artifactRef: string; imagePath: string } | null => {
+  if (!input.cachePath || !fs.existsSync(input.cachePath)) return null;
+  const pageNumber = Math.max(1, Math.floor(input.pageNumber));
+  const outputRoot = path.resolve(process.cwd(), "artifacts", "helix", "scholarly-page-images");
+  fs.mkdirSync(outputRoot, { recursive: true });
+  const imageId = hashScientificImageSourceShort([input.cachePath, input.memoryId, pageNumber]);
+  const outputPrefix = path.join(outputRoot, `${imageId}-page-${pageNumber}`);
+  const outputPath = `${outputPrefix}.png`;
+  if (!fs.existsSync(outputPath)) {
+    try {
+      execFileSync(resolvePdftoppmCommand(), [
+        "-f",
+        String(pageNumber),
+        "-l",
+        String(pageNumber),
+        "-png",
+        "-singlefile",
+        "-r",
+        "144",
+        input.cachePath,
+        outputPrefix,
+      ], { stdio: "ignore" });
+    } catch {
+      return null;
+    }
+  }
+  if (!fs.existsSync(outputPath)) return null;
+  const base64 = fs.readFileSync(outputPath).toString("base64");
+  return {
+    dataUrl: `data:image/png;base64,${base64}`,
+    artifactRef: `artifact://scholarly-pdf-page-image/${imageId}/page/${pageNumber}.png`,
+    imagePath: outputPath,
+  };
+};
+
+const isScholarlyVisualEscalationQuestion = (question: string): boolean =>
+  /\b(?:extract|read|use|take|parse|ocr|inspect|render|compare|put|create)\b[\s\S]{0,160}\b(?:equations?|formulae?|formulas?|figures?|tables?|page\s+images?|pdf\s+pages?|scientific\s+evidence\s+packet|theory\s+badge\s+graph)\b/i.test(question) ||
+  /\b(?:show\s+(?:me\s+)?(?:the\s+)?science|scientific\s+content|main\s+equations?|show\s+(?:me\s+)?(?:the\s+)?equations?|scientific\s+evidence(?:\s+packet)?)\b/i.test(question) ||
+  /\b(?:equations?|formulae?|formulas?|figures?|tables?|page\s+images?|pdf\s+pages?)\b[\s\S]{0,160}\b(?:from|in|of|on)\s+(?:that|the|this)\s+paper\b/i.test(question);
+
+const synthesizeScholarlyPageImageLaneCandidate = (input: {
+  question: string;
+  record: ScholarlyFollowupEvidenceMemoryRecord | null;
+  lookup: ScholarlyFollowupEvidenceLookup | null;
+  source?: "prior" | "current";
+}): Record<string, unknown> | null => {
+  if (!input.record || (input.source !== "current" && input.lookup?.status !== "found")) return null;
+  if (!isScholarlyVisualEscalationQuestion(input.question)) return null;
+  const sourceRef = input.record.page_image_affordance_refs[0] ?? input.record.source_pdf_ref;
+  if (!sourceRef) return null;
+  const pageNumber = scholarlyPageNumberFromRef(sourceRef) ?? 1;
+  const renderedPage = renderScholarlyPdfPageImageDataUrl({
+    cachePath: input.record.cache_path,
+    pageNumber,
+    memoryId: input.record.memory_id,
+  });
+  const sourceId = `pdf-page-render:${hashScientificImageSourceShort([input.record.memory_id, sourceRef, pageNumber])}`;
+  const wantsEquation = /\b(?:equations?|formulae?|formulas?|derive|derivation|symbolic|latex)\b/i.test(input.question);
+  return {
+    capability: VISUAL_ANALYSIS_INSPECT_IMAGE_REGION_CAPABILITY,
+    source_id: sourceId,
+    source_kind: "pdf_page_render",
+    scholarly_evidence_source: input.source ?? "prior",
+    page_number: pageNumber,
+    page_image_ref: renderedPage?.dataUrl ?? sourceRef,
+    source_image_ref: renderedPage?.dataUrl,
+    scholarly_page_image_artifact_ref: renderedPage?.artifactRef,
+    scholarly_page_image_path: renderedPage?.imagePath,
+    bbox_px: renderedPage ? { x: 0, y: 0, width: 1, height: 1 } : { x: 0, y: 0, width: 1600, height: 2200 },
+    question: [
+      input.question,
+      input.source === "current"
+        ? "Use this as observation-only PDF page evidence from the current scholarly paper retrieval."
+        : "Use this as observation-only PDF page evidence from the prior scholarly paper.",
+      wantsEquation ? "Extract visible equations or symbolic math candidates with confidence and uncertainty." : "",
+    ].filter(Boolean).join(" "),
+    reason_for_crop: "Scholarly full-text extraction reported this PDF page needs visual/OCR parsing.",
+    region_label: `scholarly_pdf_page_${pageNumber}_${wantsEquation ? "equation" : "visual"}_pass`,
+    region_kind: wantsEquation ? "equation" : "unknown",
+    detail: "high",
+    assistant_answer: false,
+    terminal_eligible: false,
+  };
+};
+
 const buildCurrentTurnArtifactLedgerFromGatewayPackets = (input: {
   turnId: string;
   packets: HelixAgentStepObservationPacket[];
@@ -3437,6 +3685,13 @@ const scholarlyResearchGatewayResults = (
     (result.gateway_admission.requested_capability || result.capability_id) === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
   );
 
+const scholarlyFullTextGatewayResults = (
+  gatewayCallResults: HelixWorkstationGatewayCallResult[],
+): HelixWorkstationGatewayCallResult[] =>
+  gatewayCallResults.filter((result) =>
+    (result.gateway_admission.requested_capability || result.capability_id) === SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+  );
+
 const hasScholarlyResearchObservation = (gatewayCallResults: HelixWorkstationGatewayCallResult[]): boolean =>
   scholarlyResearchGatewayResults(gatewayCallResults).some((result) =>
     result.ok === true && isScholarlyGatewayResultSelectedForAnswer(result),
@@ -3537,7 +3792,8 @@ const buildScholarlyResearchResponseModeProjection = (input: {
     return { text: input.text, projection: null };
   }
   const scholarlyResults = scholarlyResearchGatewayResults(input.gatewayCallResults);
-  const selectedScholarlyResult =
+  const fullTextResults = scholarlyFullTextGatewayResults(input.gatewayCallResults);
+  const selectedLookupResult =
     scholarlyResults.find((result) => result.ok === true && isScholarlyGatewayResultSelectedForAnswer(result)) ??
     [...scholarlyResults].reverse().find((result) => {
       const evidenceState = readScholarlyGatewayEvidenceState(result);
@@ -3545,9 +3801,20 @@ const buildScholarlyResearchResponseModeProjection = (input: {
       return evidenceState === "lookup_weak_match" && papers.length > 0;
     }) ??
     scholarlyResults[0];
+  const selectedFullTextResult =
+    [...fullTextResults].reverse().find((result) => {
+      const evidenceState = readScholarlyGatewayEvidenceState(result);
+      return evidenceState === "full_text_usable" || evidenceState === "page_image_parse_required";
+    }) ??
+    [...fullTextResults].reverse()[0];
+  const selectedScholarlyResult =
+    scholarlyIntent.scholarlyIntent.requires_full_text && selectedFullTextResult
+      ? selectedFullTextResult
+      : selectedLookupResult;
+  const selectedLookupIndex = selectedLookupResult ? scholarlyResults.indexOf(selectedLookupResult) : -1;
   const hasFailedScholarlyAttemptBeforeSelected =
-    Boolean(selectedScholarlyResult) &&
-    scholarlyResults.slice(0, scholarlyResults.indexOf(selectedScholarlyResult)).some((result) => result.ok !== true);
+    selectedLookupIndex > 0 &&
+    scholarlyResults.slice(0, selectedLookupIndex).some((result) => result.ok !== true);
   if (
     hasScholarlyResearchObservation(input.gatewayCallResults) &&
     scholarlyIntent.scholarlyIntent.terminal_evidence_requirement === "metadata" &&
@@ -3599,6 +3866,11 @@ const buildScholarlyResearchResponseModeProjection = (input: {
   const papers = readArray(observation?.papers)
     .map(readRecord)
     .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const lookupObservation = selectedLookupResult ? readGatewayObservationRecord(selectedLookupResult) : null;
+  const lookupPapers = readArray(lookupObservation?.papers)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const displayPapers = papers.length > 0 ? papers : lookupPapers;
   const selectedForAnswer = readScholarlyGatewaySelectedForAnswer(selected);
   const allowedResponseModes = scholarlyAllowedResponseModesForEvidenceState(evidenceState);
   const selectedResponseMode = scholarlySelectedResponseMode({
@@ -3632,7 +3904,7 @@ const buildScholarlyResearchResponseModeProjection = (input: {
       reason: readString(entry.reason),
     }))
     .filter((entry) => Boolean(entry.result_id || entry.title || entry.reason));
-  const candidateRelevanceReasons = papers.slice(0, 5).map((paper) => ({
+  const candidateRelevanceReasons = displayPapers.slice(0, 5).map((paper) => ({
     result_id: readString(paper.result_id),
     title: readString(paper.title),
     reason: readString(paper.result_id)
@@ -3737,6 +4009,39 @@ const buildScholarlyResearchResponseModeProjection = (input: {
   }
 
   if (scholarlyIntent.scholarlyIntent.requires_full_text && evidenceState !== "full_text_usable") {
+    const asksForScienceExtraction =
+      /\b(?:show\s+(?:me\s+)?(?:the\s+)?science|scientific\s+content|scientific\s+evidence(?:\s+packet)?|equations?|formulae?|formulas?|figures?|tables?|page\s+images?|pdf\s+pages?)\b/i.test(input.question);
+    if (asksForScienceExtraction && fullTextResults.length > 0 && evidenceState !== "page_image_parse_required") {
+      return {
+        text: "I found metadata and abstracts, but no accessible PDF/full text. I can’t extract equations yet.",
+        projection: {
+          schema: "helix.scholarly_response_mode_selection.v1",
+          scholarly_response_mode: "scholarly_evidence_escalation_missing",
+          allowed_response_modes: ["scholarly_evidence_escalation_missing", "scholarly_recovery_plan"],
+          selected_response_mode: "scholarly_evidence_escalation_missing",
+          evidence_state: evidenceState ?? "full_text_unavailable",
+          selected_for_answer: false,
+          selected_for_exploration: displayPapers.length > 0,
+          candidate_relevance_reasons: candidateRelevanceReasons,
+          rejected_candidate_reasons: rejectedCandidateReasons,
+          next_affordances: nextAffordances,
+          recovery_queries: recoveryQueries,
+          recovery_query_basis: recoveryQueryBasis,
+          missing_requirements: uniqueStrings([...missingRequirements, "accessible_pdf_or_full_text_required", "equation_extraction_refs_missing"]),
+          scholarly_intent: scholarlyIntent.scholarlyIntent,
+          scholarly_query: scholarlyIntent.normalizedQuery,
+          requested_workflow: scholarlyIntent.scholarlyIntent.requested_workflow,
+          planned_scholarly_capability_chain: scholarlyIntent.plannedScholarlyCapabilityChain,
+          executed_scholarly_capability_chain: executedScholarlyCapabilityChain,
+          terminal_evidence_requirement: scholarlyIntent.scholarlyIntent.terminal_evidence_requirement,
+          query_normalization_reasons: scholarlyIntent.scholarlyIntent.query_normalization_reasons,
+          terminal_artifact_kind: "scholarly_evidence_escalation_missing",
+          terminal_eligible: true,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      };
+    }
     return {
       text: [
         `Helix found scholarly metadata for "${readString(observation?.query) ?? scholarlyIntent.normalizedQuery}", but this request asked for full-text evidence.`,
@@ -3900,13 +4205,375 @@ const buildMissingScholarlyFollowupEvidenceProjection = (input: {
 const isScholarlyNumericFollowupQuestion = (question: string): boolean =>
   /\b(?:numbers?|numeric|numerical|values?|parameters?|measure(?:d|s)?|units?|plate\s+separation|force|pressure)\b/i.test(question);
 
-const buildPriorScholarlyFollowupEvidenceProjection = (input: {
+type ScholarlyEvidenceDepth =
+  | "metadata_lookup"
+  | "abstract_or_snippet"
+  | "full_text"
+  | "page_image_parse"
+  | "scientific_evidence_packet";
+
+type ScholarlyEvidenceEscalationPlan = {
+  schema: "helix.scholarly_evidence_escalation_plan.v1";
+  requested_modes: string[];
+  selected_evidence_depth: ScholarlyEvidenceDepth;
+  evidence_depth_reason: string;
+  current_evidence_state: string | null;
+  current_evidence_grade: ScholarlyFollowupEvidenceMemoryRecord["evidence_grade"] | null;
+  missing_requirements: string[];
+  full_text_fetch_status: "available" | "required" | "not_requested" | "unavailable";
+  pdf_render_status: "available" | "required" | "not_requested" | "unavailable";
+  page_image_observation_refs: string[];
+  equation_extraction_refs: string[];
+  scientific_evidence_packet_ref: string | null;
+  theory_badge_graph_reflection_ref: string | null;
+  terminal_kind: string;
+  selected_observation_refs: string[];
+  assistant_answer: false;
+  terminal_eligible: false;
+  raw_content_included: false;
+};
+
+type CurrentTurnScholarlyVisualEvidence = {
+  pageImageObservationRefs: string[];
+  equationExtractionRefs: string[];
+  scientificEvidencePacketRef: string | null;
+};
+
+type ScholarlyTheoryBadgeGraphReflectionCandidate = {
+  schema: "helix.scholarly_theory_badge_graph_reflection_candidate.v1";
+  reflection_ref: string;
+  source_memory_ref: string;
+  requested_modes: string[];
+  strongest_materialized_evidence_depth: ScholarlyEvidenceDepth;
+  evidence_maturity: string;
+  provenance_refs: string[];
+  scientific_evidence_packet_ref: string | null;
+  graph_ingestion_status: "candidate_only";
+  claim_boundary: {
+    metadataOnly: boolean;
+    abstractOrSnippetOnly: boolean;
+    pageGroundedExtraction: boolean;
+    scientificPacketMaterialized: boolean;
+    notProofAuthority: true;
+  };
+  terminal_eligible: false;
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
+const scholarlyVisualEvidenceFromLanePackets = (
+  packets: HelixAgentStepObservationPacket[],
+): CurrentTurnScholarlyVisualEvidence => {
+  const visualPackets = packets.filter((packet) => packet.capability_key === VISUAL_ANALYSIS_INSPECT_IMAGE_REGION_CAPABILITY);
+  const sidecars = visualPackets
+    .map(scientificSidecarFromLanePacket)
+    .filter((sidecar): sidecar is ScientificImageEvidenceSidecarV1 => Boolean(sidecar));
+  const packetRefs = uniqueStrings(sidecars.flatMap((sidecar) => sidecar.packet_refs));
+  return {
+    pageImageObservationRefs: uniqueStrings(visualPackets.flatMap((packet) => packet.produced_artifact_refs)),
+    equationExtractionRefs: packetRefs,
+    scientificEvidencePacketRef: sidecars[0]?.sidecar_id ?? packetRefs[0] ?? null,
+  };
+};
+
+const scholarlyFollowupRequestedModes = (question: string): string[] => uniqueStrings([
+  /\b(?:theory\s+badge\s+graph|badge\s+graph|theory\s+reflection|reflect(?:ion)?|relevance\s+to\s+(?:the\s+)?theory)\b/i.test(question)
+    ? "theory_badge_graph_reflection"
+    : "",
+  /\b(?:equations?|formulae?|formulas?|derive|derivation|variables?|parameter\s+binding)\b/i.test(question)
+    ? "equation_extraction"
+    : "",
+  isScholarlyNumericFollowupQuestion(question) ? "numeric_extraction" : "",
+  /\b(?:scientific\s+evidence\s+packet|evidence\s+packet|sidecar|scientific\s+evidence|proof\s+packet)\b/i.test(question)
+    ? "scientific_evidence_packet"
+    : "",
+  /\b(?:show\s+(?:me\s+)?(?:the\s+)?science|scientific\s+content|main\s+equations?|show\s+(?:me\s+)?(?:the\s+)?equations?)\b/i.test(question)
+    ? "page_image_parse"
+    : "",
+  /\b(?:page\s+images?|screenshots?|render(?:ed)?\s+pages?|pdf\s+pages?|image\s+lens|ocr|figures?|tables?|plots?)\b/i.test(question)
+    ? "page_image_parse"
+    : "",
+  /\b(?:full[-\s]?text|fetched\s+text|read\s+(?:the\s+)?(?:paper|pdf|article)|paper\s+content|detailed\s+(?:argument|result|conclusion))\b/i.test(question)
+    ? "full_text"
+    : "",
+  /\b(?:tell\s+me|summari[sz]e|explain|relevance|relevant)\b/i.test(question)
+    ? "metadata_context"
+    : "",
+]);
+
+const recordHasFullTextEvidence = (record: ScholarlyFollowupEvidenceMemoryRecord | null): boolean =>
+  ["full_text_usable", "numeric_evidence_usable", "answer_ready"].includes(record?.evidence_state ?? "");
+
+const recordHasAbstractOrSnippetEvidence = (record: ScholarlyFollowupEvidenceMemoryRecord | null): boolean =>
+  (record?.abstract_or_snippet_refs.length ?? 0) > 0 ||
+  record?.papers.some((paper) => Boolean(readString(paper.abstract))) === true;
+
+const recordHasPageImageEvidence = (record: ScholarlyFollowupEvidenceMemoryRecord | null): boolean =>
+  (record?.page_image_observation_refs.length ?? 0) > 0 ||
+  record?.observation_refs.some((ref) => /\b(?:image_lens|visual_analysis|visual|ocr|pdf-page|pdf_page_render|crop|region)\b/i.test(ref)) === true;
+
+const recordHasPageImageAffordance = (record: ScholarlyFollowupEvidenceMemoryRecord | null): boolean =>
+  (record?.page_image_affordance_refs.length ?? 0) > 0 ||
+  record?.next_affordances.some((affordance) =>
+    readString(readRecord(affordance)?.capability) === "visual_analysis.inspect_image_region"
+  ) === true;
+
+const recordHasEquationEvidence = (record: ScholarlyFollowupEvidenceMemoryRecord | null): boolean =>
+  (record?.equation_evidence_refs.length ?? 0) > 0 ||
+  record?.evidence_state === "numeric_evidence_usable";
+
+const strongestScholarlyMaterializedEvidenceDepth = (input: {
+  record: ScholarlyFollowupEvidenceMemoryRecord | null;
+  currentTurnVisualEvidence?: CurrentTurnScholarlyVisualEvidence | null;
+}): ScholarlyEvidenceDepth => {
+  if (input.record?.scientific_evidence_packet_refs[0] || input.currentTurnVisualEvidence?.scientificEvidencePacketRef) {
+    return "scientific_evidence_packet";
+  }
+  if (recordHasPageImageEvidence(input.record) || (input.currentTurnVisualEvidence?.pageImageObservationRefs.length ?? 0) > 0) {
+    return "page_image_parse";
+  }
+  if (recordHasFullTextEvidence(input.record)) return "full_text";
+  if (recordHasAbstractOrSnippetEvidence(input.record)) return "abstract_or_snippet";
+  return "metadata_lookup";
+};
+
+const evidenceMaturityForScholarlyDepth = (depth: ScholarlyEvidenceDepth): string => {
+  switch (depth) {
+    case "scientific_evidence_packet":
+      return "normalized_scientific_evidence";
+    case "page_image_parse":
+      return "page_grounded_visual_extraction";
+    case "full_text":
+      return "bounded_full_text";
+    case "abstract_or_snippet":
+      return "provider_abstract_or_snippet";
+    case "metadata_lookup":
+    default:
+      return "metadata_only";
+  }
+};
+
+const buildScholarlyTheoryBadgeGraphReflectionText = (input: {
+  record: ScholarlyFollowupEvidenceMemoryRecord;
+  candidate: ScholarlyTheoryBadgeGraphReflectionCandidate;
+}): string => {
+  const firstPaper = input.record.papers[0];
+  const title = readString(firstPaper?.title) ?? input.record.query ?? "the referenced scholarly paper";
+  const evidenceLabel =
+    input.candidate.strongest_materialized_evidence_depth === "metadata_lookup"
+      ? "metadata only"
+      : input.candidate.strongest_materialized_evidence_depth === "abstract_or_snippet"
+        ? "provider abstract/snippet evidence"
+        : input.candidate.strongest_materialized_evidence_depth === "full_text"
+          ? "fetched full-text evidence"
+          : input.candidate.strongest_materialized_evidence_depth === "page_image_parse"
+            ? "page-image extraction evidence"
+            : "normalized scientific evidence packet evidence";
+  return [
+    `Based on the materialized scholarly evidence, **${title}** can be reflected to the Theory Badge Graph only at the **${input.candidate.evidence_maturity}** level.`,
+    "",
+    `Evidence depth: ${input.candidate.strongest_materialized_evidence_depth} (${evidenceLabel}).`,
+    `Provenance refs: ${input.candidate.provenance_refs.slice(0, 5).join(", ")}.`,
+    "",
+    input.candidate.scientific_evidence_packet_ref
+      ? `A scientific evidence packet is materialized: ${input.candidate.scientific_evidence_packet_ref}.`
+      : "No scientific evidence packet is materialized for this paper yet.",
+    "Do not treat this as proof, validation, equation extraction, numeric binding, or badge promotion unless deeper full-text/page-image/scientific-packet evidence is present.",
+  ].join("\n");
+};
+
+const buildScholarlyTheoryBadgeGraphReflectionCandidate = (input: {
+  record: ScholarlyFollowupEvidenceMemoryRecord;
+  requestedModes: string[];
+  currentTurnVisualEvidence?: CurrentTurnScholarlyVisualEvidence | null;
+}): ScholarlyTheoryBadgeGraphReflectionCandidate | null => {
+  if (!input.requestedModes.includes("theory_badge_graph_reflection")) return null;
+  const strongestDepth = strongestScholarlyMaterializedEvidenceDepth({
+    record: input.record,
+    currentTurnVisualEvidence: input.currentTurnVisualEvidence,
+  });
+  const scientificPacketRef =
+    input.record.scientific_evidence_packet_refs[0] ??
+    input.currentTurnVisualEvidence?.scientificEvidencePacketRef ??
+    null;
+  const provenanceRefs = uniqueStrings([
+    input.record.memory_id,
+    ...input.record.observation_refs,
+    ...input.record.abstract_or_snippet_refs,
+    ...input.record.page_text_refs,
+    ...input.record.page_image_observation_refs,
+    ...input.record.equation_evidence_refs,
+    ...(scientificPacketRef ? [scientificPacketRef] : []),
+    ...(input.currentTurnVisualEvidence?.pageImageObservationRefs ?? []),
+    ...(input.currentTurnVisualEvidence?.equationExtractionRefs ?? []),
+  ]);
+  return {
+    schema: "helix.scholarly_theory_badge_graph_reflection_candidate.v1",
+    reflection_ref: `artifact://scholarly-theory-badge-graph-reflection/${hashScientificImageSourceShort([input.record.memory_id, input.requestedModes, strongestDepth, provenanceRefs])}`,
+    source_memory_ref: input.record.memory_id,
+    requested_modes: input.requestedModes,
+    strongest_materialized_evidence_depth: strongestDepth,
+    evidence_maturity: evidenceMaturityForScholarlyDepth(strongestDepth),
+    provenance_refs: provenanceRefs,
+    scientific_evidence_packet_ref: scientificPacketRef,
+    graph_ingestion_status: "candidate_only",
+    claim_boundary: {
+      metadataOnly: strongestDepth === "metadata_lookup",
+      abstractOrSnippetOnly: strongestDepth === "abstract_or_snippet",
+      pageGroundedExtraction: strongestDepth === "page_image_parse" || strongestDepth === "scientific_evidence_packet",
+      scientificPacketMaterialized: strongestDepth === "scientific_evidence_packet",
+      notProofAuthority: true,
+    },
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+const buildScholarlyEvidenceEscalationPlan = (input: {
   question: string;
   record: ScholarlyFollowupEvidenceMemoryRecord | null;
   lookup: ScholarlyFollowupEvidenceLookup | null;
+  terminalKind?: string;
+  currentTurnVisualEvidence?: CurrentTurnScholarlyVisualEvidence | null;
+}): ScholarlyEvidenceEscalationPlan | null => {
+  const requestedModes = scholarlyFollowupRequestedModes(input.question);
+  if (!input.record && requestedModes.length === 0) return null;
+  const asksScientificPacket = requestedModes.includes("scientific_evidence_packet");
+  const asksEquation = requestedModes.includes("equation_extraction") || requestedModes.includes("numeric_extraction");
+  const asksPageImage = requestedModes.includes("page_image_parse");
+  const asksFullText = requestedModes.includes("full_text");
+  const asksTheoryReflection = requestedModes.includes("theory_badge_graph_reflection");
+  const asksMetadataContext = requestedModes.includes("metadata_context");
+  const theoryReflectionCandidate = input.record
+    ? buildScholarlyTheoryBadgeGraphReflectionCandidate({
+        record: input.record,
+        requestedModes,
+        currentTurnVisualEvidence: input.currentTurnVisualEvidence,
+      })
+    : null;
+  const hasAbstractOrSnippet = recordHasAbstractOrSnippetEvidence(input.record);
+  const hasFullText = recordHasFullTextEvidence(input.record);
+  const currentPageImageRefs = input.currentTurnVisualEvidence?.pageImageObservationRefs ?? [];
+  const currentEquationRefs = input.currentTurnVisualEvidence?.equationExtractionRefs ?? [];
+  const currentScientificPacketRef = input.currentTurnVisualEvidence?.scientificEvidencePacketRef ?? null;
+  const hasPageImage = recordHasPageImageEvidence(input.record) || currentPageImageRefs.length > 0;
+  const hasPageImageAffordance = recordHasPageImageAffordance(input.record);
+  const hasEquation = recordHasEquationEvidence(input.record) || currentEquationRefs.length > 0;
+  const hasScientificPacket = Boolean(input.record?.scientific_evidence_packet_refs[0] ?? currentScientificPacketRef);
+  const selectedDepth: ScholarlyEvidenceDepth = asksScientificPacket
+    ? "scientific_evidence_packet"
+    : asksEquation || asksPageImage
+      ? "page_image_parse"
+      : asksFullText
+        ? "full_text"
+        : asksTheoryReflection || asksMetadataContext
+          ? hasAbstractOrSnippet ? "abstract_or_snippet" : "metadata_lookup"
+          : "metadata_lookup";
+  const missingRequirements = uniqueStrings([
+    ...(input.record?.missing_requirements ?? []),
+    !input.record ? "prior_scholarly_evidence_packet_unavailable" : "",
+    selectedDepth === "full_text" && !hasFullText ? "full_text_evidence_required" : "",
+    selectedDepth === "page_image_parse" && !hasFullText && !hasPageImageAffordance ? "full_text_or_page_image_evidence_required" : "",
+    selectedDepth === "page_image_parse" && asksEquation && !hasEquation ? "equation_extraction_refs_missing" : "",
+    selectedDepth === "scientific_evidence_packet" && !hasFullText && !hasPageImage && !hasPageImageAffordance ? "full_text_or_page_image_evidence_required" : "",
+    selectedDepth === "scientific_evidence_packet" && !hasEquation ? "equation_extraction_refs_missing" : "",
+    selectedDepth === "scientific_evidence_packet" && !hasScientificPacket ? "scientific_evidence_packet_ref_missing" : "",
+    asksPageImage && !hasPageImage && !hasPageImageAffordance ? "page_image_observation_refs_missing" : "",
+  ]);
+  const reason =
+    selectedDepth === "metadata_lookup"
+      ? "request_can_be_answered_as_metadata_level_relevance_with_caveats"
+      : selectedDepth === "abstract_or_snippet"
+        ? "request_can_use_provider_abstract_or_snippet_with_caveats"
+      : selectedDepth === "full_text"
+        ? "request_asks_for_paper_content_beyond_metadata"
+        : selectedDepth === "page_image_parse"
+          ? "request_asks_for_equations_or_page_layout_evidence"
+          : "request_asks_to_materialize_scientific_evidence_packet";
+  return {
+    schema: "helix.scholarly_evidence_escalation_plan.v1",
+    requested_modes: requestedModes,
+    selected_evidence_depth: selectedDepth,
+    evidence_depth_reason: reason,
+    current_evidence_state: input.record?.evidence_state ?? null,
+    current_evidence_grade: input.record?.evidence_grade ?? null,
+    missing_requirements: missingRequirements,
+    full_text_fetch_status: hasFullText
+      ? "available"
+      : input.record?.evidence_state === "page_image_parse_required" || input.record?.evidence_state === "full_text_unavailable"
+        ? "unavailable"
+        : selectedDepth === "metadata_lookup" || selectedDepth === "abstract_or_snippet" ? "not_requested" : "required",
+    pdf_render_status: hasPageImage
+      ? "available"
+      : selectedDepth === "page_image_parse" || selectedDepth === "scientific_evidence_packet" || hasPageImageAffordance
+        ? "required"
+        : "not_requested",
+    page_image_observation_refs: hasPageImage
+      ? uniqueStrings([
+          ...currentPageImageRefs,
+          ...(input.record?.page_image_observation_refs.length
+            ? input.record.page_image_observation_refs
+            : input.record?.observation_refs.filter((ref) => /\b(?:image_lens|visual_analysis|visual|ocr|pdf-page|pdf_page_render|crop|region)\b/i.test(ref)) ?? []),
+        ])
+      : [],
+    equation_extraction_refs: hasEquation
+      ? uniqueStrings([
+          ...currentEquationRefs,
+          ...(input.record?.equation_evidence_refs.length
+            ? input.record.equation_evidence_refs
+            : input.record?.observation_refs.filter((ref) => /\b(?:equation|numeric|parameter)\b/i.test(ref)) ?? []),
+        ])
+      : [],
+    scientific_evidence_packet_ref: input.record?.scientific_evidence_packet_refs[0] ?? currentScientificPacketRef,
+    theory_badge_graph_reflection_ref: input.record?.theory_badge_graph_reflection_refs[0] ?? theoryReflectionCandidate?.reflection_ref ?? null,
+    terminal_kind: input.terminalKind ?? (missingRequirements.length > 0 ? "scholarly_evidence_escalation_missing" : "scholarly_metadata_answer"),
+    selected_observation_refs: uniqueStrings([
+      ...(input.record?.observation_refs ?? []),
+      ...(input.record?.abstract_or_snippet_refs ?? []),
+      ...(input.record?.page_text_refs ?? []),
+      ...(input.record?.page_image_observation_refs ?? []),
+      ...(input.record?.equation_evidence_refs ?? []),
+      ...currentPageImageRefs,
+      ...currentEquationRefs,
+      ...(currentScientificPacketRef ? [currentScientificPacketRef] : []),
+      ...(theoryReflectionCandidate?.reflection_ref ? [theoryReflectionCandidate.reflection_ref] : []),
+    ]),
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+};
+
+const buildPriorScholarlyFollowupEvidenceProjection = (input: {
+  question: string;
+  providerText: string;
+  record: ScholarlyFollowupEvidenceMemoryRecord | null;
+  lookup: ScholarlyFollowupEvidenceLookup | null;
+  currentTurnVisualEvidence?: CurrentTurnScholarlyVisualEvidence | null;
 }): { text: string; projection: Record<string, unknown> } | null => {
   if (!input.record || input.lookup?.status !== "found") return null;
+  const escalationPlan = buildScholarlyEvidenceEscalationPlan({
+    question: input.question,
+    record: input.record,
+    lookup: input.lookup,
+    currentTurnVisualEvidence: input.currentTurnVisualEvidence,
+  });
+  const theoryReflectionCandidate = escalationPlan
+    ? buildScholarlyTheoryBadgeGraphReflectionCandidate({
+        record: input.record,
+        requestedModes: escalationPlan.requested_modes,
+        currentTurnVisualEvidence: input.currentTurnVisualEvidence,
+      })
+    : null;
   if (isScholarlyNumericFollowupQuestion(input.question) && input.record.evidence_state !== "numeric_evidence_usable") {
+    const numericPlan = buildScholarlyEvidenceEscalationPlan({
+      question: input.question,
+      record: input.record,
+      lookup: input.lookup,
+      terminalKind: "scholarly_numeric_missing",
+      currentTurnVisualEvidence: input.currentTurnVisualEvidence,
+    });
     return {
       text: [
         `I found prior scholarly evidence for "${input.record.query ?? "the referenced paper"}", but this follow-up asks for measured/numeric values.`,
@@ -3927,9 +4594,138 @@ const buildPriorScholarlyFollowupEvidenceProjection = (input: {
         rejected_candidate_reasons: [],
         next_affordances: input.record.next_affordances,
         missing_requirements: uniqueStrings([...input.record.missing_requirements, "numeric_values_not_materialized"]),
+        scholarly_evidence_escalation_plan: numericPlan,
+        ...(theoryReflectionCandidate ? { theory_badge_graph_reflection_candidate: theoryReflectionCandidate } : {}),
         followup_referent_resolution: input.lookup,
         selected_prior_evidence_ref: input.record.memory_id,
         terminal_artifact_kind: "scholarly_numeric_missing",
+        terminal_eligible: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+  }
+  if (
+    escalationPlan &&
+    ["full_text", "page_image_parse", "scientific_evidence_packet"].includes(escalationPlan.selected_evidence_depth) &&
+    escalationPlan.missing_requirements.some((entry) =>
+      [
+        "full_text_evidence_required",
+        "full_text_or_page_image_evidence_required",
+        "equation_extraction_refs_missing",
+        "scientific_evidence_packet_ref_missing",
+        "page_image_observation_refs_missing",
+      ].includes(entry)
+    )
+  ) {
+    return {
+      text: [
+        `I found prior scholarly evidence for "${input.record.query ?? "the referenced paper"}", but this follow-up needs deeper paper evidence than the current record contains.`,
+        "",
+        `Requested evidence depth: ${escalationPlan.selected_evidence_depth}.`,
+        `Prior evidence state: ${input.record.evidence_state ?? "unknown"}.`,
+        `Missing requirements: ${escalationPlan.missing_requirements.slice(0, 8).join(", ")}.`,
+        "Next useful step: fetch the paper full text or render PDF pages into Image Lens, then extract page-grounded equations before creating a scientific evidence packet or graph reflection from equations.",
+      ].join("\n"),
+      projection: {
+        schema: "helix.scholarly_response_mode_selection.v1",
+        scholarly_response_mode: "scholarly_evidence_escalation_missing",
+        allowed_response_modes: ["scholarly_evidence_escalation_missing", "scholarly_recovery_plan"],
+        selected_response_mode: "scholarly_evidence_escalation_missing",
+        evidence_state: input.record.evidence_state ?? "answer_blocked",
+        selected_for_answer: false,
+        selected_for_exploration: input.record.evidence_grade === "exploratory",
+        candidate_relevance_reasons: [],
+        rejected_candidate_reasons: [],
+        next_affordances: input.record.next_affordances,
+        missing_requirements: escalationPlan.missing_requirements,
+        scholarly_evidence_escalation_plan: {
+          ...escalationPlan,
+          terminal_kind: "scholarly_evidence_escalation_missing",
+        },
+        ...(theoryReflectionCandidate ? { theory_badge_graph_reflection_candidate: theoryReflectionCandidate } : {}),
+        followup_referent_resolution: input.lookup,
+        selected_prior_evidence_ref: input.record.memory_id,
+        terminal_artifact_kind: "scholarly_evidence_escalation_missing",
+        terminal_eligible: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+  }
+  if (escalationPlan && ["metadata_lookup", "abstract_or_snippet"].includes(escalationPlan.selected_evidence_depth)) {
+    const selectedResponseMode = input.record.evidence_grade === "exploratory"
+      ? "scholarly_exploratory_candidates"
+      : "scholarly_metadata_answer";
+    const safeProviderText = theoryReflectionCandidate
+      ? buildScholarlyTheoryBadgeGraphReflectionText({
+          record: input.record,
+          candidate: theoryReflectionCandidate,
+        })
+      : input.providerText;
+    return {
+      text: safeProviderText || [
+        `I found prior scholarly metadata for "${input.record.query ?? "the referenced paper"}".`,
+        "This is metadata-level evidence only; no full text, equations, or scientific evidence packet has been materialized.",
+      ].join("\n"),
+      projection: {
+        schema: "helix.scholarly_response_mode_selection.v1",
+        scholarly_response_mode: selectedResponseMode,
+        allowed_response_modes: [selectedResponseMode, "scholarly_recovery_plan"],
+        selected_response_mode: selectedResponseMode,
+        evidence_state: input.record.evidence_state ?? "lookup_usable",
+        selected_for_answer: input.record.selected_for_answer,
+        selected_for_exploration: input.record.selected_for_exploration,
+        candidate_relevance_reasons: [],
+        rejected_candidate_reasons: [],
+        next_affordances: input.record.next_affordances,
+        missing_requirements: escalationPlan.missing_requirements,
+        scholarly_evidence_escalation_plan: {
+          ...escalationPlan,
+          terminal_kind: selectedResponseMode,
+        },
+        ...(theoryReflectionCandidate ? { theory_badge_graph_reflection_candidate: theoryReflectionCandidate } : {}),
+        followup_referent_resolution: input.lookup,
+        selected_prior_evidence_ref: input.record.memory_id,
+        terminal_artifact_kind: selectedResponseMode,
+        terminal_eligible: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+  }
+  if (
+    escalationPlan &&
+    ["page_image_parse", "scientific_evidence_packet"].includes(escalationPlan.selected_evidence_depth) &&
+    (escalationPlan.page_image_observation_refs.length > 0 ||
+      escalationPlan.equation_extraction_refs.length > 0 ||
+      escalationPlan.scientific_evidence_packet_ref)
+  ) {
+    return {
+      text: input.providerText || [
+        `I re-entered visual paper evidence for "${input.record.query ?? "the referenced paper"}".`,
+        "Use the page-grounded Image Lens/scientific evidence refs in this turn; do not treat them as proof beyond their extraction confidence.",
+      ].join("\n"),
+      projection: {
+        schema: "helix.scholarly_response_mode_selection.v1",
+        scholarly_response_mode: "scholarly_parse_required",
+        allowed_response_modes: ["scholarly_parse_required", "scholarly_recovery_plan"],
+        selected_response_mode: "scholarly_parse_required",
+        evidence_state: input.record.evidence_state ?? "page_image_parse_required",
+        selected_for_answer: true,
+        selected_for_exploration: false,
+        candidate_relevance_reasons: [],
+        rejected_candidate_reasons: [],
+        next_affordances: input.record.next_affordances,
+        missing_requirements: escalationPlan.missing_requirements,
+        scholarly_evidence_escalation_plan: {
+          ...escalationPlan,
+          terminal_kind: "scholarly_parse_required",
+        },
+        ...(theoryReflectionCandidate ? { theory_badge_graph_reflection_candidate: theoryReflectionCandidate } : {}),
+        followup_referent_resolution: input.lookup,
+        selected_prior_evidence_ref: input.record.memory_id,
+        terminal_artifact_kind: "scholarly_parse_required",
         terminal_eligible: true,
         assistant_answer: false,
         raw_content_included: false,
@@ -5314,13 +6110,22 @@ export const codexProvider: HelixAgentProvider = {
     });
     let scholarlyFollowupEvidenceLookup: ScholarlyFollowupEvidenceLookup | null = null;
     let priorScholarlyEvidenceMemoryRecord: ScholarlyFollowupEvidenceMemoryRecord | null = null;
+    let currentTurnScholarlyDeepEvidenceMemoryRecord: ScholarlyFollowupEvidenceMemoryRecord | null = null;
+    let currentTurnScholarlyDeepEvidenceLookup: ScholarlyFollowupEvidenceLookup | null = null;
     let priorScholarlyEvidenceArtifact: Record<string, unknown> | null = null;
     let priorScholarlyEvidencePacket: HelixAgentStepObservationPacket | null = null;
-    rememberScholarlyEvidenceFromGatewayResults({
+    const currentTurnScholarlyEvidenceMemoryRecords = rememberScholarlyEvidenceFromGatewayResults({
       body: request.body,
       turnId,
       gatewayCallResults: evidenceGatewayCallResults,
     });
+    currentTurnScholarlyDeepEvidenceMemoryRecord = selectCurrentTurnScholarlyDeepEvidenceRecord({
+      records: currentTurnScholarlyEvidenceMemoryRecords,
+      question,
+    });
+    currentTurnScholarlyDeepEvidenceLookup = buildCurrentTurnScholarlyEvidenceLookup(
+      currentTurnScholarlyDeepEvidenceMemoryRecord,
+    );
     if (!evidenceGatewayCallResults.some(isScholarlyGatewayResult)) {
       const scholarlyFollowup = lookupScholarlyFollowupEvidence(request.body);
       scholarlyFollowupEvidenceLookup = scholarlyFollowup.lookup;
@@ -5989,6 +6794,24 @@ export const codexProvider: HelixAgentProvider = {
     }
     let runtimeLaneRequestSynthesized: Record<string, unknown> | Record<string, unknown>[] | null = null;
     if (!runtimeLaneRequestCandidate && capabilityLaneContext.observation_packets.length === 0) {
+      runtimeLaneRequestSynthesized = synthesizeScholarlyPageImageLaneCandidate({
+        question,
+        record: priorScholarlyEvidenceMemoryRecord,
+        lookup: scholarlyFollowupEvidenceLookup,
+        source: "prior",
+      });
+      runtimeLaneRequestCandidate = runtimeLaneRequestSynthesized;
+    }
+    if (!runtimeLaneRequestCandidate && capabilityLaneContext.observation_packets.length === 0) {
+      runtimeLaneRequestSynthesized = synthesizeScholarlyPageImageLaneCandidate({
+        question,
+        record: currentTurnScholarlyDeepEvidenceMemoryRecord,
+        lookup: currentTurnScholarlyDeepEvidenceLookup,
+        source: "current",
+      });
+      runtimeLaneRequestCandidate = runtimeLaneRequestSynthesized;
+    }
+    if (!runtimeLaneRequestCandidate && capabilityLaneContext.observation_packets.length === 0) {
       runtimeLaneRequestSynthesized = synthesizeImageLensRegionLaneCandidate(request.body, question);
       runtimeLaneRequestCandidate = runtimeLaneRequestSynthesized;
     }
@@ -6049,7 +6872,20 @@ export const codexProvider: HelixAgentProvider = {
                 : runtimeLaneRequestSynthesized,
             ) === TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY
             ? "explicit_read_aloud_referent_resolved_without_runtime_lane_json"
-            : "explicit_image_lens_region_prompt_with_submitted_image_but_no_runtime_lane_json"
+            : (() => {
+              const synthesizedRecord = readRecord(
+                Array.isArray(runtimeLaneRequestSynthesized)
+                  ? runtimeLaneRequestSynthesized[0]
+                  : runtimeLaneRequestSynthesized,
+              );
+              if (readString(synthesizedRecord?.source_kind) === "pdf_page_render") {
+                return readString(synthesizedRecord?.scholarly_evidence_source) === "current"
+                  ? "current_turn_scholarly_pdf_page_affordance_requires_image_lens_parse"
+                  : "prior_scholarly_pdf_page_affordance_requires_image_lens_parse";
+              }
+              return null;
+            })() ??
+              "explicit_image_lens_region_prompt_with_submitted_image_but_no_runtime_lane_json"
           : null,
         referent_resolution_trace: referentResolutionTrace,
         chat_referent_context_presence: chatReferentContextPresence,
@@ -6563,16 +7399,34 @@ export const codexProvider: HelixAgentProvider = {
       text: internetGuardedText,
       gatewayCallResults,
     });
+    const currentTurnScholarlyVisualEvidence = scholarlyVisualEvidenceFromLanePackets(
+      capabilityLaneContext.observation_packets,
+    );
+    const scholarlyEvidenceRecordForProjection =
+      priorScholarlyEvidenceMemoryRecord ?? currentTurnScholarlyDeepEvidenceMemoryRecord;
+    const scholarlyEvidenceLookupForProjection =
+      scholarlyFollowupEvidenceLookup ?? currentTurnScholarlyDeepEvidenceLookup;
     const scholarlyResponseModeProjection =
       buildPriorScholarlyFollowupEvidenceProjection({
         question,
-        record: priorScholarlyEvidenceMemoryRecord,
-        lookup: scholarlyFollowupEvidenceLookup,
+        providerText: internetGuardedText,
+        record: scholarlyEvidenceRecordForProjection,
+        lookup: scholarlyEvidenceLookupForProjection,
+        currentTurnVisualEvidence: currentTurnScholarlyVisualEvidence,
       }) ??
       buildMissingScholarlyFollowupEvidenceProjection({
         question,
         lookup: scholarlyFollowupEvidenceLookup,
       }) ?? scholarlyResponseModeProjectionBase;
+    const projectedScholarlyEscalationPlan =
+      readRecord(scholarlyResponseModeProjection.projection?.scholarly_evidence_escalation_plan) ??
+      buildScholarlyEvidenceEscalationPlan({
+        question,
+        record: scholarlyEvidenceRecordForProjection,
+        lookup: scholarlyEvidenceLookupForProjection,
+        terminalKind: readString(scholarlyResponseModeProjection.projection?.terminal_artifact_kind) ?? undefined,
+        currentTurnVisualEvidence: currentTurnScholarlyVisualEvidence,
+      });
     const scholarlyGuardedText = scholarlyResponseModeProjection.text;
     const finalText = applyCalculatorObservationAuthorityGuard({
       question,
@@ -6635,7 +7489,6 @@ export const codexProvider: HelixAgentProvider = {
       route: request.route,
       compoundAnswer,
     });
-    const compoundTerminalAuthorized = Boolean(compoundTerminalAuthority);
     const scholarlyProjectionTerminalArtifactKind =
       scholarlyResponseModeProjection.projection
         ? readString(scholarlyResponseModeProjection.projection.terminal_artifact_kind)
@@ -6662,6 +7515,12 @@ export const codexProvider: HelixAgentProvider = {
             assistant_answer: false,
           })
         : null;
+    const scholarlyTerminalPreemptsCompound = Boolean(
+      scholarlyExploratoryTerminalAuthority &&
+      scholarlyFollowupEvidenceLookup?.followup_reference_detected &&
+      (scholarlyFollowupEvidenceLookup.status === "found" || scholarlyFollowupEvidenceLookup.status === "missing"),
+    );
+    const compoundTerminalAuthorized = Boolean(compoundTerminalAuthority) && !scholarlyTerminalPreemptsCompound;
     const imageLensObservationReportTerminalAuthority =
       promptLeakRecoveredImageLensAnswer && processOk
         ? buildHelixTurnTerminalAuthority({
@@ -6730,9 +7589,10 @@ export const codexProvider: HelixAgentProvider = {
       terminalAnswerAuthority:
         imageLensObservationReportTerminalAuthority ??
         scholarlyExploratoryTerminalAuthority ??
+        (compoundTerminalAuthorized ? compoundTerminalAuthority : null) ??
         directTerminalAuthority ??
         providerReentry.terminalAnswerAuthority,
-      finalAnswerSource: compoundTerminalAuthority
+      finalAnswerSource: compoundTerminalAuthorized
         ? "compound_evidence_synthesis_answer"
         : imageLensObservationReportTerminalAuthority
           ? "provider_image_lens_observation_report"
@@ -6741,7 +7601,7 @@ export const codexProvider: HelixAgentProvider = {
         : providerReentry.terminalAnswerAuthority || directTerminalAuthority
           ? "agent_provider_terminal_candidate"
           : null,
-      terminalArtifactKind: compoundTerminalAuthority
+      terminalArtifactKind: compoundTerminalAuthorized
         ? "compound_evidence_synthesis_answer"
         : imageLensObservationReportTerminalAuthority
           ? "image_lens_observation_report"
@@ -6751,7 +7611,7 @@ export const codexProvider: HelixAgentProvider = {
           ? "agent_provider_terminal_candidate"
           : null,
       evidenceReentryStatus: providerReentry.workstationGatewayReentryStatus,
-      terminalAuthorityStatus: compoundTerminalAuthority
+      terminalAuthorityStatus: compoundTerminalAuthorized
         ? "authorized_by_codex_provider_compound_synthesis"
         : scholarlyExploratoryTerminalAuthority
           ? "authorized_by_scholarly_response_mode"
@@ -6767,7 +7627,7 @@ export const codexProvider: HelixAgentProvider = {
       providerText: projectedText,
       finalStatus: ok ? "completed" : "final_failure",
     });
-    const finalAnswerSource = compoundTerminalAuthority
+    const finalAnswerSource = compoundTerminalAuthorized
       ? "compound_evidence_synthesis_answer"
       : imageLensObservationReportTerminalAuthority
         ? "provider_image_lens_observation_report"
@@ -6776,7 +7636,7 @@ export const codexProvider: HelixAgentProvider = {
       : providerReentry.terminalAnswerAuthority || directTerminalAuthority
         ? "agent_provider_terminal_candidate"
         : null;
-    const terminalArtifactKind = compoundTerminalAuthority
+    const terminalArtifactKind = compoundTerminalAuthorized
       ? "compound_evidence_synthesis_answer"
       : imageLensObservationReportTerminalAuthority
         ? "image_lens_observation_report"
@@ -6785,7 +7645,7 @@ export const codexProvider: HelixAgentProvider = {
       : providerReentry.terminalAnswerAuthority || directTerminalAuthority
         ? "agent_provider_terminal_candidate"
         : null;
-    const terminalAuthorityStatus = compoundTerminalAuthority
+    const terminalAuthorityStatus = compoundTerminalAuthorized
       ? "authorized_by_codex_provider_compound_synthesis"
       : scholarlyExploratoryTerminalAuthority
         ? "authorized_by_scholarly_response_mode"
@@ -6793,7 +7653,7 @@ export const codexProvider: HelixAgentProvider = {
         ? "authorized_no_gateway_tool_required"
         : providerReentry.terminalAuthorityStatus;
     const terminalAnswerAuthority =
-      compoundTerminalAuthority ??
+      (compoundTerminalAuthorized ? compoundTerminalAuthority : null) ??
       imageLensObservationReportTerminalAuthority ??
       scholarlyExploratoryTerminalAuthority ??
       directTerminalAuthority ??
@@ -6836,7 +7696,7 @@ export const codexProvider: HelixAgentProvider = {
             capabilityLaneTerminalTimelineEvent,
           ]
         : capabilityLaneDebugProjection.capability_lane_turn_timeline;
-    const terminalPresentation = compoundTerminalAuthority
+    const terminalPresentation = compoundTerminalAuthorized
       ? {
           schema: "helix.terminal_presentation.v1",
           turn_id: turnId,
@@ -7016,6 +7876,12 @@ export const codexProvider: HelixAgentProvider = {
                 : "not_requested",
           }
         : {}),
+      ...(currentTurnScholarlyDeepEvidenceMemoryRecord
+        ? {
+            current_turn_scholarly_deep_evidence_record: currentTurnScholarlyDeepEvidenceMemoryRecord,
+            current_turn_scholarly_deep_evidence_lookup: currentTurnScholarlyDeepEvidenceLookup,
+          }
+        : {}),
       ...(scientificImageEvidenceRetry
         ? { scientific_image_evidence_retry: scientificImageEvidenceRetry }
         : {}),
@@ -7054,6 +7920,9 @@ export const codexProvider: HelixAgentProvider = {
       ...(scholarlyResponseModeProjection.projection
         ? { scholarly_response_mode_selection: scholarlyResponseModeProjection.projection }
         : {}),
+      ...(projectedScholarlyEscalationPlan
+        ? { scholarly_evidence_escalation_plan: projectedScholarlyEscalationPlan }
+        : {}),
       debug: {
         agent_runtime: "codex",
         ...modelMetadata,
@@ -7091,6 +7960,8 @@ export const codexProvider: HelixAgentProvider = {
         scientific_image_evidence_retry: scientificImageEvidenceRetry,
         followup_referent_resolution: scholarlyFollowupEvidenceLookup,
         scholarly_followup_evidence_lookup: scholarlyFollowupEvidenceLookup,
+        current_turn_scholarly_deep_evidence_record: currentTurnScholarlyDeepEvidenceMemoryRecord,
+        current_turn_scholarly_deep_evidence_lookup: currentTurnScholarlyDeepEvidenceLookup,
         prior_evidence_memory_candidates: scholarlyFollowupEvidenceLookup
           ? {
               schema: "helix.prior_evidence_memory_candidates.v1",
@@ -7163,6 +8034,7 @@ export const codexProvider: HelixAgentProvider = {
         terminal_answer_authority: terminalAnswerAuthority,
         terminal_presentation: terminalPresentation,
         scholarly_response_mode_selection: scholarlyResponseModeProjection.projection,
+        scholarly_evidence_escalation_plan: projectedScholarlyEscalationPlan,
         scholarly_response_mode: readString(scholarlyResponseModeProjection.projection?.selected_response_mode),
         allowed_response_modes: readArray(scholarlyResponseModeProjection.projection?.allowed_response_modes),
         selected_response_mode: readString(scholarlyResponseModeProjection.projection?.selected_response_mode),

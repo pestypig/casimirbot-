@@ -1,5 +1,5 @@
 import React from "react";
-import { Archive, ChevronDown, Database, KeyRound, Languages, Link2, LogIn, LogOut, ShieldCheck, UserCircle } from "lucide-react";
+import { Archive, ChevronDown, Database, KeyRound, Languages, Link2, LogIn, LogOut, RefreshCw, ShieldCheck, UserCircle } from "lucide-react";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { getInterfaceLanguageOption, getInterfaceLanguageReadiness, INTERFACE_LANGUAGE_OPTIONS } from "@/lib/i18n/interfaceLanguage";
@@ -15,7 +15,10 @@ import {
 import type { HelixProfileIngressTokenSummary } from "@shared/helix-profile-ingress";
 import { cacheAccountCapabilityPolicy } from "@/lib/workstation/accountCapabilityPolicy";
 import {
+  getProfileStorageSyncStatus,
   grantProfileStorageAttachConsent,
+  HELIX_PROFILE_STORAGE_SYNC_STATUS_EVENT,
+  type HelixProfileStorageSyncStatus,
   isProfileStorageAttachConsentGranted,
   revokeProfileStorageAttachConsent,
 } from "@/lib/workstation/profileStorageSync";
@@ -239,7 +242,9 @@ async function fetchCategorizationJobs(): Promise<CategorizationJobView[]> {
 export default function AccountSessionPanel() {
   const [status, setStatus] = React.useState<HelixAccountSessionStatus>(emptyStatus);
   const [loading, setLoading] = React.useState(false);
+  const [refreshing, setRefreshing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const refreshInFlight = React.useRef(false);
   const fallbackProfileId = "DatDamPig";
   const [accountEmail, setAccountEmail] = React.useState("");
   const [accountDisplayName, setAccountDisplayName] = React.useState("");
@@ -250,6 +255,7 @@ export default function AccountSessionPanel() {
   const [showPasswordResetHint, setShowPasswordResetHint] = React.useState(false);
   const [accountRecoveryMessage, setAccountRecoveryMessage] = React.useState<string | null>(null);
   const [profileAttachConsentGranted, setProfileAttachConsentGranted] = React.useState(false);
+  const [profileSyncStatus, setProfileSyncStatus] = React.useState<HelixProfileStorageSyncStatus | null>(null);
   const [ingressLabel, setIngressLabel] = React.useState("");
   const [newTokenValue, setNewTokenValue] = React.useState<string | null>(null);
   const [discordSessions, setDiscordSessions] = React.useState<DiscordSessionView[]>([]);
@@ -264,8 +270,9 @@ export default function AccountSessionPanel() {
   const t = interfaceText.t;
 
   const refresh = React.useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    if (refreshInFlight.current) return;
+    refreshInFlight.current = true;
+    setRefreshing(true);
     try {
       const [nextStatus, nextDiscordSessions, nextCategorizationJobs] = await Promise.all([
         fetchStatus(),
@@ -280,7 +287,8 @@ export default function AccountSessionPanel() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load account session.");
     } finally {
-      setLoading(false);
+      refreshInFlight.current = false;
+      setRefreshing(false);
     }
   }, []);
 
@@ -529,6 +537,17 @@ export default function AccountSessionPanel() {
 
   React.useEffect(() => {
     setProfileAttachConsentGranted(isProfileStorageAttachConsentGranted(session?.profile.profile_id));
+    setProfileSyncStatus(getProfileStorageSyncStatus(session?.profile.profile_id));
+  }, [session?.profile.profile_id]);
+
+  React.useEffect(() => {
+    const handleSyncStatus = ((event: CustomEvent<HelixProfileStorageSyncStatus>) => {
+      if (event.detail.profileId === session?.profile.profile_id) {
+        setProfileSyncStatus(event.detail);
+      }
+    }) as EventListener;
+    window.addEventListener(HELIX_PROFILE_STORAGE_SYNC_STATUS_EVENT, handleSyncStatus);
+    return () => window.removeEventListener(HELIX_PROFILE_STORAGE_SYNC_STATUS_EVENT, handleSyncStatus);
   }, [session?.profile.profile_id]);
 
   const attachThisBrowser = React.useCallback(() => {
@@ -559,9 +578,12 @@ export default function AccountSessionPanel() {
           <button
             type="button"
             onClick={refresh}
-            className="h-9 shrink-0 rounded border border-white/10 bg-white/5 px-3 text-xs text-slate-200 hover:bg-white/10"
+            aria-busy={refreshing}
+            aria-label={refreshing ? t("account.action.loading") : t("account.action.refresh")}
+            className="inline-flex h-9 w-[92px] shrink-0 items-center justify-center gap-2 rounded border border-white/10 bg-white/5 px-3 text-xs text-slate-200 hover:bg-white/10"
           >
-            {loading ? t("account.action.loading") : t("account.action.refresh")}
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+            <span>{t("account.action.refresh")}</span>
           </button>
         </div>
         <label className="mt-3 flex min-w-0 items-center gap-2 rounded border border-white/10 bg-slate-900/70 px-2 py-1.5 text-xs text-slate-300">
@@ -880,6 +902,35 @@ export default function AccountSessionPanel() {
               <p className="mt-1 text-slate-500">
                 {t("account.memory.attachDescription")}
               </p>
+              <div className="mt-3 grid gap-2 md:grid-cols-2">
+                <div className="rounded border border-emerald-300/20 bg-emerald-400/10 p-2">
+                  <div className="font-medium text-emerald-100">{t("account.memory.browserSavedCopy")}</div>
+                  <div className="mt-1 text-slate-400">
+                    {memoryRegistrySnapshot.artifacts.length > 0
+                      ? `${memoryRegistrySnapshot.artifacts.length} local recovery item${memoryRegistrySnapshot.artifacts.length === 1 ? "" : "s"} available.`
+                      : "No browser recovery items yet."}
+                  </div>
+                </div>
+                <div className={`rounded border p-2 ${
+                  profileSyncStatus?.pending
+                    ? "border-amber-300/25 bg-amber-400/10"
+                    : profileSyncStatus?.lastSuccessAt
+                      ? "border-cyan-300/20 bg-cyan-400/10"
+                      : "border-white/10 bg-white/5"
+                }`}>
+                  <div className="font-medium text-slate-100">{t("account.memory.profileBackup")}</div>
+                  <div className="mt-1 text-slate-400">
+                    {profileSyncStatus?.pending
+                      ? `${profileSyncStatus.pendingEntryCount} item${profileSyncStatus.pendingEntryCount === 1 ? "" : "s"} waiting to sync.`
+                      : profileSyncStatus?.lastSuccessAt
+                        ? `Last synced ${new Date(profileSyncStatus.lastSuccessAt).toLocaleTimeString()}.`
+                        : "Attach this browser to start profile backup."}
+                  </div>
+                  {profileSyncStatus?.lastError ? (
+                    <div className="mt-1 text-amber-200">{profileSyncStatus.lastError}</div>
+                  ) : null}
+                </div>
+              </div>
               <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   type="button"

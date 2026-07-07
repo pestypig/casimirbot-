@@ -164,6 +164,12 @@ and `helix_account_profile_storage` tables. Do not add separate `PGHOST` or
 `PGUSER` style settings for this path; `server/db/client.ts` owns the full
 connection string.
 
+For local development without `DATABASE_URL`, the app uses a pg-mem fallback and
+persists that fallback to `.cal/local-pg-mem.json` so workstation accounts,
+password credentials, email recovery rows, and profile saves survive server
+restarts. Override the file with `HELIX_LOCAL_DB_PATH`, or set
+`HELIX_LOCAL_PG_MEM_PERSIST=0` to return to memory-only behavior.
+
 ## High-Signal Runs
 
 Start with the agent and workstation checks. They exercise the main user-facing

@@ -1,10 +1,25 @@
 import { z } from "zod";
 import { jobSourceSchema } from "./jobs";
 
-export const proposalKindSchema = z.enum(["panel", "theme", "toolchain", "layout", "knowledge", "sector-control"]);
+export const proposalKindSchema = z.enum(["panel", "theme", "toolchain", "layout", "knowledge", "sector-control", "postulate"]);
 export type ProposalKind = z.infer<typeof proposalKindSchema>;
 
-export const proposalStatusSchema = z.enum(["new", "approved", "denied", "building", "applied", "error"]);
+export const proposalStatusSchema = z.enum([
+  "new",
+  "submitted",
+  "screening",
+  "approved",
+  "accepted",
+  "accepted_rewarded",
+  "queued_for_graph_review",
+  "denied",
+  "rejected",
+  "building",
+  "applied",
+  "implemented",
+  "claimed",
+  "error",
+]);
 export type ProposalStatus = z.infer<typeof proposalStatusSchema>;
 
 export const proposalSafetyStatusSchema = z.enum(["unknown", "pending", "running-evals", "passed", "failed"]);
@@ -39,12 +54,20 @@ const environmentTargetSchema = z.object({
   scope: z.enum(["desktop-template", "layout", "theme"]).default("desktop-template"),
 });
 
+const postulateTargetSchema = z.object({
+  type: z.literal("postulate-board"),
+  boardId: z.string().default("helix-postulates"),
+  domain: z.enum(["physics", "engineering", "ideology", "product", "other"]).default("other"),
+  badgeGraphLocatorRefs: z.array(z.string()).default([]),
+});
+
 export const proposalTargetSchema = z.discriminatedUnion("type", [
   panelTargetSchema,
   panelSeedTargetSchema,
   backendFileTargetSchema,
   backendMultiTargetSchema,
   environmentTargetSchema,
+  postulateTargetSchema,
 ]);
 export type ProposalTarget = z.infer<typeof proposalTargetSchema>;
 

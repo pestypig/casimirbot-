@@ -147,6 +147,12 @@ import { buildHelixAskLegacyCompletedReplyState } from "@/components/helix/ask-c
 import { buildHelixAskCompletedReplyBattleState } from "@/components/helix/ask-console/HelixAskCompletedReplyBattleState";
 import { buildHelixAskCompletedReplyCardState } from "@/components/helix/ask-console/HelixAskCompletedReplyCardState";
 import { buildHelixAskCompletedReplyStreamState } from "@/components/helix/ask-console/HelixAskCompletedReplyStreamState";
+import { buildHelixAskReadAloudTrafficState } from "@/components/helix/ask-console/HelixAskReadAloudTrafficState";
+import {
+  clearHelixAskReadAloudPlaybackProjectionForReply,
+  reduceHelixAskReadAloudPlaybackProjectionByReply,
+  type HelixAskReadAloudPlaybackProjectionByReply,
+} from "@/components/helix/ask-console/HelixAskReadAloudPlaybackProjection";
 import { buildHelixAskReplyTurnState } from "@/components/helix/ask-console/HelixAskReplyTurnState";
 import { useHelixAskLegacyContentRenderers } from "@/components/helix/ask-console/HelixAskLegacyContentRenderers";
 import { resolveHelixAskLegacyReplyFailContext } from "@/components/helix/ask-console/HelixAskLegacyReplyDebugContext";
@@ -263,9 +269,10 @@ import {
   selectHelixAskNativeImageAttachments,
 } from "@/components/helix/ask-console/HelixAskAttachmentPayload";
 import {
-  HELIX_ASK_TEXT_ATTACHMENT_MAX_BYTES,
   buildHelixAskTextAttachmentFromText,
   buildHelixAskTextAttachmentTurnInputItem,
+  getHelixAskTextAttachmentSizeBytes,
+  getHelixAskTextAttachmentTooLargeReason,
   type HelixAskTextAttachment,
 } from "@/components/helix/ask-console/HelixAskTextAttachment";
 import {
@@ -630,7 +637,6 @@ import {
   isMissionVoiceOutputModeEnabled,
   resolveInitialMicArmState,
   resolveReadAloudButtonPressAction,
-  resolveReadAloudRegionTrafficState,
   shouldEnableVoiceRollout,
   shouldStopReadAloudOnButtonPress,
   transitionReadAloudState,
@@ -649,7 +655,6 @@ export {
   isMissionVoiceOutputModeEnabled,
   resolveInitialMicArmState,
   resolveReadAloudButtonPressAction,
-  resolveReadAloudRegionTrafficState,
   shouldEnableVoiceRollout,
   shouldStopReadAloudOnButtonPress,
   transitionReadAloudState,
@@ -8296,9 +8301,9 @@ export function HelixAskPill({
     }
   }, [addImageAttachmentsFromFiles]);
   const addTextPasteAttachment = useCallback(async (text: string) => {
-    const encoded = new TextEncoder().encode(text);
-    if (encoded.byteLength > HELIX_ASK_TEXT_ATTACHMENT_MAX_BYTES) {
-      setAskError("Pasted text attachments are limited to 128 KB for this Helix Ask path.");
+    const tooLargeReason = getHelixAskTextAttachmentTooLargeReason(getHelixAskTextAttachmentSizeBytes(text));
+    if (tooLargeReason) {
+      setAskError(tooLargeReason);
       return false;
     }
     if (askAttachmentsRef.current.length >= HELIX_ASK_MAX_ATTACHMENTS) {
@@ -8561,6 +8566,8 @@ export function HelixAskPill({
     "idle" | "requesting" | "active" | "stopping" | "error"
   >("idle");
   const [readAloudByReply, setReadAloudByReply] = useState<Record<string, ReadAloudPlaybackState>>({});
+  const [readAloudProjectionByReply, setReadAloudProjectionByReply] =
+    useState<HelixAskReadAloudPlaybackProjectionByReply>({});
   const playbackAudioRef = useRef<HTMLAudioElement | null>(null);
   const playbackElementRef = useRef<HTMLAudioElement | null>(null);
   const voicePlaybackAudioContextRef = useRef<AudioContext | null>(null);
@@ -10705,6 +10712,7 @@ export function HelixAskPill({
         typeof input.utteranceId === "string" && input.utteranceId
           ? voiceUtteranceTimelineMetaByIdRef.current.get(input.utteranceId) ?? null
           : null;
+      const replyId = input.replyId ?? utteranceMeta?.replyId ?? null;
       const event: VoiceLaneTimelineDebugEvent = {
         id: `voice-chunk:${crypto.randomUUID()}`,
         atMs: input.atMs ?? Date.now(),
@@ -10715,6 +10723,7 @@ export function HelixAskPill({
         turnKey: input.turnKey ?? null,
         attemptId: input.attemptId ?? null,
         utteranceId: input.utteranceId ?? null,
+        replyId,
         chunkIndex: typeof input.chunkIndex === "number" ? input.chunkIndex : null,
         chunkCount: typeof input.chunkCount === "number" ? input.chunkCount : null,
         text: input.text ? summarizeVoiceDebugText(input.text, 240) : null,
@@ -10749,6 +10758,9 @@ export function HelixAskPill({
         -HELIX_VOICE_DEBUG_TIMELINE_LIMIT,
       );
       voiceChunkTimelineEventsRef.current = nextEvents;
+      setReadAloudProjectionByReply((prev) =>
+        reduceHelixAskReadAloudPlaybackProjectionByReply(prev, event),
+      );
       setVoiceTimelineDebugVersion((value) => (value + 1) % 1_000_000);
     },
     [getVoiceTurnAssemblerState],
@@ -11024,9 +11036,15 @@ export function HelixAskPill({
       URL.revokeObjectURL(playbackUrlRef.current);
       playbackUrlRef.current = null;
     }
-    if (playbackReplyIdRef.current) {
-      const replyId = playbackReplyIdRef.current;
+    const stoppedReplyId = activeUtterance?.replyId ?? playbackReplyIdRef.current;
+    if (stoppedReplyId) {
+      const replyId = stoppedReplyId;
       setReadAloudByReply((prev) => buildReadAloudStateMapTransition(prev, replyId, "stop"));
+      setReadAloudProjectionByReply((prev) =>
+        clearHelixAskReadAloudPlaybackProjectionForReply(prev, replyId),
+      );
+    }
+    if (playbackReplyIdRef.current) {
       playbackReplyIdRef.current = null;
     }
   }, [clearVoicePendingPreempt, updateVoiceAutoSpeakMetrics]);
@@ -11580,7 +11598,9 @@ export function HelixAskPill({
               utteranceId: utterance.utteranceId,
               chunkIndex: chunk.chunkIndex,
               chunkCount: chunk.chunkCount,
+              text: chunk.text,
               detail: `synth ${currentResult.synthMs}ms | cache ${currentResult.headers.cache ?? "n/a"}`,
+              replyId: utterance.replyId ?? null,
             });
             metrics.providerHeader = currentResult.headers.provider ?? undefined;
             metrics.profileHeader = currentResult.headers.profile ?? undefined;
@@ -11594,13 +11614,27 @@ export function HelixAskPill({
               voicePendingPreemptRef.current.turnKey === utterance.turnKey &&
               voicePendingPreemptRef.current.utteranceId === utterance.utteranceId;
             if (
-              (utterance.kind === "final" || utterance.kind === "brief") &&
+              (utterance.kind === "final" || utterance.kind === "brief" || utterance.kind === "manual_read_aloud") &&
               nextChunk &&
               nextChunk.text &&
               !pendingPreemptForUtterance
             ) {
               nextController = new AbortController();
               voiceAutoSpeakAbortControllerRef.current = nextController;
+              pushVoiceChunkTimelineEvent({
+                kind: "chunk_synth_start",
+                status: "running",
+                traceId: utterance.traceId ?? null,
+                turnKey: utterance.turnKey,
+                utteranceId: utterance.utteranceId,
+                chunkIndex: nextChunk.chunkIndex,
+                chunkCount: nextChunk.chunkCount,
+                text: nextChunk.text,
+                detail: "prefetch",
+                utteranceAuthority: utterance.authority ?? null,
+                utteranceSource: utterance.source ?? null,
+                replyId: utterance.replyId ?? null,
+              });
               nextFetch = synthesizeVoiceChunk({
                 utterance,
                 chunk: nextChunk,
@@ -11628,6 +11662,7 @@ export function HelixAskPill({
               chunkIndex: chunk.chunkIndex,
               chunkCount: chunk.chunkCount,
               text: chunk.text,
+              replyId: utterance.replyId ?? null,
             });
             metrics.playbackLifecycle = await playVoiceAudioBlob({
               blob: currentResult.blob,
@@ -11645,6 +11680,7 @@ export function HelixAskPill({
               chunkIndex: chunk.chunkIndex,
               chunkCount: chunk.chunkCount,
               text: chunk.text,
+              replyId: utterance.replyId ?? null,
             });
             if (voiceAutoSpeakCancelReasonRef.current) {
               metrics.cancelReason = metrics.cancelReason ?? voiceAutoSpeakCancelReasonRef.current;
@@ -11707,7 +11743,9 @@ export function HelixAskPill({
                 utteranceId: utterance.utteranceId,
                 chunkIndex: nextChunk.chunkIndex,
                 chunkCount: nextChunk.chunkCount,
+                text: nextChunk.text,
                 detail: `prefetch synth ${prefetched.synthMs}ms | cache ${prefetched.headers.cache ?? "n/a"}`,
+                replyId: utterance.replyId ?? null,
               });
               metrics.providerHeader = prefetched.headers.provider ?? metrics.providerHeader;
               metrics.profileHeader = prefetched.headers.profile ?? metrics.profileHeader;
@@ -11732,6 +11770,7 @@ export function HelixAskPill({
                 chunkCount: nextChunk.chunkCount,
                 text: nextChunk.text,
                 detail: "prefetched",
+                replyId: utterance.replyId ?? null,
               });
               metrics.playbackLifecycle = await playVoiceAudioBlob({
                 blob: prefetched.blob,
@@ -11750,6 +11789,7 @@ export function HelixAskPill({
                 chunkCount: nextChunk.chunkCount,
                 text: nextChunk.text,
                 detail: "prefetched",
+                replyId: utterance.replyId ?? null,
               });
               if (voiceAutoSpeakCancelReasonRef.current) {
                 metrics.cancelReason = metrics.cancelReason ?? voiceAutoSpeakCancelReasonRef.current;
@@ -11811,6 +11851,7 @@ export function HelixAskPill({
                 utteranceId: utterance.utteranceId,
                 chunkIndex: chunk.chunkIndex,
                 chunkCount: chunk.chunkCount,
+                replyId: utterance.replyId ?? null,
                 detail,
                 suppressionCause: "inactive_attempt",
                 authorityRejectStage: "stream",
@@ -11827,6 +11868,7 @@ export function HelixAskPill({
                 utteranceId: utterance.utteranceId,
                 chunkIndex: chunk.chunkIndex,
                 chunkCount: chunk.chunkCount,
+                replyId: utterance.replyId ?? null,
                 detail: message,
                 suppressionCause: "inactive_attempt",
                 authorityRejectStage: "stream",
@@ -11848,6 +11890,7 @@ export function HelixAskPill({
                 utteranceId: utterance.utteranceId,
                 chunkIndex: chunk.chunkIndex,
                 chunkCount: chunk.chunkCount,
+                replyId: utterance.replyId ?? null,
                 detail: message,
               });
               metrics.cancelReason = metrics.cancelReason ?? "error";
@@ -12363,6 +12406,7 @@ export function HelixAskPill({
           playbackReplyIdRef,
           playbackAudioRef,
           setReadAloudByReply,
+          setReadAloudProjectionByReply,
           recordManualReadAloudLifecycleReceipt,
           clearQueuedReply: (replyId) => {
             voiceAutoSpeakQueueRef.current = filterReadAloudQueueForReply(
@@ -24314,9 +24358,9 @@ export function HelixAskPill({
         first.length >= HELIX_ASK_LARGE_PASTE_THRESHOLD_CHARS &&
         submittedAttachments.every((attachment) => attachment.kind !== "text");
       if (firstLooksLikeLargePastedText) {
-        const encoded = new TextEncoder().encode(first);
-        if (encoded.byteLength > HELIX_ASK_TEXT_ATTACHMENT_MAX_BYTES) {
-          setAskError("Pasted text attachments are limited to 128 KB for this Helix Ask path.");
+        const tooLargeReason = getHelixAskTextAttachmentTooLargeReason(getHelixAskTextAttachmentSizeBytes(first));
+        if (tooLargeReason) {
+          setAskError(tooLargeReason);
           setAskStatus(null);
           if (askInputRef.current) {
             askInputRef.current.value = first;
@@ -25357,9 +25401,10 @@ export function HelixAskPill({
               browserAvailable: typeof window !== "undefined",
               readAloudState: readAloudByReply[reply.id] ?? "idle",
             });
-            const readAloudTraffic = resolveReadAloudRegionTrafficState({
+            const readAloudTraffic = buildHelixAskReadAloudTrafficState({
               replyId: reply.id,
               readAloudState: turnControlViewModel.readAloudState,
+              playbackProjection: readAloudProjectionByReply[reply.id] ?? null,
               events: voiceLaneTimelineEvents,
             });
             const completedReplyStreamState = buildHelixAskCompletedReplyStreamState({

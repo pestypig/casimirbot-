@@ -21,6 +21,34 @@ const FRUITION_CALCULATOR_STORAGE_KEY = "fruition-calculator:v1";
 export const HELIX_PROFILE_STORAGE_ATTACH_CONSENT_EVENT =
   "helix-profile-storage-attach-consent";
 const PROFILE_ATTACH_CONSENT_KEY_PREFIX = "helix.profileStorage.attachConsent:";
+const PROFILE_SYNC_QUEUE_KEY_PREFIX = "helix.profileStorage.pendingSync:";
+const PROFILE_SYNC_STATUS_KEY_PREFIX = "helix.profileStorage.syncStatus:";
+export const HELIX_PROFILE_STORAGE_SYNC_STATUS_EVENT =
+  "helix-profile-storage-sync-status";
+
+export type HelixProfileStorageSyncStatus = {
+  profileId: string;
+  pending: boolean;
+  pendingEntryCount: number;
+  pendingArtifactCount: number;
+  lastAttemptAt: string | null;
+  lastSuccessAt: string | null;
+  lastErrorAt: string | null;
+  lastError: string | null;
+};
+
+type PendingProfileStorageSync = {
+  schema: "helix.profile_storage_pending_sync.v1";
+  profileId: string;
+  queuedAt: string;
+  updatedAt: string;
+  attemptCount: number;
+  payload: {
+    entries: HelixProfileStorageEntry[];
+    artifacts: HelixWorkspaceMemoryArtifact[];
+  };
+  comparable: string;
+};
 
 const byteLength = (value: string): number => {
   if (typeof TextEncoder !== "undefined") {
@@ -54,6 +82,130 @@ const safeLocalStorageRemove = (key: string): boolean => {
     return false;
   }
 };
+
+const safeJsonParse = <T,>(value: string | null): T | null => {
+  if (!value) return null;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return null;
+  }
+};
+
+const nowIso = (): string => new Date().toISOString();
+
+const profileSyncQueueKey = (profileId: string): string =>
+  `${PROFILE_SYNC_QUEUE_KEY_PREFIX}${profileId}`;
+
+const profileSyncStatusKey = (profileId: string): string =>
+  `${PROFILE_SYNC_STATUS_KEY_PREFIX}${profileId}`;
+
+function dispatchSyncStatus(status: HelixProfileStorageSyncStatus): void {
+  window.dispatchEvent(new CustomEvent(HELIX_PROFILE_STORAGE_SYNC_STATUS_EVENT, {
+    detail: status,
+  }));
+}
+
+export function getProfileStorageSyncStatus(
+  profileId: string | null | undefined,
+): HelixProfileStorageSyncStatus | null {
+  if (!profileId?.trim()) return null;
+  return safeJsonParse<HelixProfileStorageSyncStatus>(
+    safeLocalStorageGet(profileSyncStatusKey(profileId.trim())),
+  );
+}
+
+function readPendingSync(profileId: string): PendingProfileStorageSync | null {
+  const pending = safeJsonParse<PendingProfileStorageSync>(safeLocalStorageGet(profileSyncQueueKey(profileId)));
+  return pending?.schema === "helix.profile_storage_pending_sync.v1" ? pending : null;
+}
+
+function writeSyncStatus(status: HelixProfileStorageSyncStatus): void {
+  if (safeLocalStorageSet(profileSyncStatusKey(status.profileId), JSON.stringify(status))) {
+    dispatchSyncStatus(status);
+  }
+}
+
+function queuePendingSync(input: {
+  profileId: string;
+  payload: PendingProfileStorageSync["payload"];
+  comparable: string;
+}): PendingProfileStorageSync {
+  const previous = readPendingSync(input.profileId);
+  const previousStatus = getProfileStorageSyncStatus(input.profileId);
+  const pending: PendingProfileStorageSync = {
+    schema: "helix.profile_storage_pending_sync.v1",
+    profileId: input.profileId,
+    queuedAt: previous?.queuedAt ?? nowIso(),
+    updatedAt: nowIso(),
+    attemptCount: previous?.attemptCount ?? 0,
+    payload: input.payload,
+    comparable: input.comparable,
+  };
+  safeLocalStorageSet(profileSyncQueueKey(input.profileId), JSON.stringify(pending));
+  writeSyncStatus({
+    profileId: input.profileId,
+    pending: true,
+    pendingEntryCount: input.payload.entries.length,
+    pendingArtifactCount: input.payload.artifacts.length,
+    lastAttemptAt: previousStatus?.lastAttemptAt ?? null,
+    lastSuccessAt: previousStatus?.lastSuccessAt ?? null,
+    lastErrorAt: previousStatus?.lastErrorAt ?? null,
+    lastError: previousStatus?.lastError ?? null,
+  });
+  return pending;
+}
+
+function markSyncAttempt(profileId: string, pending: PendingProfileStorageSync): void {
+  const status = getProfileStorageSyncStatus(profileId);
+  const attemptedAt = nowIso();
+  const nextPending = {
+    ...pending,
+    attemptCount: pending.attemptCount + 1,
+    updatedAt: attemptedAt,
+  };
+  safeLocalStorageSet(profileSyncQueueKey(profileId), JSON.stringify(nextPending));
+  writeSyncStatus({
+    profileId,
+    pending: true,
+    pendingEntryCount: pending.payload.entries.length,
+    pendingArtifactCount: pending.payload.artifacts.length,
+    lastAttemptAt: attemptedAt,
+    lastSuccessAt: status?.lastSuccessAt ?? null,
+    lastErrorAt: status?.lastErrorAt ?? null,
+    lastError: status?.lastError ?? null,
+  });
+}
+
+function markSyncSuccess(profileId: string): void {
+  const status = getProfileStorageSyncStatus(profileId);
+  safeLocalStorageRemove(profileSyncQueueKey(profileId));
+  writeSyncStatus({
+    profileId,
+    pending: false,
+    pendingEntryCount: 0,
+    pendingArtifactCount: 0,
+    lastAttemptAt: status?.lastAttemptAt ?? null,
+    lastSuccessAt: nowIso(),
+    lastErrorAt: null,
+    lastError: null,
+  });
+}
+
+function markSyncFailure(profileId: string, message: string): void {
+  const status = getProfileStorageSyncStatus(profileId);
+  const pending = readPendingSync(profileId);
+  writeSyncStatus({
+    profileId,
+    pending: true,
+    pendingEntryCount: status?.pendingEntryCount ?? pending?.payload.entries.length ?? 0,
+    pendingArtifactCount: status?.pendingArtifactCount ?? pending?.payload.artifacts.length ?? 0,
+    lastAttemptAt: status?.lastAttemptAt ?? null,
+    lastSuccessAt: status?.lastSuccessAt ?? null,
+    lastErrorAt: nowIso(),
+    lastError: message,
+  });
+}
 
 export function profileStorageAttachConsentKey(profileId: string): string {
   return `${PROFILE_ATTACH_CONSENT_KEY_PREFIX}${profileId}`;
@@ -240,11 +392,13 @@ export function buildProfileStoragePayload(
 }
 
 async function saveProfileStorageSnapshot(
-  registry: HelixWorkspaceMemoryRegistrySnapshot,
+  payload: {
+    entries: HelixProfileStorageEntry[];
+    artifacts: HelixWorkspaceMemoryArtifact[];
+  },
   profileId: string,
   signal?: AbortSignal,
 ): Promise<HelixProfileStorageWriteReceipt | null> {
-  const payload = buildProfileStoragePayload(registry, profileId);
   if (payload.entries.length === 0 && payload.artifacts.length === 0) return null;
   const response = await fetch("/api/account/profile-storage/snapshot", {
     method: "POST",
@@ -254,6 +408,37 @@ async function saveProfileStorageSnapshot(
   });
   const body = await response.json();
   return body as HelixProfileStorageWriteReceipt;
+}
+
+async function flushPendingProfileStorageSync(
+  profileId: string,
+  signal?: AbortSignal,
+): Promise<{ ok: boolean; comparable: string | null }> {
+  const pending = readPendingSync(profileId);
+  if (!pending) return { ok: true, comparable: null };
+  markSyncAttempt(profileId, pending);
+  try {
+    const receipt = await saveProfileStorageSnapshot(pending.payload, profileId, signal);
+    if (!receipt?.ok) {
+      markSyncFailure(profileId, receipt?.message ?? "Profile backup did not complete.");
+      return { ok: false, comparable: pending.comparable };
+    }
+    markSyncSuccess(profileId);
+    for (const artifact of pending.payload.artifacts) {
+      useWorkspaceMemoryRegistryStore.getState().upsertArtifact({
+        ...artifact,
+        owner_scope: "profile",
+        sync_status: "profile_synced",
+        profile_id: profileId,
+      });
+    }
+    return { ok: true, comparable: pending.comparable };
+  } catch (err) {
+    if (!signal?.aborted) {
+      markSyncFailure(profileId, err instanceof Error ? err.message : "Profile backup failed.");
+    }
+    return { ok: false, comparable: pending.comparable };
+  }
 }
 
 async function loadProfileStorageSnapshot(signal?: AbortSignal): Promise<HelixProfileStorageSnapshot | null> {
@@ -345,8 +530,16 @@ export function useProfileStorageSync(): void {
 
   React.useEffect(() => {
     if (!profileId) return;
-    if (!shouldSaveProfileStorageSnapshot({ profileId, registry: registrySnapshot })) return;
     const payload = buildProfileStoragePayload(registrySnapshot, profileId);
+    const pending = readPendingSync(profileId);
+    if (
+      payload.entries.length === 0 &&
+      payload.artifacts.length === 0 &&
+      !pending
+    ) {
+      return;
+    }
+    if (!isProfileStorageAttachConsentGranted(profileId) && !pending) return;
     const comparable = JSON.stringify({
       profileId,
       entries: payload.entries.map((entry) => ({
@@ -360,22 +553,17 @@ export function useProfileStorageSync(): void {
         size_bytes: artifact.size_bytes ?? null,
       })),
     });
-    if (comparable === lastPayloadRef.current) return;
+    if (!pending && comparable === lastPayloadRef.current) return;
+    if (pending?.comparable === comparable && comparable === lastPayloadRef.current) return;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      void saveProfileStorageSnapshot(registrySnapshot, profileId, controller.signal).then((receipt) => {
-        if (!receipt?.ok) return;
-        lastPayloadRef.current = comparable;
-        for (const artifact of payload.artifacts) {
-          useWorkspaceMemoryRegistryStore.getState().upsertArtifact({
-            ...artifact,
-            owner_scope: "profile",
-            sync_status: "profile_synced",
-            profile_id: profileId,
-          });
+      if (payload.entries.length > 0 || payload.artifacts.length > 0) {
+        queuePendingSync({ profileId, payload, comparable });
+      }
+      void flushPendingProfileStorageSync(profileId, controller.signal).then((result) => {
+        if (result.ok && result.comparable) {
+          lastPayloadRef.current = result.comparable;
         }
-      }).catch(() => {
-        // Keep local browser persistence as the fallback when the server is unavailable.
       });
     }, PROFILE_SYNC_DEBOUNCE_MS);
     return () => {
@@ -383,4 +571,22 @@ export function useProfileStorageSync(): void {
       window.clearTimeout(timer);
     };
   }, [attachConsentTick, profileId, registrySnapshot]);
+
+  React.useEffect(() => {
+    if (!profileId) return;
+    const controller = new AbortController();
+    const retryPending = () => {
+      if (!readPendingSync(profileId)) return;
+      void flushPendingProfileStorageSync(profileId, controller.signal).then((result) => {
+        if (result.ok && result.comparable) {
+          lastPayloadRef.current = result.comparable;
+        }
+      });
+    };
+    const timer = window.setInterval(retryPending, PROFILE_SYNC_INTERVAL_MS);
+    return () => {
+      controller.abort();
+      window.clearInterval(timer);
+    };
+  }, [profileId]);
 }

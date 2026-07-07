@@ -833,6 +833,8 @@ describe("Helix Ask UI ownership boundaries", () => {
     }
     for (const symbol of [
       "base64FromText",
+      "getHelixAskTextAttachmentSizeBytes",
+      "getHelixAskTextAttachmentTooLargeReason",
       "sha256TextHex",
       "buildHelixAskTextAttachmentFromText",
       "buildHelixAskTextAttachmentTurnInputItem",
@@ -883,6 +885,8 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(attachmentPayload).toContain("buildHelixAskTextAttachmentTurnInputItem(attachment)");
     expect(attachmentPayload).toContain("validateHelixAskAttachmentForSubmit(attachment)");
     expect(textAttachment).toContain("HELIX_ASK_TEXT_ATTACHMENT_MAX_BYTES");
+    expect(textAttachment).toContain("HELIX_ASK_TEXT_ATTACHMENT_MAX_LABEL");
+    expect(textAttachment).toContain("HELIX_ASK_TEXT_ATTACHMENT_TOO_LARGE_MESSAGE");
     expect(textAttachment).toContain("HELIX_ASK_TEXT_ATTACHMENT_PREVIEW_CHARS");
     expect(textAttachment).not.toContain("validateHelixAskAttachmentForSubmit");
     expect(textAttachment).not.toContain("validateHelixAskImageAttachmentForSubmit");

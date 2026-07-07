@@ -810,7 +810,8 @@ const hasFetchableScholarlyPaperIdentity = (paper: Record<string, unknown> | nul
     isLikelyScholarlyFullTextUrl(identifiers?.pdf_url) ||
       isLikelyScholarlyFullTextUrl(identifiers?.full_text_url) ||
       isLikelyScholarlyFullTextUrl(identifiers?.url) ||
-      optionalString(identifiers?.arxiv_id),
+      optionalString(identifiers?.arxiv_id) ||
+      optionalString(identifiers?.doi),
   );
 };
 
@@ -7041,7 +7042,6 @@ export const callWorkstationGatewayCapability = async (
       sourceUrl,
       maxPages: readFiniteNumber(args.max_pages ?? args.maxPages),
       maxChunks: readFiniteNumber(args.max_chunks ?? args.maxChunks),
-      cachePdf: false,
     });
     const observation = {
       ...fullTextObservation,

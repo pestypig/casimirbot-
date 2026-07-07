@@ -419,6 +419,10 @@ const EXCLUDE_GLOBS: string[] = [
   "!**/*.spec.*",
   "!**/*.snap",
   "!**/*.map",
+  "!**/.cal/**",
+  "!**/.codex/**",
+  "!**/.env*",
+  "!**/local-pg-mem.json",
   "!**/node_modules/**",
   "!**/dist/**",
   "!**/build/**",
@@ -439,6 +443,8 @@ const REPO_SEARCH_PATH_MAX_HITS = Math.max(
   Number(process.env.HELIX_ASK_REPO_SEARCH_PATH_MAX_HITS ?? 24),
 );
 const REPO_SEARCH_FALLBACK_SKIP_DIRS = new Set([
+  ".cal",
+  ".codex",
   ".git",
   "node_modules",
   "dist",
@@ -451,6 +457,16 @@ const REPO_SEARCH_FALLBACK_SKIP_DIRS = new Set([
 
 const REPO_SEARCH_FALLBACK_SKIP_FILE_RE =
   /\.(?:png|jpe?g|gif|webp|ico|bmp|avif|pdf|zip|gz|tgz|7z|rar|wasm|woff2?|ttf|eot|mp[34]|mov|avi|sqlite|db|bin|exe|dll|pyd|so|dylib)$/i;
+
+const REPO_SEARCH_PRIVATE_FILE_NAMES = new Set([
+  ".env",
+  ".env.local",
+  ".env.development",
+  ".env.production",
+  ".npmrc",
+  ".pypirc",
+  "local-pg-mem.json",
+]);
 
 const sanitizeSearchTerm = (value: string): string => {
   const cleaned = value
@@ -614,6 +630,7 @@ export function selectRepoSearchPaths(
   }
   const filtered = Array.from(paths).filter((entry) => {
     if (!entry) return false;
+    if (isRepoSearchPrivatePath(entry)) return false;
     const resolved = path.resolve(process.cwd(), entry);
     return fs.existsSync(resolved);
   });
@@ -720,6 +737,19 @@ const pathMatchImplementationExcerpt = async (
 
 const normalizeRepoPath = (value: string): string =>
   value.replace(/\\/g, "/").replace(/^\.\//, "").replace(/^\/+/, "").trim();
+
+export const isRepoSearchPrivatePath = (value: string): boolean => {
+  const normalized = normalizeRepoPath(value).toLowerCase();
+  if (!normalized) return true;
+  const parts = normalized.split("/").filter(Boolean);
+  if (parts.some((part) => REPO_SEARCH_FALLBACK_SKIP_DIRS.has(part))) return true;
+  const fileName = parts[parts.length - 1] ?? "";
+  if (REPO_SEARCH_PRIVATE_FILE_NAMES.has(fileName)) return true;
+  if (fileName.startsWith(".env.")) return true;
+  if (/credentials(?:\.[^.]+)?$/i.test(fileName)) return true;
+  if (/service-account(?:\.[^.]+)?$/i.test(fileName)) return true;
+  return false;
+};
 
 const dedupePaths = (entries: string[]): string[] => {
   const out: string[] = [];
@@ -1230,6 +1260,7 @@ const parseRgJsonLine = (
   if (!parsed || parsed.type !== "match") return null;
   const data = parsed.data;
   if (!data?.path?.text || typeof data.line_number !== "number") return null;
+  if (isRepoSearchPrivatePath(data.path.text)) return null;
   const text = data.lines?.text ?? "";
   return {
     filePath: data.path.text,
@@ -1261,6 +1292,7 @@ const isWithinRepoRoot = (absolutePath: string): boolean => {
 const shouldSkipFallbackFile = (absolutePath: string): boolean => {
   const relative = normalizeRepoPath(path.relative(process.cwd(), absolutePath));
   if (!relative) return true;
+  if (isRepoSearchPrivatePath(relative)) return true;
   if (relative.split("/").some((part) => REPO_SEARCH_FALLBACK_SKIP_DIRS.has(part))) return true;
   if (/\.test\.[^/]+$/i.test(relative) || /\.spec\.[^/]+$/i.test(relative)) return true;
   if (/\.snap$/i.test(relative) || /\.map$/i.test(relative)) return true;
@@ -1399,7 +1431,22 @@ const runNodeFallbackRepoSearch = async (
 export async function runRepoSearch(plan: RepoSearchPlan): Promise<RepoSearchResult> {
   const stage0Prefilter = await resolveRepoSearchStage0Prefilter(plan);
   const stage0Active = stage0Prefilter.telemetry.used && stage0Prefilter.candidates.length > 0;
-  const targetPaths = stage0Active ? stage0Prefilter.candidates : plan.paths;
+  const targetPaths = (stage0Active ? stage0Prefilter.candidates : plan.paths)
+    .filter((entry) => !isRepoSearchPrivatePath(entry));
+  if (targetPaths.length === 0) {
+    return {
+      hits: [],
+      truncated: false,
+      error: "repo_search_private_paths_excluded",
+      search_backend: "ripgrep",
+      search_backend_bin: resolveRipgrepBinary(),
+      stage0: applyStage0HitRate(
+        stage0Prefilter.telemetry,
+        stage0Prefilter.candidates.map((filePath) => ({ filePath })),
+        [],
+      ),
+    };
+  }
   const pathSearch = await runRepoPathSearch(plan.terms, targetPaths);
   const hits: RepoSearchHit[] = [...pathSearch.hits];
   let truncated = pathSearch.truncated;

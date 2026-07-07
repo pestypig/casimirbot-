@@ -117,14 +117,26 @@ export type ReadAloudChunkTrafficEventLike = {
   text?: string | null;
 };
 
-export type ReadAloudRegionTrafficState = {
+export type ReadAloudRegionTrafficPhase =
+  | "loading"
+  | "reading"
+  | "preloading"
+  | "paused"
+  | "resuming"
+  | "completed";
+
+export type ReadAloudRegionTrafficRegion = {
   active: boolean;
-  phase: "loading" | "reading" | "paused" | "resuming" | "completed";
+  phase: ReadAloudRegionTrafficPhase;
   label: string;
   detail: string | null;
   chunkIndex: number | null;
   chunkCount: number | null;
   chunkText: string | null;
+};
+
+export type ReadAloudRegionTrafficState = ReadAloudRegionTrafficRegion & {
+  regions?: ReadAloudRegionTrafficRegion[];
 };
 
 export const READ_ALOUD_COMPLETED_CHUNK_TRAFFIC_LINGER_MS = 8_000;
@@ -133,6 +145,55 @@ function normalizeChunkNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) && value >= 0
     ? Math.floor(value)
     : null;
+}
+
+function readChunkText(
+  event: ReadAloudChunkTrafficEventLike | null | undefined,
+  matchingEvents: readonly ReadAloudChunkTrafficEventLike[],
+  chunkIndex: number | null,
+): string | null {
+  return typeof event?.text === "string" && event.text.trim()
+    ? event.text.trim()
+    : matchingEvents.find((candidate) =>
+        normalizeChunkNumber(candidate.chunkIndex) === chunkIndex &&
+        typeof candidate.text === "string" &&
+        candidate.text.trim(),
+      )?.text?.trim() ?? null;
+}
+
+function buildReadAloudTrafficRegion(
+  phase: ReadAloudRegionTrafficPhase,
+  event: ReadAloudChunkTrafficEventLike | null | undefined,
+  matchingEvents: readonly ReadAloudChunkTrafficEventLike[],
+): ReadAloudRegionTrafficRegion {
+  const chunkIndex = normalizeChunkNumber(event?.chunkIndex);
+  const chunkCount = normalizeChunkNumber(event?.chunkCount);
+  const chunkText = readChunkText(event, matchingEvents, chunkIndex);
+  const chunkDetail =
+    chunkIndex !== null && chunkCount !== null && chunkCount > 0
+      ? `chunk ${chunkIndex + 1}/${chunkCount}`
+      : null;
+  const label =
+    phase === "loading"
+      ? "Loading read-aloud"
+      : phase === "reading"
+        ? "Reading aloud"
+        : phase === "preloading"
+          ? "Preloading next read-aloud chunk"
+          : phase === "paused"
+            ? "Read-aloud paused"
+            : phase === "completed"
+              ? "Read-aloud completed"
+              : "Resuming read-aloud";
+  return {
+    active: true,
+    phase,
+    label,
+    detail: chunkDetail,
+    chunkIndex,
+    chunkCount,
+    chunkText,
+  };
 }
 
 export function resolveReadAloudRegionTrafficState(args: {
@@ -144,7 +205,7 @@ export function resolveReadAloudRegionTrafficState(args: {
 }): ReadAloudRegionTrafficState | null {
   const replyId = args.replyId?.trim();
   if (!replyId) return null;
-  const directPhase: ReadAloudRegionTrafficState["phase"] | null =
+  const directPhase: ReadAloudRegionTrafficPhase | null =
     args.readAloudState === "loading"
       ? "loading"
       : args.readAloudState === "playing"
@@ -177,46 +238,57 @@ export function resolveReadAloudRegionTrafficState(args: {
   const phase: ReadAloudRegionTrafficState["phase"] | null =
     directPhase ?? (recentCompletedChunk ? "completed" : null);
   if (!phase) return null;
-  const preferredEvent =
-    matchingEvents.find((event) =>
-      phase === "loading"
-        ? event.kind === "chunk_synth_start" || event.kind === "chunk_synth_ok"
-        : phase === "completed"
-          ? event.kind === "chunk_play_end" || event.kind === "chunk_play_start"
-        : event.kind === "chunk_play_start" || event.kind === "chunk_play_end",
-    ) ?? matchingEvents[0] ?? null;
-  const chunkIndex = normalizeChunkNumber(preferredEvent?.chunkIndex);
-  const chunkCount = normalizeChunkNumber(preferredEvent?.chunkCount);
-  const chunkText =
-    typeof preferredEvent?.text === "string" && preferredEvent.text.trim()
-      ? preferredEvent.text.trim()
-      : matchingEvents.find((event) =>
-          normalizeChunkNumber(event.chunkIndex) === chunkIndex &&
-          typeof event.text === "string" &&
-          event.text.trim(),
-        )?.text?.trim() ?? null;
-  const chunkDetail =
-    chunkIndex !== null && chunkCount !== null && chunkCount > 0
-      ? `chunk ${chunkIndex + 1}/${chunkCount}`
+  const latestPlayStart = matchingEvents.find((event) => event.kind === "chunk_play_start") ?? null;
+  const latestPlayEnd = matchingEvents.find((event) => event.kind === "chunk_play_end") ?? null;
+  const latestActivePlayStart = matchingEvents.find((event) => {
+    if (event.kind !== "chunk_play_start") return false;
+    const chunkIndex = normalizeChunkNumber(event.chunkIndex);
+    if (chunkIndex === null) return true;
+    const startedAtMs = event.atMs ?? 0;
+    return !matchingEvents.some((candidate) =>
+      candidate.kind === "chunk_play_end" &&
+      normalizeChunkNumber(candidate.chunkIndex) === chunkIndex &&
+      (candidate.atMs ?? 0) >= startedAtMs,
+    );
+  }) ?? null;
+  const latestProgressIndex =
+    normalizeChunkNumber(latestActivePlayStart?.chunkIndex) ??
+    normalizeChunkNumber(latestPlayEnd?.chunkIndex) ??
+    normalizeChunkNumber(latestPlayStart?.chunkIndex);
+  const primaryEvent =
+    phase === "loading" || phase === "resuming"
+      ? matchingEvents.find((event) => event.kind === "chunk_synth_start" || event.kind === "chunk_synth_ok") ?? null
+      : phase === "completed"
+        ? latestPlayEnd ?? latestPlayStart
+        : latestActivePlayStart;
+  const regions: ReadAloudRegionTrafficRegion[] = [];
+  const primaryRegion =
+    primaryEvent || phase === "loading" || phase === "resuming" || phase === "completed"
+      ? buildReadAloudTrafficRegion(phase, primaryEvent, matchingEvents)
       : null;
-  const label =
-    phase === "loading"
-      ? "Loading read-aloud"
-      : phase === "reading"
-        ? "Reading aloud"
-        : phase === "paused"
-          ? "Read-aloud paused"
-          : phase === "completed"
-            ? "Read-aloud completed"
-            : "Resuming read-aloud";
+  if (primaryRegion) regions.push(primaryRegion);
+  if (phase === "reading" || phase === "paused") {
+    const preloadEvent = matchingEvents.find((event) => {
+      if (event.kind !== "chunk_synth_start" && event.kind !== "chunk_synth_ok") return false;
+      const chunkIndex = normalizeChunkNumber(event.chunkIndex);
+      if (chunkIndex === null || latestProgressIndex === null || chunkIndex <= latestProgressIndex) {
+        return false;
+      }
+      return !matchingEvents.some((candidate) =>
+        candidate.kind === "chunk_play_start" &&
+        normalizeChunkNumber(candidate.chunkIndex) === chunkIndex &&
+        (candidate.atMs ?? 0) >= (event.atMs ?? 0),
+      );
+    }) ?? null;
+    if (preloadEvent) {
+      regions.push(buildReadAloudTrafficRegion("preloading", preloadEvent, matchingEvents));
+    }
+  }
+  const outputRegion = primaryRegion ?? regions[0] ?? null;
+  if (!outputRegion) return null;
   return {
-    active: true,
-    phase,
-    label,
-    detail: chunkDetail,
-    chunkIndex,
-    chunkCount,
-    chunkText,
+    ...outputRegion,
+    regions,
   };
 }
 

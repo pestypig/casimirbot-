@@ -504,6 +504,22 @@ export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
     ],
   }),
   contract({
+    toolName: "debug.inspect_current_turn",
+    toolFamily: "capability_catalog",
+    authority: "evidence_only",
+    mutating: false,
+    requiredObservationKinds: ["agent_runtime_loop", "debug_evidence_diagnosis"],
+    allowedTerminalKinds: ["debug_evidence_diagnosis", "typed_failure", ...evidenceOnlyTerminalKinds],
+    requiredReentry: true,
+    requiresGoalSatisfaction: true,
+    aliases: [
+      "diagnose_debug_or_runtime_evidence",
+      "debug.inspect-current-turn",
+      "debug_current_turn",
+      "runtime_debug_evidence",
+    ],
+  }),
+  contract({
     toolName: "live_env.query_micro_reasoner_presets",
     toolFamily: "live_source_mail",
     authority: "evidence_only",

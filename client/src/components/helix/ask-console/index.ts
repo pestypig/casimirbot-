@@ -330,6 +330,13 @@ export { buildHelixAskLegacyCompletedReplyState } from "./HelixAskLegacyComplete
 export { buildHelixAskCompletedReplyBattleState } from "./HelixAskCompletedReplyBattleState";
 export { buildHelixAskCompletedReplyCardState } from "./HelixAskCompletedReplyCardState";
 export { buildHelixAskCompletedReplyStreamState } from "./HelixAskCompletedReplyStreamState";
+export { buildHelixAskReadAloudTrafficState } from "./HelixAskReadAloudTrafficState";
+export {
+  buildHelixAskReadAloudTrafficStateFromPlaybackProjection,
+  clearHelixAskReadAloudPlaybackProjectionForReply,
+  reduceHelixAskReadAloudPlaybackProjection,
+  reduceHelixAskReadAloudPlaybackProjectionByReply,
+} from "./HelixAskReadAloudPlaybackProjection";
 export { buildHelixAskReplyTurnState } from "./HelixAskReplyTurnState";
 export { HelixAskReplyTurnItemSurface } from "./HelixAskReplyTurnItemSurface";
 export { HelixAskReplyTurnSurface } from "./HelixAskReplyTurnSurface";
@@ -413,10 +420,14 @@ export type { HelixAskDebugDrawerSurfaceProps } from "./HelixAskDebugDrawerSurfa
 export { HelixAskAttachmentStrip } from "./HelixAskAttachmentStrip";
 export {
   HELIX_ASK_TEXT_ATTACHMENT_MAX_BYTES,
+  HELIX_ASK_TEXT_ATTACHMENT_MAX_LABEL,
   HELIX_ASK_TEXT_ATTACHMENT_PREVIEW_CHARS,
+  HELIX_ASK_TEXT_ATTACHMENT_TOO_LARGE_MESSAGE,
   base64FromText,
   buildHelixAskTextAttachmentFromText,
   buildHelixAskTextAttachmentTurnInputItem,
+  getHelixAskTextAttachmentSizeBytes,
+  getHelixAskTextAttachmentTooLargeReason,
   sha256TextHex,
 } from "./HelixAskTextAttachment";
 export {
@@ -743,6 +754,12 @@ export type { HelixAskCompletedReplyTurnSurfaceProps } from "./HelixAskCompleted
 export type { HelixAskLegacyAnswerEnvelopeSlotProps } from "./HelixAskLegacyAnswerEnvelopeSlot";
 export type { HelixAskLegacyCompletedReplySlotProps } from "./HelixAskLegacyCompletedReplySlot";
 export type { HelixAskLegacyCompletedReplyStateOptions } from "./HelixAskLegacyCompletedReplyState";
+export type { HelixAskReadAloudTrafficStateInput } from "./HelixAskReadAloudTrafficState";
+export type {
+  HelixAskReadAloudPlaybackProjection,
+  HelixAskReadAloudPlaybackProjectionByReply,
+  HelixAskReadAloudPlaybackProjectionEvent,
+} from "./HelixAskReadAloudPlaybackProjection";
 export type { HelixAskReplyTurnStateOptions } from "./HelixAskReplyTurnState";
 export type { HelixAskReplyTurnItemSurfaceProps } from "./HelixAskReplyTurnItemSurface";
 export type { HelixAskReplyTurnSurfaceProps } from "./HelixAskReplyTurnSurface";

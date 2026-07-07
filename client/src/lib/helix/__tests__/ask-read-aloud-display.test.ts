@@ -146,6 +146,144 @@ describe("ask read-aloud display helpers", () => {
     })).toBeNull();
   });
 
+  it("projects reading and preloading chunks as separate regions", () => {
+    const events = [
+      {
+        atMs: 100,
+        kind: "chunk_play_start",
+        replyId: "reply-1",
+        chunkIndex: 0,
+        chunkCount: 2,
+        text: "The first sentence is being read.",
+      },
+      {
+        atMs: 120,
+        kind: "chunk_synth_start",
+        replyId: "reply-1",
+        chunkIndex: 1,
+        chunkCount: 2,
+        text: "The second sentence is being prepared.",
+      },
+      {
+        atMs: 130,
+        kind: "chunk_synth_ok",
+        replyId: "reply-1",
+        chunkIndex: 1,
+        chunkCount: 2,
+        text: "The second sentence is being prepared.",
+        detail: "prefetch synth 120ms",
+      },
+    ];
+
+    expect(resolveReadAloudRegionTrafficState({
+      replyId: "reply-1",
+      readAloudState: "playing",
+      events,
+    })).toMatchObject({
+      active: true,
+      phase: "reading",
+      chunkIndex: 0,
+      chunkText: "The first sentence is being read.",
+      regions: [
+        {
+          phase: "reading",
+          chunkIndex: 0,
+          chunkText: "The first sentence is being read.",
+        },
+        {
+          phase: "preloading",
+          chunkIndex: 1,
+          chunkText: "The second sentence is being prepared.",
+        },
+      ],
+    });
+  });
+
+  it("requires reply-scoped playback events before advancing the active read-aloud region", () => {
+    expect(resolveReadAloudRegionTrafficState({
+      replyId: "reply-1",
+      readAloudState: "playing",
+      events: [
+        {
+          atMs: 100,
+          kind: "chunk_play_start",
+          chunkIndex: 1,
+          chunkCount: 2,
+          text: "The second sentence is being read.",
+        },
+      ],
+    })).toBeNull();
+
+    expect(resolveReadAloudRegionTrafficState({
+      replyId: "reply-1",
+      readAloudState: "playing",
+      events: [
+        {
+          atMs: 100,
+          kind: "chunk_play_start",
+          replyId: "reply-1",
+          chunkIndex: 1,
+          chunkCount: 2,
+          text: "The second sentence is being read.",
+        },
+      ],
+    })).toMatchObject({
+      active: true,
+      phase: "reading",
+      chunkIndex: 1,
+      chunkCount: 2,
+      chunkText: "The second sentence is being read.",
+    });
+  });
+
+  it("drops an ended chunk while keeping the next preloaded chunk visible", () => {
+    const events = [
+      {
+        atMs: 100,
+        kind: "chunk_play_start",
+        replyId: "reply-1",
+        chunkIndex: 0,
+        chunkCount: 2,
+        text: "The first sentence is being read.",
+      },
+      {
+        atMs: 200,
+        kind: "chunk_play_end",
+        replyId: "reply-1",
+        chunkIndex: 0,
+        chunkCount: 2,
+        text: "The first sentence is being read.",
+      },
+      {
+        atMs: 220,
+        kind: "chunk_synth_ok",
+        replyId: "reply-1",
+        chunkIndex: 1,
+        chunkCount: 2,
+        text: "The second sentence is ready next.",
+      },
+    ];
+
+    expect(resolveReadAloudRegionTrafficState({
+      replyId: "reply-1",
+      readAloudState: "playing",
+      events,
+    })).toMatchObject({
+      active: true,
+      phase: "preloading",
+      chunkIndex: 1,
+      chunkCount: 2,
+      chunkText: "The second sentence is ready next.",
+      regions: [
+        {
+          phase: "preloading",
+          chunkIndex: 1,
+          chunkText: "The second sentence is ready next.",
+        },
+      ],
+    });
+  });
+
   it("keeps the last completed chunk visible briefly for UI confirmation", () => {
     const events = [
       {

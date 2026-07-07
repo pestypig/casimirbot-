@@ -1286,6 +1286,12 @@ const buildToolTurnChainAudit = (input: {
     input.capability,
   );
   const requestedCapabilityContract = explicitCapabilityContractForCapability(requestedCapability);
+  const requestedToolFamilyContract = requestedCapabilityContract
+    ? null
+    : resolveToolFamilyContract({
+        toolName: requestedCapability,
+        toolFamily: requestedCapability,
+      });
   const operationalTrace = readRecord(input.payload.operational_capability_trace);
   const runtimeToolCall = readRecord(input.payload.runtime_tool_call);
   const concreteSelectedCapability = firstString(
@@ -1310,6 +1316,7 @@ const buildToolTurnChainAudit = (input: {
   const requestedObservationKinds = unique([
     ...readStringArray(admission?.required_observation_kinds_for_requested_capability),
     ...(requestedCapabilityContract?.required_observation_kinds ?? []),
+    ...(requestedToolFamilyContract?.requiredObservationKinds ?? []),
   ]);
   const selectedCapabilityObservationArtifact = capabilityObservationArtifact(
     input.artifacts,
