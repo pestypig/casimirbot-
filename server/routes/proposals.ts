@@ -3,6 +3,7 @@ import { z } from "zod";
 import { handleProposalAction, listProposals, fetchProposal } from "../services/proposals/engine";
 import { proposalKindSchema, proposalSafetyStatusSchema, proposalStatusSchema } from "@shared/proposals";
 import { buildPatchPromptPresets } from "../services/proposals/prompt-presets";
+import { submitPostulateProposal } from "../services/proposals/postulate";
 
 export const proposalsRouter = Router();
 
@@ -12,6 +13,15 @@ const resolveOwnerId = (req: any): string | null =>
 const ActionRequest = z.object({
   action: z.enum(["approve", "deny"]),
   note: z.string().max(2000).optional(),
+});
+
+const PostulateRequest = z.object({
+  proposalText: z.string().min(1).max(20000),
+  userComment: z.string().max(4000).optional().nullable(),
+  originatingSessionId: z.string().max(256).optional().nullable(),
+  originatingAnswerId: z.string().max(256).optional().nullable(),
+  submittedByAgentId: z.string().max(256).optional().nullable(),
+  accountType: z.enum(["developer", "user"]).optional().nullable(),
 });
 
 const todayKey = () => new Date().toISOString().slice(0, 10);
@@ -29,6 +39,44 @@ proposalsRouter.get("/", async (req, res) => {
   const ownerId = resolveOwnerId(req);
   const proposals = await listProposals(ownerId, dayParam, { kind, status, safetyStatus });
   res.json({ day: dayParam, proposals });
+});
+
+proposalsRouter.get("/postulate/board", async (req, res) => {
+  const dayParam = typeof req.query.day === "string" && req.query.day ? req.query.day : todayKey();
+  const ownerId = resolveOwnerId(req);
+  const proposals = await listProposals(ownerId, dayParam, { kind: "postulate" });
+  const board = proposals.filter((proposal) =>
+    proposal.status === "accepted" ||
+    proposal.status === "accepted_rewarded" ||
+    proposal.status === "queued_for_graph_review" ||
+    proposal.status === "implemented" ||
+    proposal.status === "claimed"
+  );
+  res.json({ day: dayParam, proposals: board });
+});
+
+proposalsRouter.post("/postulate", async (req, res) => {
+  const parsed = PostulateRequest.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
+  }
+  try {
+    const ownerId = resolveOwnerId(req);
+    const result = await submitPostulateProposal({
+      ...parsed.data,
+      ownerId,
+      accountType: parsed.data.accountType ?? (ownerId ? "user" : "user"),
+    });
+    res.json({
+      ok: true,
+      proposal: result.proposal,
+      score: result.score,
+      receiptId: result.receiptId,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(400).json({ error: "postulate_submit_failed", message });
+  }
 });
 
 const parseIdeologyPressures = (value: unknown): string[] => {

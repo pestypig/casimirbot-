@@ -180,3 +180,41 @@ export async function fetchProposalPrompts(
   const payload = (await res.json()) as { presets?: ProposalPromptPreset[]; evidenceHints?: string[] };
   return Array.isArray(payload?.presets) ? payload.presets : [];
 }
+
+export async function submitPostulateProposal(input: {
+  proposalText: string;
+  userComment?: string | null;
+  originatingSessionId?: string | null;
+  originatingAnswerId?: string | null;
+  submittedByAgentId?: string | null;
+  accountType?: "developer" | "user" | null;
+}): Promise<{ proposal: EssenceProposal; receiptId: string }> {
+  const res = await fetch("/api/proposals/postulate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const message = await res.text().catch(() => res.statusText);
+    throw new Error(message || `postulate_submit_failed:${res.status}`);
+  }
+  const payload = (await res.json()) as { proposal?: EssenceProposal; receiptId?: string };
+  if (!payload?.proposal || !payload.receiptId) {
+    throw new Error("postulate_submit_missing_payload");
+  }
+  return { proposal: payload.proposal, receiptId: payload.receiptId };
+}
+
+export async function fetchPostulateBoard(params: { day?: string } = {}): Promise<EssenceProposal[]> {
+  const search = new URLSearchParams();
+  if (params.day) search.set("day", params.day);
+  const qs = search.toString();
+  const res = await fetch(`/api/proposals/postulate/board${qs ? `?${qs}` : ""}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    throw new Error(`postulate_board_failed:${res.status}`);
+  }
+  const body = (await res.json()) as ProposalListResponse;
+  return Array.isArray(body.proposals) ? body.proposals : [];
+}
