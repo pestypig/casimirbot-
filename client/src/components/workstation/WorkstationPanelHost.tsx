@@ -14,6 +14,7 @@ import {
   readCachedAccountCapabilityPolicy,
 } from "@/lib/workstation/accountCapabilityPolicy";
 import { markInteraction } from "@/lib/workstation/performance/workstationInteractionScheduler";
+import { isUserLaunchPanel } from "@/lib/workstation/launchPanelPolicy";
 
 export function WorkstationPanelHost({ panelId }: { panelId: string }) {
   const def = getPanelDef(panelId);
@@ -29,6 +30,7 @@ export function WorkstationPanelHost({ panelId }: { panelId: string }) {
     return React.lazy(def.loader);
   }, [def]);
   const panelAccess = resolveHelixAccountPanelAccess(accountPolicy, panelId);
+  const publicLaunchPanel = isUserLaunchPanel(panelId);
 
   useEffect(() => {
     let active = true;
@@ -63,7 +65,7 @@ export function WorkstationPanelHost({ panelId }: { panelId: string }) {
     );
   }
 
-  if (panelAccess.state === "locked") {
+  if (panelAccess.state === "locked" && !publicLaunchPanel) {
     return (
       <div
         className="flex h-full min-h-0 items-center justify-center overflow-auto bg-slate-950 p-6"

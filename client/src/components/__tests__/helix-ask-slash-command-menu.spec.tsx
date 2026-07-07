@@ -31,8 +31,12 @@ describe("Helix Ask slash command menu", () => {
       runtime: { id: "codex", label: "Codex Workstation Mode" },
     });
     expect(userItems.map((item) => item.command)).toEqual(
-      expect.arrayContaining(["/calculator", "/research", "/docs", "/image"]),
+      expect.arrayContaining(["/calculator", "/research", "/docs", "/image", "/postulate"]),
     );
+    expect(userItems.find((item) => item.command === "/postulate")).toMatchObject({
+      accessState: "available",
+      insertionText: "/postulate\n\nSend this postulate to be reviewed: ",
+    });
     expect(userItems.some((item) => item.command === "/situation")).toBe(false);
 
     const developerItems = buildHelixAskSlashCommandMenuItems({
@@ -65,6 +69,45 @@ describe("Helix Ask slash command menu", () => {
     expect(items.find((item) => item.capabilityId === "repo.search")).toMatchObject({
       command: "/repo-search",
       accessState: "available",
+    });
+  });
+
+  it("keeps the postulate scaffold visible when cached policy has the public board but not the new capability", () => {
+    const stalePolicy = {
+      ...HELIX_USER_ACCOUNT_POLICY,
+      allowed_workstation_capabilities: HELIX_USER_ACCOUNT_POLICY.allowed_workstation_capabilities.filter(
+        (capability) => capability !== "postulate.submit_proposal",
+      ),
+    };
+
+    const items = buildHelixAskSlashCommandMenuItems({
+      accountPolicy: stalePolicy,
+      runtime: { id: "codex", label: "Codex Workstation Mode" },
+    });
+
+    expect(items.find((item) => item.command === "/postulate")).toMatchObject({
+      accessState: "available",
+      fallbackPanelId: "postulate-board",
+    });
+  });
+
+  it("keeps the postulate scaffold visible when live policy has not caught up to canonical public panels", () => {
+    const livePolicyWithoutPostulate = {
+      ...HELIX_USER_ACCOUNT_POLICY,
+      allowed_panels: HELIX_USER_ACCOUNT_POLICY.allowed_panels.filter((panelId) => panelId !== "postulate-board"),
+      allowed_workstation_capabilities: HELIX_USER_ACCOUNT_POLICY.allowed_workstation_capabilities.filter(
+        (capability) => capability !== "postulate.submit_proposal",
+      ),
+    };
+
+    const items = buildHelixAskSlashCommandMenuItems({
+      accountPolicy: livePolicyWithoutPostulate,
+      runtime: { id: "codex", label: "Codex Workstation Mode" },
+    });
+
+    expect(items.find((item) => item.command === "/postulate")).toMatchObject({
+      accessState: "available",
+      fallbackPanelId: "postulate-board",
     });
   });
 

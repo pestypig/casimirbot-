@@ -606,7 +606,10 @@ import {
 export { shouldBlockStagePlayMailboxWakePromptWithoutRouteMetadata };
 import { humanizeAskLiveEventToken } from "@/lib/helix/ask-display-text";
 import { hash32, stableHelixProjectionHash } from "@/lib/helix/ask-stable-hash";
-import { buildHelixAskChatReferentContextFromSources } from "@/lib/helix/ask-chat-referent-context";
+import {
+  buildHelixAskChatReferentContextForSubmit,
+  writePersistedHelixAskReferentReply,
+} from "@/lib/helix/ask-chat-referent-context";
 import {
   readHelixEnvBoolean,
   readHelixEnvEnabledUnlessExactZero,
@@ -8354,6 +8357,7 @@ export function HelixAskPill({
   const latestAskReplyId = latestAskReply?.id ?? null;
   useEffect(() => {
     if (!latestAskReply) return;
+    writePersistedHelixAskReferentReply(latestAskReply);
     try {
       publishMoralGraphCurrentAnswerFromDebugExport(normalizeReplyMasterDebugPayload(latestAskReply, null));
     } catch {
@@ -22240,16 +22244,10 @@ export function HelixAskPill({
           const chatReferentContextBuild =
             reasoningContextModeForTurn === "isolated"
               ? null
-              : buildHelixAskChatReferentContextFromSources([
-                  {
-                    source_name: "durable_chat_session",
-                    replies: durableAskRepliesForReferents,
-                  },
-                  {
-                    source_name: "visible_ask_transcript",
-                    replies: chronologicalAskRepliesForTranscript,
-                  },
-                ]);
+              : buildHelixAskChatReferentContextForSubmit({
+                  durableReplies: durableAskRepliesForReferents,
+                  visibleReplies: chronologicalAskRepliesForTranscript,
+                });
           const workspaceContextSnapshot = chatReferentContextBuild?.context
             ? {
                 ...baseWorkspaceContextSnapshot,

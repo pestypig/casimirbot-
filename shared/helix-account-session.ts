@@ -54,6 +54,7 @@ export const HELIX_USER_WORKSTATION_PANEL_IDS = [
   "workstation-storage-map",
   "workstation-task-manager",
   "moral-graph",
+  "postulate-board",
 ] as const;
 
 export const HELIX_LOCKED_WORKSTATION_PANEL_IDS = [
@@ -144,6 +145,7 @@ export const HELIX_USER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
     "theory-badge-graph.propose_frontier_conjectures",
     "moral-graph.reflect_context",
     "moral-graph.reflect_living_substrate_context",
+    "postulate.submit_proposal",
     "text_to_speech.speak_text",
     "live_env.narrator_say",
   ],

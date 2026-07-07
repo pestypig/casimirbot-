@@ -22,6 +22,12 @@ import {
   isProfileStorageAttachConsentGranted,
   revokeProfileStorageAttachConsent,
 } from "@/lib/workstation/profileStorageSync";
+import {
+  CLAIMABLE_POSTULATE_RECEIPTS_EVENT,
+  claimPostulateReceipt,
+  readClaimablePostulateReceipts,
+  type ClaimablePostulateReceipt,
+} from "@/lib/agi/proposals";
 
 type DiscordSessionView = {
   session_id: string;
@@ -261,6 +267,8 @@ export default function AccountSessionPanel() {
   const [discordSessions, setDiscordSessions] = React.useState<DiscordSessionView[]>([]);
   const [profileArchives, setProfileArchives] = React.useState<ProfileArchiveView[]>([]);
   const [categorizationJobs, setCategorizationJobs] = React.useState<CategorizationJobView[]>([]);
+  const [postulateReceipts, setPostulateReceipts] = React.useState<ClaimablePostulateReceipt[]>([]);
+  const [claimingPostulateId, setClaimingPostulateId] = React.useState<string | null>(null);
   const { userSettings, updateSettings } = useHelixStartSettings();
   const memoryRegistrySnapshot = useWorkspaceMemoryRegistryStore((state) =>
     state.buildRegistrySnapshot(),
@@ -280,6 +288,7 @@ export default function AccountSessionPanel() {
         fetchCategorizationJobs(),
       ]);
       setStatus(nextStatus);
+      setPostulateReceipts(readClaimablePostulateReceipts());
       cacheAccountCapabilityPolicy(nextStatus.account_policy ?? nextStatus.session?.account_policy ?? null);
       setDiscordSessions(nextDiscordSessions);
       setCategorizationJobs(nextCategorizationJobs);
@@ -297,6 +306,18 @@ export default function AccountSessionPanel() {
     const timer = window.setInterval(refresh, 5000);
     return () => window.clearInterval(timer);
   }, [refresh]);
+
+  React.useEffect(() => {
+    const handlePostulateReceiptsChanged = ((event: CustomEvent<{ receipts?: ClaimablePostulateReceipt[] }>) => {
+      setPostulateReceipts(
+        Array.isArray(event.detail?.receipts)
+          ? event.detail.receipts
+          : readClaimablePostulateReceipts(),
+      );
+    }) as EventListener;
+    window.addEventListener(CLAIMABLE_POSTULATE_RECEIPTS_EVENT, handlePostulateReceiptsChanged);
+    return () => window.removeEventListener(CLAIMABLE_POSTULATE_RECEIPTS_EVENT, handlePostulateReceiptsChanged);
+  }, []);
 
   const submitPasswordAccount = React.useCallback(async () => {
     setLoading(true);
@@ -526,6 +547,28 @@ export default function AccountSessionPanel() {
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to revoke profile ingress token.");
       } finally {
+        setLoading(false);
+      }
+    },
+    [refresh],
+  );
+
+  const claimPostulateCredit = React.useCallback(
+    async (receipt: ClaimablePostulateReceipt) => {
+      setLoading(true);
+      setError(null);
+      setClaimingPostulateId(receipt.proposalId);
+      try {
+        await claimPostulateReceipt({
+          proposalId: receipt.proposalId,
+          receiptId: receipt.receiptId,
+        });
+        setPostulateReceipts(readClaimablePostulateReceipts());
+        await refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to claim postulate receipt.");
+      } finally {
+        setClaimingPostulateId(null);
         setLoading(false);
       }
     },
@@ -985,6 +1028,76 @@ export default function AccountSessionPanel() {
                   </span>
                 </div>
               ))
+            )}
+          </div>
+        </section>
+
+        <section className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Postulate receipts
+          </div>
+          <p className="mt-2 text-xs text-slate-400">
+            Anonymous postulate receipts from this browser are held here until a profile claims them.
+          </p>
+          <div className="mt-3 space-y-2">
+            {postulateReceipts.length === 0 ? (
+              <p className="text-xs text-slate-500">No claimable postulate receipts in this browser.</p>
+            ) : (
+              postulateReceipts.map((receipt) => {
+                const score = typeof receipt.score === "number" ? `${Math.round(receipt.score * 100)}%` : "not scored";
+                const issued = receipt.status === "issued";
+                const claimed = receipt.status === "claimed" || issued;
+                const receiptHash = receipt.receiptIntegrityHash
+                  ? receipt.receiptIntegrityHash.length > 18
+                    ? `${receipt.receiptIntegrityHash.slice(0, 10)}...${receipt.receiptIntegrityHash.slice(-6)}`
+                    : receipt.receiptIntegrityHash
+                  : null;
+                const issuedAt = receipt.receiptIssuedAt
+                  ? new Date(receipt.receiptIssuedAt).toLocaleString()
+                  : null;
+                return (
+                  <div
+                    key={receipt.proposalId}
+                    className="grid gap-2 rounded border border-white/10 bg-slate-950/60 p-2 text-xs lg:grid-cols-[1fr_110px_110px_120px]"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-slate-200">{receipt.title}</div>
+                      <div className="mt-1 break-all font-mono text-[10px] text-slate-500">{receipt.receiptId}</div>
+                      {receiptHash ? (
+                        <div className="mt-1 truncate font-mono text-[10px] text-slate-600">
+                          hash {receiptHash}
+                        </div>
+                      ) : null}
+                      {issuedAt ? (
+                        <div className="mt-1 truncate text-[10px] text-slate-600">
+                          issued {issuedAt}
+                        </div>
+                      ) : null}
+                    </div>
+                    <span className="rounded bg-white/5 px-2 py-1 text-center text-slate-300">{score}</span>
+                    <span className="rounded bg-white/5 px-2 py-1 text-center text-slate-300">
+                      {receipt.rewardTokens > 0 ? `${receipt.rewardTokens.toLocaleString()} credits` : "receipt only"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void claimPostulateCredit(receipt)}
+                      disabled={!session || claimed || loading || claimingPostulateId === receipt.proposalId}
+                      className="rounded border border-cyan-400/40 bg-cyan-500/15 px-2 py-1 text-cyan-100 hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {issued
+                        ? "Credits issued"
+                        : claimed
+                          ? "Claimed"
+                          : claimingPostulateId === receipt.proposalId
+                            ? "Claiming"
+                            : session
+                              ? "Claim"
+                              : "Sign in"}
+                    </button>
+                  </div>
+                );
+              })
             )}
           </div>
         </section>

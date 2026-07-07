@@ -3965,6 +3965,292 @@ describe("Helix workstation tool gateway", () => {
     expect(observation.selected_chunks?.[0]?.citation_ref).toBe("paper#page=1");
   });
 
+  it("tries later scholarly full-text candidates when the first selected paper is blocked", async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("blocked.example")) {
+        return {
+          ok: false,
+          status: 403,
+          headers: { get: () => "text/plain" },
+          arrayBuffer: async () => new TextEncoder().encode("blocked").buffer,
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: (name: string) => name.toLowerCase() === "content-type" ? "text/html" : null },
+        arrayBuffer: async () => new TextEncoder().encode([
+          "<html><body>",
+          "<p>The Casimir effect between conducting plates has pressure P = - pi^2 hbar c / (240 a^4).</p>",
+          "<p>The force between conducting plates is F = P A for plate area A.</p>",
+          "</body></html>",
+        ].join(" ")).buffer,
+      };
+    }) as typeof fetch;
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      arguments: {
+        query: "Casimir effect between conducting plates",
+        paper_result_id: "openalex:blocked",
+        paper: {
+          result_id: "openalex:blocked",
+          title: "Blocked publisher Casimir record",
+          authors: [{ name: "O. Blocked" }],
+          year: 2026,
+          source_providers: ["openalex"],
+          identifiers: {
+            doi: "10.5555/blocked",
+            full_text_url: "https://blocked.example/casimir",
+          },
+          confidence: "medium",
+          is_open_access: true,
+          evidence_refs: [],
+        },
+        papers: [
+          {
+            result_id: "openalex:blocked",
+            title: "Blocked publisher Casimir record",
+            authors: [{ name: "O. Blocked" }],
+            year: 2026,
+            source_providers: ["openalex"],
+            identifiers: {
+              doi: "10.5555/blocked",
+              full_text_url: "https://blocked.example/casimir",
+            },
+            confidence: "medium",
+            is_open_access: true,
+            evidence_refs: [],
+          },
+          {
+            result_id: "arxiv:2606.00011v1",
+            title: "Accessible Casimir plate science",
+            authors: [{ name: "A. Accessible" }],
+            year: 2026,
+            source_providers: ["arxiv"],
+            identifiers: {
+              arxiv_id: "2606.00011v1",
+              url: "https://arxiv.org/abs/2606.00011v1",
+            },
+            confidence: "high",
+            is_open_access: true,
+            evidence_refs: [],
+          },
+        ],
+      },
+      turnId: "ask:test:gateway-scholarly-full-text-retry-candidates",
+      iteration: 8,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      observation_packet: {
+        capability_key: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+        action: "fetch_full_text",
+        status: "succeeded",
+      },
+      observation: {
+        schema: "helix.scholarly_full_text_observation.v1",
+        paper_result_id: "arxiv:2606.00011v1",
+        source_url: "https://arxiv.org/pdf/2606.00011v1.pdf",
+        source_kind: "html",
+        evidence_state: "full_text_usable",
+        selected_for_answer: true,
+        missing_requirements: expect.arrayContaining(["full_text_http_403"]),
+        full_text_fetch_attempts: [
+          expect.objectContaining({
+            paper_result_id: "openalex:blocked",
+            evidence_state: "full_text_unavailable",
+            missing_requirements: expect.arrayContaining(["full_text_http_403"]),
+          }),
+          expect.objectContaining({
+            paper_result_id: "arxiv:2606.00011v1",
+            evidence_state: "full_text_usable",
+          }),
+        ],
+      },
+    });
+  });
+
+  it("runs open-access recovery lookup when the only scholarly full-text candidate is blocked", async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("blocked.example")) {
+        return {
+          ok: false,
+          status: 403,
+          headers: { get: () => "text/plain" },
+          arrayBuffer: async () => new TextEncoder().encode("blocked").buffer,
+        };
+      }
+      if (url.includes("export.arxiv.org")) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => [
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+            "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+            "<entry>",
+            "<id>https://arxiv.org/abs/2606.00012</id>",
+            "<title>Casimir effect parallel conducting plates open access evidence</title>",
+            "<summary>This paper studies the Casimir effect between parallel conducting plates.</summary>",
+            "<published>2026-06-12T00:00:00Z</published>",
+            "<author><name>A. Recovery</name></author>",
+            "</entry>",
+            "</feed>",
+          ].join(""),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: (name: string) => name.toLowerCase() === "content-type" ? "text/html" : null },
+        arrayBuffer: async () => new TextEncoder().encode([
+          "<html><body>",
+          "<p>The Casimir effect between parallel conducting plates has pressure P = - pi^2 hbar c / (240 a^4).</p>",
+          "<p>The result is a bounded open-access recovery page for equation extraction.</p>",
+          "</body></html>",
+        ].join(" ")).buffer,
+      };
+    }) as typeof fetch;
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      arguments: {
+        query: "Casimir effect between conducting plates",
+        paper_result_id: "openalex:blocked",
+        paper: {
+          result_id: "openalex:blocked",
+          title: "Blocked publisher Casimir record",
+          authors: [{ name: "O. Blocked" }],
+          year: 2026,
+          source_providers: ["openalex"],
+          identifiers: {
+            doi: "10.5555/blocked",
+            full_text_url: "https://blocked.example/casimir",
+          },
+          confidence: "medium",
+          is_open_access: true,
+          evidence_refs: [],
+        },
+      },
+      turnId: "ask:test:gateway-scholarly-full-text-open-access-recovery",
+      iteration: 8,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      observation_packet: {
+        capability_key: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+        action: "fetch_full_text",
+        status: "succeeded",
+      },
+      observation: {
+        schema: "helix.scholarly_full_text_observation.v1",
+        paper_result_id: expect.stringMatching(/^arxiv:/),
+        source_url: "https://arxiv.org/pdf/2606.00012.pdf",
+        evidence_state: "full_text_usable",
+        selected_for_answer: true,
+        full_text_fetch_attempts: [
+          expect.objectContaining({
+            paper_result_id: "openalex:blocked",
+            evidence_state: "full_text_unavailable",
+            missing_requirements: expect.arrayContaining(["full_text_http_403"]),
+          }),
+          expect.objectContaining({
+            paper_result_id: expect.stringMatching(/^arxiv:/),
+            evidence_state: "full_text_usable",
+          }),
+        ],
+      },
+    });
+  });
+
+  it("runs open-access recovery lookup when an explicit scholarly source URL is blocked", async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("blocked.example")) {
+        return {
+          ok: false,
+          status: 403,
+          headers: { get: () => "text/plain" },
+          arrayBuffer: async () => new TextEncoder().encode("blocked").buffer,
+        };
+      }
+      if (url.includes("export.arxiv.org")) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => [
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+            "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+            "<entry>",
+            "<id>https://arxiv.org/abs/2606.00013</id>",
+            "<title>Casimir effect parallel plates source URL recovery</title>",
+            "<summary>This paper studies the Casimir effect between parallel conducting plates.</summary>",
+            "<published>2026-06-13T00:00:00Z</published>",
+            "<author><name>A. Source Recovery</name></author>",
+            "</entry>",
+            "</feed>",
+          ].join(""),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: (name: string) => name.toLowerCase() === "content-type" ? "text/html" : null },
+        arrayBuffer: async () => new TextEncoder().encode([
+          "<html><body>",
+          "<p>The Casimir pressure for parallel conducting plates is P = - pi^2 hbar c / (240 a^4).</p>",
+          "<p>This recovery text is enough to become bounded full-text evidence.</p>",
+          "</body></html>",
+        ].join(" ")).buffer,
+      };
+    }) as typeof fetch;
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      arguments: {
+        query: "Casimir effect between conducting plates",
+        source_url: "https://blocked.example/casimir",
+      },
+      turnId: "ask:test:gateway-scholarly-full-text-source-url-recovery",
+      iteration: 8,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      observation: {
+        schema: "helix.scholarly_full_text_observation.v1",
+        paper_result_id: expect.stringMatching(/^arxiv:/),
+        source_url: "https://arxiv.org/pdf/2606.00013.pdf",
+        evidence_state: "full_text_usable",
+        selected_for_answer: true,
+        full_text_fetch_attempts: [
+          expect.objectContaining({
+            source_url: "https://blocked.example/casimir",
+            evidence_state: "full_text_unavailable",
+            missing_requirements: expect.arrayContaining(["full_text_http_403"]),
+          }),
+          expect.objectContaining({
+            paper_result_id: expect.stringMatching(/^arxiv:/),
+            evidence_state: "full_text_usable",
+          }),
+        ],
+      },
+    });
+  });
+
   it("classifies low-text page evidence as page-image parse required instead of usable full text", async () => {
     globalThis.fetch = vi.fn(async () => ({
       ok: true,
@@ -5100,6 +5386,7 @@ describe("Helix workstation tool gateway", () => {
       scientific_evidence_sidecar?: Record<string, unknown>;
       scientific_evidence_packet?: Record<string, unknown>;
       scientific_branch_gate?: Record<string, any>;
+      scientific_evidence_graph_reflection?: Record<string, any>;
       calculator_payloads?: Array<Record<string, unknown>>;
       claim_boundary_notes?: string[];
     };
@@ -5124,6 +5411,39 @@ describe("Helix workstation tool gateway", () => {
         "tokamak_confinement_energy_payload",
       ]),
     });
+    expect(observation.scientific_evidence_graph_reflection).toMatchObject({
+      schema: "helix.scientific_evidence_graph_reflection.v1",
+      evidence_depth: "promoted_exact_equation_row",
+      evidence_object_class: "page_ocr_math_candidate",
+      branch_gate_status: "restricted",
+      claim_boundary: expect.objectContaining({
+        diagnostic_only: true,
+        observation_not_proof: true,
+        no_physical_validation: true,
+        no_badge_promotion: true,
+      }),
+      blocked_authorities: expect.arrayContaining([
+        expect.objectContaining({ authority: "proof" }),
+        expect.objectContaining({ authority: "physical_validation" }),
+        expect.objectContaining({ authority: "badge_promotion" }),
+        expect.objectContaining({ authority: "calculator_payload" }),
+      ]),
+      normalized_scientific_features: expect.objectContaining({
+        domain_hints: expect.arrayContaining(["weyl_bianchi"]),
+        fields: expect.arrayContaining(["scalar_field_phi"]),
+      }),
+      upgrade_requirements: expect.arrayContaining([
+        "Extract neighboring definitions, assumptions, and boundary conditions.",
+        "Extract derived stress-energy, energy-density, force, or pressure equations if present.",
+      ]),
+      next_tool_affordances: expect.arrayContaining([
+        expect.objectContaining({ capability: "visual_analysis.inspect_image_region" }),
+        expect.objectContaining({ capability: "scientific-calculator.bind_variables" }),
+      ]),
+      provenance_refs: expect.arrayContaining([
+        "scientific_image_sidecar:test-sidecar-bianchi",
+      ]),
+    });
     expect(observation.calculator_payloads ?? []).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ payload_id: "tokamak_thermal_pressure_payload" }),
@@ -5135,6 +5455,83 @@ describe("Helix workstation tool gateway", () => {
         expect.stringContaining("evidence_source=sidecar"),
       ]),
     );
+  });
+
+  it("classifies promoted curved-spacetime action rows as structured scientific graph reflections", async () => {
+    const scientificEvidence = buildScientificEvidencePacket({
+      cropRegionId: "equation_row_search_1",
+      sourceRefHash: "sha256:test-casimir-action-row",
+      sourceKind: "pdf_page_render",
+      pageNumber: 2,
+      bboxPx: { x: 73, y: 697, width: 1078, height: 87 },
+      regionLabel: "equation_row_search_1",
+      textCandidate:
+        "S[phi, g] = - 1/2 int_M d^D x sqrt(-g) phi [Box + xi R] phi",
+      latexCandidate:
+        "S[\\varphi, g] = - \\frac{1}{2} \\int_{M} d^D x \\sqrt{-g} \\varphi [ \\square + \\xi R] \\varphi",
+      uncertainty: [],
+      extractionStatus: "extracted",
+    });
+    const sidecar = buildScientificImageEvidenceSidecar({
+      sidecarId: "scientific_image_sidecar:test-casimir-action-row",
+      packets: [scientificEvidence],
+    });
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+      arguments: {
+        prompt:
+          "Reflect this promoted page 2 equation row to the Theory Badge Graph, preserving diagnostic-only boundaries.",
+        scientific_evidence_sidecar: sidecar,
+        mentioned_domains: ["casimir cavity", "curved spacetime", "scalar field", "curvature coupling"],
+        limit: 8,
+      },
+      turnId: "ask:test:gateway-theory-reflection-casimir-action-row",
+      iteration: 18,
+    });
+    const observation = result.observation as {
+      scientific_evidence_graph_reflection?: Record<string, any>;
+      scientific_branch_gate?: Record<string, any>;
+      calculator_payloads?: Array<Record<string, unknown>>;
+    };
+
+    expect(result.ok).toBe(true);
+    expect(observation.scientific_evidence_graph_reflection).toMatchObject({
+      schema: "helix.scientific_evidence_graph_reflection.v1",
+      evidence_depth: "promoted_exact_equation_row",
+      evidence_object_class: "curved_spacetime_field_action",
+      normalized_scientific_features: expect.objectContaining({
+        operators: expect.arrayContaining([
+          "dAlembertian_or_wave_operator",
+          "spacetime_volume_integral",
+          "metric_determinant_density",
+          "curvature_coupling_operator",
+        ]),
+        fields: expect.arrayContaining(["scalar_field_phi", "metric_field_g"]),
+        geometry_terms: expect.arrayContaining([
+          "metric_determinant",
+          "ricci_scalar_R",
+          "curved_spacetime_dimension_D",
+          "spacetime_manifold_M",
+        ]),
+      }),
+      upgrade_requirements: expect.arrayContaining([
+        "Derive or extract the stress-energy tensor relation tied to this action.",
+        "Bind curvature coupling, field, metric, and integration-domain definitions.",
+      ]),
+      blocked_authorities: expect.arrayContaining([
+        expect.objectContaining({ authority: "proof" }),
+        expect.objectContaining({ authority: "physical_validation" }),
+        expect.objectContaining({ authority: "badge_promotion" }),
+      ]),
+      claim_boundary: expect.objectContaining({
+        diagnostic_only: true,
+        no_calculator_authority_without_bound_payload: true,
+      }),
+    });
+    expect(observation.calculator_payloads ?? []).toEqual([]);
   });
 
   it("blocks exact theory reflection when a scientific image sidecar has no admissible exact equation row", async () => {
@@ -5186,6 +5583,7 @@ describe("Helix workstation tool gateway", () => {
     const observation = result.observation as {
       scientific_evidence_sidecar?: Record<string, any>;
       scientific_branch_gate?: Record<string, any>;
+      scientific_evidence_graph_reflection?: Record<string, any>;
       rejected_calculator_payload_ids?: string[];
       calculator_payloads?: Array<Record<string, unknown>>;
       claim_boundary_notes?: string[];
@@ -5204,6 +5602,23 @@ describe("Helix workstation tool gateway", () => {
       congruence_grade_floor: "insufficient_evidence",
       notes: expect.arrayContaining([
         expect.stringContaining("insufficient_exact_equation_evidence"),
+      ]),
+    });
+    expect(observation.scientific_evidence_graph_reflection).toMatchObject({
+      schema: "helix.scientific_evidence_graph_reflection.v1",
+      evidence_depth: "page_grounded_ocr",
+      branch_gate_status: "blocked",
+      blocked_authorities: expect.arrayContaining([
+        expect.objectContaining({ authority: "proof" }),
+        expect.objectContaining({ authority: "calculator_payload" }),
+      ]),
+      upgrade_requirements: expect.arrayContaining([
+        "Crop and promote exact equation rows before graph or calculator use.",
+        expect.stringContaining("Scientific branch gate blocked"),
+      ]),
+      next_tool_affordances: expect.arrayContaining([
+        expect.objectContaining({ capability: "visual_analysis.inspect_image_region" }),
+        expect.objectContaining({ capability: "scientific-calculator.bind_variables" }),
       ]),
     });
     expect(observation.calculator_payloads ?? []).toEqual([]);

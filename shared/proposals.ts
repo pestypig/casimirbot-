@@ -22,6 +22,17 @@ export const proposalStatusSchema = z.enum([
 ]);
 export type ProposalStatus = z.infer<typeof proposalStatusSchema>;
 
+export const publicPostulateProposalStatuses = [
+  "accepted",
+  "accepted_rewarded",
+  "queued_for_graph_review",
+  "implemented",
+  "claimed",
+] as const satisfies readonly ProposalStatus[];
+
+export const isPublicPostulateStatus = (status: ProposalStatus | string | null | undefined): boolean =>
+  publicPostulateProposalStatuses.includes(status as ProposalStatus);
+
 export const proposalSafetyStatusSchema = z.enum(["unknown", "pending", "running-evals", "passed", "failed"]);
 export type ProposalSafetyStatus = z.infer<typeof proposalSafetyStatusSchema>;
 

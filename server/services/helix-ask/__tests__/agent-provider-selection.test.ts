@@ -56,6 +56,8 @@ const ENV_KEYS = [
   "Path",
   "PATHEXT",
   "CODEX_AGENT_FAKE_STDOUT",
+  "CODEX_AGENT_FAKE_STDOUT_SEQUENCE",
+  "CODEX_AGENT_FAKE_CALL_INDEX",
   "CODEX_AGENT_FAKE_NATIVE_EVENT_JSONL",
   "CODEX_AGENT_FAKE_STDERR",
   "CODEX_AGENT_FAKE_EXIT_CODE",
@@ -926,6 +928,26 @@ describe("Helix Ask agent provider selection", () => {
     });
 
     expect(extractScholarlyIntent(
+      "Find a paper on the Casimir effect between conducting plates and show me the science.",
+    )).toMatchObject({
+      scholarly_query: "Casimir effect between conducting plates",
+      requested_workflow: "full_text_summary",
+      requires_full_text: true,
+      terminal_evidence_requirement: "full_text",
+    });
+
+    expect(extractScholarlyIntent(
+      'Use the paper titled "General Relativity and Weyl Frames" with arXiv id 1106.5543v1. Fetch the PDF, render page 1 into Image Lens, and extract the first displayed equation or equation-like row. Do not run a new broad lookup unless the arXiv fetch fails.',
+    )).toMatchObject({
+      scholarly_query: "General Relativity and Weyl Frames",
+      quoted_topic: "General Relativity and Weyl Frames",
+      requested_workflow: "full_text_summary",
+      requires_full_text: true,
+      requires_numeric_extraction: false,
+      terminal_evidence_requirement: "full_text",
+    });
+
+    expect(extractScholarlyIntent(
       "Find a scholarly paper with numeric Weyl-curvature invariants for spacetime, extract reported numeric parameters with units, then calculate only if those cited values are available.",
     )).toMatchObject({
       scholarly_query: "Weyl-curvature invariants spacetime",
@@ -954,6 +976,48 @@ describe("Helix Ask agent provider selection", () => {
       ],
       terminal_evidence_requirement: "full_text",
     });
+
+    const scienceBody = {
+      turn_id: "ask:test:scholarly-show-science-workflow-plan",
+      agent_runtime: "codex",
+      question: "Find a paper on the Casimir effect between conducting plates and show me the science.",
+    };
+    const sciencePlan = buildCompoundCapabilityDependencyGatewayCallRequests(scienceBody);
+    expect(sciencePlan.map((request) => (request as any).capability_id)).toEqual([
+      "scholarly-research.lookup_papers",
+    ]);
+    expect((sciencePlan[0] as any).arguments.query).toBe("Casimir effect between conducting plates");
+    expect((sciencePlan[0] as any).arguments.planned_scholarly_capability_chain).toMatchObject({
+      planned_capabilities: [
+        "scholarly-research.lookup_papers",
+        "scholarly-research.fetch_full_text",
+      ],
+      terminal_evidence_requirement: "full_text",
+    });
+
+    const pdfPageBody = {
+      turn_id: "ask:test:scholarly-pdf-page-equation-workflow-plan",
+      agent_runtime: "codex",
+      question:
+        'Use the paper titled "General Relativity and Weyl Frames" with arXiv id 1106.5543v1. Fetch the PDF, render page 1 into Image Lens, and extract the first displayed equation or equation-like row. Do not run a new broad lookup unless the arXiv fetch fails.',
+    };
+    const pdfPagePlan = buildCompoundCapabilityDependencyGatewayCallRequests(pdfPageBody);
+    expect(pdfPagePlan.map((request) => (request as any).capability_id)).toEqual([
+      "scholarly-research.lookup_papers",
+    ]);
+    expect((pdfPagePlan[0] as any).arguments.query).toBe("General Relativity and Weyl Frames");
+    expect((pdfPagePlan[0] as any).arguments.scholarly_intent).toMatchObject({
+      requested_workflow: "full_text_summary",
+      requires_numeric_extraction: false,
+    });
+    expect((pdfPagePlan[0] as any).arguments.planned_scholarly_capability_chain).toMatchObject({
+      planned_capabilities: [
+        "scholarly-research.lookup_papers",
+        "scholarly-research.fetch_full_text",
+      ],
+      terminal_evidence_requirement: "full_text",
+    });
+    expect(JSON.stringify(pdfPagePlan)).not.toContain("scholarly-research.extract_numeric_parameters");
 
     const numericBody = {
       turn_id: "ask:test:scholarly-numeric-workflow-plan",
@@ -1831,6 +1895,55 @@ describe("Helix Ask agent provider selection", () => {
         notProofAuthority: true,
       }),
     });
+
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify({
+      entries: [{
+        region_label: "scholarly_pdf_page_2_equation_pass",
+        text_candidate: "The next rendered page contains the displayed equation candidate.",
+        latex_candidate: "E_2 = \\frac{1}{2}\\sum_n \\omega_n",
+        extraction_status: "extracted",
+        uncertainty: ["fixture OCR for scholarly PDF page 2"],
+      }],
+    });
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        'HELIX_CAPABILITY_LANE_REQUEST_JSON: {"capability":"visual_analysis.inspect_image_region","bbox_px":{"x":0,"y":0,"width":1224,"height":1584},"question":"Extract the first exact displayed equation from page 2.","region_label":"scholarly_pdf_page_2_equation_pass","reason_for_crop":"User requested the next page equation.","assistant_answer":false,"terminal_eligible":false}',
+        "Using page 2 Image Lens evidence, the extracted equation candidate is page-grounded.",
+      ],
+    });
+
+    const nextPageFollowup = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-followup-page-image-required:third",
+        thread_id: threadId,
+        agent_runtime: "codex",
+        question: "Now inspect the next pages of that paper and extract the first exact displayed equation with page evidence.",
+      },
+      headers: {},
+    });
+
+    expect(nextPageFollowup.ok).toBe(true);
+    expect(nextPageFollowup.text).toContain("Using page 2 Image Lens evidence");
+    expect((nextPageFollowup.debug as any)?.runtime_lane_request_loop).toMatchObject({
+      status: "lane_observation_reentered",
+      scholarly_pdf_image_candidate_enriched: true,
+      synthesis_reason: "scholarly_pdf_page_affordance_enriched_model_image_lens_request",
+      candidate: {
+        source_kind: "pdf_page_render",
+        page_number: 2,
+        page_image_ref: expect.stringContaining("/page/2"),
+      },
+    });
+    expect((nextPageFollowup.debug as any)?.capability_lane_observation_packets).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        capability_key: "visual_analysis.inspect_image_region",
+        status: "succeeded",
+      }),
+    ]));
   });
 
   it("escalates current-turn scholarly PDF affordances into Image Lens when asked to show the science", async () => {
@@ -1991,6 +2104,114 @@ describe("Helix Ask agent provider selection", () => {
         "accessible_pdf_or_full_text_required",
         "equation_extraction_refs_missing",
       ]),
+    });
+  });
+
+  it("prefers fetchable scholarly PDF candidates over first blocked metadata candidates", async () => {
+    const intent = extractScholarlyIntent(
+      "Find a paper on the Casimir effect between conducting plates and show me the science.",
+    );
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("api.openalex.org")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            results: [{
+              id: "https://openalex.org/W403",
+              title: "Casimir effect between conducting plates blocked publisher landing",
+              publication_year: 2026,
+              ids: { doi: "https://doi.org/10.5555/openalex-403" },
+              authorships: [{ author: { display_name: "O. Blocked" } }],
+              primary_location: {
+                landing_page_url: "https://blocked.example/casimir",
+                source: { display_name: "Blocked Journal" },
+              },
+              open_access: { is_oa: true, oa_url: "https://blocked.example/casimir" },
+            }],
+          }),
+        };
+      }
+      if (url.includes("export.arxiv.org")) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => [
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+            "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+            "<entry>",
+            "<id>https://arxiv.org/abs/2606.00011</id>",
+            "<title>Casimir effect between conducting plates accessible PDF evidence</title>",
+            "<summary>This paper studies the Casimir effect between conducting plates and has accessible PDF evidence.</summary>",
+            "<published>2026-06-11T00:00:00Z</published>",
+            "<author><name>A. Accessible</name></author>",
+            "</entry>",
+            "</feed>",
+          ].join(""),
+        };
+      }
+      if (url.includes("arxiv.org/pdf/2606.00011")) {
+        return {
+          ok: false,
+          status: 418,
+          headers: { get: () => "text/plain" },
+          arrayBuffer: async () => new TextEncoder().encode("fixture stops after source selection").buffer,
+        };
+      }
+      return {
+        ok: false,
+        status: 403,
+        headers: { get: () => "text/plain" },
+        arrayBuffer: async () => new TextEncoder().encode("blocked").buffer,
+        json: async () => ({}),
+        text: async () => "",
+      };
+    }) as typeof fetch;
+
+    const results = await runExplicitWorkstationGatewayCalls({
+      agentRuntime: "codex",
+      turnId: "ask:test:scholarly-fetchable-candidate-selection",
+      body: {
+        turn_id: "ask:test:scholarly-fetchable-candidate-selection",
+        agent_runtime: "codex",
+        question: "Find a paper on the Casimir effect between conducting plates and show me the science.",
+        workstation_gateway_calls: [{
+          capability_id: "scholarly-research.lookup_papers",
+          mode: "read",
+          compound_outcome: "scholarly_research_workflow",
+          arguments: {
+            query: "Casimir effect between conducting plates",
+            providers: ["openalex", "arxiv"],
+            limit: 5,
+            allow_scholarly_dependent_chain: true,
+            scholarly_intent: intent,
+            planned_scholarly_capability_chain: {
+              schema: "helix.scholarly_capability_chain_plan.v1",
+              requested_workflow: "full_text_summary",
+              planned_capabilities: [
+                "scholarly-research.lookup_papers",
+                "scholarly-research.fetch_full_text",
+              ],
+              terminal_evidence_requirement: "full_text",
+              calculator_requires_numeric_evidence: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          },
+        }],
+      },
+    });
+
+    expect(results.map((result) => result.capability_id)).toEqual([
+      "scholarly-research.lookup_papers",
+      "scholarly-research.fetch_full_text",
+    ]);
+    expect((results[1].observation as any)).toMatchObject({
+      paper_result_id: expect.stringContaining("arxiv"),
+      source_url: "https://arxiv.org/pdf/2606.00011.pdf",
+      status: "failed",
+      missing_requirements: expect.arrayContaining(["full_text_http_418"]),
     });
   });
 

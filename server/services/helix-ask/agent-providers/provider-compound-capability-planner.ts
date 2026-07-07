@@ -36,6 +36,42 @@ const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : 
 
 const unquotePrompt = (prompt: string): string => prompt.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
 
+const scholarlyFullTextFetchabilityScore = (paper: Record<string, unknown>): number => {
+  const identifiers = readRecord(paper.identifiers);
+  const provider = readString(paper.provider);
+  const pdfUrl = readString(identifiers?.pdf_url);
+  const fullTextUrl = readString(identifiers?.full_text_url);
+  const url = readString(identifiers?.url);
+  const arxivId = readString(identifiers?.arxiv_id);
+  const doi = readString(identifiers?.doi);
+  let score = 0;
+  if (arxivId) score += 100;
+  if (pdfUrl) score += /arxiv\.org\/pdf\//i.test(pdfUrl) ? 100 : 80;
+  if (url && /arxiv\.org\/abs\//i.test(url)) score += 90;
+  if (fullTextUrl) score += /\.pdf(?:[?#].*)?$/i.test(fullTextUrl) ? 70 : 35;
+  if (url && /\.pdf(?:[?#].*)?$/i.test(url)) score += 65;
+  if (readString(paper.is_open_access) === "true" || paper.is_open_access === true) score += 20;
+  if (provider === "arxiv") score += 40;
+  if (provider === "unpaywall" || provider === "core") score += 30;
+  if (provider === "openalex") score += 5;
+  if (doi) score += 2;
+  return score;
+};
+
+const selectScholarlyPaperForFullTextFetch = (
+  papers: Record<string, unknown>[],
+  fallbackPaper: Record<string, unknown> | undefined,
+): Record<string, unknown> | null => {
+  const ranked = papers
+    .map((paper, index) => ({
+      paper,
+      index,
+      score: scholarlyFullTextFetchabilityScore(paper),
+    }))
+    .sort((left, right) => right.score - left.score || left.index - right.index);
+  return ranked.find((entry) => entry.score > 0)?.paper ?? fallbackPaper ?? null;
+};
+
 const hasNegatedToolInstruction = (prompt: string, toolPattern: RegExp): boolean => {
   const unquoted = unquotePrompt(prompt);
   const negated = /\b(?:do\s+not|don't|dont|without|no\s+need\s+to|not\s+asking\s+to|avoid)\b[\s\S]{0,100}/gi;
@@ -2348,15 +2384,19 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
     const requestedWorkflow = readString(scholarlyIntent?.requested_workflow);
     if (requestArgs?.allow_scholarly_dependent_chain !== true) return null;
     const query = readString(observation?.query) ?? readString(requestArgs?.query) ?? "paper full text";
-    const selectedPaper = outcome === SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME
-      ? papers[0]
-      : papers.find((paper) =>
+    const relevanceSelectedPaper = papers.find((paper) =>
           readString(paper.result_id) === readString(attachScholarlyLookupRelevanceGate({
             result: input.result,
             papers,
             query,
             variableSourcePlan,
           }).selected_result_id)
+        );
+    const selectedPaper = outcome === SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME
+      ? selectScholarlyPaperForFullTextFetch(papers, firstPaper)
+      : selectScholarlyPaperForFullTextFetch(
+          relevanceSelectedPaper ? [relevanceSelectedPaper, ...papers.filter((paper) => paper !== relevanceSelectedPaper)] : papers,
+          relevanceSelectedPaper ?? firstPaper,
         );
     if (!selectedPaper) return null;
     if (!firstPaper) return null;

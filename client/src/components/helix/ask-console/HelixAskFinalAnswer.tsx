@@ -1,9 +1,14 @@
 import React, { type ReactNode } from "react";
+import { renderToString as renderKatexToString } from "katex";
+import "katex/dist/katex.min.css";
+
 import { parseHelixAskFinalAnswerBulletLine } from "@/lib/helix/ask-answer-rendering";
 import type {
   ReadAloudRegionTrafficRegion,
   ReadAloudRegionTrafficState,
 } from "@/lib/helix/ask-read-aloud-display";
+
+import { HelixAskMathHtmlSurface } from "./HelixAskMathHtmlSurface";
 
 export type HelixAskFinalAnswerTextSegment = {
   key: string;
@@ -14,6 +19,12 @@ export type HelixAskFinalAnswerBlock =
   | {
       kind: "blank";
       key: string;
+    }
+  | {
+      kind: "code";
+      key: string;
+      language: string | null;
+      text: string;
     }
   | {
       kind: "bullet";
@@ -60,36 +71,71 @@ function buildHelixAskFinalAnswerTextSegments(keyPrefix: string, text: string): 
   return segments.length > 0 ? segments : [{ key: `${keyPrefix}-segment-0`, text: normalized }];
 }
 
+function parseHelixAskFinalAnswerCodeFence(line: string): string | null {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("```")) return null;
+  const language = trimmed.replace(/^```/, "").trim();
+  return language || "";
+}
+
 export function buildHelixAskFinalAnswerBlocks(content: unknown): HelixAskFinalAnswerBlock[] {
   const text = coerceText(content);
   if (!text) return [];
-  return text.replace(/\r\n/g, "\n").split("\n").map((line, index) => {
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const blocks: HelixAskFinalAnswerBlock[] = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index] ?? "";
+    const codeLanguage = parseHelixAskFinalAnswerCodeFence(line);
+    if (codeLanguage !== null) {
+      const codeLines: string[] = [];
+      let closingIndex = index;
+      for (let codeIndex = index + 1; codeIndex < lines.length; codeIndex += 1) {
+        const codeLine = lines[codeIndex] ?? "";
+        if (parseHelixAskFinalAnswerCodeFence(codeLine) !== null) {
+          closingIndex = codeIndex;
+          break;
+        }
+        codeLines.push(codeLine);
+        closingIndex = codeIndex;
+      }
+      blocks.push({
+        kind: "code",
+        key: `final-answer-code-${index}`,
+        language: codeLanguage || null,
+        text: codeLines.join("\n"),
+      });
+      index = closingIndex;
+      continue;
+    }
     const trimmed = line.trim();
     if (!trimmed) {
-      return {
+      blocks.push({
         kind: "blank",
         key: `final-answer-blank-${index}`,
-      };
+      });
+      continue;
     }
     const bulletText = parseHelixAskFinalAnswerBulletLine(trimmed);
     if (bulletText) {
       const key = `final-answer-bullet-${index}`;
-      return {
+      blocks.push({
         kind: "bullet",
         key,
         text: bulletText,
         segments: buildHelixAskFinalAnswerTextSegments(key, bulletText),
-      };
+      });
+      continue;
     }
     const key = `final-answer-line-${index}`;
-    return {
+    blocks.push({
       kind: "line",
       key,
       text: trimmed,
       segments: buildHelixAskFinalAnswerTextSegments(key, trimmed),
       isSectionHeader: /:$/.test(trimmed) && trimmed.length <= 80,
-    };
-  });
+    });
+  }
+  return blocks;
 }
 
 function normalizeReadAloudMatchText(value: string): string {
@@ -149,12 +195,14 @@ export function resolveHelixAskFinalAnswerReadAloudBlockKeys(
   const chunkText = normalizeReadAloudMatchText(state.chunkText ?? "");
   const targets = collectHelixAskFinalAnswerReadAloudTargets(blocks);
   if (chunkText) {
-    const exactMatch = targets.find((target) => target.normalizedText === chunkText);
-    if (exactMatch) return [exactMatch.key];
+    const exactSegmentMatch = targets.find((target) => target.isSegment && target.normalizedText === chunkText);
+    if (exactSegmentMatch) return [exactSegmentMatch.key];
     const segmentTargetsInChunk = targets
       .filter((target) => target.isSegment && chunkText.includes(target.normalizedText))
       .map((target) => target.key);
     if (segmentTargetsInChunk.length > 0) return segmentTargetsInChunk;
+    const exactMatch = targets.find((target) => target.normalizedText === chunkText);
+    if (exactMatch) return [exactMatch.key];
     const containingMatches = targets
       .filter((target) => target.normalizedText.includes(chunkText))
       .sort((left, right) => {
@@ -175,6 +223,80 @@ export function resolveHelixAskFinalAnswerReadAloudBlockKeys(
     return firstTarget ? [firstTarget] : [];
   }
   return [];
+}
+
+function renderHelixAskInlineMarkdownText(
+  text: string,
+  renderText: (value: string) => ReactNode,
+): ReactNode {
+  const parts = text.split(/(`[^`]+`)/g).filter(Boolean);
+  if (parts.length === 0) return renderText(text);
+  return parts.map((part, index) => {
+    if (/^`[^`]+`$/.test(part)) {
+      const inlineCode = part.replace(/^`/, "").replace(/`$/, "");
+      return (
+        <code
+          key={`inline-code-${index}`}
+          className="rounded border border-cyan-300/20 bg-slate-950/75 px-1 py-0.5 font-mono text-[0.92em] text-cyan-100"
+        >
+          {inlineCode}
+        </code>
+      );
+    }
+    return <React.Fragment key={`inline-text-${index}`}>{renderText(part)}</React.Fragment>;
+  });
+}
+
+function isHelixAskLatexCodeBlockLanguage(language: string | null): boolean {
+  return /^(?:latex|tex|math)$/i.test(language?.trim() ?? "");
+}
+
+function renderHelixAskFinalAnswerCodeBlock(block: Extract<HelixAskFinalAnswerBlock, { kind: "code" }>) {
+  if (isHelixAskLatexCodeBlockLanguage(block.language)) {
+    try {
+      const katexHtml = renderKatexToString(block.text, {
+        displayMode: true,
+        strict: "ignore",
+        throwOnError: false,
+      });
+      return (
+        <div
+          key={block.key}
+          className="rounded-md border border-cyan-300/20 bg-slate-950/80"
+          data-testid="helix-ask-final-answer-code-block"
+          data-code-language={block.language ?? undefined}
+          data-code-renderer="katex"
+        >
+          <div className="border-b border-white/10 px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-cyan-100/80">
+            {block.language}
+          </div>
+          <div className="px-3 py-3">
+            <HelixAskMathHtmlSurface html={katexHtml} displayMode />
+          </div>
+        </div>
+      );
+    } catch {
+      // Fall back to the raw code surface below; the final answer remains readable.
+    }
+  }
+  return (
+    <div
+      key={block.key}
+      className="rounded-md border border-cyan-300/20 bg-slate-950/80"
+      data-testid="helix-ask-final-answer-code-block"
+      data-code-language={block.language ?? undefined}
+      data-code-renderer="raw"
+    >
+      {block.language ? (
+        <div className="border-b border-white/10 px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-cyan-100/80">
+          {block.language}
+        </div>
+      ) : null}
+      <pre className="whitespace-pre-wrap break-words px-3 py-2 font-mono text-xs leading-relaxed text-slate-100 [overflow-wrap:anywhere]">
+        <code>{block.text}</code>
+      </pre>
+    </div>
+  );
 }
 
 function HelixAskReadAloudBlockReticle({
@@ -263,7 +385,7 @@ export function HelixAskFinalAnswer({ text, meta, renderContent, readAloudTraffi
   const shouldWrapWholeAnswerForUnresolvedReadAloud =
     Boolean(readAloudTraffic?.active) &&
     resolvedReticleRegions.length === 0 &&
-    (readAloudTraffic.phase === "loading" || readAloudTraffic.phase === "resuming");
+    (readAloudTraffic?.phase === "loading" || readAloudTraffic?.phase === "resuming");
   const renderBlockWithReticle = (key: string, node: ReactNode) => {
     const matchingRegions = resolvedReticleRegions.filter((entry) => entry.blockKey === key);
     if (matchingRegions.length === 0) return node;
@@ -298,7 +420,7 @@ export function HelixAskFinalAnswer({ text, meta, renderContent, readAloudTraffi
     segments.map((segment, index) => (
       <React.Fragment key={segment.key}>
         {index > 0 ? " " : null}
-        {renderSegmentWithReticle(segment.key, renderText(segment.text))}
+        {renderSegmentWithReticle(segment.key, renderHelixAskInlineMarkdownText(segment.text, renderText))}
       </React.Fragment>
     ));
   const answerBody = (
@@ -306,6 +428,9 @@ export function HelixAskFinalAnswer({ text, meta, renderContent, readAloudTraffi
       {blocks.map((block) => {
         if (block.kind === "blank") {
           return <div key={block.key} className="h-2" aria-hidden="true" />;
+        }
+        if (block.kind === "code") {
+          return renderHelixAskFinalAnswerCodeBlock(block);
         }
         if (block.kind === "bullet") {
           return renderBlockWithReticle(block.key, (

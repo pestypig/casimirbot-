@@ -253,6 +253,12 @@ const shouldRunScientificImageTheoryReflectionAfterLane = (body: Record<string, 
 const asksForScientificImageTheoryContinuation = (body: Record<string, unknown>): boolean => {
   if (hasCurrentTurnImageInput(body)) return false;
   const question = readQuestion(body);
+  const scholarlyIntent = detectScholarlyResearchIntent(question);
+  const createsScholarlyPageImageEvidence =
+    scholarlyIntent.researchRequested &&
+    scholarlyIntent.fullTextRequested &&
+    /\b(?:arxiv|doi|pdf|paper\s+titled|fetch|render|page\s+\d+|image\s+lens|displayed\s+equation|equation[-\s]+like\s+row)\b/i.test(question);
+  if (createsScholarlyPageImageEvidence) return false;
   if (isScholarlyFollowupReferencePrompt(question)) return false;
   const sourceTargetIntent = readSourceTargetIntentFromBody(body);
   const requestedOutputs = readStringArray(sourceTargetIntent?.requested_outputs);
@@ -263,7 +269,11 @@ const asksForScientificImageTheoryContinuation = (body: Record<string, unknown>)
     /\b(?:theory\s+badge\s+graph|badge\s+graph|theory\s+reflection|reflect(?:ion)?|compare|comparison|congruence|branch\s+gate|calculator\s+payloads?)\b/i.test(question);
   const refersToPriorImageEvidence =
     /\b(?:prior|previous|last|earlier|extracted|extraction|image\s+evidence|image\s+lens|sidecar|evidence\s+packet|scientific\s+image|this\s+image|that\s+image|the\s+image|this\s+result|that\s+result|previous\s+result|equations?|exact\s+rows?|crop\s+observations?)\b/i.test(question);
-  return sourceTargetRequestsTheory || (wantsTheoryReflection && refersToPriorImageEvidence);
+  const wantsExactRowContinuation =
+    /\b(?:crop|inspect|use|promote|retry|extract)\b/i.test(question) &&
+    /\b(?:exact\s+(?:equation\s+)?row|row\s+crop|displayed\s+equation|equation\s+row|exact\s+equation\s+admissibility|partial_candidate|context_crop_not_exact_equation_row)\b/i.test(question) &&
+    /\b(?:prior|previous|last|earlier|just\s+found|page\s+\d+|that\s+(?:paper|page|equation|result)|the\s+(?:paper|page|equation|result))\b/i.test(question);
+  return sourceTargetRequestsTheory || (wantsTheoryReflection && refersToPriorImageEvidence) || wantsExactRowContinuation;
 };
 
 const readScientificEvidencePacket = (value: unknown): ScientificEvidencePacketV1 | null => {
@@ -912,6 +922,54 @@ const readScientificImageSourceMaterialFromBody = (
   };
 };
 
+const readScientificImageSourceMaterialFromLanePacket = (
+  packet: HelixAgentStepObservationPacket,
+): ScientificImageSourceMaterial | null => {
+  const regionInspection = readRecord(readRecord(packet.state_delta)?.visual_analysis_region_inspection);
+  const receipt = readRecord(regionInspection?.receipt);
+  const sourceId = readString(regionInspection?.source_id ?? receipt?.source_id);
+  const sourceAttachmentId = readString(regionInspection?.source_attachment_id ?? receipt?.source_attachment_id);
+  const sourceKindRaw = readString(receipt?.source_kind ?? regionInspection?.source_kind);
+  const sourceKind =
+    sourceKindRaw === "image_lens_source" ||
+    sourceKindRaw === "image_attachment" ||
+    sourceKindRaw === "pdf_page_render" ||
+    sourceKindRaw === "manual_image_url"
+      ? sourceKindRaw
+      : "unknown";
+  const sourceImageRef =
+    readString(receipt?.source_image_ref ?? receipt?.sourceImageRef) ??
+    readString(receipt?.page_image_ref ?? receipt?.pageImageRef) ??
+    readString(regionInspection?.source_image_ref ?? regionInspection?.sourceImageRef) ??
+    readString(regionInspection?.page_image_ref ?? regionInspection?.pageImageRef);
+  if (!sourceId || !sourceImageRef) return null;
+  const evidencePacket = readScientificEvidencePacket(receipt?.scientific_evidence_packet);
+  const sourceDimensions = readRecord(receipt?.source_dimensions_px ?? receipt?.sourceDimensionsPx) ??
+    evidencePacket?.row_quality_diagnostics.source_dimensions_px ??
+    null;
+  const width = readNumber(sourceDimensions?.width);
+  const height = readNumber(sourceDimensions?.height);
+  return {
+    source_id: sourceId,
+    source_attachment_id: sourceAttachmentId,
+    source_kind: sourceKind as ScientificImageSourceMaterial["source_kind"],
+    source_image_ref: sourceImageRef,
+    source_ref_hash: `sha256:${hashScientificImageSourceShort(sourceImageRef)}`,
+    has_inline_source_image_data: /^data:image\//i.test(sourceImageRef),
+    dimensions_px: width && height ? { width, height } : null,
+  };
+};
+
+const readLatestScientificImageSourceMaterialFromPackets = (
+  packets: HelixAgentStepObservationPacket[],
+): ScientificImageSourceMaterial | null => {
+  for (const packet of packets.slice().reverse()) {
+    const material = readScientificImageSourceMaterialFromLanePacket(packet);
+    if (material) return material;
+  }
+  return null;
+};
+
 const publicScientificImageSourceMaterialProjection = (
   material: ScientificImageSourceMaterial | null,
 ): Record<string, unknown> | null =>
@@ -1008,6 +1066,7 @@ const rememberScientificImageEvidenceSidecarsFromPackets = (input: {
       packets: input.packets,
     }),
     source: "current_turn_sidecar",
+    sourceMaterial: readLatestScientificImageSourceMaterialFromPackets(input.packets),
   });
 };
 
@@ -1127,10 +1186,12 @@ const buildScientificImageSidecarFromLanePackets = (input: {
 type ScientificImageRetryCandidate = {
   crop_region_id: string;
   requested_equation_label: string | null;
-  retry_variant: "padded_row" | "label_anchor" | "equation_body";
+  retry_variant: "padded_row" | "label_anchor" | "equation_body" | "row_search_band";
   original_bbox_px: { x: number; y: number; width: number; height: number };
   retry_bbox_px: { x: number; y: number; width: number; height: number };
   retry_reasons: string[];
+  extracted_latex_candidate: string | null;
+  row_search_band_index: number | null;
   lineage: Array<{
     stage: "original" | "retry";
     bbox_px: { x: number; y: number; width: number; height: number };
@@ -1195,21 +1256,78 @@ const scientificImageRetryVariantBbox = (
   return scientificImageRetryBbox(normalized);
 };
 
+const scientificImageRowSearchBandBboxes = (
+  bbox: ScientificImageRetryCandidate["retry_bbox_px"],
+): ScientificImageRetryCandidate["retry_bbox_px"][] => {
+  const normalized = {
+    x: Math.max(0, Math.floor(bbox.x)),
+    y: Math.max(0, Math.floor(bbox.y)),
+    width: Math.max(1, Math.floor(bbox.width)),
+    height: Math.max(1, Math.floor(bbox.height)),
+  };
+  const bandHeight = Math.max(36, Math.min(128, Math.round(normalized.height * 0.055)));
+  const xMargin = Math.round(normalized.width * 0.06);
+  const x = normalized.x + xMargin;
+  const width = Math.max(80, normalized.width - xMargin * 2);
+  return [0.12, 0.2, 0.28, 0.36, 0.44, 0.52, 0.6]
+    .map((fraction) => ({
+      x,
+      y: normalized.y + Math.min(
+        Math.max(0, normalized.height - bandHeight),
+        Math.round(normalized.height * fraction),
+      ),
+      width,
+      height: bandHeight,
+    }));
+};
+
 const buildScientificImageRetryCandidates = (
   sidecar: ScientificImageEvidenceSidecarV1,
 ): ScientificImageRetryCandidate[] =>
   sidecar.packets
-    .filter((packet) => packet.evidence_role === "exact_equation_candidate")
     .flatMap((packet) => {
+      const promotionReasons = packet.exact_row_promotion?.reasons ?? [];
+      const isExactCandidate = packet.evidence_role === "exact_equation_candidate";
+      const isBroadEquationContext =
+        packet.evidence_role === "context_only" &&
+        packet.exact_equation_admissibility === "partial_candidate" &&
+        promotionReasons.includes("context_crop_not_exact_equation_row") &&
+        Boolean(packet.latex_candidate || packet.text_candidate);
+      if (!isExactCandidate && !isBroadEquationContext) return [];
       const qualityReasons = packet.quality_flags.filter((flag) => retryableScientificImageQualityFlags.has(flag));
       const retryReasons = [
         ...(packet.exact_equation_admissibility === "partial_candidate" ? ["partial_exact_equation_row"] : []),
         ...(packet.exact_equation_admissibility === "inadmissible_for_exact_equation" ? ["rejected_exact_equation_row"] : []),
+        ...(isBroadEquationContext ? ["context_crop_not_exact_equation_row"] : []),
         ...(packet.confidence <= 0.55 ? ["low_confidence"] : []),
         ...qualityReasons,
       ];
       const uniqueRetryReasons = Array.from(new Set(retryReasons));
-      if (uniqueRetryReasons.length === 0 || packet.quality_flags.includes("row_crop_too_broad_for_exact_equation")) return [];
+      if (uniqueRetryReasons.length === 0) return [];
+      if (isBroadEquationContext || packet.quality_flags.includes("row_crop_too_broad_for_exact_equation")) {
+        return scientificImageRowSearchBandBboxes(packet.bbox_px).map((retryBbox, bandIndex) => ({
+          crop_region_id: packet.crop_region_id,
+          requested_equation_label: packet.requested_equation_label,
+          retry_variant: "row_search_band" as const,
+          original_bbox_px: packet.bbox_px,
+          retry_bbox_px: retryBbox,
+          retry_reasons: uniqueRetryReasons,
+          extracted_latex_candidate: packet.latex_candidate,
+          row_search_band_index: bandIndex + 1,
+          lineage: [
+            {
+              stage: "original" as const,
+              bbox_px: packet.bbox_px,
+              reason: `original ${packet.exact_equation_admissibility} broad equation context`,
+            },
+            {
+              stage: "retry" as const,
+              bbox_px: retryBbox,
+              reason: `row_search_band_${bandIndex + 1} retry for ${uniqueRetryReasons.join(", ")}`,
+            },
+          ],
+        }));
+      }
       const variants: ScientificImageRetryCandidate["retry_variant"][] = ["padded_row"];
       if (packet.quality_flags.includes("missing_requested_equation_label")) variants.push("label_anchor");
       if (
@@ -1228,6 +1346,8 @@ const buildScientificImageRetryCandidates = (
           original_bbox_px: packet.bbox_px,
           retry_bbox_px: retryBbox,
           retry_reasons: uniqueRetryReasons,
+          extracted_latex_candidate: packet.latex_candidate,
+          row_search_band_index: null,
           lineage: [
             {
               stage: "original" as const,
@@ -1263,6 +1383,7 @@ const scientificImageRetryDebugProjection = (input: {
     crop_region_id: candidate.crop_region_id,
     requested_equation_label: candidate.requested_equation_label,
     retry_variant: candidate.retry_variant,
+    row_search_band_index: candidate.row_search_band_index,
     original_bbox_px: candidate.original_bbox_px,
     retry_bbox_px: candidate.retry_bbox_px,
     retry_reasons: candidate.retry_reasons,
@@ -1340,13 +1461,20 @@ const retryScientificImageSidecarIfNeeded = async (input: {
         source_dimensions_px: input.sourceMaterial.dimensions_px,
         bbox_px: candidate.retry_bbox_px,
         question: [
-          "Retry this exact equation row crop using the original image source.",
+          candidate.retry_variant === "row_search_band"
+            ? "Inspect this narrow page band as a candidate exact displayed-equation row using the original image source."
+            : "Retry this exact equation row crop using the original image source.",
           candidate.requested_equation_label ? `Requested equation label: ${candidate.requested_equation_label}.` : "",
+          !candidate.requested_equation_label && candidate.extracted_latex_candidate
+            ? `Previously extracted equation candidate: ${candidate.extracted_latex_candidate}.`
+            : "",
           "Return observation-only OCR/math candidates.",
         ].filter(Boolean).join(" "),
         reason_for_crop: `Retry partial Image Lens exact row: ${candidate.retry_reasons.join(", ")}.`,
         region_label: candidate.requested_equation_label
           ? `retry_equation_${candidate.requested_equation_label}`
+          : candidate.retry_variant === "row_search_band"
+            ? `equation_row_search_${candidate.row_search_band_index ?? "candidate"}`
           : `retry_${candidate.crop_region_id.replace(/[^a-z0-9_.-]+/gi, "_")}`,
         requested_equation_label: candidate.requested_equation_label,
         parent_region_id: candidate.crop_region_id,
@@ -1945,6 +2073,70 @@ const buildChatReferentContextPresenceDebug = (body: Record<string, unknown>): R
   };
 };
 
+const readPreviousAssistantFinalAnswerTextFromBody = (body: Record<string, unknown>): string | null => {
+  const workspace = readRecord(body.workspace_context_snapshot ?? body.workspaceContextSnapshot);
+  const context = readRecord(workspace?.chat_referent_context ?? workspace?.chatReferentContext);
+  const previousAnswer = readRecord(context?.previous_assistant_final_answer ?? context?.previousAssistantFinalAnswer);
+  const previousMessage = readRecord(context?.previous_chat_message ?? context?.previousChatMessage);
+  return readString(previousAnswer?.text) ?? readString(previousMessage?.text);
+};
+
+const extractScholarlyPaperSearchSeedFromChatAnswer = (text: string | null): string | null => {
+  if (!text) return null;
+  const doi = text.match(/\b10\.\d{4,9}\/[-._;()/:A-Z0-9]+\b/i)?.[0];
+  if (doi) return doi;
+  const arxiv = text.match(/\barXiv:\s*([a-z-]+\/\d{7}|\d{4}\.\d{4,5})(?:v\d+)?\b/i)?.[1];
+  if (arxiv) return `arXiv:${arxiv}`;
+  const titlePatterns = [
+    /\*\*["“]?([^*"”\n]{12,180})["”]?\*\*/,
+    /(?:paper|title|was)\s+(?:called|titled|is|was)?\s*["“]([^"”\n]{12,180})["”]/i,
+    /^\s*["“]([^"”\n]{12,180})["”]\s*$/m,
+  ];
+  for (const pattern of titlePatterns) {
+    const title = text.match(pattern)?.[1]?.trim();
+    if (title && /\b(?:casimir|weyl|curvature|plates?|fields?|relativity|tensor|effect)\b/i.test(title)) {
+      return title;
+    }
+  }
+  const titleLine = text
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^[-*#\s]+/, "").replace(/\*\*/g, "").trim())
+    .find((line) =>
+      line.length >= 12 &&
+      line.length <= 180 &&
+      /\b(?:casimir|weyl|curvature|plates?|fields?|relativity|tensor|effect)\b/i.test(line) &&
+      !/[.:]\s*$/.test(line)
+    );
+  return titleLine ?? null;
+};
+
+const buildScholarlyChatReferentRecoveryBody = (input: {
+  body: Record<string, unknown>;
+  question: string;
+}): { body: Record<string, unknown>; query: string; source: string } | null => {
+  const seed = extractScholarlyPaperSearchSeedFromChatAnswer(
+    readPreviousAssistantFinalAnswerTextFromBody(input.body),
+  );
+  if (!seed) return null;
+  return {
+    body: {
+      ...input.body,
+      question: [
+        `Find scholarly research paper evidence for "${seed}".`,
+        "Fetch full text or PDF page images if available.",
+        input.question,
+      ].join(" "),
+      prompt: [
+        `Find scholarly research paper evidence for "${seed}".`,
+        "Fetch full text or PDF page images if available.",
+        input.question,
+      ].join(" "),
+    },
+    query: seed,
+    source: "previous_assistant_final_answer_chat_referent",
+  };
+};
+
 const visibleTranslationTargetsFromCapabilityLaneDebug = (
   debugProjection: { capability_lane_call_results?: unknown[] } | null | undefined,
 ): Record<string, unknown>[] => {
@@ -2203,7 +2395,6 @@ const buildImageLensObservationFallbackAnswer = (input: {
   question: string;
   capabilityLaneCallResults: unknown[];
 }): string | null => {
-  if (!isImageLensCapabilityLanePrompt(input.question)) return null;
   const imageLensResults = input.capabilityLaneCallResults
     .map(readRecord)
     .filter((entry): entry is Record<string, unknown> =>
@@ -2359,9 +2550,13 @@ const synthesizeScholarlyPageImageLaneCandidate = (input: {
 }): Record<string, unknown> | null => {
   if (!input.record || (input.source !== "current" && input.lookup?.status !== "found")) return null;
   if (!isScholarlyVisualEscalationQuestion(input.question)) return null;
-  const sourceRef = input.record.page_image_affordance_refs[0] ?? input.record.source_pdf_ref;
+  const firstSourceRef = input.record.page_image_affordance_refs[0] ?? input.record.source_pdf_ref;
+  const requestedPageNumber = scholarlyRequestedPdfPageNumber(input.question, firstSourceRef);
+  const sourceRef = requestedPageNumber && input.record.source_pdf_ref
+    ? `${input.record.source_pdf_ref}/page/${requestedPageNumber}`
+    : firstSourceRef;
   if (!sourceRef) return null;
-  const pageNumber = scholarlyPageNumberFromRef(sourceRef) ?? 1;
+  const pageNumber = requestedPageNumber ?? scholarlyPageNumberFromRef(sourceRef) ?? 1;
   const renderedPage = renderScholarlyPdfPageImageDataUrl({
     cachePath: input.record.cache_path,
     pageNumber,
@@ -2394,6 +2589,75 @@ const synthesizeScholarlyPageImageLaneCandidate = (input: {
     assistant_answer: false,
     terminal_eligible: false,
   };
+};
+
+const scholarlyRequestedPdfPageNumber = (question: string, defaultSourceRef?: string | null): number | null => {
+  const normalized = question.toLowerCase();
+  const explicit = normalized.match(/\bpage\s*(?:number\s*)?(\d{1,3})\b/);
+  if (explicit?.[1]) {
+    const parsed = Number.parseInt(explicit[1], 10);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  if (/\bnext\s+pages?\b|\bfollowing\s+pages?\b|\bsubsequent\s+pages?\b/.test(normalized)) {
+    const currentPage = scholarlyPageNumberFromRef(defaultSourceRef ?? "") ?? 1;
+    return currentPage + 1;
+  }
+  return null;
+};
+
+const candidateHasInlineImageLensSource = (candidate: Record<string, unknown>): boolean =>
+  Boolean(
+    readString(candidate.crop_image_ref ?? candidate.cropImageRef) ||
+    readString(candidate.source_image_ref ?? candidate.sourceImageRef) ||
+    readString(candidate.page_image_ref ?? candidate.pageImageRef)
+  );
+
+const enrichScholarlyImageLensCandidateFromMemory = (input: {
+  question: string;
+  candidate: Record<string, unknown> | Record<string, unknown>[] | null;
+  record: ScholarlyFollowupEvidenceMemoryRecord | null;
+  lookup: ScholarlyFollowupEvidenceLookup | null;
+  source: "prior" | "current";
+}): Record<string, unknown> | Record<string, unknown>[] | null => {
+  if (!input.candidate) return input.candidate;
+  const enrichOne = (candidate: Record<string, unknown>): Record<string, unknown> => {
+    if (
+      capabilityLaneCandidateCapability(candidate) !== VISUAL_ANALYSIS_INSPECT_IMAGE_REGION_CAPABILITY ||
+      candidateHasInlineImageLensSource(candidate)
+    ) {
+      return candidate;
+    }
+    const scholarlyCandidate = synthesizeScholarlyPageImageLaneCandidate({
+      question: input.question,
+      record: input.record,
+      lookup: input.lookup,
+      source: input.source,
+    });
+    if (!scholarlyCandidate) return candidate;
+    return {
+      ...scholarlyCandidate,
+      ...candidate,
+      source_id: readString(candidate.source_id ?? candidate.sourceId) ?? scholarlyCandidate.source_id,
+      source_kind: readString(candidate.source_kind ?? candidate.sourceKind) ?? scholarlyCandidate.source_kind,
+      source_image_ref: scholarlyCandidate.source_image_ref,
+      page_image_ref: scholarlyCandidate.page_image_ref,
+      scholarly_page_image_artifact_ref: scholarlyCandidate.scholarly_page_image_artifact_ref,
+      scholarly_page_image_path: scholarlyCandidate.scholarly_page_image_path,
+      page_number: scholarlyCandidate.page_number,
+      bbox_px: isDegenerateImageLensBbox(candidate.bbox_px ?? candidate.bboxPx)
+        ? scholarlyCandidate.bbox_px
+        : candidate.bbox_px,
+      scholarly_evidence_source: input.source,
+      assistant_answer: false,
+      terminal_eligible: false,
+    };
+  };
+  return Array.isArray(input.candidate)
+    ? input.candidate.map((entry) => {
+        const candidate = readRecord(entry);
+        return candidate ? enrichOne(candidate) : entry;
+      })
+    : enrichOne(input.candidate);
 };
 
 const buildCurrentTurnArtifactLedgerFromGatewayPackets = (input: {
@@ -6142,6 +6406,67 @@ export const codexProvider: HelixAgentProvider = {
           record: scholarlyFollowup.record,
         });
       }
+      if (!scholarlyFollowup.record && scholarlyFollowup.lookup.status === "missing") {
+        const chatRecovery = buildScholarlyChatReferentRecoveryBody({
+          body: request.body,
+          question,
+        });
+        if (chatRecovery) {
+          const recoveredGatewayResults = await runExplicitCodexWorkstationGatewayCalls({
+            body: chatRecovery.body,
+            turnId,
+          });
+          evidenceGatewayCallResults = [
+            ...evidenceGatewayCallResults,
+            ...recoveredGatewayResults,
+          ];
+          const recoveredRecords = rememberScholarlyEvidenceFromGatewayResults({
+            body: request.body,
+            turnId,
+            gatewayCallResults: recoveredGatewayResults,
+          });
+          currentTurnScholarlyDeepEvidenceMemoryRecord = selectCurrentTurnScholarlyDeepEvidenceRecord({
+            records: recoveredRecords,
+            question,
+          });
+          currentTurnScholarlyDeepEvidenceLookup = buildCurrentTurnScholarlyEvidenceLookup(
+            currentTurnScholarlyDeepEvidenceMemoryRecord,
+          );
+          scholarlyFollowupEvidenceLookup = {
+            ...scholarlyFollowup.lookup,
+            status: currentTurnScholarlyDeepEvidenceMemoryRecord ? "found" : "missing",
+            candidate_count: currentTurnScholarlyDeepEvidenceMemoryRecord ? 1 : 0,
+            selected_memory_id: currentTurnScholarlyDeepEvidenceMemoryRecord?.memory_id ?? null,
+            selected_prior_turn_id: currentTurnScholarlyDeepEvidenceMemoryRecord?.turn_id ?? null,
+            resolution_reason: currentTurnScholarlyDeepEvidenceMemoryRecord
+              ? "recovered_scholarly_referent_from_previous_chat_answer"
+              : "chat_referent_recovery_lookup_did_not_materialize_scholarly_evidence",
+            resolution_confidence: currentTurnScholarlyDeepEvidenceMemoryRecord ? "medium" : "blocked",
+            candidate_summaries: currentTurnScholarlyDeepEvidenceMemoryRecord
+              ? [{
+                  memory_id: currentTurnScholarlyDeepEvidenceMemoryRecord.memory_id,
+                  prior_turn_id: currentTurnScholarlyDeepEvidenceMemoryRecord.turn_id,
+                  query: currentTurnScholarlyDeepEvidenceMemoryRecord.query ?? chatRecovery.query,
+                  evidence_state: currentTurnScholarlyDeepEvidenceMemoryRecord.evidence_state,
+                  evidence_grade: currentTurnScholarlyDeepEvidenceMemoryRecord.evidence_grade,
+                  terminal_artifact_kind: currentTurnScholarlyDeepEvidenceMemoryRecord.terminal_artifact_kind,
+                  score: 50,
+                  selected: true,
+                }]
+              : [],
+            chat_referent_recovery: {
+              schema: "helix.scholarly_chat_referent_recovery.v1",
+              status: currentTurnScholarlyDeepEvidenceMemoryRecord ? "materialized" : "no_evidence_materialized",
+              query: chatRecovery.query,
+              source: chatRecovery.source,
+              recovered_gateway_result_count: recoveredGatewayResults.length,
+              assistant_answer: false,
+              terminal_eligible: false,
+              raw_content_included: false,
+            },
+          } as ScholarlyFollowupEvidenceLookup;
+        }
+      }
     }
     let runtimeLaneRequestLoop: Record<string, unknown> | null = null;
     const scientificImageContinuationRequired = asksForScientificImageTheoryContinuation(request.body);
@@ -6819,6 +7144,26 @@ export const codexProvider: HelixAgentProvider = {
       runtimeLaneRequestSynthesized = synthesizeTextToSpeechCandidateFromResolvedReferent(request.body);
       runtimeLaneRequestCandidate = runtimeLaneRequestSynthesized;
     }
+    const runtimeLaneRequestBeforeScholarlyImageEnrichment = runtimeLaneRequestCandidate;
+    runtimeLaneRequestCandidate = enrichScholarlyImageLensCandidateFromMemory({
+      question,
+      candidate: runtimeLaneRequestCandidate,
+      record: priorScholarlyEvidenceMemoryRecord,
+      lookup: scholarlyFollowupEvidenceLookup,
+      source: "prior",
+    });
+    runtimeLaneRequestCandidate = enrichScholarlyImageLensCandidateFromMemory({
+      question,
+      candidate: runtimeLaneRequestCandidate,
+      record: currentTurnScholarlyDeepEvidenceMemoryRecord,
+      lookup: currentTurnScholarlyDeepEvidenceLookup,
+      source: "current",
+    });
+    const scholarlyImageLensCandidateEnriched =
+      runtimeLaneRequestCandidate !== runtimeLaneRequestBeforeScholarlyImageEnrichment;
+    if (scholarlyImageLensCandidateEnriched && !runtimeLaneRequestSynthesized) {
+      runtimeLaneRequestSynthesized = runtimeLaneRequestCandidate;
+    }
     const runtimeLaneRequestBeforeImageLensAugmentation = runtimeLaneRequestCandidate;
     runtimeLaneRequestCandidate = augmentImageLensRegionCandidatesForQuestion(
       request.body,
@@ -6863,8 +7208,11 @@ export const codexProvider: HelixAgentProvider = {
         requested_by_runtime_provider: true,
         synthesized_by_helix_policy: Boolean(runtimeLaneRequestSynthesized),
         image_lens_region_candidate_augmented: imageLensRegionCandidateAugmented,
+        scholarly_pdf_image_candidate_enriched: scholarlyImageLensCandidateEnriched,
         synthesis_reason: imageLensRegionCandidateAugmented
           ? "explicit_image_lens_multi_region_prompt_missing_requested_equation_crops"
+          : scholarlyImageLensCandidateEnriched
+            ? "scholarly_pdf_page_affordance_enriched_model_image_lens_request"
           : runtimeLaneRequestSynthesized
           ? capabilityLaneCandidateCapability(
               Array.isArray(runtimeLaneRequestSynthesized)

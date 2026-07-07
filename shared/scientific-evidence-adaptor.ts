@@ -2,6 +2,8 @@ export const SCIENTIFIC_EVIDENCE_PACKET_SCHEMA = "helix.scientific_evidence_pack
 export const SCIENTIFIC_IMAGE_EVIDENCE_SIDECAR_SCHEMA = "helix.scientific_image_evidence_sidecar.v1" as const;
 export const SCIENTIFIC_BRANCH_GATE_SCHEMA = "helix.scientific_branch_gate.v1" as const;
 export const SCIENTIFIC_RUN_TRACE_SCHEMA = "helix.scientific_run_trace.v1" as const;
+export const SCIENTIFIC_EVIDENCE_GRAPH_REFLECTION_SCHEMA =
+  "helix.scientific_evidence_graph_reflection.v1" as const;
 
 export const SCIENTIFIC_EVIDENCE_DOMAIN_VALUES = [
   "adm_gr",
@@ -237,6 +239,70 @@ export type ScientificRunTraceV1 = {
   raw_content_included: false;
 };
 
+export type ScientificEvidenceGraphReflectionV1 = {
+  schema: typeof SCIENTIFIC_EVIDENCE_GRAPH_REFLECTION_SCHEMA;
+  reflection_id: string;
+  evidence_depth:
+    | "metadata_lookup"
+    | "abstract_or_snippet"
+    | "page_grounded_ocr"
+    | "promoted_exact_equation_row"
+    | "multi_equation_derivation_candidate"
+    | "calculator_payload_candidate";
+  evidence_object_class:
+    | "metadata_record"
+    | "provider_abstract_or_snippet"
+    | "page_ocr_math_candidate"
+    | "curved_spacetime_field_action"
+    | "boundary_condition"
+    | "stress_energy_or_vacuum_energy_expression"
+    | "calculator_payload_candidate"
+    | "unknown_scientific_object";
+  normalized_scientific_features: {
+    latex_candidates: string[];
+    text_candidates: string[];
+    operators: string[];
+    variables: string[];
+    constants: string[];
+    fields: string[];
+    geometry_terms: string[];
+    domain_hints: string[];
+    symbol_candidates: string[];
+  };
+  graph_attachments: Array<{
+    node_id: string;
+    node_kind: "badge" | "calculator_payload";
+    attachment_strength: "strong" | "moderate" | "weak" | "blocked";
+    evidence_depth: ScientificEvidenceGraphReflectionV1["evidence_depth"];
+    mathematical_reasons: string[];
+    matched_symbols: string[];
+    claim_boundary: "diagnostic_only";
+  }>;
+  attachment_reasons: string[];
+  claim_boundary: {
+    diagnostic_only: true;
+    observation_not_proof: true;
+    no_physical_validation: true;
+    no_badge_promotion: true;
+    no_calculator_authority_without_bound_payload: true;
+  };
+  blocked_authorities: Array<{
+    authority: "proof" | "physical_validation" | "badge_promotion" | "calculator_payload";
+    blocked_reason: string;
+  }>;
+  upgrade_requirements: string[];
+  next_tool_affordances: Array<{
+    capability: string;
+    reason: string;
+  }>;
+  provenance_refs: string[];
+  branch_gate_status: ScientificBranchGateV1["status"];
+  congruence_grade_floor: ScientificCongruenceGradeV1;
+  terminal_eligible: false;
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
 type CandidateInput = {
   textCandidate?: string | null;
   latexCandidate?: string | null;
@@ -310,7 +376,8 @@ export function extractObservedEquationLabels(input: string): string[] {
 }
 
 const isExactEquationRegion = (input: CandidateInput): boolean =>
-  Boolean(input.requestedEquationLabel?.trim()) || /^equation[_-]?\d+\.\d+/i.test(input.regionLabel ?? "");
+  Boolean(input.requestedEquationLabel?.trim()) ||
+  /^(?:equation[_-]?\d+\.\d+|equation[_-]?row|exact[_-]?equation|retry[_-]?equation)/i.test(input.regionLabel ?? "");
 
 const scientificEvidenceRole = (input: CandidateInput): ScientificEvidencePacketV1["evidence_role"] =>
   isExactEquationRegion(input) ? "exact_equation_candidate" : "context_only";
@@ -522,7 +589,9 @@ export function buildScientificEvidencePacket(input: CandidateInput): Scientific
       ? "partial_candidate"
       : !hasCandidate || status === "failed" || status === "not_run" || labelMatchStatus === "mismatched" || labelMatchStatus === "ambiguous"
         ? "inadmissible_for_exact_equation"
-        : labelMatchStatus === "matched" && allQualityFlags.length === 0 && status === "extracted"
+        : (labelMatchStatus === "matched" || (requestedEquationLabel === null && labelMatchStatus === "not_applicable")) &&
+          allQualityFlags.length === 0 &&
+          status === "extracted"
           ? "admissible_for_exact_equation"
           : "partial_candidate";
   const promotionReasons = exactEquationAdmissibility === "admissible_for_exact_equation"
@@ -1135,6 +1204,317 @@ export function buildScientificRunTrace(input: {
     },
     assistant_answer: false,
     terminal_eligible: false,
+    raw_content_included: false,
+  };
+}
+
+const evidenceRefForPacket = (packet: ScientificEvidencePacketV1): string =>
+  `${packet.source_ref_hash}#crop=${packet.bbox_px.x},${packet.bbox_px.y},${packet.bbox_px.width},${packet.bbox_px.height}`;
+
+const detectScientificEvidenceDepth = (input: {
+  evidence?: ScientificEvidencePacketV1 | null;
+  sidecar?: ScientificImageEvidenceSidecarV1 | null;
+  branchGate: ScientificBranchGateV1;
+  calculatorPayloadCount: number;
+}): ScientificEvidenceGraphReflectionV1["evidence_depth"] => {
+  if (!input.evidence) return "metadata_lookup";
+  if (
+    input.calculatorPayloadCount > 0 &&
+    input.evidence.admissibility.status === "admissible_observation" &&
+    input.branchGate.status === "admitted"
+  ) {
+    return "calculator_payload_candidate";
+  }
+  const promoted = input.sidecar?.exact_equation_summary.promoted_row_count ?? 0;
+  const equationPacketCount = input.sidecar?.packets.filter((packet) => packet.evidence_role === "exact_equation_candidate").length ?? 0;
+  if (equationPacketCount > 1) return "multi_equation_derivation_candidate";
+  if (
+    promoted > 0 ||
+    input.evidence.exact_equation_admissibility === "admissible_for_exact_equation" ||
+    input.evidence.exact_row_promotion.status === "promoted"
+  ) {
+    return "promoted_exact_equation_row";
+  }
+  if (input.evidence.source_image.source_kind === "prompt_context") return "abstract_or_snippet";
+  return "page_grounded_ocr";
+};
+
+const normalizedEvidenceText = (evidence: ScientificEvidencePacketV1 | null | undefined): string =>
+  [
+    evidence?.latex_candidate,
+    evidence?.text_candidate,
+    evidence?.ocr_text_candidate,
+    ...(evidence?.symbol_candidates ?? []),
+  ].filter(Boolean).join("\n");
+
+const detectScientificEvidenceObjectClass = (
+  evidence: ScientificEvidencePacketV1 | null,
+): ScientificEvidenceGraphReflectionV1["evidence_object_class"] => {
+  if (!evidence) return "metadata_record";
+  if (evidence.source_image.source_kind === "prompt_context") return "provider_abstract_or_snippet";
+  const text = normalizedEvidenceText(evidence).toLowerCase();
+  if (/\bs\s*\[|\\sqrt\{-?g\}|sqrt\(-?g\)|\\box|\\square|□|\\xi\s*r|ξ\s*r|ricci|curvature coupling/i.test(text)) {
+    return "curved_spacetime_field_action";
+  }
+  if (/\bboundary|robin|dirichlet|neumann|plate|surface condition/i.test(text)) return "boundary_condition";
+  if (/stress[-\s]?energy|energy density|vacuum energy|casimir force|pressure|force law/i.test(text)) {
+    return "stress_energy_or_vacuum_energy_expression";
+  }
+  if (evidence.evidence_role === "exact_equation_candidate") return "page_ocr_math_candidate";
+  return "unknown_scientific_object";
+};
+
+const findFeatureMatches = (text: string, entries: Array<[string, RegExp]>): string[] =>
+  unique(entries.filter(([, pattern]) => pattern.test(text)).map(([label]) => label));
+
+const normalizeScientificEvidenceFeatures = (
+  evidence: ScientificEvidencePacketV1 | null,
+): ScientificEvidenceGraphReflectionV1["normalized_scientific_features"] => {
+  const text = normalizedEvidenceText(evidence);
+  const lower = text.toLowerCase();
+  return {
+    latex_candidates: evidence?.latex_candidate ? [evidence.latex_candidate] : [],
+    text_candidates: evidence?.text_candidate ? [evidence.text_candidate] : [],
+    operators: findFeatureMatches(text, [
+      ["dAlembertian_or_wave_operator", /\\box|\\square|□|box/i],
+      ["spacetime_volume_integral", /\\int|∫/],
+      ["metric_determinant_density", /\\sqrt\{-?g\}|sqrt\(-?g\)|√\(-?g\)/i],
+      ["curvature_coupling_operator", /\\xi\s*R|ξ\s*R|xi\s*R/i],
+    ]),
+    variables: unique([
+      ...(evidence?.symbol_candidates ?? []),
+      ...Array.from(text.matchAll(/\b[A-Za-z][A-Za-z0-9_]*(?:\^[A-Za-z0-9{}]+)?(?:_[A-Za-z0-9{}]+)?\b/g)).map((match) => match[0]),
+    ]).slice(0, 24),
+    constants: findFeatureMatches(lower, [
+      ["hbar", /\\hbar|ℏ/],
+      ["speed_of_light", /\bc\b/],
+      ["pi", /\\pi|π|\bpi\b/],
+      ["curvature_coupling_xi", /\\xi|ξ|\bxi\b/],
+    ]),
+    fields: findFeatureMatches(text, [
+      ["scalar_field_phi", /\\varphi|\\phi|φ|ϕ|phi|varphi/i],
+      ["metric_field_g", /\bg\b|g_{\w+}|g\]/i],
+    ]),
+    geometry_terms: findFeatureMatches(text, [
+      ["metric_determinant", /\\sqrt\{-?g\}|sqrt\(-?g\)|√\(-?g\)/i],
+      ["ricci_scalar_R", /\bR\b|ricci/i],
+      ["curved_spacetime_dimension_D", /d\^D\s*x|D-dimensional|d-dimensional/i],
+      ["spacetime_manifold_M", /\\int_\{M\}|∫_M|\bM\b/],
+    ]),
+    domain_hints: unique([
+      ...(evidence?.domain_candidates.map((candidate) => candidate.domain) ?? []),
+      ...(evidence?.admissibility.allowed_branch_hints ?? []),
+      ...(evidence?.primary_domain ? [evidence.primary_domain] : []),
+    ]).slice(0, 16),
+    symbol_candidates: evidence?.symbol_candidates.slice(0, 32) ?? [],
+  };
+};
+
+const attachmentStrengthForGrade = (
+  grade: ScientificCongruenceGradeV1,
+): ScientificEvidenceGraphReflectionV1["graph_attachments"][number]["attachment_strength"] => {
+  switch (grade) {
+    case "exact_symbol_match":
+      return "strong";
+    case "same_equation_family":
+    case "domain_context_match":
+      return "moderate";
+    case "false_friend":
+    case "insufficient_evidence":
+      return "blocked";
+    case "analogy_only":
+    default:
+      return "weak";
+  }
+};
+
+const blockedAuthoritiesForReflection = (input: {
+  branchGate: ScientificBranchGateV1;
+  evidenceDepth: ScientificEvidenceGraphReflectionV1["evidence_depth"];
+  calculatorPayloadCount: number;
+}): ScientificEvidenceGraphReflectionV1["blocked_authorities"] => {
+  const blocked: ScientificEvidenceGraphReflectionV1["blocked_authorities"] = [
+    { authority: "proof", blocked_reason: "Scientific evidence packets are observations, not proof authority." },
+    { authority: "physical_validation", blocked_reason: "OCR, metadata, and graph adjacency do not validate a physical theory." },
+    { authority: "badge_promotion", blocked_reason: "Badge promotion requires graph gates beyond diagnostic reflection." },
+  ];
+  if (
+    input.calculatorPayloadCount === 0 ||
+    input.branchGate.rejected_calculator_payload_ids.length > 0 ||
+    input.evidenceDepth !== "calculator_payload_candidate"
+  ) {
+    blocked.push({
+      authority: "calculator_payload",
+      blocked_reason: "Calculator handoff requires bound variables, units, assumptions, and an admitted derivation chain.",
+    });
+  }
+  return blocked;
+};
+
+const upgradeRequirementsForReflection = (input: {
+  evidenceDepth: ScientificEvidenceGraphReflectionV1["evidence_depth"];
+  objectClass: ScientificEvidenceGraphReflectionV1["evidence_object_class"];
+  branchGate: ScientificBranchGateV1;
+  sidecar?: ScientificImageEvidenceSidecarV1 | null;
+}): string[] => unique([
+  ...(input.evidenceDepth === "metadata_lookup" ? ["Materialize abstract/snippet or full-text evidence before scientific claims."] : []),
+  ...(input.evidenceDepth === "abstract_or_snippet" ? ["Fetch full text or render PDF pages for page-grounded evidence."] : []),
+  ...(input.evidenceDepth === "page_grounded_ocr" ? ["Crop and promote exact equation rows before graph or calculator use."] : []),
+  ...(input.evidenceDepth === "promoted_exact_equation_row"
+    ? [
+        "Extract neighboring definitions, assumptions, and boundary conditions.",
+        "Extract derived stress-energy, energy-density, force, or pressure equations if present.",
+      ]
+    : []),
+  ...(input.objectClass === "curved_spacetime_field_action"
+    ? [
+        "Derive or extract the stress-energy tensor relation tied to this action.",
+        "Bind curvature coupling, field, metric, and integration-domain definitions.",
+      ]
+    : []),
+  ...(input.branchGate.status === "blocked" || input.branchGate.status === "restricted"
+    ? input.branchGate.notes.slice(0, 4)
+    : []),
+  ...((input.sidecar?.exact_equation_summary.partial_row_count ?? 0) > 0
+    ? ["Retry partial equation rows with exact row crops before promotion."]
+    : []),
+]);
+
+const nextAffordancesForReflection = (input: {
+  evidenceDepth: ScientificEvidenceGraphReflectionV1["evidence_depth"];
+  objectClass: ScientificEvidenceGraphReflectionV1["evidence_object_class"];
+  calculatorBlocked: boolean;
+}): ScientificEvidenceGraphReflectionV1["next_tool_affordances"] => [
+  ...(input.evidenceDepth === "metadata_lookup" || input.evidenceDepth === "abstract_or_snippet"
+    ? [{
+        capability: "scholarly-research.fetch_full_text",
+        reason: "Fetch full text or PDF source before equation-level reflection.",
+      }]
+    : []),
+  ...(input.evidenceDepth === "page_grounded_ocr"
+    ? [{
+        capability: "visual_analysis.inspect_image_region",
+        reason: "Crop exact equation rows and promote only if exact equation admissibility passes.",
+      }]
+    : []),
+  ...(input.evidenceDepth === "promoted_exact_equation_row"
+    ? [{
+        capability: "visual_analysis.inspect_image_region",
+        reason: "Inspect adjacent rows/pages for definitions, boundary conditions, and derived equations.",
+      }]
+    : []),
+  ...(input.objectClass === "curved_spacetime_field_action"
+    ? [{
+        capability: "scholarly-research.extract_numeric_parameters",
+        reason: "Look for parameter definitions, units, assumptions, and derived measurable forms.",
+      }]
+    : []),
+  ...(input.calculatorBlocked
+    ? [{
+        capability: "scientific-calculator.bind_variables",
+        reason: "Attempt calculator preflight only after variables, units, and assumptions are bound.",
+      }]
+    : []),
+];
+
+export function buildScientificEvidenceGraphReflection(input: {
+  turnId?: string | null;
+  evidence?: ScientificEvidencePacketV1 | null;
+  sidecar?: ScientificImageEvidenceSidecarV1 | null;
+  branchGate: ScientificBranchGateV1;
+  reflectedBadgeIds?: string[];
+  calculatorPayloads?: Array<{ payload_id?: string | null; payloadId?: string | null; badge_id?: string | null; badgeId?: string | null; expression?: string | null }>;
+  provenanceRefs?: string[];
+}): ScientificEvidenceGraphReflectionV1 {
+  const calculatorPayloads = input.calculatorPayloads ?? [];
+  const evidenceDepth = detectScientificEvidenceDepth({
+    evidence: input.evidence,
+    sidecar: input.sidecar,
+    branchGate: input.branchGate,
+    calculatorPayloadCount: calculatorPayloads.length,
+  });
+  const objectClass = evidenceDepth === "calculator_payload_candidate"
+    ? "calculator_payload_candidate"
+    : detectScientificEvidenceObjectClass(input.evidence ?? null);
+  const features = normalizeScientificEvidenceFeatures(input.evidence ?? null);
+  const reflectedBadgeIds = unique(input.reflectedBadgeIds ?? []);
+  const assessedRefs = new Set(input.branchGate.congruence_assessments.map((assessment) => assessment.target_ref));
+  const assessmentAttachments = input.branchGate.congruence_assessments.map((assessment) => ({
+    node_id: assessment.target_ref,
+    node_kind: assessment.target_kind,
+    attachment_strength: attachmentStrengthForGrade(assessment.grade),
+    evidence_depth: evidenceDepth,
+    mathematical_reasons: assessment.reasons.length
+      ? assessment.reasons
+      : [`Graph target received ${assessment.grade} from the scientific branch gate.`],
+    matched_symbols: assessment.matched_symbols,
+    claim_boundary: "diagnostic_only" as const,
+  }));
+  const unassessedBadgeAttachments = reflectedBadgeIds
+    .filter((badgeId) => !assessedRefs.has(badgeId))
+    .slice(0, 12)
+    .map((badgeId) => ({
+      node_id: badgeId,
+      node_kind: "badge" as const,
+      attachment_strength: input.branchGate.rejected_badge_ids.includes(badgeId) ? "blocked" as const : "weak" as const,
+      evidence_depth: evidenceDepth,
+      mathematical_reasons: [
+        input.branchGate.rejected_badge_ids.includes(badgeId)
+          ? "Badge was rejected by the scientific branch gate."
+          : "Badge was surfaced by graph reflection but lacks direct symbol-level support from the evidence packet.",
+      ],
+      matched_symbols: [],
+      claim_boundary: "diagnostic_only" as const,
+    }));
+  const calculatorBlocked =
+    calculatorPayloads.length === 0 ||
+    input.branchGate.rejected_calculator_payload_ids.length > 0 ||
+    evidenceDepth !== "calculator_payload_candidate";
+  return {
+    schema: SCIENTIFIC_EVIDENCE_GRAPH_REFLECTION_SCHEMA,
+    reflection_id: `scientific_evidence_graph_reflection:${input.turnId ?? "turn"}:${input.evidence?.source_ref_hash ?? "metadata"}:${input.branchGate.status}`,
+    evidence_depth: evidenceDepth,
+    evidence_object_class: objectClass,
+    normalized_scientific_features: features,
+    graph_attachments: [...assessmentAttachments, ...unassessedBadgeAttachments].slice(0, 24),
+    attachment_reasons: unique([
+      `Evidence object classified as ${objectClass}.`,
+      `Evidence depth classified as ${evidenceDepth}.`,
+      `Scientific branch gate status is ${input.branchGate.status} with floor ${input.branchGate.congruence_grade_floor}.`,
+      ...input.branchGate.notes.slice(0, 6),
+    ]),
+    claim_boundary: {
+      diagnostic_only: true,
+      observation_not_proof: true,
+      no_physical_validation: true,
+      no_badge_promotion: true,
+      no_calculator_authority_without_bound_payload: true,
+    },
+    blocked_authorities: blockedAuthoritiesForReflection({
+      branchGate: input.branchGate,
+      evidenceDepth,
+      calculatorPayloadCount: calculatorPayloads.length,
+    }),
+    upgrade_requirements: upgradeRequirementsForReflection({
+      evidenceDepth,
+      objectClass,
+      branchGate: input.branchGate,
+      sidecar: input.sidecar,
+    }),
+    next_tool_affordances: nextAffordancesForReflection({
+      evidenceDepth,
+      objectClass,
+      calculatorBlocked,
+    }),
+    provenance_refs: unique([
+      ...(input.provenanceRefs ?? []),
+      ...(input.evidence ? [evidenceRefForPacket(input.evidence), input.evidence.crop_region_id] : []),
+      ...(input.sidecar ? [input.sidecar.sidecar_id, ...input.sidecar.packet_refs] : []),
+    ]).slice(0, 24),
+    branch_gate_status: input.branchGate.status,
+    congruence_grade_floor: input.branchGate.congruence_grade_floor,
+    terminal_eligible: false,
+    assistant_answer: false,
     raw_content_included: false,
   };
 }

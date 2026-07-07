@@ -30,6 +30,8 @@ export type HelixAskChatReferentContextBuildResult = {
   };
 };
 
+const HELIX_ASK_LAST_REFERENT_REPLY_STORAGE_KEY = "helix.ask.lastReferentReply.v1";
+
 const readRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 
@@ -57,6 +59,50 @@ export function readHelixAskReplyFinalAnswerText(
     if (text) return text.slice(0, 8000);
   }
   return null;
+}
+
+export function readPersistedHelixAskReferentReply(): HelixAskChatReferentReplyLike | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(HELIX_ASK_LAST_REFERENT_REPLY_STORAGE_KEY) ?? "null");
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    const record = parsed as Record<string, unknown>;
+    const text = typeof record.selected_final_answer === "string"
+      ? record.selected_final_answer.trim()
+      : typeof record.content === "string"
+        ? record.content.trim()
+        : "";
+    if (!text) return null;
+    return {
+      id: typeof record.id === "string" ? record.id : "persisted-last-answer",
+      turn_id: typeof record.turn_id === "string" ? record.turn_id : undefined,
+      content: text,
+      selected_final_answer: text,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function writePersistedHelixAskReferentReply(
+  reply: HelixAskChatReferentReplyLike | null | undefined,
+): void {
+  if (typeof window === "undefined" || !reply) return;
+  const text = readHelixAskReplyFinalAnswerText(reply);
+  if (!text) return;
+  try {
+    window.localStorage.setItem(
+      HELIX_ASK_LAST_REFERENT_REPLY_STORAGE_KEY,
+      JSON.stringify({
+        id: reply.id,
+        turn_id: reply.turn_id,
+        selected_final_answer: text,
+        content: text,
+      }),
+    );
+  } catch {
+    // Referent persistence is best-effort; Ask must still work without local storage.
+  }
 }
 
 export function buildHelixAskChatReferentContext(
@@ -124,4 +170,28 @@ export function buildHelixAskChatReferentContextFromSources(
       raw_content_included: false,
     },
   };
+}
+
+export function buildHelixAskChatReferentContextForSubmit(input: {
+  durableReplies: readonly HelixAskChatReferentReplyLike[];
+  visibleReplies: readonly HelixAskChatReferentReplyLike[];
+  includePersistedReply?: boolean;
+}): HelixAskChatReferentContextBuildResult {
+  const persistedReply = input.includePersistedReply === false
+    ? null
+    : readPersistedHelixAskReferentReply();
+  return buildHelixAskChatReferentContextFromSources([
+    {
+      source_name: "durable_chat_session",
+      replies: input.durableReplies,
+    },
+    {
+      source_name: "visible_ask_transcript",
+      replies: input.visibleReplies,
+    },
+    {
+      source_name: "persisted_last_terminal_answer",
+      replies: persistedReply ? [persistedReply] : [],
+    },
+  ]);
 }

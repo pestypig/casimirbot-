@@ -11,6 +11,7 @@ const retries = Math.max(0, Number.parseInt(process.env.CATALOG_FILL_RETRIES ?? 
 const serverWaitMs = Math.max(0, Number.parseInt(process.env.CATALOG_FILL_SERVER_WAIT_MS ?? "180000", 10));
 const batchDelayMs = Math.max(0, Number.parseInt(process.env.CATALOG_FILL_BATCH_DELAY_MS ?? "1500", 10));
 const localeArg = process.argv.find((arg) => arg.startsWith("--locale="))?.slice("--locale=".length);
+const statusOnly = process.argv.includes("--status");
 const maxBatches = Math.max(
   0,
   Number.parseInt(process.argv.find((arg) => arg.startsWith("--max-batches="))?.slice("--max-batches=".length) ?? "0", 10),
@@ -25,6 +26,7 @@ const localeTargets = [
   ["ja", "ja"],
   ["ko", "ko"],
   ["zh", "zh-Hans"],
+  ["ar", "ar"],
   ["wo", "wo"],
 ];
 
@@ -37,6 +39,7 @@ const exportNames = {
   ja: "jaMessages",
   ko: "koMessages",
   zh: "zhMessages",
+  ar: "arMessages",
   wo: "woMessages",
 };
 
@@ -85,6 +88,27 @@ function writeLocaleCatalog(locale, manifestRows, cache) {
     if (typeof translated === "string" && translated.trim()) entries.set(row.id, translated);
   }
   fs.writeFileSync(filePath, renderCatalog(exportNames[locale], entries), "utf8");
+}
+
+function countCachedRows(locale, manifestRows, cache) {
+  return manifestRows.filter((row) => cache[cacheKey(locale, row.text)]).length;
+}
+
+function printStatus(manifestRows, cache, selectedLocales) {
+  const summary = Object.fromEntries(
+    selectedLocales.map(([locale]) => {
+      const catalogPath = path.join(messagesDir, `${locale}.ts`);
+      const targetCatalogMessages = fs.existsSync(catalogPath) ? parseCatalog(catalogPath).size : 0;
+      return [
+        locale,
+        {
+          theorySharedRows: `${countCachedRows(locale, manifestRows, cache)}/${manifestRows.length}`,
+          targetCatalogMessages,
+        },
+      ];
+    }),
+  );
+  console.log(JSON.stringify(summary, null, 2));
 }
 
 async function translateRows({ locale, rows }) {
@@ -171,6 +195,10 @@ async function main() {
   const cache = readJson(cachePath, {});
   const selectedLocales = localeTargets.filter(([locale]) => !localeArg || locale === localeArg);
   if (selectedLocales.length === 0) throw new Error(`Unknown locale: ${localeArg}`);
+  if (statusOnly) {
+    printStatus(manifestRows, cache, selectedLocales);
+    return;
+  }
 
   for (const [locale] of selectedLocales) {
     const missing = manifestRows.filter((row) => !cache[cacheKey(locale, row.text)]);
@@ -206,7 +234,8 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error);
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(message);
   process.exitCode = 1;
 });
 

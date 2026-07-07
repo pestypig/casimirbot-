@@ -12,9 +12,17 @@ import {
 import { useAgiChatStore } from "@/store/useAgiChatStore";
 import { shallow } from "zustand/shallow";
 import type { TPhaseProfile } from "@shared/essence-activity";
+import type { HelixAccountCapabilityPolicy } from "@shared/helix-account-session";
+import {
+  HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT,
+  fetchAccountCapabilityPolicy,
+  readCachedAccountCapabilityPolicy,
+} from "@/lib/workstation/accountCapabilityPolicy";
 
 const STATUS_FILTERS: Array<{ label: string; value: ProposalStatus | "all" }> = [
   { label: "New", value: "new" },
+  { label: "Accepted", value: "accepted" },
+  { label: "Graph review", value: "queued_for_graph_review" },
   { label: "Building", value: "building" },
   { label: "Applied", value: "applied" },
   { label: "Denied", value: "denied" },
@@ -42,6 +50,10 @@ export function EssenceProposalsPanel() {
   const [promptLoading, setPromptLoading] = useState(false);
   const [promptError, setPromptError] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  const [accountPolicy, setAccountPolicy] = useState<HelixAccountCapabilityPolicy | null>(() =>
+    readCachedAccountCapabilityPolicy(),
+  );
+  const isDeveloper = accountPolicy?.account_type === "developer";
   const openPromptPanel = useCallback(() => {
     if (typeof window === "undefined") return;
     window.dispatchEvent(new CustomEvent("open-helix-panel", { detail: { id: "essence-prompt-panel" } }));
@@ -83,6 +95,31 @@ export function EssenceProposalsPanel() {
   useEffect(() => {
     void loadProposals();
   }, [loadProposals]);
+
+  useEffect(() => {
+    let active = true;
+    const handlePolicyChange = (event: Event) => {
+      const policy = (event as CustomEvent<{ account_policy?: HelixAccountCapabilityPolicy | null }>).detail
+        ?.account_policy;
+      setAccountPolicy(policy ?? readCachedAccountCapabilityPolicy());
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT, handlePolicyChange as EventListener);
+    }
+    fetchAccountCapabilityPolicy()
+      .then((policy) => {
+        if (active) setAccountPolicy(policy);
+      })
+      .catch(() => {
+        if (active) setAccountPolicy(readCachedAccountCapabilityPolicy());
+      });
+    return () => {
+      active = false;
+      if (typeof window !== "undefined") {
+        window.removeEventListener(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT, handlePolicyChange as EventListener);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!proposals.length) {
@@ -167,7 +204,9 @@ export function EssenceProposalsPanel() {
     );
   }, [chats, selected, addContextMessage]);
 
-  const actionable = selected?.status === "new";
+  const postulateActionRequiresDeveloper = selected?.kind === "postulate";
+  const actionAllowed = !postulateActionRequiresDeveloper || isDeveloper;
+  const actionable = selected?.status === "new" && actionAllowed;
 
   const handleAction = useCallback(
     async (id: string, action: "approve" | "deny") => {
@@ -332,21 +371,28 @@ export function EssenceProposalsPanel() {
                 <h2 className="text-xl font-semibold">{selected.title}</h2>
                 <p className="mt-2 max-w-3xl text-sm text-slate-200 whitespace-pre-line">{selected.summary}</p>
               </div>
-              <div className="flex gap-2">
-                <button
-                  className="rounded border border-white/20 px-4 py-1 text-sm text-slate-200 hover:border-white/50 disabled:opacity-40"
-                  disabled={!actionable || busyId === selected.id}
-                  onClick={() => handleAction(selected.id, "deny")}
-                >
-                  Deny
-                </button>
-                <button
-                  className="rounded bg-sky-500 px-4 py-1 text-sm font-semibold text-white hover:bg-sky-400 disabled:opacity-40"
-                  disabled={!actionable || busyId === selected.id}
-                  onClick={() => handleAction(selected.id, "approve")}
-                >
-                  Approve
-                </button>
+              <div className="flex flex-col items-end gap-2">
+                <div className="flex gap-2">
+                  <button
+                    className="rounded border border-white/20 px-4 py-1 text-sm text-slate-200 hover:border-white/50 disabled:opacity-40"
+                    disabled={!actionable || busyId === selected.id}
+                    onClick={() => handleAction(selected.id, "deny")}
+                  >
+                    Deny
+                  </button>
+                  <button
+                    className="rounded bg-sky-500 px-4 py-1 text-sm font-semibold text-white hover:bg-sky-400 disabled:opacity-40"
+                    disabled={!actionable || busyId === selected.id}
+                    onClick={() => handleAction(selected.id, "approve")}
+                  >
+                    Approve
+                  </button>
+                </div>
+                {postulateActionRequiresDeveloper && !isDeveloper ? (
+                  <div className="max-w-xs text-right text-[11px] text-slate-400">
+                    Postulate moderation is developer-only.
+                  </div>
+                ) : null}
               </div>
             </div>
             <div className="grid flex-1 grid-cols-1 gap-4 p-6 sm:grid-cols-2">
@@ -480,10 +526,18 @@ export function EssenceProposalsPanel() {
 function StatusPill({ status }: { status: ProposalStatus }) {
   const palette: Record<ProposalStatus, string> = {
     new: "bg-slate-500/30 text-slate-100",
+    submitted: "bg-cyan-500/20 text-cyan-100",
+    screening: "bg-cyan-500/20 text-cyan-100",
     approved: "bg-blue-500/30 text-blue-100",
+    accepted: "bg-emerald-500/25 text-emerald-100",
+    accepted_rewarded: "bg-amber-400/25 text-amber-100",
+    queued_for_graph_review: "bg-violet-500/25 text-violet-100",
     denied: "bg-rose-500/30 text-rose-100",
+    rejected: "bg-rose-500/30 text-rose-100",
     building: "bg-amber-500/30 text-amber-100",
     applied: "bg-emerald-500/30 text-emerald-100",
+    implemented: "bg-emerald-600/30 text-emerald-100",
+    claimed: "bg-sky-500/30 text-sky-100",
     error: "bg-rose-700/30 text-rose-100",
   };
   return (
@@ -622,6 +676,34 @@ function TargetDetails({ proposal }: { proposal: EssenceProposal }) {
                 </div>
               ))}
             </dl>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+  if (proposal.target.type === "postulate-board") {
+    const meta = proposal.metadata?.postulate as Record<string, unknown> | undefined;
+    const locatorRefs = Array.isArray(meta?.badgeGraphLocatorRefs)
+      ? meta.badgeGraphLocatorRefs.map(String)
+      : proposal.target.badgeGraphLocatorRefs;
+    return (
+      <div className="space-y-3 text-sm text-slate-200">
+        <div>
+          <div className="text-[11px] uppercase text-slate-500">Board</div>
+          <div className="mt-1 font-semibold text-white">{proposal.target.boardId}</div>
+        </div>
+        <div>
+          <div className="text-[11px] uppercase text-slate-500">Domain</div>
+          <div className="mt-1 text-white">{proposal.target.domain}</div>
+        </div>
+        {locatorRefs.length ? (
+          <div>
+            <div className="text-[11px] uppercase text-slate-500">Badge graph locators</div>
+            <ul className="mt-1 list-outside list-disc pl-4 text-xs text-slate-300">
+              {locatorRefs.map((ref) => (
+                <li key={ref}>{ref}</li>
+              ))}
+            </ul>
           </div>
         ) : null}
       </div>

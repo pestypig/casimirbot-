@@ -1912,12 +1912,19 @@ const buildScientificEvidenceDebugProjection = (input: {
     )),
     ["scientific_evidence_sidecar_id", "status", "blocked_reason"],
   );
+  const graphReflections = uniqueRecordsById(
+    candidates.flatMap((candidate) => collectRecordsDeep(candidate, (record) =>
+      readString(record.schema) === "helix.scientific_evidence_graph_reflection.v1"
+    )),
+    ["reflection_id"],
+  );
   if (
     evidencePackets.length === 0 &&
     evidenceSidecars.length === 0 &&
     branchGates.length === 0 &&
     runTraces.length === 0 &&
-    sidecarGatewayBridges.length === 0
+    sidecarGatewayBridges.length === 0 &&
+    graphReflections.length === 0
   ) return null;
   const rejectedCalculatorPayloadIds = uniqueStrings([
     ...branchGates.flatMap((gate) => readStringArray(gate.rejected_calculator_payload_ids)),
@@ -1952,6 +1959,7 @@ const buildScientificEvidenceDebugProjection = (input: {
     branch_gate_count: branchGates.length,
     run_trace_count: runTraces.length,
     sidecar_gateway_bridge_count: sidecarGatewayBridges.length,
+    graph_reflection_count: graphReflections.length,
     primary_domains: uniqueStrings([
       ...evidencePackets.map((packet) => readString(packet.primary_domain)),
       ...branchGates.map((gate) => readString(gate.primary_domain)),
@@ -1965,7 +1973,17 @@ const buildScientificEvidenceDebugProjection = (input: {
       ...evidencePackets.map((packet) => readString(asRecord(packet.admissibility)?.congruence_grade_floor)),
       ...branchGates.map((gate) => readString(gate.congruence_grade_floor)),
       ...runTraces.map((trace) => readString(trace.congruence_grade_floor)),
+      ...graphReflections.map((reflection) => readString(reflection.congruence_grade_floor)),
     ]),
+    graph_reflection_evidence_depths: uniqueStrings(
+      graphReflections.map((reflection) => readString(reflection.evidence_depth)),
+    ),
+    graph_reflection_object_classes: uniqueStrings(
+      graphReflections.map((reflection) => readString(reflection.evidence_object_class)),
+    ),
+    graph_reflection_branch_gate_statuses: uniqueStrings(
+      graphReflections.map((reflection) => readString(reflection.branch_gate_status)),
+    ),
     congruence_assessment_count: congruenceAssessments.length,
     congruence_grades: uniqueStrings(congruenceAssessments.map((assessment) => readString(assessment.grade))),
     false_friend_refs: falseFriendRefs.slice(0, 24),
@@ -1999,6 +2017,27 @@ const buildScientificEvidenceDebugProjection = (input: {
       sidecar_admissibility_status: readString(bridge.sidecar_admissibility_status),
       sidecar_primary_domain: readString(bridge.sidecar_primary_domain),
       observation_refs: readStringArray(bridge.observation_refs).slice(0, 12),
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    })),
+    graph_reflections: graphReflections.slice(0, 8).map((reflection) => ({
+      reflection_id: readString(reflection.reflection_id),
+      evidence_depth: readString(reflection.evidence_depth),
+      evidence_object_class: readString(reflection.evidence_object_class),
+      branch_gate_status: readString(reflection.branch_gate_status),
+      congruence_grade_floor: readString(reflection.congruence_grade_floor),
+      graph_attachment_count: readRecordArray(reflection.graph_attachments).length,
+      blocked_authorities: readRecordArray(reflection.blocked_authorities).map((authority) => ({
+        authority: readString(authority.authority),
+        blocked_reason: readString(authority.blocked_reason),
+      })).slice(0, 12),
+      upgrade_requirements: readStringArray(reflection.upgrade_requirements).slice(0, 12),
+      next_tool_affordances: readRecordArray(reflection.next_tool_affordances).map((affordance) => ({
+        capability: readString(affordance.capability),
+        reason: readString(affordance.reason),
+      })).slice(0, 12),
+      provenance_refs: readStringArray(reflection.provenance_refs).slice(0, 12),
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,

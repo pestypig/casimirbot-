@@ -186,8 +186,6 @@ export async function submitPostulateProposal(input: {
   userComment?: string | null;
   originatingSessionId?: string | null;
   originatingAnswerId?: string | null;
-  submittedByAgentId?: string | null;
-  accountType?: "developer" | "user" | null;
 }): Promise<{ proposal: EssenceProposal; receiptId: string }> {
   const res = await fetch("/api/proposals/postulate", {
     method: "POST",
@@ -203,6 +201,136 @@ export async function submitPostulateProposal(input: {
     throw new Error("postulate_submit_missing_payload");
   }
   return { proposal: payload.proposal, receiptId: payload.receiptId };
+}
+
+export type ClaimablePostulateReceipt = {
+  proposalId: string;
+  receiptId: string;
+  receiptIssuedAt?: string | null;
+  receiptIntegrityHash?: string | null;
+  title: string;
+  score?: number | null;
+  rewardTokens: number;
+  createdAt: string;
+  status: "claim_pending" | "claimed" | "issued";
+};
+
+const CLAIMABLE_POSTULATE_RECEIPTS_KEY = "helix:postulate:claimable-receipts:v1";
+export const CLAIMABLE_POSTULATE_RECEIPTS_EVENT = "helix-postulate-claimable-receipts-changed";
+export const POSTULATE_BOARD_EVENT = "helix-postulate-board-changed";
+
+const notifyClaimablePostulateReceiptsChanged = (receipts: ClaimablePostulateReceipt[]): void => {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(CLAIMABLE_POSTULATE_RECEIPTS_EVENT, { detail: { receipts } }));
+};
+
+export const notifyPostulateBoardChanged = (proposal?: EssenceProposal | null): void => {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(POSTULATE_BOARD_EVENT, { detail: { proposal } }));
+};
+
+const readPostulateMeta = (proposal: EssenceProposal): Record<string, unknown> => {
+  const postulate = proposal.metadata?.postulate;
+  return postulate && typeof postulate === "object" && !Array.isArray(postulate)
+    ? postulate as Record<string, unknown>
+    : {};
+};
+
+export function buildClaimablePostulateReceipt(
+  proposal: EssenceProposal,
+  receiptId?: string | null,
+): ClaimablePostulateReceipt | null {
+  if (proposal.kind !== "postulate") return null;
+  const postulate = readPostulateMeta(proposal);
+  const resolvedReceiptId = receiptId ?? (typeof postulate.receiptId === "string" ? postulate.receiptId : "");
+  if (!resolvedReceiptId) return null;
+  const rewardCreditStatus = typeof postulate.rewardCreditStatus === "string"
+    ? postulate.rewardCreditStatus
+    : "none";
+  const receiptClaimStatus = typeof postulate.receiptClaimStatus === "string"
+    ? postulate.receiptClaimStatus
+    : "unclaimed";
+  const isAnonymousReceipt = !proposal.ownerId;
+  if (rewardCreditStatus !== "claim_pending" && rewardCreditStatus !== "issued" && !isAnonymousReceipt) return null;
+  return {
+    proposalId: proposal.id,
+    receiptId: resolvedReceiptId,
+    receiptIssuedAt: typeof postulate.receiptIssuedAt === "string" ? postulate.receiptIssuedAt : null,
+    receiptIntegrityHash: typeof postulate.receiptIntegrityHash === "string" ? postulate.receiptIntegrityHash : null,
+    title: proposal.title,
+    score: typeof proposal.safetyScore === "number" ? proposal.safetyScore : null,
+    rewardTokens: proposal.rewardTokens ?? 0,
+    createdAt: proposal.createdAt,
+    status: rewardCreditStatus === "issued" ? "issued" : receiptClaimStatus === "claimed" ? "claimed" : "claim_pending",
+  };
+}
+
+export function readClaimablePostulateReceipts(): ClaimablePostulateReceipt[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(CLAIMABLE_POSTULATE_RECEIPTS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((entry): entry is ClaimablePostulateReceipt =>
+          Boolean(entry && typeof entry.proposalId === "string" && typeof entry.receiptId === "string"),
+        )
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+export function rememberClaimablePostulateReceipt(receipt: ClaimablePostulateReceipt): void {
+  if (typeof window === "undefined") return;
+  const current = readClaimablePostulateReceipts();
+  const next = [receipt, ...current.filter((entry) => entry.proposalId !== receipt.proposalId)].slice(0, 20);
+  window.localStorage.setItem(CLAIMABLE_POSTULATE_RECEIPTS_KEY, JSON.stringify(next));
+  notifyClaimablePostulateReceiptsChanged(next);
+}
+
+export function updateClaimablePostulateReceiptStatus(
+  proposalId: string,
+  status: ClaimablePostulateReceipt["status"],
+  patch: Partial<Pick<ClaimablePostulateReceipt, "receiptIssuedAt" | "receiptIntegrityHash">> = {},
+): void {
+  if (typeof window === "undefined") return;
+  const next = readClaimablePostulateReceipts().map((entry) =>
+    entry.proposalId === proposalId ? { ...entry, ...patch, status } : entry,
+  );
+  window.localStorage.setItem(CLAIMABLE_POSTULATE_RECEIPTS_KEY, JSON.stringify(next));
+  notifyClaimablePostulateReceiptsChanged(next);
+}
+
+export async function claimPostulateReceipt(input: {
+  proposalId: string;
+  receiptId: string;
+}): Promise<EssenceProposal> {
+  const res = await fetch(`/api/proposals/postulate/${encodeURIComponent(input.proposalId)}/claim`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ receiptId: input.receiptId }),
+  });
+  if (!res.ok) {
+    const message = await res.text().catch(() => res.statusText);
+    throw new Error(message || `postulate_claim_failed:${res.status}`);
+  }
+  const payload = (await res.json()) as { proposal?: EssenceProposal };
+  if (!payload?.proposal) {
+    throw new Error("postulate_claim_missing_payload");
+  }
+  const postulate = readPostulateMeta(payload.proposal);
+  const rewardCreditStatus = typeof postulate.rewardCreditStatus === "string"
+    ? postulate.rewardCreditStatus
+    : "none";
+  const nextStatus = rewardCreditStatus === "issued" && (payload.proposal.rewardTokens ?? 0) > 0
+    ? "issued"
+    : "claimed";
+  updateClaimablePostulateReceiptStatus(input.proposalId, nextStatus, {
+    receiptIssuedAt: typeof postulate.receiptIssuedAt === "string" ? postulate.receiptIssuedAt : null,
+    receiptIntegrityHash: typeof postulate.receiptIntegrityHash === "string" ? postulate.receiptIntegrityHash : null,
+  });
+  notifyPostulateBoardChanged(payload.proposal);
+  return payload.proposal;
 }
 
 export async function fetchPostulateBoard(params: { day?: string } = {}): Promise<EssenceProposal[]> {

@@ -1,5 +1,7 @@
 import {
   HELIX_USER_ACCOUNT_POLICY,
+  HELIX_USER_WORKSTATION_PANEL_IDS,
+  resolveHelixAccountPanelAccess,
   resolveHelixWorkstationCapabilityAccess,
   type HelixAccountCapabilityPolicy,
   type HelixAccountPolicyAccessState,
@@ -19,6 +21,7 @@ export type HelixAskSlashCommandCatalogItem = {
   description: string;
   insertionText: string;
   permissionRequired?: HelixWorkstationPermissionProfile;
+  fallbackPanelId?: string;
   runtimeIds?: string[];
   developerOnly?: boolean;
   generated?: boolean;
@@ -94,6 +97,16 @@ const HELIX_ASK_SLASH_COMMAND_CATALOG: HelixAskSlashCommandCatalogItem[] = [
     description: "Use theory graph context to organize claims or conjectures.",
     insertionText: "Use the theory graph context to ",
     permissionRequired: "read",
+  },
+  {
+    id: "postulate",
+    command: "/postulate",
+    label: "Postulate review",
+    capabilityId: "postulate.submit_proposal",
+    description: "Prepare a proposal for the postulate review lane and board.",
+    insertionText: "/postulate\n\nSend this postulate to be reviewed: ",
+    permissionRequired: "act",
+    fallbackPanelId: "postulate-board",
   },
   {
     id: "voice",
@@ -175,6 +188,7 @@ export function buildHelixAskSlashCommandMenuItems(args: {
 }): HelixAskSlashCommandMenuItem[] {
   const accountPolicy = args.accountPolicy ?? HELIX_USER_ACCOUNT_POLICY;
   const runtimeId = args.runtime?.id?.trim() ?? "";
+  const publicPanelIds = new Set<string>(HELIX_USER_WORKSTATION_PANEL_IDS);
   return buildHelixAskSlashCommandCatalogForPolicy(accountPolicy)
     .map((item): HelixAskSlashCommandMenuItem => {
       const runtimeAvailable =
@@ -185,10 +199,19 @@ export function buildHelixAskSlashCommandMenuItems(args: {
             capability_id: item.capabilityId,
             permission_profile_required: item.permissionRequired,
           });
+      const fallbackPanelAccess = access.state === "available" || !item.fallbackPanelId
+        ? null
+        : resolveHelixAccountPanelAccess(accountPolicy, item.fallbackPanelId);
+      const fallbackPanelIsCanonicalPublic = item.fallbackPanelId
+        ? publicPanelIds.has(item.fallbackPanelId)
+        : false;
+      const resolvedAccess = fallbackPanelAccess?.state === "available" || fallbackPanelIsCanonicalPublic
+        ? { state: "available" as const, reason: null }
+        : access;
       return {
         ...item,
-        accessState: access.state,
-        accessReason: access.reason,
+        accessState: resolvedAccess.state,
+        accessReason: resolvedAccess.reason,
         runtimeAvailable,
         runtimeLabel: args.runtime?.label?.trim() || null,
       };

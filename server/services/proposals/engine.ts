@@ -84,13 +84,19 @@ export async function ensureDailyPanelProposals(ownerId?: string | null, day = t
 export async function listProposals(
   ownerId?: string | null,
   day = todayKey(),
-  opts?: { kind?: ProposalKind; status?: ProposalStatus; safetyStatus?: ProposalSafetyStatus },
+  opts?: {
+    kind?: ProposalKind;
+    status?: ProposalStatus;
+    safetyStatus?: ProposalSafetyStatus;
+    includeAllOwners?: boolean;
+  },
 ): Promise<EssenceProposal[]> {
   if (ownerId && ownerCacheKey(ownerId) !== "anon") {
     await ensureDailyPanelProposals(null, day);
   }
   await ensureDailyPanelProposals(ownerId, day);
-  return listProposalsForDay(day, { ...opts, ownerId });
+  const { includeAllOwners, ...filters } = opts ?? {};
+  return listProposalsForDay(day, includeAllOwners ? filters : { ...filters, ownerId });
 }
 
 export async function fetchProposal(id: string): Promise<EssenceProposal | null> {

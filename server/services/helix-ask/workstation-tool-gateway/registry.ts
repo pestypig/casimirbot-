@@ -83,6 +83,7 @@ import {
 import { runHelixTheoryContextReflectionTool } from "@shared/theory/theory-context-reflection-tool";
 import {
   buildScientificBranchGate,
+  buildScientificEvidenceGraphReflection,
   buildScientificEvidencePacket,
   buildScientificImageEvidenceSidecar,
   buildScientificRunTrace,
@@ -7562,8 +7563,35 @@ export const callWorkstationGatewayCapability = async (
         .map((payload) => payload.payload_id)
         .filter(Boolean),
     });
+    const scientificEvidenceGraphReflection = buildScientificEvidenceGraphReflection({
+      turnId,
+      evidence: scientificEvidencePacket,
+      sidecar: scientificEvidenceSidecar,
+      branchGate,
+      reflectedBadgeIds: [
+        ...reflection.overlay.exactBadgeIds,
+        ...reflection.overlay.likelyBadgeIds,
+      ],
+      calculatorPayloads,
+      provenanceRefs: [
+        reflection.reflectionId,
+        ...(scientificEvidencePacket
+          ? [
+              scientificEvidencePacket.source_ref_hash,
+              scientificEvidencePacket.crop_region_id,
+            ]
+          : []),
+        ...(scientificEvidenceSidecar
+          ? [
+              scientificEvidenceSidecar.sidecar_id,
+              ...scientificEvidenceSidecar.packet_refs,
+            ]
+          : []),
+      ],
+    });
     const scientificClaimBoundaryNotes = [
       `scientific_branch_gate=${branchGate.status}; domain=${branchGate.primary_domain}; congruence_floor=${branchGate.congruence_grade_floor}`,
+      `scientific_evidence_graph_reflection=${scientificEvidenceGraphReflection.evidence_depth}; object=${scientificEvidenceGraphReflection.evidence_object_class}`,
       ...(branchGate.rejected_calculator_payload_ids.length
         ? [`rejected_calculator_payloads=${branchGate.rejected_calculator_payload_ids.join(",")}`]
         : []),
@@ -7603,6 +7631,7 @@ export const callWorkstationGatewayCapability = async (
       scientific_evidence_source: scientificEvidenceInput.source,
       scientific_branch_gate: branchGate,
       scientific_run_trace: scientificRunTrace,
+      scientific_evidence_graph_reflection: scientificEvidenceGraphReflection,
       congruence_grade_floor: branchGate.congruence_grade_floor,
       recommended_action_ids: receipt.recommendedNextActions.map((action) => action.actionId).slice(0, 12),
       recommended_actions_solve: receipt.recommendedNextActions.some((action) => action.solves === true),

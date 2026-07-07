@@ -26,6 +26,7 @@ export type PanelId =
   | "image-lens"
   | "document-image-lens"
   | "narrator"
+  | "postulate-board"
   | HelixPanelRef["id"];
 
 export type PanelTelemetryWindowSnapshot = {
@@ -266,6 +267,14 @@ const BASE_PANELS: PanelDefinition[] = [
     defaultSize: { w: 900, h: 640 },
     defaultPosition: { x: 240, y: 130 },
     keywords: ["account", "session", "profile", "discord", "usage", "memory", "tokens", "sign in"],
+  },
+  {
+    id: "postulate-board",
+    title: "Postulate Board",
+    loader: load(() => import("@/components/workstation/PostulateBoardPanel")),
+    defaultSize: { w: 980, h: 700 },
+    defaultPosition: { x: 260, y: 150 },
+    keywords: ["postulate", "proposal", "review", "badge graph", "reward", "receipt"],
   },
   {
     id: "situation-room-sources",

@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import type { EssenceProposal } from "@shared/proposals";
 import { awardTokens } from "../jobs/token-budget";
-import { recordProposalAction, upsertProposal } from "../../db/proposals";
+import { getProposalById, recordProposalAction, updateProposalFields, upsertProposal } from "../../db/proposals";
 import { essenceHub } from "../essence/events";
 
 export type PostulateDomain = "physics" | "engineering" | "ideology" | "product" | "other";
@@ -93,14 +93,17 @@ const OVERCLAIM_TERMS = [
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 
 const containsAny = (text: string, terms: readonly string[]): boolean =>
-  terms.some((term) => text.includes(term));
+  terms.some((term: string) => text.includes(term));
 
 const countMatches = (text: string, terms: readonly string[]): number =>
-  terms.reduce((count, term) => count + (text.includes(term) ? 1 : 0), 0);
+  terms.reduce((count: number, term: string) => count + (text.includes(term) ? 1 : 0), 0);
 
 const todayKey = () => new Date().toISOString().slice(0, 10);
 
 const normalizeWhitespace = (value: string): string => value.replace(/\s+/g, " ").trim();
+
+const buildReceiptIntegrityHash = (payload: Record<string, unknown>): string =>
+  crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
 
 const extractBadgeGraphLocatorRefs = (text: string): string[] => {
   const refs = new Set<string>();
@@ -213,6 +216,23 @@ export async function submitPostulateProposal(input: SubmitPostulateProposalInpu
         ? "accepted"
         : "rejected";
   const title = text.length > 82 ? `${text.slice(0, 79)}...` : text;
+  const receiptIntegrityPayload = {
+    schema: "helix.postulate_receipt.v1",
+    receiptId,
+    proposalId: id,
+    proposalText: text,
+    originatingSessionId: input.originatingSessionId ?? null,
+    originatingAnswerId: input.originatingAnswerId ?? null,
+    submittedByAgentId: input.submittedByAgentId ?? null,
+    authorAccountId: input.ownerId ?? null,
+    accountType: input.accountType ?? "user",
+    domain: score.domain,
+    reviewScore: score.reviewScore,
+    status,
+    rewardTokens: score.rewarded ? POSTULATE_REWARD_TOKENS : 0,
+    createdAt: nowIso,
+  };
+  const receiptIntegrityHash = buildReceiptIntegrityHash(receiptIntegrityPayload);
   const proposal: EssenceProposal = {
     id,
     kind: "postulate",
@@ -245,8 +265,13 @@ export async function submitPostulateProposal(input: SubmitPostulateProposalInpu
       postulate: {
         schema: "helix.postulate_proposal.v1",
         receiptId,
+        receiptIssuedAt: nowIso,
+        receiptIntegrityHash,
+        receiptClaimStatus: "unclaimed",
         prompt: "/postulate",
         promptLabel: "Send this postulate to be reviewed",
+        proposalText: text,
+        userComment: input.userComment ? normalizeWhitespace(input.userComment) : null,
         originatingSessionId: input.originatingSessionId ?? null,
         originatingAnswerId: input.originatingAnswerId ?? null,
         submittedByAgentId: input.submittedByAgentId ?? null,
@@ -268,6 +293,15 @@ export async function submitPostulateProposal(input: SubmitPostulateProposalInpu
         graphIntegration: score.domain === "physics" && score.accepted
           ? "queued_for_developer_patch_review"
           : "not_applicable",
+        graphPatchReviewTask: score.domain === "physics" && score.accepted
+          ? {
+              status: "queued",
+              kind: "developer_patch_review",
+              queuedAt: nowIso,
+              locatorRefs: score.badgeGraphLocatorRefs,
+              instruction: "Review badge graph locators and prepare a patch proposal; do not auto-mutate the theory graph.",
+            }
+          : null,
         claimBoundary: "accepted means constructive review candidate, not proof or certification",
       },
     },
@@ -281,9 +315,9 @@ export async function submitPostulateProposal(input: SubmitPostulateProposalInpu
   });
   if (score.rewarded && input.ownerId) {
     awardTokens(input.ownerId, POSTULATE_REWARD_TOKENS, `postulate:reward:${proposal.id}`, undefined, {
-      source: "postulate",
+      source: "proposal",
       ref: proposal.id,
-      receiptId,
+      evidence: receiptId,
     });
   }
   if (score.accepted) {
@@ -296,4 +330,69 @@ export async function submitPostulateProposal(input: SubmitPostulateProposalInpu
     });
   }
   return { proposal, score, receiptId };
+}
+
+const readPostulateMetadata = (proposal: EssenceProposal): Record<string, unknown> => {
+  const postulate = proposal.metadata?.postulate;
+  return postulate && typeof postulate === "object" && !Array.isArray(postulate)
+    ? postulate as Record<string, unknown>
+    : {};
+};
+
+export async function claimPostulateReceipt(input: {
+  proposalId: string;
+  receiptId: string;
+  ownerId: string;
+}): Promise<EssenceProposal> {
+  const proposal = await getProposalById(input.proposalId);
+  if (!proposal || proposal.kind !== "postulate") {
+    throw new Error("postulate_receipt_not_found");
+  }
+  const postulate = readPostulateMetadata(proposal);
+  const expectedReceiptId = typeof postulate.receiptId === "string" ? postulate.receiptId : "";
+  if (!expectedReceiptId || expectedReceiptId !== input.receiptId) {
+    throw new Error("postulate_receipt_mismatch");
+  }
+  if (proposal.ownerId && proposal.ownerId !== input.ownerId) {
+    throw new Error("postulate_receipt_already_claimed");
+  }
+  const rewardCreditStatus = typeof postulate.rewardCreditStatus === "string"
+    ? postulate.rewardCreditStatus
+    : "none";
+  const rewardClaimPending = rewardCreditStatus === "claim_pending" && proposal.rewardTokens > 0;
+  const alreadyIssued = rewardCreditStatus === "issued";
+  const ownershipOnlyClaim = rewardCreditStatus === "none" && !proposal.ownerId;
+  if (!rewardClaimPending && !alreadyIssued && !ownershipOnlyClaim) {
+    throw new Error("postulate_receipt_not_claimable");
+  }
+  if (rewardClaimPending) {
+    awardTokens(input.ownerId, proposal.rewardTokens, `postulate:claim:${proposal.id}`, undefined, {
+      source: "proposal",
+      ref: proposal.id,
+      evidence: input.receiptId,
+    });
+  }
+  await updateProposalFields(proposal.id, {
+    ownerId: input.ownerId,
+    status: rewardClaimPending || alreadyIssued ? "claimed" : proposal.status,
+    metadata: {
+      ...(proposal.metadata ?? {}),
+      postulate: {
+        ...postulate,
+        authorAccountId: input.ownerId,
+        rewardCreditStatus: rewardClaimPending || alreadyIssued ? "issued" : rewardCreditStatus,
+        receiptClaimStatus: "claimed",
+        claimedAt: new Date().toISOString(),
+      },
+    },
+  });
+  await recordProposalAction({
+    proposalId: proposal.id,
+    action: "status-update",
+    userId: input.ownerId,
+    note: `postulate receipt claimed; receipt=${input.receiptId}`,
+  });
+  const claimed = await getProposalById(proposal.id);
+  if (!claimed) throw new Error("postulate_receipt_claim_failed");
+  return claimed;
 }

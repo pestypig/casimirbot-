@@ -1090,6 +1090,41 @@ describe("explicit workstation gateway derived calls", () => {
     });
   });
 
+  it("routes explicit arXiv PDF page Image Lens extraction as scholarly full-text workflow, not numeric extraction", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          'Use the paper titled "General Relativity and Weyl Frames" with arXiv id 1106.5543v1. Fetch the PDF, render page 1 into Image Lens, and extract the first displayed equation or equation-like row. Do not run a new broad lookup unless the arXiv fetch fails.',
+        workspace_context_snapshot: {
+          activePanel: "image-lens",
+          focusedPanel: "image-lens",
+        },
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["scholarly-research.lookup_papers"]);
+    expect(requests[0]).toMatchObject({
+      derivation_source: "helix_scholarly_workflow_planner",
+      dependent_capability_id: "scholarly-research.fetch_full_text",
+      arguments: {
+        query: "General Relativity and Weyl Frames",
+        scholarly_intent: expect.objectContaining({
+          requested_workflow: "full_text_summary",
+          requires_numeric_extraction: false,
+        }),
+        planned_scholarly_capability_chain: expect.objectContaining({
+          planned_capabilities: [
+            "scholarly-research.lookup_papers",
+            "scholarly-research.fetch_full_text",
+          ],
+        }),
+      },
+    });
+    expect(JSON.stringify(requests)).not.toContain("scholarly-research.extract_numeric_parameters");
+  });
+
   it("does not let sentence-leading words leak into mixed prompt calculator expressions", () => {
     const requests = readWorkstationGatewayCallRequestsForTurn({
       includePlannerDerived: true,

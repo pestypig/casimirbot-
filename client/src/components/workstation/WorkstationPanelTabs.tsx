@@ -200,7 +200,8 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
               {availablePanels.map((panel) => {
                 const panelTitle = getInterfacePanelTitle(t, String(panel.id), panel.title);
                 const panelAccess = resolveHelixAccountPanelAccess(accountPolicy, String(panel.id));
-                const locked = panelAccess.state === "locked";
+                const publicLaunchPanel = isUserLaunchPanel(String(panel.id));
+                const locked = panelAccess.state === "locked" && !publicLaunchPanel;
                 return (
                   <button
                     key={panel.id}

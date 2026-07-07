@@ -30,6 +30,8 @@ const force = args.has("--force");
 
 const repoRoot = process.cwd();
 const codexRoot = path.join(repoRoot, "external", "openai-codex-compare");
+const helixAskPillNoGrowthPath = "client/src/components/helix/HelixAskPill.tsx";
+const helixAskPillNoGrowthMaxLines = 25_485;
 const codexReferenceFiles = [
   "codex-rs/core/src/session/turn.rs",
   "codex-rs/mcp-server/src/codex_tool_runner.rs",
@@ -436,6 +438,22 @@ function printMessages(messages: CheckMessage[]): void {
   }
 }
 
+function checkHelixAskPillNoGrowth(messages: CheckMessage[]): void {
+  const content = readUtf8(helixAskPillNoGrowthPath);
+  if (!content) return;
+  const lineCount = content.split(/\r?\n/).length;
+  if (lineCount <= helixAskPillNoGrowthMaxLines) return;
+  messages.push({
+    level: "failure",
+    code: "helix_ask_pill_growth_blocked",
+    file: helixAskPillNoGrowthPath,
+    message:
+      `HelixAskPill.tsx grew to ${lineCount} lines over the recrown ceiling of ${helixAskPillNoGrowthMaxLines}. ` +
+      "Move new UI/display/pure behavior into client/src/components/helix/ask-console/ and leave only thin bridge wiring in the pill. " +
+      "Only lower this ceiling after extraction shrinks the file.",
+  });
+}
+
 const changedFiles = unique([
   ...gitLines(["diff", "--name-only"]),
   ...gitLines(["diff", "--name-only", "--cached"]),
@@ -448,6 +466,7 @@ const messages: CheckMessage[] = [];
 
 checkCodexReference(messages, sensitiveFiles.length > 0);
 scanFiles(sensitiveFiles, messages);
+checkHelixAskPillNoGrowth(messages);
 
 const inferredClassifications = inferClassifications(classificationFiles);
 const declaredClassification = process.env.HELIX_ASK_DISCIPLINE_CLASSIFICATION?.trim();

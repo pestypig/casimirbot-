@@ -63,6 +63,18 @@ const hasPaperCorpusCue = (promptText: string): boolean =>
 export const hasScholarlyFullTextCue = (promptText: string): boolean =>
   /\b(?:pdfs?|full[-\s]?text|paper\s+text|article\s+text|paper[-\s]+backed\s+(?:numeric|numerical|formula|variable|calculator)|research[-\s]+paper\s+(?:numeric|numerical|formula|variable)\s+evidence|source[-\s]backed\s+(?:numeric|numerical|expression|calculator)|formula\s+(?:variable\s+)?binding|bind\s+(?:the\s+)?(?:formula\s+)?variables?|calculator\s+binding|extract\s+(?:text|sections?|passages?|chunks?|science|scientific\s+content)|show\s+(?:me\s+)?(?:the\s+)?science|scientific\s+content|scientific\s+evidence(?:\s+packet)?|main\s+equations?|show\s+(?:me\s+)?(?:the\s+)?equations?|read\s+(?:the\s+)?(?:paper|pdf|article)|pages?|page\s+images?|figures?|tables?|equations?|methods?|results?|discussion|conclusion)\b/i.test(promptText);
 
+export const hasScholarlyPageImageCue = (promptText: string): boolean =>
+  /\b(?:render|inspect|ocr|parse|crop|page\s+images?|pdf\s+pages?|image\s+lens|displayed\s+equations?|equation[-\s]+like\s+rows?|exact\s+equation\s+rows?)\b/i.test(promptText);
+
+const hasScholarlyEquationRowExtractionCue = (promptText: string): boolean =>
+  /\b(?:displayed\s+equations?|equation[-\s]+like\s+rows?|exact\s+equation\s+rows?|main\s+equations?|show\s+(?:me\s+)?(?:the\s+)?equations?)\b/i.test(promptText);
+
+const hasScholarlyNumericEvidenceCue = (promptText: string): boolean =>
+  /\b(?:extract|report|return|find|fetch|bind)\b[\s\S]{0,80}\b(?:reported\s+)?(?:numeric|numerical|unit[-\s]?bearing|parameters?|values?|invariants?|measurements?|variables?\s+with\s+units?)\b/i.test(promptText) ||
+  /\b(?:numeric|numerical|unit[-\s]?bearing)\s+(?:parameters?|values?|ranges?|evidence|binding)\b/i.test(promptText) ||
+  /\b(?:paper[-\s]+backed|source[-\s]?backed|research[-\s]+paper)\s+(?:numeric|numerical|formula\s+variable|variable|calculator)\b/i.test(promptText) ||
+  /\b(?:formula\s+(?:variable\s+)?binding|bind\s+(?:the\s+)?(?:formula\s+)?variables?|calculator\s+binding)\b/i.test(promptText);
+
 const isExplanatoryOnlyPrompt = (promptText: string): boolean =>
   /\b(?:what\s+is|what\s+are|what\s+does|explain|describe|tell\s+me)\b[\s\S]{0,120}\b(?:doi|arxiv|crossref|openalex|semantic\s+scholar|citation|reference|journal)\b/i.test(promptText) &&
   !hasLookupActionCue(promptText) &&
@@ -143,6 +155,7 @@ const stripInstructionText = (promptText: string): { query: string; reasons: str
     [/\b(?:search|find|look\s*up|lookup|retrieve|collect|get)\s+(?:a\s+)?(?:scholarly\s+)?(?:paper|article)\s+(?:for|on|about|with)?\b/gi, " "],
     [/\b(?:scholarly\s+research\s+papers?|research\s+papers?|paper\s+evidence|scholarly\s+papers?|paper\s+records?|paper\s+record|papers?|article)\b/gi, " "],
     [/\b(?:fetch|pull|read)\s+(?:the\s+)?(?:full[-\s]?text|pdf|paper\s+text|article\s+text)(?:\s+if\s+available)?\b/gi, " "],
+    [/\b(?:show\s+(?:me\s+)?(?:the\s+)?science|scientific\s+content|scientific\s+evidence(?:\s+packet)?|main\s+equations?|show\s+(?:me\s+)?(?:the\s+)?equations?)\b/gi, " "],
     [/\b(?:summari[sz]e|answer|explain|review)\s+(?:only\s+)?(?:from|using|based\s+on)?\s*(?:fetched\s+text|full[-\s]?text|paper\s+evidence|metadata|the\s+results?)?\b/gi, " "],
     [/\b(?:extract|report|return)\s+(?:reported\s+)?(?:numeric|numerical)\s+(?:parameters?|values?|invariants?)(?:\s+with\s+units?)?\b/gi, " "],
     [/\bthen\s+calculate\s+only\s+if\s+(?:those\s+)?(?:cited\s+)?values?\s+(?:are|is)\s+available\b/gi, " "],
@@ -169,7 +182,7 @@ const requestedWorkflowForPrompt = (prompt: string, doi: string | null): HelixSc
   if (/\b(?:calculate|compute|solve|calculator)\b/i.test(prompt) && /\b(?:numeric|numerical|values?|parameters?|invariants?|units?)\b/i.test(prompt)) {
     return "numeric_calculation";
   }
-  if (/\b(?:extract|reported|numeric|numerical|parameters?|values?|invariants?|units?)\b/i.test(prompt)) {
+  if (hasScholarlyNumericEvidenceCue(prompt) && !hasScholarlyEquationRowExtractionCue(prompt)) {
     return "numeric_extraction";
   }
   if (/\b(?:fetch|retrieve|get|pull)\b[\s\S]{0,100}\b(?:research\s+)?papers?\b/i.test(prompt)) return "full_text_summary";

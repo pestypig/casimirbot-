@@ -39,6 +39,11 @@ describe("launchPanelPolicy", () => {
     expect(isUserLaunchPanel("theory-badge-graph")).toBe(true);
   });
 
+  it("includes the postulate board in public launch panels", () => {
+    expect(isUserLaunchPanel("postulate-board")).toBe(true);
+    expect(isLockedLaunchPanel("postulate-board")).toBe(false);
+  });
+
   it("includes the Moral Badge Graph but not the Fruition Calculator in public launch panels", () => {
     expect(isUserLaunchPanel("moral-graph")).toBe(true);
     expect(isUserLaunchPanel("fruition-calculator")).toBe(false);

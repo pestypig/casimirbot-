@@ -3650,6 +3650,88 @@ describe("Helix Ask Console recrown boundary", () => {
       },
     ]);
     expect(buildHelixAskFinalAnswerBlocks(
+      [
+        "The prior evidence only supports `partial_candidate`.",
+        "",
+        "```latex",
+        "S[\\varphi, g] = -\\frac{1}{2} \\int d^Dx \\sqrt{-g} \\varphi \\left[ \\Box + \\xi R \\right] \\varphi,",
+        "```",
+        "",
+        "with a concrete page image `source_id`.",
+      ].join("\n"),
+    )).toEqual([
+      {
+        kind: "line",
+        key: "final-answer-line-0",
+        text: "The prior evidence only supports `partial_candidate`.",
+        segments: [
+          {
+            key: "final-answer-line-0-segment-0",
+            text: "The prior evidence only supports `partial_candidate`.",
+          },
+        ],
+        isSectionHeader: false,
+      },
+      {
+        kind: "blank",
+        key: "final-answer-blank-1",
+      },
+      {
+        kind: "code",
+        key: "final-answer-code-2",
+        language: "latex",
+        text: "S[\\varphi, g] = -\\frac{1}{2} \\int d^Dx \\sqrt{-g} \\varphi \\left[ \\Box + \\xi R \\right] \\varphi,",
+      },
+      {
+        kind: "blank",
+        key: "final-answer-blank-5",
+      },
+      {
+        kind: "line",
+        key: "final-answer-line-6",
+        text: "with a concrete page image `source_id`.",
+        segments: [
+          {
+            key: "final-answer-line-6-segment-0",
+            text: "with a concrete page image `source_id`.",
+          },
+        ],
+        isSectionHeader: false,
+      },
+    ]);
+    const providerMarkdownMarkup = renderToStaticMarkup(
+      React.createElement(HelixAskFinalAnswer, {
+        text: [
+          "The prior evidence only supports `partial_candidate`.",
+          "",
+          "```latex",
+          "S[\\varphi, g] = -\\frac{1}{2} \\int d^Dx \\sqrt{-g} \\varphi \\left[ \\Box + \\xi R \\right] \\varphi,",
+          "```",
+          "",
+          "with a concrete page image `source_id`.",
+        ].join("\n"),
+      }),
+    );
+    expect(providerMarkdownMarkup).toContain("data-testid=\"helix-ask-final-answer-code-block\"");
+    expect(providerMarkdownMarkup).toContain("data-code-language=\"latex\"");
+    expect(providerMarkdownMarkup).toContain("data-code-renderer=\"katex\"");
+    expect(providerMarkdownMarkup).toContain("class=\"katex");
+    expect(providerMarkdownMarkup).toContain("partial_candidate</code>");
+    expect(providerMarkdownMarkup).toContain("source_id</code>");
+    expect(providerMarkdownMarkup).toContain("S[\\varphi, g] = -\\frac{1}{2} \\int d^Dx");
+    const rawCodeFallbackMarkup = renderToStaticMarkup(
+      React.createElement(HelixAskFinalAnswer, {
+        text: [
+          "```json",
+          "{\"status\":\"partial_candidate\"}",
+          "```",
+        ].join("\n"),
+      }),
+    );
+    expect(rawCodeFallbackMarkup).toContain("data-code-language=\"json\"");
+    expect(rawCodeFallbackMarkup).toContain("data-code-renderer=\"raw\"");
+    expect(rawCodeFallbackMarkup).toContain("{&quot;status&quot;:&quot;partial_candidate&quot;}");
+    expect(buildHelixAskFinalAnswerBlocks(
       "I cannot answer from the paper I found earlier because no prior scholarly evidence packet was recoverable for this turn. Ask me to rerun the scholarly lookup, provide a DOI/arXiv id, or refer to a specific paper title so Helix can create bounded paper evidence first.",
     )[0]).toMatchObject({
       kind: "line",

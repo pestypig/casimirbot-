@@ -5,6 +5,7 @@ import {
   HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
   HELIX_SCHOLARLY_FULL_TEXT_OBSERVATION_SCHEMA,
   type HelixScholarlyFullTextChunk,
+  type HelixScholarlyFullTextFetchAttempt,
   type HelixScholarlyFullTextObservation,
   type HelixScholarlyFullTextPage,
   type HelixScholarlyFullTextSourceKind,
@@ -12,6 +13,7 @@ import {
   type HelixScholarlyPaperResult,
   type HelixScholarlyPdfVisualCandidate,
 } from "@shared/helix-scholarly-research-observation";
+import { runScholarlyResearchLookup } from "./scholarly-research-lookup";
 
 type RecordLike = Record<string, unknown>;
 
@@ -58,6 +60,7 @@ export type RunScholarlyFullTextFetchInput = {
   extractPdfTextImpl?: ScholarlyPdfTextExtractor;
   cachePdf?: boolean;
   cacheRoot?: string | null;
+  openAccessRecoveryAttempt?: boolean;
 };
 
 const DEFAULT_MAX_PAGES = 40;
@@ -258,6 +261,65 @@ const selectPaper = (input: RunScholarlyFullTextFetchInput): HelixScholarlyPaper
     if (selected) return selected;
   }
   return papers.find((paper: HelixScholarlyPaperResult) => Boolean(resolveScholarlyFullTextUrl(paper))) ?? papers[0] ?? null;
+};
+
+const fullTextFetchabilityScore = (paper: HelixScholarlyPaperResult): number => {
+  const identifiers = paper.identifiers;
+  let score = 0;
+  if (identifiers.arxiv_id) score += 100;
+  if (identifiers.pdf_url) score += /arxiv\.org\/pdf\//i.test(identifiers.pdf_url) ? 100 : 80;
+  if (identifiers.url && /arxiv\.org\/abs\//i.test(identifiers.url)) score += 90;
+  if (identifiers.full_text_url) score += /\.pdf(?:[?#].*)?$/i.test(identifiers.full_text_url) ? 70 : 35;
+  if (identifiers.url && isLikelyPdfUrl(identifiers.url)) score += 65;
+  if (paper.is_open_access) score += 20;
+  if (paper.source_providers.includes("arxiv")) score += 40;
+  if (paper.source_providers.some((provider) => provider === "unpaywall" || provider === "core")) score += 30;
+  if (paper.source_providers.includes("openalex")) score += 5;
+  if (identifiers.doi) score += 2;
+  return score;
+};
+
+const fullTextCandidatePapers = (input: RunScholarlyFullTextFetchInput): HelixScholarlyPaperResult[] => {
+  const papers = input.papers ?? [];
+  const selected = selectPaper(input);
+  const byKey = new Map<string, HelixScholarlyPaperResult>();
+  const add = (paper: HelixScholarlyPaperResult | null | undefined): void => {
+    if (!paper) return;
+    const key = paper.result_id || paper.identifiers.doi || paper.identifiers.arxiv_id || paper.title;
+    if (!byKey.has(key)) byKey.set(key, paper);
+  };
+  add(selected);
+  papers
+    .filter((paper) => paper !== selected)
+    .map((paper, index) => ({ paper, index, score: fullTextFetchabilityScore(paper) }))
+    .sort((left, right) => right.score - left.score || left.index - right.index)
+    .forEach((entry) => add(entry.paper));
+  return Array.from(byKey.values()).filter((paper) => Boolean(resolveScholarlyFullTextUrl(paper)));
+};
+
+const fullTextFetchAttemptFor = (
+  observation: HelixScholarlyFullTextObservation,
+): HelixScholarlyFullTextFetchAttempt => ({
+  ...(observation.paper_result_id ? { paper_result_id: observation.paper_result_id } : {}),
+  ...(observation.title ? { title: observation.title } : {}),
+  ...(observation.source_url ? { source_url: observation.source_url } : {}),
+  evidence_state: observation.evidence_state,
+  source_kind: observation.source_kind,
+  missing_requirements: observation.missing_requirements,
+});
+
+const openAccessRecoveryQueries = (query: string, paper: HelixScholarlyPaperResult | null): string[] => {
+  const candidates = [
+    query,
+    paper?.title,
+    query.replace(/\bbetween\s+conducting\s+plates\b/i, "parallel conducting plates"),
+    query.replace(/\bconducting\s+plates\b/i, "parallel plates"),
+    query.includes("Casimir") ? "Casimir effect parallel conducting plates" : null,
+  ];
+  return unique(candidates
+    .filter((entry): entry is string => Boolean(entry?.trim()))
+    .map((entry) => entry.replace(/\s+/g, " ").trim()))
+    .filter((entry) => entry.length >= 3);
 };
 
 export const resolveScholarlyFullTextUrl = (
@@ -486,6 +548,163 @@ const buildFullTextNextAffordances = (input: {
 export async function runScholarlyFullTextFetch(
   input: RunScholarlyFullTextFetchInput,
 ): Promise<HelixScholarlyFullTextObservation> {
+  if (!input.sourceUrl && (input.papers?.length ?? 0) > 1) {
+    const attempts: HelixScholarlyFullTextFetchAttempt[] = [];
+    let firstObservation: HelixScholarlyFullTextObservation | null = null;
+    for (const candidatePaper of fullTextCandidatePapers(input)) {
+      const observation = await runScholarlyFullTextFetch({
+        ...input,
+        paper: candidatePaper,
+        paperResultId: candidatePaper.result_id,
+        papers: null,
+      });
+      attempts.push(fullTextFetchAttemptFor(observation));
+      if (!firstObservation) firstObservation = observation;
+      if (observation.evidence_state === "full_text_usable" || observation.evidence_state === "page_image_parse_required") {
+        return {
+          ...observation,
+          full_text_fetch_attempts: attempts,
+          missing_requirements: unique([
+            ...attempts.flatMap((attempt) => attempt.missing_requirements),
+            ...observation.missing_requirements,
+          ]),
+        };
+      }
+    }
+    if (firstObservation) {
+      return {
+        ...firstObservation,
+        full_text_fetch_attempts: attempts,
+        missing_requirements: unique(attempts.flatMap((attempt) => attempt.missing_requirements)),
+      };
+    }
+  }
+
+  if (!input.sourceUrl && (input.papers?.length ?? 0) <= 1 && input.openAccessRecoveryAttempt !== true) {
+    const selectedPaper = selectPaper(input);
+    const directObservation = selectedPaper ? await runScholarlyFullTextFetch({
+      ...input,
+      paper: selectedPaper,
+      paperResultId: selectedPaper.result_id,
+      papers: null,
+      sourceUrl: resolveScholarlyFullTextUrl(selectedPaper),
+      openAccessRecoveryAttempt: true,
+    }) : null;
+    if (directObservation?.evidence_state === "full_text_usable" || directObservation?.evidence_state === "page_image_parse_required") {
+      return {
+        ...directObservation,
+        full_text_fetch_attempts: [fullTextFetchAttemptFor(directObservation)],
+      };
+    }
+    const attempts = directObservation ? [fullTextFetchAttemptFor(directObservation)] : [];
+    const attemptedIds = new Set(attempts.map((attempt) => attempt.paper_result_id).filter(Boolean));
+    const fetchImpl = input.fetchImpl ?? defaultFetch;
+    const recoveryMissingRequirements: string[] = [];
+    for (const recoveryQuery of openAccessRecoveryQueries(input.query, selectedPaper)) {
+      const lookupObservation = await runScholarlyResearchLookup({
+        turnId: input.turnId,
+        callId: `${input.callId ?? input.turnId}:open_access_recovery:${hashShort(recoveryQuery)}`,
+        query: recoveryQuery,
+        mode: "paper_search",
+        providers: ["arxiv"],
+        limit: 5,
+        fetchImpl,
+      });
+      recoveryMissingRequirements.push(...lookupObservation.missing_requirements.map((entry) => `open_access_recovery_${entry}`));
+      const recoveryPapers = lookupObservation.papers.filter((paper) => !attemptedIds.has(paper.result_id));
+      if (!recoveryPapers.length) continue;
+      const recoveredObservation = await runScholarlyFullTextFetch({
+        ...input,
+        query: recoveryQuery,
+        paper: null,
+        paperResultId: null,
+        papers: recoveryPapers,
+        openAccessRecoveryAttempt: true,
+      });
+      attempts.push(...(recoveredObservation.full_text_fetch_attempts ?? [fullTextFetchAttemptFor(recoveredObservation)]));
+      if (recoveredObservation.evidence_state === "full_text_usable" || recoveredObservation.evidence_state === "page_image_parse_required") {
+        return {
+          ...recoveredObservation,
+          full_text_fetch_attempts: attempts,
+          missing_requirements: unique([
+            ...attempts.flatMap((attempt) => attempt.missing_requirements),
+            ...recoveryMissingRequirements,
+            ...recoveredObservation.missing_requirements,
+          ]),
+        };
+      }
+    }
+    if (directObservation) {
+      return {
+        ...directObservation,
+        full_text_fetch_attempts: attempts,
+        missing_requirements: unique([
+          ...attempts.flatMap((attempt) => attempt.missing_requirements),
+          ...recoveryMissingRequirements,
+        ]),
+      };
+    }
+  }
+
+  if (input.sourceUrl && input.openAccessRecoveryAttempt !== true) {
+    const selectedPaper = selectPaper(input);
+    const directObservation = await runScholarlyFullTextFetch({
+      ...input,
+      openAccessRecoveryAttempt: true,
+    });
+    if (directObservation.evidence_state === "full_text_usable" || directObservation.evidence_state === "page_image_parse_required") {
+      return {
+        ...directObservation,
+        full_text_fetch_attempts: [fullTextFetchAttemptFor(directObservation)],
+      };
+    }
+    const attempts = [fullTextFetchAttemptFor(directObservation)];
+    const fetchImpl = input.fetchImpl ?? defaultFetch;
+    const recoveryMissingRequirements: string[] = [];
+    for (const recoveryQuery of openAccessRecoveryQueries(input.query, selectedPaper)) {
+      const lookupObservation = await runScholarlyResearchLookup({
+        turnId: input.turnId,
+        callId: `${input.callId ?? input.turnId}:open_access_recovery:${hashShort(recoveryQuery)}`,
+        query: recoveryQuery,
+        mode: "paper_search",
+        providers: ["arxiv"],
+        limit: 5,
+        fetchImpl,
+      });
+      recoveryMissingRequirements.push(...lookupObservation.missing_requirements.map((entry) => `open_access_recovery_${entry}`));
+      if (!lookupObservation.papers.length) continue;
+      const recoveredObservation = await runScholarlyFullTextFetch({
+        ...input,
+        query: recoveryQuery,
+        paper: null,
+        paperResultId: null,
+        sourceUrl: null,
+        papers: lookupObservation.papers,
+        openAccessRecoveryAttempt: true,
+      });
+      attempts.push(...(recoveredObservation.full_text_fetch_attempts ?? [fullTextFetchAttemptFor(recoveredObservation)]));
+      if (recoveredObservation.evidence_state === "full_text_usable" || recoveredObservation.evidence_state === "page_image_parse_required") {
+        return {
+          ...recoveredObservation,
+          full_text_fetch_attempts: attempts,
+          missing_requirements: unique([
+            ...attempts.flatMap((attempt) => attempt.missing_requirements),
+            ...recoveryMissingRequirements,
+            ...recoveredObservation.missing_requirements,
+          ]),
+        };
+      }
+    }
+    return {
+      ...directObservation,
+      full_text_fetch_attempts: attempts,
+      missing_requirements: unique([
+        ...attempts.flatMap((attempt) => attempt.missing_requirements),
+        ...recoveryMissingRequirements,
+      ]),
+    };
+  }
+
   const query = input.query.trim();
   const paper = selectPaper(input);
   const sourceUrl = input.sourceUrl?.trim() || resolveScholarlyFullTextUrl(paper);

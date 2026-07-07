@@ -488,6 +488,10 @@ export function HelixAskTurnStreamPanel({
                       readAloudState={readAloudState}
                       readAloudAriaLabel={readAloudAriaLabel}
                       readAloudTitle={readAloudTitle}
+                      postulateText={finalAnswerRawText}
+                      postulateTestId="helix-ask-postulate"
+                      postulateOriginatingSessionId={activeTurnId}
+                      postulateOriginatingAnswerId={replyId}
                     />
                     <HelixAskProofTraceDetails trace={proofTrace} clipText={clipText} />
                     <HelixAskJobReadyLinkStrip links={jobReadyLinks} onRun={onRunJobReadyLink} />

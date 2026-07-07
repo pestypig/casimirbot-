@@ -20,6 +20,10 @@ The future shell target is tracked as `minimalRuntimeShellOwns` and `minimalRunt
 
 The tested minimal runtime shell is a replacement candidate, not the default path. The lazy legacy bridge remains the active day-to-day UI until live operator-surface parity is accepted.
 
+## HelixAskPill no-growth guard
+
+`HelixAskPill.tsx` is capped by the recrown no-growth guard at 25,485 Node-counted lines. New UI, display, projection, catalog, filtering, prompt-scaffold, attachment policy, and pure helper work belongs under `client/src/components/helix/ask-console/` or another documented recrowned owner. `HelixAskPill.tsx` may receive only thin bridge wiring when unavoidable. Only lower this ceiling after extraction shrinks the bridge; do not raise it to make new behavior fit.
+
 `HelixAskMinimalRuntimeSubmitPlan.ts` is the pure submit-planning boundary for the inactive shell: it normalizes the draft through the recrowned submit-admission helper, reads the active docs-viewer path from a supplied desktop URL, and builds the request envelope. It must not fetch, start streams, write clipboard, run TTS, import the legacy bridge, or make terminal-authority decisions.
 
 `HelixAskMinimalRuntimeLifecycle.ts` is the pure optimistic turn-start and injected-turn completion boundary for the inactive shell: it appends the "Reasoning in progress..." reply, marks the shell busy, records the active turn id and start time, creates the initial client live event, then can complete or fail that same local turn from an injected transport result/error. It must not fetch, start streams, write clipboard, run TTS, import the legacy bridge, or make terminal-authority decisions.

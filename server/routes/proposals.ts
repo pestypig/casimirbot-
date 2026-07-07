@@ -1,14 +1,43 @@
 import { Router } from "express";
 import { z } from "zod";
 import { handleProposalAction, listProposals, fetchProposal } from "../services/proposals/engine";
-import { proposalKindSchema, proposalSafetyStatusSchema, proposalStatusSchema } from "@shared/proposals";
+import {
+  isPublicPostulateStatus,
+  proposalKindSchema,
+  proposalSafetyStatusSchema,
+  proposalStatusSchema,
+} from "@shared/proposals";
 import { buildPatchPromptPresets } from "../services/proposals/prompt-presets";
-import { submitPostulateProposal } from "../services/proposals/postulate";
+import { claimPostulateReceipt, submitPostulateProposal } from "../services/proposals/postulate";
+import { canReadProposalForAccount, shouldListAllProposalOwnersForAccount } from "../services/proposals/access-policy";
+import { getAccountSessionStatus } from "../services/helix-account/account-session-store";
+import { readHelixSessionCookie } from "../services/helix-account/session-cookie";
+import { listProposalsForDay } from "../db/proposals";
 
 export const proposalsRouter = Router();
 
 const resolveOwnerId = (req: any): string | null =>
   (req?.auth?.sub as string | undefined) ?? (req?.auth?.personaId as string | undefined) ?? null;
+
+const resolveRequestAccount = async (req: any): Promise<{
+  ownerId: string | null;
+  accountType: "developer" | "user";
+}> => {
+  const jwtOwnerId = resolveOwnerId(req);
+  try {
+    const status = await getAccountSessionStatus(readHelixSessionCookie(req.headers.cookie));
+    const profile = status.session?.profile;
+    return {
+      ownerId: jwtOwnerId ?? profile?.profile_id ?? null,
+      accountType: profile?.account_type === "developer" ? "developer" : "user",
+    };
+  } catch {
+    return {
+      ownerId: jwtOwnerId,
+      accountType: "user",
+    };
+  }
+};
 
 const ActionRequest = z.object({
   action: z.enum(["approve", "deny"]),
@@ -20,8 +49,10 @@ const PostulateRequest = z.object({
   userComment: z.string().max(4000).optional().nullable(),
   originatingSessionId: z.string().max(256).optional().nullable(),
   originatingAnswerId: z.string().max(256).optional().nullable(),
-  submittedByAgentId: z.string().max(256).optional().nullable(),
-  accountType: z.enum(["developer", "user"]).optional().nullable(),
+});
+
+const PostulateClaimRequest = z.object({
+  receiptId: z.string().min(1).max(128),
 });
 
 const todayKey = () => new Date().toISOString().slice(0, 10);
@@ -36,22 +67,23 @@ proposalsRouter.get("/", async (req, res) => {
   const status = statusParam && proposalStatusSchema.safeParse(statusParam).success ? (statusParam as any) : undefined;
   const safetyStatus =
     safetyParam && proposalSafetyStatusSchema.safeParse(safetyParam).success ? (safetyParam as any) : undefined;
-  const ownerId = resolveOwnerId(req);
-  const proposals = await listProposals(ownerId, dayParam, { kind, status, safetyStatus });
-  res.json({ day: dayParam, proposals });
+  const { ownerId, accountType } = await resolveRequestAccount(req);
+  const proposals = await listProposals(ownerId, dayParam, {
+    kind,
+    status,
+    safetyStatus,
+    includeAllOwners: shouldListAllProposalOwnersForAccount(accountType, kind),
+  });
+  res.json({
+    day: dayParam,
+    proposals: proposals.filter((proposal) => canReadProposalForAccount(proposal, ownerId, accountType)),
+  });
 });
 
 proposalsRouter.get("/postulate/board", async (req, res) => {
   const dayParam = typeof req.query.day === "string" && req.query.day ? req.query.day : todayKey();
-  const ownerId = resolveOwnerId(req);
-  const proposals = await listProposals(ownerId, dayParam, { kind: "postulate" });
-  const board = proposals.filter((proposal) =>
-    proposal.status === "accepted" ||
-    proposal.status === "accepted_rewarded" ||
-    proposal.status === "queued_for_graph_review" ||
-    proposal.status === "implemented" ||
-    proposal.status === "claimed"
-  );
+  const proposals = await listProposalsForDay(dayParam, { kind: "postulate" });
+  const board = proposals.filter((proposal) => isPublicPostulateStatus(proposal.status));
   res.json({ day: dayParam, proposals: board });
 });
 
@@ -61,11 +93,12 @@ proposalsRouter.post("/postulate", async (req, res) => {
     return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
   }
   try {
-    const ownerId = resolveOwnerId(req);
+    const account = await resolveRequestAccount(req);
     const result = await submitPostulateProposal({
       ...parsed.data,
-      ownerId,
-      accountType: parsed.data.accountType ?? (ownerId ? "user" : "user"),
+      submittedByAgentId: "helix-postulate-gate",
+      ownerId: account.ownerId,
+      accountType: account.accountType,
     });
     res.json({
       ok: true,
@@ -76,6 +109,28 @@ proposalsRouter.post("/postulate", async (req, res) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     res.status(400).json({ error: "postulate_submit_failed", message });
+  }
+});
+
+proposalsRouter.post("/postulate/:id/claim", async (req, res) => {
+  const parsed = PostulateClaimRequest.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
+  }
+  const { ownerId } = await resolveRequestAccount(req);
+  if (!ownerId) {
+    return res.status(401).json({ error: "sign_in_required" });
+  }
+  try {
+    const proposal = await claimPostulateReceipt({
+      proposalId: req.params.id,
+      receiptId: parsed.data.receiptId,
+      ownerId,
+    });
+    res.json({ ok: true, proposal });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(400).json({ error: "postulate_claim_failed", message });
   }
 });
 
@@ -100,8 +155,8 @@ proposalsRouter.get("/:id/prompts", async (req, res) => {
   if (!proposal) {
     return res.status(404).json({ error: "not_found" });
   }
-  const ownerId = resolveOwnerId(req);
-  if (proposal.ownerId && ownerId && proposal.ownerId !== ownerId) {
+  const { ownerId, accountType } = await resolveRequestAccount(req);
+  if (!canReadProposalForAccount(proposal, ownerId, accountType)) {
     return res.status(403).json({ error: "forbidden" });
   }
   if (proposal.patchKind !== "code-diff") {
@@ -124,8 +179,8 @@ proposalsRouter.get("/:id", async (req, res) => {
   if (!proposal) {
     return res.status(404).json({ error: "not_found" });
   }
-  const ownerId = resolveOwnerId(req);
-  if (proposal.ownerId && ownerId && proposal.ownerId !== ownerId) {
+  const { ownerId, accountType } = await resolveRequestAccount(req);
+  if (!canReadProposalForAccount(proposal, ownerId, accountType)) {
     return res.status(403).json({ error: "forbidden" });
   }
   res.json({ proposal });
@@ -140,8 +195,13 @@ proposalsRouter.post("/:id/action", async (req, res) => {
   if (!proposal) {
     return res.status(404).json({ error: "not_found" });
   }
-  const ownerId = resolveOwnerId(req) ?? "anon";
-  if (proposal.ownerId && ownerId && proposal.ownerId !== ownerId) {
+  const { ownerId: resolvedOwnerId, accountType } = await resolveRequestAccount(req);
+  const ownerId = resolvedOwnerId ?? "anon";
+  if (proposal.kind === "postulate" && accountType !== "developer") {
+    return res.status(403).json({ error: "postulate_action_requires_developer" });
+  }
+  const developerPostulateAccess = proposal.kind === "postulate" && accountType === "developer";
+  if (proposal.ownerId && ownerId && proposal.ownerId !== ownerId && !developerPostulateAccess) {
     return res.status(403).json({ error: "forbidden" });
   }
   const updated = await handleProposalAction(proposal.id, parsed.data.action, String(ownerId), parsed.data.note);

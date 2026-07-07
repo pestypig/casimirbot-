@@ -234,6 +234,15 @@ export type HelixScholarlyPdfVisualCandidate = {
   image_artifact_ref?: string;
 };
 
+export type HelixScholarlyFullTextFetchAttempt = {
+  paper_result_id?: string;
+  title?: string;
+  source_url?: string;
+  evidence_state: HelixScholarlyEvidenceState;
+  source_kind: HelixScholarlyFullTextSourceKind;
+  missing_requirements: string[];
+};
+
 export type HelixScholarlyFullTextObservation = {
   schema: typeof HELIX_SCHOLARLY_FULL_TEXT_OBSERVATION_SCHEMA;
   artifact_id: string;
@@ -253,6 +262,7 @@ export type HelixScholarlyFullTextObservation = {
   selected_chunks: HelixScholarlyFullTextChunk[];
   visual_candidates: HelixScholarlyPdfVisualCandidate[];
   evidence_state: HelixScholarlyEvidenceState;
+  full_text_fetch_attempts?: HelixScholarlyFullTextFetchAttempt[];
   next_affordances: HelixScholarlyNextAffordance[];
   scholarly_full_text_recovery_affordance?: HelixScholarlyRecoveryAffordance;
   recovery_affordances?: HelixScholarlyRecoveryAffordance[];

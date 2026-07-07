@@ -1,12 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   buildHelixAskChatReferentContext,
+  buildHelixAskChatReferentContextForSubmit,
   buildHelixAskChatReferentContextFromSources,
   readHelixAskReplyFinalAnswerText,
+  readPersistedHelixAskReferentReply,
+  writePersistedHelixAskReferentReply,
 } from "@/lib/helix/ask-chat-referent-context";
 
 describe("Helix Ask chat referent context", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("selects the latest previous terminal answer as an observation-only referent", () => {
     const context = buildHelixAskChatReferentContext([
       {
@@ -100,6 +107,65 @@ describe("Helix Ask chat referent context", () => {
       previous_chat_message: {
         message_id: "durable-reply",
         text: "Durable previous answer.",
+      },
+    });
+  });
+
+  it("persists and restores the latest terminal answer as an observation-only referent", () => {
+    const storage = new Map<string, string>();
+    vi.stubGlobal("window", {
+      localStorage: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          storage.set(key, value);
+        },
+      },
+    });
+
+    writePersistedHelixAskReferentReply({
+      id: "reply-persisted",
+      turn_id: "turn-persisted",
+      selected_final_answer: "Persisted prior paper answer.",
+      content: "Fallback text.",
+    });
+
+    expect(readPersistedHelixAskReferentReply()).toMatchObject({
+      id: "reply-persisted",
+      turn_id: "turn-persisted",
+      selected_final_answer: "Persisted prior paper answer.",
+      content: "Persisted prior paper answer.",
+    });
+  });
+
+  it("uses persisted terminal answer as submit fallback when live sources are empty", () => {
+    const storage = new Map<string, string>();
+    vi.stubGlobal("window", {
+      localStorage: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          storage.set(key, value);
+        },
+      },
+    });
+    writePersistedHelixAskReferentReply({
+      id: "reply-fallback",
+      selected_final_answer: "Persisted fallback answer.",
+      content: "Fallback text.",
+    });
+
+    const result = buildHelixAskChatReferentContextForSubmit({
+      durableReplies: [],
+      visibleReplies: [],
+    });
+
+    expect(result.source_summary).toMatchObject({
+      selected_source_name: "persisted_last_terminal_answer",
+      context_present: true,
+    });
+    expect(result.context).toMatchObject({
+      previous_assistant_final_answer: {
+        reply_id: "reply-fallback",
+        text: "Persisted fallback answer.",
       },
     });
   });

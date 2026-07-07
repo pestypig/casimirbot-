@@ -198,6 +198,10 @@ export function HelixAskMinimalRuntimeTurnList({
                   copyFinalTestId="helix-ask-latest-copy-final"
                   debugCopyTestId="helix-ask-latest-debug-copy"
                   readAloudTestId="helix-ask-latest-read-aloud"
+                  postulateText={view.answerText}
+                  postulateTestId="helix-ask-postulate"
+                  postulateOriginatingSessionId={view.turnId}
+                  postulateOriginatingAnswerId={view.id}
                 />
               ) : null}
             </article>

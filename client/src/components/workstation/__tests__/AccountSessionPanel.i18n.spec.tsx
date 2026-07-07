@@ -4,6 +4,10 @@ import React from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import AccountSessionPanel from "@/components/workstation/AccountSessionPanel";
+import {
+  readClaimablePostulateReceipts,
+  rememberClaimablePostulateReceipt,
+} from "@/lib/agi/proposals";
 import { hawMessages } from "@/lib/i18n/messages/haw";
 import { INTERFACE_MESSAGE_IDS } from "@/lib/i18n/messages/types";
 
@@ -314,6 +318,69 @@ describe("AccountSessionPanel interface language", () => {
 
     await waitFor(() => {
       expect(screen.getByText("If a workstation profile exists for that email, a password reset link has been sent.")).toBeInTheDocument();
+    });
+  });
+
+  it("shows claimable postulate receipts and claims them for signed-in profiles", async () => {
+    rememberClaimablePostulateReceipt({
+      proposalId: "postulate-1",
+      receiptId: "receipt-1",
+      receiptIssuedAt: "2026-07-07T04:00:00.000Z",
+      receiptIntegrityHash: "abc123",
+      title: "High-congruence proposal",
+      score: 0.92,
+      rewardTokens: 250,
+      createdAt: "2026-07-07T04:00:00.000Z",
+      status: "claim_pending",
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/proposals/postulate/postulate-1/claim")) {
+        return new Response(JSON.stringify({
+          ok: true,
+          proposal: {
+            id: "postulate-1",
+            kind: "postulate",
+            rewardTokens: 250,
+            metadata: {
+              postulate: {
+                receiptId: "receipt-1",
+                receiptIssuedAt: "2026-07-07T04:00:00.000Z",
+                receiptIntegrityHash: "claimed-hash",
+                rewardCreditStatus: "issued",
+                receiptClaimStatus: "claimed",
+              },
+            },
+          },
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      return mockFetch(statusBodyWithMappedStates)(input);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AccountSessionPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Postulate receipts")).toBeInTheDocument();
+      expect(screen.getByText("High-congruence proposal")).toBeInTheDocument();
+      expect(screen.getByText("250 credits")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Claim" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/proposals/postulate/postulate-1/claim",
+        expect.objectContaining({ method: "POST" }),
+      );
+      expect(readClaimablePostulateReceipts()).toEqual([
+        expect.objectContaining({
+          proposalId: "postulate-1",
+          status: "issued",
+          receiptIntegrityHash: "claimed-hash",
+        }),
+      ]);
+      expect(screen.getByRole("button", { name: "Credits issued" })).toBeInTheDocument();
     });
   });
 });
