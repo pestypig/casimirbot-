@@ -3,13 +3,14 @@ import { useDocumentImageRegionStore } from "@/store/useDocumentImageRegionStore
 import { useVisualSourceCaptureStore } from "@/store/useVisualSourceCaptureStore";
 import type { ImageLensRegionInspectionReceiptV1 } from "@shared/contracts/image-lens-region-inspection.v1";
 
+let runAskTurnStream: typeof import("@/lib/agi/api").runAskTurnStream;
 let runCapabilityLaneOneShot: typeof import("@/lib/agi/api").runCapabilityLaneOneShot;
 
 const documentInitialState = useDocumentImageRegionStore.getState();
 const visualInitialState = useVisualSourceCaptureStore.getState();
 
 beforeAll(async () => {
-  ({ runCapabilityLaneOneShot } = await import("@/lib/agi/api"));
+  ({ runAskTurnStream, runCapabilityLaneOneShot } = await import("@/lib/agi/api"));
 });
 
 afterEach(() => {
@@ -136,5 +137,63 @@ describe("Image Lens region inspection API ingestion", () => {
         crop_region_id: "image_lens_region:api",
       }),
     ]);
+  });
+
+  it("applies streamed ask turn Image Lens receipts before final payload compaction", async () => {
+    const receipt = {
+      ...receiptFixture(),
+      source_kind: "pdf_page_render" as const,
+      page_number: 2,
+      page_image_ref: "data:image/png;base64,pdf-page-source",
+      source_image_ref: null,
+      document_region_receipt: {
+        ...receiptFixture().document_region_receipt,
+        sourceAttachmentId: "pdf-page-render:api",
+        sourceKind: "pdf_page_render" as const,
+        locatorAnchor: {
+          ...receiptFixture().document_region_receipt.locatorAnchor,
+          pageNumber: 2,
+        },
+      },
+    };
+    const streamText = [
+      "event: turn_transcript_event",
+      `data: ${JSON.stringify({
+        capability_lane_observation_packets: [{
+          state_delta: {
+            visual_analysis_region_inspection: {
+              receipt,
+            },
+          },
+        }],
+      })}`,
+      "",
+      "event: turn_final",
+      `data: ${JSON.stringify({
+        ok: true,
+        selected_final_answer: "done",
+        debug: {},
+      })}`,
+      "",
+    ].join("\n");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      new Response(streamText, {
+        status: 200,
+        headers: { "content-type": "text/event-stream" },
+      }),
+    ));
+
+    await runAskTurnStream({
+      turn_id: "turn:image-lens-stream",
+      question: "Inspect the PDF page.",
+    });
+
+    expect(useDocumentImageRegionStore.getState().source).toMatchObject({
+      sourceImageUrl: "data:image/png;base64,pdf-page-source",
+      sourceAttachmentId: "pdf-page-render:api",
+      sourceKind: "pdf_page_render",
+      pageNumber: 2,
+    });
+    expect(useDocumentImageRegionStore.getState().lastReceipt?.crop.regionId).toBe("image_lens_region:api");
   });
 });

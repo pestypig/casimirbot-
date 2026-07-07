@@ -1,11 +1,54 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 import { recordWorkstationTimelineEntry } from "@/store/useWorkstationWorkflowTimelineStore";
 import { emitHelixAskLiveEvent } from "@/lib/helix/liveEventsBus";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
 import { useWorkspaceMemoryRegistryStore } from "@/store/useWorkspaceMemoryRegistryStore";
 
 const WORKSTATION_NOTES_STORAGE_KEY = "workstation-notes:v1";
+
+const fallbackNotesStorage = (() => {
+  const memory: Record<string, string> = {};
+  return {
+    getItem: (name: string) => memory[name] ?? null,
+    setItem: (name: string, value: string) => {
+      memory[name] = value;
+    },
+    removeItem: (name: string) => {
+      delete memory[name];
+    },
+  };
+})();
+
+const safeNotesStorage = createJSONStorage<Pick<WorkstationNotesState, "notes" | "order" | "active_note_id">>(() => ({
+  getItem: (name) => {
+    try {
+      if (typeof window === "undefined") return fallbackNotesStorage.getItem(name);
+      return window.localStorage.getItem(name) ?? fallbackNotesStorage.getItem(name);
+    } catch (error) {
+      console.warn("[workstation-notes] localStorage read failed", error);
+      return fallbackNotesStorage.getItem(name);
+    }
+  },
+  setItem: (name, value) => {
+    fallbackNotesStorage.setItem(name, value);
+    try {
+      if (typeof window === "undefined") return;
+      window.localStorage.setItem(name, value);
+    } catch (error) {
+      console.warn("[workstation-notes] localStorage write failed; keeping session copy", error);
+    }
+  },
+  removeItem: (name) => {
+    fallbackNotesStorage.removeItem(name);
+    try {
+      if (typeof window === "undefined") return;
+      window.localStorage.removeItem(name);
+    } catch (error) {
+      console.warn("[workstation-notes] localStorage remove failed", error);
+    }
+  },
+}));
 
 export type WorkstationNoteCitation = {
   id: string;
@@ -278,6 +321,7 @@ export const useWorkstationNotesStore = create<WorkstationNotesState>()(
     }),
     {
       name: WORKSTATION_NOTES_STORAGE_KEY,
+      storage: safeNotesStorage,
       partialize: (state) => ({
         notes: state.notes,
         order: state.order,

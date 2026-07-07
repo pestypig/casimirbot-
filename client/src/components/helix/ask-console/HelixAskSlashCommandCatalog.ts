@@ -104,7 +104,7 @@ const HELIX_ASK_SLASH_COMMAND_CATALOG: HelixAskSlashCommandCatalogItem[] = [
     label: "Postulate review",
     capabilityId: "postulate.submit_proposal",
     description: "Prepare a proposal for the postulate review lane and board.",
-    insertionText: "/postulate\n\nSend this postulate to be reviewed: ",
+    insertionText: "Send this postulate to be reviewed: ",
     permissionRequired: "act",
     fallbackPanelId: "postulate-board",
   },

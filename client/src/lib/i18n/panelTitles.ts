@@ -36,6 +36,7 @@ const PANEL_TITLE_MESSAGES: Record<string, InterfaceMessageId> = {
   "star-watcher": "panel.title.starWatcher",
   "stress-map": "panel.title.stressMap",
   taskbar: "panel.title.taskbar",
+  "agi-task-history": "panel.title.taskHistory",
   "workstation-clipboard-history": "panel.title.clipboardHistory",
   "workstation-notes": "panel.title.workstationNotes",
   "workstation-process-graph": "panel.title.processGraph",

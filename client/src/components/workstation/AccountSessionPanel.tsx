@@ -1035,17 +1035,17 @@ export default function AccountSessionPanel() {
         <section className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
             <ShieldCheck className="h-3.5 w-3.5" />
-            Postulate receipts
+            {t("account.postulateReceipts.title")}
           </div>
           <p className="mt-2 text-xs text-slate-400">
-            Anonymous postulate receipts from this browser are held here until a profile claims them.
+            {t("account.postulateReceipts.description")}
           </p>
           <div className="mt-3 space-y-2">
             {postulateReceipts.length === 0 ? (
-              <p className="text-xs text-slate-500">No claimable postulate receipts in this browser.</p>
+              <p className="text-xs text-slate-500">{t("account.postulateReceipts.empty")}</p>
             ) : (
               postulateReceipts.map((receipt) => {
-                const score = typeof receipt.score === "number" ? `${Math.round(receipt.score * 100)}%` : "not scored";
+                const score = typeof receipt.score === "number" ? `${Math.round(receipt.score * 100)}%` : t("account.postulateReceipts.notScored");
                 const issued = receipt.status === "issued";
                 const claimed = receipt.status === "claimed" || issued;
                 const receiptHash = receipt.receiptIntegrityHash
@@ -1066,18 +1066,20 @@ export default function AccountSessionPanel() {
                       <div className="mt-1 break-all font-mono text-[10px] text-slate-500">{receipt.receiptId}</div>
                       {receiptHash ? (
                         <div className="mt-1 truncate font-mono text-[10px] text-slate-600">
-                          hash {receiptHash}
+                          {t("account.postulateReceipts.hash", { hash: receiptHash })}
                         </div>
                       ) : null}
                       {issuedAt ? (
                         <div className="mt-1 truncate text-[10px] text-slate-600">
-                          issued {issuedAt}
+                          {t("account.postulateReceipts.issued", { issuedAt })}
                         </div>
                       ) : null}
                     </div>
                     <span className="rounded bg-white/5 px-2 py-1 text-center text-slate-300">{score}</span>
                     <span className="rounded bg-white/5 px-2 py-1 text-center text-slate-300">
-                      {receipt.rewardTokens > 0 ? `${receipt.rewardTokens.toLocaleString()} credits` : "receipt only"}
+                      {receipt.rewardTokens > 0
+                        ? t("account.postulateReceipts.credits", { credits: receipt.rewardTokens.toLocaleString() })
+                        : t("account.postulateReceipts.receiptOnly")}
                     </span>
                     <button
                       type="button"
@@ -1086,14 +1088,14 @@ export default function AccountSessionPanel() {
                       className="rounded border border-cyan-400/40 bg-cyan-500/15 px-2 py-1 text-cyan-100 hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {issued
-                        ? "Credits issued"
+                        ? t("account.postulateReceipts.creditsIssued")
                         : claimed
-                          ? "Claimed"
+                          ? t("account.postulateReceipts.claimed")
                           : claimingPostulateId === receipt.proposalId
-                            ? "Claiming"
+                            ? t("account.postulateReceipts.claiming")
                             : session
-                              ? "Claim"
-                              : "Sign in"}
+                              ? t("account.postulateReceipts.claim")
+                              : t("account.postulateReceipts.signIn")}
                     </button>
                   </div>
                 );

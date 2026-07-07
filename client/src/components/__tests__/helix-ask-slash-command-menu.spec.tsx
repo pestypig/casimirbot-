@@ -35,7 +35,7 @@ describe("Helix Ask slash command menu", () => {
     );
     expect(userItems.find((item) => item.command === "/postulate")).toMatchObject({
       accessState: "available",
-      insertionText: "/postulate\n\nSend this postulate to be reviewed: ",
+      insertionText: "Send this postulate to be reviewed: ",
     });
     expect(userItems.some((item) => item.command === "/situation")).toBe(false);
 

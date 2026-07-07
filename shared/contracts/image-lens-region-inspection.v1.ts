@@ -62,7 +62,10 @@ export type ImageLensRegionInspectionRequestV1 = {
   source_kind?: DocumentImageSourceKindV1 | null;
   source_image_ref?: string | null;
   page_number?: number | null;
+  page_count?: number | null;
   page_image_ref?: string | null;
+  scholarly_source_pdf_ref?: string | null;
+  scholarly_pdf_cache_path?: string | null;
   source_dimensions_px?: { width: number; height: number } | null;
   bbox_px: DocumentImageBboxPxV1;
   crop_image_ref?: string | null;
@@ -95,7 +98,10 @@ export type ImageLensRegionInspectionReceiptV1 = {
   source_kind: DocumentImageSourceKindV1;
   source_image_ref: string | null;
   page_number: number | null;
+  page_count?: number | null;
   page_image_ref: string | null;
+  scholarly_source_pdf_ref?: string | null;
+  scholarly_pdf_cache_path?: string | null;
   bbox_px: DocumentImageBboxPxV1;
   source_refs: string[];
   summary: string;

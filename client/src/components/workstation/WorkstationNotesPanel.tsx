@@ -193,6 +193,7 @@ export default function WorkstationNotesPanel() {
   const renameNote = useWorkstationNotesStore((state) => state.renameNote);
   const deleteNote = useWorkstationNotesStore((state) => state.deleteNote);
   const rememberDraft = useWorkstationSessionMemoryStore((state) => state.rememberDraft);
+  const readDraft = useWorkstationSessionMemoryStore((state) => state.readDraft);
   const [viewMode, setViewMode] = React.useState<"list" | "reader">("list");
   const [saveState, setSaveState] = React.useState<NoteSaveState>("saved");
   const noteRefs = React.useRef<Record<string, HTMLButtonElement | null>>({});
@@ -227,6 +228,13 @@ export default function WorkstationNotesPanel() {
   }, [activeNoteId]);
 
   React.useEffect(() => {
+    if (!activeNote || activeNote.body.trim()) return;
+    const draftBody = readDraft(`workstation-notes:${activeNote.id}:body`);
+    if (!draftBody.trim()) return;
+    updateBody(activeNote.id, draftBody);
+  }, [activeNote, readDraft, updateBody]);
+
+  React.useEffect(() => {
     if (viewMode !== "list" || !activeNoteId) return;
     const target = noteRefs.current[activeNoteId];
     if (!target) return;
@@ -238,7 +246,7 @@ export default function WorkstationNotesPanel() {
     if (!editor || !activeNote) return;
     if (editor.innerHTML === editorHtml) return;
     editor.innerHTML = editorHtml;
-  }, [activeNote, editorHtml]);
+  }, [activeNote, editorHtml, viewMode]);
 
   React.useEffect(() => {
     if (typeof document === "undefined") return;

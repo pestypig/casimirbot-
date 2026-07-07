@@ -1921,7 +1921,7 @@ describe("Helix Ask agent provider selection", () => {
         turn_id: "ask:test:scholarly-followup-page-image-required:third",
         thread_id: threadId,
         agent_runtime: "codex",
-        question: "Now inspect the next pages of that paper and extract the first exact displayed equation with page evidence.",
+        question: "Now inspect page 2 of that same paper and extract the first exact displayed equation with page evidence.",
       },
       headers: {},
     });
@@ -1944,6 +1944,50 @@ describe("Helix Ask agent provider selection", () => {
         status: "succeeded",
       }),
     ]));
+
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify({
+      entries: [{
+        region_label: "scholarly_pdf_page_2_equation_pass",
+        text_candidate: "The rerendered page contains the displayed equation candidate.",
+        latex_candidate: "E_2 = \\frac{1}{2}\\sum_n \\omega_n",
+        extraction_status: "extracted",
+        uncertainty: ["fixture OCR for rerendered scholarly PDF page 2"],
+      }],
+    });
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        "I can’t render or inspect page 2 from this turn because no Image Lens page render, source_id, page image ref, or visual observation packet was provided.",
+        "Using rerendered page 2 Image Lens evidence, the extracted equation candidate is page-grounded.",
+      ],
+    });
+
+    const higherResolutionFollowup = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-followup-page-image-required:fourth",
+        thread_id: threadId,
+        agent_runtime: "codex",
+        question: "Render page 2 again at higher resolution, inspect the full page for equation-like rows, and return the best row bbox candidates even if exact promotion is not yet allowed.",
+      },
+      headers: {},
+    });
+
+    expect(higherResolutionFollowup.ok).toBe(true);
+    expect(higherResolutionFollowup.text).toContain("Using rerendered page 2 Image Lens evidence");
+    expect((higherResolutionFollowup.debug as any)?.scholarly_followup_evidence_lookup).toMatchObject({
+      status: "found",
+      followup_reference_detected: true,
+    });
+    expect((higherResolutionFollowup.debug as any)?.runtime_lane_request_loop).toMatchObject({
+      status: "lane_observation_reentered",
+      synthesized_by_helix_policy: true,
+      candidate: {
+        source_kind: "pdf_page_render",
+        page_number: 2,
+      },
+    });
   });
 
   it("escalates current-turn scholarly PDF affordances into Image Lens when asked to show the science", async () => {

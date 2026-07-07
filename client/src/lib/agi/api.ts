@@ -2628,6 +2628,7 @@ export async function runAskTurnStream(
     } catch {
       data = rawData;
     }
+    ingestImageLensRegionInspectionReceipts(data);
     const packet: HelixAskTurnStreamEvent = { event, data };
     onEvent?.(packet);
     if (event === "turn_final") finalPayload = data;

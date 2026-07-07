@@ -431,8 +431,14 @@ const toImageLensRegionInspectionRequest = (
       readString(call.source_image_ref ?? call.sourceImageRef) || null,
     page_number:
       readNumber(call.page_number ?? call.pageNumber),
+    page_count:
+      readNumber(call.page_count ?? call.pageCount),
     page_image_ref:
       readString(call.page_image_ref ?? call.pageImageRef) || null,
+    scholarly_source_pdf_ref:
+      readString(call.scholarly_source_pdf_ref ?? call.scholarlySourcePdfRef) || null,
+    scholarly_pdf_cache_path:
+      readString(call.scholarly_pdf_cache_path ?? call.scholarlyPdfCachePath) || null,
     bbox_px: bbox,
     crop_image_ref:
       readString(call.crop_image_ref ?? call.cropImageRef) || null,
