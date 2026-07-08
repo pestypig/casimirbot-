@@ -2,7 +2,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { codexProvider } from "../codex-provider";
+import {
+  codexProvider,
+  resetScholarlyPdfWorkbenchVolatileMemoryForTest,
+} from "../codex-provider";
 
 describe("Codex provider capability lane adapter", () => {
   const previousLiveTranslationExternalBackends = process.env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED;
@@ -92,6 +95,38 @@ describe("Codex provider capability lane adapter", () => {
         delete process.env.LLM_HTTP_MODEL;
       } else {
         process.env.LLM_HTTP_MODEL = previousModel;
+      }
+    }
+  });
+
+  it("collapses exact duplicated final-answer halves without changing observations", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Candidate postulate line A.\nCandidate postulate line B.\nCandidate postulate line A.\nCandidate postulate line B.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-dedup-final-answer-halves",
+          question: "Draft a concise candidate postulate.",
+        },
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.text).toBe("Candidate postulate line A.\nCandidate postulate line B.");
+      expect(result.text).not.toBe(process.env.CODEX_AGENT_FAKE_STDOUT);
+    } finally {
+      if (previousStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      }
+      if (previousExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
       }
     }
   });
@@ -2542,6 +2577,536 @@ describe("Codex provider capability lane adapter", () => {
     }
   });
 
+  it("recovers scientific Image Lens sidecar evidence from durable signed-in workspace memory after restart", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    const previousExtractionFixtures = process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+    resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true });
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        "The signed-in workspace scientific Image Lens evidence was filed.",
+        "The provider would otherwise ask for lookup_papers.",
+      ],
+    });
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([
+      {
+        region_label: "scholarly_pdf_page_5_exact_row",
+        text_candidate: "S = integral d4x sqrt(-g) exp(-phi) { R + 2 Lambda exp(-phi) + kappa exp(-phi) L_m }",
+        latex_candidate: "S = \\int d^{4}x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_{m} \\}",
+        extraction_status: "extracted",
+        uncertainty: [],
+      },
+      {
+        bbox_key: "138,580,948,36",
+        text_candidate: "S = integral d4x sqrt(-g) exp(-phi) { R + 2 Lambda exp(-phi) + kappa exp(-phi) L_m }",
+        latex_candidate: "S = \\int d^{4}x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_{m} \\}",
+        extraction_status: "extracted",
+        uncertainty: [],
+      },
+    ]);
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-image-durable-source",
+          session_id: "session-before-restart",
+          account_id: "local-profile:pesty",
+          username: "pesty",
+          question: "Use page 5 of the paper and crop only the exact equation row. Promote it only if the row crop supports exact equation admissibility.",
+          workspace_context_snapshot: {
+            sessionId: "helix-ui",
+            askThreadId: "helix-ask:desktop",
+            account_session: {
+              session_id: "account-session:pesty",
+              profile_id: "local-profile:pesty",
+              username: "pesty",
+            },
+          },
+          capability_lane_call: {
+            capability: "visual_analysis.inspect_image_region",
+            source_id: "pdf-page-render:durable-scientific-sidecar",
+            source_kind: "pdf_page_render",
+            source_image_ref: "data:image/png;base64,test-page-image",
+            source_dimensions_px: { width: 1224, height: 1584 },
+            bbox_px: { x: 73, y: 570, width: 1078, height: 87 },
+            page_number: 5,
+            region_label: "scholarly_pdf_page_5_exact_row",
+            question: "Extract the exact displayed equation row from page 5.",
+            reason_for_crop: "Exact row promotion from scholarly PDF page evidence.",
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        },
+      });
+
+      resetScholarlyPdfWorkbenchVolatileMemoryForTest();
+
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-image-durable-followup",
+          session_id: "session-after-restart",
+          account_id: "local-profile:pesty",
+          username: "pesty",
+          question: "Tell me which promoted page-grounded equation row, page number, crop ref, Image Lens source/hash, and evidence depth you are currently using from the prior scientific Image Lens evidence chain.",
+          workspace_context_snapshot: {
+            sessionId: "helix-ui",
+            askThreadId: "helix-ask:desktop",
+            account_session: {
+              session_id: "account-session:pesty",
+              profile_id: "local-profile:pesty",
+              username: "pesty",
+            },
+          },
+        },
+      });
+      const debug = result.debug as Record<string, any>;
+
+      expect(result.ok).toBe(true);
+      expect(result.final_answer_source).toBe("scientific_image_evidence_continuity_summary");
+      expect(result.text).toContain("latest scientific Image Lens evidence chain");
+      expect(result.text).toContain("Evidence depth: `exact_row_promoted`");
+      expect(result.text).toContain("Page: `5`");
+      expect(result.text).toContain("pdf-page-render:durable-scientific-sidecar");
+      expect(result.text).toContain("S = \\int d^{4}x");
+      expect(result.text).toContain("Active promoted row blockers: `none`");
+      expect(result.text).toContain("Historical non-promoted row blockers:");
+      expect(result.text).not.toContain("Promotion blockers:");
+      expect(result.text).not.toContain("lookup_papers observation packet");
+      expect(debug.scientific_image_evidence_continuity_lookup).toMatchObject({
+        status: "found",
+        persistent_snapshot_recovered: true,
+        selected_lookup_key: expect.stringContaining("scientific_image:"),
+        source_material: expect.objectContaining({
+          source_id: "pdf-page-render:durable-scientific-sidecar",
+          source_kind: "pdf_page_render",
+          has_inline_source_image_data: true,
+        }),
+      });
+    } finally {
+      resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true });
+      if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      else process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      if (previousStdoutSequence === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      else process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      if (previousCallIndex === undefined) delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      else process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      if (previousExitCode === undefined) delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      else process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      if (previousExtractionFixtures === undefined) delete process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+      else process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = previousExtractionFixtures;
+    }
+  });
+
+  it("runs continuity audit prompts from durable sidecar memory without scholarly lookup", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    const previousExtractionFixtures = process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+    resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true });
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        "The durable scientific Image Lens sidecar was filed.",
+        "The provider should not perform lookup_papers for this continuity audit.",
+      ],
+    });
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([
+      {
+        region_label: "scholarly_pdf_page_5_exact_row_audit",
+        latex_candidate: "S = \\int d^{4}x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_{m} \\}",
+        extraction_status: "extracted",
+        uncertainty: [],
+      },
+      {
+        bbox_key: "138,580,948,36",
+        latex_candidate: "S = \\int d^{4}x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_{m} \\}",
+        extraction_status: "extracted",
+        uncertainty: [],
+      },
+    ]);
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-image-audit-source",
+          session_id: "session-scientific-image-audit-before-restart",
+          account_id: "local-profile:pesty-audit",
+          username: "pesty-audit",
+          question: "Use page 5 of the paper and crop only the exact equation row. Promote it only if the row crop supports exact equation admissibility.",
+          workspace_context_snapshot: {
+            sessionId: "helix-ui",
+            askThreadId: "helix-ask:desktop:audit",
+            account_session: {
+              session_id: "account-session:pesty-audit",
+              profile_id: "local-profile:pesty-audit",
+              username: "pesty-audit",
+            },
+          },
+          capability_lane_call: {
+            capability: "visual_analysis.inspect_image_region",
+            source_id: "pdf-page-render:continuity-audit-sidecar",
+            source_kind: "pdf_page_render",
+            source_image_ref: "data:image/png;base64,test-page-image",
+            source_dimensions_px: { width: 1224, height: 1584 },
+            bbox_px: { x: 73, y: 570, width: 1078, height: 87 },
+            page_number: 5,
+            region_label: "scholarly_pdf_page_5_exact_row_audit",
+            question: "Extract the exact displayed equation row from page 5.",
+            reason_for_crop: "Exact row promotion from scholarly PDF page evidence.",
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        },
+      });
+
+      resetScholarlyPdfWorkbenchVolatileMemoryForTest();
+
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-image-audit-followup",
+          session_id: "session-scientific-image-audit-after-restart",
+          account_id: "local-profile:pesty-audit",
+          username: "pesty-audit",
+          question:
+            "Run a scientific Image Lens evidence continuity audit. Use the latest scientific Image Lens sidecar, not chat memory or a fresh scholarly lookup. Report only: evidence depth, sidecar id, Image Lens source id, source image hash, page number, crop ref, promoted equation LaTeX, active promoted row blockers, and historical non-promoted row blockers.",
+          workspace_context_snapshot: {
+            sessionId: "helix-ui",
+            askThreadId: "helix-ask:desktop:audit",
+            account_session: {
+              session_id: "account-session:pesty-audit",
+              profile_id: "local-profile:pesty-audit",
+              username: "pesty-audit",
+            },
+          },
+        },
+      });
+      const debug = result.debug as Record<string, any>;
+
+      expect(result.ok).toBe(true);
+      expect(result.final_answer_source).toBe("scientific_image_evidence_continuity_summary");
+      expect(result.text).toContain("Evidence depth: `exact_row_promoted`");
+      expect(result.text).toContain("Sidecar:");
+      expect(result.text).toContain("Image Lens source: `pdf-page-render:continuity-audit-sidecar`");
+      expect(result.text).toContain("Active promoted row blockers: `none`");
+      expect(result.text).toContain("Historical non-promoted row blockers:");
+      expect(result.text).not.toContain("lookup_papers observation packet");
+      expect(debug.scientific_image_evidence_continuity_requested).toBe(true);
+      expect(debug.scientific_image_evidence_continuity_lookup).toMatchObject({
+        status: "found",
+        persistent_snapshot_recovered: true,
+        selected_lookup_key: expect.stringContaining("scientific_image:"),
+      });
+      expect(debug.followup_referent_resolution).toBeNull();
+    } finally {
+      resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true });
+      if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      else process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      if (previousStdoutSequence === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      else process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      if (previousCallIndex === undefined) delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      else process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      if (previousExitCode === undefined) delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      else process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      if (previousExtractionFixtures === undefined) delete process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+      else process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = previousExtractionFixtures;
+    }
+  });
+
+  it("selects the latest persisted graph reflection for scientific Image Lens continuity audits", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    const previousExtractionFixtures = process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+    resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true });
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        "The scientific Image Lens exact row evidence was filed.",
+        "Available Helix workstation gateway capabilities:\nHelix request context JSON:",
+        "The provider should not perform lookup_papers for this graph-reflection continuity audit.",
+      ],
+    });
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([
+      {
+        region_label: "scholarly_pdf_page_5_exact_row_graph_memory",
+        latex_candidate: "S = \\int d^{4}x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_{m} \\}",
+        extraction_status: "extracted",
+        uncertainty: [],
+      },
+      {
+        bbox_key: "138,580,948,36",
+        latex_candidate: "S = \\int d^{4}x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_{m} \\}",
+        extraction_status: "extracted",
+        uncertainty: [],
+      },
+    ]);
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      const scopedWorkspace = {
+        sessionId: "helix-ui",
+        askThreadId: "helix-ask:desktop:graph-memory",
+        account_session: {
+          session_id: "account-session:pesty-graph-memory",
+          profile_id: "local-profile:pesty-graph-memory",
+          username: "pesty-graph-memory",
+        },
+      };
+      await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-image-graph-memory-source",
+          session_id: "session-scientific-image-graph-memory-source",
+          account_id: "local-profile:pesty-graph-memory",
+          username: "pesty-graph-memory",
+          question: "Use page 5 of the paper and crop only the exact equation row. Promote it only if the row crop supports exact equation admissibility.",
+          workspace_context_snapshot: scopedWorkspace,
+          capability_lane_call: {
+            capability: "visual_analysis.inspect_image_region",
+            source_id: "pdf-page-render:graph-memory-sidecar",
+            source_kind: "pdf_page_render",
+            source_image_ref: "data:image/png;base64,test-page-image",
+            source_dimensions_px: { width: 1224, height: 1584 },
+            bbox_px: { x: 73, y: 570, width: 1078, height: 87 },
+            page_number: 5,
+            region_label: "scholarly_pdf_page_5_exact_row_graph_memory",
+            question: "Extract the exact displayed equation row from page 5.",
+            reason_for_crop: "Exact row promotion from scholarly PDF page evidence.",
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        },
+      });
+
+      const reflection = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-image-graph-memory-reflection",
+          session_id: "session-scientific-image-graph-memory-reflection",
+          account_id: "local-profile:pesty-graph-memory",
+          username: "pesty-graph-memory",
+          question: "Reflect the promoted equation evidence to the Theory Badge Graph with diagnostic-only boundaries and report calculator template admissibility.",
+          workspace_context_snapshot: scopedWorkspace,
+        },
+      });
+      expect((reflection.debug as Record<string, any>).runtime_lane_request_loop).toMatchObject({
+        scientific_image_sidecar_gateway_bridge: {
+          status: "completed",
+          capability_id: "theory-badge-graph.reflect_discussion_context",
+        },
+      });
+      expect(reflection.ok).toBe(true);
+      expect(reflection.final_answer_source).toBe("theory_context_reflection_answer");
+      expect(reflection.terminal_artifact_kind).toBe("theory_context_reflection_answer");
+      expect(reflection.text).toContain("Theory Badge Graph reflection completed as diagnostic evidence only");
+      expect(reflection.text).toContain("Calculator template admissibility");
+      expect(reflection.text).not.toContain("Backend Ask was reached");
+      expect((reflection.debug as Record<string, any>).terminal_authority_status).toBe(
+        "authorized_by_theory_reflection_receipt",
+      );
+
+      resetScholarlyPdfWorkbenchVolatileMemoryForTest();
+
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-image-graph-memory-audit",
+          session_id: "session-scientific-image-graph-memory-audit",
+          account_id: "local-profile:pesty-graph-memory",
+          username: "pesty-graph-memory",
+          question:
+            "Run a scientific Image Lens evidence continuity audit. Use the latest scientific Image Lens sidecar, not chat memory or a fresh scholarly lookup. Report only: evidence depth, sidecar id, Image Lens source id, source image hash, page number, crop ref, promoted equation LaTeX, active promoted row blockers, historical non-promoted row blockers, and graph reflection refs.",
+          workspace_context_snapshot: scopedWorkspace,
+        },
+      });
+      const debug = result.debug as Record<string, any>;
+
+      expect(result.ok).toBe(true);
+      expect(debug.scientific_image_evidence_continuity_lookup).toMatchObject({
+        status: "found",
+        persistent_snapshot_recovered: true,
+      });
+      expect(debug.scientific_image_graph_reflection_lookup).toMatchObject({
+        status: "found",
+        persistent_snapshot_recovered: true,
+        selected_reflection_id: expect.stringContaining("theory-badge-graph.reflect_discussion_context"),
+        selected_bridge_status: "completed",
+      });
+      expect(debug.scientific_image_evidence_continuity_summary.latest_graph_reflection).toMatchObject({
+        bridge_status: "completed",
+        observation_refs: expect.arrayContaining([
+          expect.stringContaining("theory-badge-graph.reflect_discussion_context"),
+        ]),
+      });
+      expect(result.text).not.toContain("lookup_papers observation packet");
+    } finally {
+      resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true });
+      if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      else process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      if (previousStdoutSequence === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      else process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      if (previousCallIndex === undefined) delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      else process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      if (previousExitCode === undefined) delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      else process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      if (previousExtractionFixtures === undefined) delete process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+      else process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = previousExtractionFixtures;
+    }
+  });
+
+  it("does not stop postulate framing prompts at scientific Image Lens continuity audit", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    const previousExtractionFixtures = process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        "The promoted scientific Image Lens equation evidence was filed.",
+        "Candidate postulate wording: curvature-frame action coupling remains diagnostic-only until assumptions, variables, and branch gates are resolved.",
+      ],
+    });
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([
+      {
+        region_label: "scholarly_pdf_page_5_exact_row",
+        text_candidate: "S = integral d4x sqrt(-g) exp(-phi) { R + 2 Lambda exp(-phi) + kappa exp(-phi) L_m }",
+        latex_candidate: "S = \\int d^{4}x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_{m} \\}",
+        extraction_status: "extracted",
+        uncertainty: [],
+      },
+    ]);
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-image-postulate-source",
+          session_id: "session-codex-scientific-image-postulate",
+          question: "Use page 5 of that same paper and crop only the exact equation row. Promote it only if the row crop supports exact equation admissibility.",
+          capability_lane_call: {
+            capability: "visual_analysis.inspect_image_region",
+            source_id: "pdf_page_render:postulate-paper:page:5",
+            source_kind: "pdf_page_render",
+            source_image_ref: "data:image/png;base64,test-page-image",
+            source_dimensions_px: { width: 1224, height: 1584 },
+            bbox_px: { x: 73, y: 570, width: 1078, height: 87 },
+            page_number: 5,
+            region_label: "scholarly_pdf_page_5_exact_row",
+            question: "Extract the exact displayed equation row from page 5.",
+            reason_for_crop: "Exact row promotion from scholarly PDF page evidence.",
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        },
+      });
+
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-image-postulate-followup",
+          session_id: "session-codex-scientific-image-postulate",
+          question: [
+            "Using my previous reflection in this chat, and the currently promoted page-grounded equation evidence, help frame it into a candidate postulate.",
+            "Use the Theory Badge Graph only as diagnostic context. Do not promote any badge.",
+            "Separate candidate postulate wording, assumptions, variables, conflicts, missing support, and calculator payload admissibility.",
+          ].join("\n"),
+        },
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.text).not.toContain("I am using the latest scientific Image Lens evidence chain");
+      expect(result.final_answer_source).not.toBe("scientific_image_evidence_continuity_summary");
+      expect((result.debug as any)?.scientific_image_evidence_continuity_requested).not.toBe(true);
+      expect((result.debug as any)?.scientific_image_evidence_continuity_lookup).toBeUndefined();
+    } finally {
+      if (previousStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      }
+      if (previousStdoutSequence === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      }
+      if (previousCallIndex === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      } else {
+        process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      }
+      if (previousExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      }
+      if (previousExtractionFixtures === undefined) {
+        delete process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+      } else {
+        process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = previousExtractionFixtures;
+      }
+    }
+  });
+
+  it("does not rewrite Postulate Board Image Lens evidence-ref revisions into missing scholarly lookup failures", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    process.env.CODEX_AGENT_FAKE_STDOUT =
+      "Postulate Board draft revised with page-grounded evidence refs pending scientific Image Lens sidecar recovery.";
+    delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-postulate-evidence-ref-revision-no-sidecar",
+          session_id: "session-codex-postulate-evidence-ref-revision-no-sidecar",
+          question:
+            "Revise this Postulate Board draft so its evidence refs cite the actual promoted page-grounded equation row, page number, crop ref, Image Lens source/hash, and evidence depth. Keep it candidate / diagnostic-only. Do not promote a badge or calculator payload.",
+        },
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.text).toContain("Postulate Board draft revised");
+      expect(result.text).not.toContain("no scholarly-research.lookup_papers observation packet");
+      expect(result.text).not.toContain("Ask with an explicit scholarly search target");
+      expect((result.debug as any)?.scholarly_response_mode_selection?.requested_modes ?? []).toEqual([]);
+    } finally {
+      if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      else process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      if (previousStdoutSequence === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      else process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      if (previousCallIndex === undefined) delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      else process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      if (previousExitCode === undefined) delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      else process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+    }
+  });
+
   it("retries a partial exact equation row from prior Image Lens sidecar before graph reflection", async () => {
     const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
     const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
@@ -2640,6 +3205,20 @@ describe("Codex provider capability lane adapter", () => {
         status: "completed",
         bridge_source: "prior_turn_sidecar",
         sidecar_admissibility_status: "admissible_observation",
+      });
+      expect(debug.scholarly_pdf_workbench_state).toMatchObject({
+        schema: "helix.scholarly_pdf_workbench_state.v1",
+        selected_affordance: "reflect_to_theory_badge_graph",
+        selected_affordance_reason: expect.any(String),
+        terminal_authority: {
+          schema: "helix.scholarly_pdf_workbench_terminal_authority.v1",
+          terminal_authority_reason: expect.any(String),
+        },
+        evidence_chain: {
+          graph_reflection_refs: expect.arrayContaining([
+            expect.stringContaining("theory-badge-graph.reflect_discussion_context"),
+          ]),
+        },
       });
     } finally {
       if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
@@ -2744,6 +3323,28 @@ describe("Codex provider capability lane adapter", () => {
       }),
     ]));
     expect(debug.scientific_image_evidence_retry.final_exact_equation_summary.promoted_row_count).toBeGreaterThanOrEqual(1);
+    expect(debug.scholarly_pdf_workbench_state).toMatchObject({
+      schema: "helix.scholarly_pdf_workbench_state.v1",
+      selected_affordance: "crop_exact_equation_row",
+      selected_affordance_reason: expect.any(String),
+      terminal_authority: {
+        schema: "helix.scholarly_pdf_workbench_terminal_authority.v1",
+        terminal_authority_reason: expect.any(String),
+      },
+      status: {
+        has_promoted_exact_row: true,
+      },
+      affordances: expect.arrayContaining([
+        expect.objectContaining({
+          action: "build_scientific_evidence_packet",
+          requires_promoted_row_or_scientific_sidecar: true,
+        }),
+        expect.objectContaining({
+          action: "reflect_to_theory_badge_graph",
+          boundary: "diagnostic_only_until_branch_gate",
+        }),
+      ]),
+    });
   });
 
   it("demotes row-search fragments that do not overlap the prior page-level equation candidate", async () => {
@@ -2834,6 +3435,102 @@ describe("Codex provider capability lane adapter", () => {
     expect(debug.scientific_image_evidence_retry.final_exact_equation_summary.promotion_blockers).toEqual(expect.arrayContaining([
       "retry_row_does_not_overlap_prior_page_equation_candidate",
     ]));
+  });
+
+  it("keeps equivalent Weyl action row promoted when retry bbox overlap misses the page candidate", async () => {
+    const sourcePng =
+      "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAGElEQVR42mP8z8DwnwEJMDGgAcYBDAwAODsEBkXvxpUAAAAASUVORK5CYII=";
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        "The page 5 Weyl action equation evidence was filed.",
+        "I can't crop or promote yet because this turn does not include the page-5 image source id or an exact row bbox_px.",
+      ],
+    });
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_BACKEND = "fixture";
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([
+      {
+        region_label: "scholarly_pdf_page_3_equation_pass",
+        text_candidate:
+          "nabla_alpha g_mu_nu = sigma_alpha g_mu_nu (1) g = e^f g (2) phi_bar = phi + f (3) Gamma alpha mu nu = ... (4) d/dx g(V,U) = ... (5) g(V(lambda), U(lambda)) = ... (6)",
+        latex_candidate:
+          "\\nabla_\\alpha g_{\\mu\\nu} = \\sigma_\\alpha g_{\\mu\\nu} \\quad (1) g = e^f g \\quad (2) \\bar{\\phi} = \\phi + f \\quad (3)",
+        extraction_status: "extracted",
+        uncertainty: [],
+      },
+      {
+        region_label: "scholarly_pdf_page_4_equation_pass",
+        text_candidate: "dL/dlambda = sigma_alpha dx_alpha/dlambda L",
+        latex_candidate: "\\frac{dL}{d\\lambda} = \\frac{\\sigma_{\\alpha} dx^{\\alpha}}{d\\lambda} L",
+        extraction_status: "extracted",
+        uncertainty: [],
+      },
+      {
+        region_label: "scholarly_pdf_page_5_equation_pass",
+        text_candidate:
+          "S = \\int d^4x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_m \\}, S_n = ...",
+        latex_candidate:
+          "S = \\int d^4x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_m \\},",
+        extraction_status: "partial",
+        uncertainty: ["fixture page-level context crop is partial"],
+      },
+      {
+        bbox_key: "73,570,1078,87",
+        text_candidate:
+          "S = integral d4x sqrt(-g) exp(-phi) { R + 2 Lambda exp(-phi) + kappa exp(-phi) L_m }",
+        latex_candidate:
+          "S = \\int d^{4}x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_{m} \\},",
+        extraction_status: "extracted",
+        uncertainty: [],
+      },
+    ]);
+
+    await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "turn-codex-weyl-action-overlap-equivalence-seed",
+        session_id: "session-codex-weyl-action-overlap-equivalence",
+        question: "Inspect page 5 of the paper and extract the displayed action equation with page evidence.",
+        capability_lane_call: {
+          capability: "visual_analysis.inspect_image_region",
+          source_id: "pdf_page_render:test-weyl-action:page:5",
+          source_kind: "pdf_page_render",
+          source_image_ref: `data:image/png;base64,${sourcePng}`,
+          source_dimensions_px: { width: 1224, height: 1584 },
+          bbox_px: { x: 0, y: 0, width: 1224, height: 1584 },
+          page_number: 5,
+          region_label: "scholarly_pdf_page_5_equation_pass",
+          question: "Extract the displayed action equation from page 5.",
+          reason_for_crop: "Page-level scholarly PDF equation extraction.",
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+      },
+    });
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "turn-codex-weyl-action-overlap-equivalence-followup",
+        session_id: "session-codex-weyl-action-overlap-equivalence",
+        question:
+          "Use the page 5 action equation candidate you just found and crop only the exact equation row for equation (7). Promote it only if the row crop supports exact equation admissibility.",
+      },
+    });
+    const debug = result.debug as Record<string, any>;
+
+    expect(result.ok).toBe(true);
+    expect(result.text).toContain("Promoted exact rows: `1`");
+    expect(debug.scientific_image_evidence_retry).toMatchObject({
+      status: "completed",
+      final_exact_equation_summary: expect.objectContaining({
+        promoted_row_count: 1,
+      }),
+    });
   });
 
   it("searches adjacent PDF pages before exact-row promotion when the current page has no equation target", async () => {
@@ -3224,6 +3921,199 @@ describe("Codex provider capability lane adapter", () => {
     }
   });
 
+  it("answers scientific Image Lens continuity audits as missing instead of graph failures when no sidecar is recoverable", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true });
+    process.env.CODEX_AGENT_FAKE_STDOUT = "This model-only answer must not be used.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-image-continuity-missing-audit",
+          session_id: "session-codex-scientific-image-continuity-missing-audit",
+          account_id: "local-profile:pesty",
+          username: "pesty",
+          question: "Tell me which promoted page-grounded equation row, page number, crop ref, Image Lens source/hash, and evidence depth you are currently using from the prior scientific Image Lens evidence chain.",
+          source_target_intent: {
+            schema: "helix.ask_source_target_intent.v1",
+            target_source: "scientific_image_evidence",
+            target_kind: "scientific_image_evidence_sidecar",
+            requested_outputs: [
+              "scientific_evidence_sidecar",
+              "theory_reflection",
+            ],
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          workspace_context_snapshot: {
+            sessionId: "helix-ui",
+            askThreadId: "helix-ask:desktop",
+            account_session: {
+              session_id: "account-session:pesty",
+              profile_id: "local-profile:pesty",
+              username: "pesty",
+            },
+          },
+        },
+      });
+      const debug = result.debug as Record<string, any>;
+
+      expect(result).toMatchObject({
+        ok: true,
+        response_type: "final_answer",
+        final_status: "final_answer",
+        final_answer_source: "scientific_image_evidence_continuity_summary",
+        terminal_artifact_kind: "scientific_image_evidence_continuity_summary",
+      });
+      expect(result.answer).toContain("could not find an active scientific Image Lens evidence chain");
+      expect(result.answer).toContain("Evidence depth: `missing`");
+      expect(result.answer).toContain("Sidecar: `none`");
+      expect(result.answer).not.toContain("Theory Badge Graph reflection from image evidence");
+      expect(result.answer).not.toContain("model-only answer");
+      expect(debug.scientific_image_evidence_continuity_lookup).toMatchObject({
+        status: "missing",
+      });
+      expect(debug.scientific_image_evidence_continuity_summary).toMatchObject({
+        status: "missing",
+        evidence_depth: "missing",
+        sidecar_id: null,
+      });
+    } finally {
+      resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true });
+      if (previousStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      }
+      if (previousExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      }
+    }
+  });
+
+  it("recovers scientific Image Lens continuity from persisted PDF page source keys across sessions", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    const previousExtractionFixtures = process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+    resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true });
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        "The source-keyed scientific Image Lens sidecar was filed.",
+        "The provider should recover by active Image Lens source key.",
+      ],
+    });
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([
+      {
+        region_label: "scholarly_pdf_page_5_exact_row_source_keyed",
+        latex_candidate: "S = \\int d^{4}x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_{m} \\}",
+        extraction_status: "extracted",
+        uncertainty: [],
+      },
+    ]);
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-image-source-key-seed",
+          session_id: "session-source-key-seed",
+          account_id: "local-profile:seed",
+          username: "seed-user",
+          question: "Use page 5 of the paper and crop only the exact equation row. Promote it only if the row crop supports exact equation admissibility.",
+          workspace_context_snapshot: {
+            sessionId: "helix-ui-seed",
+            askThreadId: "helix-ask:desktop:seed",
+            account_session: {
+              session_id: "account-session:seed",
+              profile_id: "local-profile:seed",
+              username: "seed-user",
+            },
+          },
+          capability_lane_call: {
+            capability: "visual_analysis.inspect_image_region",
+            source_id: "pdf-page-render:source-keyed-sidecar",
+            source_kind: "pdf_page_render",
+            source_image_ref: "data:image/png;base64,source-keyed-page-image",
+            source_dimensions_px: { width: 1224, height: 1584 },
+            bbox_px: { x: 73, y: 570, width: 1078, height: 87 },
+            page_number: 5,
+            region_label: "scholarly_pdf_page_5_exact_row_source_keyed",
+            question: "Extract the exact displayed equation row from page 5.",
+            reason_for_crop: "Exact row promotion from scholarly PDF page evidence.",
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        },
+      });
+
+      resetScholarlyPdfWorkbenchVolatileMemoryForTest();
+
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-image-source-key-followup",
+          session_id: "session-source-key-followup",
+          account_id: "local-profile:other",
+          username: "other-user",
+          question: "Tell me which promoted page-grounded equation row, page number, crop ref, Image Lens source/hash, and evidence depth you are currently using from the prior scientific Image Lens evidence chain.",
+          workspace_context_snapshot: {
+            sessionId: "helix-ui-other",
+            askThreadId: "helix-ask:desktop:other",
+            active_image_lens_source: {
+              source_id: "pdf-page-render:source-keyed-sidecar",
+              source_kind: "pdf_page_render",
+              source_image_ref: "data:image/png;base64,source-keyed-page-image",
+              source_ref_hash: "sha256:source-keyed-page-hash",
+              page_number: 5,
+              page_count: 7,
+            },
+            account_session: {
+              session_id: "account-session:other",
+              profile_id: "local-profile:other",
+              username: "other-user",
+            },
+          },
+        },
+      });
+      const debug = result.debug as Record<string, any>;
+
+      expect(result.ok).toBe(true);
+      expect(result.final_answer_source).toBe("scientific_image_evidence_continuity_summary");
+      expect(result.text).toContain("I am using the latest scientific Image Lens evidence chain");
+      expect(result.text).not.toContain("Evidence depth: `missing`");
+      expect(result.text).toContain("Image Lens source: `pdf-page-render:source-keyed-sidecar`");
+      expect(result.text).toContain("Page: `5`");
+      expect(debug.scientific_image_evidence_continuity_lookup).toMatchObject({
+        status: "found",
+        persistent_snapshot_recovered: true,
+        selected_lookup_key: expect.stringContaining("image_lens_source"),
+      });
+    } finally {
+      resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true });
+      if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      else process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      if (previousStdoutSequence === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      else process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      if (previousCallIndex === undefined) delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      else process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      if (previousExitCode === undefined) delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      else process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      if (previousExtractionFixtures === undefined) delete process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+      else process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = previousExtractionFixtures;
+    }
+  });
+
   it("reports Image Lens observations when the post-observation provider response leaks prompt instructions", async () => {
     const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
     const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
@@ -3430,6 +4320,73 @@ describe("Codex provider capability lane adapter", () => {
         delete process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
       } else {
         process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = previousExtractionFixtures;
+      }
+    }
+  });
+
+  it("does not authorize prompt-leak fallback text as compound synthesis when no Image Lens observation was produced", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    process.env.CODEX_AGENT_FAKE_STDOUT =
+      "model_visible_capability_lane_manifest Available Helix workstation gateway capabilities: visual_analysis.inspect_image_region Before giving a final answer, decide whether the user request needs a one-shot capability lane.";
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-image-lens-prompt-leak-without-observation",
+          question: [
+            "Using my previous reflection in this chat, and the currently promoted page-grounded equation evidence, help frame it into a candidate postulate.",
+            "Use the Theory Badge Graph only as diagnostic context. Do not treat the reflection as proven. Do not promote any badge.",
+          ].join(" "),
+          workspace_context_snapshot: {
+            activePanel: "image-lens",
+          },
+        },
+      });
+
+      const debug = result.debug as Record<string, any>;
+      const visibleAndRawText = JSON.stringify({
+        answer: result.answer,
+        selected_final_answer: result.selected_final_answer,
+        final_answer_source: result.final_answer_source,
+        terminal_artifact_kind: result.terminal_artifact_kind,
+        terminal_answer_authority: result.terminal_answer_authority,
+        compound_evidence_synthesis_answer: debug?.compound_evidence_synthesis_answer,
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.final_answer_source).not.toBe("compound_evidence_synthesis_answer");
+      expect(result.terminal_artifact_kind).not.toBe("compound_evidence_synthesis_answer");
+      expect(debug?.compound_evidence_synthesis_answer).toBeUndefined();
+      expect(visibleAndRawText).not.toContain("Available Helix workstation gateway capabilities");
+      expect(visibleAndRawText).not.toContain("model_visible_capability_lane_manifest");
+      expect(result.answer).toContain("prior scientific image evidence sidecar");
+    } finally {
+      if (previousStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      }
+      if (previousStdoutSequence === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      }
+      if (previousCallIndex === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      } else {
+        process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      }
+      if (previousExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
       }
     }
   });
@@ -3714,6 +4671,127 @@ describe("Codex provider capability lane adapter", () => {
         delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
       } else {
         process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      }
+    }
+  });
+
+  it("uses active Image Lens PDF page source for current exact-row crop prompts without a prior sidecar", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    const previousExtractionFixtures = process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        "model_visible_capability_lane_manifest visual_analysis.inspect_image_region Before giving a final answer, decide whether the user request needs a one-shot capability lane.",
+        "Available Helix workstation gateway capabilities: visual_analysis.inspect_image_region",
+        "Promoted the current Image Lens page equation row from active page evidence.",
+      ],
+    });
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([{
+      region_label: "equation_7",
+      requested_equation_label: "7",
+      text_candidate: "S = integral d4x sqrt(-g) e^-phi { R + 2 Lambda e^-phi + kappa e^-phi L_m }, (7)",
+      latex_candidate: "S = \\int d^4x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_m \\}, \\quad (7)",
+      extraction_status: "extracted",
+      exact_equation_admissibility: "admissible_for_exact_equation",
+      exact_row_promotion: {
+        status: "promoted",
+        reasons: ["single_clean_row", "extracted_latex_candidate_present"],
+      },
+    }]);
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-active-image-lens-current-row-crop",
+          question: [
+            "Use the current page 5 Image Lens PDF page.",
+            "Crop only the exact equation row for equation (7).",
+            "Promote it only if the row crop is single-line, non-truncated, has LaTeX, and supports exact equation admissibility.",
+          ].join(" "),
+          workspace_context_snapshot: {
+            activePanel: "image-lens",
+            active_image_lens_source: {
+              source_id: "pdf-page-render:active-page-5",
+              source_kind: "pdf_page_render",
+              source_image_ref: "data:image/png;base64,current-page-5",
+              source_ref_hash: "sha256:active-page-5",
+              dimensions_px: { width: 1224, height: 1584 },
+              page_number: 5,
+              page_count: 12,
+            },
+          },
+          turn_input_items: [
+            {
+              type: "text",
+              text: "Use the current page 5 Image Lens PDF page.",
+              source: "user",
+            },
+          ],
+        },
+      });
+      const debug = result.debug as Record<string, any>;
+      const callResults = debug.capability_lane_call_results as Array<Record<string, any>>;
+      const observationPackets = debug.capability_lane_observation_packets as Array<Record<string, any>>;
+      const visibleAndRawText = JSON.stringify({
+        answer: result.answer,
+        text: result.text,
+        selected_final_answer: result.selected_final_answer,
+        raw: result.raw,
+        provider_terminal_candidate: debug.provider_terminal_candidate,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(visibleAndRawText).not.toContain("could not retrieve the prior scientific image evidence sidecar");
+      expect(visibleAndRawText).not.toContain("no scholarly-research.lookup_papers observation packet");
+      expect(callResults.map((call) => call.capability)).toEqual(["visual_analysis.inspect_image_region"]);
+      expect(callResults[0]).toMatchObject({
+        ok: true,
+        receipt: expect.objectContaining({
+          source_kind: "pdf_page_render",
+          page_number: 5,
+          source_image_ref: "data:image/png;base64,current-page-5",
+          bbox_px: { x: 73, y: 570, width: 1077, height: 87 },
+          requested_equation_label: "7",
+          region_label: "equation_7",
+        }),
+      });
+      expect(callResults[0]?.receipt?.source_refs).toContain("pdf-page-render:active-page-5");
+      expect(observationPackets.map((packet) => packet.capability_key)).toEqual(["visual_analysis.inspect_image_region"]);
+      expect(debug.runtime_lane_request_loop).toMatchObject({
+        status: "lane_observation_reentered",
+        synthesized_by_helix_policy: true,
+      });
+    } finally {
+      if (previousStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      }
+      if (previousStdoutSequence === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      }
+      if (previousCallIndex === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      } else {
+        process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      }
+      if (previousExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      }
+      if (previousExtractionFixtures === undefined) {
+        delete process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+      } else {
+        process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = previousExtractionFixtures;
       }
     }
   });

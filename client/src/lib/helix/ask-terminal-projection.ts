@@ -67,6 +67,15 @@ function isBackendEntrypointFailureText(value: unknown): boolean {
   return text === HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT || text === HELIX_ASK_BACKEND_DEBUG_MATERIALIZATION_TEXT;
 }
 
+function isProviderInstructionEchoFailureText(value: unknown): boolean {
+  const normalized = normalizeTerminalAnswerText(coerceText(value));
+  if (!normalized) return false;
+  return (
+    /runtime provider echoed Helix internal capability instructions/i.test(normalized) ||
+    /No visual observation receipt was produced for this turn/i.test(normalized)
+  );
+}
+
 function hasMaterializedBackendEntrypointTerminal(
   replyRecord: RecordLike | null,
   debugRecord: RecordLike | null,
@@ -189,6 +198,7 @@ export function isInvalidTerminalAnswerText(value: string | null | undefined): b
   const normalized = normalizeTerminalAnswerText(value);
   if (!normalized) return true;
   return (
+    isProviderInstructionEchoFailureText(normalized) ||
     /^no final answer returned\.?$/i.test(normalized) ||
     /^I could not produce a substantive direct answer for this background-only turn\.?$/i.test(normalized) ||
     /^I couldn't produce a final answer for that turn\. Please retry once\.?$/i.test(normalized) ||

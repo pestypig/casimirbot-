@@ -45,15 +45,36 @@ const exportNames = {
 
 function readJson(filePath, fallback) {
   if (!fs.existsSync(filePath)) return fallback;
-  return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  return JSON.parse(readTextFile(filePath));
 }
 
 function writeJson(filePath, value) {
-  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+  writeTextFile(filePath, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function retryFileOperation(action) {
+  let lastError = null;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    try {
+      return action();
+    } catch (error) {
+      lastError = error;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50 * (attempt + 1));
+    }
+  }
+  throw lastError;
+}
+
+function readTextFile(filePath) {
+  return retryFileOperation(() => fs.readFileSync(filePath, "utf8"));
+}
+
+function writeTextFile(filePath, text) {
+  retryFileOperation(() => fs.writeFileSync(filePath, text, "utf8"));
 }
 
 function parseCatalog(filePath) {
-  const text = fs.readFileSync(filePath, "utf8");
+  const text = readTextFile(filePath);
   const entries = new Map();
   const re = /  "([^"]+)":\s*"((?:\\.|[^"\\])*)",/g;
   let match;
@@ -87,7 +108,7 @@ function writeLocaleCatalog(locale, manifestRows, cache) {
     const translated = cache[cacheKey(locale, row.text)];
     if (typeof translated === "string" && translated.trim()) entries.set(row.id, translated);
   }
-  fs.writeFileSync(filePath, renderCatalog(exportNames[locale], entries), "utf8");
+  writeTextFile(filePath, renderCatalog(exportNames[locale], entries));
 }
 
 function countCachedRows(locale, manifestRows, cache) {

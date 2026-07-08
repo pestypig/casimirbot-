@@ -1129,6 +1129,23 @@ export const hasAffirmativeScholarlyResearchNowIntent = (prompt: string): boolea
   return detectScholarlyResearchIntent(prompt).researchRequested;
 };
 
+const isScientificImageEvidenceRefRevisionPrompt = (prompt: string): boolean => {
+  const unquoted = unquotePrompt(prompt);
+  return (
+    /\b(?:revise|update|convert|draft|postulate\s+board|postulate|candidate\s+postulate|evidence\s+refs?|cite)\b/i.test(unquoted) &&
+    /\b(?:promoted|page[-\s]?grounded|exact\s+row|equation\s+row|crop\s+ref|image\s+lens|source(?:\/hash|\s+hash)?|evidence\s+depth)\b/i.test(unquoted)
+  );
+};
+
+const isScientificImageExactRowRetryPrompt = (prompt: string): boolean => {
+  const unquoted = unquotePrompt(prompt);
+  return (
+    /\b(?:current|prior|previous|latest|page\s*\d+|crop\s+ref|image\s+lens|sidecar|equation\s+candidate|page[-\s]?level\s+candidate)\b/i.test(unquoted) &&
+    /\b(?:re-?crop|crop|retry|promote|exact\s+row|equation\s+row|exact\s+equation\s+admissibility)\b/i.test(unquoted) &&
+    /\b(?:single[-\s]?line|non[-\s]?truncated|latex|supports\s+exact\s+equation|equation\s*\(?\d{1,3}\)?|bbox|source\s+id)\b/i.test(unquoted)
+  );
+};
+
 export const isTheoryFormulaDiscoveryPhasePrompt = (prompt: string): boolean => {
   const unquoted = unquotePrompt(prompt);
   const mentionsTheoryGraph = /\b(?:theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b/i.test(unquoted);
@@ -1173,6 +1190,7 @@ export const buildPromptDerivedRepoSearchGatewayCallRequests = (
 ): Record<string, unknown>[] => {
   const prompt = readPrompt(body);
   if (!prompt) return [];
+  if (isScientificImageEvidenceRefRevisionPrompt(prompt)) return [];
   if (hasExplicitScholarlyFullTextNumericChainIntent(prompt)) return [];
   const query = extractRepoSearchQueryFromPrompt(prompt);
   if (!query && !hasAffirmativeRepoSearchIntent(prompt)) return [];
@@ -1213,6 +1231,8 @@ export const buildPromptDerivedInternetSearchGatewayCallRequests = (
 ): Record<string, unknown>[] => {
   const prompt = readPrompt(body);
   if (!prompt) return [];
+  if (isScientificImageEvidenceRefRevisionPrompt(prompt)) return [];
+  if (isScientificImageExactRowRetryPrompt(prompt)) return [];
   const intent = detectInternetSearchIntent(prompt);
   if (!intent.searchRequested) return [];
   return [{
@@ -1242,6 +1262,7 @@ export const buildPromptDerivedScholarlyResearchGatewayCallRequests = (
 ): Record<string, unknown>[] => {
   const prompt = readPrompt(body);
   if (!prompt) return [];
+  if (isScientificImageEvidenceRefRevisionPrompt(prompt)) return [];
   if (hasNegatedScholarlyResearchInstruction(prompt)) return [];
   const intent = detectScholarlyResearchIntent(prompt);
   if (!intent.researchRequested) return [];

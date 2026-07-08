@@ -573,6 +573,12 @@ function isConceptualNoCalculatorPrompt(prompt: string): boolean {
 function isSourceBoundNumericEvidenceCollectionPrompt(prompt: string): boolean {
   const normalized = normalizePrompt(prompt);
   if (!normalized) return false;
+  if (
+    /\b(?:postulate\s+board|postulate|candidate\s+postulate|evidence\s+refs?)\b/i.test(normalized) &&
+    /\b(?:promoted|page[-\s]?grounded|exact\s+row|equation\s+row|crop\s+ref|image\s+lens|source(?:\/hash|\s+hash)?|evidence\s+depth)\b/i.test(normalized)
+  ) {
+    return false;
+  }
   const asksForEvidence =
     /\b(?:find|grab|get|collect|look\s*up|search|return|suggest)\b[\s\S]{0,180}\b(?:cited|citation|source[-\s]?bound|unit[-\s]?bearing|research[-\s]?papers?|papers?|scholarly|numerical?\s+values?|numeric\s+values?|parameters?)\b/i.test(normalized) ||
     /\b(?:cited|citation|source[-\s]?bound|unit[-\s]?bearing|research[-\s]?papers?|papers?|scholarly)\b[\s\S]{0,180}\b(?:numerical?\s+values?|numeric\s+values?|parameters?|units?)\b/i.test(normalized);

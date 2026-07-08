@@ -7604,7 +7604,8 @@ export const callWorkstationGatewayCapability = async (
             `exact_equation_rows=admissible:${scientificEvidenceSidecar.exact_equation_summary.admissible_row_count}; partial:${scientificEvidenceSidecar.exact_equation_summary.partial_row_count}; rejected:${scientificEvidenceSidecar.exact_equation_summary.rejected_row_count}`,
           ]
         : [`scientific_image_sidecar=missing; evidence_source=${scientificEvidenceInput.source}`]),
-      "final_answer_guard=OCR candidates, graph matches, calculator payloads, and proof/validation must remain separate.",
+      "calculator_template_boundary=admitted calculator payloads are diagnostic templates unless variables, units, assumptions, and source refs are bound.",
+      "final_answer_guard=OCR candidates, graph matches, calculator templates, calculator-ready payloads, and proof/validation must remain separate.",
     ];
     const observation = {
       schema: THEORY_CONTEXT_REFLECTION_OBSERVATION_SCHEMA,
@@ -7625,6 +7626,19 @@ export const callWorkstationGatewayCapability = async (
         ...reflection.evidenceForAsk.claimBoundaries,
       ].slice(0, 12),
       calculator_payloads: calculatorPayloads,
+      calculator_template_payloads: calculatorPayloads,
+      calculator_template_admissibility: {
+        schema: "helix.calculator_template_admissibility.v1",
+        status: calculatorPayloads.length > 0 ? "template_admissible" : "none",
+        admitted_template_count: calculatorPayloads.length,
+        rejected_template_count: branchGate.rejected_calculator_payload_ids.length,
+        calculation_ready_count: 0,
+        binding_status: "unbound_variables_units_assumptions",
+        claim_boundary: "templates_only_not_calculator_solve_authority",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
       rejected_calculator_payload_ids: branchGate.rejected_calculator_payload_ids,
       scientific_evidence_packet: scientificEvidencePacket,
       scientific_evidence_sidecar: scientificEvidenceSidecar,
@@ -7658,7 +7672,7 @@ export const callWorkstationGatewayCapability = async (
       panelId: "theory-badge-graph",
       action: "reflect_discussion_context",
       status: "succeeded",
-      summary: `Theory Badge Graph reflection produced ${observation.exact_badge_ids.length} exact badge match(es), ${observation.likely_badge_ids.length} likely match(es), and ${observation.claim_boundary_notes.length} claim-boundary note(s). Scientific branch gate: ${branchGate.status} domain=${branchGate.primary_domain}; rejected calculator payloads=${branchGate.rejected_calculator_payload_ids.length}.`,
+      summary: `Theory Badge Graph reflection produced ${observation.exact_badge_ids.length} exact badge match(es), ${observation.likely_badge_ids.length} likely match(es), and ${observation.claim_boundary_notes.length} claim-boundary note(s). Scientific branch gate: ${branchGate.status} domain=${branchGate.primary_domain}; calculator templates=${calculatorPayloads.length}; rejected calculator templates=${branchGate.rejected_calculator_payload_ids.length}.`,
       observation,
       producedAffordances,
       consumedAffordances,

@@ -463,6 +463,7 @@ export const zhMessages = {
   "imageLens.status.imageLoadFailed": "图片加载失败。检查 URL 或选择本地文件。",
   "imageLens.summary.manualCropFrame": "Image Lens ({width}x{height}px) 的手动裁剪框。 Live Answer视觉色调有自己的诠释。",
   "imageLens.liveSource.note": "Image Lens 使用实时视觉源 {sourceId}。在发送裁剪后，才会对原始屏幕帧进行汇总。",
+  "imageLens.pdfPage.status": "PDF \u9875\u9762 {pageNumber}{pageCount}",
   "imageLens.sent.source": "发送至 Live Answer 源 {sourceId}",
   "imageLens.sent.evidence": "- 证据{evidenceId}",
   "imageLens.image.alt": "图片来源",

@@ -463,6 +463,7 @@ export const woMessages = {
   "imageLens.status.imageLoadFailed": "L'image n'a pas pu être chargée. Vérifiez l'URL ou choisissez un fichier local.",
   "imageLens.summary.manualCropFrame": "Cadre de recadrage manuel de Image Lens ({width}x{height}px). Les nuances visuelles Live Answer ont leur propre interprétation.",
   "imageLens.liveSource.note": "Image Lens utilise la source visuelle en direct {sourceId}. Les images d’écran brutes ne sont pas résumées jusqu’à ce qu’un recadrage soit envoyé.",
+  "imageLens.pdfPage.status": "X\u00ebtu PDF {pageNumber}{pageCount}",
   "imageLens.sent.source": "Envoyé à la source Live Answer {sourceId}",
   "imageLens.sent.evidence": "- preuve {evidenceId}",
   "imageLens.image.alt": "Source des images",

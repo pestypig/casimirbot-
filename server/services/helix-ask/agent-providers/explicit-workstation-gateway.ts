@@ -118,6 +118,27 @@ const promptExplicitlyRequestsCrossGraphMoralFollowup = (prompt: string): boolea
   );
 };
 
+const isScientificImageEvidenceScopedTurn = (body: Record<string, unknown>): boolean => {
+  const routeMetadata = readRecord(body.route_metadata ?? body.routeMetadata);
+  const sourceTargetIntent = readRecord(routeMetadata?.source_target_intent ?? routeMetadata?.sourceTargetIntent);
+  const mandatoryNextTool = readRecord(routeMetadata?.mandatory_next_tool ?? routeMetadata?.mandatoryNextTool);
+  const values = [
+    readString(routeMetadata?.sourceTarget),
+    readString(routeMetadata?.source_target),
+    readString(routeMetadata?.requiredToolFamily),
+    readString(routeMetadata?.required_tool_family),
+    readString(sourceTargetIntent?.target_source),
+    readString(sourceTargetIntent?.targetSource),
+    readString(sourceTargetIntent?.target_kind),
+    readString(sourceTargetIntent?.targetKind),
+    readString(mandatoryNextTool?.missing_required_evidence),
+    readString(mandatoryNextTool?.missingRequiredEvidence),
+    readString(mandatoryNextTool?.canonical_goal),
+    readString(mandatoryNextTool?.canonicalGoal),
+  ].filter((value): value is string => Boolean(value));
+  return values.some((value) => /scientific_image|scientific[-_\s]?image|image_lens|visual_analysis/i.test(value));
+};
+
 const isExplicitExternalResearchRequest = (
   request: Record<string, unknown>,
   prompt: string,
@@ -278,6 +299,7 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   const requests: Record<string, unknown>[] = [];
   const seen = new Set<string>();
   const prompt = readPrompt(input.body) ?? "";
+  const scientificImageEvidenceScopedTurn = isScientificImageEvidenceScopedTurn(input.body);
   const theoryFormulaDiscoveryPhase = isTheoryFormulaDiscoveryPhasePrompt(prompt);
   const paperBackedNumericBindingPhase = isPaperBackedNumericBindingPhasePrompt(prompt);
   const conditionalPriorEvidenceCalculatorFollowup = isConditionalPriorEvidenceCalculatorFollowup(prompt);
@@ -308,6 +330,15 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
     const capability = readString(request.capability_id) ?? readString(request.capabilityId);
     return !capability || !compoundDependencyCapabilities.has(capability);
   });
+  if (scientificImageEvidenceScopedTurn) {
+    requests.length = 0;
+    seen.clear();
+    appendDedupe(requests, seen, promptNamed);
+    if (!promptNamedCapabilities.has(THEORY_CONTEXT_REFLECTION_CAPABILITY)) {
+      appendDedupe(requests, seen, buildPromptDerivedTheoryReflectionGatewayCallRequests(input.body));
+    }
+    return requests.slice(0, 10);
+  }
   if (theoryFormulaDiscoveryPhase && promptNamedCapabilities.size === 0 && compoundDependencyCapabilities.size === 0) {
     appendDedupe(requests, seen, buildPromptDerivedTheoryReflectionGatewayCallRequests(input.body));
     return requests.slice(0, 10);

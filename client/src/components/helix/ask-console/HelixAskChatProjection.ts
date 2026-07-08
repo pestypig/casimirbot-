@@ -4,6 +4,7 @@ export type HelixAskChatMessageLike = {
   content: string;
   at: string;
   traceId?: string | null;
+  helixAsk?: Record<string, unknown> | null;
 };
 
 export type HelixAskChatSessionLike = {
@@ -92,6 +93,20 @@ export function shouldSuppressGeneratedStagePlayMailWakeChatProjection(
   return false;
 }
 
+function readBooleanFlag(record: Record<string, unknown> | null | undefined, ...keys: string[]): boolean {
+  if (!record) return false;
+  return keys.some((key) => record[key] === true);
+}
+
+function readStringValue(record: Record<string, unknown> | null | undefined, ...keys: string[]): string | null {
+  if (!record) return null;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
 export function buildHelixAskRepliesFromChatSessionProjection(args: {
   session: HelixAskChatSessionLike;
   policy: HelixAskChatProjectionPolicy;
@@ -130,12 +145,30 @@ export function buildHelixAskRepliesFromChatSessionProjection(args: {
     const turnId = message.traceId?.trim() || pendingUser?.traceId?.trim() || null;
     const question = pendingUser?.content ?? "";
     const askEntrypointRequired = policy.requiresBackendEntrypoint(question);
-    const askEntrypointObserved = false;
+    const askEntrypointObserved = readBooleanFlag(
+      message.helixAsk,
+      "backend_ask_entrypoint_observed",
+      "backendAskEntrypointObserved",
+      "ask_entrypoint_observed",
+    );
     const invalidDurableTerminalAnswer = policy.isInvalidTerminalAnswerText(answer);
+    const observedFinalAnswerSource = readStringValue(message.helixAsk, "final_answer_source", "finalAnswerSource");
+    const observedTerminalArtifactKind = readStringValue(message.helixAsk, "terminal_artifact_kind", "terminalArtifactKind");
+    const observedTerminalErrorCode = readStringValue(message.helixAsk, "terminal_error_code", "terminalErrorCode");
     const baseDebug = {
       durable_chat_projection: true,
       ask_entrypoint_required: askEntrypointRequired,
       ask_entrypoint_observed: askEntrypointObserved,
+      backend_ask_call_attempted: readBooleanFlag(
+        message.helixAsk,
+        "backend_ask_call_attempted",
+        "backendAskCallAttempted",
+      ),
+      use_backend_ask_turn_entrypoint: readBooleanFlag(
+        message.helixAsk,
+        "use_backend_ask_turn_entrypoint",
+        "useBackendAskTurnEntrypoint",
+      ),
       session_id: session.id,
       user_message_id: pendingUser?.id ?? null,
       assistant_message_id: message.id,
@@ -144,37 +177,6 @@ export function buildHelixAskRepliesFromChatSessionProjection(args: {
     };
 
     if (askEntrypointRequired && !askEntrypointObserved) {
-      replies.push({
-        id: buildHelixAskChatProjectionId(session, pendingUser, message),
-        createdAtMs,
-        content: policy.backendEntrypointRequiredText,
-        question,
-        turn_id: turnId,
-        ok: false,
-        final_answer_source: "typed_failure",
-        terminal_artifact_kind: "typed_failure",
-        terminal_error_code: policy.backendEntrypointRequiredErrorCode,
-        debug: {
-          ...baseDebug,
-          ask_entrypoint_observed: false,
-          ask_entrypoint_failure_code: policy.backendEntrypointRequiredErrorCode,
-          blocked_projection_kind: "durable_chat_session",
-          selected_final_answer: policy.backendEntrypointRequiredText,
-          final_answer_source: "typed_failure",
-          terminal_artifact_kind: "typed_failure",
-          terminal_error_code: policy.backendEntrypointRequiredErrorCode,
-          typed_failure: {
-            schema: "helix.ask.typed_failure.v1",
-            code: policy.backendEntrypointRequiredErrorCode,
-            message: policy.backendEntrypointRequiredText,
-          },
-          resolved_turn_summary: {
-            final_status: "final_failure",
-            terminal_artifact_kind: "typed_failure",
-            terminal_error_code: policy.backendEntrypointRequiredErrorCode,
-          },
-        },
-      });
       pendingUser = null;
       continue;
     }
@@ -222,8 +224,9 @@ export function buildHelixAskRepliesFromChatSessionProjection(args: {
       question,
       turn_id: turnId,
       ok: true,
-      final_answer_source: "durable_chat_session",
-      terminal_artifact_kind: "chat_final_answer",
+      final_answer_source: observedFinalAnswerSource ?? "durable_chat_session",
+      terminal_artifact_kind: observedTerminalArtifactKind ?? "chat_final_answer",
+      terminal_error_code: observedTerminalErrorCode,
       debug: {
         ...baseDebug,
         ask_entrypoint_failure_code: null,

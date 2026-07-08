@@ -193,6 +193,9 @@ export default function ImageLensPanel() {
   const setCropDraft = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.setCropDraft);
   const addReceipt = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.addReceipt);
   const clearReceipts = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.clearReceipts);
+  const rehydratePersistedSourceImage = useDocumentImageRegionStore(
+    (state: DocumentImageRegionState) => state.rehydratePersistedSourceImage,
+  );
   const liveSourceActive = Boolean(liveSource?.streamActive && liveSource.stream);
   const hasVisualInput = Boolean(source || liveSourceActive);
   const sourceKindOptions = useMemo<Array<[DocumentImageSourceKindV1, string]>>(
@@ -207,6 +210,19 @@ export default function ImageLensPanel() {
     setStatusMessage((current) => (current === initialStatusRef.current ? initialStatusMessage : current));
     initialStatusRef.current = initialStatusMessage;
   }, [initialStatusMessage]);
+
+  useEffect(() => {
+    if (source) return;
+    if (rehydratePersistedSourceImage()) {
+      setStatusMessage("Recovered page evidence from last Ask turn.");
+    }
+  }, [rehydratePersistedSourceImage, source]);
+
+  useEffect(() => {
+    if (!source) return;
+    setSourceKind(source.sourceKind);
+    setPageDraft(source.pageNumber ? String(source.pageNumber) : "1");
+  }, [source]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -462,6 +478,14 @@ export default function ImageLensPanel() {
           {liveSourceActive ? (
             <span className="truncate text-cyan-100">
               {t("imageLens.liveSource.note", { sourceId: liveSource?.sourceId ?? "unknown" })}
+            </span>
+          ) : null}
+          {!liveSourceActive && source?.sourceKind === "pdf_page_render" && source.pageNumber ? (
+            <span className="truncate text-cyan-100" data-testid="image-lens-mounted-pdf-source">
+              {t("imageLens.pdfPage.status", {
+                pageNumber: source.pageNumber,
+                pageCount: source.pageCount ? ` / ${source.pageCount}` : "",
+              })}
             </span>
           ) : null}
           {lastSentFrame ? (

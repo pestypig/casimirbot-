@@ -443,7 +443,26 @@ const hasPriorTheoryEquationAnaphora = (prompt: string, body: Record<string, unk
   return Boolean(readPriorTheoryReflectionFormulaContext(body));
 };
 
+const isScientificImageEvidenceRefRevisionPrompt = (prompt: string): boolean => {
+  const unquoted = unquotePrompt(prompt);
+  return (
+    /\b(?:revise|update|convert|draft|postulate\s+board|postulate|candidate\s+postulate|evidence\s+refs?|cite)\b/i.test(unquoted) &&
+    /\b(?:promoted|page[-\s]?grounded|exact\s+row|equation\s+row|crop\s+ref|image\s+lens|source(?:\/hash|\s+hash)?|evidence\s+depth)\b/i.test(unquoted)
+  );
+};
+
+const isScientificImageExactRowRetryPrompt = (prompt: string): boolean => {
+  const unquoted = unquotePrompt(prompt);
+  return (
+    /\b(?:current|prior|previous|latest|page\s*\d+|crop\s+ref|image\s+lens|sidecar|equation\s+candidate|page[-\s]?level\s+candidate)\b/i.test(unquoted) &&
+    /\b(?:re-?crop|crop|retry|promote|exact\s+row|equation\s+row|exact\s+equation\s+admissibility)\b/i.test(unquoted) &&
+    /\b(?:single[-\s]?line|non[-\s]?truncated|latex|supports\s+exact\s+equation|equation\s*\(?\d{1,3}\)?|bbox|source\s+id)\b/i.test(unquoted)
+  );
+};
+
 const isResearchQuantifyReflectPrompt = (prompt: string, body: Record<string, unknown>): boolean => {
+  if (isScientificImageEvidenceRefRevisionPrompt(prompt)) return false;
+  if (isScientificImageExactRowRetryPrompt(prompt)) return false;
   if (hasDocumentEvidenceIntent(prompt) && !hasScholarlyFullTextNumericChainIntent(prompt)) return false;
   const unquoted = unquotePrompt(prompt);
   if (
@@ -1264,6 +1283,7 @@ const buildResearchQuantifyReflectRequests = (body: Record<string, unknown>): Re
 const buildScholarlyResearchWorkflowRequests = (body: Record<string, unknown>): Record<string, unknown>[] => {
   const prompt = readPrompt(body);
   if (!prompt) return [];
+  if (isScientificImageEvidenceRefRevisionPrompt(prompt)) return [];
   if (isResearchQuantifyReflectPrompt(prompt, body)) return [];
   const intent = detectScholarlyResearchIntent(prompt);
   if (!intent.researchRequested) return [];

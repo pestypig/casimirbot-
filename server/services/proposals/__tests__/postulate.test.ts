@@ -43,7 +43,12 @@ vi.mock("../../essence/events", () => ({
   },
 }));
 
-import { claimPostulateReceipt, scorePostulateProposal, submitPostulateProposal } from "../postulate";
+import {
+  claimPostulateReceipt,
+  extractPostulateEvidenceContextFromText,
+  scorePostulateProposal,
+  submitPostulateProposal,
+} from "../postulate";
 
 const readPostulateMeta = (proposal: EssenceProposal): Record<string, unknown> => {
   const postulate = proposal.metadata?.postulate;
@@ -59,6 +64,17 @@ const highCongruencePhysicsPostulate = [
   "The candidate patch criteria should be constructive, traceable, and reviewed as a candidate only.",
 ].join(" ");
 
+const typedEvidenceContext = {
+  evidenceSidecarRefs: ["scientific_image_sidecar:weyl-paper-page-2"],
+  promotedEquationRowRefs: ["promoted_equation_row:weyl-eq-2.1"],
+  pageRenderRefs: ["page_render:weyl-paper:page-2"],
+  cropRefs: ["equation_crop:weyl-eq-2.1-row"],
+  graphReflectionRefs: ["graph_reflection:theory-badge-graph:/warp/qei/residual"],
+  provenanceAuditRefs: ["provenance_audit:weyl-paper-page-2-eq-2.1"],
+  calculatorCheckRefs: ["calculator_check:dimensional-consistency:eq-2.1"],
+  uncertaintyReductionRefs: ["uncertainty_reduction:qei-residual-bridge"],
+};
+
 beforeEach(() => {
   proposalState.stored = null;
   proposalState.actions = [];
@@ -67,6 +83,19 @@ beforeEach(() => {
 });
 
 describe("postulate proposal scoring", () => {
+  it("extracts scientific Image Lens continuity refs from Ask audit wording", () => {
+    const context = extractPostulateEvidenceContextFromText([
+      "Evidence depth: `exact_row_promoted`.",
+      "Sidecar: `ask:turn-1:scientific_image_evidence_sidecar:retry:ask:turn-2`.",
+      "Image Lens source: `pdf-page-render:a57b3f7f064f9ade`.",
+      "Crop ref: `sha256:23e70bd8fb953a139ca1afcc206cd51dd4f76c66bbef7524b487b63ba77fdf95#crop=73,570,1078,87`.",
+    ].join("\n"));
+
+    expect(context.evidenceSidecarRefs).toContain("ask:turn-1:scientific_image_evidence_sidecar:retry:ask:turn-2");
+    expect(context.pageRenderRefs).toContain("pdf-page-render:a57b3f7f064f9ade");
+    expect(context.cropRefs).toContain("sha256:23e70bd8fb953a139ca1afcc206cd51dd4f76c66bbef7524b487b63ba77fdf95#crop=73,570,1078,87");
+  });
+
   it("accepts constructive physics proposals as review candidates without certification claims", () => {
     const score = scorePostulateProposal({
       proposalText:
@@ -79,6 +108,18 @@ describe("postulate proposal scoring", () => {
     expect(score.reviewScore).toBeGreaterThanOrEqual(0.6);
     expect(score.badgeGraphLocatorRefs.length).toBeGreaterThan(0);
     expect(score.deterministicReasons).toContain("accepted_for_structured_review");
+  });
+
+  it("does not let wording alone reach the 90% reward gate", () => {
+    const score = scorePostulateProposal({
+      proposalText: highCongruencePhysicsPostulate,
+      userComment: "Send this postulate to be reviewed",
+    });
+
+    expect(score.accepted).toBe(true);
+    expect(score.rewarded).toBe(false);
+    expect(score.reviewScore).toBeLessThan(0.9);
+    expect(score.deterministicReasons).toContain("structured_evidence_refs:0");
   });
 
   it("rejects vague proposals below the constructive review threshold", () => {
@@ -99,6 +140,7 @@ describe("postulate proposal scoring", () => {
       submittedByAgentId: "helix-postulate-gate",
       originatingSessionId: "turn-123",
       originatingAnswerId: "answer-456",
+      evidenceContext: typedEvidenceContext,
     });
 
     const postulate = readPostulateMeta(result.proposal);
@@ -113,6 +155,11 @@ describe("postulate proposal scoring", () => {
     expect(postulate.receiptIntegrityHash).toEqual(expect.stringMatching(/^[a-f0-9]{64}$/));
     expect(postulate.receiptIssuedAt).toBe(result.proposal.createdAt);
     expect(postulate.receiptClaimStatus).toBe("unclaimed");
+    expect(postulate.evidenceContext).toMatchObject(typedEvidenceContext);
+    expect(postulate.evidenceDepthScore).toBeGreaterThan(0);
+    expect(postulate.calculatorCheckScore).toBeGreaterThan(0);
+    expect(postulate.graphCongruenceScore).toBeGreaterThan(0);
+    expect(postulate.uncertaintyReductionScore).toBeGreaterThan(0);
     expect(postulate.graphIntegration).toBe("queued_for_developer_patch_review");
     expect(graphTask.status).toBe("queued");
     expect(String(graphTask.instruction)).toContain("do not auto-mutate");
@@ -129,6 +176,7 @@ describe("postulate proposal scoring", () => {
       ownerId: "profile:rewarded-user",
       accountType: "user",
       submittedByAgentId: "helix-postulate-gate",
+      evidenceContext: typedEvidenceContext,
     });
     const postulate = readPostulateMeta(result.proposal);
 
@@ -153,6 +201,7 @@ describe("postulate proposal scoring", () => {
     const submitted = await submitPostulateProposal({
       proposalText: highCongruencePhysicsPostulate,
       submittedByAgentId: "helix-postulate-gate",
+      evidenceContext: typedEvidenceContext,
     });
     const submittedPostulate = readPostulateMeta(submitted.proposal);
     const receiptIntegrityHash = submittedPostulate.receiptIntegrityHash;

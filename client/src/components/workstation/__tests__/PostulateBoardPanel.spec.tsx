@@ -60,6 +60,16 @@ const acceptedPostulate = (): EssenceProposal => ({
       promptLabel: "Send this postulate to be reviewed",
       congruenceScore: 0.93,
       constructivenessScore: 0.91,
+      evidenceDepthScore: 0.88,
+      calculatorCheckScore: 0.8,
+      graphCongruenceScore: 0.86,
+      uncertaintyReductionScore: 0.72,
+      claimBoundaryScore: 0.96,
+      evidenceContext: {
+        evidenceSidecarRefs: ["scientific_image_sidecar:paper-page-2"],
+        cropRefs: ["equation_crop:eq-2.1-row"],
+        provenanceAuditRefs: ["provenance_audit:paper-page-2"],
+      },
       rewardCreditStatus: "issued",
       submittedByAgentId: "helix-postulate-gate",
       originatingAnswerId: "answer-public-1",
@@ -90,6 +100,7 @@ describe("PostulateBoardPanel", () => {
 
     expect(screen.getByText("high congruence")).toBeTruthy();
     expect(screen.getByText("92%")).toBeTruthy();
+    expect(screen.getByText("88%")).toBeTruthy();
     expect(screen.getByText("receipt-public-1")).toBeTruthy();
     expect(screen.getByText(/accepted means constructive review candidate/i)).toBeTruthy();
     expect(screen.getByText("Source:")).toBeTruthy();
@@ -108,6 +119,9 @@ describe("PostulateBoardPanel", () => {
     await waitFor(() => expect(screen.getByText("Graph patch review task: queued")).toBeTruthy());
 
     expect(screen.getByText(/proposal=postulate-card-1/i)).toBeTruthy();
+    expect(screen.getByText("scientific_image_sidecar:paper-page-2")).toBeTruthy();
+    expect(screen.getByText("equation_crop:eq-2.1-row")).toBeTruthy();
+    expect(screen.getByText("provenance_audit:paper-page-2")).toBeTruthy();
     expect(screen.getByText("Copy review packet")).toBeTruthy();
   });
 });

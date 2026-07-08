@@ -13,11 +13,13 @@ import {
   buildHelixAskSubmitAdmission,
   type HelixAskSubmitAdmissionDecision,
 } from "./HelixAskSubmitAdmission";
+import type { PendingHelixAskPrompt } from "@/lib/helix/ask-prompt-launch";
 
 export type HelixAskMinimalRuntimeSubmitPlan = {
   admission: HelixAskSubmitAdmissionDecision;
   context: HelixAskContextBridgeSnapshot;
   envelope: HelixAskConsoleRequestEnvelope | null;
+  pendingPrompt?: PendingHelixAskPrompt | null;
 };
 
 export function buildHelixAskMinimalRuntimeSubmitPlan(args: {
@@ -25,6 +27,7 @@ export function buildHelixAskMinimalRuntimeSubmitPlan(args: {
   selectedRuntime: HelixAgentRuntimeId;
   selectedLanguageModelProfile?: HelixLanguageModelProfileId;
   desktopUrl?: string | null;
+  pendingPrompt?: PendingHelixAskPrompt | null;
 }): HelixAskMinimalRuntimeSubmitPlan {
   const admission = buildHelixAskSubmitAdmission({
     entries: [args.draft],
@@ -38,6 +41,7 @@ export function buildHelixAskMinimalRuntimeSubmitPlan(args: {
   return {
     admission,
     context,
+    pendingPrompt: args.pendingPrompt ?? null,
     envelope: admission.firstEntry
       ? buildHelixAskConsoleRequestEnvelope({
           question: admission.firstEntry,

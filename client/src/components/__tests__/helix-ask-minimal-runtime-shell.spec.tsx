@@ -20,6 +20,7 @@ import {
 import { HelixAskVoiceLevelMonitor } from "@/components/helix/ask-console/HelixAskVoiceLevelMonitor";
 import { HelixAskVoiceStatusPill } from "@/components/helix/ask-console/HelixAskStatusLine";
 import { HELIX_ASK_LANGUAGE_MODEL_PROFILE_STORAGE_KEY } from "@/components/helix/ask-console/HelixAskLanguageModelPreference";
+import { launchHelixAskPrompt } from "@/lib/helix/ask-prompt-launch";
 import type {
   HelixAskMinimalRuntimeControlActions,
   HelixAskMinimalRuntimeControlPayload,
@@ -140,17 +141,92 @@ describe("HelixAskMinimalRuntimeShell", () => {
       role: message.role,
       content: message.content,
       traceId: message.traceId,
+      helixAsk: message.helixAsk,
     }))).toEqual([
       {
         role: "user",
         content: "Summarize the current whitepaper",
         traceId: "ask:minimal-shell-turn",
+        helixAsk: undefined,
       },
       {
         role: "assistant",
         content: "Minimal shell final answer.",
         traceId: "ask:minimal-shell-turn",
+        helixAsk: expect.objectContaining({
+          schema: "helix.ask.chat_backend_observation.v1",
+          backend_ask_call_attempted: true,
+          backend_ask_entrypoint_observed: true,
+          use_backend_ask_turn_entrypoint: true,
+          turn_id: "ask:minimal-shell-turn",
+        }),
       },
+    ]);
+  });
+
+  it("consumes launched postulate prompts through the recrowned backend runtime path", async () => {
+    window.history.pushState({}, "", "/desktop?doc=docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
+    vi.spyOn(globalThis.crypto, "randomUUID")
+      .mockReturnValueOnce("launched-postulate-prompt")
+      .mockReturnValueOnce("minimal-shell-launched-postulate-turn");
+    const runTurn = vi.fn(async (payload) => ({
+      selected_final_answer: "Postulate review completed.",
+      turn_id: payload.turnId,
+      final_answer_source: "postulate_review",
+    }));
+
+    render(<HelixAskMinimalRuntimeShell contextId="ctx" runTurn={runTurn} />);
+
+    launchHelixAskPrompt({
+      question: "/postulate\nReview this postulate candidate for Postulate Board submission.",
+      autoSubmit: true,
+      forceReasoningDispatch: true,
+      routeMetadata: {
+        schema: "helix.ask.route_metadata.v1",
+        source: "postulate_final_answer_button",
+        invocationKind: "postulate_final_answer_review",
+        sourceTarget: "postulate_board",
+        requiredCanonicalGoal: "postulate_runtime_review_then_gated_submit",
+        allowedCapabilities: ["postulate.submit_proposal"],
+        forbiddenCapabilities: [],
+        evidenceRefs: ["scientific_image_evidence_sidecar:test"],
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Postulate review completed.")).toBeTruthy();
+    });
+    expect(runTurn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        turnId: expect.stringMatching(/^ask:/),
+        question: "/postulate\nReview this postulate candidate for Postulate Board submission.",
+        forceReasoningDispatch: true,
+        force_reasoning_dispatch: true,
+        route_metadata: expect.objectContaining({
+          source: "postulate_final_answer_button",
+          invocationKind: "postulate_final_answer_review",
+          evidenceRefs: ["scientific_image_evidence_sidecar:test"],
+        }),
+        workspace_context_snapshot: expect.objectContaining({
+          activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        }),
+      }),
+      expect.any(Function),
+    );
+    expect(useAgiChatStore.getState().sessions[useAgiChatStore.getState().activeId ?? ""]?.messages).toEqual([
+      expect.objectContaining({
+        role: "user",
+        content: "/postulate\nReview this postulate candidate for Postulate Board submission.",
+      }),
+      expect.objectContaining({
+        role: "assistant",
+        content: "Postulate review completed.",
+        helixAsk: expect.objectContaining({
+          backend_ask_call_attempted: true,
+          backend_ask_entrypoint_observed: true,
+          use_backend_ask_turn_entrypoint: true,
+        }),
+      }),
     ]);
   });
 

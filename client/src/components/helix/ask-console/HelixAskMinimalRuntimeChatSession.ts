@@ -46,6 +46,9 @@ export function buildHelixAskMinimalRuntimeRepliesFromChatSession(
       mode: "observe",
       debug: {
         durable_chat_projection: true,
+        ask_entrypoint_observed: message.helixAsk?.backend_ask_entrypoint_observed === true,
+        backend_ask_call_attempted: message.helixAsk?.backend_ask_call_attempted === true,
+        use_backend_ask_turn_entrypoint: message.helixAsk?.use_backend_ask_turn_entrypoint === true,
         session_id: session?.id ?? null,
         user_message_id: pendingUser?.id ?? null,
         assistant_message_id: message.id,
@@ -54,8 +57,23 @@ export function buildHelixAskMinimalRuntimeRepliesFromChatSession(
       result: {
         selected_final_answer: answer,
         turn_id: turnId,
+        final_answer_source:
+          typeof message.helixAsk?.final_answer_source === "string"
+            ? message.helixAsk.final_answer_source
+            : "durable_chat_session",
+        terminal_artifact_kind:
+          typeof message.helixAsk?.terminal_artifact_kind === "string"
+            ? message.helixAsk.terminal_artifact_kind
+            : "chat_final_answer",
+        terminal_error_code:
+          typeof message.helixAsk?.terminal_error_code === "string"
+            ? message.helixAsk.terminal_error_code
+            : null,
         debug: {
           durable_chat_projection: true,
+          ask_entrypoint_observed: message.helixAsk?.backend_ask_entrypoint_observed === true,
+          backend_ask_call_attempted: message.helixAsk?.backend_ask_call_attempted === true,
+          use_backend_ask_turn_entrypoint: message.helixAsk?.use_backend_ask_turn_entrypoint === true,
           session_id: session?.id ?? null,
         },
       },

@@ -463,6 +463,7 @@ export const koMessages = {
   "imageLens.status.imageLoadFailed": "이미지를 로드하지 못했습니다. URL을 확인하거나 로컬 파일을 선택하세요.",
   "imageLens.summary.manualCropFrame": "Image Lens({width}x{height}px)의 수동 자르기 프레임. Live Answer 시각적 음영은 고유한 해석을 제공합니다.",
   "imageLens.liveSource.note": "Image Lens는 라이브 시각적 소스 {sourceId}를 사용하고 있습니다. 원시 화면 프레임은 자르기가 전송될 때까지 요약되지 않습니다.",
+  "imageLens.pdfPage.status": "PDF \ud398\uc774\uc9c0 {pageNumber}{pageCount}",
   "imageLens.sent.source": "Live Answer 소스 {sourceId}로 전송됨",
   "imageLens.sent.evidence": "- 증거 {evidenceId}",
   "imageLens.image.alt": "이미지 출처",

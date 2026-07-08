@@ -49,6 +49,16 @@ const PostulateRequest = z.object({
   userComment: z.string().max(4000).optional().nullable(),
   originatingSessionId: z.string().max(256).optional().nullable(),
   originatingAnswerId: z.string().max(256).optional().nullable(),
+  evidenceContext: z.object({
+    evidenceSidecarRefs: z.array(z.string().min(1).max(240)).max(24).optional(),
+    promotedEquationRowRefs: z.array(z.string().min(1).max(240)).max(24).optional(),
+    pageRenderRefs: z.array(z.string().min(1).max(240)).max(24).optional(),
+    cropRefs: z.array(z.string().min(1).max(240)).max(24).optional(),
+    graphReflectionRefs: z.array(z.string().min(1).max(240)).max(24).optional(),
+    provenanceAuditRefs: z.array(z.string().min(1).max(240)).max(24).optional(),
+    calculatorCheckRefs: z.array(z.string().min(1).max(240)).max(24).optional(),
+    uncertaintyReductionRefs: z.array(z.string().min(1).max(240)).max(24).optional(),
+  }).optional().nullable(),
 });
 
 const PostulateClaimRequest = z.object({

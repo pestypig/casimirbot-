@@ -1,3 +1,4 @@
+import React from "react";
 import { BrainCircuit } from "lucide-react";
 
 export type HelixAskMoodAvatarProps = {

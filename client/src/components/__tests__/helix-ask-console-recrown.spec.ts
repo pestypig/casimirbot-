@@ -214,6 +214,7 @@ import {
   createHelixAskMinimalRuntimeInitialState,
   failHelixAskMinimalRuntimeTurn,
   recordHelixAskMinimalRuntimeStreamEvent,
+  resolveHelixAskMinimalRuntimeAnswerText,
   startHelixAskMinimalRuntimeTurn,
 } from "@/components/helix/ask-console/HelixAskMinimalRuntimeLifecycle";
 import { buildHelixAskMinimalRuntimeSubmitPlan } from "@/components/helix/ask-console/HelixAskMinimalRuntimeSubmitPlan";
@@ -1846,7 +1847,7 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(ownershipMap).toContain("defaults to the legacy bridge");
   });
 
-  it("keeps the legacy bridge default while the minimal runtime shell stays explicitly selectable", () => {
+  it("keeps the legacy-looking bridge as default until the minimal runtime shell has visual parity", () => {
     const consoleSource = read("client/src/components/helix/ask-console/HelixAskConsole.tsx");
     const runtimeShellSource = read("client/src/components/helix/ask-console/HelixAskConsoleRuntimeShell.tsx");
     const bridgeSource = read("client/src/components/helix/ask-console/HelixAskLegacyRuntimeBridge.tsx");
@@ -6160,6 +6161,26 @@ describe("Helix Ask Console recrown boundary", () => {
     });
   });
 
+  it("does not surface backend debug-materialization text when minimal runtime explicitly missed the Ask entrypoint", () => {
+    const answerText = resolveHelixAskMinimalRuntimeAnswerText({
+      selected_final_answer:
+        "Backend Ask was reached, but no server terminal artifact or debug artifact was materialized for this turn.",
+      text: "I could not complete that turn.",
+      turn_id: "ask:test-turn",
+      debug: {
+        ask_entrypoint_required: true,
+        ask_entrypoint_observed: false,
+        ask_entrypoint_failure_code: "backend_ask_entry_required",
+        selected_final_answer: "I could not complete that turn.",
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+      },
+    });
+
+    expect(answerText).toBe("This prompt requires the backend Ask solver path before a final answer can be shown.");
+    expect(answerText).not.toContain("Backend Ask was reached");
+  });
+
   it("renders minimal runtime local turns through recrowned final-answer display", () => {
     const started = startHelixAskMinimalRuntimeTurn({
       state: createHelixAskMinimalRuntimeInitialState(),
@@ -6660,6 +6681,26 @@ describe("Helix Ask Console recrown boundary", () => {
             at: "2026-06-30T12:01:00.000Z",
           },
           {
+            id: "user-tool-observed",
+            role: "user",
+            content: "Use calculator tool with backend observation",
+            at: "2026-06-30T12:01:30.000Z",
+          },
+          {
+            id: "assistant-tool-observed",
+            role: "assistant",
+            content: "Backend observed answer",
+            at: "2026-06-30T12:01:45.000Z",
+            helixAsk: {
+              schema: "helix.ask.chat_backend_observation.v1",
+              backend_ask_call_attempted: true,
+              backend_ask_entrypoint_observed: true,
+              use_backend_ask_turn_entrypoint: true,
+              final_answer_source: "scientific_image_evidence_continuity_summary",
+              terminal_artifact_kind: "scientific_image_evidence_continuity_summary",
+            },
+          },
+          {
             id: "user-invalid",
             role: "user",
             content: "Normal question",
@@ -6684,14 +6725,25 @@ describe("Helix Ask Console recrown boundary", () => {
     });
 
     expect(replies.map((reply) => reply.content)).toEqual([
-      "Backend required.",
+      "Backend observed answer",
       "typed failure: terminal_authority_missing",
     ]);
     expect(replies.map((reply) => reply.terminal_error_code)).toEqual([
-      "backend_ask_entry_required",
+      null,
       "terminal_authority_missing",
     ]);
-    expect(replies.every((reply) => reply.final_answer_source === "typed_failure")).toBe(true);
+    expect(replies[0]).toMatchObject({
+      final_answer_source: "scientific_image_evidence_continuity_summary",
+      terminal_artifact_kind: "scientific_image_evidence_continuity_summary",
+      debug: {
+        ask_entrypoint_required: true,
+        ask_entrypoint_observed: true,
+        backend_ask_call_attempted: true,
+        use_backend_ask_turn_entrypoint: true,
+        blocked_projection_kind: null,
+      },
+    });
+    expect(replies[1]?.final_answer_source).toBe("typed_failure");
   });
 
   it("suppresses generated Stage Play mailbox durable projections", () => {

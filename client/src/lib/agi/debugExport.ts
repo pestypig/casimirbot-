@@ -2682,10 +2682,12 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     readBoolean(debug?.ask_entrypoint_required) ??
     readBoolean(payload.ask_entrypoint_required) ??
     promptRequiresBackendEntrypoint;
-  const askEntrypointObserved =
+  const explicitAskEntrypointObserved =
     readBoolean(agentLoop?.ask_entrypoint_observed) ??
     readBoolean(debug?.ask_entrypoint_observed) ??
-    readBoolean(payload.ask_entrypoint_observed) ??
+    readBoolean(payload.ask_entrypoint_observed);
+  const askEntrypointObserved =
+    explicitAskEntrypointObserved ??
     (askEntrypointRequired ? (isReplyScopedDebugProjection ? null : backendSolverArtifactPresent) : null);
   const askEntrypointFailureCode =
     readString(agentLoop?.ask_entrypoint_failure_code) ??
@@ -2786,21 +2788,24 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
         ? "prompt_submit_entrypoint"
         : null);
   const backendEntrypointProjectionBlocked =
-    askEntrypointRequired && askEntrypointObserved === false && !isReplyScopedDebugProjection;
+    askEntrypointRequired &&
+    askEntrypointObserved === false &&
+    (explicitAskEntrypointObserved === false || !isReplyScopedDebugProjection);
+  const backendEntrypointMissing = askEntrypointRequired && askEntrypointObserved === false;
   const effectiveTerminalErrorCode =
-    backendEntrypointProjectionBlocked
-        ? askEntrypointFailureCode
+    backendEntrypointMissing
+        ? askEntrypointFailureCode ?? "backend_ask_entry_required"
         : imageLensPromptLeakRecovered
           ? null
           : terminalErrorCode ?? askEntrypointFailureCode;
   const effectiveTerminalArtifactKind =
-    backendEntrypointProjectionBlocked
+    backendEntrypointMissing
       ? "typed_failure"
       : imageLensPromptLeakRecovered
         ? terminalArtifactKind ?? "agent_provider_terminal_candidate"
         : terminalArtifactKind ?? (effectiveTerminalErrorCode ? "typed_failure" : null);
   const effectiveFinalAnswerSource =
-    backendEntrypointProjectionBlocked
+    backendEntrypointMissing
       ? "typed_failure"
       : imageLensPromptLeakRecovered
         ? finalAnswerSource ?? "agent_provider_terminal_candidate"
@@ -2823,13 +2828,13 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
         terminalAuthorityText ??
         readString(terminalPresentation?.concise_text)
       : terminalIsTypedFailure
-      ? readString(payload.terminal_failure_text) ??
-        readString(typedFailure?.message) ??
-        (effectiveTerminalErrorCode === "backend_ask_entry_required"
+      ? (effectiveTerminalErrorCode === "backend_ask_entry_required"
           ? "This prompt requires the backend Ask solver path before a final answer can be shown."
           : effectiveTerminalErrorCode === "backend_debug_materialization"
             ? "Backend Ask was reached, but no server terminal artifact or debug artifact was materialized for this turn."
           : null) ??
+        readString(payload.terminal_failure_text) ??
+        readString(typedFailure?.message) ??
         terminalAuthorityText
       : readString(terminalPresentation?.concise_text) ??
         readString(payload.selected_final_answer) ??

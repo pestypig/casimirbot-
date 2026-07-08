@@ -112,6 +112,9 @@ export function HelixAskTurnStreamPanel({
   onRunJobReadyLink,
 }: HelixAskTurnStreamPanelProps) {
   if (rows.length === 0) return null;
+  const postulateEvidenceText = rows
+    .map((row) => [row.label, row.text, row.meta, ...(row.evidenceRefs ?? [])].filter(Boolean).join("\n"))
+    .join("\n\n");
   const capabilityLaneSummary = buildHelixAskConsoleCapabilityLaneSummary(
     rows
       .map((row) => {
@@ -489,6 +492,7 @@ export function HelixAskTurnStreamPanel({
                       readAloudAriaLabel={readAloudAriaLabel}
                       readAloudTitle={readAloudTitle}
                       postulateText={finalAnswerRawText}
+                      postulateEvidenceText={postulateEvidenceText}
                       postulateTestId="helix-ask-postulate"
                       postulateOriginatingSessionId={activeTurnId}
                       postulateOriginatingAnswerId={replyId}

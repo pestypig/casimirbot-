@@ -186,6 +186,7 @@ export async function submitPostulateProposal(input: {
   userComment?: string | null;
   originatingSessionId?: string | null;
   originatingAnswerId?: string | null;
+  evidenceContext?: PostulateEvidenceContext | null;
 }): Promise<{ proposal: EssenceProposal; receiptId: string }> {
   const res = await fetch("/api/proposals/postulate", {
     method: "POST",
@@ -201,6 +202,70 @@ export async function submitPostulateProposal(input: {
     throw new Error("postulate_submit_missing_payload");
   }
   return { proposal: payload.proposal, receiptId: payload.receiptId };
+}
+
+export type PostulateEvidenceContext = {
+  evidenceSidecarRefs?: string[];
+  promotedEquationRowRefs?: string[];
+  pageRenderRefs?: string[];
+  cropRefs?: string[];
+  graphReflectionRefs?: string[];
+  provenanceAuditRefs?: string[];
+  calculatorCheckRefs?: string[];
+  uncertaintyReductionRefs?: string[];
+};
+
+const uniqueRefMatches = (text: string, patterns: RegExp[]): string[] => {
+  const refs = new Set<string>();
+  for (const pattern of patterns) {
+    for (const match of text.matchAll(pattern)) {
+      const ref = String(match[1] ?? match[0] ?? "").replace(/[),.;`\]]+$/g, "").trim();
+      if (ref) refs.add(ref.slice(0, 240));
+    }
+  }
+  return Array.from(refs).slice(0, 24);
+};
+
+export function extractPostulateEvidenceContextFromText(text: string): PostulateEvidenceContext {
+  const source = typeof text === "string" ? text : "";
+  return {
+    evidenceSidecarRefs: uniqueRefMatches(source, [
+      /\b(scientific[_-]image[_-]sidecar[:#][a-z0-9_.:/-]+)/gi,
+      /\b(evidence[_-]sidecar[:#][a-z0-9_.:/-]+)/gi,
+      /\b(ask:[^\s`]+scientific_image_evidence_sidecar[^\s`]*)/gi,
+      /\bsidecar\s*:\s*`?([^`\n]*scientific_image_evidence_sidecar[^`\s]*)/gi,
+    ]),
+    promotedEquationRowRefs: uniqueRefMatches(source, [
+      /\b(promoted[_-]equation[_-]row[:#][a-z0-9_.:/-]+)/gi,
+      /\b(exact[_-]row[_-]promotion[:#][a-z0-9_.:/-]+)/gi,
+    ]),
+    pageRenderRefs: uniqueRefMatches(source, [
+      /\b(page[_-]render[:#][a-z0-9_.:/-]+)/gi,
+      /\b(pdf[_-]page[:#][a-z0-9_.:/-]+)/gi,
+      /\bimage\s+lens\s+source\s*:\s*`?(pdf-page-render:[a-z0-9_.:/-]+)/gi,
+    ]),
+    cropRefs: uniqueRefMatches(source, [
+      /\b(crop[:#][a-z0-9_.:/-]+)/gi,
+      /\b(equation[_-]crop[:#][a-z0-9_.:/-]+)/gi,
+      /\bcrop\s+ref\s*:\s*`?(sha256:[a-f0-9]+#crop=[0-9,]+)/gi,
+    ]),
+    graphReflectionRefs: uniqueRefMatches(source, [
+      /\b(graph[_-]reflection[:#][a-z0-9_.:/-]+)/gi,
+      /\b(theory[_-]context[_-]reflection[:#][a-z0-9_.:/-]+)/gi,
+    ]),
+    provenanceAuditRefs: uniqueRefMatches(source, [
+      /\b(provenance[_-]audit[:#][a-z0-9_.:/-]+)/gi,
+      /\b(audit[:#][a-z0-9_.:/-]+)/gi,
+    ]),
+    calculatorCheckRefs: uniqueRefMatches(source, [
+      /\b(calculator[_-]check[:#][a-z0-9_.:/-]+)/gi,
+      /\b(dimensional[_-]check[:#][a-z0-9_.:/-]+)/gi,
+    ]),
+    uncertaintyReductionRefs: uniqueRefMatches(source, [
+      /\b(uncertainty[_-]reduction[:#][a-z0-9_.:/-]+)/gi,
+      /\b(congruence[_-]delta[:#][a-z0-9_.:/-]+)/gi,
+    ]),
+  };
 }
 
 export type ClaimablePostulateReceipt = {
@@ -286,6 +351,42 @@ export function rememberClaimablePostulateReceipt(receipt: ClaimablePostulateRec
   const next = [receipt, ...current.filter((entry) => entry.proposalId !== receipt.proposalId)].slice(0, 20);
   window.localStorage.setItem(CLAIMABLE_POSTULATE_RECEIPTS_KEY, JSON.stringify(next));
   notifyClaimablePostulateReceiptsChanged(next);
+}
+
+const readProposalRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+
+export function ingestPostulateReviewReceiptsFromAskPayload(payload: unknown): void {
+  const seen = new Set<string>();
+  const visit = (value: unknown, depth = 0): void => {
+    if (depth > 8) return;
+    if (Array.isArray(value)) {
+      value.slice(0, 80).forEach((entry) => visit(entry, depth + 1));
+      return;
+    }
+    const record = readProposalRecord(value);
+    if (!record) return;
+    if (record.schema === "helix.ask.postulate_review_result.v1") {
+      const proposalRecord = readProposalRecord(record.proposal);
+      const receiptId =
+        typeof record.receiptId === "string"
+          ? record.receiptId
+          : typeof record.receipt_id === "string"
+            ? record.receipt_id
+            : undefined;
+      if (proposalRecord?.kind === "postulate") {
+        const proposal = proposalRecord as unknown as EssenceProposal;
+        notifyPostulateBoardChanged(proposal);
+        const claimableReceipt = buildClaimablePostulateReceipt(proposal, receiptId);
+        if (claimableReceipt?.status === "claim_pending" && !seen.has(claimableReceipt.proposalId)) {
+          seen.add(claimableReceipt.proposalId);
+          rememberClaimablePostulateReceipt(claimableReceipt);
+        }
+      }
+    }
+    Object.values(record).slice(0, 120).forEach((entry) => visit(entry, depth + 1));
+  };
+  visit(payload);
 }
 
 export function updateClaimablePostulateReceiptStatus(

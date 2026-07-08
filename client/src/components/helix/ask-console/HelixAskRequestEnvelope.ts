@@ -1,5 +1,6 @@
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
 import type { HelixLanguageModelProfileId } from "@shared/helix-language-model-policy";
+import type { HelixAskRouteMetadata } from "@/lib/helix/ask-prompt-launch";
 import type { HelixAskContextBridgeSnapshot } from "./HelixAskContextBridge";
 
 export type HelixAskConsoleRequestEnvelope = {
@@ -85,6 +86,11 @@ export function buildHelixAskConsoleBackendTurnPayloadCore(args: {
   question: string;
   contextFiles?: string[];
   docPath?: string | null;
+  workspaceContextSnapshot?: Record<string, unknown> | null;
+  routeMetadata?: HelixAskRouteMetadata | null;
+  bypassWorkstationDispatch?: boolean;
+  forceReasoningDispatch?: boolean;
+  suppressWorkstationPayloadActions?: boolean;
 }) {
   const activeDocPath =
     normalizeAskConsoleDocPath(args.docPath) ||
@@ -103,6 +109,35 @@ export function buildHelixAskConsoleBackendTurnPayloadCore(args: {
     turnId: args.turnId,
     maxTokens: args.maxTokens,
     question: args.question,
+    ...(args.workspaceContextSnapshot
+      ? {
+          workspace_context_snapshot: args.workspaceContextSnapshot,
+        }
+      : {}),
+    ...(args.routeMetadata
+      ? {
+          routeMetadata: args.routeMetadata,
+          route_metadata: args.routeMetadata,
+        }
+      : {}),
+    ...(args.bypassWorkstationDispatch === true
+      ? {
+          bypassWorkstationDispatch: true,
+          bypass_workstation_dispatch: true,
+        }
+      : {}),
+    ...(args.forceReasoningDispatch === true
+      ? {
+          forceReasoningDispatch: true,
+          force_reasoning_dispatch: true,
+        }
+      : {}),
+    ...(args.suppressWorkstationPayloadActions === true
+      ? {
+          suppressWorkstationPayloadActions: true,
+          suppress_workstation_payload_actions: true,
+        }
+      : {}),
     ...(activeDocPath
       ? {
           doc_path: activeDocPath,

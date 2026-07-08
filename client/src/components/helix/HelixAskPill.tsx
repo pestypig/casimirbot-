@@ -220,7 +220,7 @@ import {
 import { buildHelixAskSubmitAdmission } from "@/components/helix/ask-console/HelixAskSubmitAdmission";
 import { buildHelixAskRepliesFromChatSessionProjection } from "@/components/helix/ask-console/HelixAskChatProjection";
 import {
-  appendHelixAskConsoleReplyChronologically,
+  appendHelixAskReplyChronologicallyWithOrder,
   limitHelixAskConsoleRepliesChronologically,
   resolveHelixAskConsoleReplyCanonicalKey,
   resolveHelixAskConsoleReplyOrderMs,
@@ -413,8 +413,11 @@ import {
   buildHelixAskMathRenderDebugForText,
   hasHelixAskRenderableMath,
   isHelixAskEquationFamilyDebug,
+  isLikelyCodeStyleMathToken,
   shouldShowHelixAskCalculatorPanel,
+  splitHelixAskInlineCodeTextSegments,
   splitHelixAskTextPathSegments,
+  tokenizeHelixAskMathTokens,
 } from "@/lib/helix/ask-answer-rendering";
 export {
   buildHelixAskMathRenderDebugForText,
@@ -490,7 +493,10 @@ import {
   isWorkstationLifecycleEvent,
   readProceduralActionLabel,
 } from "@/lib/helix/ask-procedural-display";
-import { resolveExternalPromptClaimId } from "@/lib/helix/ask-external-prompt-claim";
+import {
+  claimExternalPromptSingleFlight,
+  resolveExternalPromptClaimId,
+} from "@/lib/helix/ask-external-prompt-claim";
 import {
   HELIX_WORKSTATION_PANEL_ALIASES,
   normalizeLexiconAlias,
@@ -718,21 +724,6 @@ import {
   shouldRetryVoicePlaybackWithDirectFallback,
   shouldTreatVoicePlaybackErrorAsEnded,
 } from "@/lib/helix/ask-voice-playback-classification";
-import {
-  HELIX_VOICE_FORCE_DIRECT_MOBILE,
-  isActivePlayback,
-  resolveVoicePlaybackAttemptPath,
-  resolveVoicePlaybackGain,
-  shouldBypassVoicePlaybackGraph,
-  shouldUseVoicePlaybackAudioGraph,
-} from "@/lib/helix/ask-voice-playback-runtime";
-export {
-  isActivePlayback,
-  resolveVoicePlaybackAttemptPath,
-  resolveVoicePlaybackGain,
-  shouldBypassVoicePlaybackGraph,
-  shouldUseVoicePlaybackAudioGraph,
-};
 import {
   parseTranscriptConfirmationVoiceCommand,
   type TranscriptConfirmationVoiceCommand,
@@ -1174,9 +1165,24 @@ import {
 } from "@/lib/helix/voice-call-diagnostics";
 import type { VoicePlaybackLifecycleDiagnostic } from "@/lib/helix/voice-playback-diagnostics";
 import {
+  HELIX_VOICE_FORCE_DIRECT_MOBILE,
   applyHelixAskVoicePlaybackTransportCommand,
+  isActivePlayback,
+  isLikelyMobileAudioUserAgent,
   playHelixAskVoiceAudioBlob,
+  resolveVoicePlaybackAttemptPath,
+  resolveVoicePlaybackGain,
+  shouldBypassVoicePlaybackGraph,
+  shouldUseVoicePlaybackAudioGraph,
 } from "@/components/helix/ask-console/HelixAskVoicePlaybackRuntime";
+export {
+  isActivePlayback,
+  isLikelyMobileAudioUserAgent,
+  resolveVoicePlaybackAttemptPath,
+  resolveVoicePlaybackGain,
+  shouldBypassVoicePlaybackGraph,
+  shouldUseVoicePlaybackAudioGraph,
+};
 import {
   advanceReasoningTheaterFrontierTracker,
   clampFrontierMeterPct,
@@ -1243,6 +1249,10 @@ import {
   buildReasoningBattleAmbientState,
   buildReasoningBattleBeats,
 } from "@/lib/helix/reasoning-battle-stage";
+import {
+  resolveReasoningTheaterExtrapolatedElapsedMs,
+  resolveReasoningTheaterMeterTargetForClock,
+} from "@/components/helix/ask-console/HelixAskReasoningTheaterClock";
 import {
   applyVoicePlaybackTimelineMetaUpdate,
   buildVoicePlaybackTimelineMeta,
@@ -1356,9 +1366,6 @@ const HELIX_VOICE_AUTO_DISPATCH_WINDOW_MS = 60_000;
 const HELIX_VOICE_TRANSCRIBE_PRESSURE_RETRY_DELAY_MS = 2_500;
 const HELIX_WORKSTATION_INTENT_CLASSIFIER_CONFIDENCE_MIN = 0.62;
 const HELIX_WORKSTATION_INTENT_CLASSIFIER_TIMEOUT_MS = 1800;
-const HELIX_EXTERNAL_PROMPT_CLAIM_TTL_MS = 120_000;
-const HELIX_EXTERNAL_PROMPT_CLAIMS_WINDOW_KEY = "__helixAskExternalPromptClaims";
-
 type WorkstationIntentClassificationOutcome =
   | "command_parse"
   | "classifier_match"
@@ -2010,22 +2017,6 @@ function resolveWorkstationRouterFailId(
     default:
       return null;
   }
-}
-
-function claimExternalPromptSingleFlight(claimId: string): boolean {
-  if (typeof window === "undefined") return true;
-  const host = window as Window & {
-    [HELIX_EXTERNAL_PROMPT_CLAIMS_WINDOW_KEY]?: Map<string, number>;
-  };
-  const claims = host[HELIX_EXTERNAL_PROMPT_CLAIMS_WINDOW_KEY] ?? new Map<string, number>();
-  host[HELIX_EXTERNAL_PROMPT_CLAIMS_WINDOW_KEY] = claims;
-  const now = Date.now();
-  for (const [key, ts] of claims.entries()) {
-    if (now - ts > HELIX_EXTERNAL_PROMPT_CLAIM_TTL_MS) claims.delete(key);
-  }
-  if (claims.has(claimId)) return false;
-  claims.set(claimId, now);
-  return true;
 }
 
 export type MicRuntimeState = "listening" | "transcribing" | "cooldown" | "error";
@@ -2702,6 +2693,7 @@ type AskLocalWithFallbackResult = {
 };
 
 type RunAskOptions = {
+  source?: "manual" | "voice_auto";
   bypassWorkstationDispatch?: boolean;
   forceReasoningDispatch?: boolean;
   suppressWorkstationPayloadActions?: boolean;
@@ -2841,7 +2833,8 @@ export function shouldAutoSpeakAnswerForTurn(args: {
   toolIntent?: VoiceAutoSpeakAnswerToolIntent | null;
   finalTimelineType?: "reasoning_final" | "action_receipt" | "workspace_terminal_summary" | string | null;
 }): boolean {
-  if (args.micArmState !== "on") return false;
+  const voiceOriginTurn = args.inputSource === "voice_auto";
+  if (args.micArmState !== "on" && !voiceOriginTurn) return false;
   if (args.userMuted) return false;
   if (args.toolIntent === "tool_only" || args.toolIntent === "explicit_voice_tool") return false;
   if (
@@ -2852,7 +2845,7 @@ export function shouldAutoSpeakAnswerForTurn(args: {
     return false;
   }
   if (args.answerAuthority !== "final" && args.answerAuthority !== "sealed_final") return false;
-  return args.inputSource === "voice_auto" || args.inputSource === "manual";
+  return voiceOriginTurn || args.inputSource === "manual";
 }
 
 export function shouldPreserveAuthoritativeTerminalOverEvidenceGate(args: {
@@ -3795,12 +3788,12 @@ function limitHelixAskRepliesChronologically(
   return limitHelixAskConsoleRepliesChronologically(replies, limit, resolveHelixAskReplyOrderMs);
 }
 
-export function appendHelixAskReplyChronologically(
+function appendHelixAskReplyChronologically(
   replies: HelixAskReply[],
   reply: HelixAskReply,
   limit = HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT,
 ): HelixAskReply[] {
-  return appendHelixAskConsoleReplyChronologically(replies, reply, limit, resolveHelixAskReplyOrderMs);
+  return appendHelixAskReplyChronologicallyWithOrder(replies, reply, limit, resolveHelixAskReplyOrderMs);
 }
 
 export function shouldRenderHelixAskActiveTurnStream(input: {
@@ -5571,9 +5564,16 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     trustedTerminalAuthoritySource ||
     coerceText(terminalResultForDebug?.final_answer_source).trim() ||
     (terminalErrorCode ? "typed_failure" : null);
-  const projectionBackendEntrypointRequired = requiresHelixAskBackendEntrypoint(
-    reply.question ?? coerceText(payload.selectedDebugQuestion).trim() ?? "",
-  );
+  const projectionBackendEntrypointRequired =
+    typeof agentLoop?.ask_entrypoint_required === "boolean"
+      ? agentLoop.ask_entrypoint_required
+      : typeof debug?.ask_entrypoint_required === "boolean"
+        ? debug.ask_entrypoint_required
+        : typeof payload.ask_entrypoint_required === "boolean"
+          ? payload.ask_entrypoint_required
+          : requiresHelixAskBackendEntrypoint(
+              reply.question ?? coerceText(payload.selectedDebugQuestion).trim() ?? "",
+            );
   const projectionDebugExportRebuildReason = coerceText(payload.debug_export_rebuild_reason).trim();
   const projectionDebugExportSource = coerceText(payload.debug_export_source).trim();
   const projectionIsReplyScopedDebug =
@@ -5596,34 +5596,41 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
       terminalAuthorityForDebug ??
       terminalResultForDebug,
   );
-  const projectionBackendEntrypointObserved =
+  const explicitProjectionBackendEntrypointObserved =
     typeof agentLoop?.ask_entrypoint_observed === "boolean"
       ? agentLoop.ask_entrypoint_observed
       : typeof debug?.ask_entrypoint_observed === "boolean"
         ? debug.ask_entrypoint_observed
         : typeof payload.ask_entrypoint_observed === "boolean"
           ? payload.ask_entrypoint_observed
-          : projectionBackendEntrypointRequired
-            ? projectionIsReplyScopedDebug
-              ? null
-              : projectionBackendEntrypointMaterialized
-            : null;
+          : null;
+  const projectionBackendEntrypointObserved =
+    explicitProjectionBackendEntrypointObserved ??
+    (projectionBackendEntrypointRequired
+      ? projectionIsReplyScopedDebug
+        ? null
+        : projectionBackendEntrypointMaterialized
+      : null);
   const projectionBackendEntrypointBlocked =
-    projectionBackendEntrypointRequired && projectionBackendEntrypointObserved === false && !projectionIsReplyScopedDebug;
+    projectionBackendEntrypointRequired &&
+    projectionBackendEntrypointObserved === false &&
+    (explicitProjectionBackendEntrypointObserved === false || !projectionIsReplyScopedDebug);
+  const projectionBackendEntrypointMissing =
+    projectionBackendEntrypointRequired && projectionBackendEntrypointObserved === false;
   const effectiveTerminalErrorCode =
-    projectionBackendEntrypointBlocked ? HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE : terminalErrorCode;
-  const effectiveTerminalArtifactKind = projectionBackendEntrypointBlocked ? "typed_failure" : terminalArtifactKind;
-  const effectiveFinalAnswerSource = projectionBackendEntrypointBlocked ? "typed_failure" : finalAnswerSource;
+    projectionBackendEntrypointMissing ? HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE : terminalErrorCode;
+  const effectiveTerminalArtifactKind = projectionBackendEntrypointMissing ? "typed_failure" : terminalArtifactKind;
+  const effectiveFinalAnswerSource = projectionBackendEntrypointMissing ? "typed_failure" : finalAnswerSource;
   const terminalIsTypedFailure =
     effectiveTerminalArtifactKind === "typed_failure" ||
     effectiveFinalAnswerSource === "typed_failure" ||
     Boolean(effectiveTerminalErrorCode);
   const typedFailureText =
-    coerceText(payload.terminal_failure_text).trim() ||
-    coerceText(typedFailure?.message).trim() ||
     (effectiveTerminalErrorCode === HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE
       ? HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT
       : null) ||
+    coerceText(payload.terminal_failure_text).trim() ||
+    coerceText(typedFailure?.message).trim() ||
     terminalAuthorityText ||
     renderTypedFailureFallback(effectiveTerminalErrorCode);
   const selectedFinalAnswerCandidateRaw =
@@ -9926,7 +9933,10 @@ export function HelixAskPill({
       const eventClock = reasoningTheaterEventClockRef.current;
       if (eventClock.anchorPerfMs !== null) {
         const elapsedSinceAnchorMs = Math.max(0, nowMs - eventClock.anchorPerfMs);
-        const eventTimelineElapsedMs = eventClock.baseElapsedMs + elapsedSinceAnchorMs;
+        const eventTimelineElapsedMs = resolveReasoningTheaterExtrapolatedElapsedMs({
+          baseElapsedMs: eventClock.baseElapsedMs,
+          elapsedSinceAnchorMs,
+        });
         const eventTimelineDelta = eventTimelineElapsedMs - reasoningTheaterClockElapsedMsRef.current;
         if (Number.isFinite(eventTimelineDelta)) {
           simulationDelta = clampNumber(eventTimelineDelta, 0, 240);
@@ -9936,8 +9946,13 @@ export function HelixAskPill({
       let stepped = false;
       while (reasoningTheaterClockAccumulatorMsRef.current >= REASONING_THEATER_CLOCK_STEP_MS) {
         reasoningTheaterClockAccumulatorMsRef.current -= REASONING_THEATER_CLOCK_STEP_MS;
-        const target = reasoningTheaterMeterTargetRef.current;
         const current = reasoningTheaterMeterDisplayRef.current;
+        const eventQuietMs =
+          eventClock.anchorPerfMs === null ? 0 : Math.max(0, nowMs - eventClock.anchorPerfMs);
+        const target = resolveReasoningTheaterMeterTargetForClock({
+          rawTargetPct: reasoningTheaterMeterTargetRef.current,
+          eventQuietMs,
+        });
         const delta = target - current;
         let next = current;
         if (Math.abs(delta) <= REASONING_THEATER_METER_EPSILON) {
@@ -16972,7 +16987,7 @@ export function HelixAskPill({
           "Voice turn delegated to the unified ask/turn lane.",
         );
         patchVoiceSegmentAttempt(input.segmentId, { dispatch: "queued" });
-        void runAskUnified(transcript);
+        void runAskUnified(transcript, undefined, { source: "voice_auto" });
         return;
       }
       if (!HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG) {
@@ -21453,6 +21468,8 @@ export function HelixAskPill({
     ) => {
       const trimmed = question.trim();
       if (!trimmed) return;
+      const runAskInputSource: ReasoningAttemptSource =
+        options?.source === "voice_auto" ? "voice_auto" : "manual";
       const visualEvidenceContextForTurn = buildHelixAskVisualEvidenceTurnInputContext(options?.visualEvidence);
       const visualEvidenceForTurn = visualEvidenceContextForTurn.visualEvidence;
       const visualCapabilityForTurn =
@@ -22095,7 +22112,8 @@ export function HelixAskPill({
       let backendAskCallPath: "runAskTurnStream" | "runAskTurn" | "askLocal" | null = null;
       let backendAskCallError: string | null = null;
       resetHelixAskConsoleStreamIngressDebug({ turnId: runAskTurnId, traceId, startedAtMs });
-      const voiceAutoSpeakArmedAtTurnStart = micArmStateRef.current === "on";
+      const voiceAutoSpeakArmedAtTurnStart =
+        runAskInputSource === "voice_auto" || micArmStateRef.current === "on";
       const manualAttempt = manualDispatchHint
         ? createReasoningAttempt({
             prompt: trimmed,
@@ -22463,12 +22481,20 @@ export function HelixAskPill({
                   sourceEventType === "terminal_answer" ||
                   sourceEventType === "final_answer" ||
                   coerceText(record.type).trim() === "final_answer";
+                if (isFinalAnswerEvent) {
+                  updateHelixAskConsoleStreamIngressDebug((current) => ({
+                    ...current,
+                    terminalTranscriptEventCount: current.terminalTranscriptEventCount + 1,
+                    lastTranscriptType: sourceEventType,
+                    lastUpdatedAtMs: Date.now(),
+                  }));
+                  return;
+                }
                 setAskStatus(isFinalAnswerEvent ? "Final answer ready." : tracedLiveEvent.text);
                 appendSyntheticLiveEvent(tracedLiveEvent);
                 updateHelixAskConsoleStreamIngressDebug((current) => ({
                   ...current,
                   acceptedLiveEventCount: current.acceptedLiveEventCount + 1,
-                  terminalTranscriptEventCount: current.terminalTranscriptEventCount + (isFinalAnswerEvent ? 1 : 0),
                   lastAcceptedEventId: tracedLiveEvent.id,
                   lastAcceptedText: clipText(tracedLiveEvent.text, 180),
                   lastUpdatedAtMs: Date.now(),
@@ -23179,6 +23205,7 @@ export function HelixAskPill({
               ? localResponseRecord.selected_final_answer.trim()
               : "";
           const responseIsModelSynthesizedFinalDraft =
+            !hardPromptProjectionBlocked &&
             coerceText(terminalResolutionForFinal.terminalArtifactKind).trim() === "model_synthesized_answer" &&
             (
               localResponseRecord.terminal_artifact_kind === "model_synthesized_answer" ||
@@ -23506,7 +23533,7 @@ export function HelixAskPill({
             !suppressVoiceForTerminalState &&
             shouldAutoSpeakAnswerForTurn({
               micArmState: voiceAutoSpeakArmedAtTurnStart ? "on" : "off",
-              inputSource: "manual",
+              inputSource: runAskInputSource,
               voiceMode: missionContextControls.voiceMode,
               userMuted: false,
               answerAuthority: "final",
@@ -23526,7 +23553,7 @@ export function HelixAskPill({
               traceId,
               eventId: directReplyIdForAutoSpeak,
               replyId: directReplyIdForAutoSpeak,
-              allowMicOffPlayback: true,
+              allowMicOffPlayback: runAskInputSource === "voice_auto",
               briefSource: "none",
               finalSource: "normal_reasoning",
             });
@@ -23535,6 +23562,34 @@ export function HelixAskPill({
             role: "assistant",
             content: responseText,
             traceId,
+            helixAsk: {
+              schema: "helix.ask.chat_backend_observation.v1",
+              backend_ask_call_attempted: backendAskCallAttempted,
+              backend_ask_entrypoint_observed: Boolean(
+                useBackendAskTurnEntrypoint &&
+                backendAskCallAttempted &&
+                !hardPromptProjectionBlocked
+              ),
+              use_backend_ask_turn_entrypoint: useBackendAskTurnEntrypoint,
+              backend_ask_call_path: backendAskCallPath,
+              backend_ask_call_error: backendAskCallError,
+              turn_id:
+                typeof localResponseForTerminal?.turn_id === "string" && localResponseForTerminal.turn_id.trim()
+                  ? localResponseForTerminal.turn_id
+                  : traceId,
+              final_answer_source:
+                typeof responseDebugResolvedFinalAnswerSource === "string"
+                  ? responseDebugResolvedFinalAnswerSource
+                  : null,
+              terminal_artifact_kind:
+                typeof responseDebugResolvedTerminalArtifactKind === "string"
+                  ? responseDebugResolvedTerminalArtifactKind
+                  : null,
+              terminal_error_code:
+                typeof responseDebugPayload?.terminal_error_code === "string"
+                  ? responseDebugPayload.terminal_error_code
+                  : null,
+            },
           });
           if (manualAttempt) {
             const detailMode =

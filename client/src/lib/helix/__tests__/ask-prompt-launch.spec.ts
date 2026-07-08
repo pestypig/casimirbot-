@@ -42,7 +42,30 @@ describe("helix ask prompt launch bridge", () => {
     expect(stored.blockId).toBe("nhm2.proof-guardrails");
     expect(stored.bypassWorkstationDispatch).toBe(false);
     expect(listener).toHaveBeenCalledTimes(1);
-    expect(navigateMock).toHaveBeenCalledWith("/desktop?desktop=1");
+    expect(navigateMock).toHaveBeenCalledWith("/desktop?panels=account-session&focus=account-session");
+  });
+
+  it("opens the Ask consumer panel for auto-submitted desktop prompts", () => {
+    window.history.replaceState({}, "", "/desktop?panels=image-lens%2Cpostulate-board&focus=image-lens");
+    const openPanelListener = vi.fn();
+    window.addEventListener("open-helix-panel", openPanelListener as EventListener);
+    try {
+      launchHelixAskPrompt({
+        question: "Frame a candidate postulate from the current promoted equation evidence.",
+        autoSubmit: true,
+      });
+    } finally {
+      window.removeEventListener("open-helix-panel", openPanelListener as EventListener);
+    }
+
+    expect(navigateMock).not.toHaveBeenCalled();
+    expect(openPanelListener).toHaveBeenCalledWith(expect.objectContaining({
+      detail: { id: "account-session" },
+    }));
+    expect(window.localStorage.getItem("helix:pending-panel")).toBe("account-session");
+    expect(consumePendingHelixAskPrompt()?.question).toBe(
+      "Frame a candidate postulate from the current promoted equation evidence.",
+    );
   });
 
   it("preserves structured route metadata for auto-submitted mailbox wakes", () => {

@@ -14,6 +14,18 @@ export type SubmitPostulateProposalInput = {
   submittedByAgentId?: string | null;
   ownerId?: string | null;
   accountType?: "developer" | "user" | null;
+  evidenceContext?: PostulateEvidenceContext | null;
+};
+
+export type PostulateEvidenceContext = {
+  evidenceSidecarRefs?: string[];
+  promotedEquationRowRefs?: string[];
+  pageRenderRefs?: string[];
+  cropRefs?: string[];
+  graphReflectionRefs?: string[];
+  provenanceAuditRefs?: string[];
+  calculatorCheckRefs?: string[];
+  uncertaintyReductionRefs?: string[];
 };
 
 export type PostulateProposalScore = {
@@ -24,11 +36,17 @@ export type PostulateProposalScore = {
   noveltyScore: number;
   traceabilityScore: number;
   safetyScore: number;
+  evidenceDepthScore: number;
+  calculatorCheckScore: number;
+  graphCongruenceScore: number;
+  uncertaintyReductionScore: number;
+  claimBoundaryScore: number;
   accepted: boolean;
   rewarded: boolean;
   deterministicReasons: string[];
   evidenceRefs: string[];
   badgeGraphLocatorRefs: string[];
+  evidenceContext: Required<PostulateEvidenceContext>;
 };
 
 const POSTULATE_ACCEPTANCE_THRESHOLD = 0.6;
@@ -105,6 +123,79 @@ const normalizeWhitespace = (value: string): string => value.replace(/\s+/g, " "
 const buildReceiptIntegrityHash = (payload: Record<string, unknown>): string =>
   crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
 
+const sanitizeRef = (value: unknown): string | null => {
+  if (typeof value !== "string") return null;
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) return null;
+  return normalized.slice(0, 240);
+};
+
+const uniqueRefs = (values: unknown): string[] => {
+  if (!Array.isArray(values)) return [];
+  return Array.from(new Set(values.map(sanitizeRef).filter((entry): entry is string => Boolean(entry)))).slice(0, 24);
+};
+
+export const normalizePostulateEvidenceContext = (
+  input?: PostulateEvidenceContext | null,
+): Required<PostulateEvidenceContext> => ({
+  evidenceSidecarRefs: uniqueRefs(input?.evidenceSidecarRefs),
+  promotedEquationRowRefs: uniqueRefs(input?.promotedEquationRowRefs),
+  pageRenderRefs: uniqueRefs(input?.pageRenderRefs),
+  cropRefs: uniqueRefs(input?.cropRefs),
+  graphReflectionRefs: uniqueRefs(input?.graphReflectionRefs),
+  provenanceAuditRefs: uniqueRefs(input?.provenanceAuditRefs),
+  calculatorCheckRefs: uniqueRefs(input?.calculatorCheckRefs),
+  uncertaintyReductionRefs: uniqueRefs(input?.uncertaintyReductionRefs),
+});
+
+const countEvidenceContextRefs = (context: Required<PostulateEvidenceContext>): number =>
+  Object.values(context).reduce((count, refs) => count + refs.length, 0);
+
+const collectPostulateRefs = (text: string, patterns: RegExp[]): string[] => {
+  const refs = new Set<string>();
+  for (const pattern of patterns) {
+    for (const match of text.matchAll(pattern)) {
+      const ref = String(match[1] ?? "").replace(/[),.;`]+$/g, "").trim();
+      if (ref) refs.add(ref.slice(0, 240));
+    }
+  }
+  return Array.from(refs).slice(0, 24);
+};
+
+export function extractPostulateEvidenceContextFromText(text: string): PostulateEvidenceContext {
+  const source = typeof text === "string" ? text : "";
+  return {
+    evidenceSidecarRefs: collectPostulateRefs(source, [
+      /\b((?:scientific_image_sidecar|evidence_sidecar):[a-z0-9_.:/-]+)/gi,
+      /\b(ask:[^\s`]+scientific_image_evidence_sidecar[^\s`]*)/gi,
+      /\bsidecar\s*:\s*`?([^`\n]*scientific_image_evidence_sidecar[^`\s]*)/gi,
+    ]),
+    promotedEquationRowRefs: collectPostulateRefs(source, [
+      /\b((?:promoted_equation_row|exact_row_promotion):[a-z0-9_.:/-]+)/gi,
+    ]),
+    pageRenderRefs: collectPostulateRefs(source, [
+      /\b((?:page_render|pdf_page):[a-z0-9_.:/-]+)/gi,
+      /\bimage\s+lens\s+source\s*:\s*`?(pdf-page-render:[a-z0-9_.:/-]+)/gi,
+    ]),
+    cropRefs: collectPostulateRefs(source, [
+      /\b((?:crop|equation_crop):[a-z0-9_.:/-]+)/gi,
+      /\bcrop\s+ref\s*:\s*`?(sha256:[a-f0-9]+#crop=[0-9,]+)/gi,
+    ]),
+    graphReflectionRefs: collectPostulateRefs(source, [
+      /\b((?:graph_reflection|theory_context_reflection):[a-z0-9_.:/-]+)/gi,
+    ]),
+    provenanceAuditRefs: collectPostulateRefs(source, [
+      /\b((?:provenance_audit|audit):[a-z0-9_.:/-]+)/gi,
+    ]),
+    calculatorCheckRefs: collectPostulateRefs(source, [
+      /\b((?:calculator_check|dimensional_check):[a-z0-9_.:/-]+)/gi,
+    ]),
+    uncertaintyReductionRefs: collectPostulateRefs(source, [
+      /\b((?:uncertainty_reduction|congruence_delta):[a-z0-9_.:/-]+)/gi,
+    ]),
+  };
+}
+
 const extractBadgeGraphLocatorRefs = (text: string): string[] => {
   const refs = new Set<string>();
   const patterns = [
@@ -123,10 +214,13 @@ const extractBadgeGraphLocatorRefs = (text: string): string[] => {
 export function scorePostulateProposal(input: {
   proposalText: string;
   userComment?: string | null;
+  evidenceContext?: PostulateEvidenceContext | null;
 }): PostulateProposalScore {
   const text = normalizeWhitespace([input.proposalText, input.userComment ?? ""].filter(Boolean).join(" "));
   const lower = text.toLowerCase();
   const wordCount = text ? text.split(/\s+/).length : 0;
+  const evidenceContext = normalizePostulateEvidenceContext(input.evidenceContext);
+  const structuredEvidenceRefCount = countEvidenceContextRefs(evidenceContext);
   const domain: PostulateDomain = containsAny(lower, PHYSICS_TERMS)
     ? "physics"
     : containsAny(lower, ["product", "panel", "ui", "account", "reward", "chat"])
@@ -142,18 +236,46 @@ export function scorePostulateProposal(input: {
   const constructiveHits = countMatches(lower, CONSTRUCTIVE_TERMS);
   const overclaimHits = countMatches(lower, OVERCLAIM_TERMS);
   const lengthScore = wordCount >= 40 ? 0.18 : wordCount >= 18 ? 0.1 : 0.02;
-  const traceabilityScore = clamp01(0.18 + badgeGraphLocatorRefs.length * 0.18 + evidenceHits * 0.08);
-  const congruenceScore = clamp01(0.22 + evidenceHits * 0.11 + (domain === "physics" ? 0.08 : 0.04) - overclaimHits * 0.08);
+  const evidenceDepthScore = clamp01(
+    (evidenceContext.evidenceSidecarRefs.length > 0 ? 0.25 : 0) +
+      (evidenceContext.promotedEquationRowRefs.length > 0 ? 0.25 : 0) +
+      (evidenceContext.pageRenderRefs.length > 0 ? 0.15 : 0) +
+      (evidenceContext.cropRefs.length > 0 ? 0.15 : 0) +
+      (evidenceContext.provenanceAuditRefs.length > 0 ? 0.2 : 0),
+  );
+  const calculatorCheckScore = clamp01(evidenceContext.calculatorCheckRefs.length * 0.85);
+  const graphCongruenceScore = clamp01(
+    (badgeGraphLocatorRefs.length > 0 ? 0.35 : 0) +
+      (evidenceContext.graphReflectionRefs.length > 0 ? 0.65 : 0),
+  );
+  const uncertaintyReductionScore = clamp01(evidenceContext.uncertaintyReductionRefs.length * 0.85);
+  const claimBoundaryScore = clamp01(0.72 - overclaimHits * 0.14 + (lower.includes("candidate") || lower.includes("review") ? 0.16 : 0));
+  const traceabilityScore = clamp01(0.18 + badgeGraphLocatorRefs.length * 0.18 + evidenceHits * 0.08 + evidenceDepthScore * 0.32);
+  const congruenceScore = clamp01(
+    0.22 +
+      evidenceHits * 0.08 +
+      (domain === "physics" ? 0.08 : 0.04) +
+      graphCongruenceScore * 0.24 +
+      calculatorCheckScore * 0.12 +
+      uncertaintyReductionScore * 0.12 -
+      overclaimHits * 0.08,
+  );
   const constructivenessScore = clamp01(0.24 + constructiveHits * 0.1 + badgeGraphLocatorRefs.length * 0.08 + lengthScore);
   const noveltyScore = clamp01(0.18 + Math.min(wordCount, 120) / 300 + (lower.includes("unresolved") ? 0.1 : 0));
-  const safetyScore = clamp01(0.86 - overclaimHits * 0.12 + (lower.includes("candidate") || lower.includes("review") ? 0.08 : 0));
-  const reviewScore = clamp01(
-    congruenceScore * 0.3 +
-      constructivenessScore * 0.3 +
-      noveltyScore * 0.15 +
-      traceabilityScore * 0.15 +
-      safetyScore * 0.1,
+  const safetyScore = clamp01(0.78 - overclaimHits * 0.12 + claimBoundaryScore * 0.16);
+  const rawReviewScore = clamp01(
+    congruenceScore * 0.22 +
+      constructivenessScore * 0.18 +
+      noveltyScore * 0.1 +
+      traceabilityScore * 0.14 +
+      safetyScore * 0.08 +
+      evidenceDepthScore * 0.12 +
+      calculatorCheckScore * 0.06 +
+      graphCongruenceScore * 0.05 +
+      uncertaintyReductionScore * 0.03 +
+      claimBoundaryScore * 0.02,
   );
+  const reviewScore = structuredEvidenceRefCount > 0 ? rawReviewScore : Math.min(rawReviewScore, 0.89);
   const accepted = reviewScore >= POSTULATE_ACCEPTANCE_THRESHOLD;
   const rewarded = reviewScore >= POSTULATE_REWARD_THRESHOLD;
   const deterministicReasons = [
@@ -162,6 +284,11 @@ export function scorePostulateProposal(input: {
     `evidence_terms:${evidenceHits}`,
     `constructive_terms:${constructiveHits}`,
     `locator_refs:${badgeGraphLocatorRefs.length}`,
+    `structured_evidence_refs:${structuredEvidenceRefCount}`,
+    `evidence_depth:${Math.round(evidenceDepthScore * 100)}%`,
+    `calculator_check:${Math.round(calculatorCheckScore * 100)}%`,
+    `graph_congruence:${Math.round(graphCongruenceScore * 100)}%`,
+    `uncertainty_reduction:${Math.round(uncertaintyReductionScore * 100)}%`,
     `overclaim_terms:${overclaimHits}`,
     accepted ? "accepted_for_structured_review" : "below_constructive_review_threshold",
     rewarded ? "reward_threshold_met" : "reward_threshold_not_met",
@@ -169,6 +296,7 @@ export function scorePostulateProposal(input: {
   const evidenceRefs = [
     evidenceHits > 0 ? "postulate:evidence-term-match" : null,
     badgeGraphLocatorRefs.length > 0 ? "postulate:badge-graph-locator-match" : null,
+    structuredEvidenceRefCount > 0 ? "postulate:structured-evidence-context" : null,
     domain === "physics" ? "postulate:physics-domain-triage" : null,
   ].filter((entry): entry is string => Boolean(entry));
 
@@ -180,11 +308,17 @@ export function scorePostulateProposal(input: {
     noveltyScore,
     traceabilityScore,
     safetyScore,
+    evidenceDepthScore,
+    calculatorCheckScore,
+    graphCongruenceScore,
+    uncertaintyReductionScore,
+    claimBoundaryScore,
     accepted,
     rewarded,
     deterministicReasons,
     evidenceRefs,
     badgeGraphLocatorRefs,
+    evidenceContext,
   };
 }
 
@@ -228,6 +362,7 @@ export async function submitPostulateProposal(input: SubmitPostulateProposalInpu
     accountType: input.accountType ?? "user",
     domain: score.domain,
     reviewScore: score.reviewScore,
+    evidenceContext: score.evidenceContext,
     status,
     rewardTokens: score.rewarded ? POSTULATE_REWARD_TOKENS : 0,
     createdAt: nowIso,
@@ -288,7 +423,13 @@ export async function submitPostulateProposal(input: SubmitPostulateProposalInpu
         noveltyScore: score.noveltyScore,
         traceabilityScore: score.traceabilityScore,
         safetyScore: score.safetyScore,
+        evidenceDepthScore: score.evidenceDepthScore,
+        calculatorCheckScore: score.calculatorCheckScore,
+        graphCongruenceScore: score.graphCongruenceScore,
+        uncertaintyReductionScore: score.uncertaintyReductionScore,
+        claimBoundaryScore: score.claimBoundaryScore,
         evidenceRefs: score.evidenceRefs,
+        evidenceContext: score.evidenceContext,
         badgeGraphLocatorRefs: score.badgeGraphLocatorRefs,
         graphIntegration: score.domain === "physics" && score.accepted
           ? "queued_for_developer_patch_review"

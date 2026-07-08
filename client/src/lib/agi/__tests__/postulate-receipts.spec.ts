@@ -5,7 +5,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EssenceProposal } from "@shared/proposals";
 import {
   CLAIMABLE_POSTULATE_RECEIPTS_EVENT,
+  POSTULATE_BOARD_EVENT,
   buildClaimablePostulateReceipt,
+  extractPostulateEvidenceContextFromText,
+  ingestPostulateReviewReceiptsFromAskPayload,
   readClaimablePostulateReceipts,
   rememberClaimablePostulateReceipt,
   updateClaimablePostulateReceiptStatus,
@@ -115,5 +118,68 @@ describe("postulate claimable receipt helpers", () => {
     }));
 
     expect(receipt).toBeNull();
+  });
+
+  it("extracts structured evidence refs from final-answer text", () => {
+    const context = extractPostulateEvidenceContextFromText([
+      "scientific_image_sidecar:paper-page-2",
+      "promoted_equation_row:eq-2.1",
+      "page_render:paper:2",
+      "equation_crop:eq-2.1-row",
+      "graph_reflection:theory-badge-graph:/warp/qei/residual",
+      "provenance_audit:paper-page-2",
+      "calculator_check:dimensional:eq-2.1",
+      "uncertainty_reduction:qei-residual",
+    ].join(" "));
+
+    expect(context).toMatchObject({
+      evidenceSidecarRefs: ["scientific_image_sidecar:paper-page-2"],
+      promotedEquationRowRefs: ["promoted_equation_row:eq-2.1"],
+      pageRenderRefs: ["page_render:paper:2"],
+      cropRefs: ["equation_crop:eq-2.1-row"],
+      graphReflectionRefs: ["graph_reflection:theory-badge-graph:/warp/qei/residual"],
+      provenanceAuditRefs: ["provenance_audit:paper-page-2"],
+      calculatorCheckRefs: ["calculator_check:dimensional:eq-2.1"],
+      uncertaintyReductionRefs: ["uncertainty_reduction:qei-residual"],
+    });
+  });
+
+  it("ingests Ask postulate review terminal results outside the deprecated pill", () => {
+    const boardListener = vi.fn();
+    const receiptListener = vi.fn();
+    window.addEventListener(POSTULATE_BOARD_EVENT, boardListener);
+    window.addEventListener(CLAIMABLE_POSTULATE_RECEIPTS_EVENT, receiptListener);
+
+    ingestPostulateReviewReceiptsFromAskPayload({
+      terminal_result: {
+        schema: "helix.ask.postulate_review_result.v1",
+        receiptId: "receipt-ask-1",
+        proposal: makePostulateProposal({
+          id: "postulate-ask-1",
+          metadata: {
+            postulate: {
+              receiptId: "receipt-ask-1",
+              receiptIssuedAt: "2026-07-07T04:30:00.000Z",
+              receiptIntegrityHash: "ask-hash",
+              rewardCreditStatus: "claim_pending",
+              receiptClaimStatus: "unclaimed",
+            },
+          },
+        }),
+      },
+    });
+
+    expect(readClaimablePostulateReceipts()).toEqual([
+      expect.objectContaining({
+        proposalId: "postulate-ask-1",
+        receiptId: "receipt-ask-1",
+        status: "claim_pending",
+      }),
+    ]);
+    expect(boardListener).toHaveBeenCalledTimes(1);
+    expect(receiptListener).toHaveBeenCalledTimes(1);
+
+    window.removeEventListener(POSTULATE_BOARD_EVENT, boardListener);
+    window.removeEventListener(CLAIMABLE_POSTULATE_RECEIPTS_EVENT, receiptListener);
   });
 });

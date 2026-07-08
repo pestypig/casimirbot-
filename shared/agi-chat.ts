@@ -13,6 +13,7 @@ export const chatMessageSchema = z.object({
   traceId: z.string().optional(),
   tool: z.string().optional(),
   whyBelongs: whyBelongsSchema.optional(),
+  helixAsk: z.record(z.unknown()).optional(),
 });
 export type ChatMessage = z.infer<typeof chatMessageSchema>;
 

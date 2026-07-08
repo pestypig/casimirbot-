@@ -3,6 +3,7 @@ import {
   buildWorkstationLayoutDebugSnapshotFromState,
   type AskTurnWorkspaceContextSnapshotInput,
 } from "@/lib/helix/ask-workspace-context-snapshot";
+import { attachHelixAskActiveImageLensSourceContext } from "./HelixAskImageLensContextBridge";
 
 export function buildHelixAskWorkstationLayoutDebugSnapshotBinding(
   layoutState: Parameters<typeof buildWorkstationLayoutDebugSnapshotFromState>[0],
@@ -13,5 +14,7 @@ export function buildHelixAskWorkstationLayoutDebugSnapshotBinding(
 export function buildHelixAskWorkspaceContextSnapshotBinding(
   input: AskTurnWorkspaceContextSnapshotInput,
 ): Record<string, unknown> {
-  return buildAskTurnWorkspaceContextSnapshotFromState(input);
+  return attachHelixAskActiveImageLensSourceContext(
+    buildAskTurnWorkspaceContextSnapshotFromState(input),
+  );
 }

@@ -16,6 +16,97 @@ observational lanes for measured or simulated systems, theoretical lanes for
 first-principles and derived math, and workstation tools that let the agent use
 those lanes without treating any receipt as a final answer by itself.
 
+## Research Paper Evidence Workflow
+
+Helix Ask paper work should move through a staged evidence ladder. The goal is
+to let the agent keep searching and escalating only while the user's request
+still needs deeper evidence, without turning metadata, OCR, or tool receipts
+into scientific authority too early.
+
+```text
+paper lookup
+  -> PDF/page render
+  -> page OCR/math candidate
+  -> exact row promotion
+  -> graph reflection
+  -> provenance audit
+```
+
+Each stage has a different authority boundary:
+
+- `paper lookup`: find bounded scholarly records, identifiers, provider
+  limits, and accessible PDF/full-text affordances.
+- `PDF/page render`: materialize a specific page image into Image Lens with
+  page number, source id, source hash, and reloadable PDF/page provenance when
+  available.
+- `page OCR/math candidate`: inspect the rendered page for text, equations, or
+  symbolic math candidates. A page with no equation candidate should not trigger
+  exact-row promotion from arbitrary fragments.
+- `exact row promotion`: crop and promote only a clean equation row. If the
+  current page has no equation candidate, the agent may use the retained PDF
+  page navigation metadata to scan a bounded number of adjacent pages before
+  stopping.
+- `graph reflection`: reflect promoted scientific image evidence to the Theory
+  Badge Graph as diagnostic context unless stronger authority is explicitly
+  supported by the evidence packet and branch gates.
+- `provenance audit`: answer follow-ups from the latest scientific Image Lens
+  sidecar first, naming the paper/page/equation/crop/evidence depth, and fall
+  back to scholarly lookup memory only when no page-image/scientific evidence
+  chain exists.
+
+Useful test prompt sequence:
+
+```text
+Search scholarly research papers for a PDF-accessible paper about Weyl geometry
+or Casimir scalar fields. Choose one accessible PDF, render page 1 into Image
+Lens, and report only whether page evidence was created.
+
+Now inspect page 2 of that same paper and extract the first displayed equation
+with page evidence.
+
+Use the page 2 equation you just found. Crop only the exact equation row and
+promote it only if the row crop supports exact equation admissibility.
+
+Reflect the promoted exact equation row to the Theory Badge Graph. Keep the
+boundary diagnostic-only unless the evidence supports stronger authority.
+
+Tell me which paper, page, equation, crop ref, and evidence depth you are using
+from the prior steps.
+```
+
+Local deterministic tests cover the server-side workbench path, but keyed live
+validation should use the operator-owned Helix Ask server. Do not start a new
+unkeyed server for this check. With the normal keyed server already running:
+
+```bash
+npm run helix:ask:scholarly-pdf-workbench
+```
+
+The probe sends the workflow through `/api/agi/ask/turn`, fetches debug exports,
+and checks that each turn exposes:
+
+- `scholarly_pdf_workbench_state`
+- debug-export workbench state, not only the immediate Ask response
+- page inventory and non-terminal page-scout state
+- selected workbench affordance
+- advertised workbench affordance menu for the requested next action
+- paper/PDF/page/Image Lens evidence chain
+- expected evidence-chain fields for paper, PDF, page, OCR/math, promoted
+  equation, scientific packet, and graph reflection refs
+- Image Lens source continuity for rendered PDF pages
+- claim-boundary metadata
+- terminal-authority reason
+- absence of the old `terminal_authority_missing` collapse
+- graph-reflection or exact-row continuity when requested
+
+Use `npm run helix:ask:scholarly-pdf-workbench -- --dry-run` to print the prompt
+sequence without contacting a server. Without an explicit `--base-url`, the
+probe tries both `http://127.0.0.1:5050` and `http://localhost:5050` before
+reporting the keyed server as unreachable. On a reachable server, failed runs
+include `failed_steps` with per-step contract checks such as missing debug
+workbench state, missing Image Lens source continuity, incomplete evidence
+chain shape, or stale `terminal_authority_missing` collapse.
+
 ## What To Look At First
 
 | Area | Why it matters | Entry points |

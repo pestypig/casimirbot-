@@ -9,6 +9,7 @@ import {
   applyGatewayFailureAuthorityGuard,
   codexProvider,
   readCodexArgs,
+  resetScholarlyPdfWorkbenchVolatileMemoryForTest,
   resolveCodexBinary,
   runCodexProcess,
   runExplicitCodexWorkstationGatewayCalls,
@@ -1991,6 +1992,7 @@ describe("Helix Ask agent provider selection", () => {
   });
 
   it("escalates current-turn scholarly PDF affordances into Image Lens when asked to show the science", async () => {
+    resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true });
     process.env.CODEX_AGENT_FAKE_STDOUT =
       "I found an accessible PDF, rendered pages 1-3, extracted the main equation candidates, and created a scientific evidence packet.";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
@@ -2002,6 +2004,17 @@ describe("Helix Ask agent provider selection", () => {
         latex_candidate: "F = -\\frac{\\pi^2 \\hbar c A}{240 a^4}",
         extraction_status: "extracted",
         uncertainty: ["fixture OCR for current-turn scholarly PDF page"],
+      }, {
+        region_label: "scholarly_pdf_page_1_visual_pass",
+        text_candidate: "The rendered PDF page evidence was created.",
+        extraction_status: "extracted",
+        uncertainty: ["fixture OCR for explicit arXiv page render"],
+      }, {
+        region_label: "scholarly_pdf_page_2_equation_pass",
+        text_candidate: "The next page contains the displayed equation candidate.",
+        latex_candidate: "R_{\\mu\\nu} - \\frac{1}{2}Rg_{\\mu\\nu}=0",
+        extraction_status: "extracted",
+        uncertainty: ["fixture OCR for same-paper next-page equation search"],
       }],
     });
     const scannedPdfBase64 = [
@@ -2079,7 +2092,413 @@ describe("Helix Ask agent provider selection", () => {
       ]),
       scientific_evidence_packet_ref: expect.stringContaining("scientific_image_sidecar"),
     });
-  });
+
+    const explicitRenderResult = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:explicit-arxiv-page-render",
+        thread_id: "thread:test:explicit-arxiv-page-render",
+        agent_runtime: "codex",
+        question: "Use arXiv paper 1106.5543. Render page 1 into Image Lens and report only whether page evidence was created.",
+      },
+      headers: {},
+    });
+
+    expect(explicitRenderResult.ok).toBe(true);
+    expect((explicitRenderResult.debug as any)?.runtime_lane_request_loop).toMatchObject({
+      status: "lane_observation_reentered",
+      synthesized_by_helix_policy: true,
+      synthesis_reason: "current_turn_scholarly_pdf_page_affordance_requires_image_lens_parse",
+      candidate: {
+        source_kind: "pdf_page_render",
+        scholarly_evidence_source: "current",
+        page_number: 1,
+        page_image_ref: expect.stringMatching(/^data:image\/png;base64,/),
+      },
+    });
+    expect((explicitRenderResult.debug as any)?.scholarly_pdf_workbench_state).toMatchObject({
+      schema: "helix.scholarly_pdf_workbench_state.v1",
+      active: true,
+      status: {
+        has_pdf: true,
+        has_page_image: true,
+      },
+      pdf: {
+        current_page: 1,
+      },
+      page_scout: {
+        schema: "helix.scholarly_pdf_page_scout.v1",
+        inspected_pages: expect.arrayContaining([1]),
+      },
+      page_inventory: expect.arrayContaining([
+        expect.objectContaining({
+          page_number: 1,
+          ocr_status: "extracted",
+        }),
+      ]),
+    });
+    expect((explicitRenderResult.debug as any)?.scholarly_pdf_workbench_state?.affordances)
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          action: "find_first_displayed_equation",
+          suggested_page_numbers: expect.any(Array),
+        }),
+        expect.objectContaining({ action: "audit_provenance" }),
+      ]));
+    expect((explicitRenderResult.debug as any)?.scholarly_response_mode_selection?.selected_response_mode)
+      .not.toBe("scholarly_evidence_escalation_missing");
+
+    const nextPageResult = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:explicit-arxiv-next-page-equation",
+        thread_id: "thread:test:explicit-arxiv-page-render",
+        agent_runtime: "codex",
+        question: "Now inspect the next pages of that same paper and find the first displayed equation candidate. Report the page number and candidate only; do not promote it yet.",
+      },
+      headers: {},
+    });
+
+    expect(nextPageResult.ok).toBe(true);
+    expect((nextPageResult.debug as any)?.runtime_lane_request_loop).toMatchObject({
+      status: "lane_observation_reentered",
+      synthesized_by_helix_policy: true,
+      candidate: {
+        source_kind: "pdf_page_render",
+        scholarly_evidence_source: "prior",
+        page_number: 2,
+        page_image_ref: expect.stringMatching(/^(data:image\/png;base64,|artifact:\/\/scholarly-pdf\/)/),
+      },
+    });
+    expect((nextPageResult.debug as any)?.scholarly_pdf_workbench_state).toMatchObject({
+      schema: "helix.scholarly_pdf_workbench_state.v1",
+      page_inventory: expect.arrayContaining([
+        expect.objectContaining({
+          page_number: 2,
+          equation_candidate_count: expect.any(Number),
+        }),
+      ]),
+      page_scout: {
+        inspected_pages: expect.arrayContaining([2]),
+        equation_candidate_pages: expect.arrayContaining([2]),
+      },
+      status: {
+        has_equation_candidate: true,
+      },
+    });
+    expect((nextPageResult.debug as any)?.scholarly_response_mode_selection?.selected_response_mode)
+      .not.toBe("scholarly_recovery_plan");
+    expect((nextPageResult.debug as any)?.scholarly_response_mode_selection?.selected_response_mode)
+      .not.toBe("scholarly_numeric_missing");
+    expect(nextPageResult.text).not.toContain("measured/numeric values");
+
+    process.env.CODEX_AGENT_FAKE_STDOUT =
+      'HELIX_CAPABILITY_LANE_REQUEST_JSON: {"capability":"scholarly-research.lookup_papers","query":"continue scanning the same paper displayed equation row","assistant_answer":false,"terminal_eligible":false}';
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify({
+      entries: [{
+        region_label: "scholarly_pdf_page_2_equation_pass",
+        text_candidate: "The continued same-paper scan used retained PDF page evidence instead of a fresh scholarly lookup.",
+        latex_candidate: "R_{\\mu\\nu} - \\frac{1}{2}Rg_{\\mu\\nu}=0",
+        extraction_status: "extracted",
+        uncertainty: ["fixture OCR for same-paper continuation lookup override"],
+      }],
+    });
+
+    const continueScanResult = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:explicit-arxiv-continue-page-equation",
+        thread_id: "thread:test:explicit-arxiv-page-render",
+        agent_runtime: "codex",
+        question: "Continue scanning the next pages of the same paper until you find a displayed equation row. Report the page number and the candidate only; do not promote it.",
+      },
+      headers: {},
+    });
+
+    expect(continueScanResult.ok).toBe(true);
+    expect((continueScanResult.debug as any)?.runtime_lane_request_loop).toMatchObject({
+      status: "lane_observation_reentered",
+      synthesized_by_helix_policy: true,
+      candidate: {
+        capability: "visual_analysis.inspect_image_region",
+        source_kind: "pdf_page_render",
+        scholarly_evidence_source: "prior",
+      },
+    });
+    expect((continueScanResult.debug as any)?.runtime_lane_request_loop?.candidate?.capability)
+      .not.toBe("scholarly-research.lookup_papers");
+    expect((continueScanResult.debug as any)?.scholarly_pdf_workbench_state).toMatchObject({
+      schema: "helix.scholarly_pdf_workbench_state.v1",
+      status: {
+        has_pdf: true,
+        has_page_image: true,
+      },
+    });
+    expect(continueScanResult.text).not.toContain("terminal_authority_missing");
+
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        "The first page needs PDF page evidence before I can decide.",
+        'HELIX_CAPABILITY_LANE_REQUEST_JSON: {"capability":"visual_analysis.inspect_image_region","bbox_px":{"x":0,"y":0,"width":1224,"height":1584},"page_number":2,"question":"Inspect page 2 of the same PDF for a displayed equation candidate.","region_label":"scholarly_pdf_page_2_equation_pass","reason_for_crop":"The scholarly PDF workbench indicates the agent should continue scanning the same paper.","assistant_answer":false,"terminal_eligible":false}',
+        "Page 2 has the first displayed equation candidate: R_{\\mu\\nu} - \\frac{1}{2}Rg_{\\mu\\nu}=0.",
+      ],
+    });
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify({
+      entries: [{
+        region_label: "scholarly_pdf_page_1_visual_pass",
+        text_candidate: "The rendered PDF page evidence was created.",
+        extraction_status: "extracted",
+        uncertainty: ["fixture OCR for chained page 1 render"],
+      }, {
+        region_label: "scholarly_pdf_page_2_equation_pass",
+        text_candidate: "The chained second page contains the displayed equation candidate.",
+        latex_candidate: "R_{\\mu\\nu} - \\frac{1}{2}Rg_{\\mu\\nu}=0",
+        extraction_status: "extracted",
+        uncertainty: ["fixture OCR for agent-decided second page scan"],
+      }],
+    });
+
+    const chainedPageScanResult = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:explicit-arxiv-agent-driven-page-chain",
+        thread_id: "thread:test:explicit-arxiv-agent-driven-page-chain",
+        agent_runtime: "codex",
+        question: "Use arXiv paper 1106.5543. Show me the first displayed equation in the paper. Let the PDF workbench decide whether to continue past page 1.",
+      },
+      headers: {},
+    });
+
+    expect(chainedPageScanResult.ok).toBe(true);
+    expect((chainedPageScanResult.debug as any)?.scholarly_pdf_workbench_state).toMatchObject({
+      schema: "helix.scholarly_pdf_workbench_state.v1",
+      selected_affordance: "find_first_displayed_equation",
+      selected_affordance_reason: expect.any(String),
+      terminal_authority: {
+        schema: "helix.scholarly_pdf_workbench_terminal_authority.v1",
+        terminal_authority_reason: expect.any(String),
+      },
+      page_inventory: expect.arrayContaining([
+        expect.objectContaining({ page_number: 1 }),
+        expect.objectContaining({
+          page_number: 2,
+          equation_candidate_count: expect.any(Number),
+        }),
+      ]),
+      status: {
+        has_equation_candidate: true,
+      },
+    });
+    expect((chainedPageScanResult.debug as any)?.scholarly_pdf_workbench_state?.evidence_chain).toMatchObject({
+      ocr_math_packet_refs: expect.arrayContaining([
+        expect.stringContaining("#crop="),
+      ]),
+    });
+    expect(chainedPageScanResult.text).toContain("Page 2 has the first displayed equation candidate");
+    expect(chainedPageScanResult.text).toContain("R_{\\mu\\nu}");
+
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        "Page 1 needs PDF page evidence before I can decide.",
+        'HELIX_CAPABILITY_LANE_REQUEST_JSON: {"capability":"visual_analysis.inspect_image_region","bbox_px":{"x":0,"y":0,"width":1224,"height":1584},"page_number":2,"question":"Inspect page 2 of the same PDF for a displayed equation candidate.","region_label":"scholarly_pdf_page_2_visual_pass","reason_for_crop":"The scholarly PDF workbench indicates the agent should continue scanning the same paper.","assistant_answer":false,"terminal_eligible":false}',
+        'HELIX_CAPABILITY_LANE_REQUEST_JSON: {"capability":"visual_analysis.inspect_image_region","bbox_px":{"x":0,"y":0,"width":1224,"height":1584},"page_number":3,"question":"Inspect page 3 of the same PDF for a displayed equation candidate.","region_label":"scholarly_pdf_page_3_equation_pass","reason_for_crop":"Page 2 did not satisfy the displayed-equation goal, so continue the same PDF scan.","assistant_answer":false,"terminal_eligible":false}',
+        "Page 3 has the first displayed equation candidate: \\nabla_\\alpha g_{\\mu\\nu}=\\sigma_\\alpha g_{\\mu\\nu}.",
+      ],
+    });
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify({
+      entries: [{
+        region_label: "scholarly_pdf_page_1_visual_pass",
+        text_candidate: "Page 1 title and abstract prose only.",
+        extraction_status: "extracted",
+        uncertainty: ["fixture OCR for multi-step page 1 render"],
+      }, {
+        region_label: "scholarly_pdf_page_2_visual_pass",
+        text_candidate: "Page 2 introduction prose with no displayed equation candidate.",
+        extraction_status: "extracted",
+        uncertainty: ["fixture OCR for multi-step page 2 render"],
+      }, {
+        region_label: "scholarly_pdf_page_3_equation_pass",
+        text_candidate: "The third page contains the displayed equation candidate.",
+        latex_candidate: "\\nabla_\\alpha g_{\\mu\\nu}=\\sigma_\\alpha g_{\\mu\\nu}",
+        extraction_status: "extracted",
+        uncertainty: ["fixture OCR for agent-decided third page scan"],
+      }],
+    });
+
+    const multiStepPageScanResult = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:explicit-arxiv-agent-driven-multi-page-chain",
+        thread_id: "thread:test:explicit-arxiv-agent-driven-multi-page-chain",
+        agent_runtime: "codex",
+        question: "Use arXiv paper 1106.5543. Show me the first displayed equation in the paper. Let the PDF workbench keep scanning pages until it has enough page evidence.",
+      },
+      headers: {},
+    });
+
+    expect(multiStepPageScanResult.ok).toBe(true);
+    expect((multiStepPageScanResult.debug as any)?.runtime_lane_request_loop).toMatchObject({
+      status: "lane_observation_reentered",
+      chain_step_count: 3,
+      scholarly_pdf_agent_exploration: {
+        schema: "helix.scholarly_pdf_agent_exploration.v1",
+        max_steps: expect.any(Number),
+        step_count: 3,
+        stop_reason: "agent_final_answer_or_no_next_lane_request",
+      },
+      candidate_chain: expect.arrayContaining([
+        expect.objectContaining({
+          capability: "visual_analysis.inspect_image_region",
+          page_number: 1,
+        }),
+        expect.objectContaining({
+          capability: "visual_analysis.inspect_image_region",
+          page_number: 2,
+        }),
+        expect.objectContaining({
+          capability: "visual_analysis.inspect_image_region",
+          page_number: 3,
+        }),
+      ]),
+    });
+    expect((multiStepPageScanResult.debug as any)?.scholarly_pdf_workbench_state).toMatchObject({
+      schema: "helix.scholarly_pdf_workbench_state.v1",
+      selected_affordance: "scan_next_pages",
+      selected_affordance_reason: expect.any(String),
+      pdf: {
+        current_page: 3,
+        page_count: 3,
+        image_lens_source: {
+          page_number: 3,
+          page_count: 3,
+        },
+      },
+      page_inventory: expect.arrayContaining([
+        expect.objectContaining({ page_number: 1 }),
+        expect.objectContaining({ page_number: 2 }),
+        expect.objectContaining({
+          page_number: 3,
+          equation_candidate_count: expect.any(Number),
+        }),
+      ]),
+      page_scout: {
+        inspected_pages: expect.arrayContaining([1, 2, 3]),
+        equation_candidate_pages: expect.arrayContaining([3]),
+        ocr_failed_pages: expect.arrayContaining([1]),
+      },
+      status: {
+        has_equation_candidate: true,
+      },
+    });
+    expect((multiStepPageScanResult.debug as any)?.scholarly_pdf_workbench_state?.affordances)
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          action: "rerender_page_higher_resolution",
+          suggested_page_numbers: expect.arrayContaining([1]),
+        }),
+      ]));
+
+    resetScholarlyPdfWorkbenchVolatileMemoryForTest();
+    delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Recovered the persisted PDF workbench chain and inspected page 3.";
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify({
+      entries: [{
+        region_label: "scholarly_pdf_page_3_equation_pass",
+        text_candidate: "The restored PDF workbench inspected page 3 and found a displayed equation candidate.",
+        latex_candidate: "\\nabla_\\alpha g_{\\mu\\nu}=\\sigma_\\alpha g_{\\mu\\nu}",
+        extraction_status: "extracted",
+        uncertainty: ["fixture OCR for persisted workbench recovery"],
+      }],
+    });
+
+    const persistedFollowupResult = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:explicit-arxiv-persisted-workbench-followup",
+        thread_id: "thread:test:explicit-arxiv-agent-driven-multi-page-chain",
+        agent_runtime: "codex",
+        question: "Now inspect page 3 of that same paper and report the displayed equation candidate only.",
+      },
+      headers: {},
+    });
+
+    expect(persistedFollowupResult.ok).toBe(true);
+    expect((persistedFollowupResult.debug as any)?.followup_referent_resolution).toMatchObject({
+      status: "found",
+      persistent_snapshot_recovered: true,
+    });
+    expect((persistedFollowupResult.debug as any)?.runtime_lane_request_loop).toMatchObject({
+      status: "lane_observation_reentered",
+      candidate: expect.objectContaining({
+        capability: "visual_analysis.inspect_image_region",
+        scholarly_evidence_source: "prior",
+        page_number: 3,
+      }),
+    });
+    expect((persistedFollowupResult.debug as any)?.scholarly_pdf_workbench_state).toMatchObject({
+      schema: "helix.scholarly_pdf_workbench_state.v1",
+      terminal_authority: {
+        schema: "helix.scholarly_pdf_workbench_terminal_authority.v1",
+        terminal_authority_reason: expect.any(String),
+      },
+      page_inventory: expect.arrayContaining([
+        expect.objectContaining({
+          page_number: 3,
+          equation_candidate_count: expect.any(Number),
+        }),
+      ]),
+      status: {
+        has_pdf: true,
+        has_page_image: true,
+        has_equation_candidate: true,
+      },
+    });
+
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Audited the retained paper/page/equation/crop/evidence depth provenance.";
+    const provenanceAuditResult = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:explicit-arxiv-persisted-workbench-provenance-audit",
+        thread_id: "thread:test:explicit-arxiv-agent-driven-multi-page-chain",
+        agent_runtime: "codex",
+        question: "Tell me which paper, page, equation, crop ref, and evidence depth you are using from the prior steps.",
+      },
+      headers: {},
+    });
+
+    expect(provenanceAuditResult.ok).toBe(true);
+    expect((provenanceAuditResult.debug as any)?.scholarly_pdf_workbench_state).toMatchObject({
+      schema: "helix.scholarly_pdf_workbench_state.v1",
+      selected_affordance: "audit_provenance",
+      selected_affordance_reason: expect.any(String),
+      evidence_chain: {
+        pdf_ref: expect.any(String),
+        rendered_page_refs: expect.any(Array),
+        ocr_math_packet_refs: expect.any(Array),
+        scientific_packet_refs: expect.any(Array),
+      },
+      claim_boundaries: {
+        graph_reflection_diagnostic_only_until_branch_gate: true,
+        calculator_requires_bound_variables_units_assumptions: true,
+      },
+      terminal_authority: {
+        schema: "helix.scholarly_pdf_workbench_terminal_authority.v1",
+        terminal_authority_reason: expect.any(String),
+      },
+    });
+  }, 30_000);
 
   it("fails science extraction with exact no-PDF wording when DOI landing page has no accessible PDF", async () => {
     process.env.CODEX_AGENT_FAKE_STDOUT = "Metadata found.";

@@ -49,10 +49,116 @@ describe("Helix language model policy", () => {
     });
 
     expect(policy.requested_profile).toBe("auto");
+    expect(policy.initial_requested_profile).toBe("auto");
     expect(policy.resolved_profile).toBe("deep");
+    expect(policy.auto_selected_profile).toBe("deep");
     expect(policy.persistence_scope).toBe("turn");
     expect(policy.escalation_reason).toBe("complex_tool_planning");
+    expect(policy.policy_signals).toContain("complex_tool_planning");
     expect(buildHelixLanguageModelDebugSummary(policy)).toContain("AI: Auto -> Deep");
+  });
+
+  it("uses Fast for simple Auto chat instead of the Balanced fallback", () => {
+    const policy = resolveHelixLanguageModelPolicy({
+      requestedProfile: "auto",
+      accountPolicy: HELIX_DEVELOPER_ACCOUNT_POLICY,
+      promptText: "In one sentence, explain what this workstation is for.",
+    });
+
+    expect(policy.resolved_profile).toBe("fast");
+    expect(policy.reasoning_effort).toBe("low");
+    expect(policy.policy_signals).toContain("simple_one_sentence");
+    expect(policy.persistence_scope).toBe("turn");
+  });
+
+  it("keeps ordinary architecture explanation at Balanced", () => {
+    const policy = resolveHelixLanguageModelPolicy({
+      requestedProfile: "auto",
+      accountPolicy: HELIX_DEVELOPER_ACCOUNT_POLICY,
+      promptText: "Explain how Helix Ask should separate route proposals, tool receipts, and final answer authority.",
+    });
+
+    expect(policy.resolved_profile).toBe("balanced");
+    expect(policy.reasoning_effort).toBe("medium");
+    expect(policy.policy_signals).toContain("balanced_explanation_or_tool_aware");
+  });
+
+  it("escalates debug export and failed gateway analysis to Deep", () => {
+    const policy = resolveHelixLanguageModelPolicy({
+      requestedProfile: "auto",
+      accountPolicy: HELIX_DEVELOPER_ACCOUNT_POLICY,
+      promptText:
+        "This debug export says: blocked gateway requests: internet-search.search_web tavily_requires_TAVILY_API_KEY; repo.search query_too_broad. What bugs remain in the architecture?",
+    });
+
+    expect(policy.resolved_profile).toBe("deep");
+    expect(policy.reasoning_effort).toBe("high");
+    expect(policy.escalation_reason).toContain("debug_export_analysis");
+    expect(policy.policy_signals).toEqual(expect.arrayContaining([
+      "debug_export_analysis",
+      "gateway_failure_analysis",
+      "repair_planning",
+    ]));
+  });
+
+  it("keeps lightweight scholarly candidate gathering below Deep", () => {
+    const policy = resolveHelixLanguageModelPolicy({
+      requestedProfile: "auto",
+      accountPolicy: HELIX_DEVELOPER_ACCOUNT_POLICY,
+      promptText:
+        "Find candidate papers about negative energy constraints for warp metrics. I only need starting points, not a synthesis.",
+    });
+
+    expect(policy.resolved_profile).toBe("fast");
+    expect(policy.reasoning_effort).toBe("low");
+    expect(policy.policy_signals).toContain("lightweight_candidate_listing");
+  });
+
+  it("escalates scholarly synthesis and viability judgment to Deep", () => {
+    const policy = resolveHelixLanguageModelPolicy({
+      requestedProfile: "auto",
+      accountPolicy: HELIX_DEVELOPER_ACCOUNT_POLICY,
+      promptText:
+        "Compare the strongest candidate papers about negative energy constraints for warp metrics and explain what they imply for NHM2 viability.",
+    });
+
+    expect(policy.resolved_profile).toBe("deep");
+    expect(policy.reasoning_effort).toBe("high");
+    expect(policy.policy_signals).toEqual(expect.arrayContaining([
+      "scholarly_synthesis",
+      "viability_judgment",
+      "multi_source_comparison",
+    ]));
+  });
+
+  it("escalates observation re-entry failures to Deep from runtime state", () => {
+    const policy = resolveHelixLanguageModelPolicy({
+      requestedProfile: "auto",
+      accountPolicy: HELIX_DEVELOPER_ACCOUNT_POLICY,
+      promptText:
+        "If a scholarly lookup succeeds but the final answer says observation_not_reentered, what should the agent do before answering?",
+      routeClassification: { route: "scholarly_research_lookup" },
+      failureState: { rail_failure_code: "observation_not_reentered", repair_target: "reentry_gate" },
+    });
+
+    expect(policy.resolved_profile).toBe("deep");
+    expect(policy.reasoning_effort).toBe("high");
+    expect(policy.policy_signals).toContain("evidence_reentry_failure");
+  });
+
+  it("preserves user-pinned profiles even when Auto would escalate", () => {
+    const policy = resolveHelixLanguageModelPolicy({
+      requestedProfile: "balanced",
+      accountPolicy: HELIX_DEVELOPER_ACCOUNT_POLICY,
+      promptText:
+        "This debug export says observation_not_reentered and terminal_authority_missing. Diagnose the architecture failure.",
+    });
+
+    expect(policy.requested_profile).toBe("balanced");
+    expect(policy.resolved_profile).toBe("balanced");
+    expect(policy.auto_selected_profile).toBeNull();
+    expect(policy.persistence_scope).toBe("session");
+    expect(policy.selection_source).toBe("user_selected");
   });
 
   it("uses persisted user selection when no new request is provided", () => {
@@ -89,4 +195,3 @@ describe("Helix language model policy", () => {
     expect(policy).not.toHaveProperty("admitted_capabilities");
   });
 });
-

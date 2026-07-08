@@ -169,6 +169,15 @@ export function appendHelixAskConsoleReplyChronologically<TReply extends HelixAs
   return limitHelixAskConsoleRepliesChronologically(next, limit, resolveOrderMs);
 }
 
+export function appendHelixAskReplyChronologicallyWithOrder<TReply extends HelixAskReplyLifecycleReply>(
+  replies: readonly TReply[],
+  reply: TReply,
+  limit: number,
+  resolveOrderMs: HelixAskReplyOrderResolver<TReply>,
+): TReply[] {
+  return appendHelixAskConsoleReplyChronologically(replies, reply, limit, resolveOrderMs);
+}
+
 export function shouldRenderHelixAskConsoleActiveTurnStream<TReply extends HelixAskReplyLifecycleReply>(input: {
   askBusy: boolean;
   activeTurnId?: string | null;

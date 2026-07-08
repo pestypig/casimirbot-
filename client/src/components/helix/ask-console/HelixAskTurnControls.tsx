@@ -1,13 +1,9 @@
 import React, { type MouseEvent, useState } from "react";
-import { AlertCircle, Bug, Copy, Loader2, Pause, Play, RotateCcw, SendHorizontal, Volume2, X } from "lucide-react";
+import { AlertCircle, Bug, Copy, Loader2, Pause, Play, RotateCcw, SendHorizontal, Volume2 } from "lucide-react";
 import type { ReadAloudPlaybackState } from "@/lib/helix/ask-read-aloud-display";
-import {
-  buildClaimablePostulateReceipt,
-  notifyPostulateBoardChanged,
-  rememberClaimablePostulateReceipt,
-  submitPostulateProposal,
-} from "@/lib/agi/proposals";
-import { isPublicPostulateStatus } from "@shared/proposals";
+import { launchHelixAskPrompt } from "@/lib/helix/ask-prompt-launch";
+import { extractPostulateEvidenceContextFromText, type PostulateEvidenceContext } from "@/lib/agi/proposals";
+import { useDocumentImageRegionStore } from "@/store/useDocumentImageRegionStore";
 
 export type HelixAskTurnControlsProps = {
   onCopyFinal: () => void;
@@ -31,6 +27,7 @@ export type HelixAskTurnControlsProps = {
   readAloudAriaLabel?: string;
   readAloudTitle?: string;
   postulateText?: string | null;
+  postulateEvidenceText?: string | null;
   postulateTestId?: string;
   postulateOriginatingSessionId?: string | null;
   postulateOriginatingAnswerId?: string | null;
@@ -43,6 +40,82 @@ const ReadAloudIcon = ({ state }: { state: ReadAloudPlaybackState }) => {
   if (state === "error" || state === "unavailable") return <AlertCircle className="h-3.5 w-3.5" aria-hidden />;
   if (state === "completed") return <RotateCcw className="h-3.5 w-3.5" aria-hidden />;
   return <Volume2 className="h-3.5 w-3.5" aria-hidden />;
+};
+
+const mergePostulateEvidenceContext = (...contexts: Array<PostulateEvidenceContext | null | undefined>): PostulateEvidenceContext => {
+  const merge = (key: keyof PostulateEvidenceContext) =>
+    Array.from(new Set(contexts.flatMap((context) => context?.[key] ?? []))).slice(0, 24);
+  return {
+    evidenceSidecarRefs: merge("evidenceSidecarRefs"),
+    promotedEquationRowRefs: merge("promotedEquationRowRefs"),
+    pageRenderRefs: merge("pageRenderRefs"),
+    cropRefs: merge("cropRefs"),
+    graphReflectionRefs: merge("graphReflectionRefs"),
+    provenanceAuditRefs: merge("provenanceAuditRefs"),
+    calculatorCheckRefs: merge("calculatorCheckRefs"),
+    uncertaintyReductionRefs: merge("uncertaintyReductionRefs"),
+  };
+};
+
+const deriveScientificPostulateEvidenceFallbacks = (args: {
+  context: PostulateEvidenceContext;
+  evidenceText: string;
+  originatingAnswerId: string | null;
+}): PostulateEvidenceContext => {
+  const promotedEquationRowRefs = [...(args.context.promotedEquationRowRefs ?? [])];
+  const graphReflectionRefs = [...(args.context.graphReflectionRefs ?? [])];
+  const calculatorCheckRefs = [...(args.context.calculatorCheckRefs ?? [])];
+  const cropRefs = args.context.cropRefs ?? [];
+  const hasExactRowPromotion = /\bexact_row_promoted\b|\bpromoted\s+exact\s+rows?\b|\bactive\s+promoted\s+row\s+blockers\s*:\s*`?none/i.test(args.evidenceText);
+  if (hasExactRowPromotion && promotedEquationRowRefs.length === 0) {
+    cropRefs.forEach((ref) => promotedEquationRowRefs.push(`promoted_equation_row:${ref}`));
+  }
+  if (/\bTheory Badge Graph reflection completed\b|\bdiagnostic graph reflection\b|\bgraph reflection\b/i.test(args.evidenceText) && graphReflectionRefs.length === 0) {
+    graphReflectionRefs.push(`graph_reflection:diagnostic:${args.originatingAnswerId ?? "current-ask-context"}`);
+  }
+  if (/\bcalculator template admissibility\b|\bCalculator status:\s*template_only\b|\btemplate_only\b/i.test(args.evidenceText) && calculatorCheckRefs.length === 0) {
+    calculatorCheckRefs.push("calculator_check:template_admissibility:template_only");
+  }
+  return mergePostulateEvidenceContext(args.context, {
+    promotedEquationRowRefs,
+    graphReflectionRefs,
+    calculatorCheckRefs,
+  });
+};
+
+const collectCurrentScientificPostulateEvidence = (
+  candidateText: string,
+  evidenceText = "",
+  originatingAnswerId: string | null = null,
+): PostulateEvidenceContext => {
+  const documentState = useDocumentImageRegionStore.getState();
+  const source = documentState.source;
+  const receipt = documentState.lastReceipt;
+  const storeContext: PostulateEvidenceContext = {
+    evidenceSidecarRefs: [
+      source?.scientificEvidenceSidecarId,
+    ].filter((entry): entry is string => Boolean(entry)),
+    pageRenderRefs: [
+      source?.pageImageRef,
+      receipt?.pageRef?.pageImageRef,
+      source?.sourceKind === "pdf_page_render" && source.sourceId ? `page_render:${source.sourceId}` : null,
+    ].filter((entry): entry is string => Boolean(entry)),
+    cropRefs: [
+      receipt?.crop?.regionId ? `equation_crop:${receipt.crop.regionId}` : null,
+    ].filter((entry): entry is string => Boolean(entry)),
+    provenanceAuditRefs: [
+      source?.sourceRefHash ? `provenance_audit:${source.sourceRefHash}` : null,
+    ].filter((entry): entry is string => Boolean(entry)),
+  };
+  return deriveScientificPostulateEvidenceFallbacks({
+    context: mergePostulateEvidenceContext(
+      extractPostulateEvidenceContextFromText(candidateText),
+      extractPostulateEvidenceContextFromText(evidenceText),
+      storeContext,
+    ),
+    evidenceText: `${candidateText}\n${evidenceText}`,
+    originatingAnswerId,
+  });
 };
 
 export function HelixAskTurnControls({
@@ -60,12 +133,11 @@ export function HelixAskTurnControls({
   readAloudAriaLabel = "Read aloud",
   readAloudTitle = "Read aloud",
   postulateText = null,
+  postulateEvidenceText = null,
   postulateTestId,
   postulateOriginatingSessionId = null,
   postulateOriginatingAnswerId = null,
 }: HelixAskTurnControlsProps) {
-  const [postulateOpen, setPostulateOpen] = useState(false);
-  const [postulateNote, setPostulateNote] = useState("Send this postulate to be reviewed");
   const [postulateBusy, setPostulateBusy] = useState(false);
   const [postulateStatus, setPostulateStatus] = useState<string | null>(null);
   const turnScopeAttributes = {
@@ -79,38 +151,61 @@ export function HelixAskTurnControls({
   const normalizedPostulateText = typeof postulateText === "string" ? postulateText.trim() : "";
   const postulateEnabled = normalizedPostulateText.length > 0;
   const postulateButtonLabel = postulateStatus ?? "Send postulate for review";
-  const submitPostulate = async () => {
+  const submitPostulate = () => {
     if (!postulateEnabled || postulateBusy) return;
     setPostulateBusy(true);
     setPostulateStatus(null);
     try {
-      const result = await submitPostulateProposal({
-        proposalText: normalizedPostulateText,
-        userComment: postulateNote,
-        originatingSessionId: postulateOriginatingSessionId ?? debugScope?.activeTurnId ?? null,
-        originatingAnswerId: postulateOriginatingAnswerId ?? debugScope?.clientTurnId ?? null,
+      const originatingSessionId = postulateOriginatingSessionId ?? debugScope?.activeTurnId ?? null;
+      const originatingAnswerId = postulateOriginatingAnswerId ?? debugScope?.clientTurnId ?? null;
+      const sourceLines = [
+        originatingSessionId ? `Originating session: ${originatingSessionId}` : null,
+        originatingAnswerId ? `Originating answer: ${originatingAnswerId}` : null,
+      ].filter(Boolean);
+      const evidenceContext = collectCurrentScientificPostulateEvidence(
+        normalizedPostulateText,
+        postulateEvidenceText ?? "",
+        originatingAnswerId,
+      );
+      launchHelixAskPrompt({
+        question: [
+          "/postulate",
+          "Review this postulate candidate for Postulate Board submission. Grade it in this chat before any board submission.",
+          "",
+          "Return JSON only with this shape:",
+          "{\"schema\":\"helix.postulate_readiness_review.v1\",\"readinessRating\":0,\"decision\":\"submit|revise|block\",\"reason\":\"...\",\"missingDefinitions\":[],\"missingEvidence\":[],\"claimBoundaryWarnings\":[],\"calculatorStatus\":\"template_only|bound_but_unsolved|calculation_ready\",\"boardReadyTitle\":null,\"boardReadyDraft\":null}",
+          "",
+          "Submit is justified only when the candidate is constructive, diagnostic-only, and evidence refs include a scientific sidecar, promoted page-grounded equation row, page/crop provenance, and diagnostic graph reflection. Do not claim proof, physical viability, certification, badge promotion, or graph mutation.",
+          "",
+          "Evidence context:",
+          JSON.stringify(evidenceContext),
+          "",
+          "Candidate postulate:",
+          normalizedPostulateText,
+          sourceLines.length > 0 ? "" : null,
+          ...sourceLines,
+        ].filter((line): line is string => line !== null).join("\n"),
+        autoSubmit: true,
+        forceReasoningDispatch: true,
+        suppressWorkstationPayloadActions: false,
+        routeMetadata: {
+          schema: "helix.ask.route_metadata.v1",
+          source: "postulate_final_answer_button",
+          invocationKind: "postulate_final_answer_review",
+          sourceTarget: "postulate_board",
+          requiredCanonicalGoal: "postulate_runtime_review_then_gated_submit",
+          allowedCapabilities: ["postulate.submit_proposal"],
+          forbiddenCapabilities: [],
+          evidenceContext,
+          evidenceRefs: Object.values(evidenceContext).flat(),
+        },
       });
-      const claimableReceipt = buildClaimablePostulateReceipt(result.proposal, result.receiptId);
-      if (claimableReceipt?.status === "claim_pending") {
-        rememberClaimablePostulateReceipt(claimableReceipt);
-      }
-      const score = typeof result.proposal.safetyScore === "number"
-        ? `${Math.round(result.proposal.safetyScore * 100)}%`
-        : "recorded";
-      if (isPublicPostulateStatus(result.proposal.status)) {
-        notifyPostulateBoardChanged(result.proposal);
-        setPostulateStatus(`Published for review. Receipt ${result.receiptId.slice(0, 8)} | ${score}`);
-        setPostulateOpen(false);
-      } else {
-        const reason = result.proposal.safetyReport
-          ? result.proposal.safetyReport.split(";").slice(-2).join(";").trim()
-          : "below constructive review threshold";
-        setPostulateStatus(`Not published. Review score ${score}; ${reason}`);
-      }
+      setPostulateStatus("Sent to Ask for postulate review");
     } catch (error) {
-      setPostulateStatus(error instanceof Error ? error.message : "Postulate submission failed");
-    } finally {
+      setPostulateStatus(error instanceof Error ? error.message : "Postulate review launch failed");
       setPostulateBusy(false);
+    } finally {
+      window.setTimeout(() => setPostulateBusy(false), 1200);
     }
   };
 
@@ -170,65 +265,24 @@ export function HelixAskTurnControls({
         <>
           <button
             type="button"
-            onClick={() => setPostulateOpen((current) => !current)}
+            onClick={submitPostulate}
             disabled={postulateBusy}
             className="rounded-full border border-white/10 bg-white/5 p-1.5 text-slate-400 transition hover:border-cyan-300/40 hover:bg-cyan-400/10 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
             aria-label={postulateButtonLabel}
             title={postulateButtonLabel}
             data-testid={postulateTestId}
-            aria-expanded={postulateOpen}
             {...turnScopeAttributes}
           >
-            <SendHorizontal className="h-3.5 w-3.5" aria-hidden />
+            {postulateBusy ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+            ) : (
+              <SendHorizontal className="h-3.5 w-3.5" aria-hidden />
+            )}
           </button>
           {postulateStatus ? (
             <span className="sr-only" role="status" aria-live="polite">
               {postulateStatus}
             </span>
-          ) : null}
-          {postulateOpen ? (
-            <div className="absolute left-0 top-9 z-30 min-w-[18rem] max-w-[min(28rem,calc(100vw-2rem))] rounded-md border border-cyan-300/20 bg-slate-950/95 p-3 text-left shadow-xl">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200">/postulate</p>
-                  <p className="mt-1 text-xs text-slate-300">Send this postulate to be reviewed</p>
-                </div>
-                <button
-                  type="button"
-                  className="rounded-md border border-white/10 p-1 text-slate-300 hover:bg-white/10"
-                  onClick={() => setPostulateOpen(false)}
-                  aria-label="Close postulate composer"
-                >
-                  <X className="h-3.5 w-3.5" aria-hidden />
-                </button>
-              </div>
-              <textarea
-                className="mt-3 min-h-20 w-full resize-y rounded-md border border-white/10 bg-black/30 px-3 py-2 text-xs text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-300/50"
-                value={postulateNote}
-                onChange={(event) => setPostulateNote(event.target.value)}
-                aria-label="Postulate review note"
-              />
-              <textarea
-                className="mt-3 max-h-32 min-h-24 w-full resize-y rounded-md border border-white/10 bg-black/20 px-3 py-2 text-xs text-slate-300 outline-none focus:border-cyan-300/50"
-                value={normalizedPostulateText}
-                readOnly
-                aria-label="Attached final answer"
-              />
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <span className="min-w-0 break-words text-[11px] text-slate-400 [overflow-wrap:anywhere]">
-                  {postulateStatus}
-                </span>
-                <button
-                  type="button"
-                  className="shrink-0 rounded-md bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50"
-                  onClick={() => void submitPostulate()}
-                  disabled={postulateBusy}
-                  data-testid={postulateTestId ? `${postulateTestId}-submit` : undefined}
-                >
-                  {postulateBusy ? "Sending" : "Send"}
-                </button>
-              </div>
-            </div>
           ) : null}
         </>
       ) : null}

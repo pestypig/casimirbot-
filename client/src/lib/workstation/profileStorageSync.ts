@@ -9,6 +9,7 @@ import type {
   HelixProfileStorageSnapshot,
   HelixProfileStorageWriteReceipt,
 } from "@shared/helix-profile-storage";
+import { AGI_CHAT_STORAGE_KEY, useAgiChatStore, type ChatSession } from "@/store/useAgiChatStore";
 import { useWorkspaceMemoryRegistryStore } from "@/store/useWorkspaceMemoryRegistryStore";
 
 const PROFILE_SYNC_INTERVAL_MS = 12000;
@@ -335,6 +336,50 @@ function syntheticRememberedProcedureArtifacts(profileId: string): HelixWorkspac
   }];
 }
 
+function hasRestorableAgiChatSessions(value: string): boolean {
+  const parsed = safeJsonParse<{
+    state?: { sessions?: unknown };
+    sessions?: unknown;
+  }>(value);
+  const rawSessions = parsed?.state?.sessions ?? parsed?.sessions;
+  const sessions = rawSessions && typeof rawSessions === "object"
+    ? Array.isArray(rawSessions)
+      ? rawSessions
+      : Object.values(rawSessions)
+    : [];
+  return sessions.some((session) =>
+    Boolean(
+      session &&
+      typeof session === "object" &&
+      typeof (session as { id?: unknown }).id === "string" &&
+      Array.isArray((session as { messages?: unknown }).messages) &&
+      ((session as { messages: unknown[] }).messages.length > 0),
+    ),
+  );
+}
+
+function syntheticHelixAskChatArtifacts(profileId: string): HelixWorkspaceMemoryArtifact[] {
+  const value = safeLocalStorageGet(AGI_CHAT_STORAGE_KEY);
+  if (value == null || value.trim() === "") return [];
+  if (!hasRestorableAgiChatSessions(value)) return [];
+  return [{
+    schema: "helix.workspace_memory_registry.v1",
+    artifact_id: "helix-chat-storage:agi-chat-sessions-v1",
+    artifact_type: "helix_chat_session",
+    owner_scope: "profile",
+    storage_backend: "localStorage",
+    sync_status: "profile_synced",
+    profile_id: profileId,
+    chat_session_id: null,
+    title: "Helix Ask chats",
+    storage_key: AGI_CHAT_STORAGE_KEY,
+    path_ref: `storage://localStorage/${AGI_CHAT_STORAGE_KEY}`,
+    size_bytes: byteLength(value),
+    quota_bytes: null,
+    updated_at: new Date().toISOString(),
+  }];
+}
+
 function profileEligibleArtifacts(
   registry: HelixWorkspaceMemoryRegistrySnapshot,
   profileId: string,
@@ -356,6 +401,7 @@ function profileEligibleArtifacts(
   return [
     ...artifacts,
     ...(desktopLayout ? [desktopLayout] : []),
+    ...syntheticHelixAskChatArtifacts(profileId),
     ...syntheticLinkedSourceArtifacts(profileId),
     ...syntheticRememberedProcedureArtifacts(profileId),
   ];
@@ -457,6 +503,9 @@ function applyProfileStorageSnapshot(snapshot: HelixProfileStorageSnapshot): num
     if (safeLocalStorageSet(entry.storage_key, entry.value)) {
       applied += 1;
     }
+    if (entry.storage_key === AGI_CHAT_STORAGE_KEY) {
+      applyRestoredAgiChatStorageValue(entry.value);
+    }
   }
   for (const artifact of snapshot.artifacts) {
     registry.upsertArtifact({
@@ -467,6 +516,42 @@ function applyProfileStorageSnapshot(snapshot: HelixProfileStorageSnapshot): num
     });
   }
   return applied;
+}
+
+function applyRestoredAgiChatStorageValue(value: string): void {
+  const parsed = safeJsonParse<{
+    state?: {
+      sessions?: unknown;
+      activeId?: unknown;
+    };
+    sessions?: unknown;
+    activeId?: unknown;
+  }>(value);
+  const rawSessions = parsed?.state?.sessions ?? parsed?.sessions;
+  const sessions = rawSessions && typeof rawSessions === "object"
+    ? Array.isArray(rawSessions)
+      ? rawSessions
+      : Object.values(rawSessions)
+    : [];
+  const validSessions = sessions.filter((session): session is ChatSession =>
+    Boolean(
+      session &&
+      typeof session === "object" &&
+      typeof (session as { id?: unknown }).id === "string" &&
+      typeof (session as { title?: unknown }).title === "string",
+    ),
+  );
+  if (validSessions.length === 0) return;
+  const activeId = typeof parsed?.state?.activeId === "string"
+    ? parsed.state.activeId
+    : typeof parsed?.activeId === "string"
+      ? parsed.activeId
+      : null;
+  const store = useAgiChatStore.getState();
+  store.mergeSessions(validSessions);
+  if (activeId && validSessions.some((session) => session.id === activeId)) {
+    store.setActive(activeId);
+  }
 }
 
 function maybeReloadAfterRestore(profileId: string, appliedCount: number): void {
@@ -488,7 +573,9 @@ export function useProfileStorageSync(): void {
   const [profileId, setProfileId] = React.useState<string | null>(null);
   const [attachConsentTick, setAttachConsentTick] = React.useState(0);
   const loadedProfileRef = React.useRef<string | null>(null);
+  const restoredProfilesRef = React.useRef<Set<string>>(new Set());
   const lastPayloadRef = React.useRef<string>("");
+  const [restoreTick, setRestoreTick] = React.useState(0);
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -515,6 +602,12 @@ export function useProfileStorageSync(): void {
   }, []);
 
   React.useEffect(() => {
+    if (!profileId) return;
+    if (isProfileStorageAttachConsentGranted(profileId)) return;
+    grantProfileStorageAttachConsent(profileId);
+  }, [profileId]);
+
+  React.useEffect(() => {
     if (!profileId || loadedProfileRef.current === profileId) return;
     const controller = new AbortController();
     loadedProfileRef.current = profileId;
@@ -524,12 +617,16 @@ export function useProfileStorageSync(): void {
       maybeReloadAfterRestore(profileId, appliedCount);
     }).catch(() => {
       // Restore is best-effort; browser-local state remains authoritative until sync succeeds.
+    }).finally(() => {
+      restoredProfilesRef.current.add(profileId);
+      setRestoreTick((tick) => tick + 1);
     });
     return () => controller.abort();
   }, [profileId]);
 
   React.useEffect(() => {
     if (!profileId) return;
+    if (!restoredProfilesRef.current.has(profileId)) return;
     const payload = buildProfileStoragePayload(registrySnapshot, profileId);
     const pending = readPendingSync(profileId);
     if (
@@ -570,7 +667,7 @@ export function useProfileStorageSync(): void {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [attachConsentTick, profileId, registrySnapshot]);
+  }, [attachConsentTick, profileId, registrySnapshot, restoreTick]);
 
   React.useEffect(() => {
     if (!profileId) return;

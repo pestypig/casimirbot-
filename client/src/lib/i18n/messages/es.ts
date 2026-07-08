@@ -463,6 +463,7 @@ export const esMessages = {
   "imageLens.status.imageLoadFailed": "La imagen no se pudo cargar. Verifique la URL o elija un archivo local.",
   "imageLens.summary.manualCropFrame": "Marco de recorte manual de Image Lens ({width}x{height}px). Live Answer interpretación propia de los tonos visuales.",
   "imageLens.liveSource.note": "Image Lens utiliza la fuente visual en vivo {sourceId}. Los marcos de pantalla sin procesar no se resumen hasta que se envía un recorte.",
+  "imageLens.pdfPage.status": "P\u00e1gina PDF {pageNumber}{pageCount}",
   "imageLens.sent.source": "Enviado a la fuente Live Answer {sourceId}",
   "imageLens.sent.evidence": "- evidencia {evidenceId}",
   "imageLens.image.alt": "Fuente de la imagen",

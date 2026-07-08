@@ -43,6 +43,15 @@ const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE =
 const HELIX_ASK_SCIENTIFIC_IMAGE_PROMPT_RE =
   /\b(?:attached\s+image|image|screenshot|document\s+image|scientific\s+(?:document|image|page|paper))\b[\s\S]{0,180}\b(?:equations?|latex|symbols?|scientific\s+text|theory\s+(?:badge\s+)?graph|compare|congruence|reflection)\b/i;
 
+const HELIX_ASK_SCIENTIFIC_IMAGE_FOLLOWUP_RE =
+  /\b(?:promoted|exact(?:\s+row)?|page(?:-|\s+)?grounded|page|scientific|image\s+lens|sidecar|crop|ocr|math)\b[\s\S]{0,160}\b(?:equation|latex|scientific\s+evidence|evidence\s+packet|evidence)\b[\s\S]{0,220}\b(?:reflect|reflection|theory\s+(?:badge\s+)?graph|badge\s+graph|calculator\s+payload|payload\s+admissibility|payload\s+filter|branch\s+admission)\b/i;
+
+const HELIX_ASK_SCIENTIFIC_IMAGE_EVIDENCE_REF_REVISION_RE =
+  /\b(?:revise|update|convert|draft|postulate\s+board|evidence\s+refs?)\b[\s\S]{0,220}\b(?:promoted|page(?:-|\s+)?grounded|exact(?:\s+row)?|equation\s+row|crop\s+ref|image\s+lens|source(?:\/hash|\s+hash)?|evidence\s+depth)\b/i;
+
+const HELIX_ASK_SCIENTIFIC_IMAGE_CONTINUITY_AUDIT_RE =
+  /\b(?:continuity\s+audit|evidence\s+continuity|latest\s+scientific\s+image\s+lens\s+sidecar|latest\s+scientific\s+image\s+sidecar|prior\s+scientific\s+image\s+evidence\s+chain)\b[\s\S]{0,260}\b(?:evidence\s+depth|sidecar\s+id|image\s+lens\s+source|source\s+image\s+hash|crop\s+ref|promoted\s+equation|active\s+promoted\s+row\s+blockers|historical\s+non-promoted\s+row\s+blockers|graph\s+reflection\s+refs?|postulate\s+evidence\s+refs?)\b/i;
+
 const HELIX_ASK_SCIENTIFIC_IMAGE_REFLECTION_PROMPT_RE =
   /\b(?:compare|congruence|reflect|reflection|theory\s+(?:badge\s+)?graph|badge\s+graph|calculator(?:\s+payload|\s+handoff)?|payload\s+filter|branch\s+admission|admit\s+(?:a\s+)?branch)\b/i;
 
@@ -185,12 +194,20 @@ export function resolveHelixAskBackendEntrypointFamily(
       requestedOutputs: ["tool_call_eligibility", "procedure_observation", "typed_failure"],
     };
   }
-  if (HELIX_ASK_SCIENTIFIC_IMAGE_PROMPT_RE.test(normalized)) {
+  if (
+    HELIX_ASK_SCIENTIFIC_IMAGE_PROMPT_RE.test(normalized) ||
+    HELIX_ASK_SCIENTIFIC_IMAGE_FOLLOWUP_RE.test(normalized) ||
+    HELIX_ASK_SCIENTIFIC_IMAGE_EVIDENCE_REF_REVISION_RE.test(normalized) ||
+    HELIX_ASK_SCIENTIFIC_IMAGE_CONTINUITY_AUDIT_RE.test(normalized)
+  ) {
     const requestedOutputs = [
       "tool_call_eligibility",
       "image_lens_crop_observation",
       "scientific_evidence_packet",
       "scientific_evidence_sidecar",
+      ...(HELIX_ASK_SCIENTIFIC_IMAGE_CONTINUITY_AUDIT_RE.test(normalized)
+        ? ["scientific_image_evidence_continuity_audit", "latest_scientific_image_sidecar_ref"]
+        : []),
       ...(HELIX_ASK_SCIENTIFIC_IMAGE_REFLECTION_PROMPT_RE.test(normalized)
         ? ["theory_reflection", "calculator_payload_filter"]
         : []),

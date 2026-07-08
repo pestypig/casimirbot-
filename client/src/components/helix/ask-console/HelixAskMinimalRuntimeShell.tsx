@@ -4,7 +4,10 @@ import type { HelixLanguageModelProfileId } from "@shared/helix-language-model-p
 import { DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS } from "@/lib/helix/ask-agent-runtime-display";
 import { useAgiChatStore } from "@/store/useAgiChatStore";
 
-import { HelixAskComposer } from "./HelixAskComposer";
+import {
+  buildHelixAskComposerViewModel,
+} from "./HelixAskComposer";
+import { HelixAskLegacyComposerSurface } from "./HelixAskLegacyComposerSurface";
 import { HelixAskConsoleRuntimeLayout } from "./HelixAskConsoleRuntimeLayout";
 import { buildHelixAskConsoleRuntimeBridgeProps } from "./HelixAskConsoleRuntimeShellProps";
 import { HelixAskDebugDrawer } from "./HelixAskDebugDrawer";
@@ -36,6 +39,16 @@ import {
   type HelixAskMinimalRuntimeControlPayload,
 } from "./HelixAskMinimalRuntimeControls";
 import {
+  clearPendingHelixAskPrompt,
+  consumePendingHelixAskPrompt,
+  HELIX_ASK_PROMPT_EVENT,
+  type PendingHelixAskPrompt,
+} from "@/lib/helix/ask-prompt-launch";
+import {
+  claimExternalPromptSingleFlight,
+  resolveExternalPromptClaimId,
+} from "@/lib/helix/ask-external-prompt-claim";
+import {
   buildHelixAskRuntimePickerModel,
   HelixAskRuntimePicker,
 } from "./HelixAskRuntimePicker";
@@ -53,6 +66,7 @@ import {
   HelixAskSurfaceSupplementStack,
   type HelixAskSurfaceSupplementStackProps,
 } from "./HelixAskSurfaceSupplementStack";
+import { HelixAskSurfaceFrameSurface } from "./HelixAskSurfaceFrameSurface";
 
 export type HelixAskMinimalRuntimeVisibleSurfaceSlots = {
   voiceLevelMonitor?: ReactNode;
@@ -108,6 +122,10 @@ export function HelixAskMinimalRuntimeShell({
   const runtimeGoalWakeInFlightRef = useRef(false);
   const runtimeGoalWakeLastSubmittedKeyRef = useRef<string | null>(null);
   const hydratedChatSessionRef = useRef<string | null>(null);
+  const pendingExternalPromptRef = useRef<PendingHelixAskPrompt | null>(null);
+  const askInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const toolbarCarouselRef = useRef<HTMLDivElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
   const ensureContextSession = useAgiChatStore((state) => state.ensureContextSession);
   const addChatMessage = useAgiChatStore((state) => state.addMessage);
   const setActiveChatSession = useAgiChatStore((state) => state.setActive);
@@ -231,6 +249,171 @@ export function HelixAskMinimalRuntimeShell({
     appendWakeReply: appendMinimalRuntimeWakeReply,
   });
 
+  const submitMinimalRuntimeQuestion = useCallback((questionText: string, pendingPrompt: PendingHelixAskPrompt | null = null) => {
+    const draftText = questionText.trim();
+    if (!draftText) return false;
+    if (runtimeState.askBusy) {
+      pendingExternalPromptRef.current = pendingPrompt
+        ? { ...pendingPrompt, question: draftText }
+        : {
+            promptId: `queued:${Date.now()}`,
+            question: draftText,
+            autoSubmit: true,
+            createdAt: Date.now(),
+          };
+      return true;
+    }
+    const submitPlan = buildHelixAskMinimalRuntimeSubmitPlan({
+      draft: draftText,
+      selectedRuntime,
+      selectedLanguageModelProfile,
+      desktopUrl: typeof window === "undefined" ? "" : window.location.href,
+      pendingPrompt,
+    });
+    if (submitPlan.envelope) {
+      const turnId = `ask:${crypto.randomUUID()}`;
+      const sessionId = chatSessionId ?? ensureContextSession(props.contextId, "Helix Ask");
+      onSubmitPlan?.(submitPlan);
+      if (sessionId) {
+        setChatSessionId(sessionId);
+        setActiveChatSession(sessionId);
+        addChatMessage(sessionId, {
+          role: "user",
+          content: submitPlan.envelope.question,
+          traceId: turnId,
+        });
+      }
+      setRuntimeState((state) =>
+        startHelixAskMinimalRuntimeTurn({
+          state,
+          submitPlan,
+          turnId,
+          startedAtMs: Date.now(),
+        }),
+      );
+      const payload = buildHelixAskMinimalRuntimeTurnPayload({
+        submitPlan,
+        sessionId,
+        traceId: turnId,
+        turnId,
+        maxTokens: 8192,
+      });
+      if (payload) {
+        void runHelixAskMinimalRuntimeInjectedTransport({
+          runner: turnRunner,
+          payload,
+          onEvent: (event) => {
+            setRuntimeState((state) =>
+              recordHelixAskMinimalRuntimeStreamEvent({
+                state,
+                turnId,
+                eventName: event.event,
+                receivedAtMs: Date.now(),
+              }),
+            );
+          },
+        })
+          .then((result) => {
+            if (sessionId) {
+              addChatMessage(sessionId, {
+                role: "assistant",
+                content: resolveHelixAskMinimalRuntimeAnswerText(result),
+                traceId: turnId,
+                helixAsk: {
+                  schema: "helix.ask.chat_backend_observation.v1",
+                  backend_ask_call_attempted: true,
+                  backend_ask_entrypoint_observed: true,
+                  use_backend_ask_turn_entrypoint: true,
+                  turn_id: typeof result.turn_id === "string" && result.turn_id.trim() ? result.turn_id : turnId,
+                  final_answer_source:
+                    typeof result.final_answer_source === "string" ? result.final_answer_source : null,
+                  terminal_artifact_kind:
+                    typeof result.terminal_artifact_kind === "string" ? result.terminal_artifact_kind : null,
+                  terminal_error_code:
+                    typeof result.terminal_error_code === "string" ? result.terminal_error_code : null,
+                },
+              });
+            }
+            setRuntimeState((state) =>
+              completeHelixAskMinimalRuntimeTurn({
+                state,
+                turnId,
+                result,
+                completedAtMs: Date.now(),
+              }),
+            );
+          })
+          .catch((error: unknown) => {
+            if (sessionId) {
+              addChatMessage(sessionId, {
+                role: "assistant",
+                content: error instanceof Error ? error.message : "Ask turn failed.",
+                traceId: turnId,
+              });
+            }
+            setRuntimeState((state) =>
+              failHelixAskMinimalRuntimeTurn({
+                state,
+                turnId,
+                error,
+                failedAtMs: Date.now(),
+              }),
+            );
+          });
+      }
+      setDraft("");
+      return true;
+    }
+    setDraft((value) => (value === questionText ? value.trimStart() : value));
+    return false;
+  }, [
+    addChatMessage,
+    chatSessionId,
+    ensureContextSession,
+    onSubmitPlan,
+    props.contextId,
+    runtimeState.askBusy,
+    selectedLanguageModelProfile,
+    selectedRuntime,
+    setActiveChatSession,
+    turnRunner,
+  ]);
+
+  const executePendingPrompt = useCallback((pending: PendingHelixAskPrompt | null | undefined) => {
+    const question = pending?.question?.trim() ?? "";
+    if (!question) return;
+    const claimId = resolveExternalPromptClaimId(pending, question);
+    if (!claimExternalPromptSingleFlight(claimId)) return;
+    clearPendingHelixAskPrompt();
+    if (pending?.autoSubmit === false) {
+      setDraft(question);
+      return;
+    }
+    submitMinimalRuntimeQuestion(question, pending);
+  }, [submitMinimalRuntimeQuestion]);
+
+  useEffect(() => {
+    if (runtimeState.askBusy) return;
+    const pending = pendingExternalPromptRef.current;
+    if (!pending) return;
+    pendingExternalPromptRef.current = null;
+    submitMinimalRuntimeQuestion(pending.question, pending);
+  }, [runtimeState.askBusy, submitMinimalRuntimeQuestion]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const pending = consumePendingHelixAskPrompt();
+    if (pending) executePendingPrompt(pending);
+    const handlePromptEvent = (event: Event) => {
+      const detail = (event as CustomEvent<PendingHelixAskPrompt>)?.detail;
+      executePendingPrompt(detail);
+    };
+    window.addEventListener(HELIX_ASK_PROMPT_EVENT, handlePromptEvent as EventListener);
+    return () => {
+      window.removeEventListener(HELIX_ASK_PROMPT_EVENT, handlePromptEvent as EventListener);
+    };
+  }, [executePendingPrompt]);
+
   const runtimePickerModel = useMemo(
     () =>
       buildHelixAskRuntimePickerModel({
@@ -243,6 +426,18 @@ export function HelixAskMinimalRuntimeShell({
     () => buildHelixAskLanguageModelPickerModel(selectedLanguageModelProfile),
     [selectedLanguageModelProfile],
   );
+  const composerViewModel = useMemo(
+    () =>
+      buildHelixAskComposerViewModel({
+        busy: runtimeState.askBusy,
+        placeholder: shellProps.placeholder,
+        runtimeLabel: runtimePickerModel.selectedLabel,
+      }),
+    [runtimePickerModel.selectedLabel, runtimeState.askBusy, shellProps.placeholder],
+  );
+  const submitCurrentDraft = useCallback(() => {
+    submitMinimalRuntimeQuestion(draft);
+  }, [draft, submitMinimalRuntimeQuestion]);
 
   useEffect(() => {
     const sessionId = ensureContextSession(props.contextId, "Helix Ask");
@@ -270,134 +465,106 @@ export function HelixAskMinimalRuntimeShell({
       className={shellProps.className}
       layoutVariant={shellProps.layoutVariant ?? "hero"}
       surface={
-        <section
-          className="relative z-10 w-full rounded-3xl border border-cyan-300/20 bg-slate-950/85 p-4 shadow-[0_18px_60px_rgba(0,0,0,0.45)]"
+        <div
+          className="relative z-10"
           data-testid="helix-ask-minimal-runtime-shell"
         >
-          {visibleSurface?.voiceLevelMonitor}
-          <div className="mb-3 flex justify-end gap-2">
-            <HelixAskLanguageModelPicker
-              model={languageModelPickerModel}
-              menuOpen={languageModelMenuOpen}
-              onPrimaryClick={() => {
-                setRuntimeMenuOpen(false);
-                setLanguageModelMenuOpen((open) => !open);
-              }}
-              onSelect={(profile) => {
-                setSelectedLanguageModelProfile(profile);
-                persistHelixAskLanguageModelProfile(profile);
-                setLanguageModelMenuOpen(false);
-              }}
-            />
-            <HelixAskRuntimePicker
-              model={runtimePickerModel}
-              menuOpen={runtimeMenuOpen}
-              onPrimaryClick={() => {
-                setLanguageModelMenuOpen(false);
-                setRuntimeMenuOpen((open) => !open);
-              }}
-              onSelect={(runtime) => {
-                setSelectedRuntime(runtime);
-                setRuntimeMenuOpen(false);
-                setLanguageModelMenuOpen(false);
-              }}
-            />
-          </div>
-          <HelixAskComposer
-            value={draft}
-            placeholder={shellProps.placeholder}
-            runtimeLabel={runtimePickerModel.selectedLabel}
-            onChange={setDraft}
-            onSubmit={() => {
-              const submitPlan = buildHelixAskMinimalRuntimeSubmitPlan({
-                draft,
-                selectedRuntime,
-                selectedLanguageModelProfile,
-                desktopUrl: typeof window === "undefined" ? "" : window.location.href,
-              });
-              if (submitPlan.envelope) {
-                const turnId = `ask:${crypto.randomUUID()}`;
-                const sessionId = chatSessionId ?? ensureContextSession(props.contextId, "Helix Ask");
-                onSubmitPlan?.(submitPlan);
-                if (sessionId) {
-                  setChatSessionId(sessionId);
-                  setActiveChatSession(sessionId);
-                  addChatMessage(sessionId, {
-                    role: "user",
-                    content: submitPlan.envelope.question,
-                    traceId: turnId,
-                  });
-                }
-                setRuntimeState((state) =>
-                  startHelixAskMinimalRuntimeTurn({
-                    state,
-                    submitPlan,
-                    turnId,
-                    startedAtMs: Date.now(),
-                  }),
-                );
-                const payload = buildHelixAskMinimalRuntimeTurnPayload({
-                  submitPlan,
-                  traceId: turnId,
-                  turnId,
-                  maxTokens: 8192,
-                });
-                if (payload) {
-                  void runHelixAskMinimalRuntimeInjectedTransport({
-                    runner: turnRunner,
-                    payload,
-                    onEvent: (event) => {
-                      setRuntimeState((state) =>
-                        recordHelixAskMinimalRuntimeStreamEvent({
-                          state,
-                          turnId,
-                          eventName: event.event,
-                          receivedAtMs: Date.now(),
-                        }),
-                      );
-                    },
-                  })
-                    .then((result) => {
-                      if (sessionId) {
-                        addChatMessage(sessionId, {
-                          role: "assistant",
-                          content: resolveHelixAskMinimalRuntimeAnswerText(result),
-                          traceId: turnId,
-                        });
-                      }
-                      setRuntimeState((state) =>
-                        completeHelixAskMinimalRuntimeTurn({
-                          state,
-                          turnId,
-                          result,
-                          completedAtMs: Date.now(),
-                        }),
-                      );
-                    })
-                    .catch((error: unknown) => {
-                      if (sessionId) {
-                        addChatMessage(sessionId, {
-                          role: "assistant",
-                          content: error instanceof Error ? error.message : "Ask turn failed.",
-                          traceId: turnId,
-                        });
-                      }
-                      setRuntimeState((state) =>
-                        failHelixAskMinimalRuntimeTurn({
-                          state,
-                          turnId,
-                          error,
-                          failedAtMs: Date.now(),
-                        }),
-                      );
-                    });
-                }
-                setDraft("");
-                return;
-              }
-              setDraft((value) => value.trimStart());
+          <HelixAskSurfaceFrameSurface
+            maxWidthClassName={
+              shellProps.maxWidthClassName ??
+              (shellProps.layoutVariant === "dock" ? "max-w-none" : "mx-auto max-w-4xl")
+            }
+            surfaceBorderClassName="border-cyan-300/20"
+            surfaceTintClassName="bg-cyan-400/[0.03]"
+            surfaceHaloClassName="shadow-[0_0_80px_rgba(34,211,238,0.08)]"
+            isOffline={false}
+            onPrimeInteraction={() => undefined}
+            onSubmit={(event) => {
+              event.preventDefault();
+              submitCurrentDraft();
             }}
-          />
+          >
+            <div className="relative z-[90] flex justify-end px-4 pt-3">
+              <HelixAskLanguageModelPicker
+                model={languageModelPickerModel}
+                menuOpen={languageModelMenuOpen}
+                onPrimaryClick={() => {
+                  setRuntimeMenuOpen(false);
+                  setLanguageModelMenuOpen((open) => !open);
+                }}
+                onSelect={(profile) => {
+                  setSelectedLanguageModelProfile(profile);
+                  persistHelixAskLanguageModelProfile(profile);
+                  setLanguageModelMenuOpen(false);
+                }}
+              />
+            </div>
+            {visibleSurface?.voiceLevelMonitor}
+            <HelixAskLegacyComposerSurface
+              voiceLevelMonitor={{
+                visible: false,
+                maxHeightPx: 0,
+                level: 0,
+                signalState: "low",
+              }}
+              moodAvatar={{
+                auraClassName: "border-cyan-300/25 bg-cyan-400/10 shadow-[0_0_28px_rgba(34,211,238,0.18)]",
+                ringClassName: "ring-cyan-200/25",
+                moodSrc: null,
+                moodLabel: "Helix",
+                onImageError: () => undefined,
+              }}
+              actionToolbar={{
+                carouselRef: toolbarCarouselRef,
+                imageInputRef,
+                canScrollLeft: false,
+                canScrollRight: false,
+                onScrollLeft: () => undefined,
+                onScrollRight: () => undefined,
+                onImageSelect: () => undefined,
+                onAttachImage: () => imageInputRef.current?.click(),
+                attachDisabled: true,
+                hasReadyAttachment: false,
+                hasAnyAttachment: false,
+                micEnabled: false,
+                voiceTranscribing: false,
+                onToggleMic: () => undefined,
+                showRetryVoiceSample: false,
+                retryVoiceSampleDisabled: true,
+                onRetryVoiceSample: () => undefined,
+                showVisualCaptureControls: true,
+                visualSituationSourceStatus: "idle",
+                onCaptureVisualSource: () => undefined,
+                visualSituationIncludeAudio: false,
+                displayAudioStatus: "idle",
+                visualAudioToggleDisabled: true,
+                onToggleVisualAudio: () => undefined,
+                runtimePickerModel,
+                runtimeMenuOpen,
+                onRuntimePrimaryClick: () => {
+                  setLanguageModelMenuOpen(false);
+                  setRuntimeMenuOpen((open) => !open);
+                },
+                onRuntimeSelect: (runtime) => {
+                  setSelectedRuntime(runtime);
+                  setRuntimeMenuOpen(false);
+                  setLanguageModelMenuOpen(false);
+                },
+                submitViewModel: composerViewModel,
+                onSubmitIntent: submitCurrentDraft,
+                onStop: () => undefined,
+              }}
+              textarea={{
+                ariaDisabled: runtimeState.askBusy,
+                className: composerViewModel.textareaClassName,
+                placeholder: composerViewModel.currentPlaceholder,
+                value: draft,
+                onInputValue: (value) => setDraft(value),
+                onSubmitRequested: (form) => form?.requestSubmit(),
+              }}
+              textareaRef={askInputRef}
+            />
+          </HelixAskSurfaceFrameSurface>
           {visibleSurface?.supplementStack ? (
             <HelixAskSurfaceSupplementStack {...visibleSurface.supplementStack} />
           ) : null}
@@ -407,7 +574,7 @@ export function HelixAskMinimalRuntimeShell({
             className={shellProps.replyListClassName ?? "relative z-10 mt-4 space-y-5"}
             controlActions={shellControlActions}
           />
-        </section>
+        </div>
       }
       goalPill={visibleSurface?.goalPill}
       steeringQueue={visibleSurface?.steeringQueue}

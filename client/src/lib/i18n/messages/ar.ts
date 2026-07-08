@@ -463,6 +463,7 @@ export const arMessages = {
   "imageLens.status.imageLoadFailed": "فشل تحميل الصورة. تحقق من عنوان URL أو اختر ملفًا محليًا.",
   "imageLens.summary.manualCropFrame": "إطار اقتصاص يدوي من Image Lens ({width}x{height}px). Live Answer الظلال المرئية لها تفسير خاص.",
   "imageLens.liveSource.note": "يستخدم Image Lens المصدر المرئي المباشر {sourceId}. لا يتم تلخيص إطارات الشاشة الأولية حتى يتم إرسال الاقتصاص.",
+  "imageLens.pdfPage.status": "\u0635\u0641\u062d\u0629 PDF {pageNumber}{pageCount}",
   "imageLens.sent.source": "تم إرسالها إلى مصدر Live Answer {sourceId}",
   "imageLens.sent.evidence": "- الأدلة {evidenceId}",
   "imageLens.image.alt": "مصدر الصورة",

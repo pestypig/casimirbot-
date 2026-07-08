@@ -1,4 +1,4 @@
-import type { CSSProperties, FormEventHandler, ReactNode } from "react";
+import React, { type CSSProperties, type FormEventHandler, type ReactNode } from "react";
 
 export type HelixAskSurfaceFrameProps = {
   maxWidthClassName: string;

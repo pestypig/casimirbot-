@@ -2,6 +2,39 @@ import { describe, expect, it } from "vitest";
 import { buildHelixDebugExportEnvelopeFromMasterPayload } from "@/lib/agi/debugExport";
 
 describe("Helix Ask debug export capability lanes", () => {
+  it("fails closed when backend ref is advertised but hard Ask entrypoint was explicitly not observed", () => {
+    const text = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "ask:debug-ref-without-runtime",
+        question: "Using my previous reflection and current Image Lens evidence, frame a candidate postulate.",
+        content: "I could not complete that turn.",
+      },
+      {
+        selected_final_answer: "I could not complete that turn.",
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+        ask_entrypoint_required: true,
+        ask_entrypoint_observed: false,
+        ask_entrypoint_failure_code: "backend_ask_entry_required",
+        debug_export_ref: {
+          endpoint: "/api/agi/ask/turn/ask%3Adebug-ref-without-runtime/debug-export",
+          turn_id: "ask:debug-ref-without-runtime",
+        },
+        debug_export_source: "backend_ref_advertised",
+      },
+    );
+
+    const exported = JSON.parse(text) as Record<string, unknown>;
+    expect(exported.selected_final_answer).toBe(
+      "This prompt requires the backend Ask solver path before a final answer can be shown.",
+    );
+    expect(exported.final_answer_source).toBe("typed_failure");
+    expect(exported.terminal_artifact_kind).toBe("typed_failure");
+    expect(exported.terminal_error_code).toBe("backend_ask_entry_required");
+    expect(exported.first_broken_rail).toBe("backend_ask_entrypoint");
+    expect(exported.repair_target).toBe("prompt_submit_entrypoint");
+  });
+
   it("preserves normal Image Lens crop receipts and terminal presentation in copied debug export", () => {
     const finalAnswer = [
       "**equation_area**",

@@ -133,7 +133,13 @@ export default function PostulateBoardPanel() {
       reviewScore: proposal.safetyScore ?? null,
       congruenceScore: readNumber(postulate, "congruenceScore"),
       constructivenessScore: readNumber(postulate, "constructivenessScore"),
+      evidenceDepthScore: readNumber(postulate, "evidenceDepthScore"),
+      calculatorCheckScore: readNumber(postulate, "calculatorCheckScore"),
+      graphCongruenceScore: readNumber(postulate, "graphCongruenceScore"),
+      uncertaintyReductionScore: readNumber(postulate, "uncertaintyReductionScore"),
+      claimBoundaryScore: readNumber(postulate, "claimBoundaryScore"),
       evidenceRefs: readStringArray(postulate, "evidenceRefs"),
+      evidenceContext: readRecord(postulate["evidenceContext"]),
       locatorRefs: readStringArray(postulate, "badgeGraphLocatorRefs"),
       proposalText: readString(postulate, "proposalText", proposal.summary),
       userComment: readString(postulate, "userComment"),
@@ -206,6 +212,17 @@ export default function PostulateBoardPanel() {
             const graphTaskStatus = readString(graphPatchReviewTask, "status");
             const rewardCreditStatus = readString(postulate, "rewardCreditStatus", "none");
             const promptLabel = readString(postulate, "promptLabel", "Send this postulate to be reviewed");
+            const evidenceContext = readRecord(postulate["evidenceContext"]);
+            const evidenceContextRefs = [
+              ...readStringArray(evidenceContext, "evidenceSidecarRefs"),
+              ...readStringArray(evidenceContext, "promotedEquationRowRefs"),
+              ...readStringArray(evidenceContext, "pageRenderRefs"),
+              ...readStringArray(evidenceContext, "cropRefs"),
+              ...readStringArray(evidenceContext, "graphReflectionRefs"),
+              ...readStringArray(evidenceContext, "provenanceAuditRefs"),
+              ...readStringArray(evidenceContext, "calculatorCheckRefs"),
+              ...readStringArray(evidenceContext, "uncertaintyReductionRefs"),
+            ];
             const claimBoundary = readString(
               postulate,
               "claimBoundary",
@@ -278,6 +295,10 @@ export default function PostulateBoardPanel() {
                         <dd className="mt-1 text-slate-100">{formatPercent(readNumber(postulate, "constructivenessScore"))}</dd>
                       </div>
                       <div>
+                        <dt className="text-[10px] uppercase tracking-[0.12em] text-slate-500">Evidence depth</dt>
+                        <dd className="mt-1 text-slate-100">{formatPercent(readNumber(postulate, "evidenceDepthScore"))}</dd>
+                      </div>
+                      <div>
                         <dt className="text-[10px] uppercase tracking-[0.12em] text-slate-500">Reward</dt>
                         <dd className="mt-1 text-slate-100">{rewardCreditStatus.replace(/_/g, " ")}</dd>
                       </div>
@@ -327,7 +348,25 @@ export default function PostulateBoardPanel() {
                           <span>trace={formatPercent(readNumber(postulate, "traceabilityScore"))}</span>
                           <span>novelty={formatPercent(readNumber(postulate, "noveltyScore"))}</span>
                           <span>safety={formatPercent(readNumber(postulate, "safetyScore"))}</span>
+                          <span>calculator={formatPercent(readNumber(postulate, "calculatorCheckScore"))}</span>
+                          <span>graph={formatPercent(readNumber(postulate, "graphCongruenceScore"))}</span>
+                          <span>uncertainty={formatPercent(readNumber(postulate, "uncertaintyReductionScore"))}</span>
+                          <span>boundary={formatPercent(readNumber(postulate, "claimBoundaryScore"))}</span>
                         </div>
+                        {evidenceContextRefs.length > 0 ? (
+                          <div className="border-t border-violet-200/10 pt-3">
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-violet-100/70">
+                              Evidence context refs
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {evidenceContextRefs.map((ref) => (
+                                <span key={ref} className="rounded border border-violet-200/20 bg-black/20 px-2 py-1 font-mono text-[10px] text-violet-50">
+                                  {ref}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
                         {graphTaskStatus ? (
                           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-violet-200/10 pt-3 text-xs text-violet-50">
                             <div className="min-w-0">

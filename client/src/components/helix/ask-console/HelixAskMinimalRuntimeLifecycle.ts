@@ -1,4 +1,5 @@
 import { HELIX_ASK_PROGRESS_PLACEHOLDER_TEXT } from "@/lib/helix/ask-debug-event-display";
+import { chooseVisibleFinalText } from "@/lib/helix/ask-terminal-projection";
 
 import { appendHelixAskConsoleReplyChronologically } from "./HelixAskReplyLifecycle";
 import type { HelixAskMinimalRuntimeSubmitPlan } from "./HelixAskMinimalRuntimeSubmitPlan";
@@ -109,6 +110,14 @@ export function coerceHelixAskMinimalRuntimeText(value: unknown): string {
 export function resolveHelixAskMinimalRuntimeAnswerText(
   result: HelixAskMinimalRuntimeTransportResult,
 ): string {
+  const visibleTerminalText = chooseVisibleFinalText({
+    ...(result as Record<string, unknown>),
+    id: coerceHelixAskMinimalRuntimeText(result.turn_id).trim() || "minimal-runtime-result",
+    debug: result.debug,
+  });
+  if (visibleTerminalText.trim()) {
+    return visibleTerminalText.trim();
+  }
   return (
     coerceHelixAskMinimalRuntimeText(result.selected_final_answer).trim() ||
     coerceHelixAskMinimalRuntimeText(result.assistant_answer).trim() ||

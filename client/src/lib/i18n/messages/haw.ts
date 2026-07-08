@@ -490,6 +490,7 @@ export const hawMessages = {
   "imageLens.status.imageLoadFailed": "Ua hāʻule ka hoʻouka kiʻi. E nānā i ka URL a i ʻole koho i file kūloko.",
   "imageLens.summary.manualCropFrame": "Manual crop frame mai Image Lens ({width}x{height}px). Na Live Answer visual shades ka wehewehe.",
   "imageLens.liveSource.note": "Ke hoʻohana nei ʻo Image Lens i ke kumu visual ola {sourceId}. ʻAʻole hōʻuluʻulu ʻia nā raw screen frames a hiki i ka hoʻouna ʻia ʻana o crop.",
+  "imageLens.pdfPage.status": "\u02bbAo\u02bbao PDF {pageNumber}{pageCount}",
   "imageLens.sent.source": "Ua hoʻouna ʻia i ke kumu Live Answer {sourceId}",
   "imageLens.sent.evidence": " - hōʻike {evidenceId}",
   "imageLens.image.alt": "Kumu kiʻi",

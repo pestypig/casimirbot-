@@ -1,4 +1,4 @@
-import type { ChangeEventHandler, ReactNode, Ref } from "react";
+import React, { type ChangeEventHandler, type ReactNode, type Ref } from "react";
 import { Headphones, Image as ImageIcon, Mic, Plus, RotateCcw } from "lucide-react";
 
 export type HelixAskActionToolbarProps = {

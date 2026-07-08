@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request } from "express";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -17,6 +17,27 @@ const stripViteHmrClient = (html: string): string => {
   );
   return next;
 };
+
+export function shouldServeViteIndexFallback(req: Pick<Request, "method" | "path" | "originalUrl" | "headers">): boolean {
+  if (req.method !== "GET") return false;
+
+  const url = req.originalUrl || req.path || "";
+  const accept = String(req.headers.accept ?? "");
+  const hasHtmlAccept =
+    accept.length === 0 ||
+    accept.includes("text/html") ||
+    accept.includes("*/*");
+
+  if (!hasHtmlAccept) return false;
+  if (req.path.startsWith("/src/")) return false;
+  if (req.path.startsWith("/@vite/")) return false;
+  if (req.path.startsWith("/@react-refresh")) return false;
+  if (req.path.includes("/__vite")) return false;
+  if (url.includes("html-proxy")) return false;
+  if (url.includes("?import")) return false;
+
+  return true;
+}
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -89,6 +110,10 @@ export async function setupVite(app: Express, server: Server) {
     app.use("/reasoning-theater", express.static(reasoningTheaterPath));
   }
   app.use(async (req, res, next) => {
+    if (!shouldServeViteIndexFallback(req)) {
+      next();
+      return;
+    }
     const url = req.originalUrl;
 
     try {

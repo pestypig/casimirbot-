@@ -16,6 +16,7 @@ import {
   useProfileStorageSync,
 } from "../profileStorageSync";
 import { useWorkspaceMemoryRegistryStore } from "@/store/useWorkspaceMemoryRegistryStore";
+import { useAgiChatStore } from "@/store/useAgiChatStore";
 
 const profileId = "user:test-profile";
 const emptyRegistry = (): HelixWorkspaceMemoryRegistrySnapshot => ({
@@ -48,8 +49,9 @@ const registryWithProfileCandidate = (): HelixWorkspaceMemoryRegistrySnapshot =>
 
 afterEach(() => {
   cleanup();
-  window.localStorage.clear();
+  useAgiChatStore.setState({ sessions: {}, activeId: undefined, hydrated: false });
   useWorkspaceMemoryRegistryStore.setState({ artifacts: {} });
+  window.localStorage.clear();
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
@@ -145,6 +147,198 @@ describe("profile storage sync consent", () => {
     expect(buildProfileStoragePayload(emptyRegistry(), profileId)).toMatchObject({
       artifacts: [],
       entries: [],
+    });
+  });
+
+  it("captures Helix Ask chats as profile storage even before registry rehydration", () => {
+    const chatState = JSON.stringify({
+      state: {
+        sessions: {
+          "chat:test": {
+            id: "chat:test",
+            title: "Saved Helix Ask chat",
+            createdAt: "2026-07-07T01:00:00.000Z",
+            updatedAt: "2026-07-07T01:01:00.000Z",
+            personaId: "default",
+            contextId: "helix-ask",
+            messages: [{ id: "msg:test", role: "user", content: "Saved question", at: "2026-07-07T01:00:00.000Z" }],
+          },
+        },
+        activeId: "chat:test",
+      },
+      version: 0,
+    });
+    window.localStorage.setItem("agi-chat-sessions-v1", chatState);
+    grantProfileStorageAttachConsent(profileId);
+
+    expect(shouldSaveProfileStorageSnapshot({ profileId, registry: emptyRegistry() })).toBe(true);
+
+    const payload = buildProfileStoragePayload(emptyRegistry(), profileId);
+    expect(payload.artifacts).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        artifact_id: "helix-chat-storage:agi-chat-sessions-v1",
+        artifact_type: "helix_chat_session",
+        storage_key: "agi-chat-sessions-v1",
+      }),
+    ]));
+    expect(payload.entries).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        storage_key: "agi-chat-sessions-v1",
+        value: chatState,
+        artifact_ids: ["helix-chat-storage:agi-chat-sessions-v1"],
+      }),
+    ]));
+  });
+
+  it("auto-attaches signed-in profiles so local Helix Ask chats are written", async () => {
+    vi.useFakeTimers();
+    const chatState = JSON.stringify({
+      state: {
+        sessions: {
+          "chat:auto": {
+            id: "chat:auto",
+            title: "Auto backup chat",
+            createdAt: "2026-07-07T02:00:00.000Z",
+            updatedAt: "2026-07-07T02:01:00.000Z",
+            personaId: "default",
+            contextId: "helix-ask",
+            messages: [{ id: "msg:auto", role: "user", content: "Auto saved question", at: "2026-07-07T02:00:00.000Z" }],
+          },
+        },
+        activeId: "chat:auto",
+      },
+      version: 0,
+    });
+    window.localStorage.setItem("agi-chat-sessions-v1", chatState);
+    const postedSnapshots: unknown[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/account/session") {
+        return new Response(JSON.stringify({
+          session: { profile: { profile_id: profileId } },
+          account_policy: {},
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (url === "/api/account/profile-storage/snapshot" && init?.method === "POST") {
+        postedSnapshots.push(JSON.parse(String(init.body)));
+        return new Response(JSON.stringify({ ok: true, message: "Saved." }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (url === "/api/account/profile-storage/snapshot") {
+        return new Response(JSON.stringify({
+          schema: "helix.profile_storage_snapshot.v1",
+          profile_id: profileId,
+          storage_backend: "profile_server",
+          entries: [],
+          artifacts: [],
+          total_entry_bytes: 0,
+          quota_bytes: 1024,
+          updated_at: null,
+          raw_profile_content_included: true,
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      return new Response(JSON.stringify({}), { status: 404, headers: { "Content-Type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    window.sessionStorage.setItem(`helix.profileStorage.restoreReloaded:${profileId}`, "1");
+
+    render(React.createElement(ProfileStorageSyncHarness));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+
+    expect(isProfileStorageAttachConsentGranted(profileId)).toBe(true);
+    expect(postedSnapshots).toHaveLength(1);
+    expect(postedSnapshots[0]).toMatchObject({
+      entries: [expect.objectContaining({
+        storage_key: "agi-chat-sessions-v1",
+        value: chatState,
+      })],
+    });
+  });
+
+  it("restores profile Helix Ask chats into the live chat store before backup", async () => {
+    vi.useFakeTimers();
+    const chatState = JSON.stringify({
+      state: {
+        sessions: {
+          "chat:restored": {
+            id: "chat:restored",
+            title: "Restored profile chat",
+            createdAt: "2026-07-07T03:00:00.000Z",
+            updatedAt: "2026-07-07T03:01:00.000Z",
+            personaId: "default",
+            contextId: "helix-ask-desktop",
+            messages: [{ id: "msg:1", role: "user", content: "Restored question", at: "2026-07-07T03:00:00.000Z" }],
+          },
+        },
+        activeId: "chat:restored",
+      },
+      version: 0,
+    });
+    const postedSnapshots: unknown[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/account/session") {
+        return new Response(JSON.stringify({
+          session: { profile: { profile_id: profileId } },
+          account_policy: {},
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (url === "/api/account/profile-storage/snapshot" && init?.method === "POST") {
+        postedSnapshots.push(JSON.parse(String(init.body)));
+        return new Response(JSON.stringify({ ok: true, message: "Saved." }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (url === "/api/account/profile-storage/snapshot") {
+        return new Response(JSON.stringify({
+          schema: "helix.profile_storage_snapshot.v1",
+          profile_id: profileId,
+          storage_backend: "profile_server",
+          entries: [{
+            storage_key: "agi-chat-sessions-v1",
+            storage_backend: "localStorage",
+            value: chatState,
+            size_bytes: chatState.length,
+            updated_at: "2026-07-07T03:01:00.000Z",
+            artifact_ids: ["helix-chat-storage:agi-chat-sessions-v1"],
+          }],
+          artifacts: [],
+          total_entry_bytes: chatState.length,
+          quota_bytes: 1024 * 1024,
+          updated_at: "2026-07-07T03:01:00.000Z",
+          raw_profile_content_included: true,
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      return new Response(JSON.stringify({}), { status: 404, headers: { "Content-Type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(React.createElement(ProfileStorageSyncHarness));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+
+    expect(useAgiChatStore.getState().sessions["chat:restored"]).toMatchObject({
+      title: "Restored profile chat",
+      messages: [expect.objectContaining({ content: "Restored question" })],
+    });
+    expect(useAgiChatStore.getState().activeId).toBe("chat:restored");
+    expect(postedSnapshots[0]).toMatchObject({
+      entries: [expect.objectContaining({
+        storage_key: "agi-chat-sessions-v1",
+        value: chatState,
+      })],
     });
   });
 

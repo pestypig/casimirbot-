@@ -70,6 +70,7 @@ export type HelixAskComposerTextareaProps = {
   ariaDisabled?: boolean;
   className: string;
   placeholder: string;
+  value?: string;
   onPaste?: ClipboardEventHandler<HTMLTextAreaElement>;
   onKeyDown?: KeyboardEventHandler<HTMLTextAreaElement>;
   onInputValue: (value: string, target: HTMLTextAreaElement) => void;
@@ -82,6 +83,7 @@ export const HelixAskComposerTextarea = forwardRef<HTMLTextAreaElement, HelixAsk
       ariaDisabled = false,
       className,
       placeholder,
+      value,
       onPaste,
       onKeyDown,
       onInputValue,
@@ -107,9 +109,10 @@ export const HelixAskComposerTextarea = forwardRef<HTMLTextAreaElement, HelixAsk
         className={className}
         ref={ref}
         placeholder={placeholder}
+        value={value}
         rows={1}
         onPaste={onPaste}
-        onInput={handleInput}
+        onChange={handleInput}
         onKeyDown={handleKeyDown}
       />
     );
@@ -133,7 +136,11 @@ export function HelixAskComposerSubmitButton({
       aria-label={viewModel.submitAriaLabel}
       title={viewModel.submitTitle}
       className="inline-flex h-10 w-10 shrink-0 snap-center items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60"
-      onClick={viewModel.submitMode === "stop" ? onStop : onSubmitIntent}
+      onClick={(event) => {
+        if (viewModel.submitMode !== "stop") return;
+        event.preventDefault();
+        onStop();
+      }}
       type={viewModel.submitButtonType}
     >
       {viewModel.submitIcon === "square" ? (

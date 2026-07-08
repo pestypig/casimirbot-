@@ -6,7 +6,7 @@ const manifestPath = path.join(root, ".codex-theory-shared-rows.tmp.json");
 const cachePath = path.join(root, ".codex-theory-i18n-cache.tmp.json");
 const messagesDir = path.join(root, "client/src/lib/i18n/messages");
 const envPath = path.join(root, ".env");
-const batchSize = Number.parseInt(process.env.CATALOG_FILL_BATCH_SIZE ?? "80", 10);
+const batchSize = Math.max(1, Number.parseInt(process.env.CATALOG_FILL_BATCH_SIZE ?? "5", 10));
 const retries = Math.max(0, Number.parseInt(process.env.CATALOG_FILL_RETRIES ?? "2", 10));
 const localeArg = process.argv.find((arg) => arg.startsWith("--locale="))?.slice("--locale=".length);
 const maxBatches = Number.parseInt(
@@ -60,6 +60,20 @@ function readJson(filePath, fallback) {
 
 function writeJson(filePath, value) {
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
+function sanitizeProviderError(text) {
+  return String(text ?? "")
+    .replace(/sk-[A-Za-z0-9_-]+/g, "sk-***")
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer ***");
+}
+
+function formatProviderError(status, text) {
+  if (status === 401 || status === 403) {
+    return `Provider returned ${status}: translation credentials were rejected.`;
+  }
+  const cleaned = sanitizeProviderError(text).replace(/\s+/g, " ").trim();
+  return `Provider returned ${status}${cleaned ? `: ${cleaned.slice(0, 400)}` : ""}`;
 }
 
 function parseCatalog(filePath) {
@@ -169,7 +183,7 @@ async function requestBatch({ locale, targetLanguage, rows }) {
   });
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new Error(`Provider returned ${response.status}${text ? `: ${text.slice(0, 400)}` : ""}`);
+    throw new Error(formatProviderError(response.status, text));
   }
   const body = await response.json();
   const content = body.choices?.[0]?.message?.content;
@@ -240,6 +254,7 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error);
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(sanitizeProviderError(message));
   process.exitCode = 1;
 });

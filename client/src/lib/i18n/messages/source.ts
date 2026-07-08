@@ -3592,6 +3592,14 @@ export const interfaceSourceMessages = {
     placeholders: { sourceId: "string" },
     screenshotSurface: "workstation",
   },
+  "imageLens.pdfPage.status": {
+    id: "imageLens.pdfPage.status",
+    defaultMessage: "PDF page {pageNumber}{pageCount}",
+    description: "Status note showing the mounted PDF page source.",
+    context: "Image Lens source controls.",
+    placeholders: { pageNumber: "number", pageCount: "string" },
+    screenshotSurface: "workstation",
+  },
   "imageLens.sent.source": {
     id: "imageLens.sent.source",
     defaultMessage: "Sent to Live Answer source {sourceId}",

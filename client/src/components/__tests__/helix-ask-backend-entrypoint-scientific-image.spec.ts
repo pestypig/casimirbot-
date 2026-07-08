@@ -46,6 +46,84 @@ describe("Helix Ask backend entrypoint scientific image policy", () => {
     expect(resolution?.requestedOutputs).not.toContain("calculator_payload_filter");
   });
 
+  it("routes promoted equation evidence graph follow-ups through the backend scientific sidecar path", () => {
+    const prompt =
+      "Reflect the promoted equation evidence to the Theory Badge Graph with diagnostic-only boundaries and report calculator payload admissibility.";
+    const resolution = resolveHelixAskBackendEntrypointFamily(prompt);
+
+    expect(requiresHelixAskBackendEntrypoint(prompt)).toBe(true);
+    expect(resolution).toMatchObject({
+      family: "scientific_image",
+      sourceTarget: "scientific_image_evidence",
+      targetKind: "scientific_image_evidence_sidecar",
+      requiredToolFamily: "visual_analysis",
+      selectedCapability: "visual_analysis.inspect_image_region",
+      explicitCue: "scientific_image_evidence_sidecar",
+      requestedOutputs: expect.arrayContaining([
+        "scientific_evidence_packet",
+        "scientific_evidence_sidecar",
+        "theory_reflection",
+        "calculator_payload_filter",
+        "typed_failure",
+      ]),
+    });
+  });
+
+  it("routes Postulate Board evidence-ref revisions through the scientific sidecar path", () => {
+    const prompt =
+      "Revise this Postulate Board draft so its evidence refs cite the actual promoted page-grounded equation row, page number, crop ref, Image Lens source/hash, and evidence depth. Keep it candidate / diagnostic-only. Do not promote a badge or calculator payload.";
+    const resolution = resolveHelixAskBackendEntrypointFamily(prompt);
+
+    expect(requiresHelixAskBackendEntrypoint(prompt)).toBe(true);
+    expect(resolution).toMatchObject({
+      family: "scientific_image",
+      sourceTarget: "scientific_image_evidence",
+      targetKind: "scientific_image_evidence_sidecar",
+      requestedOutputs: expect.arrayContaining([
+        "scientific_evidence_packet",
+        "scientific_evidence_sidecar",
+        "calculator_payload_filter",
+        "typed_failure",
+      ]),
+    });
+  });
+
+  it("routes scientific Image Lens continuity audits through the backend sidecar path", () => {
+    const prompt =
+      "Run a scientific Image Lens evidence continuity audit. Use the latest scientific Image Lens sidecar, not chat memory or a fresh scholarly lookup. Report only: evidence depth, sidecar id, Image Lens source id, source image hash, page number, crop ref, promoted equation LaTeX, active promoted row blockers, and historical non-promoted row blockers.";
+    const resolution = resolveHelixAskBackendEntrypointFamily(prompt);
+
+    expect(requiresHelixAskBackendEntrypoint(prompt)).toBe(true);
+    expect(resolution).toMatchObject({
+      family: "scientific_image",
+      sourceTarget: "scientific_image_evidence",
+      targetKind: "scientific_image_evidence_sidecar",
+      requestedOutputs: expect.arrayContaining([
+        "scientific_evidence_sidecar",
+        "scientific_image_evidence_continuity_audit",
+        "latest_scientific_image_sidecar_ref",
+        "typed_failure",
+      ]),
+    });
+  });
+
+  it("routes postulate evidence-ref prompts that ask for latest sidecar refs through backend Ask", () => {
+    const prompt =
+      "Before rating this postulate, hydrate it from the latest scientific Image Lens sidecar, promoted page-grounded equation refs, graph reflection refs, crop ref, source/hash, and evidence depth.";
+    const resolution = resolveHelixAskBackendEntrypointFamily(prompt);
+
+    expect(requiresHelixAskBackendEntrypoint(prompt)).toBe(true);
+    expect(resolution).toMatchObject({
+      family: "scientific_image",
+      sourceTarget: "scientific_image_evidence",
+      targetKind: "scientific_image_evidence_sidecar",
+      requestedOutputs: expect.arrayContaining([
+        "scientific_evidence_sidecar",
+        "latest_scientific_image_sidecar_ref",
+      ]),
+    });
+  });
+
   it("marks the scientific sidecar as the missing evidence for backend route metadata", () => {
     const prompt = "Here is a scientific document image. Extract the equations and compare them to the theory badge graph.";
     const metadata = buildHelixAskHardBackendEntrypointRouteMetadata({

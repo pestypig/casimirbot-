@@ -23,6 +23,7 @@ function loadLocalImage() {
 beforeEach(() => {
   useDocumentImageRegionStore.setState(initialRegionState, true);
   useVisualSourceCaptureStore.setState(initialVisualState, true);
+  window.localStorage.clear();
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
   Object.defineProperty(URL, "createObjectURL", {
     configurable: true,
@@ -189,6 +190,64 @@ describe("ImageLensPanel", () => {
     expect(screen.getByLabelText("x")).toBeInTheDocument();
     expect(screen.getByLabelText("Source kind")).toBeInTheDocument();
     expect(screen.queryByLabelText("LaTeX candidate")).not.toBeInTheDocument();
+  });
+
+  it("reflects a mounted PDF page source from Ask/Image Lens evidence", async () => {
+    useDocumentImageRegionStore.getState().setSourceImage({
+      sourceImageUrl: "data:image/png;base64,pdf-page-source",
+      sourceAttachmentId: "pdf-page-render:panel",
+      sourceKind: "pdf_page_render",
+      pageNumber: 3,
+      pageCount: 11,
+      pageImageRef: "data:image/png;base64,pdf-page-source",
+      sourceId: "pdf-page-render:source",
+      evidenceId: "ask:test:image-lens-region",
+      regionId: "image_lens_region:panel",
+      scientificEvidenceSidecarId: "scientific_image_sidecar:panel",
+      scholarlySourcePdfRef: "artifact://scholarly-pdf/panel",
+      sourceRefHash: "sha256:panel-page",
+      mountedAt: "2026-07-07T14:00:00.000Z",
+    });
+
+    render(<ImageLensPanel />);
+
+    expect(await screen.findByTestId("image-lens-mounted-pdf-source")).toHaveTextContent("PDF page 3 / 11");
+    fireEvent.click(screen.getByRole("button", { name: /advanced/i }));
+    expect(await screen.findByLabelText("Page")).toHaveValue("3");
+    expect(screen.getByLabelText("Source kind")).toHaveValue("pdf_page_render");
+  });
+
+  it("recovers a retained PDF page source when the panel opens blank", async () => {
+    window.localStorage.setItem("helix:image-lens:last-document-source:v1", JSON.stringify({
+      sourceImageUrl: "data:image/png;base64,recovered-pdf-page-source",
+      sourceAttachmentId: "pdf-page-render:recovered-panel",
+      sourceKind: "pdf_page_render",
+      pageNumber: 5,
+      pageCount: 9,
+      pageImageRef: "data:image/png;base64,recovered-pdf-page-source",
+      sourceId: "pdf-page-render:recovered-source",
+      evidenceId: "ask:test:recovered-image-lens-region",
+      regionId: "image_lens_region:recovered-panel",
+      scientificEvidenceSidecarId: "scientific_image_sidecar:recovered-panel",
+      scholarlySourcePdfRef: "artifact://scholarly-pdf/recovered-panel",
+      sourceRefHash: "sha256:recovered-panel-page",
+      mountedAt: "2026-07-07T15:00:00.000Z",
+    }));
+
+    render(<ImageLensPanel />);
+
+    expect(await screen.findByText("Recovered page evidence from last Ask turn.")).toBeInTheDocument();
+    expect(await screen.findByTestId("image-lens-mounted-pdf-source")).toHaveTextContent("PDF page 5 / 9");
+    expect(await screen.findByAltText("Image source")).toHaveAttribute(
+      "src",
+      "data:image/png;base64,recovered-pdf-page-source",
+    );
+    expect(useDocumentImageRegionStore.getState().source).toMatchObject({
+      sourceImageUrl: "data:image/png;base64,recovered-pdf-page-source",
+      sourceKind: "pdf_page_render",
+      pageNumber: 5,
+      scientificEvidenceSidecarId: "scientific_image_sidecar:recovered-panel",
+    });
   });
 
   it("keeps UI copy inside the candidate and claim-boundary lane", () => {

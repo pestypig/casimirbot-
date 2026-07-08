@@ -111,6 +111,10 @@ export function HelixAskMinimalRuntimeTurnList({
 }: HelixAskMinimalRuntimeTurnListProps) {
   const views = buildHelixAskMinimalRuntimeTurnViews({ replies, providers });
   if (views.length === 0) return null;
+  const postulateEvidenceText = views
+    .slice(-8)
+    .map((view) => [`Turn ${view.turnId}:`, view.question, view.answerText].filter(Boolean).join("\n"))
+    .join("\n\n");
 
   return (
     <HelixAskTurnList className={className}>
@@ -199,6 +203,7 @@ export function HelixAskMinimalRuntimeTurnList({
                   debugCopyTestId="helix-ask-latest-debug-copy"
                   readAloudTestId="helix-ask-latest-read-aloud"
                   postulateText={view.answerText}
+                  postulateEvidenceText={postulateEvidenceText}
                   postulateTestId="helix-ask-postulate"
                   postulateOriginatingSessionId={view.turnId}
                   postulateOriginatingAnswerId={view.id}

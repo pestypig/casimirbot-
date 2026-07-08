@@ -1014,6 +1014,20 @@ describe("explicit workstation gateway derived calls", () => {
     });
   });
 
+  it("does not admit internet search from scientific Image Lens exact-row retry wording", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Use the current page 5 crop ref and equation candidate as the target. Re-crop the exact row containing only equation (7), but do not require overlap with the prior page-level candidate if the crop text exactly matches the same equation. Promote only if the row crop is single-line, non-truncated, has LaTeX, and supports exact equation admissibility.",
+      },
+    });
+
+    expect(capabilities(requests)).not.toContain("internet-search.search_web");
+    expect(capabilities(requests)).not.toContain("scholarly-research.lookup_papers");
+  });
+
   it("admits affirmative natural-language theory reflection fetch prompts", () => {
     const requests = readWorkstationGatewayCallRequestsForTurn({
       includePlannerDerived: true,
@@ -2293,6 +2307,48 @@ describe("explicit workstation gateway derived calls", () => {
     });
   });
 
+  it("keeps scientific Image Lens evidence reflection scoped away from unrelated search tools", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Reflect the promoted equation evidence to the Theory Badge Graph with diagnostic-only boundaries and report calculator template admissibility. Include source/hash and evidence depth from the prior scientific sidecar.",
+        route_metadata: {
+          schema: "helix.ask.route_metadata.v1",
+          source: "hard_tool_backend_entrypoint",
+          sourceTarget: "scientific_image_evidence",
+          requiredToolFamily: "visual_analysis",
+          source_target_intent: {
+            target_source: "scientific_image_evidence",
+            target_kind: "scientific_image_evidence_sidecar",
+            must_enter_backend_ask: true,
+            allow_client_shortcut: false,
+          },
+          mandatory_next_tool: {
+            tool_name: "visual_analysis.inspect_image_region",
+            missing_required_evidence: "scientific_evidence_sidecar",
+            canonical_goal: "scientific_image",
+          },
+        },
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["theory-badge-graph.reflect_discussion_context"]);
+    expect(JSON.stringify(requests)).not.toMatch(
+      /scholarly-research\.lookup_papers|internet-search\.search_web|repo\.search/,
+    );
+    expect(requests[0]).toMatchObject({
+      capability_id: "theory-badge-graph.reflect_discussion_context",
+      arguments: {
+        source_target_intent: expect.objectContaining({
+          target_source: "theory_badge_graph",
+          target_kind: "theory_context_reflection",
+        }),
+      },
+    });
+  });
+
   it("keeps the Codex workstation acceptance prompt as a multi-tool itinerary", () => {
     const requests = readWorkstationGatewayCallRequestsForTurn({
       includePlannerDerived: true,
@@ -2570,6 +2626,25 @@ describe("explicit workstation gateway derived calls", () => {
 
     expect(capabilities(requests)).toEqual(["theory-badge-graph.reflect_discussion_context"]);
     expect(JSON.stringify(requests)).not.toMatch(/scholarly-research\.lookup_papers|scientific-calculator\.solve_expression/);
+  });
+
+  it("does not treat Postulate Board Image Lens evidence refs as a fresh scholarly lookup request", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Revise this Postulate Board draft so its evidence refs cite the actual promoted page-grounded equation row, page number, crop ref, Image Lens source/hash, and evidence depth. Keep it candidate / diagnostic-only. Do not promote a badge or calculator payload.",
+        workspace_context_snapshot: {
+          activePanel: "postulate-board",
+          focusedPanel: "image-lens",
+          activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        },
+      },
+    });
+
+    expect(capabilities(requests)).not.toContain("scholarly-research.lookup_papers");
+    expect(capabilities(requests)).not.toContain("scientific-calculator.solve_expression");
   });
 
   it("routes paper-backed numeric binding for a prior formula to scholarly research without docs or calculator", () => {

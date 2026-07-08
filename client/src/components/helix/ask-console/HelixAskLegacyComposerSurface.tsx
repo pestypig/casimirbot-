@@ -1,5 +1,4 @@
-import type { Ref } from "react";
-import type { ReactNode } from "react";
+import React, { type ReactNode, type Ref } from "react";
 
 import {
   HelixAskComposerActionToolbarSurface,

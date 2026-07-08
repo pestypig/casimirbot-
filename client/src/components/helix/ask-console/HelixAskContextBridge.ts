@@ -1,5 +1,9 @@
+import { readHelixAskActiveImageLensSourceContext } from "./HelixAskImageLensContextBridge";
+
 export type HelixAskContextBridgeSnapshot = {
   activeDocPath: string | null;
+  activeImageLensSource?: Record<string, unknown> | null;
+  active_image_lens_source?: Record<string, unknown> | null;
 };
 
 export function readDocPathFromDesktopUrl(url: string): string | null {
@@ -13,7 +17,10 @@ export function readDocPathFromDesktopUrl(url: string): string | null {
 }
 
 export function buildHelixAskContextBridgeSnapshot(url: string): HelixAskContextBridgeSnapshot {
+  const activeImageLensSource = readHelixAskActiveImageLensSourceContext();
   return {
     activeDocPath: readDocPathFromDesktopUrl(url),
+    activeImageLensSource,
+    active_image_lens_source: activeImageLensSource,
   };
 }

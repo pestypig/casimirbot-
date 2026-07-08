@@ -1,14 +1,17 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { ImageLensRegionInspectionReceiptV1 } from "@shared/contracts/image-lens-region-inspection.v1";
 import { useDocumentImageRegionStore } from "@/store/useDocumentImageRegionStore";
+import { useImageLensLiveSourceStore } from "@/store/useImageLensLiveSourceStore";
 import { useVisualSourceCaptureStore } from "@/store/useVisualSourceCaptureStore";
 import { applyImageLensRegionInspectionReceipt } from "../imageLensRegionInspectionClient";
 
 const documentInitialState = useDocumentImageRegionStore.getState();
+const liveSourceInitialState = useImageLensLiveSourceStore.getState();
 const visualInitialState = useVisualSourceCaptureStore.getState();
 
 afterEach(() => {
   useDocumentImageRegionStore.setState(documentInitialState, true);
+  useImageLensLiveSourceStore.setState(liveSourceInitialState, true);
   useVisualSourceCaptureStore.setState(visualInitialState, true);
 });
 
@@ -120,5 +123,63 @@ describe("Image Lens region inspection client adapter", () => {
         }),
       ],
     });
+  });
+
+  it("mounts scholarly PDF page renders as visible Image Lens sources", () => {
+    useImageLensLiveSourceStore.getState().setLiveSource({
+      sourceId: "visual-source:live",
+      threadId: "thread:test",
+      stream: {} as MediaStream,
+      streamActive: true,
+      captureMode: "screen_share_lens",
+      createdAt: "2026-07-04T11:59:00.000Z",
+    });
+
+    const pdfReceipt: ImageLensRegionInspectionReceiptV1 = {
+      ...receiptFixture(),
+      source_kind: "pdf_page_render",
+      source_image_ref: null,
+      page_number: 1,
+      page_count: 8,
+      page_image_ref: "data:image/png;base64,pdf-page",
+      scholarly_source_pdf_ref: "artifact://scholarly-pdf/example.pdf",
+      scholarly_pdf_cache_path: "artifacts/helix/scholarly-pdfs/example.pdf",
+      document_region_receipt: {
+        ...receiptFixture().document_region_receipt,
+        sourceAttachmentId: "pdf-page-render:test",
+        sourceKind: "pdf_page_render",
+        locatorAnchor: {
+          ...receiptFixture().document_region_receipt.locatorAnchor,
+          pageNumber: 1,
+        },
+      },
+    };
+
+    applyImageLensRegionInspectionReceipt({
+      receipt: pdfReceipt,
+      threadId: "thread:test",
+      capturedAt: "2026-07-04T12:00:00.000Z",
+    });
+
+    expect(useImageLensLiveSourceStore.getState().liveSource).toBeNull();
+    expect(useDocumentImageRegionStore.getState().source).toMatchObject({
+      sourceImageUrl: "data:image/png;base64,pdf-page",
+      sourceAttachmentId: "pdf-page-render:test",
+      sourceKind: "pdf_page_render",
+      pageNumber: 1,
+    });
+    expect(useVisualSourceCaptureStore.getState().producers["image-lens-source:test"]?.frame_history).toEqual([
+      expect.objectContaining({
+        source_kind: "full_frame",
+        crop_only: false,
+        preview_data_url: "data:image/png;base64,pdf-page",
+        summary: "Rendered scholarly PDF page 1 mounted in Image Lens.",
+      }),
+      expect.objectContaining({
+        source_kind: "image_lens_crop",
+        crop_only: true,
+        crop_region_id: "image_lens_region:test",
+      }),
+    ]);
   });
 });

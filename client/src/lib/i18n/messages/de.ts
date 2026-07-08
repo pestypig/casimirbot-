@@ -463,6 +463,7 @@ export const deMessages = {
   "imageLens.status.imageLoadFailed": "Das Bild konnte nicht geladen werden. Überprüfen Sie die URL oder wählen Sie eine lokale Datei aus.",
   "imageLens.summary.manualCropFrame": "Manueller Zuschneiderahmen von Image Lens ({width}x{height}px). Live Answer visuelle Farbtöne eigene Interpretation.",
   "imageLens.liveSource.note": "Image Lens verwendet die visuelle Live-Quelle {sourceId}. Rohe Bildschirmbilder werden erst zusammengefasst, wenn ein Ausschnitt gesendet wird.",
+  "imageLens.pdfPage.status": "PDF-Seite {pageNumber}{pageCount}",
   "imageLens.sent.source": "Wird an die Live Answer-Quelle {sourceId} gesendet",
   "imageLens.sent.evidence": "- Beweise {evidenceId}",
   "imageLens.image.alt": "Bildquelle",

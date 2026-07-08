@@ -95,8 +95,8 @@ export const HELIX_ASK_CONSOLE_LEGACY_BEHAVIOR_CLASSIFICATIONS = [
   },
   {
     key: "legacy_bridge_default",
-    classification: "used_temporary_adapter",
-    evidence: "minimal shell is missing operator-surface parity; default remains legacy bridge",
+    classification: "used_must_move",
+    evidence: "legacy bridge remains the default until the recrowned minimal shell reaches live visual parity with the old Ask UI; do not grow HelixAskPill while extracting parity slices",
   },
   {
     key: "development_fallbacks_and_trap_doors",

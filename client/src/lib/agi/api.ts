@@ -55,6 +55,7 @@ import {
   isImageLensRegionInspectionReceiptV1,
   type ImageLensRegionInspectionReceiptV1,
 } from "@shared/contracts/image-lens-region-inspection.v1";
+import { ingestPostulateReviewReceiptsFromAskPayload } from "@/lib/agi/proposals";
 
 const HELIX_CONTEXT_CAPSULE_MAX_IDS = 12;
 
@@ -83,6 +84,21 @@ const collectImageLensRegionInspectionReceipts = (payload: unknown): ImageLensRe
   const pushReceipt = (value: unknown) => {
     if (isImageLensRegionInspectionReceiptV1(value)) receipts.push(value);
   };
+  const visitNestedReceipts = (value: unknown, depth = 0): void => {
+    if (depth > 8) return;
+    if (isImageLensRegionInspectionReceiptV1(value)) {
+      receipts.push(value);
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.slice(0, 80).forEach((entry) => visitNestedReceipts(entry, depth + 1));
+      return;
+    }
+    const record = readAgiRecord(value);
+    if (!record) return;
+    if (record.receipt) pushReceipt(record.receipt);
+    Object.values(record).slice(0, 120).forEach((entry) => visitNestedReceipts(entry, depth + 1));
+  };
   for (const packet of candidatePackets) {
     const packetRecord = readAgiRecord(packet);
     const stateDelta = readAgiRecord(packetRecord?.state_delta);
@@ -92,6 +108,7 @@ const collectImageLensRegionInspectionReceipts = (payload: unknown): ImageLensRe
   for (const result of candidateResults) {
     pushReceipt(readAgiRecord(result)?.receipt);
   }
+  visitNestedReceipts(payload);
   const seen = new Set<string>();
   return receipts.filter((receipt) => {
     const key = receipt.evidence_id || receipt.region_id;
@@ -2629,6 +2646,7 @@ export async function runAskTurnStream(
       data = rawData;
     }
     ingestImageLensRegionInspectionReceipts(data);
+    ingestPostulateReviewReceiptsFromAskPayload(data);
     const packet: HelixAskTurnStreamEvent = { event, data };
     onEvent?.(packet);
     if (event === "turn_final") finalPayload = data;
@@ -2929,6 +2947,7 @@ const buildBlockedJobDirectFallbackResponse = (
 
 const normalizeLocalAskResponse = (payload: unknown): LocalAskResponse => {
   ingestImageLensRegionInspectionReceipts(payload);
+  ingestPostulateReviewReceiptsFromAskPayload(payload);
   const record = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
   const selectedFinalAnswer = typeof record.selected_final_answer === "string" ? record.selected_final_answer.trim() : "";
   const assistantAnswer = typeof record.assistant_answer === "string" ? record.assistant_answer.trim() : "";

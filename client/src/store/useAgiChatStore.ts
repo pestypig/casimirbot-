@@ -41,7 +41,7 @@ const rawBudget = Number(import.meta.env?.VITE_CHAT_CONTEXT_BUDGET_TOKENS ?? 819
 export const CHAT_CONTEXT_BUDGET =
   Number.isFinite(rawBudget) && rawBudget > 0 ? Math.floor(rawBudget) : 8192;
 
-const STORAGE_KEY = "agi-chat-sessions-v1";
+export const AGI_CHAT_STORAGE_KEY = "agi-chat-sessions-v1";
 const DEFAULT_CHAT_TITLES = new Set(["New chat", "Helix Ask"]);
 
 function titleFromFirstMessage(content: string): string {
@@ -54,7 +54,7 @@ function registerChatMemoryArtifact(session: ChatSession) {
   useWorkspaceMemoryRegistryStore.getState().upsertArtifact({
     artifact_id: `helix-chat-session:${session.id}`,
     artifact_type: "helix_chat_session",
-    storage_key: STORAGE_KEY,
+    storage_key: AGI_CHAT_STORAGE_KEY,
     storage_backend: "localStorage",
     owner_scope: "browser_guest",
     sync_status: "profile_candidate",
@@ -272,12 +272,13 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
       }
     }),
     {
-      name: STORAGE_KEY,
+      name: AGI_CHAT_STORAGE_KEY,
       partialize: (state) => ({
         sessions: state.sessions,
         activeId: state.activeId,
       }),
       onRehydrateStorage: () => (state) => {
+        Object.values(state?.sessions ?? {}).forEach(registerChatMemoryArtifact);
         state?.setHydrated(true);
       },
     }

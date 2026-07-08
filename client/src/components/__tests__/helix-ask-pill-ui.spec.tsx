@@ -3,6 +3,10 @@ import path from "node:path";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { buildHelixAskConsoleContextFiles } from "@/components/helix/ask-console/HelixAskRequestEnvelope";
+import { appendHelixAskConsoleReplyChronologically } from "@/components/helix/ask-console/HelixAskReplyLifecycle";
+
+const appendHelixAskReplyChronologically = (replies: any[], reply: any, limit = 50): any[] =>
+  appendHelixAskConsoleReplyChronologically(replies, reply, limit);
 
 let mergeVoiceTranscriptDraft: typeof import("@/components/helix/HelixAskPill").mergeVoiceTranscriptDraft;
 let resolveVoiceDispatchTranscriptFromDraft: typeof import("@/components/helix/HelixAskPill").resolveVoiceDispatchTranscriptFromDraft;
@@ -94,7 +98,6 @@ let resolveHelixAskFinalAnswerPresentation: typeof import("@/components/helix/He
 let readHelixAskFinalAnswerSourceLabel: typeof import("@/components/helix/HelixAskPill").readHelixAskFinalAnswerSourceLabel;
 let readReasoningTheaterHardFailureSignals: typeof import("@/components/helix/HelixAskPill").readReasoningTheaterHardFailureSignals;
 let sortHelixAskRepliesChronologically: typeof import("@/components/helix/HelixAskPill").sortHelixAskRepliesChronologically;
-let appendHelixAskReplyChronologically: typeof import("@/components/helix/HelixAskPill").appendHelixAskReplyChronologically;
 let buildHelixAskRepliesFromChatSession: typeof import("@/components/helix/HelixAskPill").buildHelixAskRepliesFromChatSession;
 let shouldRenderHelixAskActiveTurnStream: typeof import("@/components/helix/HelixAskPill").shouldRenderHelixAskActiveTurnStream;
 let shouldAdmitHelixAskExternalLiveEventToActiveStream: typeof import("@/components/helix/HelixAskPill").shouldAdmitHelixAskExternalLiveEventToActiveStream;
@@ -215,7 +218,6 @@ beforeAll(async () => {
     readHelixAskFinalAnswerSourceLabel,
     readReasoningTheaterHardFailureSignals,
     sortHelixAskRepliesChronologically,
-    appendHelixAskReplyChronologically,
     buildHelixAskRepliesFromChatSession,
     shouldRenderHelixAskActiveTurnStream,
     shouldAdmitHelixAskExternalLiveEventToActiveStream,
@@ -3809,7 +3811,7 @@ describe("HelixAskPill mic helper behavior", () => {
     ).toBe(true);
     expect(
       shouldAutoSpeakAnswerForTurn({
-        micArmState: "on",
+        micArmState: "off",
         inputSource: "voice_auto",
         answerAuthority: "sealed_final",
         toolIntent: "none",
@@ -3835,7 +3837,8 @@ describe("HelixAskPill mic helper behavior", () => {
       finalTimelineType: "reasoning_final",
     };
 
-    expect(shouldAutoSpeakAnswerForTurn({ ...base, micArmState: "off" })).toBe(false);
+    expect(shouldAutoSpeakAnswerForTurn({ ...base, micArmState: "off" })).toBe(true);
+    expect(shouldAutoSpeakAnswerForTurn({ ...base, micArmState: "off", inputSource: "manual" })).toBe(false);
     expect(shouldAutoSpeakAnswerForTurn({ ...base, userMuted: true })).toBe(false);
     expect(shouldAutoSpeakAnswerForTurn({ ...base, answerAuthority: "provisional" })).toBe(false);
     expect(shouldAutoSpeakAnswerForTurn({ ...base, toolIntent: "tool_only" })).toBe(false);

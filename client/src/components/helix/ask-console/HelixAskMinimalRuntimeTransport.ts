@@ -1,5 +1,6 @@
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
 import type { HelixLanguageModelProfileId } from "@shared/helix-language-model-policy";
+import type { HelixAskRouteMetadata } from "@/lib/helix/ask-prompt-launch";
 
 import {
   buildHelixAskConsoleBackendTurnPayloadCore,
@@ -18,6 +19,15 @@ export type HelixAskMinimalRuntimeTurnPayload = {
   maxTokens: number;
   question: string;
   contextFiles?: string[];
+  workspace_context_snapshot?: Record<string, unknown>;
+  routeMetadata?: HelixAskRouteMetadata;
+  route_metadata?: HelixAskRouteMetadata;
+  bypassWorkstationDispatch?: boolean;
+  bypass_workstation_dispatch?: boolean;
+  forceReasoningDispatch?: boolean;
+  force_reasoning_dispatch?: boolean;
+  suppressWorkstationPayloadActions?: boolean;
+  suppress_workstation_payload_actions?: boolean;
 };
 
 export type HelixAskMinimalRuntimeStreamEvent = {
@@ -56,7 +66,13 @@ export function buildHelixAskMinimalRuntimeTurnPayload(args: {
     question: envelope.question,
     contextFiles: buildHelixAskConsoleContextFiles({
       docsViewerAnchorPath: args.submitPlan.context.activeDocPath,
+      workspaceContextSnapshot: args.submitPlan.context as unknown as Record<string, unknown>,
     }),
+    workspaceContextSnapshot: args.submitPlan.context as unknown as Record<string, unknown>,
+    routeMetadata: args.submitPlan.pendingPrompt?.routeMetadata,
+    bypassWorkstationDispatch: args.submitPlan.pendingPrompt?.bypassWorkstationDispatch,
+    forceReasoningDispatch: args.submitPlan.pendingPrompt?.forceReasoningDispatch,
+    suppressWorkstationPayloadActions: args.submitPlan.pendingPrompt?.suppressWorkstationPayloadActions,
   });
 }
 

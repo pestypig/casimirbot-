@@ -1,5 +1,6 @@
 import type { ImageLensRegionInspectionReceiptV1 } from "@shared/contracts/image-lens-region-inspection.v1";
 import { useDocumentImageRegionStore } from "@/store/useDocumentImageRegionStore";
+import { useImageLensLiveSourceStore } from "@/store/useImageLensLiveSourceStore";
 import {
   VISUAL_SOURCE_FRAME_HISTORY_TTL_MS,
   type VisualSourceCaptureFrameHistoryItem,
@@ -43,14 +44,27 @@ export function applyImageLensRegionInspectionReceipt(
   const sourceImageRef = receipt.source_kind === "pdf_page_render"
     ? receipt.page_image_ref ?? receipt.source_image_ref
     : receipt.source_image_ref ?? receipt.page_image_ref;
+  const sourceImageDisplayable = isDisplayableImageRef(sourceImageRef);
 
   const documentStore = useDocumentImageRegionStore.getState();
-  if (isDisplayableImageRef(sourceImageRef)) {
+  if (sourceImageDisplayable) {
+    if (receipt.source_kind === "pdf_page_render") {
+      useImageLensLiveSourceStore.getState().clearLiveSource();
+    }
     documentStore.setSourceImage({
       sourceImageUrl: sourceImageRef,
       sourceAttachmentId: documentReceipt.sourceAttachmentId,
       sourceKind: receipt.source_kind,
       pageNumber: receipt.page_number,
+      pageCount: receipt.page_count ?? null,
+      pageImageRef: receipt.page_image_ref ?? null,
+      sourceId,
+      evidenceId: receipt.evidence_id,
+      regionId: receipt.region_id,
+      scientificEvidenceSidecarId: receipt.scientific_evidence_sidecar?.sidecar_id ?? null,
+      scholarlySourcePdfRef: receipt.scholarly_source_pdf_ref ?? null,
+      sourceRefHash: receipt.scientific_evidence_packet?.source_ref_hash ?? receipt.scientific_evidence_sidecar?.source_ref_hash ?? null,
+      mountedAt: capturedAt,
     });
   }
   useDocumentImageRegionStore.getState().setCropDraft(receipt.bbox_px);
@@ -68,12 +82,45 @@ export function applyImageLensRegionInspectionReceipt(
     cadence_ms: null,
     last_frame_at: capturedAt,
     last_heartbeat_at: capturedAt,
-    last_frame_hash: documentReceipt.crop.imageHash,
-    last_frame_preview_data_url: receipt.crop_image_ref,
+    last_frame_hash: sourceImageDisplayable ? hashString(sourceImageRef) : documentReceipt.crop.imageHash,
+    last_frame_preview_data_url: sourceImageDisplayable ? sourceImageRef : receipt.crop_image_ref,
     capture_count: 1,
     post_count: 0,
     last_error: null,
   });
+  if (sourceImageDisplayable && receipt.source_kind === "pdf_page_render") {
+    const pageFrame: VisualSourceCaptureFrameHistoryItem = {
+      history_id: `image_lens_page_source_history:${receipt.region_id}`,
+      source_id: sourceId,
+      frame_id: `${frameId}:source-page`,
+      evidence_id: null,
+      captured_at: capturedAt,
+      preview_data_url: sourceImageRef,
+      preview_hash: hashString(sourceImageRef),
+      source_kind: "full_frame",
+      crop_only: false,
+      crop_bbox_px: null,
+      crop_region_id: null,
+      summary: receipt.page_number
+        ? `Rendered scholarly PDF page ${receipt.page_number} mounted in Image Lens.`
+        : "Rendered scholarly PDF page mounted in Image Lens.",
+      visual_observer_profile_id: documentReceipt.visualSource.observerProfileId,
+      visual_observer_profile_title: "Image Lens PDF page source",
+      visual_prompt_hash: hashString([
+        receipt.scholarly_source_pdf_ref ?? "",
+        receipt.page_number ?? "",
+        receipt.page_count ?? "",
+      ].join("|")),
+      expires_at: expiresAt,
+    };
+    useVisualSourceCaptureStore.getState().appendFrameHistory(sourceId, pageFrame, {
+      last_frame_at: capturedAt,
+      last_heartbeat_at: capturedAt,
+      last_frame_hash: pageFrame.preview_hash,
+      last_frame_preview_data_url: sourceImageRef,
+      post_count: 0,
+    });
+  }
 
   const frame: VisualSourceCaptureFrameHistoryItem = {
     history_id: `image_lens_region_history:${receipt.region_id}`,

@@ -15,7 +15,9 @@ export type HelixLanguageModelPersistenceScope = "session" | "turn";
 export type HelixLanguageModelPolicy = {
   schema: typeof HELIX_LANGUAGE_MODEL_POLICY_SCHEMA;
   requested_profile: HelixLanguageModelProfileId;
+  initial_requested_profile: HelixLanguageModelProfileId;
   resolved_profile: Exclude<HelixLanguageModelProfileId, "auto">;
+  auto_selected_profile: Exclude<HelixLanguageModelProfileId, "auto"> | null;
   resolved_model: string;
   reasoning_effort: HelixLanguageReasoningEffort;
   verbosity: "low" | "medium" | "high";
@@ -24,6 +26,7 @@ export type HelixLanguageModelPolicy = {
   persistence_scope: HelixLanguageModelPersistenceScope;
   selection_reason: string;
   escalation_reason: string | null;
+  policy_signals: string[];
   downgrade_reason: string | null;
   account_policy: HelixAccountType;
   budget_limits: {
@@ -50,6 +53,15 @@ export type HelixLanguageModelPolicyInput = {
   promptText?: string | null;
   taskClass?: string | null;
   runtimeAgentLaunchMode?: string | null;
+  promptIntent?: unknown;
+  routeClassification?: unknown;
+  requiredCapabilities?: unknown;
+  sourceTargets?: unknown;
+  toolAdmission?: unknown;
+  evidenceState?: unknown;
+  terminalAuthorityState?: unknown;
+  failureState?: unknown;
+  synthesisState?: unknown;
   modelAccess?: Partial<Record<Exclude<HelixLanguageModelProfileId, "auto">, boolean>>;
 };
 
@@ -104,36 +116,171 @@ const normalizeAccountType = (value: unknown): HelixAccountType =>
 const readText = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
+const stringifySignal = (value: unknown): string => {
+  if (typeof value === "string") return value;
+  if (value == null) return "";
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "";
+  }
+};
+
+const compactSignals = (signals: string[]): string[] => {
+  const seen = new Set<string>();
+  const compacted: string[] = [];
+  for (const signal of signals) {
+    if (!signal || seen.has(signal)) continue;
+    seen.add(signal);
+    compacted.push(signal);
+  }
+  return compacted;
+};
+
 const classifyAutoProfile = (input: HelixLanguageModelPolicyInput): {
   profile: Exclude<HelixLanguageModelProfileId, "auto">;
   reason: string;
   escalationReason: string | null;
+  signals: string[];
 } => {
   const taskClass = readText(input.taskClass).toLowerCase();
   const launchMode = readText(input.runtimeAgentLaunchMode).toLowerCase();
   const prompt = readText(input.promptText).toLowerCase();
+  const runtimeState = [
+    input.promptIntent,
+    input.routeClassification,
+    input.requiredCapabilities,
+    input.sourceTargets,
+    input.toolAdmission,
+    input.evidenceState,
+    input.terminalAuthorityState,
+    input.failureState,
+    input.synthesisState,
+  ]
+    .map(stringifySignal)
+    .join(" ")
+    .toLowerCase();
+  const haystack = `${taskClass} ${launchMode} ${prompt} ${runtimeState}`;
+  const signals: string[] = [];
+  const addSignal = (signal: string, matched: boolean): boolean => {
+    if (matched) signals.push(signal);
+    return matched;
+  };
+
+  const lightweightCandidateSearch =
+    /\b(candidate|candidates|starting points?|starter|metadata|lookup|find papers?|find candidate papers?)\b/.test(prompt) &&
+    /\b(no synthesis|not a synthesis|only need starting points?|starting points only)\b/.test(prompt);
+  if (lightweightCandidateSearch) {
+    signals.push("lightweight_candidate_listing");
+  }
+
+  const simpleOneSentence = addSignal("simple_one_sentence", /\bone sentence\b/.test(prompt));
+  const wordingOnly = addSignal("wording_only", /\b(rewrite|rephrase|fix wording|clearer tone|grammar|spelling)\b/.test(prompt));
+  const shortStatus = addSignal("short_status", /\b(quick status|current status|brief status)\b/.test(prompt));
+  const simpleTurn = simpleOneSentence || wordingOnly || shortStatus;
+
+  const debugExportAnalysis = addSignal("debug_export_analysis", /\bdebug export\b/.test(haystack));
+  const gatewayFailureAnalysis = addSignal(
+    "gateway_failure_analysis",
+    /\b(blocked gateway|failed gateway|gateway request|tool receipt|action receipt|tavily_requires_tavily_api_key|query_too_broad)\b/.test(haystack),
+  );
+  const evidenceReentryFailure = addSignal(
+    "evidence_reentry_failure",
+    /\b(observation_not_reentered|not re[-\s]?entered|evidence re[-\s]?entry|reentry gate|re-entry gate)\b/.test(haystack),
+  );
+  const terminalAuthorityDispute = addSignal(
+    "terminal_authority_dispute",
+    /\b(terminal authority dispute|route authority dispute|terminal_authority_missing|terminal_authority_mismatch|route_authority|terminal_authority)\b/.test(runtimeState),
+  );
+  const repairPlanning = addSignal(
+    "repair_planning",
+    /\b(repair plan|repair target|what bugs remain|bugs remain|failure analysis|diagnose)\b/.test(haystack),
+  );
+  const deepFailureOrRepair =
+    debugExportAnalysis ||
+    gatewayFailureAnalysis ||
+    evidenceReentryFailure ||
+    terminalAuthorityDispute ||
+    repairPlanning;
+
+  const scholarlySynthesis = addSignal(
+    "scholarly_synthesis",
+    !lightweightCandidateSearch &&
+      /\b(compare|strongest|synthesize|synthesis|rank|weigh|evaluate)\b/.test(prompt) &&
+      /\b(papers?|scholarly|research)\b/.test(haystack),
+  );
+  const viabilityJudgment = addSignal(
+    "viability_judgment",
+    /\b(viability|nhm2 viability|proof|certification|certified|claim boundary|physical viability)\b/.test(haystack),
+  );
+  const multiSourceComparison = addSignal(
+    "multi_source_comparison",
+    /\b(multi[-\s]?source|compare the strongest|strongest candidate|what they imply)\b/.test(haystack),
+  );
+  const deepSynthesis = scholarlySynthesis || viabilityJudgment || multiSourceComparison;
+
+  const sourceTargetedArchitecture = addSignal(
+    "source_targeted_architecture",
+    /\b(source[-\s]?targeted|from the code|repo search|code architecture|implementation plan|runtime agent architecture)\b/.test(haystack),
+  );
+
+  if (deepFailureOrRepair || deepSynthesis || sourceTargetedArchitecture) {
+    return {
+      profile: "deep",
+      reason: "Auto selected Deep after runtime policy signals indicated failure repair, source-targeted architecture, synthesis, or authority-sensitive work.",
+      escalationReason: compactSignals(signals).join("+") || "runtime_auto_escalation",
+      signals: compactSignals(signals),
+    };
+  }
+
+  if (simpleTurn && !/\b(attached context|current document|source|evidence|tool|route|authority|architecture)\b/.test(prompt)) {
+    return {
+      profile: "fast",
+      reason: "Auto selected Fast for a simple lightweight turn.",
+      escalationReason: null,
+      signals: compactSignals(signals),
+    };
+  }
+
+  if (lightweightCandidateSearch) {
+    return {
+      profile: "fast",
+      reason: "Auto selected Fast for lightweight candidate gathering without synthesis.",
+      escalationReason: null,
+      signals: compactSignals(signals),
+    };
+  }
+
   if (
-    /\b(deep|research|debug|implement|refactor|architecture|multi[-\s]?step|tool[-\s]?heavy|reasoning|verify|diagnose)\b/.test(
-      `${taskClass} ${launchMode} ${prompt}`,
+    /\b(deep|research, implement|implement|refactor|multi[-\s]?step|tool[-\s]?heavy|verify)\b/.test(
+      haystack,
     )
   ) {
+    signals.push("complex_tool_planning");
     return {
       profile: "deep",
       reason: "Auto selected Deep for complex reasoning or tool-heavy work.",
       escalationReason: "complex_tool_planning",
+      signals: compactSignals(signals),
     };
   }
-  if (/\b(quick|fast|classify|summarize|status|voice|latency|short)\b/.test(`${taskClass} ${launchMode} ${prompt}`)) {
+  if (/\b(quick|fast|classify|summarize|status|voice|latency|short)\b/.test(haystack)) {
+    signals.push("latency_or_summary");
     return {
       profile: "fast",
       reason: "Auto selected Fast for a latency-sensitive or lightweight turn.",
       escalationReason: null,
+      signals: compactSignals(signals),
     };
+  }
+  if (/\b(explain|architecture|route proposals|tool receipts|final answer authority|bounded document|ordinary tool)\b/.test(haystack)) {
+    signals.push("balanced_explanation_or_tool_aware");
   }
   return {
     profile: "balanced",
     reason: "Auto selected Balanced as the default general-purpose profile.",
     escalationReason: null,
+    signals: compactSignals(signals),
   };
 };
 
@@ -204,7 +351,9 @@ export const resolveHelixLanguageModelPolicy = (
   return {
     schema: HELIX_LANGUAGE_MODEL_POLICY_SCHEMA,
     requested_profile: requestedProfile,
+    initial_requested_profile: requestedProfile,
     resolved_profile: resolvedProfile,
+    auto_selected_profile: autoSelection?.profile ?? null,
     resolved_model: resolvedModel,
     reasoning_effort: spec.reasoning,
     verbosity: spec.verbosity,
@@ -213,6 +362,7 @@ export const resolveHelixLanguageModelPolicy = (
     persistence_scope: requestedProfile === "auto" ? "turn" : "session",
     selection_reason: selectionReason,
     escalation_reason: autoSelection?.escalationReason ?? null,
+    policy_signals: autoSelection?.signals ?? [],
     downgrade_reason: downgradeReason,
     account_policy: accountType,
     budget_limits: {

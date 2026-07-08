@@ -322,8 +322,8 @@ describe("Helix Ask backend entrypoint projection guard", () => {
     ).toBeNull();
   });
 
-  it("fails closed instead of projecting a durable chat final for hard calculator prompts", () => {
-    const [reply] = buildHelixAskRepliesFromChatSession({
+  it("suppresses durable chat projection for hard calculator prompts without backend receipts", () => {
+    const replies = buildHelixAskRepliesFromChatSession({
       id: "session-1",
       title: "Helix Ask",
       createdAt: "2026-06-16T00:00:00.000Z",
@@ -347,14 +347,7 @@ describe("Helix Ask backend entrypoint projection guard", () => {
       ],
     } as never);
 
-    expect(reply.content).toBe("This prompt requires the backend Ask solver path before a final answer can be shown.");
-    expect(reply.ok).toBe(false);
-    expect(reply.final_answer_source).toBe("typed_failure");
-    expect(reply.terminal_artifact_kind).toBe("typed_failure");
-    expect(reply.terminal_error_code).toBe("backend_ask_entry_required");
-    expect(reply.debug?.ask_entrypoint_required).toBe(true);
-    expect(reply.debug?.ask_entrypoint_observed).toBe(false);
-    expect(reply.debug?.blocked_projection_kind).toBe("durable_chat_session");
+    expect(replies).toEqual([]);
   });
 
   it("allows ordinary durable chat projections that do not require the Ask solver entrypoint", () => {
@@ -426,7 +419,7 @@ describe("Helix Ask backend entrypoint projection guard", () => {
   });
 
   it("does not treat an ask-shaped durable chat trace id as backend entrypoint evidence", () => {
-    const [reply] = buildHelixAskRepliesFromChatSession({
+    const replies = buildHelixAskRepliesFromChatSession({
       id: "session-3",
       title: "Helix Ask",
       createdAt: "2026-06-16T00:00:00.000Z",
@@ -452,17 +445,11 @@ describe("Helix Ask backend entrypoint projection guard", () => {
       ],
     } as never);
 
-    expect(reply.content).toBe("This prompt requires the backend Ask solver path before a final answer can be shown.");
-    expect(reply.ok).toBe(false);
-    expect(reply.final_answer_source).toBe("typed_failure");
-    expect(reply.terminal_error_code).toBe("backend_ask_entry_required");
-    expect(reply.debug?.ask_entrypoint_required).toBe(true);
-    expect(reply.debug?.ask_entrypoint_observed).toBe(false);
-    expect(reply.debug?.blocked_projection_kind).toBe("durable_chat_session");
+    expect(replies).toEqual([]);
   });
 
   it("exposes backend entrypoint failure fields in debug export", () => {
-    const [reply] = buildHelixAskRepliesFromChatSession({
+    const replies = buildHelixAskRepliesFromChatSession({
       id: "session-4",
       title: "Helix Ask",
       createdAt: "2026-06-16T00:00:00.000Z",
@@ -486,25 +473,11 @@ describe("Helix Ask backend entrypoint projection guard", () => {
       ],
     } as never);
 
-    const debugExport = JSON.parse(
-      buildHelixDebugExportEnvelopeFromMasterPayload(
-        { id: reply.id, question: reply.question, content: reply.content },
-        { ...reply, debug: reply.debug } as Record<string, unknown>,
-      ),
-    ) as Record<string, unknown>;
-
-    expect(debugExport.ask_entrypoint_required).toBe(true);
-    expect(debugExport.ask_entrypoint_observed).toBe(false);
-    expect(debugExport.ask_entrypoint_failure_code).toBe("backend_ask_entry_required");
-    expect(debugExport.blocked_projection_kind).toBe("durable_chat_session");
-    expect(debugExport.final_answer_source).toBe("typed_failure");
-    expect(debugExport.terminal_artifact_kind).toBe("typed_failure");
-    expect(debugExport.first_broken_rail).toBe("backend_ask_entrypoint");
-    expect(debugExport.repair_target).toBe("prompt_submit_entrypoint");
+    expect(replies).toEqual([]);
   });
 
   it("exposes backend entrypoint failure fields in the Helix Ask pill debug export", () => {
-    const [reply] = buildHelixAskRepliesFromChatSession({
+    const replies = buildHelixAskRepliesFromChatSession({
       id: "session-5",
       title: "Helix Ask",
       createdAt: "2026-06-16T00:00:00.000Z",
@@ -530,26 +503,7 @@ describe("Helix Ask backend entrypoint projection guard", () => {
       ],
     } as never);
 
-    const debugExport = JSON.parse(
-      buildHelixPillDebugExportEnvelopeFromMasterPayload(reply, {
-        selectedDebugQuestion: reply.question,
-        selectedDebugFinalAnswer: reply.content,
-        finalAnswer: reply.content,
-        debug: reply.debug,
-      } as Record<string, unknown>),
-    ) as Record<string, unknown>;
-
-    expect(debugExport.selected_final_answer).toBe(
-      "This prompt requires the backend Ask solver path before a final answer can be shown.",
-    );
-    expect(debugExport.final_answer_source).toBe("typed_failure");
-    expect(debugExport.terminal_artifact_kind).toBe("typed_failure");
-    expect(debugExport.terminal_error_code).toBe("backend_ask_entry_required");
-    expect(debugExport.ask_entrypoint_required).toBe(true);
-    expect(debugExport.ask_entrypoint_observed).toBe(false);
-    expect(debugExport.ask_entrypoint_failure_code).toBe("backend_ask_entry_required");
-    expect(debugExport.blocked_projection_kind).toBe("durable_chat_session");
-    expect((debugExport.ui_debug_parity_harness as Record<string, unknown>).ui_answer_equals_selected_final_answer).toBe(true);
+    expect(replies).toEqual([]);
   });
 
   it("does not project scholarly workstation evaluation text when backend Ask entrypoint is missing", () => {
@@ -582,8 +536,11 @@ describe("Helix Ask backend entrypoint projection guard", () => {
       ),
     ) as Record<string, unknown>;
 
-    for (const debugExport of [reusableDebugExport, pillDebugExport]) {
-      expect(debugExport.selected_final_answer).toBe(
+    for (const [label, debugExport] of [
+      ["reusable", reusableDebugExport],
+      ["pill", pillDebugExport],
+    ] as const) {
+      expect(debugExport.selected_final_answer, label).toBe(
         "This prompt requires the backend Ask solver path before a final answer can be shown.",
       );
       expect(debugExport.final_answer_source).toBe("typed_failure");
@@ -593,6 +550,56 @@ describe("Helix Ask backend entrypoint projection guard", () => {
       expect(debugExport.ask_entrypoint_observed).toBe(false);
       expect(debugExport.first_broken_rail).toBe("backend_ask_entrypoint");
       expect(debugExport.selected_final_answer).not.toContain("pdf_or_full_text_url_required");
+    }
+  });
+
+  it("does not preserve generic typed failure text when a hard prompt explicitly missed the backend entrypoint", () => {
+    const prompt =
+      "Using my previous reflection in this chat, and the currently promoted page-grounded equation evidence, help frame it into a candidate postulate.";
+    const payload = {
+      id: "ask:postulate-entrypoint-missed",
+      question: prompt,
+      content: "I could not complete that turn.",
+      selected_final_answer: "I could not complete that turn.",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: null,
+      ask_entrypoint_required: true,
+      ask_entrypoint_observed: false,
+      ask_entrypoint_failure_code: "backend_ask_entry_required",
+      blocked_projection_kind: "client_projection",
+      debug_export_source: "backend_ref_advertised",
+      debug_export_ref: {
+        endpoint: "/api/agi/ask/turn/ask%3Apostulate-entrypoint-missed/debug-export",
+        turn_id: "ask:postulate-entrypoint-missed",
+      },
+    } as Record<string, unknown>;
+
+    const reusableDebugExport = JSON.parse(
+      buildHelixDebugExportEnvelopeFromMasterPayload(
+        { id: "ask:postulate-entrypoint-missed", question: prompt, content: "I could not complete that turn." },
+        payload,
+      ),
+    ) as Record<string, unknown>;
+    const pillDebugExport = JSON.parse(
+      buildHelixPillDebugExportEnvelopeFromMasterPayload(
+        { id: "ask:postulate-entrypoint-missed", question: prompt, content: "I could not complete that turn." } as never,
+        payload,
+      ),
+    ) as Record<string, unknown>;
+
+    for (const [label, debugExport] of [
+      ["reusable", reusableDebugExport],
+      ["pill", pillDebugExport],
+    ] as const) {
+      expect(debugExport.selected_final_answer, label).toBe(
+        "This prompt requires the backend Ask solver path before a final answer can be shown.",
+      );
+      expect(debugExport.final_answer_source, label).toBe("typed_failure");
+      expect(debugExport.terminal_artifact_kind, label).toBe("typed_failure");
+      expect(debugExport.terminal_error_code, label).toBe("backend_ask_entry_required");
+      expect(debugExport.first_broken_rail, label).toBe("backend_ask_entrypoint");
+      expect(debugExport.repair_target, label).toBe("prompt_submit_entrypoint");
     }
   });
 });

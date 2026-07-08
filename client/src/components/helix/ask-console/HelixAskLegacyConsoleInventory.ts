@@ -27,7 +27,7 @@ export const HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT = {
   liveRenderSliceStartsAtLine: 25288,
   liveLegacyConsoleViewStartsAtLine: 25288,
   inventoryReason:
-    "The active bridge still imports the whole legacy file, but the visible console render path is concentrated near the bottom and now enters the recrowned legacy console view before composing recrowned ask-console display owners.",
+    "The normal Ask path remains on the legacy-looking bridge until the recrowned minimal runtime shell reaches live visual parity. Extracted ask-console display owners should continue to grow in the recrowned directory, not inside HelixAskPill.",
 } as const;
 
 export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
@@ -36,7 +36,7 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     classification: "live_day_to_day_must_move",
     source: "HelixAskPill.tsx",
     evidence:
-      "HelixAskLegacyRuntimeBridge currently returns <HelixAskPill {...props} />, so the whole file remains active through the default legacy bridge.",
+      "HelixAskLegacyRuntimeBridge returns <HelixAskPill {...props} /> and remains the default only because live visual parity is not accepted yet. Do not grow HelixAskPill; move needed surface slices into ask-console before replacing the bridge.",
   },
   {
     key: "visible_console_layout",

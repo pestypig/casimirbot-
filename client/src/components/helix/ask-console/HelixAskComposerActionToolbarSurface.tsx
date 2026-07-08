@@ -1,4 +1,4 @@
-import type { ChangeEventHandler, Ref } from "react";
+import React, { type ChangeEventHandler, type Ref } from "react";
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
 
 import { HelixAskActionToolbar } from "./HelixAskActionToolbar";

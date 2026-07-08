@@ -5032,6 +5032,9 @@ describe("Helix workstation tool gateway", () => {
     });
     const observation = result.observation as {
       calculator_payloads?: Array<Record<string, unknown>>;
+      calculator_template_payloads?: Array<Record<string, unknown>>;
+      calculator_template_admissibility?: Record<string, unknown>;
+      claim_boundary_notes?: string[];
       recommended_actions_solve?: boolean;
       terminal_eligible?: boolean;
       assistant_answer?: boolean;
@@ -5054,6 +5057,22 @@ describe("Helix workstation tool gateway", () => {
         }),
       ]),
     );
+    expect(observation.calculator_template_payloads).toEqual(observation.calculator_payloads);
+    expect(observation.calculator_template_admissibility).toMatchObject({
+      schema: "helix.calculator_template_admissibility.v1",
+      status: "template_admissible",
+      admitted_template_count: expect.any(Number),
+      calculation_ready_count: 0,
+      binding_status: "unbound_variables_units_assumptions",
+      claim_boundary: "templates_only_not_calculator_solve_authority",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(observation.claim_boundary_notes).toEqual(expect.arrayContaining([
+      "calculator_template_boundary=admitted calculator payloads are diagnostic templates unless variables, units, assumptions, and source refs are bound.",
+      "final_answer_guard=OCR candidates, graph matches, calculator templates, calculator-ready payloads, and proof/validation must remain separate.",
+    ]));
     expect(observation.recommended_actions_solve).toBe(false);
     expect(observation.terminal_eligible).toBe(false);
     expect(observation.assistant_answer).toBe(false);

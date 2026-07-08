@@ -12,8 +12,13 @@ import {
   shouldTreatVoicePlaybackErrorAsEnded,
 } from "@/lib/helix/ask-voice-playback-classification";
 import {
+  HELIX_VOICE_FORCE_DIRECT_MOBILE,
+  isActivePlayback,
+  isLikelyMobileAudioUserAgent,
   resolveVoicePlaybackAttemptPath,
+  resolveVoicePlaybackGain,
   shouldBypassVoicePlaybackGraph,
+  shouldUseVoicePlaybackAudioGraph,
 } from "@/lib/helix/ask-voice-playback-runtime";
 import { describeMediaErrorCode } from "@/lib/helix/ask-voice-capture-display";
 import {
@@ -30,6 +35,16 @@ export const VOICE_PLAYBACK_NO_PROGRESS_TIMEOUT_MS = 3_500;
 export const VOICE_PLAYBACK_UNKNOWN_DURATION_TIMEOUT_MS = 15_000;
 export const VOICE_PLAYBACK_DURATION_TIMEOUT_PAD_MS = 4_000;
 export const VOICE_PLAYBACK_DURATION_TIMEOUT_MAX_MS = 60_000;
+
+export {
+  HELIX_VOICE_FORCE_DIRECT_MOBILE,
+  isActivePlayback,
+  isLikelyMobileAudioUserAgent,
+  resolveVoicePlaybackAttemptPath,
+  resolveVoicePlaybackGain,
+  shouldBypassVoicePlaybackGraph,
+  shouldUseVoicePlaybackAudioGraph,
+};
 
 type MutableRef<T> = { current: T };
 type VoicePlaybackPath = "audio_graph" | "direct_element" | "direct_fallback";

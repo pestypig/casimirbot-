@@ -21,6 +21,11 @@ describe("Helix Ask terminal projection", () => {
     expect(
       isInvalidTerminalAnswerText("I need retrieval before finalizing this claim. I do not yet have grounded evidence references for it."),
     ).toBe(true);
+    expect(
+      isInvalidTerminalAnswerText(
+        "I could not complete that turn because the runtime provider echoed Helix internal capability instructions instead of returning a valid lane request or final answer.\nNo visual observation receipt was produced for this turn.",
+      ),
+    ).toBe(true);
     expect(isInvalidTerminalAnswerText("  grounded answer ready  ")).toBe(false);
   });
 
@@ -205,6 +210,41 @@ describe("Helix Ask terminal projection", () => {
           visible_final_answer: projectedImageLensAnswer,
         },
         current_turn_artifact_ledger: [],
+      },
+    });
+
+    expect(visible.primary_terminal_label).toBe("final_failure");
+    expect(visible.primary_source_label).toBe("typed failure");
+    expect(visible.terminal_error_code).toBe("backend_ask_entry_required");
+    expect(visible.selected_final_answer).toBe(
+      "This prompt requires the backend Ask solver path before a final answer can be shown.",
+    );
+  });
+
+  it("does not project provider instruction echo failures from compound synthesis when backend Ask did not run", () => {
+    const providerEchoFailure =
+      "I could not complete that turn because the runtime provider echoed Helix internal capability instructions instead of returning a valid lane request or final answer.\nNo visual observation receipt was produced for this turn.";
+    const visible = buildVisibleResolvedTurn({
+      id: "reply-image-lens-provider-echo",
+      ok: true,
+      selected_final_answer: providerEchoFailure,
+      final_answer_source: "compound_evidence_synthesis_answer",
+      terminal_artifact_kind: "compound_evidence_synthesis_answer",
+      ask_entrypoint_required: true,
+      ask_entrypoint_observed: false,
+      ask_entrypoint_failure_code: "backend_ask_entry_required",
+      debug: {
+        ask_entrypoint_required: true,
+        ask_entrypoint_observed: false,
+        selected_final_answer: providerEchoFailure,
+        final_answer_source: "compound_evidence_synthesis_answer",
+        terminal_artifact_kind: "compound_evidence_synthesis_answer",
+        current_turn_artifact_ledger: [],
+        current_turn_events: [],
+        ui_debug_parity_harness: {
+          has_agent_runtime_loop: false,
+          visible_final_answer: providerEchoFailure,
+        },
       },
     });
 
