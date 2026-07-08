@@ -279,6 +279,20 @@ Only the completed solver path may answer.
 The visible answer must project the same terminal artifact selected by terminal authority.
 ```
 
+The detailed terminal handoff contract lives in
+`docs/helix-ask-terminal-authority-contract.md`. Use it when changing
+route-product contracts, terminal product materializers, terminal authority
+single-writer behavior, `terminal_presentation`, `selected_final_answer`,
+visible-answer projection, or debug-export parity. In particular:
+
+```txt
+materializers convert admitted artifacts; they do not admit artifacts
+explicit route-product allowance beats permissive legacy fallback
+terminal_presentation.concise_text is the full answer
+terminal_text_preview is diagnostic preview only
+ambient sidecars are context until admitted by the current route
+```
+
 The practical consequence is that a source-backed or tool-backed turn is not
 complete when evidence exists. It is complete only when that evidence has
 re-entered reasoning, produced a support-backed terminal artifact, passed route

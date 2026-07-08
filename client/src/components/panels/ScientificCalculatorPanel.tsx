@@ -692,7 +692,7 @@ export default function ScientificCalculatorPanel() {
         >
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-emerald-300">Calculator receipt</div>
+              <div className="text-[10px] uppercase tracking-wide text-emerald-300">{t("scientificCalculator.receipt.title")}</div>
               <div className="break-all font-mono text-[11px] text-slate-300">{lastCalculatorReceipt.receipt_id}</div>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -706,11 +706,11 @@ export default function ScientificCalculatorPanel() {
           </div>
           <div className="grid gap-2 md:grid-cols-2">
             <div className="rounded border border-slate-800 bg-slate-950/60 p-2">
-              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Expression</div>
+              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.common.expression")}</div>
               <div className="break-all font-mono text-slate-100">{lastCalculatorReceipt.latex ?? lastCalculatorReceipt.expression}</div>
             </div>
             <div className="rounded border border-slate-800 bg-slate-950/60 p-2">
-              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Result</div>
+              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.common.result")}</div>
               <div className="break-all font-mono text-slate-100">
                 {lastCalculatorReceipt.result_text ?? lastCalculatorReceipt.result_value ?? "not solved"}
                 {lastCalculatorReceipt.result_unit ? ` ${lastCalculatorReceipt.result_unit}` : ""}

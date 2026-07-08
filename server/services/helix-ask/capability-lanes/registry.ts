@@ -23,6 +23,8 @@ import { deliberateTextLaneTemplate } from "./deliberate-text";
 import { interactiveTextLaneTemplate } from "./interactive-text";
 import type { HelixCapabilityLaneTemplate } from "./lane-template";
 import { liveTranslationLaneTemplate } from "./live-translation-descriptor";
+import { realtimeSessionLaneTemplate } from "./realtime-session-descriptor";
+import { HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED_ENV } from "../realtime-session/config";
 import { speechToTextLaneTemplate } from "./speech-to-text-descriptor";
 import { textToSpeechLaneTemplate } from "./text-to-speech-descriptor";
 import { utilityTextLaneTemplate } from "./utility-text-descriptor";
@@ -70,6 +72,7 @@ const laneTemplates: HelixCapabilityLaneTemplate[] = [
   speechToTextLaneTemplate,
   textToSpeechLaneTemplate,
   liveTranslationLaneTemplate,
+  realtimeSessionLaneTemplate,
   visualAnalysisLaneTemplate,
   workstationToolReferenceLaneTemplate,
 ];
@@ -79,9 +82,22 @@ const laneSet = new Set<string>(HELIX_CAPABILITY_LANE_IDS);
 const laneEnabled = (
   laneId: HelixCapabilityLaneId,
   env: NodeJS.ProcessEnv,
-): boolean =>
-  readBooleanEnv(env.HELIX_CAPABILITY_LANES_ENABLED, true) &&
-  readBooleanEnv(env[`HELIX_CAPABILITY_LANE_${laneId.toUpperCase()}_ENABLED`], true);
+): boolean => {
+  if (laneId === "realtime_session") {
+    return readBooleanEnv(env.HELIX_CAPABILITY_LANES_ENABLED, true) &&
+      readBooleanEnv(
+        env[HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED_ENV] ??
+          env.HELIX_CAPABILITY_LANE_REALTIME_SESSION_ENABLED,
+        false,
+      );
+  }
+  const defaultEnabled = laneId !== "realtime_session";
+  return readBooleanEnv(env.HELIX_CAPABILITY_LANES_ENABLED, true) &&
+    readBooleanEnv(
+      env[`HELIX_CAPABILITY_LANE_${laneId.toUpperCase()}_ENABLED`],
+      defaultEnabled,
+    );
+};
 
 const laneStatus = (input: {
   template: HelixCapabilityLaneTemplate;

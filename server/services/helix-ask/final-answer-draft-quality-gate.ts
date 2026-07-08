@@ -145,6 +145,9 @@ export const inferFinalAnswerDraftRouteFamily = (input: {
   ) {
     return "capability_catalog";
   }
+  if (committedSourceTarget === "moral_graph" || committedSourceTarget === "moral_graph_reflection") {
+    return "moral_graph_reflection";
+  }
   if (committedSourceTarget === "repo_code" || committedSourceTarget === "runtime_evidence") {
     return "repo_evidence";
   }
@@ -253,7 +256,11 @@ export const inferFinalAnswerDraftRouteFamily = (input: {
   if (sourceTarget === "context_reflection" || /context_reflection|reflect_context_attachments|reflect_live_synthetic_data|bounded_context_reference/i.test(routeText)) {
     return "context_reflection";
   }
-  if (/moral_graph_reflection|ideology_context_reflection|procedural_moral_classification|bridge_theory_ideology_context|theory_ideology_bridge/i.test(routeText)) {
+  if (
+    sourceTarget === "moral_graph" ||
+    sourceTarget === "moral_graph_reflection" ||
+    /moral_graph|moral-graph|ideology_context_reflection|procedural_moral_classification|bridge_theory_ideology_context|theory_ideology_bridge/i.test(routeText)
+  ) {
     return "moral_graph_reflection";
   }
   if (/civilization_bounds|civilization_scenario_frame|civilization_bounds_roadmap/i.test(routeText)) {
@@ -327,7 +334,7 @@ export const collectFinalAnswerDraftSupportRefs = (input: {
     const payload = readRecord(artifact.payload);
     const kind = readString(artifact.kind);
     const schema = readString(payload?.schema);
-    if (!/repo_code_evidence_observation|scholarly_research_observation|scholarly_full_text_observation|internet_search_observation|helix_theory_context_reflection_tool_receipt|theory_context_reflection|reflect_theory_context|helix_theory_frontier_vector_field_tool_receipt|theory_frontier_vector_field|frontierVectorFieldTrace|capability_registry|capability_catalog|workspace_os_status_observation|workspace_status|doc_|docs|calculator|workspace_action|agent_step_observation/i.test([kind, schema].join(" "))) return [];
+    if (!/repo_code_evidence_observation|scholarly_research_observation|scholarly_full_text_observation|internet_search_observation|helix_theory_context_reflection_tool_receipt|theory_context_reflection|reflect_theory_context|helix_theory_frontier_vector_field_tool_receipt|theory_frontier_vector_field|frontierVectorFieldTrace|moral_graph_reflection|moral-graph\.reflect_context|helix\.moral_graph_reflection_observation\.v1|ideology_context_reflection|procedural_moral_classification|capability_registry|capability_catalog|workspace_os_status_observation|workspace_status|doc_|docs|calculator|workspace_action|agent_step_observation/i.test([kind, schema].join(" "))) return [];
     return [
       readString(artifact.artifact_id),
       ...readArray(payload?.evidence_refs).map(readString),
@@ -352,6 +359,60 @@ export const collectFinalAnswerDraftSupportRefs = (input: {
     ].filter((entry): entry is string => Boolean(entry));
   });
   return unique([...draftRefs, ...ledgerRefs]).slice(0, 16);
+};
+
+const collectMoralGraphObservationRefs = (artifacts?: ArtifactLike[] | null): string[] =>
+  unique((artifacts ?? []).flatMap((artifact: ArtifactLike) => {
+    const payload = readRecord(artifact.payload);
+    const kind = readString(artifact.kind);
+    const schema = readString(payload?.schema);
+    const id = readString(artifact.artifact_id) ?? readString(payload?.artifact_id);
+    const text = [
+      kind,
+      schema,
+      id,
+      readString(payload?.kind),
+      readString(payload?.tool_name),
+      readString(payload?.toolName),
+      readString(readRecord(payload?.observation)?.schema),
+      readString(readRecord(payload?.observation)?.kind),
+    ].join(" ");
+    if (!/moral_graph_reflection|moral-graph\.reflect_context|helix\.moral_graph_reflection_observation\.v1|ideology_context_reflection|procedural_moral_classification/i.test(text)) {
+      return [];
+    }
+    return [
+      id,
+      readString(payload?.artifact_id),
+      readString(payload?.observation_ref),
+      ...readArray(payload?.support_refs).map(readString),
+      ...readArray(payload?.evidence_refs).map(readString),
+      ...readArray(payload?.produced_artifact_refs).map(readString),
+    ].filter((entry): entry is string => Boolean(entry));
+  }));
+
+const collectExplicitDraftSupportRefs = (draftPayload?: Record<string, unknown> | null): string[] =>
+  unique([
+    ...readArray(draftPayload?.support_refs).map(readString),
+    ...readArray(draftPayload?.artifact_refs).map(readString),
+    ...readArray(draftPayload?.evidence_refs).map(readString),
+    ...readArray(draftPayload?.source_observation_refs).map(readString),
+    ...readArray(draftPayload?.grounded_observation_refs).map(readString),
+    ...readArray(draftPayload?.grounded_in_observation_refs).map(readString),
+  ].filter((entry): entry is string => Boolean(entry)));
+
+const hasMoralGraphSupportRef = (input: {
+  draftPayload?: Record<string, unknown> | null;
+  artifactLedger?: ArtifactLike[] | null;
+}): boolean => {
+  const supportRefs = collectExplicitDraftSupportRefs(input.draftPayload);
+  const moralRefs = collectMoralGraphObservationRefs(input.artifactLedger);
+  return moralRefs.some((moralRef) =>
+    supportRefs.some((supportRef) =>
+      supportRef === moralRef ||
+      supportRef.endsWith(`#${moralRef}`) ||
+      supportRef.endsWith(`/${moralRef}`),
+    ),
+  );
 };
 
 const isFallbackLike = (text: string): boolean =>
@@ -527,6 +588,12 @@ export function evaluateFinalAnswerDraftQualityGate(input: {
       artifactLedger: input.artifactLedger,
     }).length === 0
   ) {
+    violations.push("missing_support_refs_for_source_route");
+  }
+  if (routeFamily === "moral_graph_reflection" && !hasMoralGraphSupportRef({
+    draftPayload: input.draftPayload,
+    artifactLedger: input.artifactLedger,
+  })) {
     violations.push("missing_support_refs_for_source_route");
   }
   return {

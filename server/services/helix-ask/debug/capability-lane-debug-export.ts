@@ -1,4 +1,9 @@
 import {
+  buildInactiveHelixLiveRuntimeAgentControlState,
+  type HelixLiveRuntimeAgentControlState,
+} from "@shared/helix-live-runtime-agent";
+import { buildRealtimeSessionTransportPlan } from "../realtime-session/config";
+import {
   normalizeHelixLiveTranslationSourceIdentityKey,
   normalizeHelixLiveTranslationSourceKind,
 } from "@shared/helix-live-translation-source-kind";
@@ -28,6 +33,15 @@ const readScalarString = (value: unknown): string | null => {
 
 const readBoolean = (value: unknown): boolean | null =>
   typeof value === "boolean" ? value : null;
+
+const readNumberValue = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
 
 const readRuntimeAgentProvider = (...values: unknown[]): string | null => {
   for (const value of values) {
@@ -552,6 +566,63 @@ const normalizeCapabilityLaneEvidenceRecord = (
   };
 };
 
+const normalizeRealtimeTranscriptObservationRecord = (
+  record: RecordLike,
+  fallbackRuntimeAgentProvider: string | null = null,
+): RecordLike => {
+  const normalized = normalizeCapabilityLaneEvidenceRecord(record, fallbackRuntimeAgentProvider);
+  const {
+    transcript_text: _transcriptText,
+    transcriptText: _transcriptTextCamel,
+    text: _text,
+    raw_text: _rawText,
+    rawText: _rawTextCamel,
+    prompt_text: _promptText,
+    promptText: _promptTextCamel,
+    workstation_action_args: _workstationActionArgs,
+    workstationActionArgs: _workstationActionArgsCamel,
+    ...safe
+  } = normalized;
+  return {
+    ...safe,
+    runtime_agent_mode: "live_transcription",
+    runtime_agent_authority: readString(record.runtime_agent_authority) ?? "observe_only",
+    reentry_status: "pending_solver_reentry",
+    observation_reentered: false,
+    context_role: "tool_evidence",
+    transcript_is_user_intent: false,
+    reentry_required: true,
+    answer_authority: false,
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+const normalizeRealtimeToolSuggestionObservationRecord = (
+  record: RecordLike,
+  fallbackRuntimeAgentProvider: string | null = null,
+): RecordLike => {
+  const normalized = normalizeCapabilityLaneEvidenceRecord(record, fallbackRuntimeAgentProvider);
+  return {
+    ...normalized,
+    tool_admission_state: readString(record.tool_admission_state) ?? "suggest_only",
+    admission_status: readString(record.admission_status) ?? "candidate_only",
+    blocked_reason: readString(record.blocked_reason),
+    reentry_status: "pending_solver_reentry",
+    observation_reentered: false,
+    context_role: "tool_evidence",
+    execution_attempted: false,
+    gateway_execution_attempted: false,
+    workstation_action_executed: false,
+    answer_authority: false,
+    reentry_required: true,
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
 const readCapabilityLaneEvidenceRecords = (
   payload: RecordLike,
   debug: RecordLike | null,
@@ -572,6 +643,113 @@ const readCapabilityLaneEvidenceRecord = (
 ): RecordLike | null => {
   const record = readRecord(payload[key]) ?? readRecord(debug?.[key]);
   return record ? normalizeCapabilityLaneEvidenceRecord(record, fallbackRuntimeAgentProvider) : null;
+};
+
+const normalizeRealtimeRuntimeSessionSummary = (
+  value: unknown,
+): HelixLiveRuntimeAgentControlState => {
+  const record = readRecord(value);
+  const fallbackTransportPlan = buildRealtimeSessionTransportPlan();
+  if (!record) {
+    return {
+      ...buildInactiveHelixLiveRuntimeAgentControlState(),
+      live_session_admission_status: "unavailable",
+      adapter_id: fallbackTransportPlan.adapter_id,
+      adapter_state: fallbackTransportPlan.adapter_state,
+      transport_plan: fallbackTransportPlan,
+      provider_session_ref: null,
+      client_receipt_refs: [],
+      client_receipt_observation_count: 0,
+      latest_client_receipt_ref: null,
+      latest_client_receipt_kind: null,
+      latest_client_receipt_status: null,
+      live_execution_disabled_reason: fallbackTransportPlan.live_execution_disabled_reason,
+      transport_execution_attempted: false,
+      media_capture_started: false,
+      openai_network_call_attempted: false,
+      webrtc_started: false,
+      sideband_started: false,
+      terminal_authority_status: "not_terminal_authority",
+    };
+  }
+  const normalized = buildInactiveHelixLiveRuntimeAgentControlState({
+    runtime_agent_mode: record.runtime_agent_mode as HelixLiveRuntimeAgentControlState["runtime_agent_mode"],
+    runtime_agent_authority: record.runtime_agent_authority as HelixLiveRuntimeAgentControlState["runtime_agent_authority"],
+    selected_backend_provider: readString(record.selected_backend_provider),
+    selected_model_or_service: readString(record.selected_model_or_service),
+    latest_failure_code: readString(record.latest_failure_code),
+  });
+  return {
+    ...normalized,
+    ...record,
+    schema: normalized.schema,
+    runtime_agent_mode: normalized.runtime_agent_mode,
+    runtime_agent_authority: normalized.runtime_agent_authority,
+    adapter_id: readString(record.adapter_id) ?? fallbackTransportPlan.adapter_id,
+    adapter_state: readString(record.adapter_state) ?? fallbackTransportPlan.adapter_state,
+    transport_plan: readRecord(record.transport_plan) ?? fallbackTransportPlan,
+    provider_session_ref: null,
+    client_receipt_refs: readStringArray(record.client_receipt_refs),
+    client_receipt_observation_count: readNumberValue(record.client_receipt_observation_count) ?? 0,
+    latest_client_receipt_ref: readString(record.latest_client_receipt_ref),
+    latest_client_receipt_kind: readString(record.latest_client_receipt_kind),
+    latest_client_receipt_status: readString(record.latest_client_receipt_status),
+    live_session_admission_status: readString(record.live_session_admission_status) ?? "unavailable",
+    transport_execution_attempted: false,
+    media_capture_started: false,
+    openai_network_call_attempted: false,
+    webrtc_started: false,
+    sideband_started: false,
+    live_execution_disabled_reason:
+      readString(record.live_execution_disabled_reason) ??
+      fallbackTransportPlan.live_execution_disabled_reason,
+    terminal_authority_status: "not_terminal_authority",
+    reentry_required: true,
+    answer_authority: false,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+};
+
+const normalizeRealtimeClientReceiptObservationRecord = (
+  record: RecordLike,
+  fallbackRuntimeAgentProvider: string | null = null,
+): RecordLike => {
+  const normalized = normalizeCapabilityLaneEvidenceRecord(record, fallbackRuntimeAgentProvider);
+  const {
+    client_secret: _clientSecret,
+    clientSecret: _clientSecretCamel,
+    ephemeral_secret: _ephemeralSecret,
+    ephemeralSecret: _ephemeralSecretCamel,
+    sdp: _sdp,
+    audio_payload: _audioPayload,
+    audioPayload: _audioPayloadCamel,
+    raw_audio: _rawAudio,
+    rawAudio: _rawAudioCamel,
+    transcript_text: _transcriptText,
+    transcriptText: _transcriptTextCamel,
+    ...safe
+  } = normalized;
+  return {
+    ...safe,
+    reentry_status: "pending_solver_reentry",
+    observation_reentered: false,
+    context_role: "tool_evidence",
+    openai_network_call_attempted: false,
+    ephemeral_credential_minted: false,
+    webrtc_started: false,
+    sideband_started: false,
+    media_capture_started: false,
+    browser_media_api_referenced: false,
+    browser_tracks_created: false,
+    data_channels_created: false,
+    answer_authority: false,
+    reentry_required: true,
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
 };
 
 const readCapabilityLaneMailLoopDebugSummaries = (
@@ -676,6 +854,39 @@ export const buildCapabilityLaneDebugExportFields = (
       debug,
       "capability_lane_goal_dispatch_readiness",
       fallbackRuntimeAgentProvider,
+    ),
+    realtime_runtime_session_summary: normalizeRealtimeRuntimeSessionSummary(
+      read("realtime_runtime_session_summary", null),
+    ),
+    realtime_runtime_session_events: readCapabilityLaneEvidenceRecords(
+      payload,
+      debug,
+      "realtime_runtime_session_events",
+      fallbackRuntimeAgentProvider,
+    ),
+    realtime_transcript_observations: readCapabilityLaneEvidenceRecords(
+      payload,
+      debug,
+      "realtime_transcript_observations",
+      fallbackRuntimeAgentProvider,
+    ).map((record) =>
+      normalizeRealtimeTranscriptObservationRecord(record, fallbackRuntimeAgentProvider),
+    ),
+    realtime_tool_suggestion_observations: readCapabilityLaneEvidenceRecords(
+      payload,
+      debug,
+      "realtime_tool_suggestion_observations",
+      fallbackRuntimeAgentProvider,
+    ).map((record) =>
+      normalizeRealtimeToolSuggestionObservationRecord(record, fallbackRuntimeAgentProvider),
+    ),
+    realtime_client_receipt_observations: readCapabilityLaneEvidenceRecords(
+      payload,
+      debug,
+      "realtime_client_receipt_observations",
+      fallbackRuntimeAgentProvider,
+    ).map((record) =>
+      normalizeRealtimeClientReceiptObservationRecord(record, fallbackRuntimeAgentProvider),
     ),
     capability_lane_reentry_status: read("capability_lane_reentry_status", null),
     runtime_lane_request_contract: read("runtime_lane_request_contract", null),

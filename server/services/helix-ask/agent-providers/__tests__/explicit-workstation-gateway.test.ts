@@ -283,6 +283,28 @@ describe("explicit workstation gateway derived calls", () => {
     });
   });
 
+  it("preserves exact calculus function expressions in prompt-named calculator requests", () => {
+    const expression = "integrate(x^2+3*x,x)";
+    const requests = buildPromptNamedCapabilityGatewayCallRequests({
+      agent_runtime: "codex",
+      question:
+        `Call scientific-calculator.solve_expression with this exact expression: ${expression}. Wait for calculator_receipt and answer from workstation_tool_evaluation.`,
+    });
+
+    expect(capabilities(requests)).toEqual(["scientific-calculator.solve_expression"]);
+    expect(requests[0]).toMatchObject({
+      capability_id: "scientific-calculator.solve_expression",
+      arguments: {
+        expression,
+        source_target_intent: expect.objectContaining({
+          target_source: "scientific_calculator",
+          target_kind: "calculator_solve",
+          expression,
+        }),
+      },
+    });
+  });
+
   it("maps safe docs-viewer search aliases onto the canonical docs.search gateway", () => {
     const requests = buildPromptNamedCapabilityGatewayCallRequests({
       agent_runtime: "codex",
@@ -846,6 +868,43 @@ describe("explicit workstation gateway derived calls", () => {
     });
   });
 
+  it("admits implicit agency-disclosure procedural prompts as Moral Graph reflection", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Reflect on a case where withheld information caused someone else to lose the ability to plan, adapt, choose, or protect themselves. Do not judge the person's character; trace what choices were lost and what disclosure would have preserved agency.",
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["moral-graph.reflect_context"]);
+    expect(capabilities(requests)).not.toContain("internet-search.search_web");
+    expect(requests[0]).toMatchObject({
+      derivation_source: "helix_prompt_derived_moral_graph_reflection",
+      capability_id: "moral-graph.reflect_context",
+      arguments: {
+        source_target_intent: expect.objectContaining({
+          target_source: "moral_graph",
+          target_kind: "moral_graph_reflection",
+        }),
+      },
+    });
+  });
+
+  it("does not admit Moral Graph or web tools for generic reflection wording", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question: "Reflect on this.",
+      },
+    });
+
+    expect(capabilities(requests)).not.toContain("moral-graph.reflect_context");
+    expect(capabilities(requests)).not.toContain("internet-search.search_web");
+  });
+
   it("keeps browser-style Moral Graph procedural evidence prompts on the Moral Graph lane", () => {
     const requests = readWorkstationGatewayCallRequestsForTurn({
       includePlannerDerived: true,
@@ -900,6 +959,34 @@ describe("explicit workstation gateway derived calls", () => {
     });
 
     expect(capabilities(requests)).not.toContain("moral-graph.reflect_context");
+    expect(capabilities(requests)).not.toContain("internet-search.search_web");
+  });
+
+  it("does not execute contextual or screen-visible implicit procedural badge mentions", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          'The screen shows "withheld information caused someone to lose the ability to plan"; explain why quoted text should not run Moral Graph or web tools.',
+      },
+    });
+
+    expect(capabilities(requests)).not.toContain("moral-graph.reflect_context");
+    expect(capabilities(requests)).not.toContain("internet-search.search_web");
+  });
+
+  it("does not admit web search from broad research wording in implicit Moral Graph prompts", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Reflect on the evidence and research around withheld information causing affected parties to lose the ability to plan and adapt. Trace the agency-preserving disclosure questions without using web search.",
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["moral-graph.reflect_context"]);
     expect(capabilities(requests)).not.toContain("internet-search.search_web");
   });
 
@@ -987,6 +1074,56 @@ describe("explicit workstation gateway derived calls", () => {
       "internet-search.search_web",
     ]);
     expect((requests[0].arguments as Record<string, any>).next_affordances).toBeUndefined();
+  });
+
+  it("keeps explicit Moral Graph reflection primary when adjacent evidence families are negated", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Use moral-graph.reflect_context. Reflect on delayed disclosure in a shared obligation. Identify the dependency, who needed the information, what deadline preserved agency, and what repair path should be considered. Do not use calculator, image, PDF, page, or web evidence.",
+        workspace_context_snapshot: {
+          activePanel: "image-lens",
+          focusedPanel: "image-lens",
+          openPanels: ["image-lens", "postulate-board", "scientific-calculator"],
+          activeCalculatorContext: {
+            expression: "8*9",
+            result: 72,
+          },
+        },
+        route_metadata: {
+          source_target_intent: {
+            selected_capability: "scholarly-research.lookup_papers",
+            args: {
+              query: "delayed disclosure shared obligation agency harm",
+            },
+          },
+        },
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["moral-graph.reflect_context"]);
+    expect(capabilities(requests)).not.toContain("scholarly-research.lookup_papers");
+    expect(capabilities(requests)).not.toContain("internet-search.search_web");
+    expect(capabilities(requests)).not.toContain("scientific-calculator.solve_expression");
+    const args = requests[0].arguments as Record<string, any>;
+    expect(args.next_affordances).toBeUndefined();
+    expect(args.source_target_intent).toMatchObject({
+      rejected_adjacent_tool_families: expect.arrayContaining([
+        "external_evidence",
+        "page_evidence",
+      ]),
+      rejected_adjacent_capabilities: expect.arrayContaining([
+        expect.objectContaining({
+          capability: "scholarly-research.lookup_papers",
+          reason: "negative_evidence_constraint",
+          forbidden_families: expect.arrayContaining(["external_evidence", "page_evidence"]),
+          terminal_eligible: false,
+          assistant_answer: false,
+        }),
+      ]),
+    });
   });
 
   it("does not admit internet search from local current-whitepaper evidence wording", () => {

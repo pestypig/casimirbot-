@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ImageLensPanel from "@/components/workstation/ImageLensPanel";
 import { HELIX_ASK_LIVE_EVENT_BUS_EVENT } from "@/lib/helix/liveEventsBus";
 import { useDocumentImageRegionStore } from "@/store/useDocumentImageRegionStore";
+import { mergeScientificEvidenceWorkflowStatus, useScientificEvidenceWorkflowStore } from "@/store/useScientificEvidenceWorkflowStore";
 import { useVisualSourceCaptureStore } from "@/store/useVisualSourceCaptureStore";
 
 const initialRegionState = useDocumentImageRegionStore.getState();
@@ -23,6 +24,7 @@ function loadLocalImage() {
 beforeEach(() => {
   useDocumentImageRegionStore.setState(initialRegionState, true);
   useVisualSourceCaptureStore.setState(initialVisualState, true);
+  useScientificEvidenceWorkflowStore.getState().clear();
   window.localStorage.clear();
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
   Object.defineProperty(URL, "createObjectURL", {
@@ -220,6 +222,62 @@ describe("ImageLensPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: /advanced/i }));
     expect(await screen.findByLabelText("Page")).toHaveValue("3");
     expect(screen.getByLabelText("Source kind")).toHaveValue("pdf_page_render");
+  });
+
+  it("hydrates the status strip from compact scientific workflow memory", async () => {
+    useDocumentImageRegionStore.getState().setSourceImage({
+      sourceImageUrl: "data:image/png;base64,pdf-page-source",
+      sourceAttachmentId: "pdf-page-render:panel",
+      sourceKind: "pdf_page_render",
+      pageNumber: 5,
+      pageCount: 11,
+      pageImageRef: "data:image/png;base64,pdf-page-source",
+      sourceId: "pdf-page-render:source",
+      evidenceId: "ask:test:image-lens-region",
+      regionId: "image_lens_region:panel",
+      scientificEvidenceSidecarId: "scientific_image_sidecar:panel",
+      scholarlySourcePdfRef: "artifact://scholarly-pdf/panel",
+      sourceRefHash: "sha256:panel-page",
+      mountedAt: "2026-07-07T14:00:00.000Z",
+    });
+    mergeScientificEvidenceWorkflowStatus({
+      schema: "helix.scientific_evidence_workflow_status.v1",
+      pageLoaded: true,
+      sourceId: "pdf-page-render:source",
+      sourceKind: "pdf_page_render",
+      sourceImageHash: "sha256:panel-page",
+      pageNumber: 5,
+      pageCount: 11,
+      cropRef: "sha256:panel-page#crop=73,570,1077,87",
+      cropRegionRef: "equation_crop:image_lens_region:panel",
+      sidecarId: "scientific_image_sidecar:panel",
+      evidenceDepth: "exact_row_promoted",
+      promotedRowState: "promoted",
+      promotedEquationLatex: "S = \\int d^4x \\sqrt{-g} e^{-\\phi} \\{R + L_m\\}, (7)",
+      graphReflectionStatus: "diagnostic_reflected",
+      calculatorTemplateStatus: "template_admissible",
+      postulateReadyRefs: {
+        evidenceSidecarRefs: ["scientific_image_sidecar:panel"],
+        promotedEquationRowRefs: ["promoted_equation_row:image_lens_region:panel"],
+        pageRenderRefs: ["pdf-page-render:source"],
+        cropRefs: ["sha256:panel-page#crop=73,570,1077,87"],
+        graphReflectionRefs: ["graph_reflection:diagnostic:panel"],
+        provenanceAuditRefs: ["provenance_audit:sha256:panel-page"],
+        calculatorCheckRefs: ["calculator_check:template_admissibility:panel"],
+        uncertaintyReductionRefs: [],
+      },
+      activeBlockers: [],
+      historicalBlockers: ["no_ocr_or_latex_candidate"],
+      claimBoundary: "observation_only_not_proof",
+    });
+
+    render(<ImageLensPanel />);
+
+    const workflowStatus = await screen.findByTestId("image-lens-scientific-workflow-status");
+    expect(workflowStatus).toHaveTextContent("Row: promoted");
+    expect(workflowStatus).toHaveTextContent("Graph: diagnostic_reflected");
+    expect(workflowStatus).toHaveTextContent("Calculator: template_admissible");
+    expect(workflowStatus).toHaveTextContent(/Postulate refs: [1-9]/);
   });
 
   it("recovers a retained PDF page source when the panel opens blank", async () => {

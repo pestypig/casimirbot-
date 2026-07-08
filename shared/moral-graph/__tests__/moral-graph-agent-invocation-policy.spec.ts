@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   decideMoralGraphAgentInvocationPolicyV1,
   moralGraphPolicyAllowsLivingSubstrateReflection,
+  moralGraphPolicyAllowsProceduralBadgeReflection,
   moralGraphPolicyPrefersTheoryFirst,
 } from "../moral-graph-agent-invocation-policy";
 
@@ -137,6 +138,38 @@ describe("MoralGraph agent invocation policy", () => {
       inputKind: "user_prompt",
       text: "How should moral care classify non-human organisms from sensing and homeostasis?",
     })).toBe(true);
+  });
+
+  it("allows implicit procedural badge reflection from agency-preserving disclosure cues", () => {
+    const prompt =
+      "Reflect on a case where withheld information caused someone else to lose the ability to plan, adapt, choose, or protect themselves. Do not judge the person's character; trace what choices were lost and what disclosure would have preserved agency.";
+    const decision = decideMoralGraphAgentInvocationPolicyV1({
+      inputKind: "user_prompt",
+      text: prompt,
+    });
+
+    expect(decision.decision).toBe("eligible");
+    expect(decision.reasonCodes).toContain("procedural_moral_badge_reflection_request");
+    expect(moralGraphPolicyAllowsProceduralBadgeReflection({
+      inputKind: "user_prompt",
+      text: prompt,
+    })).toBe(true);
+  });
+
+  it("does not allow generic reflection or contextual procedural badge cues", () => {
+    expect(moralGraphPolicyAllowsProceduralBadgeReflection({
+      inputKind: "user_prompt",
+      text: "Reflect on this.",
+    })).toBe(false);
+
+    const contextual = decideMoralGraphAgentInvocationPolicyV1({
+      inputKind: "user_prompt",
+      text:
+        'The screen shows "withheld information caused someone to lose the ability to plan"; explain why quoted text should not run a Moral Graph tool.',
+    });
+
+    expect(contextual.eligible).toBe(false);
+    expect(contextual.blockingReasonCodes).toContain("contextual_or_quoted_tool_mention");
   });
 
   it("marks microtubule and Fourier mechanism prompts as theory-first", () => {

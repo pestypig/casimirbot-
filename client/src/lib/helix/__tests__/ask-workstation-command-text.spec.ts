@@ -4,6 +4,7 @@ import {
   normalizePanelQuery,
   normalizeWorkstationCommandText,
   parseOpenPanelCommand,
+  parseWorkstationNoteCreateLexiconArgs,
   restateWorkstationSubgoal,
   resolvePanelIdFromPath,
   resolvePanelIdFromText,
@@ -82,5 +83,20 @@ describe("ask workstation command text helpers", () => {
     expect(normalizeLexiconAlias("Please open up my Clipboard History!")).toBe("open clipboard history");
     expect(normalizeLexiconAlias("could you show the calculator, please")).toBe("show calculator please");
     expect(normalizeLexiconAlias("kindly   Open-Up  Notes")).toBe("open up notes");
+  });
+
+  it("parses note-create lexicon args without legacy bridge state", () => {
+    expect(
+      parseWorkstationNoteCreateLexiconArgs({
+        source: 'make a note for me "qwerty"',
+        conversationalCandidate: 'make a note for me "qwerty',
+      }),
+    ).toEqual({ body: "qwerty" });
+    expect(
+      parseWorkstationNoteCreateLexiconArgs({
+        source: "create a note called Warp Notes",
+        conversationalCandidate: "create a note called Warp Notes",
+      }),
+    ).toEqual({ title: "Warp Notes", topic: "Warp Notes" });
   });
 });

@@ -32,6 +32,25 @@ describe("helix ask turn e10.7 unified planner intake", () => {
     expect(response.body?.planner_contract?.selected_action?.action_id).toBe("create_note");
   });
 
+  it("maps quoted make-note phrasing to a create_note body", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: 'make a note for me "qwerty"',
+        mode: "read",
+        sessionId: `e107-make-note-body-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.route_reason_code).toBe("dispatch:act");
+    expect(response.body?.dispatch_policy).toBe("workspace_only");
+    expect(response.body?.workspace_action?.panel_id).toBe("workstation-notes");
+    expect(response.body?.workspace_action?.action_id).toBe("create_note");
+    expect(response.body?.workspace_action?.args).toEqual({ body: "qwerty" });
+    expect(response.body?.planner_contract?.selected_action?.args).toEqual({ body: "qwerty" });
+  });
+
   it("maps exact-opened-doc wording to identify_current_doc instead of opening docs", async () => {
     const app = createApp();
     const sessionId = `e107-doc-identity-${Date.now()}`;

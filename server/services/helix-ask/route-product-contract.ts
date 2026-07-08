@@ -70,6 +70,8 @@ export const AUXILIARY_TERMINAL_PRODUCTS = [
   "panel_generated_answer",
   "ask_debug_history_summary",
   "capability_help_summary",
+  "image_lens_named_receipt_evaluation",
+  "image_lens_observation_report",
 ] as const;
 
 export const ALL_ROUTE_TERMINAL_PRODUCTS = [
@@ -154,6 +156,8 @@ const normalizeSourceTarget = (
   if (sourceTarget === "workspace_panel") return "workstation_panel";
   if (
     sourceTarget === "visual_capture" ||
+    sourceTarget === "image_lens" ||
+    sourceTarget === "scientific_image_evidence" ||
     sourceTarget === "audio_transcript" ||
     sourceTarget === "active_doc" ||
     sourceTarget === "docs_viewer" ||
@@ -183,6 +187,7 @@ const normalizeSourceTarget = (
     sourceTarget === "model_only" ||
     sourceTarget === "unknown"
   ) {
+    if (sourceTarget === "image_lens" || sourceTarget === "scientific_image_evidence") return "visual_capture";
     return sourceTarget;
   }
   return "unknown";
@@ -226,6 +231,19 @@ const isVisualContentRequestPrompt = (promptText: string): boolean =>
 const isNoteMutationPrompt = (promptText: string): boolean =>
   /\b(?:create|append|add|write|save|store|copy)\b[\s\S]{0,120}\b(?:note|workstation\s+notes?)\b/i.test(promptText) ||
   /\b(?:note|workstation\s+notes?)\b[\s\S]{0,120}\b(?:create|append|add|write|save|store|copy)\b/i.test(promptText);
+
+const isExplicitCreateNotePrompt = (promptText: string): boolean => {
+  const prompt = promptText.trim();
+  if (!prompt) return false;
+  if (/\b(?:do\s+not|don't|dont|never|avoid|without|not\s+asking\s+to)\b[\s\S]{0,120}\b(?:create|make|write|save|store)\b[\s\S]{0,80}\b(?:note|workstation\s+notes?)\b/i.test(prompt)) {
+    return false;
+  }
+  return (
+    /\b(?:create|make|write|save|store)\b[\s\S]{0,120}\b(?:note|workstation\s+notes?)\b/i.test(prompt) ||
+    /\b(?:note|workstation\s+notes?)\b[\s\S]{0,120}\b(?:create|make|write|save|store)\b/i.test(prompt) ||
+    /\bworkstation-notes\.create(?:_note)?\b/i.test(prompt)
+  );
+};
 
 const isSituationRoomDottieActionPrompt = (promptText: string): boolean =>
   /\b(?:manifest|materiali[sz]e|create|start|set\s+up|build|attach|query|watch|witness)\b[\s\S]{0,140}\b(?:auntie\s+dottie|dottie|observer|voice\s+delivery|voice_delivery)\b/i.test(promptText) ||
@@ -293,6 +311,34 @@ export function buildRouteProductContract(input: {
     requestedOutputs.includes("moral_badge_locator/v1") ||
     requestedOutputs.includes("fruition_procedure_expression/v1") ||
     /\b(?:moral\s*(?:badge\s*)?graph|moral\s*batch\s*graph|moralgraph|procedural\s+moral|inner[-\s]?practice|fruition\s+(?:calculator|solve|expression)|ideology\s+(?:tree|graph|map))\b/i.test(promptText);
+
+  if (requestedOutputs.includes("image_lens_named_receipt_evaluation")) {
+    return makeContract({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      sourceTarget: "visual_capture",
+      allowedCore: [],
+      allowedExtra: ["image_lens_named_receipt_evaluation", "image_lens_observation_report"],
+      forbiddenExtra: [
+        "client_projection",
+        "compound_research_locator_answer",
+        "direct_answer_text",
+        "internet_search_answer",
+        "model_only_concept",
+        "model_synthesized_answer",
+        "no_tool_direct",
+        "panel_generated_answer",
+        "scholarly_research_answer",
+        "theory_context_reflection_answer",
+        "workstation_tool_evaluation",
+      ],
+      sideArtifactKindsAllowed: [
+        "helix.image_lens_named_receipt_evaluation.v1",
+        "helix.scientific_image_evidence_sidecar.v1",
+      ],
+      precedenceReason: "image_lens_named_receipt_prompt_allows_bounded_receipt_report_without_claim_synthesis",
+    });
+  }
 
   if (moralGraphReflectionTarget && sourceTarget === "workstation_panel") {
     return makeContract({
@@ -511,8 +557,23 @@ export function buildRouteProductContract(input: {
         : explicitBindingDiagnosis
           ? ["situation_context_pack", "live_environment_binding_diagnosis"]
           : ["situation_context_pack"],
-      allowedExtra: ["live_visual_answer", "live_source_typed_failure", "typed_failure", "visual_frame_evidence", "source_binding_status", "source_binding_repair_candidate"],
+      allowedExtra: [
+        "live_visual_answer",
+        "live_source_typed_failure",
+        "typed_failure",
+        "visual_frame_evidence",
+        "image_lens_observation_report",
+        "image_lens_named_receipt_evaluation",
+        "source_binding_status",
+        "source_binding_repair_candidate",
+      ],
       forbiddenExtra: ["active_doc_identity", "doc_summary", "doc_location_matches", "doc_evidence_location", "client_projection", "no_tool_direct", "model_only_concept", "panel_generated_answer", "process_graph_overview"],
+      sideArtifactKindsAllowed: [
+        "helix.image_lens_named_receipt_evaluation.v1",
+        "helix.scientific_image_evidence_sidecar.v1",
+        "capability_lane_observation_packet",
+        "visual_analysis.inspect_image_region",
+      ],
       precedenceReason: "visual_source_target_allows_current_situation_terminal_products",
     });
   }
@@ -982,6 +1043,25 @@ export function buildRouteProductContract(input: {
       allowedExtra: ["process_node_detail", "source_binding_status", "source_binding_repair_candidate", "workstation_tool_evaluation"],
       forbiddenExtra: ["procedure_epoch_replay", "visual_scene_comparison_result", "repo_code_evidence_answer", "doc_location_result", "situation_context_pack", "no_tool_direct", "model_only_concept"],
       precedenceReason: "process_graph_source_target_allows_only_workstation_process_products",
+    });
+  }
+
+  if (isExplicitCreateNotePrompt(promptText)) {
+    return makeContract({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      sourceTarget: sourceTarget === "unknown" ? "workspace_action" : sourceTarget,
+      allowedCore: [],
+      allowedExtra: [
+        "note_update_receipt",
+        "workspace_action_receipt",
+        "workstation_tool_evaluation",
+        "tool_evaluation",
+        "typed_failure",
+      ],
+      forbiddenExtra: ["visual_frame_evidence", "doc_location_result", "direct_answer_text", "no_tool_direct", "model_only_concept", "model_synthesized_answer", "panel_generated_answer"],
+      sideArtifactKindsAllowed: ["workspace_action_receipt", "note_action_receipt", "note_create_receipt"],
+      precedenceReason: "explicit_create_note_prompt_requires_note_update_receipt_terminal_authority",
     });
   }
 

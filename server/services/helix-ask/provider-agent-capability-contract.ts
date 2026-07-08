@@ -7,6 +7,7 @@ export type ProviderAgentCapabilityAvailability =
   | "shared_capability_lane_now"
   | "safe_to_graduate_next"
   | "requires_confirmation_contract"
+  | "candidate_host_receipt_bridge"
   | "helix_native_only"
   | "legacy_dynamic_panel_only"
   | "blocked_pending_contract"
@@ -118,6 +119,27 @@ const explicit = (
   availability: input.availability,
   permission_class: input.permissionClass,
   provider_availability: helixOnlyProviderAvailability,
+  required_contract_before_gateway: input.requiredContractBeforeGateway,
+  notes: input.notes,
+});
+
+const codexHostReceiptBridgeExplicit = (
+  capabilityId: string,
+  input: {
+    permissionClass: ProviderAgentPermissionClass;
+    requiredContractBeforeGateway: string[];
+    notes: string;
+  },
+): ProviderAgentCapabilityClassification => ({
+  capability_id: capabilityId,
+  surface: "explicit_contract",
+  availability: "candidate_host_receipt_bridge",
+  permission_class: input.permissionClass,
+  provider_availability: providerAvailability({
+    helixNative: true,
+    codexWorkstation: true,
+    futureProvider: false,
+  }),
   required_contract_before_gateway: input.requiredContractBeforeGateway,
   notes: input.notes,
 });
@@ -263,7 +285,6 @@ export const PROVIDER_AGENT_CAPABILITY_CLASSIFICATIONS: readonly ProviderAgentCa
     "scientific-calculator.open",
     "scientific-calculator.start_equation_live_source",
     "workstation-notes.append_to_note",
-    "workstation-notes.create_note",
     "workstation-notes.create",
     "workstation-notes.open",
   ].map((capabilityId) =>
@@ -274,6 +295,11 @@ export const PROVIDER_AGENT_CAPABILITY_CLASSIFICATIONS: readonly ProviderAgentCa
       notes: "Explicit side-effecting workstation route contract exists; keep out of provider gateway until confirmation, receipt, and projection tests exist.",
     }),
   ),
+  codexHostReceiptBridgeExplicit("workstation-notes.create_note", {
+    permissionClass: "user_confirmed_side_effect",
+    requiredContractBeforeGateway: sideEffectGraduationChecklist,
+    notes: "Explicit affirmative note-create route may be projected to Codex Workstation Mode as a host-dispatched action envelope with a client persistence receipt; it remains absent from the shared provider gateway manifest.",
+  }),
   ...[
     "live_env.read_card",
     "live_env.reflect_stage_play_context",

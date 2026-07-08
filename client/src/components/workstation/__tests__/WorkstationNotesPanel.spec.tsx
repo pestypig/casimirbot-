@@ -52,4 +52,39 @@ describe("WorkstationNotesPanel", () => {
       "<p>typed draft survives</p>",
     );
   });
+
+  it("persists typed note body when backing out and re-entering the note", async () => {
+    useWorkstationNotesStore.getState().upsertWorkflowNote({
+      id: "note:manual:autosave-proof",
+      title: "Autosave proof",
+      topic: "manual-document",
+      body: "",
+      citations: [],
+      snippets: [],
+      trace_id: "test-note-autosave",
+    });
+
+    render(<WorkstationNotesPanel />);
+    fireEvent.click(screen.getAllByRole("button", { name: /Autosave proof/i })[0]);
+
+    const editor = await screen.findByRole("textbox", { name: /Workstation note document editor/i });
+    editor.innerHTML = "<p>typed body survives panel navigation</p>";
+    fireEvent.input(editor);
+    fireEvent.blur(editor);
+
+    await waitFor(() => {
+      expect(useWorkstationNotesStore.getState().notes["note:manual:autosave-proof"]?.body).toBe(
+        "<p>typed body survives panel navigation</p>",
+      );
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Back to workstation notes/i }));
+    fireEvent.click(screen.getAllByRole("button", { name: /Autosave proof/i })[0]);
+
+    await waitFor(() => {
+      expect(screen.getByRole("textbox", { name: /Workstation note document editor/i }).innerHTML).toContain(
+        "typed body survives panel navigation",
+      );
+    });
+  });
 });

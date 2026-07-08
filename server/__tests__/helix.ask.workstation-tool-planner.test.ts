@@ -291,6 +291,17 @@ describe("Helix Ask workstation tool planner", () => {
     ]);
   });
 
+  it("routes quoted make-note phrasing to a create note body", () => {
+    const plan = planWorkstationToolUse('make a note for me "qwerty"');
+
+    expect(plan.intent).toBe("notes_create");
+    expect(plan.action).toEqual({
+      panel_id: "workstation-notes",
+      action_id: "create_note",
+      args: { body: "qwerty" },
+    });
+  });
+
   it("prefers explicit note creation even when note body contains math", () => {
     const plan = planWorkstationToolUse(
       'Create a workstation note titled "Tool Demo" with body Calculator verified x^2 - 4 = 0 gives x = 2 and x = -2.',
@@ -676,6 +687,37 @@ describe("Helix Ask workstation tool planner", () => {
           include_recommended_actions: true,
         }),
       }));
+  });
+
+  it("plans general Moral Graph reflection for implicit agency-disclosure procedural prompts", () => {
+    const plan = planWorkstationToolUse(
+      "Reflect on a case where withheld information caused someone else to lose the ability to plan, adapt, choose, or protect themselves. Do not judge the person's character; trace what choices were lost and what disclosure would have preserved agency.",
+    );
+
+    expect(plan.intent).toBe("moral_graph_reflection");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.tool_plan?.steps.map((step) => step.step_id)).toEqual([
+      "reflect_moral_graph_context",
+      "evaluate_moral_graph_reflection",
+    ]);
+    expect(plan.tool_plan?.steps.find((step) => step.step_id === "reflect_moral_graph_context"))
+      .toEqual(expect.objectContaining({
+        kind: "run_ask_tool",
+        tool_id: "helix_ask.reflect_ideology_context",
+      }));
+  });
+
+  it("does not plan Moral Graph reflection for generic or contextual procedural words", () => {
+    for (const prompt of [
+      "Reflect on this.",
+      'The screen shows "withheld information caused someone to lose the ability to plan"; explain the quote without running tools.',
+    ]) {
+      const plan = planWorkstationToolUse(prompt);
+
+      expect(plan.intent).toBe("direct_answer");
+      expect(plan.should_use_tool).toBe(false);
+      expect(plan.tool_plan).toBeNull();
+    }
   });
 
   it("plans theory reflection before Moral substrate reflection for mechanism-heavy prompts", () => {

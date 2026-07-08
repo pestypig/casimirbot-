@@ -254,6 +254,32 @@ describe("Helix internet search tool admission", () => {
     expect(toolAdmission.admitted_tool_families).not.toContain("internet_search");
   });
 
+  it("does not treat current Image Lens PDF page crop prompts as internet freshness requests", () => {
+    const prompt = [
+      "Use the current page 5 Image Lens PDF page.",
+      "Crop only the exact equation row for equation (7) using bbox x=73, y=570, width=1077, height=87.",
+      "Promote only if the returned crop itself contains the full equation body plus label (7).",
+    ].join(" ");
+    const restatement = buildToolUseRestatement(prompt);
+    expect(restatement.freshnessRequired).toBe(false);
+    expect(restatement.currentAffairsRequired).toBe(false);
+    expect(restatement.requiredToolFamilies).not.toContain("internet_search");
+
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId: "ask:current-image-lens-page-crop",
+      threadId: "helix-ask:test",
+      promptText: prompt,
+    });
+    expect(sourceTargetIntent.target_source).not.toBe("internet_search");
+
+    const toolAdmission = buildToolCallAdmissionDecision({
+      turnId: "ask:current-image-lens-page-crop",
+      sourceTargetIntent,
+      promptText: prompt,
+    });
+    expect(toolAdmission.admitted_tool_families).not.toContain("internet_search");
+  });
+
   it("records quoted current-events phrases without admitting internet search from the quote alone", () => {
     const prompt = "Quote this prompt literally: 'search the latest conflict news'.";
     const restatement = buildToolUseRestatement(prompt);

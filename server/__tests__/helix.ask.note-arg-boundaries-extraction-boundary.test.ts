@@ -19,6 +19,7 @@ import {
   isAskTurnNoteMutationPrecedenceIntent,
   isAskTurnRepoCueIntent,
   maskAskTurnProtectedArgumentSpansForIntent,
+  resolveAskTurnCreateNoteBodyArg,
   resolveAskTurnCreateNoteTitleArg,
   resolveAskTurnTextArg,
   resolveAskTurnTitleArg,
@@ -104,6 +105,12 @@ describe("Helix Ask note arg boundary extraction boundary", () => {
     expect(resolveAskTurnTitleArg('create note "Field Notes, then read docs"')).toBe("Field Notes");
     expect(resolveAskTurnTitleArg("create note called Field Notes, then read docs")).toBe("Field Notes");
     expect(resolveAskTurnTitleArg("create note Field Notes, then read docs")).toBe("Field Notes");
+  });
+
+  it("extracts create-note bodies without treating them as titles", () => {
+    expect(resolveAskTurnCreateNoteBodyArg('make a note for me "qwerty"')).toBe("qwerty");
+    expect(resolveAskTurnCreateNoteBodyArg("Create a workstation note with body hello")).toBe("hello");
+    expect(resolveAskTurnCreateNoteBodyArg("make a note called Field Notes")).toBeNull();
   });
 
   it("preserves create-note title and protected argument masking", () => {

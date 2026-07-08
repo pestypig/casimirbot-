@@ -336,7 +336,7 @@ tested.
 | `scientific-calculator.open` | [workstation.explicit_side_effect_boundaries.md](workstation.explicit_side_effect_boundaries.md) | `blocked_pending_contract` |
 | `scientific-calculator.start_equation_live_source` | [workstation.explicit_side_effect_boundaries.md](workstation.explicit_side_effect_boundaries.md) | `blocked_pending_contract` |
 | `workstation-notes.append_to_note` | [workstation-notes.side_effect_actions.md](workstation-notes.side_effect_actions.md) | `blocked_pending_contract` |
-| `workstation-notes.create_note` | [workstation-notes.side_effect_actions.md](workstation-notes.side_effect_actions.md) | `blocked_pending_contract` |
+| `workstation-notes.create_note` | [workstation-notes.side_effect_actions.md](workstation-notes.side_effect_actions.md) | `candidate_host_receipt_bridge` |
 | `workstation-notes.create` | [workstation-notes.side_effect_actions.md](workstation-notes.side_effect_actions.md) | `blocked_pending_contract` |
 | `workstation-notes.open` | [workstation-notes.side_effect_actions.md](workstation-notes.side_effect_actions.md) | `blocked_pending_contract` |
 | `client.read_aloud` | [client.read_aloud.md](client.read_aloud.md) | `client_projection_only` |

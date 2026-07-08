@@ -74,6 +74,7 @@ describe("Helix capability lane registry", () => {
       "speech_to_text",
       "text_to_speech",
       "live_translation",
+      "realtime_session",
       "visual_analysis",
       "workstation_tool_reference",
     ]);
@@ -993,6 +994,181 @@ describe("Helix capability lane registry", () => {
     expect(enabled.lane_ids).toEqual(blocked.lane_ids);
     expect(enabled.lanes.find((lane) => lane.lane_id === "workstation_tool_reference")?.status).toBe("available");
     expect(blocked.lanes.find((lane) => lane.lane_id === "workstation_tool_reference")?.status).toBe("permission_blocked");
+  });
+
+  it("keeps the Realtime session lane disabled by default and non-terminal", () => {
+    const manifest = listHelixCapabilityLanes({
+      provider: buildProvider({ id: "codex" }),
+      env: { OPENAI_API_KEY: "test-key" } as NodeJS.ProcessEnv,
+    });
+    const lane = manifest.lanes.find((entry) => entry.lane_id === "realtime_session");
+    const provider = lane?.backend_providers.find(
+      (entry) => entry.provider_id === "realtime_session.openai_realtime",
+    );
+    const trace = resolveHelixCapabilityLaneRequest({
+      provider: buildProvider({ id: "codex" }),
+      requestedLane: "realtime_session",
+      requestedBackendProvider: "realtime_session.openai_realtime",
+      env: { OPENAI_API_KEY: "test-key" } as NodeJS.ProcessEnv,
+    });
+
+    expect(lane).toMatchObject({
+      family: "live_runtime_agent",
+      status: "disabled",
+      status_reason: "capability_lane_disabled_by_policy",
+      backend_family: "openai_realtime",
+      model_or_service_ref: "gpt_realtime_session_placeholder",
+      default_backend_provider: "realtime_session.openai_realtime",
+      requestable_by_runtime_provider: false,
+      one_shot_call_contract: expect.objectContaining({
+        supported: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+      }),
+      session_contract: expect.objectContaining({
+        supported: true,
+        emits_observations: true,
+        terminal_eligible: false,
+      }),
+      goal_binding_contract: expect.objectContaining({
+        supported: false,
+        backend_provider_becomes_root_agent: false,
+      }),
+      terminal_policy: expect.objectContaining({
+        lane_output_can_be_final_answer: false,
+        terminal_authority_owner: "helix",
+        requires_evidence_reentry: true,
+      }),
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+      safety_tags: expect.arrayContaining([
+        "disabled_by_default",
+        "no_network_phase1",
+        "requires_visible_consent",
+      ]),
+    });
+    expect(lane?.capabilities.map((capability) => capability.capability_id)).toEqual([
+      "realtime_session.start",
+      "realtime_session.record_tool_request",
+      "realtime_session.record_client_receipt",
+    ]);
+    expect(provider).toMatchObject({
+      configuration_status: "disabled",
+      required_env_vars: ["OPENAI_REALTIME_API_KEY", "OPENAI_API_KEY"],
+      configured_env_vars: ["OPENAI_API_KEY"],
+      availability_status: "disabled",
+      permission_status: "policy_disabled",
+      raw_secret_exposed: false,
+    });
+    expect(trace).toMatchObject({
+      admission_status: "blocked",
+      lane_status: "disabled",
+      requested_backend_provider_known: true,
+      selected_backend_provider: null,
+      backend_selection_decision: expect.objectContaining({
+        outcome: "blocked",
+        selected_runtime_provider_remains_root: true,
+        backend_provider_becomes_root_agent: false,
+        live_backend_execution_enabled: false,
+        terminal_authority_owner: "helix",
+      }),
+      resolved_backend_provider: null,
+      resolved_model_or_service: null,
+      blocked_reason: "capability_lane_disabled_by_policy",
+      execution_status: "not_executed_shadow_only",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("admits the Realtime session lane as dry-run only when explicitly enabled", () => {
+    const trace = resolveHelixCapabilityLaneRequest({
+      provider: buildProvider({ id: "codex" }),
+      requestedLane: "realtime_session",
+      env: {
+        HELIX_CAPABILITY_LANE_REALTIME_SESSION_ENABLED: "1",
+        OPENAI_REALTIME_API_KEY: "test-realtime-key",
+      } as NodeJS.ProcessEnv,
+    });
+
+    expect(trace).toMatchObject({
+      admission_status: "admitted_shadow_only",
+      lane_status: "dry_run",
+      selected_backend_provider: "realtime_session.openai_realtime",
+      resolved_backend_provider: "openai_realtime",
+      resolved_model_or_service: "gpt_realtime_session_placeholder",
+      execution_status: "not_executed_shadow_only",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(trace.backend_selection_decision).toMatchObject({
+      live_backend_execution_enabled: false,
+      backend_provider_becomes_root_agent: false,
+      terminal_authority_owner: "helix",
+    });
+  });
+
+  it("supports the explicit Realtime descriptor flag without enabling adapter transport", () => {
+    const trace = resolveHelixCapabilityLaneRequest({
+      provider: buildProvider({ id: "codex" }),
+      requestedLane: "realtime_session",
+      env: {
+        HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED: "1",
+        OPENAI_REALTIME_API_KEY: "test-realtime-key",
+      } as NodeJS.ProcessEnv,
+    });
+
+    expect(trace).toMatchObject({
+      admission_status: "admitted_shadow_only",
+      lane_status: "dry_run",
+      selected_backend_provider: "realtime_session.openai_realtime",
+      resolved_backend_provider: "openai_realtime",
+      resolved_model_or_service: "gpt_realtime_session_placeholder",
+      execution_status: "not_executed_shadow_only",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(trace.backend_selection_decision).toMatchObject({
+      live_backend_execution_enabled: false,
+      backend_provider_becomes_root_agent: false,
+      terminal_authority_owner: "helix",
+    });
+  });
+
+  it("does not make Realtime executable from adapter or live transport flags alone", () => {
+    const trace = resolveHelixCapabilityLaneRequest({
+      provider: buildProvider({ id: "codex" }),
+      requestedLane: "realtime_session",
+      requestedBackendProvider: "realtime_session.openai_realtime",
+      env: {
+        HELIX_REALTIME_SESSION_ADAPTER_ENABLED: "1",
+        HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED: "1",
+        OPENAI_REALTIME_API_KEY: "test-realtime-key",
+      } as NodeJS.ProcessEnv,
+    });
+
+    expect(trace).toMatchObject({
+      admission_status: "blocked",
+      lane_status: "disabled",
+      selected_backend_provider: null,
+      resolved_backend_provider: null,
+      resolved_model_or_service: null,
+      blocked_reason: "capability_lane_disabled_by_policy",
+      execution_status: "not_executed_shadow_only",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(trace.backend_selection_decision).toMatchObject({
+      outcome: "blocked",
+      live_backend_execution_enabled: false,
+      backend_provider_becomes_root_agent: false,
+      terminal_authority_owner: "helix",
+    });
   });
 
   it("keeps every provider-neutral lane model-visible and observation-only", () => {

@@ -188,6 +188,58 @@ const isTheoryLocatorObservation = (artifact: ArtifactLike): boolean =>
     [artifactKind(artifact), artifactSchema(artifact), artifactId(artifact)].join(" "),
   );
 
+const moralGraphObservationRefs = (artifacts: ArtifactLike[]): string[] =>
+  unique(artifacts.flatMap((artifact) => {
+    const payload = artifactPayload(artifact);
+    const observation = readRecord(payload?.observation);
+    const text = [
+      artifactKind(artifact),
+      artifactSchema(artifact),
+      artifactId(artifact),
+      readString(payload?.kind),
+      readString(payload?.schema),
+      readString(payload?.tool_name),
+      readString(payload?.toolName),
+      readString(observation?.kind),
+      readString(observation?.schema),
+    ].join(" ");
+    if (!/moral_graph_reflection|moral-graph\.reflect_context|helix\.moral_graph_reflection_observation\.v1|ideology_context_reflection|procedural_moral_classification/i.test(text)) {
+      return [];
+    }
+    return [
+      artifactId(artifact),
+      readString(payload?.artifact_id),
+      readString(payload?.observation_ref),
+      ...readArray(payload?.support_refs).map(readString),
+      ...readArray(payload?.evidence_refs).map(readString),
+      ...readArray(payload?.produced_artifact_refs).map(readString),
+    ].filter((entry): entry is string => Boolean(entry));
+  }));
+
+const supportRefsIncludeMoralGraphObservation = (
+  supportRefs: string[],
+  artifacts: ArtifactLike[],
+): boolean => {
+  const moralRefs = moralGraphObservationRefs(artifacts);
+  return moralRefs.some((moralRef) =>
+    supportRefs.some((supportRef) =>
+      supportRef === moralRef ||
+      supportRef.endsWith(`#${moralRef}`) ||
+      supportRef.endsWith(`/${moralRef}`),
+    ),
+  );
+};
+
+const explicitDraftSupportRefs = (draftPayload?: Record<string, unknown> | null): string[] =>
+  unique([
+    ...readArray(draftPayload?.support_refs).map(readString),
+    ...readArray(draftPayload?.artifact_refs).map(readString),
+    ...readArray(draftPayload?.evidence_refs).map(readString),
+    ...readArray(draftPayload?.source_observation_refs).map(readString),
+    ...readArray(draftPayload?.grounded_observation_refs).map(readString),
+    ...readArray(draftPayload?.grounded_in_observation_refs).map(readString),
+  ].filter((entry): entry is string => Boolean(entry)));
+
 const isDocsEvidenceObservation = (artifact: ArtifactLike): boolean =>
   /\b(?:doc_summary|doc_location_result|doc_evidence_location|doc_location_matches|doc_equation_context|doc_equation_location|doc_calculator_evidence|agent_step_observation_packet)\b/i.test(
     [artifactKind(artifact), artifactSchema(artifact), artifactId(artifact)].join(" "),
@@ -274,7 +326,11 @@ const capabilityFamilyFromCapability = (capability: string | null): string | nul
   if (capability === "internet_search.web_research" || capability === "internet-search.search_web") return "internet_search";
   if (capability.startsWith("scholarly-research.") || capability.startsWith("scholarly_research.")) return "scholarly_research";
   if (capability === "helix_ask.reflect_theory_context" || capability.includes("theory_context")) return "theory_locator";
-  if (capability === "helix_ask.reflect_ideology_context" || capability === "helix_ask.bridge_theory_ideology_context") {
+  if (
+    capability === "moral-graph.reflect_context" ||
+    capability === "helix_ask.reflect_ideology_context" ||
+    capability === "helix_ask.bridge_theory_ideology_context"
+  ) {
     return "moral_graph_reflection";
   }
   if (capability === "helix_ask.build_civilization_scenario_frame" || capability === "helix_ask.reflect_civilization_bounds") {
@@ -1572,6 +1628,22 @@ export function materializeFinalAnswerDraftTerminal(input: {
       raw_content_included: false,
     };
   }
+  if (
+    routeFamily === "moral_graph_reflection" &&
+    !supportRefsIncludeMoralGraphObservation(explicitDraftSupportRefs(draftPayload), artifactLedger)
+  ) {
+    return {
+      schema: "helix.final_answer_draft_terminal_materializer_result.v1",
+      turn_id: input.turnId,
+      final_answer_draft_ref: draft.ref,
+      ok: false,
+      blocked_reason: "source_support_refs_missing",
+      route_allowed_terminal_artifact_kinds: routeAllowed,
+      final_answer_draft_quality_gate: qualityGate,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
   const subgoalObservationRefs = compoundTerminalSupport.subgoalObservationRefs;
   const effectiveSubgoalObservationRefs =
     subgoalObservationRefs.length > 0
@@ -1592,7 +1664,9 @@ export function materializeFinalAnswerDraftTerminal(input: {
     support_refs_count: terminalSupportRefs.length,
     subgoal_observation_refs: effectiveSubgoalObservationRefs,
     subgoal_observation_refs_count: effectiveSubgoalObservationRefs.length,
-    source_families: compoundTerminalSupport.sourceFamilies,
+    source_families: routeFamily === "moral_graph_reflection" && compoundTerminalSupport.sourceFamilies.length === 0
+      ? ["moral_graph_reflection"]
+      : compoundTerminalSupport.sourceFamilies,
     model_step_capability: genericCompoundTargetKind === "compound_evidence_synthesis_answer"
       ? "model.synthesize_from_compound_subgoal_observations"
       : effectiveSubgoalObservationRefs.length > 1

@@ -51,6 +51,7 @@ export const HelixAskTurnList = forwardRef<HTMLDivElement, HelixAskTurnListProps
           ref={ref}
           className={className}
           onScroll={onScroll}
+          data-testid="helix-ask-turn-list-scroll"
         >
           {consoleDebugSnapshot ? (
             <details

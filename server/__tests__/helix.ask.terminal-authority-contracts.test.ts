@@ -1326,6 +1326,27 @@ describe("Helix Ask terminal authority contracts", () => {
     expect(contract.forbidden_terminal_artifact_kinds).not.toContain("doc_summary");
   });
 
+  it("treats named Image Lens receipt evaluation as a bounded visual terminal product", () => {
+    const contract = buildRouteProductContract({
+      turnId: "ask:test:image-lens-named-receipt",
+      threadId: "thread:test",
+      sourceTargetIntent: {
+        schema: "helix.ask_source_target_intent.v1",
+        target_source: "scientific_image_evidence",
+        target_kind: "scientific_image_named_receipt",
+        requested_outputs: ["image_lens_named_receipt_evaluation", "typed_failure"],
+      },
+      promptText: "Use only the latest Image Lens observation receipt named crop_1 and report its status.",
+    });
+
+    expect(contract.source_target).toBe("visual_capture");
+    expect(contract.allowed_terminal_artifact_kinds).toContain("image_lens_named_receipt_evaluation");
+    expect(contract.allowed_terminal_artifact_kinds).toContain("image_lens_observation_report");
+    expect(contract.forbidden_terminal_artifact_kinds).not.toContain("image_lens_named_receipt_evaluation");
+    expect(contract.forbidden_terminal_artifact_kinds).toContain("model_synthesized_answer");
+    expect(contract.forbidden_terminal_artifact_kinds).toContain("scholarly_research_answer");
+  });
+
   it("treats explicit Dottie manifest prompts as workstation panel product contracts", () => {
     const contract = buildRouteProductContract({
       turnId: "ask:test:dottie-manifest",
@@ -1373,7 +1394,32 @@ describe("Helix Ask terminal authority contracts", () => {
     expect(contract.side_artifact_kinds_allowed).toContain("repo_code_evidence_observation");
   });
 
-  it("keeps note mutation receipts as side evidence and requires synthesized terminal text", () => {
+  it("allows explicit create-note receipts as terminal authority", () => {
+    const contract = buildRouteProductContract({
+      turnId: "ask:test:create-note-terminal-contract",
+      threadId: "thread:test",
+      sourceTargetIntent: {
+        schema: "helix.ask_source_target_intent.v1",
+        target_source: "unknown",
+      },
+      promptText: 'Make a note for me "hh".',
+    });
+
+    expect(contract.allowed_terminal_artifact_kinds).toContain("note_update_receipt");
+    expect(contract.allowed_terminal_artifact_kinds).not.toContain("model_synthesized_answer");
+    expect(contract.forbidden_terminal_artifact_kinds).toEqual(expect.arrayContaining([
+      "model_synthesized_answer",
+      "direct_answer_text",
+      "panel_generated_answer",
+    ]));
+    expect(contract.side_artifact_kinds_allowed).toEqual(expect.arrayContaining([
+      "workspace_action_receipt",
+      "note_action_receipt",
+      "note_create_receipt",
+    ]));
+  });
+
+  it("keeps append-style note mutation receipts as side evidence and requires synthesized terminal text", () => {
     const contract = buildRouteProductContract({
       turnId: "ask:test:note-mutation-terminal-contract",
       threadId: "thread:test",
@@ -1381,7 +1427,7 @@ describe("Helix Ask terminal authority contracts", () => {
         schema: "helix.ask_source_target_intent.v1",
         target_source: "unknown",
       },
-      promptText: "Create a note titled Tool Test with the text receipts are observations.",
+      promptText: "Append this summary to the existing note titled Tool Test: receipts are observations.",
     });
 
     expect(contract.allowed_terminal_artifact_kinds).toContain("model_synthesized_answer");

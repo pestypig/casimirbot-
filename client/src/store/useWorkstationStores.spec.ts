@@ -158,6 +158,61 @@ describe("workstation stores", () => {
     }
   });
 
+  it("keeps chat messages in memory while trimming the browser-saved copy after quota pressure", () => {
+    const originalWindow = (globalThis as { window?: unknown }).window;
+    const storage = new Map<string, string>();
+    let throwNextChatWrite = true;
+    vi.stubGlobal("window", {
+      localStorage: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        removeItem: (key: string) => {
+          storage.delete(key);
+        },
+        setItem: (key: string, value: string) => {
+          if (key === "agi-chat-sessions-v1" && throwNextChatWrite) {
+            throwNextChatWrite = false;
+            throw new Error("Quota exceeded");
+          }
+          storage.set(key, value);
+        },
+      },
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    try {
+      const chats = useAgiChatStore.getState();
+      const sessionId = chats.newSession("Quota chat", "helix-ask-chat:quota");
+      const hugeContent = `answer\n${"x".repeat(50_000)}`;
+      chats.addMessage(sessionId, {
+        role: "assistant",
+        content: hugeContent,
+        helixAsk: {
+          debug: "y".repeat(40_000),
+        },
+      });
+
+      const inMemoryMessage = useAgiChatStore.getState().sessions[sessionId]?.messages[0];
+      expect(inMemoryMessage?.content).toBe(hugeContent);
+      expect(JSON.stringify(inMemoryMessage?.helixAsk ?? {})).toContain("y".repeat(100));
+
+      const stored = storage.get("agi-chat-sessions-v1");
+      expect(stored).toBeTruthy();
+      expect(stored?.length ?? 0).toBeLessThan(80_000);
+      expect(stored).toContain("saved chat copy");
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[agi-chat] saved chat copy was truncated after storage quota pressure"),
+        expect.anything(),
+      );
+    } finally {
+      warnSpy.mockRestore();
+      if (originalWindow === undefined) {
+        vi.unstubAllGlobals();
+      } else {
+        vi.stubGlobal("window", originalWindow);
+      }
+    }
+  });
+
   it("remembers workstation scroll positions and drafts for the browser session", () => {
     const memory = useWorkstationSessionMemoryStore.getState();
     memory.rememberPanelScroll("docs-viewer:doc:/docs/example.md", {

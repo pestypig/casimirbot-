@@ -203,6 +203,54 @@ describe("scientific evidence adaptor", () => {
     });
   });
 
+  it("treats bundled multi-equation page candidates as scouting evidence, not exact rows", () => {
+    const bundledPageCandidate = buildScientificEvidencePacket({
+      cropRegionId: "scholarly_pdf_page_5_equation_pass",
+      sourceRefHash: "sha256:page-5",
+      sourceKind: "pdf_page_render",
+      pageNumber: 5,
+      bboxPx: { x: 0, y: 0, width: 1224, height: 1584 },
+      sourceDimensionsPx: { width: 1224, height: 1584 },
+      requestedEquationLabel: "7",
+      regionLabel: "equation_7",
+      textCandidate: [
+        "S = \\int d^4x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_m \\}, (7)",
+        "S_n = \\int d^nx \\sqrt{-g} e^{(1 - n/2)\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_m \\}, (8)",
+        "\\Delta \\tau = \\int_a^b e^{\\phi/2} (g_{\\mu\\nu} dx^\\mu/d\\lambda dx^\\nu/d\\lambda)^{1/2} d\\lambda, (9)",
+      ].join("\n"),
+      latexCandidate: [
+        "S = \\int d^4x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_m \\}, \\quad (7)",
+        "S_n = \\int d^nx \\sqrt{-g} e^{(1 - n/2)\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_m \\}, \\quad (8)",
+        "\\Delta \\tau = \\int_a^b e^{\\phi/2} \\left(g_{\\mu\\nu} \\frac{dx^\\mu}{d\\lambda} \\frac{dx^\\nu}{d\\lambda}\\right)^{1/2} d\\lambda, \\quad (9)",
+      ].join("\n"),
+      uncertainty: ["page-level OCR candidate list"],
+      extractionStatus: "partial",
+    });
+    const sidecar = buildScientificImageEvidenceSidecar({
+      sidecarId: "sidecar:multi-equation-page-candidate",
+      packets: [bundledPageCandidate],
+    });
+
+    expect(bundledPageCandidate).toMatchObject({
+      observed_equation_labels: expect.arrayContaining(["7", "8", "9"]),
+      label_match_status: "ambiguous",
+      quality_flags: expect.arrayContaining([
+        "candidate_contains_multiple_display_equations",
+        "row_crop_contains_multiple_equation_lines",
+      ]),
+      exact_equation_admissibility: "inadmissible_for_exact_equation",
+      exact_row_promotion: expect.objectContaining({
+        status: "rejected",
+        reasons: expect.arrayContaining(["candidate_contains_multiple_display_equations"]),
+      }),
+    });
+    expect(sidecar.selected_evidence_object).toBeNull();
+    expect(sidecar.promoted_equation_ref).toBeNull();
+    expect(sidecar.historical_blockers).toEqual(expect.arrayContaining([
+      "candidate_contains_multiple_display_equations",
+    ]));
+  });
+
   it("projects promoted rows as stable structured evidence objects", () => {
     const exactLatex = "S = \\int d^4x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_m \\}, \\, (7)";
     const exactRow = buildScientificEvidencePacket({

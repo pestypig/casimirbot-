@@ -358,6 +358,7 @@ describe("Helix Ask UI ownership boundaries", () => {
     const voiceBrief = read("client/src/lib/helix/ask-voice-brief-policy.ts");
     const readAloud = read("client/src/lib/helix/ask-read-aloud-display.ts");
     const terminalProjection = read("client/src/lib/helix/ask-terminal-projection.ts");
+    const voiceAutoSpeakDebug = read("client/src/components/helix/ask-console/HelixAskVoiceAutoSpeakDebug.ts");
 
     expect(pill).toContain("inferAskMode");
     expect(pill).not.toContain("export function inferAskMode");
@@ -369,7 +370,9 @@ describe("Helix Ask UI ownership boundaries", () => {
       "shouldAutoSpeakAnswerForTurn",
       "shouldPreserveAuthoritativeTerminalOverEvidenceGate",
     ]) {
-      expect(pill).toContain(`export function ${symbol}`);
+      expect(pill).toContain(symbol);
+      expect(pill).not.toContain(`export function ${symbol}`);
+      expect(voiceAutoSpeakDebug).toContain(`export const ${symbol}`);
       expect(map).toContain(symbol);
       for (const owner of [outputCleanup, voiceBrief, readAloud, terminalProjection]) {
         expect(owner).not.toContain(symbol);
@@ -710,6 +713,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       "client/src/components/helix/ask-console/HelixAskBackendEntrypointPolicy.ts",
     );
     const queuedTurnOwner = read("client/src/components/helix/ask-console/HelixAskQueuedTurn.ts");
+    const submitEntrypointOwner = read("client/src/components/helix/ask-console/HelixAskSubmitBackendEntrypointOptions.ts");
     const requestDisplayOwners = [docsContext, outputCleanup, terminalProjection, valueNormalization];
 
     expect(map).toContain("Ask request construction and attachment admission");
@@ -730,8 +734,10 @@ describe("Helix Ask UI ownership boundaries", () => {
       }
     }
     expect(backendEntrypointPolicy).toContain("export function buildHelixAskHardBackendEntrypointRouteMetadata");
-    expect(pill).toContain("buildHelixAskHardBackendEntrypointRouteMetadata({");
+    expect(pill).toContain("buildHelixAskSubmitBackendEntrypointRoutePlan({");
+    expect(pill).not.toContain("buildHelixAskHardBackendEntrypointRouteMetadata({");
     expect(pill).not.toContain("function buildHelixAskHardBackendEntrypointRouteMetadata");
+    expect(submitEntrypointOwner).toContain("buildHelixAskHardBackendEntrypointRouteMetadata({");
     expect(pill).not.toContain("resolveHelixAskHardBackendEntrypointFamily");
     expect(pill).not.toContain("type HelixAskHardBackendEntrypointFamily");
     expect(pill).toContain("buildQueuedAskTurn");
@@ -920,11 +926,14 @@ describe("Helix Ask UI ownership boundaries", () => {
     const debugExport = read("client/src/lib/agi/debugExport.ts");
     const clipboard = read("client/src/components/helix/ask-console/HelixAskClipboard.ts");
     const debugSizeControl = read("client/src/components/helix/ask-console/HelixAskDebugExportSizeControl.ts");
+    const debugCopyProjection = read("client/src/components/helix/ask-console/HelixAskDebugCopyProjection.ts");
+    const renderedReplyDebugExport = read(
+      "client/src/components/helix/ask-console/HelixAskRenderedReplyDebugExport.ts",
+    );
 
     for (const localSymbol of [
       "buildReplyMasterEventClockExport",
       "normalizeReplyMasterDebugPayload",
-      "buildClientProjectionDebugFields",
       "buildReplyScopedDebugExportFromRenderedReply",
       "buildReplyScopedDebugExportFromRenderedButton",
       "resolveAuthoritativeDebugExportPayload",
@@ -934,16 +943,14 @@ describe("Helix Ask UI ownership boundaries", () => {
       expect(map).toContain(localSymbol);
       expect(debugExport).not.toContain(localSymbol);
     }
+    expect(debugCopyProjection).toContain("buildHelixAskClientProjectionDebugFields");
+    expect(pill).not.toContain("function buildClientProjectionDebugFields");
     const controls = read("client/src/components/helix/ask-console/HelixAskLegacyTurnControls.ts");
     for (const recrownedSymbol of [
       "buildHelixAskLegacyTurnControlActionPayload",
       "buildHelixAskReplyCopyText",
       "clearHelixAskLegacyCopiedDebugIdIfCurrent",
-      "collectHelixAskLegacyReplyTerminalTranscriptTexts",
       "debugPayloadMatchesHelixAskLegacyRenderedReply",
-      "isHelixAskLegacyBackendDebugExportEligibleTurnId",
-      "isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted",
-      "resolveHelixAskLegacyDebugExportBackendTarget",
       "debugPayloadMatchesHelixAskLegacyRenderedTurnPayload",
       "enforceHelixAskLegacyDebugExportMatchesClickedButton",
       "extractHelixAskLegacyClickedTurnDebugScope",
@@ -953,6 +960,21 @@ describe("Helix Ask UI ownership boundaries", () => {
       expect(map).toContain(recrownedSymbol);
       expect(debugExport).not.toContain(recrownedSymbol);
     }
+    expect(pill).not.toContain("isHelixAskLegacyBackendDebugExportEligibleTurnId");
+    expect(controls).toContain("export function isHelixAskLegacyBackendDebugExportEligibleTurnId");
+    expect(debugCopyProjection).toContain("isHelixAskLegacyBackendDebugExportEligibleTurnId");
+    expect(map).toContain("isHelixAskLegacyBackendDebugExportEligibleTurnId");
+    expect(debugExport).not.toContain("isHelixAskLegacyBackendDebugExportEligibleTurnId");
+    expect(pill).not.toContain("resolveHelixAskLegacyDebugExportBackendTarget");
+    expect(controls).toContain("export function resolveHelixAskLegacyDebugExportBackendTarget");
+    expect(debugCopyProjection).toContain("resolveHelixAskLegacyDebugExportBackendTarget");
+    expect(map).toContain("resolveHelixAskLegacyDebugExportBackendTarget");
+    expect(debugExport).not.toContain("resolveHelixAskLegacyDebugExportBackendTarget");
+    expect(pill).not.toContain("isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted");
+    expect(controls).toContain("export function isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted");
+    expect(renderedReplyDebugExport).toContain("isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted");
+    expect(map).toContain("isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted");
+    expect(debugExport).not.toContain("isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted");
     expect(pill).toContain(
       "export function buildHelixAskReplyCopyText(reply: HelixAskReply): string {\n  return buildRecrownedHelixAskReplyCopyText(reply);\n}",
     );
@@ -971,7 +993,8 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(clipboard).toContain("document.execCommand(\"copy\")");
     expect(clipboard).not.toContain("copyDebugPayloadToClipboard");
     expect(clipboard).not.toContain("resolveAuthoritativeDebugExportPayload");
-    expect(pill).toContain("return copyHelixAskDebugJsonToClipboard(json);");
+    expect(pill).toContain("return copyHelixAskDebugPayloadToClipboard(payload);");
+    expect(debugCopyProjection).toContain("return copyHelixAskDebugJsonToClipboard(json);");
     expect(pill).toContain("copyHelixAskContextCapsuleToClipboard(reply.contextCapsule)");
     expect(pill).toContain("clearHelixAskLegacyCopiedDebugIdIfCurrent(current, clickedReply.id)");
     expect(pill).not.toContain("current === clickedReply.id ? null : current");
@@ -1020,20 +1043,24 @@ describe("Helix Ask UI ownership boundaries", () => {
   it("keeps rendered-button debug copy scoped to the matched reply turn only", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const normalizedPill = pill.replace(/\r\n/g, "\n");
+    const renderedReplyDebugExport = read(
+      "client/src/components/helix/ask-console/HelixAskRenderedReplyDebugExport.ts",
+    );
+    const normalizedRenderedReplyDebugExport = renderedReplyDebugExport.replace(/\r\n/g, "\n");
 
-    expect(pill).toContain("const renderedMatchesReply =");
-    expect(pill).toContain("const backendTurnScopeTrusted = isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted({");
-    expect(pill).toContain("const includeReplyDebug = renderedMatchesReply && backendTurnScopeTrusted");
-    expect(pill).toContain("debug: includeReplyDebug ? reply.debug ?? null : null");
-    expect(pill).toContain("active_turn_id: renderedMatchesReply ? activeTurnId : null");
-    expect(pill).toContain("const replyResolvedTurnIdTrusted =");
-    expect(pill).toContain("!isBackendAskTurnDebugExportEligibleTurnId(replyResolvedTurnId) || Boolean(rendered.activeTurnId)");
-    expect(pill).toContain("const selectedDebugTurnId = resolveHelixAskReplyDebugTurnId(args.reply)");
-    expect(pill).toContain("client_active_turn_id: clientSelectedDebugTurnId");
-    expect(pill).toContain(
+    expect(renderedReplyDebugExport).toContain("const renderedMatchesReply =");
+    expect(renderedReplyDebugExport).toContain("const backendTurnScopeTrusted = isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted({");
+    expect(renderedReplyDebugExport).toContain("const includeReplyDebug = renderedMatchesReply && backendTurnScopeTrusted");
+    expect(renderedReplyDebugExport).toContain("debug: includeReplyDebug ? args.reply.debug ?? null : null");
+    expect(renderedReplyDebugExport).toContain("active_turn_id: renderedMatchesReply ? activeTurnId : null");
+    expect(renderedReplyDebugExport).toContain("const replyResolvedTurnIdTrusted =");
+    expect(renderedReplyDebugExport).toContain("!isHelixAskLegacyBackendDebugExportEligibleTurnId(replyResolvedTurnId) || Boolean(rendered.activeTurnId)");
+    expect(renderedReplyDebugExport).toContain("selectedDebugTurnId: renderedMatchesReply ? activeTurnId : null");
+    expect(renderedReplyDebugExport).toContain("client_active_turn_id: clientTurnId ?? args.reply.id");
+    expect(renderedReplyDebugExport).toContain(
       "debug_export_ref: includeReplyDebug ? replyRecord.debug_export_ref ?? replyDebugRecord?.debug_export_ref ?? null : null",
     );
-    expect(normalizedPill).toContain(
+    expect(normalizedRenderedReplyDebugExport).toContain(
       "backend_debug_response_ref: includeReplyDebug\n      ? replyRecord.backend_debug_response_ref ?? replyDebugRecord?.backend_debug_response_ref ?? null\n      : null",
     );
     expect(normalizedPill).toContain(
@@ -1051,13 +1078,14 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(pill).toContain("buildReplyScopedDebugExportFromRenderedButton(");
     expect(pill).toContain("resolveAuthoritativeDebugExportPayload(localExportPayload)");
     expect(pill).toContain("selectHelixAskLegacyReplyScopedDebugExportPayload({");
-    expect(pill).toContain("resolveHelixAskLegacyDebugExportClientTurnId(parsed)");
+    expect(pill).not.toContain("resolveHelixAskLegacyDebugExportClientTurnId(parsed)");
     expect(pill).not.toContain("coerceText(parsed.clientSelectedDebugTurnId).trim()");
-    expect(pill).toContain("collectHelixAskLegacyReplyTerminalTranscriptTexts(reply)");
     expect(pill).not.toContain("function collectHelixReplyTerminalTranscriptTexts");
     expect(pill).toContain("debugPayloadMatchesHelixAskLegacyRenderedReply as debugPayloadMatchesRenderedReply");
     expect(pill).not.toContain("function debugPayloadMatchesRenderedReply");
     const controls = read("client/src/components/helix/ask-console/HelixAskLegacyTurnControls.ts");
+    const debugCopyProjection = read("client/src/components/helix/ask-console/HelixAskDebugCopyProjection.ts");
+    expect(debugCopyProjection).toContain("resolveHelixAskLegacyDebugExportClientTurnId(parsed)");
     expect(controls).toContain("selectHelixAskLegacyDebugCopyLocalPayload");
     expect(controls).toContain("selectHelixAskLegacyGuardedDebugExportPayload");
     expect(controls).toContain("selectHelixAskLegacyReplyScopedDebugExportPayload");
@@ -1069,6 +1097,8 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(controls).toContain("export function resolveHelixAskLegacyClickedDebugReply");
     expect(controls).toContain("export function resolveHelixAskLegacyReplyDebugTurnId");
     expect(controls).toContain("export function collectHelixAskLegacyReplyTerminalTranscriptTexts");
+    expect(pill).not.toContain("collectHelixAskLegacyReplyTerminalTranscriptTexts(reply)");
+    expect(renderedReplyDebugExport).toContain("collectHelixAskLegacyReplyTerminalTranscriptTexts(args.reply)");
     expect(controls).toContain("export function debugPayloadMatchesHelixAskLegacyRenderedReply");
     expect(controls).toContain("readTurnScopeAttribute(\"data-turn-control-question\", \"data-debug-copy-question\")");
     expect(controls).toContain(
@@ -2115,6 +2145,7 @@ describe("Helix Ask UI ownership boundaries", () => {
 
     for (const anchor of [
       "resolveExternalPromptClaimId",
+      "claimExternalPromptSingleFlight",
     ]) {
       expect(pill).toContain(anchor);
       expect(pill).not.toContain(`function ${anchor}`);
@@ -2125,7 +2156,6 @@ describe("Helix Ask UI ownership boundaries", () => {
       }
     }
     for (const anchor of [
-      "claimExternalPromptSingleFlight",
       "pendingExternalAskPromptRef",
       "consumePendingHelixAskPrompt",
       "clearPendingHelixAskPrompt",
@@ -2886,7 +2916,9 @@ describe("Helix Ask UI ownership boundaries", () => {
     }
     expect(pill).toContain("buildReadAloudStateMapTransition(prev,");
     expect(pill).toContain("resolveReadAloudButtonPressAction({ currentState })");
-    expect(pill).toContain("filterReadAloudQueueForReply(voiceAutoSpeakQueueRef.current, reply.id)");
+    expect(pill).toContain("filterReadAloudQueueForReply(");
+    expect(pill).toContain("voiceAutoSpeakQueueRef.current");
+    expect(pill).toContain("reply.id");
     expect(pill).not.toContain("transitionReadAloudState(prev[");
     expect(pill).not.toContain("utterance.replyId !== reply.id");
     expect(pill).not.toContain("const VOICE_AUTO_SPEAK_UTTERANCE_ID_MAX_CHARS");
@@ -3185,6 +3217,7 @@ describe("Helix Ask UI ownership boundaries", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const diagnosticsExport = read("client/src/lib/helix/ask-voice-diagnostics-export.ts");
+    const debugCopyProjection = read("client/src/components/helix/ask-console/HelixAskDebugCopyProjection.ts");
 
     expect(map).toContain("ask-voice-diagnostics-export.ts");
     expect(map).toContain("Deterministic voice diagnostics export projection");
@@ -3209,7 +3242,8 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(diagnosticsExport).toContain("tool_admission");
     expect(diagnosticsExport).toContain("playback_receipt");
     expect(diagnosticsExport).toContain("terminal_answer_authority");
-    expect(pill).toContain("client_voice_authority_debug");
+    expect(debugCopyProjection).toContain("client_voice_authority_debug");
+    expect(pill).not.toContain("client_voice_authority_debug");
     for (const localAnchor of [
       "buildCurrentVoiceDiagnosticsSnapshot",
       "publishVoiceCaptureDiagnosticsSnapshot",
@@ -3310,6 +3344,7 @@ describe("Helix Ask UI ownership boundaries", () => {
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const playbackClassification = read("client/src/lib/helix/ask-voice-playback-classification.ts");
     const playbackRuntime = read("client/src/lib/helix/ask-voice-playback-runtime.ts");
+    const askPlaybackRuntime = read("client/src/components/helix/ask-console/HelixAskVoicePlaybackRuntime.ts");
     const readAloud = read("client/src/lib/helix/ask-read-aloud-display.ts");
     const voiceCopy = read("client/src/lib/helix/ask-voice-copy-display.ts");
 
@@ -3317,7 +3352,7 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(map).toContain("ask-voice-playback-runtime.ts");
     expect(map).toContain("user-agent/env playback policy");
     expect(pill).toContain('from "@/lib/helix/ask-voice-playback-classification"');
-    expect(pill).toContain('from "@/lib/helix/ask-voice-playback-runtime"');
+    expect(askPlaybackRuntime).toContain('from "@/lib/helix/ask-voice-playback-runtime"');
     for (const symbol of [
       "shouldRetryVoicePlaybackWithDirectFallback",
       "shouldRetryVoicePlaybackDirectAttempt",
@@ -4275,6 +4310,7 @@ describe("Helix Ask UI ownership boundaries", () => {
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const playbackIntent = read("client/src/lib/helix/ask-voice-playback-intent.ts");
     const playbackRuntime = read("client/src/lib/helix/voice-playback.ts");
+    const askPlaybackRuntime = read("client/src/components/helix/ask-console/HelixAskVoicePlaybackRuntime.ts");
 
     expect(map).toContain("ask-voice-playback-intent.ts");
     expect(map).toContain("Deterministic voice playback intent/task projection");
@@ -4291,11 +4327,12 @@ describe("Helix Ask UI ownership boundaries", () => {
       "enqueueVoiceAutoSpeakTask",
       "voiceAutoSpeakQueueRef",
       "speakVoice",
-      "updateVoicePlaybackLifecycleDiagnosticFromAudio",
     ]) {
       expect(pill).toContain(localAnchor);
       expect(playbackIntent).not.toContain(localAnchor);
     }
+    expect(askPlaybackRuntime).toContain("updateVoicePlaybackLifecycleDiagnosticFromAudio");
+    expect(playbackIntent).not.toContain("updateVoicePlaybackLifecycleDiagnosticFromAudio");
     expect(playbackRuntime).toContain("export function createVoicePlaybackUtterance");
     expect(playbackIntent).not.toContain("createVoicePlaybackUtterance");
     for (const forbidden of [

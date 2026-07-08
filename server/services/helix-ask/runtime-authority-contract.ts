@@ -225,6 +225,9 @@ const artifactKindMatchesCapability = (
   if (capability === "helix_ask.reflect_context_attachments") {
     return /helix_context_reflection_tool_receipt|context_attachment|bounded_context_reference/i.test(joined);
   }
+  if (capability === "moral-graph.reflect_context") {
+    return /moral_graph_reflection|moral-graph\.reflect_context|helix\.moral_graph_reflection_observation\.v1|ideology_context_reflection|procedural_moral_classification|moral_badge_locator/i.test(joined);
+  }
   if (capability === "helix_ask.reflect_ideology_context") {
     return /helix_moral_graph_reflection_tool_result|ideology_context_reflection|procedural_moral_classification|moral_badge_locator|fruition_procedure_expression|reflect_ideology_context|workstation_tool_evaluation/i.test(joined);
   }
@@ -1266,6 +1269,29 @@ const contextResumeFrameRecallTerminalAllowed = (payload: Record<string, unknown
   return goalSatisfactionAllowsTerminal(payload);
 };
 
+const contractAuthorizedNoteReceiptTerminalAllowed = (payload: Record<string, unknown>): boolean => {
+  const terminalKind = readString(payload.terminal_artifact_kind);
+  const finalAnswerSource = readString(payload.final_answer_source);
+  if (terminalKind !== "note_update_receipt" || finalAnswerSource !== "note_update_receipt") return false;
+  const canonicalGoal = readRecord(payload.canonical_goal_frame);
+  const routeProduct = readRecord(payload.route_product_contract);
+  const allowed = readArray(routeProduct?.allowed_terminal_artifact_kinds)
+    .map(readString)
+    .filter(Boolean);
+  const forbidden = readArray(routeProduct?.forbidden_terminal_artifact_kinds)
+    .map(readString)
+    .filter(Boolean);
+  if (forbidden.includes("note_update_receipt")) return false;
+  if (
+    readString(canonicalGoal?.required_terminal_kind) !== "note_update_receipt" &&
+    readString(routeProduct?.required_terminal_kind) !== "note_update_receipt" &&
+    !allowed.includes("note_update_receipt")
+  ) {
+    return false;
+  }
+  return goalSatisfactionAllowsTerminal(payload) && hasSelectedCapabilityObservation(payload);
+};
+
 export function hasCleanTypedFailure(payload: Record<string, unknown>): boolean {
   if (readString(payload.terminal_artifact_kind) !== "typed_failure" && readString(payload.final_answer_source) !== "typed_failure") return false;
   return Boolean(
@@ -1296,6 +1322,7 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
   const workstationControlReceiptAllowed = workstationControlReceiptTerminalAllowed(payload);
   const stagePlayReceiptTerminal = stagePlayReceiptSelectedAsTerminal(payload);
   const contextResumeFrameRecallAllowed = contextResumeFrameRecallTerminalAllowed(payload);
+  const noteReceiptTerminalAllowed = contractAuthorizedNoteReceiptTerminalAllowed(payload);
   const microDeckObservationBackedRoute = isMicroDeckObservationBackedRoute(payload);
   const microDeckCapability = selectedMicroDeckCapability(payload);
   const repoEvidenceAnswerTerminal = repoEvidenceAnswerTerminalAllowed(payload);
@@ -1315,11 +1342,12 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
     !livePipelineReceiptAllowed &&
     !liveEnvironmentBindingDiagnosisAllowed &&
     !workstationControlReceiptAllowed &&
+    !noteReceiptTerminalAllowed &&
     !contextResumeFrameRecallAllowed;
   const blockingReasons: string[] = [];
   if (runtimeBoundTurn) {
     if (stagePlayReceiptTerminal) blockingReasons.push("stage_play_receipt_terminal_without_model_review");
-    if (!checks.goal_satisfaction_allows_terminal && !livePipelineReceiptAllowed && !liveEnvironmentBindingDiagnosisAllowed && !workstationControlReceiptAllowed) blockingReasons.push("goal_satisfaction_not_terminal");
+    if (!checks.goal_satisfaction_allows_terminal && !livePipelineReceiptAllowed && !liveEnvironmentBindingDiagnosisAllowed && !workstationControlReceiptAllowed && !noteReceiptTerminalAllowed) blockingReasons.push("goal_satisfaction_not_terminal");
     if (terminalKind === "typed_failure") {
       if (!checks.typed_failure_clean) blockingReasons.push("typed_failure_missing_code");
     } else if (modelDirectAnswerTurn) {
@@ -1328,7 +1356,7 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
         if (!checks.agent_step_decision) blockingReasons.push("agent_step_decision_missing");
         if (!checks.post_observation_model_decision) blockingReasons.push("post_observation_model_decision_missing");
       }
-    } else if (livePipelineReceiptAllowed || liveEnvironmentBindingDiagnosisAllowed || workstationControlReceiptAllowed || contextResumeFrameRecallAllowed) {
+    } else if (livePipelineReceiptAllowed || liveEnvironmentBindingDiagnosisAllowed || workstationControlReceiptAllowed || noteReceiptTerminalAllowed || contextResumeFrameRecallAllowed) {
       // Control/status Live Pipeline receipts and binding diagnostics are terminal only by route-product contract.
       // The receipt/diagnosis and disclosure remain observations, not assistant answers or raw logs.
     } else {

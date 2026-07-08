@@ -36,6 +36,8 @@ describe("Helix Ask slash command menu", () => {
     expect(userItems.find((item) => item.command === "/postulate")).toMatchObject({
       accessState: "available",
       insertionText: "Send this postulate to be reviewed: ",
+      expectedTerminalProductKind: "postulate_runtime_review",
+      allowedTerminalProductKinds: ["postulate_runtime_review", "typed_failure"],
     });
     expect(userItems.some((item) => item.command === "/situation")).toBe(false);
 
@@ -70,6 +72,39 @@ describe("Helix Ask slash command menu", () => {
       command: "/repo-search",
       accessState: "available",
     });
+  });
+
+  it("declares terminal product contracts for curated slash commands", () => {
+    const catalog = buildHelixAskSlashCommandCatalogForPolicy(HELIX_USER_ACCOUNT_POLICY);
+    expect(catalog).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          command: "/calculator",
+          expectedTerminalProductKind: "workstation_tool_evaluation",
+          allowedTerminalProductKinds: expect.arrayContaining(["workstation_tool_evaluation", "typed_failure"]),
+        }),
+        expect.objectContaining({
+          command: "/image",
+          expectedTerminalProductKind: "image_lens_observation_report",
+          allowedTerminalProductKinds: expect.arrayContaining(["image_lens_observation_report", "typed_failure"]),
+        }),
+        expect.objectContaining({
+          command: "/moral",
+          expectedTerminalProductKind: "agent_provider_terminal_candidate",
+          allowedTerminalProductKinds: expect.arrayContaining(["agent_provider_terminal_candidate", "typed_failure"]),
+        }),
+        expect.objectContaining({
+          command: "/theory",
+          expectedTerminalProductKind: "theory_context_reflection_answer",
+          allowedTerminalProductKinds: expect.arrayContaining(["theory_context_reflection_answer", "typed_failure"]),
+        }),
+        expect.objectContaining({
+          command: "/postulate",
+          expectedTerminalProductKind: "postulate_runtime_review",
+          allowedTerminalProductKinds: ["postulate_runtime_review", "typed_failure"],
+        }),
+      ]),
+    );
   });
 
   it("keeps the postulate scaffold visible when cached policy has the public board but not the new capability", () => {

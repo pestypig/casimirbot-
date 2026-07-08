@@ -828,14 +828,17 @@ export const cleanCalculatorExpression = (value: string | null | undefined): str
   if (!value) return null;
   const expression = value
     .trim()
-    .replace(/(?:then|and)\s+[\s\S]*$/i, "")
+    .replace(/\b(?:then|and|wait|report|answer|give|explain|summari[sz]e|tell)\b[\s\S]*$/i, "")
+    .trim()
     .replace(/[.,;:!?]+$/g, "")
     .replace(/\s+/g, "")
     .replace(/(?:[eE][+-]?|\.)+$/g, "")
     .trim();
-  if (!expression || expression.length > 120) return null;
-  if (!/\d/.test(expression) || !/[+\-*/^%]/.test(expression)) return null;
-  if (!/^[0-9eE.+\-*/^%()[\]]+$/.test(expression)) return null;
+  if (!expression || expression.length > 160) return null;
+  if (!/\d/.test(expression) || !/[+\-*/^%]|\b(?:diff|differentiate|derivative|integrate|integral|sqrt|ln|log|exp|sin|cos|tan|abs)\s*\(/i.test(expression)) {
+    return null;
+  }
+  if (!/^[0-9A-Za-z_.,+\-*/^%()[\]]+$/.test(expression)) return null;
   return expression;
 };
 
@@ -870,7 +873,7 @@ export const extractCalculatorMathTokenSequence = (value: string | null | undefi
   const source = value.trim();
   let start = -1;
   for (let index = 0; index < source.length; index += 1) {
-    if (/[\d(]/.test(source[index] ?? "")) {
+    if (/[A-Za-z0-9(]/.test(source[index] ?? "")) {
       start = index;
       break;
     }
@@ -879,7 +882,10 @@ export const extractCalculatorMathTokenSequence = (value: string | null | undefi
   let candidate = "";
   for (let index = start; index < source.length; index += 1) {
     const char = source[index] ?? "";
-    if (/[0-9eE.+\-*/^%()[\]\s]/.test(char)) {
+    if (char === "." && /\s/.test(source[index + 1] ?? "")) {
+      break;
+    }
+    if (/[0-9A-Za-z_.,+\-*/^%()[\]\s]/.test(char)) {
       candidate += char;
       continue;
     }

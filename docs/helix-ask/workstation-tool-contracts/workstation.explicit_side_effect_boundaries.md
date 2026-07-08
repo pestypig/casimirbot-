@@ -4,7 +4,8 @@ Maturity: `draft`
 
 Owner surface: Helix Ask explicit route contracts and workstation panels
 
-Provider status: blocked from Codex/provider gateway
+Provider status: blocked from the shared provider gateway; `workstation-notes.create_note`
+has a narrow Codex Workstation host-dispatch receipt bridge
 
 ## Purpose
 
@@ -33,7 +34,9 @@ workstation-notes.open
 ## Inputs
 
 Provider-mode input must fail closed for these capabilities until a
-capability-specific side-effect contract exists. A valid future contract must
+capability-specific side-effect contract exists, except for the narrow
+`workstation-notes.create_note` Codex Workstation bridge documented in
+`workstation-notes.side_effect_actions.md`. A valid side-effect contract must
 require:
 
 - explicit affirmative operator command admission
@@ -83,12 +86,23 @@ Debug export and visible UI rows must agree for the same turn id.
 
 ## Tests
 
-Current held-back behavior:
+Current held-back behavior for all listed side effects except
+`workstation-notes.create_note`:
 
 ```txt
 availability=blocked_pending_contract
 permission_class=user_confirmed_side_effect
 codex_workstation=false
+future_provider=false
+gateway_manifest=absent
+```
+
+Current `workstation-notes.create_note` bridge behavior:
+
+```txt
+availability=candidate_host_receipt_bridge
+permission_class=user_confirmed_side_effect
+codex_workstation=true
 future_provider=false
 gateway_manifest=absent
 ```

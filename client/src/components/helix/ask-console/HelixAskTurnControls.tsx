@@ -5,6 +5,11 @@ import { launchHelixAskPrompt } from "@/lib/helix/ask-prompt-launch";
 import { extractPostulateEvidenceContextFromText, type PostulateEvidenceContext } from "@/lib/agi/proposals";
 import { useDocumentImageRegionStore } from "@/store/useDocumentImageRegionStore";
 import { buildScientificEvidenceWorkflowStatus } from "./ScientificEvidenceWorkflowStatus";
+import {
+  mergeScientificEvidenceWorkflowStatus,
+  mergeScientificEvidenceWorkflowStatusRecords,
+  readActiveScientificEvidenceWorkflowStatus,
+} from "@/store/useScientificEvidenceWorkflowStore";
 
 export type HelixAskTurnControlsProps = {
   onCopyFinal: () => void;
@@ -90,7 +95,7 @@ const collectCurrentScientificPostulateEvidence = (
   originatingAnswerId: string | null = null,
 ): PostulateEvidenceContext => {
   const documentState = useDocumentImageRegionStore.getState();
-  const workflowStatus = buildScientificEvidenceWorkflowStatus({
+  const localWorkflowStatus = buildScientificEvidenceWorkflowStatus({
     source: documentState.source,
     cropDraft: documentState.cropDraft,
     lastReceipt: documentState.lastReceipt,
@@ -100,6 +105,11 @@ const collectCurrentScientificPostulateEvidence = (
     ),
     evidenceText: `${candidateText}\n${evidenceText}`,
   });
+  const storedWorkflowStatus = readActiveScientificEvidenceWorkflowStatus();
+  const workflowStatus = storedWorkflowStatus
+    ? mergeScientificEvidenceWorkflowStatusRecords(localWorkflowStatus, storedWorkflowStatus)
+    : localWorkflowStatus;
+  mergeScientificEvidenceWorkflowStatus(workflowStatus, { askThreadId: "helix-ask:desktop" });
   return deriveScientificPostulateEvidenceFallbacks({
     context: mergePostulateEvidenceContext(
       extractPostulateEvidenceContextFromText(candidateText),
@@ -160,13 +170,18 @@ export function HelixAskTurnControls({
         postulateEvidenceText ?? "",
         originatingAnswerId,
       );
-      const workflowStatus = buildScientificEvidenceWorkflowStatus({
+      const localWorkflowStatus = buildScientificEvidenceWorkflowStatus({
         source: useDocumentImageRegionStore.getState().source,
         cropDraft: useDocumentImageRegionStore.getState().cropDraft,
         lastReceipt: useDocumentImageRegionStore.getState().lastReceipt,
         evidenceContext,
         evidenceText: `${normalizedPostulateText}\n${postulateEvidenceText ?? ""}`,
       });
+      const storedWorkflowStatus = readActiveScientificEvidenceWorkflowStatus();
+      const workflowStatus = storedWorkflowStatus
+        ? mergeScientificEvidenceWorkflowStatusRecords(localWorkflowStatus, storedWorkflowStatus)
+        : localWorkflowStatus;
+      mergeScientificEvidenceWorkflowStatus(workflowStatus, { askThreadId: "helix-ask:desktop" });
       launchHelixAskPrompt({
         question: [
           "/postulate",
@@ -198,6 +213,10 @@ export function HelixAskTurnControls({
           invocationKind: "postulate_final_answer_review",
           sourceTarget: "postulate_board",
           requiredCanonicalGoal: "postulate_runtime_review_then_gated_submit",
+          requiredTerminalProductKind: "postulate_runtime_review",
+          requiredTerminalArtifactKind: "postulate_runtime_review",
+          allowedTerminalProductKinds: ["postulate_runtime_review", "typed_failure"],
+          allowedTerminalArtifactKinds: ["postulate_runtime_review", "typed_failure"],
           allowedCapabilities: ["postulate.submit_proposal"],
           forbiddenCapabilities: [],
           evidenceContext,

@@ -7,6 +7,7 @@ import { applyCompoundTerminalPolicy, readCompoundTerminalPolicy } from "../serv
 import { resolveCompoundCapabilitySynthesisReadiness } from "../services/helix-ask/compound-capability-synthesis";
 import { explicitCapabilityContractsForTests } from "../services/helix-ask/explicit-capability-contract";
 import { TOOL_FAMILY_CONTRACTS } from "../services/helix-ask/tool-family-contract";
+import { buildToolCallAdmissionDecision } from "../services/helix-ask/tool-call-admission";
 
 type ExplicitContract = typeof explicitCapabilityContractsForTests[number];
 
@@ -1123,6 +1124,61 @@ describe("Helix Ask compound capability family matrix", () => {
         /Then call|workspace-directory\.resolve|docs-viewer\.locate_in_doc|repo-code\.search_concept|internet_search\.web_research/,
       );
     }
+  });
+
+  it("keeps explicit Moral Graph reflection as a single subgoal when adjacent evidence families are negated", () => {
+    const promptText =
+      "Use moral-graph.reflect_context. Reflect on delayed disclosure in a shared obligation. Identify the dependency, who needed the information, what deadline preserved agency, and what repair path should be considered. Do not use calculator, image, PDF, page, or web evidence.";
+    const compound = buildHelixCompoundCapabilityContract({
+      turnId: "ask:compound-family:moral-graph-negative-evidence",
+      promptText,
+    });
+
+    expect(compound).toMatchObject({
+      prompt_shape: "single_capability",
+      requires_all_subgoals: false,
+      required_capabilities: ["moral-graph.reflect_context"],
+    });
+    expect(compound?.subgoals).toHaveLength(1);
+    expect(compound?.subgoals[0]).toMatchObject({
+      requested_capability: "moral-graph.reflect_context",
+      runtime_capability: "moral-graph.reflect_context",
+      capability_family: "moral_graph_reflection",
+      source_target: "moral_graph",
+    });
+    expect(JSON.stringify(compound)).not.toMatch(
+      /scholarly-research\.lookup_papers|internet_search\.web_research|image_lens\.inspect|scientific-calculator\.solve_expression/,
+    );
+
+    const admission = buildToolCallAdmissionDecision({
+      turnId: "ask:compound-family:moral-graph-negative-evidence",
+      promptText,
+    });
+    expect(admission.source_target).toBe("moral_graph");
+    expect(admission.admitted_tool_families).toEqual(["workstation_action"]);
+    expect(admission.forbidden_tool_families).toEqual(expect.arrayContaining([
+      "calculator",
+      "docs_viewer",
+      "internet_search",
+      "situation_run",
+      "scholarly_research",
+      "visual_capture",
+    ]));
+
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:compound-family:moral-graph-negative-evidence",
+      promptText,
+      toolCallAdmissionDecision: admission,
+    });
+    expect(itinerary.prompt_shape).toBe("single_tool");
+    expect(itinerary.relevant_tool_families).toEqual(["moral_graph_reflection"]);
+    expect(itinerary.missing_tool_families).toEqual([]);
+    expect(itinerary.terminal_success_criteria.required_observation_families).toEqual([
+      "moral_graph_reflection",
+    ]);
+    expect(itinerary.planned_steps.map((step) => step.tool_family)).toEqual(["moral_graph_reflection"]);
+    expect(itinerary.planned_steps.map((step) => step.capability_hint)).toEqual(["moral-graph.reflect_context"]);
+    expect(itinerary.terminal_success_criteria.required_capabilities).toEqual(["moral-graph.reflect_context"]);
   });
 
   it("removes explicit query labels and compound connectors from extracted args", () => {

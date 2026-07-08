@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import {
   buildHelixAskHardBackendEntrypointRouteMetadata as buildRecrownedHardBackendEntrypointRouteMetadata,
 } from "@/components/helix/ask-console/HelixAskBackendEntrypointPolicy";
+import { buildHelixAskSubmitBackendEntrypointRoutePlan } from "@/components/helix/ask-console/HelixAskSubmitBackendEntrypointOptions";
 
 let parseHelixAskQueuedQuestionsInput: typeof import("@/components/helix/HelixAskPill").parseHelixAskQueuedQuestionsInput;
 let buildHelixAskRepliesFromChatSession: typeof import("@/components/helix/HelixAskPill").buildHelixAskRepliesFromChatSession;
@@ -71,6 +72,43 @@ describe("Helix Ask backend entrypoint projection guard", () => {
     expect(requiresHelixAskBackendEntrypoint("What should I cook for dinner tonight?")).toBe(false);
   });
 
+  it("builds submit route plans outside the legacy pill for natural Moral Graph prompts", () => {
+    const prompt =
+      "Use the Moral Graph to help me reflect on a roommate situation. Someone knew they might not be able to meet a shared payment, but waited until the last moment to say anything.";
+    const plan = buildHelixAskSubmitBackendEntrypointRoutePlan({
+      question: prompt,
+      turnId: "ask:moral-submit-plan",
+      threadId: "session:moral-submit-plan",
+      manualCanaryEnabled: true,
+    });
+    const routeMetadata = plan.routeMetadata as Record<string, unknown>;
+    const sourceTarget = routeMetadata.source_target_intent as Record<string, unknown>;
+    const mandatoryNextTool = routeMetadata.mandatory_next_tool as Record<string, unknown>;
+
+    expect(plan).toMatchObject({
+      backendOwnedPastedTextResumeRecall: false,
+      hardBackendEntrypointRequired: true,
+      forceReasoningDispatch: true,
+      useBackendAskTurnEntrypoint: true,
+    });
+    expect(routeMetadata).toMatchObject({
+      source: "hard_tool_backend_entrypoint",
+      sourceTarget: "moral_graph",
+      requiredToolFamily: "moral_graph",
+    });
+    expect(sourceTarget).toMatchObject({
+      target_source: "moral_graph",
+      target_kind: "moral_graph_reflection",
+      strength: "hard",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+    });
+    expect(mandatoryNextTool).toMatchObject({
+      tool_name: "moral-graph.reflect_context",
+      required_tool_family: "moral_graph",
+    });
+  });
+
   it("builds hard backend Ask route metadata for Image Lens region prompts", () => {
     const prompt =
       "Use the Image Lens region tool on the attached image. Inspect the header/caption area first, then inspect each equation block separately.";
@@ -83,12 +121,12 @@ describe("Helix Ask backend entrypoint projection guard", () => {
     const mandatoryNextTool = metadata.mandatory_next_tool as Record<string, unknown>;
 
     expect(metadata.source).toBe("hard_tool_backend_entrypoint");
-    expect(metadata.sourceTarget).toBe("image_lens");
+    expect(metadata.sourceTarget).toBe("scientific_image_evidence");
     expect(metadata.requiredToolFamily).toBe("visual_analysis");
     expect(sourceTarget).toMatchObject({
       schema: "helix.ask_source_target_intent.v1",
-      target_source: "image_lens",
-      target_kind: "visual_region_evidence",
+      target_source: "scientific_image_evidence",
+      target_kind: "scientific_image_evidence_sidecar",
       strength: "hard",
       must_enter_backend_ask: true,
       allow_client_shortcut: false,
@@ -601,5 +639,40 @@ describe("Helix Ask backend entrypoint projection guard", () => {
       expect(debugExport.first_broken_rail, label).toBe("backend_ask_entrypoint");
       expect(debugExport.repair_target, label).toBe("prompt_submit_entrypoint");
     }
+  });
+
+  it("does not preserve stale selected_final_answer in size-bounded backend-entrypoint debug exports", () => {
+    const prompt =
+      "Use the Moral Graph to help me reflect on a roommate situation. Someone knew they might not be able to meet a shared payment, but waited until the last moment to say anything.";
+    const staleProjection =
+      "I can see the scientific workflow still has a page source to work from, but the reusable scientific evidence package is not available in this turn.";
+    const payload = {
+      id: "ask:moral-graph-entrypoint-missed-large-export",
+      question: prompt,
+      content: staleProjection,
+      selected_final_answer: staleProjection,
+      ask_entrypoint_required: true,
+      ask_entrypoint_observed: false,
+      ask_entrypoint_failure_code: "backend_ask_entry_required",
+      blocked_projection_kind: "client_projection",
+      oversized_debug_padding: "x".repeat(760_000),
+    } as Record<string, unknown>;
+
+    const debugExport = JSON.parse(
+      buildHelixDebugExportEnvelopeFromMasterPayload(
+        { id: "ask:moral-graph-entrypoint-missed-large-export", question: prompt, content: staleProjection },
+        payload,
+      ),
+    ) as Record<string, unknown>;
+
+    expect(debugExport.selected_final_answer).toBe(
+      "This prompt requires the backend Ask solver path before a final answer can be shown.",
+    );
+    expect(debugExport.final_answer_source).toBe("typed_failure");
+    expect(debugExport.terminal_artifact_kind).toBe("typed_failure");
+    expect(debugExport.terminal_error_code).toBe("backend_ask_entry_required");
+    expect(debugExport.first_broken_rail).toBe("backend_ask_entrypoint");
+    expect(debugExport.repair_target).toBe("prompt_submit_entrypoint");
+    expect(debugExport.selected_final_answer).not.toContain("scientific workflow");
   });
 });

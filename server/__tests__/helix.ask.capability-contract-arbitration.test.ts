@@ -122,6 +122,7 @@ describe("Helix capability contract arbitration", () => {
       ["visual_capture", "image_lens.inspect", "situation_context_pack", "situation_context_pack"],
       ["civilization_bounds", "helix_ask.reflect_civilization_bounds", "civilization_bounds_roadmap/v1", "model_synthesized_answer"],
       ["moral_graph_reflection", "helix_ask.reflect_ideology_context", "ideology_context_reflection/v1", "model_synthesized_answer"],
+      ["workstation", "workstation-notes.create_note", "note_update_receipt", "note_update_receipt"],
     ] as const;
 
     for (const [family, capability, observationKind, terminalKind] of cases) {

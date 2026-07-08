@@ -182,7 +182,7 @@ export const hasNegatedToolInstruction = (prompt: string, toolPattern: RegExp): 
 };
 
 const CALCULATOR_EXECUTION_PATTERN = /\b(?:calculator|calculate|compute|evaluate|solve|expression)\b/i;
-const SCHOLARLY_RESEARCH_EXECUTION_PATTERN = /\b(?:research|papers?|research[-\s]+papers?|scholarly|arxiv|doi|cit(?:e|ed|ation)s?|sources?)\b/i;
+const SCHOLARLY_RESEARCH_EXECUTION_PATTERN = /\b(?:research|papers?|research[-\s]+papers?|scholarly|arxiv|doi|cit(?:e|ed|ation)s?|sources?|web|internet|online|external|pdfs?|pages?)\b/i;
 
 export const hasNegatedCalculatorExecutionInstruction = (prompt: string): boolean =>
   hasNegatedToolInstruction(prompt, CALCULATOR_EXECUTION_PATTERN);

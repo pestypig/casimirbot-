@@ -238,7 +238,7 @@ const reviewedNonSharedProviderCapabilityClassifications = [
   "situation-room.describe_visual_capture|safe_to_graduate_next|read_observe|explicit_contract",
   "workspace-directory.resolve|safe_to_graduate_next|read_observe|explicit_contract",
   "workstation-notes.append_to_note|blocked_pending_contract|user_confirmed_side_effect|explicit_contract",
-  "workstation-notes.create_note|blocked_pending_contract|user_confirmed_side_effect|explicit_contract",
+  "workstation-notes.create_note|candidate_host_receipt_bridge|user_confirmed_side_effect|explicit_contract",
   "workstation-notes.create|blocked_pending_contract|user_confirmed_side_effect|explicit_contract",
   "workstation-notes.open|blocked_pending_contract|user_confirmed_side_effect|explicit_contract",
 ] as const;
@@ -612,7 +612,6 @@ describe("provider-agent capability contract catalog", () => {
       "scientific-calculator.open",
       "scientific-calculator.start_equation_live_source",
       "workstation-notes.append_to_note",
-      "workstation-notes.create_note",
       "workstation-notes.create",
       "workstation-notes.open",
     ];
@@ -633,6 +632,18 @@ describe("provider-agent capability contract catalog", () => {
         },
       });
     }
+    expect(contractIndex).toContain("`workstation-notes.create_note`");
+    expect(explicitSideEffectContract).toContain("workstation-notes.create_note");
+    expect(workstationNotesSideEffectContract).toContain("workstation-notes.create_note");
+    expect(gatewayIds.has("workstation-notes.create_note")).toBe(false);
+    expect(classifyProviderAgentCapability("workstation-notes.create_note")).toMatchObject({
+      availability: "candidate_host_receipt_bridge",
+      permission_class: "user_confirmed_side_effect",
+      provider_availability: {
+        codex_workstation: true,
+        future_provider: false,
+      },
+    });
     expect(workstationNotesSideEffectContract).toContain("workstation-notes.create -> workstation-notes.create_note");
     expect(workstationNotesSideEffectContract).toContain("Do not create a note");
     expect(workstationNotesSideEffectContract).toContain("`workstation-notes.append_to_note` appears in this document");
@@ -1497,6 +1508,11 @@ describe("provider-agent capability contract catalog", () => {
         } else {
           expect(classification.provider_gateway_alias_target, classification.capability_id).toBeUndefined();
         }
+      } else if (classification.availability === "candidate_host_receipt_bridge") {
+        expect(classification.provider_availability.codex_workstation).toBe(true);
+        expect(classification.provider_availability.future_provider).toBe(false);
+        expect(classification.provider_gateway_alias_target, classification.capability_id).toBeUndefined();
+        expect(classification.required_contract_before_gateway.length).toBeGreaterThan(0);
       } else {
         expect(classification.provider_availability.codex_workstation).toBe(false);
         expect(classification.provider_gateway_alias_target, classification.capability_id).toBeUndefined();

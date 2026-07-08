@@ -183,6 +183,8 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
     case "live_env.record_live_source_mail_decision":
     case "live_env.request_interim_voice_callout":
       return "processed_mail_voice_decision";
+    case "visual_analysis.inspect_image_region":
+      return "image_lens_region_inspection";
     case "image_lens.inspect":
     case "situation-room.describe_visual_capture":
       return "visual_capture_describe";
@@ -258,6 +260,8 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
       return "live_source_mail";
     case "live_env.request_interim_voice_callout":
       return "live_environment_state";
+    case "visual_analysis.inspect_image_region":
+      return "visual_capture";
     case "image_lens.inspect":
     case "situation-room.describe_visual_capture":
       return "visual_capture";

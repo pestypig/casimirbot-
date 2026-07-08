@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { applyGatewayFailureAuthorityGuard } from "../codex-provider";
+import {
+  applyGatewayFailureAuthorityGuard,
+  buildMoralGraphObservationFallbackAnswer,
+} from "../codex-provider";
 
 const buildScholarlyNumericMissingResult = () => ({
   ok: false,
@@ -222,6 +225,36 @@ describe("Codex provider terminal pass-through", () => {
     expect(guarded).toContain(providerText);
     expect(guarded).toContain("External evidence unavailable: internet-search.search_web: tavily_requires_TAVILY_API_KEY.");
     expect(guarded).not.toContain("I cannot claim the requested workstation tool or UI action ran");
+  });
+
+  it("builds a bounded Moral Graph fallback answer from the reflection observation when provider text is absent", () => {
+    const answer = buildMoralGraphObservationFallbackAnswer({
+      promptText:
+        "Use moral-graph.reflect_context. Reflect on delayed disclosure in a shared obligation. Identify the dependency, who needed the information, what deadline preserves agency, and what repair path should be considered. Do not use calculator, image, PDF, page, or web evidence.",
+      normalizedArtifacts: [{
+        artifact_id: "ask:moral:reflection",
+        kind: "moral_graph_reflection",
+        capability_key: "moral-graph.reflect_context",
+        payload_schema: "helix.moral_graph_reflection_observation.v1",
+        payload: {
+          schema: "helix.moral_graph_reflection_observation.v1",
+          located_badge_ids: [
+            "dependency-transparency-gate",
+            "agency-preserving-disclosure",
+            "fallout-transfer-check",
+          ],
+          claim_boundary_notes: ["procedural reflection only; not a character verdict"],
+          summary: "Moral Graph reflection located agency-preserving disclosure badges.",
+        },
+      }],
+    });
+
+    expect(answer).toContain("Dependency:");
+    expect(answer).toContain("Who needs the information:");
+    expect(answer).toContain("Agency-preserving deadline:");
+    expect(answer).toContain("Repair path:");
+    expect(answer).toContain("dependency-transparency-gate");
+    expect(answer).not.toMatch(/calculator|PDF|web evidence|internet search/i);
   });
 
   it("preserves Codex explanation for calculator expression syntax blocks", () => {

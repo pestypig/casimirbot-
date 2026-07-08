@@ -10,6 +10,10 @@ import {
   HelixAskRuntimePicker,
   type HelixAskRuntimePickerModel,
 } from "./HelixAskRuntimePicker";
+import {
+  HelixAskLiveRuntimeControls,
+  type HelixAskLiveRuntimeControlsModel,
+} from "./HelixAskLiveRuntimeControls";
 
 export type HelixAskComposerActionToolbarSurfaceProps = {
   carouselRef?: Ref<HTMLDivElement>;
@@ -40,6 +44,7 @@ export type HelixAskComposerActionToolbarSurfaceProps = {
   runtimeMenuOpen: boolean;
   onRuntimePrimaryClick: () => void;
   onRuntimeSelect: (value: HelixAgentRuntimeId) => void;
+  liveRuntimeControlsModel?: HelixAskLiveRuntimeControlsModel | null;
   submitViewModel: HelixAskComposerViewModel;
   onSubmitIntent: () => void;
   onStop: () => void;
@@ -74,6 +79,7 @@ export function HelixAskComposerActionToolbarSurface({
   runtimeMenuOpen,
   onRuntimePrimaryClick,
   onRuntimeSelect,
+  liveRuntimeControlsModel = null,
   submitViewModel,
   onSubmitIntent,
   onStop,
@@ -111,6 +117,9 @@ export function HelixAskComposerActionToolbarSurface({
           onPrimaryClick={onRuntimePrimaryClick}
           onSelect={onRuntimeSelect}
         />
+      }
+      liveRuntimeControls={
+        liveRuntimeControlsModel ? <HelixAskLiveRuntimeControls model={liveRuntimeControlsModel} /> : null
       }
       submitButton={
         <HelixAskComposerSubmitButton

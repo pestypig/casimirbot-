@@ -76,6 +76,12 @@ function isProviderInstructionEchoFailureText(value: unknown): boolean {
   );
 }
 
+function isHardBackendEntrypointPrompt(value: unknown): boolean {
+  const text = coerceText(value);
+  if (!text) return false;
+  return /\b(?:moral-graph\.[a-z0-9_.-]+|moral\s+graph\s+(?:tool|reflection)|(?:use|with|through|via)\s+(?:the\s+)?moral\s+graph\b[\s\S]{0,160}\b(?:reflect|reflection|case|situation|dependency|repair|boundary|agency|badge|lens|roommate))\b/i.test(text);
+}
+
 function hasMaterializedBackendEntrypointTerminal(
   replyRecord: RecordLike | null,
   debugRecord: RecordLike | null,
@@ -377,13 +383,14 @@ export function buildVisibleResolvedTurn(reply: HelixAskTerminalProjectionReply)
   const askEntrypointRequired =
     readBoolean(replyRecord?.ask_entrypoint_required) ??
     readBoolean(debugRecord?.ask_entrypoint_required) ??
-    false;
+    isHardBackendEntrypointPrompt(reply.question ?? replyRecord?.question ?? debugRecord?.active_prompt);
   const askEntrypointObserved =
     readBoolean(replyRecord?.ask_entrypoint_observed) ??
     readBoolean(debugRecord?.ask_entrypoint_observed);
+  const hardBackendPrompt = isHardBackendEntrypointPrompt(reply.question ?? replyRecord?.question ?? debugRecord?.active_prompt);
   if (
     askEntrypointRequired &&
-    askEntrypointObserved === false &&
+    (askEntrypointObserved === false || (hardBackendPrompt && askEntrypointObserved !== true)) &&
     !hasMaterializedBackendEntrypointTerminal(replyRecord, debugRecord)
   ) {
     return {

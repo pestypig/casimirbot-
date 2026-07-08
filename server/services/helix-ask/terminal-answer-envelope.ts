@@ -956,9 +956,24 @@ export function resolveTerminalAnswerEnvelope(
       compoundTerminalPolicy.allowed.length === 0 ||
       compoundTerminalPolicy.allowed.includes(terminalArtifactKind)
     );
+  const routeProductAllowsTerminal =
+    !compoundTerminalPolicy.policy.active &&
+    !readArray(routeProductContract?.forbidden_terminal_artifact_kinds)
+      .map(readString)
+      .filter((entry): entry is string => Boolean(entry))
+      .includes(terminalArtifactKind) &&
+    (
+      readString(routeProductContract?.required_terminal_kind) === terminalArtifactKind ||
+      readArray(routeProductContract?.allowed_terminal_artifact_kinds)
+        .map(readString)
+        .filter((entry): entry is string => Boolean(entry))
+        .includes(terminalArtifactKind)
+    );
   const committedRouteAllowsTerminal =
     compoundTerminalPolicy.policy.active
       ? compoundPolicyAllowsTerminal
+      : !committedRoute && routeProductAllowsTerminal
+        ? true
       : committedRouteAllowsTerminalKind({
           committedRoute,
           terminalArtifactKind,

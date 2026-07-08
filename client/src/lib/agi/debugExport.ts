@@ -773,6 +773,208 @@ const normalizeCapabilityLaneTimelineSummaryForExport = (
   };
 };
 
+const buildRealtimeDebugFallbackTransportPlan = (): Record<string, unknown> => ({
+  schema: "helix.realtime_session.transport_plan.v1",
+  requested_transport: "webrtc",
+  planned_transport: "none",
+  adapter_id: "disabled",
+  adapter_state: "disabled",
+  descriptor_enabled: false,
+  adapter_enabled: false,
+  live_transport_enabled: false,
+  live_execution_attempted: false,
+  live_execution_disabled_reason: "realtime_adapter_disabled_by_env",
+  requires_visible_user_gesture: true,
+  requires_server_session_response: true,
+  requires_client_consent_receipt: true,
+  client_secret_requested: false,
+  client_secret_issued: false,
+  sdp_exchange_requested: false,
+  server_sideband_requested: false,
+  provider_session_ref: null,
+  client_receipt_refs: [],
+});
+
+const normalizeRealtimeRuntimeSessionSummaryForExport = (
+  value: unknown,
+): Record<string, unknown> => {
+  const record = asRecord(value);
+  const transportPlan = asRecord(record?.transport_plan) ?? buildRealtimeDebugFallbackTransportPlan();
+  const selectedModelOrService =
+    readString(record?.selected_model_or_service) ??
+    readString(record?.selected_realtime_model);
+  const clientReceiptRefs = readStringArray(record?.client_receipt_refs);
+  return {
+    schema: "helix.live_runtime_agent.control_state.v1",
+    realtime_session_id: readString(record?.realtime_session_id),
+    runtime_agent_mode: readString(record?.runtime_agent_mode) ?? "off",
+    runtime_agent_authority: readString(record?.runtime_agent_authority) ?? "observe_only",
+    transport: "none",
+    session_status: readString(record?.session_status) ?? "idle",
+    session_lifecycle: readStringArray(record?.session_lifecycle),
+    selected_backend_provider: readString(record?.selected_backend_provider),
+    selected_model_or_service: selectedModelOrService,
+    selected_realtime_model: readString(record?.selected_realtime_model) ?? selectedModelOrService,
+    source_binding: asRecord(record?.source_binding),
+    live_session_admission_status: readString(record?.live_session_admission_status) ?? "unavailable",
+    consent_state: readString(record?.consent_state) ?? "not_requested",
+    tool_admission_state: readString(record?.tool_admission_state) ?? "not_requested",
+    client_receipt_state: readString(record?.client_receipt_state) ?? "not_expected",
+    tool_request_count: readNumberValue(record?.tool_request_count) ?? 0,
+    admitted_tool_request_count: readNumberValue(record?.admitted_tool_request_count) ?? 0,
+    blocked_tool_request_count: readNumberValue(record?.blocked_tool_request_count) ?? 0,
+    client_receipt_count: readNumberValue(record?.client_receipt_count) ?? clientReceiptRefs.length,
+    client_receipt_observation_count: readNumberValue(record?.client_receipt_observation_count) ?? 0,
+    latest_client_receipt_ref: readString(record?.latest_client_receipt_ref),
+    latest_client_receipt_kind: readString(record?.latest_client_receipt_kind),
+    latest_client_receipt_status: readString(record?.latest_client_receipt_status),
+    latest_failure_code:
+      readString(record?.latest_failure_code) ??
+      readString(record?.live_execution_disabled_reason) ??
+      readString(transportPlan.live_execution_disabled_reason),
+    terminal_authority_status: "not_terminal_authority",
+    adapter_id: readString(record?.adapter_id) ?? readString(transportPlan.adapter_id) ?? "disabled",
+    adapter_state: readString(record?.adapter_state) ?? readString(transportPlan.adapter_state) ?? "disabled",
+    transport_plan: transportPlan,
+    provider_session_ref: null,
+    client_receipt_refs: clientReceiptRefs,
+    live_execution_disabled_reason:
+      readString(record?.live_execution_disabled_reason) ??
+      readString(transportPlan.live_execution_disabled_reason) ??
+      "realtime_adapter_disabled_by_env",
+    transport_execution_attempted: false,
+    media_capture_started: false,
+    openai_network_call_attempted: false,
+    webrtc_started: false,
+    sideband_started: false,
+    transcript_observation_count: readNumberValue(record?.transcript_observation_count) ?? 0,
+    latest_transcript_event_type: readString(record?.latest_transcript_event_type),
+    latest_transcript_observation_ref: readString(record?.latest_transcript_observation_ref),
+    reentry_required: true,
+    answer_authority: false,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+};
+
+const normalizeRealtimeTranscriptObservationForExport = (
+  value: unknown,
+  fallbackRuntimeAgentProvider: string | null = null,
+): Record<string, unknown> => {
+  const normalized = normalizeCapabilityLaneEvidenceRecords(
+    [value],
+    fallbackRuntimeAgentProvider,
+  )[0] ?? {};
+  const record = asRecord(value);
+  const {
+    transcript_text: _transcriptText,
+    transcriptText: _transcriptTextCamel,
+    text: _text,
+    raw_text: _rawText,
+    rawText: _rawTextCamel,
+    prompt_text: _promptText,
+    promptText: _promptTextCamel,
+    workstation_action_args: _workstationActionArgs,
+    workstationActionArgs: _workstationActionArgsCamel,
+    ...safe
+  } = normalized;
+  return {
+    ...safe,
+    runtime_agent_mode: "live_transcription",
+    runtime_agent_authority: readString(record?.runtime_agent_authority) ?? "observe_only",
+    reentry_status: "pending_solver_reentry",
+    observation_reentered: false,
+    context_role: "tool_evidence",
+    transcript_is_user_intent: false,
+    reentry_required: true,
+    answer_authority: false,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+};
+
+const normalizeRealtimeTranscriptObservationsForExport = (
+  value: unknown,
+  fallbackRuntimeAgentProvider: string | null = null,
+): Record<string, unknown>[] =>
+  readRecordArray(value).map((entry) =>
+    normalizeRealtimeTranscriptObservationForExport(entry, fallbackRuntimeAgentProvider),
+  );
+
+const normalizeRealtimeToolSuggestionObservationsForExport = (
+  value: unknown,
+  fallbackRuntimeAgentProvider: string | null = null,
+): Record<string, unknown>[] =>
+  readRecordArray(value).map((entry) => {
+    const normalized = normalizeCapabilityLaneEvidenceRecords(
+      [entry],
+      fallbackRuntimeAgentProvider,
+    )[0] ?? {};
+    return {
+      ...normalized,
+      tool_admission_state: readString(entry.tool_admission_state) ?? "suggest_only",
+      admission_status: readString(entry.admission_status) ?? "candidate_only",
+      blocked_reason: readString(entry.blocked_reason),
+      reentry_status: "pending_solver_reentry",
+      observation_reentered: false,
+      context_role: "tool_evidence",
+      execution_attempted: false,
+      gateway_execution_attempted: false,
+      workstation_action_executed: false,
+      answer_authority: false,
+      reentry_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+  });
+
+const normalizeRealtimeClientReceiptObservationsForExport = (
+  value: unknown,
+  fallbackRuntimeAgentProvider: string | null = null,
+): Record<string, unknown>[] =>
+  readRecordArray(value).map((entry) => {
+    const normalized = normalizeCapabilityLaneEvidenceRecords(
+      [entry],
+      fallbackRuntimeAgentProvider,
+    )[0] ?? {};
+    const {
+      client_secret: _clientSecret,
+      clientSecret: _clientSecretCamel,
+      ephemeral_secret: _ephemeralSecret,
+      ephemeralSecret: _ephemeralSecretCamel,
+      sdp: _sdp,
+      audio_payload: _audioPayload,
+      audioPayload: _audioPayloadCamel,
+      raw_audio: _rawAudio,
+      rawAudio: _rawAudioCamel,
+      transcript_text: _transcriptText,
+      transcriptText: _transcriptTextCamel,
+      ...safe
+    } = normalized;
+    return {
+      ...safe,
+      reentry_status: "pending_solver_reentry",
+      observation_reentered: false,
+      context_role: "tool_evidence",
+      openai_network_call_attempted: false,
+      ephemeral_credential_minted: false,
+      webrtc_started: false,
+      sideband_started: false,
+      media_capture_started: false,
+      browser_media_api_referenced: false,
+      browser_tracks_created: false,
+      data_channels_created: false,
+      answer_authority: false,
+      reentry_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+  });
+
 const readNestedRecord = (value: unknown, keys: string[]): Record<string, unknown> | null => {
   let cursor: unknown = value;
   for (const key of keys) {
@@ -1138,14 +1340,25 @@ const readCapabilityLaneMailLoopDebugSummaries = (input: {
 };
 
 const HELIX_DEBUG_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE =
-  /\b(?:scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\s+viewer|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|scholarly-research\.[a-z0-9_.-]+|scholarly_research\.[a-z0-9_.-]+|scholarly\s+research\s+tool|lookup_papers|fetch_full_text|extract_numeric_parameters|live_env\.[a-z0-9_.-]+|helix_ask\.[a-z0-9_.-]+|image[_\s-]?lens|visual_analysis\.inspect_image_region|visual_capture)\b/i;
+  /\b(?:scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\s+viewer|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|moral-graph\.[a-z0-9_.-]+|moral\s+graph\s+(?:tool|reflection)|(?:use|with|through|via)\s+(?:the\s+)?moral\s+graph\b[\s\S]{0,120}\b(?:reflect|reflection|case|situation|dependency|repair|boundary|agency|badge|lens)|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|scholarly-research\.[a-z0-9_.-]+|scholarly_research\.[a-z0-9_.-]+|scholarly\s+research\s+tool|lookup_papers|fetch_full_text|extract_numeric_parameters|live_env\.[a-z0-9_.-]+|helix_ask\.[a-z0-9_.-]+|image[_\s-]?lens|visual_analysis\.inspect_image_region|visual_capture)\b/i;
 
 const requiresBackendEntrypointForDebugExport = (value: unknown): boolean => {
   const text = readString(value);
   return Boolean(text && HELIX_DEBUG_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE.test(text));
 };
 
+const isHardBackendEntrypointDebugPrompt = (value: unknown): boolean => {
+  const text = readString(value);
+  return Boolean(
+    text &&
+      /\b(?:moral-graph\.[a-z0-9_.-]+|moral\s+graph\s+(?:tool|reflection)|(?:use|with|through|via)\s+(?:the\s+)?moral\s+graph\b[\s\S]{0,160}\b(?:reflect|reflection|case|situation|dependency|repair|boundary|agency|badge|lens|roommate))\b/i.test(text),
+  );
+};
+
 const HELIX_DEBUG_EXPORT_MAX_UI_CHARS = 750_000;
+const HELIX_DEBUG_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE = "backend_ask_entry_required";
+const HELIX_DEBUG_BACKEND_ENTRYPOINT_REQUIRED_TEXT =
+  "This prompt requires the backend Ask solver path before a final answer can be shown.";
 
 const clipDebugText = (value: string, limit = 240): string =>
   value.length <= limit ? value : `${value.slice(0, limit)}...`;
@@ -1293,6 +1506,42 @@ const copyRailCriticalDebugFields = (
 const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: string): string => {
   if (text.length <= HELIX_DEBUG_EXPORT_MAX_UI_CHARS) return text;
   const debug = asRecord(payload.debug);
+  const askEntrypointRequired =
+    readBoolean(payload.ask_entrypoint_required) ??
+    readBoolean(debug?.ask_entrypoint_required) ??
+    false;
+  const askEntrypointObserved =
+    readBoolean(payload.ask_entrypoint_observed) ??
+    readBoolean(debug?.ask_entrypoint_observed);
+  const terminalAuthority = asRecord(payload.terminal_answer_authority ?? debug?.terminal_answer_authority);
+  const terminalPresentation = asRecord(payload.terminal_presentation ?? debug?.terminal_presentation);
+  const terminalAuthorityText =
+    readString(terminalPresentation?.concise_text) ??
+    readString(terminalAuthority?.terminal_text) ??
+    readString(terminalAuthority?.terminal_text_preview);
+  const terminalAuthorityVerified = readBoolean(terminalAuthority?.server_authoritative) === true && Boolean(terminalAuthorityText);
+  const activeQuestionForEntrypoint =
+    readString(payload.selectedDebugQuestion) ??
+    readString(payload.question) ??
+    readString(debug?.active_prompt) ??
+    "";
+  const hardBackendEntrypointPrompt = isHardBackendEntrypointDebugPrompt(activeQuestionForEntrypoint);
+  const backendEntrypointMissing =
+    askEntrypointRequired &&
+    (askEntrypointObserved === false || (hardBackendEntrypointPrompt && askEntrypointObserved !== true)) &&
+    !terminalAuthorityVerified;
+  const minimalSelectedFinalAnswer = backendEntrypointMissing
+    ? HELIX_DEBUG_BACKEND_ENTRYPOINT_REQUIRED_TEXT
+    : payload.selected_final_answer;
+  const minimalFinalAnswerSource = backendEntrypointMissing
+    ? "typed_failure"
+    : payload.final_answer_source;
+  const minimalTerminalArtifactKind = backendEntrypointMissing
+    ? "typed_failure"
+    : payload.terminal_artifact_kind;
+  const minimalTerminalErrorCode = backendEntrypointMissing
+    ? HELIX_DEBUG_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE
+    : payload.terminal_error_code;
   const fallbackRuntimeAgentProvider = readRuntimeAgentProvider(
     payload.selected_runtime_agent_provider,
     payload.agent_runtime,
@@ -1330,14 +1579,20 @@ const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: st
     schema: payload.schema ?? "helix.ask.debug_export.v1",
     exported_at_ms: payload.exported_at_ms,
     active_turn_id: payload.active_turn_id,
-    selected_final_answer: payload.selected_final_answer,
-    final_answer_source: payload.final_answer_source,
-    terminal_artifact_kind: payload.terminal_artifact_kind,
-    terminal_error_code: payload.terminal_error_code,
+    selected_final_answer: minimalSelectedFinalAnswer,
+    final_answer_source: minimalFinalAnswerSource,
+    terminal_artifact_kind: minimalTerminalArtifactKind,
+    terminal_error_code: minimalTerminalErrorCode,
     ask_entrypoint_required: payload.ask_entrypoint_required ?? debug?.ask_entrypoint_required ?? null,
     ask_entrypoint_observed: payload.ask_entrypoint_observed ?? debug?.ask_entrypoint_observed ?? null,
-    ask_entrypoint_failure_code: payload.ask_entrypoint_failure_code ?? debug?.ask_entrypoint_failure_code ?? null,
-    blocked_projection_kind: payload.blocked_projection_kind ?? debug?.blocked_projection_kind ?? null,
+    ask_entrypoint_failure_code:
+      payload.ask_entrypoint_failure_code ??
+      debug?.ask_entrypoint_failure_code ??
+      (backendEntrypointMissing ? HELIX_DEBUG_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE : null),
+    blocked_projection_kind:
+      payload.blocked_projection_kind ??
+      debug?.blocked_projection_kind ??
+      (backendEntrypointMissing ? "client_projection" : null),
     hard_prompt_projection_guard: payload.hard_prompt_projection_guard ?? debug?.hard_prompt_projection_guard ?? null,
     client_projection_policy_version:
       payload.client_projection_policy_version ?? debug?.client_projection_policy_version ?? null,
@@ -1357,8 +1612,14 @@ const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: st
     route_metadata_source: payload.route_metadata_source ?? debug?.route_metadata_source ?? null,
     mandatory_next_tool_name: payload.mandatory_next_tool_name ?? debug?.mandatory_next_tool_name ?? null,
     legacy_ask_local_bypassed: payload.legacy_ask_local_bypassed ?? debug?.legacy_ask_local_bypassed ?? null,
-    first_broken_rail: payload.first_broken_rail ?? debug?.first_broken_rail ?? null,
-    repair_target: payload.repair_target ?? debug?.repair_target ?? null,
+    first_broken_rail:
+      payload.first_broken_rail ??
+      debug?.first_broken_rail ??
+      (backendEntrypointMissing ? "backend_ask_entrypoint" : null),
+    repair_target:
+      payload.repair_target ??
+      debug?.repair_target ??
+      (backendEntrypointMissing ? "prompt_submit_entrypoint" : null),
     server_build_commit: payload.server_build_commit ?? debug?.server_build_commit ?? null,
     server_build_started_at_ms: payload.server_build_started_at_ms ?? debug?.server_build_started_at_ms ?? null,
     helix_docs_synthesis_bridge_version:
@@ -1996,6 +2257,12 @@ const buildScientificEvidenceDebugProjection = (input: {
     )),
     ["sourceId", "sourceImageHash", "cropRef", "sidecarId", "evidenceDepth"],
   );
+  const artifactAdmissionTraces = uniqueRecordsById(
+    candidates.flatMap((candidate) => collectRecordsDeep(candidate, (record) =>
+      readString(record.schema) === "helix.artifact_admission_trace.v1"
+    )),
+    ["route_contract", "status", "continuity_requested", "continuation_required"],
+  );
   if (
     evidencePackets.length === 0 &&
     evidenceSidecars.length === 0 &&
@@ -2005,7 +2272,8 @@ const buildScientificEvidenceDebugProjection = (input: {
     graphReflections.length === 0 &&
     calculatorTemplateAdmissibilityRecords.length === 0 &&
     promotedEvidenceObjects.length === 0 &&
-    workflowStatuses.length === 0
+    workflowStatuses.length === 0 &&
+    artifactAdmissionTraces.length === 0
   ) return null;
   const rejectedCalculatorPayloadIds = uniqueStrings([
     ...branchGates.flatMap((gate) => readStringArray(gate.rejected_calculator_payload_ids)),
@@ -2044,6 +2312,7 @@ const buildScientificEvidenceDebugProjection = (input: {
     calculator_template_check_count: calculatorTemplateAdmissibilityRecords.length,
     promoted_evidence_object_count: promotedEvidenceObjects.length,
     workflow_status_count: workflowStatuses.length,
+    artifact_admission_trace_count: artifactAdmissionTraces.length,
     primary_domains: uniqueStrings([
       ...evidencePackets.map((packet) => readString(packet.primary_domain)),
       ...branchGates.map((gate) => readString(gate.primary_domain)),
@@ -2182,6 +2451,48 @@ const buildScientificEvidenceDebugProjection = (input: {
       calculator_template_status: readString(status.calculatorTemplateStatus),
       active_blockers: readStringArray(status.activeBlockers).slice(0, 12),
       claim_boundary: readString(status.claimBoundary),
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    })),
+    artifact_admission_traces: artifactAdmissionTraces.slice(0, 8).map((trace) => ({
+      status: readString(trace.status),
+      route_contract: readString(trace.route_contract),
+      policy: readString(trace.policy),
+      continuity_requested: trace.continuity_requested === true,
+      continuation_required: trace.continuation_required === true,
+      ambient_artifacts: readRecordArray(trace.ambient_artifacts).map((artifact) => ({
+        kind: readString(artifact.kind),
+        id: readString(artifact.id),
+        ref: readString(artifact.ref),
+        capability_id: readString(artifact.capability_id),
+        status: readString(artifact.status),
+        reason: readString(artifact.reason),
+      })).slice(0, 12),
+      admitted_artifacts: readRecordArray(trace.admitted_artifacts).map((artifact) => ({
+        kind: readString(artifact.kind),
+        id: readString(artifact.id),
+        ref: readString(artifact.ref),
+        capability_id: readString(artifact.capability_id),
+        status: readString(artifact.status),
+        reason: readString(artifact.reason),
+      })).slice(0, 12),
+      required_prerequisites: readRecordArray(trace.required_prerequisites).map((artifact) => ({
+        kind: readString(artifact.kind),
+        id: readString(artifact.id),
+        ref: readString(artifact.ref),
+        capability_id: readString(artifact.capability_id),
+        status: readString(artifact.status),
+        reason: readString(artifact.reason),
+      })).slice(0, 12),
+      ignored_artifacts: readRecordArray(trace.ignored_artifacts).map((artifact) => ({
+        kind: readString(artifact.kind),
+        id: readString(artifact.id),
+        ref: readString(artifact.ref),
+        capability_id: readString(artifact.capability_id),
+        status: readString(artifact.status),
+        reason: readString(artifact.reason),
+      })).slice(0, 12),
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
@@ -2461,7 +2772,12 @@ export function buildHelixUiDebugParityHarnessSnapshot(args: {
 }): Record<string, unknown> {
   const visibleFinalAnswer = readString(args.visibleFinalAnswer) ?? "";
   const terminalAuthority = asRecord(args.debugExport.terminal_answer_authority);
-  const terminalAuthorityText = readString(terminalAuthority?.terminal_text_preview) ?? "";
+  const terminalPresentation = asRecord(args.debugExport.terminal_presentation);
+  const terminalAuthorityText =
+    readString(terminalPresentation?.concise_text) ??
+    readString(terminalAuthority?.terminal_text) ??
+    readString(terminalAuthority?.terminal_text_preview) ??
+    "";
   const selectedFinalAnswer = readString(args.debugExport.selected_final_answer) ?? "";
   const coverageArtifacts = Array.isArray(args.debugExport.coverage_artifacts)
     ? args.debugExport.coverage_artifacts
@@ -2751,6 +3067,27 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     payload.runtime_lane_request_loop ?? debug?.runtime_lane_request_loop ?? agentLoop?.runtime_lane_request_loop;
   const runtimeLaneRequestRetry =
     payload.runtime_lane_request_retry ?? debug?.runtime_lane_request_retry ?? agentLoop?.runtime_lane_request_retry;
+  const realtimeRuntimeSessionSummary = normalizeRealtimeRuntimeSessionSummaryForExport(
+    payload.realtime_runtime_session_summary ??
+      debug?.realtime_runtime_session_summary ??
+      agentLoop?.realtime_runtime_session_summary,
+  );
+  const realtimeRuntimeSessionEvents =
+    payload.realtime_runtime_session_events ??
+    debug?.realtime_runtime_session_events ??
+    agentLoop?.realtime_runtime_session_events;
+  const realtimeTranscriptObservations =
+    payload.realtime_transcript_observations ??
+    debug?.realtime_transcript_observations ??
+    agentLoop?.realtime_transcript_observations;
+  const realtimeToolSuggestionObservations =
+    payload.realtime_tool_suggestion_observations ??
+    debug?.realtime_tool_suggestion_observations ??
+    agentLoop?.realtime_tool_suggestion_observations;
+  const realtimeClientReceiptObservations =
+    payload.realtime_client_receipt_observations ??
+    debug?.realtime_client_receipt_observations ??
+    agentLoop?.realtime_client_receipt_observations;
   const visibleTranslationChainSummary = buildVisibleTranslationChainSummaryForExport({
     runtimeLaneRequestLoop,
     capabilityLaneTurnTimeline,
@@ -2895,6 +3232,8 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
         : [];
   const coverageArtifacts = collectCoverageArtifacts(ledger);
   const calculatorPanelState = asRecord(payload.calculator_panel_state ?? debug?.calculator_panel_state ?? agentLoop?.calculator_panel_state);
+  const terminalAuthorityText = readString(terminalAuthority?.terminal_text_preview);
+  const terminalAuthorityVerified = readBoolean(terminalAuthority?.server_authoritative) === true && Boolean(terminalAuthorityText);
   const terminalArtifactKind = imageLensPromptLeakRecovered
     ? readString(terminalPresentation?.terminal_artifact_kind) ??
       readString(terminalAuthority?.terminal_artifact_kind) ??
@@ -2902,6 +3241,13 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       readString(agentLoop?.terminal_artifact_kind) ??
       readString(payload.terminal_artifact_kind) ??
       "agent_provider_terminal_candidate"
+    : terminalAuthorityVerified
+      ? readString(terminalAuthority?.terminal_artifact_kind) ??
+        readString(terminalPresentation?.terminal_artifact_kind) ??
+        readString(agentLoop?.terminal_artifact_kind) ??
+        readString(debug?.terminal_artifact_kind) ??
+        readString(payload.terminal_artifact_kind) ??
+        null
     : readString(agentLoop?.terminal_artifact_kind) ??
       readString(debug?.terminal_artifact_kind) ??
       readString(payload.terminal_artifact_kind) ??
@@ -2914,12 +3260,20 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       readString(agentLoop?.final_answer_source) ??
       readString(payload.final_answer_source) ??
       "agent_provider_terminal_candidate"
+    : terminalAuthorityVerified
+      ? readString(terminalAuthority?.final_answer_source) ??
+        readString(terminalPresentation?.final_answer_source) ??
+        readString(agentLoop?.final_answer_source) ??
+        readString(debug?.final_answer_source) ??
+        readString(payload.final_answer_source)
     : readString(agentLoop?.final_answer_source) ??
       readString(debug?.final_answer_source) ??
       readString(payload.final_answer_source) ??
       readString(terminalAuthority?.final_answer_source);
   const terminalErrorCode = imageLensPromptLeakRecovered
     ? null
+    : terminalAuthorityVerified
+      ? null
     : readString(agentLoop?.terminal_error_code) ??
       readString(debug?.terminal_error_code) ??
       readString(payload.terminal_error_code);
@@ -3072,14 +3426,23 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
   const backendEntrypointProjectionBlocked =
     askEntrypointRequired &&
     askEntrypointObserved === false &&
+    !terminalAuthorityVerified &&
     (explicitAskEntrypointObserved === false || !isReplyScopedDebugProjection);
-  const backendEntrypointMissing = askEntrypointRequired && askEntrypointObserved === false;
+  const hardBackendEntrypointPrompt = isHardBackendEntrypointDebugPrompt(
+    readString(reply.question) ?? readString(payload.selectedDebugQuestion) ?? "",
+  );
+  const backendEntrypointMissing =
+    askEntrypointRequired &&
+    (askEntrypointObserved === false || (hardBackendEntrypointPrompt && askEntrypointObserved !== true)) &&
+    !terminalAuthorityVerified;
   const effectiveTerminalErrorCode =
     backendEntrypointMissing
         ? askEntrypointFailureCode ?? "backend_ask_entry_required"
         : imageLensPromptLeakRecovered
           ? null
-          : terminalErrorCode ?? askEntrypointFailureCode;
+          : terminalAuthorityVerified
+            ? null
+            : terminalErrorCode ?? askEntrypointFailureCode;
   const effectiveTerminalArtifactKind =
     backendEntrypointMissing
       ? "typed_failure"
@@ -3093,7 +3456,6 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
         ? finalAnswerSource ?? "agent_provider_terminal_candidate"
         : finalAnswerSource ?? (effectiveTerminalErrorCode ? "typed_failure" : null);
   const typedFailure = asRecord(payload.typed_failure ?? debug?.typed_failure ?? agentLoop?.typed_failure);
-  const terminalAuthorityText = readString(terminalAuthority?.terminal_text_preview);
   const terminalIsTypedFailure =
     effectiveTerminalArtifactKind === "typed_failure" ||
     effectiveFinalAnswerSource === "typed_failure" ||
@@ -3103,7 +3465,9 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     effectiveTerminalArtifactKind === "model_synthesized_answer" &&
     effectiveFinalAnswerSource === "final_answer_draft";
   const selectedFinalAnswer =
-    modelSynthesizedFinalDraft
+    terminalAuthorityVerified
+      ? terminalAuthorityText
+    : modelSynthesizedFinalDraft
       ? readString(payload.selected_final_answer) ??
         readString(agentLoop?.selected_final_answer) ??
         readString(debug?.selected_final_answer) ??
@@ -3138,12 +3502,67 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     buildBackendDebugExportRef(canonicalActiveTurnId) ??
     buildBackendDebugExportRef(activeTurnId) ??
     buildBackendDebugExportRef(reply.id);
-  const clientActiveTurnId = readString(reply.id);
+  const clientActiveTurnId = readString(payload.client_active_turn_id) ?? readString(reply.id);
   const scientificEvidenceTrace = buildScientificEvidenceDebugProjection({
     activeTurnId: canonicalActiveTurnId,
     source: payload,
     ledger,
   });
+  const routeProductContract = asRecord(payload.route_product_contract ?? debug?.route_product_contract);
+  const committedAskRoute = asRecord(payload.committed_ask_route ?? debug?.committed_ask_route);
+  const committedCanonicalGoal = asRecord(committedAskRoute?.canonical_goal);
+  const sourceTargetIntent = asRecord(payload.source_target_intent ?? debug?.source_target_intent);
+  const compactArtifactAdmissionTraces = readRecordArray(scientificEvidenceTrace?.artifact_admission_traces);
+  const hardEvidenceTurnPathTrace = {
+    schema: "helix.hard_evidence_turn_path_trace.v1",
+    submit_path_entered: runAskEntered ?? null,
+    backend_ask_required: hardBackendEntrypointRequired ?? askEntrypointRequired,
+    backend_ask_called: backendAskCallAttempted ?? null,
+    backend_ask_call_path: backendAskCallPath ?? null,
+    backend_ask_call_error: backendAskCallError ?? null,
+    route_contract_selected: Boolean(routeProductContract || committedCanonicalGoal || sourceTargetIntent),
+    route_contract_source_target:
+      readString(routeProductContract?.source_target) ??
+      readString(sourceTargetIntent?.target_source) ??
+      readString(committedCanonicalGoal?.source_target) ??
+      null,
+    route_contract_target_kind:
+      readString(sourceTargetIntent?.target_kind) ??
+      readString(committedCanonicalGoal?.target_kind) ??
+      null,
+    route_contract_allowed_terminal_artifact_kinds: [
+      ...readStringArray(routeProductContract?.allowed_terminal_artifact_kinds),
+      ...readStringArray(committedCanonicalGoal?.allowed_terminal_artifact_kinds),
+    ].slice(0, 24),
+    route_metadata_source: routeMetadataSource ?? null,
+    mandatory_next_tool_name: mandatoryNextToolName ?? null,
+    ambient_artifact_count: compactArtifactAdmissionTraces.reduce(
+      (count, trace) => count + readRecordArray(trace.ambient_artifacts).length,
+      0,
+    ),
+    admitted_artifact_count: compactArtifactAdmissionTraces.reduce(
+      (count, trace) => count + readRecordArray(trace.admitted_artifacts).length,
+      0,
+    ),
+    required_observation_count: compactArtifactAdmissionTraces.reduce(
+      (count, trace) => count + readRecordArray(trace.required_prerequisites).length,
+      0,
+    ),
+    ignored_artifact_count: compactArtifactAdmissionTraces.reduce(
+      (count, trace) => count + readRecordArray(trace.ignored_artifacts).length,
+      0,
+    ),
+    artifact_admission_statuses: compactArtifactAdmissionTraces
+      .map((trace) => readString(trace.status))
+      .filter((entry): entry is string => Boolean(entry))
+      .slice(0, 12),
+    terminal_artifact_selected: effectiveTerminalArtifactKind ?? null,
+    final_answer_source_selected: effectiveFinalAnswerSource ?? null,
+    terminal_error_code: effectiveTerminalErrorCode ?? null,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
   const calculatorReceiptTrace = buildCalculatorReceiptDebugProjection({
     activeTurnId: canonicalActiveTurnId,
     source: payload,
@@ -3177,7 +3596,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     exported_at_ms: Date.now(),
     active_turn_id: canonicalActiveTurnId,
     backend_turn_id: canonicalActiveTurnId,
-    client_active_turn_id: clientActiveTurnId && clientActiveTurnId !== canonicalActiveTurnId
+    client_active_turn_id: clientActiveTurnId && (isReplyScopedDebugProjection || clientActiveTurnId !== canonicalActiveTurnId)
       ? clientActiveTurnId
       : null,
     active_prompt: readString(reply.question) ?? readString(payload.selectedDebugQuestion) ?? "",
@@ -3203,6 +3622,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     backend_ask_call_attempted: backendAskCallAttempted,
     backend_ask_call_path: backendAskCallPath,
     backend_ask_call_error: backendAskCallError,
+    hard_evidence_turn_path_trace: hardEvidenceTurnPathTrace,
     route_metadata_source: routeMetadataSource,
     mandatory_next_tool_name: mandatoryNextToolName,
     legacy_ask_local_bypassed: legacyAskLocalBypassed,
@@ -3233,6 +3653,11 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     agent_step_loop: agentStepLoop,
     agent_runtime_loop: agentRuntimeLoop,
     agent_runtime_loop_admission: agentRuntimeLoopAdmission,
+    ask_turn_solver_trace:
+      payload.ask_turn_solver_trace ??
+      debug?.ask_turn_solver_trace ??
+      agentLoop?.ask_turn_solver_trace ??
+      null,
     agent_runtime: agentRuntime,
     agent_runtime_selection_trace: agentRuntimeSelectionTrace,
     selected_agent_provider: selectedAgentProvider,
@@ -3283,6 +3708,26 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     runtime_lane_request_contract: runtimeLaneRequestContract,
     runtime_lane_request_loop: runtimeLaneRequestLoop,
     runtime_lane_request_retry: runtimeLaneRequestRetry,
+    realtime_runtime_session_summary: realtimeRuntimeSessionSummary,
+    realtime_runtime_session_events: normalizeCapabilityLaneEvidenceRecords(
+      realtimeRuntimeSessionEvents,
+      fallbackRuntimeAgentProvider,
+    ),
+    realtime_transcript_observations: normalizeCapabilityLaneEvidenceRecords(
+      normalizeRealtimeTranscriptObservationsForExport(
+        realtimeTranscriptObservations,
+        fallbackRuntimeAgentProvider,
+      ),
+      fallbackRuntimeAgentProvider,
+    ),
+    realtime_tool_suggestion_observations: normalizeRealtimeToolSuggestionObservationsForExport(
+      realtimeToolSuggestionObservations,
+      fallbackRuntimeAgentProvider,
+    ),
+    realtime_client_receipt_observations: normalizeRealtimeClientReceiptObservationsForExport(
+      realtimeClientReceiptObservations,
+      fallbackRuntimeAgentProvider,
+    ),
     provider_prompt_leak_guard: providerPromptLeakGuard,
     visible_translation_chain_summary: visibleTranslationChainSummary,
     terminal_authority_status:
@@ -3291,6 +3736,10 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       agentLoop?.terminal_authority_status,
     workstation_gateway_call_results: workstationGatewayCallResults,
     workstation_gateway_observation_packets: workstationGatewayObservationPackets,
+    workspace_action_client_ack:
+      payload.workspace_action_client_ack ?? debug?.workspace_action_client_ack ?? null,
+    client_receipt_terminal:
+      payload.client_receipt_terminal ?? debug?.client_receipt_terminal ?? null,
     turn_transcript_events: Array.isArray(turnTranscriptEvents) ? turnTranscriptEvents : [],
     provider_terminal_candidate: providerTerminalCandidate,
     provider_reasoning_reentry: providerReasoningReentry,

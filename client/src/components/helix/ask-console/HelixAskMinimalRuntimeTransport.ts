@@ -6,6 +6,10 @@ import {
   buildHelixAskConsoleBackendTurnPayloadCore,
   buildHelixAskConsoleContextFiles,
 } from "./HelixAskRequestEnvelope";
+import {
+  buildHelixAskHardBackendEntrypointRouteMetadata,
+  requiresHelixAskBackendEntrypoint,
+} from "./HelixAskBackendEntrypointPolicy";
 import type { HelixAskMinimalRuntimeSubmitPlan } from "./HelixAskMinimalRuntimeSubmitPlan";
 
 export type HelixAskMinimalRuntimeTurnPayload = {
@@ -30,6 +34,18 @@ export type HelixAskMinimalRuntimeTurnPayload = {
   requires_backend_ask_entrypoint?: boolean;
   suppressWorkstationPayloadActions?: boolean;
   suppress_workstation_payload_actions?: boolean;
+  backend_ask_entrypoint_runtime_fingerprint?: Record<string, unknown>;
+  client_entrypoint_guard_version?: string;
+  submit_handler_source?: string;
+  runAsk_entered?: boolean;
+  hard_backend_entrypoint_required?: boolean;
+  use_backend_ask_turn_entrypoint?: boolean;
+  backend_ask_call_attempted?: boolean;
+  backend_ask_call_path?: "runAskTurnStream" | "runAskTurn" | "askLocal" | null;
+  backend_ask_call_error?: string | null;
+  route_metadata_source?: string | null;
+  mandatory_next_tool_name?: string | null;
+  legacy_ask_local_bypassed?: boolean;
 };
 
 export type HelixAskMinimalRuntimeStreamEvent = {
@@ -58,25 +74,74 @@ export function buildHelixAskMinimalRuntimeTurnPayload(args: {
 }): HelixAskMinimalRuntimeTurnPayload | null {
   const envelope = args.submitPlan.envelope;
   if (!envelope?.question.trim()) return null;
-  return buildHelixAskConsoleBackendTurnPayloadCore({
+  const question = envelope.question.trim();
+  const requiresBackendAskEntrypoint =
+    args.submitPlan.pendingPrompt?.requiresBackendAskEntrypoint === true ||
+    requiresHelixAskBackendEntrypoint(question);
+  const routeMetadata =
+    args.submitPlan.pendingPrompt?.routeMetadata ??
+    (requiresBackendAskEntrypoint
+      ? buildHelixAskHardBackendEntrypointRouteMetadata({
+          question,
+          turnId: args.turnId,
+          threadId: args.sessionId ?? args.turnId,
+        })
+      : undefined);
+  const payload = buildHelixAskConsoleBackendTurnPayloadCore({
     sessionId: args.sessionId,
     agentRuntime: envelope.agent_runtime,
     languageModelProfile: envelope.language_model_profile,
     traceId: args.traceId,
     turnId: args.turnId,
     maxTokens: args.maxTokens,
-    question: envelope.question,
+    question,
     contextFiles: buildHelixAskConsoleContextFiles({
       docsViewerAnchorPath: args.submitPlan.context.activeDocPath,
       workspaceContextSnapshot: args.submitPlan.context as unknown as Record<string, unknown>,
     }),
     workspaceContextSnapshot: args.submitPlan.context as unknown as Record<string, unknown>,
-    routeMetadata: args.submitPlan.pendingPrompt?.routeMetadata,
+    routeMetadata,
     bypassWorkstationDispatch: args.submitPlan.pendingPrompt?.bypassWorkstationDispatch,
-    forceReasoningDispatch: args.submitPlan.pendingPrompt?.forceReasoningDispatch,
-    requiresBackendAskEntrypoint: args.submitPlan.pendingPrompt?.requiresBackendAskEntrypoint,
+    forceReasoningDispatch: args.submitPlan.pendingPrompt?.forceReasoningDispatch === true || requiresBackendAskEntrypoint,
+    requiresBackendAskEntrypoint,
     suppressWorkstationPayloadActions: args.submitPlan.pendingPrompt?.suppressWorkstationPayloadActions,
   });
+  if (!requiresBackendAskEntrypoint) return payload;
+  const fingerprint = {
+    schema: "helix.ask.backend_entrypoint_runtime_fingerprint.v1",
+    client_entrypoint_guard_version: "minimal-runtime:E79",
+    submit_handler_source: "HelixAskMinimalRuntimeShell.submitMinimalRuntimeQuestion",
+    runAsk_entered: true,
+    hard_backend_entrypoint_required: true,
+    use_backend_ask_turn_entrypoint: true,
+    backend_ask_call_attempted: true,
+    backend_ask_call_path: "runAskTurnStream" as const,
+    backend_ask_call_error: null,
+    route_metadata_source:
+      typeof routeMetadata?.source === "string" ? routeMetadata.source : null,
+    mandatory_next_tool_name:
+      typeof routeMetadata?.mandatory_next_tool?.tool_name === "string"
+        ? routeMetadata.mandatory_next_tool.tool_name
+        : null,
+    legacy_ask_local_bypassed: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  return {
+    ...payload,
+    backend_ask_entrypoint_runtime_fingerprint: fingerprint,
+    client_entrypoint_guard_version: fingerprint.client_entrypoint_guard_version,
+    submit_handler_source: fingerprint.submit_handler_source,
+    runAsk_entered: fingerprint.runAsk_entered,
+    hard_backend_entrypoint_required: fingerprint.hard_backend_entrypoint_required,
+    use_backend_ask_turn_entrypoint: fingerprint.use_backend_ask_turn_entrypoint,
+    backend_ask_call_attempted: fingerprint.backend_ask_call_attempted,
+    backend_ask_call_path: fingerprint.backend_ask_call_path,
+    backend_ask_call_error: fingerprint.backend_ask_call_error,
+    route_metadata_source: fingerprint.route_metadata_source,
+    mandatory_next_tool_name: fingerprint.mandatory_next_tool_name,
+    legacy_ask_local_bypassed: fingerprint.legacy_ask_local_bypassed,
+  };
 }
 
 export async function runHelixAskMinimalRuntimeInjectedTransport(args: {

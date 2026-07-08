@@ -1,5 +1,10 @@
 import { useDocumentImageRegionStore } from "@/store/useDocumentImageRegionStore";
 import { buildScientificEvidenceWorkflowStatus, cropRefFromScientificEvidenceSource } from "./ScientificEvidenceWorkflowStatus";
+import {
+  mergeScientificEvidenceWorkflowStatus,
+  mergeScientificEvidenceWorkflowStatusRecords,
+  readActiveScientificEvidenceWorkflowStatus,
+} from "@/store/useScientificEvidenceWorkflowStore";
 
 export function readHelixAskActiveImageLensSourceContext(): Record<string, unknown> | null {
   const state = useDocumentImageRegionStore.getState();
@@ -11,11 +16,16 @@ export function readHelixAskActiveImageLensSourceContext(): Record<string, unkno
   const pageRenderRef = source.sourceKind === "pdf_page_render" && source.sourceRefHash
     ? `page_render:${source.sourceRefHash}${source.pageNumber ? `:page:${source.pageNumber}` : ""}`
     : null;
-  const scientificEvidenceWorkflowStatus = buildScientificEvidenceWorkflowStatus({
+  const localScientificEvidenceWorkflowStatus = buildScientificEvidenceWorkflowStatus({
     source,
     cropDraft: currentCrop,
     lastReceipt: state.lastReceipt,
   });
+  const storedScientificEvidenceWorkflowStatus = readActiveScientificEvidenceWorkflowStatus();
+  const scientificEvidenceWorkflowStatus = storedScientificEvidenceWorkflowStatus
+    ? mergeScientificEvidenceWorkflowStatusRecords(localScientificEvidenceWorkflowStatus, storedScientificEvidenceWorkflowStatus)
+    : localScientificEvidenceWorkflowStatus;
+  mergeScientificEvidenceWorkflowStatus(scientificEvidenceWorkflowStatus, { askThreadId: "helix-ask:desktop" });
   return {
     source_id: source.sourceId ?? null,
     source_attachment_id: source.sourceAttachmentId,

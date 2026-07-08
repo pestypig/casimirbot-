@@ -12,7 +12,7 @@ const scriptPath = fileURLToPath(new URL("../../../scripts/py/math_solve.py", im
 
 export type HelixAskMathSolveResult = {
   ok: boolean;
-  kind?: "solve" | "derivative" | "evaluate";
+  kind?: "solve" | "derivative" | "integral" | "evaluate";
   final?: string;
   equation?: string;
   equations?: string[];
@@ -94,7 +94,7 @@ export function isHelixAskMathQuestion(question: string): boolean {
   const normalized = sanitizeMathInput(trimmed);
   if (!normalized) return false;
   if (looksLikeMathExpression(normalized)) return true;
-  if (/\b(?:derivative|differentiate|integral|d\/d[A-Za-z_][A-Za-z0-9_]*)\b/i.test(normalized)) {
+  if (/\b(?:derivative|differentiate|integral|integrate|antiderivative|d\/d[A-Za-z_][A-Za-z0-9_]*)\b/i.test(normalized)) {
     return true;
   }
   if (/\bsolve\s+for\b/i.test(normalized)) {
@@ -296,6 +296,18 @@ function inferDerivativeVariable(question: string): string {
   return "x";
 }
 
+function inferIntegralVariable(question: string): string {
+  const wrtMatch = question.match(/with\s+respect\s+to\s+([A-Za-z_][A-Za-z0-9_]*)/i);
+  if (wrtMatch?.[1]) return wrtMatch[1];
+  const integrateWrtMatch = question.match(/integrat(?:e|ion|al)?[\s\S]{0,80}\bd([A-Za-z_][A-Za-z0-9_]*)\b/i);
+  if (integrateWrtMatch?.[1]) return integrateWrtMatch[1];
+  const trailingDxMatch = question.match(/\bd([A-Za-z_][A-Za-z0-9_]*)\s*$/i);
+  if (trailingDxMatch?.[1]) return trailingDxMatch[1];
+  const fxVar = question.match(/f\(([A-Za-z_][A-Za-z0-9_]*)\)/i);
+  if (fxVar?.[1]) return fxVar[1];
+  return "x";
+}
+
 function extractDerivativeExpr(question: string): { expr: string; variable: string } | null {
   const variable = inferDerivativeVariable(question);
   const fxMatch = question.match(/f\([A-Za-z_][A-Za-z0-9_]*\)\s*=\s*(.+)$/i);
@@ -304,6 +316,19 @@ function extractDerivativeExpr(question: string): { expr: string; variable: stri
   if (derivMatch?.[1]) return { expr: sanitizeMathInput(derivMatch[1]), variable };
   const ddxMatch = question.match(/d\/d[A-Za-z_][A-Za-z0-9_]*\s*(.+)$/i);
   if (ddxMatch?.[1]) return { expr: sanitizeMathInput(ddxMatch[1]), variable };
+  return null;
+}
+
+function extractIntegralExpr(question: string): { expr: string; variable: string } | null {
+  const variable = inferIntegralVariable(question);
+  const fxMatch = question.match(/f\([A-Za-z_][A-Za-z0-9_]*\)\s*=\s*(.+)$/i);
+  if (fxMatch?.[1]) return { expr: sanitizeMathInput(fxMatch[1]), variable };
+  const integralOfMatch = question.match(/(?:integral|antiderivative)\s+of\s+(.+?)(?:\s+with\s+respect\s+to\s+[A-Za-z_][A-Za-z0-9_]*)?$/i);
+  if (integralOfMatch?.[1]) return { expr: sanitizeMathInput(integralOfMatch[1]), variable };
+  const integrateMatch = question.match(/integrate\s+(.+?)(?:\s+with\s+respect\s+to\s+[A-Za-z_][A-Za-z0-9_]*)?$/i);
+  if (integrateMatch?.[1]) return { expr: sanitizeMathInput(integrateMatch[1]), variable };
+  const symbolicMatch = question.match(/(?:\u222b|int)\s*(.+?)(?:\s*d[A-Za-z_][A-Za-z0-9_]*)?$/i);
+  if (symbolicMatch?.[1]) return { expr: sanitizeMathInput(symbolicMatch[1]), variable };
   return null;
 }
 
@@ -647,6 +672,16 @@ function solveWithNerdamer(question: string): HelixAskMathSolveResult | null {
       const final = prettyMath(nerdamer.diff(expr, variable).toString());
       return { ok: true, kind: "derivative", expr: displayExpr, final, variable, reason: "js_solver" };
     }
+    if (lowered.includes("integral") || lowered.includes("integrate") || lowered.includes("antiderivative") || /\bint\b|\u222b/i.test(normalizedQuestion)) {
+      const integralTarget = extractIntegralExpr(normalizedQuestion);
+      if (!integralTarget) return { ok: false, reason: "js_missing_expression" };
+      const displayExpr = prettyMath(stripLeadingNoise(normalizeExpression(integralTarget.expr)));
+      if (!displayExpr) return { ok: false, reason: "js_missing_expression" };
+      const expr = toExplicitMultiplication(displayExpr);
+      const variable = integralTarget.variable || "x";
+      const final = prettyMath(nerdamer.integrate(expr, variable).toString());
+      return { ok: true, kind: "integral", expr: displayExpr, final, variable, reason: "js_solver" };
+    }
     if (lowered.includes("solve") || normalizedQuestion.includes("=")) {
       const equations = extractEquationSystem(normalizedQuestion);
       if (!equations.length) return { ok: false, reason: "js_missing_equation" };
@@ -840,6 +875,13 @@ export function buildHelixAskMathAnswer(result: HelixAskMathSolveResult): string
       return `The derivative of f(x) = ${result.expr} is ${result.final}.`;
     }
     return `The derivative with respect to ${variable} of f(${variable}) = ${result.expr} is ${result.final}.`;
+  }
+  if (result.kind === "integral" && result.final && result.expr) {
+    const variable = result.variable ?? "x";
+    if (variable === "x") {
+      return `The indefinite integral of f(x) = ${result.expr} is ${result.final} + C.`;
+    }
+    return `The indefinite integral with respect to ${variable} of f(${variable}) = ${result.expr} is ${result.final} + C.`;
   }
   if (result.kind === "solve") {
     if (result.solutionMap && Object.keys(result.solutionMap).length > 1) {

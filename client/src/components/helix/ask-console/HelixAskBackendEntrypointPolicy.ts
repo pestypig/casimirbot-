@@ -1,4 +1,4 @@
-import type { HelixAskRouteMetadata } from "@/lib/agi/api";
+import type { HelixAskRouteMetadata } from "@/lib/helix/ask-prompt-launch";
 
 export const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE = "backend_ask_entry_required";
 export const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT =
@@ -9,7 +9,9 @@ type HelixAskBackendEntrypointFamily =
   | "calculator"
   | "docs_viewer"
   | "narrator"
+  | "workstation_notes"
   | "repo_code"
+  | "moral_graph"
   | "workspace_diagnostic"
   | "internet_search"
   | "scholarly_research"
@@ -39,7 +41,21 @@ const HELIX_EVIDENCE_GATE_TRANSFORM_TASK_RE =
 const HELIX_ASK_COMPARE_TRIGGER_RE = /\b(?:compare|contrast|difference|diff|what changed|changed since)\b/i;
 
 const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE =
-  /(?:^|\s)\/postulate\b|\b(?:postulate\.submit_proposal|scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\s+viewer|narrator\.[a-z0-9_.-]+|panel[_\s-]?id\s*(?:=|:)\s*narrator|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|scholarly-research\.[a-z0-9_.-]+|scholarly_research\.[a-z0-9_.-]+|scholarly\s+research\s+tool|lookup_papers|fetch_full_text|extract_numeric_parameters|live_env\.[a-z0-9_.-]+|helix_ask\.[a-z0-9_.-]+|image[_\s-]?lens|visual_analysis\.inspect_image_region|visual_capture|scientific\s+(?:document|image|page)|document\s+image|attached\s+image.*(?:equation|latex|theory\s+graph))\b/i;
+  /(?:^|\s)\/postulate\b|\b(?:postulate\.submit_proposal|scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\.search|docs\s+viewer|docs\s+search|narrator\.[a-z0-9_.-]+|panel[_\s-]?id\s*(?:=|:)\s*narrator|workstation-notes\.create_note|workstation-notes\.create|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|repo\.search|repo\s+search|moral-graph\.[a-z0-9_.-]+|moral\s+graph\s+(?:tool|reflection)|(?:use|with|through|via)\s+(?:the\s+)?moral\s+graph\b[\s\S]{0,120}\b(?:reflect|reflection|case|situation|dependency|repair|boundary|agency|badge|lens)|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|scholarly-research\.[a-z0-9_.-]+|scholarly_research\.[a-z0-9_.-]+|scholarly\s+research\s+tool|lookup_papers|fetch_full_text|extract_numeric_parameters|live_env\.[a-z0-9_.-]+|helix_ask\.[a-z0-9_.-]+|image[_\s-]?lens|visual_analysis\.inspect_image_region|visual_capture|scientific\s+(?:document|image|page)|document\s+image|attached\s+image.*(?:equation|latex|theory\s+graph))\b/i;
+
+const HELIX_ASK_NOTE_CREATE_NEGATED_OR_CONTEXTUAL_RE =
+  /\b(?:don't|do\s+not|dont|never|no\s+need\s+to|without|avoid|stop|cancel|should\s+i|would\s+it|could\s+it|when\s+i|when\s+you|if\s+i|if\s+you|before\s+i|after\s+i|last\s+time|previously|earlier|failed|failure|debug|quote|quoted|says?|said|screen\s+shows?)\b[\s\S]{0,120}\b(?:write|make|create|save|take|add)\s+(?:me\s+)?(?:a\s+|the\s+|new\s+)?note\b/i;
+
+const HELIX_ASK_NOTE_CREATE_COMMAND_RE =
+  /^\s*(?:(?:please|pls|hey\s+helix|helix|can\s+you|could\s+you|would\s+you|will\s+you|i\s+need\s+you\s+to|i\s+want\s+you\s+to)\s+)?(?:write|make|create|save|take|add)\s+(?:me\s+)?(?:a\s+|the\s+|new\s+)?note\b/i;
+
+function isExplicitWorkstationNoteCreatePrompt(question: string): boolean {
+  const normalized = question.trim();
+  if (!normalized) return false;
+  if (HELIX_ASK_NOTE_CREATE_NEGATED_OR_CONTEXTUAL_RE.test(normalized)) return false;
+  if (/\bworkstation-notes\.create(?:_note)?\b/i.test(normalized)) return true;
+  return HELIX_ASK_NOTE_CREATE_COMMAND_RE.test(normalized);
+}
 
 const HELIX_ASK_SCIENTIFIC_IMAGE_PROMPT_RE =
   /\b(?:attached\s+image|image|screenshot|document\s+image|scientific\s+(?:document|image|page|paper))\b[\s\S]{0,180}\b(?:equations?|latex|symbols?|scientific\s+text|theory\s+(?:badge\s+)?graph|compare|congruence|reflection)\b/i;
@@ -52,6 +68,9 @@ const HELIX_ASK_SCIENTIFIC_IMAGE_EVIDENCE_REF_REVISION_RE =
 
 const HELIX_ASK_SCIENTIFIC_IMAGE_CONTINUITY_AUDIT_RE =
   /\b(?:continuity\s+audit|evidence\s+continuity|latest\s+scientific\s+image\s+lens\s+sidecar|latest\s+scientific\s+image\s+sidecar|prior\s+scientific\s+image\s+evidence\s+chain)\b[\s\S]{0,260}\b(?:evidence\s+depth|sidecar\s+id|image\s+lens\s+source|source\s+image\s+hash|crop\s+ref|promoted\s+equation|active\s+promoted\s+row\s+blockers|historical\s+non-promoted\s+row\s+blockers|graph\s+reflection\s+refs?|postulate\s+evidence\s+refs?)\b/i;
+
+const HELIX_ASK_IMAGE_LENS_NAMED_RECEIPT_EVALUATION_RE =
+  /\b(?:use|evaluate|report|promote|treat|from)\b[\s\S]{0,160}\b(?:image\s+lens\s+)?(?:observation\s+)?receipt\s+(?:named|called)?\s*`?(?:crop_\d+|equation_\d+)`?\b/i;
 
 const HELIX_ASK_SCIENTIFIC_IMAGE_REFLECTION_PROMPT_RE =
   /\b(?:compare|congruence|reflect|reflection|theory\s+(?:badge\s+)?graph|badge\s+graph|calculator(?:\s+payload|\s+handoff)?|payload\s+filter|branch\s+admission|admit\s+(?:a\s+)?branch)\b/i;
@@ -109,8 +128,10 @@ export function resolveHelixAskBackendEntrypointFamily(
       requestedOutputs: ["tool_call_eligibility", "calculator_receipt", "typed_failure"],
     };
   }
-  if (/\b(?:docs-viewer\.[a-z0-9_.-]+|docs\s+viewer)\b/i.test(normalized)) {
-    const capability = normalized.match(/\bdocs-viewer\.[a-z0-9_.-]+\b/i)?.[0] ?? null;
+  if (/\b(?:docs-viewer\.[a-z0-9_.-]+|docs\.search|docs\s+viewer|docs\s+search)\b/i.test(normalized)) {
+    const capability =
+      normalized.match(/\bdocs-viewer\.[a-z0-9_.-]+\b/i)?.[0] ??
+      (/\b(?:docs\.search|docs\s+search)\b/i.test(normalized) ? "docs.search" : null);
     return {
       family: "docs_viewer",
       sourceTarget: "docs_viewer",
@@ -134,8 +155,21 @@ export function resolveHelixAskBackendEntrypointFamily(
       requestedOutputs: ["tool_call_eligibility", "workspace_action_receipt", "voice_debug_receipt", "typed_failure"],
     };
   }
-  if (/\b(?:repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+)\b/i.test(normalized)) {
-    const capability = normalized.match(/\b(?:repo-code|repo_code)\.[a-z0-9_.-]+\b/i)?.[0]?.replace(/^repo_code\./i, "repo-code.") ?? null;
+  if (isExplicitWorkstationNoteCreatePrompt(normalized)) {
+    return {
+      family: "workstation_notes",
+      sourceTarget: "workstation_panel",
+      targetKind: "workstation_state",
+      requiredToolFamily: "workstation-notes",
+      selectedCapability: "workstation-notes.create_note",
+      explicitCue: "explicit_workstation_note_create",
+      requestedOutputs: ["tool_call_eligibility", "workspace_action_receipt", "note_update_receipt", "typed_failure"],
+    };
+  }
+  if (/\b(?:repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|repo\.search|repo\s+search)\b/i.test(normalized)) {
+    const capability =
+      normalized.match(/\b(?:repo-code|repo_code)\.[a-z0-9_.-]+\b/i)?.[0]?.replace(/^repo_code\./i, "repo-code.") ??
+      (/\b(?:repo\.search|repo\s+search)\b/i.test(normalized) ? "repo.search" : null);
     return {
       family: "repo_code",
       sourceTarget: "repo_code",
@@ -144,6 +178,25 @@ export function resolveHelixAskBackendEntrypointFamily(
       selectedCapability: capability,
       explicitCue: "repo_code_tool_family",
       requestedOutputs: ["tool_call_eligibility", "repo_code", "line_backed_source", "typed_failure"],
+    };
+  }
+  if (
+    /\b(?:moral-graph\.[a-z0-9_.-]+|moral\s+graph\s+(?:tool|reflection))\b/i.test(normalized) ||
+    /\b(?:use|with|through|via)\s+(?:the\s+)?moral\s+graph\b[\s\S]{0,120}\b(?:reflect|reflection|case|situation|dependency|repair|boundary|agency|badge|lens)\b/i.test(normalized)
+  ) {
+    const capability =
+      normalized.match(/\bmoral-graph\.[a-z0-9_.-]+\b/i)?.[0] ??
+      "moral-graph.reflect_context";
+    return {
+      family: "moral_graph",
+      sourceTarget: "moral_graph",
+      targetKind: capability === "moral-graph.reflect_living_substrate_context"
+        ? "moral_living_substrate_reflection"
+        : "moral_graph_reflection",
+      requiredToolFamily: "moral_graph",
+      selectedCapability: capability,
+      explicitCue: "moral_graph_tool_family",
+      requestedOutputs: ["tool_call_eligibility", "moral_graph_observation", "diagnostic_reflection", "typed_failure"],
     };
   }
   if (/\b(?:workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status)\b/i.test(normalized)) {
@@ -210,6 +263,22 @@ export function resolveHelixAskBackendEntrypointFamily(
       selectedCapability: capability,
       explicitCue: "helix_ask_tool_family",
       requestedOutputs: ["tool_call_eligibility", "procedure_observation", "typed_failure"],
+    };
+  }
+  if (
+    HELIX_ASK_IMAGE_LENS_NAMED_RECEIPT_EVALUATION_RE.test(normalized)
+  ) {
+    return {
+      family: "scientific_image",
+      sourceTarget: "scientific_image_evidence",
+      targetKind: "scientific_image_named_receipt",
+      requiredToolFamily: "visual_analysis",
+      selectedCapability: null,
+      explicitCue: "image_lens_named_observation_receipt",
+      requestedOutputs: [
+        "image_lens_named_receipt_evaluation",
+        "typed_failure",
+      ],
     };
   }
   if (

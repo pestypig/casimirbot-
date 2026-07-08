@@ -2,6 +2,364 @@ import { describe, expect, it } from "vitest";
 import { buildHelixDebugExportEnvelopeFromMasterPayload } from "@/lib/agi/debugExport";
 
 describe("Helix Ask debug export capability lanes", () => {
+  it("exports Realtime runtime session debug as non-terminal blocked evidence", () => {
+    const poisonedTranscript = "open the postulate board now";
+    const text = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "ask:realtime-debug-observability",
+        question: "show live runtime state",
+        content: "Realtime state recorded.",
+      },
+      {
+        selected_final_answer: "Realtime state recorded.",
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "realtime_session_disabled",
+        realtime_runtime_session_summary: {
+          schema: "helix.live_runtime_agent.control_state.v1",
+          realtime_session_id: "realtime:test",
+          runtime_agent_mode: "live_voice",
+          runtime_agent_authority: "execute_confirmed_actions",
+          transport: "webrtc",
+          session_status: "active",
+          session_lifecycle: ["start", "realtime_live_transport_disabled_by_env"],
+          selected_backend_provider: "openai",
+          selected_model_or_service: "gpt-realtime",
+          selected_realtime_model: "gpt-realtime",
+          consent_state: "granted",
+          tool_admission_state: "confirmation_required",
+          client_receipt_state: "received",
+          client_receipt_count: 1,
+          client_receipt_refs: ["receipt:visible-consent"],
+          latest_failure_code: "realtime_live_transport_disabled_by_env",
+          transport_execution_attempted: true,
+          media_capture_started: true,
+          openai_network_call_attempted: true,
+          webrtc_started: true,
+          sideband_started: true,
+          terminal_authority_status: "pending_helix_terminal_authority",
+          answer_authority: true,
+          assistant_answer: true,
+          terminal_eligible: true,
+          raw_content_included: true,
+        },
+        realtime_runtime_session_events: [
+          {
+            schema: "helix.realtime_session.lifecycle_event.v1",
+            action: "record_client_receipt",
+            receipt_ref: "receipt:visible-consent",
+            answer_authority: true,
+            assistant_answer: true,
+            terminal_eligible: true,
+            raw_content_included: true,
+          },
+        ],
+        realtime_transcript_observations: [
+          {
+            schema: "helix.realtime.transcript_observation.v1",
+            observation_ref: "obs:realtime:transcript:test",
+            runtime_agent_authority: "execute_confirmed_actions",
+            transcript_text_hash: "sha256:abc",
+            transcript_text_char_count: poisonedTranscript.length,
+            transcript_text: poisonedTranscript,
+            text: poisonedTranscript,
+            prompt_text: poisonedTranscript,
+            workstation_action_args: {
+              action_id: "must_not_execute",
+              transcript_text: poisonedTranscript,
+            },
+            reentry_status: "reentered",
+            observation_reentered: true,
+            transcript_is_user_intent: true,
+            answer_authority: true,
+            assistant_answer: true,
+            terminal_eligible: true,
+            raw_content_included: true,
+          },
+        ],
+        realtime_tool_suggestion_observations: [
+          {
+            schema: "helix.realtime.tool_suggestion_observation.v1",
+            suggestion_ref: "suggestion:realtime:debug",
+            realtime_session_id: "realtime:test",
+            runtime_agent_mode: "live_voice",
+            runtime_agent_authority: "execute_confirmed_actions",
+            event_type: "action.suggestion",
+            suggested_action_id: "inspect_docs_selection",
+            source_observation_ref: "obs:realtime:transcript:test",
+            client_receipt_ref: "receipt:suggestion:debug",
+            tool_admission_state: "suggest_only",
+            admission_status: "candidate_only",
+            execution_attempted: true,
+            gateway_execution_attempted: true,
+            workstation_action_executed: true,
+            answer_authority: true,
+            assistant_answer: true,
+            terminal_eligible: true,
+            raw_content_included: true,
+          },
+        ],
+        realtime_client_receipt_observations: [
+          {
+            schema: "helix.realtime.client_receipt_observation.v1",
+            receipt_ref: "receipt:realtime:debug",
+            realtime_session_id: "realtime:test",
+            runtime_agent_mode: "live_voice",
+            runtime_agent_authority: "execute_confirmed_actions",
+            receipt_kind: "mic_permission_granted",
+            status: "granted",
+            client_receipt_ref: "receipt:visible-consent",
+            client_secret: "must-not-export",
+            ephemeral_secret: "must-not-export",
+            sdp: "v=0 must-not-export",
+            audio_payload: "must-not-export",
+            raw_audio: "must-not-export",
+            openai_network_call_attempted: true,
+            ephemeral_credential_minted: true,
+            webrtc_started: true,
+            sideband_started: true,
+            media_capture_started: true,
+            browser_media_api_referenced: true,
+            browser_tracks_created: true,
+            data_channels_created: true,
+            answer_authority: true,
+            assistant_answer: true,
+            terminal_eligible: true,
+            raw_content_included: true,
+          },
+        ],
+        debug: {
+          turn_id: "ask:realtime-debug-observability",
+        },
+      },
+    );
+
+    const exported = JSON.parse(text) as Record<string, any>;
+    expect(exported.realtime_runtime_session_summary).toMatchObject({
+      realtime_session_id: "realtime:test",
+      runtime_agent_mode: "live_voice",
+      runtime_agent_authority: "execute_confirmed_actions",
+      transport: "none",
+      session_lifecycle: ["start", "realtime_live_transport_disabled_by_env"],
+      consent_state: "granted",
+      client_receipt_count: 1,
+      latest_failure_code: "realtime_live_transport_disabled_by_env",
+      terminal_authority_status: "not_terminal_authority",
+      transport_execution_attempted: false,
+      media_capture_started: false,
+      openai_network_call_attempted: false,
+      webrtc_started: false,
+      sideband_started: false,
+      reentry_required: true,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(exported.realtime_runtime_session_events).toEqual([
+      expect.objectContaining({
+        receipt_ref: "receipt:visible-consent",
+        context_role: "tool_evidence",
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(exported.realtime_transcript_observations).toEqual([
+      expect.objectContaining({
+        observation_ref: "obs:realtime:transcript:test",
+        runtime_agent_mode: "live_transcription",
+        runtime_agent_authority: "execute_confirmed_actions",
+        context_role: "tool_evidence",
+        transcript_text_hash: "sha256:abc",
+        transcript_text_char_count: poisonedTranscript.length,
+        transcript_is_user_intent: false,
+        reentry_status: "pending_solver_reentry",
+        observation_reentered: false,
+        reentry_required: true,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(exported.realtime_tool_suggestion_observations).toEqual([
+      expect.objectContaining({
+        suggestion_ref: "suggestion:realtime:debug",
+        suggested_action_id: "inspect_docs_selection",
+        source_observation_ref: "obs:realtime:transcript:test",
+        client_receipt_ref: "receipt:suggestion:debug",
+        context_role: "tool_evidence",
+        tool_admission_state: "suggest_only",
+        admission_status: "candidate_only",
+        reentry_status: "pending_solver_reentry",
+        observation_reentered: false,
+        execution_attempted: false,
+        gateway_execution_attempted: false,
+        workstation_action_executed: false,
+        reentry_required: true,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(exported.realtime_client_receipt_observations).toEqual([
+      expect.objectContaining({
+        receipt_ref: "receipt:realtime:debug",
+        client_receipt_ref: "receipt:visible-consent",
+        receipt_kind: "mic_permission_granted",
+        status: "granted",
+        context_role: "tool_evidence",
+        reentry_status: "pending_solver_reentry",
+        observation_reentered: false,
+        openai_network_call_attempted: false,
+        ephemeral_credential_minted: false,
+        webrtc_started: false,
+        sideband_started: false,
+        media_capture_started: false,
+        browser_media_api_referenced: false,
+        browser_tracks_created: false,
+        data_channels_created: false,
+        reentry_required: true,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(text).not.toContain(poisonedTranscript);
+    expect(text).not.toContain("must-not-export");
+    expect(text).not.toContain("must_not_execute");
+    expect(text).not.toContain("workstation_action_args");
+    expect(text).not.toContain("prompt_text");
+  });
+
+  it("preserves client note persistence receipts for workstation note creation", () => {
+    const text = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "ask:note-create-client-receipt",
+        question: 'make a note for me "hh"',
+        content: "Note saved.",
+      },
+      {
+        selected_final_answer: "Note saved.",
+        final_answer_source: "client_workstation_receipt",
+        terminal_artifact_kind: "note_update_receipt",
+        ask_turn_solver_trace: {
+          schema: "helix.ask_turn_solver_trace.v1",
+          turn_id: "ask:note-create-client-receipt",
+          completed_solver_path: true,
+          final_arbitration: {
+            terminal_artifact_kind: "note_update_receipt",
+            final_answer_source: "client_workstation_receipt",
+          },
+        },
+        action_envelope: {
+          schema: "helix.ask.action_envelope.v1",
+          workstation_actions: [
+            {
+              action: "run_panel_action",
+              panel_id: "workstation-notes",
+              action_id: "create_note",
+              args: { body: "hh" },
+            },
+          ],
+        },
+        workstation_gateway_call_results: [
+          {
+            capability_id: "workstation-notes.create_note",
+            ok: true,
+          },
+        ],
+        agent_step_loop: {
+          iterations: [
+            {
+              decision: {
+                chosen_capability: "workstation-notes.create_note",
+              },
+            },
+          ],
+        },
+        workspace_action_client_ack: [
+          {
+            turn_id: "ask:note-create-client-receipt",
+            item_id: "workstation-receipt:note-1",
+            action_key: "workstation-notes.create_note",
+            target_id: "workstation-notes",
+            action_id: "create_note",
+            applied: true,
+            persisted: true,
+            receipt_kind: "note_update_receipt",
+            state_observed: true,
+          },
+        ],
+        client_receipt_terminal: {
+          turn_id: "ask:note-create-client-receipt",
+          text: "Note saved.",
+          receipt_kind: "note_update_receipt",
+          panel_id: "workstation-notes",
+          action_id: "create_note",
+          note_id: "note-1",
+        },
+        debug: {
+          turn_id: "ask:note-create-client-receipt",
+        },
+      },
+    );
+
+    const exported = JSON.parse(text) as Record<string, any>;
+    expect(exported.selected_final_answer).toBe("Note saved.");
+    expect(exported.final_answer_source).toBe("client_workstation_receipt");
+    expect(exported.terminal_artifact_kind).toBe("note_update_receipt");
+    expect(exported.ask_turn_solver_trace).toMatchObject({
+      schema: "helix.ask_turn_solver_trace.v1",
+      turn_id: "ask:note-create-client-receipt",
+      completed_solver_path: true,
+      final_arbitration: {
+        terminal_artifact_kind: "note_update_receipt",
+      },
+    });
+    expect(exported.action_envelope).toMatchObject({
+      schema: "helix.ask.action_envelope.v1",
+      workstation_actions: [
+        expect.objectContaining({
+          panel_id: "workstation-notes",
+          action_id: "create_note",
+        }),
+      ],
+    });
+    expect(exported.workstation_gateway_call_results).toEqual([
+      expect.objectContaining({
+        capability_id: "workstation-notes.create_note",
+      }),
+    ]);
+    expect(exported.agent_step_loop).toMatchObject({
+      iterations: [
+        {
+          decision: {
+            chosen_capability: "workstation-notes.create_note",
+          },
+        },
+      ],
+    });
+    expect(exported.workspace_action_client_ack).toEqual([
+      expect.objectContaining({
+        action_key: "workstation-notes.create_note",
+        receipt_kind: "note_update_receipt",
+        persisted: true,
+        state_observed: true,
+      }),
+    ]);
+    expect(exported.client_receipt_terminal).toMatchObject({
+      turn_id: "ask:note-create-client-receipt",
+      receipt_kind: "note_update_receipt",
+      panel_id: "workstation-notes",
+      action_id: "create_note",
+    });
+  });
+
   it("fails closed when backend ref is advertised but hard Ask entrypoint was explicitly not observed", () => {
     const text = buildHelixDebugExportEnvelopeFromMasterPayload(
       {
@@ -672,6 +1030,61 @@ describe("Helix Ask debug export capability lanes", () => {
       historicalBlockers: ["partial_extraction_status"],
       claimBoundary: "observation_only_not_proof",
     };
+    const artifactAdmissionTrace = {
+      schema: "helix.artifact_admission_trace.v1",
+      status: "ambient_available",
+      route_contract: "unrelated_or_unbound_turn",
+      policy: "artifact presence is not permission; artifacts become support refs or prerequisites only when admitted by current-turn intent or route contract",
+      continuity_requested: false,
+      continuation_required: false,
+      ambient_artifacts: [
+        { kind: "scientific_image_evidence_sidecar", id: "scientific_image_sidecar:test-bianchi", reason: "available_but_not_bound_by_current_turn" },
+      ],
+      admitted_artifacts: [],
+      required_prerequisites: [],
+      ignored_artifacts: [
+        { kind: "scientific_image_evidence_sidecar", id: "scientific_image_sidecar:test-bianchi", reason: "ambient_artifact_not_bound_by_current_turn_intent" },
+      ],
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const workstationArtifactAdmissionTrace = {
+      schema: "helix.artifact_admission_trace.v1",
+      artifact_family: "workstation_gateway",
+      status: "admitted_evidence",
+      route_contract: "current_turn_workstation_gateway",
+      policy: "artifact presence is not permission; artifacts become support refs or prerequisites only when admitted by current-turn intent or route contract",
+      ambient_artifacts: [
+        {
+          kind: "helix.theory_context_reflection_observation.v1",
+          ref: "theory-reflection:obs:test-bianchi",
+          capability_id: "theory-badge-graph.reflect_discussion_context",
+          reason: "current_turn_gateway_observation",
+        },
+      ],
+      admitted_artifacts: [
+        {
+          kind: "helix.theory_context_reflection_observation.v1",
+          ref: "theory-reflection:obs:test-bianchi",
+          capability_id: "theory-badge-graph.reflect_discussion_context",
+          reason: "current_turn_observation_admitted_as_support_ref",
+        },
+      ],
+      required_prerequisites: [
+        {
+          kind: "helix.theory_context_reflection_observation.v1",
+          ref: "theory-reflection:obs:test-bianchi",
+          capability_id: "theory-badge-graph.reflect_discussion_context",
+          status: "satisfied",
+          reason: "current_turn_gateway_route_selected_observation",
+        },
+      ],
+      ignored_artifacts: [],
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
     const text = buildHelixDebugExportEnvelopeFromMasterPayload(
       {
         id: "helix-chat-turn:test:ask:scientific-evidence-trace",
@@ -682,6 +1095,31 @@ describe("Helix Ask debug export capability lanes", () => {
         selected_final_answer: finalAnswer,
         final_answer_source: "theory_context_reflection_answer",
         terminal_artifact_kind: "theory_context_reflection_answer",
+        backend_ask_entrypoint_runtime_fingerprint: {
+          schema: "helix.backend_ask_entrypoint_runtime_fingerprint.v1",
+          runAsk_entered: true,
+          hard_backend_entrypoint_required: true,
+          backend_ask_call_attempted: true,
+          backend_ask_call_path: "/api/agi/ask/turn",
+          route_metadata_source: "hard_tool_backend_entrypoint",
+          mandatory_next_tool_name: "theory-badge-graph.reflect_discussion_context",
+          legacy_ask_local_bypassed: true,
+        },
+        route_product_contract: {
+          schema: "helix.route_product_contract.v1",
+          source_target: "context_reflection",
+          allowed_terminal_artifact_kinds: ["theory_context_reflection_answer", "typed_failure"],
+          forbidden_terminal_artifact_kinds: ["model_synthesized_answer"],
+          required_artifact_refs: [],
+          precedence_reason: "theory_reflection_requires_gateway_observation",
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        source_target_intent: {
+          schema: "helix.ask_source_target_intent.v1",
+          target_source: "context_reflection",
+          target_kind: "theory_badge_graph_reflection",
+        },
         scientific_evidence_workflow_status: scientificEvidenceWorkflowStatus,
         action_envelope: {
           workstation_actions: [
@@ -730,6 +1168,8 @@ describe("Helix Ask debug export capability lanes", () => {
         },
         debug: {
           turn_id: "ask:scientific-evidence-trace",
+          scientific_image_artifact_admission_trace: artifactAdmissionTrace,
+          workstation_artifact_admission_trace: workstationArtifactAdmissionTrace,
           runtime_lane_request_loop: {
             schema: "helix.runtime_agent_lane_request_loop.v1",
             status: "lane_observation_reentered",
@@ -742,6 +1182,28 @@ describe("Helix Ask debug export capability lanes", () => {
     );
 
     const exported = JSON.parse(text) as Record<string, any>;
+    expect(exported.hard_evidence_turn_path_trace).toMatchObject({
+      schema: "helix.hard_evidence_turn_path_trace.v1",
+      submit_path_entered: true,
+      backend_ask_required: true,
+      backend_ask_called: true,
+      backend_ask_call_path: "/api/agi/ask/turn",
+      route_contract_selected: true,
+      route_contract_source_target: "context_reflection",
+      route_contract_target_kind: "theory_badge_graph_reflection",
+      route_contract_allowed_terminal_artifact_kinds: ["theory_context_reflection_answer", "typed_failure"],
+      route_metadata_source: "hard_tool_backend_entrypoint",
+      mandatory_next_tool_name: "theory-badge-graph.reflect_discussion_context",
+      ambient_artifact_count: 2,
+      admitted_artifact_count: 1,
+      required_observation_count: 1,
+      ignored_artifact_count: 1,
+      artifact_admission_statuses: expect.arrayContaining(["ambient_available", "admitted_evidence"]),
+      terminal_artifact_selected: "theory_context_reflection_answer",
+      final_answer_source_selected: "theory_context_reflection_answer",
+      terminal_error_code: null,
+      raw_content_included: false,
+    });
     expect(exported.scientific_evidence_trace).toMatchObject({
       schema: "helix.scientific_evidence_debug_projection.v1",
       evidence_packet_count: 1,
@@ -753,6 +1215,7 @@ describe("Helix Ask debug export capability lanes", () => {
       calculator_template_check_count: 1,
       promoted_evidence_object_count: 1,
       workflow_status_count: 1,
+      artifact_admission_trace_count: 2,
       primary_domains: ["weyl_bianchi"],
       branch_gate_statuses: ["restricted"],
       congruence_grade_floors: ["domain_context_match"],
@@ -859,6 +1322,58 @@ describe("Helix Ask debug export capability lanes", () => {
           calculator_template_status: "template_admissible",
           active_blockers: [],
           claim_boundary: "observation_only_not_proof",
+        }),
+      ],
+      artifact_admission_traces: [
+        expect.objectContaining({
+          status: "ambient_available",
+          route_contract: "unrelated_or_unbound_turn",
+          continuity_requested: false,
+          continuation_required: false,
+          ambient_artifacts: [
+            expect.objectContaining({
+              kind: "scientific_image_evidence_sidecar",
+              id: "scientific_image_sidecar:test-bianchi",
+              reason: "available_but_not_bound_by_current_turn",
+            }),
+          ],
+          required_prerequisites: [],
+          ignored_artifacts: [
+            expect.objectContaining({
+              kind: "scientific_image_evidence_sidecar",
+              id: "scientific_image_sidecar:test-bianchi",
+              reason: "ambient_artifact_not_bound_by_current_turn_intent",
+            }),
+          ],
+          raw_content_included: false,
+        }),
+        expect.objectContaining({
+          status: "admitted_evidence",
+          route_contract: "current_turn_workstation_gateway",
+          ambient_artifacts: [
+            expect.objectContaining({
+              kind: "helix.theory_context_reflection_observation.v1",
+              ref: "theory-reflection:obs:test-bianchi",
+              capability_id: "theory-badge-graph.reflect_discussion_context",
+              reason: "current_turn_gateway_observation",
+            }),
+          ],
+          admitted_artifacts: [
+            expect.objectContaining({
+              ref: "theory-reflection:obs:test-bianchi",
+              capability_id: "theory-badge-graph.reflect_discussion_context",
+              reason: "current_turn_observation_admitted_as_support_ref",
+            }),
+          ],
+          required_prerequisites: [
+            expect.objectContaining({
+              ref: "theory-reflection:obs:test-bianchi",
+              capability_id: "theory-badge-graph.reflect_discussion_context",
+              status: "satisfied",
+              reason: "current_turn_gateway_route_selected_observation",
+            }),
+          ],
+          raw_content_included: false,
         }),
       ],
       compound_stage_sequence: [

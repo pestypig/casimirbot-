@@ -29,6 +29,217 @@ describe("Helix Ask tool lifecycle trace", () => {
     expect(contract?.allowedTerminalKinds).toEqual(expect.arrayContaining(["doc_summary"]));
   });
 
+  it("does not mark Moral Graph family reentered when top-level reentry failed", () => {
+    const turnId = "ask:test:moral-graph-family-reentry-failed";
+    const moralRef = `${turnId}:moral_graph_reflection:1`;
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: turnId,
+        capability_family: "moral_graph_reflection",
+        requested_capability: "moral-graph.reflect_context",
+        selected_capability: "moral-graph.reflect_context",
+        admission_status: "admitted",
+      },
+      tool_call_admission_decision: {
+        requested_capability: "moral-graph.reflect_context",
+        requested_capability_family: "moral_graph_reflection",
+        selected_capability: "moral-graph.reflect_context",
+        admitted_capability: "moral-graph.reflect_context",
+      },
+      runtime_tool_call: {
+        capability_key: "moral-graph.reflect_context",
+        status: "completed",
+      },
+      tool_surface_packet: {
+        schema: "helix.tool_surface_packet.v1",
+        capabilities: ["moral-graph.reflect_context", "workstation_tool_gateway"],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: moralRef,
+          kind: "moral_graph_reflection",
+          payload: {
+            schema: "helix.moral_graph_reflection_observation.v1",
+            artifact_id: moralRef,
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+      tool_lifecycle_trace: {
+        schema: "helix.tool_lifecycle_trace.v1",
+        requested_capability: "moral-graph.reflect_context",
+        admitted_capability: "moral-graph.reflect_context",
+        executed_capability: "moral-graph.reflect_context",
+        observation_refs: [moralRef],
+        lifecycle_stage: "observed",
+        status: "succeeded",
+        evidence_reentered: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      tool_followup_decision: {
+        schema: "helix.tool_followup_decision.v1",
+        evidence_reentered: false,
+        next_action: "continue_reasoning",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "typed_failure",
+        concise_text: "I could not complete this turn.",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+        server_authoritative: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+
+    const index = buildArtifactQueryIndex({ turnId, payload });
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      requested_capability: "moral-graph.reflect_context",
+      observation_ref: moralRef,
+      reentry_proven: false,
+      rail_failure_code: "reentry_step_not_executed",
+    });
+    expect(index.tool_turn_chain_family_matrix).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          route_family: "moral_graph_reflection",
+          observed: true,
+          artifact_produced: true,
+          artifact_reentered: false,
+          rail_failure_code: "reentry_step_not_executed",
+          rail_status: expect.not.stringMatching(/^complete$/),
+        }),
+      ]),
+    );
+  });
+
+  it("maps workstation gateway Moral Graph observations to the Moral Graph family before reentry", () => {
+    const turnId = "ask:test:moral-graph-workstation-gateway-reentry-failed";
+    const moralRef = `${turnId}:codex_normalized:moral_graph_reflection:1`;
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: turnId,
+        capability_family: "workstation_tool_gateway",
+        requested_capability: "moral-graph.reflect_context",
+        selected_capability: "moral-graph.reflect_context",
+        admission_status: "admitted",
+      },
+      tool_call_admission_decision: {
+        requested_capability: "moral-graph.reflect_context",
+        requested_capability_family: "moral_graph_reflection",
+        selected_capability: "moral-graph.reflect_context",
+        admitted_capability: "moral-graph.reflect_context",
+      },
+      runtime_tool_call: {
+        capability_key: "moral-graph.reflect_context",
+        status: "completed",
+      },
+      tool_surface_packet: {
+        schema: "helix.tool_surface_packet.v1",
+        capabilities: ["moral-graph.reflect_context", "workstation_tool_gateway"],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: moralRef,
+          kind: "moral_graph_reflection",
+          payload: {
+            schema: "helix.moral_graph_reflection_observation.v1",
+            artifact_id: moralRef,
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+      tool_lifecycle_trace: {
+        schema: "helix.tool_lifecycle_trace.v1",
+        requested_capability: "moral-graph.reflect_context",
+        admitted_capability: "moral-graph.reflect_context",
+        executed_capability: "moral-graph.reflect_context",
+        observation_refs: [moralRef],
+        lifecycle_stage: "observed",
+        status: "succeeded",
+        evidence_reentered: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      tool_followup_decision: {
+        schema: "helix.tool_followup_decision.v1",
+        evidence_reentered: false,
+        next_action: "continue_reasoning",
+        required_next_capability: "model.direct_answer",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "typed_failure",
+        concise_text: "I could not complete this turn because a tool observation required a follow-up model answer step.",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+        server_authoritative: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+
+    const index = buildArtifactQueryIndex({ turnId, payload });
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      route_family: "moral_graph_reflection",
+      requested_capability: "moral-graph.reflect_context",
+      observation_ref: moralRef,
+      expected_reentry_capability: "model.direct_answer",
+      reentry_proven: false,
+      rail_failure_code: "reentry_step_not_executed",
+    });
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      observation_ref: moralRef,
+      reentry_status: "not_reentered",
+      first_broken_rail: "evidence_reentry",
+      repair_target: "reentry_gate",
+      codex_parity_class: "observation_not_reentered",
+      rail_failure_code: "reentry_step_not_executed",
+    });
+    expect(index.tool_turn_chain_family_matrix).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          route_family: "moral_graph_reflection",
+          observed: true,
+          artifact_produced: true,
+          observation_ref: moralRef,
+          artifact_reentered: false,
+          rail_failure_code: "reentry_step_not_executed",
+        }),
+      ]),
+    );
+  });
+
   it("keeps pending multi-step tools in poll mode instead of terminalizing", () => {
     const payload: Record<string, unknown> = {
       capability_plan: {

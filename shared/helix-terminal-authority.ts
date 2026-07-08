@@ -43,6 +43,8 @@ export type HelixTerminalCandidateSource =
   | "situation_context_pack"
   | "visual_context_pack"
   | "visual_frame_evidence"
+  | "image_lens_observation_report"
+  | "provider_image_lens_observation_report"
   | "agent_step_observation_packet"
   | "client_projection"
   | "deterministic_receipt_fallback"
@@ -101,7 +103,8 @@ export type HelixTerminalAuthoritySingleWriterRejectionReason =
   | "stale_solver_continuation_superseded_by_repo_terminal"
   | "stale_solver_continuation_superseded_by_docs_terminal"
   | "stale_solver_continuation_superseded_by_scholarly_terminal"
-  | "stale_solver_continuation_superseded_by_stage_play_terminal";
+  | "stale_solver_continuation_superseded_by_stage_play_terminal"
+  | "stale_solver_continuation_superseded_by_image_lens_observation_report";
 
 export type TerminalAuthoritySingleWriterAuditRejectionReason =
   | "receipt_not_terminal_eligible"
@@ -146,6 +149,8 @@ export type HelixTerminalAuthoritySingleWriterResult = {
     | "situation_context_pack"
     | "visual_context_pack"
     | "visual_frame_evidence"
+    | "image_lens_observation_report"
+    | "provider_image_lens_observation_report"
     | "live_environment_binding_diagnosis"
     | "capability_help_summary"
     | "workspace_directory_resolution"
@@ -202,6 +207,8 @@ export type HelixTerminalAuthoritySingleWriterResult = {
     | "situation_context_pack"
     | "visual_context_pack"
     | "visual_frame_evidence"
+    | "image_lens_observation_report"
+    | "provider_image_lens_observation_report"
     | "live_environment_binding_diagnosis"
     | "capability_help_summary"
     | "workspace_directory_resolution"

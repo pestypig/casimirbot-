@@ -62,6 +62,16 @@ export const resolveAskTurnCreateNoteTitleArg = (transcript: string): string | n
   return resolveAskTurnTitleArg(transcript);
 };
 
+export const resolveAskTurnCreateNoteBodyArg = (transcript: string): string | null => {
+  const quotedBody = transcript.match(/\b(?:create|make)\s+(?:a\s+)?note\s+(?:for\s+me\s+)?["'](.+?)["']\s*$/i)?.[1];
+  if (quotedBody?.trim()) return quotedBody.trim();
+  const explicitBody = transcript.match(
+    /\b(?:create|make|new|start)\s+(?:a\s+)?(?:[\w-]+\s+){0,3}note\b[\s\S]{0,80}\b(?:with\s+body|body|containing|that\s+says|saying|with\s+text|text)\s*[:\-]?\s*(.+)$/i,
+  )?.[1];
+  if (explicitBody?.trim()) return trimAskTurnProtectedTitleArgBoundaries(explicitBody);
+  return null;
+};
+
 export const isAskTurnCreateNoteIntent = (transcript: string): boolean =>
   /\b(?:create|make|new|start)\s+(?:a\s+)?(?:[\w-]+\s+){0,3}note\b/i.test(transcript.trim());
 

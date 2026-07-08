@@ -22,10 +22,10 @@ export const HELIX_ASK_LEGACY_CONSOLE_ACTIVE_PATH = [
 
 export const HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT = {
   file: "client/src/components/helix/HelixAskPill.tsx",
-  lineCountAtInventory: 25485,
-  exportedComponentStartsAtLine: 7751,
-  liveRenderSliceStartsAtLine: 25288,
-  liveLegacyConsoleViewStartsAtLine: 25288,
+  lineCountAtInventory: 24189,
+  exportedComponentStartsAtLine: 6357,
+  liveRenderSliceStartsAtLine: 23993,
+  liveLegacyConsoleViewStartsAtLine: 23993,
   inventoryReason:
     "The normal Ask path remains on the legacy-looking bridge until the recrowned minimal runtime shell reaches live visual parity. Extracted ask-console display owners should continue to grow in the recrowned directory, not inside HelixAskPill.",
 } as const;

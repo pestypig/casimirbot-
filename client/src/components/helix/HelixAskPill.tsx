@@ -39,11 +39,14 @@ import {
   type ToolLogEvent,
 } from "@/lib/agi/api";
 import {
+  buildHelixDebugExportEnvelopeFromMasterPayload as buildSharedHelixDebugExportEnvelopeFromMasterPayload,
   hashDebugExportText,
 } from "@/lib/agi/debugExport";
 import { buildHelixAskClientBypassAudit, buildWorkspaceActionClientAckSnapshot } from "@/lib/agi/workspaceActionAck";
 import { useAgiChatStore, type ChatSession } from "@/store/useAgiChatStore";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
+import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
+import { useInterfaceText } from "@/lib/i18n/interfaceText";
 import { HELIX_SETTINGS_OPEN_STATE_EVENT } from "@/hooks/useHelixSettingsDialog";
 import { classifyMoodFromWhisper } from "@/lib/luma-mood-spectrum";
 import { LUMA_MOOD_ORDER, resolveMoodAsset, type LumaMood } from "@/lib/luma-moods";
@@ -79,6 +82,10 @@ import {
   type HelixAskQueuedTurnReason,
 } from "@/components/helix/ask-console/HelixAskQueuedTurn";
 import {
+  buildHelixAskSubmitBackendEntrypointRoutePlan,
+  mergeHelixAskSubmitBackendEntrypointRunOptions,
+} from "@/components/helix/ask-console/HelixAskSubmitBackendEntrypointOptions";
+import {
   buildHelixAskDocViewerDebugSnapshotBinding,
   readHelixAskDocViewerPathFromDesktopUrlForSnapshot,
   rememberHelixAskDocViewerPathForSnapshot,
@@ -90,7 +97,6 @@ import {
 } from "@/components/helix/ask-console/HelixAskWorkspaceContextBinding";
 import {
   copyHelixAskContextCapsuleToClipboard,
-  copyHelixAskDebugJsonToClipboard,
   copyHelixAskPlainTextToClipboard as copyRecrownedHelixAskPlainTextToClipboard,
 } from "@/components/helix/ask-console/HelixAskClipboard";
 import {
@@ -98,31 +104,51 @@ import {
   HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT as RECROWNED_HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
   HELIX_ASK_ENTRYPOINT_GUARD_VERSION as RECROWNED_HELIX_ASK_ENTRYPOINT_GUARD_VERSION,
   buildHelixAskHardBackendEntrypointRouteMetadata,
-  buildHelixAskPastedTextResumeRecallRouteMetadata,
   requiresHelixAskBackendEntrypoint as recrownedRequiresHelixAskBackendEntrypoint,
   shouldUseHelixAskBackendTurnEntrypoint as recrownedShouldUseHelixAskBackendTurnEntrypoint,
 } from "@/components/helix/ask-console/HelixAskBackendEntrypointPolicy";
+export { buildHelixAskHardBackendEntrypointRouteMetadata };
+import {
+  HELIX_ASK_BACKEND_DEBUG_MATERIALIZATION_ERROR_CODE,
+  HELIX_ASK_BACKEND_DEBUG_MATERIALIZATION_TEXT,
+  HELIX_ASK_SINGLE_TERMINAL_PROJECTOR_VERSION,
+  buildHelixAskBackendEntrypointRuntimeFingerprint,
+  resolveHelixAskHardPromptProjectionGuard,
+} from "@/components/helix/ask-console/HelixAskBackendEntrypointRuntimeGuard";
+export {
+  HELIX_ASK_BACKEND_DEBUG_MATERIALIZATION_ERROR_CODE,
+  HELIX_ASK_BACKEND_DEBUG_MATERIALIZATION_TEXT,
+  HELIX_ASK_SINGLE_TERMINAL_PROJECTOR_VERSION,
+  buildHelixAskBackendEntrypointRuntimeFingerprint,
+  resolveHelixAskHardPromptProjectionGuard,
+};
 import { buildHelixAskLatestTurnBinding } from "@/components/helix/ask-console/HelixAskLatestTurnBinding";
 import {
   buildHelixAskLegacyTurnControlViewModel,
   buildHelixAskReplyCopyText as buildRecrownedHelixAskReplyCopyText,
   buildHelixAskLegacyTurnControlActionPayload,
   clearHelixAskLegacyCopiedDebugIdIfCurrent,
-  collectHelixAskLegacyReplyTerminalTranscriptTexts,
   debugPayloadMatchesHelixAskLegacyRenderedReply as debugPayloadMatchesRenderedReply,
   debugPayloadMatchesHelixAskLegacyRenderedTurnPayload as debugPayloadMatchesRenderedTurnPayload,
   enforceHelixAskLegacyDebugExportMatchesClickedButton as enforceDebugExportMatchesClickedButton,
   extractHelixAskLegacyClickedTurnDebugScope,
-  isHelixAskLegacyBackendDebugExportEligibleTurnId,
-  isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted,
-  resolveHelixAskLegacyDebugExportBackendTarget,
-  resolveHelixAskLegacyDebugExportClientTurnId,
   resolveHelixAskLegacyReplyDebugTurnId as resolveHelixAskReplyDebugTurnId,
   resolveHelixAskLegacyClickedDebugReply,
   selectHelixAskLegacyDebugCopyLocalPayload,
   selectHelixAskLegacyReplyScopedDebugExportPayload,
 } from "@/components/helix/ask-console/HelixAskLegacyTurnControls";
 import { boundHelixDebugExportTextForUi } from "@/components/helix/ask-console/HelixAskDebugExportSizeControl";
+import {
+  copyHelixAskDebugPayloadToClipboard,
+  resolveHelixAskAuthoritativeDebugExportPayload,
+} from "@/components/helix/ask-console/HelixAskDebugCopyProjection";
+import {
+  normalizeHelixAskReplyMasterDebugPayload,
+} from "@/components/helix/ask-console/HelixAskDebugCopyLocalPayload";
+import {
+  buildHelixAskReplyScopedDebugExportFromRenderedButton,
+  buildHelixAskReplyScopedDebugExportFromRenderedReply,
+} from "@/components/helix/ask-console/HelixAskRenderedReplyDebugExport";
 import {
   hasSuccessfulWorkstationTerminalTranscriptRows,
   resolveHelixAskConsoleFinalAnswerSourceLabel,
@@ -167,6 +193,10 @@ import {
   resolveHelixAskLegacyFinalSourceLabel,
   selectHelixAskLegacyFinalAnswerText,
 } from "@/components/helix/ask-console/HelixAskLegacyFinalTextSelection";
+import {
+  selectHelixAskVisibleFinalAnswer,
+  type HelixAskVisibleFinalAnswerSelection as HelixAskVisibleTerminalResolution,
+} from "@/components/helix/ask-console/HelixAskVisibleFinalAnswerSelection";
 import { HelixAskLegacyConsoleView } from "@/components/helix/ask-console/HelixAskLegacyConsoleView";
 import { buildHelixAskConsoleSupplementState } from "@/components/helix/ask-console/HelixAskConsoleSupplementState";
 import {
@@ -475,12 +505,10 @@ export type {
 import {
   buildAskLiveEventLogDetailPayload,
   buildAskLiveEventLogExport,
-  buildCompactToolTraceDisclosure,
   cleanHelixRenderedFinalAnswerText,
   formatAskLiveEventLogLine,
   HELIX_ASK_PROGRESS_PLACEHOLDER_TEXT,
   isHelixAskProgressPlaceholderText,
-  normalizedDebugReplyText,
   parseAskLiveEventTimestampMs,
   parseHelixAskQueuedQuestionsInput,
   readEventMetaString,
@@ -515,6 +543,7 @@ import {
   normalizeLexiconAlias,
   normalizeWorkstationCommandText,
   parseOpenPanelCommand,
+  parseWorkstationNoteCreateLexiconArgs,
   restateWorkstationSubgoal,
   resolvePanelIdFromPath,
   type WorkstationPanelResolverConfig,
@@ -1017,9 +1046,6 @@ import {
 } from "@/lib/helix/liveSourceMailRefreshEvent";
 import type { StagePlayLiveSourceMailTranscriptEntryV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import {
-  resolveHelixVisibleTerminal as resolveHelixVisibleTerminalCore,
-} from "@/lib/helix/resolveHelixVisibleTerminal";
-import {
   mergeVoiceTranscriptDraft,
   resolveVoiceDispatchTranscriptFromDraft,
 } from "@/lib/helix/voice/voice-transcript";
@@ -1059,13 +1085,8 @@ import {
   type SituationRoomState,
 } from "@/lib/helix/situation-room";
 import { buildSituationRoomCaptureContext } from "@/lib/helix/situation-capture-context";
-import {
-  dispatchHelixWorkstationAction,
-  dispatchHelixWorkstationActions,
-  coerceHelixWorkstationActions,
-  extractHelixWorkstationActionBlocks,
-  type HelixWorkstationAction,
-} from "@/lib/workstation/workstationActionContract";
+import { dispatchHelixWorkstationActions, coerceHelixWorkstationActions, extractHelixWorkstationActionBlocks, type HelixWorkstationAction } from "@/lib/workstation/workstationActionContract";
+import { resolveHelixAskWorkstationReceiptTerminal, runHelixAskWorkstationActionWithReceiptLedger, type HelixAskWorkstationActionDispatchResult } from "@/components/helix/ask-console/HelixAskWorkstationActionDispatch";
 import {
   getWorkstationPanelCapabilities,
   WORKSTATION_V1_PANEL_CAPABILITIES,
@@ -1112,9 +1133,6 @@ import {
   type VoicePlaybackOutcomeStatus,
 } from "@/lib/helix/voice-capture-diagnostics";
 import {
-  buildVoiceClientDebugProjectionFields,
-  buildVoicePlaybackReceiptBarrierDebug,
-  buildVoicePlaybackReconciliationDebug,
   resolveVoiceTimelineClientBuildStamp as resolveVoiceTimelineClientBuildStampFromInputs,
   sanitizeVoiceDiagnosticsForExport,
 } from "@/lib/helix/ask-voice-diagnostics-export";
@@ -1310,6 +1328,7 @@ import {
 } from "@/store/useSituationRoomJobStore";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
+import { useWorkstationActionExecutionStore } from "@/store/useWorkstationActionExecutionStore";
 
 const HELIX_ASK_THREAD_ID = "helix-ask:desktop";
 const HELIX_ASK_AUDIO_TRANSCRIPT_SOURCE_ID = `audio_transcript:${HELIX_ASK_THREAD_ID}`;
@@ -3262,13 +3281,6 @@ export const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE =
 export const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT =
   RECROWNED_HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT;
 export const HELIX_ASK_ENTRYPOINT_GUARD_VERSION = RECROWNED_HELIX_ASK_ENTRYPOINT_GUARD_VERSION;
-export const HELIX_ASK_SINGLE_TERMINAL_PROJECTOR_VERSION = "E80";
-export const HELIX_ASK_BACKEND_DEBUG_MATERIALIZATION_ERROR_CODE = "backend_debug_materialization";
-export const HELIX_ASK_BACKEND_DEBUG_MATERIALIZATION_TEXT =
-  "Backend Ask was reached, but no server terminal artifact or debug artifact was materialized for this turn.";
-
-const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE =
-  /\b(?:scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\s+viewer|narrator\.[a-z0-9_.-]+|panel[_\s-]?id\s*(?:=|:)\s*narrator|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|live_env\.[a-z0-9_.-]+|helix_ask\.[a-z0-9_.-]+|image_lens|visual_capture)\b/i;
 
 export function requiresHelixAskBackendEntrypoint(question: string | null | undefined): boolean {
   return recrownedRequiresHelixAskBackendEntrypoint(question);
@@ -3279,119 +3291,6 @@ export function shouldUseHelixAskBackendTurnEntrypoint(args: {
   hardBackendEntrypointRequired: boolean;
 }): boolean {
   return recrownedShouldUseHelixAskBackendTurnEntrypoint(args);
-}
-
-export function buildHelixAskBackendEntrypointRuntimeFingerprint(args: {
-  submitHandlerSource: string;
-  runAskEntered: boolean;
-  hardBackendEntrypointRequired: boolean;
-  useBackendAskTurnEntrypoint: boolean;
-  backendAskCallAttempted: boolean;
-  backendAskCallPath: "runAskTurnStream" | "runAskTurn" | "askLocal" | null;
-  backendAskCallError?: string | null;
-  routeMetadata?: unknown;
-  legacyAskLocalBypassed: boolean;
-  askEntrypointObserved?: boolean | null;
-}): Record<string, unknown> {
-  const routeMetadata = readAgentLoopAuditRecord(args.routeMetadata);
-  const mandatoryNextTool = readAgentLoopAuditRecord(routeMetadata?.mandatory_next_tool);
-  const firstBrokenRail =
-    !args.runAskEntered
-      ? "prompt_submit_entrypoint"
-      : args.hardBackendEntrypointRequired && !args.useBackendAskTurnEntrypoint
-      ? "backend_ask_entrypoint"
-      : args.hardBackendEntrypointRequired && !args.backendAskCallAttempted
-      ? "backend_ask_entrypoint"
-      : args.hardBackendEntrypointRequired &&
-        args.backendAskCallAttempted &&
-        args.askEntrypointObserved === false
-      ? "backend_debug_materialization"
-      : null;
-  const repairTarget =
-    firstBrokenRail === "prompt_submit_entrypoint" || firstBrokenRail === "backend_ask_entrypoint"
-      ? "prompt_submit_entrypoint"
-      : firstBrokenRail === "backend_debug_materialization"
-      ? "debug_export_bridge"
-      : null;
-  return {
-    schema: "helix.backend_ask_entrypoint_runtime_fingerprint.v1",
-    client_entrypoint_guard_version: HELIX_ASK_ENTRYPOINT_GUARD_VERSION,
-    submit_handler_source: args.submitHandlerSource,
-    runAsk_entered: args.runAskEntered,
-    hard_backend_entrypoint_required: args.hardBackendEntrypointRequired,
-    use_backend_ask_turn_entrypoint: args.useBackendAskTurnEntrypoint,
-    backend_ask_call_attempted: args.backendAskCallAttempted,
-    backend_ask_call_path: args.backendAskCallPath,
-    backend_ask_call_error: args.backendAskCallError ?? null,
-    route_metadata_source: coerceText(routeMetadata?.source).trim() || null,
-    mandatory_next_tool_name:
-      coerceText(mandatoryNextTool?.tool_name).trim() ||
-      coerceText(mandatoryNextTool?.selected_capability).trim() ||
-      null,
-    legacy_ask_local_bypassed: args.legacyAskLocalBypassed,
-    first_broken_rail: firstBrokenRail,
-    repair_target: repairTarget,
-    assistant_answer: false,
-    raw_content_included: false,
-  };
-}
-
-export function resolveHelixAskHardPromptProjectionGuard(args: {
-  hardBackendEntrypointRequired: boolean;
-  backendAskCallAttempted: boolean | null;
-  serverTerminalText?: string | null;
-  serverTerminalSource?: string | null;
-  currentBrokenRail?: string | null;
-  currentRepairTarget?: string | null;
-}): Record<string, unknown> | null {
-  if (!args.hardBackendEntrypointRequired) return null;
-  const serverTerminalText = coerceText(args.serverTerminalText).trim();
-  const serverTerminalSource = coerceText(args.serverTerminalSource).trim();
-  if (serverTerminalText && serverTerminalSource && serverTerminalSource !== "legacy_shadow" && serverTerminalSource !== "empty") {
-    return {
-      schema: "helix.hard_prompt_projection_guard.v1",
-      client_projection_policy_version: HELIX_ASK_SINGLE_TERMINAL_PROJECTOR_VERSION,
-      projection_allowed: true,
-      allowed_projection_source: serverTerminalSource,
-      selected_failure_code: null,
-      selected_failure_text: null,
-      demoted_projection_layers: [],
-      first_broken_rail: null,
-      repair_target: null,
-      assistant_answer: false,
-      raw_content_included: false,
-    };
-  }
-  const backendAskAttempted = args.backendAskCallAttempted === true;
-  const selectedFailureCode = backendAskAttempted
-    ? HELIX_ASK_BACKEND_DEBUG_MATERIALIZATION_ERROR_CODE
-    : HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE;
-  return {
-    schema: "helix.hard_prompt_projection_guard.v1",
-    client_projection_policy_version: HELIX_ASK_SINGLE_TERMINAL_PROJECTOR_VERSION,
-    projection_allowed: false,
-    allowed_projection_source: null,
-    selected_failure_code: selectedFailureCode,
-    selected_failure_text: backendAskAttempted
-      ? HELIX_ASK_BACKEND_DEBUG_MATERIALIZATION_TEXT
-      : HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
-    demoted_projection_layers: [
-      "durable_chat_session",
-      "client_projection",
-      "evidence_finalization_fallback",
-      "model_synthesized_fallback",
-      "receipt_derived_final",
-      "debug_export_derived_final",
-    ],
-    first_broken_rail:
-      coerceText(args.currentBrokenRail).trim() ||
-      (backendAskAttempted ? "backend_debug_materialization" : "backend_ask_entrypoint"),
-    repair_target:
-      coerceText(args.currentRepairTarget).trim() ||
-      (backendAskAttempted ? "debug_export_bridge" : "prompt_submit_entrypoint"),
-    assistant_answer: false,
-    raw_content_included: false,
-  };
 }
 
 export function buildHelixAskRepliesFromChatSession(session: ChatSession): HelixAskReply[] {
@@ -3507,19 +3406,8 @@ function resolveHelixVisibleTerminalKind(args: {
   return String(terminalKind ?? args.fallback ?? "n/a");
 }
 
-type HelixAskVisibleTerminalResolution = {
-  text: string;
-  source: string;
-  backendTerminalText: string | null;
-};
-
 function resolveHelixAskVisibleTerminal(value: unknown, fallbackContent?: string | null): HelixAskVisibleTerminalResolution {
-  const terminal = resolveHelixVisibleTerminalCore(value, fallbackContent);
-  return {
-    text: terminal.text,
-    source: terminal.source,
-    backendTerminalText: terminal.backendTerminalText,
-  };
+  return selectHelixAskVisibleFinalAnswer({ source: value, fallbackContent });
 }
 
 type StagePlayLiveSourceMailTranscriptResponse = {
@@ -4977,6 +4865,7 @@ function buildReplyMasterEventClockExport(args: {
     openPanels: Array.isArray(workstationLayoutDebugSnapshot.openPanels)
       ? workstationLayoutDebugSnapshot.openPanels.filter((panelId): panelId is string => typeof panelId === "string")
       : [],
+    actionExecutions: useWorkstationActionExecutionStore.getState().executions,
   });
   const firstWorkspaceActionReceipt = currentTurnArtifactLedger
     .map((artifact) => readAgentLoopAuditRecord(artifact))
@@ -5246,42 +5135,16 @@ function buildReplyMasterEventClockExport(args: {
 }
 
 function buildReplyScopedDebugExportFromRenderedReply(reply: HelixAskReply, reason: string): string {
-  const visibleTerminal = resolveHelixAskVisibleTerminal(reply, reply.content);
-  const visibleAnswerText = visibleTerminal.text || reply.content || "";
-  const suppressVisibleAnswer = isHelixAskProgressPlaceholderText(visibleAnswerText);
-  const replyRecord = reply as Record<string, unknown>;
-  const activeTurnId = resolveHelixAskReplyDebugTurnId(reply);
-  const clientTurnId = reply.id || null;
-  return buildHelixDebugExportEnvelopeFromMasterPayload(reply, {
-    schema: "helix.ask.master_event_clock.v2",
-    exportedAt: new Date().toISOString(),
-    debug_export_rebuild_reason: reason,
-    active_turn_id: activeTurnId,
-    client_active_turn_id: clientTurnId,
-    selectedDebugTurnId: activeTurnId,
-    selectedDebugQuestion: reply.question ?? null,
-    selectedDebugFinalAnswer: suppressVisibleAnswer ? "" : visibleAnswerText,
-    selectedDebugSource: "rendered_reply",
-    reply: {
-      id: reply.id,
-      mode: reply.mode ?? null,
-      question: reply.question ?? null,
-      sourceCount: reply.sources?.length ?? 0,
+  return buildHelixAskReplyScopedDebugExportFromRenderedReply({
+    reply,
+    reason,
+    deps: {
+      buildEnvelope: (targetReply, payload) =>
+        buildHelixDebugExportEnvelopeFromMasterPayload(targetReply as HelixAskReply, payload),
+      resolveVisibleTerminal: (targetReply, fallbackContent) =>
+        resolveHelixAskVisibleTerminal(targetReply as HelixAskReply, fallbackContent),
+      resolveReplyDebugTurnId: (targetReply) => resolveHelixAskReplyDebugTurnId(targetReply as HelixAskReply),
     },
-    debug: reply.debug ?? null,
-    active_prompt: reply.question ?? null,
-    selected_final_answer: suppressVisibleAnswer ? "" : visibleAnswerText,
-    final_answer_source: replyRecord.final_answer_source ?? reply.debug?.final_answer_source ?? visibleTerminal.finalAnswerSource ?? null,
-    terminal_artifact_kind:
-      replyRecord.terminal_artifact_kind ?? reply.debug?.terminal_artifact_kind ?? visibleTerminal.terminalArtifactKind ?? null,
-    terminal_result: replyRecord.terminal_result ?? reply.debug?.terminal_result ?? null,
-    terminal_results: replyRecord.terminal_results ?? reply.debug?.terminal_results ?? [],
-    debug_export_ref: replyRecord.debug_export_ref ?? reply.debug?.debug_export_ref ?? null,
-    backend_debug_response_ref: replyRecord.backend_debug_response_ref ?? reply.debug?.backend_debug_response_ref ?? null,
-    golden_path_runtime: replyRecord.golden_path_runtime ?? reply.debug?.golden_path_runtime ?? null,
-    golden_path_runtime_status: replyRecord.golden_path_runtime_status ?? reply.debug?.golden_path_runtime_status ?? null,
-    server_build_commit: replyRecord.server_build_commit ?? reply.debug?.server_build_commit ?? null,
-    server_build_started_at_ms: replyRecord.server_build_started_at_ms ?? reply.debug?.server_build_started_at_ms ?? null,
   });
 }
 
@@ -5290,941 +5153,23 @@ export function buildReplyScopedDebugExportFromRenderedButton(
   sourceElement: HTMLElement | null | undefined,
   reason: string,
 ): string | null {
-  const rendered = extractHelixAskLegacyClickedTurnDebugScope(sourceElement);
-  if (!rendered || (!rendered.question && !rendered.finalAnswer)) return null;
-  const visibleTerminal = resolveHelixAskVisibleTerminal(reply, reply.content);
-  const replyTerminalTranscriptTexts = collectHelixAskLegacyReplyTerminalTranscriptTexts(reply);
-  const renderedFinalMatchesReply =
-    !rendered.finalAnswer ||
-    [visibleTerminal.text, reply.content, ...replyTerminalTranscriptTexts]
-      .map(normalizedDebugReplyText)
-      .filter(Boolean)
-      .some((candidate) => candidate === normalizedDebugReplyText(rendered.finalAnswer));
-  const renderedMatchesReply =
-    (!rendered.question || normalizedDebugReplyText(rendered.question) === normalizedDebugReplyText(reply.question)) &&
-    renderedFinalMatchesReply;
-  const replyRecord = reply as Record<string, unknown>;
-  const replyDebugRecord = renderedMatchesReply ? readAgentLoopAuditRecord(reply.debug) : null;
-  const backendTurnScopeTrusted = isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted({
-    rendered,
-    renderedMatchesReply,
-    replyDebugRecord,
-  });
-  const renderedClientScopedTurnId = rendered.clientTurnId && (rendered.question || rendered.finalAnswer) ? rendered.clientTurnId : null;
-  const replyResolvedTurnId = resolveHelixAskReplyDebugTurnId(reply);
-  const replyResolvedTurnIdTrusted =
-    backendTurnScopeTrusted &&
-    (!isBackendAskTurnDebugExportEligibleTurnId(replyResolvedTurnId) || Boolean(rendered.activeTurnId));
-  const activeTurnId =
-    (backendTurnScopeTrusted ? rendered.activeTurnId : null) ||
-    renderedClientScopedTurnId ||
-    (replyResolvedTurnIdTrusted ? replyResolvedTurnId : reply.id) ||
-    null;
-  const clientTurnId = rendered.clientTurnId || reply.id || null;
-  const includeReplyDebug = renderedMatchesReply && backendTurnScopeTrusted;
-  const renderedModelPolicyDebugSummary = coerceText(rendered.modelPolicyDebugSummary).trim();
-  const renderedLanguageModelDebugSummary =
-    /^AI:\s*/i.test(renderedModelPolicyDebugSummary) ? renderedModelPolicyDebugSummary : null;
-  return buildHelixDebugExportEnvelopeFromMasterPayload(reply, {
-    schema: "helix.ask.master_event_clock.v2",
-    exportedAt: new Date().toISOString(),
-    debug_export_rebuild_reason: reason,
-    debug_export_source: "rendered_reply_dom",
-    backend_debug_response_status: "not_advertised",
-    active_turn_id: renderedMatchesReply ? activeTurnId : null,
-    client_active_turn_id: clientTurnId ?? reply.id,
-    selectedDebugTurnId: renderedMatchesReply ? activeTurnId : null,
-    selectedDebugQuestion: rendered.question ?? reply.question ?? null,
-    selectedDebugFinalAnswer: rendered.finalAnswer ?? "",
-    selectedDebugSource: "rendered_reply_dom",
-    reply: {
-      id: renderedMatchesReply ? reply.id : null,
-      client_id: reply.id,
-      mode: reply.mode ?? null,
-      question: rendered.question ?? reply.question ?? null,
-      sourceCount: reply.sources?.length ?? 0,
+  return buildHelixAskReplyScopedDebugExportFromRenderedButton({
+    reply,
+    sourceElement,
+    reason,
+    deps: {
+      buildEnvelope: (targetReply, payload) =>
+        buildHelixDebugExportEnvelopeFromMasterPayload(targetReply as HelixAskReply, payload),
+      resolveVisibleTerminal: (targetReply, fallbackContent) =>
+        resolveHelixAskVisibleTerminal(targetReply as HelixAskReply, fallbackContent),
+      resolveReplyDebugTurnId: (targetReply) => resolveHelixAskReplyDebugTurnId(targetReply as HelixAskReply),
     },
-    debug: includeReplyDebug ? reply.debug ?? null : null,
-    language_model_debug_summary:
-      (includeReplyDebug ? replyRecord.language_model_debug_summary ?? replyDebugRecord?.language_model_debug_summary : null) ??
-      renderedLanguageModelDebugSummary,
-    model_policy_debug_summary:
-      (includeReplyDebug ? replyRecord.model_policy_debug_summary ?? replyDebugRecord?.model_policy_debug_summary : null) ??
-      renderedLanguageModelDebugSummary,
-    active_prompt: rendered.question ?? reply.question ?? null,
-    selected_final_answer: rendered.finalAnswer ?? "",
-    final_answer_source:
-      rendered.terminalArtifactKind ??
-      (includeReplyDebug ? replyRecord.final_answer_source : null) ??
-      replyDebugRecord?.final_answer_source ??
-      visibleTerminal.finalAnswerSource ??
-      null,
-    terminal_artifact_kind:
-      rendered.terminalArtifactKind ??
-      (includeReplyDebug ? replyRecord.terminal_artifact_kind : null) ??
-      replyDebugRecord?.terminal_artifact_kind ??
-      visibleTerminal.terminalArtifactKind ??
-      null,
-    terminal_result: includeReplyDebug ? replyRecord.terminal_result ?? replyDebugRecord?.terminal_result ?? null : null,
-    terminal_results: includeReplyDebug ? replyRecord.terminal_results ?? replyDebugRecord?.terminal_results ?? [] : [],
-    debug_export_ref: includeReplyDebug ? replyRecord.debug_export_ref ?? replyDebugRecord?.debug_export_ref ?? null : null,
-    backend_debug_response_ref: includeReplyDebug
-      ? replyRecord.backend_debug_response_ref ?? replyDebugRecord?.backend_debug_response_ref ?? null
-      : null,
-    golden_path_runtime: includeReplyDebug ? replyRecord.golden_path_runtime ?? replyDebugRecord?.golden_path_runtime ?? null : null,
-    golden_path_runtime_status: includeReplyDebug
-      ? replyRecord.golden_path_runtime_status ?? replyDebugRecord?.golden_path_runtime_status ?? null
-      : null,
-    server_build_commit: includeReplyDebug ? replyRecord.server_build_commit ?? replyDebugRecord?.server_build_commit ?? null : null,
-    server_build_started_at_ms: includeReplyDebug
-      ? replyRecord.server_build_started_at_ms ?? replyDebugRecord?.server_build_started_at_ms ?? null
-      : null,
   });
 }
 
 export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskReply, payload: Record<string, unknown>): string {
-  const debug = readAgentLoopAuditRecord(payload.debug);
-  const agentLoop = readAgentLoopAuditRecord(payload.agentLoop);
-  const turnTruthTable = readAgentLoopAuditRecord(payload.turnTruthTable ?? agentLoop?.turn_truth_table);
-  const resolvedTurnSummary = readAgentLoopAuditRecord(payload.resolved_turn_summary ?? turnTruthTable?.resolved_turn_summary);
-  const ledger = Array.isArray(agentLoop?.current_turn_artifact_ledger)
-    ? agentLoop.current_turn_artifact_ledger
-    : Array.isArray(debug?.current_turn_artifact_ledger)
-      ? debug.current_turn_artifact_ledger
-      : [];
-  const receiptArtifact =
-    ledger
-      .map((artifact) => readAgentLoopAuditRecord(artifact))
-      .reverse()
-      .find((artifact) => {
-        if (artifact?.kind !== "workspace_action_receipt") return false;
-        const payloadRecord = readAgentLoopAuditRecord(artifact.payload);
-        return Boolean(
-          coerceText(payloadRecord?.action_key).trim() ||
-            coerceText(payloadRecord?.target_id).trim(),
-        );
-      }) ??
-    ledger
-      .map((artifact) => readAgentLoopAuditRecord(artifact))
-      .reverse()
-      .find((artifact) => artifact?.kind === "workspace_action_receipt");
-  const receipt = readAgentLoopAuditRecord(receiptArtifact?.payload);
-  const typedFailureArtifact = ledger
-    .map((artifact) => readAgentLoopAuditRecord(artifact))
-    .find((artifact) => artifact?.kind === "typed_failure");
-  const typedFailure = readAgentLoopAuditRecord(typedFailureArtifact?.payload);
-  const workspaceActionSource = receipt ?? typedFailure;
-  const situationContextPackForDebug =
-    debug?.situation_context_pack ??
-    agentLoop?.situation_context_pack ??
-    null;
-  const liveEnvironmentRelevanceForDebug =
-    debug?.live_environment_turn_relevance ??
-    agentLoop?.live_environment_turn_relevance ??
-    null;
-  const liveEnvironmentAnswerForDebug =
-    readAgentLoopAuditRecord(liveEnvironmentRelevanceForDebug)?.artifact_synthesis_allowed === true
-      ? renderLiveAnswerEnvironmentContextPackAnswer(situationContextPackForDebug)
-      : null;
-  const terminalAuthorityForDebug = readAgentLoopAuditRecord(
-    payload.terminal_answer_authority ?? debug?.terminal_answer_authority ?? agentLoop?.terminal_answer_authority,
-  );
-  const terminalResultForDebug = readAgentLoopAuditRecord(
-    payload.terminal_result ?? debug?.terminal_result ?? agentLoop?.terminal_result,
-  );
-  const terminalAuthorityTrustedForDebug =
-    terminalAuthorityForDebug?.schema === "helix.turn_terminal_authority.v1" &&
-    terminalAuthorityForDebug.server_authoritative === true;
-  const terminalAuthorityText = coerceText(terminalAuthorityForDebug?.terminal_text_preview).trim();
-  const trustedTerminalAuthorityKind = terminalAuthorityTrustedForDebug
-    ? coerceText(terminalAuthorityForDebug?.terminal_artifact_kind).trim()
-    : "";
-  const trustedTerminalAuthoritySource = terminalAuthorityTrustedForDebug
-    ? coerceText(terminalAuthorityForDebug?.final_answer_source).trim()
-    : "";
-  const terminalAuthoritySuccessForDebug =
-    terminalAuthorityTrustedForDebug &&
-    Boolean(terminalAuthorityText) &&
-    trustedTerminalAuthorityKind !== "typed_failure" &&
-    trustedTerminalAuthoritySource !== "typed_failure";
-  const terminalArtifactKind =
-    (terminalAuthoritySuccessForDebug ? trustedTerminalAuthorityKind : "") ||
-    coerceText(payload.terminal_artifact_kind).trim() ||
-    coerceText(agentLoop?.terminal_artifact_kind).trim() ||
-    coerceText(debug?.terminal_artifact_kind).trim() ||
-    coerceText(resolvedTurnSummary?.terminal_artifact_kind).trim() ||
-    trustedTerminalAuthorityKind ||
-    coerceText(terminalResultForDebug?.terminal_artifact_kind).trim() ||
-    coerceText(terminalResultForDebug?.artifact_kind).trim() ||
-    null;
-  const terminalErrorCode =
-    terminalAuthoritySuccessForDebug
-      ? null
-      : coerceText(agentLoop?.terminal_error_code).trim() ||
-        coerceText(debug?.terminal_error_code).trim() ||
-        coerceText(typedFailure?.terminal_error_code).trim() ||
-        coerceText(typedFailure?.error_code).trim() ||
-        null;
-  const finalAnswerSource =
-    (terminalAuthoritySuccessForDebug ? trustedTerminalAuthoritySource : "") ||
-    coerceText(payload.final_answer_source).trim() ||
-    coerceText(agentLoop?.final_answer_source).trim() ||
-    coerceText(debug?.final_answer_source).trim() ||
-    trustedTerminalAuthoritySource ||
-    coerceText(terminalResultForDebug?.final_answer_source).trim() ||
-    (terminalErrorCode ? "typed_failure" : null);
-  const projectionBackendEntrypointRequired =
-    typeof agentLoop?.ask_entrypoint_required === "boolean"
-      ? agentLoop.ask_entrypoint_required
-      : typeof debug?.ask_entrypoint_required === "boolean"
-        ? debug.ask_entrypoint_required
-        : typeof payload.ask_entrypoint_required === "boolean"
-          ? payload.ask_entrypoint_required
-          : requiresHelixAskBackendEntrypoint(
-              reply.question ?? coerceText(payload.selectedDebugQuestion).trim() ?? "",
-            );
-  const projectionDebugExportRebuildReason = coerceText(payload.debug_export_rebuild_reason).trim();
-  const projectionDebugExportSource = coerceText(payload.debug_export_source).trim();
-  const projectionIsReplyScopedDebug =
-    projectionDebugExportSource === "rendered_reply_dom" ||
-    projectionDebugExportRebuildReason === "rendered_button_scope" ||
-    projectionDebugExportRebuildReason === "rendered_reply" ||
-    projectionDebugExportRebuildReason === "payload_reply_mismatch" ||
-    projectionDebugExportRebuildReason === "empty_payload" ||
-    projectionDebugExportRebuildReason === "invalid_json_payload";
-  const projectionBackendEntrypointMaterialized = Boolean(
-    payload.ask_turn_solver_trace ??
-      debug?.ask_turn_solver_trace ??
-      agentLoop?.ask_turn_solver_trace ??
-      payload.agent_runtime_loop ??
-      debug?.agent_runtime_loop ??
-      agentLoop?.agent_runtime_loop ??
-      payload.canonical_goal_frame ??
-      debug?.canonical_goal_frame ??
-      agentLoop?.canonical_goal_frame ??
-      terminalAuthorityForDebug ??
-      terminalResultForDebug,
-  );
-  const explicitProjectionBackendEntrypointObserved =
-    typeof agentLoop?.ask_entrypoint_observed === "boolean"
-      ? agentLoop.ask_entrypoint_observed
-      : typeof debug?.ask_entrypoint_observed === "boolean"
-        ? debug.ask_entrypoint_observed
-        : typeof payload.ask_entrypoint_observed === "boolean"
-          ? payload.ask_entrypoint_observed
-          : null;
-  const projectionBackendEntrypointObserved =
-    explicitProjectionBackendEntrypointObserved ??
-    (projectionBackendEntrypointRequired
-      ? projectionIsReplyScopedDebug
-        ? null
-        : projectionBackendEntrypointMaterialized
-      : null);
-  const projectionBackendEntrypointBlocked =
-    projectionBackendEntrypointRequired &&
-    projectionBackendEntrypointObserved === false &&
-    (explicitProjectionBackendEntrypointObserved === false || !projectionIsReplyScopedDebug);
-  const projectionBackendEntrypointMissing =
-    projectionBackendEntrypointRequired && projectionBackendEntrypointObserved === false;
-  const effectiveTerminalErrorCode =
-    projectionBackendEntrypointMissing ? HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE : terminalErrorCode;
-  const effectiveTerminalArtifactKind = projectionBackendEntrypointMissing ? "typed_failure" : terminalArtifactKind;
-  const effectiveFinalAnswerSource = projectionBackendEntrypointMissing ? "typed_failure" : finalAnswerSource;
-  const terminalIsTypedFailure =
-    effectiveTerminalArtifactKind === "typed_failure" ||
-    effectiveFinalAnswerSource === "typed_failure" ||
-    Boolean(effectiveTerminalErrorCode);
-  const typedFailureText =
-    (effectiveTerminalErrorCode === HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE
-      ? HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT
-      : null) ||
-    coerceText(payload.terminal_failure_text).trim() ||
-    coerceText(typedFailure?.message).trim() ||
-    terminalAuthorityText ||
-    renderTypedFailureFallback(effectiveTerminalErrorCode);
-  const selectedFinalAnswerCandidateRaw =
-    terminalAuthoritySuccessForDebug
-      ? terminalAuthorityText
-      : terminalIsTypedFailure
-      ? typedFailureText
-      : coerceText(payload.selected_final_answer).trim() ||
-        coerceText(payload.answer).trim() ||
-        coerceText(payload.assistant_answer).trim() ||
-        coerceText(terminalResultForDebug?.text).trim() ||
-        coerceText(payload.selectedDebugFinalAnswer).trim() ||
-        coerceText(payload.finalAnswer).trim() ||
-        coerceText(agentLoop?.selected_final_answer).trim() ||
-        coerceText(debug?.selected_final_answer).trim() ||
-        reply.content ||
-        null;
-  const selectedFinalAnswerCandidate =
-    !terminalAuthorityTrustedForDebug &&
-    !terminalIsTypedFailure &&
-    isHelixAskProgressPlaceholderText(selectedFinalAnswerCandidateRaw)
-      ? null
-      : selectedFinalAnswerCandidateRaw;
-  const clientProgressPlaceholderExport =
-    !terminalAuthorityTrustedForDebug &&
-    !terminalIsTypedFailure &&
-    isHelixAskProgressPlaceholderText(selectedFinalAnswerCandidateRaw);
-  const liveEnvironmentAnswerApplied =
-    Boolean(liveEnvironmentAnswerForDebug) &&
-    (isInvalidTerminalAnswerText(selectedFinalAnswerCandidate) ||
-      normalizeTerminalAnswerText(selectedFinalAnswerCandidate) === normalizeTerminalAnswerText(liveEnvironmentAnswerForDebug));
-  const selectedFinalAnswer =
-    terminalIsTypedFailure
-      ? typedFailureText
-      : liveEnvironmentAnswerForDebug && liveEnvironmentAnswerApplied
-      ? liveEnvironmentAnswerForDebug
-      : selectedFinalAnswerCandidate;
-  const canonicalGoalFrame = readAgentLoopAuditRecord(debug?.canonical_goal_frame ?? agentLoop?.canonical_goal_frame);
-  const availableCapabilities =
-    payload.available_capabilities ?? debug?.available_capabilities ?? agentLoop?.available_capabilities;
-  const agentStepDecision =
-    payload.agent_step_decision ?? debug?.agent_step_decision ?? agentLoop?.agent_step_decision;
-  const observationReview =
-    payload.observation_review ?? debug?.observation_review ?? agentLoop?.observation_review;
-  const goalSatisfactionEvaluation =
-    payload.goal_satisfaction_evaluation ?? debug?.goal_satisfaction_evaluation ?? agentLoop?.goal_satisfaction_evaluation;
-  const initialAvailableCapabilities =
-    payload.initial_available_capabilities ?? debug?.initial_available_capabilities ?? agentLoop?.initial_available_capabilities;
-  const initialAgentStepDecision =
-    payload.initial_agent_step_decision ?? debug?.initial_agent_step_decision ?? agentLoop?.initial_agent_step_decision;
-  const agentStepAuthorityCheck =
-    payload.agent_step_authority_check ?? debug?.agent_step_authority_check ?? agentLoop?.agent_step_authority_check;
-  const agentStepLoop =
-    payload.agent_step_loop ?? debug?.agent_step_loop ?? agentLoop?.agent_step_loop;
-  const agentRuntimeLoop =
-    payload.agent_runtime_loop ?? debug?.agent_runtime_loop ?? agentLoop?.agent_runtime_loop;
-  const agentRuntimeLoopAdmission =
-    payload.agent_runtime_loop_admission ?? debug?.agent_runtime_loop_admission ?? agentLoop?.agent_runtime_loop_admission;
-  const runtimeIntentPacket =
-    payload.runtime_intent_packet ?? debug?.runtime_intent_packet ?? agentLoop?.runtime_intent_packet;
-  const runtimeAuthorityAudit =
-    payload.runtime_authority_audit ?? debug?.runtime_authority_audit ?? agentLoop?.runtime_authority_audit;
-  const agentRuntime = payload.agent_runtime ?? debug?.agent_runtime ?? agentLoop?.agent_runtime ?? null;
-  const agentRuntimeSelectionTrace = readAgentLoopAuditRecord(
-    payload.agent_runtime_selection_trace ??
-      debug?.agent_runtime_selection_trace ??
-      agentLoop?.agent_runtime_selection_trace,
-  );
-  const selectedAgentProvider = readAgentLoopAuditRecord(
-    payload.selected_agent_provider ?? debug?.selected_agent_provider ?? agentLoop?.selected_agent_provider,
-  );
-  const providerGatewayDebugSummary = readAgentLoopAuditRecord(
-    payload.provider_gateway_debug_summary ??
-      debug?.provider_gateway_debug_summary ??
-      agentLoop?.provider_gateway_debug_summary,
-  );
-  const workstationGatewayManifest = readAgentLoopAuditRecord(
-    payload.workstation_gateway_manifest ??
-      debug?.workstation_gateway_manifest ??
-      agentLoop?.workstation_gateway_manifest,
-  );
-  const workstationGatewayCallResults =
-    payload.workstation_gateway_call_results ??
-    debug?.workstation_gateway_call_results ??
-    agentLoop?.workstation_gateway_call_results;
-  const workstationGatewayObservationPackets =
-    payload.workstation_gateway_observation_packets ??
-    debug?.workstation_gateway_observation_packets ??
-    agentLoop?.workstation_gateway_observation_packets;
-  const providerTerminalCandidate = readAgentLoopAuditRecord(
-    payload.provider_terminal_candidate ??
-      debug?.provider_terminal_candidate ??
-      agentLoop?.provider_terminal_candidate,
-  );
-  const providerReasoningReentry = readAgentLoopAuditRecord(
-    payload.provider_reasoning_reentry ??
-      debug?.provider_reasoning_reentry ??
-      agentLoop?.provider_reasoning_reentry,
-  );
-  const terminalAuthorityCandidateReview = readAgentLoopAuditRecord(
-    payload.terminal_authority_candidate_review ??
-      debug?.terminal_authority_candidate_review ??
-      agentLoop?.terminal_authority_candidate_review,
-  );
-  const providerTerminalAuthorityBridge = readAgentLoopAuditRecord(
-    payload.provider_terminal_authority_bridge ??
-      debug?.provider_terminal_authority_bridge ??
-      agentLoop?.provider_terminal_authority_bridge,
-  );
-  const runtimeContinuationHints =
-    payload.runtime_continuation_hints ?? debug?.runtime_continuation_hints ?? agentLoop?.runtime_continuation_hints;
-  const findLedgerPayloadByKind = (kind: string): Record<string, unknown> | null =>
-    readAgentLoopAuditRecord(
-      ledger
-        .map((artifact) => readAgentLoopAuditRecord(artifact))
-        .reverse()
-        .find((artifact) => artifact?.kind === kind)?.payload,
-    );
-  const collectCoveragePayloads = (): Record<string, unknown>[] =>
-    ledger
-      .map((artifact) => readAgentLoopAuditRecord(artifact))
-      .filter((artifact) => {
-        const kind = coerceText(artifact?.kind).trim();
-        return kind === "calculator_plan_coverage" || /_coverage$/.test(kind);
-      })
-      .map((artifact) => readAgentLoopAuditRecord(artifact?.payload) ?? artifact)
-      .filter((artifact): artifact is Record<string, unknown> => Boolean(artifact));
-  const terminalPresentationForDebug = readAgentLoopAuditRecord(
-    payload.terminal_presentation ?? debug?.terminal_presentation ?? agentLoop?.terminal_presentation,
-  );
-  const calculatorPlannerResultForDebug =
-    readAgentLoopAuditRecord(
-      payload.calculator_planner_result ?? debug?.calculator_planner_result ?? agentLoop?.calculator_planner_result,
-    ) ?? findLedgerPayloadByKind("calculator_planner_result");
-  const calculatorPlannerRepairResultForDebug =
-    readAgentLoopAuditRecord(
-      payload.calculator_planner_repair_result ??
-        debug?.calculator_planner_repair_result ??
-        agentLoop?.calculator_planner_repair_result,
-    ) ?? findLedgerPayloadByKind("calculator_planner_repair_result");
-  const calculatorPlanCoverageForDebug =
-    readAgentLoopAuditRecord(
-      payload.calculator_plan_coverage ?? debug?.calculator_plan_coverage ?? agentLoop?.calculator_plan_coverage,
-    ) ?? findLedgerPayloadByKind("calculator_plan_coverage");
-  const promptRequirementCoverageForDebug =
-    readAgentLoopAuditRecord(
-      payload.prompt_requirement_coverage ?? debug?.prompt_requirement_coverage ?? agentLoop?.prompt_requirement_coverage,
-    ) ?? findLedgerPayloadByKind("prompt_requirement_coverage");
-  const finalAnswerRepairRequestForDebug =
-    readAgentLoopAuditRecord(
-      payload.final_answer_repair_request ?? debug?.final_answer_repair_request ?? agentLoop?.final_answer_repair_request,
-    ) ?? findLedgerPayloadByKind("final_answer_repair_request");
-  const finalAnswerDraftForDebug =
-    readAgentLoopAuditRecord(payload.final_answer_draft ?? debug?.final_answer_draft ?? agentLoop?.final_answer_draft) ??
-    findLedgerPayloadByKind("final_answer_draft");
-  const actionEnvelopeForDebug = readAgentLoopAuditRecord(
-    payload.action_envelope ?? debug?.action_envelope ?? agentLoop?.action_envelope,
-  );
-  const coverageArtifactsForDebug = collectCoveragePayloads();
-  const calculatorPanelStateForDebug = readAgentLoopAuditRecord(
-    payload.calculator_panel_state ?? debug?.calculator_panel_state ?? agentLoop?.calculator_panel_state,
-  );
-  const debugExportRebuildReason = projectionDebugExportRebuildReason;
-  const debugExportSource = projectionDebugExportSource;
-  const isReplyScopedDebugProjection =
-    debugExportSource === "rendered_reply_dom" ||
-    debugExportRebuildReason === "rendered_button_scope" ||
-    debugExportRebuildReason === "rendered_reply" ||
-    debugExportRebuildReason === "payload_reply_mismatch" ||
-    debugExportRebuildReason === "empty_payload" ||
-    debugExportRebuildReason === "invalid_json_payload";
-  const isRenderedDomProjectionWithoutTurn =
-    debugExportSource === "rendered_reply_dom" &&
-    !coerceText(payload.active_turn_id).trim();
-  const activeTurnId =
-    (isReplyScopedDebugProjection ? coerceText(payload.active_turn_id).trim() : "") ||
-    (!isReplyScopedDebugProjection ? coerceText(agentLoop?.terminal_artifact_owner_turn_id).trim() : "") ||
-    (!isReplyScopedDebugProjection ? coerceText(debug?.turn_id).trim() : "") ||
-    coerceText(payload.active_turn_id).trim() ||
-    coerceText((reply as Record<string, unknown>).turn_id).trim() ||
-    coerceText((reply as Record<string, unknown>).turnId).trim() ||
-    (!isReplyScopedDebugProjection ? coerceText(canonicalGoalFrame?.turn_id).trim() : "") ||
-    (!isReplyScopedDebugProjection ? coerceText(turnTruthTable?.turn_id).trim() : "") ||
-    (isRenderedDomProjectionWithoutTurn ? "" : reply.id);
-  const canonicalActiveTurnId = coerceText(terminalAuthorityForDebug?.turn_id).trim() || activeTurnId;
-  const clientActiveTurnId = coerceText(payload.client_active_turn_id).trim() || reply.id || null;
-  const activePrompt = coerceText(payload.selectedDebugQuestion).trim() || reply.question || "";
-  const backendDebugRefPresent = Boolean(
-    readAgentLoopAuditRecord(debug?.debug_export_ref) ?? readAgentLoopAuditRecord(payload.debug_export_ref),
-  );
-  const backendSolverArtifactPresent = Boolean(
-    payload.ask_turn_solver_trace ??
-      debug?.ask_turn_solver_trace ??
-      agentLoop?.ask_turn_solver_trace ??
-      payload.agent_runtime_loop ??
-      debug?.agent_runtime_loop ??
-      agentLoop?.agent_runtime_loop ??
-      payload.canonical_goal_frame ??
-      debug?.canonical_goal_frame ??
-      agentLoop?.canonical_goal_frame,
-  );
-  const askEntrypointRequired =
-    typeof agentLoop?.ask_entrypoint_required === "boolean"
-      ? agentLoop.ask_entrypoint_required
-      : typeof debug?.ask_entrypoint_required === "boolean"
-        ? debug.ask_entrypoint_required
-        : typeof payload.ask_entrypoint_required === "boolean"
-          ? payload.ask_entrypoint_required
-          : requiresHelixAskBackendEntrypoint(activePrompt);
-  const askEntrypointObserved =
-    typeof agentLoop?.ask_entrypoint_observed === "boolean"
-      ? agentLoop.ask_entrypoint_observed
-      : typeof debug?.ask_entrypoint_observed === "boolean"
-        ? debug.ask_entrypoint_observed
-        : typeof payload.ask_entrypoint_observed === "boolean"
-          ? payload.ask_entrypoint_observed
-          : askEntrypointRequired
-            ? backendSolverArtifactPresent
-            : null;
-  const askEntrypointFailureCode =
-    coerceText(agentLoop?.ask_entrypoint_failure_code).trim() ||
-    coerceText(debug?.ask_entrypoint_failure_code).trim() ||
-    coerceText(payload.ask_entrypoint_failure_code).trim() ||
-    (askEntrypointRequired && askEntrypointObserved === false
-      ? HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE
-      : null);
-  const blockedProjectionKind =
-    coerceText(agentLoop?.blocked_projection_kind).trim() ||
-    coerceText(debug?.blocked_projection_kind).trim() ||
-    coerceText(payload.blocked_projection_kind).trim() ||
-    (askEntrypointRequired && askEntrypointObserved === false ? "client_projection" : null);
-  const backendEntrypointRuntimeFingerprint = readAgentLoopAuditRecord(
-    payload.backend_ask_entrypoint_runtime_fingerprint ??
-      debug?.backend_ask_entrypoint_runtime_fingerprint ??
-      agentLoop?.backend_ask_entrypoint_runtime_fingerprint,
-  );
-  const hardPromptProjectionGuard = readAgentLoopAuditRecord(
-    payload.hard_prompt_projection_guard ??
-      debug?.hard_prompt_projection_guard ??
-      agentLoop?.hard_prompt_projection_guard,
-  );
-  const clientProjectionPolicyVersion =
-    coerceText(hardPromptProjectionGuard?.client_projection_policy_version).trim() ||
-    coerceText(debug?.client_projection_policy_version).trim() ||
-    coerceText(payload.client_projection_policy_version).trim() ||
-    null;
-  const demotedProjectionLayers =
-    Array.isArray(hardPromptProjectionGuard?.demoted_projection_layers)
-      ? hardPromptProjectionGuard.demoted_projection_layers
-      : Array.isArray(debug?.demoted_projection_layers)
-        ? debug.demoted_projection_layers
-        : Array.isArray(payload.demoted_projection_layers)
-          ? payload.demoted_projection_layers
-          : [];
-  const evidenceFinalizationGateDemoted =
-    typeof debug?.evidence_finalization_gate_demoted === "boolean"
-      ? debug.evidence_finalization_gate_demoted
-      : typeof payload.evidence_finalization_gate_demoted === "boolean"
-        ? payload.evidence_finalization_gate_demoted
-        : false;
-  const clientEntrypointGuardVersion =
-    coerceText(backendEntrypointRuntimeFingerprint?.client_entrypoint_guard_version).trim() ||
-    coerceText(debug?.client_entrypoint_guard_version).trim() ||
-    coerceText(payload.client_entrypoint_guard_version).trim() ||
-    null;
-  const submitHandlerSource =
-    coerceText(backendEntrypointRuntimeFingerprint?.submit_handler_source).trim() ||
-    coerceText(debug?.submit_handler_source).trim() ||
-    coerceText(payload.submit_handler_source).trim() ||
-    null;
-  const runAskEntered =
-    typeof backendEntrypointRuntimeFingerprint?.runAsk_entered === "boolean"
-      ? backendEntrypointRuntimeFingerprint.runAsk_entered
-      : typeof debug?.runAsk_entered === "boolean"
-        ? debug.runAsk_entered
-        : typeof payload.runAsk_entered === "boolean"
-          ? payload.runAsk_entered
-          : null;
-  const hardBackendEntrypointRequired =
-    typeof backendEntrypointRuntimeFingerprint?.hard_backend_entrypoint_required === "boolean"
-      ? backendEntrypointRuntimeFingerprint.hard_backend_entrypoint_required
-      : typeof debug?.hard_backend_entrypoint_required === "boolean"
-        ? debug.hard_backend_entrypoint_required
-        : typeof payload.hard_backend_entrypoint_required === "boolean"
-          ? payload.hard_backend_entrypoint_required
-          : askEntrypointRequired;
-  const useBackendAskTurnEntrypoint =
-    typeof backendEntrypointRuntimeFingerprint?.use_backend_ask_turn_entrypoint === "boolean"
-      ? backendEntrypointRuntimeFingerprint.use_backend_ask_turn_entrypoint
-      : typeof debug?.use_backend_ask_turn_entrypoint === "boolean"
-        ? debug.use_backend_ask_turn_entrypoint
-        : typeof payload.use_backend_ask_turn_entrypoint === "boolean"
-          ? payload.use_backend_ask_turn_entrypoint
-          : null;
-  const backendAskCallAttempted =
-    typeof backendEntrypointRuntimeFingerprint?.backend_ask_call_attempted === "boolean"
-      ? backendEntrypointRuntimeFingerprint.backend_ask_call_attempted
-      : typeof debug?.backend_ask_call_attempted === "boolean"
-        ? debug.backend_ask_call_attempted
-        : typeof payload.backend_ask_call_attempted === "boolean"
-          ? payload.backend_ask_call_attempted
-          : null;
-  const backendAskCallPath =
-    coerceText(backendEntrypointRuntimeFingerprint?.backend_ask_call_path).trim() ||
-    coerceText(debug?.backend_ask_call_path).trim() ||
-    coerceText(payload.backend_ask_call_path).trim() ||
-    null;
-  const backendAskCallError =
-    coerceText(backendEntrypointRuntimeFingerprint?.backend_ask_call_error).trim() ||
-    coerceText(debug?.backend_ask_call_error).trim() ||
-    coerceText(payload.backend_ask_call_error).trim() ||
-    null;
-  const routeMetadataSource =
-    coerceText(backendEntrypointRuntimeFingerprint?.route_metadata_source).trim() ||
-    coerceText(debug?.route_metadata_source).trim() ||
-    coerceText(payload.route_metadata_source).trim() ||
-    null;
-  const mandatoryNextToolName =
-    coerceText(backendEntrypointRuntimeFingerprint?.mandatory_next_tool_name).trim() ||
-    coerceText(debug?.mandatory_next_tool_name).trim() ||
-    coerceText(payload.mandatory_next_tool_name).trim() ||
-    null;
-  const legacyAskLocalBypassed =
-    typeof backendEntrypointRuntimeFingerprint?.legacy_ask_local_bypassed === "boolean"
-      ? backendEntrypointRuntimeFingerprint.legacy_ask_local_bypassed
-      : typeof debug?.legacy_ask_local_bypassed === "boolean"
-        ? debug.legacy_ask_local_bypassed
-        : typeof payload.legacy_ask_local_bypassed === "boolean"
-          ? payload.legacy_ask_local_bypassed
-          : null;
-  const firstBrokenRail =
-    coerceText(backendEntrypointRuntimeFingerprint?.first_broken_rail).trim() ||
-    coerceText(debug?.first_broken_rail).trim() ||
-    coerceText(payload.first_broken_rail).trim() ||
-    (askEntrypointRequired && askEntrypointObserved === false
-      ? backendAskCallAttempted === true
-        ? "backend_debug_materialization"
-        : "backend_ask_entrypoint"
-      : null);
-  const repairTarget =
-    coerceText(backendEntrypointRuntimeFingerprint?.repair_target).trim() ||
-    coerceText(debug?.repair_target).trim() ||
-    coerceText(payload.repair_target).trim() ||
-    (firstBrokenRail === "backend_debug_materialization"
-      ? "debug_export_bridge"
-      : firstBrokenRail === "backend_ask_entrypoint" || firstBrokenRail === "prompt_submit_entrypoint"
-        ? "prompt_submit_entrypoint"
-        : null);
-  const toolTraceDisclosureForDebug = buildCompactToolTraceDisclosure(
-    actionEnvelopeForDebug,
-    canonicalActiveTurnId || "client_rendered_reply_dom",
-  );
-  const voicePlaybackReconciliation = buildVoicePlaybackReconciliationDebug({
-    activeTurnId: canonicalActiveTurnId || null,
-    selectedFinalAnswer,
-    source: payload,
-  });
-  const voicePlaybackReceiptBarrier = buildVoicePlaybackReceiptBarrierDebug({
-    activeTurnId: canonicalActiveTurnId || null,
-    selectedFinalAnswer,
-    source: payload,
-  });
-  const consoleAssemblyDebugForExport =
-    readAgentLoopAuditRecord(payload.console_assembly_debug) ??
-    readAgentLoopAuditRecord(payload.client_console_assembly_debug) ??
-    readAgentLoopAuditRecord(debug?.console_assembly_debug) ??
-    readAgentLoopAuditRecord(debug?.client_console_assembly_debug) ??
-    null;
-  const languageModelPolicyForDebug =
-    readAgentLoopAuditRecord(payload.language_model_policy) ??
-    readAgentLoopAuditRecord(debug?.language_model_policy) ??
-    readAgentLoopAuditRecord(agentLoop?.language_model_policy);
-  const languageModelDebugSummary =
-    coerceText(payload.language_model_debug_summary).trim() ||
-    coerceText(debug?.language_model_debug_summary).trim() ||
-    coerceText(agentLoop?.language_model_debug_summary).trim() ||
-    null;
-  const modelPolicyDebugSummary =
-    coerceText(payload.model_policy_debug_summary).trim() ||
-    coerceText(debug?.model_policy_debug_summary).trim() ||
-    coerceText(agentLoop?.model_policy_debug_summary).trim() ||
-    languageModelDebugSummary;
-  const lifecycleEvents = Array.isArray(workspaceActionSource?.workspace_action_lifecycle_events)
-    ? workspaceActionSource.workspace_action_lifecycle_events
-    : Array.isArray(payload.workspace_action_lifecycle_events)
-      ? payload.workspace_action_lifecycle_events
-      : [];
-  const receiptMessage = coerceText(receipt?.message).trim();
-  const advertisedBackendDebugRefCandidates = [
-    readAgentLoopAuditRecord(debug?.backend_debug_response_ref),
-    readAgentLoopAuditRecord(payload.backend_debug_response_ref),
-    readAgentLoopAuditRecord(debug?.debug_export_ref),
-    readAgentLoopAuditRecord(payload.debug_export_ref),
-    buildBackendAskTurnDebugExportRef(canonicalActiveTurnId),
-    buildBackendAskTurnDebugExportRef(activeTurnId),
-    buildBackendAskTurnDebugExportRef(clientActiveTurnId),
-  ];
-  const matchingBackendDebugRef = advertisedBackendDebugRefCandidates.find((candidate) => {
-    if (!candidate) return false;
-    const endpoint = coerceText(candidate.endpoint).trim();
-    if (!endpoint.startsWith("/api/agi/ask/turn/")) return false;
-    const candidateTurnId = coerceText(candidate.turn_id).trim();
-    if (!isReplyScopedDebugProjection) return true;
-    return Boolean(candidateTurnId && canonicalActiveTurnId && candidateTurnId === canonicalActiveTurnId);
-  }) ?? null;
-  const envelopeWithoutHash = {
-    schema: "helix.ask.debug_export.v1",
-    exported_at_ms: Date.now(),
-    active_turn_id: canonicalActiveTurnId || null,
-    backend_turn_id: canonicalActiveTurnId || null,
-    client_active_turn_id: clientActiveTurnId,
-    active_prompt: activePrompt,
-    active_prompt_hash: stableHelixProjectionHash(activePrompt),
-    selected_final_answer: selectedFinalAnswer,
-    final_answer_source: clientProgressPlaceholderExport ? null : effectiveFinalAnswerSource,
-    terminal_artifact_kind: effectiveTerminalArtifactKind,
-    terminal_error_code: effectiveTerminalErrorCode,
-    ask_entrypoint_required: askEntrypointRequired,
-    ask_entrypoint_observed: askEntrypointObserved,
-    ask_entrypoint_failure_code: askEntrypointFailureCode,
-    blocked_projection_kind: blockedProjectionKind,
-    hard_prompt_projection_guard: hardPromptProjectionGuard,
-    client_projection_policy_version: clientProjectionPolicyVersion,
-    demoted_projection_layers: demotedProjectionLayers,
-    evidence_finalization_gate_demoted: evidenceFinalizationGateDemoted,
-    backend_ask_entrypoint_runtime_fingerprint: backendEntrypointRuntimeFingerprint,
-    client_entrypoint_guard_version: clientEntrypointGuardVersion,
-    submit_handler_source: submitHandlerSource,
-    runAsk_entered: runAskEntered,
-    hard_backend_entrypoint_required: hardBackendEntrypointRequired,
-    use_backend_ask_turn_entrypoint: useBackendAskTurnEntrypoint,
-    backend_ask_call_attempted: backendAskCallAttempted,
-    backend_ask_call_path: backendAskCallPath,
-    backend_ask_call_error: backendAskCallError,
-    route_metadata_source: routeMetadataSource,
-    mandatory_next_tool_name: mandatoryNextToolName,
-    legacy_ask_local_bypassed: legacyAskLocalBypassed,
-    first_broken_rail: firstBrokenRail,
-    repair_target: repairTarget,
-    console_assembly_debug: consoleAssemblyDebugForExport,
-    client_console_assembly_debug: consoleAssemblyDebugForExport,
-    voice_playback_reconciliation: voicePlaybackReconciliation,
-    voice_playback_receipt_barrier: voicePlaybackReceiptBarrier,
-    situation_context_pack: situationContextPackForDebug,
-    live_environment_turn_relevance: liveEnvironmentRelevanceForDebug,
-    resolved_turn_summary: {
-      turn_id: canonicalActiveTurnId || null,
-      final_status:
-        (clientProgressPlaceholderExport ? "in_progress" : null) ||
-        (liveEnvironmentAnswerApplied ? "final_answer" : null) ||
-        coerceText(resolvedTurnSummary?.final_status).trim() ||
-        coerceText(payload.visible_projection_invariant).trim() ||
-        "final_answer",
-      resolved_route_label:
-        (liveEnvironmentAnswerApplied ? "live_answer_environment / artifact_synthesis" : null) ||
-        coerceText(resolvedTurnSummary?.resolved_route_label).trim() ||
-        coerceText(payload.debugAuditSummary && readAgentLoopAuditRecord(payload.debugAuditSummary)?.route).trim() ||
-        "unknown",
-      terminal_artifact_kind: effectiveTerminalArtifactKind,
-      terminal_error_code: effectiveTerminalErrorCode,
-      pending_server_request_present: Boolean(agentLoop?.pending_request),
-    },
-    canonical_goal_frame: canonicalGoalFrame,
-    intent_arbitration: debug?.intent_arbitration,
-    available_capabilities: availableCapabilities,
-    agent_step_decision: agentStepDecision,
-    observation_review: observationReview,
-    goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-    initial_available_capabilities: initialAvailableCapabilities,
-    initial_agent_step_decision: initialAgentStepDecision,
-    agent_step_authority_check: agentStepAuthorityCheck,
-    agent_step_loop: agentStepLoop,
-    agent_runtime_loop: agentRuntimeLoop,
-    agent_runtime_loop_admission: agentRuntimeLoopAdmission,
-    agent_runtime: agentRuntime,
-    agent_runtime_selection_trace: agentRuntimeSelectionTrace,
-    selected_agent_provider: selectedAgentProvider,
-    language_model_policy: languageModelPolicyForDebug ?? null,
-    language_model_debug_summary: languageModelDebugSummary,
-    model_policy_debug_summary: modelPolicyDebugSummary,
-    debug: {
-      schema: "helix.ask.debug_export_policy_projection.v1",
-      language_model_policy: languageModelPolicyForDebug ?? null,
-      language_model_debug_summary: languageModelDebugSummary,
-      model_policy_debug_summary: modelPolicyDebugSummary,
-    },
-    provider_gateway_debug_summary: providerGatewayDebugSummary,
-    workstation_gateway_manifest: workstationGatewayManifest,
-    workstation_gateway_manifest_version:
-      payload.workstation_gateway_manifest_version ??
-      debug?.workstation_gateway_manifest_version ??
-      agentLoop?.workstation_gateway_manifest_version ??
-      workstationGatewayManifest?.manifest_version,
-    workstation_gateway_capability_ids:
-      payload.workstation_gateway_capability_ids ??
-      debug?.workstation_gateway_capability_ids ??
-      agentLoop?.workstation_gateway_capability_ids,
-    workstation_gateway_reentry_status:
-      payload.workstation_gateway_reentry_status ??
-      debug?.workstation_gateway_reentry_status ??
-      agentLoop?.workstation_gateway_reentry_status,
-    terminal_authority_status:
-      payload.terminal_authority_status ??
-      debug?.terminal_authority_status ??
-      agentLoop?.terminal_authority_status,
-    workstation_gateway_call_results: workstationGatewayCallResults,
-    workstation_gateway_observation_packets: workstationGatewayObservationPackets,
-    provider_terminal_candidate: providerTerminalCandidate,
-    provider_reasoning_reentry: providerReasoningReentry,
-    terminal_authority_candidate_review: terminalAuthorityCandidateReview,
-    provider_terminal_authority_bridge: providerTerminalAuthorityBridge,
-    runtime_intent_packet: runtimeIntentPacket ?? findLedgerPayloadByKind("runtime_intent_packet"),
-    runtime_authority_audit: runtimeAuthorityAudit,
-    runtime_continuation_hints: runtimeContinuationHints,
-    current_turn_artifact_ledger: ledger,
-    current_turn_events: Array.isArray(agentLoop?.turn_events)
-      ? agentLoop.turn_events
-      : Array.isArray(agentLoop?.turn_transcript_events)
-        ? agentLoop.turn_transcript_events
-        : [],
-    terminal_answer_authority: terminalAuthorityForDebug,
-    terminal_presentation: terminalPresentationForDebug,
-    calculator_planner_result: calculatorPlannerResultForDebug,
-    calculator_planner_repair_result: calculatorPlannerRepairResultForDebug,
-    calculator_plan_coverage: calculatorPlanCoverageForDebug,
-    prompt_requirement_coverage: promptRequirementCoverageForDebug,
-    final_answer_repair_request: finalAnswerRepairRequestForDebug,
-    final_answer_draft: finalAnswerDraftForDebug,
-    action_envelope: actionEnvelopeForDebug,
-    tool_trace_disclosure: toolTraceDisclosureForDebug,
-    coverage_artifacts: coverageArtifactsForDebug,
-    calculator_panel_state: calculatorPanelStateForDebug,
-    route_history_debug: payload.route_history_debug,
-    visible_projection_invariant: payload.visible_projection_invariant,
-    workspace_action_debug: workspaceActionSource
-      ? {
-          workspace_action_intent: workspaceActionSource.workspace_action_intent,
-          workspace_action_registry_audit: workspaceActionSource.workspace_action_registry_audit ?? payload.workspace_action_registry_audit,
-          workspace_action_lifecycle_events: lifecycleEvents,
-          workspace_action_receipt: receipt,
-          anti_determinism_audit: workspaceActionSource.workspace_action_anti_determinism_audit ?? payload.workspace_action_anti_determinism_audit,
-          workspace_action_debug_proof: receipt
-            ? {
-                action_key: receipt.action_key ?? null,
-                target_id: receipt.target_id ?? null,
-                action_id: receipt.action_id ?? null,
-                lifecycle_events_present: lifecycleEvents
-                  .map((entry) => coerceText(readAgentLoopAuditRecord(entry)?.event).trim())
-                  .filter(Boolean),
-                receipt_artifact_id: coerceText(receiptArtifact?.artifact_id).trim() || null,
-                receipt_status: receipt.status ?? null,
-                registry_verdict: readAgentLoopAuditRecord(receipt.workspace_action_registry_audit)?.verdict ?? null,
-                anti_determinism_verdict: readAgentLoopAuditRecord(receipt.workspace_action_anti_determinism_audit)?.verdict ?? null,
-                final_answer_receipt_backed: Boolean(receiptMessage && selectedFinalAnswer === receiptMessage),
-              }
-            : null,
-        }
-      : undefined,
-    evidence_debug: {
-      evidence_validity: Array.isArray(debug?.evidence_validity) ? debug.evidence_validity : [],
-      evidence_handoff_decision: debug?.evidence_handoff_decision,
-      final_rendering_invariant: debug?.final_rendering_invariant,
-    },
-    equation_attempt_debug: debug?.equation_attempt_debug ?? agentLoop?.equation_attempt_debug,
-    composite_goal_frame: debug?.composite_goal_frame ?? agentLoop?.composite_goal_frame,
-    composite_execution_plan: debug?.composite_execution_plan ?? agentLoop?.composite_execution_plan,
-    composite_turn_receipt: debug?.composite_turn_receipt ?? agentLoop?.composite_turn_receipt,
-    subgoal_artifact_map: debug?.subgoal_artifact_map ?? agentLoop?.subgoal_artifact_map,
-    composite_anti_determinism_audit:
-      debug?.composite_anti_determinism_audit ?? agentLoop?.composite_anti_determinism_audit,
-    composite_subgoal_reference_intent:
-      debug?.composite_subgoal_reference_intent ?? agentLoop?.composite_subgoal_reference_intent ?? payload.composite_subgoal_reference_intent,
-    composite_subgoal_binding: debug?.composite_subgoal_binding ?? agentLoop?.composite_subgoal_binding ?? payload.composite_subgoal_binding,
-    composite_handoff_decision: debug?.composite_handoff_decision ?? agentLoop?.composite_handoff_decision ?? payload.composite_handoff_decision,
-    composite_subgoal_explanation:
-      debug?.composite_subgoal_explanation ?? agentLoop?.composite_subgoal_explanation ?? payload.composite_subgoal_explanation,
-    composite_followup_anti_determinism_audit:
-      debug?.composite_followup_anti_determinism_audit ?? agentLoop?.composite_followup_anti_determinism_audit ?? payload.composite_followup_anti_determinism_audit,
-    live_interpretation_debug:
-      payload.live_interpretation_debug ?? debug?.live_interpretation_debug ?? agentLoop?.live_interpretation_debug,
-    live_interpretation_run:
-      payload.live_interpretation_run ?? debug?.live_interpretation_run ?? agentLoop?.live_interpretation_run,
-    live_interpretation_workers:
-      payload.live_interpretation_workers ?? debug?.live_interpretation_workers ?? agentLoop?.live_interpretation_workers,
-    live_interpretation_worker_runs:
-      payload.live_interpretation_worker_runs ??
-      debug?.live_interpretation_worker_runs ??
-      agentLoop?.live_interpretation_worker_runs,
-    live_interpretation_validation_artifacts:
-      payload.live_interpretation_validation_artifacts ??
-      debug?.live_interpretation_validation_artifacts ??
-      agentLoop?.live_interpretation_validation_artifacts,
-    live_interpretation_hypotheses:
-      payload.live_interpretation_hypotheses ??
-      debug?.live_interpretation_hypotheses ??
-      agentLoop?.live_interpretation_hypotheses,
-    live_interpretation_graph:
-      payload.live_interpretation_graph ?? debug?.live_interpretation_graph ?? agentLoop?.live_interpretation_graph,
-    live_interpretation_epoch_delta:
-      payload.live_interpretation_epoch_delta ??
-      debug?.live_interpretation_epoch_delta ??
-      agentLoop?.live_interpretation_epoch_delta,
-    pending_server_request: agentLoop?.pending_request ?? payload.pending_server_request ?? payload.pending_request ?? null,
-    poison_audit: payload.poison_audit ?? debug?.poison_audit ?? agentLoop?.poison_audit,
-    prompt_poison_audit: payload.prompt_poison_audit ?? debug?.prompt_poison_audit ?? agentLoop?.prompt_poison_audit,
-    selected_evidence_pack: payload.selected_evidence_pack ?? debug?.selected_evidence_pack ?? agentLoop?.selected_evidence_pack,
-    turn_input_items: payload.turn_input_items ?? debug?.turn_input_items ?? agentLoop?.turn_input_items,
-    multimodal_turn_context: payload.multimodal_turn_context ?? debug?.multimodal_turn_context ?? agentLoop?.multimodal_turn_context,
-    visual_analysis_turn_items: payload.visual_analysis_turn_items ?? debug?.visual_analysis_turn_items ?? agentLoop?.visual_analysis_turn_items,
-    visual_frame_evidence: payload.visual_frame_evidence ?? debug?.visual_frame_evidence ?? agentLoop?.visual_frame_evidence,
-    turn_item_lifecycle_events: payload.turn_item_lifecycle_events ?? debug?.turn_item_lifecycle_events ?? agentLoop?.turn_item_lifecycle_events,
-    route_reason_code:
-      payload.route_reason_code ??
-      debug?.route_reason_code ??
-      agentLoop?.route_reason_code ??
-      (coerceText(resolvedTurnSummary?.resolved_route_label).trim() || null),
-    backend_debug_response_ref: matchingBackendDebugRef ?? undefined,
-    debug_export_ref: matchingBackendDebugRef ?? undefined,
-    debug_export_source: matchingBackendDebugRef
-      ? "backend_ref_advertised"
-      : "client_projection",
-    backend_debug_response_status: matchingBackendDebugRef
-      ? "ref_advertised"
-      : "not_advertised",
-    debug_export_anti_determinism_audit: {
-      verdict: "clean",
-      checks: [
-        { check: "projection_only_patch", passed: true, evidence: "debug_export" },
-        { check: "no_goal_mutation", passed: true, evidence: coerceText(readAgentLoopAuditRecord(debug?.canonical_goal_frame)?.goal_kind).trim() || "unknown" },
-        { check: "no_terminal_mutation", passed: true, evidence: effectiveTerminalArtifactKind ?? "none" },
-        { check: "active_turn_only", passed: true, evidence: canonicalActiveTurnId },
-        { check: "no_dom_scrape_source", passed: true, evidence: "reply_payload" },
-        { check: "receipt_not_fabricated", passed: true, evidence: receipt ? "current_turn_ledger" : "no_workspace_receipt" },
-      ],
-    },
-  };
-  const visibleFinalAnswerForParity = clientProgressPlaceholderExport
-    ? ""
-    : projectionBackendEntrypointBlocked || terminalIsTypedFailure
-      ? selectedFinalAnswer || ""
-      : coerceText(payload.visible_final_answer).trim() ||
-        coerceText(payload.visibleFinalAnswer).trim() ||
-        selectedFinalAnswer ||
-        "";
-  const selectedFinalAnswerForParity = coerceText(envelopeWithoutHash.selected_final_answer).trim();
-  const currentCompoundRunIdForParity = coerceText(calculatorPanelStateForDebug?.current_compound_run_id).trim();
-  const visibleCompoundRunIdsForParity = Array.isArray(calculatorPanelStateForDebug?.visible_compound_run_ids)
-    ? calculatorPanelStateForDebug.visible_compound_run_ids
-        .map((value) => coerceText(value).trim())
-        .filter(Boolean)
-    : [];
-  const uiDebugParityHarness = {
-    schema: "helix.ui_debug_parity_harness.v1",
-    visible_final_answer: visibleFinalAnswerForParity,
-    selected_final_answer: selectedFinalAnswerForParity,
-    terminal_authority_text: terminalAuthorityText,
-    ui_answer_equals_selected_final_answer:
-      Boolean(visibleFinalAnswerForParity && selectedFinalAnswerForParity) &&
-      visibleFinalAnswerForParity === selectedFinalAnswerForParity,
-    ui_answer_equals_terminal_authority_text:
-      Boolean(visibleFinalAnswerForParity && terminalAuthorityText) && visibleFinalAnswerForParity === terminalAuthorityText,
-    has_terminal_authority: Boolean(terminalAuthorityForDebug),
-    has_goal_satisfaction: Boolean(goalSatisfactionEvaluation),
-    has_agent_runtime_loop: Boolean(agentRuntimeLoop),
-    has_coverage_artifact: coverageArtifactsForDebug.length > 0,
-    has_planner_artifact: Boolean(calculatorPlannerResultForDebug),
-    has_repair_artifact: Boolean(calculatorPlannerRepairResultForDebug),
-    has_receipt_artifact: ledger.some((artifact) => readAgentLoopAuditRecord(artifact)?.kind === "workspace_action_receipt"),
-    has_composer_artifact: Boolean(finalAnswerDraftForDebug),
-    calculator_panel_state: calculatorPanelStateForDebug,
-    calculator_panel_current_compound_run_id: currentCompoundRunIdForParity || null,
-    calculator_panel_visible_compound_run_ids: visibleCompoundRunIdsForParity,
-    calculator_panel_stale_compound_run_visible: Boolean(
-      currentCompoundRunIdForParity &&
-        visibleCompoundRunIdsForParity.some((runId) => runId !== currentCompoundRunIdForParity),
-    ),
-    clipboard_debug_copy_required_for_prompt_submission: false,
-  };
-  return safeJsonStringify({
-    ...envelopeWithoutHash,
-    ui_debug_parity_harness: uiDebugParityHarness,
-    payload_hash: stableHelixProjectionHash(safeJsonStringify(envelopeWithoutHash)),
-  });
+  return buildSharedHelixDebugExportEnvelopeFromMasterPayload(reply, payload);
 }
-
 export function buildHelixAskReplyCopyText(reply: HelixAskReply): string {
   return buildRecrownedHelixAskReplyCopyText(reply);
 }
@@ -6236,277 +5181,28 @@ export async function copyHelixAskPlainTextToClipboard(text: string): Promise<bo
 export { debugPayloadMatchesRenderedTurnPayload };
 
 function normalizeReplyMasterDebugPayload(reply: HelixAskReply, payload: string | null | undefined): string {
-  const trimmed = typeof payload === "string" ? payload.trim() : "";
-  if (!trimmed) return buildReplyScopedDebugExportFromRenderedReply(reply, "empty_payload");
-  try {
-    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
-    if (parsed && typeof parsed === "object") {
-      if (!debugPayloadMatchesRenderedReply(reply, parsed)) {
-        return buildReplyScopedDebugExportFromRenderedReply(reply, "payload_reply_mismatch");
-      }
-      const canceledPendingTurn = isHelixCanceledPendingTurn(reply, reply.debug, parsed, parsed.debug, parsed.agentLoop);
-      if (canceledPendingTurn) {
-        const parsedAgentLoop = readAgentLoopAuditRecord(parsed.agentLoop);
-        const parsedDebugContext = readAgentLoopAuditRecord(parsed.debugContext);
-        parsed.pendingCanceled = true;
-        parsed.agentLoop = parsedAgentLoop
-          ? {
-              ...parsedAgentLoop,
-              pending_request: null,
-              pending_canceled: true,
-            }
-          : parsed.agentLoop;
-        parsed.debugContext = parsedDebugContext
-          ? {
-              ...parsedDebugContext,
-              pending_request: null,
-              pending_server_request: null,
-              pending_canceled: true,
-            }
-          : parsed.debugContext;
-      }
-      const hasVisibleAnswer =
-        typeof parsed.selectedDebugFinalAnswer === "string" ||
-        typeof parsed.finalAnswer === "string" ||
-        Boolean(readAgentLoopAuditRecord(parsed.visibleAnswerState)?.finalAnswer);
-      if (!hasVisibleAnswer) {
-        return safeJsonStringify({
-          ...parsed,
-          schema: typeof parsed.schema === "string" ? parsed.schema : "helix.ask.master_event_clock.v2",
-          visibleAnswerState: {
-            question: reply.question ?? null,
-            finalAnswer: resolveHelixAskVisibleTerminal(reply, reply.content).text || reply.content || "",
-          },
-          finalAnswer: resolveHelixAskVisibleTerminal(reply, reply.content).text || reply.content || "",
-        });
-      }
-    }
-    return trimmed;
-  } catch {
-    return buildReplyScopedDebugExportFromRenderedReply(reply, "invalid_json_payload");
-  }
+  return normalizeHelixAskReplyMasterDebugPayload({
+    reply,
+    payload,
+    buildReplyScopedDebugExportFromRenderedReply: (targetReply, reason) =>
+      buildReplyScopedDebugExportFromRenderedReply(targetReply as HelixAskReply, reason),
+    debugPayloadMatchesRenderedReply: (targetReply, parsed) =>
+      debugPayloadMatchesRenderedReply(targetReply as HelixAskReply, parsed),
+    isCanceledPendingTurn: (targetReply, replyDebug, parsed, parsedDebug, parsedAgentLoop) =>
+      isHelixCanceledPendingTurn(targetReply as HelixAskReply, replyDebug, parsed, parsedDebug, parsedAgentLoop),
+    resolveVisibleTerminal: (targetReply, fallbackContent) =>
+      resolveHelixAskVisibleTerminal(targetReply as HelixAskReply, fallbackContent),
+  });
 }
 
 export type DebugClipboardCopyResult = HelixAskDebugClipboardCopyResult;
 
-const isBackendAskTurnDebugExportEligibleTurnId = isHelixAskLegacyBackendDebugExportEligibleTurnId;
-
-function normalizeBackendAskTurnDebugExportTurnId(value: unknown): string | null {
-  const text = coerceText(value).trim();
-  if (!text) return null;
-  if (text.startsWith("ask:")) return text;
-  const match = text.match(/(?:^|:)(ask:[^:]+)/i);
-  return match?.[1] ?? null;
-}
-
-function buildBackendAskTurnDebugExportRef(value: unknown): Record<string, string> | null {
-  const turnId = normalizeBackendAskTurnDebugExportTurnId(value);
-  if (!turnId || !isBackendAskTurnDebugExportEligibleTurnId(turnId)) return null;
-  return {
-    endpoint: `/api/agi/ask/turn/${encodeURIComponent(turnId)}/debug-export`,
-    turn_id: turnId,
-  };
-}
-
-function buildClientProjectionDebugFields(localPayload: Record<string, unknown>): Record<string, unknown> {
-  const liveVoiceSnapshot = getVoiceCaptureDiagnosticsSnapshot();
-  const liveVoice = liveVoiceSnapshot ? sanitizeVoiceDiagnosticsForExport(liveVoiceSnapshot) : null;
-  return buildVoiceClientDebugProjectionFields({
-    localPayload,
-    liveVoice,
-  });
-}
-
 async function resolveAuthoritativeDebugExportPayload(localPayload: string): Promise<string> {
-  if (typeof fetch !== "function") return localPayload;
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(localPayload) as Record<string, unknown>;
-  } catch {
-    return localPayload;
-  }
-  const readDebugBoolean = (value: unknown): boolean | null => {
-    if (typeof value === "boolean") return value;
-    const text = coerceText(value).trim().toLowerCase();
-    if (text === "true") return true;
-    if (text === "false") return false;
-    return null;
-  };
-  const readMaterializedTerminal = (): { text: string; terminalArtifactKind: string; finalAnswerSource: string } | null => {
-    const resolvedTurnSummary = readAgentLoopAuditRecord(parsed.resolved_turn_summary);
-    const uiDebugParityHarness = readAgentLoopAuditRecord(parsed.ui_debug_parity_harness);
-    const visibleFinalAnswer = coerceText(uiDebugParityHarness?.visible_final_answer).trim();
-    const summaryTerminalKind = coerceText(resolvedTurnSummary?.terminal_artifact_kind).trim();
-    const summaryFinalAnswerSource = coerceText(resolvedTurnSummary?.final_answer_source).trim();
-    const summaryFinalStatus = coerceText(resolvedTurnSummary?.final_status).trim();
-    if (
-      (summaryTerminalKind === "workstation_tool_evaluation" || summaryTerminalKind === "model_synthesized_answer") &&
-      summaryFinalStatus !== "typed_failure" &&
-      visibleFinalAnswer &&
-      visibleFinalAnswer !== HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT
-    ) {
-      return {
-        text: visibleFinalAnswer,
-        terminalArtifactKind: summaryTerminalKind,
-        finalAnswerSource: summaryFinalAnswerSource || summaryTerminalKind,
-      };
-    }
-    return null;
-  };
-  const projectionPayload = (status: string, extra: Record<string, unknown> = {}) => {
-    const askEntrypointRequired = readDebugBoolean(parsed.ask_entrypoint_required) === true;
-    const askEntrypointObserved = readDebugBoolean(parsed.ask_entrypoint_observed);
-    const askEntrypointFailureCode = coerceText(parsed.ask_entrypoint_failure_code).trim();
-    const parsedDebugExportSource = coerceText(parsed.debug_export_source).trim();
-    const parsedDebugExportRebuildReason = coerceText(parsed.debug_export_rebuild_reason).trim();
-    const parsedReplyScopedDebugProjection =
-      parsedDebugExportSource === "rendered_reply_dom" ||
-      parsedDebugExportRebuildReason === "rendered_button_scope" ||
-      parsedDebugExportRebuildReason === "rendered_reply" ||
-      parsedDebugExportRebuildReason === "payload_reply_mismatch" ||
-      parsedDebugExportRebuildReason === "empty_payload" ||
-      parsedDebugExportRebuildReason === "invalid_json_payload";
-    const materializedTerminal = readMaterializedTerminal();
-    const backendEntrypointObserved = askEntrypointObserved === true || Boolean(materializedTerminal);
-    const backendEntrypointBlocked =
-      askEntrypointRequired && !backendEntrypointObserved && !parsedReplyScopedDebugProjection;
-    const projected = {
-      ...parsed,
-      debug_export_source: status === "not_advertised"
-        ? "client_projection"
-        : "client_projection_backend_unresolved",
-      backend_debug_response_status: status,
-      ...extra,
-      ...(materializedTerminal
-        ? {
-            selected_final_answer: materializedTerminal.text,
-            visible_final_answer: materializedTerminal.text,
-            final_answer_source: materializedTerminal.finalAnswerSource,
-            terminal_artifact_kind: materializedTerminal.terminalArtifactKind,
-            terminal_error_code: null,
-            ask_entrypoint_observed: true,
-            ask_entrypoint_failure_code: null,
-            first_broken_rail: null,
-            repair_target: null,
-          }
-        : {}),
-      ...(backendEntrypointBlocked
-        ? {
-            selected_final_answer: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
-            visible_final_answer: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
-            final_answer_source: "typed_failure",
-            terminal_artifact_kind: "typed_failure",
-            terminal_error_code: askEntrypointFailureCode || HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
-            ask_entrypoint_required: true,
-            ask_entrypoint_observed: false,
-            ask_entrypoint_failure_code: askEntrypointFailureCode || HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
-            blocked_projection_kind: "client_projection",
-            first_broken_rail: "backend_ask_entrypoint",
-            repair_target: "prompt_submit_entrypoint",
-          }
-        : {}),
-    };
-    return JSON.stringify(projected, null, 2);
-  };
-  const backendTarget = resolveHelixAskLegacyDebugExportBackendTarget(parsed);
-  const activeTurnId = backendTarget.activeTurnId;
-  const synthesizedBackendRef = buildBackendAskTurnDebugExportRef(activeTurnId);
-  if (backendTarget.status === "not_advertised" && !synthesizedBackendRef) {
-    return projectionPayload("not_advertised", { backend_debug_response_ref: undefined });
-  }
-  const backendRef = backendTarget.backendRef ?? synthesizedBackendRef;
-  if (backendTarget.status === "turn_mismatch") {
-    return projectionPayload("turn_mismatch", { backend_debug_response_ref: backendRef });
-  }
-  const endpoint = backendTarget.endpoint ?? coerceText(backendRef?.endpoint).trim();
-  if (!endpoint) return projectionPayload("not_advertised", { backend_debug_response_ref: undefined });
-  try {
-    const response = await fetch(endpoint, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-    });
-    if (!response.ok) {
-      return projectionPayload("fetch_failed", {
-        backend_debug_response_ref: backendRef,
-        backend_debug_response_http_status: response.status,
-      });
-    }
-    const body = await response.json() as Record<string, unknown>;
-    const authoritativePayload = readAgentLoopAuditRecord(body.payload) ?? readAgentLoopAuditRecord(body);
-    if (!authoritativePayload) {
-      return projectionPayload("payload_missing", { backend_debug_response_ref: backendRef });
-    }
-    const authoritativeTurnId = coerceText(authoritativePayload.active_turn_id).trim();
-    if (activeTurnId && authoritativeTurnId && authoritativeTurnId !== activeTurnId) {
-      return projectionPayload("turn_mismatch", {
-        backend_debug_response_ref: backendRef,
-        backend_debug_response_turn_id: authoritativeTurnId || null,
-      });
-    }
-    const localPrompt = normalizedDebugReplyText(
-      parsed.selectedDebugQuestion ?? parsed.active_prompt ?? parsed.prompt ?? parsed.user_prompt,
-    );
-    const authoritativePrompt = normalizedDebugReplyText(
-      authoritativePayload.selectedDebugQuestion ??
-        authoritativePayload.active_prompt ??
-        authoritativePayload.prompt ??
-        authoritativePayload.user_prompt,
-    );
-    if (localPrompt && authoritativePrompt && localPrompt !== authoritativePrompt) {
-      return projectionPayload("prompt_mismatch", {
-        backend_debug_response_ref: backendRef,
-        backend_debug_response_turn_id: authoritativeTurnId || null,
-        backend_debug_response_prompt: authoritativePrompt,
-      });
-    }
-    const clientProjection = buildClientProjectionDebugFields(parsed);
-    const clientActiveTurnId = resolveHelixAskLegacyDebugExportClientTurnId(parsed);
-    const clientConsoleAssemblyDebug =
-      readAgentLoopAuditRecord(parsed.console_assembly_debug) ??
-      readAgentLoopAuditRecord(parsed.debug?.console_assembly_debug) ??
-      readAgentLoopAuditRecord(parsed.reply?.console_assembly_debug);
-    const mergedPayload = {
-      ...authoritativePayload,
-      ...mergeHelixAskRuntimeGoalDebugFields(authoritativePayload, parsed),
-      debug_export_source: "backend_endpoint",
-      backend_debug_response_status: "fetched",
-      client_active_turn_id: clientActiveTurnId,
-      ui_client_active_turn_id: clientActiveTurnId,
-      console_assembly_debug: clientConsoleAssemblyDebug,
-      client_console_assembly_debug: clientConsoleAssemblyDebug,
-      client_projection_payload_hash: hashDebugExportText(localPayload),
-      client_debug_projection: clientProjection,
-      client_voice_debug: clientProjection.voice,
-      client_voice_authority_debug: clientProjection.voice_authority_debug,
-      client_voice_playback_receipts: clientProjection.voice_playback_receipts,
-      client_voice_playback_output: clientProjection.voice_playback_output,
-      client_voice_playback_metrics: clientProjection.voice_playback_metrics,
-      client_voice_calls: clientProjection.voice_calls,
-    };
-    return boundHelixDebugExportTextForUi(JSON.stringify({
-      ...mergedPayload,
-      voice_playback_reconciliation: buildVoicePlaybackReconciliationDebug({
-        activeTurnId: coerceText(mergedPayload.active_turn_id).trim() || null,
-        selectedFinalAnswer: coerceText(mergedPayload.selected_final_answer).trim() || null,
-        source: mergedPayload,
-      }),
-      voice_playback_receipt_barrier: buildVoicePlaybackReceiptBarrierDebug({
-        activeTurnId: coerceText(mergedPayload.active_turn_id).trim() || null,
-        selectedFinalAnswer: coerceText(mergedPayload.selected_final_answer).trim() || null,
-        source: mergedPayload,
-      }),
-    }, null, 2));
-  } catch (error) {
-    return projectionPayload("fetch_error", {
-      backend_debug_response_ref: backendRef,
-      backend_debug_response_error: error instanceof Error ? error.message : "debug_export_fetch_error",
-    });
-  }
+  return resolveHelixAskAuthoritativeDebugExportPayload(localPayload);
 }
 
 export async function copyDebugPayloadToClipboard(payload: string): Promise<DebugClipboardCopyResult> {
-  const json = boundHelixDebugExportTextForUi(typeof payload === "string" ? payload : "");
-  return copyHelixAskDebugJsonToClipboard(json);
+  return copyHelixAskDebugPayloadToClipboard(payload);
 }
 
 function coerceReasoningTheaterStateV1(value: unknown): HelixAskReasoningTheaterStateV1 | null {
@@ -6899,15 +5595,9 @@ function parseWorkstationLexiconAction(
     return buildLexiconPanelAction("workstation-notes", "list_notes");
   }
 
-  const createNoteMatch =
-    conversationalCandidate.match(/\bcreate\s+(?:a\s+)?note\s+(?:called|named|titled)\s+(.+)$/i) ??
-    conversationalCandidate.match(/\bnew\s+note\s+(.+)$/i) ??
-    conversationalCandidate.match(/\bstart\s+note\s+(?:about|on|for)\s+(.+)$/i);
-  if (createNoteMatch) {
-    const title = createNoteMatch[1]?.replace(/[?.!]+$/g, "").trim();
-    if (title) {
-      return buildLexiconPanelAction("workstation-notes", "create_note", { title, topic: title });
-    }
+  const createNoteArgs = parseWorkstationNoteCreateLexiconArgs({ source, conversationalCandidate });
+  if (createNoteArgs) {
+    return buildLexiconPanelAction("workstation-notes", "create_note", createNoteArgs);
   }
 
   const appendToMyNoteMatch =
@@ -7676,6 +6366,8 @@ export function HelixAskPill({
   replyListClassName,
 }: HelixAskPillProps) {
   const { userSettings } = useHelixStartSettings();
+  const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const { t } = useInterfaceText(interfaceLanguage.code);
   const preferredResponseLanguage = useMemo(() => {
     const raw = userSettings.preferredResponseLanguage?.trim();
     if (!raw || /^auto$/i.test(raw)) return undefined;
@@ -9993,16 +8685,9 @@ export function HelixAskPill({
     [onOpenPanel],
   );
 
-  const runWorkstationAction = useCallback(
-    (action: HelixWorkstationAction) => {
-      if (onRunWorkstationAction) {
-        onRunWorkstationAction(action);
-        return;
-      }
-      dispatchHelixWorkstationAction(action);
-    },
-    [onRunWorkstationAction],
-  );
+  const runWorkstationAction = useCallback((action: HelixWorkstationAction, runtime?: { turnId?: string | null; traceId?: string | null }) => {
+    return runHelixAskWorkstationActionWithReceiptLedger({ action, onOpenPanel, onRunWorkstationAction, turnId: runtime?.turnId ?? activeAskTurnIdRef.current ?? null, traceId: runtime?.traceId ?? null });
+  }, [onOpenPanel, onRunWorkstationAction]);
 
   const classifyWorkstationActionIntent = useCallback(
     async (question: string): Promise<WorkstationIntentClassificationResult> => {
@@ -10152,19 +8837,14 @@ export function HelixAskPill({
   );
 
   const applyGovernedActionEnvelope = useCallback(
-    (
+    async (
       envelope: HelixActionEnvelope | undefined,
-      context?: {
-        question?: string | null;
-        mode?: "read" | "observe" | "act" | "verify";
-        suppressSecondaryDocsActions?: boolean;
-      },
-    ): boolean => {
-      if (!envelope || envelope.schema !== "helix.ask.action_envelope.v1") {
-        return false;
-      }
+      context?: { question?: string | null; mode?: "read" | "observe" | "act" | "verify"; suppressSecondaryDocsActions?: boolean; turnId?: string | null; traceId?: string | null },
+    ): Promise<{ handled: boolean; receiptTerminal: ReturnType<typeof resolveHelixAskWorkstationReceiptTerminal> }> => {
+      if (!envelope || envelope.schema !== "helix.ask.action_envelope.v1") return { handled: false, receiptTerminal: null };
       const dispatch = envelope.governance?.dispatch ?? "allow";
       const suppressed = dispatch === "suppress";
+      const dispatchResults: HelixAskWorkstationActionDispatchResult[] = [];
       if (!suppressed) {
         const candidates = coerceHelixWorkstationActions(envelope.workstation_actions ?? []).filter(
           (action) => !(context?.suppressSecondaryDocsActions === true && isSecondaryDocsReasoningAction(action)),
@@ -10179,17 +8859,13 @@ export function HelixAskPill({
         });
         if (deduped.length > 0) {
           deduped.forEach((action) => syncDocViewerStateFromWorkstationAction(action));
-          if (onRunWorkstationAction) {
-            deduped.forEach((action) => onRunWorkstationAction(action));
-          } else {
-            dispatchHelixWorkstationActions(deduped);
-          }
+          dispatchResults.push(...(await Promise.all(deduped.map((action) => runWorkstationAction(action, { turnId: context?.turnId, traceId: context?.traceId })))));
         }
         launchAtomicViewer(envelope.viewer_launch, context);
       }
-      return true;
+      return { handled: true, receiptTerminal: resolveHelixAskWorkstationReceiptTerminal(dispatchResults) };
     },
-    [isSecondaryDocsReasoningAction, launchAtomicViewer, onRunWorkstationAction],
+    [isSecondaryDocsReasoningAction, launchAtomicViewer, onRunWorkstationAction, runWorkstationAction],
   );
 
   const runJobReadyLink = useCallback(
@@ -12557,8 +11233,9 @@ export function HelixAskPill({
           id: selectedAgentRuntime,
           label: agentRuntimePickerModel.selectedLabel,
         },
+        translate: t,
       }),
-    [accountCapabilityPolicy, agentRuntimePickerModel.selectedLabel, selectedAgentRuntime],
+    [accountCapabilityPolicy, agentRuntimePickerModel.selectedLabel, selectedAgentRuntime, t],
   );
   const askSlashCommandMenuState = buildHelixAskSlashCommandMenuState({
     open: askSlashCommandOpen,
@@ -21263,22 +19940,18 @@ export function HelixAskPill({
             debug: responseDebug,
             envelope: responseEnvelope,
           });
-          const actionEnvelopeHandled = applyGovernedActionEnvelope(responseActionEnvelope, {
-            question: questionText,
-            mode: responseMode,
-            suppressSecondaryDocsActions: suppressPayloadActionsAfterDocOpen,
-          });
+          const actionEnvelopeApplication = await applyGovernedActionEnvelope(responseActionEnvelope, { question: questionText, mode: responseMode, suppressSecondaryDocsActions: suppressPayloadActionsAfterDocOpen, turnId: traceId, traceId });
+          const actionEnvelopeHandled = actionEnvelopeApplication.handled;
+          if (actionEnvelopeApplication.receiptTerminal) {
+            responseText = actionEnvelopeApplication.receiptTerminal.text;
+            responseDebug = { ...(responseDebug ?? {}), client_receipt_terminal: actionEnvelopeApplication.receiptTerminal, selected_final_answer: responseText, final_answer_source: "client_workstation_receipt", terminal_artifact_kind: actionEnvelopeApplication.receiptTerminal.receipt_kind };
+          }
           if (!actionEnvelopeHandled && !suppressPayloadActionsAfterDocOpen) {
             applyWorkstationActionsFromPayload(responseDebug);
           }
-          if (responseContextCapsule) {
-            upsertContextCapsuleSessionLedger(responseContextCapsule);
-          }
+          if (responseContextCapsule) upsertContextCapsuleSessionLedger(responseContextCapsule);
           if (!actionEnvelopeHandled) {
-            launchAtomicViewer(responseViewerLaunch, {
-              question: questionText,
-              mode: responseMode,
-            });
+            launchAtomicViewer(responseViewerLaunch, { question: questionText, mode: responseMode });
           }
           updateMoodFromText(responseText);
           requestMoodHint(responseText, { force: true });
@@ -21400,8 +20073,18 @@ export function HelixAskPill({
             : null,
       });
       const runAskTurnId = pendingWorkstationUserInputRef.current?.turn_id ?? `ask:${crypto.randomUUID()}`;
-      const backendOwnedPastedTextResumeRecall = isHelixAskPastedTextResumeRecallPrompt(trimmed);
-      const hardBackendEntrypointRequired = options?.requiresBackendAskEntrypoint === true || requiresHelixAskBackendEntrypoint(trimmed);
+      const sessionIdForTurn = getHelixAskSessionId();
+      const backendEntrypointRoutePlan = buildHelixAskSubmitBackendEntrypointRoutePlan({
+        question: trimmed,
+        baseRunOptions: options,
+        turnId: runAskTurnId,
+        threadId: sessionIdForTurn ?? runAskTurnId,
+        manualCanaryEnabled: HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG,
+        backendOwnedPastedTextResumeRecall: isHelixAskPastedTextResumeRecallPrompt(trimmed),
+      });
+      const backendOwnedPastedTextResumeRecall = backendEntrypointRoutePlan.backendOwnedPastedTextResumeRecall;
+      const hardBackendEntrypointRequired = backendEntrypointRoutePlan.hardBackendEntrypointRequired;
+      const forceReasoningDispatchForTurn = backendEntrypointRoutePlan.forceReasoningDispatch;
       let imageAttachmentLensRunForTurn = options?.imageAttachmentLensRun ?? null;
       const firstNativeImageAttachment = selectFirstHelixAskSubmitReadyImageAttachment(submittedAttachments);
       if (!imageAttachmentLensRunForTurn && firstNativeImageAttachment) {
@@ -21573,12 +20256,12 @@ export function HelixAskPill({
         question: trimmed,
         workstationAction: parsedWorkstationCommand,
         explicitPanelCommand,
-        forceReasoningDispatch: options?.forceReasoningDispatch === true,
+        forceReasoningDispatch: forceReasoningDispatchForTurn,
       });
       const preliminaryPlannerContract = deriveHelixPlannerContract({
         question: trimmed,
         workstationAction: parsedWorkstationCommand,
-        forceReasoningDispatch: options?.forceReasoningDispatch === true,
+        forceReasoningDispatch: forceReasoningDispatchForTurn,
         explicitPanelCommand,
         dispatchPolicy: frozenRunAskDispatchPolicy,
       });
@@ -21704,7 +20387,7 @@ export function HelixAskPill({
         const intentPlannerContract = deriveHelixPlannerContract({
           question: trimmed,
           workstationAction: workstationCommand,
-          forceReasoningDispatch: options?.forceReasoningDispatch === true,
+          forceReasoningDispatch: forceReasoningDispatchForTurn,
           explicitPanelCommand,
           dispatchPolicy: frozenRunAskDispatchPolicy,
         });
@@ -21749,7 +20432,7 @@ export function HelixAskPill({
           const resolvedPlannerContract = deriveHelixPlannerContract({
             question: trimmed,
             workstationAction: workstationCommand,
-            forceReasoningDispatch: options?.forceReasoningDispatch === true,
+            forceReasoningDispatch: forceReasoningDispatchForTurn,
             explicitPanelCommand,
             dispatchPolicy: frozenRunAskDispatchPolicy,
           });
@@ -21908,7 +20591,7 @@ export function HelixAskPill({
         !repoCodeEvidencePrompt &&
         (docsViewerWorkstationLane ||
           simpleConversationTurnLane ||
-          (options?.forceReasoningDispatch !== true &&
+          (!forceReasoningDispatchForTurn &&
             inferredMode === "read" &&
             isSimpleDirectPromptLaneCandidate(trimmed)));
       const allowBackgroundReasoningLane =
@@ -21923,7 +20606,7 @@ export function HelixAskPill({
         deriveHelixPlannerContract({
           question: trimmed,
           workstationAction: null,
-          forceReasoningDispatch: options?.forceReasoningDispatch === true,
+          forceReasoningDispatch: forceReasoningDispatchForTurn,
           explicitPanelCommand,
           dispatchPolicy: frozenRunAskDispatchPolicy,
         }).reasoning_required === "hard";
@@ -21931,7 +20614,7 @@ export function HelixAskPill({
         hardBackendEntrypointRequired ||
         !HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG &&
         !simpleDirectPromptLane &&
-        (options?.forceReasoningDispatch === true || trimmed.length > 0);
+        (forceReasoningDispatchForTurn || trimmed.length > 0);
       const manualRouteReasonCode = simpleDirectPromptLane
         ? docsViewerWorkstationLane
           ? "dispatch:docs_viewer_direct_lane"
@@ -21976,8 +20659,7 @@ export function HelixAskPill({
                 meta: {
                   kind: "client_optimistic_turn_start",
                   turn_id: runAskTurnId,
-                  route_metadata_source:
-                    typeof options?.routeMetadata?.source === "string" ? options.routeMetadata.source : null,
+                  route_metadata_source: typeof options?.routeMetadata?.source === "string" ? options.routeMetadata.source : null,
                   assistant_answer: false,
                 },
               },
@@ -21996,27 +20678,9 @@ export function HelixAskPill({
       cancelMoodHint();
       updateMoodFromText(trimmed);
       requestMoodHint(trimmed, { force: true });
-      const sessionId = getHelixAskSessionId();
-      const traceId = runAskTurnId;
-      const hardBackendEntrypointRouteMetadata = hardBackendEntrypointRequired
-        ? buildHelixAskHardBackendEntrypointRouteMetadata({
-            question: trimmed,
-            base: options?.routeMetadata,
-            turnId: runAskTurnId,
-            threadId: sessionId ?? runAskTurnId,
-          })
-        : null;
-      const routeMetadataForTurn = backendOwnedPastedTextResumeRecall
-        ? buildHelixAskPastedTextResumeRecallRouteMetadata({
-            base: options?.routeMetadata,
-            turnId: runAskTurnId,
-            threadId: sessionId ?? runAskTurnId,
-          })
-        : hardBackendEntrypointRouteMetadata ?? options?.routeMetadata;
-      const useBackendAskTurnEntrypoint = shouldUseHelixAskBackendTurnEntrypoint({
-        manualCanaryEnabled: HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG,
-        hardBackendEntrypointRequired,
-      });
+      const sessionId = sessionIdForTurn, traceId = runAskTurnId;
+      const routeMetadataForTurn = backendEntrypointRoutePlan.routeMetadata;
+      const useBackendAskTurnEntrypoint = backendEntrypointRoutePlan.useBackendAskTurnEntrypoint;
       let backendAskCallAttempted = false;
       let backendAskCallPath: "runAskTurnStream" | "runAskTurn" | "askLocal" | null = null;
       let backendAskCallError: string | null = null;
@@ -22269,6 +20933,20 @@ export function HelixAskPill({
           let localResponse: AskLocalResult;
           let downgradedFromMode: AskLocalMode | undefined;
           if (useBackendAskTurnEntrypoint) {
+            const backendEntrypointRequestFingerprint = hardBackendEntrypointRequired
+              ? buildHelixAskBackendEntrypointRuntimeFingerprint({
+                  submitHandlerSource: "HelixAskPill.runAsk",
+                  runAskEntered: true,
+                  hardBackendEntrypointRequired,
+                  useBackendAskTurnEntrypoint,
+                  backendAskCallAttempted: true,
+                  backendAskCallPath: "runAskTurnStream",
+                  backendAskCallError: null,
+                  routeMetadata: routeMetadataForTurn,
+                  legacyAskLocalBypassed: true,
+                  askEntrypointObserved: null,
+                })
+              : null;
             const askTurnPayload = {
               ...buildHelixAskConsoleBackendTurnPayloadCore({
                 sessionId,
@@ -22277,8 +20955,31 @@ export function HelixAskPill({
                 turnId: runAskTurnId,
                 maxTokens: HELIX_ASK_OUTPUT_TOKENS,
                 question: trimmed,
-                contextFiles: contextFilesForTurn, requiresBackendAskEntrypoint: hardBackendEntrypointRequired,
+                contextFiles: contextFilesForTurn,
+                workspaceContextSnapshot: reasoningContextModeForTurn === "isolated" ? undefined : workspaceContextSnapshotForTurn,
+                routeMetadata: routeMetadataForTurn,
+                requiresBackendAskEntrypoint: hardBackendEntrypointRequired,
               }),
+              ...(backendEntrypointRequestFingerprint
+                ? {
+                    backend_ask_entrypoint_runtime_fingerprint: backendEntrypointRequestFingerprint,
+                    client_entrypoint_guard_version:
+                      backendEntrypointRequestFingerprint.client_entrypoint_guard_version,
+                    submit_handler_source: backendEntrypointRequestFingerprint.submit_handler_source,
+                    runAsk_entered: backendEntrypointRequestFingerprint.runAsk_entered,
+                    hard_backend_entrypoint_required:
+                      backendEntrypointRequestFingerprint.hard_backend_entrypoint_required,
+                    use_backend_ask_turn_entrypoint:
+                      backendEntrypointRequestFingerprint.use_backend_ask_turn_entrypoint,
+                    backend_ask_call_attempted:
+                      backendEntrypointRequestFingerprint.backend_ask_call_attempted,
+                    backend_ask_call_path: backendEntrypointRequestFingerprint.backend_ask_call_path,
+                    backend_ask_call_error: backendEntrypointRequestFingerprint.backend_ask_call_error,
+                    route_metadata_source: backendEntrypointRequestFingerprint.route_metadata_source,
+                    mandatory_next_tool_name: backendEntrypointRequestFingerprint.mandatory_next_tool_name,
+                    legacy_ask_local_bypassed: backendEntrypointRequestFingerprint.legacy_ask_local_bypassed,
+                  }
+                : {}),
               responseLanguage: preferredResponseLanguage,
               preferredResponseLanguage: preferredResponseLanguage,
               lang_schema_version: "helix.lang.v1",
@@ -22835,22 +21536,19 @@ export function HelixAskPill({
             debug: responseDebug,
             envelope: responseEnvelope,
           });
-          const actionEnvelopeHandled = applyGovernedActionEnvelope(responseActionEnvelope, {
-            question: trimmed,
-            mode: responseMode,
-            suppressSecondaryDocsActions: suppressPayloadActionsAfterDocOpen,
-          });
+          const actionEnvelopeApplication = await applyGovernedActionEnvelope(responseActionEnvelope, { question: trimmed, mode: responseMode, suppressSecondaryDocsActions: suppressPayloadActionsAfterDocOpen, turnId: runAskTurnId, traceId });
+          const actionEnvelopeHandled = actionEnvelopeApplication.handled;
+          if (actionEnvelopeApplication.receiptTerminal) {
+            responseText = actionEnvelopeApplication.receiptTerminal.text;
+            responseDebug = { ...(responseDebug ?? {}), client_receipt_terminal: actionEnvelopeApplication.receiptTerminal, selected_final_answer: responseText, final_answer_source: "client_workstation_receipt", terminal_artifact_kind: actionEnvelopeApplication.receiptTerminal.receipt_kind };
+            responseDebugWithClientMode = responseDebugWithClientMode ? { ...responseDebugWithClientMode, client_receipt_terminal: actionEnvelopeApplication.receiptTerminal, selected_final_answer: responseText, final_answer_source: "client_workstation_receipt", terminal_artifact_kind: actionEnvelopeApplication.receiptTerminal.receipt_kind } : responseDebugWithClientMode;
+          }
           if (!suppressWorkstationPayloadActions && !actionEnvelopeHandled && !suppressPayloadActionsAfterDocOpen) {
             applyWorkstationActionsFromPayload(responseDebug);
           }
-          if (responseContextCapsule) {
-            upsertContextCapsuleSessionLedger(responseContextCapsule);
-          }
+          if (responseContextCapsule) upsertContextCapsuleSessionLedger(responseContextCapsule);
           if (!actionEnvelopeHandled) {
-            launchAtomicViewer(responseViewerLaunch, {
-              question: trimmed,
-              mode: responseMode,
-            });
+            launchAtomicViewer(responseViewerLaunch, { question: trimmed, mode: responseMode });
           }
           updateMoodFromText(responseText);
           requestMoodHint(responseText, { force: true });
@@ -24424,12 +23122,15 @@ export function HelixAskPill({
       if (submittedAttachments.length > 0) {
         clearAskAttachments();
       }
-      const runOptions: RunAskOptions | undefined = buildHelixAskSubmitRunOptionsPayload({
+      const baseRunOptions: RunAskOptions | undefined = buildHelixAskSubmitRunOptionsPayload({
         submittedAttachments,
         promotedPastedTextTurnInputItems,
         expectsVisualInput,
         submittedVisualEvidence,
         submittedVisualCapability,
+      });
+      const runOptions = mergeHelixAskSubmitBackendEntrypointRunOptions({
+        question: first, baseRunOptions, turnId: submitTurnId, threadId: getHelixAskSessionId() ?? submitTurnId,
       });
       void runAsk(first, selectedCapsuleIds, runOptions);
     },
@@ -24813,6 +23514,10 @@ export function HelixAskPill({
         state={askSlashCommandMenuState}
         onHoverIndex={setAskSlashCommandSelectedIndex}
         onSelect={insertAskSlashCommandMenuItem}
+        ariaLabel={t("helixAsk.slash.menu.aria")}
+        chooseLabel={t("helixAsk.slash.menu.choose")}
+        matchingLabel={(query) => t("helixAsk.slash.menu.matching", { query })}
+        emptyLabel={t("helixAsk.slash.menu.empty")}
       />
     ),
   });

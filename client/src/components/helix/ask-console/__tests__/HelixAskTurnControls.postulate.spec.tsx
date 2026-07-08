@@ -3,7 +3,7 @@
  */
 import React from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const launchMocks = vi.hoisted(() => ({
   launchHelixAskPrompt: vi.fn(),
@@ -15,12 +15,18 @@ vi.mock("@/lib/helix/ask-prompt-launch", () => ({
 
 import { HelixAskTurnControls } from "../HelixAskTurnControls";
 import { useDocumentImageRegionStore } from "@/store/useDocumentImageRegionStore";
+import { useScientificEvidenceWorkflowStore } from "@/store/useScientificEvidenceWorkflowStore";
 
 describe("HelixAskTurnControls postulate action", () => {
+  beforeEach(() => {
+    useScientificEvidenceWorkflowStore.getState().clear();
+  });
+
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
     vi.clearAllTimers();
+    useScientificEvidenceWorkflowStore.getState().clear();
     useDocumentImageRegionStore.setState({
       source: null,
       naturalSize: null,
@@ -79,6 +85,10 @@ describe("HelixAskTurnControls postulate action", () => {
         invocationKind: "postulate_final_answer_review",
         allowedCapabilities: ["postulate.submit_proposal"],
         requiredCanonicalGoal: "postulate_runtime_review_then_gated_submit",
+        requiredTerminalProductKind: "postulate_runtime_review",
+        requiredTerminalArtifactKind: "postulate_runtime_review",
+        allowedTerminalProductKinds: ["postulate_runtime_review", "typed_failure"],
+        allowedTerminalArtifactKinds: ["postulate_runtime_review", "typed_failure"],
       }),
     }));
     const payload = launchMocks.launchHelixAskPrompt.mock.calls[0]?.[0];
@@ -162,7 +172,7 @@ describe("HelixAskTurnControls postulate action", () => {
 
     const payload = launchMocks.launchHelixAskPrompt.mock.calls[0]?.[0];
     expect(payload.routeMetadata.evidenceContext).toMatchObject({
-      evidenceSidecarRefs: ["ask:turn-7:scientific_image_evidence_sidecar"],
+      evidenceSidecarRefs: expect.arrayContaining(["ask:turn-7:scientific_image_evidence_sidecar"]),
       pageRenderRefs: expect.arrayContaining([
         "pdf-page-render:a57b3f7f064f9ade",
         "page_render:pdf-page-render:a57b3f7f064f9ade",

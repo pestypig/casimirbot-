@@ -30,6 +30,12 @@ import type { InterfaceMessageId } from "@/lib/i18n/messages/types";
 import { useDocumentImageRegionStore, type DocumentImageRegionState } from "@/store/useDocumentImageRegionStore";
 import { useImageLensLiveSourceStore } from "@/store/useImageLensLiveSourceStore";
 import { buildScientificEvidenceWorkflowStatus } from "@/components/helix/ask-console/ScientificEvidenceWorkflowStatus";
+import {
+  mergeScientificEvidenceWorkflowStatus,
+  mergeScientificEvidenceWorkflowStatusRecords,
+  readActiveScientificEvidenceWorkflowStatus,
+  useScientificEvidenceWorkflowStore,
+} from "@/store/useScientificEvidenceWorkflowStore";
 
 type DragState = {
   pointerId: number;
@@ -197,6 +203,9 @@ export default function ImageLensPanel() {
   const rehydratePersistedSourceImage = useDocumentImageRegionStore(
     (state: DocumentImageRegionState) => state.rehydratePersistedSourceImage,
   );
+  const storedScientificWorkflowStatus = useScientificEvidenceWorkflowStore((state) =>
+    state.activeKey ? state.statuses[state.activeKey] ?? null : null,
+  );
   const liveSourceActive = Boolean(liveSource?.streamActive && liveSource.stream);
   const hasVisualInput = Boolean(source || liveSourceActive);
   const sourceKindOptions = useMemo<Array<[DocumentImageSourceKindV1, string]>>(
@@ -206,7 +215,7 @@ export default function ImageLensPanel() {
     ]),
     [t],
   );
-  const scientificWorkflowStatus = useMemo(
+  const localScientificWorkflowStatus = useMemo(
     () => buildScientificEvidenceWorkflowStatus({
       source,
       cropDraft,
@@ -214,6 +223,26 @@ export default function ImageLensPanel() {
     }),
     [cropDraft, receipts, source],
   );
+  const scientificWorkflowStatus = useMemo(() => {
+    if (!storedScientificWorkflowStatus) return localScientificWorkflowStatus;
+    if (
+      localScientificWorkflowStatus.sourceId &&
+      storedScientificWorkflowStatus.sourceId &&
+      localScientificWorkflowStatus.sourceId !== storedScientificWorkflowStatus.sourceId
+    ) {
+      return localScientificWorkflowStatus;
+    }
+    return mergeScientificEvidenceWorkflowStatusRecords(localScientificWorkflowStatus, storedScientificWorkflowStatus);
+  }, [localScientificWorkflowStatus, storedScientificWorkflowStatus]);
+
+  useEffect(() => {
+    if (!source) return;
+    const storedStatus = readActiveScientificEvidenceWorkflowStatus();
+    const statusToPersist = storedStatus
+      ? mergeScientificEvidenceWorkflowStatusRecords(localScientificWorkflowStatus, storedStatus)
+      : localScientificWorkflowStatus;
+    mergeScientificEvidenceWorkflowStatus(statusToPersist, { askThreadId: "helix-ask:desktop" });
+  }, [localScientificWorkflowStatus, source]);
 
   useEffect(() => {
     setStatusMessage((current) => (current === initialStatusRef.current ? initialStatusMessage : current));
@@ -527,7 +556,7 @@ export default function ImageLensPanel() {
           <span className="truncate">Graph: {scientificWorkflowStatus.graphReflectionStatus}</span>
           <span className="truncate">Calculator: {scientificWorkflowStatus.calculatorTemplateStatus}</span>
           <span className="truncate">
-            Postulate refs: {Object.values(scientificWorkflowStatus.postulateReadyRefs).flat().length}
+            {t("imageLens.workflow.postulateRefs", { count: Object.values(scientificWorkflowStatus.postulateReadyRefs).flat().length })}
           </span>
         </div>
       </div>

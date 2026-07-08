@@ -9,6 +9,8 @@ import {
 } from "./provider-compound-capability-planner";
 import {
   CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+  CALCULATOR_ACTIVE_CONTEXT_CAPABILITY,
+  CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY,
   CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
   DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY,
   DOCS_READ_VISIBLE_SURFACE_CAPABILITY,
@@ -18,9 +20,13 @@ import {
   REPO_SEARCH_CAPABILITY,
   SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
   TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY,
+  VISUAL_OBSERVER_COMPARE_PROFILES_CAPABILITY,
+  VISUAL_OBSERVER_QUERY_PROFILES_CAPABILITY,
+  VISUAL_OBSERVER_TEST_PROFILE_CAPABILITY,
   THEORY_CONTEXT_REFLECTION_CAPABILITY,
   VOICE_INTERIM_CALLOUT_CAPABILITY,
   VOICE_NARRATOR_SAY_CAPABILITY,
+  WORKSTATION_ACTIVE_CONTEXT_CAPABILITY,
   WORKSPACE_OS_STATUS_CAPABILITY,
   hasSelectedHelixAgentRuntime,
   readArray,
@@ -75,6 +81,68 @@ const MORAL_SUBSTRATE_DEFERRED_AFFORDANCE_CAPABILITIES = new Set([
   CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
 ]);
 
+type ForbiddenEvidenceFamily =
+  | "external_evidence"
+  | "page_evidence"
+  | "visual_evidence"
+  | "calculator_evidence"
+  | "ambient_context";
+
+const MORAL_GRAPH_FORBIDDEN_ADJACENT_CAPABILITY_FAMILIES: Record<string, ForbiddenEvidenceFamily[]> = {
+  [INTERNET_SEARCH_CAPABILITY]: ["external_evidence"],
+  [SCHOLARLY_RESEARCH_SEARCH_CAPABILITY]: ["external_evidence", "page_evidence"],
+  [DOCS_SEARCH_CAPABILITY]: ["page_evidence"],
+  [DOCS_READ_VISIBLE_SURFACE_CAPABILITY]: ["page_evidence", "ambient_context"],
+  [DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY]: ["page_evidence", "ambient_context"],
+  [CALCULATOR_SOLVE_EXPRESSION_CAPABILITY]: ["calculator_evidence"],
+  [CALCULATOR_ACTIVE_CONTEXT_CAPABILITY]: ["calculator_evidence", "ambient_context"],
+  [CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY]: ["calculator_evidence", "ambient_context"],
+  [VISUAL_OBSERVER_QUERY_PROFILES_CAPABILITY]: ["visual_evidence"],
+  [VISUAL_OBSERVER_TEST_PROFILE_CAPABILITY]: ["visual_evidence"],
+  [VISUAL_OBSERVER_COMPARE_PROFILES_CAPABILITY]: ["visual_evidence"],
+  [WORKSTATION_ACTIVE_CONTEXT_CAPABILITY]: ["ambient_context"],
+};
+
+const NEGATED_EVIDENCE_FAMILY_PATTERNS: Record<ForbiddenEvidenceFamily, RegExp> = {
+  external_evidence:
+    /\b(?:web|internet|online|external|scholarly|research\s+papers?|papers?|arxiv|doi|cit(?:e|ed|ation)s?|sources?)\b(?:\s+(?:evidence|sources?|search|retrieval|lookup))?/i,
+  page_evidence:
+    /\b(?:pdfs?|pages?|docs?|documents?|visible\s+surface|current\s+(?:doc|document|page)|page[-\s]?grounded)\b(?:\s+(?:evidence|source|surface|sidecar))?/i,
+  visual_evidence:
+    /\b(?:images?|image\s+lens|image-lens|visual|crop|bbox|screenshot|attached\s+image|visible\s+image)\b(?:\s+(?:evidence|sidecar|observation))?/i,
+  calculator_evidence:
+    /\b(?:calculator|scientific\s+calculator|calculate|compute|evaluate|solve|expression)\b(?:\s+(?:evidence|result|receipt|sidecar))?/i,
+  ambient_context:
+    /\b(?:current[-\s]?panel|current\s+panel|active\s+panel|sidecar|stale\s+evidence|old\s+evidence|pre[-\s]?existing\s+evidence|ambient\s+evidence)\b/i,
+};
+
+const promptNegatesEvidenceFamily = (prompt: string, family: ForbiddenEvidenceFamily): boolean => {
+  const unquoted = unquotePrompt(prompt);
+  const negatedWindow =
+    /\b(?:do\s+not|don't|dont|without|no\s+need\s+to|not\s+asking\s+to|not|avoid)\b[\s\S]{0,160}/gi;
+  for (const match of unquoted.matchAll(negatedWindow)) {
+    if (NEGATED_EVIDENCE_FAMILY_PATTERNS[family].test(match[0] ?? "")) return true;
+  }
+  return false;
+};
+
+const promptForbiddenEvidenceFamilies = (prompt: string): Set<ForbiddenEvidenceFamily> => {
+  const forbidden = new Set<ForbiddenEvidenceFamily>();
+  for (const family of Object.keys(NEGATED_EVIDENCE_FAMILY_PATTERNS) as ForbiddenEvidenceFamily[]) {
+    if (promptNegatesEvidenceFamily(prompt, family)) forbidden.add(family);
+  }
+  return forbidden;
+};
+
+const forbiddenFamiliesForCapability = (
+  capability: string | null,
+  forbiddenFamilies: Set<ForbiddenEvidenceFamily>,
+): ForbiddenEvidenceFamily[] => {
+  if (!capability) return [];
+  return (MORAL_GRAPH_FORBIDDEN_ADJACENT_CAPABILITY_FAMILIES[capability] ?? [])
+    .filter((family) => forbiddenFamilies.has(family));
+};
+
 const isMoralGraphPrimaryRequest = (request: Record<string, unknown>): boolean => {
   const capability = readString(request.capability_id) ?? readString(request.capabilityId);
   return Boolean(capability && MORAL_GRAPH_PRIMARY_CAPABILITIES.has(capability));
@@ -91,7 +159,7 @@ const isMoralGraphPrimaryIntent = (request: Record<string, unknown>): boolean =>
 };
 
 const promptNegatesExternalEvidence = (prompt: string): boolean =>
-  /\b(?:do\s+not|don't|dont|without|no|not)\b[\s\S]{0,100}\b(?:search\s+(?:the\s+)?(?:web|internet|online)|web\s+search|internet\s+search|online\s+search|external\s+sources?)\b/i.test(
+  /\b(?:do\s+not|don't|dont|without|no|not|avoid)\b[\s\S]{0,160}\b(?:search\s+(?:the\s+)?(?:web|internet|online)|web\s+search|internet\s+search|online\s+search|external\s+sources?|(?:web|internet|online|external|scholarly|research\s+papers?|papers?|pdfs?|pages?)\s+(?:evidence|sources?|search|retrieval|lookup))\b/i.test(
     unquotePrompt(prompt),
   );
 
@@ -201,24 +269,62 @@ const requestToProviderNextAffordance = (request: Record<string, unknown>): Reco
 const attachNextAffordancesToRequest = (
   request: Record<string, unknown>,
   affordances: Record<string, unknown>[],
+  rejectedAdjacentCapabilities: Record<string, unknown>[] = [],
 ): Record<string, unknown> => {
-  if (affordances.length === 0) return request;
+  if (affordances.length === 0 && rejectedAdjacentCapabilities.length === 0) return request;
   const args = readRecord(request.arguments) ?? {};
   const sourceTargetIntent = readRecord(args.source_target_intent) ?? {};
+  const rejectedFamilies = Array.from(new Set(
+    rejectedAdjacentCapabilities
+      .flatMap((entry) => readArray(entry.forbidden_families))
+      .filter((entry): entry is string => typeof entry === "string" && entry.length > 0),
+  ));
   return {
     ...request,
     arguments: {
       ...args,
-      next_affordances: [
-        ...readArray(args.next_affordances),
-        ...affordances,
-      ],
+      ...(affordances.length > 0
+        ? {
+            next_affordances: [
+              ...readArray(args.next_affordances),
+              ...affordances,
+            ],
+          }
+        : {}),
+      ...(rejectedAdjacentCapabilities.length > 0
+        ? {
+            rejected_adjacent_capabilities: [
+              ...readArray(args.rejected_adjacent_capabilities),
+              ...rejectedAdjacentCapabilities,
+            ],
+            rejected_adjacent_tool_families: [
+              ...readArray(args.rejected_adjacent_tool_families),
+              ...rejectedFamilies,
+            ],
+          }
+        : {}),
       source_target_intent: {
         ...sourceTargetIntent,
-        next_affordances: [
-          ...readArray(sourceTargetIntent.next_affordances),
-          ...affordances,
-        ],
+        ...(affordances.length > 0
+          ? {
+              next_affordances: [
+                ...readArray(sourceTargetIntent.next_affordances),
+                ...affordances,
+              ],
+            }
+          : {}),
+        ...(rejectedAdjacentCapabilities.length > 0
+          ? {
+              rejected_adjacent_capabilities: [
+                ...readArray(sourceTargetIntent.rejected_adjacent_capabilities),
+                ...rejectedAdjacentCapabilities,
+              ],
+              rejected_adjacent_tool_families: [
+                ...readArray(sourceTargetIntent.rejected_adjacent_tool_families),
+                ...rejectedFamilies,
+              ],
+            }
+          : {}),
       },
     },
   };
@@ -235,12 +341,27 @@ const reduceMoralGraphRequestsToPrimary = (
   if (moralIndex < 0) return input.requests;
   const moralRequest = input.requests[moralIndex];
   const deferredAffordances: Record<string, unknown>[] = [];
+  const rejectedAdjacentCapabilities: Record<string, unknown>[] = [];
   const retained: Record<string, unknown>[] = [];
+  const forbiddenFamilies = promptForbiddenEvidenceFamilies(input.prompt);
 
   for (const [index, request] of input.requests.entries()) {
     if (index === moralIndex) continue;
     if (isMoralGraphPrimaryRequest(request)) continue;
     const capability = readString(request.capability_id) ?? readString(request.capabilityId);
+    const blockedFamilies = forbiddenFamiliesForCapability(capability ?? null, forbiddenFamilies);
+    if (capability && blockedFamilies.length > 0) {
+      rejectedAdjacentCapabilities.push({
+        schema: "helix.moral_graph_rejected_adjacent_capability.v1",
+        capability,
+        reason: "negative_evidence_constraint",
+        forbidden_families: blockedFamilies,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      });
+      continue;
+    }
     const shouldDefer =
       capability &&
       MORAL_SUBSTRATE_DEFERRED_AFFORDANCE_CAPABILITIES.has(capability) &&
@@ -253,7 +374,11 @@ const reduceMoralGraphRequestsToPrimary = (
     retained.push(request);
   }
 
-  const primary = attachNextAffordancesToRequest(moralRequest, deferredAffordances);
+  const primary = attachNextAffordancesToRequest(
+    moralRequest,
+    deferredAffordances,
+    rejectedAdjacentCapabilities,
+  );
   return [primary, ...retained];
 };
 

@@ -350,6 +350,8 @@ const optionalArgsForCapability = (capability: string): string[] => {
       return ["refs", "options", "scenario", "scenario_text", "source_ref", "source_refs"];
     case "helix_ask.reflect_civilization_bounds":
       return ["scenarioFrameRef", "source_ref", "source_refs", "refs", "options"];
+    case "visual_analysis.inspect_image_region":
+      return ["source_id", "bbox_px"];
     case "image_lens.inspect":
       return ["view_state", "source_id", "regions"];
     case "workstation-notes.create":
@@ -1532,6 +1534,40 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   },
   {
     schema: "helix.explicit_capability_contract.v1",
+    capability: "visual_analysis.inspect_image_region",
+    aliases: [
+      "image lens pdf page",
+      "image lens page",
+      "image lens crop",
+      "image lens region",
+      "image lens observation",
+      "pdf page crop",
+      "exact equation row",
+      "equation row crop",
+      "crop ref",
+      "bbox",
+      "bounding box",
+    ],
+    capability_family: "visual_capture",
+    plan_family: "visual_capture",
+    source_target: "visual_capture",
+    admission_families: ["situation_run"],
+    required_observation_kinds: [
+      "capability_lane_observation_packet",
+      "visual_analysis.inspect_image_region",
+      "scientific_image_evidence_sidecar",
+    ],
+    required_terminal_kind: "image_lens_observation_report",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: [
+      "situation-room.describe_visual_capture",
+      "docs-viewer.locate_in_doc",
+      "repo-code.search_concept",
+      "model.direct_answer",
+    ],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
     capability: "image_lens.inspect",
     runtime_capability: "situation-room.describe_visual_capture",
     aliases: [
@@ -1581,10 +1617,9 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
     admission_families: ["notes", "workstation_action"],
     required_observation_kinds: [
       "workspace_action_receipt",
-      "note_context",
-      "note_create_receipt",
+      "note_update_receipt",
     ],
-    required_terminal_kind: "model_synthesized_answer",
+    required_terminal_kind: "note_update_receipt",
     allowed_substitutions: ["workstation-notes.create"],
     forbidden_nearby_capabilities: ["model.direct_answer"],
   },

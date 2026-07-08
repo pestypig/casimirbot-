@@ -1,6 +1,8 @@
 import type { ImageLensRegionInspectionReceiptV1 } from "@shared/contracts/image-lens-region-inspection.v1";
 import { useDocumentImageRegionStore } from "@/store/useDocumentImageRegionStore";
 import { useImageLensLiveSourceStore } from "@/store/useImageLensLiveSourceStore";
+import { buildScientificEvidenceWorkflowStatus } from "@/components/helix/ask-console/ScientificEvidenceWorkflowStatus";
+import { mergeScientificEvidenceWorkflowStatus } from "@/store/useScientificEvidenceWorkflowStore";
 import {
   VISUAL_SOURCE_FRAME_HISTORY_TTL_MS,
   type VisualSourceCaptureFrameHistoryItem,
@@ -69,6 +71,15 @@ export function applyImageLensRegionInspectionReceipt(
   }
   useDocumentImageRegionStore.getState().setCropDraft(receipt.bbox_px);
   useDocumentImageRegionStore.getState().addReceipt(documentReceipt);
+  const nextDocumentState = useDocumentImageRegionStore.getState();
+  mergeScientificEvidenceWorkflowStatus(
+    buildScientificEvidenceWorkflowStatus({
+      source: nextDocumentState.source,
+      cropDraft: nextDocumentState.cropDraft,
+      lastReceipt: nextDocumentState.lastReceipt,
+    }),
+    { askThreadId: input.threadId },
+  );
   useVisualSourceCaptureStore.getState().upsertProducer({
     source_id: sourceId,
     thread_id: input.threadId,

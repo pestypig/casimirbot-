@@ -4478,6 +4478,48 @@ describe("Helix Ask agent provider selection", () => {
     });
   });
 
+  it("materializes explicit calculator workstation evaluation when Codex returns no provider terminal text", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn/stream",
+      body: {
+        turn_id: "ask:test:codex-calculator-workstation-evaluation-materialized",
+        agent_runtime: "codex",
+        question:
+          "Call scientific-calculator.solve_expression with this exact expression: 2+2. Wait for calculator_receipt and answer from workstation_tool_evaluation.",
+      },
+      headers: {},
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.response_type).toBe("final_answer");
+    expect(result.final_status).toBe("completed");
+    expect(result.final_answer_source).toBe("workstation_tool_evaluation");
+    expect(result.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(result.text).toContain("Calculator verification plan completed.");
+    expect(result.text).toContain("Expression: 2+2");
+    expect(result.text).toContain("Result: 4");
+    expect((result as any).workstation_tool_evaluation).toMatchObject({
+      schema: "helix.workstation_tool_evaluation.v1",
+      source: "calculator_receipt_materialization",
+      expression: "2+2",
+      result_text: "4",
+    });
+    expect((result.debug as any)?.provider_gateway_debug_summary).toMatchObject({
+      terminal_authority_result: "authorized_by_terminal_authority_single_writer",
+      terminal_authority_granted: true,
+      final_answer_source: "workstation_tool_evaluation",
+      terminal_artifact_kind: "workstation_tool_evaluation",
+    });
+    expect((result.debug as any)?.terminal_authority_single_writer).toMatchObject({
+      selected_terminal_artifact_kind: "workstation_tool_evaluation",
+      source: "workstation_tool_evaluation",
+    });
+  });
+
   it("projects Codex interface-language gateway receipts into executable actions and workspace receipts", async () => {
     process.env.CODEX_AGENT_FAKE_STDOUT = "The workstation interface language was set to Hawaiian (`haw`).";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";

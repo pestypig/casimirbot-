@@ -47,7 +47,8 @@ const hasLocalWorkspaceScopeCue = (promptText: string): boolean =>
   /(?:^|[\s"'(])(?:\/docs\/|docs[\\/])\S+/i.test(promptText);
 
 const hasLocalObservationScopeCue = (promptText: string): boolean =>
-  /\b(?:screen\s+capture|screenshot|screen|visual|frame|capture|camera|live\s+(?:source|environment|answer|card|pipeline)|current\s+(?:screen|visual|frame|capture|live\s+source|live\s+environment)|what\s+is\s+happening\s+right\s+now\s+in\s+the\s+screen)\b/i.test(promptText);
+  /\b(?:screen\s+capture|screenshot|screen|visual|frame|capture|camera|live\s+(?:source|environment|answer|card|pipeline)|current\s+(?:screen|visual|frame|capture|live\s+source|live\s+environment)|what\s+is\s+happening\s+right\s+now\s+in\s+the\s+screen)\b/i.test(promptText) ||
+  /\b(?:image\s*lens|pdf\s+page|page\s+\d+|current\s+page|crop(?:ped|ping)?|bbox|bounding\s+box|equation\s+row|exact\s+row|crop\s+ref|source\s+image\s+hash|page[-\s]?grounded|scientific\s+image\s+evidence|visual_analysis\.inspect_image_region)\b/i.test(promptText);
 
 const hasScholarlyScopeCue = (promptText: string): boolean =>
   /\b(?:doi|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|journal|peer[-\s]?reviewed|citations?|references?|bibliograph(?:y|ies)|research\s+papers?|scholarly\s+(?:papers?|articles?|sources?))\b/i.test(promptText);
@@ -215,9 +216,10 @@ export const buildToolUseRestatement = (promptText: string): ToolUseRestatementV
   const suppressed = compactLiveSourceMailboxHandoff || negativeConstraints.length > 0 || isSuppliedTextOnlyTask(prompt);
   const requiresDocsViewer = !suppressed && hasAffirmativeDocsViewerSearchCue(prompt);
   const requiresVoiceDelivery = !suppressed && hasAffirmativeVoiceReadAloudCue(prompt);
-  const freshnessRequired = !suppressed && (explicitProviderCue || currentWebCue || timeSensitiveCue || currentAffairsCue);
-  const currentAffairsRequired = !suppressed && currentAffairsCue;
   const localSourceScope = hasLocalWorkspaceScopeCue(prompt) || hasLocalObservationScopeCue(prompt);
+  const localSourceWithoutExplicitWeb = localSourceScope && !explicitProviderCue;
+  const freshnessRequired = !suppressed && !localSourceWithoutExplicitWeb && (explicitProviderCue || currentWebCue || timeSensitiveCue || currentAffairsCue);
+  const currentAffairsRequired = !suppressed && !localSourceWithoutExplicitWeb && currentAffairsCue;
   const requiresInternet = !suppressed && !localSourceScope && !hasScholarlyScopeCue(prompt) && (
     explicitProviderCue ||
     (searchAction && (currentWebCue || timeSensitiveCue)) ||

@@ -131,6 +131,72 @@ const collectObservationRefs = (loopTrace: RecordLike | null): string[] =>
     .map((entry) => readString(entry.observation_id))
     .filter(Boolean);
 
+const collectImageLensEvidenceRefs = (input: {
+  payload: RecordLike;
+  terminalArtifactKind: string;
+  finalAnswerSource: string;
+}): string[] => {
+  const terminalUsesImageLens =
+    /image_lens_(?:observation_report|named_receipt_evaluation)/i.test(input.terminalArtifactKind) ||
+    /image_lens_(?:observation_report|named_receipt_evaluation)/i.test(input.finalAnswerSource) ||
+    /provider_image_lens_observation_report/i.test(input.finalAnswerSource);
+  if (!terminalUsesImageLens) return [];
+
+  const refs: string[] = [];
+  const ledger = Array.isArray(input.payload.current_turn_artifact_ledger)
+    ? input.payload.current_turn_artifact_ledger
+    : [];
+  for (const rawEntry of ledger) {
+    const entry = readRecord(rawEntry);
+    if (!entry) continue;
+    const payloadRecord = readRecord(entry.payload);
+    const haystack = [
+      readString(entry.kind),
+      readString(entry.artifact_id),
+      readString(payloadRecord?.schema),
+      readString(payloadRecord?.artifact_id),
+      readString(payloadRecord?.capability),
+      readString(payloadRecord?.capability_key),
+      readString(payloadRecord?.tool_id),
+    ].join(" ");
+    if (
+      !/scientific_image_evidence_sidecar|capability_lane_observation_packet|visual_analysis\.inspect_image_region|image_lens/i.test(haystack)
+    ) {
+      continue;
+    }
+    refs.push(
+      readString(entry.artifact_id),
+      readString(payloadRecord?.artifact_id),
+      readString(payloadRecord?.sidecar_id),
+      readString(payloadRecord?.receipt_id),
+      readString(payloadRecord?.crop_ref),
+      readString(payloadRecord?.crop_image_ref),
+      readString(payloadRecord?.source_image_ref),
+      readString(payloadRecord?.source_ref_hash),
+      ...readStringArray(payloadRecord?.evidence_refs),
+      ...readStringArray(payloadRecord?.support_refs),
+      ...readStringArray(payloadRecord?.source_refs),
+      ...readStringArray(payloadRecord?.produced_artifact_refs),
+    );
+  }
+
+  const sidecar = readRecord(input.payload.scientific_image_evidence_sidecar);
+  if (sidecar) {
+    refs.push(
+      readString(sidecar.artifact_id),
+      readString(sidecar.sidecar_id),
+      readString(sidecar.crop_ref),
+      readString(sidecar.source_image_ref),
+      readString(sidecar.source_ref_hash),
+      ...readStringArray(sidecar.evidence_refs),
+      ...readStringArray(sidecar.support_refs),
+      ...readStringArray(sidecar.source_refs),
+    );
+  }
+
+  return unique(refs.filter(Boolean));
+};
+
 const collectWorkspaceSourceEvidenceRefs = (input: {
   payload: RecordLike;
   terminalArtifactKind: string;
@@ -301,6 +367,66 @@ const collectCapabilityHelpEvidenceRefs = (input: {
     })
     .map((entry) => readString(entry.artifact_id))
     .filter(Boolean);
+};
+
+const collectMoralGraphEvidenceRefs = (input: {
+  payload: RecordLike;
+  terminalArtifactKind: string;
+  finalAnswerSource: string;
+}): string[] => {
+  const terminalUsesMoralGraph =
+    /agent_provider_terminal_candidate|final_answer_draft|model_synthesized_answer/i.test(input.terminalArtifactKind) ||
+    /agent_provider_terminal_candidate|final_answer_draft|model_synthesized_answer/i.test(input.finalAnswerSource);
+  if (!terminalUsesMoralGraph) return [];
+  const goalFrame = readRecord(input.payload.canonical_goal_frame);
+  const requestedCapability = readString(goalFrame?.requested_capability);
+  const goalKind = readString(goalFrame?.goal_kind);
+  const routeText = [
+    requestedCapability,
+    goalKind,
+    readString(input.payload.route_reason_code),
+    readString(input.payload.route),
+  ].join(" ");
+  if (!/moral[-_.:]?graph|moral_graph_reflection|ideology_context_reflection|procedural_moral_classification/i.test(routeText)) {
+    return [];
+  }
+  const presentation = readRecord(input.payload.terminal_presentation);
+  const providerCandidate = readRecord(input.payload.provider_terminal_candidate);
+  const providerBridge = readRecord(input.payload.provider_terminal_authority_bridge);
+  const ledger = Array.isArray(input.payload.current_turn_artifact_ledger)
+    ? input.payload.current_turn_artifact_ledger
+    : [];
+  const ledgerRefs = ledger
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is RecordLike => Boolean(entry))
+    .filter((entry) => {
+      const payloadRecord = readRecord(entry.payload);
+      const text = [
+        readString(entry.kind),
+        readString(entry.capability_key),
+        readString(entry.payload_schema),
+        readString(payloadRecord?.schema),
+      ].join(" ");
+      return /moral_graph_reflection|moral-graph\.reflect_context|helix\.moral_graph_reflection_observation\.v1|ideology_context_reflection|procedural_moral_classification/i.test(text);
+    })
+    .flatMap((entry) => {
+      const payloadRecord = readRecord(entry.payload);
+      return [
+        readString(entry.artifact_id),
+        readString(payloadRecord?.artifact_id),
+        ...readStringArray(payloadRecord?.support_refs),
+        ...readStringArray(payloadRecord?.evidence_refs),
+        ...readStringArray(payloadRecord?.produced_artifact_refs),
+      ];
+    });
+  return unique([
+    ...readStringArray(presentation?.selected_observation_refs),
+    ...readStringArray(providerCandidate?.grounded_in_observation_refs),
+    ...readStringArray(providerCandidate?.normalized_observation_refs),
+    ...readStringArray(providerBridge?.gateway_observation_refs),
+    ...readStringArray(providerBridge?.normalized_observation_refs),
+    ...ledgerRefs,
+  ].filter(Boolean));
 };
 
 const capabilityItineraryEvidencePatterns: Array<{ family: string; pattern: RegExp }> = [
@@ -588,7 +714,17 @@ export function buildEvidenceReentryGate(input: {
       terminalArtifactKind: input.terminalArtifactKind,
       finalAnswerSource: input.finalAnswerSource,
     }),
+    ...collectImageLensEvidenceRefs({
+      payload: input.payload,
+      terminalArtifactKind: input.terminalArtifactKind,
+      finalAnswerSource: input.finalAnswerSource,
+    }),
     ...collectCapabilityHelpEvidenceRefs({
+      payload: input.payload,
+      terminalArtifactKind: input.terminalArtifactKind,
+      finalAnswerSource: input.finalAnswerSource,
+    }),
+    ...collectMoralGraphEvidenceRefs({
       payload: input.payload,
       terminalArtifactKind: input.terminalArtifactKind,
       finalAnswerSource: input.finalAnswerSource,

@@ -8,6 +8,7 @@ export const HELIX_CAPABILITY_LANE_IDS = [
   "speech_to_text",
   "text_to_speech",
   "live_translation",
+  "realtime_session",
   "visual_analysis",
   "workstation_tool_reference",
 ] as const;
@@ -20,6 +21,7 @@ export type HelixCapabilityLaneFamily =
   | "speech_to_text"
   | "text_to_speech"
   | "live_translation"
+  | "live_runtime_agent"
   | "visual_analysis"
   | "workstation_tool_reference";
 
@@ -61,6 +63,7 @@ export type HelixCapabilityLanePrivacyClass =
 
 export type HelixCapabilityLaneBackendFamily =
   | "openai_compatible"
+  | "openai_realtime"
   | "google_gemini"
   | "elevenlabs"
   | "local_runtime"

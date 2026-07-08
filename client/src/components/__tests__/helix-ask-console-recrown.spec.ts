@@ -4,6 +4,10 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { ContextCapsuleSummary } from "@shared/helix-context-capsule";
+import {
+  HELIX_DEVELOPER_ACCOUNT_POLICY,
+  HELIX_USER_ACCOUNT_POLICY,
+} from "@shared/helix-account-session";
 
 import {
   HELIX_ASK_CONSOLE_ACTIVE_RECROWN_PHASE,
@@ -48,6 +52,40 @@ import {
   HELIX_ASK_CONSOLE_HERO_REPLY_LIST_CLASS_NAME,
   buildHelixAskConsoleRuntimeBridgeProps,
 } from "@/components/helix/ask-console/HelixAskConsoleRuntimeShellProps";
+import {
+  captureHelixAskOperatorSurfaceBrowserRecord,
+  captureHelixAskOperatorSurfaceViewportMeasurement,
+  HELIX_ASK_OPERATOR_SURFACE_BROWSER_CAPTURE_SELECTORS,
+} from "@/components/helix/ask-console/HelixAskOperatorSurfaceBrowserCapture";
+import {
+  HELIX_ASK_OPERATOR_SURFACE_PARITY_CHECKLIST,
+  buildHelixAskOperatorSurfaceParityChecklistSummary,
+  selectHelixAskOperatorSurfaceParityChecklistByStatus,
+  selectHelixAskOperatorSurfaceParityLayoutOpenKeys,
+} from "@/components/helix/ask-console/HelixAskOperatorSurfaceParityChecklist";
+import {
+  HELIX_ASK_OPERATOR_SURFACE_LAYOUT_PARITY_CRITERIA,
+  buildHelixAskOperatorSurfaceLayoutParityBrowserRecord,
+  buildHelixAskOperatorSurfaceLayoutParityEvidencePacket,
+  buildHelixAskOperatorSurfaceLayoutParityEvidenceFromMeasurements,
+  buildHelixAskOperatorSurfaceLayoutParitySummary,
+  mergeHelixAskOperatorSurfaceLayoutParityEvidence,
+  resolveHelixAskOperatorSurfaceLayoutParityViewportKind,
+  resolveHelixAskOperatorSurfaceLayoutParityReadiness,
+  upsertHelixAskOperatorSurfaceLayoutParityBrowserRecord,
+} from "@/components/helix/ask-console/HelixAskOperatorSurfaceLayoutParity";
+import {
+  buildHelixAskOperatorSurfaceParityHarnessContextIds,
+} from "@/components/helix/ask-console/HelixAskOperatorSurfaceParityHarness";
+import {
+  HelixAskOperatorSurfaceParityEvidencePanel,
+} from "@/components/helix/ask-console/HelixAskOperatorSurfaceParityEvidencePanel";
+import {
+  HELIX_ASK_OPERATOR_SURFACE_PARITY_ROUTE_PARAM,
+  HELIX_ASK_OPERATOR_SURFACE_PARITY_ROUTE_VALUE,
+  buildHelixAskOperatorSurfaceParityRouteHint,
+  shouldRenderHelixAskOperatorSurfaceParityHarness,
+} from "@/components/helix/ask-console/HelixAskOperatorSurfaceParityRoute";
 import {
   buildHelixAskFinalAnswerBlocks,
   HelixAskFinalAnswer,
@@ -120,6 +158,15 @@ import {
   boundHelixDebugExportTextForUi,
 } from "@/components/helix/ask-console/HelixAskDebugExportSizeControl";
 import {
+  resolveHelixAskBackendEntrypointFailureProjection,
+} from "@/components/helix/ask-console/HelixAskBackendEntrypointProjection";
+import {
+  buildHelixAskBackendTurnDebugExportRef,
+  copyHelixAskDebugPayloadToClipboard,
+  resolveHelixAskAuthoritativeDebugExportPayload,
+} from "@/components/helix/ask-console/HelixAskDebugCopyProjection";
+import { selectHelixAskVisibleFinalAnswer } from "@/components/helix/ask-console/HelixAskVisibleFinalAnswerSelection";
+import {
   buildHelixAskRuntimeGoalDebugFields,
   buildHelixAskRuntimeGoalDebugSummary,
   mergeHelixAskRuntimeGoalDebugFields,
@@ -138,6 +185,24 @@ import {
   selectHelixAskConsoleWorkstationTraceRows,
 } from "@/components/helix/ask-console/HelixAskWorkstationTraceRows";
 import { buildHelixAskRuntimePickerModel } from "@/components/helix/ask-console/HelixAskRuntimePicker";
+import {
+  HelixAskLiveRuntimeControls,
+  buildHelixAskLiveRuntimeControlsModel,
+} from "@/components/helix/ask-console/HelixAskLiveRuntimeControls";
+import {
+  HELIX_ASK_DISABLED_LIVE_RUNTIME_TRANSPORT_BOUNDARY,
+  HELIX_ASK_LIVE_RUNTIME_LIFECYCLE_STATES,
+  HELIX_ASK_LIVE_RUNTIME_TRANSPORT_CONTROLLER_STATES,
+  buildHelixAskLiveRuntimeClientReceiptPayload,
+  buildHelixAskLiveRuntimeRouteRequest,
+  buildHelixAskLiveRuntimeTransportControllerModel,
+  buildHelixAskLiveRuntimeTransportHandoffPlan,
+  buildHelixAskLiveRuntimeTransportLifecycleReceiptPayload,
+  buildHelixAskLiveRuntimeTransportReceiptRouteRequest,
+} from "@/components/helix/ask-console/HelixAskLiveRuntimeLifecycle";
+import {
+  createHelixAskLiveRuntimeBrowserTransportController,
+} from "@/components/helix/ask-console/HelixAskLiveRuntimeTransportController";
 import {
   HELIX_ASK_CONSOLE_MAX_PROMPT_LINES,
   buildHelixAskComposerPlaceholder,
@@ -176,6 +241,7 @@ import {
   buildHelixAskConsoleChatTurnPayloads,
 } from "@/components/helix/ask-console/HelixAskChatPersistence";
 import {
+  isHelixAgentRuntimeId,
   normalizeHelixAgentProvidersResponse,
   resolveHelixAgentRuntimePrimaryButtonDecision,
   resolveHelixAgentRuntimeSelectDecision,
@@ -1324,6 +1390,301 @@ describe("Helix Ask Console recrown boundary", () => {
       "layout_position_sizing_dock_behavior",
       "top_of_console_readable",
     ]);
+    expect(HELIX_ASK_OPERATOR_SURFACE_PARITY_CHECKLIST.map((item) => item.key)).toEqual(
+      HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_ITEMS,
+    );
+    expect(new Set(selectHelixAskOperatorSurfaceParityChecklistByStatus("proven").map((item) => item.key))).toEqual(
+      new Set(HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_PROVEN_ITEMS),
+    );
+    expect(new Set(selectHelixAskOperatorSurfaceParityChecklistByStatus("open").map((item) => item.key))).toEqual(
+      new Set(HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_OPEN_ITEMS),
+    );
+    expect(buildHelixAskOperatorSurfaceParityChecklistSummary()).toEqual({
+      totalCount: HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_ITEMS.length,
+      provenCount: HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_PROVEN_ITEMS.length,
+      openCount: HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_OPEN_ITEMS.length,
+      ready: false,
+      openKeys: HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_OPEN_ITEMS,
+    });
+    expect(
+      HELIX_ASK_OPERATOR_SURFACE_PARITY_CHECKLIST
+        .filter((item) => item.status === "open")
+        .every((item) => item.validationKind === "browser_visual_parity"),
+    ).toBe(true);
+    expect(selectHelixAskOperatorSurfaceParityLayoutOpenKeys()).toEqual(
+      HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_OPEN_ITEMS,
+    );
+    expect(HELIX_ASK_OPERATOR_SURFACE_LAYOUT_PARITY_CRITERIA.map((criterion) => criterion.key)).toEqual(
+      HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_OPEN_ITEMS,
+    );
+    expect(buildHelixAskOperatorSurfaceLayoutParitySummary()).toMatchObject({
+      criteriaCount: HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_OPEN_ITEMS.length,
+      ready: false,
+      openKeys: HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_OPEN_ITEMS,
+    });
+    expect(resolveHelixAskOperatorSurfaceLayoutParityReadiness({
+      oldBridgeScreenshotRef: "artifacts/ask-console/bridge-desktop.png",
+      recrownedShellScreenshotRef: "artifacts/ask-console/recrowned-desktop.png",
+      desktopTopOffsetPx: 16,
+      mobileTopOffsetPx: 12,
+      dockReplyListScrolls: true,
+      composerFullyVisible: true,
+      completedTurnLaneVisible: true,
+    })).toMatchObject({
+      ready: true,
+      openKeys: [],
+      missingEvidence: {},
+    });
+    expect(resolveHelixAskOperatorSurfaceLayoutParityViewportKind({ width: 390, height: 844 })).toBe("mobile");
+    expect(resolveHelixAskOperatorSurfaceLayoutParityViewportKind({ width: 1280, height: 720 })).toBe("desktop");
+    expect(resolveHelixAskOperatorSurfaceLayoutParityViewportKind({ width: 0, height: 720 })).toBe("unknown");
+    expect(buildHelixAskOperatorSurfaceLayoutParityBrowserRecord({
+      route: "?helixAskParity=operator_surface",
+      capturedAtMs: 1783030000000,
+      viewportWidth: 1280,
+      viewportHeight: 720,
+      evidence: {
+        oldBridgeScreenshotRef: "artifacts/ask-console/bridge-desktop.png",
+        recrownedShellScreenshotRef: "artifacts/ask-console/recrowned-desktop.png",
+        desktopTopOffsetPx: 16,
+        mobileTopOffsetPx: 12,
+        dockReplyListScrolls: true,
+        composerFullyVisible: true,
+        completedTurnLaneVisible: true,
+      },
+    })).toMatchObject({
+      schema: "helix.ask.operator_surface.layout_parity.browser_record.v1",
+      route: "?helixAskParity=operator_surface",
+      capturedAtMs: 1783030000000,
+      viewport: {
+        width: 1280,
+        height: 720,
+        kind: "desktop",
+      },
+      readiness: {
+        ready: true,
+        openKeys: [],
+        missingEvidence: {},
+      },
+    });
+    const measuredEvidence = buildHelixAskOperatorSurfaceLayoutParityEvidenceFromMeasurements({
+      oldBridgeScreenshotRef: "artifacts/ask-console/bridge-measured.png",
+      recrownedShellScreenshotRef: "artifacts/ask-console/recrowned-measured.png",
+      desktop: {
+        viewportWidth: 1280,
+        viewportHeight: 720,
+        legacySurfaceRect: { top: 16, bottom: 704, height: 688 },
+        recrownedSurfaceRect: { top: 16, bottom: 704, height: 688 },
+        recrownedComposerRect: { top: 24, bottom: 104, height: 80 },
+        recrownedCompletedTurnLaneRect: { top: 112, bottom: 690, height: 578 },
+        recrownedReplyListScrollMetrics: { clientHeight: 578, scrollHeight: 1200 },
+      },
+      mobile: {
+        viewportWidth: 390,
+        viewportHeight: 844,
+        legacySurfaceRect: { top: 12, bottom: 832, height: 820 },
+        recrownedSurfaceRect: { top: 12, bottom: 832, height: 820 },
+        recrownedComposerRect: { top: 20, bottom: 112, height: 92 },
+        recrownedCompletedTurnLaneRect: { top: 120, bottom: 828, height: 708 },
+        recrownedReplyListScrollMetrics: { clientHeight: 708, scrollHeight: 1600 },
+      },
+    });
+    expect(measuredEvidence).toEqual({
+      oldBridgeScreenshotRef: "artifacts/ask-console/bridge-measured.png",
+      recrownedShellScreenshotRef: "artifacts/ask-console/recrowned-measured.png",
+      desktopTopOffsetPx: 16,
+      mobileTopOffsetPx: 12,
+      dockReplyListScrolls: true,
+      composerFullyVisible: true,
+      completedTurnLaneVisible: true,
+    });
+    expect(resolveHelixAskOperatorSurfaceLayoutParityReadiness(measuredEvidence)).toMatchObject({
+      ready: true,
+      openKeys: [],
+      missingEvidence: {},
+    });
+    const fakeElement = (rect: { top: number; bottom: number; height: number }, scroll?: {
+      clientHeight: number;
+      scrollHeight: number;
+    }) => ({
+      getBoundingClientRect: () => rect,
+      clientHeight: scroll?.clientHeight ?? rect.height,
+      scrollHeight: scroll?.scrollHeight ?? rect.height,
+    } as unknown as Element);
+    const fakeDocument = {
+      querySelector: (selector: string) =>
+        ({
+          [HELIX_ASK_OPERATOR_SURFACE_BROWSER_CAPTURE_SELECTORS.legacySurface]: fakeElement({
+            top: 18,
+            bottom: 708,
+            height: 690,
+          }),
+          [HELIX_ASK_OPERATOR_SURFACE_BROWSER_CAPTURE_SELECTORS.recrownedSurface]: fakeElement({
+            top: 18,
+            bottom: 708,
+            height: 690,
+          }),
+          [HELIX_ASK_OPERATOR_SURFACE_BROWSER_CAPTURE_SELECTORS.recrownedComposer]: fakeElement({
+            top: 28,
+            bottom: 104,
+            height: 76,
+          }),
+          [HELIX_ASK_OPERATOR_SURFACE_BROWSER_CAPTURE_SELECTORS.recrownedCompletedTurnLane]: fakeElement({
+            top: 112,
+            bottom: 694,
+            height: 582,
+          }),
+          [HELIX_ASK_OPERATOR_SURFACE_BROWSER_CAPTURE_SELECTORS.recrownedReplyList]: fakeElement(
+            { top: 112, bottom: 694, height: 582 },
+            { clientHeight: 582, scrollHeight: 1400 },
+          ),
+        }[selector] ?? null),
+    };
+    expect(captureHelixAskOperatorSurfaceViewportMeasurement({
+      document: fakeDocument,
+      viewportWidth: 1280,
+      viewportHeight: 720,
+    })).toMatchObject({
+      viewportWidth: 1280,
+      viewportHeight: 720,
+      legacySurfaceRect: {
+        top: 18,
+        bottom: 708,
+        height: 690,
+      },
+      recrownedReplyListScrollMetrics: {
+        clientHeight: 582,
+        scrollHeight: 1400,
+      },
+    });
+    expect(captureHelixAskOperatorSurfaceBrowserRecord({
+      document: fakeDocument,
+      viewportWidth: 1280,
+      viewportHeight: 720,
+      capturedAtMs: 1783030000001,
+      oldBridgeScreenshotRef: "artifacts/ask-console/bridge-captured.png",
+      recrownedShellScreenshotRef: "artifacts/ask-console/recrowned-captured.png",
+    })).toMatchObject({
+      status: "captured",
+      record: {
+        schema: "helix.ask.operator_surface.layout_parity.browser_record.v1",
+        capturedAtMs: 1783030000001,
+        viewport: {
+          width: 1280,
+          height: 720,
+          kind: "desktop",
+        },
+        evidence: {
+          oldBridgeScreenshotRef: "artifacts/ask-console/bridge-captured.png",
+          recrownedShellScreenshotRef: "artifacts/ask-console/recrowned-captured.png",
+          desktopTopOffsetPx: 18,
+          dockReplyListScrolls: true,
+          composerFullyVisible: true,
+          completedTurnLaneVisible: true,
+        },
+      },
+      missingSelectors: [],
+    });
+    expect(captureHelixAskOperatorSurfaceBrowserRecord({
+      document: { querySelector: () => null },
+      viewportWidth: 1280,
+      viewportHeight: 720,
+      capturedAtMs: 1783030000002,
+    })).toMatchObject({
+      status: "missing_selectors",
+      record: null,
+      missingSelectors: Object.values(HELIX_ASK_OPERATOR_SURFACE_BROWSER_CAPTURE_SELECTORS),
+    });
+    const desktopRecord = buildHelixAskOperatorSurfaceLayoutParityBrowserRecord({
+      route: "?helixAskParity=operator_surface",
+      capturedAtMs: 1783030000003,
+      viewportWidth: 1280,
+      viewportHeight: 720,
+      evidence: {
+        oldBridgeScreenshotRef: "artifacts/ask-console/bridge-desktop.png",
+        recrownedShellScreenshotRef: "artifacts/ask-console/recrowned-desktop.png",
+        desktopTopOffsetPx: 18,
+        dockReplyListScrolls: true,
+        composerFullyVisible: true,
+        completedTurnLaneVisible: true,
+      },
+    });
+    const mobileRecord = buildHelixAskOperatorSurfaceLayoutParityBrowserRecord({
+      route: "?helixAskParity=operator_surface",
+      capturedAtMs: 1783030000004,
+      viewportWidth: 390,
+      viewportHeight: 844,
+      evidence: {
+        oldBridgeScreenshotRef: "artifacts/ask-console/bridge-mobile.png",
+        recrownedShellScreenshotRef: "artifacts/ask-console/recrowned-mobile.png",
+        mobileTopOffsetPx: 12,
+        dockReplyListScrolls: true,
+        composerFullyVisible: true,
+        completedTurnLaneVisible: true,
+      },
+    });
+    const mergedEvidence = mergeHelixAskOperatorSurfaceLayoutParityEvidence([desktopRecord, mobileRecord]);
+    expect(mergedEvidence).toEqual({
+      oldBridgeScreenshotRef: "artifacts/ask-console/bridge-desktop.png",
+      recrownedShellScreenshotRef: "artifacts/ask-console/recrowned-desktop.png",
+      desktopTopOffsetPx: 18,
+      mobileTopOffsetPx: 12,
+      dockReplyListScrolls: true,
+      composerFullyVisible: true,
+      completedTurnLaneVisible: true,
+    });
+    expect(resolveHelixAskOperatorSurfaceLayoutParityReadiness(mergedEvidence)).toMatchObject({
+      ready: true,
+      openKeys: [],
+      missingEvidence: {},
+    });
+    expect(buildHelixAskOperatorSurfaceLayoutParityEvidencePacket([desktopRecord])).toMatchObject({
+      schema: "helix.ask.operator_surface.layout_parity.evidence_packet.v1",
+      desktopRecordCount: 1,
+      mobileRecordCount: 0,
+      missingViewportKinds: ["mobile"],
+      ready: false,
+    });
+    expect(buildHelixAskOperatorSurfaceLayoutParityEvidencePacket([desktopRecord, mobileRecord])).toMatchObject({
+      schema: "helix.ask.operator_surface.layout_parity.evidence_packet.v1",
+      desktopRecordCount: 1,
+      mobileRecordCount: 1,
+      missingViewportKinds: [],
+      ready: true,
+      readiness: {
+        ready: true,
+        openKeys: [],
+        missingEvidence: {},
+      },
+    });
+    const updatedDesktopRecord = buildHelixAskOperatorSurfaceLayoutParityBrowserRecord({
+      route: "?helixAskParity=operator_surface",
+      capturedAtMs: 1783030000005,
+      viewportWidth: 1440,
+      viewportHeight: 900,
+      evidence: {
+        oldBridgeScreenshotRef: "artifacts/ask-console/bridge-desktop-updated.png",
+        recrownedShellScreenshotRef: "artifacts/ask-console/recrowned-desktop-updated.png",
+        desktopTopOffsetPx: 22,
+        dockReplyListScrolls: true,
+        composerFullyVisible: true,
+        completedTurnLaneVisible: true,
+      },
+    });
+    const upsertedRecords = upsertHelixAskOperatorSurfaceLayoutParityBrowserRecord(
+      [desktopRecord, mobileRecord],
+      updatedDesktopRecord,
+    );
+    expect(upsertedRecords.map((record) => record.capturedAtMs)).toEqual([1783030000005, 1783030000004]);
+    const unknownRecord = buildHelixAskOperatorSurfaceLayoutParityBrowserRecord({
+      route: "?helixAskParity=operator_surface",
+      capturedAtMs: 1783030000006,
+      viewportWidth: 0,
+      viewportHeight: 0,
+    });
+    expect(upsertHelixAskOperatorSurfaceLayoutParityBrowserRecord(upsertedRecords, unknownRecord)).toBe(
+      upsertedRecords,
+    );
     expect(HELIX_ASK_CONSOLE_LEGACY_BEHAVIOR_CLASSIFICATIONS.map((entry) => entry.classification)).toEqual([
       "used_must_move",
       "used_must_move",
@@ -1357,9 +1718,9 @@ describe("Helix Ask Console recrown boundary", () => {
       liveLegacyConsoleViewStartsAtLine: legacyConsoleViewLine,
     });
     expect(Math.abs(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.lineCountAtInventory - legacyPillLines.length)).toBeLessThanOrEqual(5);
-    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.lineCountAtInventory).toBeGreaterThan(25000);
-    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.exportedComponentStartsAtLine).toBeGreaterThan(7000);
-    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.liveRenderSliceStartsAtLine).toBeGreaterThan(25000);
+    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.lineCountAtInventory).toBeGreaterThan(24000);
+    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.exportedComponentStartsAtLine).toBeGreaterThan(6300);
+    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.liveRenderSliceStartsAtLine).toBeGreaterThan(23900);
     const sliceClassifications = HELIX_ASK_LEGACY_CONSOLE_SLICES.map((slice) => slice.classification);
     expect(sliceClassifications[0]).toBe("live_day_to_day_must_move");
     expect(new Set(sliceClassifications)).toEqual(
@@ -1852,7 +2213,48 @@ describe("Helix Ask Console recrown boundary", () => {
     const runtimeShellSource = read("client/src/components/helix/ask-console/HelixAskConsoleRuntimeShell.tsx");
     const bridgeSource = read("client/src/components/helix/ask-console/HelixAskLegacyRuntimeBridge.tsx");
     const minimalShellSource = read("client/src/components/helix/ask-console/HelixAskMinimalRuntimeShell.tsx");
+    const parityHarnessSource = read("client/src/components/helix/ask-console/HelixAskOperatorSurfaceParityHarness.tsx");
+    const parityRouteSource = read("client/src/components/helix/ask-console/HelixAskOperatorSurfaceParityRoute.ts");
 
+    expect(HELIX_ASK_OPERATOR_SURFACE_PARITY_ROUTE_PARAM).toBe("helixAskParity");
+    expect(HELIX_ASK_OPERATOR_SURFACE_PARITY_ROUTE_VALUE).toBe("operator_surface");
+    expect(shouldRenderHelixAskOperatorSurfaceParityHarness("")).toBe(false);
+    expect(shouldRenderHelixAskOperatorSurfaceParityHarness("?helixAskParity=off")).toBe(false);
+    expect(shouldRenderHelixAskOperatorSurfaceParityHarness("?helixAskParity=operator_surface")).toBe(true);
+    expect(buildHelixAskOperatorSurfaceParityRouteHint()).toBe("?helixAskParity=operator_surface");
+    const parityEvidenceMarkup = renderToStaticMarkup(
+      React.createElement(HelixAskOperatorSurfaceParityEvidencePanel, {
+        routeSearch: "?helixAskParity=operator_surface",
+      }),
+    );
+    expect(parityEvidenceMarkup).toContain("data-testid=\"helix-ask-operator-surface-parity-evidence\"");
+    expect(parityEvidenceMarkup).toContain("data-open-gate-count=\"2\"");
+    expect(parityEvidenceMarkup).toContain("layout_position_sizing_dock_behavior");
+    expect(parityEvidenceMarkup).toContain("top_of_console_readable");
+    expect(parityEvidenceMarkup).toContain("data-active-parity-route=\"true\"");
+    expect(parityEvidenceMarkup).toContain("data-testid=\"helix-ask-operator-surface-parity-record-schema\"");
+    expect(parityEvidenceMarkup).toContain("helix.ask.operator_surface.layout_parity.browser_record.v1");
+    expect(parityEvidenceMarkup).toContain("data-testid=\"helix-ask-operator-surface-parity-capture-status\"");
+    expect(parityEvidenceMarkup).toContain("data-capture-status=\"waiting_for_browser_measurement\"");
+    expect(parityEvidenceMarkup).toContain("data-record-ready=\"unknown\"");
+    expect(parityEvidenceMarkup).toContain("data-viewport-kind=\"unknown\"");
+    expect(parityEvidenceMarkup).toContain(
+      "data-testid=\"helix-ask-operator-surface-parity-evidence-packet-status\"",
+    );
+    expect(parityEvidenceMarkup).toContain("data-packet-ready=\"false\"");
+    expect(parityEvidenceMarkup).toContain("data-desktop-record-count=\"0\"");
+    expect(parityEvidenceMarkup).toContain("data-mobile-record-count=\"0\"");
+    expect(parityEvidenceMarkup).toContain("data-missing-viewport-kinds=\"desktop,mobile\"");
+    expect(parityEvidenceMarkup).toContain("data-testid=\"helix-ask-operator-surface-parity-capture-record\"");
+    expect(parityEvidenceMarkup).toContain(
+      "data-record-schema=\"helix.ask.operator_surface.layout_parity.browser_record.v1\"",
+    );
+    expect(parityEvidenceMarkup).toContain("data-testid=\"helix-ask-operator-surface-parity-evidence-packet\"");
+    expect(parityEvidenceMarkup).toContain(
+      "data-packet-schema=\"helix.ask.operator_surface.layout_parity.evidence_packet.v1\"",
+    );
+    expect(consoleSource).toContain("shouldRenderHelixAskOperatorSurfaceParityHarness(search)");
+    expect(consoleSource).toContain("return <HelixAskOperatorSurfaceParityHarness {...props} />");
     expect(consoleSource).toContain("return <HelixAskConsoleRuntimeShell {...props} />");
     expect(runtimeShellSource).toContain("buildHelixAskConsoleRuntimeBridgeProps(props)");
     expect(runtimeShellSource).toContain("runtimeImplementation = \"legacy_bridge\"");
@@ -1886,6 +2288,18 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(minimalShellSource).toContain("onSubmitPlan?.(submitPlan)");
     expect(minimalShellSource).not.toContain("HelixAskLegacyRuntimeBridge");
     expect(minimalShellSource).not.toContain("@/components/helix/HelixAskPill");
+    expect(buildHelixAskOperatorSurfaceParityHarnessContextIds("ctx")).toEqual({
+      legacyContextId: "ctx:legacy-parity",
+      recrownedContextId: "ctx:recrowned-parity",
+    });
+    expect(parityHarnessSource).toContain("data-parity-harness=\"operator_surface\"");
+    expect(parityHarnessSource).toContain("<HelixAskOperatorSurfaceParityEvidencePanel");
+    expect(parityHarnessSource).toContain("runtimeImplementation=\"legacy_bridge\"");
+    expect(parityHarnessSource).toContain("runtimeImplementation=\"minimal_runtime_shell\"");
+    expect(parityHarnessSource).toContain("buildHelixAskOperatorSurfaceParityHarnessContextIds");
+    expect(parityHarnessSource).not.toContain("@/components/helix/HelixAskPill");
+    expect(parityRouteSource).toContain("HELIX_ASK_OPERATOR_SURFACE_PARITY_ROUTE_PARAM");
+    expect(parityRouteSource).toContain("HELIX_ASK_OPERATOR_SURFACE_PARITY_ROUTE_VALUE");
     for (const forbidden of [
       "runAskTurn",
       "runAskTurnStream",
@@ -2423,9 +2837,13 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(legacyPill).toContain("buildHelixAskConsoleContextFiles");
     expect(legacyPill).toContain("buildHelixAskConsoleContextFiles({");
     expect(legacyPill).not.toContain("function buildHelixAskContextFilesForTurn");
-    expect(legacyPill).toContain("buildHelixAskHardBackendEntrypointRouteMetadata({");
+    expect(legacyPill).toContain("buildHelixAskSubmitBackendEntrypointRoutePlan({");
+    expect(legacyPill).not.toContain("buildHelixAskHardBackendEntrypointRouteMetadata({");
     expect(legacyPill).not.toContain("function buildHelixAskHardBackendEntrypointRouteMetadata");
     expect(backendEntrypointPolicy).toContain("export function buildHelixAskHardBackendEntrypointRouteMetadata");
+    expect(read("client/src/components/helix/ask-console/HelixAskSubmitBackendEntrypointOptions.ts")).toContain(
+      "buildHelixAskHardBackendEntrypointRouteMetadata({",
+    );
     expect(legacyPill).toContain("readHelixAskDocViewerPathFromDesktopUrlForSnapshot");
     expect(activeDocBinding).toContain("readDocPathFromDesktopUrl");
   });
@@ -3052,17 +3470,24 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(legacyPill).not.toContain("askReplies.find((candidate) => candidate.id === clickedTurnScope.clientTurnId) ?? reply");
     expect(legacyPill).toContain("normalizeReplyMasterDebugPayload(clickedReply, payload)");
     expect(legacyPill).toContain("buildReplyScopedDebugExportFromRenderedButton(\n          clickedReply,");
-    expect(legacyPill).toContain("collectHelixAskLegacyReplyTerminalTranscriptTexts(reply)");
+    const renderedReplyDebugExportSource = read(
+      "client/src/components/helix/ask-console/HelixAskRenderedReplyDebugExport.ts",
+    );
+    expect(legacyPill).not.toContain("collectHelixAskLegacyReplyTerminalTranscriptTexts(reply)");
+    expect(renderedReplyDebugExportSource).toContain("collectHelixAskLegacyReplyTerminalTranscriptTexts(args.reply)");
     expect(legacyPill).not.toContain("function collectHelixReplyTerminalTranscriptTexts");
     expect(legacyPill).toContain("debugPayloadMatchesHelixAskLegacyRenderedReply as debugPayloadMatchesRenderedReply");
     expect(legacyPill).not.toContain("function debugPayloadMatchesRenderedReply");
     expect(legacyPill).toContain("boundHelixDebugExportTextForUi");
     expect(legacyPill).toContain("buildHelixAskRuntimeGoalDebugFields(localResponseRecord)");
-    expect(legacyPill).toContain("mergeHelixAskRuntimeGoalDebugFields(authoritativePayload, parsed)");
+    const debugCopyProjectionSource = read("client/src/components/helix/ask-console/HelixAskDebugCopyProjection.ts");
+    expect(legacyPill).toContain("resolveHelixAskAuthoritativeDebugExportPayload(localPayload)");
+    expect(debugCopyProjectionSource).toContain("...mergeHelixAskRuntimeGoalDebugFields(authoritativePayload, parsed)");
     expect(legacyPill).not.toContain("localResponseRecord.runtime_goal_command && typeof localResponseRecord.runtime_goal_command");
     expect(legacyPill).not.toContain("const HELIX_DEBUG_EXPORT_MAX_UI_CHARS = 750_000");
     expect(legacyPill).not.toContain("function copyHelixRailCriticalDebugFieldsForUi");
-    expect(legacyPill).toContain("isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted({");
+    expect(legacyPill).not.toContain("isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted({");
+    expect(renderedReplyDebugExportSource).toContain("isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted({");
     expect(legacyPill).toContain("extractHelixAskLegacyClickedTurnDebugScope(sourceElement)");
     expect(legacyPill).toContain("resolveHelixAskLegacyReplyDebugTurnId as resolveHelixAskReplyDebugTurnId");
     expect(legacyPill).not.toContain("function extractHelixRenderedTurnDebugFromButton");
@@ -3089,6 +3514,8 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(debugSizeControlSource).not.toContain("navigator.clipboard");
     expect(debugSizeControlSource).not.toContain("fetch(");
     expect(debugSizeControlSource).not.toMatch(/from ["']react["']/);
+    expect(debugCopyProjectionSource).toContain("export async function resolveHelixAskAuthoritativeDebugExportPayload");
+    expect(debugCopyProjectionSource).toContain("export async function copyHelixAskDebugPayloadToClipboard");
     for (const forbidden of [
       "navigator.clipboard",
       "speechSynthesis",
@@ -3234,8 +3661,12 @@ describe("Helix Ask Console recrown boundary", () => {
 
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     const controlsSource = read("client/src/components/helix/ask-console/HelixAskLegacyTurnControls.ts");
-    expect(legacyPill).toContain("resolveHelixAskLegacyDebugExportBackendTarget(parsed)");
-    expect(legacyPill).toContain("resolveHelixAskLegacyDebugExportClientTurnId(parsed)");
+    const debugCopyProjectionSource = read("client/src/components/helix/ask-console/HelixAskDebugCopyProjection.ts");
+    expect(debugCopyProjectionSource).toContain("resolveHelixAskLegacyDebugExportBackendTarget(parsed)");
+    expect(debugCopyProjectionSource).toContain("resolveHelixAskLegacyDebugExportClientTurnId(parsed)");
+    expect(legacyPill).not.toContain("resolveHelixAskLegacyDebugExportBackendTarget(parsed)");
+    expect(legacyPill).not.toContain("resolveHelixAskLegacyDebugExportClientTurnId(parsed)");
+    expect(legacyPill).toContain("resolveHelixAskAuthoritativeDebugExportPayload(localPayload)");
     expect(legacyPill).not.toContain("coerceText(parsed.clientSelectedDebugTurnId).trim()");
     expect(controlsSource).toContain("export function resolveHelixAskLegacyDebugExportBackendTarget");
     expect(controlsSource).toContain("export function resolveHelixAskLegacyDebugExportClientTurnId");
@@ -3251,6 +3682,64 @@ describe("Helix Ask Console recrown boundary", () => {
       "runAskTurnStream",
     ]) {
       expect(controlsSource).not.toContain(forbidden);
+    }
+  });
+
+  it("resolves debug-copy backend-entrypoint misses as typed failure before stale sidecar text can answer", async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchCalls: string[] = [];
+    Object.defineProperty(globalThis, "fetch", {
+      configurable: true,
+      value: vi.fn(async (input: unknown) => {
+        fetchCalls.push(String(input));
+        return {
+          ok: false,
+          status: 404,
+          json: vi.fn(async () => ({})),
+        } as unknown as Response;
+      }),
+    });
+
+    try {
+      expect(buildHelixAskBackendTurnDebugExportRef("chat:ask:moral-copy")).toEqual({
+        endpoint: "/api/agi/ask/turn/ask%3Amoral-copy/debug-export",
+        turn_id: "ask:moral-copy",
+      });
+      const resolved = await resolveHelixAskAuthoritativeDebugExportPayload(JSON.stringify({
+        schema: "helix.ask.debug_export.v1",
+        active_turn_id: "ask:moral-copy",
+        selected_final_answer: "stale scientific sidecar text",
+        visible_final_answer: "stale scientific sidecar text",
+        final_answer_source: "scholarly_pdf_workbench_state",
+        terminal_artifact_kind: "scientific_image_evidence",
+        ask_entrypoint_required: true,
+        ask_entrypoint_observed: false,
+        ask_entrypoint_failure_code: "backend_ask_entry_required",
+        source_target_intent: {
+          target_source: "moral_graph",
+          target_kind: "moral_graph_reflection",
+        },
+      }));
+      const parsed = JSON.parse(resolved);
+
+      expect(fetchCalls).toEqual(["/api/agi/ask/turn/ask%3Amoral-copy/debug-export"]);
+      expect(copyHelixAskDebugPayloadToClipboard).toBeTypeOf("function");
+      expect(parsed).toMatchObject({
+        selected_final_answer: "This prompt requires the backend Ask solver path before a final answer can be shown.",
+        visible_final_answer: "This prompt requires the backend Ask solver path before a final answer can be shown.",
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "backend_ask_entry_required",
+        ask_entrypoint_required: true,
+        ask_entrypoint_observed: false,
+        first_broken_rail: "backend_ask_entrypoint",
+        repair_target: "prompt_submit_entrypoint",
+      });
+    } finally {
+      Object.defineProperty(globalThis, "fetch", {
+        configurable: true,
+        value: originalFetch,
+      });
     }
   });
 
@@ -4351,6 +4840,805 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(runtimePicker).not.toContain('fetch("/api/agi/agent-providers"');
   });
 
+  it("keeps live runtime controls developer-gated and outside the language runtime picker", () => {
+    const developerModel = buildHelixAskLiveRuntimeControlsModel({
+      accountPolicy: HELIX_DEVELOPER_ACCOUNT_POLICY,
+      lifecycleState: "listening",
+      transportControllerState: "ready_blocked",
+      transportBlockedReason: "realtime_live_transport_disabled_by_env",
+    });
+    const userModel = buildHelixAskLiveRuntimeControlsModel({
+      accountPolicy: HELIX_USER_ACCOUNT_POLICY,
+      mode: "live_voice",
+      authority: "execute_confirmed_actions",
+    });
+
+    expect(developerModel).toMatchObject({
+      visible: true,
+      locked: false,
+      lockReason: null,
+      modeLabel: "Live Off",
+      authorityLabel: "Observe",
+      lifecycleState: "listening",
+      lifecycleLabel: "Listening",
+      transportControllerState: "ready_blocked",
+      transportControllerLabel: "Ready Blocked",
+      transportBlockedReason: "realtime_live_transport_disabled_by_env",
+      controlState: expect.objectContaining({
+        runtime_agent_mode: "off",
+        runtime_agent_authority: "observe_only",
+        session_status: "idle",
+        answer_authority: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    });
+    expect(userModel).toMatchObject({
+      visible: true,
+      locked: true,
+      lockReason: "developer_runtime_agent_controls_required",
+      modeLabel: "Live Voice",
+      authorityLabel: "Confirm",
+      controlState: expect.objectContaining({
+        runtime_agent_mode: "live_voice",
+        runtime_agent_authority: "execute_confirmed_actions",
+        terminal_eligible: false,
+        assistant_answer: false,
+      }),
+    });
+    expect(isHelixAgentRuntimeId("realtime_session")).toBe(false);
+    expect(normalizeHelixAgentProvidersResponse({
+      providers: [
+        {
+          id: "realtime_session",
+          label: "Realtime runtime session",
+          enabled: true,
+        },
+      ],
+    })).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "helix" }),
+    ]));
+
+    const markup = renderToStaticMarkup(
+      React.createElement(HelixAskLiveRuntimeControls, { model: developerModel }),
+    );
+    const toolbar = read("client/src/components/helix/ask-console/HelixAskActionToolbar.tsx");
+    const actionToolbarSurface = read("client/src/components/helix/ask-console/HelixAskComposerActionToolbarSurface.tsx");
+    const liveRuntimeControls = read("client/src/components/helix/ask-console/HelixAskLiveRuntimeControls.tsx");
+    const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+
+    expect(markup).toContain("Live Off");
+    expect(markup).toContain("Observe");
+    expect(markup).toContain("Listening");
+    expect(markup).toContain("Ready Blocked");
+    expect(toolbar).toContain("{liveRuntimeControls}");
+    expect(actionToolbarSurface).toContain("<HelixAskLiveRuntimeControls");
+    expect(liveRuntimeControls).toContain("developer_runtime_agent_controls_required");
+    expect(liveRuntimeControls).toContain("data-transport-controller-state");
+    expect(liveRuntimeControls).toContain('data-transport-execution-attempted="false"');
+    expect(liveRuntimeControls).not.toContain("fetch(");
+    expect(liveRuntimeControls).not.toContain("navigator.mediaDevices");
+    expect(liveRuntimeControls).not.toContain("RTCPeerConnection");
+    expect(liveRuntimeControls).not.toContain("OpenAI");
+    expect(legacyPill).not.toContain("HelixAskLiveRuntimeControls");
+  });
+
+  it("builds live runtime lifecycle receipts as non-terminal route requests only", () => {
+    expect(HELIX_ASK_LIVE_RUNTIME_LIFECYCLE_STATES).toEqual([
+      "off",
+      "requesting",
+      "active",
+      "listening",
+      "paused",
+      "transcript_received",
+      "stopping",
+      "stopped",
+      "error",
+    ]);
+
+    const receiptKinds = [
+      "session_start_requested",
+      "session_started",
+      "consent_granted",
+      "consent_denied",
+      "mic_permission_granted",
+      "mic_permission_denied",
+      "capture_active",
+      "capture_stopped",
+      "track_stopped",
+      "playback_started",
+      "playback_ended",
+      "playback_failed",
+      "transcript_event_received",
+      "stop_requested",
+      "stopped",
+      "error",
+    ] as const;
+    const payloads = receiptKinds.map((receiptKind) =>
+      buildHelixAskLiveRuntimeClientReceiptPayload({
+        receiptKind,
+        realtimeSessionId: "realtime:test",
+        runtimeAgentMode: "live_transcription",
+        runtimeAgentAuthority: "execute_confirmed_actions",
+        lifecycleState: receiptKind === "transcript_event_received" ? "transcript_received" : undefined,
+        clientReceiptRef: `receipt:${receiptKind}`,
+        observedAtMs: 1783375252000,
+        eventType: receiptKind === "transcript_event_received" ? "transcript.final" : null,
+        sourceBinding: receiptKind === "transcript_event_received" ? { source_id: "mic:visible" } : null,
+        transcriptObservationRef:
+          receiptKind === "transcript_event_received" ? "obs:realtime:transcript:test" : null,
+        transcriptTextHash:
+          receiptKind === "transcript_event_received" ? "sha256:abc" : null,
+        transcriptTextCharCount: receiptKind === "transcript_event_received" ? 42 : null,
+        errorCode: receiptKind === "error" ? "permission_denied" : null,
+      }),
+    );
+
+    for (const payload of payloads) {
+      expect(payload).toMatchObject({
+        schema: "helix.ask.live_runtime.client_receipt.v1",
+        realtime_session_id: "realtime:test",
+        runtime_agent_mode: "live_transcription",
+        runtime_agent_authority: "execute_confirmed_actions",
+        route_method: "POST",
+        transcript_is_user_intent: false,
+        openai_network_call_attempted: false,
+        ephemeral_credential_minted: false,
+        webrtc_started: false,
+        sideband_started: false,
+        media_capture_started: false,
+        browser_media_api_referenced: false,
+        reentry_required: true,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      });
+      expect(payload).not.toHaveProperty("transcript_text");
+      expect(payload).not.toHaveProperty("transcriptText");
+      const request = buildHelixAskLiveRuntimeRouteRequest(payload);
+      expect(request).toMatchObject({
+        method: "POST",
+        path: payload.route_path,
+      });
+      expect(request.body).not.toHaveProperty("transcript_text");
+      expect(request.body).not.toHaveProperty("transcriptText");
+      expect(JSON.stringify(request.body)).not.toContain("navigator.mediaDevices");
+      expect(JSON.stringify(request.body)).not.toContain("RTCPeerConnection");
+      expect(JSON.stringify(request.body)).not.toContain("OpenAI");
+    }
+
+    expect(buildHelixAskLiveRuntimeRouteRequest(payloads[0])).toMatchObject({
+      path: "/api/agi/realtime/session",
+      body: expect.objectContaining({
+        visible_user_consent_receipt: "receipt:session_start_requested",
+        openai_network_call_attempted: false,
+        ephemeral_credential_minted: false,
+        webrtc_started: false,
+        media_capture_started: false,
+      }),
+    });
+    const transcriptReceipt = payloads.find((payload) => payload.receipt_kind === "transcript_event_received");
+    expect(transcriptReceipt).toBeDefined();
+    expect(buildHelixAskLiveRuntimeRouteRequest(transcriptReceipt!)).toMatchObject({
+      path: "/api/agi/realtime/session/realtime%3Atest/event",
+      body: expect.objectContaining({
+        event_type: "transcript.final",
+        event_ref: "obs:realtime:transcript:test",
+        client_receipt_ref: "receipt:transcript_event_received",
+        transcript_text_hash: "sha256:abc",
+        transcript_text_char_count: 42,
+      }),
+    });
+    const stopReceipt = payloads.find((payload) => payload.receipt_kind === "stop_requested");
+    expect(stopReceipt).toBeDefined();
+    expect(buildHelixAskLiveRuntimeRouteRequest(stopReceipt!)).toMatchObject({
+      path: "/api/agi/realtime/session/realtime%3Atest/stop",
+      body: expect.objectContaining({
+        receipt_kind: "stop_requested",
+        lifecycle_state: "stopping",
+        assistant_answer: false,
+        terminal_eligible: false,
+      }),
+    });
+
+    const consentReceipt = buildHelixAskLiveRuntimeClientReceiptPayload({
+      receiptKind: "consent_granted",
+      realtimeSessionId: "realtime:test",
+      clientReceiptRef: "receipt:consent:granted",
+      observedAtMs: 1783375252001,
+    });
+    expect(buildHelixAskLiveRuntimeTransportHandoffPlan({})).toMatchObject({
+      schema: "helix.ask.live_runtime.transport_handoff_plan.v1",
+      status: "waiting_for_visible_consent",
+      visible_user_consent_receipt: null,
+      requires_visible_user_gesture: true,
+      requires_server_session_response: true,
+      requires_client_consent_receipt: true,
+      can_start_browser_transport: false,
+      media_capture_started: false,
+      browser_media_api_referenced: false,
+      webrtc_started: false,
+      openai_network_call_attempted: false,
+      blocked_reason: "visible_user_consent_required",
+      reentry_required: true,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(buildHelixAskLiveRuntimeTransportHandoffPlan({
+      consentReceipt,
+    })).toMatchObject({
+      status: "waiting_for_server_session_response",
+      visible_user_consent_receipt: "receipt:consent:granted",
+      server_session_response_observed: false,
+      can_start_browser_transport: false,
+      blocked_reason: "server_session_response_required",
+    });
+    expect(buildHelixAskLiveRuntimeTransportHandoffPlan({
+      consentReceipt,
+      serverResponse: {
+        schema: "helix.realtime_session.response.v1",
+        ok: false,
+        action: "start",
+        error: "realtime_session_disabled",
+        blocked_reason: "capability_lane_disabled_by_policy",
+        realtime_session_id: "realtime:test",
+        lane_id: "realtime_session",
+        transport: "none",
+        transport_plan: {
+          schema: "helix.realtime_session.transport_plan.v1",
+          requested_transport: "webrtc",
+          planned_transport: "none",
+          adapter_id: "disabled",
+          adapter_state: "disabled",
+          descriptor_enabled: false,
+          adapter_enabled: false,
+          live_transport_enabled: false,
+          live_execution_attempted: false,
+          live_execution_disabled_reason: "realtime_adapter_disabled_by_env",
+          requires_visible_user_gesture: true,
+          requires_server_session_response: true,
+          requires_client_consent_receipt: true,
+          client_secret_requested: false,
+          client_secret_issued: false,
+          sdp_exchange_requested: false,
+          server_sideband_requested: false,
+          provider_session_ref: null,
+          client_receipt_refs: ["receipt:consent:granted"],
+        },
+        client_secret_requested: false,
+        client_secret_issued: false,
+        sdp_exchange_requested: false,
+        server_sideband_requested: false,
+        provider_session_ref: null,
+        openai_network_call_attempted: false,
+        ephemeral_credential_minted: false,
+        webrtc_started: false,
+        sideband_started: false,
+        account_policy: HELIX_DEVELOPER_ACCOUNT_POLICY,
+        policy_gate: {
+          account_type: "developer",
+          runtime_agent_controls_available: true,
+          locked_reason: null,
+          requested_runtime_agent_mode: "live_voice",
+          requested_runtime_agent_authority: "observe_only",
+        },
+        realtime_runtime_session_summary: {} as never,
+        realtime_runtime_session_events: [],
+        realtime_transcript_observations: [],
+        realtime_tool_suggestion_observations: [],
+        realtime_client_receipt_observations: [],
+        realtime_reentry_status: null,
+        reentry_required: true,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+    })).toMatchObject({
+      status: "blocked_live_transport_disabled",
+      server_session_response_observed: true,
+      server_session_response_ok: false,
+      provider_session_ref: null,
+      client_secret_issued: false,
+      sdp_exchange_allowed: false,
+      server_sideband_allowed: false,
+      can_start_browser_transport: false,
+      blocked_reason: "realtime_adapter_disabled_by_env",
+    });
+
+    const lifecycle = read("client/src/components/helix/ask-console/HelixAskLiveRuntimeLifecycle.ts");
+    const controls = read("client/src/components/helix/ask-console/HelixAskLiveRuntimeControls.tsx");
+    const index = read("client/src/components/helix/ask-console/index.ts");
+    const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+
+    expect(lifecycle).not.toContain("fetch(");
+    expect(lifecycle).not.toContain("navigator.mediaDevices");
+    expect(lifecycle).not.toContain("RTCPeerConnection");
+    expect(lifecycle).not.toContain("client_secrets");
+    expect(lifecycle).not.toContain("/v1/realtime");
+    expect(lifecycle).not.toContain("OPENAI_API_KEY");
+    expect(controls).toContain("data-lifecycle-state");
+    expect(index).toContain("buildHelixAskLiveRuntimeClientReceiptPayload");
+    expect(legacyPill).not.toContain("HelixAskLiveRuntimeLifecycle");
+    expect(legacyPill).not.toContain("buildHelixAskLiveRuntimeClientReceiptPayload");
+  });
+
+  it("builds a disabled live runtime transport controller without browser execution", async () => {
+    expect(HELIX_ASK_LIVE_RUNTIME_TRANSPORT_CONTROLLER_STATES).toEqual([
+      "idle",
+      "awaiting_consent",
+      "awaiting_server_session",
+      "ready_blocked",
+      "starting_blocked",
+      "stopping",
+      "stopped",
+      "error",
+    ]);
+
+    const consentReceipt = buildHelixAskLiveRuntimeClientReceiptPayload({
+      receiptKind: "consent_granted",
+      realtimeSessionId: "realtime:controller",
+      clientReceiptRef: "receipt:controller:consent",
+      observedAtMs: 1783375252100,
+    });
+    const handoffPlan = buildHelixAskLiveRuntimeTransportHandoffPlan({
+      consentReceipt,
+      serverResponse: {
+        schema: "helix.realtime_session.response.v1",
+        ok: false,
+        action: "start",
+        error: "realtime_session_disabled",
+        blocked_reason: "capability_lane_disabled_by_policy",
+        realtime_session_id: "realtime:controller",
+        lane_id: "realtime_session",
+        transport: "none",
+        transport_plan: {
+          schema: "helix.realtime_session.transport_plan.v1",
+          requested_transport: "webrtc",
+          planned_transport: "none",
+          adapter_id: "disabled",
+          adapter_state: "disabled",
+          descriptor_enabled: false,
+          adapter_enabled: false,
+          live_transport_enabled: false,
+          live_execution_attempted: false,
+          live_execution_disabled_reason: "realtime_live_transport_disabled_by_env",
+          requires_visible_user_gesture: true,
+          requires_server_session_response: true,
+          requires_client_consent_receipt: true,
+          client_secret_requested: false,
+          client_secret_issued: false,
+          sdp_exchange_requested: false,
+          server_sideband_requested: false,
+          provider_session_ref: null,
+          client_receipt_refs: ["receipt:controller:consent"],
+        },
+        client_secret_requested: false,
+        client_secret_issued: false,
+        sdp_exchange_requested: false,
+        server_sideband_requested: false,
+        provider_session_ref: null,
+        openai_network_call_attempted: false,
+        ephemeral_credential_minted: false,
+        webrtc_started: false,
+        sideband_started: false,
+        account_policy: HELIX_DEVELOPER_ACCOUNT_POLICY,
+        policy_gate: {
+          account_type: "developer",
+          runtime_agent_controls_available: true,
+          locked_reason: null,
+          requested_runtime_agent_mode: "live_voice",
+          requested_runtime_agent_authority: "observe_only",
+        },
+        realtime_runtime_session_summary: {} as never,
+        realtime_runtime_session_events: [],
+        realtime_transcript_observations: [],
+        realtime_tool_suggestion_observations: [],
+        realtime_client_receipt_observations: [],
+        realtime_reentry_status: null,
+        reentry_required: true,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+    });
+    const startBlockedReceipt = buildHelixAskLiveRuntimeTransportLifecycleReceiptPayload({
+      receiptKind: "transport_start_blocked",
+      realtimeSessionId: "realtime:controller",
+      handoffPlan,
+      clientReceiptRef: "receipt:transport:start-blocked",
+      observedAtMs: 1783375252200,
+    });
+    const controller = buildHelixAskLiveRuntimeTransportControllerModel({
+      handoffPlan,
+      latestReceipt: startBlockedReceipt,
+    });
+    const routeRequest = buildHelixAskLiveRuntimeTransportReceiptRouteRequest(startBlockedReceipt);
+
+    expect(controller).toMatchObject({
+      schema: "helix.ask.live_runtime.transport_controller_model.v1",
+      controller_state: "starting_blocked",
+      controller_label: "Start Blocked",
+      latest_lifecycle_receipt_refs: ["receipt:transport:start-blocked"],
+      blocked_reason: "realtime_live_transport_disabled_by_env",
+      transport_execution_attempted: false,
+      media_capture_started: false,
+      browser_media_api_referenced: false,
+      webrtc_started: false,
+      openai_network_call_attempted: false,
+      reentry_required: true,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      events: [
+        expect.objectContaining({
+          event_kind: "transport_start_blocked",
+          receipt_ref: "receipt:transport:start-blocked",
+          transport_execution_attempted: false,
+          media_capture_started: false,
+          webrtc_started: false,
+          assistant_answer: false,
+          terminal_eligible: false,
+        }),
+      ],
+    });
+    expect(startBlockedReceipt).toMatchObject({
+      schema: "helix.ask.live_runtime.transport_lifecycle_receipt.v1",
+      receipt_kind: "transport_start_blocked",
+      controller_state: "starting_blocked",
+      handoff_status: "blocked_live_transport_disabled",
+      route_path: "/api/agi/realtime/session/realtime%3Acontroller/client-receipt",
+      blocked_reason: "realtime_live_transport_disabled_by_env",
+      transport_execution_attempted: false,
+      media_capture_started: false,
+      browser_media_api_referenced: false,
+      webrtc_started: false,
+      openai_network_call_attempted: false,
+      browser_tracks_created: false,
+      data_channels_created: false,
+      reentry_required: true,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(routeRequest).toMatchObject({
+      method: "POST",
+      path: "/api/agi/realtime/session/realtime%3Acontroller/client-receipt",
+      body: expect.objectContaining({
+        receipt_kind: "transport_start_blocked",
+        controller_state: "starting_blocked",
+        transport_execution_attempted: false,
+        media_capture_started: false,
+        browser_media_api_referenced: false,
+        webrtc_started: false,
+        openai_network_call_attempted: false,
+        browser_tracks_created: false,
+        data_channels_created: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+      }),
+    });
+
+    const prepare = await HELIX_ASK_DISABLED_LIVE_RUNTIME_TRANSPORT_BOUNDARY.prepareTransport({
+      handoffPlan,
+      observedAtMs: 1783375252300,
+    });
+    const start = await HELIX_ASK_DISABLED_LIVE_RUNTIME_TRANSPORT_BOUNDARY.startTransport({
+      handoffPlan,
+      observedAtMs: 1783375252400,
+    });
+    const stop = await HELIX_ASK_DISABLED_LIVE_RUNTIME_TRANSPORT_BOUNDARY.stopTransport({
+      realtimeSessionId: "realtime:controller",
+      observedAtMs: 1783375252500,
+    });
+
+    expect(prepare).toMatchObject({
+      ok: false,
+      method: "prepareTransport",
+      controller_state: "ready_blocked",
+      blocked_reason: "realtime_live_transport_disabled_by_env",
+      transport_execution_attempted: false,
+      media_capture_started: false,
+      browser_media_api_referenced: false,
+      webrtc_started: false,
+      openai_network_call_attempted: false,
+      browser_tracks_created: false,
+      data_channels_created: false,
+    });
+    expect(start).toMatchObject({
+      ok: false,
+      method: "startTransport",
+      controller_state: "starting_blocked",
+      receipt: expect.objectContaining({
+        receipt_kind: "transport_start_blocked",
+        terminal_eligible: false,
+        assistant_answer: false,
+      }),
+    });
+    expect(stop).toMatchObject({
+      ok: false,
+      method: "stopTransport",
+      controller_state: "stopped",
+      blocked_reason: "transport_stop_recorded_without_browser_resources",
+      receipt: expect.objectContaining({
+        receipt_kind: "transport_stopped",
+        route_path: "/api/agi/realtime/session/realtime%3Acontroller/client-receipt",
+        media_capture_started: false,
+        webrtc_started: false,
+      }),
+    });
+
+    const lifecycle = read("client/src/components/helix/ask-console/HelixAskLiveRuntimeLifecycle.ts");
+    expect(lifecycle).toContain("prepareTransport");
+    expect(lifecycle).toContain("startTransport");
+    expect(lifecycle).toContain("stopTransport");
+    expect(lifecycle).not.toContain("navigator.mediaDevices");
+    expect(lifecycle).not.toContain("RTCPeerConnection");
+    expect(lifecycle).not.toContain("fetch(");
+    expect(lifecycle).not.toContain("client_secrets");
+    expect(lifecycle).not.toContain("/v1/realtime");
+    expect(lifecycle).not.toContain("OPENAI_API_KEY");
+    expect(lifecycle).not.toContain("MediaStreamTrack");
+    expect(lifecycle).not.toContain("createDataChannel");
+  });
+
+  it("gates live runtime browser Realtime transport on server admission and cleans up explicit resources", async () => {
+    const consentDenied = buildHelixAskLiveRuntimeClientReceiptPayload({
+      receiptKind: "consent_denied",
+      realtimeSessionId: "realtime:browser",
+      clientReceiptRef: "receipt:consent:denied",
+      observedAtMs: 1783375252600,
+      errorCode: "permission_denied",
+    });
+    expect(consentDenied).toMatchObject({
+      lifecycle_state: "error",
+      status: "denied",
+      route_path: "/api/agi/realtime/session/realtime%3Abrowser/client-receipt",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      reentry_required: true,
+    });
+    expect(buildHelixAskLiveRuntimeRouteRequest(consentDenied)).toMatchObject({
+      body: expect.objectContaining({
+        receipt_kind: "consent_denied",
+        status: "denied",
+        error_code: "permission_denied",
+        assistant_answer: false,
+        terminal_eligible: false,
+      }),
+    });
+
+    const deniedMicRequest = vi.fn(async () => ({
+      getTracks: () => [],
+    }));
+    const blockedController = createHelixAskLiveRuntimeBrowserTransportController({
+      requestMicrophone: deniedMicRequest,
+      nowMs: () => 1783375252700,
+    });
+    const blockedHandoff = buildHelixAskLiveRuntimeTransportHandoffPlan({
+      consentReceipt: buildHelixAskLiveRuntimeClientReceiptPayload({
+        receiptKind: "consent_granted",
+        realtimeSessionId: "realtime:browser",
+        clientReceiptRef: "receipt:consent:granted",
+        observedAtMs: 1783375252650,
+      }),
+      serverResponse: {
+        schema: "helix.realtime_session.response.v1",
+        ok: false,
+        action: "start",
+        error: "realtime_session_disabled",
+        blocked_reason: "capability_lane_disabled_by_policy",
+        realtime_session_id: "realtime:browser",
+        lane_id: "realtime_session",
+        transport: "none",
+        transport_plan: {
+          schema: "helix.realtime_session.transport_plan.v1",
+          requested_transport: "webrtc",
+          planned_transport: "none",
+          adapter_id: "openai_realtime_stub",
+          adapter_state: "stubbed",
+          descriptor_enabled: true,
+          adapter_enabled: true,
+          live_transport_enabled: false,
+          live_execution_attempted: false,
+          live_execution_disabled_reason: "realtime_live_transport_disabled_by_env",
+          requires_visible_user_gesture: true,
+          requires_server_session_response: true,
+          requires_client_consent_receipt: true,
+          client_secret_requested: false,
+          client_secret_issued: false,
+          sdp_exchange_requested: false,
+          server_sideband_requested: false,
+          provider_session_ref: null,
+          client_receipt_refs: ["receipt:consent:granted"],
+        },
+        client_secret_requested: false,
+        client_secret_issued: false,
+        sdp_exchange_requested: false,
+        server_sideband_requested: false,
+        provider_session_ref: null,
+        openai_network_call_attempted: false,
+        ephemeral_credential_minted: false,
+        webrtc_started: false,
+        sideband_started: false,
+        account_policy: HELIX_DEVELOPER_ACCOUNT_POLICY,
+        policy_gate: {
+          account_type: "developer",
+          runtime_agent_controls_available: true,
+          locked_reason: null,
+          requested_runtime_agent_mode: "live_voice",
+          requested_runtime_agent_authority: "observe_only",
+        },
+        realtime_runtime_session_summary: {} as never,
+        realtime_runtime_session_events: [],
+        realtime_transcript_observations: [],
+        realtime_tool_suggestion_observations: [],
+        realtime_client_receipt_observations: [],
+        realtime_reentry_status: null,
+        reentry_required: true,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+    });
+    const blockedStart = await blockedController.startTransport({
+      handoffPlan: blockedHandoff,
+      observedAtMs: 1783375252700,
+    });
+    expect(blockedStart).toMatchObject({
+      ok: false,
+      method: "startTransport",
+      controller_state: "starting_blocked",
+      blocked_reason: "realtime_live_transport_disabled_by_env",
+      transport_execution_attempted: false,
+      browser_media_api_referenced: false,
+      media_capture_started: false,
+      webrtc_started: false,
+      openai_network_call_attempted: false,
+      receipt: expect.objectContaining({
+        receipt_kind: "transport_start_blocked",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        reentry_required: true,
+      }),
+    });
+    expect(deniedMicRequest).not.toHaveBeenCalled();
+
+    const stopWithoutResources = await blockedController.stopTransport({
+      realtimeSessionId: "realtime:browser",
+      observedAtMs: 1783375252750,
+    });
+    expect(stopWithoutResources).toMatchObject({
+      ok: false,
+      controller_state: "stopped",
+      blocked_reason: "transport_stop_recorded_without_browser_resources",
+      browser_tracks_created: false,
+      data_channels_created: false,
+      receipt: expect.objectContaining({
+        receipt_kind: "transport_stopped",
+        media_capture_started: false,
+        webrtc_started: false,
+      }),
+    });
+
+    const trackStop = vi.fn();
+    const dataChannelClose = vi.fn();
+    const peerConnectionClose = vi.fn();
+    const allowedHandoff = {
+      schema: "helix.ask.live_runtime.transport_handoff_plan.v1",
+      status: "blocked_live_transport_disabled",
+      visible_user_consent_receipt: "receipt:consent:granted",
+      server_session_response_observed: true,
+      server_session_response_ok: true,
+      transport_plan: blockedHandoff.transport_plan,
+      provider_session_ref: null,
+      requires_visible_user_gesture: true,
+      requires_server_session_response: true,
+      requires_client_consent_receipt: true,
+      client_secret_issued: true,
+      sdp_exchange_allowed: true,
+      server_sideband_allowed: false,
+      can_start_browser_transport: true,
+      media_capture_started: false,
+      browser_media_api_referenced: false,
+      webrtc_started: false,
+      openai_network_call_attempted: false,
+      blocked_reason: "transport_contract_admitted",
+      reentry_required: true,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    } as const;
+    const serverReturnedSessionContract = {
+      ok: true,
+      client_secret_issued: true,
+      sdp_exchange_requested: true,
+      openai_network_call_attempted: false,
+      ephemeral_credential_minted: false,
+    } as never;
+    const allowedController = createHelixAskLiveRuntimeBrowserTransportController({
+      nowMs: () => 1783375252800,
+      requestMicrophone: vi.fn(async () => ({
+        getTracks: () => [{ stop: trackStop }],
+      })),
+      createPeerConnection: () => ({
+        createDataChannel: () => ({ close: dataChannelClose }),
+        close: peerConnectionClose,
+      }),
+    });
+    const started = await allowedController.startTransport({
+      handoffPlan: allowedHandoff,
+      serverResponse: serverReturnedSessionContract,
+      observedAtMs: 1783375252800,
+    });
+    expect(started).toMatchObject({
+      ok: true,
+      transport_execution_attempted: true,
+      browser_media_api_referenced: true,
+      media_capture_started: true,
+      webrtc_started: true,
+      browser_tracks_created: true,
+      data_channels_created: true,
+      openai_network_call_attempted: false,
+      receipt: expect.objectContaining({
+        receipt_kind: "transport_start_requested",
+        transport_execution_attempted: true,
+        browser_media_api_referenced: true,
+        media_capture_started: true,
+        webrtc_started: true,
+        browser_tracks_created: true,
+        data_channels_created: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+      }),
+    });
+    const stopped = await allowedController.stopTransport({
+      realtimeSessionId: "realtime:browser",
+      observedAtMs: 1783375252900,
+    });
+    expect(trackStop).toHaveBeenCalledTimes(1);
+    expect(dataChannelClose).toHaveBeenCalledTimes(1);
+    expect(peerConnectionClose).toHaveBeenCalledTimes(1);
+    expect(stopped).toMatchObject({
+      controller_state: "stopped",
+      blocked_reason: "transport_resources_stopped",
+      browser_tracks_created: true,
+      data_channels_created: true,
+      receipt: expect.objectContaining({
+        receipt_kind: "transport_stopped",
+        browser_tracks_created: true,
+        data_channels_created: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        reentry_required: true,
+      }),
+    });
+
+    const controllerSource = read("client/src/components/helix/ask-console/HelixAskLiveRuntimeTransportController.ts");
+    const lifecycleSource = read("client/src/components/helix/ask-console/HelixAskLiveRuntimeLifecycle.ts");
+    const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    expect(controllerSource).toContain("navigator?.mediaDevices");
+    expect(controllerSource).toContain("RTCPeerConnection");
+    expect(controllerSource).not.toContain("OPENAI_API_KEY");
+    expect(controllerSource).not.toContain("client_secrets");
+    expect(controllerSource).not.toContain("/v1/realtime");
+    expect(lifecycleSource).not.toContain("navigator.mediaDevices");
+    expect(lifecycleSource).not.toContain("RTCPeerConnection");
+    expect(legacyPill).not.toContain("HelixAskLiveRuntimeTransportController");
+  });
+
   it("owns prompt composer display state without submit-stream behavior", () => {
     expect(HELIX_ASK_CONSOLE_MAX_PROMPT_LINES).toBe(10);
     expect(buildHelixAskComposerViewModel({
@@ -4440,7 +5728,7 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(actionToolbarSurface).toContain("onStop={onStop}");
     expect(composer).toContain("runtimeLabel?: string | null");
     expect(composer).not.toContain('placeholder = "Ask Helix about this workspace"');
-    expect(minimalShell).toContain("runtimeLabel={runtimePickerModel.selectedLabel}");
+    expect(minimalShell).toContain("runtimeLabel: runtimePickerModel.selectedLabel");
     expect(composer).toContain('aria-label="Ask Helix"');
     expect(composer).toContain("onSubmitRequested(event.currentTarget.form)");
     expect(composer).toContain("title={viewModel.submitTitle}");
@@ -4921,6 +6209,10 @@ describe("Helix Ask Console recrown boundary", () => {
       runtimeMenuOpen: false,
       onRuntimePrimaryClick: vi.fn(),
       onRuntimeSelect: vi.fn(),
+      liveRuntimeControlsModel: buildHelixAskLiveRuntimeControlsModel({
+        accountPolicy: HELIX_DEVELOPER_ACCOUNT_POLICY,
+        lifecycleState: "transcript_received",
+      }),
       submitViewModel: buildHelixAskComposerViewModel({
         busy: false,
         placeholder: "Ask Helix",
@@ -4934,6 +6226,10 @@ describe("Helix Ask Console recrown boundary", () => {
       micEnabled: true,
       visualSituationSourceStatus: "idle",
       runtimeMenuOpen: false,
+      liveRuntimeControlsModel: expect.objectContaining({
+        lifecycleState: "transcript_received",
+        lifecycleLabel: "Transcript",
+      }),
       onStop,
     });
 
@@ -5796,17 +7092,25 @@ describe("Helix Ask Console recrown boundary", () => {
     });
 
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const submitBackendEntrypointOptions = read(
+      "client/src/components/helix/ask-console/HelixAskSubmitBackendEntrypointOptions.ts",
+    );
     expect(legacyPill).toContain("buildHelixAskSubmitAdmission");
+    expect(legacyPill).toContain("mergeHelixAskSubmitBackendEntrypointRunOptions({");
+    expect(submitBackendEntrypointOptions).toContain("requiresHelixAskBackendEntrypoint(args.question)");
+    expect(submitBackendEntrypointOptions).toContain("requiresBackendAskEntrypoint: true");
+    expect(submitBackendEntrypointOptions).toContain("buildHelixAskHardBackendEntrypointRouteMetadata({");
     expect(legacyPill).toContain("void runAsk(first, selectedCapsuleIds, runOptions)");
   });
 
   it("builds a minimal shell submit plan without starting transport", () => {
-    expect(buildHelixAskMinimalRuntimeSubmitPlan({
+    const submitPlan = buildHelixAskMinimalRuntimeSubmitPlan({
       draft: "  summarize current doc  ",
       selectedRuntime: "codex",
       selectedLanguageModelProfile: "deep",
       desktopUrl: "http://127.0.0.1:1498/desktop?doc=docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
-    })).toEqual({
+    });
+    expect(submitPlan).toMatchObject({
       admission: {
         normalizedEntries: ["summarize current doc"],
         singleEntry: "summarize current doc",
@@ -5819,6 +7123,9 @@ describe("Helix Ask Console recrown boundary", () => {
       },
       context: {
         activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        chat_referent_context_source_summary: {
+          context_present: false,
+        },
       },
       envelope: {
         question: "summarize current doc",
@@ -5961,7 +7268,7 @@ describe("Helix Ask Console recrown boundary", () => {
       turnId: "ask:test-turn",
       maxTokens: 8192,
     });
-    expect(payload).toEqual({
+    expect(payload).toMatchObject({
       sessionId: "session-1",
       agentRuntime: "codex",
       agent_runtime: "codex",
@@ -5974,6 +7281,12 @@ describe("Helix Ask Console recrown boundary", () => {
       doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
       active_doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
       contextFiles: ["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"],
+      workspace_context_snapshot: {
+        activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        chat_referent_context_source_summary: {
+          context_present: false,
+        },
+      },
     });
 
     const seenEvents: unknown[] = [];
@@ -6010,6 +7323,109 @@ describe("Helix Ask Console recrown boundary", () => {
     ]) {
       expect(transportSource).not.toContain(forbidden);
     }
+  });
+
+  it("hydrates minimal runtime named Image Lens receipt prompts with prior answer context and hard backend route metadata", () => {
+    const priorReceiptText = [
+      "The runtime provider echoed Helix internal capability instructions after Image Lens observations re-entered.",
+      "",
+      "**crop_1**",
+      "- Bbox: x=73, y=562, width=1077, height=103",
+      "- Crop ref: [inline image/png crop data redacted; ref_hash=sha256:6718b03937ecd859]",
+      "- Extraction status: extracted",
+      "- Exact equation admissibility: partial_candidate",
+      "- Exact row promotion: not_applicable; reasons: context_crop_not_exact_equation_row",
+      "- Extracted information:",
+      "- latex_candidate:",
+      "```latex",
+      "S = \\int d^4x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_m \\}, \\ (7)",
+      "```",
+    ].join("\n");
+    const question = [
+      "Do not run scholarly lookup or internet retrieval. Use only the latest Image Lens observation receipt named crop_1.",
+      "Evaluate crop_1 as an exact equation row for equation (7).",
+      "Do not finalize a scientific claim, do not run Theory Badge Graph, and do not use calculator payloads.",
+    ].join("\n");
+    const submitPlan = buildHelixAskMinimalRuntimeSubmitPlan({
+      draft: question,
+      selectedRuntime: "codex",
+      desktopUrl: "http://127.0.0.1:1498/desktop?panels=image-lens&focus=image-lens",
+      visibleReplies: [
+        {
+          id: "ask:previous",
+          turn_id: "ask:previous",
+          content: priorReceiptText,
+        },
+      ],
+    });
+    const payload = buildHelixAskMinimalRuntimeTurnPayload({
+      submitPlan,
+      sessionId: "session-1",
+      traceId: "ask:named-receipt",
+      turnId: "ask:named-receipt",
+      maxTokens: 8192,
+    });
+    const workspaceContext = payload?.workspace_context_snapshot as Record<string, unknown> | undefined;
+    const referent = workspaceContext?.chat_referent_context as Record<string, unknown> | undefined;
+    const previousAnswer = referent?.previous_assistant_final_answer as Record<string, unknown> | undefined;
+    const routeMetadata = payload?.route_metadata as Record<string, unknown> | undefined;
+
+    expect(payload).toMatchObject({
+      requiresBackendAskEntrypoint: true,
+      requires_backend_ask_entrypoint: true,
+      ask_entrypoint_required: true,
+      submit_handler_source: "HelixAskMinimalRuntimeShell.submitMinimalRuntimeQuestion",
+      runAsk_entered: true,
+      hard_backend_entrypoint_required: true,
+      use_backend_ask_turn_entrypoint: true,
+      backend_ask_call_attempted: true,
+      backend_ask_call_path: "runAskTurnStream",
+      backend_ask_call_error: null,
+      route_metadata_source: "hard_tool_backend_entrypoint",
+      mandatory_next_tool_name: null,
+      legacy_ask_local_bypassed: true,
+    });
+    expect(payload?.backend_ask_entrypoint_runtime_fingerprint).toMatchObject({
+      schema: "helix.ask.backend_entrypoint_runtime_fingerprint.v1",
+      submit_handler_source: "HelixAskMinimalRuntimeShell.submitMinimalRuntimeQuestion",
+      backend_ask_call_attempted: true,
+      backend_ask_call_path: "runAskTurnStream",
+      route_metadata_source: "hard_tool_backend_entrypoint",
+      mandatory_next_tool_name: null,
+    });
+    expect(previousAnswer?.text).toContain("**crop_1**");
+    expect(previousAnswer?.text).toContain("context_crop_not_exact_equation_row");
+    expect(routeMetadata).toMatchObject({
+      source: "hard_tool_backend_entrypoint",
+      sourceTarget: "scientific_image_evidence",
+      requiredToolFamily: "visual_analysis",
+    });
+    expect(routeMetadata?.mandatory_next_tool).toBeUndefined();
+    expect(routeMetadata?.source_target_intent).toMatchObject({
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      target_source: "scientific_image_evidence",
+    });
+  });
+
+  it("sends backend-entrypoint proof in the legacy Ask backend request before response projection", () => {
+    const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const requestFingerprintIndex = legacyPill.indexOf("const backendEntrypointRequestFingerprint");
+    const payloadIndex = legacyPill.indexOf("const askTurnPayload = {", requestFingerprintIndex);
+    const streamCallIndex = legacyPill.indexOf("localResponse = await runAskTurnStream", payloadIndex);
+    const payloadBlock = legacyPill.slice(payloadIndex, streamCallIndex);
+
+    expect(requestFingerprintIndex).toBeGreaterThan(0);
+    expect(payloadIndex).toBeGreaterThan(requestFingerprintIndex);
+    expect(streamCallIndex).toBeGreaterThan(payloadIndex);
+    expect(payloadBlock).toContain("backend_ask_entrypoint_runtime_fingerprint");
+    expect(payloadBlock).toContain("submit_handler_source");
+    expect(payloadBlock).toContain("runAsk_entered");
+    expect(payloadBlock).toContain("backend_ask_call_attempted");
+    expect(payloadBlock).toContain("backend_ask_call_path");
+    expect(payloadBlock).toContain("legacy_ask_local_bypassed");
+    expect(payloadBlock).toContain("workspaceContextSnapshot: reasoningContextModeForTurn === \"isolated\" ? undefined : workspaceContextSnapshotForTurn");
+    expect(payloadBlock).toContain("routeMetadata: routeMetadataForTurn");
   });
 
   it("wraps backend stream transport with fallback for the minimal runtime shell", async () => {
@@ -6570,13 +7986,22 @@ describe("Helix Ask Console recrown boundary", () => {
           user_message_id: "user-early",
           assistant_message_id: "assistant-late",
           turn_id: "turn-1",
+          backend_ask_call_attempted: false,
+          use_backend_ask_turn_entrypoint: false,
+          ask_entrypoint_observed: false,
         },
         result: {
           selected_final_answer: "Hydrated answer.",
           turn_id: "turn-1",
+          final_answer_source: "durable_chat_session",
+          terminal_artifact_kind: "chat_final_answer",
+          terminal_error_code: null,
           debug: {
             durable_chat_projection: true,
             session_id: "session-1",
+            backend_ask_call_attempted: false,
+            use_backend_ask_turn_entrypoint: false,
+            ask_entrypoint_observed: false,
           },
         },
         liveEvents: [],
@@ -6828,7 +8253,7 @@ describe("Helix Ask Console recrown boundary", () => {
     }, 2).map((reply) => reply.id)).toEqual(["early", "late"]);
 
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
-    expect(legacyPill).toContain("appendHelixAskConsoleReplyChronologically");
+    expect(legacyPill).toContain("appendHelixAskReplyChronologicallyWithOrder");
     expect(legacyPill).toContain("setAskReplies");
   });
 
@@ -8669,5 +10094,118 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(voiceConfirmationState).not.toContain("setTranscriptConfirmState");
     expect(supplementSurface).toContain("<HelixAskTranscriptConfirmationPanel");
     expect(supplementSurface).toContain("visible={transcriptConfirmation.visible}");
+  });
+
+  it("bounds debug exports without preserving stale client projection when backend Ask was required", () => {
+    const staleProjection =
+      "I can see the scientific workflow still has a page source to work from, but the reusable scientific evidence package is not available in this turn.";
+    const oversizedDebugPayload = JSON.stringify({
+      schema: "helix.ask.debug_export.v1",
+      active_turn_id: "ask:moral-graph-entrypoint-missed",
+      active_prompt:
+        "Use the Moral Graph to help me reflect on a roommate situation where delayed disclosure removed planning options.",
+      selected_final_answer: staleProjection,
+      final_answer_source: null,
+      terminal_artifact_kind: null,
+      terminal_error_code: null,
+      ask_entrypoint_required: true,
+      ask_entrypoint_observed: false,
+      ask_entrypoint_failure_code: "backend_ask_entry_required",
+      blocked_projection_kind: "client_projection",
+      debug_export_source: "backend_ref_advertised",
+      backend_debug_response_status: "ref_advertised",
+      giant_debug_blob: "x".repeat(HELIX_DEBUG_EXPORT_MAX_UI_CHARS + 1000),
+    });
+
+    const parsed = JSON.parse(boundHelixDebugExportTextForUi(oversizedDebugPayload));
+
+    expect(parsed).toMatchObject({
+      selected_final_answer: "This prompt requires the backend Ask solver path before a final answer can be shown.",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: "backend_ask_entry_required",
+      first_broken_rail: "backend_ask_entrypoint",
+      repair_target: "prompt_submit_entrypoint",
+    });
+    expect(parsed.selected_final_answer).not.toContain("scientific workflow");
+  });
+
+  it("resolves backend-entrypoint miss as a typed failure before stale client text can answer", () => {
+    const staleProjection =
+      "I can see the scientific workflow still has a page source to work from, but the reusable scientific evidence package is not available in this turn.";
+    const projection = resolveHelixAskBackendEntrypointFailureProjection({
+      source: {
+        selected_final_answer: staleProjection,
+        ask_entrypoint_required: true,
+        ask_entrypoint_observed: false,
+      },
+    });
+
+    expect(projection).toMatchObject({
+      selected_final_answer: "This prompt requires the backend Ask solver path before a final answer can be shown.",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: "backend_ask_entry_required",
+      ask_entrypoint_failure_code: "backend_ask_entry_required",
+      blocked_projection_kind: "client_projection",
+      first_broken_rail: "backend_ask_entrypoint",
+      repair_target: "prompt_submit_entrypoint",
+    });
+    expect(projection?.selected_final_answer).not.toContain("scientific workflow");
+
+    expect(
+      resolveHelixAskBackendEntrypointFailureProjection({
+        source: {
+          selected_final_answer: "Moral Graph answered from its observation.",
+          ask_entrypoint_required: true,
+          ask_entrypoint_observed: true,
+        },
+      }),
+    ).toBeNull();
+  });
+
+  it("selects visible final answer from terminal authority before stale selected text", () => {
+    const selection = selectHelixAskVisibleFinalAnswer({
+      source: {
+        selected_final_answer:
+          "I can see the scientific workflow still has a page source to work from, but the reusable scientific evidence package is not available in this turn.",
+        terminal_answer_authority: {
+          schema: "helix.turn_terminal_authority.v1",
+          server_authoritative: true,
+          terminal_text_preview:
+            "The Moral Graph treats this as a bounded procedural reflection about disclosure under shared dependency.",
+          terminal_artifact_kind: "model_synthesized_answer",
+          final_answer_source: "final_answer_draft",
+        },
+      },
+    });
+
+    expect(selection).toMatchObject({
+      text: "The Moral Graph treats this as a bounded procedural reflection about disclosure under shared dependency.",
+      backendTerminalText:
+        "The Moral Graph treats this as a bounded procedural reflection about disclosure under shared dependency.",
+      terminalArtifactKind: "model_synthesized_answer",
+      finalAnswerSource: "final_answer_draft",
+      authorityVerified: true,
+    });
+    expect(selection.text).not.toContain("scientific workflow");
+  });
+
+  it("selects backend-entrypoint typed failure as visible final answer when projection is blocked", () => {
+    const selection = selectHelixAskVisibleFinalAnswer({
+      source: {
+        selected_final_answer: "This prompt requires the backend Ask solver path before a final answer can be shown.",
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "backend_ask_entry_required",
+      },
+    });
+
+    expect(selection).toMatchObject({
+      text: "This prompt requires the backend Ask solver path before a final answer can be shown.",
+      terminalArtifactKind: "typed_failure",
+      finalAnswerSource: "typed_failure",
+      terminalErrorCode: "backend_ask_entry_required",
+    });
   });
 });

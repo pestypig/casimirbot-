@@ -64,6 +64,27 @@ const liveSourceMailContract = (turnId: string) => ({
   raw_content_included: false,
 });
 
+const moralGraphContract = (turnId: string) => ({
+  schema: "helix.route_product_contract.v1",
+  turn_id: turnId,
+  thread_id: "thread:test",
+  source_target: "moral_graph",
+  allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure", "request_user_input"],
+  forbidden_terminal_artifact_kinds: [
+    "direct_answer_text",
+    "doc_summary",
+    "repo_code_evidence_answer",
+    "scholarly_research_answer",
+    "internet_search_answer",
+    "workspace_action_receipt",
+  ],
+  side_artifact_kinds_allowed: ["moral_graph_reflection", "final_answer_draft"],
+  required_artifact_refs: [],
+  precedence_reason: "moral_graph_requires_reflection_observation_before_terminal_synthesis",
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
 const docsEvidenceContract = (turnId: string) => ({
   schema: "helix.route_product_contract.v1",
   turn_id: turnId,
@@ -216,6 +237,40 @@ const addCalculatorRuntimeProof = (
     canonical_goal_kind: "calculator_solve",
     required_terminal_kind: "workstation_tool_evaluation",
     terminal_artifact_kind: "workstation_tool_evaluation",
+    satisfaction: "satisfied",
+    next_decision: "allow_terminal",
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+const addMoralGraphRuntimeProof = (payload: Record<string, unknown>, observationRef: string): void => {
+  payload.agent_runtime_loop = {
+    schema: "helix.agent_runtime_loop.v1",
+    iterations: [
+      {
+        iteration: 1,
+        next_step: "next_action",
+        chosen_capability: "moral-graph.reflect_context",
+        executed_action_key: "moral-graph.reflect_context",
+        decision_authority: "llm",
+        observed_artifact_refs: [observationRef],
+      },
+      {
+        iteration: 2,
+        next_step: "answer",
+        chosen_capability: "model.synthesize_from_current_observations",
+        decision_authority: "llm",
+        observation_role: "model_answer_draft",
+      },
+    ],
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  payload.goal_satisfaction_evaluation = {
+    schema: "helix.goal_satisfaction_evaluation.v1",
+    canonical_goal_kind: "moral_graph_reflection",
+    required_terminal_kind: "model_synthesized_answer",
     satisfaction: "satisfied",
     next_decision: "allow_terminal",
     assistant_answer: false,
@@ -3355,6 +3410,167 @@ describe("final_answer_draft terminal selection", () => {
     expect((payload.workstation_tool_terminal_synthesis as Record<string, unknown>).applied).toBe(true);
   });
 
+  it("materializes calculator receipt into workstation evaluation when provider text mode does not return a terminal", () => {
+    const turnId = "ask:test:calculator-receipt-materializes-workstation-evaluation";
+    const receiptRef = `${turnId}:calculator_receipt`;
+    const artifacts = [
+      {
+        artifact_id: receiptRef,
+        kind: "calculator_receipt",
+        payload: {
+          schema: "helix.calculator_receipt.v1",
+          kind: "calculator_receipt",
+          capability_key: "scientific-calculator.solve_expression",
+          expression: "2+2",
+          normalized_expression: "2+2",
+          result: "4",
+          status: "succeeded",
+          terminal_eligible: false,
+          post_tool_model_step_required: true,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt:
+        "Call scientific-calculator.solve_expression with this exact expression: 2+2. Wait for calculator_receipt and answer from workstation_tool_evaluation.",
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "calculator_solve",
+        required_terminal_kind: "workstation_tool_evaluation",
+      },
+      source_target_intent: {
+        schema: "helix.ask_source_target_intent.v1",
+        target_source: "calculator_stream",
+        target_kind: "calculator_stream",
+        requested_outputs: ["calculator_receipt", "workstation_tool_evaluation"],
+      },
+      route_product_contract: {
+        ...modelOnlyContract(turnId),
+        source_target: "calculator_stream",
+        allowed_terminal_artifact_kinds: ["workstation_tool_evaluation", "typed_failure", "request_user_input"],
+        required_terminal_kinds: ["workstation_tool_evaluation"],
+      },
+      current_turn_artifact_ledger: artifacts,
+      provider_reasoning_reentry: {
+        schema: "helix.provider_reasoning_reentry.v1",
+        status: "not_run",
+        normalized_observation_packet_count: 1,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+      },
+    };
+    addCalculatorRuntimeProof(payload, receiptRef, "calculator_receipt");
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(result.source).toBe("workstation_tool_evaluation");
+    expect(payload.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(payload.final_answer_source).toBe("workstation_tool_evaluation");
+    expect(payload.terminal_error_code).toBeUndefined();
+    expect(payload.selected_final_answer).toContain("Calculator verification plan completed.");
+    expect(payload.selected_final_answer).toContain("Expression: 2+2");
+    expect(payload.selected_final_answer).toContain("Result: 4");
+    expect(payload.workstation_tool_evaluation).toMatchObject({
+      schema: "helix.workstation_tool_evaluation.v1",
+      supports_goal: true,
+      expression: "2+2",
+      result_text: "4",
+    });
+    expect(artifacts.some((artifact) => artifact.kind === "workstation_tool_evaluation")).toBe(true);
+  });
+
+  it("materializes explicit calculator workstation evaluation requests from provider gateway turns", () => {
+    const turnId = "ask:test:calculator-gateway-provider-terminal-frame";
+    const receiptRef = `${turnId}:codex_normalized:calculator_receipt:1`;
+    const artifacts = [
+      {
+        artifact_id: receiptRef,
+        kind: "calculator_receipt",
+        payload: {
+          schema: "helix.calculator_receipt.v1",
+          kind: "calculator_receipt",
+          capability_key: "scientific-calculator.solve_expression",
+          source_capability_id: "scientific-calculator.solve_expression",
+          expression: "2+2",
+          normalized_expression: "2+2",
+          result: "4",
+          status: "succeeded",
+          terminal_eligible: false,
+          post_tool_model_step_required: true,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt:
+        "Call scientific-calculator.solve_expression with this exact expression: 2+2. Wait for calculator_receipt and answer from workstation_tool_evaluation.",
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "agent_provider_gateway_turn",
+        requested_capability: "scientific-calculator.solve_expression",
+        required_terminal_kind: "agent_provider_terminal_candidate",
+        source: "codex_provider_workstation_gateway_projection",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      provider_gateway_debug_summary: {
+        schema: "helix.provider_gateway_debug_summary.v1",
+        requested_capabilities: ["scientific-calculator.solve_expression"],
+        admitted_capabilities: ["scientific-calculator.solve_expression"],
+        executed_capabilities: ["scientific-calculator.solve_expression"],
+        gateway_successful_tool_observation_count: 1,
+        terminal_candidate_present: false,
+        terminal_authority_granted: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: artifacts,
+      provider_reasoning_reentry: {
+        schema: "helix.provider_reasoning_reentry.v1",
+        status: "not_run",
+        normalized_observation_packet_count: 1,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+      },
+    };
+    addCalculatorRuntimeProof(payload, receiptRef, "calculator_receipt");
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(result.source).toBe("workstation_tool_evaluation");
+    expect(payload.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(payload.final_answer_source).toBe("workstation_tool_evaluation");
+    expect(payload.terminal_error_code).toBeUndefined();
+    expect(payload.selected_final_answer).toContain("Calculator verification plan completed.");
+    expect(payload.selected_final_answer).toContain("Expression: 2+2");
+    expect(payload.selected_final_answer).toContain("Result: 4");
+    expect(payload.workstation_tool_evaluation).toMatchObject({
+      schema: "helix.workstation_tool_evaluation.v1",
+      source: "calculator_receipt_materialization",
+      expression: "2+2",
+      result_text: "4",
+    });
+    expect(artifacts.some((artifact) => artifact.kind === "workstation_tool_evaluation")).toBe(true);
+  });
+
   it("lets satisfied calculator workstation evaluation supersede stale continuation state", () => {
     const turnId = "ask:test:calculator-evaluation-stale-continuation";
     const terminalText = "Calculator-backed result: ((sqrt(81)+ln(e^3))*7-5^2)/2 = 29.5.";
@@ -3881,5 +4097,198 @@ describe("final_answer_draft terminal selection", () => {
     expect(result.selected_terminal_artifact_kind).toBe("model_synthesized_answer");
     expect(result.visible_text).toContain("2*7=14");
     expect(result.integrity.receipt_visible_as_answer).toBe(false);
+  });
+
+  it("materializes a Moral Graph answer only when the draft supports the Moral Graph observation", () => {
+    const turnId = "ask:test:moral-graph-supported-draft";
+    const moralRef = `${turnId}:moral_graph_reflection:1`;
+    const answerText =
+      "The Moral Graph frames this as agency-preserving disclosure: identify the dependency, the lost planning choices, and the repair path without making a character verdict.";
+    const artifacts = [
+      {
+        artifact_id: moralRef,
+        kind: "moral_graph_reflection",
+        payload: {
+          schema: "helix.moral_graph_reflection_observation.v1",
+          artifact_id: moralRef,
+          located_badge_ids: ["agency-preserving-disclosure", "dependency-transparency-gate"],
+          claim_boundary_notes: ["procedural reflection, not character verdict"],
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: `${turnId}:draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: answerText,
+          artifact_refs: [moralRef],
+          support_refs: [moralRef],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt: "Use the Moral Graph reflection tool to reflect on withheld information and agency loss.",
+      route_product_contract: moralGraphContract(turnId),
+      canonical_goal_frame: {
+        goal_kind: "moral_graph_reflection",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      capability_plan: {
+        capability_family: "moral_graph_reflection",
+        requested_capability: "moral-graph.reflect_context",
+        selected_capability: "moral-graph.reflect_context",
+      },
+      tool_call_admission_decision: {
+        requested_capability: "moral-graph.reflect_context",
+        requested_capability_family: "moral_graph_reflection",
+        selected_capability: "moral-graph.reflect_context",
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: "Stale page-grounded equation evidence should not survive.",
+    };
+    addMoralGraphRuntimeProof(payload, moralRef);
+
+    const materialized = materializeFinalAnswerDraftTerminal({
+      turnId,
+      payload,
+      artifactLedger: artifacts,
+      routeProductContract: moralGraphContract(turnId),
+    });
+    expect(materialized?.ok).toBe(true);
+    expect(materialized?.materialized_terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(payload.model_synthesized_answer).toMatchObject({
+      support_refs: expect.arrayContaining([moralRef]),
+      source_families: expect.arrayContaining(["moral_graph_reflection"]),
+    });
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(result.visible_text).toBe(answerText);
+    expect(payload.selected_final_answer).toBe(answerText);
+    expect(payload.selected_final_answer).not.toContain("equation evidence");
+  });
+
+  it("fails closed when a Moral Graph route has only stale scientific sidecar support", () => {
+    const turnId = "ask:test:moral-graph-stale-sidecar-blocked";
+    const moralRef = `${turnId}:moral_graph_reflection:1`;
+    const staleScientificRef = `${turnId}:scientific_image_evidence:prior`;
+    const staleCalculatorRef = `${turnId}:calculator_receipt:prior`;
+    const artifacts = [
+      {
+        artifact_id: moralRef,
+        kind: "moral_graph_reflection",
+        payload: {
+          schema: "helix.moral_graph_reflection_observation.v1",
+          artifact_id: moralRef,
+          located_badge_ids: ["agency-preserving-disclosure"],
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: staleScientificRef,
+        kind: "scientific_image_evidence_continuity_summary",
+        payload: {
+          schema: "helix.scientific_image_evidence_continuity_summary.v1",
+          text: "Stale page-grounded equation evidence.",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: staleCalculatorRef,
+        kind: "calculator_receipt",
+        payload: {
+          schema: "helix.calculator_receipt.v1",
+          expression: "stale prior expression",
+          result: "42",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: `${turnId}:draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: "I have page-grounded equation evidence available, so this can support a bounded conceptual reflection.",
+          artifact_refs: [staleScientificRef, staleCalculatorRef],
+          support_refs: [staleScientificRef, staleCalculatorRef],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt: "Use the Moral Graph reflection tool. Reflect on withheld information and lost agency.",
+      route_product_contract: moralGraphContract(turnId),
+      canonical_goal_frame: {
+        goal_kind: "moral_graph_reflection",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      capability_plan: {
+        capability_family: "moral_graph_reflection",
+        requested_capability: "moral-graph.reflect_context",
+        selected_capability: "moral-graph.reflect_context",
+      },
+      tool_call_admission_decision: {
+        requested_capability: "moral-graph.reflect_context",
+        requested_capability_family: "moral_graph_reflection",
+        selected_capability: "moral-graph.reflect_context",
+      },
+      current_turn_artifact_ledger: artifacts,
+      scholarly_pdf_workbench_state: {
+        schema: "helix.scholarly_pdf_workbench_state.v1",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      scientific_image_evidence_continuation_lookup: {
+        schema: "helix.scientific_image_evidence_continuation_lookup.v1",
+        selected_evidence_ref: staleScientificRef,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      selected_final_answer: "I have page-grounded equation evidence available.",
+    };
+    addMoralGraphRuntimeProof(payload, moralRef);
+
+    const materialized = materializeFinalAnswerDraftTerminal({
+      turnId,
+      payload,
+      artifactLedger: artifacts,
+      routeProductContract: moralGraphContract(turnId),
+    });
+    expect(materialized?.ok).toBe(false);
+    expect(materialized?.blocked_reason).toBe("source_support_refs_missing");
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.terminal_artifact_kind).toBe("typed_failure");
+    expect(["post_tool_model_step_missing", "terminal_projection_mismatch"]).toContain(payload.terminal_error_code);
+    expect(String(payload.selected_final_answer)).not.toContain("page-grounded equation evidence available");
   });
 });

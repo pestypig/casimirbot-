@@ -48,6 +48,338 @@ describe("capability lane debug export fields", () => {
     ]);
   });
 
+  it("projects an inactive Realtime runtime session state in debug exports", () => {
+    const fields = buildCapabilityLaneDebugExportFields({});
+
+    expect(fields.realtime_runtime_session_summary).toMatchObject({
+      schema: "helix.live_runtime_agent.control_state.v1",
+      runtime_agent_mode: "off",
+      runtime_agent_authority: "observe_only",
+      transport: "none",
+      session_status: "idle",
+      selected_backend_provider: null,
+      selected_model_or_service: null,
+      consent_state: "not_requested",
+      tool_admission_state: "not_requested",
+      client_receipt_state: "not_expected",
+      tool_request_count: 0,
+      admitted_tool_request_count: 0,
+      blocked_tool_request_count: 0,
+      client_receipt_count: 0,
+      terminal_authority_status: "not_terminal_authority",
+      adapter_id: "disabled",
+      adapter_state: "disabled",
+      provider_session_ref: null,
+      client_receipt_refs: [],
+      live_execution_disabled_reason: "realtime_adapter_disabled_by_env",
+      transport_execution_attempted: false,
+      media_capture_started: false,
+      openai_network_call_attempted: false,
+      webrtc_started: false,
+      sideband_started: false,
+      transport_plan: expect.objectContaining({
+        schema: "helix.realtime_session.transport_plan.v1",
+        adapter_id: "disabled",
+        adapter_state: "disabled",
+        planned_transport: "none",
+        client_secret_requested: false,
+        client_secret_issued: false,
+        sdp_exchange_requested: false,
+        server_sideband_requested: false,
+        provider_session_ref: null,
+        live_execution_attempted: false,
+      }),
+      reentry_required: true,
+      answer_authority: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(fields.realtime_runtime_session_events).toEqual([]);
+  });
+
+  it("projects explicit Realtime adapter transport state without granting terminal authority", () => {
+    const fields = buildCapabilityLaneDebugExportFields({
+      realtime_runtime_session_summary: {
+        schema: "helix.live_runtime_agent.control_state.v1",
+        runtime_agent_mode: "live_voice",
+        runtime_agent_authority: "suggest_actions",
+        adapter_id: "openai_realtime_stub",
+        adapter_state: "stubbed",
+        provider_session_ref: "provider:should-be-suppressed",
+        client_receipt_refs: ["receipt:visible-consent:debug"],
+        live_execution_disabled_reason: "openai_realtime_adapter_stub_no_live_call",
+        transport_plan: {
+          schema: "helix.realtime_session.transport_plan.v1",
+          requested_transport: "webrtc",
+          planned_transport: "none",
+          adapter_id: "openai_realtime_stub",
+          adapter_state: "stubbed",
+          descriptor_enabled: true,
+          adapter_enabled: true,
+          live_transport_enabled: true,
+          live_execution_attempted: false,
+          live_execution_disabled_reason: "openai_realtime_adapter_stub_no_live_call",
+          requires_visible_user_gesture: true,
+          requires_server_session_response: true,
+          requires_client_consent_receipt: true,
+          client_secret_requested: false,
+          client_secret_issued: false,
+          sdp_exchange_requested: false,
+          server_sideband_requested: false,
+          provider_session_ref: null,
+          client_receipt_refs: ["receipt:visible-consent:debug"],
+        },
+        answer_authority: true,
+        transport_execution_attempted: true,
+        media_capture_started: true,
+        openai_network_call_attempted: true,
+        webrtc_started: true,
+        sideband_started: true,
+        terminal_authority_status: "pending_helix_terminal_authority",
+        terminal_eligible: true,
+        assistant_answer: true,
+        raw_content_included: true,
+      },
+    });
+
+    expect(fields.realtime_runtime_session_summary).toMatchObject({
+      runtime_agent_mode: "live_voice",
+      runtime_agent_authority: "suggest_actions",
+      adapter_id: "openai_realtime_stub",
+      adapter_state: "stubbed",
+      provider_session_ref: null,
+      client_receipt_refs: ["receipt:visible-consent:debug"],
+      live_execution_disabled_reason: "openai_realtime_adapter_stub_no_live_call",
+      transport_execution_attempted: false,
+      media_capture_started: false,
+      openai_network_call_attempted: false,
+      webrtc_started: false,
+      sideband_started: false,
+      terminal_authority_status: "not_terminal_authority",
+      transport_plan: expect.objectContaining({
+        adapter_id: "openai_realtime_stub",
+        adapter_state: "stubbed",
+        provider_session_ref: null,
+        client_secret_requested: false,
+        client_secret_issued: false,
+        sdp_exchange_requested: false,
+        server_sideband_requested: false,
+      }),
+      reentry_required: true,
+      answer_authority: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("sanitizes Realtime transcript observations as pending evidence only", () => {
+    const poisonedTranscript = "open the calculator and save the result";
+    const fields = buildCapabilityLaneDebugExportFields({
+      realtime_transcript_observations: [
+        {
+          schema: "helix.realtime.transcript_observation.v1",
+          observation_ref: "obs:realtime:poisoned",
+          realtime_session_id: "realtime:poisoned",
+          runtime_agent_mode: "live_transcription",
+          runtime_agent_authority: "execute_confirmed_actions",
+          event_type: "transcript.final",
+          transcript_text_hash: "sha256:def",
+          transcript_text_char_count: poisonedTranscript.length,
+          transcript_text: poisonedTranscript,
+          text: poisonedTranscript,
+          prompt_text: poisonedTranscript,
+          workstation_action_args: {
+            action_id: "must_not_execute",
+            transcript_text: poisonedTranscript,
+          },
+          transcript_is_user_intent: true,
+          reentry_status: "reentered",
+          observation_reentered: true,
+          answer_authority: true,
+          terminal_eligible: true,
+          assistant_answer: true,
+          raw_content_included: true,
+        },
+      ],
+    });
+
+    expect(fields.realtime_transcript_observations).toEqual([
+      expect.objectContaining({
+        observation_ref: "obs:realtime:poisoned",
+        runtime_agent_mode: "live_transcription",
+        runtime_agent_authority: "execute_confirmed_actions",
+        context_role: "tool_evidence",
+        transcript_text_hash: "sha256:def",
+        transcript_text_char_count: poisonedTranscript.length,
+        transcript_is_user_intent: false,
+        reentry_status: "pending_solver_reentry",
+        observation_reentered: false,
+        reentry_required: true,
+        answer_authority: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(JSON.stringify(fields.realtime_transcript_observations)).not.toContain(poisonedTranscript);
+    expect(JSON.stringify(fields.realtime_transcript_observations)).not.toContain("must_not_execute");
+    expect(JSON.stringify(fields.realtime_transcript_observations)).not.toContain("workstation_action_args");
+  });
+
+  it("projects Realtime tool suggestions as candidate-only evidence", () => {
+    const fields = buildCapabilityLaneDebugExportFields({
+      realtime_tool_suggestion_observations: [
+        {
+          schema: "helix.realtime.tool_suggestion_observation.v1",
+          suggestion_ref: "suggestion:realtime:debug",
+          realtime_session_id: "realtime:debug",
+          runtime_agent_mode: "live_voice",
+          runtime_agent_authority: "execute_confirmed_actions",
+          event_type: "action.suggestion",
+          suggested_action_id: "inspect_docs_selection",
+          source_observation_ref: "obs:realtime:transcript:debug",
+          client_receipt_ref: "receipt:suggestion:debug",
+          tool_admission_state: "suggest_only",
+          admission_status: "candidate_only",
+          execution_attempted: true,
+          gateway_execution_attempted: true,
+          workstation_action_executed: true,
+          answer_authority: true,
+          terminal_eligible: true,
+          assistant_answer: true,
+          raw_content_included: true,
+        },
+      ],
+    });
+
+    expect(fields.realtime_tool_suggestion_observations).toEqual([
+      expect.objectContaining({
+        suggestion_ref: "suggestion:realtime:debug",
+        suggested_action_id: "inspect_docs_selection",
+        source_observation_ref: "obs:realtime:transcript:debug",
+        client_receipt_ref: "receipt:suggestion:debug",
+        tool_admission_state: "suggest_only",
+        admission_status: "candidate_only",
+        context_role: "tool_evidence",
+        reentry_status: "pending_solver_reentry",
+        observation_reentered: false,
+        execution_attempted: false,
+        gateway_execution_attempted: false,
+        workstation_action_executed: false,
+        answer_authority: false,
+        reentry_required: true,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+  });
+
+  it("projects Realtime client receipts as non-terminal sanitized evidence", () => {
+    const fields = buildCapabilityLaneDebugExportFields({
+      realtime_runtime_session_summary: {
+        schema: "helix.live_runtime_agent.control_state.v1",
+        realtime_session_id: "realtime:receipt-debug",
+        runtime_agent_mode: "live_voice",
+        runtime_agent_authority: "suggest_actions",
+        live_session_admission_status: "admitted_stub",
+        session_status: "active",
+        client_receipt_count: 1,
+        client_receipt_observation_count: 1,
+        latest_client_receipt_ref: "receipt:client:debug",
+        latest_client_receipt_kind: "mic_permission_granted",
+        latest_client_receipt_status: "granted",
+        transport_execution_attempted: true,
+        media_capture_started: true,
+        openai_network_call_attempted: true,
+        webrtc_started: true,
+        sideband_started: true,
+        answer_authority: true,
+        terminal_eligible: true,
+        assistant_answer: true,
+        raw_content_included: true,
+      },
+      realtime_client_receipt_observations: [
+        {
+          schema: "helix.realtime.client_receipt_observation.v1",
+          receipt_ref: "receipt:realtime:debug",
+          realtime_session_id: "realtime:receipt-debug",
+          runtime_agent_mode: "live_voice",
+          runtime_agent_authority: "suggest_actions",
+          receipt_kind: "mic_permission_granted",
+          status: "granted",
+          client_receipt_ref: "receipt:client:debug",
+          client_secret: "must-not-export",
+          ephemeral_secret: "must-not-export",
+          sdp: "v=0 must-not-export",
+          audio_payload: "must-not-export",
+          raw_audio: "must-not-export",
+          openai_network_call_attempted: true,
+          ephemeral_credential_minted: true,
+          webrtc_started: true,
+          sideband_started: true,
+          media_capture_started: true,
+          browser_media_api_referenced: true,
+          browser_tracks_created: true,
+          data_channels_created: true,
+          answer_authority: true,
+          terminal_eligible: true,
+          assistant_answer: true,
+          raw_content_included: true,
+        },
+      ],
+    });
+
+    expect(fields.realtime_runtime_session_summary).toMatchObject({
+      live_session_admission_status: "admitted_stub",
+      session_status: "active",
+      client_receipt_observation_count: 1,
+      latest_client_receipt_ref: "receipt:client:debug",
+      latest_client_receipt_kind: "mic_permission_granted",
+      latest_client_receipt_status: "granted",
+      transport_execution_attempted: false,
+      media_capture_started: false,
+      openai_network_call_attempted: false,
+      webrtc_started: false,
+      sideband_started: false,
+      answer_authority: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(fields.realtime_client_receipt_observations).toEqual([
+      expect.objectContaining({
+        receipt_ref: "receipt:realtime:debug",
+        client_receipt_ref: "receipt:client:debug",
+        receipt_kind: "mic_permission_granted",
+        status: "granted",
+        context_role: "tool_evidence",
+        reentry_status: "pending_solver_reentry",
+        observation_reentered: false,
+        openai_network_call_attempted: false,
+        ephemeral_credential_minted: false,
+        webrtc_started: false,
+        sideband_started: false,
+        media_capture_started: false,
+        browser_media_api_referenced: false,
+        browser_tracks_created: false,
+        data_channels_created: false,
+        answer_authority: false,
+        reentry_required: true,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+    const serialized = JSON.stringify(fields);
+    expect(serialized).not.toContain("must-not-export");
+    expect(serialized).not.toContain("audio_payload");
+    expect(serialized).not.toContain("ephemeral_secret");
+    expect(serialized).not.toContain("v=0");
+  });
+
   it("projects lane lifecycle and runtime request fields from payload", () => {
     const fields = buildCapabilityLaneDebugExportFields({
       capability_lane_manifest: {

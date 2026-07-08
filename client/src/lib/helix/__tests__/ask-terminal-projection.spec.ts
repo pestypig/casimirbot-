@@ -26,6 +26,11 @@ describe("Helix Ask terminal projection", () => {
         "I could not complete that turn because the runtime provider echoed Helix internal capability instructions instead of returning a valid lane request or final answer.\nNo visual observation receipt was produced for this turn.",
       ),
     ).toBe(true);
+    expect(
+      isInvalidTerminalAnswerText(
+        "I could not complete that turn because the runtime provider echoed Helix internal capability instructions instead of returning a valid lane request or final answer.\nNo calculator workstation_tool_evaluation was produced from the calculator receipt for this turn.",
+      ),
+    ).toBe(true);
     expect(isInvalidTerminalAnswerText("  grounded answer ready  ")).toBe(false);
   });
 
@@ -112,6 +117,39 @@ describe("Helix Ask terminal projection", () => {
     expect(visible.primary_source_label).not.toBe("typed failure");
     expect(visible.terminal_error_code).toBeNull();
     expect(visible.selected_final_answer).toBe("Observed expression: 8*9\nResult: 72");
+  });
+
+  it("uses full terminal presentation text instead of terminal authority preview", () => {
+    const preview =
+      "Moral Graph reflection supports the principle as a procedural boundary, not a final moral verdict.\n\nThe strongest matched lenses are `direct-observation-before-claim`, `falsifiability-and-truth-conve";
+    const fullAnswer =
+      "Moral Graph reflection supports the principle as a procedural boundary, not a final moral verdict.\n\nThe strongest matched lenses are `direct-observation-before-claim`, `falsifiability-and-truth-convergence`, and `right-speech-and-accurate-formulation`. Presence is only availability. Permission requires current intent, source-target admission, and a bounded purpose.";
+
+    const visible = buildVisibleResolvedTurn({
+      id: "reply-moral-graph-full-terminal-presentation",
+      turn_id: "ask:moral-graph-full-terminal-presentation",
+      ok: true,
+      selected_final_answer: preview,
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        concise_text: fullAnswer,
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        server_authoritative: true,
+        terminal_text_preview: preview,
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+      },
+    });
+
+    expect(visible.primary_terminal_label).toBe("final_answer");
+    expect(visible.selected_final_answer).toBe(fullAnswer);
+    expect(visible.selected_final_answer).not.toBe(preview);
   });
 
   it("blocks workstation evaluation projection when the backend Ask entrypoint is missing", () => {
@@ -254,6 +292,35 @@ describe("Helix Ask terminal projection", () => {
     expect(visible.selected_final_answer).toBe(
       "This prompt requires the backend Ask solver path before a final answer can be shown.",
     );
+  });
+
+  it("blocks stale scholarly fallbacks for natural Moral Graph prompts without backend authority", () => {
+    const staleScholarlyFallback =
+      "I cannot answer scholarly paper content from this turn because no scholarly-research.lookup_papers observation packet was materialized.\nAsk with an explicit scholarly search target, DOI, or arXiv id so Helix can create bounded research-paper evidence first.";
+    const visible = buildVisibleResolvedTurn({
+      id: "reply-moral-graph-stale-scholarly-fallback",
+      ok: true,
+      question:
+        "Use the Moral Graph to help me reflect on a roommate situation. Do not use calculator, image, PDF, page, or web evidence.",
+      selected_final_answer: staleScholarlyFallback,
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      ask_entrypoint_required: true,
+      debug: {
+        debug_export_source: "rendered_reply_dom",
+        selected_final_answer: staleScholarlyFallback,
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+      },
+    });
+
+    expect(visible.primary_terminal_label).toBe("final_failure");
+    expect(visible.primary_source_label).toBe("typed failure");
+    expect(visible.terminal_error_code).toBe("backend_ask_entry_required");
+    expect(visible.selected_final_answer).toBe(
+      "This prompt requires the backend Ask solver path before a final answer can be shown.",
+    );
+    expect(visible.selected_final_answer).not.toContain("scholarly paper content");
   });
 
   it("lets structured workstation gateway success outrank stale typed-failure labels", () => {

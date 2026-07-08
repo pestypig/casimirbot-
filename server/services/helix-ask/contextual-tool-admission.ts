@@ -78,6 +78,8 @@ const LIVE_ENV_CONTROL_CUE_RE = new RegExp(
   String.raw`\blive_env\.${LIVE_ENV_WORKSTATION_TOOL_PATTERN}\b|\bnarrator\.(?:say|bind_stream)\b`,
   "i",
 );
+const NEGATED_EVIDENCE_FAMILY_RE =
+  /\b(?:do\s+not|don't|dont|never|without|no)\b[^.!?;\n]{0,180}\b(?:use|include|rely\s+on|pull\s+from|answer\s+from)?[^.!?;\n]{0,120}\b(?:calculator|scientific\s+calculator|image|images|visual|image\s+lens|image-lens|pdfs?|pages?|page\s+evidence|web|internet|online|search|scholarly|research|papers?|citations?|references?|sidecars?|side\s+cars?|current[-\s]?panel|panel)\b[^.!?;\n]{0,120}\b(?:evidence|sources?|sidecars?|side\s+cars?|artifacts?|refs?|reference)\b/i;
 
 const stripWriteOnlyNegationsForExternalToolMatching = (prompt: string): string =>
   prompt.replace(MUTATING_WRITE_NEGATION_RE, " ").replace(NEGATED_MUTATING_WRITE_CLAUSE_RE, (clause) => {
@@ -93,6 +95,39 @@ const scholarlyVerbOrCue = (text: string): string =>
     ? "scholarly-research.fetch_full_text"
     : "scholarly-research.lookup_papers";
 
+const isNegatedEvidenceFamilySuppression = (
+  suppression: HelixContextualToolAdmissionSuppression,
+): boolean =>
+  suppression.suppression_reason === "negated_tool_instruction" &&
+  /^external_evidence_family\b/i.test(suppression.verb_or_cue);
+
+const negatedEvidenceFamilyBlocks = (
+  suppression: HelixContextualToolAdmissionSuppression,
+  family: HelixContextualToolSuppressionFamily | string,
+): boolean => {
+  if (!isNegatedEvidenceFamilySuppression(suppression)) return false;
+  const evidenceText = `${suppression.verb_or_cue} ${suppression.text}`;
+  if (family === "scientific_calculator" || family === "calculator") {
+    return /\b(?:scientific\s+calculator|calculator|calculate|compute|equation|expression)\b/i.test(evidenceText);
+  }
+  if (family === "visual_capture" || family === "situation_run") {
+    return /\b(?:image|images|visual|image\s+lens|image-lens|current\s+visual\s+frame)\b/i.test(evidenceText);
+  }
+  if (family === "internet_search") {
+    return /\b(?:web|internet|online|search|browse|google|bing)\b/i.test(evidenceText);
+  }
+  if (family === "scholarly_research") {
+    return /\b(?:scholarly|research|papers?|citations?|references?|bibliograph(?:y|ies)|pdfs?|pages?|web|internet|external)\b/i.test(evidenceText);
+  }
+  if (family === "docs_viewer") {
+    return /\b(?:docs?|documents?|pdfs?|pages?|page\s+evidence|current[-\s]?panel|panel)\b/i.test(evidenceText);
+  }
+  if (family === "runtime_evidence" || family === "workspace_diagnostic") {
+    return /\b(?:sidecars?|side\s+cars?|current[-\s]?panel|panel|artifacts?|refs?|reference)\b/i.test(evidenceText);
+  }
+  return false;
+};
+
 export function contextualToolSuppressionBlocksFamily(
   suppression: HelixContextualToolAdmissionSuppression | null | undefined,
   family: HelixContextualToolSuppressionFamily | string,
@@ -100,6 +135,7 @@ export function contextualToolSuppressionBlocksFamily(
   if (!suppression) return false;
   const cue = suppression.verb_or_cue;
   if (/all[_-]?tools/i.test(cue)) return true;
+  if (negatedEvidenceFamilyBlocks(suppression, family)) return true;
   if (family === "docs_viewer") return /docs_viewer|docs-viewer/i.test(cue) || DOCS_MD_PATH_CUE_RE.test(suppression.text);
   if (family === "scientific_calculator" || family === "calculator") return /scientific[_-]calculator|calculator/i.test(cue);
   if (family === "scholarly_research") return /scholarly|doi|arxiv|paper|citation|research/i.test(cue);
@@ -140,6 +176,7 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       !CAPABILITY_CATALOG_CUE_RE.test(prompt) &&
       !LIVE_SOURCE_MAIL_CUE_RE.test(prompt) &&
       !LIVE_ENV_CONTROL_CUE_RE.test(prompt) &&
+      !NEGATED_EVIDENCE_FAMILY_RE.test(prompt) &&
       !MUTATING_WRITE_NEGATION_RE.test(prompt)
     )
   ) return null;
@@ -152,6 +189,16 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       suppression_reason: "negated_tool_instruction",
       verb_or_cue: "all_tools",
       text: genericNoTools,
+    };
+  }
+
+  const negatedEvidenceFamily = prompt.match(NEGATED_EVIDENCE_FAMILY_RE)?.[0];
+  if (negatedEvidenceFamily) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: "negated_tool_instruction",
+      verb_or_cue: "external_evidence_family",
+      text: negatedEvidenceFamily,
     };
   }
 

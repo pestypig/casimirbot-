@@ -268,6 +268,73 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
     expect(trace.completed_solver_path).toBe(true);
   });
 
+  it("selects Moral Graph observations for agent-provider terminal candidates", () => {
+    const turnId = "turn:moral-graph-provider-answer";
+    const moralRef = `${turnId}:codex_normalized:moral_graph_reflection:1`;
+    const packetRef = `${turnId}:workstation_gateway:moral-graph.reflect_context:packet`;
+    const gate = buildEvidenceReentryGate({
+      turnId,
+      payload: {
+        canonical_goal_frame: {
+          schema: "helix.canonical_goal_frame.v1",
+          goal_kind: "agent_provider_gateway_turn",
+          requested_capability: "moral-graph.reflect_context",
+          required_terminal_kind: "agent_provider_terminal_candidate",
+        },
+        terminal_presentation: {
+          schema: "helix.terminal_presentation.v1",
+          terminal_artifact_kind: "agent_provider_terminal_candidate",
+          final_answer_source: "agent_provider_terminal_candidate",
+          selected_observation_refs: [moralRef],
+        },
+        provider_terminal_candidate: {
+          schema: "helix.agent_provider_terminal_candidate.v1",
+          grounded_in_observation_refs: [packetRef],
+          normalized_observation_refs: [moralRef],
+        },
+        provider_terminal_authority_bridge: {
+          schema: "helix.provider_terminal_authority_bridge.v1",
+          gateway_observation_refs: [packetRef],
+          normalized_observation_refs: [moralRef],
+        },
+        current_turn_artifact_ledger: [
+          {
+            artifact_id: moralRef,
+            kind: "moral_graph_reflection",
+            capability_key: "moral-graph.reflect_context",
+            payload_schema: "helix.moral_graph_reflection_observation.v1",
+            payload: {
+              schema: "helix.moral_graph_reflection_observation.v1",
+              artifact_id: moralRef,
+            },
+          },
+          {
+            artifact_id: packetRef,
+            kind: "provider_gateway_observation_packet",
+            capability_key: "moral-graph.reflect_context",
+            payload_schema: "helix.agent_step_observation_packet.v1",
+          },
+        ],
+      },
+      loopTrace: {
+        actual_tool_calls: [],
+        observations_created: [{ observation_id: moralRef, source_kind: "moral_graph_reflection" }],
+        evidence_selected_for_answer: [],
+        evidence_rejected_for_answer: [],
+      },
+      primaryIntent: "content_question",
+      terminalArtifactKind: "agent_provider_terminal_candidate",
+      finalAnswerSource: "agent_provider_terminal_candidate",
+      finalArbitrationRan: true,
+      sourceEvidenceRequired: true,
+      allowedTerminalProducts: ["agent_provider_terminal_candidate", "typed_failure"],
+    });
+
+    expect(gate.selected_evidence_refs).toEqual(expect.arrayContaining([moralRef, packetRef]));
+    expect(gate.violation_codes).not.toContain("source_observation_terminal_without_selection");
+    expect(gate.completed).toBe(true);
+  });
+
   it("keeps solver final arbitration aligned with authoritative workstation terminal metadata", () => {
     const payload = {
       ...authorityPayload({

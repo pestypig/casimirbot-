@@ -238,7 +238,8 @@ const isGenericAuditFamily = (family: unknown): boolean => {
     normalized === "none" ||
     normalized === "unknown" ||
     normalized === "debug_export" ||
-    normalized === "workstation_action"
+    normalized === "workstation_action" ||
+    normalized === "workstation_tool_gateway"
   );
 };
 
@@ -995,15 +996,23 @@ const supportRefsCount = (payload: RecordLike, artifacts: RecordLike[]): number 
   const draftSelection = readRecord(payload.final_answer_draft_selection);
   const usableDraftSelection = draftSelectionUsableForTerminalProof(payload, draftSelection);
   const refs = unique([
+    ...readStringArray(payload.selected_terminal_support_refs),
+    ...readStringArray(payload.terminal_synthesis_support_refs),
     ...readStringArray(payloadDraft?.support_refs),
     ...readStringArray(payloadDraft?.artifact_refs),
     ...readStringArray(draftPayload?.support_refs),
     ...readStringArray(draftPayload?.artifact_refs),
     ...(authorityRecordUsableForTerminalProof(terminalAuthority)
-      ? readStringArray(terminalAuthority?.support_refs)
+      ? [
+        ...readStringArray(terminalAuthority?.support_refs),
+        ...readStringArray(terminalAuthority?.selected_terminal_support_refs),
+      ]
       : []),
     ...(authorityRecordUsableForTerminalProof(terminalAnswerAuthority)
-      ? readStringArray(terminalAnswerAuthority?.support_refs)
+      ? [
+        ...readStringArray(terminalAnswerAuthority?.support_refs),
+        ...readStringArray(terminalAnswerAuthority?.selected_terminal_support_refs),
+      ]
       : []),
     ...(usableDraftSelection ? readStringArray(draftSelection?.support_refs) : []),
   ]);
@@ -1011,11 +1020,15 @@ const supportRefsCount = (payload: RecordLike, artifacts: RecordLike[]): number 
     refs.length ||
     readNumber(payloadDraft?.support_refs_count) ||
     readNumber(draftPayload?.support_refs_count) ||
+    readNumber(payload.selected_terminal_support_refs_count) ||
+    readNumber(payload.terminal_synthesis_support_refs_count) ||
     (authorityRecordUsableForTerminalProof(terminalAuthority)
-      ? readNumber(terminalAuthority?.support_refs_count)
+      ? readNumber(terminalAuthority?.support_refs_count) ??
+        readNumber(terminalAuthority?.selected_terminal_support_refs_count)
       : null) ||
     (authorityRecordUsableForTerminalProof(terminalAnswerAuthority)
-      ? readNumber(terminalAnswerAuthority?.support_refs_count)
+      ? readNumber(terminalAnswerAuthority?.support_refs_count) ??
+        readNumber(terminalAnswerAuthority?.selected_terminal_support_refs_count)
       : null) ||
     (usableDraftSelection ? readNumber(draftSelection?.support_refs_count) : null) ||
     0
@@ -1469,6 +1482,14 @@ const buildToolTurnChainAudit = (input: {
         normalizedEqual(input.payload.final_answer_source, "capability_help_summary") ||
         input.artifacts.some((artifact) => observationKindMatches(artifact, "capability_help_summary"))),
   );
+  const agentProviderTerminalReenteredObservation = Boolean(
+    observationRef &&
+      supportCount > 0 &&
+      normalizedEqual(requiredTerminal, "agent_provider_terminal_candidate") &&
+      normalizedEqual(materializedTerminal, "agent_provider_terminal_candidate") &&
+      normalizedEqual(authorityTerminal, "agent_provider_terminal_candidate") &&
+      visibleTerminalProjection.proven,
+  );
   const reentryProofSource =
     readString(input.lifecycleTrace?.lifecycle_stage) === "reentered_solver"
       ? "tool_lifecycle_trace.lifecycle_stage"
@@ -1478,6 +1499,8 @@ const buildToolTurnChainAudit = (input: {
           ? "direct_answer_text_materialized"
           : capabilityCatalogSummaryMaterialized
             ? "capability_help_summary_materialized_from_catalog_observation"
+            : agentProviderTerminalReenteredObservation
+              ? "agent_provider_terminal_candidate_with_support_refs"
           : observationRef && supportCount > 0 && finalDraftRef
             ? "final_answer_draft_with_support_refs"
             : null;
@@ -1488,6 +1511,12 @@ const buildToolTurnChainAudit = (input: {
     input.followupDecision,
     observationRef,
   );
+  const observationNeedsReentry = Boolean(
+    observationRef &&
+      !reentryExecuted &&
+      !textToSpeechHandoffTerminalAllowed,
+  );
+  const expectedReentryMissing = Boolean(observationNeedsReentry && expectedReentry);
   const terminalProjectionMismatch = Boolean(authorityTerminal && visibleTerminal && !normalizedEqual(authorityTerminal, visibleTerminal));
   const terminalProductMismatch = Boolean(
     requiredTerminal &&
@@ -1605,14 +1634,16 @@ const buildToolTurnChainAudit = (input: {
                   ? "required_observation_missing"
                   : repoWeakEvidenceRepairLoop
                     ? "weak_evidence_repair_loop"
+                    : expectedReentryMissing
+                      ? "reentry_step_not_executed"
+                    : observationNeedsReentry
+                      ? "observation_not_reentered"
                     : !input.requiredObservationsSatisfied && !concreteTurnChainComplete
                       ? requestedCapability
                         ? "required_observation_missing"
                         : "observation_missing"
-                      : observationRef && !reentryExecuted && !textToSpeechHandoffTerminalAllowed
-                        ? "observation_not_reentered"
-                        : expectedReentry && !reentryExecuted && !textToSpeechHandoffTerminalAllowed
-                          ? "reentry_step_not_executed"
+                      : expectedReentry && !reentryExecuted && !textToSpeechHandoffTerminalAllowed
+                        ? "reentry_step_not_executed"
                           : draftNeedsSupport && supportCount === 0
                             ? "support_refs_missing"
                             : typedFailureInsteadOfRequiredTerminal
@@ -1760,6 +1791,12 @@ const buildToolTurnChainFamilyMatrix = (
       .map((entry) => readString(entry.rail_failure_code))
       .filter((entry): entry is string => Boolean(entry)));
     const compoundStatus = matrixStatusForCompoundEntries(compoundEntries);
+    const primaryReentryFailed =
+      primaryObserved &&
+      (
+        readString(audit.rail_failure_code) === "observation_not_reentered" ||
+        readString(audit.rail_failure_code) === "reentry_step_not_executed"
+      );
     return {
       route_family: matrixFamily,
       observed,
@@ -1795,12 +1832,14 @@ const buildToolTurnChainFamilyMatrix = (
           ? audit.observation_ref ?? null
           : null,
       artifact_reentered: observed
-        ? compoundObserved
+        ? primaryReentryFailed
+          ? false
+          : compoundObserved
           ? compoundEntries.every((entry) =>
               compoundSubgoalHasSatisfiedObservation(entry)
             )
           : primaryObserved
-          ? audit.reentry_executed === true
+          ? audit.reentry_executed === true || audit.reentry_proven === true
           : null
         : null,
       required_terminal_kind: compoundObserved

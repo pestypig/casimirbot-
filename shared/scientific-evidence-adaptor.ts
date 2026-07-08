@@ -435,6 +435,7 @@ const classifyLabelMatch = (
 ): ScientificEquationLabelMatchStatusV1 => {
   if (!requestedEquationLabel) return "not_applicable";
   if (!observedEquationLabels.length) return "missing_observed_label";
+  if (observedEquationLabels.length > 1) return "ambiguous";
   if (observedEquationLabels.includes(requestedEquationLabel)) return "matched";
   return observedEquationLabels.length > 1 ? "ambiguous" : "mismatched";
 };
@@ -454,6 +455,17 @@ const isLabelOnlyExactEquationCandidate = (input: { text: string; latex: string;
   if (!input.hasCandidate) return false;
   const candidates = [input.text, input.latex].map((entry) => entry.trim()).filter(Boolean);
   return candidates.length > 0 && candidates.every(isEquationLabelOnlyCandidate);
+};
+
+const containsMultipleDisplayedEquationCandidates = (input: {
+  text: string;
+  latex: string;
+  observedEquationLabels: string[];
+}): boolean => {
+  const combined = `${input.text}\n${input.latex}`;
+  if (input.observedEquationLabels.length > 1) return true;
+  if (/\blatex_candidate\b[\s\S]{0,80}\[\s*["']/i.test(combined)) return true;
+  return false;
 };
 
 const detectScientificQualityFlags = (input: {
@@ -483,6 +495,7 @@ const detectScientificQualityFlags = (input: {
   }
   if (input.evidenceRole === "exact_equation_candidate") {
     if (isLabelOnlyExactEquationCandidate(input)) flags.push("label_only_equation_locator");
+    if (containsMultipleDisplayedEquationCandidates(input)) flags.push("candidate_contains_multiple_display_equations");
     if (input.labelMatchStatus === "missing_observed_label") flags.push("missing_requested_equation_label");
     if (input.labelMatchStatus === "mismatched") flags.push("mismatched_equation_label");
     if (input.labelMatchStatus === "ambiguous") flags.push("ambiguous_equation_label");
@@ -550,6 +563,7 @@ const qualityFlagReason = (flag: string): string => {
     case "ellipsized_or_truncated_equation": return "The equation candidate is ellipsized or visibly truncated.";
     case "malformed_latex_candidate": return "The LaTeX candidate is malformed.";
     case "label_only_equation_locator": return "The crop contains only an equation label locator, not the equation row.";
+    case "candidate_contains_multiple_display_equations": return "The crop contains multiple displayed equation candidates and must be narrowed before exact-row use.";
     case "row_crop_too_broad_for_exact_equation": return "The row crop is too broad to treat as one exact equation row.";
     case "degenerate_crop_dimensions": return "The crop dimensions are degenerate and cannot support exact extraction.";
     case "exact_row_crop_too_small_for_reliable_math_ocr": return "The exact row crop is too small for reliable math OCR.";
@@ -610,12 +624,16 @@ const isLabelOnlyScientificPacket = (packet: ScientificEvidencePacketV1): boolea
     hasCandidate: Boolean(packet.text_candidate || packet.ocr_text_candidate || packet.latex_candidate),
   });
 
+const isNonSelectableScientificImagePacket = (packet: ScientificEvidencePacketV1): boolean =>
+  isLabelOnlyScientificPacket(packet) ||
+  packet.quality_flags.includes("candidate_contains_multiple_display_equations");
+
 const selectStructuredScientificImageEvidencePacket = (
   packets: ScientificEvidencePacketV1[],
 ): ScientificEvidencePacketV1 | null => {
   const ranked = packets.slice().sort((left, right) => {
     const score = (packet: ScientificEvidencePacketV1): number => {
-      if (isLabelOnlyScientificPacket(packet)) return -10_000;
+      if (isNonSelectableScientificImagePacket(packet)) return -10_000;
       let total = 0;
       if (packet.exact_row_promotion.status === "promoted") total += 10_000;
       if (packet.exact_equation_admissibility === "admissible_for_exact_equation") total += 4_000;
@@ -629,7 +647,7 @@ const selectStructuredScientificImageEvidencePacket = (
     };
     return score(right) - score(left);
   });
-  return ranked.find((packet) => !isLabelOnlyScientificPacket(packet)) ?? null;
+  return ranked.find((packet) => !isNonSelectableScientificImagePacket(packet)) ?? null;
 };
 
 const buildPromotedScientificImageEvidence = (
@@ -757,7 +775,8 @@ export function buildScientificEvidencePacket(input: CandidateInput): Scientific
         status === "not_run" ||
         labelMatchStatus === "mismatched" ||
         labelMatchStatus === "ambiguous" ||
-        allQualityFlags.includes("label_only_equation_locator")
+        allQualityFlags.includes("label_only_equation_locator") ||
+        allQualityFlags.includes("candidate_contains_multiple_display_equations")
         ? "inadmissible_for_exact_equation"
         : (labelMatchStatus === "matched" || (requestedEquationLabel === null && labelMatchStatus === "not_applicable")) &&
           allQualityFlags.length === 0 &&

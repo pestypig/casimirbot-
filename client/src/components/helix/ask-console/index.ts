@@ -1,5 +1,58 @@
 export { HelixAskConsole } from "./HelixAskConsole";
 export {
+  captureHelixAskOperatorSurfaceBrowserRecord,
+  captureHelixAskOperatorSurfaceViewportMeasurement,
+  HELIX_ASK_OPERATOR_SURFACE_BROWSER_CAPTURE_SELECTORS,
+} from "./HelixAskOperatorSurfaceBrowserCapture";
+export type {
+  HelixAskOperatorSurfaceBrowserCaptureResult,
+  HelixAskOperatorSurfaceBrowserCaptureSelectors,
+} from "./HelixAskOperatorSurfaceBrowserCapture";
+export {
+  HELIX_ASK_OPERATOR_SURFACE_PARITY_CHECKLIST,
+  buildHelixAskOperatorSurfaceParityChecklistSummary,
+  selectHelixAskOperatorSurfaceParityChecklistByStatus,
+  selectHelixAskOperatorSurfaceParityLayoutOpenKeys,
+} from "./HelixAskOperatorSurfaceParityChecklist";
+export type {
+  HelixAskOperatorSurfaceParityChecklistItem,
+  HelixAskOperatorSurfaceParityStatus,
+  HelixAskOperatorSurfaceParityValidationKind,
+} from "./HelixAskOperatorSurfaceParityChecklist";
+export {
+  HELIX_ASK_OPERATOR_SURFACE_LAYOUT_PARITY_CRITERIA,
+  buildHelixAskOperatorSurfaceLayoutParityEvidenceFromMeasurements,
+  buildHelixAskOperatorSurfaceLayoutParityBrowserRecord,
+  buildHelixAskOperatorSurfaceLayoutParityEvidencePacket,
+  buildHelixAskOperatorSurfaceLayoutParitySummary,
+  mergeHelixAskOperatorSurfaceLayoutParityEvidence,
+  resolveHelixAskOperatorSurfaceLayoutParityViewportKind,
+  resolveHelixAskOperatorSurfaceLayoutParityReadiness,
+  upsertHelixAskOperatorSurfaceLayoutParityBrowserRecord,
+} from "./HelixAskOperatorSurfaceLayoutParity";
+export type {
+  HelixAskOperatorSurfaceLayoutParityBrowserRecord,
+  HelixAskOperatorSurfaceLayoutParityCriterion,
+  HelixAskOperatorSurfaceLayoutParityEvidence,
+  HelixAskOperatorSurfaceLayoutParityEvidencePacket,
+  HelixAskOperatorSurfaceLayoutParityReadiness,
+  HelixAskOperatorSurfaceLayoutParityRect,
+  HelixAskOperatorSurfaceLayoutParityScrollMetrics,
+  HelixAskOperatorSurfaceLayoutParityViewportKind,
+  HelixAskOperatorSurfaceLayoutParityViewportMeasurement,
+} from "./HelixAskOperatorSurfaceLayoutParity";
+export {
+  HelixAskOperatorSurfaceParityHarness,
+  buildHelixAskOperatorSurfaceParityHarnessContextIds,
+} from "./HelixAskOperatorSurfaceParityHarness";
+export type { HelixAskOperatorSurfaceParityHarnessProps } from "./HelixAskOperatorSurfaceParityHarness";
+export {
+  HELIX_ASK_OPERATOR_SURFACE_PARITY_ROUTE_PARAM,
+  HELIX_ASK_OPERATOR_SURFACE_PARITY_ROUTE_VALUE,
+  buildHelixAskOperatorSurfaceParityRouteHint,
+  shouldRenderHelixAskOperatorSurfaceParityHarness,
+} from "./HelixAskOperatorSurfaceParityRoute";
+export {
   buildHelixAskVoicePlaybackToolHandoffPlan,
   buildHelixAskVoicePlaybackToolOutputState,
   executeHelixAskVoicePlaybackToolHandoffPlan,
@@ -192,6 +245,26 @@ export {
 } from "./HelixAskContextCompactionResumeFrameStorage";
 export { HelixAskRuntimePicker } from "./HelixAskRuntimePicker";
 export { buildHelixAskRuntimePickerModel } from "./HelixAskRuntimePicker";
+export {
+  HelixAskLiveRuntimeControls,
+  buildHelixAskLiveRuntimeControlsModel,
+} from "./HelixAskLiveRuntimeControls";
+export {
+  HELIX_ASK_DISABLED_LIVE_RUNTIME_TRANSPORT_BOUNDARY,
+  HELIX_ASK_LIVE_RUNTIME_LIFECYCLE_STATES,
+  HELIX_ASK_LIVE_RUNTIME_TRANSPORT_CONTROLLER_STATES,
+  buildHelixAskLiveRuntimeClientReceiptPayload,
+  buildHelixAskLiveRuntimeRouteRequest,
+  buildHelixAskLiveRuntimeTransportControllerModel,
+  buildHelixAskLiveRuntimeTransportHandoffPlan,
+  buildHelixAskLiveRuntimeTransportLifecycleReceiptPayload,
+  buildHelixAskLiveRuntimeTransportReceiptRouteRequest,
+  labelForHelixAskLiveRuntimeLifecycleState,
+  labelForHelixAskLiveRuntimeTransportControllerState,
+} from "./HelixAskLiveRuntimeLifecycle";
+export {
+  createHelixAskLiveRuntimeBrowserTransportController,
+} from "./HelixAskLiveRuntimeTransportController";
 export { HelixAskLanguageModelPicker } from "./HelixAskLanguageModelPicker";
 export { buildHelixAskLanguageModelPickerModel } from "./HelixAskLanguageModelPicker";
 export {
@@ -520,7 +593,46 @@ export {
   resolveHelixAskBackendEntrypointFamily,
   shouldUseHelixAskBackendTurnEntrypoint,
 } from "./HelixAskBackendEntrypointPolicy";
+export {
+  applyHelixAskBackendEntrypointFailureProjection,
+  resolveHelixAskBackendEntrypointFailureProjection,
+} from "./HelixAskBackendEntrypointProjection";
+export type { HelixAskBackendEntrypointFailureProjection } from "./HelixAskBackendEntrypointProjection";
+export {
+  buildHelixAskBackendTurnDebugExportRef,
+  buildHelixAskClientProjectionDebugFields,
+  copyHelixAskDebugPayloadToClipboard,
+  normalizeHelixAskBackendTurnDebugExportTurnId,
+  resolveHelixAskAuthoritativeDebugExportPayload,
+} from "./HelixAskDebugCopyProjection";
+export type {
+  HelixAskDebugPayloadClipboardCopyResult,
+} from "./HelixAskDebugCopyProjection";
+export {
+  normalizeHelixAskReplyMasterDebugPayload,
+} from "./HelixAskDebugCopyLocalPayload";
+export type {
+  HelixAskDebugCopyLocalReply,
+  HelixAskDebugCopyVisibleTerminal,
+} from "./HelixAskDebugCopyLocalPayload";
+export {
+  buildHelixAskReplyScopedDebugExportFromRenderedButton,
+  buildHelixAskReplyScopedDebugExportFromRenderedReply,
+} from "./HelixAskRenderedReplyDebugExport";
+export type {
+  HelixAskRenderedReplyDebugExportDeps,
+  HelixAskRenderedReplyDebugExportReply,
+  HelixAskRenderedReplyVisibleTerminal,
+} from "./HelixAskRenderedReplyDebugExport";
 export { buildHelixAskMinimalRuntimeSubmitPlan } from "./HelixAskMinimalRuntimeSubmitPlan";
+export {
+  buildHelixAskSubmitBackendEntrypointRoutePlan,
+  mergeHelixAskSubmitBackendEntrypointRunOptions,
+} from "./HelixAskSubmitBackendEntrypointOptions";
+export type {
+  HelixAskSubmitBackendEntrypointRoutePlan,
+  HelixAskSubmitBackendEntrypointRunOptions,
+} from "./HelixAskSubmitBackendEntrypointOptions";
 export {
   completeHelixAskMinimalRuntimeTurn,
   coerceHelixAskMinimalRuntimeText,
@@ -534,6 +646,12 @@ export {
   buildHelixAskMinimalRuntimeTurnPayload,
   runHelixAskMinimalRuntimeInjectedTransport,
 } from "./HelixAskMinimalRuntimeTransport";
+export {
+  HelixAskOperatorSurfaceParityEvidencePanel,
+} from "./HelixAskOperatorSurfaceParityEvidencePanel";
+export type {
+  HelixAskOperatorSurfaceParityEvidencePanelProps,
+} from "./HelixAskOperatorSurfaceParityEvidencePanel";
 export {
   createHelixAskMinimalRuntimeBackendRunner,
   runHelixAskMinimalRuntimeBackendTurn,
@@ -560,6 +678,8 @@ export {
   hasSuccessfulWorkstationTerminalTranscriptRows,
   resolveHelixAskConsoleFinalAnswerSourceLabel,
 } from "./HelixAskFinalProjection";
+export { selectHelixAskVisibleFinalAnswer } from "./HelixAskVisibleFinalAnswerSelection";
+export type { HelixAskVisibleFinalAnswerSelection } from "./HelixAskVisibleFinalAnswerSelection";
 export {
   isHelixAskConsoleWorkstationTraceRow,
   selectHelixAskConsoleTurnTranscriptRowsForStream,
@@ -691,6 +811,30 @@ export type {
   HelixAskRuntimePickerModel,
   HelixAskRuntimePickerProps,
 } from "./HelixAskRuntimePicker";
+export type { HelixAskLiveRuntimeControlsModel } from "./HelixAskLiveRuntimeControls";
+export type {
+  HelixAskLiveRuntimeClientReceiptKind,
+  HelixAskLiveRuntimeClientReceiptPayload,
+  HelixAskLiveRuntimeLifecycleState,
+  HelixAskLiveRuntimeRouteRequest,
+  HelixAskLiveRuntimeTransportBoundaryResult,
+  HelixAskLiveRuntimeTransportControllerEvent,
+  HelixAskLiveRuntimeTransportControllerModel,
+  HelixAskLiveRuntimeTransportControllerState,
+  HelixAskLiveRuntimeTransportExecutionBoundary,
+  HelixAskLiveRuntimeTransportHandoffPlan,
+  HelixAskLiveRuntimeTransportLifecycleReceiptKind,
+  HelixAskLiveRuntimeTransportLifecycleReceiptPayload,
+} from "./HelixAskLiveRuntimeLifecycle";
+export type {
+  HelixAskLiveRuntimeBrowserResources,
+  HelixAskLiveRuntimeBrowserTransportController,
+  HelixAskLiveRuntimeBrowserTransportDeps,
+  HelixAskLiveRuntimeDataChannelLike,
+  HelixAskLiveRuntimeMediaStreamLike,
+  HelixAskLiveRuntimePeerConnectionLike,
+  HelixAskLiveRuntimeTrackLike,
+} from "./HelixAskLiveRuntimeTransportController";
 export type {
   HelixAskSituationRoomSourceDerivedStateOptions,
   HelixAskSituationRoomSourceStateOptions,

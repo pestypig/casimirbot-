@@ -27,6 +27,7 @@ export type HelixAskActionToolbarProps = {
   visualAudioToggleDisabled?: boolean;
   onToggleVisualAudio: () => void;
   runtimePicker: ReactNode;
+  liveRuntimeControls?: ReactNode;
   submitButton: ReactNode;
 };
 
@@ -97,6 +98,7 @@ export function HelixAskActionToolbar({
   visualAudioToggleDisabled = false,
   onToggleVisualAudio,
   runtimePicker,
+  liveRuntimeControls = null,
   submitButton,
 }: HelixAskActionToolbarProps) {
   const micTitle = micEnabled ? "Disable microphone" : "Enable microphone";
@@ -128,6 +130,7 @@ export function HelixAskActionToolbar({
           onChange={onImageSelect}
         />
         {runtimePicker}
+        {liveRuntimeControls}
         <button
           type="button"
           data-helix-ask-action-item="true"

@@ -4,6 +4,7 @@ import {
   summarizeHelixDebugArtifactsForCopy,
 } from "@/lib/helix/ask-debug-event-display";
 import { readAgentLoopAuditRecord } from "@/lib/helix/ask-runtime-authority-readers";
+import { applyHelixAskBackendEntrypointFailureProjection } from "./HelixAskBackendEntrypointProjection";
 
 export const HELIX_DEBUG_EXPORT_MAX_UI_CHARS = 750_000;
 
@@ -124,6 +125,7 @@ export function boundHelixDebugExportTextForUi(payload: string): string {
     ].forEach((key) => {
       if (parsed[key] !== undefined) minimal[key] = parsed[key];
     });
+    applyHelixAskBackendEntrypointFailureProjection({ target: minimal, source: parsed, debug });
     copyHelixRailCriticalDebugFieldsForUi(minimal, parsed, debug);
     minimal.debug = {
       schema: "helix.ask.debug_export_minimal_debug.v1",
@@ -166,6 +168,13 @@ export function boundHelixDebugExportTextForUi(payload: string): string {
       selected_final_answer: parsed.selected_final_answer ?? null,
       final_answer_source: parsed.final_answer_source ?? null,
       terminal_artifact_kind: parsed.terminal_artifact_kind ?? null,
+      terminal_error_code: parsed.terminal_error_code ?? null,
+      ask_entrypoint_required: parsed.ask_entrypoint_required ?? debug?.ask_entrypoint_required ?? null,
+      ask_entrypoint_observed: parsed.ask_entrypoint_observed ?? debug?.ask_entrypoint_observed ?? null,
+      ask_entrypoint_failure_code: parsed.ask_entrypoint_failure_code ?? debug?.ask_entrypoint_failure_code ?? null,
+      blocked_projection_kind: parsed.blocked_projection_kind ?? debug?.blocked_projection_kind ?? null,
+      first_broken_rail: parsed.first_broken_rail ?? debug?.first_broken_rail ?? null,
+      repair_target: parsed.repair_target ?? debug?.repair_target ?? null,
       server_build_commit: parsed.server_build_commit ?? debug?.server_build_commit ?? null,
       helix_docs_synthesis_bridge_version:
         parsed.helix_docs_synthesis_bridge_version ?? debug?.helix_docs_synthesis_bridge_version ?? null,
@@ -179,6 +188,7 @@ export function boundHelixDebugExportTextForUi(payload: string): string {
       client_console_assembly_debug: parsed.client_console_assembly_debug ?? debug?.client_console_assembly_debug ?? null,
       debug_export_size_control: minimal.debug_export_size_control,
     };
+    applyHelixAskBackendEntrypointFailureProjection({ target: fallback, source: parsed, debug });
     copyHelixRailCriticalDebugFieldsForUi(fallback, parsed, debug);
     return safeJsonStringify(fallback);
   } catch {

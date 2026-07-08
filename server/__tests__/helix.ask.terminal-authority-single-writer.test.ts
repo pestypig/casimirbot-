@@ -21,8 +21,572 @@ const makePostToolObservation = (turnId: string) => ({
     panel_id: "docs-viewer",
   },
 });
-
 describe("Helix terminal authority single writer", () => {
+  it("selects a Postulate runtime review candidate through terminal authority", () => {
+    const turnId = "ask:test:postulate-runtime-review";
+    const answerText = "Postulate review: submit at 91%.\nSubmitted: yes.\nBoundary: accepted means constructive review candidate, not proof, physical viability, or certification.";
+    const reviewArtifact = {
+      artifact_id: `${turnId}:postulate_runtime_review`,
+      kind: "postulate_runtime_review",
+      payload: {
+        schema: "helix.postulate_runtime_review.v1",
+        artifact_id: `${turnId}:postulate_runtime_review`,
+        turn_id: turnId,
+        text: answerText,
+        answer_text: answerText,
+        terminal_result: {
+          schema: "helix.ask.postulate_review_result.v1",
+          runtimeReview: {
+            readinessRating: 91,
+            decision: "submit",
+          },
+          submissionGate: {
+            shouldSubmit: true,
+            reasons: [],
+          },
+        },
+        assistant_answer: false,
+        terminal_eligible: true,
+        raw_content_included: false,
+      },
+    };
+    const artifacts = [reviewArtifact];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      ok: true,
+      response_type: "final_answer",
+      final_status: "completed",
+      postulate_runtime_review: reviewArtifact.payload,
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        required_terminal_kind: "postulate_runtime_review",
+        required_terminal_artifact_kind: "postulate_runtime_review",
+        allowed_terminal_artifact_kinds: ["postulate_runtime_review", "typed_failure"],
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "postulate_runtime_review",
+        required_terminal_kind: "postulate_runtime_review",
+      },
+      current_turn_artifact_ledger: artifacts,
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("postulate_runtime_review");
+    expect(result.source).toBe("postulate_runtime_review");
+    expect(result.visible_text).toBe(answerText);
+    expect(payload.terminal_artifact_kind).toBe("postulate_runtime_review");
+    expect(payload.final_answer_source).toBe("postulate_runtime_review");
+    expect(payload.selected_final_answer).toBe(answerText);
+    expect(payload.terminal_error_code).toBeUndefined();
+  });
+
+  it("allows a bounded Image Lens observation report after visual receipt re-entry", () => {
+    const turnId = "ask:test:image-lens-observation-report";
+    const observationRef = `${turnId}:capability_lane:visual_analysis.inspect_image_region:obs`;
+    const answerText = [
+      "The runtime provider echoed Helix internal capability instructions after Image Lens observations re-entered, so I am using only the observation receipts below and not the echoed provider text.",
+      "",
+      "**crop_1**",
+      "- Bbox: x=73, y=570, width=1077, height=87",
+      "- Extraction status: extracted",
+      "- Exact equation admissibility: admissible_for_exact_equation",
+      "- Exact row promotion: promoted; reasons: requested_label_matched, single_clean_row, extracted_latex_candidate_present",
+    ].join("\n");
+    const artifacts = [
+      {
+        artifact_id: observationRef,
+        kind: "agent_step_observation_packet",
+        payload: {
+          schema: "helix.agent_step_observation_packet.v1",
+          turn_id: turnId,
+          status: "succeeded",
+          terminal_eligible: false,
+          post_tool_model_step_required: true,
+          action: "inspect_image_region",
+          panel_id: "image_lens",
+          capability_key: "visual_analysis.inspect_image_region",
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      ok: true,
+      response_type: "final_answer",
+      final_status: "completed",
+      selected_final_answer: answerText,
+      answer: answerText,
+      text: answerText,
+      final_answer_source: "provider_image_lens_observation_report",
+      terminal_artifact_kind: "image_lens_observation_report",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        required_terminal_artifact_kind: "image_lens_observation_report",
+        required_terminal_kind: "image_lens_observation_report",
+        allowed_terminal_artifact_kinds: ["image_lens_observation_report", "typed_failure"],
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "agent_provider_gateway_turn",
+        required_terminal_kind: "image_lens_observation_report",
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        thread_id: "thread:test",
+        turn_id: turnId,
+        terminal_kind: "answer",
+        final_answer_source: "provider_image_lens_observation_report",
+        terminal_artifact_kind: "image_lens_observation_report",
+        terminal_item_id: `${turnId}:image_lens_observation_report`,
+        terminal_text_preview: answerText,
+        server_authoritative: true,
+        terminal_eligible: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        turn_id: turnId,
+        terminal_artifact_kind: "image_lens_observation_report",
+        concise_text: answerText,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: artifacts,
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("image_lens_observation_report");
+    expect(result.source).toBe("provider_image_lens_observation_report");
+    expect(result.visible_text).toBe(answerText);
+    expect(payload.terminal_artifact_kind).toBe("image_lens_observation_report");
+    expect(payload.final_answer_source).toBe("provider_image_lens_observation_report");
+    expect(payload.terminal_error_code).toBeUndefined();
+    expect(String(payload.selected_final_answer)).not.toContain("post-tool model step");
+  });
+
+  it("materializes an Image Lens observation report from the current turn ledger before post-tool failure", () => {
+    const turnId = "ask:test:image-lens-ledger-materialized";
+    const observationRef = `${turnId}:capability_lane:visual_analysis.inspect_image_region:obs`;
+    const receipt = {
+      capability: "visual_analysis.inspect_image_region",
+      region_label: "equation_7",
+      bbox_px: { x: 73, y: 570, width: 1077, height: 87 },
+      crop_ref: "sha256:test#crop=73,570,1077,87",
+      extraction_status: "extracted",
+      label_match_status: "matched",
+      exact_equation_admissibility: "admissible_for_exact_equation",
+      exact_row_promotion: {
+        status: "promoted",
+        reasons: ["requested_label_matched", "single_clean_row", "extracted_latex_candidate_present"],
+      },
+      text_candidate:
+        "S = \\int d^{4}x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_{m} \\}, (7)",
+      latex_candidate:
+        "S = \\int d^{4}x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_{m} \\}, \\quad (7)",
+    };
+    const artifacts = [
+      {
+        artifact_id: observationRef,
+        kind: "capability_lane_observation_packet",
+        payload: {
+          schema: "helix.agent_step_observation_packet.v1",
+          turn_id: turnId,
+          status: "succeeded",
+          terminal_eligible: false,
+          post_tool_model_step_required: true,
+          capability_key: "visual_analysis.inspect_image_region",
+          receipt,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      ok: true,
+      response_type: "final_answer",
+      final_status: "completed",
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      final_answer_source: "agent_provider_terminal_candidate",
+      solver_continuation_observation: {
+        schema: "helix.solver_continuation_observation.v1",
+        required_next_step: "finalize",
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        required_terminal_artifact_kind: "image_lens_observation_report",
+        allowed_terminal_artifact_kinds: ["image_lens_observation_report", "typed_failure"],
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "image_lens_region_inspection",
+        required_terminal_kind: "image_lens_observation_report",
+      },
+      debug: {
+        capability_lane_call_results: [
+          {
+            capability: "visual_analysis.inspect_image_region",
+            ok: true,
+            receipt,
+          },
+        ],
+      },
+      current_turn_artifact_ledger: artifacts,
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("image_lens_observation_report");
+    expect(result.source).toBe("provider_image_lens_observation_report");
+    expect(result.visible_text).toContain("**equation_7**");
+    expect(result.visible_text).toContain("admissible_for_exact_equation");
+    expect(result.visible_text).toContain("```latex");
+    expect(payload.terminal_artifact_kind).toBe("image_lens_observation_report");
+    expect(payload.final_answer_source).toBe("provider_image_lens_observation_report");
+    expect(payload.terminal_error_code).toBeUndefined();
+    expect(String(payload.selected_final_answer)).not.toContain("post-tool model step");
+  });
+
+  it("keeps Image Lens observation packets ambient when the route does not admit image reports", () => {
+    const turnId = "ask:test:image-lens-ambient-not-terminal";
+    const answerText = "A direct conceptual answer should remain the terminal answer.";
+    const imageObservationRef = `${turnId}:capability_lane:visual_analysis.inspect_image_region:obs`;
+    const directAnswerRef = `${turnId}:direct_answer_text`;
+    const receipt = {
+      capability: "visual_analysis.inspect_image_region",
+      region_label: "equation_7",
+      bbox_px: { x: 73, y: 570, width: 1077, height: 87 },
+      crop_ref: "sha256:test#crop=73,570,1077,87",
+      extraction_status: "extracted",
+      exact_equation_admissibility: "admissible_for_exact_equation",
+      latex_candidate:
+        "S = \\int d^{4}x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_{m} \\}, \\quad (7)",
+    };
+    const artifacts = [
+      {
+        artifact_id: imageObservationRef,
+        kind: "capability_lane_observation_packet",
+        payload: {
+          schema: "helix.agent_step_observation_packet.v1",
+          turn_id: turnId,
+          status: "succeeded",
+          capability_key: "visual_analysis.inspect_image_region",
+          receipt,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: directAnswerRef,
+        kind: "direct_answer_text",
+        payload: {
+          schema: "helix.direct_answer_text.v1",
+          artifact_id: directAnswerRef,
+          text: answerText,
+          answer_text: answerText,
+          terminal_eligible: true,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      ok: true,
+      response_type: "final_answer",
+      final_status: "completed",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        required_terminal_kind: "direct_answer_text",
+        allowed_terminal_artifact_kinds: ["direct_answer_text", "typed_failure"],
+      },
+      committed_ask_route: {
+        schema: "helix.committed_ask_route.v1",
+        turn_id: turnId,
+        commit_id: "commit:test",
+        prompt_hash: "hash:test",
+        committed_at_stage: "post_prompt_source_arbitration",
+        prompt_intent: {
+          primary_intent_kind: "content_question",
+          secondary_intent_kinds: [],
+        },
+        route: {
+          selected_route: "model_only_concept",
+          source_target: "model_only",
+          target_kind: "general_background",
+          strength: "hard",
+          route_reason: "image_lens_observation_is_ambient",
+          stale_metadata_policy: "ignore_unless_matches_commit",
+        },
+        canonical_goal: {
+          goal_kind: "model_only_concept",
+          required_terminal_kind: "direct_answer_text",
+          allowed_terminal_artifact_kinds: ["direct_answer_text", "typed_failure"],
+        },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: artifacts,
+      canonical_goal_frame: {
+        goal_kind: "model_only_concept",
+        answer_scope: "model_only",
+        required_terminal_kind: "direct_answer_text",
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+        terminal_contract: {
+          goal_kind: "model_only_concept",
+          required_terminal_kinds: ["direct_answer_text"],
+        },
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("direct_answer_text");
+    expect(result.source).toBe("direct_answer_text");
+    expect(result.visible_text).toBe(answerText);
+    expect(payload.terminal_artifact_kind).toBe("direct_answer_text");
+    expect(payload.final_answer_source).not.toBe("provider_image_lens_observation_report");
+    expect(payload.selected_final_answer).toBe(answerText);
+  });
+
+  it("surfaces an authorized provider terminal candidate after Moral Graph observation re-entry", () => {
+    const turnId = "ask:test:moral-graph-provider-terminal";
+    const observationRef = `${turnId}:codex_normalized:moral_graph_reflection:1`;
+    const staleImageRef = `${turnId}:prior_scientific_image_sidecar`;
+    const staleScholarlyRef = `${turnId}:prior_scholarly_lookup`;
+    const answerText =
+      "The Moral Graph frames delayed disclosure as a dependency-transparency problem that should preserve agency before options close.";
+    const artifacts = [
+      {
+        artifact_id: observationRef,
+        kind: "moral_graph_reflection",
+        payload: {
+          schema: "helix.moral_graph_reflection_observation.v1",
+          turn_id: turnId,
+          capability_key: "moral-graph.reflect_context",
+          status: "succeeded",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: staleImageRef,
+        kind: "scientific_image_evidence_sidecar",
+        source_scope: "prior_context",
+        payload: {
+          schema: "helix.scientific_image_evidence_sidecar.v1",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: staleScholarlyRef,
+        kind: "scholarly_research_observation",
+        source_scope: "prior_context",
+        payload: {
+          schema: "helix.scholarly_research_observation.v1",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      response_type: "final_answer",
+      final_status: "completed",
+      text: answerText,
+      answer: answerText,
+      selected_final_answer: answerText,
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "agent_provider_gateway_turn",
+        required_terminal_artifact_kind: "agent_provider_terminal_candidate",
+        allowed_terminal_artifact_kinds: ["agent_provider_terminal_candidate", "typed_failure"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "agent_provider_gateway_turn",
+        requested_capability: "moral-graph.reflect_context",
+        required_terminal_kind: "agent_provider_terminal_candidate",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        thread_id: "thread:test",
+        turn_id: turnId,
+        route: "/ask/turn",
+        terminal_kind: "answer",
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        terminal_item_id: `${turnId}:agent_provider_terminal_candidate:codex:abc123`,
+        terminal_text_preview: answerText,
+        server_authoritative: true,
+        terminal_eligible: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        turn_id: turnId,
+        concise_text: answerText,
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_authority_ref: `${turnId}:agent_provider_terminal_candidate:codex:abc123`,
+        selected_observation_refs: [observationRef, staleImageRef],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      debug: {
+        provider_terminal_candidate: {
+          schema: "helix.agent_provider_terminal_candidate.v1",
+          candidate_id: `${turnId}:agent_provider_terminal_candidate:codex:abc123`,
+          candidate_text_preview: answerText,
+          grounded_in_observation_refs: [observationRef, staleImageRef, staleScholarlyRef],
+          normalized_observation_refs: [observationRef, staleImageRef],
+          evidence_reentry_required: true,
+          provider_reasoning_completed: true,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+      current_turn_artifact_ledger: artifacts,
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("agent_provider_terminal_candidate");
+    expect(result.source).toBe("agent_provider_terminal_candidate");
+    expect(result.visible_text).toBe(answerText);
+    expect(payload.final_answer_source).toBe("agent_provider_terminal_candidate");
+    expect(payload.terminal_artifact_kind).toBe("agent_provider_terminal_candidate");
+    expect(payload.terminal_error_code).toBeUndefined();
+    expect(payload.selected_terminal_support_refs).toEqual([observationRef]);
+    expect(payload.terminal_synthesis_support_refs).toEqual([observationRef]);
+    expect((payload.terminal_presentation as Record<string, unknown>).selected_observation_refs).toEqual([
+      observationRef,
+    ]);
+    expect((payload.terminal_presentation as Record<string, unknown>).support_refs).toEqual([observationRef]);
+    expect((payload.terminal_presentation as Record<string, unknown>).rejected_support_refs).toEqual([
+      staleImageRef,
+      staleScholarlyRef,
+    ]);
+    expect((payload.terminal_presentation as Record<string, unknown>).support_ref_filter).toBe("moral_graph_reflection_only");
+  });
+
+  it("fails closed with a Moral Graph typed failure when no provider terminal candidate follows observation re-entry", () => {
+    const turnId = "ask:test:moral-graph-provider-terminal-missing";
+    const observationRef = `${turnId}:codex_normalized:moral_graph_reflection:1`;
+    const artifacts = [
+      {
+        artifact_id: observationRef,
+        kind: "moral_graph_reflection",
+        payload: {
+          schema: "helix.moral_graph_reflection_observation.v1",
+          turn_id: turnId,
+          capability_key: "moral-graph.reflect_context",
+          status: "succeeded",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      response_type: "final_answer",
+      final_status: "completed",
+      final_answer_source: "workstation_tool_observation",
+      terminal_artifact_kind: "moral_graph_reflection",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "agent_provider_gateway_turn",
+        required_terminal_artifact_kind: "agent_provider_terminal_candidate",
+        allowed_terminal_artifact_kinds: ["agent_provider_terminal_candidate", "typed_failure"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "agent_provider_gateway_turn",
+        requested_capability: "moral-graph.reflect_context",
+        required_terminal_kind: "agent_provider_terminal_candidate",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: artifacts,
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(result.source).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("moral_graph_agent_provider_terminal_candidate_missing");
+    expect(String(payload.selected_final_answer)).toContain("Moral Graph observation was produced");
+    expect((payload.typed_failure as Record<string, unknown>)).toMatchObject({
+      schema: "helix.typed_failure.v1",
+      error_code: "moral_graph_agent_provider_terminal_candidate_missing",
+      route_family: "moral_graph_reflection",
+      required_terminal_artifact_kind: "agent_provider_terminal_candidate",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(String(payload.selected_final_answer)).not.toMatch(/scholarly|calculator|internet search|PDF\/full-text/i);
+  });
+
   it("does not surface success-looking drafts for failed mutating capability rails", () => {
     const turnId = "ask:test:goal-session-not-admitted";
     const successLookingText =
@@ -366,6 +930,25 @@ describe("Helix terminal authority single writer", () => {
           authority: "llm_post_observation_composer",
         },
       },
+      {
+        artifact_id: `${turnId}:obs`,
+        kind: "agent_step_observation_packet",
+        payload: {
+          schema: "helix.agent_step_observation_packet.v1",
+          turn_id: turnId,
+          status: "succeeded",
+          terminal_eligible: false,
+          post_tool_model_step_required: false,
+          capability_id: "workstation-notes.create_note",
+          capability_key: "workstation-notes.create_note",
+          tool_name: "workstation-notes.create_note",
+          action: {
+            panel_id: "workstation-notes",
+            action_id: "create_note",
+          },
+          produced_artifact_refs: [`${turnId}:note_update_receipt`],
+        },
+      },
     ];
     const payload: Record<string, unknown> = {
       turn_id: turnId,
@@ -481,6 +1064,25 @@ describe("Helix terminal authority single writer", () => {
       goal_satisfaction_evaluation: {
         satisfaction: "satisfied",
         next_decision: "allow_terminal",
+      },
+      agent_runtime_loop: {
+        schema: "helix.agent_step_loop.v1",
+        iterations: [
+          {
+            iteration: 1,
+            next_step: "next_action",
+            chosen_capability: "workstation-notes.create_note",
+            decision_authority: "helix_policy",
+            observed_artifact_refs: [`${turnId}:obs`, `${turnId}:note_update_receipt`],
+          },
+          {
+            iteration: 2,
+            next_step: "answer",
+            chosen_capability: "workstation-notes.create_note",
+            decision_authority: "client_receipt",
+            observed_artifact_refs: [`${turnId}:note_update_receipt`],
+          },
+        ],
       },
     };
 
@@ -1659,6 +2261,45 @@ describe("Helix terminal authority single writer", () => {
         satisfaction: "satisfied",
         next_decision: "allow_terminal",
       },
+      agent_runtime_loop: {
+        schema: "helix.agent_step_loop.v1",
+        iterations: [
+          {
+            iteration: 1,
+            decision_id: `${turnId}:decision:create-note`,
+            next_step: "next_action",
+            chosen_capability: "workstation-notes.create_note",
+            decision_authority: "helix_policy",
+            observed_artifact_refs: [`${turnId}:obs`, `${turnId}:note_update_receipt`],
+          },
+          {
+            iteration: 2,
+            decision_id: `${turnId}:decision:receipt-terminal`,
+            decision_timing: "terminal_review",
+            next_step: "answer",
+            chosen_capability: "workstation-notes.create_note",
+            decision_authority: "deterministic_policy_fallback",
+            observed_artifact_refs: [`${turnId}:note_update_receipt`],
+          },
+        ],
+      },
+      agent_step_loop: {
+        schema: "helix.agent_step_loop.v1",
+        steps: [
+          {
+            decision_ref: `${turnId}:decision:create-note`,
+            chosen_capability: "workstation-notes.create_note",
+            next_step: "next_action",
+            observed_artifact_refs: [`${turnId}:obs`, `${turnId}:note_update_receipt`],
+          },
+          {
+            decision_ref: `${turnId}:decision:receipt-terminal`,
+            chosen_capability: "workstation-notes.create_note",
+            next_step: "answer",
+            observed_artifact_refs: [`${turnId}:note_update_receipt`],
+          },
+        ],
+      },
     };
 
     const result = applyHelixTerminalAuthoritySingleWriter({
@@ -1678,6 +2319,157 @@ describe("Helix terminal authority single writer", () => {
     );
     expect(payload.terminal_artifact_kind).toBe("model_synthesized_answer");
     expect(payload.final_answer_source).toBe("final_answer_draft");
+  });
+
+  it("selects a note receipt when the create-note contract authorizes receipt terminal authority", () => {
+    const turnId = "ask:test:create-note-receipt-terminal";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:note_update_receipt`,
+        kind: "note_update_receipt",
+        payload: {
+          schema: "helix.note_update_receipt.v1",
+          kind: "note_update_receipt",
+          title: "Helix Ask Note",
+          message: "Created note: hh",
+          text: "Created note: hh",
+        },
+      },
+      {
+        artifact_id: `${turnId}:final_answer_draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: "I created the note.",
+          authority: "llm_post_observation_composer",
+        },
+      },
+      {
+        artifact_id: `${turnId}:obs`,
+        kind: "agent_step_observation_packet",
+        payload: {
+          schema: "helix.agent_step_observation_packet.v1",
+          turn_id: turnId,
+          status: "succeeded",
+          terminal_eligible: false,
+          post_tool_model_step_required: false,
+          capability_id: "workstation-notes.create_note",
+          capability_key: "workstation-notes.create_note",
+          tool_name: "workstation-notes.create_note",
+          action: {
+            panel_id: "workstation-notes",
+            action_id: "create_note",
+          },
+          produced_artifact_refs: [`${turnId}:note_update_receipt`],
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt: 'Make a note for me "hh".',
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        turn_id: turnId,
+        thread_id: "thread:test",
+        source_target: "workspace_action",
+        allowed_terminal_artifact_kinds: ["note_update_receipt", "typed_failure", "request_user_input"],
+        forbidden_terminal_artifact_kinds: ["model_synthesized_answer", "direct_answer_text", "panel_generated_answer"],
+        side_artifact_kinds_allowed: ["workspace_action_receipt", "note_action_receipt", "note_create_receipt"],
+        required_artifact_refs: [],
+        precedence_reason: "explicit_create_note_prompt_requires_note_update_receipt_terminal_authority",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        goal_kind: "note_mutation",
+        required_terminal_kind: "note_update_receipt",
+      },
+      current_turn_artifact_ledger: artifacts,
+      step_results: [
+        {
+          step_id: "workspace_action_create_note",
+          status: "completed",
+          actual_artifacts: ["note_update_receipt"],
+          result_artifact: {
+            artifact_id: `${turnId}:note_update_receipt`,
+            kind: "note_update_receipt",
+            schema: "helix.note_update_receipt.v1",
+            message: "Created note: hh",
+            text: "Created note: hh",
+          },
+        },
+      ],
+      selected_capability: "workstation-notes.create_note",
+      agent_step_decision: {
+        schema: "helix.agent_step_decision.v1",
+        decision_id: `${turnId}:decision:receipt-terminal`,
+        chosen_capability: "workstation-notes.create_note",
+        next_step: "answer",
+        decision_timing: "terminal_review",
+        decision_authority: "deterministic_policy_fallback",
+      },
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        text: "I created the note.",
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      agent_runtime_loop: {
+        schema: "helix.agent_step_loop.v1",
+        iterations: [
+          {
+            iteration: 1,
+            decision_id: `${turnId}:decision:create-note`,
+            next_step: "next_action",
+            chosen_capability: "workstation-notes.create_note",
+            decision_authority: "helix_policy",
+            observed_artifact_refs: [`${turnId}:obs`, `${turnId}:note_update_receipt`],
+          },
+          {
+            iteration: 2,
+            decision_id: `${turnId}:decision:receipt-terminal`,
+            decision_timing: "terminal_review",
+            next_step: "answer",
+            chosen_capability: "workstation-notes.create_note",
+            decision_authority: "deterministic_policy_fallback",
+            observed_artifact_refs: [`${turnId}:note_update_receipt`],
+          },
+        ],
+      },
+      agent_step_loop: {
+        schema: "helix.agent_step_loop.v1",
+        steps: [
+          {
+            decision_ref: `${turnId}:decision:create-note`,
+            chosen_capability: "workstation-notes.create_note",
+            next_step: "next_action",
+            observed_artifact_refs: [`${turnId}:obs`, `${turnId}:note_update_receipt`],
+          },
+          {
+            decision_ref: `${turnId}:decision:receipt-terminal`,
+            chosen_capability: "workstation-notes.create_note",
+            next_step: "answer",
+            observed_artifact_refs: [`${turnId}:note_update_receipt`],
+          },
+        ],
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("note_update_receipt");
+    expect(result.source).toBe("note_update_receipt");
+    expect(result.visible_text).toBe("Created note: hh");
+    expect(payload.terminal_artifact_kind).toBe("note_update_receipt");
+    expect(payload.final_answer_source).toBe("note_update_receipt");
   });
 
   it("blocks receipt terminals for multi-subgoal compound synthesis turns", () => {

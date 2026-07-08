@@ -41,6 +41,24 @@ describe("Helix Ask math solver", () => {
     expect(result?.final).toContain("+3");
   });
 
+  it("handles indefinite integrals", async () => {
+    const result = await solveHelixAskMathQuestion("What is the integral of x^2 + 3x?");
+    expect(result?.ok).toBe(true);
+    expect(result?.kind).toBe("integral");
+    expect(result?.variable).toBe("x");
+    expect(result?.final).toContain("x^3");
+    expect(result?.final).toContain("x^2");
+    expect(buildHelixAskMathAnswer(result!)).toContain("+ C");
+  });
+
+  it("handles non-x integrals", async () => {
+    const result = await solveHelixAskMathQuestion("Integrate 2t with respect to t");
+    expect(result?.ok).toBe(true);
+    expect(result?.kind).toBe("integral");
+    expect(result?.variable).toBe("t");
+    expect(result?.final).toBe("t^2");
+  });
+
   it("evaluates arithmetic prompts with leading words cleanly", async () => {
     const result = await solveHelixAskMathQuestion("What is 2 + 2?");
     expect(result?.ok).toBe(true);

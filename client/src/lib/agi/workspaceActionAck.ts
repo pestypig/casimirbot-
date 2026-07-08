@@ -6,6 +6,12 @@ export type WorkspaceActionClientAck = {
   action_id: string;
   applied: boolean;
   visible_panel_id?: string;
+  execution_id?: string;
+  execution_status?: string;
+  receipt_id?: string;
+  receipt_kind?: string;
+  state_observed?: boolean;
+  persisted?: boolean;
   error?: string;
   created_at_ms: number;
 };
@@ -30,22 +36,38 @@ type WorkspaceActionReceiptLike = {
   payload?: unknown;
 };
 
+type WorkstationActionExecutionLike = {
+  execution_id?: unknown;
+  turn_id?: unknown;
+  panel_id?: unknown;
+  action_id?: unknown;
+  status?: unknown;
+  receipt?: unknown;
+  state_observed?: unknown;
+  error?: unknown;
+};
+
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
+const readBoolean = (value: unknown): boolean | null =>
+  typeof value === "boolean" ? value : null;
+
 export function buildWorkspaceActionClientAckSnapshot(args: {
   artifactLedger: unknown;
   openPanels: string[];
+  actionExecutions?: unknown;
   createdAtMs?: number;
 }): WorkspaceActionClientAck[] {
-  if (!Array.isArray(args.artifactLedger)) return [];
   const openPanelSet = new Set(args.openPanels.map((panelId) => panelId.trim()).filter(Boolean));
   const createdAtMs = args.createdAtMs ?? Date.now();
+  const acks: WorkspaceActionClientAck[] = [];
 
-  return (args.artifactLedger as WorkspaceActionReceiptLike[]).flatMap((artifact) => {
+  if (Array.isArray(args.artifactLedger)) {
+    acks.push(...(args.artifactLedger as WorkspaceActionReceiptLike[]).flatMap((artifact) => {
     if (artifact?.kind !== "workspace_action_receipt") return [];
     const payload = asRecord(artifact.payload);
     if (!payload) return [];
@@ -66,7 +88,43 @@ export function buildWorkspaceActionClientAckSnapshot(args: {
         created_at_ms: createdAtMs,
       },
     ];
-  });
+    }));
+  }
+
+  const executionValues = Array.isArray(args.actionExecutions)
+    ? args.actionExecutions
+    : Object.values(asRecord(args.actionExecutions) ?? {});
+  for (const rawExecution of executionValues as WorkstationActionExecutionLike[]) {
+    const execution = asRecord(rawExecution);
+    if (!execution) continue;
+    const panelId = readString(execution.panel_id);
+    const actionId = readString(execution.action_id);
+    if (!panelId || !actionId) continue;
+    const receipt = asRecord(execution.receipt);
+    const status = readString(execution.status);
+    const receiptOk = readBoolean(receipt?.ok);
+    const stateObserved = readBoolean(execution.state_observed) === true;
+    const applied = receiptOk === true && stateObserved;
+    acks.push({
+      turn_id: readString(execution.turn_id) ?? readString(receipt?.turn_id),
+      item_id: readString(receipt?.receipt_id) ?? readString(execution.execution_id),
+      action_key: `${panelId}.${actionId}`,
+      target_id: panelId,
+      action_id: actionId,
+      applied,
+      ...(openPanelSet.has(panelId) ? { visible_panel_id: panelId } : {}),
+      ...(readString(execution.execution_id) ? { execution_id: readString(execution.execution_id) as string } : {}),
+      ...(status ? { execution_status: status } : {}),
+      ...(readString(receipt?.receipt_id) ? { receipt_id: readString(receipt?.receipt_id) as string } : {}),
+      ...(readString(receipt?.receipt_kind) ? { receipt_kind: readString(receipt?.receipt_kind) as string } : {}),
+      state_observed: stateObserved,
+      persisted: applied,
+      ...(readString(execution.error) ? { error: readString(execution.error) as string } : {}),
+      created_at_ms: createdAtMs,
+    });
+  }
+
+  return acks;
 }
 
 export function buildHelixAskClientBypassAudit(args: {

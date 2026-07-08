@@ -170,3 +170,23 @@ export function normalizeLexiconAlias(value: string): string {
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 }
+
+export type WorkstationNoteCreateLexiconArgs = {
+  title?: string;
+  topic?: string;
+  body?: string;
+};
+
+export function parseWorkstationNoteCreateLexiconArgs(input: {
+  source: string;
+  conversationalCandidate: string;
+}): WorkstationNoteCreateLexiconArgs | null {
+  const bodyMatch = input.source.match(/\b(?:create|make)\s+(?:a\s+)?note\s+(?:for\s+me\s+)?["'](.+?)["']\s*$/i);
+  if (bodyMatch?.[1]?.trim()) return { body: bodyMatch[1].trim() };
+  const title =
+    input.conversationalCandidate.match(/\bcreate\s+(?:a\s+)?note\s+(?:called|named|titled)\s+(.+)$/i)?.[1] ??
+    input.conversationalCandidate.match(/\bnew\s+note\s+(.+)$/i)?.[1] ??
+    input.conversationalCandidate.match(/\bstart\s+note\s+(?:about|on|for)\s+(.+)$/i)?.[1];
+  const normalizedTitle = title?.replace(/[?.!]+$/g, "").trim();
+  return normalizedTitle ? { title: normalizedTitle, topic: normalizedTitle } : null;
+}

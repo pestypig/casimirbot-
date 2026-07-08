@@ -1319,11 +1319,14 @@ describe("HelixAskPill mic-first surface contract", () => {
   });
 
   it("preserves provider gateway trace fields in the UI debug export path", () => {
-    const source = fs.readFileSync(pillPath, "utf8");
-    expect(source).toContain("providerGatewayDebugSummary");
-    expect(source).toContain("provider_gateway_debug_summary: providerGatewayDebugSummary");
-    expect(source).toContain("workstation_gateway_call_results: workstationGatewayCallResults");
-    expect(source).toContain("provider_terminal_authority_bridge: providerTerminalAuthorityBridge");
+    const debugExportSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/lib/agi/debugExport.ts"),
+      "utf8",
+    );
+    expect(debugExportSource).toContain("providerGatewayDebugSummary");
+    expect(debugExportSource).toContain("provider_gateway_debug_summary: providerGatewayDebugSummary");
+    expect(debugExportSource).toContain("workstation_gateway_call_results: workstationGatewayCallResults");
+    expect(debugExportSource).toContain("provider_terminal_authority_bridge: providerTerminalAuthorityBridge");
   });
 
   it("includes active scientific calculator context in backend Ask turn snapshots", () => {
@@ -1487,10 +1490,13 @@ describe("HelixAskPill mic-first surface contract", () => {
   });
 
   it("advertises backend debug export lookup for chat-scoped Ask turn ids", () => {
-    const source = fs.readFileSync(pillPath, "utf8");
     const controlsSource = fs.readFileSync(askConsoleLegacyTurnControlsPath, "utf8");
-    expect(source).toContain("isHelixAskLegacyBackendDebugExportEligibleTurnId");
-    expect(source).toContain("resolveHelixAskLegacyDebugExportBackendTarget(parsed)");
+    const debugCopyProjectionSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskDebugCopyProjection.ts"),
+      "utf8",
+    );
+    expect(debugCopyProjectionSource).toContain("isHelixAskLegacyBackendDebugExportEligibleTurnId");
+    expect(debugCopyProjectionSource).toContain("resolveHelixAskLegacyDebugExportBackendTarget(parsed)");
     expect(controlsSource).toContain("export function isHelixAskLegacyBackendDebugExportEligibleTurnId");
     expect(controlsSource).toContain('trimmed.startsWith("ask:")');
     expect(controlsSource).toContain('(?:^|:)ask:[^:]+');
@@ -1500,9 +1506,17 @@ describe("HelixAskPill mic-first surface contract", () => {
   it("keeps rendered-button debug copy scoped to the visible reply turn", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     const controlsSource = fs.readFileSync(askConsoleLegacyTurnControlsPath, "utf8");
-    expect(source).toContain('debug_export_rebuild_reason: reason');
+    const renderedReplyDebugExportSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskRenderedReplyDebugExport.ts"),
+      "utf8",
+    );
+    const debugCopyProjectionSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskDebugCopyProjection.ts"),
+      "utf8",
+    );
+    expect(renderedReplyDebugExportSource).toContain("debug_export_rebuild_reason: args.reason");
     expect(source).toContain("selectHelixAskLegacyDebugCopyLocalPayload");
-    expect(source).toContain("resolveHelixAskLegacyDebugExportBackendTarget(parsed)");
+    expect(debugCopyProjectionSource).toContain("resolveHelixAskLegacyDebugExportBackendTarget(parsed)");
     expect(controlsSource).toContain('rebuildReason === "rendered_button_scope"');
     expect(controlsSource).toContain("matchingBackendRef ??");
     expect(controlsSource).toContain("(isReplyScopedRebuild ? null : refCandidates[0])");
@@ -4326,6 +4340,12 @@ describe("HelixAskPill mic helper behavior", () => {
       panel_id: "workstation-notes",
       action_id: "create_note",
       args: { title: "Casimir capture", topic: "Casimir capture" },
+    });
+    expect(parseWorkstationActionCommand('make a note for me "qwerty"')).toEqual({
+      action: "run_panel_action",
+      panel_id: "workstation-notes",
+      action_id: "create_note",
+      args: { body: "qwerty" },
     });
     expect(parseWorkstationActionCommand("add to note Mission Log: Track quantum inequality bounds")).toEqual({
       action: "run_panel_action",

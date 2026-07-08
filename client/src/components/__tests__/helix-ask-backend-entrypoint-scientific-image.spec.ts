@@ -52,6 +52,100 @@ describe("Helix Ask backend entrypoint scientific image policy", () => {
     expect(metadata?.mandatory_next_tool).toBeUndefined();
   });
 
+  it("routes explicit Moral Graph prompts through backend Ask without image sidecar prerequisites", () => {
+    const prompt =
+      "Use moral-graph.reflect_context for inherited conditioning, purpose as inquiry, and recognition before transcendence.";
+    const metadata = buildHelixAskHardBackendEntrypointRouteMetadata({
+      question: prompt,
+      turnId: "turn:moral-graph",
+      threadId: "thread:moral-graph",
+    });
+
+    expect(requiresHelixAskBackendEntrypoint(prompt)).toBe(true);
+    expect(resolveHelixAskBackendEntrypointFamily(prompt)).toMatchObject({
+      family: "moral_graph",
+      sourceTarget: "moral_graph",
+      targetKind: "moral_graph_reflection",
+      requiredToolFamily: "moral_graph",
+      selectedCapability: "moral-graph.reflect_context",
+      requestedOutputs: expect.arrayContaining([
+        "moral_graph_observation",
+        "diagnostic_reflection",
+        "typed_failure",
+      ]),
+    });
+    expect(metadata?.source_target_intent).toMatchObject({
+      target_source: "moral_graph",
+      target_kind: "moral_graph_reflection",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      requested_outputs: expect.arrayContaining(["moral_graph_observation"]),
+    });
+    expect(metadata?.source_target_intent?.requested_outputs).not.toContain("scientific_evidence_sidecar");
+    expect(metadata?.mandatory_next_tool).toMatchObject({
+      tool_name: "moral-graph.reflect_context",
+      required_tool_family: "moral_graph",
+      missing_required_evidence: "tool_observation",
+      canonical_goal: "moral_graph",
+    });
+  });
+
+  it("routes natural Moral Graph reflection requests through backend Ask", () => {
+    const prompt =
+      "Use the Moral Graph to help me reflect on a roommate situation. Someone knew they might not be able to meet a shared payment, but waited until the last moment to say anything. I don't want to decide whether they are a bad person. I want to understand what dependency existed, what choices were taken away by the delay, and what kind of repair or boundary would be fair now.";
+    const metadata = buildHelixAskHardBackendEntrypointRouteMetadata({
+      question: prompt,
+      turnId: "turn:moral-graph-natural",
+      threadId: "thread:moral-graph-natural",
+    });
+
+    expect(requiresHelixAskBackendEntrypoint(prompt)).toBe(true);
+    expect(resolveHelixAskBackendEntrypointFamily(prompt)).toMatchObject({
+      family: "moral_graph",
+      sourceTarget: "moral_graph",
+      targetKind: "moral_graph_reflection",
+      requiredToolFamily: "moral_graph",
+      selectedCapability: "moral-graph.reflect_context",
+    });
+    expect(metadata?.source_target_intent).toMatchObject({
+      target_source: "moral_graph",
+      target_kind: "moral_graph_reflection",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+      requested_outputs: expect.arrayContaining(["moral_graph_observation", "diagnostic_reflection"]),
+    });
+    expect(metadata?.source_target_intent?.suppressed_routes).toEqual(
+      expect.arrayContaining(["client_projection", "evidence_finalization_fallback"]),
+    );
+    expect(metadata?.source_target_intent?.requested_outputs).not.toContain("scientific_evidence_sidecar");
+    expect(metadata?.mandatory_next_tool).toMatchObject({
+      tool_name: "moral-graph.reflect_context",
+      required_tool_family: "moral_graph",
+    });
+  });
+
+  it("routes docs.search and repo.search prompts through backend Ask evidence lanes", () => {
+    const docsPrompt = "Use docs.search to find the section that defines evidence admission.";
+    const repoPrompt = "Use repo.search to find where artifact admission traces are built.";
+
+    expect(requiresHelixAskBackendEntrypoint(docsPrompt)).toBe(true);
+    expect(resolveHelixAskBackendEntrypointFamily(docsPrompt)).toMatchObject({
+      family: "docs_viewer",
+      sourceTarget: "docs_viewer",
+      selectedCapability: "docs.search",
+      requestedOutputs: expect.arrayContaining(["doc_evidence"]),
+    });
+
+    expect(requiresHelixAskBackendEntrypoint(repoPrompt)).toBe(true);
+    expect(resolveHelixAskBackendEntrypointFamily(repoPrompt)).toMatchObject({
+      family: "repo_code",
+      sourceTarget: "repo_code",
+      selectedCapability: "repo.search",
+      requestedOutputs: expect.arrayContaining(["repo_code", "line_backed_source"]),
+    });
+  });
+
   it("routes natural scientific document image prompts through the compound backend path", () => {
     const prompt = "Here is a scientific document image. Extract the equations and compare them to the theory badge graph.";
 
@@ -151,6 +245,39 @@ describe("Helix Ask backend entrypoint scientific image policy", () => {
         "typed_failure",
       ]),
     });
+  });
+
+  it("routes named Image Lens receipt evaluation through backend Ask without requiring a new crop", () => {
+    for (const receiptName of ["crop_1", "equation_7"]) {
+      const prompt =
+        `Do not run scholarly lookup or internet retrieval. Use only the latest Image Lens observation receipt named ${receiptName}. Evaluate ${receiptName} as an exact equation row for equation (7).`;
+      const resolution = resolveHelixAskBackendEntrypointFamily(prompt);
+      const metadata = buildHelixAskHardBackendEntrypointRouteMetadata({
+        question: prompt,
+        turnId: `turn:named-receipt:${receiptName}`,
+        threadId: `thread:named-receipt:${receiptName}`,
+      });
+
+      expect(requiresHelixAskBackendEntrypoint(prompt)).toBe(true);
+      expect(resolution).toMatchObject({
+        family: "scientific_image",
+        sourceTarget: "scientific_image_evidence",
+        targetKind: "scientific_image_named_receipt",
+        requiredToolFamily: "visual_analysis",
+        selectedCapability: null,
+        explicitCue: "image_lens_named_observation_receipt",
+        requestedOutputs: ["image_lens_named_receipt_evaluation", "typed_failure"],
+      });
+      expect(metadata?.source_target_intent).toMatchObject({
+        target_source: "scientific_image_evidence",
+        target_kind: "scientific_image_named_receipt",
+        must_enter_backend_ask: true,
+        allow_client_shortcut: false,
+        allow_no_tool_direct: false,
+        requested_outputs: ["image_lens_named_receipt_evaluation", "typed_failure"],
+      });
+      expect(metadata?.mandatory_next_tool).toBeUndefined();
+    }
   });
 
   it("routes postulate evidence-ref prompts that ask for latest sidecar refs through backend Ask", () => {

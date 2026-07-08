@@ -3024,7 +3024,8 @@ export function planWorkstationToolUse(
 
   if (isNoteCreatePrompt(normalized)) {
     const title = extractNoteTitle(normalized);
-    const body = extractNoteBody(normalized);
+    const quotedBody = /\b(?:called|named|titled)\b/i.test(normalized) ? null : extractQuoted(normalized);
+    const body = extractNoteBody(normalized) ?? quotedBody;
     pushScore({
       affordance_id: "workstation-notes.create_note",
       panel_id: "workstation-notes",

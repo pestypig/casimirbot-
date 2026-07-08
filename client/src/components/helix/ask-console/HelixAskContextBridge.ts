@@ -1,6 +1,7 @@
 import { readHelixAskActiveImageLensSourceContext } from "./HelixAskImageLensContextBridge";
 
 export type HelixAskContextBridgeSnapshot = {
+  [key: string]: unknown;
   activeDocPath: string | null;
   activeImageLensSource?: Record<string, unknown> | null;
   active_image_lens_source?: Record<string, unknown> | null;

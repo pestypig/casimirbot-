@@ -2,6 +2,10 @@ import { readFileSync } from "node:fs";
 import crypto from "node:crypto";
 import path from "node:path";
 
+import nerdamer from "nerdamer";
+import "nerdamer/Algebra";
+import "nerdamer/Calculus";
+import "nerdamer/Solve";
 import {
   HELIX_WORKSPACE_OS_STATUS_CAPABILITY,
 } from "../workspace-os-status-intent";
@@ -869,30 +873,104 @@ const normalizeCalculatorExpressionForGateway = (expression: string): string => 
   return expression;
 };
 
-const solveSafeArithmeticExpression = (expression: string): {
+const findMatchingParen = (text: string, openIndex: number): number => {
+  let depth = 0;
+  for (let index = openIndex; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === "(") depth += 1;
+    if (char === ")") {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+  return -1;
+};
+
+const splitTopLevelCalculatorArgs = (text: string): string[] => {
+  const args: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === "(" || char === "[") depth += 1;
+    if (char === ")" || char === "]") depth = Math.max(0, depth - 1);
+    if (char === "," && depth === 0) {
+      args.push(text.slice(start, index).trim());
+      start = index + 1;
+    }
+  }
+  args.push(text.slice(start).trim());
+  return args;
+};
+
+const rewriteCalculatorDefiniteIntegrals = (expression: string): string => {
+  let output = "";
+  for (let index = 0; index < expression.length;) {
+    if (
+      expression.slice(index, index + "integrate(".length).toLowerCase() === "integrate(" &&
+      (index === 0 || !/[A-Za-z0-9_]/.test(expression[index - 1] ?? ""))
+    ) {
+      const openIndex = index + "integrate".length;
+      const closeIndex = findMatchingParen(expression, openIndex);
+      if (closeIndex === -1) {
+        output += expression.slice(index);
+        break;
+      }
+      const inner = expression.slice(openIndex + 1, closeIndex);
+      const args = splitTopLevelCalculatorArgs(inner).map((arg) => rewriteCalculatorDefiniteIntegrals(arg));
+      if (args.length === 4 && args.every((arg) => arg.length > 0)) {
+        output += `defint(${args[0]},${args[2]},${args[3]},${args[1]})`;
+      } else {
+        output += `integrate(${args.join(",")})`;
+      }
+      index = closeIndex + 1;
+      continue;
+    }
+    output += expression[index];
+    index += 1;
+  }
+  return output;
+};
+
+const solveSafeArithmeticExpression = (expression: string, options?: { allowSymbolicResult?: boolean }): {
   ok: boolean;
   result?: string;
   normalized_expression?: string;
   blocked_reason?: string;
 } => {
-  const normalizedExpression = normalizeCalculatorExpressionForGateway(expression);
+  const normalizedExpression = rewriteCalculatorDefiniteIntegrals(normalizeCalculatorExpressionForGateway(expression));
   const normalized = normalizedExpression.replace(/\s+/g, "");
   if (!normalized) return { ok: false, blocked_reason: "missing_expression" };
   if (normalized.length > 240) return { ok: false, blocked_reason: "expression_too_long" };
-  if (!/^[\deE.+\-*/^()%]+$/.test(normalized)) {
+  if (!/^[\dA-Za-z_.,+\-*/^%()[\]]+$/.test(normalized)) {
     return { ok: false, blocked_reason: "unsupported_expression_syntax" };
   }
-  if (!/[+\-*/^%]/.test(normalized)) {
+  if (/[A-Za-z_]\.[A-Za-z_]/.test(normalized)) {
+    return { ok: false, blocked_reason: "unsupported_expression_syntax" };
+  }
+  if (!/[+\-*/^%]|\b(?:diff|differentiate|derivative|integrate|integral|defint|sqrt|ln|log|exp|sin|cos|tan|abs)\s*\(/i.test(normalized)) {
     return { ok: false, blocked_reason: "expression_has_no_operator" };
   }
   try {
-    const value = Function(`"use strict"; return (${normalized.replace(/\^/g, "**")});`)();
-    if (typeof value !== "number" || !Number.isFinite(value)) {
-      return { ok: false, blocked_reason: "expression_result_not_finite" };
+    if (/^[\deE.+\-*/^()%]+$/.test(normalized)) {
+      const value = Function(`"use strict"; return (${normalized.replace(/\^/g, "**")});`)();
+      if (typeof value !== "number" || !Number.isFinite(value)) {
+        return { ok: false, blocked_reason: "expression_result_not_finite" };
+      }
+      return {
+        ok: true,
+        result: normalizeNumberText(value),
+        normalized_expression: normalizedExpression,
+      };
+    }
+    const expanded = nerdamer(normalizedExpression).expand().toString();
+    const evaluated = nerdamer(expanded).evaluate().text("decimals");
+    if (options?.allowSymbolicResult === false && /[A-Za-z_]/.test(evaluated)) {
+      return { ok: false, blocked_reason: "unsupported_expression_syntax" };
     }
     return {
       ok: true,
-      result: normalizeNumberText(value),
+      result: evaluated,
       normalized_expression: normalizedExpression,
     };
   } catch {
@@ -4290,7 +4368,7 @@ export const callWorkstationGatewayCapability = async (
     const scalarTarget = extractScalarSolveTarget(expression);
     const solved = scalarTarget.blocked_reason
       ? { ok: false as const, blocked_reason: scalarTarget.blocked_reason }
-      : solveSafeArithmeticExpression(scalarTarget.scalar_expression);
+      : solveSafeArithmeticExpression(scalarTarget.scalar_expression, { allowSymbolicResult: false });
     const missingSourceRefs = sourceRefs.length === 0;
     const ok = solved.ok && !missingSourceRefs;
     const primaryBlockedReason = missingSourceRefs

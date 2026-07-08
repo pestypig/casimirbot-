@@ -1766,6 +1766,101 @@ describe("Helix workstation tool gateway", () => {
     });
   });
 
+  it("calls scientific-calculator.solve_expression for calculus expressions as read-only non-terminal evidence", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+      arguments: {
+        expression: "integrate(x^2+3*x,x)",
+      },
+      turnId: "ask:test:gateway-calculator-integral",
+      iteration: 1,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      observation_packet: {
+        schema: "helix.agent_step_observation_packet.v1",
+        turn_id: "ask:test:gateway-calculator-integral",
+        capability_key: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+        panel_id: "scientific-calculator",
+        action: "solve_expression",
+        status: "succeeded",
+      },
+      observation: {
+        schema: "helix.calculator_solve_observation.v1",
+        expression: "integrate(x^2+3*x,x)",
+        normalized_expression: "integrate(x^2+3*x,x)",
+        result: "0.3333333333333333*x^3+1.5*x^2",
+        status: "succeeded",
+      },
+    });
+  });
+
+  it("normalizes Calc-style definite integrals before evaluating calculator expressions", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+      arguments: {
+        expression: "integrate(t^2+3*t,t,0,5)",
+      },
+      turnId: "ask:test:gateway-calculator-definite-integral",
+      iteration: 1,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+      observation_packet: {
+        schema: "helix.agent_step_observation_packet.v1",
+        status: "succeeded",
+      },
+      observation: {
+        schema: "helix.calculator_solve_observation.v1",
+        expression: "integrate(t^2+3*t,t,0,5)",
+        normalized_expression: "defint(t^2+3*t,0,5,t)",
+        result: "79.166666666666666667",
+        status: "succeeded",
+      },
+    });
+  });
+
+  it("evaluates nested Calc-style definite integrals as calculator expressions", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+      arguments: {
+        expression: "integrate(integrate(x*y,y,0,2),x,0,3)",
+      },
+      turnId: "ask:test:gateway-calculator-nested-definite-integral",
+      iteration: 1,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+      observation_packet: {
+        schema: "helix.agent_step_observation_packet.v1",
+        status: "succeeded",
+      },
+      observation: {
+        schema: "helix.calculator_solve_observation.v1",
+        expression: "integrate(integrate(x*y,y,0,2),x,0,3)",
+        normalized_expression: "defint(defint(x*y,0,2,y),0,3,x)",
+        result: "9",
+        status: "succeeded",
+      },
+    });
+  });
+
   it("blocks symbolic scientific-calculator.solve_expression without producing numeric evidence", async () => {
     const result = await callWorkstationGatewayCapability({
       agentRuntime: "codex",

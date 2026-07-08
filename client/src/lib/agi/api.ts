@@ -61,6 +61,7 @@ import {
 } from "@shared/contracts/scientific-calculator-receipt.v1";
 import { ingestPostulateReviewReceiptsFromAskPayload } from "@/lib/agi/proposals";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
+import { ingestScientificEvidenceWorkflowStatusFromAskPayload } from "@/store/useScientificEvidenceWorkflowStore";
 
 const HELIX_CONTEXT_CAPSULE_MAX_IDS = 12;
 
@@ -2529,6 +2530,7 @@ export async function runCapabilityLaneOneShot(
   const result = await asJson<CapabilityLaneOneShotResponse>(response);
   ingestImageLensRegionInspectionReceipts(result);
   ingestScientificCalculatorReceiptsFromAskPayload(result);
+  ingestScientificEvidenceWorkflowStatusFromAskPayload(result);
   return result;
 }
 
@@ -2774,6 +2776,7 @@ export async function runAskTurnStream(
     ingestImageLensRegionInspectionReceipts(data);
     ingestScientificCalculatorReceiptsFromAskPayload(data);
     ingestPostulateReviewReceiptsFromAskPayload(data);
+    ingestScientificEvidenceWorkflowStatusFromAskPayload(data);
     const packet: HelixAskTurnStreamEvent = { event, data };
     onEvent?.(packet);
     if (event === "turn_final") finalPayload = data;
@@ -3076,6 +3079,7 @@ const normalizeLocalAskResponse = (payload: unknown): LocalAskResponse => {
   ingestImageLensRegionInspectionReceipts(payload);
   ingestScientificCalculatorReceiptsFromAskPayload(payload);
   ingestPostulateReviewReceiptsFromAskPayload(payload);
+  ingestScientificEvidenceWorkflowStatusFromAskPayload(payload);
   const record = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
   const selectedFinalAnswer = typeof record.selected_final_answer === "string" ? record.selected_final_answer.trim() : "";
   const assistantAnswer = typeof record.assistant_answer === "string" ? record.assistant_answer.trim() : "";

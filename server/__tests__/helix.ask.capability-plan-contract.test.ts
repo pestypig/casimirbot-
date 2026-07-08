@@ -1570,6 +1570,39 @@ describe("Helix capability plan contract", () => {
     });
   });
 
+  it("maps Image Lens PDF equation-row crop prompts to the region inspection capability", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:image-lens-pdf-equation-row",
+      promptText:
+        "Use the current page 5 Image Lens PDF page. Crop only the exact equation row for equation (7) using bbox x=73, y=570, width=1077, height=87.",
+      sourceTargetIntent: baseSourceTarget("model_only", "general_background"),
+      toolCallAdmissionDecision: toolAdmission("model_only", ["model_only"]),
+      canonicalGoalFrame: canonicalGoal("model_only_concept", "direct_answer_text"),
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "visual_capture",
+      source_target: "visual_capture",
+      requested_capability: "visual_analysis.inspect_image_region",
+      requested_action: "visual_analysis.inspect_image_region",
+      selected_capability: "visual_analysis.inspect_image_region",
+      goal_kind: "image_lens_region_inspection",
+      required_terminal_kind: "image_lens_observation_report",
+    });
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "explicit_capability_command",
+      requested_capability: "visual_analysis.inspect_image_region",
+      selected_source_target: "visual_capture",
+      selected_plan_family: "visual_capture",
+      canonical_goal_kind: "image_lens_region_inspection",
+      required_observation_kinds: expect.arrayContaining([
+        "capability_lane_observation_packet",
+        "visual_analysis.inspect_image_region",
+      ]),
+      required_terminal_kind: "image_lens_observation_report",
+    });
+  });
+
   it("lets negated visual-capture references suppress hard visual metadata", () => {
     const plan = buildCapabilityPlan({
       turnId: "ask:negated-visual-capture-reference",

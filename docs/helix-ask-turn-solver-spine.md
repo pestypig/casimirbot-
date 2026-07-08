@@ -19,6 +19,12 @@ Helix Ask owns prompt interpretation policy, intent arbitration, source-target a
 
 The trace schema is `helix.ask_turn_solver_trace.v1`. It is attached to debug Ask responses as `ask_turn_solver_trace`, included in `/api/agi/ask/turn/:turnId/debug-export`, and mirrored into the debug envelope when present.
 
+For the visible-answer handoff, also follow
+`docs/helix-ask-terminal-authority-contract.md`. That contract defines how
+explicit route-product allowances, terminal product materializers, terminal
+authority single-writer selection, terminal presentation, and debug/UI
+projection fit together.
+
 ## Authority Rules
 
 Routes are proposed procedures, not conclusions. A selected route becomes answer authority only after the solver trace records final arbitration and the route-authority audit passes.
@@ -28,6 +34,17 @@ Receipts are observations, not answers. A receipt can be terminal only when the 
 Classifiers generate hypotheses, not authority. Intent hypotheses are evidence for arbitration; they do not directly choose the terminal product.
 
 Only the completed solver path can answer. The trace reports `completed_solver_path` for compatibility and records `route_authority_ok`, `poison_audit_ok`, and `terminal_authority_ok` as first-class fields.
+
+Terminal product materializers are conversion helpers, not admission helpers.
+They may turn an admitted artifact into terminal text only when the current
+route/product contract explicitly allows that product kind. Legacy permissive
+helpers may remain for compatibility, but new route products should use the
+explicit allowance path.
+
+`terminal_answer_authority.terminal_text_preview` is diagnostic preview text.
+The full visible answer should come from `terminal_presentation.concise_text`
+when terminal authority is verified. UI and debug projection must not replace
+that full presentation with a preview.
 
 ## Hard Gates
 

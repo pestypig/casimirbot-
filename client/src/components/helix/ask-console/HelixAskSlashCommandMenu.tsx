@@ -9,12 +9,20 @@ export type HelixAskSlashCommandMenuProps = {
   state: HelixAskSlashCommandMenuState;
   onSelect: (item: HelixAskSlashCommandMenuItem) => void;
   onHoverIndex?: (index: number) => void;
+  ariaLabel?: string;
+  chooseLabel?: string;
+  matchingLabel?: (query: string) => string;
+  emptyLabel?: string;
 };
 
 export function HelixAskSlashCommandMenu({
   state,
   onSelect,
   onHoverIndex,
+  ariaLabel = "Ask slash commands",
+  chooseLabel = "Choose a tool prompt scaffold",
+  matchingLabel = (query) => `Commands matching /${query}`,
+  emptyLabel = "No matching commands for this account.",
 }: HelixAskSlashCommandMenuProps) {
   const anchorRef = useRef<HTMLSpanElement | null>(null);
   const [portalStyle, setPortalStyle] = useState<React.CSSProperties | null>(null);
@@ -48,13 +56,13 @@ export function HelixAskSlashCommandMenu({
       className="pointer-events-auto fixed z-[2147483000] max-h-72 overflow-hidden rounded-lg border border-white/12 bg-slate-950 shadow-2xl shadow-black/60 ring-1 ring-cyan-300/20"
       data-testid="helix-ask-slash-command-menu"
       role="listbox"
-      aria-label="Ask slash commands"
+      aria-label={ariaLabel}
       style={portalStyle}
     >
       <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2 text-xs text-slate-400">
         <Search className="h-3.5 w-3.5 text-cyan-200/80" />
         <span className="truncate">
-          {state.query ? `Commands matching /${state.query}` : "Choose a tool prompt scaffold"}
+          {state.query ? matchingLabel(state.query) : chooseLabel}
         </span>
       </div>
       <div className="max-h-60 overflow-y-auto py-1">
@@ -102,7 +110,7 @@ export function HelixAskSlashCommandMenu({
           })
         ) : (
           <div className="px-3 py-4 text-sm text-slate-400" data-testid="helix-ask-slash-command-empty">
-            No matching commands for this account.
+            {emptyLabel}
           </div>
         )}
       </div>

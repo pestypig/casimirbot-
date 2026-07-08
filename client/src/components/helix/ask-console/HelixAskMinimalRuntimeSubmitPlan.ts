@@ -14,6 +14,10 @@ import {
   type HelixAskSubmitAdmissionDecision,
 } from "./HelixAskSubmitAdmission";
 import type { PendingHelixAskPrompt } from "@/lib/helix/ask-prompt-launch";
+import {
+  buildHelixAskChatReferentContextForSubmit,
+  type HelixAskChatReferentReplyLike,
+} from "@/lib/helix/ask-chat-referent-context";
 
 export type HelixAskMinimalRuntimeSubmitPlan = {
   admission: HelixAskSubmitAdmissionDecision;
@@ -28,6 +32,8 @@ export function buildHelixAskMinimalRuntimeSubmitPlan(args: {
   selectedLanguageModelProfile?: HelixLanguageModelProfileId;
   desktopUrl?: string | null;
   pendingPrompt?: PendingHelixAskPrompt | null;
+  durableReplies?: readonly HelixAskChatReferentReplyLike[];
+  visibleReplies?: readonly HelixAskChatReferentReplyLike[];
 }): HelixAskMinimalRuntimeSubmitPlan {
   const admission = buildHelixAskSubmitAdmission({
     entries: [args.draft],
@@ -37,7 +43,24 @@ export function buildHelixAskMinimalRuntimeSubmitPlan(args: {
     attachmentKinds: [],
     allEntriesArePastedTextResumeRecallPrompt: false,
   });
-  const context = buildHelixAskContextBridgeSnapshot(args.desktopUrl ?? "");
+  const baseContext = buildHelixAskContextBridgeSnapshot(args.desktopUrl ?? "");
+  const chatReferentContextBuild = buildHelixAskChatReferentContextForSubmit({
+    durableReplies: args.durableReplies ?? [],
+    visibleReplies: args.visibleReplies ?? [],
+  });
+  const context: HelixAskContextBridgeSnapshot = chatReferentContextBuild.context
+    ? {
+        ...baseContext,
+        chatReferentContext: chatReferentContextBuild.context,
+        chat_referent_context: chatReferentContextBuild.context,
+        chatReferentContextSourceSummary: chatReferentContextBuild.source_summary,
+        chat_referent_context_source_summary: chatReferentContextBuild.source_summary,
+      }
+    : {
+        ...baseContext,
+        chatReferentContextSourceSummary: chatReferentContextBuild.source_summary,
+        chat_referent_context_source_summary: chatReferentContextBuild.source_summary,
+      };
   return {
     admission,
     context,

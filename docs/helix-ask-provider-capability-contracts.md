@@ -96,6 +96,7 @@ capability-lane, or workstation-gateway changes.
 | `shared_capability_lane_now` | Exposed through the capability-lane runner for Helix, Codex, and future providers without adding a workstation gateway manifest entry. |
 | `safe_to_graduate_next` | Read/observe capability that can be promoted after bounded observation, debug, and negative-admission tests exist. |
 | `requires_confirmation_contract` | Side-effecting output such as voice; needs explicit affirmative admission, confirmation/playback policy, and receipts. |
+| `candidate_host_receipt_bridge` | Narrow Codex Workstation host-dispatch bridge with structured action envelope and receipt; absent from the shared provider gateway manifest. |
 | `helix_native_only` | Helix-owned live-environment behavior that should not be provider-facing until a narrower contract exists. |
 | `legacy_dynamic_panel_only` | Retired or panel-local dynamic action; do not count as provider gateway parity. |
 | `blocked_pending_contract` | Mutating/control capability or ambiguous lifecycle; fail closed until a permission and receipt contract exists. |
@@ -353,12 +354,15 @@ terminal_eligible=false
 post_tool_model_step_required=true
 ```
 
-Missing notes context blocks with `workstation_notes_context_missing`. The
-mutating Workstation Notes actions remain held back:
+Missing notes context blocks with `workstation_notes_context_missing`.
+`workstation-notes.create_note` has a narrow Codex provider host-dispatch receipt
+bridge for explicit affirmative create-note commands. It is still absent from
+the shared gateway manifest and does not grant direct note mutation authority to
+provider agents. The remaining mutating Workstation Notes actions stay held
+back:
 
 ```txt
 workstation-notes.append_to_note
-workstation-notes.create_note
 workstation-notes.create
 workstation-notes.open
 ```
@@ -428,10 +432,16 @@ confirmation, receipt, and projection contracts:
 scientific-calculator.open
 scientific-calculator.start_equation_live_source
 workstation-notes.append_to_note
-workstation-notes.create_note
 workstation-notes.create
 workstation-notes.open
 ```
+
+`workstation-notes.create_note` is the current exception: Codex Workstation Mode
+may receive a structured `helix.workstation_ui_action_receipt.v1` plus
+`helix.ask.action_envelope.v1` from the provider adapter when Helix admission
+classifies the prompt as an explicit affirmative note-create command. It remains
+outside the shared gateway manifest until broader confirmation, negative
+admission, and projection tests promote it.
 
 ## Safe Next Read/Observe Candidates
 

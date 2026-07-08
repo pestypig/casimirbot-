@@ -32,6 +32,7 @@ import {
   runHelixAskMinimalRuntimeInjectedTransport,
   type HelixAskMinimalRuntimeTurnRunner,
 } from "./HelixAskMinimalRuntimeTransport";
+import { applyHelixAskWorkstationActionsFromResult } from "./HelixAskWorkstationActionBridge";
 import { HelixAskMinimalRuntimeTurnList } from "./HelixAskMinimalRuntimeTurnList";
 import {
   HELIX_ASK_MINIMAL_RUNTIME_BROWSER_CONTROL_ACTIONS,
@@ -223,7 +224,7 @@ export function HelixAskMinimalRuntimeShell({
               : Date.now(),
           content,
           question,
-          mode: "observe",
+          mode: "observe" as const,
           result: reply,
           debug: reply.debug,
           liveEvents: [],
@@ -269,6 +270,8 @@ export function HelixAskMinimalRuntimeShell({
       selectedLanguageModelProfile,
       desktopUrl: typeof window === "undefined" ? "" : window.location.href,
       pendingPrompt,
+      durableReplies: chatSession ? buildHelixAskMinimalRuntimeRepliesFromChatSession(chatSession) : [],
+      visibleReplies: runtimeState.replies,
     });
     if (submitPlan.envelope) {
       const turnId = `ask:${crypto.randomUUID()}`;
@@ -313,6 +316,13 @@ export function HelixAskMinimalRuntimeShell({
             );
           },
         })
+          .then((result) =>
+            applyHelixAskWorkstationActionsFromResult({
+              result,
+              turnId,
+              traceId: turnId,
+            }),
+          )
           .then((result) => {
             if (sessionId) {
               addChatMessage(sessionId, {

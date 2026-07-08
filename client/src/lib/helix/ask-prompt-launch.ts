@@ -41,6 +41,10 @@ export type HelixAskStagePlayMailboxWakeRouteMetadata = {
   live_source_mailbox_authority_summary?: Record<string, unknown>;
   mandatory_next_tool?: Record<string, unknown>;
   requiredToolFamily?: string | null;
+  requiredTerminalProductKind?: string | null;
+  requiredTerminalArtifactKind?: string | null;
+  allowedTerminalProductKinds?: string[];
+  allowedTerminalArtifactKinds?: string[];
   compact_context?: Record<string, unknown>;
   context_resume_frame?: Record<string, unknown> | null;
   contextResumeFrame?: Record<string, unknown> | null;
@@ -70,6 +74,10 @@ export type HelixAskGenericRouteMetadata = {
   live_source_mailbox_authority_summary?: Record<string, unknown>;
   mandatory_next_tool?: Record<string, unknown>;
   requiredToolFamily?: string | null;
+  requiredTerminalProductKind?: string | null;
+  requiredTerminalArtifactKind?: string | null;
+  allowedTerminalProductKinds?: string[];
+  allowedTerminalArtifactKinds?: string[];
   compact_context?: Record<string, unknown>;
   context_resume_frame?: Record<string, unknown> | null;
   contextResumeFrame?: Record<string, unknown> | null;

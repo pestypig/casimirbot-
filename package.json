@@ -117,6 +117,7 @@
     "helix:ask:tool-chain-matrix": "tsx scripts/helix-ask-tool-chain-matrix-probe.ts",
     "helix:ask:provider-gateway-trace": "tsx scripts/helix-ask-provider-gateway-trace.ts",
     "helix:ask:codex-workstation-release-validation": "tsx scripts/helix-ask-codex-workstation-release-validation.ts",
+    "helix:ask:notes-create:acceptance": "tsx scripts/helix-ask-notes-create-debug-acceptance.ts",
     "helix:ask:discipline": "tsx scripts/helix-ask-discipline-check.ts --run-required",
     "helix:ask:discipline:quick": "tsx scripts/helix-ask-discipline-check.ts --check-only",
     "helix:ask:discipline:full": "tsx scripts/helix-ask-discipline-check.ts --run-full",
