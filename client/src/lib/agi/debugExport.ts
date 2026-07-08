@@ -7,6 +7,7 @@ import {
   normalizeHelixLiveTranslationSourceIdentityKey,
   normalizeHelixLiveTranslationSourceKind,
 } from "@shared/helix-live-translation-source-kind";
+import { normalizeScientificCalculatorReceiptV1 } from "@shared/contracts/scientific-calculator-receipt.v1";
 
 export type DebugExportUiResult = {
   attempted_payload_hash: string;
@@ -1911,6 +1912,16 @@ const scientificImageEvidenceSelectionReasonForDebug = (
 ): string => {
   const record = asRecord(value);
   const depth = readString(record?.evidence_depth);
+  const activeBlockers = readStringArray(record?.active_blockers);
+  const latexCandidate = readString(record?.latex_candidate);
+  const textCandidate = readString(record?.text_candidate);
+  const normalizedCandidate = (latexCandidate || textCandidate || "").replace(/\s+/g, " ").trim();
+  if (
+    activeBlockers.includes("label_only_equation_locator") ||
+    /^(?:\(?\s*[A-Za-z]?\d+(?:\.\d+)?[A-Za-z]?\s*\)?|\\tag\{\s*[A-Za-z]?\d+(?:\.\d+)?[A-Za-z]?\s*\})$/i.test(normalizedCandidate)
+  ) {
+    return "label_only_locator_requires_row_expansion";
+  }
   if (depth === "exact_row_promoted") return "latest_promoted_exact_row";
   if (depth === "exact_row_admissible") return "latest_admissible_exact_row";
   if (depth === "exact_row_partial") return "latest_partial_exact_row";
@@ -2349,7 +2360,14 @@ const buildCalculatorReceiptDebugProjection = (input: {
     "artifact_id",
     "expression",
     "status",
-  ]);
+  ])
+    .map((receipt) => normalizeScientificCalculatorReceiptV1(receipt, {
+      artifactId: readString(receipt.artifact_id),
+    }))
+    .filter((receipt): receipt is NonNullable<ReturnType<typeof normalizeScientificCalculatorReceiptV1>> =>
+      Boolean(receipt),
+    )
+    .map((receipt) => receipt as unknown as Record<string, unknown>);
   const latestReceipt = receipts[0] ?? null;
   return {
     schema: "helix.calculator_receipt_debug_projection.v1",

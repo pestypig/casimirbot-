@@ -12,7 +12,7 @@ const VAGUE_RULE_PATTERNS = [
 
 describe("Moral wisdom procedural principle catalog", () => {
   it("requires every principle mapping to carry procedural source, rule, trace, and boundaries", () => {
-    expect(MORAL_WISDOM_PRINCIPLES.length).toBe(31);
+    expect(MORAL_WISDOM_PRINCIPLES.length).toBe(35);
 
     for (const principle of MORAL_WISDOM_PRINCIPLES) {
       expect(principle.sourceIdeologyNodeId).toBe(principle.id);
@@ -106,6 +106,30 @@ describe("Moral wisdom procedural principle catalog", () => {
     expect(getMoralWisdomPrinciple("recognition-before-transcendence")).toMatchObject({
       proceduralRole: "constraint",
       refusesAuthority: ["assimilation_as_transcendence", "abandonment_as_transcendence"],
+    });
+  });
+
+  it("models dependency failure badges as repairable procedural gates", () => {
+    expect(getMoralWisdomPrinciple("dependency-transparency-gate")).toMatchObject({
+      proceduralRole: "action_gate",
+      procedureOperator: "requires",
+      evidenceNeeds: ["shared_dependency_context", "risk_disclosure_deadline", "contingency_or_repair_path"],
+      refusesAuthority: ["hidden_dependency_risk", "late_disclosure_as_private_matter"],
+    });
+    expect(getMoralWisdomPrinciple("agency-preserving-disclosure")).toMatchObject({
+      proceduralRole: "constraint",
+      evidenceNeeds: ["affected_choices", "response_time_window", "disclosure_scope"],
+      refusesAuthority: ["silence_as_private_when_options_are_controlled", "agency_stripping_by_delay"],
+    });
+    expect(getMoralWisdomPrinciple("shame-avoidance-loop")).toMatchObject({
+      proceduralRole: "constraint",
+      evidenceNeeds: ["shame_context", "repair_delay_cost", "actionable_truth"],
+      refusesAuthority: ["shame_as_reason_to_hide", "self_image_protection_as_repair"],
+    });
+    expect(getMoralWisdomPrinciple("fallout-transfer-check")).toMatchObject({
+      proceduralRole: "constraint",
+      evidenceNeeds: ["transferred_burden_map", "affected_party_consent", "urgency_or_cost_shift"],
+      refusesAuthority: ["delayed_conflict_as_reduced_harm", "externalized_fallout_without_consent"],
     });
   });
 });

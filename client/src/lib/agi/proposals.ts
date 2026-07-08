@@ -267,6 +267,8 @@ export function extractPostulateEvidenceContextFromText(text: string): Postulate
     calculatorCheckRefs: uniqueRefMatches(source, [
       /\b(calculator[_-]check[:#][a-z0-9_.:/-]+)/gi,
       /\b(dimensional[_-]check[:#][a-z0-9_.:/-]+)/gi,
+      /\b(scientific-calculator-receipt[:#][a-z0-9_.:/-]+)/gi,
+      /"receipt_id"\s*:\s*"([^"]*(?:scientific-calculator-receipt|calculator_receipt)[^"]*)"/gi,
     ]),
     uncertaintyReductionRefs: uniqueRefMatches(source, [
       /\b(uncertainty[_-]reduction[:#][a-z0-9_.:/-]+)/gi,

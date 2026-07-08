@@ -2184,7 +2184,9 @@ const buildScientificImageContinuationSidecarArtifact = (input: {
   lookup: Record<string, unknown>;
   retryDebug?: Record<string, unknown> | null;
 }): Record<string, unknown> => {
-  const selectedObject = input.sidecar.selected_evidence_object;
+  const selectedObject = scientificImageEvidenceObjectIsLabelOnly(input.sidecar.selected_evidence_object)
+    ? null
+    : input.sidecar.selected_evidence_object;
   return {
     schema: "helix.current_turn_artifact.v1",
     artifact_id: `${input.turnId}:prior_scientific_image_evidence_sidecar`,
@@ -2233,6 +2235,7 @@ const selectScientificImageContinuityPacket = (
     .slice()
     .sort((left, right) => {
       const score = (packet: ScientificEvidencePacketV1): number => {
+        if (packet.quality_flags.includes("label_only_equation_locator")) return -10_000;
         let total = 0;
         if (packet.exact_row_promotion.status === "promoted") total += 100;
         if (packet.exact_equation_admissibility === "admissible_for_exact_equation") total += 40;
@@ -2243,7 +2246,8 @@ const selectScientificImageContinuityPacket = (
         return total;
       };
       return score(right) - score(left);
-    })[0] ?? null;
+    })
+    .find((packet) => !packet.quality_flags.includes("label_only_equation_locator")) ?? null;
 
 const scientificImageEvidenceDepthLabel = (sidecar: ScientificImageEvidenceSidecarV1): string => {
   if (typeof sidecar.evidence_depth === "string" && sidecar.evidence_depth !== "missing") {
@@ -2262,10 +2266,24 @@ const scientificImageEvidenceDepthLabel = (sidecar: ScientificImageEvidenceSidec
 const scientificImageEvidenceSelectionReason = (sidecar: ScientificImageEvidenceSidecarV1): string => {
   const selected = sidecar.selected_evidence_object;
   if (!selected) return "no_structured_evidence_object_available";
+  if (selected.active_blockers.includes("label_only_equation_locator")) return "label_only_locator_requires_row_expansion";
   if (selected.evidence_depth === "exact_row_promoted") return "latest_promoted_exact_row";
   if (selected.evidence_depth === "exact_row_admissible") return "latest_admissible_exact_row";
   if (selected.evidence_depth === "exact_row_partial") return "latest_partial_exact_row";
   return "latest_page_image_ocr_math_candidate";
+};
+
+const scientificImageEvidenceObjectIsLabelOnly = (value: unknown): boolean => {
+  const record = readRecord(value);
+  if (!record) return false;
+  const activeBlockers = readStringArray(record.active_blockers);
+  const candidate = (
+    readString(record.latex_candidate) ??
+    readString(record.text_candidate) ??
+    ""
+  ).replace(/\s+/g, " ").trim();
+  return activeBlockers.includes("label_only_equation_locator") ||
+    /^(?:\(?\s*[A-Za-z]?\d+(?:\.\d+)?[A-Za-z]?\s*\)?|\\tag\{\s*[A-Za-z]?\d+(?:\.\d+)?[A-Za-z]?\s*\})$/i.test(candidate);
 };
 
 const SCIENTIFIC_IMAGE_EXACT_ROW_PROMOTION_REASON_LABELS = new Set([
@@ -2294,7 +2312,9 @@ const buildScientificImageEvidenceContinuityText = (input: {
   lookup: Record<string, unknown>;
   sourceMaterial: ScientificImageSourceMaterial | null;
 }): string => {
-  const selectedObject = input.sidecar.selected_evidence_object;
+  const selectedObject = scientificImageEvidenceObjectIsLabelOnly(input.sidecar.selected_evidence_object)
+    ? null
+    : input.sidecar.selected_evidence_object;
   const packet = selectedObject
     ? input.sidecar.packets.find((entry) =>
         `${entry.source_ref_hash}#crop=${entry.bbox_px.x},${entry.bbox_px.y},${entry.bbox_px.width},${entry.bbox_px.height}` === selectedObject.packet_ref) ??

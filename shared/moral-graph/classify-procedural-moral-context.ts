@@ -114,6 +114,36 @@ const PROCEDURAL_MORAL_PATTERN_RULES: readonly ProceduralMoralPatternRule[] = [
     reasonCodes: ["affected_party_mapping", "consideration_debt"],
   },
   {
+    id: "dependency-transparency-gate",
+    cues: [
+      /\b(?:hidden shared risk|late disclosure|shared obligation transparency|dependency risk disclosure)\b/i,
+      /\b(?:tell them before damage compounds|shared obligation is at risk|materially depend)\b/i,
+    ],
+    observedPattern: "unconsidered_harm",
+    moralRootId: "dependency-transparency-gate",
+    proceduralMove: "identify_affected_parties",
+    explanation:
+      "Hidden dependency risk is routed toward naming who depends on timely disclosure, what risk is known, and what deadline preserves their ability to adapt.",
+    missingEvidence: ["shared_dependency_context", "risk_disclosure_deadline", "contingency_or_repair_path"],
+    warnings: ["avoid_late_disclosure_as_private_matter", "avoid_character_verdict"],
+    reasonCodes: ["dependency_transparency_gate", "shared_obligation"],
+  },
+  {
+    id: "agency-preserving-disclosure",
+    cues: [
+      /\b(?:stripped away agency|could not plan|withheld information|lost ability to adapt|planning harm)\b/i,
+      /\b(?:silence would remove|choose, prepare, or protect|ability to choose|ability to prepare|ability to protect)\b/i,
+    ],
+    observedPattern: "unconsidered_harm",
+    moralRootId: "agency-preserving-disclosure",
+    proceduralMove: "identify_affected_parties",
+    explanation:
+      "Agency-preserving disclosure asks which choices become unavailable when information stays hidden from affected people.",
+    missingEvidence: ["affected_choices", "response_time_window", "disclosure_scope"],
+    warnings: ["avoid_treating_silence_as_private_when_options_are_controlled", "preserve_response_time"],
+    reasonCodes: ["agency_preserving_disclosure", "planning_harm"],
+  },
+  {
     id: "guilt-signal",
     cues: [/\b(?:guilt|guilty|moral guilt|shame|blame|wrongdoing|wrong)\b/i],
     observedPattern: "guilt_signal",
@@ -124,6 +154,36 @@ const PROCEDURAL_MORAL_PATTERN_RULES: readonly ProceduralMoralPatternRule[] = [
     missingEvidence: ["evidence_of_effect", "repair_or_restraint_option", "user_confirmed_responsibility_frame"],
     warnings: ["avoid_self_punishment_loop", "avoid_character_verdict"],
     reasonCodes: ["guilt_to_repair", "repair_readiness"],
+  },
+  {
+    id: "shame-avoidance-loop",
+    cues: [
+      /\b(?:shame[-\s]?avoidance loop|avoidance loop|hiding because of shame|too ashamed to disclose)\b/i,
+      /\b(?:delaying conflict|compounding damage|shame delays truth|shame blocks repair)\b/i,
+    ],
+    observedPattern: "guilt_signal",
+    moralRootId: "shame-avoidance-loop",
+    proceduralMove: "separate_guilt_from_repair",
+    explanation:
+      "Shame-avoidance is treated as a repairable loop: separate self-image pain from the actionable truth and next repair step.",
+    missingEvidence: ["shame_context", "repair_delay_cost", "actionable_truth"],
+    warnings: ["avoid_shame_as_reason_to_hide", "avoid_self_image_as_repair"],
+    reasonCodes: ["shame_avoidance_loop", "repair_readiness"],
+  },
+  {
+    id: "fallout-transfer-check",
+    cues: [
+      /\b(?:fallout transfer|externalized fallout|shifted burden|transferred damage|cost of hiding)\b/i,
+      /\b(?:drag others into the wake|shift(?:ed|ing)? cost|shift(?:ed|ing)? urgency|urgency onto others)\b/i,
+    ],
+    observedPattern: "unconsidered_harm",
+    moralRootId: "fallout-transfer-check",
+    proceduralMove: "identify_affected_parties",
+    explanation:
+      "Fallout transfer maps whether avoided responsibility has shifted cost, uncertainty, or urgency onto people who did not consent to carry it.",
+    missingEvidence: ["transferred_burden_map", "affected_party_consent", "urgency_or_cost_shift"],
+    warnings: ["avoid_delayed_conflict_as_reduced_harm", "avoid_externalized_fallout_without_consent"],
+    reasonCodes: ["fallout_transfer_check", "consideration_debt"],
   },
   {
     id: "willful-avoidance-risk",

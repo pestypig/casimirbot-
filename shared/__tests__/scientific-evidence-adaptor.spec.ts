@@ -140,6 +140,69 @@ describe("scientific evidence adaptor", () => {
     });
   });
 
+  it("treats label-only equation crops as locators instead of selected equation evidence", () => {
+    const labelOnly = buildScientificEvidencePacket({
+      cropRegionId: "image_lens_region:label-only-7",
+      sourceRefHash: "sha256:label-only",
+      sourceKind: "pdf_page_render",
+      pageNumber: 5,
+      bboxPx: { x: 866, y: 567, width: 266, height: 36 },
+      sourceDimensionsPx: { width: 1224, height: 1584 },
+      requestedEquationLabel: "7",
+      regionLabel: "equation_7",
+      textCandidate: "(7)",
+      latexCandidate: "(7)",
+      uncertainty: [],
+      extractionStatus: "extracted",
+    });
+    const fullRowPartial = buildScientificEvidencePacket({
+      cropRegionId: "image_lens_region:full-row-partial-7",
+      sourceRefHash: "sha256:full-row-partial",
+      sourceKind: "pdf_page_render",
+      pageNumber: 5,
+      bboxPx: { x: 73, y: 570, width: 1077, height: 87 },
+      sourceDimensionsPx: { width: 1224, height: 1584 },
+      requestedEquationLabel: "7",
+      regionLabel: "equation_7",
+      textCandidate: "S = \\int d^4x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_m \\}, \\ (7)",
+      latexCandidate: "S = \\int d^4x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_m \\}, \\ (7)",
+      uncertainty: ["partial OCR"],
+      extractionStatus: "partial",
+    });
+
+    const sidecar = buildScientificImageEvidenceSidecar({
+      sidecarId: "sidecar:label-locator",
+      packets: [labelOnly, fullRowPartial],
+    });
+    const labelOnlySidecar = buildScientificImageEvidenceSidecar({
+      sidecarId: "sidecar:label-only",
+      packets: [labelOnly],
+    });
+
+    expect(labelOnly).toMatchObject({
+      quality_flags: expect.arrayContaining(["label_only_equation_locator"]),
+      exact_equation_admissibility: "inadmissible_for_exact_equation",
+      exact_row_promotion: expect.objectContaining({
+        status: "rejected",
+        reasons: expect.arrayContaining(["label_only_equation_locator"]),
+      }),
+    });
+    expect(sidecar.selected_evidence_object).toMatchObject({
+      crop_region_id: "image_lens_region:full-row-partial-7",
+      evidence_depth: "exact_row_partial",
+      latex_candidate: expect.stringContaining("S = \\int d^4x"),
+    });
+    expect(sidecar.selected_evidence_object?.latex_candidate).not.toBe("(7)");
+    expect(sidecar.historical_blockers).toEqual(expect.arrayContaining(["label_only_equation_locator"]));
+    expect(labelOnlySidecar.selected_evidence_object).toBeNull();
+    expect(labelOnlySidecar.promoted_equation_ref).toBeNull();
+    expect(labelOnlySidecar.exact_equation_summary).toMatchObject({
+      promoted_row_count: 0,
+      admissible_row_count: 0,
+      rejected_row_count: 1,
+    });
+  });
+
   it("projects promoted rows as stable structured evidence objects", () => {
     const exactLatex = "S = \\int d^4x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_m \\}, \\, (7)";
     const exactRow = buildScientificEvidencePacket({

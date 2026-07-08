@@ -217,6 +217,17 @@ export const extractPostulateEvidenceContextFromRuntimePayload = (payload: unkno
       pushUniqueRef(calculatorCheckRefs, `calculator_check:template_admissibility:${status}:${Number.isFinite(admitted) ? admitted : 0}`);
     }
 
+    if (schema === "helix.scientific_calculator_receipt.v1" || schema === "helix.calculator_receipt.v1" || kind === "calculator_receipt") {
+      const status = readCalculatorStatus(record.status);
+      const receiptId = readString(record.receipt_id ?? record.artifact_id);
+      pushUniqueRef(
+        calculatorCheckRefs,
+        receiptId
+          ? `calculator_check:receipt:${status}:${receiptId}`
+          : `calculator_check:receipt:${status}`,
+      );
+    }
+
     if (
       schema === "helix.theory_context_reflection.v1" ||
       schema === "helix.theory_badge_graph_reflection.v1" ||

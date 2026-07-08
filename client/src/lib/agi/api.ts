@@ -55,7 +55,12 @@ import {
   isImageLensRegionInspectionReceiptV1,
   type ImageLensRegionInspectionReceiptV1,
 } from "@shared/contracts/image-lens-region-inspection.v1";
+import {
+  normalizeScientificCalculatorReceiptV1,
+  type ScientificCalculatorReceiptV1,
+} from "@shared/contracts/scientific-calculator-receipt.v1";
 import { ingestPostulateReviewReceiptsFromAskPayload } from "@/lib/agi/proposals";
+import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 
 const HELIX_CONTEXT_CAPSULE_MAX_IDS = 12;
 
@@ -132,6 +137,126 @@ const ingestImageLensRegionInspectionReceipts = (payload: unknown): void => {
       threadId,
     });
   }
+};
+
+const collectScientificCalculatorContextKeys = (
+  record: Record<string, unknown> | null,
+  inherited: string[] = [],
+): string[] => {
+  if (!record) return inherited;
+  const debug = readAgiRecord(record.debug);
+  const accountSession = readAgiRecord(record.account_session ?? debug?.account_session);
+  const activeCalculatorContext = readAgiRecord(
+    record.activeCalculatorContext ??
+    record.active_calculator_context ??
+    debug?.activeCalculatorContext ??
+    debug?.active_calculator_context,
+  );
+  const workspaceSnapshot = readAgiRecord(record.workspace_context_snapshot ?? debug?.workspace_context_snapshot);
+  const workspaceCalculatorContext = readAgiRecord(workspaceSnapshot?.activeCalculatorContext);
+  const candidates = [
+    ["ask:turn", readAgiString(record.turn_id) || readAgiString(record.turnId)],
+    ["ask:thread", readAgiString(record.thread_id) || readAgiString(record.threadId)],
+    ["ask:session", readAgiString(record.session_id) || readAgiString(record.sessionId)],
+    ["account", readAgiString(accountSession?.account_id) || readAgiString(accountSession?.accountId)],
+    ["workspace", readAgiString(record.workspace_id) || readAgiString(record.workspaceId)],
+    ["calculator:receipt", readAgiString(record.calculator_receipt_ref) || readAgiString(activeCalculatorContext?.calculator_receipt_ref)],
+    ["calculator:receipt", readAgiString(workspaceCalculatorContext?.calculator_receipt_ref)],
+    ["calculator:source", readAgiString(record.source_id) || readAgiString(record.sourceId)],
+    ["calculator:source_hash", readAgiString(record.source_hash) || readAgiString(record.sourceHash)],
+  ];
+  return Array.from(new Set([
+    ...inherited,
+    ...candidates.flatMap(([prefix, value]) => value ? [`${prefix}:${value}`] : []),
+  ]));
+};
+
+const collectScientificCalculatorReceipts = (payload: unknown): ScientificCalculatorReceiptV1[] => {
+  const receipts: ScientificCalculatorReceiptV1[] = [];
+  const seenObjects = new WeakSet<object>();
+
+  const rootContextKeys = collectScientificCalculatorContextKeys(readAgiRecord(payload));
+
+  const pushReceipt = (
+    value: unknown,
+    meta: { artifactId?: string | null; receiptId?: string | null; contextKeys?: string[] } = {},
+  ) => {
+    const normalized = normalizeScientificCalculatorReceiptV1(value, meta);
+    if (!normalized) return;
+    if (!normalized.expression.trim() && !normalized.result_text && normalized.missing_bindings.length === 0 && normalized.blockers.length === 0) {
+      return;
+    }
+    receipts.push(normalized);
+  };
+
+  const visit = (
+    value: unknown,
+    depth = 0,
+    meta: { artifactId?: string | null; receiptId?: string | null; contextKeys?: string[] } = { contextKeys: rootContextKeys },
+  ): void => {
+    if (depth > 8) return;
+    if (Array.isArray(value)) {
+      value.slice(0, 120).forEach((entry) => visit(entry, depth + 1, meta));
+      return;
+    }
+    const record = readAgiRecord(value);
+    if (!record) return;
+    if (seenObjects.has(record)) return;
+    seenObjects.add(record);
+
+    const artifactId =
+      readAgiString(record.artifact_id) ||
+      readAgiString(record.artifactId) ||
+      readAgiString(record.ref) ||
+      meta.artifactId ||
+      null;
+    const receiptId = readAgiString(record.receipt_id) || meta.receiptId || null;
+    const contextKeys = collectScientificCalculatorContextKeys(record, meta.contextKeys ?? rootContextKeys);
+    const nextMeta = { artifactId, receiptId, contextKeys };
+    const schema = readAgiString(record.schema);
+    const kind = readAgiString(record.kind);
+
+    if (schema === "helix.scientific_calculator_receipt.v1" || schema === "helix.calculator_receipt.v1") {
+      pushReceipt(record, nextMeta);
+    }
+    if (kind === "calculator_receipt") {
+      pushReceipt(record, nextMeta);
+      pushReceipt(record.payload, nextMeta);
+      pushReceipt(record.receipt, nextMeta);
+    }
+    pushReceipt(record.calculator_receipt, nextMeta);
+    pushReceipt(record.lastCalculatorReceipt, nextMeta);
+    pushReceipt(record.last_calculator_receipt, nextMeta);
+
+    Object.values(record).slice(0, 160).forEach((entry) => visit(entry, depth + 1, nextMeta));
+  };
+
+  visit(payload);
+  const seen = new Set<string>();
+  return receipts.filter((receipt) => {
+    const key = `${receipt.receipt_id}:${receipt.status}:${receipt.expression}:${receipt.result_text ?? ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+export const ingestScientificCalculatorReceiptsFromAskPayload = (payload: unknown): ScientificCalculatorReceiptV1[] => {
+  const receipts = collectScientificCalculatorReceipts(payload);
+  if (receipts.length === 0) return [];
+  const store = useScientificCalculatorStore.getState();
+  const existing = new Set(
+    store.calculatorReceipts.map((receipt) => `${receipt.receipt_id}:${receipt.status}:${receipt.expression}:${receipt.result_text ?? ""}`),
+  );
+  const applied: ScientificCalculatorReceiptV1[] = [];
+  for (const receipt of receipts) {
+    const key = `${receipt.receipt_id}:${receipt.status}:${receipt.expression}:${receipt.result_text ?? ""}`;
+    if (existing.has(key)) continue;
+    useScientificCalculatorStore.getState().recordCalculatorReceipt(receipt);
+    existing.add(key);
+    applied.push(receipt);
+  }
+  return applied;
 };
 
 export type PlanResponse = {
@@ -2403,6 +2528,7 @@ export async function runCapabilityLaneOneShot(
   });
   const result = await asJson<CapabilityLaneOneShotResponse>(response);
   ingestImageLensRegionInspectionReceipts(result);
+  ingestScientificCalculatorReceiptsFromAskPayload(result);
   return result;
 }
 
@@ -2646,6 +2772,7 @@ export async function runAskTurnStream(
       data = rawData;
     }
     ingestImageLensRegionInspectionReceipts(data);
+    ingestScientificCalculatorReceiptsFromAskPayload(data);
     ingestPostulateReviewReceiptsFromAskPayload(data);
     const packet: HelixAskTurnStreamEvent = { event, data };
     onEvent?.(packet);
@@ -2947,6 +3074,7 @@ const buildBlockedJobDirectFallbackResponse = (
 
 const normalizeLocalAskResponse = (payload: unknown): LocalAskResponse => {
   ingestImageLensRegionInspectionReceipts(payload);
+  ingestScientificCalculatorReceiptsFromAskPayload(payload);
   ingestPostulateReviewReceiptsFromAskPayload(payload);
   const record = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
   const selectedFinalAnswer = typeof record.selected_final_answer === "string" ? record.selected_final_answer.trim() : "";

@@ -30,5 +30,13 @@
     "source": "theory.badge.astrochemistry.fullerene.c60_c70_carbon_cage_context",
     "field": "assumptions[1]",
     "error": "Translation route failed: 502 {\"ok\":false,\"error\":\"document_translation_failed\",\"message\":\"Document translation timed out.\"}"
+  },
+  "wo\u0000Lapse-shift profile rows must not be interpreted as ordinary vehicle velocity.": {
+    "locale": "wo",
+    "id": "theoryBadgeGraph.shared.lapseShiftProfileRowsMustNotBeInterpretedAsOrdinary",
+    "text": "Lapse-shift profile rows must not be interpreted as ordinary vehicle velocity.",
+    "source": "theory.edge.shift_profile_blocks_speed_boundary",
+    "field": "label",
+    "error": "Translation route failed: 502 {\"ok\":false,\"error\":\"document_translation_failed\",\"message\":\"Document translation timed out.\"}"
   }
 }

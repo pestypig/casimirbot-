@@ -71,6 +71,7 @@ type ScientificCalculatorState = {
   activeTheoryLoadoutItemIndex: number | null;
   lastSetup: HelixCalculatorSetupContext | null;
   calculatorReceipts: ScientificCalculatorReceiptV1[];
+  calculatorReceiptIdsByContextKey: Record<string, string>;
   lastCalculatorReceipt: ScientificCalculatorReceiptV1 | null;
   steps: ScientificSolveResult["steps"];
   debugEvents: ScientificCalculatorDebugEvent[];
@@ -126,6 +127,11 @@ const MAX_HISTORY = 80;
 const MAX_DEBUG_EVENTS = 160;
 const MAX_CALCULATOR_RECEIPTS = 80;
 
+const indexCalculatorReceiptContextKeys = (
+  receipt: ScientificCalculatorReceiptV1,
+): Record<string, string> =>
+  Object.fromEntries((receipt.context_keys ?? []).map((key) => [key, receipt.receipt_id]));
+
 function makeDebugEvent(
   event: Omit<ScientificCalculatorDebugEvent, "id" | "ts" | "panel_id">,
 ): ScientificCalculatorDebugEvent {
@@ -173,6 +179,11 @@ const buildReceiptFromSolve = (
       ...(meta?.compoundRunId ? [`compound_run:${meta.compoundRunId}`] : []),
       ...(meta?.compoundSubgoalId ? [`compound_subgoal:${meta.compoundSubgoalId}`] : []),
     ],
+    context_keys: [
+      `calculator_trace:${result.trace.traceId}`,
+      ...(meta?.compoundRunId ? [`compound_run:${meta.compoundRunId}`] : []),
+      ...(meta?.compoundSubgoalId ? [`compound_subgoal:${meta.compoundSubgoalId}`] : []),
+    ],
     dimensional_check_status: setup?.result_dimension_signature
       ? "passed"
       : setup?.input_units && Object.keys(setup.input_units).length > 0
@@ -205,6 +216,7 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
       activeTheoryLoadoutItemIndex: null,
       lastSetup: null,
       calculatorReceipts: [],
+      calculatorReceiptIdsByContextKey: {},
       lastCalculatorReceipt: null,
       steps: [],
       debugEvents: [],
@@ -269,6 +281,10 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
           lastSetup: meta && "calculatorSetup" in meta ? (meta.calculatorSetup ?? null) : state.lastSetup,
           lastCalculatorReceipt: receipt,
           calculatorReceipts: [receipt, ...state.calculatorReceipts].slice(0, MAX_CALCULATOR_RECEIPTS),
+          calculatorReceiptIdsByContextKey: {
+            ...state.calculatorReceiptIdsByContextKey,
+            ...indexCalculatorReceiptContextKeys(receipt),
+          },
           steps: result.steps,
           debugEvents: [debugEvent, ...state.debugEvents].slice(0, MAX_DEBUG_EVENTS),
         }));
@@ -347,6 +363,7 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
           variables: receiptInput.variables ?? [],
           assumptions: receiptInput.assumptions ?? [],
           source_refs: receiptInput.source_refs ?? [],
+          context_keys: receiptInput.context_keys ?? [],
           dimensional_check_status: receiptInput.dimensional_check_status ?? "not_run",
           result_value: receiptInput.result_value ?? null,
           result_unit: receiptInput.result_unit ?? null,
@@ -374,6 +391,10 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
           currentLatex: receipt.latex ?? receipt.expression,
           lastCalculatorReceipt: receipt,
           calculatorReceipts: [receipt, ...state.calculatorReceipts].slice(0, MAX_CALCULATOR_RECEIPTS),
+          calculatorReceiptIdsByContextKey: {
+            ...state.calculatorReceiptIdsByContextKey,
+            ...indexCalculatorReceiptContextKeys(receipt),
+          },
           debugEvents: [debugEvent, ...state.debugEvents].slice(0, MAX_DEBUG_EVENTS),
         }));
         return receipt;
@@ -430,6 +451,7 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
         activeTheoryLoadoutItemIndex: state.activeTheoryLoadoutItemIndex,
         lastSetup: state.lastSetup,
         calculatorReceipts: state.calculatorReceipts,
+        calculatorReceiptIdsByContextKey: state.calculatorReceiptIdsByContextKey,
         lastCalculatorReceipt: state.lastCalculatorReceipt,
         steps: state.steps,
         debugEvents: state.debugEvents,

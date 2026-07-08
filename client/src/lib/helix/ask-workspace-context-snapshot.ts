@@ -82,6 +82,7 @@ type ScientificCalculatorSnapshotInput = {
   } | null;
   lastCalculatorReceipt?: unknown;
   calculatorReceipts?: unknown;
+  calculatorReceiptIdsByContextKey?: unknown;
   steps?: unknown;
   debugEvents?: unknown;
 };
@@ -313,6 +314,16 @@ export function buildAskTurnWorkspaceContextSnapshotFromState(
       )
       .slice(0, 5)
     : [];
+  const calculatorReceiptContextIndex =
+    input.calculatorState.calculatorReceiptIdsByContextKey &&
+    typeof input.calculatorState.calculatorReceiptIdsByContextKey === "object" &&
+    !Array.isArray(input.calculatorState.calculatorReceiptIdsByContextKey)
+      ? Object.fromEntries(
+        Object.entries(input.calculatorState.calculatorReceiptIdsByContextKey as Record<string, unknown>)
+          .filter((entry): entry is [string, string] => typeof entry[1] === "string")
+          .slice(0, 20),
+      )
+      : {};
   const activeCalculatorContext = {
     schema: "helix.scientific_calculator_active_context.v1",
     panel_id: "scientific-calculator",
@@ -328,6 +339,7 @@ export function buildAskTurnWorkspaceContextSnapshotFromState(
       typeof lastCalculatorReceipt?.status === "string" ? lastCalculatorReceipt.status : null,
     calculator_receipt_ref:
       typeof lastCalculatorReceipt?.receipt_id === "string" ? lastCalculatorReceipt.receipt_id : null,
+    calculator_receipt_context_index: calculatorReceiptContextIndex,
     step_count: Array.isArray(input.calculatorState.steps) ? input.calculatorState.steps.length : 0,
     recent_debug_events: calculatorRecentDebugEvents,
   };

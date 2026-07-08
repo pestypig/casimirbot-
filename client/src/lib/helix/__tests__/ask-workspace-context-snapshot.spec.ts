@@ -105,6 +105,7 @@ describe("ask workspace context snapshot helpers", () => {
           variables: [],
           assumptions: [],
           source_refs: ["trace-123"],
+          context_keys: ["ask:turn:turn-72"],
           dimensional_check_status: "not_applicable",
           result_value: "72",
           result_unit: null,
@@ -124,6 +125,7 @@ describe("ask workspace context snapshot helpers", () => {
           variables: [],
           assumptions: [],
           source_refs: ["trace-123"],
+          context_keys: ["ask:turn:turn-72"],
           dimensional_check_status: "not_applicable",
           provenance_refs: ["calculator_trace:trace-123"],
           missing_bindings: [],
@@ -132,6 +134,9 @@ describe("ask workspace context snapshot helpers", () => {
           created_at: "2026-07-08T00:00:00.000Z",
           updated_at: "2026-07-08T00:00:00.000Z",
         }],
+        calculatorReceiptIdsByContextKey: {
+          "ask:turn:turn-72": "receipt:calculator:72",
+        },
         steps: [{ id: 1 }, { id: 2 }],
         debugEvents: [
           {
@@ -536,6 +541,7 @@ describe("ask workspace context snapshot helpers", () => {
         variables: [],
         assumptions: [],
         source_refs: ["trace-123"],
+        context_keys: ["ask:turn:turn-72"],
         dimensional_check_status: "not_applicable",
         result_value: "72",
         result_unit: null,
@@ -555,6 +561,7 @@ describe("ask workspace context snapshot helpers", () => {
         variables: [],
         assumptions: [],
         source_refs: ["trace-123"],
+        context_keys: ["ask:turn:turn-72"],
         dimensional_check_status: "not_applicable",
         provenance_refs: ["calculator_trace:trace-123"],
         missing_bindings: [],
@@ -565,6 +572,9 @@ describe("ask workspace context snapshot helpers", () => {
       }],
       calculator_receipt_status: "solved",
       calculator_receipt_ref: "receipt:calculator:72",
+      calculator_receipt_context_index: {
+        "ask:turn:turn-72": "receipt:calculator:72",
+      },
       step_count: 2,
       recent_debug_events: [{
         action_id: "solve_expression",

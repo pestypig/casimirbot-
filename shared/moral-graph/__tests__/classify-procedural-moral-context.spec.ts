@@ -30,6 +30,10 @@ const nodeIds = [
   "inspiration-without-imitation",
   "goalpost-integrity",
   "recognition-before-transcendence",
+  "dependency-transparency-gate",
+  "agency-preserving-disclosure",
+  "shame-avoidance-loop",
+  "fallout-transfer-check",
 ] as const;
 
 const graphDocument: IdeologyGraphDocument = {
@@ -241,5 +245,54 @@ describe("procedural Moral context classifier", () => {
       character_verdict: false,
       moral_finality: false,
     });
+  });
+
+  it("classifies hidden dependency risk as agency-preserving repair work, not a verdict", () => {
+    const classification = classify(
+      [
+        "There was hidden shared risk in a shared obligation, and late disclosure meant the affected people could not plan.",
+        "The person withheld information, which stripped away agency and created planning harm.",
+        "A shame-avoidance loop kept delaying conflict until there was compounding damage.",
+        "Now there is externalized fallout, shifted burden, and transferred damage from the cost of hiding.",
+      ].join(" "),
+    );
+
+    expect(validateProceduralMoralClassificationV1(classification)).toEqual([]);
+    expect(classification.classifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          moralRootId: "dependency-transparency-gate",
+          proceduralMove: "identify_affected_parties",
+        }),
+        expect.objectContaining({
+          moralRootId: "agency-preserving-disclosure",
+          proceduralMove: "identify_affected_parties",
+        }),
+        expect.objectContaining({
+          moralRootId: "shame-avoidance-loop",
+          proceduralMove: "separate_guilt_from_repair",
+        }),
+        expect.objectContaining({
+          moralRootId: "fallout-transfer-check",
+          proceduralMove: "identify_affected_parties",
+        }),
+      ]),
+    );
+    expect(classification.recommendedNextMoves).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "procedural-moral-action:identify-affected-parties",
+        }),
+        expect.objectContaining({
+          id: "procedural-moral-action:separate-guilt-from-repair",
+        }),
+      ]),
+    );
+    expect(classification.authority).toMatchObject({
+      terminal_eligible: false,
+      character_verdict: false,
+      moral_finality: false,
+    });
+    expect(JSON.stringify(classification)).not.toMatch(/bad person|morally approved|morally failed/i);
   });
 });

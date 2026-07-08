@@ -439,6 +439,23 @@ const classifyLabelMatch = (
   return observedEquationLabels.length > 1 ? "ambiguous" : "mismatched";
 };
 
+const isEquationLabelOnlyCandidate = (value: string): boolean => {
+  const normalized = value
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/\\(?:,|;|!|quad|qquad|left|right)/g, " ")
+    .replace(/\\tag\s*\{\s*([^}]+)\s*\}/g, "($1)")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!normalized) return false;
+  return /^(?:\(?\s*[A-Za-z]?\d+(?:\.\d+)?[A-Za-z]?\s*\)?|[\[\{]\s*[A-Za-z]?\d+(?:\.\d+)?[A-Za-z]?\s*[\]\}])$/i.test(normalized);
+};
+
+const isLabelOnlyExactEquationCandidate = (input: { text: string; latex: string; hasCandidate: boolean }): boolean => {
+  if (!input.hasCandidate) return false;
+  const candidates = [input.text, input.latex].map((entry) => entry.trim()).filter(Boolean);
+  return candidates.length > 0 && candidates.every(isEquationLabelOnlyCandidate);
+};
+
 const detectScientificQualityFlags = (input: {
   text: string;
   latex: string;
@@ -465,6 +482,7 @@ const detectScientificQualityFlags = (input: {
       : "context_crop_contains_unverified_formalism_prose");
   }
   if (input.evidenceRole === "exact_equation_candidate") {
+    if (isLabelOnlyExactEquationCandidate(input)) flags.push("label_only_equation_locator");
     if (input.labelMatchStatus === "missing_observed_label") flags.push("missing_requested_equation_label");
     if (input.labelMatchStatus === "mismatched") flags.push("mismatched_equation_label");
     if (input.labelMatchStatus === "ambiguous") flags.push("ambiguous_equation_label");
@@ -531,6 +549,7 @@ const qualityFlagReason = (flag: string): string => {
     case "mojibake_or_corrupted_symbol_text": return "The OCR/LaTeX candidate contains corrupted symbols or mojibake.";
     case "ellipsized_or_truncated_equation": return "The equation candidate is ellipsized or visibly truncated.";
     case "malformed_latex_candidate": return "The LaTeX candidate is malformed.";
+    case "label_only_equation_locator": return "The crop contains only an equation label locator, not the equation row.";
     case "row_crop_too_broad_for_exact_equation": return "The row crop is too broad to treat as one exact equation row.";
     case "degenerate_crop_dimensions": return "The crop dimensions are degenerate and cannot support exact extraction.";
     case "exact_row_crop_too_small_for_reliable_math_ocr": return "The exact row crop is too small for reliable math OCR.";
@@ -583,11 +602,20 @@ const promotionReasonsForScientificPacket = (packet: ScientificEvidencePacketV1 
         SCIENTIFIC_IMAGE_EXACT_ROW_PROMOTION_REASON_VALUES.has(reason)))
     : [];
 
+const isLabelOnlyScientificPacket = (packet: ScientificEvidencePacketV1): boolean =>
+  packet.quality_flags.includes("label_only_equation_locator") ||
+  isLabelOnlyExactEquationCandidate({
+    text: packet.text_candidate ?? packet.ocr_text_candidate ?? "",
+    latex: packet.latex_candidate ?? "",
+    hasCandidate: Boolean(packet.text_candidate || packet.ocr_text_candidate || packet.latex_candidate),
+  });
+
 const selectStructuredScientificImageEvidencePacket = (
   packets: ScientificEvidencePacketV1[],
 ): ScientificEvidencePacketV1 | null => {
   const ranked = packets.slice().sort((left, right) => {
     const score = (packet: ScientificEvidencePacketV1): number => {
+      if (isLabelOnlyScientificPacket(packet)) return -10_000;
       let total = 0;
       if (packet.exact_row_promotion.status === "promoted") total += 10_000;
       if (packet.exact_equation_admissibility === "admissible_for_exact_equation") total += 4_000;
@@ -601,7 +629,7 @@ const selectStructuredScientificImageEvidencePacket = (
     };
     return score(right) - score(left);
   });
-  return ranked[0] ?? null;
+  return ranked.find((packet) => !isLabelOnlyScientificPacket(packet)) ?? null;
 };
 
 const buildPromotedScientificImageEvidence = (
@@ -724,7 +752,12 @@ export function buildScientificEvidencePacket(input: CandidateInput): Scientific
   const exactEquationAdmissibility: ScientificExactEquationAdmissibilityV1 =
     evidenceRole === "context_only"
       ? "partial_candidate"
-      : !hasCandidate || status === "failed" || status === "not_run" || labelMatchStatus === "mismatched" || labelMatchStatus === "ambiguous"
+      : !hasCandidate ||
+        status === "failed" ||
+        status === "not_run" ||
+        labelMatchStatus === "mismatched" ||
+        labelMatchStatus === "ambiguous" ||
+        allQualityFlags.includes("label_only_equation_locator")
         ? "inadmissible_for_exact_equation"
         : (labelMatchStatus === "matched" || (requestedEquationLabel === null && labelMatchStatus === "not_applicable")) &&
           allQualityFlags.length === 0 &&

@@ -307,6 +307,25 @@ describe("postulate runtime review gate", () => {
             admitted_template_count: 4,
           },
           {
+            schema: "helix.scientific_calculator_receipt.v1",
+            receipt_id: "scientific-calculator-receipt:rho-template",
+            status: "template_only",
+            expression: "rho = E / V",
+            variables: [
+              { symbol: "E", value: null, unit: "J" },
+              { symbol: "V", value: null, unit: "m^3" },
+            ],
+            assumptions: [],
+            source_refs: ["scientific_evidence_graph_reflection:source-page-a"],
+            dimensional_check_status: "missing_units",
+            provenance_refs: ["calculator_template:rho"],
+            missing_bindings: ["variable:E", "variable:V"],
+            blockers: ["missing_variable_bindings"],
+            claim_boundary: "diagnostic only",
+            created_at: "2026-07-08T00:00:00.000Z",
+            updated_at: "2026-07-08T00:00:00.000Z",
+          },
+          {
             schema: "helix.scientific_image_graph_reflection_lookup.v1",
             status: "found",
             selected_lookup_key: "scientific_image:account:pesty",
@@ -328,6 +347,7 @@ describe("postulate runtime review gate", () => {
     expect(hydrated.graphReflectionRefs).toContain("scientific_evidence_graph_reflection:source-page-a");
     expect(hydrated.graphReflectionRefs).toContain("theory_context_reflection:latest-scoped");
     expect(hydrated.calculatorCheckRefs).toContain("calculator_check:template_admissibility:template_admissible:4");
+    expect(hydrated.calculatorCheckRefs).toContain("calculator_check:receipt:template_admissible:scientific-calculator-receipt:rho-template");
   });
 
   it("normalizes legacy calculator readiness labels to the graded handoff vocabulary", () => {

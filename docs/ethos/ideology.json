@@ -1277,6 +1277,7 @@
       "children": [
         "recognition-before-transcendence",
         "consideration-debt",
+        "shame-avoidance-loop",
         "unseen-harm-inquiry",
         "due-care-before-judgment",
         "guilt-to-repair",
@@ -1389,7 +1390,9 @@
         "missing consideration",
         "blind spot"
       ],
-      "children": [],
+      "children": [
+        "fallout-transfer-check"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -1410,6 +1413,226 @@
         "move": "Name the missing consideration and turn it into a research or listening question.",
         "missingCheck": "Who or what is affected but not represented in the current frame?",
         "antiPattern": "Letting absent guilt replace due care."
+      }
+    },
+    {
+      "id": "dependency-transparency-gate",
+      "slug": "dependency-transparency-gate",
+      "title": "Dependency Transparency Gate",
+      "excerpt": "When others materially depend on a commitment, disclose risk early enough for them to adapt.",
+      "bodyMD": "Dependency transparency appears when shared obligation, dependency, or commitment creates material risk for others. The procedural move is to disclose risk early enough that affected people can plan, adapt, consent, or protect themselves.\n\nAnti-pattern: treating late disclosure as private when others depended on the information.\n\nMinimal artifact: Dependency Risk Notice with the shared obligation, known risk, affected people, disclosure deadline, and contingency or repair path.",
+      "tags": [
+        "transparency",
+        "dependency",
+        "shared_obligation",
+        "right_speech",
+        "due_process",
+        "repair_readiness"
+      ],
+      "aliases": [
+        "hidden shared risk",
+        "late disclosure",
+        "tell them before damage compounds",
+        "shared obligation transparency",
+        "dependency risk disclosure"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "fairness-due-process-and-justification"
+        },
+        {
+          "rel": "see-also",
+          "to": "right-speech-and-accurate-formulation"
+        },
+        {
+          "rel": "see-also",
+          "to": "skillful-action-under-uncertainty"
+        },
+        {
+          "rel": "see-also",
+          "to": "consideration-debt"
+        }
+      ],
+      "references": [
+        {
+          "kind": "doc",
+          "title": "Ideology Graph",
+          "path": "docs/ethos/ideology.json"
+        }
+      ],
+      "summary": "When others materially depend on a commitment, disclose risk early enough for them to adapt.",
+      "proceduralLanguage": {
+        "pattern": "A shared obligation is at risk, but affected people may not know soon enough to adapt.",
+        "move": "Disclose the risk, name the uncertainty, and create a repair or contingency path.",
+        "missingCheck": "Who depends on this information, and what deadline preserves their agency?",
+        "antiPattern": "Hiding a material risk until others lose the ability to plan."
+      }
+    },
+    {
+      "id": "agency-preserving-disclosure",
+      "slug": "agency-preserving-disclosure",
+      "title": "Agency-Preserving Disclosure",
+      "excerpt": "Disclosure is required when silence would remove another person's ability to choose, prepare, or protect themselves.",
+      "bodyMD": "Agency-preserving disclosure treats silence as morally relevant when it controls another person's options. The procedural move is to identify which choices, protections, or preparations disappear if information remains hidden.\n\nAnti-pattern: treating silence as private when it removes another person's meaningful options.\n\nMinimal artifact: Agency Preservation Note with affected choices, response time, disclosure scope, and options lost through delay.",
+      "tags": [
+        "agency",
+        "disclosure",
+        "non-harm",
+        "affected_parties",
+        "consent",
+        "planning"
+      ],
+      "aliases": [
+        "stripped away agency",
+        "could not plan",
+        "withheld information",
+        "lost ability to adapt",
+        "planning harm"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "non-harm-and-compassionate-constraint"
+        },
+        {
+          "rel": "see-also",
+          "to": "consideration-debt"
+        },
+        {
+          "rel": "see-also",
+          "to": "unseen-harm-inquiry"
+        },
+        {
+          "rel": "see-also",
+          "to": "right-speech-and-accurate-formulation"
+        }
+      ],
+      "references": [
+        {
+          "kind": "doc",
+          "title": "Ideology Graph",
+          "path": "docs/ethos/ideology.json"
+        }
+      ],
+      "summary": "Disclosure is required when silence would remove another person's ability to choose, prepare, or protect themselves.",
+      "proceduralLanguage": {
+        "pattern": "A person's silence may remove another person's meaningful options.",
+        "move": "Name the affected choices, disclose the relevant risk, and preserve response time.",
+        "missingCheck": "What choices become unavailable if this information stays hidden?",
+        "antiPattern": "Treating silence as private when it controls another person's options."
+      }
+    },
+    {
+      "id": "shame-avoidance-loop",
+      "slug": "shame-avoidance-loop",
+      "title": "Shame-Avoidance Loop",
+      "excerpt": "Shame becomes destructive when it delays truth, blocks repair, and lets damage compound.",
+      "bodyMD": "Shame is not a character verdict. It becomes procedurally important when self-image pain delays disclosure, blocks repair, or lets damage compound for affected people. The move is to separate shame from actionable truth and repair.\n\nAnti-pattern: using shame as a reason to hide information from affected people.\n\nMinimal artifact: Shame-to-Repair Note with the shame context, avoided truth, repair delay cost, and next repairable action.",
+      "tags": [
+        "shame",
+        "avoidance",
+        "repair_readiness",
+        "guilt_signal",
+        "feedback_loop",
+        "responsibility"
+      ],
+      "aliases": [
+        "avoidance loop",
+        "hiding because of shame",
+        "delaying conflict",
+        "too ashamed to disclose",
+        "compounding damage"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ignorance-and-consideration"
+        },
+        {
+          "rel": "see-also",
+          "to": "identity-view-and-non-attachment"
+        },
+        {
+          "rel": "see-also",
+          "to": "guilt-to-repair"
+        },
+        {
+          "rel": "see-also",
+          "to": "feedback-loop-hygiene"
+        }
+      ],
+      "references": [
+        {
+          "kind": "doc",
+          "title": "Ideology Graph",
+          "path": "docs/ethos/ideology.json"
+        }
+      ],
+      "summary": "Shame becomes destructive when it delays truth, blocks repair, and lets damage compound.",
+      "proceduralLanguage": {
+        "pattern": "A person avoids disclosure because the emotional cost of admitting failure feels too high.",
+        "move": "Separate shame from repair, then disclose the actionable truth and next repair step.",
+        "missingCheck": "What repair becomes harder the longer disclosure is delayed?",
+        "antiPattern": "Using shame as a reason to hide information from affected people."
+      }
+    },
+    {
+      "id": "fallout-transfer-check",
+      "slug": "fallout-transfer-check",
+      "title": "Fallout Transfer Check",
+      "excerpt": "Detect when avoided responsibility shifts cost, uncertainty, or urgency onto affected people.",
+      "bodyMD": "Fallout transfer appears when a person reduces immediate discomfort by moving cost, uncertainty, time pressure, or urgency onto others. The procedural move is to map the transferred burden and route toward disclosure, repair, or boundary reset.\n\nAnti-pattern: mistaking delayed conflict for reduced harm.\n\nMinimal artifact: Fallout Transfer Map with avoided responsibility, shifted burden, affected people, consent state, and repair or boundary path.",
+      "tags": [
+        "consideration_debt",
+        "externalized_cost",
+        "affected_parties",
+        "dependency",
+        "non-harm",
+        "fairness"
+      ],
+      "aliases": [
+        "drag others into the wake",
+        "externalized fallout",
+        "shifted burden",
+        "transferred damage",
+        "cost of hiding"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "consideration-debt"
+        },
+        {
+          "rel": "see-also",
+          "to": "unseen-harm-inquiry"
+        },
+        {
+          "rel": "see-also",
+          "to": "non-harm-and-compassionate-constraint"
+        },
+        {
+          "rel": "see-also",
+          "to": "fairness-due-process-and-justification"
+        }
+      ],
+      "references": [
+        {
+          "kind": "doc",
+          "title": "Ideology Graph",
+          "path": "docs/ethos/ideology.json"
+        }
+      ],
+      "summary": "Detect when avoided responsibility shifts cost, uncertainty, or urgency onto affected people.",
+      "proceduralLanguage": {
+        "pattern": "A person reduces their own immediate discomfort by increasing another person's cost, uncertainty, or urgency.",
+        "move": "Map the transferred burden and route toward disclosure, repair, or boundary reset.",
+        "missingCheck": "What cost or urgency has been moved onto someone who did not consent to carry it?",
+        "antiPattern": "Mistaking delayed conflict for reduced harm."
       }
     },
     {
@@ -1597,7 +1820,9 @@
         "constraint",
         "repair"
       ],
-      "children": [],
+      "children": [
+        "agency-preserving-disclosure"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -1678,7 +1903,9 @@
         "justification",
         "governance"
       ],
-      "children": [],
+      "children": [
+        "dependency-transparency-gate"
+      ],
       "links": [
         {
           "rel": "parent",
