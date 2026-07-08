@@ -10,6 +10,7 @@ export const MORAL_GRAPH_INVOCATION_REASON_CODES = [
   "ethical_or_values_tension",
   "wise_next_step_request",
   "motive_action_reflection",
+  "procedural_moral_badge_reflection_request",
   "living_substrate_reflection_request",
   "theory_first_mechanism_request",
   "competing_values",
@@ -75,6 +76,41 @@ function unique<T>(values: T[]): T[] {
   return Array.from(new Set(values));
 }
 
+function hasProceduralMoralBadgeReflectionCue(text: string): boolean {
+  const hiddenDependencyRisk =
+    has(/\b(?:hidden|withheld|concealed|delayed|late)\b[\s\S]{0,80}\b(?:information|risk|disclosure|truth)\b/, text) &&
+    has(/\b(?:plan|adapt|choose|protect|prepare|agency|options?|affected|dependency|shared obligation)\b/, text);
+  const agencyDisclosure =
+    has(/\b(?:lost|lose|remove|removed|stripped|narrowed|closed)\b[\s\S]{0,100}\b(?:ability|agency|choices?|options?)\b/, text) &&
+    has(/\b(?:plan|adapt|choose|protect|prepare|disclos|information|risk)\b/, text);
+  const sharedDependency =
+    has(/\b(?:shared obligation|shared dependency|dependency|affected part(?:y|ies)|stakeholders?)\b/, text) &&
+    has(/\b(?:material risk|hidden risk|late disclosure|disclos|contingency|repair|fallout|planning harm)\b/, text);
+  const repairWithoutVerdict =
+    has(/\b(?:do not judge|don't judge|dont judge|no character verdict|not a character verdict|without judging)\b/, text) &&
+    has(/\b(?:repair|disclos|affected|choices?|options?|agency|responsibility|fallout)\b/, text);
+  const namedNewBadge =
+    has(
+      /\b(?:dependency[-\s]?transparency[-\s]?gate|agency[-\s]?preserving[-\s]?disclosure|shame[-\s]?avoidance[-\s]?loop|fallout[-\s]?transfer[-\s]?check|hidden shared risk|planning harm|externalized fallout|shifted burden|transferred damage|cost of hiding)\b/,
+      text,
+    );
+
+  return hiddenDependencyRisk || agencyDisclosure || sharedDependency || repairWithoutVerdict || namedNewBadge;
+}
+
+function hasContextualProceduralMoralBadgeCue(text: string): boolean {
+  return (
+    has(
+      /\b(?:text|sentence|phrase|quote|screen|page|button|label|ui)\b[\s\S]{0,120}\b(?:says|shows|reads|contains|mentions|labeled|labelled|called|named)\b[\s\S]{0,220}\b(?:withheld information|hidden shared risk|late disclosure|agency[-\s]?preserving|dependency[-\s]?transparency|fallout[-\s]?transfer|shame[-\s]?avoidance|planning harm|no character verdict)\b/,
+      text,
+    ) ||
+    has(
+      /\b(?:future|later|eventually|hypothetically|if|when|after|before|would|could|might|previously|historically)\b[\s\S]{0,180}\b(?:reflect|use|run|call|execute|try)\b[\s\S]{0,180}\b(?:withheld information|hidden shared risk|late disclosure|agency[-\s]?preserving|dependency[-\s]?transparency|fallout[-\s]?transfer|shame[-\s]?avoidance|planning harm|no character verdict)\b/,
+      text,
+    )
+  );
+}
+
 function positiveReasons(input: MoralGraphAgentInvocationPolicyInputV1, text: string): MoralGraphInvocationReasonCodeV1[] {
   const reasons: MoralGraphInvocationReasonCodeV1[] = [];
 
@@ -102,6 +138,9 @@ function positiveReasons(input: MoralGraphAgentInvocationPolicyInputV1, text: st
   }
   if (has(/\b(motive|motivation|intent|intention|why did|why would|action reflection|reflect .* action)\b/, text)) {
     reasons.push("motive_action_reflection");
+  }
+  if (hasProceduralMoralBadgeReflectionCue(text)) {
+    reasons.push("procedural_moral_badge_reflection_request");
   }
   if (
     has(
@@ -147,6 +186,9 @@ function blockingReasons(text: string): MoralGraphInvocationReasonCodeV1[] {
       text,
     )
   ) {
+    reasons.push("contextual_or_quoted_tool_mention");
+  }
+  if (hasContextualProceduralMoralBadgeCue(text)) {
     reasons.push("contextual_or_quoted_tool_mention");
   }
 
@@ -219,6 +261,17 @@ export function moralGraphPolicyAllowsLivingSubstrateReflection(
   return (
     decision.eligible &&
     decision.reasonCodes.includes("living_substrate_reflection_request") &&
+    !decision.reasonCodes.includes("contextual_or_quoted_tool_mention")
+  );
+}
+
+export function moralGraphPolicyAllowsProceduralBadgeReflection(
+  input: MoralGraphAgentInvocationPolicyInputV1,
+): boolean {
+  const decision = decideMoralGraphAgentInvocationPolicyV1(input);
+  return (
+    decision.eligible &&
+    decision.reasonCodes.includes("procedural_moral_badge_reflection_request") &&
     !decision.reasonCodes.includes("contextual_or_quoted_tool_mention")
   );
 }

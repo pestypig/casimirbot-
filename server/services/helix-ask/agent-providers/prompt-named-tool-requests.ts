@@ -1,6 +1,7 @@
 import { isWorkspaceOsStatusPrompt, workspaceOsStatusReasonCodes } from "../workspace-os-status-intent";
 import { detectInternetSearchIntent } from "../internet-search-intent";
 import { detectScholarlyResearchIntent } from "../scholarly-research-intent";
+import { moralGraphPolicyAllowsProceduralBadgeReflection } from "../../../../shared/moral-graph/moral-graph-agent-invocation-policy";
 import {
   SHARED_INTERFACE_LANGUAGE_CODES,
   type SharedInterfaceLanguageCode,
@@ -1010,11 +1011,16 @@ export const buildPromptDerivedMoralGraphReflectionGatewayCallRequests = (
     return [];
   }
   const unquoted = unquotePrompt(prompt);
+  const wantsProceduralBadgeReflection = moralGraphPolicyAllowsProceduralBadgeReflection({
+    inputKind: "user_prompt",
+    text: prompt,
+  });
   const wantsMoralGraphReflection =
     /\breflect\b[\s\S]{0,140}\b(?:moral\s+graph|moral\s+badge\s+graph|moral\s+badges?|ideology\s+context|badge\s+locator)\b/i.test(unquoted) ||
     /\b(?:moral\s+graph|moral\s+badge\s+graph|moral\s+badges?|ideology\s+context|badge\s+locator)\b[\s\S]{0,140}\breflect(?:ion)?\b/i.test(unquoted) ||
     /\b(?:use|run|call|query|read|apply)\b[\s\S]{0,100}\b(?:moral\s+graph|moral\s+badge\s+graph|moral\s+badges?|ideology\s+context|badge\s+locator)\b/i.test(unquoted) ||
-    /\b(?:locate|identify|select|surface|map)\b[\s\S]{0,140}\b(?:moral\s+badges?|badge\s+locator|moral\s+graph)\b/i.test(unquoted);
+    /\b(?:locate|identify|select|surface|map)\b[\s\S]{0,140}\b(?:moral\s+badges?|badge\s+locator|moral\s+graph)\b/i.test(unquoted) ||
+    wantsProceduralBadgeReflection;
   if (!wantsMoralGraphReflection) return [];
   const focusedPrompt =
     cleanNamedCapabilityArgumentText(

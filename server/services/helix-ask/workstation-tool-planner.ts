@@ -36,6 +36,7 @@ import {
 } from "./workstation-context-feed-query-tool-contracts";
 import {
   moralGraphPolicyAllowsLivingSubstrateReflection,
+  moralGraphPolicyAllowsProceduralBadgeReflection,
   moralGraphPolicyPrefersTheoryFirst,
 } from "../../../shared/moral-graph/moral-graph-agent-invocation-policy";
 
@@ -2699,7 +2700,13 @@ function isTheoryIdeologyBridgeReflectionPrompt(prompt: string): boolean {
 function isMoralGraphReflectionPrompt(prompt: string): boolean {
   if (!prompt || isWorkstationToolDiagnosticPrompt(prompt)) return false;
   if (userExplicitlyDisallowsPanelsOrTools(prompt) || userExplicitlyDisallowsMoralGraphTools(prompt)) return false;
-  if (!hasMoralGraphPromptCue(prompt)) return false;
+  const hasGeneralMoralGraphCue = hasMoralGraphPromptCue(prompt);
+  const hasProceduralBadgeCue = moralGraphPolicyAllowsProceduralBadgeReflection({
+    inputKind: "user_prompt",
+    text: prompt,
+  });
+  if (!hasGeneralMoralGraphCue && !hasProceduralBadgeCue) return false;
+  if (hasProceduralBadgeCue) return true;
   return /\b(?:use|through|with|plot|map|reflect|compare|classify|locate|show|calculate|solve|assemble|derive|trace|badge|fruition|lens|lenses|procedural)\b/i.test(
     prompt,
   );
