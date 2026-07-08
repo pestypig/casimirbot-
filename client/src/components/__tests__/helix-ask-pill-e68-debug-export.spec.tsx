@@ -80,6 +80,72 @@ describe("helix ask pill E68 debug export envelope", () => {
     expect(parsed.payload_hash).toEqual(expect.any(String));
   });
 
+  it("classifies structured calculator receipts in debug exports", () => {
+    const payload = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "turn-calculator-receipt",
+        question: "Use the scientific calculator",
+        content: "Calculator receipt materialized.",
+        mode: "read",
+        debug: {},
+      } as any,
+      {
+        selectedDebugFinalAnswer: "Calculator receipt materialized.",
+        calculator_panel_state: {
+          lastCalculatorReceipt: {
+            schema: "helix.scientific_calculator_receipt.v1",
+            receipt_id: "scientific-calculator-receipt:test",
+            expression_template_id: "template:rho",
+            status: "blocked",
+            expression: "rho = E / V",
+            latex: "\\rho = E / V",
+            variables: [
+              { symbol: "E", value: null, unit: "J" },
+              { symbol: "V", value: null, unit: "m^3" },
+            ],
+            assumptions: [],
+            source_refs: ["theory-reflection:test"],
+            dimensional_check_status: "missing_units",
+            result_value: null,
+            result_unit: null,
+            result_text: null,
+            provenance_refs: ["calculator_template:test"],
+            missing_bindings: ["variable:E", "variable:V"],
+            blockers: ["missing_variable_bindings"],
+            claim_boundary: "diagnostic only",
+            created_at: "2026-07-08T00:00:00.000Z",
+            updated_at: "2026-07-08T00:00:00.000Z",
+          },
+        },
+        debug: {
+          turn_id: "turn-calculator-receipt",
+          selected_final_answer: "Calculator receipt materialized.",
+          terminal_artifact_kind: "calculator_receipt",
+        },
+      },
+    );
+    const parsed = JSON.parse(payload);
+
+    expect(parsed.calculator_receipt_taxonomy).toBe("calculator_blocked_missing_bindings");
+    expect(parsed.calculator_receipt_status).toBe("blocked");
+    expect(parsed.calculator_receipt_ref).toBe("scientific-calculator-receipt:test");
+    expect(parsed.calculator_receipt_debug_projection).toMatchObject({
+      schema: "helix.calculator_receipt_debug_projection.v1",
+      taxonomy: "calculator_blocked_missing_bindings",
+      calculator_receipt_count: 1,
+      missing_bindings: ["variable:E", "variable:V"],
+      blockers: ["missing_variable_bindings"],
+    });
+    expect(parsed.calculator_receipt_debug_projection.latest_receipt).toMatchObject({
+      receipt_id: "scientific-calculator-receipt:test",
+      status: "blocked",
+      variable_symbols: ["E", "V"],
+      result_present: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+  });
+
   it("preserves durable live interpretation debug attachments", () => {
     const payload = buildHelixDebugExportEnvelopeFromMasterPayload(
       {

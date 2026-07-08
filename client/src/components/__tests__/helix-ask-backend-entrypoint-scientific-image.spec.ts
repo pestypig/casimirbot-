@@ -6,6 +6,52 @@ import {
 } from "../helix/ask-console/HelixAskBackendEntrypointPolicy";
 
 describe("Helix Ask backend entrypoint scientific image policy", () => {
+  it("routes /postulate through the backend runtime review gate instead of client projection", () => {
+    const prompt =
+      "/postulate Review this postulate candidate for Postulate Board submission. Grade it in this chat before any board submission.";
+    const resolution = resolveHelixAskBackendEntrypointFamily(prompt);
+
+    expect(requiresHelixAskBackendEntrypoint(prompt)).toBe(true);
+    expect(resolution).toMatchObject({
+      family: "postulate",
+      sourceTarget: "postulate_board",
+      targetKind: "postulate_runtime_review",
+      requiredToolFamily: "postulate",
+      selectedCapability: null,
+      explicitCue: "/postulate",
+      requestedOutputs: expect.arrayContaining([
+        "postulate_runtime_review",
+        "postulate_submission_gate",
+        "postulate_submit_receipt",
+        "revision_recovery_plan",
+        "typed_failure",
+      ]),
+    });
+  });
+
+  it("marks /postulate hard backend metadata as a no-shortcut postulate review contract", () => {
+    const metadata = buildHelixAskHardBackendEntrypointRouteMetadata({
+      question: "/postulate Review this postulate candidate.",
+      turnId: "turn:postulate",
+      threadId: "thread:postulate",
+    });
+
+    expect(metadata?.sourceTarget).toBe("postulate_board");
+    expect(metadata?.source_target_intent).toMatchObject({
+      target_source: "postulate_board",
+      target_kind: "postulate_runtime_review",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+      requested_outputs: expect.arrayContaining([
+        "postulate_runtime_review",
+        "postulate_submission_gate",
+        "revision_recovery_plan",
+      ]),
+    });
+    expect(metadata?.mandatory_next_tool).toBeUndefined();
+  });
+
   it("routes natural scientific document image prompts through the compound backend path", () => {
     const prompt = "Here is a scientific document image. Extract the equations and compare them to the theory badge graph.";
 

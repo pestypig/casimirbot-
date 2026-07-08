@@ -2673,6 +2673,8 @@ describe("Codex provider capability lane adapter", () => {
       expect(result.final_answer_source).toBe("scientific_image_evidence_continuity_summary");
       expect(result.text).toContain("latest scientific Image Lens evidence chain");
       expect(result.text).toContain("Evidence depth: `exact_row_promoted`");
+      expect(result.text).toContain("Selected evidence object: `promoted_scientific_image_evidence:");
+      expect(result.text).toContain("Selected reason: `latest_promoted_exact_row`");
       expect(result.text).toContain("Page: `5`");
       expect(result.text).toContain("pdf-page-render:durable-scientific-sidecar");
       expect(result.text).toContain("S = \\int d^{4}x");
@@ -2684,6 +2686,9 @@ describe("Codex provider capability lane adapter", () => {
         status: "found",
         persistent_snapshot_recovered: true,
         selected_lookup_key: expect.stringContaining("scientific_image:"),
+        selected_evidence_ref: expect.stringMatching(/#crop=\d+,\d+,\d+,\d+$/),
+        selected_evidence_reason: "latest_promoted_exact_row",
+        active_blockers: [],
         source_material: expect.objectContaining({
           source_id: "pdf-page-render:durable-scientific-sidecar",
           source_kind: "pdf_page_render",
@@ -2800,6 +2805,8 @@ describe("Codex provider capability lane adapter", () => {
       expect(result.final_answer_source).toBe("scientific_image_evidence_continuity_summary");
       expect(result.text).toContain("Evidence depth: `exact_row_promoted`");
       expect(result.text).toContain("Sidecar:");
+      expect(result.text).toContain("Selected evidence object: `promoted_scientific_image_evidence:");
+      expect(result.text).toContain("Selected reason: `latest_promoted_exact_row`");
       expect(result.text).toContain("Image Lens source: `pdf-page-render:continuity-audit-sidecar`");
       expect(result.text).toContain("Active promoted row blockers: `none`");
       expect(result.text).toContain("Historical non-promoted row blockers:");
@@ -2809,6 +2816,8 @@ describe("Codex provider capability lane adapter", () => {
         status: "found",
         persistent_snapshot_recovered: true,
         selected_lookup_key: expect.stringContaining("scientific_image:"),
+        selected_evidence_ref: expect.stringMatching(/#crop=\d+,\d+,\d+,\d+$/),
+        selected_evidence_reason: "latest_promoted_exact_row",
       });
       expect(debug.followup_referent_resolution).toBeNull();
     } finally {
@@ -2917,6 +2926,8 @@ describe("Codex provider capability lane adapter", () => {
       expect(reflection.terminal_artifact_kind).toBe("theory_context_reflection_answer");
       expect(reflection.text).toContain("Theory Badge Graph reflection completed as diagnostic evidence only");
       expect(reflection.text).toContain("Calculator template admissibility");
+      expect(reflection.text).toContain("Calculation-ready solves");
+      expect(reflection.text).not.toContain("Calculation-ready payloads");
       expect(reflection.text).not.toContain("Backend Ask was reached");
       expect((reflection.debug as Record<string, any>).terminal_authority_status).toBe(
         "authorized_by_theory_reflection_receipt",
@@ -3996,12 +4007,124 @@ describe("Codex provider capability lane adapter", () => {
     }
   });
 
+  it("reports recovered Image Lens workflow status separately when continuity sidecar lookup misses", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true });
+    process.env.CODEX_AGENT_FAKE_STDOUT = "This model-only answer must not be used.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      const workflowStatus = {
+        schema: "helix.scientific_evidence_workflow_status.v1",
+        pageLoaded: true,
+        sourceId: "pdf-page-render:active-page",
+        sourceKind: "pdf_page_render",
+        sourceImageHash: "sha256:active-page-hash",
+        pageNumber: 5,
+        pageCount: 7,
+        cropRef: "sha256:active-page-hash#crop=73,570,1077,87",
+        cropRegionRef: "equation_crop:image_lens_region:active",
+        sidecarId: null,
+        evidenceDepth: "page_loaded",
+        promotedRowState: "missing",
+        graphReflectionStatus: "missing",
+        calculatorTemplateStatus: "missing",
+        postulateReadyRefs: {
+          evidenceSidecarRefs: [],
+          promotedEquationRowRefs: [],
+          pageRenderRefs: ["pdf-page-render:active-page"],
+          cropRefs: ["sha256:active-page-hash#crop=73,570,1077,87"],
+          graphReflectionRefs: [],
+          provenanceAuditRefs: ["provenance_audit:sha256:active-page-hash"],
+          calculatorCheckRefs: [],
+          uncertaintyReductionRefs: [],
+        },
+        activeBlockers: ["scientific_sidecar_ref_missing", "promoted_equation_row_ref_missing"],
+        historicalBlockers: [],
+        claimBoundary: "observation_only_not_proof",
+      };
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-scientific-image-continuity-workflow-status-no-sidecar",
+          session_id: "session-codex-scientific-image-continuity-workflow-status-no-sidecar",
+          account_id: "local-profile:pesty",
+          username: "pesty",
+          question: "Tell me which promoted page-grounded equation row, page number, crop ref, Image Lens source/hash, and evidence depth you are currently using from the prior scientific Image Lens evidence chain.",
+          workspace_context_snapshot: {
+            sessionId: "helix-ui",
+            askThreadId: "helix-ask:desktop",
+            active_image_lens_source: {
+              source_id: "pdf-page-render:active-page",
+              source_kind: "pdf_page_render",
+              source_image_ref: "data:image/png;base64,active-page",
+              source_ref_hash: "sha256:active-page-hash",
+              page_number: 5,
+              page_count: 7,
+              current_crop_ref: "sha256:active-page-hash#crop=73,570,1077,87",
+              scientific_evidence_workflow_status: workflowStatus,
+            },
+            scientific_evidence_workflow_status: workflowStatus,
+            account_session: {
+              session_id: "account-session:pesty",
+              profile_id: "local-profile:pesty",
+              username: "pesty",
+            },
+          },
+        },
+      });
+      const debug = result.debug as Record<string, any>;
+
+      expect(result).toMatchObject({
+        ok: true,
+        response_type: "final_answer",
+        final_status: "final_answer",
+        final_answer_source: "scientific_image_evidence_continuity_summary",
+        terminal_artifact_kind: "scientific_image_evidence_continuity_summary",
+      });
+      expect(result.answer).toContain("active Image Lens page/source state");
+      expect(result.answer).toContain("Sidecar: `none`");
+      expect(result.answer).toContain("Image Lens source: `pdf-page-render:active-page`");
+      expect(result.answer).toContain("Source image hash: `sha256:active-page-hash`");
+      expect(result.answer).toContain("Page: `5`");
+      expect(result.answer).toContain("Crop ref: `sha256:active-page-hash#crop=73,570,1077,87`");
+      expect(result.answer).not.toContain("model-only answer");
+      expect(debug.scientific_image_evidence_continuity_summary).toMatchObject({
+        status: "page_source_recovered_sidecar_missing",
+        evidence_depth: "page_loaded",
+        sidecar_id: null,
+        scientific_evidence_workflow_status: workflowStatus,
+        source_material: {
+          source_id: "pdf-page-render:active-page",
+          source_ref_hash: "sha256:active-page-hash",
+          page_number: 5,
+          crop_ref: "sha256:active-page-hash#crop=73,570,1077,87",
+        },
+      });
+    } finally {
+      resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true });
+      if (previousStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      }
+      if (previousExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      }
+    }
+  });
+
   it("recovers scientific Image Lens continuity from persisted PDF page source keys across sessions", async () => {
     const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
     const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
     const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
     const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
     const previousExtractionFixtures = process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+    const originalCwd = process.cwd();
+    const alternateCwd = fs.mkdtempSync(path.join(os.tmpdir(), "helix-sidecar-cwd-"));
     resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true });
     delete process.env.CODEX_AGENT_FAKE_STDOUT;
     process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
@@ -4057,6 +4180,7 @@ describe("Codex provider capability lane adapter", () => {
       });
 
       resetScholarlyPdfWorkbenchVolatileMemoryForTest();
+      process.chdir(alternateCwd);
 
       const result = await codexProvider.runTurn({
         runtime: "codex",
@@ -4073,8 +4197,8 @@ describe("Codex provider capability lane adapter", () => {
             active_image_lens_source: {
               source_id: "pdf-page-render:source-keyed-sidecar",
               source_kind: "pdf_page_render",
-              source_image_ref: "data:image/png;base64,source-keyed-page-image",
-              source_ref_hash: "sha256:source-keyed-page-hash",
+              source_image_ref: "data:image/png;base64,source-keyed-page-image-after-restart",
+              source_ref_hash: "sha256:source-keyed-page-hash-after-restart",
               page_number: 5,
               page_count: 7,
             },
@@ -4100,6 +4224,8 @@ describe("Codex provider capability lane adapter", () => {
         selected_lookup_key: expect.stringContaining("image_lens_source"),
       });
     } finally {
+      process.chdir(originalCwd);
+      fs.rmSync(alternateCwd, { recursive: true, force: true });
       resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true });
       if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
       else process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
@@ -4720,10 +4846,11 @@ describe("Codex provider capability lane adapter", () => {
               source_id: "pdf-page-render:active-page-5",
               source_kind: "pdf_page_render",
               source_image_ref: "data:image/png;base64,current-page-5",
-              source_ref_hash: "sha256:active-page-5",
-              dimensions_px: { width: 1224, height: 1584 },
-              page_number: 5,
-              page_count: 12,
+            source_ref_hash: "sha256:active-page-5",
+            current_crop_bbox_px: { x: 91, y: 612, width: 1001, height: 72 },
+            crop_ref: "sha256:active-page-5#crop=91,612,1001,72",
+            page_number: 5,
+            page_count: 12,
             },
           },
           turn_input_items: [
@@ -4752,14 +4879,15 @@ describe("Codex provider capability lane adapter", () => {
       expect(callResults.map((call) => call.capability)).toEqual(["visual_analysis.inspect_image_region"]);
       expect(callResults[0]).toMatchObject({
         ok: true,
-        receipt: expect.objectContaining({
-          source_kind: "pdf_page_render",
-          page_number: 5,
-          source_image_ref: "data:image/png;base64,current-page-5",
-          bbox_px: { x: 73, y: 570, width: 1077, height: 87 },
-          requested_equation_label: "7",
-          region_label: "equation_7",
-        }),
+          receipt: expect.objectContaining({
+            source_kind: "pdf_page_render",
+            page_number: 5,
+            source_image_ref: "data:image/png;base64,current-page-5",
+            bbox_px: { x: 91, y: 612, width: 1001, height: 72 },
+            crop_ref: "sha256:active-page-5#crop=91,612,1001,72",
+            requested_equation_label: "7",
+            region_label: "equation_7",
+          }),
       });
       expect(callResults[0]?.receipt?.source_refs).toContain("pdf-page-render:active-page-5");
       expect(observationPackets.map((packet) => packet.capability_key)).toEqual(["visual_analysis.inspect_image_region"]);

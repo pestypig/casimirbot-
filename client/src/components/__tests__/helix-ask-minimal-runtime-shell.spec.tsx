@@ -202,6 +202,9 @@ describe("HelixAskMinimalRuntimeShell", () => {
         question: "/postulate\nReview this postulate candidate for Postulate Board submission.",
         forceReasoningDispatch: true,
         force_reasoning_dispatch: true,
+        requiresBackendAskEntrypoint: true,
+        requires_backend_ask_entrypoint: true,
+        ask_entrypoint_required: true,
         route_metadata: expect.objectContaining({
           source: "postulate_final_answer_button",
           invocationKind: "postulate_final_answer_review",

@@ -7,7 +7,7 @@ import {
 } from "./postulate";
 
 export type PostulateReviewDecision = "submit" | "revise" | "block";
-export type PostulateCalculatorStatus = "template_only" | "bound_but_unsolved" | "calculation_ready";
+export type PostulateCalculatorStatus = "no_template" | "template_admissible" | "calculation_ready" | "solved";
 
 export type PostulateReadinessReview = {
   schema?: string;
@@ -51,9 +51,14 @@ const readReviewDecision = (value: unknown): PostulateReviewDecision =>
   value === "submit" || value === "revise" || value === "block" ? value : "block";
 
 const readCalculatorStatus = (value: unknown): PostulateCalculatorStatus =>
-  value === "calculation_ready" || value === "bound_but_unsolved" || value === "template_only"
+  value === "no_template" ||
+  value === "template_admissible" ||
+  value === "calculation_ready" ||
+  value === "solved"
     ? value
-    : "template_only";
+    : value === "template_only" || value === "bound_but_unsolved"
+      ? "template_admissible"
+      : "no_template";
 
 const clampRating = (value: unknown): number => {
   const numeric = typeof value === "number" ? value : Number(value);
@@ -127,8 +132,19 @@ export const extractPostulateEvidenceContextFromRuntimePayload = (payload: unkno
 
     if (schema === "helix.scientific_image_evidence_sidecar.v1" || kind === "scientific_image_evidence_sidecar") {
       pushUniqueRef(evidenceSidecarRefs, record.sidecar_id);
+      const promotedRef = readString(record.promoted_equation_ref);
+      if (promotedRef) promotedEquationRowRefs.add(promotedRef);
       readStringArray(record.packet_refs).forEach((ref) => promotedEquationRowRefs.add(ref));
       readStringArray(record.produced_artifact_refs).forEach((ref) => provenanceAuditRefs.add(ref));
+    }
+
+    if (schema === "helix.promoted_scientific_image_evidence.v1") {
+      pushUniqueRef(promotedEquationRowRefs, record.packet_ref);
+      pushUniqueRef(promotedEquationRowRefs, record.evidence_id);
+      pushUniqueRef(cropRefs, record.crop_ref ? `equation_crop:${record.crop_ref}` : null);
+      pushUniqueRef(pageRenderRefs, record.source_hash ? `page_render:${record.source_hash}${record.page_number ? `:page:${record.page_number}` : ""}` : null);
+      pushUniqueRef(provenanceAuditRefs, record.source_id ? `provenance_audit:${record.source_id}` : null);
+      pushUniqueRef(evidenceSidecarRefs, record.sidecar_id);
     }
 
     if (schema === "helix.scientific_evidence_packet.v1") {
@@ -159,6 +175,36 @@ export const extractPostulateEvidenceContextFromRuntimePayload = (payload: unkno
       pushUniqueRef(provenanceAuditRefs, record.selected_lookup_key ? `provenance_audit:${record.selected_lookup_key}` : null);
     }
 
+    if (schema === "helix.scientific_evidence_workflow_status.v1") {
+      pushUniqueRef(evidenceSidecarRefs, record.sidecarId ?? record.sidecar_id);
+      pushUniqueRef(promotedEquationRowRefs, record.cropRef ? `promoted_equation_row:${record.cropRef}` : null);
+      pushUniqueRef(pageRenderRefs, record.sourceId ?? record.source_id);
+      pushUniqueRef(
+        pageRenderRefs,
+        record.sourceImageHash
+          ? `page_render:${record.sourceImageHash}${record.pageNumber ? `:page:${record.pageNumber}` : ""}`
+          : null,
+      );
+      pushUniqueRef(cropRefs, record.cropRef ? `equation_crop:${record.cropRef}` : null);
+      pushUniqueRef(cropRefs, record.cropRegionRef ?? record.crop_region_ref);
+      pushUniqueRef(provenanceAuditRefs, record.sourceImageHash ? `provenance_audit:${record.sourceImageHash}` : null);
+      const readyRefs = record.postulateReadyRefs && typeof record.postulateReadyRefs === "object" && !Array.isArray(record.postulateReadyRefs)
+        ? record.postulateReadyRefs as Record<string, unknown>
+        : null;
+      readStringArray(readyRefs?.evidenceSidecarRefs).forEach((ref) => evidenceSidecarRefs.add(ref));
+      readStringArray(readyRefs?.promotedEquationRowRefs).forEach((ref) => promotedEquationRowRefs.add(ref));
+      readStringArray(readyRefs?.pageRenderRefs).forEach((ref) => pageRenderRefs.add(ref));
+      readStringArray(readyRefs?.cropRefs).forEach((ref) => cropRefs.add(ref));
+      readStringArray(readyRefs?.graphReflectionRefs).forEach((ref) => graphReflectionRefs.add(ref));
+      readStringArray(readyRefs?.provenanceAuditRefs).forEach((ref) => provenanceAuditRefs.add(ref));
+      readStringArray(readyRefs?.calculatorCheckRefs).forEach((ref) => calculatorCheckRefs.add(ref));
+      readStringArray(readyRefs?.uncertaintyReductionRefs).forEach((ref) => uncertaintyReductionRefs.add(ref));
+      const calculatorStatus = readCalculatorStatus(record.calculatorTemplateStatus ?? record.calculator_template_status);
+      if (calculatorStatus !== "no_template") {
+        pushUniqueRef(calculatorCheckRefs, `calculator_check:template_admissibility:${calculatorStatus}:0`);
+      }
+    }
+
     if (schema === "helix.scientific_image_graph_reflection_lookup.v1") {
       pushUniqueRef(graphReflectionRefs, record.selected_reflection_id);
       pushUniqueRef(provenanceAuditRefs, record.selected_lookup_key ? `provenance_audit:${record.selected_lookup_key}` : null);
@@ -166,7 +212,7 @@ export const extractPostulateEvidenceContextFromRuntimePayload = (payload: unkno
     }
 
     if (schema === "helix.calculator_template_admissibility.v1") {
-      const status = readString(record.status) ?? "template_only";
+      const status = readCalculatorStatus(record.status);
       const admitted = Number(record.admitted_template_count ?? record.admitted_count ?? 0);
       pushUniqueRef(calculatorCheckRefs, `calculator_check:template_admissibility:${status}:${Number.isFinite(admitted) ? admitted : 0}`);
     }
@@ -174,9 +220,11 @@ export const extractPostulateEvidenceContextFromRuntimePayload = (payload: unkno
     if (
       schema === "helix.theory_context_reflection.v1" ||
       schema === "helix.theory_badge_graph_reflection.v1" ||
+      schema === "helix.scientific_evidence_graph_reflection.v1" ||
       /theory.*reflection|graph.*reflection/i.test(kind ?? "")
     ) {
-      pushUniqueRef(graphReflectionRefs, record.ref ?? record.ref_id ?? record.refId ?? record.id ?? record.artifact_id);
+      pushUniqueRef(graphReflectionRefs, record.ref ?? record.ref_id ?? record.refId ?? record.id ?? record.reflection_id ?? record.artifact_id);
+      pushUniqueRef(promotedEquationRowRefs, record.exact_evidence_ref);
       pushUniqueRef(uncertaintyReductionRefs, record.congruence_delta_ref ?? record.uncertainty_reduction_ref);
     }
 
@@ -218,10 +266,47 @@ const extractJsonRecord = (text: string): Record<string, unknown> | null => {
   }
 };
 
+const extractPromptEvidenceContext = (body: string): PostulateEvidenceContext => {
+  const match = body.match(/\bevidence\s+context\s*:\s*([\s\S]*?)(?:\n\s*scientific\s+evidence\s+workflow\s+status\s*:|\n\s*candidate\s+postulate\s*:|\n\s*final\s+answer\s+proposal\s*:|$)/i);
+  const raw = match?.[1]?.trim();
+  const workflowMatch = body.match(/\bscientific\s+evidence\s+workflow\s+status\s*:\s*([\s\S]*?)(?:\n\s*candidate\s+postulate\s*:|\n\s*final\s+answer\s+proposal\s*:|$)/i);
+  const workflowRaw = workflowMatch?.[1]?.trim();
+  const workflowContext = (() => {
+    if (!workflowRaw) return normalizePostulateEvidenceContext();
+    const first = workflowRaw.indexOf("{");
+    const last = workflowRaw.lastIndexOf("}");
+    if (first < 0 || last <= first) return extractPostulateEvidenceContextFromText(workflowRaw);
+    try {
+      return extractPostulateEvidenceContextFromRuntimePayload(JSON.parse(workflowRaw.slice(first, last + 1)));
+    } catch {
+      return extractPostulateEvidenceContextFromText(workflowRaw);
+    }
+  })();
+  if (!raw) return workflowContext;
+  const first = raw.indexOf("{");
+  const last = raw.lastIndexOf("}");
+  if (first < 0 || last <= first) {
+    return mergeEvidenceContexts(extractPostulateEvidenceContextFromText(raw), workflowContext);
+  }
+  try {
+    const parsed = JSON.parse(raw.slice(first, last + 1));
+    return mergeEvidenceContexts(
+      parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? parsed as PostulateEvidenceContext
+        : null,
+      extractPostulateEvidenceContextFromText(raw),
+      workflowContext,
+    );
+  } catch {
+    return mergeEvidenceContexts(extractPostulateEvidenceContextFromText(raw), workflowContext);
+  }
+};
+
 export const parseAskPostulateReviewRequest = (prompt: string): ParsedAskPostulateReviewRequest | null => {
   const text = typeof prompt === "string" ? prompt.trim() : "";
   if (!POSTULATE_COMMAND_RE.test(text)) return null;
   const body = text.replace(POSTULATE_COMMAND_RE, "").trim();
+  const promptEvidenceContext = extractPromptEvidenceContext(body);
   const marker = body.match(POSTULATE_PROPOSAL_MARKER_RE);
   const proposalBlock = marker?.index !== undefined
     ? body.slice(marker.index + marker[0].length).trim()
@@ -243,7 +328,10 @@ export const parseAskPostulateReviewRequest = (prompt: string): ParsedAskPostula
     proposalText,
     originatingSessionId,
     originatingAnswerId,
-    evidenceContext: extractPostulateEvidenceContextFromText(text),
+    evidenceContext: mergeEvidenceContexts(
+      promptEvidenceContext,
+      extractPostulateEvidenceContextFromText(text),
+    ),
   };
 };
 
@@ -331,6 +419,13 @@ export const buildPostulateReviewFinalText = (input: {
   } else {
     lines.push("Submitted: no.");
     lines.push(`Missing requirements: ${input.gate.reasons.join(", ") || "none"}.`);
+    const continuationActions = buildPostulateRevisionContinuationActions({
+      review,
+      gate: input.gate,
+    });
+    if (continuationActions.length > 0) {
+      lines.push(`Next evidence actions: ${continuationActions.join("; ")}.`);
+    }
   }
   if (review?.missingDefinitions.length) {
     lines.push(`Missing definitions: ${review.missingDefinitions.join("; ")}.`);
@@ -341,9 +436,54 @@ export const buildPostulateReviewFinalText = (input: {
   if (review?.claimBoundaryWarnings.length) {
     lines.push(`Claim boundaries: ${review.claimBoundaryWarnings.join("; ")}.`);
   }
-  lines.push(`Calculator status: ${review?.calculatorStatus ?? "template_only"}.`);
+  lines.push(`Calculator status: ${review?.calculatorStatus ?? "no_template"}.`);
   lines.push("Boundary: accepted means constructive review candidate, not proof, physical viability, or certification.");
   return lines.join("\n");
+};
+
+const buildPostulateRevisionContinuationActions = (input: {
+  review: PostulateReadinessReview | null;
+  gate: PostulateSubmissionGateResult;
+}): string[] => {
+  const review = input.review;
+  const reasons = new Set(input.gate.reasons);
+  const missingText = [
+    ...(review?.missingEvidence ?? []),
+    ...(review?.missingDefinitions ?? []),
+  ].join(" ").toLowerCase();
+  const actions: string[] = [];
+  if (reasons.has("runtime_review_missing")) {
+    actions.push("rerun through backend Ask so a runtime-authored readiness review is available");
+  }
+  if (reasons.has("decision_revise") || reasons.has("decision_block") || review?.decision === "revise") {
+    actions.push("continue the solver path instead of treating the review JSON as a terminal answer");
+  }
+  if (reasons.has("scientific_sidecar_ref_missing")) {
+    actions.push("create or hydrate the latest scientific Image Lens sidecar ref");
+  }
+  if (reasons.has("promoted_equation_row_ref_missing")) {
+    actions.push("promote a clean page-grounded equation row before retrying");
+  }
+  if (reasons.has("page_render_ref_missing") || reasons.has("crop_ref_missing")) {
+    actions.push("attach page render and crop provenance for the same equation row");
+  }
+  if (reasons.has("graph_reflection_ref_missing") || /\bgraph|congruence|unblocked\b/.test(missingText)) {
+    actions.push("run a diagnostic Theory Badge Graph reflection with explicit blocked or admitted gate status");
+  }
+  if (/\bprovenance\s+audit|source\s+hash\b/.test(missingText)) {
+    actions.push("run a provenance audit that binds paper, page, row, crop, and source hash");
+  }
+  if (/\buncertainty|congruence\s+trace|reduction\b/.test(missingText)) {
+    actions.push("produce an uncertainty-reduction or congruence trace for the same unresolved constraint");
+  }
+  if (
+    review?.calculatorStatus === "no_template" ||
+    review?.calculatorStatus === "template_admissible" ||
+    /\bcalculator|dimensional|bound\b/.test(missingText)
+  ) {
+    actions.push("bind or explicitly block the calculator template with missing-variable diagnostics");
+  }
+  return Array.from(new Set(actions)).slice(0, 8);
 };
 
 export const buildPostulateSubmissionTextAndEvidence = (input: {

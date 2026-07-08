@@ -112,6 +112,91 @@ describe("scientific evidence adaptor", () => {
     });
   });
 
+  it("recognizes plain integer equation labels in exact row OCR", () => {
+    const exactRow = buildScientificEvidencePacket({
+      cropRegionId: "equation_7",
+      sourceRefHash: "sha256:equation-7",
+      sourceKind: "pdf_page_render",
+      pageNumber: 5,
+      bboxPx: { x: 73, y: 570, width: 1077, height: 87 },
+      sourceDimensionsPx: { width: 1224, height: 1584 },
+      requestedEquationLabel: "7",
+      regionLabel: "equation_7",
+      textCandidate: "S = \\int d^4x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_m \\}, \\ (7)",
+      latexCandidate: "S = \\int d^4x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_m \\}, \\ (7)",
+      uncertainty: [],
+      extractionStatus: "extracted",
+    });
+
+    expect(exactRow).toMatchObject({
+      requested_equation_label: "7",
+      observed_equation_labels: expect.arrayContaining(["7"]),
+      label_match_status: "matched",
+      exact_equation_admissibility: "admissible_for_exact_equation",
+      exact_row_promotion: {
+        status: "promoted",
+        reasons: expect.arrayContaining(["requested_label_matched", "single_clean_row"]),
+      },
+    });
+  });
+
+  it("projects promoted rows as stable structured evidence objects", () => {
+    const exactLatex = "S = \\int d^4x \\sqrt{-g} e^{-\\phi} \\{ R + 2\\Lambda e^{-\\phi} + \\kappa e^{-\\phi} L_m \\}, \\, (7)";
+    const exactRow = buildScientificEvidencePacket({
+      cropRegionId: "equation_7",
+      sourceRefHash: "sha256:crop-row",
+      sourceImageRefHash: "sha256:page-source",
+      sourceKind: "pdf_page_render",
+      pageNumber: 5,
+      bboxPx: { x: 73, y: 570, width: 1077, height: 87 },
+      sourceDimensionsPx: { width: 1224, height: 1584 },
+      requestedEquationLabel: "7",
+      regionLabel: "equation_7",
+      textCandidate: exactLatex,
+      latexCandidate: exactLatex,
+      uncertainty: [],
+      extractionStatus: "extracted",
+    });
+    const partialRow = buildScientificEvidencePacket({
+      cropRegionId: "equation_7_partial",
+      sourceRefHash: "sha256:page-full",
+      sourceKind: "pdf_page_render",
+      pageNumber: 5,
+      bboxPx: { x: 73, y: 570, width: 1077, height: 87 },
+      requestedEquationLabel: "7",
+      regionLabel: "equation_7",
+      textCandidate: `${exactLatex} where R denotes surrounding page explanation`,
+      latexCandidate: null,
+      uncertainty: ["context crop"],
+      extractionStatus: "partial",
+    });
+
+    const sidecar = buildScientificImageEvidenceSidecar({
+      sidecarId: "sidecar:stable-row",
+      packets: [partialRow, exactRow],
+    });
+
+    expect(sidecar.evidence_depth).toBe("exact_row_promoted");
+    expect(sidecar.promoted_equation_latex).toBe(exactLatex);
+    expect(sidecar.active_blockers).toEqual([]);
+    expect(sidecar.historical_blockers).toEqual(expect.arrayContaining(["partial_extraction_status"]));
+    expect(sidecar.active_promoted_row).toMatchObject({
+      schema: "helix.promoted_scientific_image_evidence.v1",
+      sidecar_id: "sidecar:stable-row",
+      source_kind: "pdf_page_render",
+      source_hash: "sha256:page-source",
+      page_number: 5,
+      crop_ref: "sha256:crop-row#crop=73,570,1077,87",
+      latex_candidate: exactLatex,
+      requested_label: "7",
+      observed_label: "7",
+      evidence_depth: "exact_row_promoted",
+      claim_boundary: "observation_only_not_proof",
+      raw_content_included: false,
+    });
+    expect(sidecar.selected_evidence_object?.latex_candidate).not.toContain("where R denotes");
+  });
+
   it("keeps missing-label and tiny-source exact rows out of exact promotion", () => {
     const missingLabel = buildScientificEvidencePacket({
       cropRegionId: "equation_3.52",
@@ -447,8 +532,8 @@ describe("scientific evidence adaptor", () => {
     });
 
     expect(reflection).toMatchObject({
-      evidence_depth: "calculator_payload_candidate",
-      evidence_object_class: "calculator_payload_candidate",
+      evidence_depth: "calculator_template_candidate",
+      evidence_object_class: "calculator_template_candidate",
       graph_attachments: [
         expect.objectContaining({
           node_id: "casimir_pressure_payload",

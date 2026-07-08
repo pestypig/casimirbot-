@@ -440,6 +440,10 @@ const toImageLensRegionInspectionRequest = (
     scholarly_pdf_cache_path:
       readString(call.scholarly_pdf_cache_path ?? call.scholarlyPdfCachePath) || null,
     bbox_px: bbox,
+    crop_ref:
+      readString(call.crop_ref ?? call.cropRef) || null,
+    current_crop_ref:
+      readString(call.current_crop_ref ?? call.currentCropRef) || null,
     crop_image_ref:
       readString(call.crop_image_ref ?? call.cropImageRef) || null,
     question: readString(call.question) || null,

@@ -27,7 +27,7 @@ const submitReviewJson = JSON.stringify({
   missingDefinitions: [],
   missingEvidence: [],
   claimBoundaryWarnings: ["accepted for structured review only"],
-  calculatorStatus: "bound_but_unsolved",
+  calculatorStatus: "template_admissible",
   boardReadyTitle: "Warp/QEI residual review target",
   boardReadyDraft:
     "A warp/QEI residual may be accepted for structured review when the cited row, crop, page, and graph reflection all point to the same residual constraint; this is not proof or certification.",
@@ -50,6 +50,76 @@ describe("postulate runtime review gate", () => {
     expect(request?.originatingAnswerId).toBe("answer-1");
     expect(request?.evidenceContext.evidenceSidecarRefs).toContain("scientific_image_sidecar:paper-page-2");
     expect(request?.evidenceContext.promotedEquationRowRefs).toContain("promoted_equation_row:eq-2.1");
+  });
+
+  it("parses literal Evidence context JSON arrays without relying on prose patterns", () => {
+    const request = parseAskPostulateReviewRequest([
+      "/postulate",
+      "Review this postulate candidate for Postulate Board submission.",
+      "",
+      "Evidence context:",
+      JSON.stringify({
+        evidenceSidecarRefs: ["ask:turn-7:scientific_image_evidence_sidecar"],
+        promotedEquationRowRefs: ["scientific_packet:source-page-row-a"],
+        pageRenderRefs: ["pdf-page-render:a57b3f7f064f9ade"],
+        cropRefs: ["sha256:abcdef1234567890#crop=73,570,1077,87"],
+        graphReflectionRefs: ["scientific_evidence_graph_reflection:source-page-a"],
+        calculatorCheckRefs: ["calculator_check:template_admissibility:template_admissible:4"],
+      }),
+      "",
+      "Candidate postulate:",
+      "A candidate diagnostic postulate with no embedded evidence refs.",
+    ].join("\n"));
+
+    expect(request?.proposalText).toBe("A candidate diagnostic postulate with no embedded evidence refs.");
+    expect(request?.evidenceContext.evidenceSidecarRefs).toEqual(["ask:turn-7:scientific_image_evidence_sidecar"]);
+    expect(request?.evidenceContext.promotedEquationRowRefs).toEqual(["scientific_packet:source-page-row-a"]);
+    expect(request?.evidenceContext.pageRenderRefs).toEqual(["pdf-page-render:a57b3f7f064f9ade"]);
+    expect(request?.evidenceContext.cropRefs).toEqual(["sha256:abcdef1234567890#crop=73,570,1077,87"]);
+    expect(request?.evidenceContext.graphReflectionRefs).toEqual(["scientific_evidence_graph_reflection:source-page-a"]);
+    expect(request?.evidenceContext.calculatorCheckRefs).toEqual(["calculator_check:template_admissibility:template_admissible:4"]);
+  });
+
+  it("hydrates postulate evidence refs from scientific workflow status blocks", () => {
+    const workflowStatus = {
+      schema: "helix.scientific_evidence_workflow_status.v1",
+      sourceId: "pdf-page-render:a57b3f7f064f9ade",
+      sourceImageHash: "sha256:abcdef1234567890",
+      pageNumber: 5,
+      cropRef: "sha256:abcdef1234567890#crop=73,570,1077,87",
+      cropRegionRef: "equation_crop:image_lens_region:eq7",
+      sidecarId: "ask:turn-7:scientific_image_evidence_sidecar",
+      evidenceDepth: "exact_row_promoted",
+      promotedRowState: "promoted",
+      graphReflectionStatus: "diagnostic_reflected",
+      calculatorTemplateStatus: "template_admissible",
+      postulateReadyRefs: {
+        graphReflectionRefs: ["scientific_evidence_graph_reflection:eq7"],
+        calculatorCheckRefs: ["calculator_check:template_admissibility:template_admissible:4"],
+      },
+    };
+    const request = parseAskPostulateReviewRequest([
+      "/postulate",
+      "Review this postulate candidate for Postulate Board submission.",
+      "",
+      "Evidence context:",
+      JSON.stringify({ evidenceSidecarRefs: [] }),
+      "",
+      "Scientific evidence workflow status:",
+      JSON.stringify(workflowStatus),
+      "",
+      "Candidate postulate:",
+      "A diagnostic candidate postulate.",
+    ].join("\n"));
+
+    expect(request?.evidenceContext.evidenceSidecarRefs).toContain("ask:turn-7:scientific_image_evidence_sidecar");
+    expect(request?.evidenceContext.promotedEquationRowRefs).toContain(
+      "promoted_equation_row:sha256:abcdef1234567890#crop=73,570,1077,87",
+    );
+    expect(request?.evidenceContext.pageRenderRefs).toContain("page_render:sha256:abcdef1234567890:page:5");
+    expect(request?.evidenceContext.cropRefs).toContain("equation_crop:sha256:abcdef1234567890#crop=73,570,1077,87");
+    expect(request?.evidenceContext.graphReflectionRefs).toContain("scientific_evidence_graph_reflection:eq7");
+    expect(request?.evidenceContext.calculatorCheckRefs).toContain("calculator_check:template_admissibility:template_admissible:4");
   });
 
   it("allows a high-rating submit decision only when required evidence refs are present", () => {
@@ -122,6 +192,35 @@ describe("postulate runtime review gate", () => {
     expect(finalText).not.toContain("Receipt:");
   });
 
+  it("turns revise reviews into continuation guidance instead of a raw terminal dead end", () => {
+    const review = parsePostulateReadinessReview(JSON.stringify({
+      ...JSON.parse(submitReviewJson),
+      readinessRating: 72,
+      decision: "revise",
+      missingDefinitions: ["Define same unresolved constraint across sidecar and graph reflection."],
+      missingEvidence: [
+        "explicit provenance audit artifact",
+        "explicit uncertainty-reduction trace",
+        "calculation-ready or bound dimensional-template status",
+        "unblocked graph congruence showing the row maps to a specific unresolved constraint",
+      ],
+      calculatorStatus: "no_template",
+      boardReadyTitle: null,
+      boardReadyDraft: null,
+    }));
+    const gate = evaluatePostulateSubmissionGate({ review, evidenceContext });
+    const finalText = buildPostulateReviewFinalText({ review, gate });
+
+    expect(finalText).toContain("Postulate review: revise at 72%.");
+    expect(finalText).toContain("Submitted: no.");
+    expect(finalText).toContain("Next evidence actions:");
+    expect(finalText).toContain("continue the solver path");
+    expect(finalText).toContain("run a provenance audit");
+    expect(finalText).toContain("uncertainty-reduction or congruence trace");
+    expect(finalText).toContain("bind or explicitly block the calculator template");
+    expect(finalText).not.toContain("Receipt:");
+  });
+
   it("uses the board-ready draft and merges refs for a passing submission", () => {
     const request = parseAskPostulateReviewRequest([
       "/postulate",
@@ -146,13 +245,13 @@ describe("postulate runtime review gate", () => {
           {
             schema: "helix.current_turn_artifact.v1",
             kind: "scientific_image_evidence_sidecar",
-            sidecar_id: "scientific_image_sidecar:weyl-page-5",
-            packet_refs: ["scientific_packet:weyl-page-5-row-7"],
-            produced_artifact_refs: ["scientific_image_sidecar:weyl-page-5"],
+            sidecar_id: "scientific_image_sidecar:source-page-a",
+            packet_refs: ["scientific_packet:source-page-row-a"],
+            produced_artifact_refs: ["scientific_image_sidecar:source-page-a"],
             payload: {
               schema: "helix.scientific_image_evidence_sidecar.v1",
-              sidecar_id: "scientific_image_sidecar:weyl-page-5",
-              packet_refs: ["scientific_packet:weyl-page-5-row-7"],
+              sidecar_id: "scientific_image_sidecar:source-page-a",
+              packet_refs: ["scientific_packet:source-page-row-a"],
               packets: [
                 {
                   schema: "helix.scientific_evidence_packet.v1",
@@ -162,9 +261,9 @@ describe("postulate runtime review gate", () => {
                     source_kind: "pdf_page_render",
                     page_number: 5,
                   },
-                  crop_region_id: "image_lens_region:eq7",
+                  crop_region_id: "image_lens_region:promoted-row-a",
                   crop_region: {
-                    region_id: "image_lens_region:eq7",
+                    region_id: "image_lens_region:promoted-row-a",
                     source_ref_hash: "sha256:pagehash",
                     bbox_px: { x: 73, y: 570, width: 1078, height: 87 },
                   },
@@ -178,9 +277,29 @@ describe("postulate runtime review gate", () => {
             },
           },
           {
+            schema: "helix.promoted_scientific_image_evidence.v1",
+            evidence_id: "promoted_scientific_image_evidence:image_lens_region:promoted-row-a",
+            sidecar_id: "scientific_image_sidecar:source-page-a",
+            packet_ref: "sha256:pagehash#crop=73,570,1078,87",
+            source_id: "pdf-page-render:test",
+            source_kind: "pdf_page_render",
+            source_hash: "sha256:pagehash",
+            page_number: 5,
+            bbox_px: { x: 73, y: 570, width: 1078, height: 87 },
+            crop_ref: "sha256:pagehash#crop=73,570,1078,87",
+            crop_region_id: "image_lens_region:promoted-row-a",
+            latex_candidate: "S = \\int d^4x \\sqrt{-g}",
+            evidence_depth: "exact_row_promoted",
+          },
+          {
+            schema: "helix.scientific_evidence_graph_reflection.v1",
+            reflection_id: "scientific_evidence_graph_reflection:source-page-a",
+            exact_evidence_ref: "sha256:pagehash#crop=73,570,1078,87",
+          },
+          {
             schema: "helix.theory_context_reflection.v1",
             kind: "theory_graph_reflection",
-            id: "graph_reflection:latest-weyl",
+            id: "graph_reflection:latest-scientific-image",
           },
           {
             schema: "helix.calculator_template_admissibility.v1",
@@ -198,13 +317,35 @@ describe("postulate runtime review gate", () => {
       },
     });
 
-    expect(hydrated.evidenceSidecarRefs).toContain("scientific_image_sidecar:weyl-page-5");
-    expect(hydrated.promotedEquationRowRefs).toContain("scientific_packet:weyl-page-5-row-7");
-    expect(hydrated.promotedEquationRowRefs).toContain("promoted_equation_row:image_lens_region:eq7");
+    expect(hydrated.evidenceSidecarRefs).toContain("scientific_image_sidecar:source-page-a");
+    expect(hydrated.promotedEquationRowRefs).toContain("scientific_packet:source-page-row-a");
+    expect(hydrated.promotedEquationRowRefs).toContain("promoted_equation_row:image_lens_region:promoted-row-a");
+    expect(hydrated.promotedEquationRowRefs).toContain("sha256:pagehash#crop=73,570,1078,87");
+    expect(hydrated.promotedEquationRowRefs).toContain("promoted_scientific_image_evidence:image_lens_region:promoted-row-a");
     expect(hydrated.pageRenderRefs).toContain("page_render:sha256:pagehash:page:5");
     expect(hydrated.cropRefs).toContain("equation_crop:sha256:pagehash#crop=73,570,1078,87");
-    expect(hydrated.graphReflectionRefs).toContain("graph_reflection:latest-weyl");
+    expect(hydrated.graphReflectionRefs).toContain("graph_reflection:latest-scientific-image");
+    expect(hydrated.graphReflectionRefs).toContain("scientific_evidence_graph_reflection:source-page-a");
     expect(hydrated.graphReflectionRefs).toContain("theory_context_reflection:latest-scoped");
     expect(hydrated.calculatorCheckRefs).toContain("calculator_check:template_admissibility:template_admissible:4");
+  });
+
+  it("normalizes legacy calculator readiness labels to the graded handoff vocabulary", () => {
+    const legacyTemplateOnly = parsePostulateReadinessReview(JSON.stringify({
+      ...JSON.parse(submitReviewJson),
+      calculatorStatus: "template_only",
+    }));
+    const legacyBound = parsePostulateReadinessReview(JSON.stringify({
+      ...JSON.parse(submitReviewJson),
+      calculator_status: "bound_but_unsolved",
+    }));
+    const solved = parsePostulateReadinessReview(JSON.stringify({
+      ...JSON.parse(submitReviewJson),
+      calculatorStatus: "solved",
+    }));
+
+    expect(legacyTemplateOnly?.calculatorStatus).toBe("template_admissible");
+    expect(legacyBound?.calculatorStatus).toBe("template_admissible");
+    expect(solved?.calculatorStatus).toBe("solved");
   });
 });

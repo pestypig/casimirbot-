@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { afterEach, describe, expect, it } from "vitest";
 import { buildDocumentImageRegionReceipt } from "@/lib/document-image/documentImageRegions";
 import { useDocumentImageRegionStore } from "../useDocumentImageRegionStore";
@@ -5,6 +7,7 @@ import { useDocumentImageRegionStore } from "../useDocumentImageRegionStore";
 const initialState = useDocumentImageRegionStore.getState();
 
 afterEach(() => {
+  window.localStorage.clear();
   useDocumentImageRegionStore.setState(initialState, true);
 });
 
@@ -47,5 +50,33 @@ describe("document image region store", () => {
     const updated = useDocumentImageRegionStore.getState().receipts[0];
     expect(updated?.extraction.status).toBe("confirmed");
     expect(updated?.claimBoundary.notProofAuthority).toBe(true);
+  });
+
+  it("persists PDF page source dimensions for restart recovery", () => {
+    useDocumentImageRegionStore.getState().setSourceImage({
+      sourceImageUrl: "data:image/png;base64,page",
+      sourceAttachmentId: "pdf-page-render:test",
+      sourceKind: "pdf_page_render",
+      sourceId: "pdf-page-render:test",
+      pageImageRef: "data:image/png;base64,page",
+      pageNumber: 5,
+      pageCount: 12,
+    });
+
+    useDocumentImageRegionStore.getState().setNaturalSize({ width: 1224, height: 1584 });
+    useDocumentImageRegionStore.getState().setCropDraft({ x: 73, y: 570, width: 1077, height: 87 });
+    useDocumentImageRegionStore.setState(initialState, true);
+
+    expect(useDocumentImageRegionStore.getState().rehydratePersistedSourceImage()).toBe(true);
+    expect(useDocumentImageRegionStore.getState().source).toMatchObject({
+      sourceId: "pdf-page-render:test",
+      sourceKind: "pdf_page_render",
+      sourceDimensionsPx: { width: 1224, height: 1584 },
+      cropDraft: { x: 73, y: 570, width: 1077, height: 87 },
+      viewMode: "manual_crop",
+      coordinateSpace: "natural_image_px",
+    });
+    expect(useDocumentImageRegionStore.getState().naturalSize).toEqual({ width: 1224, height: 1584 });
+    expect(useDocumentImageRegionStore.getState().cropDraft).toEqual({ x: 73, y: 570, width: 1077, height: 87 });
   });
 });

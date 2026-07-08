@@ -5071,7 +5071,7 @@ describe("Helix workstation tool gateway", () => {
     });
     expect(observation.claim_boundary_notes).toEqual(expect.arrayContaining([
       "calculator_template_boundary=admitted calculator payloads are diagnostic templates unless variables, units, assumptions, and source refs are bound.",
-      "final_answer_guard=OCR candidates, graph matches, calculator templates, calculator-ready payloads, and proof/validation must remain separate.",
+      "final_answer_guard=OCR candidates, graph matches, calculator templates, calculation-ready handoffs, and proof/validation must remain separate.",
     ]));
     expect(observation.recommended_actions_solve).toBe(false);
     expect(observation.terminal_eligible).toBe(false);
@@ -5479,7 +5479,7 @@ describe("Helix workstation tool gateway", () => {
   it("classifies promoted curved-spacetime action rows as structured scientific graph reflections", async () => {
     const scientificEvidence = buildScientificEvidencePacket({
       cropRegionId: "equation_row_search_1",
-      sourceRefHash: "sha256:test-casimir-action-row",
+      sourceRefHash: "sha256:test-curved-action-row",
       sourceKind: "pdf_page_render",
       pageNumber: 2,
       bboxPx: { x: 73, y: 697, width: 1078, height: 87 },
@@ -5491,9 +5491,22 @@ describe("Helix workstation tool gateway", () => {
       uncertainty: [],
       extractionStatus: "extracted",
     });
+    const broadPageContext = buildScientificEvidencePacket({
+      cropRegionId: "page_2_context",
+      sourceRefHash: "sha256:test-curved-action-page-context",
+      sourceKind: "pdf_page_render",
+      pageNumber: 2,
+      bboxPx: { x: 0, y: 0, width: 1224, height: 1584 },
+      regionLabel: "page_2_context",
+      textCandidate:
+        "S[phi, g] = - 1/2 int_M d^D x sqrt(-g) phi [Box + xi R] phi where R denotes surrounding explanatory context that must not enter the promoted row.",
+      latexCandidate: null,
+      uncertainty: ["context crop"],
+      extractionStatus: "partial",
+    });
     const sidecar = buildScientificImageEvidenceSidecar({
-      sidecarId: "scientific_image_sidecar:test-casimir-action-row",
-      packets: [scientificEvidence],
+      sidecarId: "scientific_image_sidecar:test-curved-action-row",
+      packets: [broadPageContext, scientificEvidence],
     });
 
     const result = await callWorkstationGatewayCapability({
@@ -5504,16 +5517,19 @@ describe("Helix workstation tool gateway", () => {
         prompt:
           "Reflect this promoted page 2 equation row to the Theory Badge Graph, preserving diagnostic-only boundaries.",
         scientific_evidence_sidecar: sidecar,
-        mentioned_domains: ["casimir cavity", "curved spacetime", "scalar field", "curvature coupling"],
+        mentioned_domains: ["curved spacetime", "scalar field", "curvature coupling"],
         limit: 8,
       },
-      turnId: "ask:test:gateway-theory-reflection-casimir-action-row",
+      turnId: "ask:test:gateway-theory-reflection-curved-action-row",
       iteration: 18,
     });
     const observation = result.observation as {
       scientific_evidence_graph_reflection?: Record<string, any>;
+      selected_scientific_evidence_object?: Record<string, any> | null;
+      promoted_equation_row_ref?: string | null;
       scientific_branch_gate?: Record<string, any>;
       calculator_payloads?: Array<Record<string, unknown>>;
+      calculator_template_admissibility?: Record<string, unknown>;
     };
 
     expect(result.ok).toBe(true);
@@ -5549,6 +5565,27 @@ describe("Helix workstation tool gateway", () => {
         diagnostic_only: true,
         no_calculator_authority_without_bound_payload: true,
       }),
+      selected_evidence_object: expect.objectContaining({
+        schema: "helix.promoted_scientific_image_evidence.v1",
+        page_number: 2,
+        crop_ref: "sha256:test-curved-action-row#crop=73,697,1078,87",
+        latex_candidate:
+          "S[\\varphi, g] = - \\frac{1}{2} \\int_{M} d^D x \\sqrt{-g} \\varphi [ \\square + \\xi R] \\varphi",
+        active_blockers: [],
+      }),
+      exact_evidence_latex:
+        "S[\\varphi, g] = - \\frac{1}{2} \\int_{M} d^D x \\sqrt{-g} \\varphi [ \\square + \\xi R] \\varphi",
+    });
+    expect(observation.scientific_evidence_graph_reflection?.exact_evidence_latex).not.toContain("where R denotes");
+    expect(observation.scientific_evidence_graph_reflection?.selected_evidence_object?.latex_candidate).not.toContain("where R denotes");
+    expect(observation.selected_scientific_evidence_object).toMatchObject({
+      schema: "helix.promoted_scientific_image_evidence.v1",
+      crop_ref: "sha256:test-curved-action-row#crop=73,697,1078,87",
+    });
+    expect(observation.promoted_equation_row_ref).toBe("sha256:test-curved-action-row#crop=73,697,1078,87");
+    expect(observation.calculator_template_admissibility).toMatchObject({
+      status: "no_template",
+      calculation_ready_count: 0,
     });
     expect(observation.calculator_payloads ?? []).toEqual([]);
   });

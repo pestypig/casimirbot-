@@ -541,6 +541,8 @@ const buildReceipt = (input: {
   const sourceKind = sourceKindFor(input.request);
   const sourceImageRef = nonEmpty(input.request.source_image_ref);
   const pageImageRef = nonEmpty(input.request.page_image_ref);
+  const requestCropRef = nonEmpty(input.request.crop_ref) ?? nonEmpty(input.request.current_crop_ref);
+  const sourceImageRefHash = imageHash(pageImageRef ?? sourceImageRef ?? input.request.source_id);
   const documentRegionReceipt = buildDocumentRegionReceipt({
     request: input.request,
     bbox: input.bbox,
@@ -563,6 +565,8 @@ const buildReceipt = (input: {
   const scientificEvidencePacket = buildScientificEvidencePacket({
     cropRegionId: input.regionId,
     sourceRefHash: imageHash({ cropImageRef: input.cropImageRef, bbox: input.bbox }),
+    sourceImageRefHash,
+    sourceId: input.request.source_id ?? null,
     sourceKind,
     pageNumber: input.request.page_number ?? null,
     bboxPx: input.bbox,
@@ -576,7 +580,7 @@ const buildReceipt = (input: {
   });
   const scientificEvidenceSidecar = buildScientificImageEvidenceSidecar({
     sidecarId: `${input.evidenceId}:scientific_image_sidecar`,
-    sourceRefHash: scientificEvidencePacket.source_ref_hash,
+    sourceRefHash: sourceImageRefHash,
     packets: [scientificEvidencePacket],
   });
   return {
@@ -592,6 +596,7 @@ const buildReceipt = (input: {
     scholarly_source_pdf_ref: input.request.scholarly_source_pdf_ref ?? null,
     scholarly_pdf_cache_path: input.request.scholarly_pdf_cache_path ?? null,
     bbox_px: input.bbox,
+    ...(requestCropRef ? { crop_ref: requestCropRef } : {}),
     source_refs: sourceRefs,
     summary,
     ...(input.extraction.text_candidate ? { text_candidate: input.extraction.text_candidate } : {}),

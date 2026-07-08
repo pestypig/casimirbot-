@@ -212,6 +212,11 @@ describe("ImageLensPanel", () => {
     render(<ImageLensPanel />);
 
     expect(await screen.findByTestId("image-lens-mounted-pdf-source")).toHaveTextContent("PDF page 3 / 11");
+    const workflowStatus = await screen.findByTestId("image-lens-scientific-workflow-status");
+    expect(workflowStatus).toHaveTextContent("pdf-page-render:source");
+    expect(workflowStatus).toHaveTextContent("sha256:panel-page");
+    expect(workflowStatus).toHaveTextContent("scientific_image_sidecar:panel");
+    expect(workflowStatus).toHaveTextContent("Postulate refs:");
     fireEvent.click(screen.getByRole("button", { name: /advanced/i }));
     expect(await screen.findByLabelText("Page")).toHaveValue("3");
     expect(screen.getByLabelText("Source kind")).toHaveValue("pdf_page_render");

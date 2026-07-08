@@ -4,6 +4,7 @@ import type { ReadAloudPlaybackState } from "@/lib/helix/ask-read-aloud-display"
 import { launchHelixAskPrompt } from "@/lib/helix/ask-prompt-launch";
 import { extractPostulateEvidenceContextFromText, type PostulateEvidenceContext } from "@/lib/agi/proposals";
 import { useDocumentImageRegionStore } from "@/store/useDocumentImageRegionStore";
+import { buildScientificEvidenceWorkflowStatus } from "./ScientificEvidenceWorkflowStatus";
 
 export type HelixAskTurnControlsProps = {
   onCopyFinal: () => void;
@@ -73,8 +74,8 @@ const deriveScientificPostulateEvidenceFallbacks = (args: {
   if (/\bTheory Badge Graph reflection completed\b|\bdiagnostic graph reflection\b|\bgraph reflection\b/i.test(args.evidenceText) && graphReflectionRefs.length === 0) {
     graphReflectionRefs.push(`graph_reflection:diagnostic:${args.originatingAnswerId ?? "current-ask-context"}`);
   }
-  if (/\bcalculator template admissibility\b|\bCalculator status:\s*template_only\b|\btemplate_only\b/i.test(args.evidenceText) && calculatorCheckRefs.length === 0) {
-    calculatorCheckRefs.push("calculator_check:template_admissibility:template_only");
+  if (/\bcalculator template admissibility\b|\bCalculator status:\s*(?:template_admissible|template_only)\b|\btemplate_admissible\b|\btemplate_only\b/i.test(args.evidenceText) && calculatorCheckRefs.length === 0) {
+    calculatorCheckRefs.push("calculator_check:template_admissibility:template_admissible");
   }
   return mergePostulateEvidenceContext(args.context, {
     promotedEquationRowRefs,
@@ -89,29 +90,21 @@ const collectCurrentScientificPostulateEvidence = (
   originatingAnswerId: string | null = null,
 ): PostulateEvidenceContext => {
   const documentState = useDocumentImageRegionStore.getState();
-  const source = documentState.source;
-  const receipt = documentState.lastReceipt;
-  const storeContext: PostulateEvidenceContext = {
-    evidenceSidecarRefs: [
-      source?.scientificEvidenceSidecarId,
-    ].filter((entry): entry is string => Boolean(entry)),
-    pageRenderRefs: [
-      source?.pageImageRef,
-      receipt?.pageRef?.pageImageRef,
-      source?.sourceKind === "pdf_page_render" && source.sourceId ? `page_render:${source.sourceId}` : null,
-    ].filter((entry): entry is string => Boolean(entry)),
-    cropRefs: [
-      receipt?.crop?.regionId ? `equation_crop:${receipt.crop.regionId}` : null,
-    ].filter((entry): entry is string => Boolean(entry)),
-    provenanceAuditRefs: [
-      source?.sourceRefHash ? `provenance_audit:${source.sourceRefHash}` : null,
-    ].filter((entry): entry is string => Boolean(entry)),
-  };
+  const workflowStatus = buildScientificEvidenceWorkflowStatus({
+    source: documentState.source,
+    cropDraft: documentState.cropDraft,
+    lastReceipt: documentState.lastReceipt,
+    evidenceContext: mergePostulateEvidenceContext(
+      extractPostulateEvidenceContextFromText(candidateText),
+      extractPostulateEvidenceContextFromText(evidenceText),
+    ),
+    evidenceText: `${candidateText}\n${evidenceText}`,
+  });
   return deriveScientificPostulateEvidenceFallbacks({
     context: mergePostulateEvidenceContext(
       extractPostulateEvidenceContextFromText(candidateText),
       extractPostulateEvidenceContextFromText(evidenceText),
-      storeContext,
+      workflowStatus.postulateReadyRefs,
     ),
     evidenceText: `${candidateText}\n${evidenceText}`,
     originatingAnswerId,
@@ -167,18 +160,28 @@ export function HelixAskTurnControls({
         postulateEvidenceText ?? "",
         originatingAnswerId,
       );
+      const workflowStatus = buildScientificEvidenceWorkflowStatus({
+        source: useDocumentImageRegionStore.getState().source,
+        cropDraft: useDocumentImageRegionStore.getState().cropDraft,
+        lastReceipt: useDocumentImageRegionStore.getState().lastReceipt,
+        evidenceContext,
+        evidenceText: `${normalizedPostulateText}\n${postulateEvidenceText ?? ""}`,
+      });
       launchHelixAskPrompt({
         question: [
           "/postulate",
           "Review this postulate candidate for Postulate Board submission. Grade it in this chat before any board submission.",
           "",
           "Return JSON only with this shape:",
-          "{\"schema\":\"helix.postulate_readiness_review.v1\",\"readinessRating\":0,\"decision\":\"submit|revise|block\",\"reason\":\"...\",\"missingDefinitions\":[],\"missingEvidence\":[],\"claimBoundaryWarnings\":[],\"calculatorStatus\":\"template_only|bound_but_unsolved|calculation_ready\",\"boardReadyTitle\":null,\"boardReadyDraft\":null}",
+          "{\"schema\":\"helix.postulate_readiness_review.v1\",\"readinessRating\":0,\"decision\":\"submit|revise|block\",\"reason\":\"...\",\"missingDefinitions\":[],\"missingEvidence\":[],\"claimBoundaryWarnings\":[],\"calculatorStatus\":\"no_template|template_admissible|calculation_ready|solved\",\"boardReadyTitle\":null,\"boardReadyDraft\":null}",
           "",
           "Submit is justified only when the candidate is constructive, diagnostic-only, and evidence refs include a scientific sidecar, promoted page-grounded equation row, page/crop provenance, and diagnostic graph reflection. Do not claim proof, physical viability, certification, badge promotion, or graph mutation.",
           "",
           "Evidence context:",
           JSON.stringify(evidenceContext),
+          "",
+          "Scientific evidence workflow status:",
+          JSON.stringify(workflowStatus),
           "",
           "Candidate postulate:",
           normalizedPostulateText,
@@ -187,6 +190,7 @@ export function HelixAskTurnControls({
         ].filter((line): line is string => line !== null).join("\n"),
         autoSubmit: true,
         forceReasoningDispatch: true,
+        requiresBackendAskEntrypoint: true,
         suppressWorkstationPayloadActions: false,
         routeMetadata: {
           schema: "helix.ask.route_metadata.v1",
@@ -197,6 +201,8 @@ export function HelixAskTurnControls({
           allowedCapabilities: ["postulate.submit_proposal"],
           forbiddenCapabilities: [],
           evidenceContext,
+          scientificEvidenceWorkflowStatus: workflowStatus,
+          scientific_evidence_workflow_status: workflowStatus,
           evidenceRefs: Object.values(evidenceContext).flat(),
         },
       });

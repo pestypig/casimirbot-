@@ -65,12 +65,12 @@ const highCongruencePhysicsPostulate = [
 ].join(" ");
 
 const typedEvidenceContext = {
-  evidenceSidecarRefs: ["scientific_image_sidecar:weyl-paper-page-2"],
-  promotedEquationRowRefs: ["promoted_equation_row:weyl-eq-2.1"],
-  pageRenderRefs: ["page_render:weyl-paper:page-2"],
-  cropRefs: ["equation_crop:weyl-eq-2.1-row"],
+  evidenceSidecarRefs: ["scientific_image_sidecar:source-page-2"],
+  promotedEquationRowRefs: ["promoted_equation_row:source-row-2.1"],
+  pageRenderRefs: ["page_render:source-document:page-2"],
+  cropRefs: ["equation_crop:source-row-2.1"],
   graphReflectionRefs: ["graph_reflection:theory-badge-graph:/warp/qei/residual"],
-  provenanceAuditRefs: ["provenance_audit:weyl-paper-page-2-eq-2.1"],
+  provenanceAuditRefs: ["provenance_audit:source-page-2-row-2.1"],
   calculatorCheckRefs: ["calculator_check:dimensional-consistency:eq-2.1"],
   uncertaintyReductionRefs: ["uncertainty_reduction:qei-residual-bridge"],
 };
@@ -94,6 +94,27 @@ describe("postulate proposal scoring", () => {
     expect(context.evidenceSidecarRefs).toContain("ask:turn-1:scientific_image_evidence_sidecar:retry:ask:turn-2");
     expect(context.pageRenderRefs).toContain("pdf-page-render:a57b3f7f064f9ade");
     expect(context.cropRefs).toContain("sha256:23e70bd8fb953a139ca1afcc206cd51dd4f76c66bbef7524b487b63ba77fdf95#crop=73,570,1078,87");
+  });
+
+  it("extracts promoted scientific evidence refs from structured receipt text", () => {
+    const context = extractPostulateEvidenceContextFromText(JSON.stringify({
+      schema: "helix.promoted_scientific_image_evidence.v1",
+      evidence_id: "promoted_scientific_image_evidence:image_lens_region:promoted-row-a",
+      sidecar_id: "ask:turn-7:scientific_image_evidence_sidecar",
+      source_id: "pdf-page-render:a57b3f7f064f9ade",
+      source_hash: "sha256:abcdef1234567890",
+      packet_ref: "scientific_packet:source-page-row-a",
+      crop_ref: "sha256:abcdef1234567890#crop=73,570,1077,87",
+      reflection_id: "scientific_evidence_graph_reflection:source-page-a",
+    }));
+
+    expect(context.evidenceSidecarRefs).toContain("ask:turn-7:scientific_image_evidence_sidecar");
+    expect(context.promotedEquationRowRefs).toContain("scientific_packet:source-page-row-a");
+    expect(context.promotedEquationRowRefs).toContain("promoted_scientific_image_evidence:image_lens_region:promoted-row-a");
+    expect(context.pageRenderRefs).toContain("pdf-page-render:a57b3f7f064f9ade");
+    expect(context.pageRenderRefs).toContain("sha256:abcdef1234567890");
+    expect(context.cropRefs).toContain("sha256:abcdef1234567890#crop=73,570,1077,87");
+    expect(context.graphReflectionRefs).toContain("scientific_evidence_graph_reflection:source-page-a");
   });
 
   it("accepts constructive physics proposals as review candidates without certification claims", () => {

@@ -212,7 +212,7 @@ export function resolveScientificCalculatorVisibleHistory(
 }
 
 export default function ScientificCalculatorPanel() {
-  const { currentLatex, history, lastSolve, lastArtifactV1, lastTheoryLoadout, activeTheoryLoadoutItemIndex, lastSetup, steps, debugEvents, ingestLatex, setSolveResult, setTheoryLoadout, loadTheoryLoadoutItem, recordDebugEvent, clear } =
+  const { currentLatex, history, lastSolve, lastArtifactV1, lastTheoryLoadout, activeTheoryLoadoutItemIndex, lastSetup, lastCalculatorReceipt, steps, debugEvents, ingestLatex, setSolveResult, setTheoryLoadout, loadTheoryLoadoutItem, recordDebugEvent, clear } =
     useScientificCalculatorStore();
   const { userSettings } = useHelixStartSettings();
   const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
@@ -685,6 +685,55 @@ export default function ScientificCalculatorPanel() {
       </div>
 
       <div className="flex flex-col gap-3">
+      {lastCalculatorReceipt ? (
+        <div
+          className="rounded-md border border-emerald-900/60 bg-emerald-950/20 p-3 text-xs"
+          data-testid="scientific-calculator-receipt-card"
+        >
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-emerald-300">Calculator receipt</div>
+              <div className="break-all font-mono text-[11px] text-slate-300">{lastCalculatorReceipt.receipt_id}</div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline" className="border-emerald-700/70 text-emerald-100">
+                {lastCalculatorReceipt.status}
+              </Badge>
+              <Badge variant="outline" className="border-slate-700 text-slate-200">
+                dimensions: {lastCalculatorReceipt.dimensional_check_status}
+              </Badge>
+            </div>
+          </div>
+          <div className="grid gap-2 md:grid-cols-2">
+            <div className="rounded border border-slate-800 bg-slate-950/60 p-2">
+              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Expression</div>
+              <div className="break-all font-mono text-slate-100">{lastCalculatorReceipt.latex ?? lastCalculatorReceipt.expression}</div>
+            </div>
+            <div className="rounded border border-slate-800 bg-slate-950/60 p-2">
+              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Result</div>
+              <div className="break-all font-mono text-slate-100">
+                {lastCalculatorReceipt.result_text ?? lastCalculatorReceipt.result_value ?? "not solved"}
+                {lastCalculatorReceipt.result_unit ? ` ${lastCalculatorReceipt.result_unit}` : ""}
+              </div>
+            </div>
+          </div>
+          {lastCalculatorReceipt.variables.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {lastCalculatorReceipt.variables.slice(0, 8).map((variable) => (
+                <Badge key={`${lastCalculatorReceipt.receipt_id}:${variable.symbol}`} variant="outline" className="border-slate-700 text-slate-200">
+                  {variable.symbol}={variable.value ?? "unbound"}{variable.unit ? ` ${variable.unit}` : ""}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
+          {lastCalculatorReceipt.missing_bindings.length > 0 || lastCalculatorReceipt.blockers.length > 0 ? (
+            <div className="mt-2 rounded border border-amber-900/60 bg-amber-950/20 p-2 text-[11px] text-amber-100">
+              {[...lastCalculatorReceipt.missing_bindings, ...lastCalculatorReceipt.blockers].join("; ")}
+            </div>
+          ) : null}
+          <div className="mt-2 text-[11px] text-slate-400">{lastCalculatorReceipt.claim_boundary}</div>
+        </div>
+      ) : null}
       {showTheoryWorkbench ? (
         <div
           className="rounded-md border border-cyan-900/60 bg-cyan-950/20 p-3"

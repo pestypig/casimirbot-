@@ -189,6 +189,19 @@ import {
   buildHelixAskVoiceCaptureHealthState,
   type HelixAskVoiceCaptureHealthSnapshot,
 } from "@/components/helix/ask-console/HelixAskVoiceCaptureHealthState";
+import {
+  buildHelixAskVoiceAutoSpeakEligibilityDebug,
+  shouldAutoSpeakAnswerForTurn,
+  shouldAutoSpeakVoiceDecisionLifecycle,
+  shouldPreserveAuthoritativeTerminalOverEvidenceGate,
+  type VoiceAutoSpeakAnswerToolIntent,
+} from "@/components/helix/ask-console/HelixAskVoiceAutoSpeakDebug";
+export {
+  shouldAutoSpeakAnswerForTurn,
+  shouldAutoSpeakVoiceDecisionLifecycle,
+  shouldPreserveAuthoritativeTerminalOverEvidenceGate,
+};
+export type { VoiceAutoSpeakAnswerToolIntent };
 import { buildHelixAskVoiceCaptureDiagnosticsBaseState } from "@/components/helix/ask-console/HelixAskVoiceCaptureDiagnosticsState";
 import { buildHelixAskVoiceLevelMonitorState } from "@/components/helix/ask-console/HelixAskVoiceLevelMonitorState";
 import { buildHelixAskVoiceStatusDerivedState } from "@/components/helix/ask-console/HelixAskVoiceStatusState";
@@ -891,7 +904,6 @@ import {
   formatReasoningAttemptDetail,
   formatVoiceDecisionSentence,
   laneLabelForConversationMode,
-  normalizeConversationRouteReasonCode,
   resolveReasoningAttemptTimelineText,
   type VoiceDecisionLifecycle,
 } from "@/lib/helix/ask-voice-copy-display";
@@ -1259,7 +1271,6 @@ import {
   prepareVoicePlaybackQueueUpdate,
   type VoicePlaybackCancelReason,
   type VoicePlaybackChunk,
-  type VoicePlaybackIntentAuthority,
   type VoicePlaybackIntentSource,
   type VoicePlaybackMetrics,
   type VoicePlaybackTimelineMeta,
@@ -2695,7 +2706,7 @@ type AskLocalWithFallbackResult = {
 type RunAskOptions = {
   source?: "manual" | "voice_auto";
   bypassWorkstationDispatch?: boolean;
-  forceReasoningDispatch?: boolean;
+  forceReasoningDispatch?: boolean; requiresBackendAskEntrypoint?: boolean;
   suppressWorkstationPayloadActions?: boolean;
   answerContract?: HelixAskAnswerContract;
   routeMetadata?: HelixAskRouteMetadata;
@@ -2767,7 +2778,7 @@ async function askLocalWithMultilangFailOpenFallback(
   };
 }
 
-export async function askLocalWithPreflightScopeFallback(
+async function askLocalWithPreflightScopeFallback(
   prompt: string | undefined,
   options?: AskLocalOptions,
 ): Promise<AskLocalWithFallbackResult> {
@@ -2793,108 +2804,6 @@ export async function askLocalWithPreflightScopeFallback(
       bypassedMultilangGate: fallback.bypassedMultilangGate,
     };
   }
-}
-
-export function shouldAutoSpeakVoiceDecisionLifecycle(
-  lifecycle: VoiceDecisionLifecycle | undefined,
-  options?: {
-    routeReasonCode?: string | null;
-    failReasonRaw?: string | null;
-  },
-): boolean {
-  if (lifecycle === "queued") return true;
-  if (lifecycle === "running") return true;
-  if (lifecycle === "suppressed") {
-    const reasonCode = normalizeConversationRouteReasonCode(options?.routeReasonCode);
-    if (
-      reasonCode === "suppressed:clarify_after_attempt1" ||
-      reasonCode === "suppressed:clarify_after_artifact_retry_exhausted"
-    ) {
-      return true;
-    }
-    return false;
-  }
-  if (lifecycle === "failed") return false;
-  return false;
-}
-
-export type VoiceAutoSpeakAnswerToolIntent =
-  | "none"
-  | "tool_only"
-  | "explicit_voice_tool"
-  | "workspace_terminal_summary";
-
-export function shouldAutoSpeakAnswerForTurn(args: {
-  micArmState: MicArmState;
-  inputSource?: ReasoningAttemptSource | null;
-  voiceMode?: string | null;
-  userMuted?: boolean;
-  answerAuthority?: VoicePlaybackIntentAuthority | "sealed_final" | "provisional" | null;
-  toolIntent?: VoiceAutoSpeakAnswerToolIntent | null;
-  finalTimelineType?: "reasoning_final" | "action_receipt" | "workspace_terminal_summary" | string | null;
-}): boolean {
-  const voiceOriginTurn = args.inputSource === "voice_auto";
-  if (args.micArmState !== "on" && !voiceOriginTurn) return false;
-  if (args.userMuted) return false;
-  if (args.toolIntent === "tool_only" || args.toolIntent === "explicit_voice_tool") return false;
-  if (
-    args.finalTimelineType &&
-    args.finalTimelineType !== "reasoning_final" &&
-    args.finalTimelineType !== "workspace_terminal_summary"
-  ) {
-    return false;
-  }
-  if (args.answerAuthority !== "final" && args.answerAuthority !== "sealed_final") return false;
-  return voiceOriginTurn || args.inputSource === "manual";
-}
-
-export function shouldPreserveAuthoritativeTerminalOverEvidenceGate(args: {
-  evidenceGateBlocked: boolean;
-  dispatchPolicy?: string | null;
-  routeReasonCode?: string | null;
-  finalAnswerSource?: string | null;
-  terminalArtifactKind?: string | null;
-  hasCompletedWorkspaceTool?: boolean;
-  hasTerminalText?: boolean;
-  hasPendingRequest?: boolean;
-}): boolean {
-  if (!args.evidenceGateBlocked) return false;
-  if (!args.hasTerminalText) return false;
-  if (
-    args.finalAnswerSource &&
-    !["unknown", "typed_failure", "legacy_fallback"].includes(args.finalAnswerSource) &&
-    args.terminalArtifactKind &&
-    !["unknown", "typed_failure"].includes(args.terminalArtifactKind)
-  ) {
-    return true;
-  }
-  if (args.finalAnswerSource === "artifact_synthesis" && args.terminalArtifactKind === "situation_context_pack") {
-    return true;
-  }
-  if (args.finalAnswerSource === "artifact_synthesis" && args.routeReasonCode === "situation_context_pack") {
-    return true;
-  }
-  if (args.finalAnswerSource === "artifact_synthesis" && args.terminalArtifactKind === "doc_summary") {
-    return true;
-  }
-  if (args.finalAnswerSource === "artifact_synthesis" && args.routeReasonCode?.includes("active_doc_summary")) {
-    return true;
-  }
-  if (args.finalAnswerSource === "workstation_reasoning_trace" && args.routeReasonCode === "proof_recall") {
-    return true;
-  }
-  if (args.finalAnswerSource === "workstation_tool_evaluation" && args.terminalArtifactKind === "workstation_tool_evaluation") {
-    return true;
-  }
-  if (args.hasPendingRequest) return true;
-  if (
-    (args.dispatchPolicy === "workspace_only" || args.dispatchPolicy === "workspace_context_reasoning") &&
-    args.routeReasonCode === "dispatch:act" &&
-    args.hasCompletedWorkspaceTool
-  ) {
-    return true;
-  }
-  return args.dispatchPolicy === "direct_answer_only" && args.routeReasonCode === "conversation:simple";
 }
 
 type HelixAskReply = {
@@ -21492,7 +21401,7 @@ export function HelixAskPill({
       });
       const runAskTurnId = pendingWorkstationUserInputRef.current?.turn_id ?? `ask:${crypto.randomUUID()}`;
       const backendOwnedPastedTextResumeRecall = isHelixAskPastedTextResumeRecallPrompt(trimmed);
-      const hardBackendEntrypointRequired = requiresHelixAskBackendEntrypoint(trimmed);
+      const hardBackendEntrypointRequired = options?.requiresBackendAskEntrypoint === true || requiresHelixAskBackendEntrypoint(trimmed);
       let imageAttachmentLensRunForTurn = options?.imageAttachmentLensRun ?? null;
       const firstNativeImageAttachment = selectFirstHelixAskSubmitReadyImageAttachment(submittedAttachments);
       if (!imageAttachmentLensRunForTurn && firstNativeImageAttachment) {
@@ -22368,7 +22277,7 @@ export function HelixAskPill({
                 turnId: runAskTurnId,
                 maxTokens: HELIX_ASK_OUTPUT_TOKENS,
                 question: trimmed,
-                contextFiles: contextFilesForTurn,
+                contextFiles: contextFilesForTurn, requiresBackendAskEntrypoint: hardBackendEntrypointRequired,
               }),
               responseLanguage: preferredResponseLanguage,
               preferredResponseLanguage: preferredResponseLanguage,
@@ -23463,7 +23372,7 @@ export function HelixAskPill({
             }));
             setLiveSourceMailTranscriptRefreshSeq((current) => current + 1);
           }
-          let directReplyIdForAutoSpeak: string | null = null;
+          let directReplyIdForAutoSpeak: string | null = traceId;
           if (briefOnlyReply) {
             patchHelixTimelineEntry(manualBriefTimelineEntry.id, {
               status: "done",
@@ -23478,7 +23387,6 @@ export function HelixAskPill({
             });
           } else {
             const replyId = traceId;
-            directReplyIdForAutoSpeak = replyId;
             setAskReplies((prev) =>
               appendHelixAskReplyChronologically(
                 prev,
@@ -23525,7 +23433,7 @@ export function HelixAskPill({
           const directAnswerToolIntent: VoiceAutoSpeakAnswerToolIntent = directAnswerHasWorkspaceAction
             ? "workspace_terminal_summary"
             : "none";
-          if (
+          const directAutoSpeakEligible = Boolean(
             directReplyIdForAutoSpeak &&
             responseText &&
             !manualAttempt &&
@@ -23539,11 +23447,13 @@ export function HelixAskPill({
               answerAuthority: "final",
               toolIntent: directAnswerToolIntent,
               finalTimelineType: directAnswerTimelineType,
-            })
-          ) {
+            }),
+          );
+          let directAutoSpeakEnqueued = false;
+          if (directAutoSpeakEligible && directReplyIdForAutoSpeak) {
             voiceSuppressedFinalTurnKeysRef.current.delete(traceId);
             const finalRevision = bumpVoiceTurnRevision(traceId, "final");
-            enqueueVoicePlaybackIntent({
+            directAutoSpeakEnqueued = enqueueVoicePlaybackIntent({
               kind: "final",
               authority: "final",
               source: "agent_loop",
@@ -23557,6 +23467,37 @@ export function HelixAskPill({
               briefSource: "none",
               finalSource: "normal_reasoning",
             });
+          }
+          if (responseDebugForReply && typeof responseDebugForReply === "object") {
+            responseDebugForReply = {
+              ...responseDebugForReply,
+              voice_auto_speak_eligibility: buildHelixAskVoiceAutoSpeakEligibilityDebug({
+                turnId: traceId,
+                replyId: directReplyIdForAutoSpeak,
+                inputSource: runAskInputSource,
+                briefOnlyReply,
+                micArmedAtTurnStart: voiceAutoSpeakArmedAtTurnStart,
+                eligible: directAutoSpeakEligible,
+                enqueued: directAutoSpeakEnqueued,
+                hasResponseText: Boolean(responseText),
+                manualAttempt,
+                evidenceGateBlocked: evidenceGateDecision.blocked,
+                preserveAuthoritativeTerminal,
+                terminalStateSuppressed: suppressVoiceForTerminalState,
+              }),
+            };
+            if (!briefOnlyReply && directReplyIdForAutoSpeak) {
+              setAskReplies((prev) =>
+                prev.map((reply) =>
+                  reply.id === directReplyIdForAutoSpeak
+                    ? {
+                        ...reply,
+                        debug: responseDebugForReply,
+                      }
+                    : reply,
+                ),
+              );
+            }
           }
           addHelixAskLegacyChatMessage(addMessage, sessionId, {
             role: "assistant",
@@ -23588,6 +23529,10 @@ export function HelixAskPill({
               terminal_error_code:
                 typeof responseDebugPayload?.terminal_error_code === "string"
                   ? responseDebugPayload.terminal_error_code
+                  : null,
+              voice_auto_speak_eligibility:
+                responseDebugForReply && typeof responseDebugForReply === "object"
+                  ? (responseDebugForReply as Record<string, unknown>).voice_auto_speak_eligibility ?? null
                   : null,
             },
           });
@@ -23970,7 +23915,7 @@ export function HelixAskPill({
       }
       void runAsk(question, undefined, {
         bypassWorkstationDispatch,
-        forceReasoningDispatch,
+        forceReasoningDispatch, requiresBackendAskEntrypoint: pending?.requiresBackendAskEntrypoint === true,
         suppressWorkstationPayloadActions,
         answerContract,
         routeMetadata,

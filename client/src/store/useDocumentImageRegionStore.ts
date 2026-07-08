@@ -17,6 +17,11 @@ export type DocumentImageSourceState = {
   pageNumber: number | null;
   pageCount?: number | null;
   pageImageRef?: string | null;
+  naturalSize?: { width: number; height: number } | null;
+  sourceDimensionsPx?: { width: number; height: number } | null;
+  cropDraft?: DocumentImageBboxPxV1 | null;
+  viewMode?: "full_image" | "fit_to_panel" | "manual_crop" | null;
+  coordinateSpace?: "natural_image_px" | "viewport_px" | null;
   sourceId?: string | null;
   evidenceId?: string | null;
   regionId?: string | null;
@@ -52,6 +57,26 @@ const isDisplayableImageRef = (value: unknown): value is string =>
   typeof value === "string" &&
   /^(data:image\/|blob:|https?:\/\/|file:\/\/)/i.test(value.trim());
 
+const readPositiveSize = (value: unknown): { width: number; height: number } | null => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const width = typeof record.width === "number" ? record.width : null;
+  const height = typeof record.height === "number" ? record.height : null;
+  return width && width > 0 && height && height > 0 ? { width, height } : null;
+};
+
+const readBbox = (value: unknown): DocumentImageBboxPxV1 | null => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const x = typeof record.x === "number" ? record.x : null;
+  const y = typeof record.y === "number" ? record.y : null;
+  const width = typeof record.width === "number" ? record.width : null;
+  const height = typeof record.height === "number" ? record.height : null;
+  return x !== null && x >= 0 && y !== null && y >= 0 && width && width > 0 && height && height > 0
+    ? { x, y, width, height }
+    : null;
+};
+
 const readPersistedSourceImage = (): DocumentImageSourceState | null => {
   if (typeof window === "undefined") return null;
   try {
@@ -65,6 +90,15 @@ const readPersistedSourceImage = (): DocumentImageSourceState | null => {
       pageNumber: typeof record.pageNumber === "number" ? record.pageNumber : null,
       pageCount: typeof record.pageCount === "number" ? record.pageCount : null,
       pageImageRef: typeof record.pageImageRef === "string" ? record.pageImageRef : null,
+      naturalSize: readPositiveSize(record.naturalSize),
+      sourceDimensionsPx: readPositiveSize(record.sourceDimensionsPx),
+      cropDraft: readBbox(record.cropDraft),
+      viewMode: record.viewMode === "manual_crop" || record.viewMode === "fit_to_panel" || record.viewMode === "full_image"
+        ? record.viewMode
+        : null,
+      coordinateSpace: record.coordinateSpace === "viewport_px" || record.coordinateSpace === "natural_image_px"
+        ? record.coordinateSpace
+        : "natural_image_px",
       sourceId: typeof record.sourceId === "string" ? record.sourceId : null,
       evidenceId: typeof record.evidenceId === "string" ? record.evidenceId : null,
       regionId: typeof record.regionId === "string" ? record.regionId : null,
@@ -97,30 +131,69 @@ const creator: StateCreator<DocumentImageRegionState> = (set) => ({
   receipts: [],
   lastReceipt: null,
   setSourceImage: (source: DocumentImageSourceState) => {
-    persistSourceImage(source);
+    const normalizedSource = {
+      ...source,
+      sourceDimensionsPx: source.sourceDimensionsPx ?? source.naturalSize ?? null,
+      coordinateSpace: source.coordinateSpace ?? "natural_image_px",
+      viewMode: source.viewMode ?? "fit_to_panel",
+    };
+    persistSourceImage(normalizedSource);
     set({
-      source,
-      naturalSize: null,
-      cropDraft: DEFAULT_CROP,
+      source: normalizedSource,
+      naturalSize: normalizedSource.naturalSize ?? normalizedSource.sourceDimensionsPx ?? null,
+      cropDraft: normalizedSource.cropDraft ?? DEFAULT_CROP,
     });
   },
   setNaturalSize: (naturalSize: { width: number; height: number }) =>
-    set((state: DocumentImageRegionState) => ({
-      naturalSize,
-      cropDraft: {
+    set((state: DocumentImageRegionState) => {
+      const nextCropDraft = {
         x: Math.max(0, Math.min(state.cropDraft.x, Math.max(0, naturalSize.width - 1))),
         y: Math.max(0, Math.min(state.cropDraft.y, Math.max(0, naturalSize.height - 1))),
         width: Math.max(1, Math.min(state.cropDraft.width, naturalSize.width)),
         height: Math.max(1, Math.min(state.cropDraft.height, naturalSize.height)),
-      },
-    })),
+      };
+      const nextSource = state.source
+        ? {
+            ...state.source,
+            naturalSize,
+            sourceDimensionsPx: naturalSize,
+            cropDraft: nextCropDraft,
+            coordinateSpace: "natural_image_px",
+          }
+        : state.source;
+      if (nextSource) persistSourceImage(nextSource);
+      return {
+        source: nextSource,
+        naturalSize,
+        cropDraft: nextCropDraft,
+      };
+    }),
   setCropDraft: (cropDraft: Partial<DocumentImageBboxPxV1>) =>
-    set((state: DocumentImageRegionState) => ({
-      cropDraft: {
+    set((state: DocumentImageRegionState) => {
+      const nextCropDraft = {
         ...state.cropDraft,
         ...cropDraft,
-      },
-    })),
+      };
+      const nextSource = state.source
+        ? {
+            ...state.source,
+            cropDraft: nextCropDraft,
+            viewMode: nextCropDraft.x === 0 &&
+              nextCropDraft.y === 0 &&
+              state.naturalSize &&
+              nextCropDraft.width === state.naturalSize.width &&
+              nextCropDraft.height === state.naturalSize.height
+                ? "full_image" as const
+                : "manual_crop" as const,
+            coordinateSpace: "natural_image_px" as const,
+          }
+        : state.source;
+      if (nextSource) persistSourceImage(nextSource);
+      return {
+        source: nextSource,
+        cropDraft: nextCropDraft,
+      };
+    }),
   addReceipt: (receipt: DocumentImageRegionReceiptV1) =>
     set((state: DocumentImageRegionState) => ({
       lastReceipt: receipt,
@@ -144,13 +217,14 @@ const creator: StateCreator<DocumentImageRegionState> = (set) => ({
   rehydratePersistedSourceImage: () => {
     const source = readPersistedSourceImage();
     if (!source) return false;
+    const naturalSize = source.naturalSize ?? source.sourceDimensionsPx ?? null;
     set({
       source: {
         ...source,
         mountedAt: source.mountedAt ?? new Date().toISOString(),
       },
-      naturalSize: null,
-      cropDraft: DEFAULT_CROP,
+      naturalSize,
+      cropDraft: source.cropDraft ?? DEFAULT_CROP,
     });
     return true;
   },

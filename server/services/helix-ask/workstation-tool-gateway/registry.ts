@@ -7605,7 +7605,7 @@ export const callWorkstationGatewayCapability = async (
           ]
         : [`scientific_image_sidecar=missing; evidence_source=${scientificEvidenceInput.source}`]),
       "calculator_template_boundary=admitted calculator payloads are diagnostic templates unless variables, units, assumptions, and source refs are bound.",
-      "final_answer_guard=OCR candidates, graph matches, calculator templates, calculator-ready payloads, and proof/validation must remain separate.",
+      "final_answer_guard=OCR candidates, graph matches, calculator templates, calculation-ready handoffs, and proof/validation must remain separate.",
     ];
     const observation = {
       schema: THEORY_CONTEXT_REFLECTION_OBSERVATION_SCHEMA,
@@ -7629,7 +7629,7 @@ export const callWorkstationGatewayCapability = async (
       calculator_template_payloads: calculatorPayloads,
       calculator_template_admissibility: {
         schema: "helix.calculator_template_admissibility.v1",
-        status: calculatorPayloads.length > 0 ? "template_admissible" : "none",
+        status: calculatorPayloads.length > 0 ? "template_admissible" : "no_template",
         admitted_template_count: calculatorPayloads.length,
         rejected_template_count: branchGate.rejected_calculator_payload_ids.length,
         calculation_ready_count: 0,
@@ -7642,6 +7642,15 @@ export const callWorkstationGatewayCapability = async (
       rejected_calculator_payload_ids: branchGate.rejected_calculator_payload_ids,
       scientific_evidence_packet: scientificEvidencePacket,
       scientific_evidence_sidecar: scientificEvidenceSidecar,
+      selected_scientific_evidence_object:
+        scientificEvidenceGraphReflection.selected_evidence_object ??
+        scientificEvidenceSidecar?.active_promoted_row ??
+        scientificEvidenceSidecar?.selected_evidence_object ??
+        null,
+      promoted_equation_row_ref:
+        scientificEvidenceGraphReflection.exact_evidence_ref ??
+        scientificEvidenceSidecar?.promoted_equation_ref ??
+        null,
       scientific_evidence_source: scientificEvidenceInput.source,
       scientific_branch_gate: branchGate,
       scientific_run_trace: scientificRunTrace,

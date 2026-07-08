@@ -26,6 +26,8 @@ export type HelixAskMinimalRuntimeTurnPayload = {
   bypass_workstation_dispatch?: boolean;
   forceReasoningDispatch?: boolean;
   force_reasoning_dispatch?: boolean;
+  requiresBackendAskEntrypoint?: boolean;
+  requires_backend_ask_entrypoint?: boolean;
   suppressWorkstationPayloadActions?: boolean;
   suppress_workstation_payload_actions?: boolean;
 };
@@ -72,6 +74,7 @@ export function buildHelixAskMinimalRuntimeTurnPayload(args: {
     routeMetadata: args.submitPlan.pendingPrompt?.routeMetadata,
     bypassWorkstationDispatch: args.submitPlan.pendingPrompt?.bypassWorkstationDispatch,
     forceReasoningDispatch: args.submitPlan.pendingPrompt?.forceReasoningDispatch,
+    requiresBackendAskEntrypoint: args.submitPlan.pendingPrompt?.requiresBackendAskEntrypoint,
     suppressWorkstationPayloadActions: args.submitPlan.pendingPrompt?.suppressWorkstationPayloadActions,
   });
 }

@@ -4,6 +4,8 @@ export type HelixAskContextBridgeSnapshot = {
   activeDocPath: string | null;
   activeImageLensSource?: Record<string, unknown> | null;
   active_image_lens_source?: Record<string, unknown> | null;
+  scientificEvidenceWorkflowStatus?: unknown;
+  scientific_evidence_workflow_status?: unknown;
 };
 
 export function readDocPathFromDesktopUrl(url: string): string | null {
@@ -18,9 +20,13 @@ export function readDocPathFromDesktopUrl(url: string): string | null {
 
 export function buildHelixAskContextBridgeSnapshot(url: string): HelixAskContextBridgeSnapshot {
   const activeImageLensSource = readHelixAskActiveImageLensSourceContext();
+  const scientificEvidenceWorkflowStatus =
+    activeImageLensSource?.scientific_evidence_workflow_status ?? null;
   return {
     activeDocPath: readDocPathFromDesktopUrl(url),
     activeImageLensSource,
     active_image_lens_source: activeImageLensSource,
+    scientificEvidenceWorkflowStatus,
+    scientific_evidence_workflow_status: scientificEvidenceWorkflowStatus,
   };
 }

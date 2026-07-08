@@ -14,12 +14,20 @@ vi.mock("@/lib/helix/ask-prompt-launch", () => ({
 }));
 
 import { HelixAskTurnControls } from "../HelixAskTurnControls";
+import { useDocumentImageRegionStore } from "@/store/useDocumentImageRegionStore";
 
 describe("HelixAskTurnControls postulate action", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
     vi.clearAllTimers();
+    useDocumentImageRegionStore.setState({
+      source: null,
+      naturalSize: null,
+      cropDraft: { x: 0, y: 0, width: 640, height: 360 },
+      receipts: [],
+      lastReceipt: null,
+    });
   });
 
   const renderControls = (overrides: Partial<React.ComponentProps<typeof HelixAskTurnControls>> = {}) =>
@@ -65,6 +73,7 @@ describe("HelixAskTurnControls postulate action", () => {
     expect(launchMocks.launchHelixAskPrompt).toHaveBeenCalledWith(expect.objectContaining({
       autoSubmit: true,
       forceReasoningDispatch: true,
+      requiresBackendAskEntrypoint: true,
       question: expect.stringContaining("/postulate\nReview this postulate candidate"),
       routeMetadata: expect.objectContaining({
         invocationKind: "postulate_final_answer_review",
@@ -108,9 +117,72 @@ describe("HelixAskTurnControls postulate action", () => {
       pageRenderRefs: expect.arrayContaining(["pdf-page-render:a57b3f7f064f9ade"]),
       cropRefs: [expect.stringContaining("sha256:23e70bd8fb953a139")],
       graphReflectionRefs: ["graph_reflection:diagnostic:answer-source-1"],
-      calculatorCheckRefs: ["calculator_check:template_admissibility:template_only"],
+      calculatorCheckRefs: ["calculator_check:template_admissibility:template_admissible"],
     });
+    expect(payload.routeMetadata.scientificEvidenceWorkflowStatus).toMatchObject({
+      schema: "helix.scientific_evidence_workflow_status.v1",
+      evidenceDepth: "exact_row_promoted",
+      promotedRowState: "promoted",
+      calculatorTemplateStatus: "template_admissible",
+    });
+    expect(payload.question).toContain("Scientific evidence workflow status:");
     expect(payload.question).toContain("promotedEquationRowRefs");
     expect(payload.question).toContain("graphReflectionRefs");
+  });
+
+  it("adds restored Image Lens PDF source and crop provenance to the postulate evidence package", () => {
+    useDocumentImageRegionStore.setState({
+      source: {
+        sourceImageUrl: "data:image/png;base64,abc",
+        sourceAttachmentId: "pdf-page-render:a57b3f7f064f9ade",
+        sourceKind: "pdf_page_render",
+        pageNumber: 5,
+        pageImageRef: "pdf-page-render:a57b3f7f064f9ade",
+        sourceId: "pdf-page-render:a57b3f7f064f9ade",
+        scientificEvidenceSidecarId: "ask:turn-7:scientific_image_evidence_sidecar",
+        sourceRefHash: "sha256:abcdef1234567890",
+        naturalSize: { width: 1224, height: 1584 },
+        sourceDimensionsPx: { width: 1224, height: 1584 },
+        cropDraft: { x: 73, y: 570, width: 1077, height: 87 },
+        viewMode: "manual_crop",
+        coordinateSpace: "natural_image_px",
+      },
+      naturalSize: { width: 1224, height: 1584 },
+      cropDraft: { x: 73, y: 570, width: 1077, height: 87 },
+    });
+
+    renderControls({
+      postulateEvidenceText: [
+        "Evidence depth: `exact_row_promoted`.",
+        "Active promoted row blockers: `none`.",
+      ].join("\n"),
+    });
+
+    fireEvent.click(screen.getByTestId("helix-ask-postulate"));
+
+    const payload = launchMocks.launchHelixAskPrompt.mock.calls[0]?.[0];
+    expect(payload.routeMetadata.evidenceContext).toMatchObject({
+      evidenceSidecarRefs: ["ask:turn-7:scientific_image_evidence_sidecar"],
+      pageRenderRefs: expect.arrayContaining([
+        "pdf-page-render:a57b3f7f064f9ade",
+        "page_render:pdf-page-render:a57b3f7f064f9ade",
+        "page_render:sha256:abcdef1234567890:page:5",
+      ]),
+      cropRefs: expect.arrayContaining([
+        "equation_crop:sha256:abcdef1234567890#crop=73,570,1077,87",
+        "sha256:abcdef1234567890#crop=73,570,1077,87",
+      ]),
+      promotedEquationRowRefs: expect.arrayContaining([
+        "promoted_equation_row:sha256:abcdef1234567890#crop=73,570,1077,87",
+      ]),
+    });
+    expect(payload.routeMetadata.scientificEvidenceWorkflowStatus).toMatchObject({
+      sourceId: "pdf-page-render:a57b3f7f064f9ade",
+      sourceImageHash: "sha256:abcdef1234567890",
+      pageNumber: 5,
+      cropRef: "sha256:abcdef1234567890#crop=73,570,1077,87",
+      sidecarId: "ask:turn-7:scientific_image_evidence_sidecar",
+      evidenceDepth: "exact_row_promoted",
+    });
   });
 });

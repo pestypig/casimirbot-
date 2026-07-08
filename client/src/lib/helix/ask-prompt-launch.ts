@@ -44,6 +44,9 @@ export type HelixAskStagePlayMailboxWakeRouteMetadata = {
   compact_context?: Record<string, unknown>;
   context_resume_frame?: Record<string, unknown> | null;
   contextResumeFrame?: Record<string, unknown> | null;
+  evidenceContext?: Record<string, unknown> | null;
+  scientificEvidenceWorkflowStatus?: Record<string, unknown> | null;
+  scientific_evidence_workflow_status?: Record<string, unknown> | null;
 };
 
 export type HelixAskGenericRouteMetadata = {
@@ -84,12 +87,32 @@ export type PendingHelixAskPrompt = {
   panelId?: string | null;
   bypassWorkstationDispatch?: boolean;
   forceReasoningDispatch?: boolean;
+  requiresBackendAskEntrypoint?: boolean;
+  requires_backend_ask_entrypoint?: boolean;
   suppressWorkstationPayloadActions?: boolean;
   answerContract?: HelixAskAnswerContract;
   routeMetadata?: HelixAskRouteMetadata;
   route_metadata?: HelixAskRouteMetadata;
   createdAt: number;
 };
+
+const routeMetadataRequiresBackendAskEntrypoint = (
+  routeMetadata: HelixAskRouteMetadata | undefined,
+): boolean => {
+  if (!routeMetadata) return false;
+  return (
+    routeMetadata.sourceTarget === "postulate_board" ||
+    routeMetadata.requiredCanonicalGoal === "postulate_runtime_review_then_gated_submit" ||
+    routeMetadata.invocationKind === "postulate_final_answer_review" ||
+    routeMetadata.source_target_intent?.must_enter_backend_ask === true
+  );
+};
+
+const promptRequiresBackendAskEntrypoint = (
+  question: string,
+  routeMetadata: HelixAskRouteMetadata | undefined,
+): boolean =>
+  /^\s*\/postulate\b/i.test(question) || routeMetadataRequiresBackendAskEntrypoint(routeMetadata);
 
 const isDesktopRoute = () =>
   typeof window !== "undefined" && window.location.pathname.startsWith("/desktop");
@@ -159,6 +182,18 @@ export function consumePendingHelixAskPrompt(): PendingHelixAskPrompt | null {
       panelId: typeof parsed.panelId === "string" && parsed.panelId.trim() ? parsed.panelId.trim() : null,
       bypassWorkstationDispatch: parsed.bypassWorkstationDispatch === true,
       forceReasoningDispatch: parsed.forceReasoningDispatch === true ? true : undefined,
+      requiresBackendAskEntrypoint:
+        parsed.requiresBackendAskEntrypoint === true ||
+        parsed.requires_backend_ask_entrypoint === true ||
+        promptRequiresBackendAskEntrypoint(question, routeMetadata)
+          ? true
+          : undefined,
+      requires_backend_ask_entrypoint:
+        parsed.requiresBackendAskEntrypoint === true ||
+        parsed.requires_backend_ask_entrypoint === true ||
+        promptRequiresBackendAskEntrypoint(question, routeMetadata)
+          ? true
+          : undefined,
       suppressWorkstationPayloadActions:
         parsed.suppressWorkstationPayloadActions === true ? true : undefined,
       answerContract:
@@ -188,6 +223,8 @@ export function launchHelixAskPrompt(args: {
   bypassWorkstationDispatch?: boolean;
   forceReasoningDispatch?: boolean;
   suppressWorkstationPayloadActions?: boolean;
+  requiresBackendAskEntrypoint?: boolean;
+  requires_backend_ask_entrypoint?: boolean;
   answerContract?: HelixAskAnswerContract;
   routeMetadata?: HelixAskRouteMetadata;
   route_metadata?: HelixAskRouteMetadata;
@@ -197,6 +234,10 @@ export function launchHelixAskPrompt(args: {
   if (!question) return;
 
   const routeMetadata = args.routeMetadata ?? args.route_metadata;
+  const requiresBackendAskEntrypoint =
+    args.requiresBackendAskEntrypoint === true ||
+    args.requires_backend_ask_entrypoint === true ||
+    promptRequiresBackendAskEntrypoint(question, routeMetadata);
   const payload: PendingHelixAskPrompt = {
     promptId: crypto.randomUUID(),
     question,
@@ -204,7 +245,9 @@ export function launchHelixAskPrompt(args: {
     blockId: args.blockId?.trim() || null,
     panelId: args.panelId?.trim() || null,
     bypassWorkstationDispatch: args.bypassWorkstationDispatch === true,
-    forceReasoningDispatch: args.forceReasoningDispatch === true,
+    forceReasoningDispatch: args.forceReasoningDispatch === true || requiresBackendAskEntrypoint,
+    requiresBackendAskEntrypoint,
+    requires_backend_ask_entrypoint: requiresBackendAskEntrypoint,
     suppressWorkstationPayloadActions: args.suppressWorkstationPayloadActions === true,
     answerContract: args.answerContract,
     routeMetadata,

@@ -144,6 +144,28 @@ describe("postulate claimable receipt helpers", () => {
     });
   });
 
+  it("extracts promoted scientific Image Lens refs from structured receipt text", () => {
+    const context = extractPostulateEvidenceContextFromText(JSON.stringify({
+      schema: "helix.promoted_scientific_image_evidence.v1",
+      evidence_id: "promoted_scientific_image_evidence:image_lens_region:promoted-row-a",
+      sidecar_id: "ask:turn-7:scientific_image_evidence_sidecar",
+      source_id: "pdf-page-render:a57b3f7f064f9ade",
+      source_hash: "sha256:abcdef1234567890",
+      page_number: 5,
+      packet_ref: "scientific_packet:source-page-row-a",
+      crop_ref: "sha256:abcdef1234567890#crop=73,570,1077,87",
+      reflection_id: "scientific_evidence_graph_reflection:source-page-a",
+    }));
+
+    expect(context.evidenceSidecarRefs).toContain("ask:turn-7:scientific_image_evidence_sidecar");
+    expect(context.promotedEquationRowRefs).toContain("scientific_packet:source-page-row-a");
+    expect(context.promotedEquationRowRefs).toContain("promoted_scientific_image_evidence:image_lens_region:promoted-row-a");
+    expect(context.pageRenderRefs).toContain("pdf-page-render:a57b3f7f064f9ade");
+    expect(context.pageRenderRefs).toContain("sha256:abcdef1234567890");
+    expect(context.cropRefs).toContain("sha256:abcdef1234567890#crop=73,570,1077,87");
+    expect(context.graphReflectionRefs).toContain("scientific_evidence_graph_reflection:source-page-a");
+  });
+
   it("ingests Ask postulate review terminal results outside the deprecated pill", () => {
     const boardListener = vi.fn();
     const receiptListener = vi.fn();

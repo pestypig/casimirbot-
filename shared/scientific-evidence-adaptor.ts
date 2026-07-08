@@ -4,6 +4,8 @@ export const SCIENTIFIC_BRANCH_GATE_SCHEMA = "helix.scientific_branch_gate.v1" a
 export const SCIENTIFIC_RUN_TRACE_SCHEMA = "helix.scientific_run_trace.v1" as const;
 export const SCIENTIFIC_EVIDENCE_GRAPH_REFLECTION_SCHEMA =
   "helix.scientific_evidence_graph_reflection.v1" as const;
+export const PROMOTED_SCIENTIFIC_IMAGE_EVIDENCE_SCHEMA =
+  "helix.promoted_scientific_image_evidence.v1" as const;
 
 export const SCIENTIFIC_EVIDENCE_DOMAIN_VALUES = [
   "adm_gr",
@@ -43,6 +45,7 @@ export type ScientificEvidencePacketV1 = {
   evidence_type: "image_lens_region_ocr_math";
   source_ref_hash: string;
   source_image: {
+    source_id: string | null;
     ref_hash: string;
     source_kind: "image_lens_source" | "image_attachment" | "pdf_page_render" | "manual_image_url" | "prompt_context" | "unknown";
     page_number: number | null;
@@ -108,6 +111,35 @@ export type ScientificEvidencePacketV1 = {
   raw_content_included: false;
 };
 
+export type PromotedScientificImageEvidenceV1 = {
+  schema: typeof PROMOTED_SCIENTIFIC_IMAGE_EVIDENCE_SCHEMA;
+  evidence_id: string;
+  sidecar_id: string;
+  packet_ref: string;
+  source_id: string | null;
+  source_kind: ScientificEvidencePacketV1["source_image"]["source_kind"];
+  source_hash: string;
+  page_number: number | null;
+  bbox_px: ScientificEvidencePacketV1["bbox_px"];
+  crop_ref: string;
+  crop_region_id: string;
+  text_candidate: string | null;
+  latex_candidate: string | null;
+  requested_label: string | null;
+  observed_label: string | null;
+  observed_labels: string[];
+  evidence_depth: "exact_row_promoted" | "exact_row_admissible" | "exact_row_partial" | "page_image_ocr_math_candidate";
+  admissibility: ScientificEvidencePacketV1["admissibility"]["status"];
+  exact_equation_admissibility: ScientificExactEquationAdmissibilityV1;
+  exact_row_promotion: ScientificEvidencePacketV1["exact_row_promotion"];
+  active_blockers: string[];
+  promotion_reasons: string[];
+  claim_boundary: "observation_only_not_proof";
+  assistant_answer: false;
+  terminal_eligible: false;
+  raw_content_included: false;
+};
+
 export type ScientificImageEvidenceSidecarV1 = {
   schema: typeof SCIENTIFIC_IMAGE_EVIDENCE_SIDECAR_SCHEMA;
   sidecar_id: string;
@@ -132,6 +164,14 @@ export type ScientificImageEvidenceSidecarV1 = {
     exact_row_promotion?: ScientificEvidencePacketV1["exact_row_promotion"];
   }>;
   primary_packet_ref: string | null;
+  active_promoted_row: PromotedScientificImageEvidenceV1 | null;
+  selected_evidence_object: PromotedScientificImageEvidenceV1 | null;
+  promoted_equation_ref: string | null;
+  promoted_equation_latex: string | null;
+  promoted_equation_text: string | null;
+  active_blockers: string[];
+  historical_blockers: string[];
+  evidence_depth: PromotedScientificImageEvidenceV1["evidence_depth"] | "missing";
   primary_domain: ScientificEvidenceDomainV1;
   primary_domains: ScientificEvidenceDomainV1[];
   extraction_summary: {
@@ -248,7 +288,7 @@ export type ScientificEvidenceGraphReflectionV1 = {
     | "page_grounded_ocr"
     | "promoted_exact_equation_row"
     | "multi_equation_derivation_candidate"
-    | "calculator_payload_candidate";
+    | "calculator_template_candidate";
   evidence_object_class:
     | "metadata_record"
     | "provider_abstract_or_snippet"
@@ -256,7 +296,7 @@ export type ScientificEvidenceGraphReflectionV1 = {
     | "curved_spacetime_field_action"
     | "boundary_condition"
     | "stress_energy_or_vacuum_energy_expression"
-    | "calculator_payload_candidate"
+    | "calculator_template_candidate"
     | "unknown_scientific_object";
   normalized_scientific_features: {
     latex_candidates: string[];
@@ -296,6 +336,10 @@ export type ScientificEvidenceGraphReflectionV1 = {
     reason: string;
   }>;
   provenance_refs: string[];
+  selected_evidence_object: PromotedScientificImageEvidenceV1 | null;
+  exact_evidence_ref: string | null;
+  exact_evidence_latex: string | null;
+  exact_evidence_text: string | null;
   branch_gate_status: ScientificBranchGateV1["status"];
   congruence_grade_floor: ScientificCongruenceGradeV1;
   terminal_eligible: false;
@@ -312,6 +356,8 @@ type CandidateInput = {
   regionLabel?: string | null;
   cropRegionId: string;
   sourceRefHash: string;
+  sourceImageRefHash?: string | null;
+  sourceId?: string | null;
   sourceKind?: ScientificEvidencePacketV1["source_image"]["source_kind"] | null;
   pageNumber?: number | null;
   bboxPx: ScientificEvidencePacketV1["bbox_px"];
@@ -371,6 +417,7 @@ export function extractObservedEquationLabels(input: string): string[] {
   const labels = [
     ...Array.from(input.matchAll(/\\tag\{([^}]+)\}/g)).map((match) => match[1]),
     ...Array.from(input.matchAll(/\((\d+\.\d+(?:[a-z']+)?)\)/gi)).map((match) => match[1]),
+    ...Array.from(input.matchAll(/(?:^|[^\w])\\?\s*\(\s*(\d{1,3})\s*\)/g)).map((match) => match[1]),
   ].map(normalizeEquationLabel);
   return unique(labels).slice(0, 12);
 }
@@ -505,6 +552,96 @@ const buildRetryDebug = (qualityFlags: string[]): ScientificEvidencePacketV1["re
 const evidencePacketRef = (packet: ScientificEvidencePacketV1): string =>
   `${packet.source_ref_hash}#crop=${packet.bbox_px.x},${packet.bbox_px.y},${packet.bbox_px.width},${packet.bbox_px.height}`;
 
+const SCIENTIFIC_IMAGE_EXACT_ROW_PROMOTION_REASON_VALUES = new Set([
+  "requested_label_matched",
+  "single_clean_row",
+  "extracted_latex_candidate_present",
+  "no_truncation_or_ellipsis",
+  "no_malformed_latex",
+  "higher_resolution_retry_not_required",
+]);
+
+const scientificImageEvidenceDepthForPacket = (
+  packet: ScientificEvidencePacketV1 | null,
+): PromotedScientificImageEvidenceV1["evidence_depth"] | "missing" => {
+  if (!packet) return "missing";
+  if (packet.exact_row_promotion.status === "promoted") return "exact_row_promoted";
+  if (packet.exact_equation_admissibility === "admissible_for_exact_equation") return "exact_row_admissible";
+  if (packet.evidence_role === "exact_equation_candidate") return "exact_row_partial";
+  return "page_image_ocr_math_candidate";
+};
+
+const activeBlockersForScientificPacket = (packet: ScientificEvidencePacketV1 | null): string[] =>
+  packet
+    ? unique(packet.exact_row_promotion.reasons.filter((reason) =>
+        !SCIENTIFIC_IMAGE_EXACT_ROW_PROMOTION_REASON_VALUES.has(reason)))
+    : [];
+
+const promotionReasonsForScientificPacket = (packet: ScientificEvidencePacketV1 | null): string[] =>
+  packet
+    ? unique(packet.exact_row_promotion.reasons.filter((reason) =>
+        SCIENTIFIC_IMAGE_EXACT_ROW_PROMOTION_REASON_VALUES.has(reason)))
+    : [];
+
+const selectStructuredScientificImageEvidencePacket = (
+  packets: ScientificEvidencePacketV1[],
+): ScientificEvidencePacketV1 | null => {
+  const ranked = packets.slice().sort((left, right) => {
+    const score = (packet: ScientificEvidencePacketV1): number => {
+      let total = 0;
+      if (packet.exact_row_promotion.status === "promoted") total += 10_000;
+      if (packet.exact_equation_admissibility === "admissible_for_exact_equation") total += 4_000;
+      if (packet.evidence_role === "exact_equation_candidate") total += 1_000;
+      if (packet.extraction_status === "extracted") total += 300;
+      if (packet.extraction_status === "partial") total += 100;
+      if (packet.latex_candidate) total += 40;
+      if (packet.text_candidate || packet.ocr_text_candidate) total += 20;
+      total += packet.confidence;
+      return total;
+    };
+    return score(right) - score(left);
+  });
+  return ranked[0] ?? null;
+};
+
+const buildPromotedScientificImageEvidence = (
+  packet: ScientificEvidencePacketV1 | null,
+  sidecarId: string,
+): PromotedScientificImageEvidenceV1 | null => {
+  if (!packet) return null;
+  const packetRef = evidencePacketRef(packet);
+  const evidenceDepth = scientificImageEvidenceDepthForPacket(packet);
+  if (evidenceDepth === "missing") return null;
+  return {
+    schema: PROMOTED_SCIENTIFIC_IMAGE_EVIDENCE_SCHEMA,
+    evidence_id: `promoted_scientific_image_evidence:${packet.crop_region_id}`,
+    sidecar_id: sidecarId,
+    packet_ref: packetRef,
+    source_id: packet.source_image.source_id,
+    source_kind: packet.source_image.source_kind,
+    source_hash: packet.source_image.ref_hash,
+    page_number: packet.source_image.page_number,
+    bbox_px: packet.bbox_px,
+    crop_ref: packetRef,
+    crop_region_id: packet.crop_region_id,
+    text_candidate: packet.text_candidate ?? packet.ocr_text_candidate ?? null,
+    latex_candidate: packet.latex_candidate ?? null,
+    requested_label: packet.requested_equation_label,
+    observed_label: packet.observed_equation_labels[0] ?? null,
+    observed_labels: packet.observed_equation_labels,
+    evidence_depth: evidenceDepth,
+    admissibility: packet.admissibility.status,
+    exact_equation_admissibility: packet.exact_equation_admissibility,
+    exact_row_promotion: packet.exact_row_promotion,
+    active_blockers: activeBlockersForScientificPacket(packet),
+    promotion_reasons: promotionReasonsForScientificPacket(packet),
+    claim_boundary: "observation_only_not_proof",
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+};
+
 const scientificPacketRank = (packet: ScientificEvidencePacketV1): number => {
   const admissibilityRank =
     packet.admissibility.status === "admissible_observation"
@@ -627,7 +764,8 @@ export function buildScientificEvidencePacket(input: CandidateInput): Scientific
     evidence_type: "image_lens_region_ocr_math",
     source_ref_hash: input.sourceRefHash,
     source_image: {
-      ref_hash: input.sourceRefHash,
+      source_id: input.sourceId?.trim() || null,
+      ref_hash: input.sourceImageRefHash?.trim() || input.sourceRefHash,
       source_kind: input.sourceKind ?? (input.sourceRefHash === "prompt_context" ? "prompt_context" : "unknown"),
       page_number: input.pageNumber ?? null,
       raw_ref_included: false,
@@ -747,7 +885,17 @@ export function buildScientificImageEvidenceSidecar(input: {
   ) as ScientificEvidenceDomainV1[];
   const sourceRefHash = input.sourceRefHash?.trim() || primaryPacket?.source_ref_hash || "scientific_image_sidecar";
   const sidecarId = input.sidecarId?.trim() || `scientific_image_sidecar:${sourceRefHash}`;
-  const primaryPacketRef = primaryPacket ? evidencePacketRef(primaryPacket) : null;
+  const selectedEvidencePacket = selectStructuredScientificImageEvidencePacket(packets);
+  const selectedEvidenceObject = buildPromotedScientificImageEvidence(selectedEvidencePacket, sidecarId);
+  const primaryPacketRef = selectedEvidenceObject?.packet_ref ?? (primaryPacket ? evidencePacketRef(primaryPacket) : null);
+  const activeBlockers = selectedEvidenceObject?.active_blockers ?? [];
+  const historicalBlockers = unique(exactRows
+    .filter((packet) => packet !== selectedEvidencePacket || packet.exact_row_promotion.status !== "promoted")
+    .flatMap((packet) => [
+      ...packet.exact_row_promotion.reasons,
+      ...packet.quality_flags,
+    ])
+    .filter((reason) => !SCIENTIFIC_IMAGE_EXACT_ROW_PROMOTION_REASON_VALUES.has(reason)));
   const routeStatus = status === "admissible_observation"
     ? "candidate"
     : status === "unverified_math_observation"
@@ -781,6 +929,14 @@ export function buildScientificImageEvidenceSidecar(input: {
       exact_row_promotion: packet.exact_row_promotion,
     })),
     primary_packet_ref: primaryPacketRef,
+    active_promoted_row: selectedEvidenceObject?.evidence_depth === "exact_row_promoted" ? selectedEvidenceObject : null,
+    selected_evidence_object: selectedEvidenceObject,
+    promoted_equation_ref: selectedEvidenceObject?.evidence_depth === "exact_row_promoted" ? selectedEvidenceObject.packet_ref : null,
+    promoted_equation_latex: selectedEvidenceObject?.evidence_depth === "exact_row_promoted" ? selectedEvidenceObject.latex_candidate : null,
+    promoted_equation_text: selectedEvidenceObject?.evidence_depth === "exact_row_promoted" ? selectedEvidenceObject.text_candidate : null,
+    active_blockers: activeBlockers,
+    historical_blockers: historicalBlockers,
+    evidence_depth: selectedEvidenceObject?.evidence_depth ?? "missing",
     primary_domain: primaryPacket?.primary_domain ?? "unknown_math",
     primary_domains: primaryDomains.length ? primaryDomains : ["unknown_math"],
     extraction_summary: {
@@ -1223,7 +1379,7 @@ const detectScientificEvidenceDepth = (input: {
     input.evidence.admissibility.status === "admissible_observation" &&
     input.branchGate.status === "admitted"
   ) {
-    return "calculator_payload_candidate";
+    return "calculator_template_candidate";
   }
   const promoted = input.sidecar?.exact_equation_summary.promoted_row_count ?? 0;
   const equationPacketCount = input.sidecar?.packets.filter((packet) => packet.evidence_role === "exact_equation_candidate").length ?? 0;
@@ -1341,7 +1497,7 @@ const blockedAuthoritiesForReflection = (input: {
   if (
     input.calculatorPayloadCount === 0 ||
     input.branchGate.rejected_calculator_payload_ids.length > 0 ||
-    input.evidenceDepth !== "calculator_payload_candidate"
+    input.evidenceDepth !== "calculator_template_candidate"
   ) {
     blocked.push({
       authority: "calculator_payload",
@@ -1427,14 +1583,15 @@ export function buildScientificEvidenceGraphReflection(input: {
   provenanceRefs?: string[];
 }): ScientificEvidenceGraphReflectionV1 {
   const calculatorPayloads = input.calculatorPayloads ?? [];
+  const selectedEvidenceObject = input.sidecar?.selected_evidence_object ?? buildPromotedScientificImageEvidence(input.evidence ?? null, input.sidecar?.sidecar_id ?? "scientific_image_sidecar:reflection");
   const evidenceDepth = detectScientificEvidenceDepth({
     evidence: input.evidence,
     sidecar: input.sidecar,
     branchGate: input.branchGate,
     calculatorPayloadCount: calculatorPayloads.length,
   });
-  const objectClass = evidenceDepth === "calculator_payload_candidate"
-    ? "calculator_payload_candidate"
+  const objectClass = evidenceDepth === "calculator_template_candidate"
+    ? "calculator_template_candidate"
     : detectScientificEvidenceObjectClass(input.evidence ?? null);
   const features = normalizeScientificEvidenceFeatures(input.evidence ?? null);
   const reflectedBadgeIds = unique(input.reflectedBadgeIds ?? []);
@@ -1469,7 +1626,7 @@ export function buildScientificEvidenceGraphReflection(input: {
   const calculatorBlocked =
     calculatorPayloads.length === 0 ||
     input.branchGate.rejected_calculator_payload_ids.length > 0 ||
-    evidenceDepth !== "calculator_payload_candidate";
+    evidenceDepth !== "calculator_template_candidate";
   return {
     schema: SCIENTIFIC_EVIDENCE_GRAPH_REFLECTION_SCHEMA,
     reflection_id: `scientific_evidence_graph_reflection:${input.turnId ?? "turn"}:${input.evidence?.source_ref_hash ?? "metadata"}:${input.branchGate.status}`,
@@ -1508,9 +1665,14 @@ export function buildScientificEvidenceGraphReflection(input: {
     }),
     provenance_refs: unique([
       ...(input.provenanceRefs ?? []),
+      ...(selectedEvidenceObject ? [selectedEvidenceObject.evidence_id, selectedEvidenceObject.packet_ref] : []),
       ...(input.evidence ? [evidenceRefForPacket(input.evidence), input.evidence.crop_region_id] : []),
       ...(input.sidecar ? [input.sidecar.sidecar_id, ...input.sidecar.packet_refs] : []),
     ]).slice(0, 24),
+    selected_evidence_object: selectedEvidenceObject,
+    exact_evidence_ref: selectedEvidenceObject?.packet_ref ?? null,
+    exact_evidence_latex: selectedEvidenceObject?.latex_candidate ?? null,
+    exact_evidence_text: selectedEvidenceObject?.text_candidate ?? null,
     branch_gate_status: input.branchGate.status,
     congruence_grade_floor: input.branchGate.congruence_grade_floor,
     terminal_eligible: false,

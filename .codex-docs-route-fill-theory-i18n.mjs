@@ -4,6 +4,7 @@ import path from "node:path";
 const root = process.cwd();
 const manifestPath = path.join(root, ".codex-theory-shared-rows.tmp.json");
 const cachePath = path.join(root, ".codex-theory-i18n-cache.tmp.json");
+const skipPath = path.join(root, ".codex-theory-i18n-skipped.tmp.json");
 const messagesDir = path.join(root, "client/src/lib/i18n/messages");
 const serverBase = process.env.CATALOG_FILL_SERVER_BASE ?? "http://127.0.0.1:5050";
 const batchSize = Math.max(1, Number.parseInt(process.env.CATALOG_FILL_BATCH_SIZE ?? "5", 10));
@@ -12,6 +13,7 @@ const serverWaitMs = Math.max(0, Number.parseInt(process.env.CATALOG_FILL_SERVER
 const batchDelayMs = Math.max(0, Number.parseInt(process.env.CATALOG_FILL_BATCH_DELAY_MS ?? "1500", 10));
 const localeArg = process.argv.find((arg) => arg.startsWith("--locale="))?.slice("--locale=".length);
 const statusOnly = process.argv.includes("--status");
+const skipTimeoutRows = process.argv.includes("--skip-timeouts");
 const maxBatches = Math.max(
   0,
   Number.parseInt(process.argv.find((arg) => arg.startsWith("--max-batches="))?.slice("--max-batches=".length) ?? "0", 10),
@@ -70,13 +72,26 @@ function readTextFile(filePath) {
 }
 
 function writeTextFile(filePath, text) {
-  retryFileOperation(() => fs.writeFileSync(filePath, text, "utf8"));
+  const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    retryFileOperation(() => fs.writeFileSync(tempPath, text, "utf8"));
+    try {
+      retryFileOperation(() => fs.renameSync(tempPath, filePath));
+    } catch (error) {
+      if (error?.code !== "EPERM" && error?.code !== "EACCES") throw error;
+      retryFileOperation(() => fs.copyFileSync(tempPath, filePath));
+    }
+  } finally {
+    if (fs.existsSync(tempPath)) {
+      retryFileOperation(() => fs.rmSync(tempPath, { force: true }));
+    }
+  }
 }
 
 function parseCatalog(filePath) {
   const text = readTextFile(filePath);
   const entries = new Map();
-  const re = /  "([^"]+)":\s*"((?:\\.|[^"\\])*)",/g;
+  const re = /^[ \t]*"([^"]+)"[ \t]*:[ \t]*"((?:\\.|[^"\\])*)"[ \t]*,[ \t]*$/gm;
   let match;
   while ((match = re.exec(text)) !== null) {
     entries.set(match[1], JSON.parse(`"${match[2]}"`));
@@ -99,6 +114,20 @@ function renderCatalog(exportName, entries) {
 
 function cacheKey(locale, text) {
   return `${locale}\0${text}`;
+}
+
+function appendSkippedRow(skipped, locale, row, error) {
+  const key = cacheKey(locale, row.text);
+  if (!skipped[key]) {
+    skipped[key] = {
+      locale,
+      id: row.id,
+      text: row.text,
+      source: row.source,
+      field: row.field,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 function writeLocaleCatalog(locale, manifestRows, cache) {
@@ -214,6 +243,7 @@ async function main() {
     throw new Error(`No manifest rows found at ${manifestPath}`);
   }
   const cache = readJson(cachePath, {});
+  const skipped = readJson(skipPath, {});
   const selectedLocales = localeTargets.filter(([locale]) => !localeArg || locale === localeArg);
   if (selectedLocales.length === 0) throw new Error(`Unknown locale: ${localeArg}`);
   if (statusOnly) {
@@ -222,7 +252,7 @@ async function main() {
   }
 
   for (const [locale] of selectedLocales) {
-    const missing = manifestRows.filter((row) => !cache[cacheKey(locale, row.text)]);
+    const missing = manifestRows.filter((row) => !cache[cacheKey(locale, row.text)] && !skipped[cacheKey(locale, row.text)]);
     console.log(`${locale}: ${manifestRows.length - missing.length}/${manifestRows.length} cached`);
     let completed = 0;
     let batches = 0;
@@ -236,11 +266,30 @@ async function main() {
         });
       } catch (error) {
         if (isFatalTranslationError(error)) throw error;
-        if (rows.length === 1) throw error;
+        if (rows.length === 1) {
+          if (skipTimeoutRows && isTimeoutTranslationError(error)) {
+            appendSkippedRow(skipped, locale, rows[0], error);
+            writeJson(skipPath, skipped);
+            console.warn(`${locale}: skipped timed-out row ${rows[0].id}`);
+          } else {
+            throw error;
+          }
+        } else {
         console.warn(`${locale}: splitting failed batch of ${rows.length}: ${error.message}`);
         for (const row of rows) {
-          const [translation] = await translateRowsWithRetry({ locale, rows: [row] });
-          cache[cacheKey(locale, row.text)] = translation;
+          try {
+            const [translation] = await translateRowsWithRetry({ locale, rows: [row] });
+            cache[cacheKey(locale, row.text)] = translation;
+          } catch (rowError) {
+            if (skipTimeoutRows && isTimeoutTranslationError(rowError)) {
+              appendSkippedRow(skipped, locale, row, rowError);
+              writeJson(skipPath, skipped);
+              console.warn(`${locale}: skipped timed-out row ${row.id}`);
+            } else {
+              throw rowError;
+            }
+          }
+        }
         }
       }
       batches += 1;
@@ -266,4 +315,9 @@ function isFatalTranslationError(error) {
     message.includes("translation credentials were rejected") ||
     message.includes("document_translation_unavailable")
   );
+}
+
+function isTimeoutTranslationError(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("document_translation_failed") && message.includes("timed out");
 }

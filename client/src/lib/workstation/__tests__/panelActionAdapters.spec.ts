@@ -120,6 +120,8 @@ describe("panelActionAdapters", () => {
       lastTheoryLoadout: null,
       activeTheoryLoadoutItemIndex: null,
       lastSetup: null,
+      calculatorReceipts: [],
+      lastCalculatorReceipt: null,
       steps: [],
       debugEvents: [],
     });
@@ -220,6 +222,8 @@ describe("panelActionAdapters", () => {
       panel_generated_answer: false,
       assistant_answer: false,
       terminal_eligible: false,
+      produced_calculator_receipt: true,
+      calculator_receipt_status: "solved",
     });
     const calculatorState = useScientificCalculatorStore.getState();
     expect(calculatorState.currentLatex).toBe("(18+6)*3");
@@ -233,6 +237,13 @@ describe("panelActionAdapters", () => {
         delegatedTo: "scientific-calculator.solve_expression",
       },
     });
+    expect(calculatorState.lastCalculatorReceipt).toMatchObject({
+      schema: "helix.scientific_calculator_receipt.v1",
+      status: "solved",
+      expression: "(18+6)*3",
+      result_text: "72",
+    });
+    expect(result.artifact?.calculator_receipt_ref).toBe(calculatorState.lastCalculatorReceipt?.receipt_id);
     expect(calculatorState.debugEvents[0]).toMatchObject({
       action_id: "solve_expression",
       source: "workstation_action",
@@ -269,7 +280,8 @@ describe("panelActionAdapters", () => {
       schema: "helix.calculator_expression_prefill_receipt.v1",
       latex: "E = h * f",
       source_path: "paper:eq1",
-      produced_calculator_receipt: false,
+      produced_calculator_receipt: true,
+      calculator_receipt_status: "blocked",
       produced_numeric_value_evidence: false,
       terminal_eligible: false,
       assistant_answer: false,
@@ -282,7 +294,15 @@ describe("panelActionAdapters", () => {
     const calculatorState = useScientificCalculatorStore.getState();
     expect(calculatorState.currentLatex).toBe("E = h * f");
     expect(calculatorState.lastSolve).toBeNull();
-    expect(calculatorState.debugEvents[0]).toMatchObject({
+    expect(calculatorState.lastCalculatorReceipt).toMatchObject({
+      schema: "helix.scientific_calculator_receipt.v1",
+      status: "blocked",
+      expression: "E = h * f",
+      missing_bindings: ["variable:f"],
+      blockers: ["missing_variable_bindings"],
+    });
+    expect(result.artifact?.calculator_receipt_ref).toBe(calculatorState.lastCalculatorReceipt?.receipt_id);
+    expect(calculatorState.debugEvents[1]).toMatchObject({
       action_id: "prefill_expression",
       source: "workstation_action",
       input_latex: "E = h * f",

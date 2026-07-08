@@ -29,6 +29,7 @@ import { useInterfaceText, type InterfaceTextResolver } from "@/lib/i18n/interfa
 import type { InterfaceMessageId } from "@/lib/i18n/messages/types";
 import { useDocumentImageRegionStore, type DocumentImageRegionState } from "@/store/useDocumentImageRegionStore";
 import { useImageLensLiveSourceStore } from "@/store/useImageLensLiveSourceStore";
+import { buildScientificEvidenceWorkflowStatus } from "@/components/helix/ask-console/ScientificEvidenceWorkflowStatus";
 
 type DragState = {
   pointerId: number;
@@ -204,6 +205,14 @@ export default function ImageLensPanel() {
       displayMappedValue(t, value, sourceKindMessages),
     ]),
     [t],
+  );
+  const scientificWorkflowStatus = useMemo(
+    () => buildScientificEvidenceWorkflowStatus({
+      source,
+      cropDraft,
+      lastReceipt: receipts[0] ?? null,
+    }),
+    [cropDraft, receipts, source],
   );
 
   useEffect(() => {
@@ -503,6 +512,23 @@ export default function ImageLensPanel() {
               </button>
             </span>
           ) : null}
+        </div>
+        <div
+          className="mt-2 grid gap-1 rounded border border-cyan-300/15 bg-cyan-950/20 p-2 text-[10px] leading-4 text-slate-300 sm:grid-cols-2 xl:grid-cols-4"
+          data-testid="image-lens-scientific-workflow-status"
+        >
+          <span className="truncate">
+            Page: {scientificWorkflowStatus.pageLoaded ? `${scientificWorkflowStatus.sourceId ?? "source"}${scientificWorkflowStatus.pageNumber ? ` p.${scientificWorkflowStatus.pageNumber}` : ""}` : "none"}
+          </span>
+          <span className="truncate">Hash: {scientificWorkflowStatus.sourceImageHash ?? "missing"}</span>
+          <span className="truncate">Crop: {scientificWorkflowStatus.cropRef ?? scientificWorkflowStatus.cropRegionRef ?? "missing"}</span>
+          <span className="truncate">Sidecar: {scientificWorkflowStatus.sidecarId ?? "missing"}</span>
+          <span className="truncate">Row: {scientificWorkflowStatus.promotedRowState}</span>
+          <span className="truncate">Graph: {scientificWorkflowStatus.graphReflectionStatus}</span>
+          <span className="truncate">Calculator: {scientificWorkflowStatus.calculatorTemplateStatus}</span>
+          <span className="truncate">
+            Postulate refs: {Object.values(scientificWorkflowStatus.postulateReadyRefs).flat().length}
+          </span>
         </div>
       </div>
 

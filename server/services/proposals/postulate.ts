@@ -167,22 +167,29 @@ export function extractPostulateEvidenceContextFromText(text: string): Postulate
   return {
     evidenceSidecarRefs: collectPostulateRefs(source, [
       /\b((?:scientific_image_sidecar|evidence_sidecar):[a-z0-9_.:/-]+)/gi,
-      /\b(ask:[^\s`]+scientific_image_evidence_sidecar[^\s`]*)/gi,
-      /\bsidecar\s*:\s*`?([^`\n]*scientific_image_evidence_sidecar[^`\s]*)/gi,
+      /\b(ask:[^\s`",\]}]+scientific_image_evidence_sidecar[^\s`",\]}]*)/gi,
+      /\bsidecar\s*:\s*`?([^`",\]\n]*scientific_image_evidence_sidecar[^`",\]\s]*)/gi,
+      /"sidecar_id"\s*:\s*"([^"]*scientific_image_evidence_sidecar[^"]*)"/gi,
     ]),
     promotedEquationRowRefs: collectPostulateRefs(source, [
       /\b((?:promoted_equation_row|exact_row_promotion):[a-z0-9_.:/-]+)/gi,
+      /"(?:packet_ref|exact_evidence_ref|promoted_equation_ref|promoted_equation_row_ref)"\s*:\s*"([^"]+)"/gi,
+      /"evidence_id"\s*:\s*"(promoted_scientific_image_evidence:[^"]+)"/gi,
     ]),
     pageRenderRefs: collectPostulateRefs(source, [
       /\b((?:page_render|pdf_page):[a-z0-9_.:/-]+)/gi,
       /\bimage\s+lens\s+source\s*:\s*`?(pdf-page-render:[a-z0-9_.:/-]+)/gi,
+      /"source_id"\s*:\s*"(pdf-page-render:[^"]+)"/gi,
+      /"source_hash"\s*:\s*"(sha256:[a-f0-9]+)"/gi,
     ]),
     cropRefs: collectPostulateRefs(source, [
       /\b((?:crop|equation_crop):[a-z0-9_.:/-]+)/gi,
       /\bcrop\s+ref\s*:\s*`?(sha256:[a-f0-9]+#crop=[0-9,]+)/gi,
+      /"crop_ref"\s*:\s*"(sha256:[a-f0-9]+#crop=[0-9,]+)"/gi,
     ]),
     graphReflectionRefs: collectPostulateRefs(source, [
       /\b((?:graph_reflection|theory_context_reflection):[a-z0-9_.:/-]+)/gi,
+      /"(?:reflection_id|selected_reflection_id)"\s*:\s*"([^"]*(?:graph_reflection|theory_context_reflection|scientific_evidence_graph_reflection)[^"]*)"/gi,
     ]),
     provenanceAuditRefs: collectPostulateRefs(source, [
       /\b((?:provenance_audit|audit):[a-z0-9_.:/-]+)/gi,

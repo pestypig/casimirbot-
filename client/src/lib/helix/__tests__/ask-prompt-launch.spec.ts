@@ -154,6 +154,45 @@ describe("helix ask prompt launch bridge", () => {
     });
   });
 
+  it("marks postulate review prompts as backend Ask entrypoint required", () => {
+    const listener = vi.fn();
+    window.addEventListener(HELIX_ASK_PROMPT_EVENT, listener as EventListener);
+    try {
+      launchHelixAskPrompt({
+        question: "/postulate\nReview this postulate candidate.",
+        autoSubmit: true,
+        routeMetadata: {
+          schema: "helix.ask.route_metadata.v1",
+          source: "postulate_final_answer_button",
+          invocationKind: "postulate_final_answer_review",
+          sourceTarget: "postulate_board",
+          requiredCanonicalGoal: "postulate_runtime_review_then_gated_submit",
+          allowedCapabilities: ["postulate.submit_proposal"],
+          forbiddenCapabilities: [],
+        },
+      });
+    } finally {
+      window.removeEventListener(HELIX_ASK_PROMPT_EVENT, listener as EventListener);
+    }
+
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({
+      detail: expect.objectContaining({
+        forceReasoningDispatch: true,
+        requiresBackendAskEntrypoint: true,
+        requires_backend_ask_entrypoint: true,
+      }),
+    }));
+    expect(consumePendingHelixAskPrompt()).toMatchObject({
+      question: "/postulate\nReview this postulate candidate.",
+      forceReasoningDispatch: true,
+      requiresBackendAskEntrypoint: true,
+      requires_backend_ask_entrypoint: true,
+      routeMetadata: expect.objectContaining({
+        sourceTarget: "postulate_board",
+      }),
+    });
+  });
+
   it("consumes and clears pending prompts deterministically", () => {
     window.localStorage.setItem(
       HELIX_PENDING_ASK_KEY,

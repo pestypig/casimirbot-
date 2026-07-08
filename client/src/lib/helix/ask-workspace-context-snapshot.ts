@@ -80,6 +80,8 @@ type ScientificCalculatorSnapshotInput = {
     trace?: { traceId?: unknown } | null;
     ok?: unknown;
   } | null;
+  lastCalculatorReceipt?: unknown;
+  calculatorReceipts?: unknown;
   steps?: unknown;
   debugEvents?: unknown;
 };
@@ -298,6 +300,19 @@ export function buildAskTurnWorkspaceContextSnapshotFromState(
     message: clipTextForAskTurn(event.message, 240),
     ts: event.ts,
   }));
+  const lastCalculatorReceipt =
+    input.calculatorState.lastCalculatorReceipt &&
+    typeof input.calculatorState.lastCalculatorReceipt === "object" &&
+    !Array.isArray(input.calculatorState.lastCalculatorReceipt)
+      ? input.calculatorState.lastCalculatorReceipt as Record<string, unknown>
+      : null;
+  const calculatorReceipts = Array.isArray(input.calculatorState.calculatorReceipts)
+    ? input.calculatorState.calculatorReceipts
+      .filter((receipt): receipt is Record<string, unknown> =>
+        Boolean(receipt) && typeof receipt === "object" && !Array.isArray(receipt)
+      )
+      .slice(0, 5)
+    : [];
   const activeCalculatorContext = {
     schema: "helix.scientific_calculator_active_context.v1",
     panel_id: "scientific-calculator",
@@ -307,6 +322,12 @@ export function buildAskTurnWorkspaceContextSnapshotFromState(
     last_normalized_expression: clipTextForAskTurn(input.calculatorState.lastSolve?.normalized_expression, 800),
     last_trace_id: clipTextForAskTurn(input.calculatorState.lastSolve?.trace?.traceId, 240),
     last_ok: input.calculatorState.lastSolve?.ok ?? null,
+    last_calculator_receipt: lastCalculatorReceipt,
+    calculator_receipts: calculatorReceipts,
+    calculator_receipt_status:
+      typeof lastCalculatorReceipt?.status === "string" ? lastCalculatorReceipt.status : null,
+    calculator_receipt_ref:
+      typeof lastCalculatorReceipt?.receipt_id === "string" ? lastCalculatorReceipt.receipt_id : null,
     step_count: Array.isArray(input.calculatorState.steps) ? input.calculatorState.steps.length : 0,
     recent_debug_events: calculatorRecentDebugEvents,
   };
@@ -370,6 +391,7 @@ export function buildAskTurnWorkspaceContextSnapshotFromState(
     hasCalculatorContext: activePanel === "scientific-calculator" && (
       Boolean(activeCalculatorContext.current_latex) ||
       Boolean(activeCalculatorContext.last_result_text) ||
+      Boolean(activeCalculatorContext.last_calculator_receipt) ||
       calculatorRecentDebugEvents.length > 0
     ),
     active_panel: activePanel,

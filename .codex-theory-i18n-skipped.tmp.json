@@ -1,0 +1,34 @@
+{
+  "wo\u0000It prevents downstream gates from evaluating different implied hull, wall, exterior, or transition geometries.": {
+    "locale": "wo",
+    "id": "theoryBadgeGraph.shared.itPreventsDownstreamGatesFromEvaluatingDifferentImpliedHullWall",
+    "text": "It prevents downstream gates from evaluating different implied hull, wall, exterior, or transition geometries.",
+    "source": "theory.badge.nhm2.regional_atlas.available",
+    "field": "whyItMatters",
+    "error": "Translation route failed: 502 {\"ok\":false,\"error\":\"document_translation_failed\",\"message\":\"Document translation timed out.\"}"
+  },
+  "wo\u0000Converts a small spectral shift into line-of-sight velocity.": {
+    "locale": "wo",
+    "id": "theoryBadgeGraph.shared.convertsASmallSpectralShiftIntoLineOfSightVelocity",
+    "text": "Converts a small spectral shift into line-of-sight velocity.",
+    "source": "theory.badge.solar.spectrum.radial_velocity_proxy",
+    "field": "plainMeaning",
+    "error": "Translation route failed: 502 {\"ok\":false,\"error\":\"document_translation_failed\",\"message\":\"Document translation timed out.\"}"
+  },
+  "wo\u0000Individual PAH-like detections do not establish a direct path to dopamine, pleasure, consciousness, or objective collapse.": {
+    "locale": "wo",
+    "id": "theoryBadgeGraph.shared.individualPahLikeDetectionsDoNotEstablishADirectPath",
+    "text": "Individual PAH-like detections do not establish a direct path to dopamine, pleasure, consciousness, or objective collapse.",
+    "source": "theory.badge.astrochemistry.pah.spectral_family_context",
+    "field": "assumptions[1]",
+    "error": "Translation route failed: 502 {\"ok\":false,\"error\":\"document_translation_failed\",\"message\":\"Document translation timed out.\"}"
+  },
+  "wo\u0000C-C bond preservation context does not prove a specific prebiotic synthesis pathway.": {
+    "locale": "wo",
+    "id": "theoryBadgeGraph.shared.cCBondPreservationContextDoesNotProveASpecific",
+    "text": "C-C bond preservation context does not prove a specific prebiotic synthesis pathway.",
+    "source": "theory.badge.astrochemistry.fullerene.c60_c70_carbon_cage_context",
+    "field": "assumptions[1]",
+    "error": "Translation route failed: 502 {\"ok\":false,\"error\":\"document_translation_failed\",\"message\":\"Document translation timed out.\"}"
+  }
+}

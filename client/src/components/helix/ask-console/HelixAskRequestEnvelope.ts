@@ -90,6 +90,7 @@ export function buildHelixAskConsoleBackendTurnPayloadCore(args: {
   routeMetadata?: HelixAskRouteMetadata | null;
   bypassWorkstationDispatch?: boolean;
   forceReasoningDispatch?: boolean;
+  requiresBackendAskEntrypoint?: boolean;
   suppressWorkstationPayloadActions?: boolean;
 }) {
   const activeDocPath =
@@ -130,6 +131,13 @@ export function buildHelixAskConsoleBackendTurnPayloadCore(args: {
       ? {
           forceReasoningDispatch: true,
           force_reasoning_dispatch: true,
+        }
+      : {}),
+    ...(args.requiresBackendAskEntrypoint === true
+      ? {
+          requiresBackendAskEntrypoint: true,
+          requires_backend_ask_entrypoint: true,
+          ask_entrypoint_required: true,
         }
       : {}),
     ...(args.suppressWorkstationPayloadActions === true

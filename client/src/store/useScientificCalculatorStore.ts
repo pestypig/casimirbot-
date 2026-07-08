@@ -7,6 +7,10 @@ import type {
   TheoryCalculatorLoadoutItemV1,
   TheoryCalculatorLoadoutV1,
 } from "@shared/contracts/theory-calculator-loadout.v1";
+import {
+  SCIENTIFIC_CALCULATOR_RECEIPT_CLAIM_BOUNDARY,
+  type ScientificCalculatorReceiptV1,
+} from "@shared/contracts/scientific-calculator-receipt.v1";
 
 const SCIENTIFIC_CALCULATOR_STORAGE_KEY = "scientific-calculator:v1";
 
@@ -66,6 +70,8 @@ type ScientificCalculatorState = {
   lastTheoryLoadout: TheoryCalculatorLoadoutV1 | null;
   activeTheoryLoadoutItemIndex: number | null;
   lastSetup: HelixCalculatorSetupContext | null;
+  calculatorReceipts: ScientificCalculatorReceiptV1[];
+  lastCalculatorReceipt: ScientificCalculatorReceiptV1 | null;
   steps: ScientificSolveResult["steps"];
   debugEvents: ScientificCalculatorDebugEvent[];
   ingestLatex: (
@@ -98,6 +104,12 @@ type ScientificCalculatorState = {
   recordDebugEvent: (
     event: Omit<ScientificCalculatorDebugEvent, "id" | "ts" | "panel_id">,
   ) => ScientificCalculatorDebugEvent;
+  recordCalculatorReceipt: (
+    receipt: Partial<ScientificCalculatorReceiptV1> & {
+      expression: string;
+      status: ScientificCalculatorReceiptV1["status"];
+    },
+  ) => ScientificCalculatorReceiptV1;
   setLiveWorkbenchExpression: (
     latex: string,
     meta?: {
@@ -112,6 +124,7 @@ type ScientificCalculatorState = {
 
 const MAX_HISTORY = 80;
 const MAX_DEBUG_EVENTS = 160;
+const MAX_CALCULATOR_RECEIPTS = 80;
 
 function makeDebugEvent(
   event: Omit<ScientificCalculatorDebugEvent, "id" | "ts" | "panel_id">,
@@ -125,6 +138,62 @@ function makeDebugEvent(
   };
 }
 
+const makeReceiptId = (): string =>
+  `scientific-calculator-receipt:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+
+const buildReceiptFromSolve = (
+  result: ScientificSolveResult,
+  meta?: {
+    calculatorSetup?: HelixCalculatorSetupContext | null;
+    compoundRunId?: string | null;
+    compoundSubgoalId?: string | null;
+  },
+): ScientificCalculatorReceiptV1 => {
+  const now = new Date().toISOString();
+  const setup = meta?.calculatorSetup ?? null;
+  return {
+    schema: "helix.scientific_calculator_receipt.v1",
+    receipt_id: `scientific-calculator-receipt:${result.trace.traceId}`,
+    expression_template_id: meta?.compoundSubgoalId ?? setup?.subgoal ?? null,
+    status: result.ok ? "solved" : "blocked",
+    expression: result.normalized_expression || result.input_latex,
+    latex: result.input_latex,
+    variables: (setup?.variables ?? []).map((variable) => ({
+      symbol: variable.symbol,
+      value: variable.value,
+      unit: variable.unit ?? setup?.input_units?.[variable.symbol] ?? null,
+      meaning: variable.meaning ?? null,
+      dimension_signature: variable.dimension_signature ?? null,
+      source_refs: [],
+    })),
+    assumptions: setup?.assumptions ?? [],
+    source_refs: [
+      result.trace.traceId,
+      result.trace.route,
+      ...(meta?.compoundRunId ? [`compound_run:${meta.compoundRunId}`] : []),
+      ...(meta?.compoundSubgoalId ? [`compound_subgoal:${meta.compoundSubgoalId}`] : []),
+    ],
+    dimensional_check_status: setup?.result_dimension_signature
+      ? "passed"
+      : setup?.input_units && Object.keys(setup.input_units).length > 0
+        ? "not_run"
+        : "missing_units",
+    result_value: result.ok ? result.result_text : null,
+    result_unit: setup?.result_unit ?? null,
+    result_text: result.ok ? result.result_text : result.error ?? null,
+    provenance_refs: [
+      `calculator_trace:${result.trace.traceId}`,
+      `calculator_engine:${result.trace.engine}`,
+      ...(result.artifact_v1?.artifactId ? [`calculator_artifact:${result.artifact_v1.artifactId}`] : []),
+    ],
+    missing_bindings: result.ok ? [] : ["calculator_result"],
+    blockers: result.ok ? [] : [result.error ?? "solve_failed"],
+    claim_boundary: SCIENTIFIC_CALCULATOR_RECEIPT_CLAIM_BOUNDARY,
+    created_at: now,
+    updated_at: now,
+  };
+};
+
 export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
   persist(
     (set) => ({
@@ -135,6 +204,8 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
       lastTheoryLoadout: null,
       activeTheoryLoadoutItemIndex: null,
       lastSetup: null,
+      calculatorReceipts: [],
+      lastCalculatorReceipt: null,
       steps: [],
       debugEvents: [],
       ingestLatex: (latex, meta) => {
@@ -187,10 +258,17 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
           target_workbench: meta?.targetWorkbench ?? (meta?.compoundRunId ? "theory" : "scalar"),
           message: result.ok ? "solve_completed" : result.error ?? "solve_failed",
         });
+        const receipt = buildReceiptFromSolve(result, {
+          calculatorSetup: meta?.calculatorSetup ?? null,
+          compoundRunId: meta?.compoundRunId ?? null,
+          compoundSubgoalId: meta?.compoundSubgoalId ?? null,
+        });
         set((state) => ({
           lastSolve: result,
           lastArtifactV1: result.artifact_v1 ?? null,
           lastSetup: meta && "calculatorSetup" in meta ? (meta.calculatorSetup ?? null) : state.lastSetup,
+          lastCalculatorReceipt: receipt,
+          calculatorReceipts: [receipt, ...state.calculatorReceipts].slice(0, MAX_CALCULATOR_RECEIPTS),
           steps: result.steps,
           debugEvents: [debugEvent, ...state.debugEvents].slice(0, MAX_DEBUG_EVENTS),
         }));
@@ -257,6 +335,49 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
         }));
         return debugEvent;
       },
+      recordCalculatorReceipt: (receiptInput) => {
+        const now = new Date().toISOString();
+        const receipt: ScientificCalculatorReceiptV1 = {
+          schema: "helix.scientific_calculator_receipt.v1",
+          receipt_id: receiptInput.receipt_id ?? makeReceiptId(),
+          expression_template_id: receiptInput.expression_template_id ?? null,
+          status: receiptInput.status,
+          expression: receiptInput.expression.trim(),
+          latex: receiptInput.latex ?? receiptInput.expression.trim(),
+          variables: receiptInput.variables ?? [],
+          assumptions: receiptInput.assumptions ?? [],
+          source_refs: receiptInput.source_refs ?? [],
+          dimensional_check_status: receiptInput.dimensional_check_status ?? "not_run",
+          result_value: receiptInput.result_value ?? null,
+          result_unit: receiptInput.result_unit ?? null,
+          result_text: receiptInput.result_text ?? null,
+          provenance_refs: receiptInput.provenance_refs ?? [],
+          missing_bindings: receiptInput.missing_bindings ?? [],
+          blockers: receiptInput.blockers ?? [],
+          claim_boundary: receiptInput.claim_boundary ?? SCIENTIFIC_CALCULATOR_RECEIPT_CLAIM_BOUNDARY,
+          created_at: receiptInput.created_at ?? now,
+          updated_at: now,
+        };
+        const debugEvent = makeDebugEvent({
+          action_id: receipt.status === "solved" ? "solve_expression" : "classify_expression",
+          source: "workstation_action",
+          ok: receipt.status === "solved" || receipt.status === "calculation_ready",
+          input_latex: receipt.latex ?? receipt.expression,
+          result_text: receipt.result_text ?? undefined,
+          normalized_expression: receipt.expression,
+          trace_id: receipt.receipt_id,
+          route: "scientific-calculator/receipt",
+          engine: "nerdamer",
+          message: `calculator_receipt_${receipt.status}`,
+        });
+        set((state) => ({
+          currentLatex: receipt.latex ?? receipt.expression,
+          lastCalculatorReceipt: receipt,
+          calculatorReceipts: [receipt, ...state.calculatorReceipts].slice(0, MAX_CALCULATOR_RECEIPTS),
+          debugEvents: [debugEvent, ...state.debugEvents].slice(0, MAX_DEBUG_EVENTS),
+        }));
+        return receipt;
+      },
       setLiveWorkbenchExpression: (latex, meta) => {
         const trimmed = latex.trim();
         const debugEvent = makeDebugEvent({
@@ -285,6 +406,7 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
           lastTheoryLoadout: null,
           activeTheoryLoadoutItemIndex: null,
           lastSetup: null,
+          lastCalculatorReceipt: null,
           steps: [],
           debugEvents: [
             makeDebugEvent({
@@ -307,6 +429,8 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
         lastTheoryLoadout: state.lastTheoryLoadout,
         activeTheoryLoadoutItemIndex: state.activeTheoryLoadoutItemIndex,
         lastSetup: state.lastSetup,
+        calculatorReceipts: state.calculatorReceipts,
+        lastCalculatorReceipt: state.lastCalculatorReceipt,
         steps: state.steps,
         debugEvents: state.debugEvents,
       }),

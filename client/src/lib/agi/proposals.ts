@@ -232,26 +232,33 @@ export function extractPostulateEvidenceContextFromText(text: string): Postulate
     evidenceSidecarRefs: uniqueRefMatches(source, [
       /\b(scientific[_-]image[_-]sidecar[:#][a-z0-9_.:/-]+)/gi,
       /\b(evidence[_-]sidecar[:#][a-z0-9_.:/-]+)/gi,
-      /\b(ask:[^\s`]+scientific_image_evidence_sidecar[^\s`]*)/gi,
-      /\bsidecar\s*:\s*`?([^`\n]*scientific_image_evidence_sidecar[^`\s]*)/gi,
+      /\b(ask:[^\s`",\]}]+scientific_image_evidence_sidecar[^\s`",\]}]*)/gi,
+      /\bsidecar\s*:\s*`?([^`",\]\n]*scientific_image_evidence_sidecar[^`",\]\s]*)/gi,
+      /"sidecar_id"\s*:\s*"([^"]*scientific_image_evidence_sidecar[^"]*)"/gi,
     ]),
     promotedEquationRowRefs: uniqueRefMatches(source, [
       /\b(promoted[_-]equation[_-]row[:#][a-z0-9_.:/-]+)/gi,
       /\b(exact[_-]row[_-]promotion[:#][a-z0-9_.:/-]+)/gi,
+      /"(?:packet_ref|exact_evidence_ref|promoted_equation_ref|promoted_equation_row_ref)"\s*:\s*"([^"]+)"/gi,
+      /"evidence_id"\s*:\s*"(promoted_scientific_image_evidence:[^"]+)"/gi,
     ]),
     pageRenderRefs: uniqueRefMatches(source, [
       /\b(page[_-]render[:#][a-z0-9_.:/-]+)/gi,
       /\b(pdf[_-]page[:#][a-z0-9_.:/-]+)/gi,
       /\bimage\s+lens\s+source\s*:\s*`?(pdf-page-render:[a-z0-9_.:/-]+)/gi,
+      /"source_id"\s*:\s*"(pdf-page-render:[^"]+)"/gi,
+      /"source_hash"\s*:\s*"(sha256:[a-f0-9]+)"/gi,
     ]),
     cropRefs: uniqueRefMatches(source, [
       /\b(crop[:#][a-z0-9_.:/-]+)/gi,
       /\b(equation[_-]crop[:#][a-z0-9_.:/-]+)/gi,
       /\bcrop\s+ref\s*:\s*`?(sha256:[a-f0-9]+#crop=[0-9,]+)/gi,
+      /"crop_ref"\s*:\s*"(sha256:[a-f0-9]+#crop=[0-9,]+)"/gi,
     ]),
     graphReflectionRefs: uniqueRefMatches(source, [
       /\b(graph[_-]reflection[:#][a-z0-9_.:/-]+)/gi,
       /\b(theory[_-]context[_-]reflection[:#][a-z0-9_.:/-]+)/gi,
+      /"(?:reflection_id|selected_reflection_id)"\s*:\s*"([^"]*(?:graph_reflection|theory_context_reflection|scientific_evidence_graph_reflection)[^"]*)"/gi,
     ]),
     provenanceAuditRefs: uniqueRefMatches(source, [
       /\b(provenance[_-]audit[:#][a-z0-9_.:/-]+)/gi,

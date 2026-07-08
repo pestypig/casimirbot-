@@ -2,6 +2,7 @@ import { execFileSync, spawn, spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type {
   HelixAgentProvider,
   HelixAgentRunResult,
@@ -343,6 +344,30 @@ type ScientificImageContinuationSidecarRecord = {
 };
 
 const scientificImageContinuationSidecars = new Map<string, ScientificImageContinuationSidecarRecord>();
+
+const SCIENTIFIC_EVIDENCE_WORKFLOW_STATUS_SCHEMA = "helix.scientific_evidence_workflow_status.v1";
+
+const readScientificEvidenceWorkflowStatusRecord = (
+  body: Record<string, unknown>,
+): Record<string, unknown> | null => {
+  const workspaceSnapshot = readRecord(body.workspace_context_snapshot ?? body.workspaceContextSnapshot);
+  const activeImageLensSource =
+    readRecord(body.active_image_lens_source ?? body.activeImageLensSource) ??
+    readRecord(workspaceSnapshot?.active_image_lens_source ?? workspaceSnapshot?.activeImageLensSource);
+  const candidates = [
+    body.scientific_evidence_workflow_status,
+    body.scientificEvidenceWorkflowStatus,
+    workspaceSnapshot?.scientific_evidence_workflow_status,
+    workspaceSnapshot?.scientificEvidenceWorkflowStatus,
+    activeImageLensSource?.scientific_evidence_workflow_status,
+    activeImageLensSource?.scientificEvidenceWorkflowStatus,
+  ];
+  for (const candidate of candidates) {
+    const record = readRecord(candidate);
+    if (readString(record?.schema) === SCIENTIFIC_EVIDENCE_WORKFLOW_STATUS_SCHEMA) return record;
+  }
+  return null;
+};
 
 type ScientificImageGraphReflectionRecord = {
   schema: "helix.scientific_image_graph_reflection_memory_record.v1";
@@ -976,6 +1001,8 @@ type ScientificImageSourceMaterial = {
   source_ref_hash: string;
   has_inline_source_image_data: boolean;
   dimensions_px: { width: number; height: number } | null;
+  current_crop_bbox_px: { x: number; y: number; width: number; height: number } | null;
+  crop_ref: string | null;
   page_number: number | null;
   page_count: number | null;
   scholarly_source_pdf_ref: string | null;
@@ -985,8 +1012,51 @@ type ScientificImageSourceMaterial = {
 const hashScientificImageSourceShort = (value: unknown): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 16);
 
+const readScientificImageBbox = (value: unknown): { x: number; y: number; width: number; height: number } | null => {
+  const record = readRecord(value);
+  if (!record) return null;
+  const x = readNumber(record.x);
+  const y = readNumber(record.y);
+  const width = readNumber(record.width);
+  const height = readNumber(record.height);
+  return x !== null && y !== null && width !== null && height !== null && x >= 0 && y >= 0 && width > 0 && height > 0
+    ? { x, y, width, height }
+    : null;
+};
+
+const findCasimirBotRepoRoot = (): string => {
+  const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    process.env.HELIX_REPO_ROOT,
+    process.cwd(),
+    moduleDir,
+  ].filter((entry): entry is string => Boolean(entry && entry.trim()));
+  for (const candidate of candidates) {
+    let current = path.resolve(candidate);
+    for (let depth = 0; depth < 8; depth += 1) {
+      const packagePath = path.join(current, "package.json");
+      if (fs.existsSync(packagePath)) {
+        try {
+          const parsed = JSON.parse(fs.readFileSync(packagePath, "utf8"));
+          if (parsed?.name === "rest-express" && fs.existsSync(path.join(current, "server"))) {
+            return current;
+          }
+        } catch {
+          // Keep walking upward; malformed package metadata should not break Ask recovery.
+        }
+      }
+      const parent = path.dirname(current);
+      if (parent === current) break;
+      current = parent;
+    }
+  }
+  return process.cwd();
+};
+
 const scholarlyPdfWorkbenchMemoryDir = (): string =>
-  path.resolve(process.cwd(), "artifacts", "helix", "scholarly-pdf-workbench-memory");
+  process.env.HELIX_SCHOLARLY_PDF_WORKBENCH_MEMORY_DIR
+    ? path.resolve(process.env.HELIX_SCHOLARLY_PDF_WORKBENCH_MEMORY_DIR)
+    : path.resolve(findCasimirBotRepoRoot(), "artifacts", "helix", "scholarly-pdf-workbench-memory");
 
 const scholarlyPdfWorkbenchMemoryPathForKey = (key: string): string =>
   path.join(scholarlyPdfWorkbenchMemoryDir(), `${hashScientificImageSourceShort(key)}.json`);
@@ -1176,6 +1246,8 @@ const readScientificImageSourceMaterialFromBody = (
     source_ref_hash: `sha256:${hashScientificImageSourceShort(sourceImageRef)}`,
     has_inline_source_image_data: Boolean(inlineImageRef),
     dimensions_px: widthPx && heightPx ? { width: widthPx, height: heightPx } : null,
+    current_crop_bbox_px: readScientificImageBbox(imageItem.current_crop_bbox_px ?? imageItem.currentCropBboxPx ?? imageItem.bbox_px ?? imageItem.bboxPx),
+    crop_ref: readString(imageItem.crop_ref ?? imageItem.cropRef ?? imageItem.current_crop_ref ?? imageItem.currentCropRef),
     page_number: readNumber(imageItem.page_number ?? imageItem.pageNumber),
     page_count: readNumber(imageItem.page_count ?? imageItem.pageCount),
     scholarly_source_pdf_ref: readString(imageItem.scholarly_source_pdf_ref ?? imageItem.scholarlySourcePdfRef),
@@ -1220,6 +1292,8 @@ const readScientificImageSourceMaterialFromLanePacket = (
     source_ref_hash: `sha256:${hashScientificImageSourceShort(sourceImageRef)}`,
     has_inline_source_image_data: /^data:image\//i.test(sourceImageRef),
     dimensions_px: width && height ? { width, height } : null,
+    current_crop_bbox_px: readScientificImageBbox(receipt?.current_crop_bbox_px ?? receipt?.currentCropBboxPx ?? receipt?.bbox_px ?? receipt?.bboxPx ?? regionInspection?.bbox_px ?? regionInspection?.bboxPx),
+    crop_ref: readString(receipt?.crop_ref ?? receipt?.cropRef ?? receipt?.current_crop_ref ?? receipt?.currentCropRef ?? regionInspection?.crop_ref ?? regionInspection?.cropRef),
     page_number: pageNumber,
     page_count: pageCount,
     scholarly_source_pdf_ref: readString(receipt?.scholarly_source_pdf_ref ?? receipt?.scholarlySourcePdfRef ?? regionInspection?.scholarly_source_pdf_ref),
@@ -1240,7 +1314,9 @@ const readLatestScientificImageSourceMaterialFromPackets = (
 const readScientificImageSourceMaterialRecord = (value: unknown): ScientificImageSourceMaterial | null => {
   const record = readRecord(value);
   const sourceId = readString(record?.source_id ?? record?.sourceId);
-  const sourceImageRef = readString(record?.source_image_ref ?? record?.sourceImageRef);
+  const sourceImageRef =
+    readString(record?.source_image_ref ?? record?.sourceImageRef) ??
+    readString(record?.page_image_ref ?? record?.pageImageRef);
   if (!sourceId || !sourceImageRef) return null;
   const sourceKindRaw = readString(record?.source_kind ?? record?.sourceKind);
   const sourceKind =
@@ -1250,7 +1326,11 @@ const readScientificImageSourceMaterialRecord = (value: unknown): ScientificImag
     sourceKindRaw === "manual_image_url"
       ? sourceKindRaw
       : "unknown";
-  const dimensions = readRecord(record?.dimensions_px ?? record?.dimensionsPx);
+  const dimensions =
+    readRecord(record?.dimensions_px ?? record?.dimensionsPx) ??
+    readRecord(record?.source_dimensions_px ?? record?.sourceDimensionsPx) ??
+    readRecord(record?.natural_size_px ?? record?.naturalSizePx) ??
+    readRecord(record?.naturalSize);
   const width = readNumber(dimensions?.width);
   const height = readNumber(dimensions?.height);
   return {
@@ -1264,6 +1344,8 @@ const readScientificImageSourceMaterialRecord = (value: unknown): ScientificImag
         ? record.has_inline_source_image_data
         : /^data:image\//i.test(sourceImageRef),
     dimensions_px: width && height ? { width, height } : null,
+    current_crop_bbox_px: readScientificImageBbox(record?.current_crop_bbox_px ?? record?.currentCropBboxPx ?? record?.crop_bbox_px ?? record?.cropBboxPx ?? record?.current_crop_bbox ?? record?.currentCropBbox),
+    crop_ref: readString(record?.crop_ref ?? record?.cropRef ?? record?.current_crop_ref ?? record?.currentCropRef),
     page_number: readNumber(record?.page_number ?? record?.pageNumber),
     page_count: readNumber(record?.page_count ?? record?.pageCount),
     scholarly_source_pdf_ref: readString(record?.scholarly_source_pdf_ref ?? record?.scholarlySourcePdfRef),
@@ -1282,6 +1364,8 @@ const publicScientificImageSourceMaterialProjection = (
         source_ref_hash: material.source_ref_hash,
         has_inline_source_image_data: material.has_inline_source_image_data,
         dimensions_px: material.dimensions_px,
+        current_crop_bbox_px: material.current_crop_bbox_px,
+        crop_ref: material.crop_ref,
         page_number: material.page_number,
         page_count: material.page_count,
         scholarly_source_pdf_ref: material.scholarly_source_pdf_ref,
@@ -1709,6 +1793,7 @@ const addScientificImageContinuationKeysFromSourceMaterial = (
   if (!material) return;
   addScientificImageContinuationKey(keys, "image_lens_source", material.source_id);
   addScientificImageContinuationKey(keys, "image_lens_source_hash", material.source_ref_hash);
+  addScientificImageContinuationKey(keys, "image_lens_crop", material.crop_ref);
   addScientificImageContinuationKey(keys, "image_lens_attachment", material.source_attachment_id);
   addScientificImageContinuationKey(keys, "image_lens_pdf", material.scholarly_source_pdf_ref);
   if (material.source_id && material.page_number !== null) {
@@ -1879,6 +1964,11 @@ const lookupScientificImageContinuationSidecar = (
         source: "request_body_sidecar",
         lookup_keys: keys,
         sidecar_id: explicit.sidecar_id,
+        selected_evidence_object: explicit.selected_evidence_object,
+        selected_evidence_ref: explicit.selected_evidence_object?.packet_ref ?? null,
+        selected_evidence_reason: scientificImageEvidenceSelectionReason(explicit),
+        active_blockers: explicit.active_blockers,
+        historical_blockers: explicit.historical_blockers,
         source_material: publicScientificImageSourceMaterialProjection(requestSourceMaterial),
         terminal_eligible: false,
         assistant_answer: false,
@@ -1915,6 +2005,11 @@ const lookupScientificImageContinuationSidecar = (
       lookup_keys: keys,
       selected_lookup_key: selectedEntry?.key ?? null,
       sidecar_id: cached?.sidecar.sidecar_id ?? null,
+      selected_evidence_object: cached?.sidecar.selected_evidence_object ?? null,
+      selected_evidence_ref: cached?.sidecar.selected_evidence_object?.packet_ref ?? null,
+      selected_evidence_reason: cached?.sidecar ? scientificImageEvidenceSelectionReason(cached.sidecar) : null,
+      active_blockers: cached?.sidecar.active_blockers ?? [],
+      historical_blockers: cached?.sidecar.historical_blockers ?? [],
       cached_turn_id: cached?.turn_id ?? null,
       stored_at_ms: cached?.stored_at_ms ?? null,
       persistent_snapshot_recovered: persistentSnapshotRecovered,
@@ -2088,39 +2183,48 @@ const buildScientificImageContinuationSidecarArtifact = (input: {
   sidecar: ScientificImageEvidenceSidecarV1;
   lookup: Record<string, unknown>;
   retryDebug?: Record<string, unknown> | null;
-}): Record<string, unknown> => ({
-  schema: "helix.current_turn_artifact.v1",
-  artifact_id: `${input.turnId}:prior_scientific_image_evidence_sidecar`,
-  producer_item_id: "scientific_image_evidence_continuation_lookup",
-  kind: "scientific_image_evidence_sidecar",
-  observation_kind: "scientific_image_evidence_continuation_lookup",
-  turn_id: input.turnId,
-  source_scope: "prior_turn_context",
-  sidecar_id: input.sidecar.sidecar_id,
-  sidecar_kind: input.sidecar.sidecar_kind,
-  memory_kind: readString(readRecord(input.sidecar.memory_classification)?.memory_kind) ?? "transient_scientific_image_evidence",
-  retrieval_tags: readStringArray(readRecord(input.sidecar.memory_classification)?.retrieval_tags),
-  suggested_consumers: readStringArray(readRecord(input.sidecar.memory_classification)?.suggested_consumers),
-  source_ref_hash: input.sidecar.source_ref_hash,
-  source_kind: input.sidecar.source_kind,
-  packet_count: input.sidecar.packet_count,
-  packet_refs: input.sidecar.packet_refs,
-  crop_regions: input.sidecar.crop_regions,
-  primary_packet_ref: input.sidecar.primary_packet_ref,
-  primary_domain: input.sidecar.primary_domain,
-  primary_domains: input.sidecar.primary_domains,
-  extraction_summary: input.sidecar.extraction_summary,
-  admissibility_status: input.sidecar.admissibility.status,
-  admissibility_reasons: input.sidecar.admissibility.reasons,
-  exact_equation_summary: input.sidecar.exact_equation_summary,
-  continuation_lookup: input.lookup,
-  ...(input.retryDebug ? { scientific_image_evidence_retry: input.retryDebug } : {}),
-  produced_artifact_refs: [input.sidecar.sidecar_id, ...input.sidecar.packet_refs],
-  payload: input.sidecar,
-  assistant_answer: false,
-  terminal_eligible: false,
-  raw_content_included: false,
-});
+}): Record<string, unknown> => {
+  const selectedObject = input.sidecar.selected_evidence_object;
+  return {
+    schema: "helix.current_turn_artifact.v1",
+    artifact_id: `${input.turnId}:prior_scientific_image_evidence_sidecar`,
+    producer_item_id: "scientific_image_evidence_continuation_lookup",
+    kind: "scientific_image_evidence_sidecar",
+    observation_kind: "scientific_image_evidence_continuation_lookup",
+    turn_id: input.turnId,
+    source_scope: "prior_turn_context",
+    sidecar_id: input.sidecar.sidecar_id,
+    sidecar_kind: input.sidecar.sidecar_kind,
+    memory_kind: readString(readRecord(input.sidecar.memory_classification)?.memory_kind) ?? "transient_scientific_image_evidence",
+    retrieval_tags: readStringArray(readRecord(input.sidecar.memory_classification)?.retrieval_tags),
+    suggested_consumers: readStringArray(readRecord(input.sidecar.memory_classification)?.suggested_consumers),
+    source_ref_hash: input.sidecar.source_ref_hash,
+    source_kind: input.sidecar.source_kind,
+    packet_count: input.sidecar.packet_count,
+    packet_refs: input.sidecar.packet_refs,
+    crop_regions: input.sidecar.crop_regions,
+    primary_packet_ref: input.sidecar.primary_packet_ref,
+    selected_evidence_object: selectedObject,
+    selected_evidence_ref: selectedObject?.packet_ref ?? null,
+    selected_evidence_reason: scientificImageEvidenceSelectionReason(input.sidecar),
+    active_promoted_row: input.sidecar.active_promoted_row,
+    active_blockers: input.sidecar.active_blockers,
+    historical_blockers: input.sidecar.historical_blockers,
+    primary_domain: input.sidecar.primary_domain,
+    primary_domains: input.sidecar.primary_domains,
+    extraction_summary: input.sidecar.extraction_summary,
+    admissibility_status: input.sidecar.admissibility.status,
+    admissibility_reasons: input.sidecar.admissibility.reasons,
+    exact_equation_summary: input.sidecar.exact_equation_summary,
+    continuation_lookup: input.lookup,
+    ...(input.retryDebug ? { scientific_image_evidence_retry: input.retryDebug } : {}),
+    produced_artifact_refs: [input.sidecar.sidecar_id, ...input.sidecar.packet_refs],
+    payload: input.sidecar,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+};
 
 const selectScientificImageContinuityPacket = (
   sidecar: ScientificImageEvidenceSidecarV1,
@@ -2142,6 +2246,9 @@ const selectScientificImageContinuityPacket = (
     })[0] ?? null;
 
 const scientificImageEvidenceDepthLabel = (sidecar: ScientificImageEvidenceSidecarV1): string => {
+  if (typeof sidecar.evidence_depth === "string" && sidecar.evidence_depth !== "missing") {
+    return sidecar.evidence_depth;
+  }
   const exactSummary = sidecar.exact_equation_summary;
   if ((exactSummary.promoted_row_count ?? 0) > 0) return "exact_row_promoted";
   if ((exactSummary.admissible_row_count ?? 0) > 0) return "exact_row_admissible";
@@ -2150,6 +2257,15 @@ const scientificImageEvidenceDepthLabel = (sidecar: ScientificImageEvidenceSidec
     return "page_image_ocr_math_candidate";
   }
   return "page_image_observation";
+};
+
+const scientificImageEvidenceSelectionReason = (sidecar: ScientificImageEvidenceSidecarV1): string => {
+  const selected = sidecar.selected_evidence_object;
+  if (!selected) return "no_structured_evidence_object_available";
+  if (selected.evidence_depth === "exact_row_promoted") return "latest_promoted_exact_row";
+  if (selected.evidence_depth === "exact_row_admissible") return "latest_admissible_exact_row";
+  if (selected.evidence_depth === "exact_row_partial") return "latest_partial_exact_row";
+  return "latest_page_image_ocr_math_candidate";
 };
 
 const SCIENTIFIC_IMAGE_EXACT_ROW_PROMOTION_REASON_LABELS = new Set([
@@ -2178,32 +2294,45 @@ const buildScientificImageEvidenceContinuityText = (input: {
   lookup: Record<string, unknown>;
   sourceMaterial: ScientificImageSourceMaterial | null;
 }): string => {
-  const packet = selectScientificImageContinuityPacket(input.sidecar);
+  const selectedObject = input.sidecar.selected_evidence_object;
+  const packet = selectedObject
+    ? input.sidecar.packets.find((entry) =>
+        `${entry.source_ref_hash}#crop=${entry.bbox_px.x},${entry.bbox_px.y},${entry.bbox_px.width},${entry.bbox_px.height}` === selectedObject.packet_ref) ??
+      selectScientificImageContinuityPacket(input.sidecar)
+    : selectScientificImageContinuityPacket(input.sidecar);
   const sourceMaterial = input.sourceMaterial;
-  const pageNumber = packet?.source_image.page_number ?? null;
-  const cropRef = packet
+  const pageNumber = selectedObject?.page_number ?? packet?.source_image.page_number ?? null;
+  const cropRef = selectedObject?.crop_ref ?? (packet
     ? `${packet.crop_region.source_ref_hash}#crop=${packet.bbox_px.x},${packet.bbox_px.y},${packet.bbox_px.width},${packet.bbox_px.height}`
     : input.sidecar.crop_regions[0]
       ? `${input.sidecar.crop_regions[0].source_ref_hash}#crop=${input.sidecar.crop_regions[0].bbox_px.x},${input.sidecar.crop_regions[0].bbox_px.y},${input.sidecar.crop_regions[0].bbox_px.width},${input.sidecar.crop_regions[0].bbox_px.height}`
-      : null;
+      : null);
   const equationCandidate =
+    selectedObject?.latex_candidate ??
+    selectedObject?.text_candidate ??
     packet?.latex_candidate ??
     packet?.text_candidate ??
     packet?.ocr_text_candidate ??
     input.sidecar.packets.map(packetEquationText).find((entry) => entry.trim().length > 0) ??
     null;
   const exactSummary = input.sidecar.exact_equation_summary;
-  const historicalPromotionBlockers = exactSummary.promotion_blockers.filter(
+  const historicalPromotionBlockers = input.sidecar.historical_blockers.length
+    ? input.sidecar.historical_blockers
+    : exactSummary.promotion_blockers.filter(
     (entry) => !SCIENTIFIC_IMAGE_EXACT_ROW_PROMOTION_REASON_LABELS.has(entry),
   );
   const sidecarPromotionReasons = exactSummary.promotion_blockers.filter(
     (entry) => SCIENTIFIC_IMAGE_EXACT_ROW_PROMOTION_REASON_LABELS.has(entry),
   );
-  const activePromotionReasons = packet?.exact_row_promotion.status === "promoted"
+  const activePromotionReasons = selectedObject?.promotion_reasons.length
+    ? selectedObject.promotion_reasons
+    : packet?.exact_row_promotion.status === "promoted"
     ? packet.exact_row_promotion.reasons.filter((entry) =>
         SCIENTIFIC_IMAGE_EXACT_ROW_PROMOTION_REASON_LABELS.has(entry))
     : sidecarPromotionReasons;
-  const activePromotionBlockers = packet?.exact_row_promotion.status === "promoted"
+  const activePromotionBlockers = selectedObject
+    ? selectedObject.active_blockers
+    : packet?.exact_row_promotion.status === "promoted"
     ? []
     : packet?.exact_row_promotion.reasons.filter((entry) =>
         !SCIENTIFIC_IMAGE_EXACT_ROW_PROMOTION_REASON_LABELS.has(entry)) ?? historicalPromotionBlockers;
@@ -2213,6 +2342,8 @@ const buildScientificImageEvidenceContinuityText = (input: {
     "",
     `Evidence depth: \`${scientificImageEvidenceDepthLabel(input.sidecar)}\`.`,
     `Sidecar: \`${input.sidecar.sidecar_id}\`.`,
+    selectedObject ? `Selected evidence object: \`${selectedObject.evidence_id}\`.` : null,
+    `Selected reason: \`${scientificImageEvidenceSelectionReason(input.sidecar)}\`.`,
     `Source kind: \`${sourceMaterial?.source_kind ?? input.sidecar.source_kind}\`.`,
     sourceMaterial?.source_id ? `Image Lens source: \`${sourceMaterial.source_id}\`.` : null,
     sourceMaterial?.source_ref_hash ? `Source image hash: \`${sourceMaterial.source_ref_hash}\`.` : `Source image hash: \`${input.sidecar.source_ref_hash}\`.`,
@@ -2241,11 +2372,47 @@ const buildScientificImageEvidenceContinuityText = (input: {
 
 const buildScientificImageEvidenceContinuityMissingText = (input: {
   lookup: Record<string, unknown> | null;
+  workflowStatus?: Record<string, unknown> | null;
 }): string => {
   const lookup = input.lookup;
   const lookupKeys = readStringArray(lookup?.lookup_keys);
   const source = readString(lookup?.source) ?? "unknown";
   const recovered = lookup?.persistent_snapshot_recovered === true;
+  const sourceMaterial = readRecord(lookup?.source_material);
+  const workflowStatus = input.workflowStatus ?? null;
+  const workflowDepth = readString(workflowStatus?.evidenceDepth ?? workflowStatus?.evidence_depth);
+  const sourceId =
+    readString(workflowStatus?.sourceId ?? workflowStatus?.source_id) ??
+    readString(sourceMaterial?.source_id);
+  const sourceHash =
+    readString(workflowStatus?.sourceImageHash ?? workflowStatus?.source_image_hash) ??
+    readString(sourceMaterial?.source_ref_hash);
+  const pageNumber =
+    readNumber(workflowStatus?.pageNumber ?? workflowStatus?.page_number) ??
+    readNumber(sourceMaterial?.page_number);
+  const cropRef =
+    readString(workflowStatus?.cropRef ?? workflowStatus?.crop_ref) ??
+    readString(sourceMaterial?.crop_ref);
+  const hasRecoveredPageSource = Boolean(sourceId || sourceHash || pageNumber !== null || cropRef);
+  if (hasRecoveredPageSource) {
+    return [
+      "I found an active Image Lens page/source state, but no recoverable scientific Image Lens sidecar for this continuity audit.",
+      "",
+      `Evidence depth: \`${workflowDepth ?? "page_loaded"}\`.`,
+      "Sidecar: `none`.",
+      sourceId ? `Image Lens source: \`${sourceId}\`.` : null,
+      sourceHash ? `Source image hash: \`${sourceHash}\`.` : null,
+      pageNumber !== null ? `Page: \`${pageNumber}\`.` : null,
+      cropRef ? `Crop ref: \`${cropRef}\`.` : null,
+      `Lookup source: \`${source}\`.`,
+      `Persistent snapshot recovered: \`${recovered ? "true" : "false"}\`.`,
+      lookupKeys.length > 0
+        ? `Lookup keys checked: ${lookupKeys.slice(0, 5).map((entry) => `\`${entry}\``).join(", ")}${lookupKeys.length > 5 ? ", ..." : ""}.`
+        : "Lookup keys checked: none.",
+      "",
+      "The page/source state can guide the next crop or sidecar repair, but graph reflection and calculator handoff remain blocked until a scientific sidecar with promoted page-grounded evidence is created or restored.",
+    ].filter(Boolean).join("\n");
+  }
   return [
     "I could not find an active scientific Image Lens evidence chain for this continuity audit.",
     "",
@@ -4025,10 +4192,13 @@ const synthesizeImageLensRegionLaneCandidate = (
   if (!hasSubmittedImage && !sourceMaterial) return null;
   const sourceWidth = sourceMaterial?.dimensions_px?.width;
   const sourceHeight = sourceMaterial?.dimensions_px?.height;
+  const defaultPdfPageDimensions = sourceMaterial?.source_kind === "pdf_page_render"
+    ? { width: 1224, height: 1584 }
+    : null;
   const exactRowRequested = asksForCurrentImageLensExactRowExtraction(body, question);
   const requestedEquationLabel = imageLensRequestedEquationLabels(question)[0] ?? null;
-  const fallbackWidth = sourceWidth && sourceWidth > 0 ? sourceWidth : 9999;
-  const fallbackHeight = sourceHeight && sourceHeight > 0 ? sourceHeight : 9999;
+  const fallbackWidth = sourceWidth && sourceWidth > 0 ? sourceWidth : defaultPdfPageDimensions?.width ?? 9999;
+  const fallbackHeight = sourceHeight && sourceHeight > 0 ? sourceHeight : defaultPdfPageDimensions?.height ?? 9999;
   const exactRowHeight = Math.max(48, Math.round(fallbackHeight * 0.055));
   const exactRowBbox = {
     x: Math.max(0, Math.round(fallbackWidth * 0.06)),
@@ -4036,10 +4206,11 @@ const synthesizeImageLensRegionLaneCandidate = (
     width: Math.max(1, Math.round(fallbackWidth * 0.88)),
     height: Math.max(1, exactRowHeight),
   };
+  const activeCropBbox = sourceMaterial?.current_crop_bbox_px ?? null;
   return enrichImageLensRegionCandidateFromBody(body, {
     capability: VISUAL_ANALYSIS_INSPECT_IMAGE_REGION_CAPABILITY,
     bbox_px: exactRowRequested
-      ? exactRowBbox
+      ? activeCropBbox ?? exactRowBbox
       : {
           x: 0,
           y: 0,
@@ -4061,7 +4232,9 @@ const synthesizeImageLensRegionLaneCandidate = (
     source_kind: sourceMaterial?.source_kind,
     source_image_ref: sourceMaterial?.source_image_ref,
     page_image_ref: sourceMaterial?.source_kind === "pdf_page_render" ? sourceMaterial.source_image_ref : undefined,
-    source_dimensions_px: sourceMaterial?.dimensions_px ?? undefined,
+    source_dimensions_px: sourceMaterial?.dimensions_px ?? defaultPdfPageDimensions ?? undefined,
+    crop_ref: sourceMaterial?.crop_ref ?? undefined,
+    current_crop_ref: sourceMaterial?.crop_ref ?? undefined,
     page_number: sourceMaterial?.page_number ?? undefined,
     page_count: sourceMaterial?.page_count ?? undefined,
     scholarly_source_pdf_ref: sourceMaterial?.scholarly_source_pdf_ref ?? undefined,
@@ -4884,6 +5057,10 @@ const buildCodexTheoryReflectionReceiptAnswer = (input: {
   const sourceSidecar = readRecord(payload.scientific_evidence_sidecar);
   const sourcePacket = readRecord(payload.scientific_evidence_packet);
   const graphReflection = readRecord(payload.scientific_evidence_graph_reflection);
+  const selectedEvidenceObject =
+    readRecord(graphReflection?.selected_evidence_object) ??
+    readRecord(sourceSidecar?.active_promoted_row) ??
+    readRecord(sourceSidecar?.selected_evidence_object);
   const exactBadgeIds = readStringArray(payload.exact_badge_ids);
   const likelyBadgeIds = readStringArray(payload.likely_badge_ids);
   const rejectedBadgeIds = readStringArray(payload.rejected_badge_ids);
@@ -4906,21 +5083,26 @@ const buildCodexTheoryReflectionReceiptAnswer = (input: {
     `${input.turnId}:${THEORY_CONTEXT_REFLECTION_CAPABILITY}`;
   const sidecarId = readString(sourceSidecar?.sidecar_id);
   const pageNumber =
+    readNumber(selectedEvidenceObject?.page_number) ??
     readNumber(sourcePacket?.page_number) ??
     readNumber(sourceSidecar?.page_number) ??
     readNumber(readRecord(sourceSidecar?.source_material)?.page_number);
   const cropRef =
+    readString(selectedEvidenceObject?.crop_ref) ??
+    readString(graphReflection?.exact_evidence_ref) ??
     readString(sourcePacket?.crop_ref) ??
     readString(sourcePacket?.crop_image_ref) ??
     readString(sourceSidecar?.crop_ref) ??
     readString(readRecord(sourceSidecar?.source_material)?.crop_ref);
   const equationLatex =
-    readString(sourcePacket?.latex_candidate) ??
-    readString(sourcePacket?.equation_latex) ??
+    readString(selectedEvidenceObject?.latex_candidate) ??
+    readString(graphReflection?.exact_evidence_latex) ??
     readString(sourceSidecar?.promoted_equation_latex) ??
-    readString(readRecord(sourceSidecar?.active_promoted_row)?.latex_candidate);
+    readString(readRecord(sourceSidecar?.active_promoted_row)?.latex_candidate) ??
+    readString(sourcePacket?.latex_candidate) ??
+    readString(sourcePacket?.equation_latex);
   const calculatorStatus = readString(calculatorTemplateAdmissibility?.status) ??
-    (readArray(payload.calculator_template_payloads).length > 0 ? "template_admissible" : "none");
+    (readArray(payload.calculator_template_payloads).length > 0 ? "template_admissible" : "no_template");
   const admittedTemplateCount =
     readNumber(calculatorTemplateAdmissibility?.admitted_template_count) ??
     readArray(payload.calculator_template_payloads).length;
@@ -4954,7 +5136,7 @@ const buildCodexTheoryReflectionReceiptAnswer = (input: {
     `- Status: \`${calculatorStatus}\``,
     `- Admitted templates: \`${admittedTemplateCount}\``,
     `- Rejected templates: \`${rejectedTemplateCount}\``,
-    `- Calculation-ready payloads: \`${calculationReadyCount}\``,
+    `- Calculation-ready solves: \`${calculationReadyCount}\``,
     `- Binding status: \`${bindingStatus}\``,
     rejectedCalculatorIds.length > 0 ? `- Rejected template ids: ${rejectedCalculatorIds.slice(0, 8).map((id) => `\`${id}\``).join(", ")}` : null,
     "",
@@ -8817,8 +8999,18 @@ export const codexProvider: HelixAgentProvider = {
     }
 
     if (scientificImageEvidenceContinuityRequested && !scientificImageContinuityPrelookup?.sidecar) {
+      const scientificEvidenceWorkflowStatus = readScientificEvidenceWorkflowStatusRecord(request.body);
+      const recoveredSourceMaterial = scientificImageContinuityPrelookup?.sourceMaterial ?? null;
+      const recoveredWorkflowDepth =
+        readString(scientificEvidenceWorkflowStatus?.evidenceDepth ?? scientificEvidenceWorkflowStatus?.evidence_depth) ??
+        (recoveredSourceMaterial ? "page_loaded" : "missing");
+      const recoveredWorkflowStatus =
+        scientificEvidenceWorkflowStatus || recoveredSourceMaterial
+          ? "page_source_recovered_sidecar_missing"
+          : "missing";
       const text = buildScientificImageEvidenceContinuityMissingText({
         lookup: scientificImageContinuityPrelookup?.lookup ?? null,
+        workflowStatus: scientificEvidenceWorkflowStatus,
       });
       const providerGatewayDebugSummary = buildProviderGatewayDebugSummary({
         body: request.body,
@@ -8870,10 +9062,11 @@ export const codexProvider: HelixAgentProvider = {
           scientific_image_graph_reflection_lookup: scientificImageGraphReflectionPrelookup?.lookup ?? null,
           scientific_image_evidence_continuity_summary: {
             schema: "helix.scientific_image_evidence_continuity_summary.v1",
-            status: "missing",
+            status: recoveredWorkflowStatus,
             sidecar_id: null,
-            evidence_depth: "missing",
-            source_material: null,
+            evidence_depth: recoveredWorkflowDepth,
+            scientific_evidence_workflow_status: scientificEvidenceWorkflowStatus,
+            source_material: publicScientificImageSourceMaterialProjection(recoveredSourceMaterial),
             terminal_eligible: false,
             assistant_answer: false,
             raw_content_included: false,

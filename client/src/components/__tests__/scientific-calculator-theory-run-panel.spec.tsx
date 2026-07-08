@@ -192,6 +192,34 @@ describe("ScientificCalculatorPanel theory run workbench", () => {
     expect(screen.getByRole("tab", { name: "Scalar Workbench" })).toHaveAttribute("aria-selected", "true");
   });
 
+  it("projects the latest structured calculator receipt in the panel", () => {
+    act(() => {
+      useScientificCalculatorStore.getState().recordCalculatorReceipt({
+        receipt_id: "scientific-calculator-receipt:panel-test",
+        expression_template_id: "template:rho",
+        status: "template_only",
+        expression: "rho = E / V",
+        latex: "\\rho = E / V",
+        variables: [
+          { symbol: "E", value: null, unit: "J" },
+          { symbol: "V", value: null, unit: "m^3" },
+        ],
+        dimensional_check_status: "missing_units",
+        missing_bindings: ["variable:E", "variable:V"],
+        blockers: ["missing_variable_bindings"],
+        provenance_refs: ["theory-reflection:test"],
+      });
+    });
+
+    render(<ScientificCalculatorPanel />);
+
+    const receiptCard = screen.getByTestId("scientific-calculator-receipt-card");
+    expect(receiptCard).toHaveTextContent("scientific-calculator-receipt:panel-test");
+    expect(receiptCard).toHaveTextContent("template_only");
+    expect(receiptCard).toHaveTextContent("\\rho = E / V");
+    expect(receiptCard).toHaveTextContent("variable:E; variable:V; missing_variable_bindings");
+  });
+
   it("shows equation intake classification without solving symbolic prefill", async () => {
     render(<ScientificCalculatorPanel />);
 

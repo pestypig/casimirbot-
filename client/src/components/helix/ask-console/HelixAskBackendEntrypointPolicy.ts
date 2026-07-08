@@ -17,7 +17,8 @@ type HelixAskBackendEntrypointFamily =
   | "helix_ask"
   | "visual_capture"
   | "image_lens"
-  | "scientific_image";
+  | "scientific_image"
+  | "postulate";
 
 type HelixAskBackendEntrypointFamilyResolution = {
   family: HelixAskBackendEntrypointFamily;
@@ -38,7 +39,7 @@ const HELIX_EVIDENCE_GATE_TRANSFORM_TASK_RE =
 const HELIX_ASK_COMPARE_TRIGGER_RE = /\b(?:compare|contrast|difference|diff|what changed|changed since)\b/i;
 
 const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE =
-  /\b(?:scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\s+viewer|narrator\.[a-z0-9_.-]+|panel[_\s-]?id\s*(?:=|:)\s*narrator|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|scholarly-research\.[a-z0-9_.-]+|scholarly_research\.[a-z0-9_.-]+|scholarly\s+research\s+tool|lookup_papers|fetch_full_text|extract_numeric_parameters|live_env\.[a-z0-9_.-]+|helix_ask\.[a-z0-9_.-]+|image[_\s-]?lens|visual_analysis\.inspect_image_region|visual_capture|scientific\s+(?:document|image|page)|document\s+image|attached\s+image.*(?:equation|latex|theory\s+graph))\b/i;
+  /(?:^|\s)\/postulate\b|\b(?:postulate\.submit_proposal|scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\s+viewer|narrator\.[a-z0-9_.-]+|panel[_\s-]?id\s*(?:=|:)\s*narrator|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|scholarly-research\.[a-z0-9_.-]+|scholarly_research\.[a-z0-9_.-]+|scholarly\s+research\s+tool|lookup_papers|fetch_full_text|extract_numeric_parameters|live_env\.[a-z0-9_.-]+|helix_ask\.[a-z0-9_.-]+|image[_\s-]?lens|visual_analysis\.inspect_image_region|visual_capture|scientific\s+(?:document|image|page)|document\s+image|attached\s+image.*(?:equation|latex|theory\s+graph))\b/i;
 
 const HELIX_ASK_SCIENTIFIC_IMAGE_PROMPT_RE =
   /\b(?:attached\s+image|image|screenshot|document\s+image|scientific\s+(?:document|image|page|paper))\b[\s\S]{0,180}\b(?:equations?|latex|symbols?|scientific\s+text|theory\s+(?:badge\s+)?graph|compare|congruence|reflection)\b/i;
@@ -78,6 +79,23 @@ export function resolveHelixAskBackendEntrypointFamily(
   const normalized = value.trim();
   if (!normalized) return null;
   if (isQuotedTransformOnlyForBackendEntrypointPolicy(normalized)) return null;
+  if (/(?:^|\s)\/postulate\b|\bpostulate\.submit_proposal\b/i.test(normalized)) {
+    return {
+      family: "postulate",
+      sourceTarget: "postulate_board",
+      targetKind: "postulate_runtime_review",
+      requiredToolFamily: "postulate",
+      selectedCapability: null,
+      explicitCue: "/postulate",
+      requestedOutputs: [
+        "postulate_runtime_review",
+        "postulate_submission_gate",
+        "postulate_submit_receipt",
+        "revision_recovery_plan",
+        "typed_failure",
+      ],
+    };
+  }
   if (/\b(?:scientific-calculator\.solve_expression|scientific-calculator\.solve_with_steps|scientific\s+calculator|calculator_receipt|calculator\s+tool)\b/i.test(normalized)) {
     return {
       family: "calculator",

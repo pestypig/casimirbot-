@@ -6462,6 +6462,36 @@ export function executeHelixPanelAction(
         latestDebugEvents[0] ??
         null;
       const classification = classifyScientificCalculatorExpression(entry.latex);
+      const missingBindings = [
+        ...classification.missing_variables.map((symbol) => `variable:${symbol}`),
+        ...classification.required_assumptions.map((assumption) => `assumption:${assumption}`),
+      ];
+      const calculatorReceipt = scientificState.recordCalculatorReceipt({
+        expression_template_id: entry.id,
+        status: classification.blocked_reasons.length > 0 || missingBindings.length > 0
+          ? "blocked"
+          : classification.possible_routes.includes("arithmetic_safe")
+            ? "calculation_ready"
+            : "template_only",
+        expression: classification.normalized_expression ?? entry.latex,
+        latex: entry.latex,
+        variables: classification.detected_symbols.map((symbol) => ({
+          symbol,
+          value: null,
+          unit: entry.calculatorSetup?.input_units?.[symbol] ?? null,
+          source_refs: [],
+        })),
+        assumptions: classification.required_assumptions,
+        source_refs: [
+          ...(entry.sourcePath ? [entry.sourcePath] : []),
+          ...(entry.anchor ? [entry.anchor] : []),
+        ],
+        dimensional_check_status: missingBindings.length > 0 ? "missing_units" : "not_run",
+        missing_bindings: missingBindings,
+        blockers: classification.blocked_reasons,
+        provenance_refs: [entry.id],
+      });
+      const latestReceiptDebugEvents = useScientificCalculatorStore.getState().debugEvents;
       return {
         ok: true,
         panel_id: panelId,
@@ -6475,14 +6505,17 @@ export function executeHelixPanelAction(
           source_path: entry.sourcePath,
           anchor: entry.anchor,
           classification,
-          produced_calculator_receipt: false,
+          produced_calculator_receipt: true,
+          calculator_receipt: calculatorReceipt,
+          calculator_receipt_ref: calculatorReceipt.receipt_id,
+          calculator_receipt_status: calculatorReceipt.status,
           produced_numeric_value_evidence: false,
           terminal_eligible: false,
           assistant_answer: false,
           calculator_setup: entry.calculatorSetup ?? null,
           history_id: entry.id,
           debug_event: ingestDebugEvent,
-          debug_log_tail: buildScientificCalculatorDebugSnapshot(latestDebugEvents, 8),
+          debug_log_tail: buildScientificCalculatorDebugSnapshot(latestReceiptDebugEvents, 8),
         },
       };
     }
@@ -6531,6 +6564,7 @@ export function executeHelixPanelAction(
       context.openPanel(panelId, undefined);
       context.focusPanel(panelId, undefined);
       const latestCalculatorState = useScientificCalculatorStore.getState();
+      const calculatorReceipt = latestCalculatorState.lastCalculatorReceipt;
       return {
         ok: solveResult.ok,
         panel_id: panelId,
@@ -6565,6 +6599,10 @@ export function executeHelixPanelAction(
           warnings: solveResult.trace.warnings,
           target_workbench: targetWorkbench,
           error: solveResult.error ?? null,
+          produced_calculator_receipt: Boolean(calculatorReceipt),
+          calculator_receipt: calculatorReceipt,
+          calculator_receipt_ref: calculatorReceipt?.receipt_id ?? null,
+          calculator_receipt_status: calculatorReceipt?.status ?? null,
           debug_event: latestCalculatorState.debugEvents[0] ?? null,
           debug_log_tail: buildScientificCalculatorDebugSnapshot(latestCalculatorState.debugEvents, 8),
         },
@@ -6636,6 +6674,7 @@ export function executeHelixPanelAction(
       context.openPanel(panelId, undefined);
       context.focusPanel(panelId, undefined);
       const latestCalculatorState = useScientificCalculatorStore.getState();
+      const calculatorReceipt = latestCalculatorState.lastCalculatorReceipt;
       return {
         ok: true,
         panel_id: panelId,
@@ -6653,6 +6692,10 @@ export function executeHelixPanelAction(
           panel_generated_answer: false,
           assistant_answer: false,
           terminal_eligible: false,
+          produced_calculator_receipt: Boolean(calculatorReceipt),
+          calculator_receipt: calculatorReceipt,
+          calculator_receipt_ref: calculatorReceipt?.receipt_id ?? null,
+          calculator_receipt_status: calculatorReceipt?.status ?? null,
           debug_event: latestCalculatorState.debugEvents[0] ?? null,
           debug_log_tail: buildScientificCalculatorDebugSnapshot(latestCalculatorState.debugEvents, 8),
         },

@@ -1869,6 +1869,55 @@ const compactScientificRunTraceStages = (trace: Record<string, unknown>): Record
     artifact_refs: readStringArray(stage.artifact_refs).slice(0, 8),
   }));
 
+const compactPromotedScientificImageEvidence = (
+  value: unknown,
+): Record<string, unknown> | null => {
+  const record = asRecord(value);
+  if (!record) return null;
+  const latexCandidate = readString(record.latex_candidate);
+  const textCandidate = readString(record.text_candidate);
+  return {
+    evidence_id: readString(record.evidence_id),
+    sidecar_id: readString(record.sidecar_id),
+    packet_ref: readString(record.packet_ref),
+    source_id: readString(record.source_id),
+    source_kind: readString(record.source_kind),
+    source_hash: readString(record.source_hash),
+    page_number: typeof record.page_number === "number" ? record.page_number : null,
+    bbox_px: asRecord(record.bbox_px),
+    crop_ref: readString(record.crop_ref),
+    crop_region_id: readString(record.crop_region_id),
+    requested_label: readString(record.requested_label),
+    observed_label: readString(record.observed_label),
+    observed_labels: readStringArray(record.observed_labels).slice(0, 12),
+    evidence_depth: readString(record.evidence_depth),
+    admissibility: readString(record.admissibility),
+    exact_equation_admissibility: readString(record.exact_equation_admissibility),
+    exact_row_promotion_status: readString(asRecord(record.exact_row_promotion)?.status),
+    active_blockers: readStringArray(record.active_blockers).slice(0, 16),
+    promotion_reasons: readStringArray(record.promotion_reasons).slice(0, 16),
+    claim_boundary: readString(record.claim_boundary),
+    latex_candidate_hash: latexCandidate ? hashDebugExportText(latexCandidate) : null,
+    text_candidate_hash: textCandidate ? hashDebugExportText(textCandidate) : null,
+    candidate_text_included: false,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+};
+
+const scientificImageEvidenceSelectionReasonForDebug = (
+  value: unknown,
+): string => {
+  const record = asRecord(value);
+  const depth = readString(record?.evidence_depth);
+  if (depth === "exact_row_promoted") return "latest_promoted_exact_row";
+  if (depth === "exact_row_admissible") return "latest_admissible_exact_row";
+  if (depth === "exact_row_partial") return "latest_partial_exact_row";
+  if (depth) return "latest_page_image_ocr_math_candidate";
+  return "no_structured_evidence_object_available";
+};
+
 const buildScientificEvidenceDebugProjection = (input: {
   activeTurnId: string | null;
   source: Record<string, unknown>;
@@ -1918,13 +1967,34 @@ const buildScientificEvidenceDebugProjection = (input: {
     )),
     ["reflection_id"],
   );
+  const calculatorTemplateAdmissibilityRecords = uniqueRecordsById(
+    candidates.flatMap((candidate) => collectRecordsDeep(candidate, (record) =>
+      readString(record.schema) === "helix.calculator_template_admissibility.v1"
+    )),
+    ["status", "admitted_template_count", "rejected_template_count", "calculation_ready_count"],
+  );
+  const promotedEvidenceObjects = uniqueRecordsById(
+    candidates.flatMap((candidate) => collectRecordsDeep(candidate, (record) =>
+      readString(record.schema) === "helix.promoted_scientific_image_evidence.v1"
+    )),
+    ["evidence_id", "packet_ref", "crop_ref"],
+  );
+  const workflowStatuses = uniqueRecordsById(
+    candidates.flatMap((candidate) => collectRecordsDeep(candidate, (record) =>
+      readString(record.schema) === "helix.scientific_evidence_workflow_status.v1"
+    )),
+    ["sourceId", "sourceImageHash", "cropRef", "sidecarId", "evidenceDepth"],
+  );
   if (
     evidencePackets.length === 0 &&
     evidenceSidecars.length === 0 &&
     branchGates.length === 0 &&
     runTraces.length === 0 &&
     sidecarGatewayBridges.length === 0 &&
-    graphReflections.length === 0
+    graphReflections.length === 0 &&
+    calculatorTemplateAdmissibilityRecords.length === 0 &&
+    promotedEvidenceObjects.length === 0 &&
+    workflowStatuses.length === 0
   ) return null;
   const rejectedCalculatorPayloadIds = uniqueStrings([
     ...branchGates.flatMap((gate) => readStringArray(gate.rejected_calculator_payload_ids)),
@@ -1960,6 +2030,9 @@ const buildScientificEvidenceDebugProjection = (input: {
     run_trace_count: runTraces.length,
     sidecar_gateway_bridge_count: sidecarGatewayBridges.length,
     graph_reflection_count: graphReflections.length,
+    calculator_template_check_count: calculatorTemplateAdmissibilityRecords.length,
+    promoted_evidence_object_count: promotedEvidenceObjects.length,
+    workflow_status_count: workflowStatuses.length,
     primary_domains: uniqueStrings([
       ...evidencePackets.map((packet) => readString(packet.primary_domain)),
       ...branchGates.map((gate) => readString(gate.primary_domain)),
@@ -1984,6 +2057,9 @@ const buildScientificEvidenceDebugProjection = (input: {
     graph_reflection_branch_gate_statuses: uniqueStrings(
       graphReflections.map((reflection) => readString(reflection.branch_gate_status)),
     ),
+    calculator_template_statuses: uniqueStrings(
+      calculatorTemplateAdmissibilityRecords.map((record) => readString(record.status)),
+    ),
     congruence_assessment_count: congruenceAssessments.length,
     congruence_grades: uniqueStrings(congruenceAssessments.map((assessment) => readString(assessment.grade))),
     false_friend_refs: falseFriendRefs.slice(0, 24),
@@ -1995,7 +2071,30 @@ const buildScientificEvidenceDebugProjection = (input: {
       blocked_by_branch_hint: assessment.blocked_by_branch_hint === true,
     })),
     source_ref_hashes: uniqueStrings(evidencePackets.map((packet) => readString(packet.source_ref_hash))).slice(0, 12),
+    selected_evidence_object_ids: uniqueStrings([
+      ...promotedEvidenceObjects.map((object) => readString(object.evidence_id)),
+      ...evidenceSidecars.map((sidecar) => readString(asRecord(sidecar.selected_evidence_object)?.evidence_id)),
+      ...graphReflections.map((reflection) => readString(asRecord(reflection.selected_evidence_object)?.evidence_id)),
+      ...workflowStatuses.flatMap((status) => readStringArray(asRecord(status.postulateReadyRefs)?.promotedEquationRowRefs)),
+    ]).slice(0, 12),
+    selected_evidence_refs: uniqueStrings([
+      ...promotedEvidenceObjects.map((object) => readString(object.packet_ref)),
+      ...evidenceSidecars.map((sidecar) => readString(asRecord(sidecar.selected_evidence_object)?.packet_ref)),
+      ...evidenceSidecars.map((sidecar) => readString(sidecar.promoted_equation_ref)),
+      ...graphReflections.map((reflection) => readString(reflection.exact_evidence_ref)),
+      ...workflowStatuses.map((status) => readString(status.cropRef)),
+    ]).slice(0, 12),
+    selected_evidence_reasons: uniqueStrings([
+      ...evidenceSidecars.map((sidecar) => scientificImageEvidenceSelectionReasonForDebug(sidecar.selected_evidence_object)),
+      ...graphReflections.map((reflection) => scientificImageEvidenceSelectionReasonForDebug(reflection.selected_evidence_object)),
+    ]).filter((reason) => reason !== "no_structured_evidence_object_available").slice(0, 12),
+    calculator_check_refs: calculatorTemplateAdmissibilityRecords.slice(0, 12).map((record) => {
+      const status = readString(record.status) ?? "no_template";
+      const admitted = typeof record.admitted_template_count === "number" ? record.admitted_template_count : 0;
+      return `calculator_check:template_admissibility:${status}:${admitted}`;
+    }),
     sidecar_ids: uniqueStrings(evidenceSidecars.map((sidecar) => readString(sidecar.sidecar_id))).slice(0, 12),
+    workflow_sidecar_ids: uniqueStrings(workflowStatuses.map((status) => readString(status.sidecarId))).slice(0, 12),
     sidecar_admissibility_statuses: uniqueStrings(
       evidenceSidecars.map((sidecar) => readString(asRecord(sidecar.admissibility)?.status)),
     ),
@@ -2025,6 +2124,8 @@ const buildScientificEvidenceDebugProjection = (input: {
       reflection_id: readString(reflection.reflection_id),
       evidence_depth: readString(reflection.evidence_depth),
       evidence_object_class: readString(reflection.evidence_object_class),
+      exact_evidence_ref: readString(reflection.exact_evidence_ref),
+      selected_evidence_object_id: readString(asRecord(reflection.selected_evidence_object)?.evidence_id),
       branch_gate_status: readString(reflection.branch_gate_status),
       congruence_grade_floor: readString(reflection.congruence_grade_floor),
       graph_attachment_count: readRecordArray(reflection.graph_attachments).length,
@@ -2038,6 +2139,38 @@ const buildScientificEvidenceDebugProjection = (input: {
         reason: readString(affordance.reason),
       })).slice(0, 12),
       provenance_refs: readStringArray(reflection.provenance_refs).slice(0, 12),
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    })),
+    promoted_evidence_objects: promotedEvidenceObjects.slice(0, 12)
+      .map(compactPromotedScientificImageEvidence)
+      .filter((entry): entry is Record<string, unknown> => Boolean(entry)),
+    calculator_template_checks: calculatorTemplateAdmissibilityRecords.slice(0, 12).map((record) => ({
+      status: readString(record.status),
+      admitted_template_count: typeof record.admitted_template_count === "number" ? record.admitted_template_count : null,
+      rejected_template_count: typeof record.rejected_template_count === "number" ? record.rejected_template_count : null,
+      calculation_ready_count: typeof record.calculation_ready_count === "number" ? record.calculation_ready_count : null,
+      binding_status: readString(record.binding_status),
+      claim_boundary: readString(record.claim_boundary),
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    })),
+    scientific_evidence_workflow_statuses: workflowStatuses.slice(0, 8).map((status) => ({
+      evidence_depth: readString(status.evidenceDepth),
+      source_id: readString(status.sourceId),
+      source_kind: readString(status.sourceKind),
+      source_image_hash: readString(status.sourceImageHash),
+      page_number: typeof status.pageNumber === "number" ? status.pageNumber : null,
+      crop_ref: readString(status.cropRef),
+      crop_region_ref: readString(status.cropRegionRef),
+      sidecar_id: readString(status.sidecarId),
+      promoted_row_state: readString(status.promotedRowState),
+      graph_reflection_status: readString(status.graphReflectionStatus),
+      calculator_template_status: readString(status.calculatorTemplateStatus),
+      active_blockers: readStringArray(status.activeBlockers).slice(0, 12),
+      claim_boundary: readString(status.claimBoundary),
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
@@ -2057,6 +2190,12 @@ const buildScientificEvidenceDebugProjection = (input: {
       source_kind: readString(sidecar.source_kind),
       packet_count: typeof sidecar.packet_count === "number" ? sidecar.packet_count : null,
       primary_packet_ref: readString(sidecar.primary_packet_ref),
+      selected_evidence_object_id: readString(asRecord(sidecar.selected_evidence_object)?.evidence_id),
+      selected_evidence_ref: readString(asRecord(sidecar.selected_evidence_object)?.packet_ref),
+      selected_evidence_reason: scientificImageEvidenceSelectionReasonForDebug(sidecar.selected_evidence_object),
+      promoted_equation_ref: readString(sidecar.promoted_equation_ref),
+      active_blockers: readStringArray(sidecar.active_blockers).slice(0, 16),
+      historical_blockers: readStringArray(sidecar.historical_blockers).slice(0, 16),
       primary_domain: readString(sidecar.primary_domain),
       primary_domains: readStringArray(sidecar.primary_domains).slice(0, 8),
       admissibility_status: readString(asRecord(sidecar.admissibility)?.status),
@@ -2105,6 +2244,131 @@ const buildScientificEvidenceDebugProjection = (input: {
     terminal_eligible: false,
     raw_content_included: false,
     output_authority: "scientific_evidence_debug_projection",
+  };
+};
+
+const calculatorReceiptTaxonomyForStatus = (
+  receipt: Record<string, unknown> | null,
+):
+  | "calculator_receipt_found"
+  | "calculator_template_only"
+  | "calculator_blocked_missing_bindings"
+  | "calculator_solved"
+  | "calculator_receipt_missing" => {
+  if (!receipt) return "calculator_receipt_missing";
+  const status = readString(receipt.status);
+  const missingBindings = readStringArray(receipt.missing_bindings);
+  const blockers = readStringArray(receipt.blockers);
+  if (status === "solved") return "calculator_solved";
+  if (status === "template_only") return "calculator_template_only";
+  if (status === "blocked" || missingBindings.length > 0 || blockers.length > 0) {
+    return "calculator_blocked_missing_bindings";
+  }
+  return "calculator_receipt_found";
+};
+
+const compactCalculatorReceiptForDebug = (
+  receipt: Record<string, unknown> | null,
+): Record<string, unknown> | null => {
+  if (!receipt) return null;
+  const expression = readString(receipt.expression);
+  const latex = readString(receipt.latex);
+  return {
+    receipt_id: readString(receipt.receipt_id),
+    schema: readString(receipt.schema),
+    expression_template_id: readString(receipt.expression_template_id),
+    status: readString(receipt.status),
+    expression_hash: expression ? hashDebugExportText(expression) : null,
+    latex_hash: latex ? hashDebugExportText(latex) : null,
+    variable_symbols: readRecordArray(receipt.variables)
+      .map((variable) => readString(variable.symbol))
+      .filter(Boolean)
+      .slice(0, 24),
+    dimensional_check_status: readString(receipt.dimensional_check_status),
+    result_present: Boolean(readScalarString(receipt.result_value) ?? readString(receipt.result_text)),
+    result_unit: readString(receipt.result_unit),
+    source_refs: readStringArray(receipt.source_refs).slice(0, 12),
+    provenance_refs: readStringArray(receipt.provenance_refs).slice(0, 12),
+    missing_bindings: readStringArray(receipt.missing_bindings).slice(0, 24),
+    blockers: readStringArray(receipt.blockers).slice(0, 24),
+    claim_boundary: readString(receipt.claim_boundary),
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+};
+
+const buildCalculatorReceiptDebugProjection = (input: {
+  activeTurnId: string | null;
+  source: Record<string, unknown>;
+  ledger: unknown[];
+}): Record<string, unknown> => {
+  const debug = asRecord(input.source.debug);
+  const agentLoop = asRecord(input.source.agentLoop);
+  const workspaceSnapshot =
+    asRecord(input.source.workspace_context_snapshot) ??
+    asRecord(debug?.workspace_context_snapshot) ??
+    asRecord(agentLoop?.workspace_context_snapshot);
+  const calculatorPanelState = asRecord(
+    input.source.calculator_panel_state ?? debug?.calculator_panel_state ?? agentLoop?.calculator_panel_state,
+  );
+  const activeCalculatorContext = asRecord(
+    input.source.activeCalculatorContext ??
+      input.source.active_calculator_context ??
+      workspaceSnapshot?.activeCalculatorContext ??
+      workspaceSnapshot?.active_calculator_context,
+  );
+  const candidates = [
+    input.source,
+    debug,
+    agentLoop,
+    workspaceSnapshot,
+    calculatorPanelState,
+    activeCalculatorContext,
+    ...input.ledger,
+  ].filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const directReceipts = [
+    asRecord(input.source.calculator_receipt),
+    asRecord(debug?.calculator_receipt),
+    asRecord(agentLoop?.calculator_receipt),
+    asRecord(calculatorPanelState?.lastCalculatorReceipt),
+    asRecord(calculatorPanelState?.last_calculator_receipt),
+    asRecord(activeCalculatorContext?.last_calculator_receipt),
+    asRecord(activeCalculatorContext?.lastCalculatorReceipt),
+  ].filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const nestedReceipts = uniqueRecordsById(
+    candidates.flatMap((candidate) => collectRecordsDeep(candidate, (record) =>
+      readString(record.schema) === "helix.scientific_calculator_receipt.v1" ||
+      readString(record.schema) === "helix.calculator_receipt.v1" ||
+      readString(record.kind) === "calculator_receipt"
+    )),
+    ["receipt_id", "artifact_id", "expression", "status"],
+  );
+  const receipts = uniqueRecordsById([...directReceipts, ...nestedReceipts], [
+    "receipt_id",
+    "artifact_id",
+    "expression",
+    "status",
+  ]);
+  const latestReceipt = receipts[0] ?? null;
+  return {
+    schema: "helix.calculator_receipt_debug_projection.v1",
+    turn_id: input.activeTurnId,
+    taxonomy: calculatorReceiptTaxonomyForStatus(latestReceipt),
+    calculator_receipt_status: readString(latestReceipt?.status),
+    calculator_receipt_ref: readString(latestReceipt?.receipt_id) ?? readString(latestReceipt?.artifact_id),
+    calculator_receipt_count: receipts.length,
+    latest_receipt: compactCalculatorReceiptForDebug(latestReceipt),
+    receipt_refs: receipts
+      .map((receipt) => readString(receipt.receipt_id) ?? readString(receipt.artifact_id))
+      .filter(Boolean)
+      .slice(0, 24),
+    statuses: uniqueStrings(receipts.map((receipt) => readString(receipt.status))).slice(0, 12),
+    missing_bindings: uniqueStrings(receipts.flatMap((receipt) => readStringArray(receipt.missing_bindings))).slice(0, 24),
+    blockers: uniqueStrings(receipts.flatMap((receipt) => readStringArray(receipt.blockers))).slice(0, 24),
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
   };
 };
 
@@ -2862,6 +3126,11 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     source: payload,
     ledger,
   });
+  const calculatorReceiptTrace = buildCalculatorReceiptDebugProjection({
+    activeTurnId: canonicalActiveTurnId,
+    source: payload,
+    ledger,
+  });
   const toolTraceDisclosure = buildCompactToolTraceDisclosure({
     actionEnvelope,
     turnId: canonicalActiveTurnId,
@@ -3023,6 +3292,10 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     calculator_planner_result: calculatorPlannerResult,
     calculator_planner_repair_result: calculatorPlannerRepairResult,
     calculator_plan_coverage: calculatorPlanCoverage,
+    calculator_receipt_debug_projection: calculatorReceiptTrace,
+    calculator_receipt_taxonomy: calculatorReceiptTrace.taxonomy,
+    calculator_receipt_status: calculatorReceiptTrace.calculator_receipt_status,
+    calculator_receipt_ref: calculatorReceiptTrace.calculator_receipt_ref,
     prompt_requirement_coverage: promptRequirementCoverage,
     final_answer_repair_request: finalAnswerRepairRequest,
     final_answer_draft: finalAnswerDraft,
