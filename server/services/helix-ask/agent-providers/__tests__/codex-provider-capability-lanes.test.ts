@@ -201,6 +201,70 @@ describe("Codex provider capability lane adapter", () => {
     }
   });
 
+  it("projects unquoted note creation into the stream provider action envelope", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Prepared the note action.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn/stream",
+        body: {
+          turn_id: "turn-codex-note-create-unquoted-action-envelope",
+          question: "make a note for hhh",
+        },
+      });
+      const debug = result.debug as Record<string, any>;
+      const actions = Array.isArray((result as any).action_envelope?.workstation_actions)
+        ? (result as any).action_envelope.workstation_actions
+        : [];
+      const gatewayResult = debug?.workstation_gateway_call_results?.find((entry: any) =>
+        entry?.capability_id === "workstation-notes.create_note"
+      );
+
+      expect((result as any).action_envelope).toMatchObject({
+        schema: "helix.ask.action_envelope.v1",
+        source: "codex_workstation_gateway_action_receipts",
+        receipt_capability_ids: expect.arrayContaining(["workstation-notes.create_note"]),
+      });
+      expect(actions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            schema_version: "helix.workstation.action/v1",
+            action: "run_panel_action",
+            panel_id: "workstation-notes",
+            action_id: "create_note",
+            args: expect.objectContaining({ body: "hhh" }),
+          }),
+        ]),
+      );
+      expect(gatewayResult).toMatchObject({
+        ok: true,
+        capability_id: "workstation-notes.create_note",
+        mode: "act",
+        observation: expect.objectContaining({
+          schema: "helix.workstation_ui_action_receipt.v1",
+          capability_key: "workstation-notes.create_note",
+          panel_id: "workstation-notes",
+          action_id: "create_note",
+          terminal_artifact_kind: "note_update_receipt",
+        }),
+      });
+    } finally {
+      if (previousStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      }
+      if (previousExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      }
+    }
+  });
+
   it("collapses exact duplicated final-answer halves without changing observations", async () => {
     const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
     const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;

@@ -1463,14 +1463,35 @@ const routeContractAllowsTerminalKind = (
   }
   const routeEvidenceAuthority = readRecord(payload.route_evidence_authority);
   if (routeEvidenceAuthority?.schema === "helix.route_evidence_authority.v1") {
+    const routeProduct = readRecord(payload.route_product_contract);
+    const routeProductRequiredKind =
+      readString(routeProduct?.required_terminal_kind) ??
+      readString(routeProduct?.required_terminal_artifact_kind);
+    const routeProductAllowed = readArray(routeProduct?.allowed_terminal_artifact_kinds)
+      .map(readString)
+      .filter((entry): entry is string => Boolean(entry));
+    const canonicalRequiredKind = readString(canonicalGoal?.required_terminal_kind);
+    const currentRouteExplicitlyAllowsKind =
+      (
+        routeProductRequiredKind === kind ||
+        canonicalRequiredKind === kind ||
+        routeProductAllowed.includes(kind)
+      ) &&
+      (routeProductAllowed.length === 0 || routeProductAllowed.includes(kind));
     const allowed = readArray(routeEvidenceAuthority.allowed_terminal_artifact_kinds)
       .map(readString)
       .filter((entry): entry is string => Boolean(entry));
     const forbidden = readArray(routeEvidenceAuthority.forbidden_terminal_artifact_kinds)
       .map(readString)
       .filter((entry): entry is string => Boolean(entry));
-    if (forbidden.includes(kind)) return false;
-    if (kind !== "typed_failure" && kind !== "request_user_input" && allowed.length > 0 && !allowed.includes(kind)) {
+    if (forbidden.includes(kind) && !currentRouteExplicitlyAllowsKind) return false;
+    if (
+      kind !== "typed_failure" &&
+      kind !== "request_user_input" &&
+      allowed.length > 0 &&
+      !allowed.includes(kind) &&
+      !currentRouteExplicitlyAllowsKind
+    ) {
       return false;
     }
   }
@@ -1489,6 +1510,23 @@ const routeContractAllowsTerminalKind = (
     kind === "doc_evidence_synthesis_answer" &&
     readString(canonicalGoal?.goal_kind) === "doc_evidence_synthesis" &&
     readString(canonicalGoal?.required_terminal_kind) === "doc_evidence_synthesis_answer"
+  ) {
+    return true;
+  }
+  const routeProduct = readRecord(payload.route_product_contract);
+  const routeProductRequiredKind =
+    readString(routeProduct?.required_terminal_kind) ??
+    readString(routeProduct?.required_terminal_artifact_kind);
+  const routeProductAllowed = readArray(routeProduct?.allowed_terminal_artifact_kinds)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+  if (
+    (
+      routeProductRequiredKind === kind ||
+      readString(canonicalGoal?.required_terminal_kind) === kind ||
+      routeProductAllowed.includes(kind)
+    ) &&
+    (routeProductAllowed.length === 0 || routeProductAllowed.includes(kind))
   ) {
     return true;
   }
@@ -2001,6 +2039,82 @@ const findGoalSatisfyingReceiptTerminalArtifact = (
   return null;
 };
 
+const isSucceededCreateNoteCapabilityResult = (value: unknown): Record<string, unknown> | null => {
+  const record = readRecord(value);
+  if (!record) return null;
+  const capability = readString(record.capability_key) ??
+    readString(record.executed_capability) ??
+    readString(record.admitted_capability) ??
+    readString(record.requested_capability);
+  if (capability !== "workstation-notes.create_note") return null;
+  if (readString(record.status) !== "succeeded") return null;
+  return record;
+};
+
+const findSucceededCreateNoteCapabilityResult = (
+  payload: Record<string, unknown>,
+  artifacts: ArtifactLike[],
+): Record<string, unknown> | null => {
+  const directCandidates = [
+    payload.capability_result,
+    readRecord(payload.debug)?.capability_result,
+  ];
+  for (const candidate of directCandidates) {
+    const result = isSucceededCreateNoteCapabilityResult(candidate);
+    if (result) return result;
+  }
+
+  for (let index = artifacts.length - 1; index >= 0; index -= 1) {
+    const artifact = artifacts[index];
+    if (!artifact) continue;
+    if (artifactKind(artifact) !== "capability_result" && artifactSchema(artifact) !== "helix.capability_result.v1") continue;
+    const result = isSucceededCreateNoteCapabilityResult(artifactPayload(artifact));
+    if (result) return result;
+  }
+  return null;
+};
+
+const materializeCreateNoteCapabilityResultReceipt = (
+  payload: Record<string, unknown>,
+  artifacts: ArtifactLike[],
+): { artifact: ArtifactLike; kind: string; text: string; ref: string | null } | null => {
+  const capabilityResult = findSucceededCreateNoteCapabilityResult(payload, artifacts);
+  if (!capabilityResult) return null;
+  const turnId = readString(capabilityResult.turn_id) ?? readString(payload.turn_id) ?? "current_turn";
+  const observationRefs = readStringArray(capabilityResult.observation_refs).length > 0
+    ? readStringArray(capabilityResult.observation_refs)
+    : readStringArray(capabilityResult.evidence_refs);
+  const ref =
+    readString(capabilityResult.capability_plan_id) ??
+    `${turnId}:workstation-notes.create_note:note_update_receipt`;
+  const artifact = {
+    artifact_id: ref,
+    kind: "note_update_receipt",
+    payload: {
+      schema: "helix.note_update_receipt.v1",
+      kind: "note_update_receipt",
+      receipt_kind: "note_update_receipt",
+      action_id: "create_note",
+      capability_key: "workstation-notes.create_note",
+      status: "succeeded",
+      message: "Note saved.",
+      text: "Note saved.",
+      summary: "Note saved.",
+      observation_refs: observationRefs,
+      evidence_refs: observationRefs,
+      source: "capability_result_receipt_materializer",
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+  } satisfies ArtifactLike;
+  return {
+    artifact,
+    kind: "note_update_receipt",
+    text: "Note saved.",
+    ref,
+  };
+};
+
 const findRequiredNoteReceiptTerminalArtifact = (
   payload: Record<string, unknown>,
   artifacts: ArtifactLike[],
@@ -2015,7 +2129,8 @@ const findRequiredNoteReceiptTerminalArtifact = (
   if (readArray(routeProduct?.forbidden_terminal_artifact_kinds).map(readString).includes("note_update_receipt")) {
     return null;
   }
-  if (!goalSatisfactionAllowsTerminal(payload) && !goalObservedResultsSupportKind(payload, "note_update_receipt")) return null;
+  const capabilityResultReceipt = materializeCreateNoteCapabilityResultReceipt(payload, artifacts);
+  if (!goalSatisfactionAllowsTerminal(payload) && !goalObservedResultsSupportKind(payload, "note_update_receipt") && !capabilityResultReceipt) return null;
 
   const stepResultArtifacts = readArray(payload.step_results)
     .map(readRecord)
@@ -2051,7 +2166,7 @@ const findRequiredNoteReceiptTerminalArtifact = (
       ref: artifactId(artifact) ?? readString(artifactPayload(artifact)?.receipt_id),
     };
   }
-  return null;
+  return capabilityResultReceipt;
 };
 
 const isPostToolObservation = (artifact: ArtifactLike): boolean => {
@@ -5832,7 +5947,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
         readString(input.payload.text)
       : null;
   const noteReceiptAuthorityEnvelopeText =
-    selectedArtifactKind === "note_update_receipt" && selectedSource === "note_update_receipt"
+    selectedArtifactKind === "note_update_receipt"
       ? readString(input.payload.selected_final_answer) ??
         readString(input.payload.answer) ??
         readString(input.payload.text)
@@ -6059,6 +6174,23 @@ export function applyHelixTerminalAuthoritySingleWriter(
     if (terminalEnvelope) {
       terminalEnvelope.final_answer_source = "deterministic_receipt_fallback";
     }
+  }
+  if (selectedArtifactKind === "note_update_receipt") {
+    const receiptText =
+      readString(input.payload.selected_final_answer) ??
+      readString(input.payload.answer) ??
+      readString(input.payload.text) ??
+      "Note saved.";
+    envelope = {
+      ...envelope,
+      terminal_artifact_kind: "note_update_receipt",
+      final_answer_source: "note_update_receipt",
+      terminal_text: receiptText,
+      terminal_text_hash: hashHelixTerminalText(receiptText),
+      terminal_kind: "workspace_action_receipt",
+      authority_origin: "terminal_presentation",
+    };
+    appliedEnvelope = applyTerminalAnswerEnvelope(input.payload, envelope);
   }
   const visibleText = appliedEnvelope.terminal_text;
   const latestDraftForIntegrity =

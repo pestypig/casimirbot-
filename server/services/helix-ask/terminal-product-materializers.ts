@@ -35,6 +35,13 @@ const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : 
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.filter((value): value is string => Boolean(value))));
 
+const isPromptContaminatedCalculatorExpression = (expression: string | null): boolean => {
+  if (!expression) return false;
+  const compact = expression.replace(/\s+/g, "");
+  const mathWordsStripped = compact.replace(/\b(?:Math\.)?(?:sqrt|sin|cos|tan|log10|log|ln|PI|E|pi|e)\b/gi, "");
+  return /[A-Za-z]{12,}/.test(mathWordsStripped);
+};
+
 const artifactPayload = (artifact: HelixTerminalProductArtifactLike): Record<string, unknown> | null =>
   readRecord(artifact.payload);
 
@@ -473,6 +480,7 @@ const readSuccessfulCalculatorReceiptArtifact = (
     const expression = readString(payload?.expression);
     const result = readString(payload?.result) ?? readString(payload?.result_text) ?? readString(payload?.calculator_result);
     if (!expression || !result) continue;
+    if (isPromptContaminatedCalculatorExpression(expression)) continue;
     return {
       artifact,
       expression,

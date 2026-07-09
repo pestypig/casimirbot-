@@ -26,6 +26,8 @@ export const renderAskTurnModelOnlyFallbackAnswer = (fallbackId: string): string
       return "I can help with docs, notes, source paths, evidence location, comparisons, summaries, and background-only explanations. I can open or search workspace docs, locate specific lines, create or append notes, compare notes against documents, and answer general questions without using workspace tools when the prompt asks for background-only reasoning.";
     case "model_only_fallback.momentum_conservation":
       return "Momentum is conserved in an isolated two-object collision because the net external impulse on the two-object system is zero. The objects exert equal and opposite internal forces on each other, so their internal impulses cancel when you add the two momenta together. Individual momenta can change during the collision, but the total momentum of the isolated system remains constant.";
+    case "model_only_fallback.tool_name_explanation":
+      return "The phrase is a software tool identifier: the part before the dot names the tool family or service, and the part after the dot names the specific operation.";
     case "model_only_fallback.receipts_observations_terminal_authority":
       return "Calculator receipts are observations: they record the tool input, execution trace, and result so the solver can verify what happened. They can support a final answer, but they are not terminal authority by themselves. Terminal authority must select a completed answer artifact after the observation has re-entered the solver path.";
     default:

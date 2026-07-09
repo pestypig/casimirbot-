@@ -600,6 +600,21 @@ describe("Helix Ask golden path runtime", () => {
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
 
+  it("does not treat quoted and negated internet-search tool names as golden-path search requests", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:27:10.000Z"),
+      body: {
+        turn_id: "ask:golden:quoted-internet-search-name",
+        prompt:
+          "Explain the literal phrase `internet-search.search_web` as a software tool name. Do not browse, search, retrieve web evidence, or call tools.",
+      },
+    });
+
+    expect(decision).toEqual({ handled: false, reason: "not_requested" });
+  });
+
   it("fails closed when internet search lacks compact web result evidence", () => {
     process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
 

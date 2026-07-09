@@ -153,6 +153,49 @@ const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : 
 const readStringArray = (value: unknown): string[] =>
   readArray(value).map(readString).filter((entry): entry is string => Boolean(entry));
 
+const routeAllowsModelOnlyDirectAnswer = (body: Record<string, unknown>): boolean => {
+  const committedRoute = readRecord(body.committed_ask_route);
+  const committedGoal = readRecord(committedRoute?.canonical_goal);
+  const canonicalGoalFrame = readRecord(body.canonical_goal_frame);
+  const canonicalGoal =
+    readString(canonicalGoalFrame?.goal_kind) === "model_only_concept"
+      ? canonicalGoalFrame
+      : committedGoal ?? canonicalGoalFrame;
+  const routeEvidenceAuthority = readRecord(body.route_evidence_authority);
+  const allowedKinds = new Set([
+    ...readStringArray(committedGoal?.allowed_terminal_artifact_kinds),
+    ...readStringArray(canonicalGoal?.allowed_terminal_artifact_kinds),
+    ...readStringArray(routeEvidenceAuthority?.allowed_terminal_artifact_kinds),
+  ]);
+  const canonicalAllowsDirectAnswer =
+    readString(canonicalGoal?.goal_kind) === "model_only_concept" &&
+    readString(canonicalGoal?.required_terminal_kind) === "direct_answer_text" &&
+    (
+      allowedKinds.has("direct_answer_text") ||
+      allowedKinds.has("agent_provider_terminal_candidate") ||
+      readString(routeEvidenceAuthority?.required_terminal_kind) === "direct_answer_text"
+    );
+  if (canonicalAllowsDirectAnswer) return true;
+  const question = readQuestion(body);
+  const normalized = question.toLowerCase();
+  const unquotedNormalized = question
+    .replace(/`[^`]*`/g, " ")
+    .replace(/"[^"]*"/g, " ")
+    .replace(/'[^']*'/g, " ")
+    .toLowerCase();
+  const explicitNoToolDirectAnswer =
+    /\b(?:answer\s+normally|answer\s+directly|no\s+tools?|without\s+tools?|do\s+not\s+(?:use|call|run|execute)\s+(?:any\s+)?tools?|do\s+not\s+use\s+tools?\s+or\s+panels?|do\s+not\s+browse|do\s+not\s+search|do\s+not\s+retrieve\s+(?:web\s+)?evidence)\b/i.test(question);
+  const literalOrExplanatoryToolNamePrompt =
+    /\b(?:explain|describe|literal\s+phrase|software\s+tool\s+name|tool\s+name|identifier|means?|meaning)\b/i.test(question) &&
+    /(?:`[^`]*(?:[a-z0-9_-]+\.[a-z0-9_-]+)[^`]*`|literal\s+phrase\s+[a-z0-9_-]+\.[a-z0-9_-]+)/i.test(question) &&
+    /\b(?:do\s+not|don't|dont|without|no)\b[\s\S]{0,120}\b(?:browse|search|retrieve|call|run|execute|tools?)\b/i.test(question);
+  const explicitToolOrSourceRequest =
+    /\b(?:use|run|open|search|browse|look\s*up|lookup|find|crop|inspect|reflect|calculate|compute|solve|create|make|append|save|postulate|calculator|image\s+lens|pdf|doc|docs|paper|web|internet|moral\s+graph|theory\s+badge|note)\b/i.test(unquotedNormalized) &&
+    !explicitNoToolDirectAnswer &&
+    !literalOrExplanatoryToolNamePrompt;
+  return (explicitNoToolDirectAnswer || literalOrExplanatoryToolNamePrompt) && !explicitToolOrSourceRequest;
+};
+
 const SCHOLARLY_GATEWAY_CAPABILITIES = new Set<string>([
   SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
   SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
@@ -7947,7 +7990,6 @@ const buildCodexProviderRailContractProjection = (input: {
   capabilityResult: Record<string, unknown> | null;
 } => {
   const selected = selectRailReentryGatewayResult(input.gatewayCallResults);
-  const terminalArtifactKind = input.terminalArtifactKind ?? "agent_provider_terminal_candidate";
   if (!selected) {
     return {
       toolCallAdmissionDecision: null,
@@ -7964,6 +8006,22 @@ const buildCodexProviderRailContractProjection = (input: {
   const admittedCapability =
     readString(selected.gateway_admission.admitted_capability) ??
     selected.capability_id;
+  const explicitContract =
+    explicitCapabilityContractForCapability(admittedCapability) ??
+    explicitCapabilityContractForCapability(requestedCapability) ??
+    explicitCapabilityContractForCapability(selected.capability_id);
+  const explicitRequiredTerminalKind = readString(explicitContract?.required_terminal_kind);
+  const terminalArtifactKind =
+    input.terminalArtifactKind && input.terminalArtifactKind !== "agent_provider_terminal_candidate"
+      ? input.terminalArtifactKind
+      : explicitRequiredTerminalKind ?? input.terminalArtifactKind ?? "agent_provider_terminal_candidate";
+  const requiredObservationKinds = readStringArray(explicitContract?.required_observation_kinds);
+  const allowedTerminalArtifactKinds = uniqueStrings([
+    terminalArtifactKind,
+    explicitRequiredTerminalKind ?? "",
+    ...requiredObservationKinds.filter((kind) => /receipt|evaluation|answer|failure/i.test(kind)),
+    "typed_failure",
+  ]);
   const observationRefs = selected.artifact_refs.length > 0
     ? selected.artifact_refs
     : selected.observation_packet.produced_artifact_refs;
@@ -7994,10 +8052,7 @@ const buildCodexProviderRailContractProjection = (input: {
       source_target: "agent_provider_gateway_turn",
       required_terminal_artifact_kind: terminalArtifactKind,
       required_terminal_kind: terminalArtifactKind,
-      allowed_terminal_artifact_kinds: [
-        terminalArtifactKind,
-        "typed_failure",
-      ],
+      allowed_terminal_artifact_kinds: allowedTerminalArtifactKinds,
       source: "codex_provider_terminal_authority_bridge",
       assistant_answer: false,
       raw_content_included: false,
@@ -10390,15 +10445,32 @@ export const codexProvider: HelixAgentProvider = {
     });
     await waitForVoicePlaybackGatewayReceipts(gatewayCallResults);
 
-    const prompt = [
-      "You are running inside Helix Codex Workstation Mode.",
-      "When asked what runtime agent provider you are using, answer: codex / Codex Workstation Mode.",
-      "When asked what adapter boundary you are using, answer separately: helix_agent_provider_edge.",
-      "Do not describe helix_agent_provider_edge as the runtime agent provider; it is the adapter boundary.",
-      ...adapterContract.prompt_policy_lines,
-      "The current Helix workstation gateway gives Codex read/observe evidence only. Helix may separately project non-mutating UI action receipts from those observations.",
-      `Provider permission profile: ${JSON.stringify(codexProvider.permissionProfile)}`,
-      "Answer the user request using the provided context.",
+    const modelOnlyDirectAnswerForPrompt =
+      routeAllowsModelOnlyDirectAnswer(request.body) &&
+      gatewayCallResults.length === 0 &&
+      gatewayObservationPackets.length === 0 &&
+      capabilityLaneContext.observation_packets.length === 0;
+    const prompt = modelOnlyDirectAnswerForPrompt
+      ? [
+          "You are running inside Helix Codex Workstation Mode.",
+          "When asked what runtime agent provider you are using, answer: codex / Codex Workstation Mode.",
+          "When asked what adapter boundary you are using, answer separately: helix_agent_provider_edge.",
+          "Do not describe helix_agent_provider_edge as the runtime agent provider; it is the adapter boundary.",
+          "This turn is admitted as model-only/direct answer. Do not call tools, request retrieval, or require evidence unless the user explicitly asks for external/source-backed evidence.",
+          "Answer the user request directly and concisely.",
+          "",
+          "User request:",
+          question,
+        ].join("\n")
+      : [
+          "You are running inside Helix Codex Workstation Mode.",
+          "When asked what runtime agent provider you are using, answer: codex / Codex Workstation Mode.",
+          "When asked what adapter boundary you are using, answer separately: helix_agent_provider_edge.",
+          "Do not describe helix_agent_provider_edge as the runtime agent provider; it is the adapter boundary.",
+          ...adapterContract.prompt_policy_lines,
+          "The current Helix workstation gateway gives Codex read/observe evidence only. Helix may separately project non-mutating UI action receipts from those observations.",
+          `Provider permission profile: ${JSON.stringify(codexProvider.permissionProfile)}`,
+          "Answer the user request using the provided context.",
       "",
       "Available Helix workstation gateway capabilities:",
       JSON.stringify(gatewayManifest, null, 2),
@@ -10483,7 +10555,7 @@ export const codexProvider: HelixAgentProvider = {
         null,
         2,
       ),
-    ].join("\n");
+      ].join("\n");
 
     const providerReentryTranscriptEvents = buildCodexProviderTurnTranscriptEvents({
       turnId,
@@ -11666,6 +11738,7 @@ export const codexProvider: HelixAgentProvider = {
       goalSatisfied:
         gatewayCallsSucceeded(gatewayCallResults) &&
         capabilityLaneContext.calls_succeeded,
+      modelOnlyDirectAnswerAllowed: routeAllowsModelOnlyDirectAnswer(request.body),
     });
     const compoundAnswer = processOk
       ? buildCodexCompoundEvidenceSynthesisAnswer({

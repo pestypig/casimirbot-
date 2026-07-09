@@ -75,6 +75,7 @@ export function classifyDeterministicFallbackUse(input: {
     isSimpleElectronDefinitionPrompt(input.promptText);
   const simpleDefinition = simpleElectron ||
     /^(?:what(?:'s| is)|define|briefly explain)\s+[\w -]+\??$/i.test(input.promptText.trim());
+  const safeToolNameExplanation = input.fallbackId === "model_only_fallback.tool_name_explanation";
   if (richSignal.applies) reasonCodes.push("rich_model_only_concept_signal");
   if (hasCompoundContract(input.payload)) reasonCodes.push("compound_contract_present");
   if (
@@ -91,6 +92,7 @@ export function classifyDeterministicFallbackUse(input: {
   const terminalAllowed =
     reasonCodes.length === 0 &&
     (simpleDefinition ||
+      safeToolNameExplanation ||
       /receipt|typed_failure|request_user_input/i.test(input.fallbackId ?? "") ||
       readString(input.payload.terminal_artifact_kind) === "typed_failure" ||
       readString(input.payload.terminal_artifact_kind) === "request_user_input");

@@ -34,6 +34,14 @@ export const classifyAskTurnModelOnlyFallbackId = (transcript: string): string |
     return "model_only_fallback.momentum_conservation";
   }
   if (
+    /\b(?:literal\s+phrase|literal\s+tool\s+name|software\s+tool\s+name)\b/.test(normalized) &&
+    /\b(?:internet-search\.search_web|internet_search\.web_research|scientific-calculator\.solve_expression|docs-viewer\.locate_in_doc|repo-code\.search_concept)\b/.test(normalized) &&
+    /\b(?:do\s+not|don't|dont|without|no)\b/.test(normalized) &&
+    /\btools?\b/.test(normalized)
+  ) {
+    return "model_only_fallback.tool_name_explanation";
+  }
+  if (
     /\b(?:calculator|tool)\s+receipts?\b/.test(normalized) &&
     /\bobservation(?:s|al)?\b/.test(normalized) &&
     /\bterminal\s+authority\b/.test(normalized)

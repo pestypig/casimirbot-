@@ -392,6 +392,33 @@ const promoteRequestUserInputTerminal = (
 
 const typedFailureText = (payload: Record<string, unknown>): string =>
   (() => {
+    const canonicalGoal = readRecord(payload.canonical_goal_frame);
+    const goal = readRecord(payload.goal_satisfaction_evaluation);
+    const satisfactionReport = readRecord(payload.satisfaction_report);
+    const goalKind = readString(canonicalGoal?.goal_kind) ?? readString(goal?.canonical_goal_kind);
+    if (
+      goalKind === "model_only_concept" &&
+      (
+        readString(satisfactionReport?.missing_reason) === "provider_terminal_candidate_missing" ||
+        readString(payload.terminal_error_code) === "provider_terminal_candidate_missing"
+      )
+    ) {
+      const text = "I could not produce a terminal answer because the selected provider did not produce a terminal candidate for this turn.";
+      payload.terminal_error_code = "provider_terminal_candidate_missing";
+      payload.terminal_failure_text = text;
+      payload.typed_failure = {
+        ...(readRecord(payload.typed_failure) ?? {}),
+        schema: "helix.typed_failure.v1",
+        kind: "typed_failure",
+        error_code: "provider_terminal_candidate_missing",
+        message: text,
+        text,
+        answer_text: text,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+      return text;
+    }
     const localizedFailureText = buildHelixLocalizedTypedFailureTextForPayload(payload);
     const typedFailure = readRecord(payload.typed_failure);
     const candidate =
@@ -565,10 +592,37 @@ const isFailureLikeTerminalText = (text: string | null): boolean =>
   isHelixGenericTypedFailureText(text) ||
   /\b(?:I could not|could not complete|could not produce|terminal boundary|typed failure|solver controller blocked)\b/i.test(text);
 
+const directAnswerHasModelOrProviderAuthority = (
+  artifact: Record<string, unknown> | null | undefined,
+  artifactPayload: Record<string, unknown> | null | undefined,
+): boolean => {
+  const source = readString(artifactPayload?.source);
+  const producedBy = readString(artifactPayload?.produced_by);
+  const producerItemId = readString(artifact?.producer_item_id);
+  return (
+    source === "model_direct_answer" ||
+    source === "agent_provider_terminal_candidate" ||
+    producedBy === "agent_runtime_loop" ||
+    producerItemId === "agent_runtime_loop" ||
+    Boolean(readString(artifactPayload?.provider_terminal_candidate_ref)) ||
+    Boolean(readString(artifactPayload?.agent_provider_terminal_candidate_ref))
+  );
+};
+
 const readDirectAnswerArtifactText = (payload: Record<string, unknown>): string | null => {
+  const canonicalGoal = readRecord(payload.canonical_goal_frame);
+  const goal = readRecord(payload.goal_satisfaction_evaluation);
+  const goalKind = readString(canonicalGoal?.goal_kind) ?? readString(goal?.canonical_goal_kind);
+  const requiresModelOrProviderAuthority = goalKind === "model_only_concept";
   const directRecord = readRecord(payload.direct_answer_text);
   const directRecordText = readString(directRecord?.answer_text) ?? readString(directRecord?.text);
-  if (directRecordText && !isFailureLikeTerminalText(directRecordText)) return directRecordText;
+  if (
+    directRecordText &&
+    !isFailureLikeTerminalText(directRecordText) &&
+    (!requiresModelOrProviderAuthority || directAnswerHasModelOrProviderAuthority(null, directRecord))
+  ) {
+    return directRecordText;
+  }
 
   for (const entry of readArray(payload.current_turn_artifact_ledger)) {
     const artifact = readRecord(entry);
@@ -586,8 +640,16 @@ const readDirectAnswerArtifactText = (payload: Record<string, unknown>): string 
       readString(artifactPayload?.answer_text) ??
       readString(artifactPayload?.text) ??
       readString(artifact?.text);
-    if (text && !isFailureLikeTerminalText(text)) return text;
+    if (
+      text &&
+      !isFailureLikeTerminalText(text) &&
+      (!requiresModelOrProviderAuthority || directAnswerHasModelOrProviderAuthority(artifact, artifactPayload))
+    ) {
+      return text;
+    }
   }
+
+  if (requiresModelOrProviderAuthority) return null;
 
   const draftText = readFinalAnswerDraftText(payload);
   if (draftText && !isFailureLikeTerminalText(draftText)) return draftText;
@@ -657,6 +719,12 @@ const workstationToolEvaluationTerminalContractSatisfied = (payload: Record<stri
     requiredTerminalKinds.includes("workstation_tool_evaluation") ||
     allowedTerminalKinds.includes("workstation_tool_evaluation");
   if (!workstationRequired) return false;
+  const workstationEvaluation = readRecord(payload.workstation_tool_evaluation);
+  const workstationEvaluationText =
+    readString(workstationEvaluation?.answer_text) ??
+    readString(workstationEvaluation?.summary) ??
+    readString(workstationEvaluation?.text);
+  if (workstationEvaluationText) return true;
   if (readString(goal?.satisfaction) !== "satisfied" && readString(goal?.next_decision) !== "allow_terminal") {
     return false;
   }

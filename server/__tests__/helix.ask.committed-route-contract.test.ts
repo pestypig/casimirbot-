@@ -90,6 +90,7 @@ describe("Helix Ask committed route contract", () => {
       "direct_answer_text",
       "model_synthesized_answer",
       "final_answer_draft",
+      "agent_provider_terminal_candidate",
     ]));
     expect(committedRoute.terminal_product.required_terminal_product).toBe("direct_answer_text");
 
@@ -104,6 +105,7 @@ describe("Helix Ask committed route contract", () => {
     });
     expect(authority.terminal_product_allowed).toBe(true);
     expect(authority.allowed_terminal_artifact_kinds).toContain("direct_answer_text");
+    expect(authority.allowed_terminal_artifact_kinds).toContain("agent_provider_terminal_candidate");
   });
 
   it("keeps quoted and negated tool-name explanations on a direct model terminal contract", () => {

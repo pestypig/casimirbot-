@@ -398,6 +398,116 @@ const buildCalculatorUnsupportedExpressionResult = () => ({
 });
 
 describe("provider terminal authority for capability lanes", () => {
+  it("allows model-only direct provider text without observation evidence when the route contract permits it", () => {
+    const result = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId: "turn-model-only-direct-authority",
+      threadId: "thread-model-only-direct-authority",
+      route: "/ask/turn",
+      gatewayCallResults: [],
+      capabilityLaneObservationPackets: [],
+      normalizedObservationPackets: [],
+      providerText: "4",
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+      modelOnlyDirectAnswerAllowed: true,
+    });
+
+    expect(result.providerReasoningReentry).toMatchObject({
+      status: "completed",
+      evidence_reentry_required: false,
+      evidence_reentered: true,
+      model_only_direct_answer_allowed: true,
+      post_tool_model_step_required: false,
+    });
+    expect(result.terminalAuthorityCandidateReview).toMatchObject({
+      terminal_authority_status: "authorized_by_model_only_direct_answer_contract",
+      terminal_authority_granted: true,
+      blockers: [],
+    });
+    expect(result.providerTerminalAuthorityBridge).toMatchObject({
+      normalized_observation_packet_count: 0,
+      evidence_reentry_required: false,
+      model_only_direct_answer_allowed: true,
+      terminal_authority_granted: true,
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+    });
+    expect(result.terminalAnswerAuthority).toMatchObject({
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      server_authoritative: true,
+    });
+    expect(result.providerTerminalCandidate).toMatchObject({
+      candidate_text_preview: "4",
+    });
+    expect(result.terminalPresentation).toMatchObject({
+      concise_text: "4",
+    });
+  });
+
+  it("blocks no-observation provider text when no model-only direct answer contract permits it", () => {
+    const result = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId: "turn-model-only-direct-missing-contract",
+      threadId: "thread-model-only-direct-missing-contract",
+      route: "/ask/turn",
+      gatewayCallResults: [],
+      capabilityLaneObservationPackets: [],
+      normalizedObservationPackets: [],
+      providerText: "4",
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+    });
+
+    expect(result.providerReasoningReentry).toMatchObject({
+      status: "pending_helix_solver_reentry",
+      evidence_reentry_required: false,
+      evidence_reentered: false,
+      model_only_direct_answer_allowed: false,
+      post_tool_model_step_required: true,
+    });
+    expect(result.terminalAuthorityCandidateReview).toMatchObject({
+      terminal_authority_status: "blocked_by_missing_normalized_observations",
+      terminal_authority_granted: false,
+      blockers: ["normalized_observation_packet_missing"],
+    });
+    expect(result.terminalAnswerAuthority).toBeNull();
+  });
+
+  it("reports missing provider text distinctly for model-only direct answer contracts", () => {
+    const result = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId: "turn-model-only-direct-empty-provider",
+      threadId: "thread-model-only-direct-empty-provider",
+      route: "/ask/turn",
+      gatewayCallResults: [],
+      capabilityLaneObservationPackets: [],
+      normalizedObservationPackets: [],
+      providerText: "",
+      ok: false,
+      solverCompleted: true,
+      goalSatisfied: true,
+      modelOnlyDirectAnswerAllowed: true,
+    });
+
+    expect(result.providerReasoningReentry).toMatchObject({
+      status: "not_run",
+      provider_terminal_candidate_present: false,
+      post_tool_model_step_required: false,
+    });
+    expect(result.terminalAuthorityCandidateReview).toMatchObject({
+      terminal_authority_status: "provider_terminal_candidate_missing_for_model_only_direct_answer",
+      terminal_authority_granted: false,
+      blockers: ["provider_terminal_candidate_missing"],
+    });
+    expect(result.terminalAnswerAuthority).toBeNull();
+  });
+
   it("allows a provider terminal candidate only after lane observations are accounted as re-entered evidence", () => {
     const packet = buildLanePacket();
     const result = buildHelixProviderReasoningReentry({

@@ -5,7 +5,7 @@ import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-fail
 import {
   buildHelixAskGoldenPathRouteGateArtifactId,
   buildHelixAskGoldenPathTerminalResultId,
-  isHelixAskGoldenPathCapabilityNamedInRequest,
+  isHelixAskGoldenPathCapabilityExplicitlyRequested,
   HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
   HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
   readArray,
@@ -17,6 +17,10 @@ import {
   readStringArray,
   type RecordLike,
 } from "../core";
+import {
+  contextualToolSuppressionBlocksFamily,
+  detectContextualToolAdmissionSuppression,
+} from "../../contextual-tool-admission";
 
 export type HelixAskGoldenPathInternetSearchDependencies = {
   now: () => Date;
@@ -26,13 +30,20 @@ export type HelixAskGoldenPathInternetSearchDependencies = {
 
 export const isHelixAskGoldenPathInternetSearchRequested = (body: RecordLike): boolean => {
   if (
-    isHelixAskGoldenPathCapabilityNamedInRequest(body, [
+    isHelixAskGoldenPathCapabilityExplicitlyRequested(body, [
       HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
       HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
     ])
-  )
+  ) {
     return true;
-  const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
+  }
+  const promptText = readHelixAskGoldenPathPrompt(body);
+  const contextualSuppression = detectContextualToolAdmissionSuppression(promptText);
+  if (contextualToolSuppressionBlocksFamily(contextualSuppression, "internet_search")) return false;
+  if (/\b(?:literal\s+phrase|literal\s+tool\s+name|software\s+tool\s+name)\b/i.test(promptText)) {
+    return false;
+  }
+  const prompt = promptText.toLowerCase();
   return (
     /\b(?:internet\s+search|web\s+research|web\s+search|search\s+web|look\s+up\s+online|check\s+online|current\s+web|public\s+web)\b/.test(prompt)
   );

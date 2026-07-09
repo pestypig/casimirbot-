@@ -298,7 +298,18 @@ describe("Helix Ask workstation tool planner", () => {
     expect(plan.action).toEqual({
       panel_id: "workstation-notes",
       action_id: "create_note",
-      args: { body: "qwerty" },
+      args: { title: "qwerty", body: "qwerty" },
+    });
+  });
+
+  it("routes unquoted make-note phrasing to a create note body", () => {
+    const plan = planWorkstationToolUse("make a note for hhh");
+
+    expect(plan.intent).toBe("notes_create");
+    expect(plan.action).toEqual({
+      panel_id: "workstation-notes",
+      action_id: "create_note",
+      args: { title: "hhh", body: "hhh" },
     });
   });
 

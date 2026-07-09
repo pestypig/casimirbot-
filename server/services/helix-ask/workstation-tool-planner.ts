@@ -541,6 +541,10 @@ function extractNoteBody(prompt: string): string | null {
   const normalized = normalizePrompt(prompt);
   const body = normalized.match(/\b(?:with\s+body|body|containing|that\s+says|saying|with\s+text|text)\s*[:\-]?\s*(.+)$/i)?.[1];
   if (body) return stripOuterPunctuation(body);
+  if (!/\b(?:called|named|titled)\b/i.test(normalized)) {
+    const makeNoteFor = normalized.match(/\b(?:make|create|new|start)\s+(?:a\s+)?(?:workstation\s+)?note\s+for\s+(?:me\s+)?(.+)$/i)?.[1];
+    if (makeNoteFor) return stripOuterPunctuation(makeNoteFor);
+  }
   const afterColon = normalized.match(/:\s*(.+)$/)?.[1];
   if (afterColon && /\b(?:note|notes|notepad|store|save)\b/i.test(normalized)) return stripOuterPunctuation(afterColon);
   return null;
@@ -3026,12 +3030,17 @@ export function planWorkstationToolUse(
     const title = extractNoteTitle(normalized);
     const quotedBody = /\b(?:called|named|titled)\b/i.test(normalized) ? null : extractQuoted(normalized);
     const body = extractNoteBody(normalized) ?? quotedBody;
+    const resolvedTitle = title ?? body ?? "Helix Ask Note";
     pushScore({
       affordance_id: "workstation-notes.create_note",
       panel_id: "workstation-notes",
       action_id: "create_note",
-      score: title ? 0.92 : 0.72,
-      reason: title ? "note creation prompt includes a title" : "note creation prompt can create an untitled note",
+      score: title ? 0.92 : body ? 0.82 : 0.72,
+      reason: title
+        ? "note creation prompt includes a title"
+        : body
+          ? "note creation prompt body can be used as a deterministic title"
+          : "note creation prompt can create a default-titled note",
       required_args_missing: [],
     });
     const toolPlan = buildToolPlan({
@@ -3047,7 +3056,7 @@ export function planWorkstationToolUse(
           panel_id: "workstation-notes",
           action_id: "create_note",
           args: {
-            ...(title ? { title } : {}),
+            title: resolvedTitle,
             ...(body ? { body } : {}),
           },
           depends_on: ["open_workstation_notes"],
@@ -3070,7 +3079,7 @@ export function planWorkstationToolUse(
         panel_id: "workstation-notes",
         action_id: "create_note",
         args: {
-          ...(title ? { title } : {}),
+          title: resolvedTitle,
           ...(body ? { body } : {}),
         },
       },

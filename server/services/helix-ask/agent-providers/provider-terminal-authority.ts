@@ -175,6 +175,7 @@ export const buildHelixProviderReasoningReentry = (input: {
   ok: boolean;
   solverCompleted?: boolean;
   goalSatisfied?: boolean;
+  modelOnlyDirectAnswerAllowed?: boolean;
 }) => {
   const capabilityLaneObservationPackets = input.capabilityLaneObservationPackets ?? [];
   const priorEvidenceObservationPackets = input.priorEvidenceObservationPackets ?? [];
@@ -223,11 +224,19 @@ export const buildHelixProviderReasoningReentry = (input: {
   const evidenceSourceCount =
     input.gatewayCallResults.length + capabilityLaneObservationPackets.length + priorEvidenceObservationPackets.length;
   const allEvidenceSucceeded = allGatewayCallsSucceeded && allCapabilityLaneObservationsSucceeded;
+  const evidenceReentryRequired = evidenceSourceCount > 0;
+  const noEvidenceDirectAnswerReady =
+    !evidenceReentryRequired &&
+    input.modelOnlyDirectAnswerAllowed === true &&
+    allEvidenceSucceeded;
   const normalizedObservationsReady =
-    evidenceSourceCount > 0 &&
-    allEvidenceSucceeded &&
-    normalizedObservationPackets.length >= evidenceSourceCount &&
-    normalizedObservationPackets.length > 0;
+    noEvidenceDirectAnswerReady ||
+    (
+      evidenceReentryRequired &&
+      allEvidenceSucceeded &&
+      normalizedObservationPackets.length >= evidenceSourceCount &&
+      normalizedObservationPackets.length > 0
+    );
   const solverAuthoritySatisfied = input.solverCompleted === true && input.goalSatisfied !== false;
   const candidateId = input.ok && input.providerText.trim()
     ? `${input.turnId}:agent_provider_terminal_candidate:${input.runtime}:${sha256(input.providerText).slice(0, 16)}`
@@ -240,7 +249,9 @@ export const buildHelixProviderReasoningReentry = (input: {
   const terminalAuthorityMayUseProviderText =
     Boolean(candidateId && normalizedObservationsReady && solverAuthoritySatisfied && !pendingVoiceHandoffOverclaim);
   const terminalAuthorityStatus = terminalAuthorityMayUseProviderText
-    ? "authorized_by_helix_provider_candidate_bridge"
+    ? noEvidenceDirectAnswerReady
+      ? "authorized_by_model_only_direct_answer_contract"
+      : "authorized_by_helix_provider_candidate_bridge"
     : candidateId && pendingVoiceHandoffOverclaim
       ? "blocked_by_voice_playback_overclaim"
     : candidateId && !allEvidenceSucceeded
@@ -249,6 +260,8 @@ export const buildHelixProviderReasoningReentry = (input: {
         ? "blocked_by_missing_normalized_observations"
         : candidateId
           ? "blocked_pending_helix_solver_completion"
+          : input.modelOnlyDirectAnswerAllowed === true
+            ? "provider_terminal_candidate_missing_for_model_only_direct_answer"
           : "not_evaluated_provider_text_mode";
   const terminalAuthorityBlockers = candidateId
     ? terminalAuthorityMayUseProviderText
@@ -277,7 +290,7 @@ export const buildHelixProviderReasoningReentry = (input: {
         candidate_text_preview: input.providerText.slice(0, 4000),
         grounded_in_observation_refs: observationRefs,
         normalized_observation_refs: normalizedObservationRefs,
-        evidence_reentry_required: evidenceSourceCount > 0,
+        evidence_reentry_required: evidenceReentryRequired,
         provider_reasoning_completed: true,
         assistant_answer: false,
         terminal_eligible: false,
@@ -302,6 +315,8 @@ export const buildHelixProviderReasoningReentry = (input: {
     normalized_observation_packet_count: normalizedObservationPackets.length,
     capability_lane_observation_packet_count: capabilityLaneObservationPackets.length,
     prior_evidence_observation_packet_count: priorEvidenceObservationPackets.length,
+    evidence_reentry_required: evidenceReentryRequired,
+    model_only_direct_answer_allowed: input.modelOnlyDirectAnswerAllowed === true,
     provider_terminal_candidate_ref: candidateId,
     provider_terminal_candidate_present: Boolean(candidateId),
     post_tool_model_step_required: Boolean(candidateId && !terminalAuthorityMayUseProviderText),
@@ -384,6 +399,8 @@ export const buildHelixProviderReasoningReentry = (input: {
     all_capability_lane_observations_succeeded: allCapabilityLaneObservationsSucceeded,
     all_observations_succeeded: allEvidenceSucceeded,
     normalized_observations_ready: normalizedObservationsReady,
+    evidence_reentry_required: evidenceReentryRequired,
+    model_only_direct_answer_allowed: input.modelOnlyDirectAnswerAllowed === true,
     solver_completed: input.solverCompleted === true,
     goal_satisfaction_compatible: input.goalSatisfied === true,
     route_authority_status: terminalAnswerAuthority

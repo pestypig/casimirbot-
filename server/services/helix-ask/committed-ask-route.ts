@@ -51,6 +51,7 @@ const MODEL_ONLY_TERMINAL_ALIASES = new Set([
   "direct_answer_text",
   "model_synthesized_answer",
   "final_answer_draft",
+  "agent_provider_terminal_candidate",
 ]);
 
 const MODEL_ONLY_FORBIDDEN_SOURCE_TERMINALS = [
@@ -312,6 +313,27 @@ const readSupportingEvidenceRefsFromPayload = (payload: RecordLike): string[] =>
   return unique(refs);
 };
 
+const isCalculatorGatewayAdmission = (payload: RecordLike): boolean => {
+  const admission = readRecord(payload.tool_call_admission_decision);
+  const capability =
+    readString(admission?.admitted_capability) ||
+    readString(admission?.selected_capability) ||
+    readString(admission?.requested_capability);
+  if (/scientific[-_.]?calculator|calculator/i.test(capability)) return true;
+  const ledger = Array.isArray(payload.current_turn_artifact_ledger) ? payload.current_turn_artifact_ledger : [];
+  return ledger.some((entry) => {
+    const artifact = readRecord(entry);
+    const kind = readString(artifact?.kind);
+    const producer = readString(artifact?.producer_item_id);
+    const nested = readRecord(artifact?.payload);
+    return (
+      /calculator_receipt/i.test(kind) ||
+      /scientific-calculator|calculator/i.test(producer) ||
+      readString(nested?.schema) === "helix.calculator_receipt.v1"
+    );
+  });
+};
+
 export function readCommittedAskRoute(payload: RecordLike | null | undefined): HelixCommittedAskRoute | null {
   const route = readRecord(payload?.committed_ask_route);
   return route?.schema === HELIX_COMMITTED_ASK_ROUTE_SCHEMA ? (route as HelixCommittedAskRoute) : null;
@@ -328,12 +350,54 @@ export function buildCommittedAskRoute(input: {
 }): HelixCommittedAskRoute {
   const existing = readCommittedAskRoute(input.payload);
   if (existing) {
+    const shouldRepairExistingCalculatorGatewayRoute =
+      isCalculatorGatewayAdmission(input.payload) &&
+      (
+        existing.route.source_target === "agent_provider_gateway_turn" ||
+        existing.canonical_goal.required_terminal_kind === "scholarly_recovery_plan" ||
+        existing.canonical_goal.goal_kind === "agent_provider_gateway_turn"
+      );
+    const existingRawGoal = readCanonicalGoal(input.payload);
+    const shouldRepairExistingModelOnlyRoute =
+      !shouldRepairExistingCalculatorGatewayRoute &&
+      existing.canonical_goal.goal_kind === "unknown" &&
+      existing.canonical_goal.required_terminal_kind === "unknown" &&
+      (existing.route.source_target === "unknown" || existing.route.source_target === "model_only") &&
+      existingRawGoal.goalKind === "model_only_concept" &&
+      normalizeCommittedRouteTerminalKind(existingRawGoal.requiredTerminalKind) === "direct_answer_text" &&
+      buildToolUseRestatement(input.promptText).requiredToolFamilies.length === 0;
+    const existingAllowed = shouldRepairExistingModelOnlyRoute
+      ? unique([
+          ...existing.canonical_goal.allowed_terminal_artifact_kinds,
+          ...Array.from(MODEL_ONLY_TERMINAL_ALIASES),
+          "direct_answer_text",
+        ])
+      : shouldRepairExistingCalculatorGatewayRoute
+        ? unique([
+            ...existing.canonical_goal.allowed_terminal_artifact_kinds,
+            "workstation_tool_evaluation",
+            "typed_failure",
+          ])
+      : existing.canonical_goal.allowed_terminal_artifact_kinds;
+    const existingForbidden = shouldRepairExistingModelOnlyRoute
+      ? unique([
+          ...existing.canonical_goal.forbidden_terminal_artifact_kinds.filter((kind) => !MODEL_ONLY_TERMINAL_ALIASES.has(normalizeCommittedRouteTerminalKind(kind))),
+          ...MODEL_ONLY_FORBIDDEN_SOURCE_TERMINALS,
+        ])
+      : shouldRepairExistingCalculatorGatewayRoute
+        ? existing.canonical_goal.forbidden_terminal_artifact_kinds.filter((kind) => kind !== "workstation_tool_evaluation")
+      : existing.canonical_goal.forbidden_terminal_artifact_kinds;
+    const existingRequiredTerminalKind = shouldRepairExistingModelOnlyRoute
+      ? "direct_answer_text"
+      : shouldRepairExistingCalculatorGatewayRoute
+        ? "workstation_tool_evaluation"
+      : existing.canonical_goal.required_terminal_kind;
     const compoundPolicy = applyCompoundTerminalPolicy(input.payload, {
-      allowed: existing.canonical_goal.allowed_terminal_artifact_kinds,
-      forbidden: existing.canonical_goal.forbidden_terminal_artifact_kinds,
-      requiredTerminalKind: existing.canonical_goal.required_terminal_kind,
+      allowed: existingAllowed,
+      forbidden: existingForbidden,
+      requiredTerminalKind: existingRequiredTerminalKind,
     });
-    if (!compoundPolicy.policy.active) return existing;
+    if (!compoundPolicy.policy.active && !shouldRepairExistingModelOnlyRoute && !shouldRepairExistingCalculatorGatewayRoute) return existing;
     const requiredTerminalProduct =
       compoundPolicy.requiredTerminalKind ||
       existing.terminal_product.required_terminal_product;
@@ -341,6 +405,11 @@ export function buildCommittedAskRoute(input: {
       ...existing,
       canonical_goal: {
         ...existing.canonical_goal,
+        goal_kind: shouldRepairExistingModelOnlyRoute
+          ? "model_only_concept"
+          : shouldRepairExistingCalculatorGatewayRoute
+            ? "calculator_solve"
+          : existing.canonical_goal.goal_kind,
         required_terminal_kind: requiredTerminalProduct,
         allowed_terminal_artifact_kinds: compoundPolicy.allowed,
         forbidden_terminal_artifact_kinds: compoundPolicy.forbidden,
@@ -374,7 +443,13 @@ export function buildCommittedAskRoute(input: {
     rawGoal.requiredTerminalKind === "unknown" &&
     !routeContractSourceTarget &&
     toolUseRestatement.requiredToolFamilies.length === 0;
+  const canonicalModelOnlyDirectAnswer =
+    (route.sourceTarget === "unknown" || route.sourceTarget === "model_only") &&
+    rawGoal.goalKind === "model_only_concept" &&
+    normalizeCommittedRouteTerminalKind(rawGoal.requiredTerminalKind) === "direct_answer_text" &&
+    toolUseRestatement.requiredToolFamilies.length === 0;
   const shouldUseModelOnlyGoal =
+    canonicalModelOnlyDirectAnswer ||
     plainNoSourceModelOnlyRoute ||
     (
       route.sourceTarget === "model_only" &&

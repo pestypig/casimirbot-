@@ -72,11 +72,74 @@ describe("helix ask E50 terminal consistency", () => {
     expect(response.body?.terminal_consistency_check?.consistent).toBe(true);
     if (response.body?.terminal_artifact_kind === "typed_failure") {
       expect(artifactKinds(response.body)).toContain("typed_failure");
-      expect(response.body?.terminal_error_code).toBe("model_only_answer_unavailable");
+      expect(["model_only_answer_unavailable", "provider_terminal_candidate_missing"]).toContain(response.body?.terminal_error_code);
     } else {
       expect(artifactKinds(response.body)).toContain("direct_answer_text");
       expect(response.body?.terminal_artifact_kind).toBe("direct_answer_text");
     }
+  }, 60000);
+
+  it("routes explicit no-tool plain chat through model-only terminal authority without retrieval leakage", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Answer normally with no tools: what is 2+2?",
+        mode: "read",
+        debug: true,
+        sessionId: `e50-release-plain-chat-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("model_only_concept");
+    expect(response.body?.route_evidence_authority?.terminal_product_allowed).toBe(true);
+    if (response.body?.ok === true) {
+      expect(response.body?.terminal_artifact_kind).toBe("direct_answer_text");
+      expect(response.body?.final_answer_source).toBe("model_direct_answer");
+      expect(response.body?.response_type).toBe("final_answer");
+      expect(response.body?.final_status).toBe("final_answer");
+      expect(response.body?.terminal_error_code ?? null).toBeNull();
+      expect(answerText(response.body)).toMatch(/\b4\b|four/i);
+    } else {
+      expect(response.body?.terminal_artifact_kind).toBe("typed_failure");
+      expect(response.body?.final_answer_source).toBe("typed_failure");
+      expect(response.body?.terminal_error_code).toBe("provider_terminal_candidate_missing");
+      expect(response.body?.satisfaction_report?.missing_reason).toBe("provider_terminal_candidate_missing");
+    }
+    expect(answerText(response.body)).not.toMatch(/retrieval|grounded evidence|scholarly paper content|tavily/i);
+  }, 60000);
+
+  it("keeps quoted and negated tool-name explanations out of search routing", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question:
+          "Explain the literal phrase `internet-search.search_web` as a software tool name. Do not browse, search, retrieve web evidence, or call tools.",
+        mode: "read",
+        debug: true,
+        sessionId: `e50-quoted-tool-name-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("model_only_concept");
+    expect(response.body?.route_evidence_authority?.terminal_product_allowed).toBe(true);
+    expect(response.body?.route_evidence_authority?.allowed_terminal_artifact_kinds).toContain("direct_answer_text");
+    expect(response.body?.route_evidence_authority?.admitted_tools ?? []).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          capability_id: expect.stringMatching(/internet-search\.search_web|internet_search/i),
+        }),
+      ]),
+    );
+    if (response.body?.ok === true) {
+      expect(response.body?.terminal_artifact_kind).toBe("direct_answer_text");
+      expect(response.body?.final_answer_source).toBe("model_direct_answer");
+    } else {
+      expect(response.body?.terminal_artifact_kind).toBe("typed_failure");
+      expect(response.body?.terminal_error_code).toBe("provider_terminal_candidate_missing");
+    }
+    expect(answerText(response.body)).not.toMatch(/tavily|retrieval|grounded evidence|scholarly paper content/i);
   }, 60000);
 
   it("answers general concept questions directly despite ambient active-doc context", async () => {

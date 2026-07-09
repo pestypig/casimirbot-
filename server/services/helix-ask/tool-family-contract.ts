@@ -1346,6 +1346,16 @@ export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
     requiresGoalSatisfaction: true,
   }),
   contract({
+    toolName: "workstation-notes.create_note",
+    toolFamily: "workstation",
+    authority: "control_receipt",
+    mutating: true,
+    requiredObservationKinds: ["workspace_action_receipt", "note_update_receipt"],
+    allowedTerminalKinds: ["workspace_action_receipt", "note_update_receipt", "note_action_receipt", ...evidenceOnlyTerminalKinds],
+    requiredReentry: true,
+    requiresGoalSatisfaction: true,
+  }),
+  contract({
     toolName: "internet_search.web_research",
     toolFamily: "internet_search",
     authority: "evidence_only",
