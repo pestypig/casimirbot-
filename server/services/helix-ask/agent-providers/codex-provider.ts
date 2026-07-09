@@ -7944,6 +7944,15 @@ const gatewayCallsSucceeded = (gatewayCallResults: HelixWorkstationGatewayCallRe
   gatewayCallResults.length === 0 ||
   gatewayCallResults.every((_, index) => isGatewayResultCompatibleWithProviderReentry(gatewayCallResults, index));
 
+const hasSuccessfulTheoryContextReflectionGatewayResult = (
+  gatewayCallResults: HelixWorkstationGatewayCallResult[],
+): boolean =>
+  gatewayCallResults.some((result) =>
+    result.capability_id === THEORY_CONTEXT_REFLECTION_CAPABILITY &&
+    result.ok === true &&
+    result.observation_packet.produced_artifact_refs.length > 0
+  );
+
 const isSuccessfulEvidenceGatewayResult = (result: HelixWorkstationGatewayCallResult): boolean => {
   if (isWorkstationActionReceipt(result)) return false;
   if (isScholarlyGatewayResult(result)) {
@@ -9758,6 +9767,8 @@ export const codexProvider: HelixAgentProvider = {
       turnId,
       gatewayCallResults,
     });
+    const currentTurnTheoryReflectionSucceeded =
+      hasSuccessfulTheoryContextReflectionGatewayResult(gatewayCallResults);
     const workstationArtifactAdmissionTrace = buildWorkstationArtifactAdmissionTrace({
       turnId,
       gatewayCallResults,
@@ -10124,7 +10135,11 @@ export const codexProvider: HelixAgentProvider = {
       };
     }
 
-    if (scientificImageEvidenceContinuityRequested && !scientificImageContinuityPrelookup?.sidecar) {
+    if (
+      scientificImageEvidenceContinuityRequested &&
+      !scientificImageContinuityPrelookup?.sidecar &&
+      !currentTurnTheoryReflectionSucceeded
+    ) {
       const scientificEvidenceWorkflowStatus = readScientificEvidenceWorkflowStatusRecord(request.body);
       const recoveredSourceMaterial = scientificImageContinuityPrelookup?.sourceMaterial ?? null;
       const recoveredWorkflowDepth =
@@ -10270,7 +10285,10 @@ export const codexProvider: HelixAgentProvider = {
       };
     }
 
-    if ((scientificImageContinuationRequired && !scientificImageContinuationArtifact) || scientificImageContinuationFailure) {
+    if (
+      !currentTurnTheoryReflectionSucceeded &&
+      ((scientificImageContinuationRequired && !scientificImageContinuationArtifact) || scientificImageContinuationFailure)
+    ) {
       const rawText = scientificImageContinuationFailure?.text ??
         "I could not retrieve the prior scientific image evidence sidecar for this follow-up, so I cannot run Theory Badge Graph reflection from image evidence.";
       const failReason = scientificImageContinuationFailure?.reason ?? "scientific_image_evidence_sidecar_lookup_failed";
