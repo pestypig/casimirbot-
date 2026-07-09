@@ -11,6 +11,9 @@ else
   npm install --omit=dev
 fi
 
+export VITE_BUILD_ID="${VITE_BUILD_ID:-$(git rev-parse --short=12 HEAD 2>/dev/null || date +%s)}"
+echo "[replit] build id: ${VITE_BUILD_ID}"
+
 echo "[replit] building current checkout"
 VITE_HELIX_ASK_JOB_TIMEOUT_MS="${VITE_HELIX_ASK_JOB_TIMEOUT_MS:-1200000}" npm run build
 
