@@ -264,6 +264,26 @@ hatch and intentionally skips API route registration. Do not prune dev
 dependencies for Preview, because Replit's Vite middleware needs the Replit Vite
 plugins from `devDependencies`.
 
+For Helix Ask's Codex runtime on Replit, use the committed wrapper instead of
+pointing `CODEX_BIN` directly at the native Codex binary:
+
+```bash
+CODEX_BIN=/home/runner/workspace/scripts/replit-codex-wrapper.sh
+```
+
+The wrapper executes the native Codex CLI, but maps Replit's proxy credentials
+into the environment names Codex expects:
+
+```bash
+OPENAI_BASE_URL=$LLM_HTTP_BASE
+OPENAI_API_KEY=$LLM_HTTP_API_KEY
+```
+
+This keeps local development unchanged. On local machines, continue using the
+normal `OPENAI_API_KEY` / `LLM_HTTP_BASE` shape shown above. Replit may also
+carry legacy local-LLM secrets such as `LLM_LOCAL_*`; they can remain present,
+but they are not required for the Replit Codex wrapper path.
+
 Use the production path only for deployment or when you explicitly want the
 compiled server:
 
