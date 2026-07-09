@@ -433,6 +433,8 @@ export function buildVisibleResolvedTurn(reply: HelixAskTerminalProjectionReply)
   const statusCandidate =
     terminalIsFinalAnswer
       ? "final_answer"
+      : terminalResolution.terminalErrorCode
+      ? "final_failure"
       : coerceText(summary?.final_status).trim() ||
         coerceText(readAgentLoopAuditRecord(replyRecord?.satisfaction_report ?? debugRecord?.satisfaction_report)?.terminal_kind).trim() ||
         (pendingPresent ? "pending_input" : reply.ok === false ? "final_failure" : "final_answer");

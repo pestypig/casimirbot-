@@ -43,8 +43,9 @@ import {
   type ToolUseRestatementV1,
 } from "./internet-search-intent";
 import { contextualToolSuppressionBlocksFamily } from "./contextual-tool-admission";
-import type { HelixCommittedAskRoute } from "@shared/helix-committed-ask-route";
+import type { HelixCommittedAskRoute, HelixRouteEvidenceAuthority } from "@shared/helix-committed-ask-route";
 import {
+  buildRouteEvidenceAuthority,
   buildCommittedAskRoute,
   committedRouteAllowsTerminalKind,
   evaluateCommittedAskRouteCompatibility,
@@ -123,6 +124,7 @@ export type HelixAskTurnSolverTrace = {
   };
   compound_prompt_coverage_gate?: HelixCompoundPromptCoverageGate;
   committed_ask_route?: HelixCommittedAskRoute;
+  route_evidence_authority?: HelixRouteEvidenceAuthority;
   committed_route_compatibility?: {
     schema: "helix.committed_ask_route_compatibility.v1";
     turn_id: string;
@@ -1450,6 +1452,11 @@ export function buildAskTurnSolverTrace(input: {
     committedRoute: committedAskRoute,
     payload: input.payload,
   });
+  const routeEvidenceAuthority = buildRouteEvidenceAuthority({
+    committedRoute: committedAskRoute,
+    payload: input.payload,
+  });
+  input.payload.route_evidence_authority = routeEvidenceAuthority;
   const effectiveSourceTargetInfo = {
     sourceTarget: committedAskRoute.route.source_target,
     targetKind: committedAskRoute.route.target_kind,
@@ -1634,6 +1641,7 @@ export function buildAskTurnSolverTrace(input: {
     ...(compoundCoverage ? { compound_prompt_coverage: compoundCoverage } : {}),
     ...(compoundCoverageGate ? { compound_prompt_coverage_gate: compoundCoverageGate } : {}),
     committed_ask_route: committedAskRoute,
+    route_evidence_authority: routeEvidenceAuthority,
     committed_route_compatibility: committedRouteCompatibility,
     intent_hypotheses: intentHypotheses,
     intent_arbitration: intentArbitration,

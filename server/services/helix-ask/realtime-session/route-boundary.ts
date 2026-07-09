@@ -169,6 +169,12 @@ export const buildRealtimeRuntimeSessionDebugSummary = (input: {
         ? "locked_by_account_policy"
         : input.action === "record_client_receipt" && clientReceipt
           ? "receipt_recorded"
+          : input.blockedReason === "missing_openai_key"
+            ? "missing_openai_key"
+          : input.blockedReason === "openai_realtime_contract_ready"
+            ? "openai_realtime_contract_ready"
+          : input.blockedReason === "openai_realtime_contract_failed"
+            ? "openai_realtime_contract_failed"
           : input.blockedReason === "realtime_session_admitted_stub"
             ? "admitted_stub"
             : input.blockedReason === "realtime_live_transport_disabled_by_env" ||
@@ -198,8 +204,9 @@ export const buildRealtimeRuntimeSessionDebugSummary = (input: {
     adapter_id: transportPlan.adapter_id,
     adapter_state: transportPlan.adapter_state,
     transport_plan: transportPlan,
-    provider_session_ref: null,
+    provider_session_ref: transportPlan.provider_session_ref,
     client_receipt_refs: transportPlan.client_receipt_refs,
+    ephemeral_client_secret_expires_at_ms: transportPlan.ephemeral_client_secret_expires_at_ms,
     client_receipt_observation_count: clientReceipt ? 1 : 0,
     latest_client_receipt_ref: clientReceipt?.client_receipt_ref ?? null,
     latest_client_receipt_kind: clientReceipt?.receipt_kind ?? null,
@@ -411,7 +418,10 @@ export const buildRealtimeSessionBoundaryResponse = (input: {
     | "realtime_session_not_found"
     | "realtime_adapter_disabled_by_env"
     | "realtime_live_transport_disabled_by_env"
-    | "openai_realtime_adapter_stub_no_live_call";
+    | "openai_realtime_adapter_stub_no_live_call"
+    | "missing_openai_key"
+    | "openai_realtime_transport_not_configured"
+    | "openai_realtime_contract_failed";
   adapterResult?: HelixRealtimeSessionAdapterResult | null;
 }): HelixRealtimeSessionResponse => {
   const body = readRecord(input.body);
@@ -428,6 +438,8 @@ export const buildRealtimeSessionBoundaryResponse = (input: {
     ? "realtime_runtime_agent_locked_by_account_policy"
     : input.blockedReason === "realtime_session_not_found"
       ? "realtime_session_not_found"
+      : input.blockedReason === "openai_realtime_contract_failed"
+        ? "realtime_openai_contract_failed"
       : "realtime_session_disabled";
   const summary = buildRealtimeRuntimeSessionDebugSummary({
     realtimeSessionId: input.realtimeSessionId ?? null,
@@ -450,14 +462,28 @@ export const buildRealtimeSessionBoundaryResponse = (input: {
     client_secret_issued: false,
     sdp_exchange_requested: false,
     server_sideband_requested: false,
-    provider_session_ref: null,
-    openai_network_call_attempted: false,
-    ephemeral_credential_minted: false,
+    provider_session_ref: input.adapterResult?.provider_session_ref ?? null,
+    openai_network_call_attempted: input.adapterResult?.openai_network_call_attempted === true,
+    ephemeral_credential_minted: input.adapterResult?.ephemeral_credential_minted === true,
     webrtc_started: false,
     sideband_started: false,
     account_policy: input.accountPolicy,
     policy_gate: policyGate,
-    realtime_runtime_session_summary: summary,
+    realtime_runtime_session_summary: {
+      ...summary,
+      live_session_admission_status:
+        input.blockedReason === "missing_openai_key"
+          ? "missing_openai_key"
+          : input.blockedReason === "openai_realtime_contract_failed"
+            ? "openai_realtime_contract_failed"
+            : summary.live_session_admission_status,
+      openai_network_call_attempted: input.adapterResult?.openai_network_call_attempted === true,
+      provider_session_ref: input.adapterResult?.provider_session_ref ?? null,
+      latest_failure_code: input.adapterResult?.blocked_reason ?? summary.latest_failure_code,
+      ephemeral_client_secret_expires_at_ms:
+        input.adapterResult?.ephemeral_client_secret_expires_at_ms ??
+        transportPlan.ephemeral_client_secret_expires_at_ms,
+    },
     realtime_runtime_session_events: [],
     realtime_transcript_observations: [],
     realtime_tool_suggestion_observations: [],
@@ -498,7 +524,9 @@ export const buildRealtimeSessionAdmissionResponse = (input: {
     realtimeSessionId,
     action: "start",
     body: input.body,
-    blockedReason: "realtime_session_admitted_stub",
+    blockedReason: input.adapterResult?.blocked_reason === "openai_realtime_contract_ready"
+      ? "openai_realtime_contract_ready"
+      : "realtime_session_admitted_stub",
     transportPlan,
   });
   const lifecycleEventRef = buildRealtimeLifecycleEventRef({
@@ -518,13 +546,13 @@ export const buildRealtimeSessionAdmissionResponse = (input: {
     lane_id: "realtime_session",
     transport: "none",
     transport_plan: transportPlan,
-    client_secret_requested: false,
-    client_secret_issued: false,
-    sdp_exchange_requested: false,
+    client_secret_requested: transportPlan.client_secret_requested,
+    client_secret_issued: transportPlan.client_secret_issued,
+    sdp_exchange_requested: transportPlan.sdp_exchange_requested,
     server_sideband_requested: false,
-    provider_session_ref: null,
-    openai_network_call_attempted: false,
-    ephemeral_credential_minted: false,
+    provider_session_ref: input.adapterResult?.provider_session_ref ?? transportPlan.provider_session_ref,
+    openai_network_call_attempted: input.adapterResult?.openai_network_call_attempted === true,
+    ephemeral_credential_minted: input.adapterResult?.ephemeral_credential_minted === true,
     webrtc_started: false,
     sideband_started: false,
     account_policy: input.accountPolicy,
@@ -534,26 +562,41 @@ export const buildRealtimeSessionAdmissionResponse = (input: {
     }),
     realtime_runtime_session_summary: {
       ...summary,
-      live_session_admission_status: "admitted_stub",
+      live_session_admission_status: input.adapterResult?.blocked_reason === "openai_realtime_contract_ready"
+        ? "openai_realtime_contract_ready"
+        : "admitted_stub",
       session_status: "requesting",
-      session_lifecycle: ["start", "realtime_session_admitted_stub", transportPlan.live_execution_disabled_reason],
+      session_lifecycle: [
+        "start",
+        input.adapterResult?.blocked_reason === "openai_realtime_contract_ready"
+          ? "openai_realtime_contract_ready"
+          : "realtime_session_admitted_stub",
+        transportPlan.live_execution_disabled_reason,
+      ],
       transport: "none",
       client_receipt_state: transportPlan.client_receipt_refs.length > 0
         ? "awaiting_client_receipt"
         : "not_expected",
       latest_failure_code: transportPlan.live_execution_disabled_reason,
+      provider_session_ref: input.adapterResult?.provider_session_ref ?? transportPlan.provider_session_ref,
+      openai_network_call_attempted: input.adapterResult?.openai_network_call_attempted === true,
+      ephemeral_client_secret_expires_at_ms: transportPlan.ephemeral_client_secret_expires_at_ms,
     },
     realtime_runtime_session_events: [
       {
         schema: "helix.realtime_session.lifecycle_event.v1",
         lifecycle_event_ref: lifecycleEventRef,
         action: "start",
-        event_type: "session.admitted_stub",
+        event_type: input.adapterResult?.blocked_reason === "openai_realtime_contract_ready"
+          ? "session.openai_realtime_contract_ready"
+          : "session.admitted_stub",
         realtime_session_id: realtimeSessionId,
-        admission_status: "admitted_stub",
+        admission_status: input.adapterResult?.blocked_reason === "openai_realtime_contract_ready"
+          ? "openai_realtime_contract_ready"
+          : "admitted_stub",
         transport_execution_attempted: false,
         media_capture_started: false,
-        openai_network_call_attempted: false,
+        openai_network_call_attempted: input.adapterResult?.openai_network_call_attempted === true,
         webrtc_started: false,
         sideband_started: false,
         reentry_status: "pending_solver_reentry",

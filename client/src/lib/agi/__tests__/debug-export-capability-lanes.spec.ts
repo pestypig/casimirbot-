@@ -31,6 +31,9 @@ describe("Helix Ask debug export capability lanes", () => {
           client_receipt_state: "received",
           client_receipt_count: 1,
           client_receipt_refs: ["receipt:visible-consent"],
+          provider_session_ref: "provider:session:client-debug-safe",
+          ephemeral_client_secret: "summary-secret-must-not-export",
+          ephemeral_client_secret_expires_at_ms: 1783550300000,
           latest_failure_code: "realtime_live_transport_disabled_by_env",
           transport_execution_attempted: true,
           media_capture_started: true,
@@ -143,6 +146,8 @@ describe("Helix Ask debug export capability lanes", () => {
       session_lifecycle: ["start", "realtime_live_transport_disabled_by_env"],
       consent_state: "granted",
       client_receipt_count: 1,
+      provider_session_ref: "provider:session:client-debug-safe",
+      ephemeral_client_secret_expires_at_ms: 1783550300000,
       latest_failure_code: "realtime_live_transport_disabled_by_env",
       terminal_authority_status: "not_terminal_authority",
       transport_execution_attempted: false,
@@ -231,6 +236,7 @@ describe("Helix Ask debug export capability lanes", () => {
     ]);
     expect(text).not.toContain(poisonedTranscript);
     expect(text).not.toContain("must-not-export");
+    expect(text).not.toContain("summary-secret-must-not-export");
     expect(text).not.toContain("must_not_execute");
     expect(text).not.toContain("workstation_action_args");
     expect(text).not.toContain("prompt_text");
@@ -649,6 +655,83 @@ describe("Helix Ask debug export capability lanes", () => {
     });
     expect(exported.selected_final_answer).not.toContain("tokamak");
     expect(exported.ui_debug_parity_harness.visible_final_answer).not.toContain("Bianchi identities");
+  });
+
+  it("projects route evidence authority when it blocks a wrong-route terminal", () => {
+    const staleScholarlyFallback =
+      "I cannot answer scholarly paper content from this turn because no scholarly-research.lookup_papers observation packet was materialized.";
+    const text = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "ask:moral-graph-route-authority-debug-export",
+        question: "Review this current route authority projection. Do not use scholarly lookup.",
+        content: staleScholarlyFallback,
+      },
+      {
+        selected_final_answer: staleScholarlyFallback,
+        final_answer_source: "scholarly_research_answer",
+        terminal_artifact_kind: "scholarly_research_answer",
+        terminal_answer_envelope: {
+          terminal_kind: "final_answer",
+          terminal_artifact_kind: "scholarly_research_answer",
+          final_answer_source: "scholarly_research_answer",
+          terminal_text: staleScholarlyFallback,
+        },
+        route_evidence_authority: {
+          schema: "helix.route_evidence_authority.v1",
+          turn_id: "ask:moral-graph-route-authority-debug-export",
+          candidate_tools: [
+            {
+              capability_id: "moral-graph.reflect_context",
+              family: "moral_graph",
+              reason: "requested_route",
+            },
+            {
+              capability_id: "scholarly-research.lookup_papers",
+              family: "scholarly_research",
+              reason: "explicitly_suppressed",
+            },
+          ],
+          admitted_tools: [
+            {
+              capability_id: "moral-graph.reflect_context",
+              family: "moral_graph",
+              admission_ref: "ask:moral-graph-route-authority-debug-export:moral_graph_admission",
+            },
+          ],
+          rejected_tools: [
+            {
+              capability_id: "scholarly-research.lookup_papers",
+              family: "scholarly_research",
+              reason: "route_suppressed",
+            },
+          ],
+          supporting_evidence_refs: ["ask:moral-graph-route-authority-debug-export:moral_graph_observation"],
+          allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+          forbidden_terminal_artifact_kinds: ["scholarly_research_answer"],
+          required_terminal_kind: null,
+          terminal_product_allowed: true,
+          current_turn_only: true,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    );
+
+    const exported = JSON.parse(text) as Record<string, any>;
+    expect(exported.selected_final_answer).not.toBe(staleScholarlyFallback);
+    expect(exported.selected_final_answer).not.toContain("scholarly paper content");
+    expect(exported.final_answer_source).toBe("typed_failure");
+    expect(exported.terminal_artifact_kind).toBe("typed_failure");
+    expect(exported.terminal_error_code).toBe("route_terminal_product_not_allowed");
+    expect(exported.route_evidence_authority).toMatchObject({
+      schema: "helix.route_evidence_authority.v1",
+      allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+      forbidden_terminal_artifact_kinds: ["scholarly_research_answer"],
+    });
+    expect(exported.hard_evidence_turn_path_trace).toMatchObject({
+      route_evidence_authority_ref: "ask:moral-graph-route-authority-debug-export:route_evidence_authority",
+      route_authority_terminal_product_allowed: true,
+    });
   });
 
   it("preserves rendered Image Lens reply-scoped exports when backend artifacts are not advertised", () => {

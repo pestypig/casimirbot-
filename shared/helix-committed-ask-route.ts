@@ -98,3 +98,26 @@ export type HelixCommittedAskRouteToolAdmissionResult = {
   assistant_answer: false;
   raw_content_included: false;
 };
+
+export type HelixRouteEvidenceAuthorityTool = {
+  capability_id: string;
+  family: string;
+  reason: string;
+  admission_ref?: string;
+};
+
+export type HelixRouteEvidenceAuthority = {
+  schema: "helix.route_evidence_authority.v1";
+  turn_id: string;
+  candidate_tools: HelixRouteEvidenceAuthorityTool[];
+  admitted_tools: HelixRouteEvidenceAuthorityTool[];
+  rejected_tools: HelixRouteEvidenceAuthorityTool[];
+  supporting_evidence_refs: string[];
+  allowed_terminal_artifact_kinds: string[];
+  forbidden_terminal_artifact_kinds: string[];
+  required_terminal_kind: string | null;
+  terminal_product_allowed: boolean;
+  current_turn_only: boolean;
+  assistant_answer: false;
+  raw_content_included: false;
+};

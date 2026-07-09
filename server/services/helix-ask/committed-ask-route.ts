@@ -3,6 +3,8 @@ import {
   HELIX_COMMITTED_ASK_ROUTE_SCHEMA,
   type HelixCommittedAskRoute,
   type HelixCommittedAskRouteCompatibilityResult,
+  type HelixRouteEvidenceAuthority,
+  type HelixRouteEvidenceAuthorityTool,
   type HelixCommittedAskRouteToolAdmissionResult,
 } from "@shared/helix-committed-ask-route";
 import type { HelixPromptInterpretation } from "./prompt-interpretation";
@@ -26,6 +28,21 @@ const readStringArray = (value: unknown): string[] =>
     : [];
 
 const unique = (entries: string[]): string[] => Array.from(new Set(entries.filter(Boolean)));
+
+const uniqueTools = (entries: HelixRouteEvidenceAuthorityTool[]): HelixRouteEvidenceAuthorityTool[] => {
+  const seen = new Set<string>();
+  const result: HelixRouteEvidenceAuthorityTool[] = [];
+  for (const entry of entries) {
+    const capabilityId = readString(entry.capability_id);
+    const family = readString(entry.family);
+    if (!capabilityId && !family) continue;
+    const key = `${capabilityId || "family"}:${family || "unknown"}:${entry.reason}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push({ ...entry, capability_id: capabilityId || family, family: family || "unknown" });
+  }
+  return result;
+};
 
 const hashShort = (value: unknown): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 16);
@@ -224,6 +241,77 @@ const allowedFamiliesFromPayload = (payload: RecordLike, sourceTarget: string): 
   return unique([...fromAdmission, sourceFamily]);
 };
 
+const readCapabilityCandidatesFromPayload = (payload: RecordLike): HelixRouteEvidenceAuthorityTool[] => {
+  const admission = readRecord(payload.tool_call_admission_decision);
+  const capabilityPlan = readRecord(payload.capability_plan);
+  const lifecycle = readRecord(payload.tool_lifecycle_trace);
+  const operational = readRecord(payload.operational_capability_trace);
+  const entries: HelixRouteEvidenceAuthorityTool[] = [];
+  for (const candidate of [
+    { capability: admission?.selected_capability, reason: "tool_call_admission_decision.selected_capability" },
+    { capability: admission?.requested_capability, reason: "tool_call_admission_decision.requested_capability" },
+    { capability: capabilityPlan?.selected_capability, reason: "capability_plan.selected_capability" },
+    { capability: lifecycle?.requested_capability, reason: "tool_lifecycle_trace.requested_capability" },
+    { capability: operational?.model_proposed_capability, reason: "operational_capability_trace.model_proposed_capability" },
+  ]) {
+    const capabilityId = readString(candidate.capability);
+    if (!capabilityId) continue;
+    entries.push({
+      capability_id: capabilityId,
+      family: inferCommittedRouteToolFamily(capabilityId),
+      reason: candidate.reason,
+    });
+  }
+  return uniqueTools(entries);
+};
+
+const readAdmittedToolsFromPayload = (payload: RecordLike): HelixRouteEvidenceAuthorityTool[] => {
+  const admission = readRecord(payload.tool_call_admission_decision);
+  const lifecycle = readRecord(payload.tool_lifecycle_trace);
+  const operational = readRecord(payload.operational_capability_trace);
+  const entries: HelixRouteEvidenceAuthorityTool[] = [];
+  for (const candidate of [
+    { capability: admission?.admitted_capability, reason: "tool_call_admission_decision.admitted_capability" },
+    { capability: lifecycle?.admitted_capability, reason: "tool_lifecycle_trace.admitted_capability" },
+    { capability: operational?.policy_admitted_capability, reason: "operational_capability_trace.policy_admitted_capability" },
+  ]) {
+    const capabilityId = readString(candidate.capability);
+    if (!capabilityId) continue;
+    entries.push({
+      capability_id: capabilityId,
+      family: inferCommittedRouteToolFamily(capabilityId),
+      reason: candidate.reason,
+      admission_ref: candidate.reason,
+    });
+  }
+  const admittedFamilies = readStringArray(admission?.admitted_tool_families);
+  for (const family of admittedFamilies) {
+    entries.push({
+      capability_id: `family:${family}`,
+      family,
+      reason: "tool_call_admission_decision.admitted_tool_families",
+      admission_ref: "tool_call_admission_decision",
+    });
+  }
+  return uniqueTools(entries);
+};
+
+const readSupportingEvidenceRefsFromPayload = (payload: RecordLike): string[] => {
+  const refs: string[] = [];
+  const evidenceGate = readRecord(payload.evidence_reentry_gate);
+  refs.push(...readStringArray(evidenceGate?.selected_evidence_refs));
+  const artifactLedger = Array.isArray(payload.current_turn_artifact_ledger) ? payload.current_turn_artifact_ledger : [];
+  for (const entry of artifactLedger) {
+    const artifact = readRecord(entry);
+    refs.push(
+      readString(artifact?.artifact_id) ||
+      readString(artifact?.ref_id) ||
+      readString(artifact?.evidence_ref),
+    );
+  }
+  return unique(refs);
+};
+
 export function readCommittedAskRoute(payload: RecordLike | null | undefined): HelixCommittedAskRoute | null {
   const route = readRecord(payload?.committed_ask_route);
   return route?.schema === HELIX_COMMITTED_ASK_ROUTE_SCHEMA ? (route as HelixCommittedAskRoute) : null;
@@ -417,6 +505,49 @@ export function evaluateCommittedAskRouteCompatibility(input: {
   };
 }
 
+export function buildRouteEvidenceAuthority(input: {
+  committedRoute: HelixCommittedAskRoute | null | undefined;
+  payload?: RecordLike | null;
+}): HelixRouteEvidenceAuthority {
+  const payload = input.payload ?? {};
+  const route = input.committedRoute ?? readCommittedAskRoute(payload);
+  const candidateTools = readCapabilityCandidatesFromPayload(payload);
+  const admittedFromPayload = readAdmittedToolsFromPayload(payload);
+  const admittedFromRoute = route
+    ? route.capability_policy.allowed_tool_families.map((family): HelixRouteEvidenceAuthorityTool => ({
+        capability_id: `family:${family}`,
+        family,
+        reason: "committed_ask_route.capability_policy.allowed_tool_families",
+        admission_ref: route.commit_id,
+      }))
+    : [];
+  const rejectedFromRoute = route
+    ? route.capability_policy.suppressed_tool_families.map((family): HelixRouteEvidenceAuthorityTool => ({
+        capability_id: `family:${family}`,
+        family,
+        reason: "committed_ask_route.capability_policy.suppressed_tool_families",
+        admission_ref: route.commit_id,
+      }))
+    : [];
+  const allowedTerminalArtifactKinds = route?.canonical_goal.allowed_terminal_artifact_kinds ?? [];
+  const forbiddenTerminalArtifactKinds = route?.canonical_goal.forbidden_terminal_artifact_kinds ?? [];
+  return {
+    schema: "helix.route_evidence_authority.v1",
+    turn_id: route?.turn_id ?? readString(payload.turn_id) ?? "unknown-turn",
+    candidate_tools: candidateTools,
+    admitted_tools: uniqueTools([...admittedFromPayload, ...admittedFromRoute]),
+    rejected_tools: uniqueTools(rejectedFromRoute),
+    supporting_evidence_refs: readSupportingEvidenceRefsFromPayload(payload),
+    allowed_terminal_artifact_kinds: allowedTerminalArtifactKinds,
+    forbidden_terminal_artifact_kinds: forbiddenTerminalArtifactKinds,
+    required_terminal_kind: route?.canonical_goal.required_terminal_kind ?? null,
+    terminal_product_allowed: Boolean(route && allowedTerminalArtifactKinds.length > 0),
+    current_turn_only: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+}
+
 export function assertCapabilityAllowedByCommittedRoute(input: {
   committedRoute: HelixCommittedAskRoute | null | undefined;
   capabilityId: string;
@@ -426,13 +557,16 @@ export function assertCapabilityAllowedByCommittedRoute(input: {
   const family = inferCommittedRouteToolFamily(input.capabilityId);
   const route = input.committedRoute ?? null;
   if (!route) {
+    const modelOnlyCompatible = family === "model_only" || family === "unknown";
     return {
       schema: "helix.committed_ask_route_tool_admission.v1",
       turn_id: "unknown-turn",
       capability_id: input.capabilityId,
       inferred_family: family,
-      allowed: true,
-      reason: "committed_route_missing_fallback_used",
+      allowed: modelOnlyCompatible,
+      reason: modelOnlyCompatible
+        ? "committed_route_missing_model_only_compatibility"
+        : "committed_route_missing_for_tool_capability",
       from_shortcut: input.fromShortcut === true,
       assistant_answer: false,
       raw_content_included: false,

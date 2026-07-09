@@ -31,8 +31,8 @@ export type HelixRealtimeSessionTransportPlan = {
   schema: "helix.realtime_session.transport_plan.v1";
   requested_transport: HelixRealtimeSessionTransport;
   planned_transport: HelixRealtimeSessionTransport;
-  adapter_id: "disabled" | "openai_realtime_stub";
-  adapter_state: "disabled" | "stubbed";
+  adapter_id: "disabled" | "openai_realtime_stub" | "openai_realtime";
+  adapter_state: "disabled" | "stubbed" | "missing_key" | "contract_ready" | "contract_failed";
   descriptor_enabled: boolean;
   adapter_enabled: boolean;
   live_transport_enabled: boolean;
@@ -41,12 +41,13 @@ export type HelixRealtimeSessionTransportPlan = {
   requires_visible_user_gesture: true;
   requires_server_session_response: true;
   requires_client_consent_receipt: true;
-  client_secret_requested: false;
-  client_secret_issued: false;
-  sdp_exchange_requested: false;
-  server_sideband_requested: false;
-  provider_session_ref: null;
+  client_secret_requested: boolean;
+  client_secret_issued: boolean;
+  sdp_exchange_requested: boolean;
+  server_sideband_requested: boolean;
+  provider_session_ref: string | null;
   client_receipt_refs: string[];
+  ephemeral_client_secret_expires_at_ms: number | null;
 };
 
 export type HelixRealtimeSessionRequest = {
@@ -86,20 +87,24 @@ export type HelixRealtimeSessionDebugSummary = HelixLiveRuntimeAgentControlState
     | "unavailable"
     | "locked_by_account_policy"
     | "admitted_stub"
+    | "missing_openai_key"
+    | "openai_realtime_contract_ready"
+    | "openai_realtime_contract_failed"
     | "transport_blocked"
     | "receipt_recorded";
   session_lifecycle: string[];
   selected_realtime_model: string | null;
   transport_execution_attempted: false;
   media_capture_started: false;
-  openai_network_call_attempted: false;
+  openai_network_call_attempted: boolean;
   webrtc_started: false;
   sideband_started: false;
   adapter_id: HelixRealtimeSessionTransportPlan["adapter_id"];
   adapter_state: HelixRealtimeSessionTransportPlan["adapter_state"];
   transport_plan: HelixRealtimeSessionTransportPlan;
-  provider_session_ref: null;
+  provider_session_ref: string | null;
   client_receipt_refs: string[];
+  ephemeral_client_secret_expires_at_ms: number | null;
   client_receipt_observation_count: number;
   latest_client_receipt_ref: string | null;
   latest_client_receipt_kind: string | null;
@@ -126,19 +131,20 @@ export type HelixRealtimeSessionResponse = {
     | "realtime_runtime_agent_locked_by_account_policy"
     | "realtime_session_disabled"
     | "realtime_session_not_found"
+    | "realtime_openai_contract_failed"
     | null;
   blocked_reason: string | null;
   realtime_session_id: string | null;
   lane_id: "realtime_session";
   transport: HelixRealtimeSessionTransport;
   transport_plan: HelixRealtimeSessionTransportPlan;
-  client_secret_requested: false;
-  client_secret_issued: false;
-  sdp_exchange_requested: false;
+  client_secret_requested: boolean;
+  client_secret_issued: boolean;
+  sdp_exchange_requested: boolean;
   server_sideband_requested: false;
-  provider_session_ref: null;
-  openai_network_call_attempted: false;
-  ephemeral_credential_minted: false;
+  provider_session_ref: string | null;
+  openai_network_call_attempted: boolean;
+  ephemeral_credential_minted: boolean;
   webrtc_started: false;
   sideband_started: false;
   account_policy: HelixAccountCapabilityPolicy;

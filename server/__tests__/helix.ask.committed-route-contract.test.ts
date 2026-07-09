@@ -4,6 +4,7 @@ import { buildAskTurnSolverTrace, evaluateAskTurnSolverHardGate } from "../servi
 import {
   assertCapabilityAllowedByCommittedRoute,
   buildCommittedAskRoute,
+  buildRouteEvidenceAuthority,
   committedRouteAllowsTerminalKind,
 } from "../services/helix-ask/committed-ask-route";
 import { interpretHelixAskPrompt } from "../services/helix-ask/prompt-interpretation";
@@ -121,6 +122,129 @@ describe("Helix Ask committed route contract", () => {
 
     expect(admission.allowed).toBe(false);
     expect(admission.reason).toBe("committed_route_tool_family_suppressed");
+  });
+
+  it("fails closed when a known non-model capability has no committed route", () => {
+    const admission = assertCapabilityAllowedByCommittedRoute({
+      committedRoute: null,
+      capabilityId: "scholarly-research.lookup_papers",
+    });
+
+    expect(admission.allowed).toBe(false);
+    expect(admission.inferred_family).toBe("scholarly_research");
+    expect(admission.reason).toBe("committed_route_missing_for_tool_capability");
+  });
+
+  it("keeps model-only compatibility when no committed route exists", () => {
+    const admission = assertCapabilityAllowedByCommittedRoute({
+      committedRoute: null,
+      capabilityId: "model.direct_answer",
+    });
+
+    expect(admission.allowed).toBe(true);
+    expect(admission.reason).toBe("committed_route_missing_model_only_compatibility");
+  });
+
+  it("allows scholarly lookup when the committed route admits scholarly research", () => {
+    const committedRoute = buildCommittedAskRoute({
+      turnId,
+      promptText: "Look up arXiv 1106.5543 and summarize the paper metadata.",
+      selectedRoute: "scholarly_research.lookup",
+      payload: {
+        turn_id: turnId,
+        source_target_intent: {
+          ...docsSourceTarget,
+          target_source: "scholarly_research",
+          target_kind: "paper_lookup",
+          strength: "hard",
+        },
+        route_product_contract: {
+          ...docsRouteContract,
+          source_target: "scholarly_research",
+          allowed_terminal_artifact_kinds: ["scholarly_research_answer", "typed_failure"],
+          forbidden_terminal_artifact_kinds: ["model_synthesized_answer"],
+        },
+        canonical_goal_frame: {
+          turn_id: turnId,
+          goal_kind: "scholarly_research_answer",
+          required_terminal_kind: "scholarly_research_answer",
+        },
+        tool_call_admission_decision: {
+          admitted_tool_families: ["scholarly_research"],
+        },
+      },
+    });
+
+    const admission = assertCapabilityAllowedByCommittedRoute({
+      committedRoute,
+      capabilityId: "scholarly-research.lookup_papers",
+    });
+
+    expect(admission.allowed).toBe(true);
+    expect(admission.inferred_family).toBe("scholarly_research");
+    expect(admission.reason).toBe("capability_allowed_by_committed_route");
+  });
+
+  it("projects route evidence authority without turning candidates into terminal authority", () => {
+    const committedRoute = buildCommittedAskRoute({
+      turnId,
+      promptText,
+      selectedRoute: "docs_viewer.local_docs_path_compare",
+      payload: {
+        turn_id: turnId,
+        source_target_intent: docsSourceTarget,
+        route_product_contract: docsRouteContract,
+        canonical_goal_frame: {
+          turn_id: turnId,
+          goal_kind: "doc_evidence_synthesis",
+          required_terminal_kind: "doc_evidence_synthesis",
+        },
+        tool_call_admission_decision: {
+          selected_capability: "docs-viewer.locate_in_doc",
+          admitted_capability: "docs-viewer.locate_in_doc",
+          admitted_tool_families: ["docs_viewer"],
+          suppressed_tool_families: ["scholarly_research"],
+        },
+        current_turn_artifact_ledger: [{
+          artifact_id: "ask:test:doc-observation:1",
+          kind: "docs_viewer_observation",
+        }],
+      },
+    });
+
+    const authority = buildRouteEvidenceAuthority({
+      committedRoute,
+      payload: {
+        turn_id: turnId,
+        tool_call_admission_decision: {
+          selected_capability: "docs-viewer.locate_in_doc",
+          admitted_capability: "docs-viewer.locate_in_doc",
+          admitted_tool_families: ["docs_viewer"],
+        },
+        current_turn_artifact_ledger: [{
+          artifact_id: "ask:test:doc-observation:1",
+          kind: "docs_viewer_observation",
+        }],
+      },
+    });
+
+    expect(authority.schema).toBe("helix.route_evidence_authority.v1");
+    expect(authority.candidate_tools).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        capability_id: "docs-viewer.locate_in_doc",
+        family: "docs_viewer",
+      }),
+    ]));
+    expect(authority.admitted_tools).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        capability_id: "docs-viewer.locate_in_doc",
+        family: "docs_viewer",
+      }),
+    ]));
+    expect(authority.supporting_evidence_refs).toContain("ask:test:doc-observation:1");
+    expect(authority.allowed_terminal_artifact_kinds).toContain("doc_evidence_synthesis");
+    expect(authority.terminal_product_allowed).toBe(true);
+    expect(authority.assistant_answer).toBe(false);
   });
 
   it("preserves the committed route through model-turn continuation and blocks dispatch", async () => {

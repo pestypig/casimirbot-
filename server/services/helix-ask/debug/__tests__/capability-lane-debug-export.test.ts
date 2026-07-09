@@ -106,7 +106,9 @@ describe("capability lane debug export fields", () => {
         runtime_agent_authority: "suggest_actions",
         adapter_id: "openai_realtime_stub",
         adapter_state: "stubbed",
-        provider_session_ref: "provider:should-be-suppressed",
+        provider_session_ref: "provider:session:debug-safe",
+        ephemeral_client_secret: "summary-secret-must-not-export",
+        ephemeral_client_secret_expires_at_ms: 1783550200000,
         client_receipt_refs: ["receipt:visible-consent:debug"],
         live_execution_disabled_reason: "openai_realtime_adapter_stub_no_live_call",
         transport_plan: {
@@ -148,7 +150,8 @@ describe("capability lane debug export fields", () => {
       runtime_agent_authority: "suggest_actions",
       adapter_id: "openai_realtime_stub",
       adapter_state: "stubbed",
-      provider_session_ref: null,
+      provider_session_ref: "provider:session:debug-safe",
+      ephemeral_client_secret_expires_at_ms: 1783550200000,
       client_receipt_refs: ["receipt:visible-consent:debug"],
       live_execution_disabled_reason: "openai_realtime_adapter_stub_no_live_call",
       transport_execution_attempted: false,
@@ -172,6 +175,7 @@ describe("capability lane debug export fields", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+    expect(JSON.stringify(fields)).not.toContain("summary-secret-must-not-export");
   });
 
   it("sanitizes Realtime transcript observations as pending evidence only", () => {

@@ -131,6 +131,22 @@ const readStringArray = (value: unknown): string[] =>
         .filter((entry): entry is string => Boolean(entry))
     : [];
 
+const routeEvidenceAuthorityAllowsTerminalKind = (
+  authority: Record<string, unknown> | null,
+  terminalArtifactKind: string | null,
+): boolean => {
+  if (readString(authority?.schema) !== "helix.route_evidence_authority.v1") return true;
+  const kind = readString(terminalArtifactKind);
+  if (kind === "typed_failure" || kind === "request_user_input") return true;
+  if (authority?.terminal_product_allowed === false) return false;
+  if (!kind) return false;
+  if (readStringArray(authority?.forbidden_terminal_artifact_kinds).includes(kind)) return false;
+  const requiredKind = readString(authority?.required_terminal_kind);
+  if (requiredKind && kind !== requiredKind) return false;
+  const allowedKinds = readStringArray(authority?.allowed_terminal_artifact_kinds);
+  return allowedKinds.length === 0 || allowedKinds.includes(kind);
+};
+
 const selectTerminalRecordForRecoveredImageLens = (
   recovered: boolean,
   ...values: unknown[]
@@ -793,13 +809,43 @@ const buildRealtimeDebugFallbackTransportPlan = (): Record<string, unknown> => (
   server_sideband_requested: false,
   provider_session_ref: null,
   client_receipt_refs: [],
+  ephemeral_client_secret_expires_at_ms: null,
 });
+
+const sanitizeRealtimeTransportPlanForDebugExport = (
+  value: unknown,
+): Record<string, unknown> | null => {
+  const record = asRecord(value);
+  if (!record) return null;
+  const {
+    client_secret: _clientSecret,
+    clientSecret: _clientSecretCamel,
+    ephemeral_client_secret: _ephemeralClientSecret,
+    ephemeralClientSecret: _ephemeralClientSecretCamel,
+    ephemeral_secret: _ephemeralSecret,
+    ephemeralSecret: _ephemeralSecretCamel,
+    sdp: _sdp,
+    sdp_blob: _sdpBlob,
+    sdpBlob: _sdpBlobCamel,
+    raw_provider_response: _rawProviderResponse,
+    rawProviderResponse: _rawProviderResponseCamel,
+    raw_audio: _rawAudio,
+    rawAudio: _rawAudioCamel,
+    audio_payload: _audioPayload,
+    audioPayload: _audioPayloadCamel,
+    transcript_text: _transcriptText,
+    transcriptText: _transcriptTextCamel,
+    ...safe
+  } = record;
+  return safe;
+};
 
 const normalizeRealtimeRuntimeSessionSummaryForExport = (
   value: unknown,
 ): Record<string, unknown> => {
   const record = asRecord(value);
-  const transportPlan = asRecord(record?.transport_plan) ?? buildRealtimeDebugFallbackTransportPlan();
+  const transportPlan = sanitizeRealtimeTransportPlanForDebugExport(record?.transport_plan) ??
+    buildRealtimeDebugFallbackTransportPlan();
   const selectedModelOrService =
     readString(record?.selected_model_or_service) ??
     readString(record?.selected_realtime_model);
@@ -836,8 +882,9 @@ const normalizeRealtimeRuntimeSessionSummaryForExport = (
     adapter_id: readString(record?.adapter_id) ?? readString(transportPlan.adapter_id) ?? "disabled",
     adapter_state: readString(record?.adapter_state) ?? readString(transportPlan.adapter_state) ?? "disabled",
     transport_plan: transportPlan,
-    provider_session_ref: null,
+    provider_session_ref: readString(record?.provider_session_ref),
     client_receipt_refs: clientReceiptRefs,
+    ephemeral_client_secret_expires_at_ms: readNumberValue(record?.ephemeral_client_secret_expires_at_ms),
     live_execution_disabled_reason:
       readString(record?.live_execution_disabled_reason) ??
       readString(transportPlan.live_execution_disabled_reason) ??
@@ -3277,6 +3324,13 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     : readString(agentLoop?.terminal_error_code) ??
       readString(debug?.terminal_error_code) ??
       readString(payload.terminal_error_code);
+  const routeEvidenceAuthority = asRecord(
+    payload.route_evidence_authority ??
+    debug?.route_evidence_authority ??
+    asRecord(debug?.ask_turn_solver_trace)?.route_evidence_authority,
+  );
+  const routeTerminalProductBlocked =
+    !routeEvidenceAuthorityAllowsTerminalKind(routeEvidenceAuthority, terminalArtifactKind);
   const debugExportRebuildReason = readString(payload.debug_export_rebuild_reason)?.trim() ?? "";
   const debugExportSource = readString(payload.debug_export_source)?.trim() ?? "";
   const isReplyScopedDebugProjection =
@@ -3438,6 +3492,8 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
   const effectiveTerminalErrorCode =
     backendEntrypointMissing
         ? askEntrypointFailureCode ?? "backend_ask_entry_required"
+        : routeTerminalProductBlocked
+          ? "route_terminal_product_not_allowed"
         : imageLensPromptLeakRecovered
           ? null
           : terminalAuthorityVerified
@@ -3446,12 +3502,16 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
   const effectiveTerminalArtifactKind =
     backendEntrypointMissing
       ? "typed_failure"
+      : routeTerminalProductBlocked
+        ? "typed_failure"
       : imageLensPromptLeakRecovered
         ? terminalArtifactKind ?? "agent_provider_terminal_candidate"
         : terminalArtifactKind ?? (effectiveTerminalErrorCode ? "typed_failure" : null);
   const effectiveFinalAnswerSource =
     backendEntrypointMissing
       ? "typed_failure"
+      : routeTerminalProductBlocked
+        ? "typed_failure"
       : imageLensPromptLeakRecovered
         ? finalAnswerSource ?? "agent_provider_terminal_candidate"
         : finalAnswerSource ?? (effectiveTerminalErrorCode ? "typed_failure" : null);
@@ -3478,6 +3538,8 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
           ? "This prompt requires the backend Ask solver path before a final answer can be shown."
           : effectiveTerminalErrorCode === "backend_debug_materialization"
             ? "Backend Ask was reached, but no server terminal artifact or debug artifact was materialized for this turn."
+          : effectiveTerminalErrorCode === "route_terminal_product_not_allowed"
+            ? "I could not complete that turn.\nCause: route_terminal_product_not_allowed."
           : null) ??
         readString(payload.terminal_failure_text) ??
         readString(typedFailure?.message) ??
@@ -3533,7 +3595,17 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     route_contract_allowed_terminal_artifact_kinds: [
       ...readStringArray(routeProductContract?.allowed_terminal_artifact_kinds),
       ...readStringArray(committedCanonicalGoal?.allowed_terminal_artifact_kinds),
+      ...readStringArray(routeEvidenceAuthority?.allowed_terminal_artifact_kinds),
     ].slice(0, 24),
+    route_evidence_authority_ref:
+      readString(routeEvidenceAuthority?.schema) === "helix.route_evidence_authority.v1"
+        ? `${readString(routeEvidenceAuthority?.turn_id) || canonicalActiveTurnId}:route_evidence_authority`
+        : null,
+    route_authority_candidate_tool_count: readRecordArray(routeEvidenceAuthority?.candidate_tools).length,
+    route_authority_admitted_tool_count: readRecordArray(routeEvidenceAuthority?.admitted_tools).length,
+    route_authority_rejected_tool_count: readRecordArray(routeEvidenceAuthority?.rejected_tools).length,
+    route_authority_supporting_evidence_ref_count: readStringArray(routeEvidenceAuthority?.supporting_evidence_refs).length,
+    route_authority_terminal_product_allowed: readBoolean(routeEvidenceAuthority?.terminal_product_allowed),
     route_metadata_source: routeMetadataSource ?? null,
     mandatory_next_tool_name: mandatoryNextToolName ?? null,
     ambient_artifact_count: compactArtifactAdmissionTraces.reduce(
@@ -3622,6 +3694,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     backend_ask_call_attempted: backendAskCallAttempted,
     backend_ask_call_path: backendAskCallPath,
     backend_ask_call_error: backendAskCallError,
+    route_evidence_authority: routeEvidenceAuthority,
     hard_evidence_turn_path_trace: hardEvidenceTurnPathTrace,
     route_metadata_source: routeMetadataSource,
     mandatory_next_tool_name: mandatoryNextToolName,

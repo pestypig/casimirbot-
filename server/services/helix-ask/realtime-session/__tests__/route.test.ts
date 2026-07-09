@@ -1,9 +1,10 @@
 import express from "express";
 import request from "supertest";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { accountSessionRouter } from "../../../../routes/account-session";
 import { realtimeSessionRouter } from "../../../../routes/agi.realtime-session";
 import { resetAccountSessionStore } from "../../../helix-account/account-session-store";
+import { setOpenAiRealtimeContractTransportForTests } from "../adapter";
 
 const createApp = (): express.Express => {
   const app = express();
@@ -94,6 +95,10 @@ describe("AGI Realtime session route boundary", () => {
     await resetAccountSessionStore();
   });
 
+  afterEach(() => {
+    setOpenAiRealtimeContractTransportForTests(null);
+  });
+
   it("locks no-session and user accounts out of Realtime runtime controls", async () => {
     const noSession = await request(createApp())
       .post("/api/agi/realtime/session")
@@ -160,7 +165,7 @@ describe("AGI Realtime session route boundary", () => {
         selected_backend_provider: "realtime_session.openai_realtime",
         selected_model_or_service: "gpt-realtime-placeholder",
         selected_realtime_model: "gpt-realtime-placeholder",
-        latest_failure_code: "capability_lane_disabled_by_policy",
+        latest_failure_code: "realtime_adapter_disabled_by_env",
         tool_request_count: 0,
         admitted_tool_request_count: 0,
         blocked_tool_request_count: 0,
@@ -372,6 +377,293 @@ describe("AGI Realtime session route boundary", () => {
       } else {
         process.env.OPENAI_API_KEY = previousKey;
       }
+    }
+  });
+
+  it("keeps no-session locked before the OpenAI contract adapter can run", async () => {
+    const previousDescriptor = process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED;
+    const previousAdapter = process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED;
+    const previousTransport = process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED;
+    const previousContract = process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED;
+    const previousKey = process.env.OPENAI_API_KEY;
+    const transport = vi.fn(async () => ({
+      ok: true,
+      providerSessionRef: "provider:session:locked",
+      ephemeralClientSecret: "locked-secret-must-not-export",
+    }));
+    setOpenAiRealtimeContractTransportForTests(transport);
+    process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED = "1";
+    process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED = "1";
+    process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED = "1";
+    process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED = "1";
+    process.env.OPENAI_API_KEY = "locked-server-key-must-not-leak";
+    try {
+      const response = await request(createApp())
+        .post("/api/agi/realtime/session")
+        .send({
+          runtime_agent_mode: "live_voice",
+          runtime_agent_authority: "suggest_actions",
+          transport: "webrtc",
+        })
+        .expect(403);
+
+      expect(transport).not.toHaveBeenCalled();
+      expect(response.body).toMatchObject({
+        error: "realtime_runtime_agent_locked_by_account_policy",
+        blocked_reason: "developer_account_required",
+        openai_network_call_attempted: false,
+        ephemeral_credential_minted: false,
+        realtime_runtime_session_summary: expect.objectContaining({
+          live_session_admission_status: "locked_by_account_policy",
+          openai_network_call_attempted: false,
+          provider_session_ref: null,
+        }),
+      });
+      const serialized = JSON.stringify(response.body);
+      expect(serialized).not.toContain("locked-server-key-must-not-leak");
+      expect(serialized).not.toContain("locked-secret-must-not-export");
+    } finally {
+      if (previousDescriptor === undefined) delete process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED;
+      else process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED = previousDescriptor;
+      if (previousAdapter === undefined) delete process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED;
+      else process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED = previousAdapter;
+      if (previousTransport === undefined) delete process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED;
+      else process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED = previousTransport;
+      if (previousContract === undefined) delete process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED;
+      else process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED = previousContract;
+      if (previousKey === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = previousKey;
+    }
+  });
+
+  it("returns a typed missing-key envelope for developer OpenAI contract admission", async () => {
+    const previousDescriptor = process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED;
+    const previousAdapter = process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED;
+    const previousTransport = process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED;
+    const previousContract = process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED;
+    const previousKey = process.env.OPENAI_API_KEY;
+    const transport = vi.fn(async () => ({
+      ok: true,
+      providerSessionRef: "provider:session:missing-key",
+    }));
+    setOpenAiRealtimeContractTransportForTests(transport);
+    process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED = "1";
+    process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED = "1";
+    process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED = "1";
+    process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED = "1";
+    delete process.env.OPENAI_API_KEY;
+    try {
+      const agent = await createDeveloperAgent();
+      const response = await agent
+        .post("/api/agi/realtime/session")
+        .send({
+          runtime_agent_mode: "live_voice",
+          runtime_agent_authority: "suggest_actions",
+          transport: "webrtc",
+          visible_user_consent_receipt: "receipt:visible-consent:missing-key",
+        })
+        .expect(409);
+
+      expect(transport).not.toHaveBeenCalled();
+      expect(response.body).toMatchObject({
+        error: "realtime_session_disabled",
+        blocked_reason: "missing_openai_key",
+        provider_session_ref: null,
+        openai_network_call_attempted: false,
+        ephemeral_credential_minted: false,
+        transport_plan: expect.objectContaining({
+          adapter_id: "openai_realtime",
+          adapter_state: "missing_key",
+          live_execution_disabled_reason: "missing_openai_key",
+        }),
+        realtime_runtime_session_summary: expect.objectContaining({
+          live_session_admission_status: "missing_openai_key",
+          adapter_id: "openai_realtime",
+          adapter_state: "missing_key",
+          latest_failure_code: "missing_openai_key",
+          openai_network_call_attempted: false,
+          provider_session_ref: null,
+        }),
+      });
+    } finally {
+      if (previousDescriptor === undefined) delete process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED;
+      else process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED = previousDescriptor;
+      if (previousAdapter === undefined) delete process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED;
+      else process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED = previousAdapter;
+      if (previousTransport === undefined) delete process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED;
+      else process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED = previousTransport;
+      if (previousContract === undefined) delete process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED;
+      else process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED = previousContract;
+      if (previousKey === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = previousKey;
+    }
+  });
+
+  it("returns a browser-safe OpenAI Realtime session contract for guarded developer admission", async () => {
+    const previousDescriptor = process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED;
+    const previousAdapter = process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED;
+    const previousTransport = process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED;
+    const previousContract = process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED;
+    const previousKey = process.env.OPENAI_API_KEY;
+    const transport = vi.fn(async () => ({
+      ok: true,
+      providerSessionRef: "provider:session:route",
+      ephemeralClientSecret: "route-ephemeral-secret-must-not-debug",
+      ephemeralClientSecretExpiresAtMs: 1783550100000,
+    }));
+    setOpenAiRealtimeContractTransportForTests(transport);
+    process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED = "1";
+    process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED = "1";
+    process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED = "1";
+    process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED = "1";
+    process.env.OPENAI_API_KEY = "route-server-key-must-not-leak";
+    try {
+      const agent = await createDeveloperAgent();
+      const response = await agent
+        .post("/api/agi/realtime/session")
+        .send({
+          runtime_agent_mode: "live_voice",
+          runtime_agent_authority: "suggest_actions",
+          transport: "webrtc",
+          selected_model_or_service: "gpt-realtime",
+          visible_user_consent_receipt: "receipt:visible-consent:route",
+        })
+        .expect(200);
+
+      expect(transport).toHaveBeenCalledWith({
+        apiKey: "route-server-key-must-not-leak",
+        model: "gpt-realtime",
+        requestedTransport: "webrtc",
+        runtimeAgentMode: "live_voice",
+        runtimeAgentAuthority: "suggest_actions",
+        clientReceiptRefs: ["receipt:visible-consent:route"],
+      });
+      expect(response.body).toMatchObject({
+        ok: true,
+        error: null,
+        blocked_reason: null,
+        client_secret_requested: true,
+        client_secret_issued: true,
+        sdp_exchange_requested: true,
+        provider_session_ref: "provider:session:route",
+        openai_network_call_attempted: true,
+        ephemeral_credential_minted: true,
+        transport_plan: expect.objectContaining({
+          adapter_id: "openai_realtime",
+          adapter_state: "contract_ready",
+          planned_transport: "webrtc",
+          client_secret_requested: true,
+          client_secret_issued: true,
+          sdp_exchange_requested: true,
+          provider_session_ref: "provider:session:route",
+          ephemeral_client_secret_expires_at_ms: 1783550100000,
+        }),
+        realtime_runtime_session_summary: expect.objectContaining({
+          live_session_admission_status: "openai_realtime_contract_ready",
+          adapter_id: "openai_realtime",
+          adapter_state: "contract_ready",
+          provider_session_ref: "provider:session:route",
+          openai_network_call_attempted: true,
+          ephemeral_client_secret_expires_at_ms: 1783550100000,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        }),
+        realtime_runtime_session_events: [
+          expect.objectContaining({
+            event_type: "session.openai_realtime_contract_ready",
+            admission_status: "openai_realtime_contract_ready",
+            openai_network_call_attempted: true,
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          }),
+        ],
+      });
+      const serialized = JSON.stringify(response.body);
+      expect(serialized).not.toContain("route-server-key-must-not-leak");
+      expect(serialized).not.toContain("route-ephemeral-secret-must-not-debug");
+      expect(serialized).not.toContain("OPENAI_API_KEY");
+      expect(serialized).not.toContain("v=0");
+    } finally {
+      if (previousDescriptor === undefined) delete process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED;
+      else process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED = previousDescriptor;
+      if (previousAdapter === undefined) delete process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED;
+      else process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED = previousAdapter;
+      if (previousTransport === undefined) delete process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED;
+      else process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED = previousTransport;
+      if (previousContract === undefined) delete process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED;
+      else process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED = previousContract;
+      if (previousKey === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = previousKey;
+    }
+  });
+
+  it("returns a typed OpenAI Realtime contract failure envelope without leaking provider payloads", async () => {
+    const previousDescriptor = process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED;
+    const previousAdapter = process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED;
+    const previousTransport = process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED;
+    const previousContract = process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED;
+    const previousKey = process.env.OPENAI_API_KEY;
+    const transport = vi.fn(async () => ({
+      ok: false,
+      failureReason: "fixture_contract_failure",
+      providerSessionRef: "provider:should-not-export",
+      ephemeralClientSecret: "failed-secret-must-not-export",
+    }));
+    setOpenAiRealtimeContractTransportForTests(transport);
+    process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED = "1";
+    process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED = "1";
+    process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED = "1";
+    process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED = "1";
+    process.env.OPENAI_API_KEY = "failure-server-key-must-not-leak";
+    try {
+      const agent = await createDeveloperAgent();
+      const response = await agent
+        .post("/api/agi/realtime/session")
+        .send({
+          runtime_agent_mode: "live_voice",
+          runtime_agent_authority: "suggest_actions",
+          transport: "webrtc",
+        })
+        .expect(409);
+
+      expect(transport).toHaveBeenCalledTimes(1);
+      expect(response.body).toMatchObject({
+        error: "realtime_openai_contract_failed",
+        blocked_reason: "openai_realtime_contract_failed",
+        provider_session_ref: null,
+        openai_network_call_attempted: true,
+        ephemeral_credential_minted: false,
+        transport_plan: expect.objectContaining({
+          adapter_id: "openai_realtime",
+          adapter_state: "contract_failed",
+          live_execution_disabled_reason: "fixture_contract_failure",
+          client_secret_issued: false,
+        }),
+        realtime_runtime_session_summary: expect.objectContaining({
+          live_session_admission_status: "openai_realtime_contract_failed",
+          latest_failure_code: "openai_realtime_contract_failed",
+          provider_session_ref: null,
+          openai_network_call_attempted: true,
+        }),
+      });
+      const serialized = JSON.stringify(response.body);
+      expect(serialized).not.toContain("failure-server-key-must-not-leak");
+      expect(serialized).not.toContain("failed-secret-must-not-export");
+      expect(serialized).not.toContain("provider:should-not-export");
+      expect(serialized).not.toContain("OPENAI_API_KEY");
+    } finally {
+      if (previousDescriptor === undefined) delete process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED;
+      else process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED = previousDescriptor;
+      if (previousAdapter === undefined) delete process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED;
+      else process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED = previousAdapter;
+      if (previousTransport === undefined) delete process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED;
+      else process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED = previousTransport;
+      if (previousContract === undefined) delete process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED;
+      else process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED = previousContract;
+      if (previousKey === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = previousKey;
     }
   });
 

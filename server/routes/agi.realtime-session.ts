@@ -36,6 +36,17 @@ const respondRealtimeBoundary = async (input: {
   const body = readRecord(input.req.body);
   const accountPolicy = await accountPolicyForRequest(input.req);
   const policyGate = resolveRealtimeSessionPolicyGate({ accountPolicy, body });
+
+  if (!policyGate.runtime_agent_controls_available) {
+    return input.res.status(403).json(buildRealtimeSessionBoundaryResponse({
+      action: input.action,
+      accountPolicy,
+      body,
+      realtimeSessionId: input.realtimeSessionId ?? null,
+      blockedReason: "account_policy_locked",
+    }));
+  }
+
   const adapter = selectRealtimeSessionAdapter();
   const adapterArgs = {
     body,
@@ -51,13 +62,15 @@ const respondRealtimeBoundary = async (input: {
           ? await adapter.recordClientReceipt(adapterArgs)
           : await adapter.recordProviderEvent(adapterArgs);
 
-  if (!policyGate.runtime_agent_controls_available) {
-    return input.res.status(403).json(buildRealtimeSessionBoundaryResponse({
-      action: input.action,
+  if (
+    input.action === "start" &&
+    adapterResult.ok === true &&
+    adapterResult.blocked_reason === "openai_realtime_contract_ready"
+  ) {
+    return input.res.status(200).json(buildRealtimeSessionAdmissionResponse({
       accountPolicy,
       body,
       realtimeSessionId: input.realtimeSessionId ?? null,
-      blockedReason: "account_policy_locked",
       adapterResult,
     }));
   }
@@ -65,7 +78,8 @@ const respondRealtimeBoundary = async (input: {
   if (
     input.action === "start" &&
     adapterResult.transport_plan.descriptor_enabled &&
-    adapterResult.transport_plan.adapter_enabled
+    adapterResult.transport_plan.adapter_enabled &&
+    adapterResult.adapter_id === "openai_realtime_stub"
   ) {
     return input.res.status(200).json(buildRealtimeSessionAdmissionResponse({
       accountPolicy,

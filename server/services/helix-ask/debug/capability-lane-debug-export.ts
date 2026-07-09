@@ -650,6 +650,31 @@ const normalizeRealtimeRuntimeSessionSummary = (
 ): HelixLiveRuntimeAgentControlState => {
   const record = readRecord(value);
   const fallbackTransportPlan = buildRealtimeSessionTransportPlan();
+  const sanitizeTransportPlan = (transportPlan: unknown): RecordLike | null => {
+    const plan = readRecord(transportPlan);
+    if (!plan) return null;
+    const {
+      client_secret: _clientSecret,
+      clientSecret: _clientSecretCamel,
+      ephemeral_client_secret: _ephemeralClientSecret,
+      ephemeralClientSecret: _ephemeralClientSecretCamel,
+      ephemeral_secret: _ephemeralSecret,
+      ephemeralSecret: _ephemeralSecretCamel,
+      sdp: _sdp,
+      sdp_blob: _sdpBlob,
+      sdpBlob: _sdpBlobCamel,
+      raw_provider_response: _rawProviderResponse,
+      rawProviderResponse: _rawProviderResponseCamel,
+      raw_audio: _rawAudio,
+      rawAudio: _rawAudioCamel,
+      audio_payload: _audioPayload,
+      audioPayload: _audioPayloadCamel,
+      transcript_text: _transcriptText,
+      transcriptText: _transcriptTextCamel,
+      ...safe
+    } = plan;
+    return safe;
+  };
   if (!record) {
     return {
       ...buildInactiveHelixLiveRuntimeAgentControlState(),
@@ -659,6 +684,7 @@ const normalizeRealtimeRuntimeSessionSummary = (
       transport_plan: fallbackTransportPlan,
       provider_session_ref: null,
       client_receipt_refs: [],
+      ephemeral_client_secret_expires_at_ms: null,
       client_receipt_observation_count: 0,
       latest_client_receipt_ref: null,
       latest_client_receipt_kind: null,
@@ -679,17 +705,39 @@ const normalizeRealtimeRuntimeSessionSummary = (
     selected_model_or_service: readString(record.selected_model_or_service),
     latest_failure_code: readString(record.latest_failure_code),
   });
+  const {
+    client_secret: _clientSecret,
+    clientSecret: _clientSecretCamel,
+    ephemeral_client_secret: _ephemeralClientSecret,
+    ephemeralClientSecret: _ephemeralClientSecretCamel,
+    ephemeral_secret: _ephemeralSecret,
+    ephemeralSecret: _ephemeralSecretCamel,
+    sdp: _sdp,
+    sdp_blob: _sdpBlob,
+    sdpBlob: _sdpBlobCamel,
+    raw_provider_response: _rawProviderResponse,
+    rawProviderResponse: _rawProviderResponseCamel,
+    raw_audio: _rawAudio,
+    rawAudio: _rawAudioCamel,
+    audio_payload: _audioPayload,
+    audioPayload: _audioPayloadCamel,
+    transcript_text: _transcriptText,
+    transcriptText: _transcriptTextCamel,
+    ...safeRecord
+  } = record;
+  const transportPlan = sanitizeTransportPlan(record.transport_plan) ?? fallbackTransportPlan;
   return {
     ...normalized,
-    ...record,
+    ...safeRecord,
     schema: normalized.schema,
     runtime_agent_mode: normalized.runtime_agent_mode,
     runtime_agent_authority: normalized.runtime_agent_authority,
-    adapter_id: readString(record.adapter_id) ?? fallbackTransportPlan.adapter_id,
-    adapter_state: readString(record.adapter_state) ?? fallbackTransportPlan.adapter_state,
-    transport_plan: readRecord(record.transport_plan) ?? fallbackTransportPlan,
-    provider_session_ref: null,
+    adapter_id: readString(record.adapter_id) ?? readString(transportPlan.adapter_id) ?? fallbackTransportPlan.adapter_id,
+    adapter_state: readString(record.adapter_state) ?? readString(transportPlan.adapter_state) ?? fallbackTransportPlan.adapter_state,
+    transport_plan: transportPlan,
+    provider_session_ref: readString(record.provider_session_ref),
     client_receipt_refs: readStringArray(record.client_receipt_refs),
+    ephemeral_client_secret_expires_at_ms: readNumberValue(record.ephemeral_client_secret_expires_at_ms),
     client_receipt_observation_count: readNumberValue(record.client_receipt_observation_count) ?? 0,
     latest_client_receipt_ref: readString(record.latest_client_receipt_ref),
     latest_client_receipt_kind: readString(record.latest_client_receipt_kind),

@@ -587,6 +587,175 @@ describe("Helix terminal authority single writer", () => {
     expect(String(payload.selected_final_answer)).not.toMatch(/scholarly|calculator|internet search|PDF\/full-text/i);
   });
 
+  it("does not let route evidence authority admit a scholarly terminal for a Moral Graph turn", () => {
+    const turnId = "ask:test:moral-graph-blocks-scholarly-terminal";
+    const scholarlyText =
+      "I cannot answer scholarly paper content from this turn because no scholarly-research.lookup_papers observation packet was materialized.";
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      response_type: "final_answer",
+      final_status: "completed",
+      selected_final_answer: scholarlyText,
+      final_answer_source: "scholarly_research_answer",
+      terminal_artifact_kind: "scholarly_research_answer",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "agent_provider_gateway_turn",
+        allowed_terminal_artifact_kinds: ["scholarly_research_answer", "typed_failure"],
+        forbidden_terminal_artifact_kinds: [],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      route_evidence_authority: {
+        schema: "helix.route_evidence_authority.v1",
+        turn_id: turnId,
+        candidate_tools: [
+          {
+            capability_id: "moral-graph.reflect_context",
+            family: "moral_graph_reflection",
+            reason: "prompt_requested_moral_graph",
+          },
+        ],
+        admitted_tools: [
+          {
+            capability_id: "moral-graph.reflect_context",
+            family: "moral_graph_reflection",
+            reason: "current_route_admitted_moral_graph",
+            admission_ref: "route:test",
+          },
+        ],
+        rejected_tools: [
+          {
+            capability_id: "scholarly-research.lookup_papers",
+            family: "scholarly_research",
+            reason: "not_requested_by_current_route",
+          },
+        ],
+        supporting_evidence_refs: [],
+        allowed_terminal_artifact_kinds: ["agent_provider_terminal_candidate", "typed_failure"],
+        forbidden_terminal_artifact_kinds: ["scholarly_research_answer"],
+        required_terminal_kind: "agent_provider_terminal_candidate",
+        terminal_product_allowed: true,
+        current_turn_only: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "agent_provider_gateway_turn",
+        requested_capability: "moral-graph.reflect_context",
+        required_terminal_kind: "agent_provider_terminal_candidate",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: [],
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: [],
+    });
+
+    expect(result.selected_terminal_artifact_kind).not.toBe("scholarly_research_answer");
+    expect(payload.terminal_artifact_kind).not.toBe("scholarly_research_answer");
+    expect(String(payload.selected_final_answer)).not.toBe(scholarlyText);
+  });
+
+  it("keeps stale scientific Image Lens sidecars ambient during unrelated Moral Graph turns", () => {
+    const turnId = "ask:test:moral-graph-ignores-stale-scientific-sidecar";
+    const answerText =
+      "Moral Graph reflection supports the boundary as a procedural reflection only.";
+    const staleSidecar = {
+      artifact_id: "ask:prior:scientific_image_evidence_sidecar",
+      kind: "scientific_image_evidence_sidecar",
+      source_scope: "prior_turn_context",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+      payload: {
+        schema: "helix.scientific_image_evidence_sidecar.v1",
+        source_kind: "pdf_page_render",
+        page: 5,
+        evidence_depth: "exact_row_promoted",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      response_type: "final_answer",
+      final_status: "completed",
+      selected_final_answer: answerText,
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "agent_provider_gateway_turn",
+        allowed_terminal_artifact_kinds: ["agent_provider_terminal_candidate", "typed_failure"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      route_evidence_authority: {
+        schema: "helix.route_evidence_authority.v1",
+        turn_id: turnId,
+        candidate_tools: [
+          {
+            capability_id: "moral-graph.reflect_context",
+            family: "moral_graph_reflection",
+            reason: "prompt_requested_moral_graph",
+          },
+          {
+            capability_id: "visual_analysis.inspect_image_region",
+            family: "image_lens",
+            reason: "ambient_prior_sidecar_not_requested",
+          },
+        ],
+        admitted_tools: [
+          {
+            capability_id: "moral-graph.reflect_context",
+            family: "moral_graph_reflection",
+            reason: "current_route_admitted_moral_graph",
+            admission_ref: "route:test:moral_graph",
+          },
+        ],
+        rejected_tools: [
+          {
+            capability_id: "visual_analysis.inspect_image_region",
+            family: "image_lens",
+            reason: "ambient_prior_sidecar_not_admitted",
+          },
+        ],
+        supporting_evidence_refs: ["ask:test:moral_graph_observation"],
+        allowed_terminal_artifact_kinds: ["agent_provider_terminal_candidate", "typed_failure"],
+        forbidden_terminal_artifact_kinds: ["image_lens_observation_report", "scientific_image_evidence_sidecar"],
+        required_terminal_kind: "agent_provider_terminal_candidate",
+        terminal_product_allowed: true,
+        current_turn_only: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: [staleSidecar],
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: [staleSidecar],
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("agent_provider_terminal_candidate");
+    expect(payload.selected_final_answer).toBe(answerText);
+    expect(String(payload.selected_final_answer)).not.toContain("scientific_image_evidence_sidecar_lookup_failed");
+    expect(String(payload.selected_final_answer)).not.toContain("Image Lens");
+    expect(payload.terminal_error_code).toBeFalsy();
+  });
+
   it("does not surface success-looking drafts for failed mutating capability rails", () => {
     const turnId = "ask:test:goal-session-not-admitted";
     const successLookingText =

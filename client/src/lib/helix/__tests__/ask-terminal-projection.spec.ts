@@ -323,6 +323,65 @@ describe("Helix Ask terminal projection", () => {
     expect(visible.selected_final_answer).not.toContain("scholarly paper content");
   });
 
+  it("rejects terminal envelopes forbidden by route evidence authority", () => {
+    const staleScholarlyFallback =
+      "I cannot answer scholarly paper content from this turn because no scholarly-research.lookup_papers observation packet was materialized.";
+    const visible = buildVisibleResolvedTurn({
+      id: "reply-moral-graph-route-authority-vetoes-scholarly-envelope",
+      ok: true,
+      terminal_answer_envelope: {
+        terminal_kind: "final_answer",
+        terminal_artifact_kind: "scholarly_research_answer",
+        final_answer_source: "scholarly_research_answer",
+        terminal_text: staleScholarlyFallback,
+      },
+      route_evidence_authority: {
+        schema: "helix.route_evidence_authority.v1",
+        turn_id: "ask:moral-graph-route-authority-vetoes-scholarly-envelope",
+        candidate_tools: [
+          {
+            capability_id: "moral-graph.reflect_context",
+            family: "moral_graph",
+            reason: "requested_route",
+          },
+          {
+            capability_id: "scholarly-research.lookup_papers",
+            family: "scholarly_research",
+            reason: "ambient_context_rejected",
+          },
+        ],
+        admitted_tools: [
+          {
+            capability_id: "moral-graph.reflect_context",
+            family: "moral_graph",
+            admission_ref: "ask:moral-graph-route-authority:admission",
+          },
+        ],
+        rejected_tools: [
+          {
+            capability_id: "scholarly-research.lookup_papers",
+            family: "scholarly_research",
+            reason: "route_suppressed",
+          },
+        ],
+        supporting_evidence_refs: ["ask:moral-graph-route-authority:moral_graph_observation"],
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+        forbidden_terminal_artifact_kinds: ["scholarly_research_answer"],
+        required_terminal_kind: null,
+        terminal_product_allowed: true,
+        current_turn_only: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+
+    expect(visible.primary_terminal_label).toBe("final_failure");
+    expect(visible.primary_source_label).toBe("typed failure");
+    expect(visible.terminal_error_code).toBe("route_terminal_product_not_allowed");
+    expect(visible.selected_final_answer).not.toBe(staleScholarlyFallback);
+    expect(visible.selected_final_answer).not.toContain("scholarly paper content");
+  });
+
   it("lets structured workstation gateway success outrank stale typed-failure labels", () => {
     const reply = {
       id: "reply-codex-workstation-live-stale-failure",

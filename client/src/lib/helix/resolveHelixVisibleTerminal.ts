@@ -72,6 +72,10 @@ function firstRecordFromArray(value: unknown): RecordLike | null {
   return null;
 }
 
+function readStringSet(value: unknown): Set<string> {
+  return new Set(readArray(value).map((entry) => readString(entry)).filter(Boolean));
+}
+
 function firstText(...values: unknown[]): string {
   for (const value of values) {
     const text = normalizeTerminalText(value);
@@ -83,6 +87,45 @@ function firstText(...values: unknown[]): string {
 function firstTerminalErrorCode(...values: unknown[]): string {
   const codes = values.map((value) => firstText(value)).filter(Boolean);
   return codes.find((code) => code !== "terminal_projection_mismatch") ?? codes[0] ?? "";
+}
+
+function readRouteEvidenceAuthority(
+  record: RecordLike | null,
+  debug: RecordLike | null,
+  agentLoop: RecordLike | null,
+): RecordLike | null {
+  const debugSolverTrace = readRecord(debug?.ask_turn_solver_trace);
+  const recordSolverTrace = readRecord(record?.ask_turn_solver_trace);
+  const authority = firstRecord(
+    record?.route_evidence_authority,
+    debug?.route_evidence_authority,
+    agentLoop?.route_evidence_authority,
+    recordSolverTrace?.route_evidence_authority,
+    debugSolverTrace?.route_evidence_authority,
+  );
+  return authority?.schema === "helix.route_evidence_authority.v1" ? authority : null;
+}
+
+function routeEvidenceAuthorityAllowsTerminalKind(
+  authority: RecordLike | null,
+  terminalArtifactKind: string | null,
+): boolean {
+  if (!authority) return true;
+  const kind = readString(terminalArtifactKind);
+  if (kind === "typed_failure" || kind === "request_user_input") return true;
+  if (authority.terminal_product_allowed === false) return false;
+  if (!kind) return false;
+
+  const forbiddenKinds = readStringSet(authority.forbidden_terminal_artifact_kinds);
+  if (forbiddenKinds.has(kind)) return false;
+
+  const requiredKind = readString(authority.required_terminal_kind);
+  if (requiredKind && kind !== requiredKind) return false;
+
+  const allowedKinds = readStringSet(authority.allowed_terminal_artifact_kinds);
+  if (allowedKinds.size > 0 && !allowedKinds.has(kind)) return false;
+
+  return true;
 }
 
 export function normalizeFinalAnswerSourceForTerminalKind(
@@ -302,6 +345,7 @@ export function resolveHelixVisibleTerminal(
     firstRecordFromArray(debug?.terminal_results),
   );
   const summary = firstRecord(record?.resolved_turn_summary, debug?.resolved_turn_summary);
+  const routeEvidenceAuthority = readRouteEvidenceAuthority(record, debug, agentLoop);
   const sourceCapabilityTurn = isSourceOrCapabilityTurn({ record, debug, agentLoop });
   const recoveredModelDirectAnswer =
     !sourceCapabilityTurn && hasSatisfiedDirectAnswerGoal(record, debug) ? directAnswerTextFromRecord(record, debug) : "";
@@ -393,6 +437,21 @@ export function resolveHelixVisibleTerminal(
     !firstText(singleWriter?.visible_text) &&
     !firstText(presentation?.concise_text) &&
     Boolean(selectedFinalAnswer);
+
+  if (!routeEvidenceAuthorityAllowsTerminalKind(routeEvidenceAuthority, terminalArtifactKind)) {
+    const text = renderTypedFailureFallback("route_terminal_product_not_allowed");
+    return {
+      text,
+      source: "typed_failure",
+      backendTerminalText: text,
+      terminalKind: "failure",
+      terminalArtifactKind: "typed_failure",
+      finalAnswerSource: "typed_failure",
+      terminalErrorCode: "route_terminal_product_not_allowed",
+      authorityVerified: false,
+      usedLegacyShadow: false,
+    };
+  }
 
   if (envelopeText) {
     return {

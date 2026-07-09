@@ -1358,21 +1358,28 @@ const isStagePlayPostObservationSynthesisText = (value: unknown): boolean =>
 
 const routeContractAllowedTerminalKinds = (payload: Record<string, unknown>): string[] =>
   applyCompoundTerminalPolicy(payload, {
-    allowed: readArray(
-      readRecord(payload.committed_ask_route)?.schema === HELIX_COMMITTED_ASK_ROUTE_SCHEMA
-        ? readRecord(readRecord(payload.committed_ask_route)?.canonical_goal)?.allowed_terminal_artifact_kinds
-        : readRecord(payload.route_product_contract)?.allowed_terminal_artifact_kinds,
-    )
+    allowed: [
+      ...readArray(
+        readRecord(payload.committed_ask_route)?.schema === HELIX_COMMITTED_ASK_ROUTE_SCHEMA
+          ? readRecord(readRecord(payload.committed_ask_route)?.canonical_goal)?.allowed_terminal_artifact_kinds
+          : readRecord(payload.route_product_contract)?.allowed_terminal_artifact_kinds,
+      ),
+      ...readArray(readRecord(payload.route_evidence_authority)?.allowed_terminal_artifact_kinds),
+    ]
       .map(readString)
       .filter((entry): entry is string => Boolean(entry)),
-    forbidden: readArray(
-      readRecord(payload.committed_ask_route)?.schema === HELIX_COMMITTED_ASK_ROUTE_SCHEMA
-        ? readRecord(readRecord(payload.committed_ask_route)?.canonical_goal)?.forbidden_terminal_artifact_kinds
-        : readRecord(payload.route_product_contract)?.forbidden_terminal_artifact_kinds,
-    )
+    forbidden: [
+      ...readArray(
+        readRecord(payload.committed_ask_route)?.schema === HELIX_COMMITTED_ASK_ROUTE_SCHEMA
+          ? readRecord(readRecord(payload.committed_ask_route)?.canonical_goal)?.forbidden_terminal_artifact_kinds
+          : readRecord(payload.route_product_contract)?.forbidden_terminal_artifact_kinds,
+      ),
+      ...readArray(readRecord(payload.route_evidence_authority)?.forbidden_terminal_artifact_kinds),
+    ]
       .map(readString)
       .filter((entry): entry is string => Boolean(entry)),
     requiredTerminalKind:
+      readString(readRecord(payload.route_evidence_authority)?.required_terminal_kind) ??
       readString(readRecord(readRecord(payload.committed_ask_route)?.canonical_goal)?.required_terminal_kind) ??
       readString(readRecord(payload.route_product_contract)?.required_terminal_kind),
   }).allowed;
@@ -1390,10 +1397,15 @@ const committedRouteForbiddenTerminalKinds = (payload: Record<string, unknown>):
     allowed: readArray(readRecord(readRecord(payload.committed_ask_route)?.canonical_goal)?.allowed_terminal_artifact_kinds)
       .map(readString)
       .filter((entry): entry is string => Boolean(entry)),
-    forbidden: readArray(readRecord(readRecord(payload.committed_ask_route)?.canonical_goal)?.forbidden_terminal_artifact_kinds)
+    forbidden: [
+      ...readArray(readRecord(readRecord(payload.committed_ask_route)?.canonical_goal)?.forbidden_terminal_artifact_kinds),
+      ...readArray(readRecord(payload.route_evidence_authority)?.forbidden_terminal_artifact_kinds),
+    ]
       .map(readString)
       .filter((entry): entry is string => Boolean(entry)),
-    requiredTerminalKind: readString(readRecord(readRecord(payload.committed_ask_route)?.canonical_goal)?.required_terminal_kind),
+    requiredTerminalKind:
+      readString(readRecord(payload.route_evidence_authority)?.required_terminal_kind) ??
+      readString(readRecord(readRecord(payload.committed_ask_route)?.canonical_goal)?.required_terminal_kind),
   }).forbidden.filter((kind) => {
     if (kind !== "doc_evidence_synthesis_answer") return true;
     const canonicalGoal = readRecord(payload.canonical_goal_frame);
@@ -1448,6 +1460,19 @@ const routeContractAllowsTerminalKind = (
     readString(canonicalGoal?.required_terminal_kind) === "note_update_receipt"
   ) {
     return false;
+  }
+  const routeEvidenceAuthority = readRecord(payload.route_evidence_authority);
+  if (routeEvidenceAuthority?.schema === "helix.route_evidence_authority.v1") {
+    const allowed = readArray(routeEvidenceAuthority.allowed_terminal_artifact_kinds)
+      .map(readString)
+      .filter((entry): entry is string => Boolean(entry));
+    const forbidden = readArray(routeEvidenceAuthority.forbidden_terminal_artifact_kinds)
+      .map(readString)
+      .filter((entry): entry is string => Boolean(entry));
+    if (forbidden.includes(kind)) return false;
+    if (kind !== "typed_failure" && kind !== "request_user_input" && allowed.length > 0 && !allowed.includes(kind)) {
+      return false;
+    }
   }
   const compoundPolicy = applyCompoundTerminalPolicy(payload, {
     allowed: routeContractAllowedTerminalKinds(payload),
@@ -5910,7 +5935,120 @@ export function applyHelixTerminalAuthoritySingleWriter(
       ? artifactId(deterministicReceiptFallbackDraft.artifact)
       : readString(input.payload.terminal_artifact_id);
   }
-  const appliedEnvelope = applyTerminalAnswerEnvelope(input.payload, envelope);
+  if (
+    selectedArtifactKind &&
+    selectedArtifactKind !== "typed_failure" &&
+    selectedArtifactKind !== "request_user_input" &&
+    !routeContractAllowsTerminalKind(input.payload, selectedArtifactKind)
+  ) {
+    rejectedCandidates.push({
+      ref: selectedArtifactRef ?? undefined,
+      kind: selectedArtifactKind,
+      source: selectedSource,
+      reason: "route_contract_forbidden",
+    });
+    const routeBlockedText =
+      `I could not complete this turn because the selected terminal product ` +
+      `${selectedArtifactKind} is not allowed by the current route authority.`;
+    selectedArtifactRef = `${input.turnId}:typed_failure:route_terminal_product_not_allowed`;
+    selectedArtifactKind = "typed_failure";
+    selectedSource = "typed_failure";
+    input.payload.ok = false;
+    input.payload.response_type = "final_answer";
+    input.payload.final_status = "typed_failure";
+    input.payload.status = "typed_failure";
+    input.payload.terminal_artifact_kind = "typed_failure";
+    input.payload.final_answer_source = "typed_failure";
+    input.payload.terminal_error_code = "route_terminal_product_not_allowed";
+    input.payload.selected_final_answer = routeBlockedText;
+    input.payload.answer = routeBlockedText;
+    input.payload.text = routeBlockedText;
+    input.payload.assistant_answer = false;
+    input.payload.typed_failure = {
+      schema: "helix.typed_failure.v1",
+      turn_id: input.turnId,
+      error_code: "route_terminal_product_not_allowed",
+      message: routeBlockedText,
+      blocked_terminal_artifact_kind: rejectedCandidates[rejectedCandidates.length - 1]?.kind ?? null,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    input.payload.terminal_presentation = {
+      ...(readRecord(input.payload.terminal_presentation) ?? {}),
+      schema: "helix.terminal_presentation.v1",
+      turn_id: input.turnId,
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      concise_text: routeBlockedText,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    envelope = {
+      ...envelope,
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_text: routeBlockedText,
+      terminal_text_hash: hashHelixTerminalText(routeBlockedText),
+      terminal_kind: "failure",
+      authority_origin: "typed_failure",
+    };
+  }
+  let appliedEnvelope = applyTerminalAnswerEnvelope(input.payload, envelope);
+  if (
+    appliedEnvelope.terminal_artifact_kind &&
+    appliedEnvelope.terminal_artifact_kind !== "typed_failure" &&
+    appliedEnvelope.terminal_artifact_kind !== "request_user_input" &&
+    !routeContractAllowsTerminalKind(input.payload, appliedEnvelope.terminal_artifact_kind)
+  ) {
+    rejectedCandidates.push({
+      ref: selectedArtifactRef ?? undefined,
+      kind: appliedEnvelope.terminal_artifact_kind,
+      source: appliedEnvelope.final_answer_source ?? selectedSource,
+      reason: "route_contract_forbidden",
+    });
+    const routeBlockedText =
+      `I could not complete this turn because the selected terminal product ` +
+      `${appliedEnvelope.terminal_artifact_kind} is not allowed by the current route authority.`;
+    selectedArtifactRef = `${input.turnId}:typed_failure:route_terminal_product_not_allowed`;
+    selectedArtifactKind = "typed_failure";
+    selectedSource = "typed_failure";
+    envelope = {
+      ...envelope,
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_text: routeBlockedText,
+      terminal_text_hash: hashHelixTerminalText(routeBlockedText),
+      terminal_kind: "failure",
+      authority_origin: "typed_failure",
+    };
+    input.payload.terminal_artifact_kind = "typed_failure";
+    input.payload.final_answer_source = "typed_failure";
+    input.payload.terminal_error_code = "route_terminal_product_not_allowed";
+    input.payload.selected_final_answer = routeBlockedText;
+    input.payload.answer = routeBlockedText;
+    input.payload.text = routeBlockedText;
+    input.payload.assistant_answer = false;
+    input.payload.typed_failure = {
+      schema: "helix.typed_failure.v1",
+      turn_id: input.turnId,
+      error_code: "route_terminal_product_not_allowed",
+      message: routeBlockedText,
+      blocked_terminal_artifact_kind: rejectedCandidates[rejectedCandidates.length - 1]?.kind ?? null,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    input.payload.terminal_presentation = {
+      ...(readRecord(input.payload.terminal_presentation) ?? {}),
+      schema: "helix.terminal_presentation.v1",
+      turn_id: input.turnId,
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      concise_text: routeBlockedText,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    appliedEnvelope = applyTerminalAnswerEnvelope(input.payload, envelope);
+  }
   if (deterministicReceiptFallbackCanSurface && deterministicReceiptFallbackDraft) {
     input.payload.final_answer_source = "deterministic_receipt_fallback";
     const terminalAuthority = readRecord(input.payload.terminal_answer_authority);
