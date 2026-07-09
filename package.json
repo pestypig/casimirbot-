@@ -509,7 +509,7 @@
     "express": "^4.21.2",
     "express-session": "^1.18.1",
     "ez_canvas_controller": "^1.0.0",
-    "fast-xml-parser": "^5.2.5",
+    "fast-xml-parser": "^5.9.3",
     "framer-motion": "^11.13.1",
     "gl-matrix": "^3.4.4",
     "google-auth-library": "^10.5.0",
@@ -518,6 +518,7 @@
     "input-otp": "^1.4.2",
     "ioredis": "^5.4.1",
     "jsonwebtoken": "^9.0.2",
+    "katex": "^0.16.45",
     "lucide-react": "^0.453.0",
     "marked": "^15.0.12",
     "mathjs": "^15.2.0",
@@ -566,6 +567,9 @@
     "zod-validation-error": "^3.4.0",
     "zustand": "^4.5.2"
   },
+  "overrides": {
+    "fast-xml-parser": "$fast-xml-parser"
+  },
   "devDependencies": {
     "@hpcc-js/wasm": "^2.33.5",
     "@playwright/test": "^1.57.0",
@@ -592,7 +596,6 @@
     "fast-glob": "^3.3.2",
     "gray-matter": "^4.0.3",
     "jsdom": "^25.0.1",
-    "katex": "^0.16.45",
     "supertest": "^7.1.1",
     "tsx": "^4.21.0",
     "vega": "^6.2.0",

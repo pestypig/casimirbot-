@@ -742,8 +742,19 @@ export function buildRouteEvidenceAuthority(input: {
         admission_ref: route.commit_id,
       }))
     : [];
-  const allowedTerminalArtifactKinds = route?.canonical_goal.allowed_terminal_artifact_kinds ?? [];
-  const forbiddenTerminalArtifactKinds = route?.canonical_goal.forbidden_terminal_artifact_kinds ?? [];
+  const requiredTerminalKind = route?.canonical_goal.required_terminal_kind ?? null;
+  const normalizedRequiredTerminalKind = normalizeCommittedRouteTerminalKind(requiredTerminalKind);
+  const forbiddenTerminalArtifactKinds = (route?.canonical_goal.forbidden_terminal_artifact_kinds ?? []).filter(
+    (kind) => normalizeCommittedRouteTerminalKind(kind) !== normalizedRequiredTerminalKind,
+  );
+  const allowedTerminalArtifactKinds = unique([
+    ...(route?.canonical_goal.allowed_terminal_artifact_kinds ?? []),
+    requiredTerminalKind ?? "",
+  ]).filter((kind) => {
+    const normalized = normalizeCommittedRouteTerminalKind(kind);
+    return Boolean(normalized && normalized !== "unknown") &&
+      !forbiddenTerminalArtifactKinds.some((forbidden) => normalizeCommittedRouteTerminalKind(forbidden) === normalized);
+  });
   const allowedTerminalOutputRoles = uniqueOutputRoles(
     allowedTerminalArtifactKinds.map((kind) => helixToolOutputRoleForTerminalKind(kind)),
   );
@@ -757,7 +768,7 @@ export function buildRouteEvidenceAuthority(input: {
     supporting_evidence_refs: readSupportingEvidenceRefsFromPayload(payload),
     allowed_terminal_artifact_kinds: allowedTerminalArtifactKinds,
     forbidden_terminal_artifact_kinds: forbiddenTerminalArtifactKinds,
-    required_terminal_kind: route?.canonical_goal.required_terminal_kind ?? null,
+    required_terminal_kind: requiredTerminalKind,
     allowed_terminal_output_roles: allowedTerminalOutputRoles,
     required_terminal_output_role: requiredTerminalOutputRole,
     terminal_product_allowed: Boolean(route && allowedTerminalArtifactKinds.length > 0),

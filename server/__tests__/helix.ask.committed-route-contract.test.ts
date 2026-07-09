@@ -53,6 +53,73 @@ const docsRouteContract = {
 };
 
 describe("Helix Ask committed route contract", () => {
+  it("keeps route evidence authority terminal allowance consistent with the required terminal kind", () => {
+    const authority = buildRouteEvidenceAuthority({
+      committedRoute: {
+        schema: "helix.committed_ask_route.v1",
+        turn_id: "ask:test:theory-reflection-authority-consistency",
+        commit_id: "committed-route:test-theory-reflection",
+        prompt_hash: "hash",
+        committed_at_stage: "post_prompt_source_arbitration",
+        prompt_intent: {
+          primary_intent_kind: "general_reasoning",
+          secondary_intent_kinds: [],
+          interpretation_ref: "prompt_interpretation",
+          arbitration_ref: "intent_arbitration",
+        },
+        route: {
+          selected_route: "/ask",
+          source_target: "theory_locator",
+          target_kind: "theory_locator",
+          strength: "hard",
+          source_identity: null,
+          route_reason: "explicit_capability_contract",
+          stale_metadata_policy: "ignore_unless_matches_commit",
+        },
+        canonical_goal: {
+          goal_kind: "theory_locator",
+          required_terminal_kind: "theory_context_reflection_answer",
+          allowed_terminal_artifact_kinds: ["final_answer_draft", "compound_evidence_synthesis_answer", "model_synthesized_answer"],
+          forbidden_terminal_artifact_kinds: ["tool_receipt", "calculator_receipt"],
+        },
+        capability_policy: {
+          allowed_tool_families: ["workstation_tool_gateway", "theory_locator"],
+          suppressed_tool_families: [],
+          required_capability_families: ["theory_locator"],
+          mutating_families_allowed: false,
+        },
+        suppression: {
+          contextual_tool_mentions: [],
+          negative_constraints: [],
+          suppressed_families: [],
+          firewall_required: true,
+        },
+        terminal_product: {
+          terminal_authority_required: true,
+          evidence_reentry_required: true,
+          followup_reasoning_required: false,
+          required_terminal_product: "theory_context_reflection_answer",
+        },
+        transitions: [],
+        compatibility: {
+          source_goal_capability_terminal_compatible: true,
+          stale_metadata_ignored: false,
+          shortcut_firewall_applied: false,
+          violations: [],
+        },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      payload: {
+        turn_id: "ask:test:theory-reflection-authority-consistency",
+      },
+    });
+
+    expect(authority.required_terminal_kind).toBe("theory_context_reflection_answer");
+    expect(authority.allowed_terminal_artifact_kinds).toContain("theory_context_reflection_answer");
+    expect(authority.forbidden_terminal_artifact_kinds).not.toContain("theory_context_reflection_answer");
+  });
+
   it("allows direct model terminal products for plain no-source prompts", () => {
     const promptInterpretation = interpretHelixAskPrompt("Answer normally with no tools: what is 2+2?");
     const committedRoute = buildCommittedAskRoute({

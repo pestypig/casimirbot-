@@ -4588,6 +4588,38 @@ const formatImageLensCandidateBlock = (
   return [`- ${label}:`, `\`\`\`${fence}`, value.replace(/```/g, "`\u200b``"), "```"].join("\n");
 };
 
+const imageLensReceiptDedupeKey = (result: Record<string, unknown>): string => {
+  const receipt = readRecord(result.receipt) ?? readRecord(result.observation) ?? result;
+  const bbox = readRecord(receipt.bbox_px ?? receipt.bboxPx);
+  const bboxKey = bbox
+    ? [
+        readNumber(bbox.x) ?? "?",
+        readNumber(bbox.y) ?? "?",
+        readNumber(bbox.width) ?? "?",
+        readNumber(bbox.height) ?? "?",
+      ].join(",")
+    : "bbox:missing";
+  return [
+    readString(receipt.region_label) ?? readString(receipt.requested_equation_label) ?? "region:unknown",
+    bboxKey,
+    readString(receipt.extraction_status ?? receipt.extractionStatus) ?? "status:unknown",
+    readString(receipt.label_match_status) ?? "label_match:unknown",
+    readString(receipt.exact_equation_admissibility) ?? "admissibility:unknown",
+    readString(receipt.text_candidate ?? receipt.textCandidate) ?? "text:missing",
+    readString(receipt.latex_candidate ?? receipt.latexCandidate) ?? "latex:missing",
+  ].join("|");
+};
+
+const dedupeImageLensReceiptResults = (results: Record<string, unknown>[]): Record<string, unknown>[] => {
+  const seen = new Set<string>();
+  return results.filter((result) => {
+    const key = imageLensReceiptDedupeKey(result);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
 const buildImageLensObservationFallbackAnswer = (input: {
   question: string;
   capabilityLaneCallResults: unknown[];
@@ -4607,11 +4639,12 @@ const buildImageLensObservationFallbackAnswer = (input: {
           (packet as unknown as Record<string, unknown>)
         ),
     );
-  if (imageLensResults.length === 0) return null;
+  const uniqueImageLensResults = dedupeImageLensReceiptResults(imageLensResults);
+  if (uniqueImageLensResults.length === 0) return null;
 
   let failedScholarlyPageExtractionCount = 0;
   let usefulExtractionCount = 0;
-  const sections = imageLensResults.map((result, index) => {
+  const sections = uniqueImageLensResults.map((result, index) => {
     const receipt = readRecord(result.receipt) ?? readRecord(result.observation) ?? result;
     const label =
       readString(receipt.region_label) ??
@@ -11828,7 +11861,6 @@ export const codexProvider: HelixAgentProvider = {
     const theoryReflectionReceiptProjection =
       !compoundTerminalAuthorized &&
       !scholarlyExploratoryTerminalAuthority &&
-      !providerTerminalAuthorized &&
       gatewayCallsSucceeded(gatewayCallResults)
         ? buildCodexTheoryReflectionReceiptAnswer({
             turnId,
@@ -12333,7 +12365,18 @@ export const codexProvider: HelixAgentProvider = {
         : {}),
       ...(compoundAnswer ? { compound_evidence_synthesis_answer: compoundAnswer } : {}),
       ...(theoryReflectionReceiptProjection
-        ? { theory_reflection_receipt_answer: theoryReflectionReceiptProjection.answer }
+        ? {
+            theory_reflection_receipt_answer: theoryReflectionReceiptProjection.answer,
+            theory_context_reflection_answer: {
+              ...theoryReflectionReceiptProjection.answer,
+              schema: "helix.theory_context_reflection_answer.v1",
+              artifact_id:
+                readString(theoryReflectionReceiptProjection.answer.artifact_id) ??
+                readString(theoryReflectionReceiptProjection.answer.answer_id) ??
+                `${turnId}:theory_context_reflection_answer`,
+              source: "codex_provider_theory_reflection_receipt",
+            },
+          }
         : {}),
       ...(codexCompoundSubgoalLedger ? { compound_capability_contract: codexCompoundSubgoalLedger } : {}),
       ...(scholarlyResponseModeProjection.projection
