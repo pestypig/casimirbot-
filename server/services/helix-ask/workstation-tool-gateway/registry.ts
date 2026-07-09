@@ -3,9 +3,9 @@ import crypto from "node:crypto";
 import path from "node:path";
 
 import nerdamer from "nerdamer";
-import "nerdamer/Algebra";
-import "nerdamer/Calculus";
-import "nerdamer/Solve";
+import "nerdamer/Algebra.js";
+import "nerdamer/Calculus.js";
+import "nerdamer/Solve.js";
 import {
   HELIX_WORKSPACE_OS_STATUS_CAPABILITY,
 } from "../workspace-os-status-intent";
