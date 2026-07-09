@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+echo "[replit] installing runtime dependencies"
+npm install --omit=dev
+
+echo "[replit] building current checkout"
+VITE_HELIX_ASK_JOB_TIMEOUT_MS="${VITE_HELIX_ASK_JOB_TIMEOUT_MS:-1200000}" npm run build
+
+if [ -f scripts/deploy-clean.cjs ]; then
+  echo "[replit] cleaning deployment artifacts"
+  node scripts/deploy-clean.cjs
+fi
+
+echo "[replit] pruning dev dependencies"
+npm prune --omit=dev

@@ -1,5 +1,5 @@
 modules = ["nodejs-20", "web", "python-3.11", "python3", "postgresql-16"]
-run = "node dist/index.js"
+run = "bash scripts/replit-start.sh"
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
@@ -8,8 +8,8 @@ packages = ["gmsh", "emscripten", "jq", "ffmpeg", "cmake", "lsof"]
 
 [deployment]
 deploymentTarget = "autoscale"
-build = ["bash", "-lc", "VITE_HELIX_ASK_JOB_TIMEOUT_MS=1200000 npm run build && node scripts/deploy-clean.cjs && npm prune --omit=dev"]
-run = ["bash", "-lc", "node dist/index.js"]
+build = ["bash", "-lc", "bash scripts/replit-build.sh"]
+run = ["bash", "-lc", "PORT=${PORT:-5000} HOST=${HOST:-0.0.0.0} NODE_ENV=production HELIX_ASK_GOLDEN_PATH_RUNTIME=1 node --max-old-space-size=4096 dist/index.js"]
 
 [[ports]]
 localPort = 5000
@@ -145,7 +145,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node dist/index.js"
+args = "bash scripts/replit-start.sh"
 waitForPort = 5000
 
 [objectStorage]
