@@ -1002,6 +1002,7 @@ describe("explicit workstation gateway derived calls", () => {
   it("does not admit tools from conceptual no-run tool identifier explanations", () => {
     const prompts = [
       "What is the Moral Graph reflection tool? Explain conceptually. Do not run it.",
+      "What is the Moral Badge Graph reflection tool? Explain conceptually. Do not run it.",
       "In plain English, describe what the string `internet-search.search_web` looks like as a tool identifier. Do not run it.",
       "Explain `scientific-calculator.solve_expression` as a tool identifier. Do not run it.",
       "Describe `repo.search` as a capability name. Do not run it.",

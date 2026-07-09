@@ -762,6 +762,12 @@ export function buildRouteEvidenceAuthority(input: {
   return {
     schema: "helix.route_evidence_authority.v1",
     turn_id: route?.turn_id ?? readString(payload.turn_id) ?? "unknown-turn",
+    route_proposal_authority: {
+      semantic_route_proposal_source: null,
+      classifier_hints: "hint_only",
+      prompt_derived_gateway_requests: "policy_admission_fallback",
+      boundary: "runtime_decides_steps_helix_validates_admission",
+    },
     candidate_tools: candidateTools,
     admitted_tools: uniqueTools([...admittedFromPayload, ...admittedFromRoute]),
     rejected_tools: uniqueTools(rejectedFromRoute),

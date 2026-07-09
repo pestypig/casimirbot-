@@ -2388,6 +2388,13 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
       },
     };
   }
+  const lookupRelevanceGate = readScholarlyLookupRelevanceGate(input.result);
+  if (
+    input.result.capability_id === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY &&
+    readString(lookupRelevanceGate?.status) === "blocked"
+  ) {
+    return null;
+  }
   if (
     (outcome === RESEARCH_QUANTIFY_REFLECT_OUTCOME || outcome === SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME) &&
     input.result.capability_id === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY &&
@@ -2404,14 +2411,16 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
     const requestedWorkflow = readString(scholarlyIntent?.requested_workflow);
     if (requestArgs?.allow_scholarly_dependent_chain !== true) return null;
     const query = readString(observation?.query) ?? readString(requestArgs?.query) ?? "paper full text";
+    const relevanceGate = attachScholarlyLookupRelevanceGate({
+      result: input.result,
+      papers,
+      query,
+      variableSourcePlan,
+    });
+    if (readString(relevanceGate.status) === "blocked") return null;
     const relevanceSelectedPaper = papers.find((paper) =>
-          readString(paper.result_id) === readString(attachScholarlyLookupRelevanceGate({
-            result: input.result,
-            papers,
-            query,
-            variableSourcePlan,
-          }).selected_result_id)
-        );
+      readString(paper.result_id) === readString(relevanceGate.selected_result_id)
+    );
     const selectedPaper = outcome === SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME
       ? selectScholarlyPaperForFullTextFetch(papers, firstPaper)
       : selectScholarlyPaperForFullTextFetch(

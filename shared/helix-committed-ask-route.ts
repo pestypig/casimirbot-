@@ -111,6 +111,12 @@ export type HelixRouteEvidenceAuthorityTool = {
 export type HelixRouteEvidenceAuthority = {
   schema: "helix.route_evidence_authority.v1";
   turn_id: string;
+  route_proposal_authority: {
+    semantic_route_proposal_source: "agent_runtime" | null;
+    classifier_hints: "hint_only";
+    prompt_derived_gateway_requests: "policy_admission_fallback";
+    boundary: "runtime_decides_steps_helix_validates_admission";
+  };
   candidate_tools: HelixRouteEvidenceAuthorityTool[];
   admitted_tools: HelixRouteEvidenceAuthorityTool[];
   rejected_tools: HelixRouteEvidenceAuthorityTool[];

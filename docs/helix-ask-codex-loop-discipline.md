@@ -79,6 +79,36 @@ provider selected
 -> visible/debug projection
 ```
 
+## Semantic Route Proposal Boundary
+
+Helix may build prompt-derived gateway requests as policy fallbacks, but those
+requests are not Codex semantic route proposals. Treat them as admission
+candidates only:
+
+```txt
+prompt text
+-> contextual/firewall suppression
+-> candidate capability
+-> Helix admission or rejection
+-> observation packet
+-> Codex/runtime reasoning
+-> route-approved terminal product
+```
+
+For Codex Workstation Mode, semantic step choice belongs to the runtime agent.
+Helix should not infer final intent from phrase lists such as tool names,
+badge names, or panel names. Lexical classifiers may expose `hint_only`
+metadata, reject contextual/negated/quoted/historical/future tool mentions, and
+validate requested capabilities against permission and route contracts. They
+must not act as a private planner or terminal answer source.
+
+Debug exports should preserve this distinction. Route evidence authority uses
+`route_proposal_authority.prompt_derived_gateway_requests =
+"policy_admission_fallback"` and `classifier_hints = "hint_only"` until a
+runtime-authored semantic route proposal exists. A future semantic proposal from
+Codex should be explicit, current-turn scoped, and still pass Helix admission
+before any workstation capability runs.
+
 Future agent onboarding should improve this shared contract instead of adding
 private side channels. If a new provider needs more workstation affordances,
 extend the Helix gateway/action manifest and admission policy first, then teach

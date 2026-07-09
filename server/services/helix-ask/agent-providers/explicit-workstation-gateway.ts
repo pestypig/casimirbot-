@@ -14,6 +14,7 @@ import {
   CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
   DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY,
   DOCS_READ_VISIBLE_SURFACE_CAPABILITY,
+  DOCS_OPEN_DOC_CAPABILITY,
   DOCS_SEARCH_CAPABILITY,
   INTERNET_SEARCH_CAPABILITY,
   MORAL_GRAPH_REFLECTION_CAPABILITY,
@@ -38,6 +39,12 @@ import {
   unquotePrompt,
 } from "./explicit-tool-requests";
 import { appendDedupe } from "./gateway-request-dedupe";
+import {
+  contextualToolSuppressionBlocksFamily,
+  detectContextualToolAdmissionSuppression,
+  type HelixContextualToolAdmissionSuppression,
+  type HelixContextualToolSuppressionFamily,
+} from "../contextual-tool-admission";
 import {
   attachDependentRequestAsNextAffordance,
   isCodexReasoningDependentRequest,
@@ -205,6 +212,66 @@ const isScientificImageEvidenceScopedTurn = (body: Record<string, unknown>): boo
     readString(mandatoryNextTool?.canonicalGoal),
   ].filter((value): value is string => Boolean(value));
   return values.some((value) => /scientific_image|scientific[-_\s]?image|image_lens|visual_analysis/i.test(value));
+};
+
+const contextualSuppressionFamilyForCapability = (
+  capability: string | null | undefined,
+): HelixContextualToolSuppressionFamily | null => {
+  if (!capability) return null;
+  if (
+    capability === DOCS_SEARCH_CAPABILITY ||
+    capability === DOCS_READ_VISIBLE_SURFACE_CAPABILITY ||
+    capability === DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY ||
+    capability === DOCS_OPEN_DOC_CAPABILITY
+  ) return "docs_viewer";
+  if (capability === REPO_SEARCH_CAPABILITY) return "repo_code";
+  if (capability === INTERNET_SEARCH_CAPABILITY) return "internet_search";
+  if (capability === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY) return "scholarly_research";
+  if (capability === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) return "scientific_calculator";
+  if (
+    capability === CALCULATOR_ACTIVE_CONTEXT_CAPABILITY ||
+    capability === CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY
+  ) return "calculator";
+  if (capability === THEORY_CONTEXT_REFLECTION_CAPABILITY) return "theory_locator";
+  if (
+    capability === MORAL_GRAPH_REFLECTION_CAPABILITY ||
+    capability === MORAL_SUBSTRATE_PRIMARY_CAPABILITY
+  ) return "moral_graph_reflection";
+  if (capability === CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY) return "civilization_bounds";
+  if (
+    capability === WORKSTATION_ACTIVE_CONTEXT_CAPABILITY ||
+    capability === WORKSPACE_OS_STATUS_CAPABILITY
+  ) return "workspace_diagnostic";
+  if (
+    capability === VISUAL_OBSERVER_QUERY_PROFILES_CAPABILITY ||
+    capability === VISUAL_OBSERVER_TEST_PROFILE_CAPABILITY ||
+    capability === VISUAL_OBSERVER_COMPARE_PROFILES_CAPABILITY
+  ) return "visual_capture";
+  if (
+    capability === TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY ||
+    capability === VOICE_INTERIM_CALLOUT_CAPABILITY ||
+    capability === VOICE_NARRATOR_SAY_CAPABILITY
+  ) return "live_environment";
+  return null;
+};
+
+const filterContextuallySuppressedPromptRequests = (
+  requests: Record<string, unknown>[],
+  suppression: HelixContextualToolAdmissionSuppression | null,
+): Record<string, unknown>[] => {
+  if (!suppression) return requests;
+  if (
+    suppression.suppression_reason !== "negated_tool_instruction" &&
+    suppression.suppression_reason !== "quoted_tool_command" &&
+    suppression.suppression_reason !== "explanatory_only"
+  ) {
+    return requests;
+  }
+  return requests.filter((request) => {
+    const capability = readString(request.capability_id) ?? readString(request.capabilityId);
+    const family = contextualSuppressionFamilyForCapability(capability);
+    return !family || !contextualToolSuppressionBlocksFamily(suppression, family);
+  });
 };
 
 const isExplicitExternalResearchRequest = (
@@ -424,6 +491,14 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   const requests: Record<string, unknown>[] = [];
   const seen = new Set<string>();
   const prompt = readPrompt(input.body) ?? "";
+  const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
+  const appendPromptDerivedDedupe = (candidates: Record<string, unknown>[]): void => {
+    appendDedupe(
+      requests,
+      seen,
+      filterContextuallySuppressedPromptRequests(candidates, contextualSuppression),
+    );
+  };
   const scientificImageEvidenceScopedTurn = isScientificImageEvidenceScopedTurn(input.body);
   const theoryFormulaDiscoveryPhase = isTheoryFormulaDiscoveryPhasePrompt(prompt);
   const paperBackedNumericBindingPhase = isPaperBackedNumericBindingPhasePrompt(prompt);
@@ -445,7 +520,10 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
       .filter((capability): capability is string => Boolean(capability)),
   );
 
-  const promptNamed = buildPromptNamedCapabilityGatewayCallRequests(input.body);
+  const promptNamed = filterContextuallySuppressedPromptRequests(
+    buildPromptNamedCapabilityGatewayCallRequests(input.body),
+    contextualSuppression,
+  );
   const promptNamedCapabilities = new Set(
     promptNamed
       .map((request) => readString(request.capability_id) ?? readString(request.capabilityId))
@@ -458,37 +536,37 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   if (scientificImageEvidenceScopedTurn) {
     requests.length = 0;
     seen.clear();
-    appendDedupe(requests, seen, promptNamed);
+    appendPromptDerivedDedupe(promptNamed);
     if (!promptNamedCapabilities.has(THEORY_CONTEXT_REFLECTION_CAPABILITY)) {
-      appendDedupe(requests, seen, buildPromptDerivedTheoryReflectionGatewayCallRequests(input.body));
+      appendPromptDerivedDedupe(buildPromptDerivedTheoryReflectionGatewayCallRequests(input.body));
     }
     return requests.slice(0, 10);
   }
   if (theoryFormulaDiscoveryPhase && promptNamedCapabilities.size === 0 && compoundDependencyCapabilities.size === 0) {
-    appendDedupe(requests, seen, buildPromptDerivedTheoryReflectionGatewayCallRequests(input.body));
+    appendPromptDerivedDedupe(buildPromptDerivedTheoryReflectionGatewayCallRequests(input.body));
     return requests.slice(0, 10);
   }
   const hasNamedDocsSearch = promptNamed.some((request) => readString(request.capability_id) === DOCS_SEARCH_CAPABILITY);
   const activeDocsContext = buildActiveDocsContextWorkstationGatewayCallRequests(input.body);
   if (hasNamedDocsSearch) {
-    appendDedupe(requests, seen, promptNamedForAppend);
+    appendPromptDerivedDedupe(promptNamedForAppend);
   } else {
     if (
       !compoundDependencyCapabilities.has(DOCS_SEARCH_CAPABILITY) &&
       !compoundDependencyCapabilities.has(DOCS_READ_VISIBLE_SURFACE_CAPABILITY) &&
       !compoundDependencyCapabilities.has(DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY)
     ) {
-      appendDedupe(requests, seen, activeDocsContext);
+      appendPromptDerivedDedupe(activeDocsContext);
     }
-    appendDedupe(requests, seen, promptNamedForAppend);
+    appendPromptDerivedDedupe(promptNamedForAppend);
   }
   const activeCalculatorContext = buildActiveCalculatorContextWorkstationGatewayCallRequests(input.body);
-  appendDedupe(requests, seen, activeCalculatorContext);
+  appendPromptDerivedDedupe(activeCalculatorContext);
   const activeWorkstationContext = buildActiveWorkstationContextGatewayCallRequests(input.body);
-  appendDedupe(requests, seen, activeWorkstationContext);
-  appendDedupe(requests, seen, buildPromptDerivedReadableSurfaceGatewayCallRequests(input.body));
+  appendPromptDerivedDedupe(activeWorkstationContext);
+  appendPromptDerivedDedupe(buildPromptDerivedReadableSurfaceGatewayCallRequests(input.body));
   if (!promptNamedCapabilities.has(WORKSPACE_OS_STATUS_CAPABILITY)) {
-    appendDedupe(requests, seen, buildPromptDerivedWorkspaceStatusGatewayCallRequests(input.body));
+    appendPromptDerivedDedupe(buildPromptDerivedWorkspaceStatusGatewayCallRequests(input.body));
   }
   if (
     !promptNamedCapabilities.has(TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY) &&
@@ -496,25 +574,25 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
     !promptNamedCapabilities.has(VOICE_NARRATOR_SAY_CAPABILITY) &&
     compoundDependencyCapabilities.size === 0
   ) {
-    appendDedupe(requests, seen, buildPromptDerivedVoiceGatewayCallRequests(input.body));
+    appendPromptDerivedDedupe(buildPromptDerivedVoiceGatewayCallRequests(input.body));
   }
   if (
     !promptNamedCapabilities.has(MORAL_GRAPH_REFLECTION_CAPABILITY) &&
     compoundDependencyCapabilities.size === 0
   ) {
-    appendDedupe(requests, seen, buildPromptDerivedMoralGraphReflectionGatewayCallRequests(input.body));
+    appendPromptDerivedDedupe(buildPromptDerivedMoralGraphReflectionGatewayCallRequests(input.body));
   }
   if (
     !promptNamedCapabilities.has(CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) &&
     !compoundDependencyCapabilities.has(CALCULATOR_SOLVE_EXPRESSION_CAPABILITY)
   ) {
-    appendDedupe(requests, seen, buildPromptDerivedCalculatorSolveGatewayCallRequests(input.body));
+    appendPromptDerivedDedupe(buildPromptDerivedCalculatorSolveGatewayCallRequests(input.body));
   }
   if (
     !promptNamedCapabilities.has(THEORY_CONTEXT_REFLECTION_CAPABILITY) &&
     compoundDependencyCapabilities.size === 0
   ) {
-    appendDedupe(requests, seen, buildPromptDerivedTheoryReflectionGatewayCallRequests(input.body));
+    appendPromptDerivedDedupe(buildPromptDerivedTheoryReflectionGatewayCallRequests(input.body));
   }
   if (
     promptNamedCapabilities.size === 0 &&
@@ -522,22 +600,22 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
     (activeDocsContext.length === 0 || allowsCompoundAdjunctCapabilities) &&
     !paperBackedNumericBindingPhase
   ) {
-    appendDedupe(requests, seen, buildPlannerDerivedWorkstationGatewayCallRequests(input.body));
+    appendPromptDerivedDedupe(buildPlannerDerivedWorkstationGatewayCallRequests(input.body));
   }
   if (
     !promptNamedCapabilities.has(SCHOLARLY_RESEARCH_SEARCH_CAPABILITY) &&
     (compoundDependencyCapabilities.size === 0 || allowsCompoundAdjunctCapabilities)
   ) {
-    appendDedupe(requests, seen, buildPromptDerivedScholarlyResearchGatewayCallRequests(input.body));
+    appendPromptDerivedDedupe(buildPromptDerivedScholarlyResearchGatewayCallRequests(input.body));
   }
   if (
     !promptNamedCapabilities.has(INTERNET_SEARCH_CAPABILITY) &&
     (compoundDependencyCapabilities.size === 0 || allowsCompoundAdjunctCapabilities)
   ) {
-    appendDedupe(requests, seen, buildPromptDerivedInternetSearchGatewayCallRequests(input.body));
+    appendPromptDerivedDedupe(buildPromptDerivedInternetSearchGatewayCallRequests(input.body));
   }
   if (!promptNamedCapabilities.has(REPO_SEARCH_CAPABILITY) && !compoundDependencyCapabilities.has(REPO_SEARCH_CAPABILITY)) {
-    appendDedupe(requests, seen, buildPromptDerivedRepoSearchGatewayCallRequests(input.body));
+    appendPromptDerivedDedupe(buildPromptDerivedRepoSearchGatewayCallRequests(input.body));
   }
   return reduceMoralGraphRequestsToPrimary({
     requests,
