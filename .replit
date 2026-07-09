@@ -12,7 +12,7 @@ packages = ["gmsh", "emscripten", "jq", "ffmpeg", "cmake", "lsof"]
 [deployment]
 deploymentTarget = "autoscale"
 build = ["bash", "-lc", "npm run replit:build"]
-run = ["bash", "-lc", "PORT=${PORT:-5000} HOST=${HOST:-0.0.0.0} NODE_ENV=production HELIX_ASK_GOLDEN_PATH_RUNTIME=1 node --max-old-space-size=4096 dist/index.js"]
+run = ["bash", "-lc", "npm run replit:start"]
 
 [[ports]]
 localPort = 5000
