@@ -3027,7 +3027,7 @@ export const DOC_FILE_METADATA: Record<string, DocFileMetadata> = {
   "docs/helix-ask-codex-aligned-checklist-status.md": {"mtimeMs":1774499033348,"mtimeIso":"2026-03-26T04:23:53.348Z","sizeBytes":17451},
   "docs/helix-ask-codex-boundary-audit.md": {"mtimeMs":1782954015023,"mtimeIso":"2026-07-02T01:00:15.023Z","sizeBytes":10780},
   "docs/helix-ask-codex-loop-dedup-instructions-2026-05-02.md": {"mtimeMs":1777745064611,"mtimeIso":"2026-05-02T18:04:24.611Z","sizeBytes":8018},
-  "docs/helix-ask-codex-loop-discipline.md": {"mtimeMs":1783571186760,"mtimeIso":"2026-07-09T04:26:26.760Z","sizeBytes":54946},
+  "docs/helix-ask-codex-loop-discipline.md": {"mtimeMs":1783625433964,"mtimeIso":"2026-07-09T19:30:33.964Z","sizeBytes":56208},
   "docs/helix-ask-codex-methodology-debug-patch-plan.md": {"mtimeMs":1782165188322,"mtimeIso":"2026-06-22T21:53:08.322Z","sizeBytes":17664},
   "docs/helix-ask-codex-workstation-live-debug-evidence-2026-06-29.md": {"mtimeMs":1783624405272,"mtimeIso":"2026-07-09T19:13:25.272Z","sizeBytes":14430},
   "docs/helix-ask-codex-workstation-release-readiness.md": {"mtimeMs":1783235105402,"mtimeIso":"2026-07-05T07:05:05.402Z","sizeBytes":5339},

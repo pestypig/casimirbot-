@@ -1,4 +1,3 @@
-import { SOURCE_LOADERS, SOURCE_PATTERNS } from "./source-list";
 import { type RepoSnapshot, type SnapshotFileEntry } from "./types";
 
 type SourceLoader = () => Promise<string>;
@@ -15,8 +14,16 @@ export type SnapshotDiagnostics = {
 
 const CODE_FILE_PATTERN = /\.(c|m)?(t|j)sx?$/i;
 
+const SOURCE_PATTERNS = [
+  "/src/**/*.{ts,tsx,js,jsx,mts,cts,mjs,cjs}",
+  "/../server/**/*.{ts,tsx,js,jsx,mts,cts,mjs,cjs}",
+  "/../shared/**/*.{ts,tsx,js,jsx,mts,cts,mjs,cjs}",
+  "/../modules/**/*.{ts,tsx,js,jsx,mts,cts,mjs,cjs}",
+] as const;
+
 const sourceLoaders = new Map<string, SourceLoader>();
 const sourceCache = new Map<string, string>();
+let sourceListLoadAttempted = false;
 
 function normalizeSourceKey(raw: string) {
   let normalized = raw.replace(/\\/g, "/");
@@ -60,7 +67,13 @@ function registerSources(record: Record<string, SourceLoader>) {
   }
 }
 
-registerSources(SOURCE_LOADERS);
+async function registerDevGlobSources() {
+  if (sourceListLoadAttempted || !import.meta.env.DEV) return;
+  sourceListLoadAttempted = true;
+  const sourceListUrl = new URL("./source-list.ts", import.meta.url).href;
+  const sourceList = await import(/* @vite-ignore */ sourceListUrl);
+  registerSources(sourceList.SOURCE_LOADERS);
+}
 
 function countMatchedSources() {
   let count = 0;
@@ -115,6 +128,7 @@ async function resolveSource(path: string) {
 }
 
 export async function loadSnapshotSource(path: string) {
+  await registerDevGlobSources();
   return resolveSource(path);
 }
 
@@ -349,6 +363,7 @@ async function fetchRemoteSnapshot(endpoint: FallbackEndpoint) {
 }
 
 export async function buildSnapshot(): Promise<RepoSnapshot> {
+  await registerDevGlobSources();
   const globPaths = snapshotSourcePaths().filter((path) => CODE_FILE_PATTERN.test(path));
 
   const files: SnapshotInputFile[] = [];
