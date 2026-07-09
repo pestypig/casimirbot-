@@ -1,5 +1,6 @@
 modules = ["nodejs-20", "web", "python-3.11", "python3", "postgresql-16"]
-run = "bash scripts/replit-start.sh"
+# Replit Run button: always rebuild the current checkout before serving port 5000.
+run = "npm run replit:start"
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
@@ -8,7 +9,7 @@ packages = ["gmsh", "emscripten", "jq", "ffmpeg", "cmake", "lsof"]
 
 [deployment]
 deploymentTarget = "autoscale"
-build = ["bash", "-lc", "bash scripts/replit-build.sh"]
+build = ["bash", "-lc", "npm run replit:build"]
 run = ["bash", "-lc", "PORT=${PORT:-5000} HOST=${HOST:-0.0.0.0} NODE_ENV=production HELIX_ASK_GOLDEN_PATH_RUNTIME=1 node --max-old-space-size=4096 dist/index.js"]
 
 [[ports]]
@@ -145,7 +146,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "bash scripts/replit-start.sh"
+args = "npm run replit:start"
 waitForPort = 5000
 
 [objectStorage]
