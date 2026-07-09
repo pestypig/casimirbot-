@@ -1,6 +1,8 @@
 modules = ["nodejs-20", "web", "python-3.11", "python3", "postgresql-16"]
-# Replit Run button: always rebuild the current checkout before serving port 5000.
-run = "npm run replit:start"
+# Replit Run button / Preview: use dev mode on port 5000 so Vite middleware and
+# Helix Ask API routes are both live. Production deployment still uses
+# [deployment] build/run below.
+run = "npm run replit:dev"
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
@@ -146,7 +148,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run replit:start"
+args = "npm run replit:dev"
 waitForPort = 5000
 
 [objectStorage]

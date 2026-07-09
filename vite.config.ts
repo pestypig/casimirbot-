@@ -138,6 +138,7 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    reportCompressedSize: false,
   },
   optimizeDeps: {
     exclude: ["web-tree-sitter"],

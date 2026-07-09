@@ -249,6 +249,34 @@ Do not print or paste real secret values into issue comments, chat logs, or
 agent prompts. Share only redacted forms such as
 `postgresql://USER:****@HOST/DATABASE?sslmode=require`.
 
+### Replit Preview
+
+Replit Preview should run the development server, not the production build:
+
+```bash
+npm run replit:dev
+```
+
+That command keeps the app on `0.0.0.0:${PORT:-5000}`, preserves Vite
+middleware, and leaves the Helix Ask `/api/*` routes mounted. Do not use
+`FAST_BOOT=1` for normal Helix Ask testing; it is only a frontend-shell escape
+hatch and intentionally skips API route registration. Do not prune dev
+dependencies for Preview, because Replit's Vite middleware needs the Replit Vite
+plugins from `devDependencies`.
+
+Use the production path only for deployment or when you explicitly want the
+compiled server:
+
+```bash
+npm run replit:build
+npm run replit:start
+```
+
+If the Replit production build is memory-constrained, keep Preview on
+`npm run replit:dev` and check that `curl -I http://127.0.0.1:5000` returns an
+HTTP status. The production client build disables compressed-size reporting to
+avoid spending memory on gzip-size calculation after bundling.
+
 Hosted account persistence uses that same `DATABASE_URL`. Account profiles,
 sessions, linked providers, and profile storage snapshots are migrated into the
 `helix_accounts`, `helix_account_sessions`, `helix_account_linked_providers`,

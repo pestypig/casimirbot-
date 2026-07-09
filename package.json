@@ -23,6 +23,7 @@
     "build:whispers": "tsx scripts/build-whispers.ts",
     "build:code-lattice": "tsx scripts/build-code-lattice.ts",
     "replit:build": "bash scripts/replit-build.sh",
+    "replit:dev": "bash scripts/replit-dev.sh",
     "replit:start": "bash scripts/replit-start.sh",
     "start": "cross-env NODE_ENV=production HELIX_ASK_GOLDEN_PATH_RUNTIME=1 node --max-old-space-size=4096 dist/index.js",
     "check": "tsc",
