@@ -368,12 +368,21 @@ export function buildCommittedAskRoute(input: {
         /^(?:doc_|docs_|active_doc|repo_code_|live_|visual_|calculator_|process_|note_)/i.test(kind),
       )
     );
+  const plainNoSourceModelOnlyRoute =
+    (route.sourceTarget === "unknown" || route.sourceTarget === "model_only") &&
+    rawGoal.goalKind === "unknown" &&
+    rawGoal.requiredTerminalKind === "unknown" &&
+    !routeContractSourceTarget &&
+    toolUseRestatement.requiredToolFamilies.length === 0;
   const shouldUseModelOnlyGoal =
-    route.sourceTarget === "model_only" &&
+    plainNoSourceModelOnlyRoute ||
     (
-      contextualSuppressionPresent ||
-      sourceContractForModelOnlyRoute ||
-      /^(?:summarize_doc|doc_|docs_|active_doc|repo_code_)/i.test(rawGoal.goalKind)
+      route.sourceTarget === "model_only" &&
+      (
+        contextualSuppressionPresent ||
+        sourceContractForModelOnlyRoute ||
+        /^(?:summarize_doc|doc_|docs_|active_doc|repo_code_)/i.test(rawGoal.goalKind)
+      )
     );
   const goal = shouldUseModelOnlyGoal
     ? { goalKind: "model_only_concept", requiredTerminalKind: "direct_answer_text" }

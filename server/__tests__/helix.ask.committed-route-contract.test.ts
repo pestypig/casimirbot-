@@ -53,6 +53,98 @@ const docsRouteContract = {
 };
 
 describe("Helix Ask committed route contract", () => {
+  it("allows direct model terminal products for plain no-source prompts", () => {
+    const promptInterpretation = interpretHelixAskPrompt("Answer normally with no tools: what is 2+2?");
+    const committedRoute = buildCommittedAskRoute({
+      turnId: "ask:test:plain-model-only",
+      promptText: "Answer normally with no tools: what is 2+2?",
+      selectedRoute: "/ask",
+      payload: {
+        turn_id: "ask:test:plain-model-only",
+        tool_call_admission_decision: {
+          admitted_tool_families: ["model_only"],
+        },
+      },
+      promptInterpretation,
+      intentArbitration: {
+        schema: "helix.intent_arbitration.v1",
+        selected_primary_intent_id: "intent:general",
+        selected_primary_intent_kind: "general_reasoning",
+        secondary_intent_ids: [],
+        contextual_tool_mentions: [],
+        executable_operator_commands: [],
+        route_candidates_allowed: ["/ask"],
+        route_candidates_suppressed: [],
+        terminal_products_allowed: ["typed_failure", "request_user_input"],
+        terminal_products_forbidden: ["client_projection"],
+        ambiguity_status: "resolved",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+
+    expect(committedRoute.route.source_target).toBe("unknown");
+    expect(committedRoute.canonical_goal.goal_kind).toBe("model_only_concept");
+    expect(committedRoute.canonical_goal.required_terminal_kind).toBe("direct_answer_text");
+    expect(committedRoute.canonical_goal.allowed_terminal_artifact_kinds).toEqual(expect.arrayContaining([
+      "direct_answer_text",
+      "model_synthesized_answer",
+      "final_answer_draft",
+    ]));
+    expect(committedRoute.terminal_product.required_terminal_product).toBe("direct_answer_text");
+
+    const authority = buildRouteEvidenceAuthority({
+      committedRoute,
+      payload: {
+        turn_id: "ask:test:plain-model-only",
+        tool_call_admission_decision: {
+          admitted_tool_families: ["model_only"],
+        },
+      },
+    });
+    expect(authority.terminal_product_allowed).toBe(true);
+    expect(authority.allowed_terminal_artifact_kinds).toContain("direct_answer_text");
+  });
+
+  it("keeps quoted and negated tool-name explanations on a direct model terminal contract", () => {
+    const prompt =
+      "Explain the literal phrase `internet-search.search_web` as a software tool name. Do not browse, search, retrieve web evidence, or call tools.";
+    const promptInterpretation = interpretHelixAskPrompt(prompt);
+    const committedRoute = buildCommittedAskRoute({
+      turnId: "ask:test:quoted-tool-model-only",
+      promptText: prompt,
+      selectedRoute: "/ask",
+      payload: {
+        turn_id: "ask:test:quoted-tool-model-only",
+        tool_call_admission_decision: {
+          admitted_tool_families: ["model_only"],
+          suppressed_tool_families: ["internet_search"],
+        },
+      },
+      promptInterpretation,
+      intentArbitration: {
+        schema: "helix.intent_arbitration.v1",
+        selected_primary_intent_id: "intent:general",
+        selected_primary_intent_kind: "general_reasoning",
+        secondary_intent_ids: [],
+        contextual_tool_mentions: promptInterpretation.contextual_tool_mentions,
+        executable_operator_commands: [],
+        route_candidates_allowed: ["/ask"],
+        route_candidates_suppressed: ["internet_search"],
+        terminal_products_allowed: ["typed_failure", "request_user_input"],
+        terminal_products_forbidden: ["internet_search_answer", "client_projection"],
+        ambiguity_status: "resolved",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+
+    expect(committedRoute.canonical_goal.goal_kind).toBe("model_only_concept");
+    expect(committedRoute.canonical_goal.allowed_terminal_artifact_kinds).toContain("direct_answer_text");
+    expect(committedRoute.capability_policy.allowed_tool_families).not.toContain("internet_search");
+    expect(committedRoute.capability_policy.suppressed_tool_families).toContain("internet_search");
+  });
+
   it("records docs route versus stale model-only goal as incompatible", () => {
     const payload: Record<string, unknown> = {
       turn_id: turnId,
