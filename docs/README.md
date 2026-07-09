@@ -8,7 +8,7 @@ find while preserving older generated notes as historical evidence.
 
 1. `research/` - research papers, cited memos, and research-grade sidecar
    artifacts. The canonical NHM2 whitepaper is:
-   `research/nhm2-current-status-whitepaper-2026-05-02.md`
+   `research/nhm2-current-status-whitepaper.md`
 2. `development/` - current development notes that still describe the active
    implementation path, operating contracts, or near-term engineering work.
 3. `synthetic-research/` - generated research-style notes, prompts, sweeps, and

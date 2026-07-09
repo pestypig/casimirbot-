@@ -101,7 +101,7 @@ describe("Helix Ask objective mini-answer extraction boundary", () => {
           {
             objective_id: "obj_1",
             pass_index: 1,
-            files: ["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"],
+            files: ["docs/research/nhm2-current-status-whitepaper.md"],
           },
         ],
         fallbackEvidenceRefs: ["docs/fallback.md"],
@@ -115,19 +115,19 @@ describe("Helix Ask objective mini-answer extraction boundary", () => {
         matched_slots: ["mechanism", "repo-mapping", "retrieval-reasoning"],
         missing_slots: [],
         evidence_refs: [
-          "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          "docs/research/nhm2-current-status-whitepaper.md",
           "mechanism",
           "docs/research/nhm2.md",
           "server/routes/evidence-reasoning.ts",
         ],
         linked_evidence_refs: [
-          "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          "docs/research/nhm2-current-status-whitepaper.md",
           "mechanism",
           "docs/research/nhm2.md",
           "server/routes/evidence-reasoning.ts",
         ],
         summary:
-          "Mechanism Coverage: covered. Evidence: docs/research/nhm2-current-status-whitepaper-2026-05-02.md, mechanism, docs/research/nhm2.md, server/routes/evidence-reasoning.ts. Missing slots: none.",
+          "Mechanism Coverage: covered. Evidence: docs/research/nhm2-current-status-whitepaper.md, mechanism, docs/research/nhm2.md, server/routes/evidence-reasoning.ts. Missing slots: none.",
         unknown_block: undefined,
       },
       {
@@ -203,7 +203,7 @@ describe("Helix Ask objective mini-answer extraction boundary", () => {
             matched_slots: ["doc-evidence"],
             missing_slots: ["numeric-result"],
             evidence_refs: [
-              "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+              "docs/research/nhm2-current-status-whitepaper.md",
               "server/services/helix-ask/evidence.ts",
             ],
             summary: "Evidence Coverage: partially covered.",
@@ -232,7 +232,7 @@ describe("Helix Ask objective mini-answer extraction boundary", () => {
         "baseline_status=partial",
         "matched_slots=doc-evidence",
         "missing_slots=numeric-result",
-        "evidence_refs=docs/research/nhm2-current-status-whitepaper-2026-05-02.md, server/services/helix-ask/evidence.ts",
+        "evidence_refs=docs/research/nhm2-current-status-whitepaper.md, server/services/helix-ask/evidence.ts",
         "summary=Evidence Coverage: partially covered.",
       ].join("\n"),
     );
@@ -250,7 +250,7 @@ describe("Helix Ask objective mini-answer extraction boundary", () => {
             status: "covered",
             matched_slots: ["doc-evidence", "numeric-result"],
             missing_slots: [],
-            evidence_refs: ["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"],
+            evidence_refs: ["docs/research/nhm2-current-status-whitepaper.md"],
             summary: "Evidence Coverage: covered.",
           },
         ],
@@ -277,7 +277,7 @@ describe("Helix Ask objective mini-answer extraction boundary", () => {
         "current_status=covered",
         "matched_slots=doc-evidence, numeric-result",
         "missing_slots=none",
-        "evidence_refs=docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        "evidence_refs=docs/research/nhm2-current-status-whitepaper.md",
         "summary=Evidence Coverage: covered.",
       ].join("\n"),
     );

@@ -17,8 +17,8 @@ describe("Helix Ask workspace directory resolver", () => {
 
     expect(result.schema).toBe("helix.workspace_directory_resolution.v1");
     expect(["resolved", "ambiguous"]).toContain(result.status);
-    expect(result.selected_doc_path).toBe("docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
-    expect(result.selected_uri).toBe("workspace://workspace/docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
+    expect(result.selected_doc_path).toBe("docs/research/nhm2-current-status-whitepaper.md");
+    expect(result.selected_uri).toBe("workspace://workspace/docs/research/nhm2-current-status-whitepaper.md");
     expect(result.assistant_answer).toBe(false);
     expect(result.terminal_eligible).toBe(false);
     expect(result.raw_content_included).toBe(false);
@@ -29,11 +29,11 @@ describe("Helix Ask workspace directory resolver", () => {
     const safe = executeWorkspaceDirectoryResolveTool({
       turnId: "ask:workspace-directory",
       callId: "call:safe",
-      uri: "workspace://workspace/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      uri: "workspace://workspace/docs/research/nhm2-current-status-whitepaper.md",
       workspaceRoot,
     });
     expect(safe.status).toBe("resolved");
-    expect(safe.selected_doc_path).toBe("docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
+    expect(safe.selected_doc_path).toBe("docs/research/nhm2-current-status-whitepaper.md");
 
     const invalid = executeWorkspaceDirectoryResolveTool({
       turnId: "ask:workspace-directory",
@@ -50,7 +50,7 @@ describe("Helix Ask workspace directory resolver", () => {
     const result = executeWorkspaceDirectoryResolveTool({
       turnId: "ask:workspace-directory",
       callId: "call:direct-equation-uri",
-      uri: "workspace://workspace/docs/research/nhm2-current-status-whitepaper-2026-05-02.md#nhm2-wall-t00-source-residual",
+      uri: "workspace://workspace/docs/research/nhm2-current-status-whitepaper.md#nhm2-wall-t00-source-residual",
       workspaceRoot,
     });
 
@@ -58,7 +58,7 @@ describe("Helix Ask workspace directory resolver", () => {
     expect(result.selected_target_kind).toBe("doc_equation");
     expect(result.selected_anchor).toBe("nhm2-wall-t00-source-residual");
     expect(result.selected_uri).toBe(
-      "workspace://workspace/docs/research/nhm2-current-status-whitepaper-2026-05-02.md#nhm2-wall-t00-source-residual",
+      "workspace://workspace/docs/research/nhm2-current-status-whitepaper.md#nhm2-wall-t00-source-residual",
     );
   });
 
@@ -72,11 +72,11 @@ describe("Helix Ask workspace directory resolver", () => {
 
     expect(result.status).toBe("resolved");
     expect(result.selected_target_kind).toBe("doc_equation");
-    expect(result.selected_doc_path).toBe("docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
+    expect(result.selected_doc_path).toBe("docs/research/nhm2-current-status-whitepaper.md");
     expect(result.selected_anchor).toBe("nhm2-wall-t00-source-residual");
     expect(result.selected_artifact_kind).toBe("doc_equation_context/v1");
     expect(result.selected_uri).toBe(
-      "workspace://workspace/docs/research/nhm2-current-status-whitepaper-2026-05-02.md#nhm2-wall-t00-source-residual",
+      "workspace://workspace/docs/research/nhm2-current-status-whitepaper.md#nhm2-wall-t00-source-residual",
     );
     expect(result.candidates[0]).toMatchObject({
       target_kind: "doc_equation",

@@ -295,6 +295,41 @@ describe("Codex provider terminal pass-through", () => {
     );
   });
 
+  it("materializes moral badge graph karma prompts as bounded Moral Graph synthesized answers", () => {
+    const projection = buildCodexMoralGraphReflectionReceiptAnswer({
+      turnId: "ask:test:moral-badge-graph-karma",
+      threadId: "helix-agent-provider",
+      route: "/ask",
+      promptText:
+        "what could karma really mean in terms of the moral badge graph? reflect on the idea and what may really happen?",
+      normalizedArtifacts: [{
+        artifact_id: "ask:test:moral-badge-graph-karma:codex_normalized:moral_graph_reflection:1",
+        kind: "moral_graph_reflection",
+        capability_key: "moral-graph.reflect_context",
+        payload_schema: "helix.moral_graph_reflection_observation.v1",
+        payload: {
+          schema: "helix.moral_graph_reflection_observation.v1",
+          located_badge_ids: [
+            "feedback-loop-hygiene",
+            "moral-residue-after-awareness",
+            "falsifiability-and-truth-convergence",
+          ],
+          claim_boundary_notes: ["diagnostic reflection only; not proof of cosmic repayment"],
+          summary: "Moral Graph reflection located consequence and feedback-loop lenses.",
+        },
+      }],
+    });
+
+    expect(projection?.answer.answer_text).toContain("karma as a bounded reflection");
+    expect(projection?.answer.answer_text).toContain("ordinary feedback loops");
+    expect(projection?.answer.answer_text).not.toContain("Dependency:");
+    expect(projection?.answer.support_refs).toContain(
+      "ask:test:moral-badge-graph-karma:codex_normalized:moral_graph_reflection:1",
+    );
+    expect(projection?.authority.terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(projection?.authority.final_answer_source).toBe("moral_graph_reflection_answer");
+  });
+
   it("preserves Codex explanation for calculator expression syntax blocks", () => {
     const providerText =
       "The calculator request was admitted as a tool attempt, but the supplied expression was prose rather than a bound arithmetic expression, so no calculator result exists.";

@@ -128,8 +128,8 @@ describe("Helix solver retry policy", () => {
             kind: "doc_candidate_validation",
             payload: {
               selected_doc_path: "/docs/research/wrong.md",
-              opened_path: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
-              next_candidate_path: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+              opened_path: "/docs/research/nhm2-current-status-whitepaper.md",
+              next_candidate_path: "/docs/research/nhm2-current-status-whitepaper.md",
             },
           },
         ],

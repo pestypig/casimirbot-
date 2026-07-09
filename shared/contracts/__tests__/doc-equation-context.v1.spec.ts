@@ -8,16 +8,16 @@ import {
 const makeArtifact = (): DocEquationContextArtifactV1 => ({
   contractVersion: "doc_equation_context/v1",
   generatedAt: "2026-06-10T00:00:00.000Z",
-  docPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+  docPath: "docs/research/nhm2-current-status-whitepaper.md",
   equationId: "nhm2-same-chart-full-tensor-ledger",
   equationLabel: "Same-chart full tensor ledger",
   sectionAnchor: "57-workstation-equation-anchors",
-  uri: "workspace://workspace/docs/research/nhm2-current-status-whitepaper-2026-05-02.md#nhm2-same-chart-full-tensor-ledger",
+  uri: "workspace://workspace/docs/research/nhm2-current-status-whitepaper.md#nhm2-same-chart-full-tensor-ledger",
   pathRef: {
     root: "workspace",
-    relativePath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
-    displaySegments: ["Workspace", "docs", "research", "nhm2-current-status-whitepaper-2026-05-02.md"],
-    virtualUri: "workspace://workspace/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+    relativePath: "docs/research/nhm2-current-status-whitepaper.md",
+    displaySegments: ["Workspace", "docs", "research", "nhm2-current-status-whitepaper.md"],
+    virtualUri: "workspace://workspace/docs/research/nhm2-current-status-whitepaper.md",
   },
   anchor: "nhm2-same-chart-full-tensor-ledger",
   latex: "\\mathcal{T}^{\\rm same-chart}_{\\rm full}=\\{T_{00},T_{0i},T_{ii},T_{ij,\\ i\\ne j}\\}.",
@@ -33,7 +33,7 @@ const makeArtifact = (): DocEquationContextArtifactV1 => ({
   links: [
     {
       rel: "supports_doc_section",
-      docPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      docPath: "docs/research/nhm2-current-status-whitepaper.md",
       anchor: "57-workstation-equation-anchors",
     },
     { rel: "opens_panel", panelId: "theory-badge-graph" },

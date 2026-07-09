@@ -7,6 +7,7 @@ import {
 } from "../HelixAskBackendEntrypointPolicy";
 import { buildHelixAskMinimalRuntimeSubmitPlan } from "../HelixAskMinimalRuntimeSubmitPlan";
 import { buildHelixAskMinimalRuntimeTurnPayload } from "../HelixAskMinimalRuntimeTransport";
+import { buildHelixAskSubmitBackendEntrypointRoutePlan } from "../HelixAskSubmitBackendEntrypointOptions";
 
 describe("Helix Ask backend entrypoint policy", () => {
   it("routes affirmative note creation through backend Ask with the note-create capability", () => {
@@ -57,6 +58,55 @@ describe("Helix Ask backend entrypoint policy", () => {
     }
   });
 
+  it("does not require backend Ask when the user asks conceptually about a tool and forbids execution", () => {
+    for (const question of [
+      "What is the Moral Graph reflection tool? Explain conceptually. Do not run it.",
+      "In plain English, describe what the string `internet-search.search_web` looks like as a tool identifier. Do not run it.",
+      "Explain `scientific-calculator.solve_expression` as a tool identifier. Do not run it.",
+      "What is the Docs Viewer tool? Explain conceptually. Do not open docs.",
+      "Describe `repo.search` as a capability name. Do not run it.",
+      "What is Image Lens as a tool? Explain only; do not inspect an image.",
+      "Define the scholarly-research.lookup_papers capability. Do not call it.",
+    ]) {
+      expect(requiresHelixAskBackendEntrypoint(question)).toBe(false);
+      expect(resolveHelixAskBackendEntrypointFamily(question)).toBeNull();
+    }
+  });
+
+  it("still requires backend Ask when the user explicitly asks to use a tool family", () => {
+    const examples = [
+      {
+        question:
+          "Use only the Moral Graph. Reflect on whether I should apologize after snapping at a coworker. Do not use web, papers, calculator, image, or PDF context.",
+        family: "moral_graph",
+        selectedCapability: "moral-graph.reflect_context",
+      },
+      {
+        question: "Use the scientific calculator to solve 8*9.",
+        family: "calculator",
+        selectedCapability: "scientific-calculator.solve_expression",
+      },
+      {
+        question: "Use repo.search to find terminal authority code.",
+        family: "repo_code",
+        selectedCapability: "repo.search",
+      },
+      {
+        question: "Use scholarly-research.lookup_papers for Weyl integrable spacetime.",
+        family: "scholarly_research",
+        selectedCapability: "scholarly-research.lookup_papers",
+      },
+    ];
+
+    for (const example of examples) {
+      expect(requiresHelixAskBackendEntrypoint(example.question)).toBe(true);
+      expect(resolveHelixAskBackendEntrypointFamily(example.question)).toMatchObject({
+        family: example.family,
+        selectedCapability: example.selectedCapability,
+      });
+    }
+  });
+
   it("builds a recrowned minimal-runtime backend payload for note creation", () => {
     const submitPlan = buildHelixAskMinimalRuntimeSubmitPlan({
       draft: 'make a note for me "hh"',
@@ -93,5 +143,74 @@ describe("Helix Ask backend entrypoint policy", () => {
         },
       },
     });
+  });
+
+  it("ignores stale backend-entrypoint flags for conceptual no-run tool explanations", () => {
+    const question = "What is the Moral Graph reflection tool? Explain conceptually. Do not run it.";
+    const routePlan = buildHelixAskSubmitBackendEntrypointRoutePlan({
+      question,
+      baseRunOptions: {
+        requiresBackendAskEntrypoint: true,
+        forceReasoningDispatch: true,
+        routeMetadata: {
+          schema: "helix.ask.route_metadata.v1",
+          source: "hard_tool_backend_entrypoint",
+          sourceTarget: "moral_graph",
+          requiredToolFamily: "moral_graph",
+        },
+      },
+      turnId: "turn-concept-no-run",
+      threadId: "thread-concept-no-run",
+      manualCanaryEnabled: false,
+    });
+
+    expect(routePlan).toMatchObject({
+      hardBackendEntrypointRequired: false,
+      forceReasoningDispatch: false,
+      useBackendAskTurnEntrypoint: false,
+      routeMetadata: undefined,
+    });
+
+    const submitPlan = buildHelixAskMinimalRuntimeSubmitPlan({
+      draft: question,
+      selectedRuntime: "codex",
+      selectedLanguageModelProfile: "auto",
+      desktopUrl: "http://localhost:5173/workstation",
+      pendingPrompt: {
+        promptId: "pending-concept-no-run",
+        question,
+        autoSubmit: true,
+        requiresBackendAskEntrypoint: true,
+        requires_backend_ask_entrypoint: true,
+        forceReasoningDispatch: true,
+        routeMetadata: {
+          schema: "helix.ask.route_metadata.v1",
+          source: "hard_tool_backend_entrypoint",
+          sourceTarget: "moral_graph",
+          requiredToolFamily: "moral_graph",
+        },
+        createdAt: Date.now(),
+      },
+    });
+
+    const payload = buildHelixAskMinimalRuntimeTurnPayload({
+      submitPlan,
+      sessionId: "thread-concept-no-run",
+      traceId: "trace-concept-no-run",
+      turnId: "turn-concept-no-run",
+      maxTokens: 1000,
+    });
+
+    expect(payload).toMatchObject({ question });
+    expect(payload?.requiresBackendAskEntrypoint).toBeUndefined();
+    expect(payload?.requires_backend_ask_entrypoint).toBeUndefined();
+    expect(payload?.forceReasoningDispatch).toBeUndefined();
+    expect(payload?.force_reasoning_dispatch).toBeUndefined();
+    expect(payload?.routeMetadata).toBeUndefined();
+    expect(payload?.route_metadata).toBeUndefined();
+    expect(payload?.ask_entrypoint_required).toBeUndefined();
+    expect(payload?.hard_backend_entrypoint_required).toBeUndefined();
+    expect(payload?.backend_ask_call_attempted).toBeUndefined();
+    expect(payload?.mandatory_next_tool_name).toBeUndefined();
   });
 });

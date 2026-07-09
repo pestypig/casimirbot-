@@ -77,14 +77,14 @@ describe("runtime goal wake dispatcher", () => {
         event_kind: "visible_source_changed",
         goal_id: goalId,
         source_kind: "docs_viewer_visible_surface",
-        doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        doc_path: "docs/research/nhm2-current-status-whitepaper.md",
         active_panel_id: "docs-viewer",
         source_freshness_ms: 11,
         source_hash: "fnv1a32:auto-new",
         reason: "docs_viewer_active_doc_changed",
-        dedupe_key: "docs-viewer:docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        dedupe_key: "docs-viewer:docs/research/nhm2-current-status-whitepaper.md",
         workspace_context_snapshot: visibleDocSnapshot(
-          "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          "docs/research/nhm2-current-status-whitepaper.md",
           "The NHM2 document frames current status as diagnostic and artifact-limited.",
           "fnv1a32:auto-new",
         ),
@@ -98,8 +98,8 @@ describe("runtime goal wake dispatcher", () => {
       wake_event_id: expect.stringContaining("goal-wake:"),
       runtime_goal_wake_candidate: {
         event_kind: "visible_source_changed",
-        doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
-        dedupe_key: "docs-viewer:docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        doc_path: "docs/research/nhm2-current-status-whitepaper.md",
+        dedupe_key: "docs-viewer:docs/research/nhm2-current-status-whitepaper.md",
       },
       runtime_goal_wake_admission: {
         status: "admitted",
@@ -118,7 +118,7 @@ describe("runtime goal wake dispatcher", () => {
         terminal_authority_status: "authorized",
       },
       runtime_goal_source_binding: {
-        doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        doc_path: "docs/research/nhm2-current-status-whitepaper.md",
         source_kind: "docs_viewer_visible_surface",
       },
       runtime_goal_wake_plan: {
@@ -135,7 +135,7 @@ describe("runtime goal wake dispatcher", () => {
     });
     expect(String(result.payload.selected_final_answer)).toContain("Auto wake summary");
     expect(String(result.payload.selected_final_answer)).toContain(
-      "Observed source: docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      "Observed source: docs/research/nhm2-current-status-whitepaper.md",
     );
     expect((result.payload.runtime_goal_session as Record<string, unknown>).latest_observation_refs).toEqual(
       expect.arrayContaining([expect.stringContaining("docs-viewer.read_visible_surface")]),
@@ -255,13 +255,13 @@ describe("runtime goal wake dispatcher", () => {
         turn_id: "ask:test:server-resolved-wake",
         event_kind: "visible_source_changed",
         source_kind: "docs_viewer_visible_surface",
-        doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        doc_path: "docs/research/nhm2-current-status-whitepaper.md",
         active_panel_id: "docs-viewer",
         source_hash: "fnv1a32:server-resolved-new",
         reason: "docs_viewer_active_doc_changed",
-        dedupe_key: "docs-viewer:docs/research/nhm2-current-status-whitepaper-2026-05-02.md:server-resolved",
+        dedupe_key: "docs-viewer:docs/research/nhm2-current-status-whitepaper.md:server-resolved",
         workspace_context_snapshot: visibleDocSnapshot(
-          "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          "docs/research/nhm2-current-status-whitepaper.md",
           "The NHM2 document frames current status as diagnostic and artifact-limited.",
           "fnv1a32:server-resolved-new",
         ),

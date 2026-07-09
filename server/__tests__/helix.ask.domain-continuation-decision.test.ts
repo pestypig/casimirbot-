@@ -21,7 +21,7 @@ describe("helix ask domain continuation decision", () => {
       current_turn_artifact_ledger: [
         {
           kind: "active_doc_identity",
-          payload: { active_doc_path: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md" },
+          payload: { active_doc_path: "/docs/research/nhm2-current-status-whitepaper.md" },
         },
       ],
     });
@@ -45,7 +45,7 @@ describe("helix ask domain continuation decision", () => {
           kind: "doc_search_results",
           payload: {
             query: "NHM-2 whitepaper",
-            matches: [{ path: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md" }],
+            matches: [{ path: "/docs/research/nhm2-current-status-whitepaper.md" }],
           },
         },
       ],
@@ -162,7 +162,7 @@ describe("helix ask domain continuation decision", () => {
           payload: {
             query: "NHM-2 whitepaper",
             selected_status: "strong",
-            selected_path: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+            selected_path: "/docs/research/nhm2-current-status-whitepaper.md",
           },
         },
       ],
@@ -174,7 +174,7 @@ describe("helix ask domain continuation decision", () => {
       expect.objectContaining({
         panel_id: "docs-viewer",
         action_id: "open_doc_by_path",
-        args: expect.objectContaining({ path: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md" }),
+        args: expect.objectContaining({ path: "/docs/research/nhm2-current-status-whitepaper.md" }),
       }),
     );
   });
@@ -190,7 +190,7 @@ describe("helix ask domain continuation decision", () => {
           payload: {
             query: "NHM-2 whitepaper",
             selected_status: "strong",
-            selected_path: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+            selected_path: "/docs/research/nhm2-current-status-whitepaper.md",
           },
         },
         {
@@ -207,7 +207,7 @@ describe("helix ask domain continuation decision", () => {
     expect(decision.reason).toBe("doc_open_path_mismatch_retry_selected_path");
     expect(suggestedAction(decision)?.args).toEqual(
       expect.objectContaining({
-        path: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        path: "/docs/research/nhm2-current-status-whitepaper.md",
         previous_opened_path: "/docs/research/nhm2-current-status-whitepaper-2026-04-03.md",
       }),
     );
@@ -219,7 +219,7 @@ describe("helix ask domain continuation decision", () => {
         terminal_contract: { goal_kind: "doc_evidence_location" },
       },
       workspace_context_snapshot: {
-        activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        activeDocPath: "/docs/research/nhm2-current-status-whitepaper.md",
       },
     });
 
@@ -230,7 +230,7 @@ describe("helix ask domain continuation decision", () => {
         panel_id: "docs-viewer",
         action_id: "locate_in_doc",
         args: expect.objectContaining({
-          path: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          path: "/docs/research/nhm2-current-status-whitepaper.md",
           query: "lapse shift",
         }),
       }),

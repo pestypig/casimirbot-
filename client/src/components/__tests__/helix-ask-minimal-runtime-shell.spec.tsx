@@ -66,7 +66,7 @@ describe("HelixAskMinimalRuntimeShell", () => {
   });
 
   it("submits through injected transport and binds latest visible turn controls without HelixAskPill", async () => {
-    window.history.pushState({}, "", "/desktop?doc=docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
+    window.history.pushState({}, "", "/desktop?doc=docs/research/nhm2-current-status-whitepaper.md");
     vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue("minimal-shell-turn");
     const copied: HelixAskMinimalRuntimeControlPayload[] = [];
     const debugCopied: HelixAskMinimalRuntimeControlPayload[] = [];
@@ -106,7 +106,7 @@ describe("HelixAskMinimalRuntimeShell", () => {
       expect.objectContaining({
         turnId: "ask:minimal-shell-turn",
         question: "Summarize the current whitepaper",
-        contextFiles: ["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"],
+        contextFiles: ["docs/research/nhm2-current-status-whitepaper.md"],
       }),
       expect.any(Function),
     );
@@ -165,7 +165,7 @@ describe("HelixAskMinimalRuntimeShell", () => {
   });
 
   it("consumes launched postulate prompts through the recrowned backend runtime path", async () => {
-    window.history.pushState({}, "", "/desktop?doc=docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
+    window.history.pushState({}, "", "/desktop?doc=docs/research/nhm2-current-status-whitepaper.md");
     vi.spyOn(globalThis.crypto, "randomUUID")
       .mockReturnValueOnce("launched-postulate-prompt")
       .mockReturnValueOnce("minimal-shell-launched-postulate-turn");
@@ -211,7 +211,7 @@ describe("HelixAskMinimalRuntimeShell", () => {
           evidenceRefs: ["scientific_image_evidence_sidecar:test"],
         }),
         workspace_context_snapshot: expect.objectContaining({
-          activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
         }),
       }),
       expect.any(Function),

@@ -621,10 +621,10 @@ describe("thread-bound situation context bridge", () => {
         workspace_context_snapshot: {
           sessionId: "helix-ask:desktop",
           activePanel: "live-answer-environment",
-          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper.md",
           hasDocContext: true,
           docContextValid: true,
-          docContextPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          docContextPath: "/docs/research/nhm2-current-status-whitepaper.md",
         },
       })
       .expect(200);
@@ -653,10 +653,10 @@ describe("thread-bound situation context bridge", () => {
         workspace_context_snapshot: {
           sessionId: "helix-ask:desktop",
           activePanel: "docs-viewer",
-          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper.md",
           hasDocContext: true,
           docContextValid: true,
-          docContextPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          docContextPath: "/docs/research/nhm2-current-status-whitepaper.md",
         },
       })
       .expect(200);
@@ -814,10 +814,10 @@ describe("thread-bound situation context bridge", () => {
         workspace_context_snapshot: {
           sessionId: "helix-ask:desktop",
           activePanel: "docs-viewer",
-          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper.md",
           hasDocContext: true,
           docContextValid: true,
-          docContextPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          docContextPath: "/docs/research/nhm2-current-status-whitepaper.md",
         },
       })
       .expect(200);
@@ -854,7 +854,7 @@ describe("thread-bound situation context bridge", () => {
     const question = [
       "Find where this topic is addressed in the current docs viewer context.",
       "Return a short \"Locations:\" list with anchors/sections and one-line evidence snippets.",
-      "Document path: docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      "Document path: docs/research/nhm2-current-status-whitepaper.md",
       "Locate query: \"Okay, can you open up Docs and read me the latest NHM2 white paper?\"",
     ].join("\n");
     const response = await request(app)
@@ -867,10 +867,10 @@ describe("thread-bound situation context bridge", () => {
         workspace_context_snapshot: {
           sessionId: "helix-ask:desktop",
           activePanel: "docs-viewer",
-          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper.md",
           hasDocContext: true,
           docContextValid: true,
-          docContextPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          docContextPath: "/docs/research/nhm2-current-status-whitepaper.md",
         },
       })
       .expect(200);
@@ -902,7 +902,7 @@ describe("thread-bound situation context bridge", () => {
     expect(response.body?.doc_location_result).toMatchObject({
       schema: "helix.doc_location_result.v1",
       turn_id: expect.stringMatching(/^ask:/),
-      doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      doc_path: "docs/research/nhm2-current-status-whitepaper.md",
       locate_query: "Okay, can you open up Docs and read me the latest NHM2 white paper?",
       assistant_answer: false,
       raw_content_included: false,

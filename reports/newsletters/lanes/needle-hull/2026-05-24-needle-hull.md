@@ -7,7 +7,7 @@ Some weeks in this lane arrive with new numbers. This one arrived with sharper f
 For a first-time reader, this lane is the repo's effort to turn speculative warp geometry into explicit NHM2 modeling, constraint tracking, solver evidence, and policy-gated review rather than loose imagery. The baseline in `docs/nhm2-closed-loop.md` is still conservative: NHM2 is a lapse-extended Natario-style candidate lane with solve-backed diagnostics, not a certified transport result. Promotion still depends on source closure, observer audits, QEI-style evidence, Stage 3 certificate issuance, and certificate integrity, not on a panel, a render, or a suggestive sidecar.
 
 ## What changed this week
-The clearest lane-specific code movement landed on May 18, 2026 in commit `ca753978` (`Add source binding evidence gates`). Its NHM2-facing effect was not a new solve. It updated `docs/research/nhm2-current-status-whitepaper-2026-05-02.md`, `shared/quantum-spacetime-congruence.ts`, `shared/nhm2-representation-space-navigation.ts`, and `tests/quantum-spacetime-congruence.spec.ts` so the quantum-spacetime proxy lane stays tagged as proxy-only and non-promoting. The new language is explicit: representation-space analogies may help organize thought, but they do not become metric equivalence, source closure, wormhole inventory, or local photon-production evidence.
+The clearest lane-specific code movement landed on May 18, 2026 in commit `ca753978` (`Add source binding evidence gates`). Its NHM2-facing effect was not a new solve. It updated `docs/research/nhm2-current-status-whitepaper.md`, `shared/quantum-spacetime-congruence.ts`, `shared/nhm2-representation-space-navigation.ts`, and `tests/quantum-spacetime-congruence.spec.ts` so the quantum-spacetime proxy lane stays tagged as proxy-only and non-promoting. The new language is explicit: representation-space analogies may help organize thought, but they do not become metric equivalence, source closure, wormhole inventory, or local photon-production evidence.
 
 That boundary work continued on May 19, 2026 in commit `69ee46a3` (`Add curvature leverage claim coverage`). The repo added a `curvature_leverage_full_solve` node to `docs/research/nhm2-observable-equation-map.v1.json`, binding regional tensor scale reasoning to `nhm2-source-closure-metric-required-tensor-latest.json` and the reference ledger while marking it `diagnostic` and `promotionAllowed: false`. In other words, the code now has a more formal way to talk about regional curvature scale without pretending that this closes the source-to-geometry bridge.
 
@@ -29,7 +29,7 @@ The next gate is still a controlled rerun that carries a lower-alpha NHM2 profil
 - commit `ca753978` on 2026-05-18: `Add source binding evidence gates`
 - commit `69ee46a3` on 2026-05-19: `Add curvature leverage claim coverage`
 - `docs/nhm2-closed-loop.md`
-- `docs/research/nhm2-current-status-whitepaper-2026-05-02.md`
+- `docs/research/nhm2-current-status-whitepaper.md`
 - `docs/research/nhm2-observable-equation-map.v1.json`
 - `shared/nhm2-representation-space-navigation.ts`
 - `shared/quantum-spacetime-congruence.ts`

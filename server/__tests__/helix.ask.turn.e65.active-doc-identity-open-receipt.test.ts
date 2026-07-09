@@ -225,8 +225,8 @@ describe("helix ask E65 active document and open receipt terminals", () => {
         workspace_context_snapshot: {
           sessionId,
           activePanel: "docs-viewer",
-          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
-          docContextPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper.md",
+          docContextPath: "/docs/research/nhm2-current-status-whitepaper.md",
           hasDocContext: true,
           docContextValid: true,
         },
@@ -384,8 +384,8 @@ describe("helix ask E65 active document and open receipt terminals", () => {
         workspace_context_snapshot: {
           sessionId,
           activePanel: "docs-viewer",
-          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
-          docContextPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper.md",
+          docContextPath: "/docs/research/nhm2-current-status-whitepaper.md",
           hasDocContext: true,
           docContextValid: true,
         },
@@ -396,7 +396,7 @@ describe("helix ask E65 active document and open receipt terminals", () => {
     expect(response.body?.terminal_artifact_kind).toBe("doc_open_receipt");
     expect(response.body?.open_doc_selected_path).toMatch(/\/docs\/research\/nhm2-deeper-reformulation-decision-memo-2026-0[34]-\d{2}\.md$/);
     expect(String(response.body?.selected_final_answer ?? "")).toContain("nhm2-deeper-reformulation-decision-memo");
-    expect(String(response.body?.selected_final_answer ?? "")).not.toContain("nhm2-current-status-whitepaper-2026-05-02.md");
+    expect(String(response.body?.selected_final_answer ?? "")).not.toContain("nhm2-current-status-whitepaper.md");
     expect(String(response.body?.terminal_presentation?.concise_text ?? "")).toContain("nhm2-deeper-reformulation-decision-memo");
     expect(String(response.body?.terminal_presentation?.concise_text ?? "")).not.toMatch(/^Locations:/i);
     expect(JSON.stringify(response.body?.current_turn_events ?? [])).not.toContain("workspace_action_locate_variant");

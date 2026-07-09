@@ -1223,7 +1223,7 @@ export const PHYSICS_ATLAS_BLOCKS: PhysicsAtlasBlockV1[] = [
     repoPathHints: [
       "shared/theory/nhm2-full-solve-theory-badges.ts",
       "docs/research/nhm2-observable-equation-map.v1.json",
-      "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      "docs/research/nhm2-current-status-whitepaper.md",
     ],
     primaryBadgeIds: [
       "nhm2.observer.eulerian_normal",
@@ -1283,7 +1283,7 @@ export const PHYSICS_ATLAS_BLOCKS: PhysicsAtlasBlockV1[] = [
     sourceRefs: [
       sourceRef("repo_module", "shared/theory/nhm2-full-solve-theory-badges.ts", "NHM2 full-solve badge branch."),
       sourceRef("doc", "docs/research/nhm2-observable-equation-map.v1.json", "Observable equation map."),
-      sourceRef("doc", "docs/research/nhm2-current-status-whitepaper-2026-05-02.md", "Current status whitepaper."),
+      sourceRef("doc", "docs/research/nhm2-current-status-whitepaper.md", "Current status whitepaper."),
     ],
     claimBoundaryNotes: [
       "Shift is a chart-dependent descriptor, not ordinary vehicle velocity.",

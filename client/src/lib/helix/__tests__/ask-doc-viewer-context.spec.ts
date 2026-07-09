@@ -124,8 +124,8 @@ describe("ask docs-viewer context helpers", () => {
   it("resolves current docs-viewer anchor paths from deictic and artifact cues", () => {
     expect(resolveDocsViewerAnchorPathCandidate({
       question: "Summarize the current NHM2 whitepaper.",
-      currentPath: "\\docs\\research\\nhm2-current-status-whitepaper-2026-05-02.md",
-    })).toBe("docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
+      currentPath: "\\docs\\research\\nhm2-current-status-whitepaper.md",
+    })).toBe("docs/research/nhm2-current-status-whitepaper.md");
     expect(resolveDocsViewerAnchorPathCandidate({
       question: "Use the current document for this answer.",
       currentPath: "docs/research/current.md",

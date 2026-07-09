@@ -1,13 +1,11 @@
 {
-  "contractVersion": "doc_equation_actions/v1",
-  "docPath": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+  "contractVersion": "doc_equation_action_source/v1",
+  "docPath": "docs/research/nhm2-current-status-whitepaper.md",
   "generatedAt": "2026-06-13T00:00:00.000Z",
   "entries": [
     {
       "equationId": "nhm2-adm-line-element",
       "label": "ADM 3+1 line element",
-      "sectionAnchor": "21-adm--31-foliation",
-      "latex": "ds^2 = -\\alpha^2 dt^2 + \\gamma_{ij}(dx^i+\\beta^i dt)(dx^j+\\beta^j dt).",
       "aliases": [
         "ds^2 = -\\alpha^2 dt^2 + \\gamma_{ij}(dx^i+\\beta^i dt)(dx^j+\\beta^j dt)"
       ],
@@ -16,17 +14,12 @@
           "actionId": "open-adm-3p1-theory-path",
           "kind": "artifact_backed_theory_run",
           "label": "Open ADM / 3+1 theory path",
-          "badgeIds": [
-            "physics.gr.3p1_decomposition"
-          ],
+          "badgeIds": ["physics.gr.3p1_decomposition"],
           "preferredBadgeId": "physics.gr.3p1_decomposition",
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.gr.reference_roots",
-          "openPanels": [
-            "theory-badge-graph",
-            "scientific-calculator"
-          ],
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "ADM context orients the graph; it is formalism, not NHM2 validation."
         }
@@ -38,8 +31,6 @@
     {
       "equationId": "nhm2-proper-time-normalization",
       "label": "3+1 proper-time normalization",
-      "sectionAnchor": "22-eulerian-observers-and-proper-time",
-      "latex": "\\left(\\frac{d\\tau}{dt}\\right)^2=\\alpha^2-\\gamma_{ij}(v^i+\\beta^i)(v^j+\\beta^j).",
       "aliases": [
         "\\frac{d\\tau^2}{dt^2}=\\alpha^2-\\gamma_{ij}(v^i+\\beta^i)(v^j+\\beta^j)",
         "\\left(\\frac{d\\tau}{dt}\\right)^2=\\alpha^2-\\gamma_{ij}(v^i+\\beta^i)(v^j+\\beta^j)"
@@ -55,27 +46,19 @@
           },
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.geometry_sample",
-          "openPanels": [
-            "scientific-calculator"
-          ],
+          "openPanels": ["scientific-calculator"],
           "claimBoundaryNote": "Calculator replay is a scalar timing aid, not a route result."
         },
         {
           "actionId": "open-lapse-shift-theory-path",
           "kind": "artifact_backed_theory_run",
           "label": "Open lapse-shift theory path",
-          "badgeIds": [
-            "physics.gr.3p1_decomposition",
-            "nhm2.geometry.lapse_shift_profile"
-          ],
+          "badgeIds": ["physics.gr.3p1_decomposition", "nhm2.geometry.lapse_shift_profile"],
           "preferredBadgeId": "nhm2.geometry.lapse_shift_profile",
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.geometry_sample",
-          "openPanels": [
-            "theory-badge-graph",
-            "scientific-calculator"
-          ],
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "The timing relation remains chart and observer dependent."
         }
@@ -87,8 +70,7 @@
     {
       "equationId": "nhm2-observer-projections",
       "label": "Eulerian observer stress-energy projections",
-      "sectionAnchor": "23-stress-energy-projections-e-ji-sij",
-      "latex": "E=T_{\\mu\\nu}n^\\mu n^\\nu,\\qquad J_i=-T_{\\mu\\nu}n^\\mu\\gamma^\\nu{}_i,\\qquad S_{ij}=T_{\\mu\\nu}\\gamma^\\mu{}_i\\gamma^\\nu{}_j.",
+      "mathBlockCount": 3,
       "aliases": [
         "E=T_{\\mu\\nu}n^\\mu n^\\nu",
         "J_i=-T_{\\mu\\nu}n^\\mu\\gamma^\\nu{}_i",
@@ -109,10 +91,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "theory-badge-graph",
-            "scientific-calculator"
-          ],
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "Observer projections require same-chart tensor evidence."
         }
@@ -124,8 +103,6 @@
     {
       "equationId": "nhm2-einstein-tensor-route",
       "label": "Geometry-first Einstein tensor route",
-      "sectionAnchor": "54-einstein-tensor-geometry-first-route",
-      "latex": "G_{\\mu\\nu}=8\\pi T_{\\mu\\nu}, \\qquad T_{\\mu\\nu}^{\\rm geom}=\\frac{1}{8\\pi}G_{\\mu\\nu}.",
       "aliases": [
         "G_{\\mu\\nu}=8\\pi T_{\\mu\\nu}",
         "T_{\\mu\\nu}^{\\rm geom}=\\frac{1}{8\\pi}G_{\\mu\\nu}"
@@ -144,10 +121,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "theory-badge-graph",
-            "scientific-calculator"
-          ],
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "Geometry-first tensor evaluation is diagnostic unless source, observer, QEI, and policy ledgers also close."
         }
@@ -159,8 +133,6 @@
     {
       "equationId": "nhm2-same-chart-full-tensor-ledger",
       "label": "Same-chart full tensor ledger",
-      "sectionAnchor": "57-workstation-equation-anchors",
-      "latex": "\\mathcal{T}^{\\rm same-chart}_{\\rm full} =\\{T_{00},T_{0i},T_{ii},T_{ij,\\ i\\ne j}\\}.",
       "aliases": [
         "\\mathcal{T}^{\\rm same-chart}_{\\rm full}=\\{T_{00},T_{0i},T_{ii},T_{ij,\\ i\\ne j}\\}"
       ],
@@ -177,10 +149,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "theory-badge-graph",
-            "scientific-calculator"
-          ],
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "Missing T0i or off-diagonal Tij is a blocker, not a zero."
         }
@@ -192,8 +161,6 @@
     {
       "equationId": "nhm2-source-component-authority-ledger",
       "label": "Source component authority ledger",
-      "sectionAnchor": "57-workstation-equation-anchors",
-      "latex": "\\mathrm{Ledger}_{source} =\\bigwedge_R(T_{00}\\land T_{0i}\\land T_{ii}\\land T_{ij,\\ i\\ne j})_{source}.",
       "aliases": [
         "nhm2_source_component_authority_ledger/v1",
         "\\mathrm{Ledger}_{source}=\\bigwedge_R(T_{00}\\land T_{0i}\\land T_{ii}\\land T_{ij,\\ i\\ne j})_{source}"
@@ -212,10 +179,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.source_closure",
-          "openPanels": [
-            "theory-badge-graph",
-            "scientific-calculator"
-          ],
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "Component authority is evidence admission, not material-source proof."
         }
@@ -227,8 +191,6 @@
     {
       "equationId": "nhm2-wall-t00-source-residual",
       "label": "Wall T00 source residual",
-      "sectionAnchor": "57-workstation-equation-anchors",
-      "latex": "R_{{\\rm wall},T00}=T00_{{\\rm wall},{\\rm required}}-T00_{{\\rm wall},{\\rm available}}.",
       "aliases": [
         "R_wall_T00 = T00_wall_required - T00_wall_available",
         "R_{{\\rm wall},T00}=T00_{{\\rm wall},{\\rm required}}-T00_{{\\rm wall},{\\rm available}}"
@@ -244,9 +206,7 @@
           },
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.source_closure",
-          "openPanels": [
-            "scientific-calculator"
-          ],
+          "openPanels": ["scientific-calculator"],
           "claimBoundaryNote": "Scalar residual replay is secondary to wall-source closure artifact status."
         },
         {
@@ -261,10 +221,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.source_closure",
-          "openPanels": [
-            "theory-badge-graph",
-            "scientific-calculator"
-          ],
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "Global residual cannot override a missing or failing wall closure."
         }
@@ -276,8 +233,6 @@
     {
       "equationId": "nhm2-observer-robust-energy-condition-gate",
       "label": "Observer-robust energy-condition gate",
-      "sectionAnchor": "57-workstation-equation-anchors",
-      "latex": "{\\rm EC}_{\\rm observer\\ robust} =\\{ {\\rm WEC},{\\rm NEC},{\\rm DEC},{\\rm SEC}\\}_{\\rm observer\\ families}.",
       "aliases": [
         "{\\rm EC}_{\\rm observer\\ robust}=\\{ {\\rm WEC},{\\rm NEC},{\\rm DEC},{\\rm SEC}\\}_{\\rm observer\\ families}"
       ],
@@ -294,10 +249,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "theory-badge-graph",
-            "scientific-calculator"
-          ],
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "Eulerian-only checks are restricted scope and cannot be called observer-robust."
         }
@@ -309,8 +261,6 @@
     {
       "equationId": "nhm2-qei-margin-dossier-bridge",
       "label": "QEI scalar margin to worldline dossier bridge",
-      "sectionAnchor": "57-workstation-equation-anchors",
-      "latex": "qei_{\\rm margin}=qei_{\\rm bound}-qei_{\\rm sample}.",
       "aliases": [
         "qei_margin = qei_bound - qei_sample",
         "qei_{\\rm margin}=qei_{\\rm bound}-qei_{\\rm sample}"
@@ -326,9 +276,7 @@
           },
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "scientific-calculator"
-          ],
+          "openPanels": ["scientific-calculator"],
           "claimBoundaryNote": "Scalar QEI margin is badge replay, not a worldline dossier."
         },
         {
@@ -344,10 +292,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "theory-badge-graph",
-            "scientific-calculator"
-          ],
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "A scalar margin cannot substitute for worldline, sampling, bound, and consistency evidence."
         }
@@ -359,8 +304,6 @@
     {
       "equationId": "nhm2-june-pass-path-smoke-chain",
       "label": "June pass-path smoke-chain gates",
-      "sectionAnchor": "57-workstation-equation-anchors",
-      "latex": "\\mathrm{Ready}_{path} =source\\land R_{{\\rm wall},T00}\\land residuals\\land conservation\\land QEI\\land observer\\land material\\land coupled.",
       "aliases": [
         "nhm2_regional_tensor_pass_path_harness/v1",
         "nhm2_coupled_closure_pass_candidate/v1",
@@ -383,10 +326,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "theory-badge-graph",
-            "scientific-calculator"
-          ],
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "Wall T00 can be under reduced-order tolerance while coupled closure and pass-path readiness remain false."
         }
@@ -398,8 +338,6 @@
     {
       "equationId": "casimir-material-receipt-ledger",
       "label": "Casimir material receipt ledger",
-      "sectionAnchor": "57-workstation-equation-anchors",
-      "latex": "{\\rm Receipt}_{\\rm Casimir} =({\\rm gap},{\\rm material},{\\rm temperature},{\\rm roughness},{\\rm geometry}).",
       "aliases": [
         "{\\rm Receipt}_{\\rm Casimir}=({\\rm gap},{\\rm material},{\\rm temperature},{\\rm roughness},{\\rm geometry})"
       ],
@@ -417,10 +355,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.source_closure",
-          "openPanels": [
-            "theory-badge-graph",
-            "scientific-calculator"
-          ],
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "Ideal Casimir plate math is not material-receipted source evidence."
         }
@@ -432,8 +367,6 @@
     {
       "equationId": "nhm2-natario-invariant-audit-ledger",
       "label": "Natario invariant audit ledger",
-      "sectionAnchor": "57-workstation-equation-anchors",
-      "latex": "{\\rm Natario}_{\\rm audit} =\\theta\\land R\\land K\\land C^2\\land{\\rm Petrov}\\land J_i\\land{\\rm stability}.",
       "aliases": [
         "{\\rm Natario}_{\\rm audit}=\\theta\\land R\\land K\\land C^2\\land{\\rm Petrov}\\land J_i\\land{\\rm stability}"
       ],
@@ -450,10 +383,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "theory-badge-graph",
-            "scientific-calculator"
-          ],
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "Zero expansion is separate from invariant, curvature, stability, and safety status."
         }
@@ -465,8 +395,6 @@
     {
       "equationId": "nhm2-lean-campaign-certificate-workflow",
       "label": "Lean diagnostic campaign certificate workflow",
-      "sectionAnchor": "57-workstation-equation-anchors",
-      "latex": "\\mathrm{artifacts}_{runtime} \\rightarrow \\mathrm{certificate}_{export} \\rightarrow \\mathrm{Lean}_{verify} \\rightarrow \\mathrm{DiagnosticCampaignAdmissible} \\land \\mathrm{ClaimLocksClosed}.",
       "aliases": [
         "runtime campaign artifacts -> certificate export -> Lean verification -> diagnostic admissibility -> claim locks remain closed",
         "DiagnosticCampaignAdmissible",
@@ -490,9 +418,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "theory-badge-graph"
-          ],
+          "openPanels": ["theory-badge-graph"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "Lean verifies diagnostic campaign admissibility from the emitted certificate; claim locks remain closed."
         }
@@ -505,8 +431,6 @@
     {
       "equationId": "nhm2-experiment-facing-theory-roadmap",
       "label": "NHM2 experiment-facing theory roadmap",
-      "sectionAnchor": "9-experiment-facing-physical-evidence-campaign",
-      "latex": "\\mathrm{PredictionFreeze}\\rightarrow\\mathrm{TileMetrology}\\rightarrow\\mathrm{EnergyLedger}\\rightarrow\\mathrm{ArrayScaling}\\rightarrow T_{\\mu\\nu}^{apparatus}\\rightarrow\\mathrm{VacuumWeight}\\rightarrow\\mathrm{MetricResponse}.",
       "aliases": [
         "PredictionFreeze -> TileMetrology -> EnergyLedger -> ArrayScaling -> T_mu_nu apparatus -> VacuumWeight -> MetricResponse",
         "nhm2_experiment_facing_theory_roadmap/v1",
@@ -537,10 +461,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "theory-badge-graph",
-            "scientific-calculator"
-          ],
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "The roadmap names pre-hardware theory solves and falsifiers; it is not an experimental receipt or physical-viability result."
         }
@@ -553,8 +474,6 @@
     {
       "equationId": "nhm2-experiment-parameter-targets",
       "label": "NHM2 experiment parameter targets",
-      "sectionAnchor": "910-parameter-targets-and-feasibility-ranges",
-      "latex": "\\mathrm{Target}_{stage,parameter}= \\{\\mathrm{NHM2Target},\\mathrm{LiteratureRange},\\mathrm{Receipt},\\mathrm{Blocker}\\}.",
       "aliases": [
         "Target_stage_parameter = {NHM2Target, LiteratureRange, Receipt, Blocker}",
         "nhm2_experiment_parameter_targets/v1",
@@ -583,10 +502,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "theory-badge-graph",
-            "scientific-calculator"
-          ],
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "Parameter targets are planning rows; modeled scalar values, literature ranges, and feasibility notes cannot substitute for experimental receipts."
         }
@@ -599,8 +515,6 @@
     {
       "equationId": "nhm2-experiment-research-gap-ledger",
       "label": "NHM2 experiment research gap ledger",
-      "sectionAnchor": "911-research-gaps-and-value-of-information",
-      "latex": "\\mathrm{Gap}_{target}= \\{\\mathrm{Precedent},\\mathrm{UncoveredRegime},\\mathrm{Receipt},\\mathrm{NullMeaning},\\mathrm{ClaimImpact}\\}.",
       "aliases": [
         "Gap_target = {Precedent, UncoveredRegime, Receipt, NullMeaning, ClaimImpact}",
         "nhm2_experiment_research_gap_ledger/v1",
@@ -626,10 +540,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "theory-badge-graph",
-            "scientific-calculator"
-          ],
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "Research-gap rows are value-of-information and falsifier planning surfaces; they cannot unlock physical viability, transport, route, propulsion, or speed claims."
         }
@@ -643,8 +554,6 @@
     {
       "equationId": "nhm2-layer-stack-mechanical-receipt",
       "label": "NHM2 layer-stack mechanical receipt",
-      "sectionAnchor": "912-layer-stack-mechanical-receipt",
-      "latex": "P_{ideal}=\\frac{\\pi^2\\hbar c}{240a^4},\\qquad F_{stack}=N_{layer}P_{ideal}A.",
       "aliases": [
         "P_ideal = pi^2 hbar c/(240 a^4); F_stack = N_layer P_ideal A",
         "nhm2_layer_stack_mechanical_receipt/v1",
@@ -668,10 +577,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "theory-badge-graph",
-            "scientific-calculator"
-          ],
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "The 447-layer force calculation is an internal-load diagnostic; it cannot substitute for material, pull-in, support, thermal, fatigue, active-control, or full-tensor receipts."
         }
@@ -685,8 +591,6 @@
     {
       "equationId": "nhm2-layer-stack-support-fraction-sweep",
       "label": "NHM2 layer-stack support-fraction sweep",
-      "sectionAnchor": "913-support-fraction-gono-go-map",
-      "latex": "\\sigma_{support}=\\frac{F_{stack}}{A f_s},\\qquad R_{source}=(1-f_s)C_{material}\\eta_{layer}.",
       "aliases": [
         "sigma_support = F_stack/(A f_s); R_source = (1-f_s) C_material eta_layer",
         "nhm2_layer_stack_support_fraction_sweep/v1",
@@ -711,10 +615,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "theory-badge-graph",
-            "scientific-calculator"
-          ],
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "The support-fraction sweep is a reduced-order go/no-go map; it cannot substitute for pull-in, material, active-control, full-tensor, or metric-response receipts."
         }
@@ -728,8 +629,6 @@
     {
       "equationId": "nhm2-layer-stack-architecture-loop",
       "label": "NHM2 layer-stack engineering architecture loop",
-      "sectionAnchor": "914-architecture-loop-for-decoupled-load-paths",
-      "latex": "\\sigma_{support}=\\frac{F_{stack}}{A f_{load}},\\qquad R_{source}=(1-f_{lost})C_{material}\\eta_{layer},\\qquad M_{pull-in}=\\frac{k_{eff}}{SF\\,\\partial F_{Casimir}/\\partial g}.",
       "aliases": [
         "sigma_support = F_stack/(A f_load); R_source = (1-f_lost) C_material eta_layer; M_pull-in = k_eff/(SF dF_Casimir/dg)",
         "nhm2_layer_stack_engineering_architecture_loop/v1",
@@ -755,10 +654,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "theory-badge-graph",
-            "scientific-calculator"
-          ],
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "The architecture loop is a diagnostic engineering research map; it cannot substitute for material coupons, pull-in tests, roughness and patch metrology, active-control receipts, or full-apparatus tensor terms."
         }
@@ -772,8 +668,6 @@
     {
       "equationId": "nhm2-layer-stack-full-apparatus-receipt-loop",
       "label": "NHM2 layer-stack full-apparatus receipt loop",
-      "sectionAnchor": "915-full-apparatus-receipt-loop",
-      "latex": "\\mathrm{Candidate}_{eng}=M_{coupon}\\land F(g)\\land R_{rough/patch}\\land C_{active}\\land L_{fatigue}\\land S_{layers}\\land T^{apparatus}_{\\mu\\nu}.",
       "aliases": [
         "Candidate_eng = M_coupon and F(g) and R_rough_patch and C_active and L_fatigue and S_layers and T_apparatus_munu",
         "nhm2_layer_stack_full_apparatus_receipt_loop/v1",
@@ -800,10 +694,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "theory-badge-graph",
-            "scientific-calculator"
-          ],
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "The full-apparatus receipt loop is an engineering evidence-admission ladder; it cannot substitute for physical viability, wall closure, transport, route, speed, or propulsion claims."
         }
@@ -817,8 +708,6 @@
     {
       "equationId": "nhm2-tile-source-physical-validation-plan",
       "label": "NHM2 tile-source physical validation plan",
-      "sectionAnchor": "916-tile-source-physical-validation-plan",
-      "latex": "\\mathrm{Candidate}_{source}=R_{receipts}\\land T^{apparatus}_{\\mu\\nu}\\land R_{closure}\\land \\nabla_{\\mu}T^{\\mu\\nu}\\land QEI\\land EC_{obs}\\land M_{cred}\\land C_{coupled}.",
       "aliases": [
         "Candidate_source = R_receipts and T_apparatus_munu and R_closure and nabla_mu_T_munu and QEI and EC_obs and M_cred and C_coupled",
         "nhm2_tile_source_physical_validation_plan/v1",
@@ -844,10 +733,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "theory-badge-graph",
-            "scientific-calculator"
-          ],
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "The tile-source validation plan can localize physical-source blockers, but it cannot substitute for material receipts, full apparatus tensor authority, downstream gate closure, or physical transport validation."
         }
@@ -862,8 +748,6 @@
     {
       "equationId": "nhm2-frozen-447-material-evidence-gate",
       "label": "Frozen 447-layer material-evidence gate",
-      "sectionAnchor": "917-frozen-447-layer-material-evidence-gate",
-      "latex": "\\mathrm{Coupon}_{admit}= A_{topology}\\land N_{layer}=447\\land f_{support}=0.26\\land f_{lost}=0.08 \\land R_{topology}\\land R_{deposition}\\land R_{\\sigma,map}\\land R_{adhesion}\\land n_{coupon}\\ge 5.",
       "aliases": [
         "Coupon_admit = A_topology and N_layer=447 and f_support=0.26 and f_lost=0.08",
         "nhm2_447_layer_topology_optimized_lattice_tin_v1",
@@ -889,9 +773,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "theory-badge-graph"
-          ],
+          "openPanels": ["theory-badge-graph"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "The frozen 447-layer coupon gate is an evidence-admission and architecture-compatibility gate, not material validation, source proof, physical viability, transport, propulsion, route, or speed authority."
         }
@@ -905,8 +787,6 @@
     {
       "equationId": "nhm2-qst-er-epr-stage1-sidecar-boundary",
       "label": "QST ER_EPR_STAGE1 sidecar boundary",
-      "sectionAnchor": "410-quantum-spacetime-sidecar-ereprstage1-solver-status",
-      "latex": "\\mathrm{QST}_{proxy}=ER\\_EPR\\_STAGE1\\land ER\\_EPR\\_TINY\\_SYK\\land \\neg ADM_{\\rm metric}\\land \\neg T_{\\mu\\nu}^{source}\\land \\neg Claim_{NHM2}.",
       "aliases": [
         "ER_EPR_STAGE1",
         "ER_EPR_STAGE1_SOLVER_ADAPTER_V1",
@@ -928,9 +808,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.claim_boundary",
-          "openPanels": [
-            "theory-badge-graph"
-          ],
+          "openPanels": ["theory-badge-graph"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "The ER/EPR sidecar is a model-internal QST proxy lane; it is not an ADM metric lane, stress-energy source, wormhole inventory, or NHM2 validation layer."
         }
@@ -943,8 +821,6 @@
     {
       "equationId": "nhm2-0p7000-candidate-metric-profile-spec",
       "label": "0p7000 candidate metric profile spec",
-      "sectionAnchor": "65-expected-lower-alpha-ladder-calculations",
-      "latex": "\\tau=0.7000\\times137755965.9171795=96429176.1420256\\ {\\rm s},",
       "aliases": [
         "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
         "nhm2_candidate_metric_profile_spec/v1",
@@ -970,9 +846,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "theory-badge-graph"
-          ],
+          "openPanels": ["theory-badge-graph"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "The 0p7000 profile spec is a diagnostic clocking/profile governance row; it is not route ETA, speed, transport, propulsion, physical viability, or material-source proof."
         }
@@ -985,8 +859,6 @@
     {
       "equationId": "nhm2-time-dependent-source-campaign-gate",
       "label": "Time-dependent source campaign gate",
-      "sectionAnchor": "time-dependent-source-campaign-target",
-      "latex": "\\mathrm{Campaign}_{td}=I_{source}\\land C_{switch}\\land C_{freq}\\land G_{dyn/eff}\\land T_{\\mu\\nu}^{regional}\\land EC_{obs}\\land QEI\\land S_{stability}.",
       "aliases": [
         "nhm2_time_dependent_source_campaign/v1",
         "sourceIndependencePass and switchingConservationPass and frequencyConvergencePass",
@@ -1013,9 +885,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "theory-badge-graph"
-          ],
+          "openPanels": ["theory-badge-graph"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "A time-dependent campaign pass is diagnostic and artifact-scoped; it is not material-source proof, physical viability, route ETA, transport, propulsion, or speed authority."
         }
@@ -1028,8 +898,6 @@
     {
       "equationId": "nhm2-0p7000-profile-campaign-frontier",
       "label": "0p7000 profile campaign frontier",
-      "sectionAnchor": "74-0p7000-diagnostic-campaign-frontier",
-      "latex": "\\mathrm{Frontier}_{0p7000}=Profile_{0p7000}\\land Manifest_{campaign}\\land Campaign_{pass}\\land Locks_{closed}.",
       "aliases": [
         "nhm2_profile_campaign_frontier/v1",
         "nhm2_campaign_profile_run_manifest/v1",
@@ -1056,9 +924,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "theory-badge-graph"
-          ],
+          "openPanels": ["theory-badge-graph"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "The 0p7000 frontier is a diagnostic campaign-admissible profile and run-manifest result only; physical, route, transport, propulsion, material-source, speed, and external-validation claims remain locked."
         }
@@ -1071,8 +937,6 @@
     {
       "equationId": "nhm2-physical-evidence-campaign-ladder",
       "label": "NHM2 physical evidence campaign ladder",
-      "sectionAnchor": "57-workstation-equation-anchors",
-      "latex": "\\mathrm{DiagnosticCampaignAdmissible} \\rightarrow \\mathrm{PredictionFreeze} \\rightarrow \\mathrm{TileMetrology} \\rightarrow \\mathrm{VacuumWeight} \\rightarrow \\mathrm{MetricResponse} \\rightarrow \\mathrm{TransportPrecursor}.",
       "aliases": [
         "DiagnosticCampaignAdmissible -> PredictionFreeze -> TileMetrology -> VacuumWeight -> MetricResponse -> TransportPrecursor",
         "nhm2_physical_viability_campaign/v1",
@@ -1106,10 +970,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "theory-badge-graph",
-            "scientific-calculator"
-          ],
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "The diagnostic campaign can feed the physical evidence ladder, but experimental receipts are still missing and claim locks remain closed."
         }
@@ -1122,8 +983,6 @@
     {
       "equationId": "nhm2-trip-clocking-tau",
       "label": "Trip clocking proper time",
-      "sectionAnchor": "67-twin-paradox-trip-clocking-interpretation",
-      "latex": "\\tau = \\alpha_{\\rm centerline}T.",
       "aliases": [
         "\\tau=\\alpha_{\\rm centerline}T",
         "\\tau=\\alpha_{centerline}T_{coordinate}"
@@ -1139,9 +998,7 @@
           },
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "scientific-calculator"
-          ],
+          "openPanels": ["scientific-calculator"],
           "claimBoundaryNote": "Trip clocking reports ship-clock accumulation only, not route speed or ETA."
         },
         {
@@ -1157,10 +1014,7 @@
           "compoundRunMode": "dependency_path",
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "theory-badge-graph",
-            "scientific-calculator"
-          ],
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
           "alsoIngestLatex": true,
           "claimBoundaryNote": "Trip clocking extends tau=alpha T while keeping route, speed, and viability claims blocked."
         }
@@ -1172,8 +1026,6 @@
     {
       "equationId": "nhm2-trip-clocking-saved-days",
       "label": "Trip clocking saved days",
-      "sectionAnchor": "67-twin-paradox-trip-clocking-interpretation",
-      "latex": "\\frac{(1-0.995)T}{86400}\\approx 7.971989\\ {\\rm days}.",
       "aliases": [
         "{\\rm savedDays}=(1-\\alpha_{\\rm centerline})T/86400",
         "saved_days=(1-alpha_centerline)*T_coordinate/86400"
@@ -1189,9 +1041,7 @@
           },
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "scientific-calculator"
-          ],
+          "openPanels": ["scientific-calculator"],
           "claimBoundaryNote": "Saved days are a ship-clock delta under the bounded lapse schedule, not travel-time certification."
         }
       ],
@@ -1202,8 +1052,6 @@
     {
       "equationId": "nhm2-trip-clocking-round-trip",
       "label": "Mirrored round-trip clocking",
-      "sectionAnchor": "67-twin-paradox-trip-clocking-interpretation",
-      "latex": "T_{\\rm round}=2T,\\qquad \\tau_{\\rm round}=2\\tau,",
       "aliases": [
         "T_{\\rm round}=2T,\\tau_{\\rm round}=2\\tau",
         "round_trip_saved_days=2*saved_days"
@@ -1219,9 +1067,7 @@
           },
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "scientific-calculator"
-          ],
+          "openPanels": ["scientific-calculator"],
           "claimBoundaryNote": "The round-trip row mirrors the one-way schedule and is not a route-dynamics model."
         }
       ],
@@ -1232,8 +1078,6 @@
     {
       "equationId": "nhm2-trip-clocking-sr-beta-analogy",
       "label": "SR beta clock-ratio analogy",
-      "sectionAnchor": "67-twin-paradox-trip-clocking-interpretation",
-      "latex": "\\beta_{\\rm SR,analogy}=\\sqrt{1-\\alpha_{\\rm centerline}^{2}}.",
       "aliases": [
         "\\beta_{\\rm SR,analogy}=\\sqrt{1-\\alpha_{\\rm centerline}^{2}}",
         "beta_sr_analogy=sqrt(1-alpha_centerline^2)"
@@ -1249,9 +1093,7 @@
           },
           "atlasLensId": "warp_gr_nhm2",
           "atlasGroupId": "warp.nhm2.diagnostic_path",
-          "openPanels": [
-            "scientific-calculator"
-          ],
+          "openPanels": ["scientific-calculator"],
           "claimBoundaryNote": "The SR beta row is an analogy for the same clock ratio, not ship speed."
         }
       ],

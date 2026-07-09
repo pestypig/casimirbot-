@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import nhm2WhitepaperActions from "../../../docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.json";
-import nhm2WhitepaperActionSource from "../../../docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.source.json";
+import nhm2WhitepaperActions from "../../../docs/research/nhm2-current-status-whitepaper.equation-actions.json";
+import nhm2WhitepaperActionSource from "../../../docs/research/nhm2-current-status-whitepaper.equation-actions.source.json";
 import {
   isDocEquationActionManifestV1,
   validateDocEquationActionManifestV1,
@@ -17,7 +17,7 @@ import {
   stableStringifyDocEquationActionManifest,
 } from "../../../scripts/doc-equation-action-generator";
 
-const NHM2_WHITEPAPER_PATH = "docs/research/nhm2-current-status-whitepaper-2026-05-02.md";
+const NHM2_WHITEPAPER_PATH = "docs/research/nhm2-current-status-whitepaper.md";
 
 describe("doc_equation_actions/v1", () => {
   it("validates the NHM2 whitepaper sidecar", () => {

@@ -918,7 +918,7 @@ describe("askLocal lane parity default", () => {
         lane_id: "live_translation",
         requested_backend_provider: "live_translation.local_runtime",
         source_binding: {
-          source_id: "docs:research/nhm2-current-status-whitepaper-2026-05-02.md",
+          source_id: "docs:research/nhm2-current-status-whitepaper.md",
           source_hash: "sha256:doc-a",
           source_kind: "docs",
           projection_target: "docs_viewer.inline_translation",
@@ -941,7 +941,7 @@ describe("askLocal lane parity default", () => {
         lane_id: "live_translation",
         requested_backend_provider: "live_translation.local_runtime",
         source_binding: expect.objectContaining({
-          source_id: "docs:research/nhm2-current-status-whitepaper-2026-05-02.md",
+          source_id: "docs:research/nhm2-current-status-whitepaper.md",
           source_hash: "sha256:doc-a",
           source_kind: "docs",
           projection_target: "docs_viewer.inline_translation",

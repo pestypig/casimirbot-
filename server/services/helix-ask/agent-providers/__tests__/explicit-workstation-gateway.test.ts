@@ -25,7 +25,7 @@ import { runtimeMemoryGovernor } from "../../../runtime/runtime-memory-governor"
 
 const docSnapshot = {
   activePanel: "scientific-calculator",
-  activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+  activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
 };
 
 const capabilities = (requests: Record<string, unknown>[]): string[] =>
@@ -140,10 +140,10 @@ describe("explicit workstation gateway derived calls", () => {
       capability_id: "docs.search",
       mode: "read",
       arguments: {
-        paths: ["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"],
+        paths: ["docs/research/nhm2-current-status-whitepaper.md"],
         source_target_intent: expect.objectContaining({
           retained_source_context: true,
-          active_doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          active_doc_path: "docs/research/nhm2-current-status-whitepaper.md",
         }),
       },
     });
@@ -309,7 +309,7 @@ describe("explicit workstation gateway derived calls", () => {
     const requests = buildPromptNamedCapabilityGatewayCallRequests({
       agent_runtime: "codex",
       question:
-        "Use docs-viewer.locate_in_doc for docs/research/nhm2-current-status-whitepaper-2026-05-02.md with query claim boundary.",
+        "Use docs-viewer.locate_in_doc for docs/research/nhm2-current-status-whitepaper.md with query claim boundary.",
     });
 
     expect(capabilities(requests)).toEqual(["docs.search"]);
@@ -319,12 +319,12 @@ describe("explicit workstation gateway derived calls", () => {
       mode: "read",
       arguments: {
         query: "claim boundary",
-        paths: ["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"],
+        paths: ["docs/research/nhm2-current-status-whitepaper.md"],
         source_target_intent: expect.objectContaining({
           target_source: "docs",
           target_kind: "docs_search",
           alias_capability: "docs-viewer.locate_in_doc",
-          requested_doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          requested_doc_path: "docs/research/nhm2-current-status-whitepaper.md",
         }),
       },
     });
@@ -334,7 +334,7 @@ describe("explicit workstation gateway derived calls", () => {
     const requests = buildPromptNamedCapabilityGatewayCallRequests({
       agent_runtime: "codex",
       question:
-        "Use docs-viewer.open_doc_by_path for docs/research/nhm2-current-status-whitepaper-2026-05-02.md.",
+        "Use docs-viewer.open_doc_by_path for docs/research/nhm2-current-status-whitepaper.md.",
     });
 
     expect(capabilities(requests)).toEqual(["docs-viewer.open_doc"]);
@@ -343,12 +343,12 @@ describe("explicit workstation gateway derived calls", () => {
       capability_id: "docs-viewer.open_doc",
       mode: "act",
       arguments: {
-        path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        path: "docs/research/nhm2-current-status-whitepaper.md",
         source_target_intent: expect.objectContaining({
           target_source: "docs",
           target_kind: "docs_open_doc",
           alias_capability: "docs-viewer.open_doc_by_path",
-          requested_doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          requested_doc_path: "docs/research/nhm2-current-status-whitepaper.md",
         }),
       },
     });
@@ -361,7 +361,7 @@ describe("explicit workstation gateway derived calls", () => {
         selected_capability: "docs-viewer.summarize_doc",
         args: {
           query: "claim boundary",
-          paths: ["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"],
+          paths: ["docs/research/nhm2-current-status-whitepaper.md"],
         },
       },
       route_metadata: {
@@ -379,7 +379,7 @@ describe("explicit workstation gateway derived calls", () => {
       capability_id: "docs.search",
       arguments: {
         query: "claim boundary",
-        paths: ["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"],
+        paths: ["docs/research/nhm2-current-status-whitepaper.md"],
         source_target_intent: expect.objectContaining({
           alias_capability: "docs-viewer.summarize_doc",
         }),
@@ -773,7 +773,7 @@ describe("explicit workstation gateway derived calls", () => {
       body: {
         agent_runtime: "codex",
         question:
-          "Codex workstation focused retest: use exactly these workstation observations before answering: docs.search for docs/research/nhm2-current-status-whitepaper-2026-05-02.md with query claim boundary; scientific-calculator.solve_expression with expression 8*9; theory-badge-graph.reflect_discussion_context for NHM2 claim boundary. Answer what those observations support and what remains unproven.",
+          "Codex workstation focused retest: use exactly these workstation observations before answering: docs.search for docs/research/nhm2-current-status-whitepaper.md with query claim boundary; scientific-calculator.solve_expression with expression 8*9; theory-badge-graph.reflect_discussion_context for NHM2 claim boundary. Answer what those observations support and what remains unproven.",
         workspace_context_snapshot: docSnapshot,
       },
     });
@@ -787,7 +787,7 @@ describe("explicit workstation gateway derived calls", () => {
       derivation_source: "helix_prompt_named_capability",
       arguments: {
         query: "claim boundary",
-        paths: ["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"],
+        paths: ["docs/research/nhm2-current-status-whitepaper.md"],
       },
     });
     expect(requests.find((request) => request.capability_id === "scientific-calculator.solve_expression")).toMatchObject({
@@ -984,6 +984,41 @@ describe("explicit workstation gateway derived calls", () => {
 
     expect(capabilities(requests)).not.toContain("moral-graph.reflect_context");
     expect(capabilities(requests)).not.toContain("internet-search.search_web");
+  });
+
+  it("does not execute conceptual no-run Moral Graph tool explanations", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question: "What is the Moral Graph reflection tool? Explain conceptually. Do not run it.",
+      },
+    });
+
+    expect(capabilities(requests)).not.toContain("moral-graph.reflect_context");
+    expect(capabilities(requests)).not.toContain("internet-search.search_web");
+  });
+
+  it("does not admit tools from conceptual no-run tool identifier explanations", () => {
+    const prompts = [
+      "What is the Moral Graph reflection tool? Explain conceptually. Do not run it.",
+      "In plain English, describe what the string `internet-search.search_web` looks like as a tool identifier. Do not run it.",
+      "Explain `scientific-calculator.solve_expression` as a tool identifier. Do not run it.",
+      "Describe `repo.search` as a capability name. Do not run it.",
+      "Define `scholarly-research.lookup_papers` as a capability identifier. Do not call it.",
+    ];
+
+    for (const question of prompts) {
+      const requests = readWorkstationGatewayCallRequestsForTurn({
+        includePlannerDerived: true,
+        body: {
+          agent_runtime: "codex",
+          question,
+        },
+      });
+
+      expect(capabilities(requests), question).toEqual([]);
+    }
   });
 
   it("does not execute contextual or screen-visible implicit procedural badge mentions", () => {
@@ -2521,7 +2556,7 @@ describe("explicit workstation gateway derived calls", () => {
           activePanel: "scientific-calculator",
           focusedPanel: "scientific-calculator",
           openPanels: ["docs-viewer", "scientific-calculator"],
-          activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
           hasDocContext: true,
         },
       },
@@ -2536,7 +2571,7 @@ describe("explicit workstation gateway derived calls", () => {
     ]);
     expect(requests.find((request) => request.capability_id === "docs.search")).toMatchObject({
       arguments: {
-        paths: ["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"],
+        paths: ["docs/research/nhm2-current-status-whitepaper.md"],
         source_target_intent: expect.objectContaining({
           retained_source_context: true,
         }),
@@ -2560,7 +2595,7 @@ describe("explicit workstation gateway derived calls", () => {
           activePanel: "scientific-calculator",
           focusedPanel: "scientific-calculator",
           openPanels: ["docs-viewer", "scientific-calculator"],
-          activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
           hasDocContext: true,
         },
       },
@@ -2575,7 +2610,7 @@ describe("explicit workstation gateway derived calls", () => {
     ]);
     expect(requests.find((request) => request.capability_id === "docs.search")).toMatchObject({
       arguments: {
-        paths: ["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"],
+        paths: ["docs/research/nhm2-current-status-whitepaper.md"],
       },
     });
     expect(requests.find((request) => request.capability_id === "scholarly-research.lookup_papers")).toMatchObject({
@@ -2799,7 +2834,7 @@ describe("explicit workstation gateway derived calls", () => {
         workspace_context_snapshot: {
           activePanel: "postulate-board",
           focusedPanel: "image-lens",
-          activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
         },
       },
     });
@@ -2818,7 +2853,7 @@ describe("explicit workstation gateway derived calls", () => {
         workspace_context_snapshot: {
           activePanel: "scientific-calculator",
           focusedPanel: "scientific-calculator",
-          activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
         },
       },
     });
@@ -3317,7 +3352,7 @@ describe("explicit workstation gateway derived calls", () => {
           activePanel: "docs-viewer",
           focusedPanel: "docs-viewer",
           openPanels: ["docs-viewer", "scientific-calculator"],
-          activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
           hasDocContext: true,
         },
       },
@@ -3344,7 +3379,7 @@ describe("explicit workstation gateway derived calls", () => {
           activePanel: "docs-viewer",
           focusedPanel: "docs-viewer",
           openPanels: ["docs-viewer", "scientific-calculator"],
-          activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
           hasDocContext: true,
         },
       },

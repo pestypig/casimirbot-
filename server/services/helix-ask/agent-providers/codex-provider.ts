@@ -371,6 +371,12 @@ const asksForCurrentImageLensPanelState = (question: string): boolean =>
 const asksForScientificImageEvidenceContinuity = (body: Record<string, unknown>): boolean => {
   const question = readQuestion(body).replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
   if (!question) return false;
+  if (
+    /\bmoral\s+graph\b/i.test(question) &&
+    !/\b(?:scientific|image\s+lens|pdf|page|crop|equation|sidecar|source\s+(?:id|hash)|theory\s+badge\s+graph)\b/i.test(question)
+  ) {
+    return false;
+  }
   if (asksForCurrentImageLensPanelState(question)) return false;
   if (asksToUseScientificImageEvidenceForSynthesis(question)) return false;
   const asksForEvidenceIdentity =
@@ -379,7 +385,7 @@ const asksForScientificImageEvidenceContinuity = (body: Record<string, unknown>)
   const refersToScientificVisualChain =
     /\b(?:prior\s+steps?|previous|last|earlier|latest|just\s+found|promoted|exact\s+row|equation\s+row|page\s+\d+|crop\s+ref|image\s+lens|sidecar|page\s+evidence|scientific\s+image|visual\s+evidence|source\s+image\s+hash|active\s+promoted\s+row\s+blockers|historical\s+non-promoted\s+row\s+blockers)\b/i.test(question);
   const asksForGraphOrCalculatorEvidence =
-    /\b(?:theory\s+badge\s+graph|graph\s+reflection|calculator\s+payload|evidence\s+chain|claim\s+boundary)\b/i.test(question) &&
+    /\b(?:theory\s+badge\s+graph|theory\s+graph\s+reflection|badge\s+graph\s+reflection|calculator\s+payload|evidence\s+chain|claim\s+boundary)\b/i.test(question) &&
     /\b(?:what|which|using|evidence|source|why|authority|depth)\b/i.test(question);
   const asksForContinuityAudit =
     /\b(?:scientific\s+image\s+lens\s+evidence\s+continuity\s+audit|scientific\s+image\s+evidence\s+continuity\s+audit|evidence\s+continuity\s+audit|continuity\s+audit)\b/i.test(question) &&
@@ -5609,7 +5615,7 @@ export const buildMoralGraphObservationFallbackAnswer = (input: {
 }): string | null => {
   const moralArtifacts = input.normalizedArtifacts.filter(isMoralGraphReflectionArtifact);
   if (moralArtifacts.length === 0) return null;
-  if (!/\bmoral[-_. ]?graph|moral-graph\.reflect_context|delayed\s+disclosure|shared\s+obligation|withheld\s+information|agency\b/i.test(input.promptText)) {
+  if (!/\bmoral[-_. ]?graph|\bmoral\s+badge\s+graph\b|moral-graph\.reflect_context|delayed\s+disclosure|shared\s+obligation|withheld\s+information|agency\b/i.test(input.promptText)) {
     return null;
   }
   const selected = moralArtifacts[moralArtifacts.length - 1];
@@ -5633,6 +5639,8 @@ export const buildMoralGraphObservationFallbackAnswer = (input: {
     : "This is a procedural Moral Graph reflection, not a character verdict or external evidence claim.";
   const asksForApologyRepair =
     /\b(?:apolog(?:y|ize|ise|ized|ised)|snapp(?:ed|ing)|coworker|co-worker)\b/i.test(input.promptText);
+  const asksForKarmaReflection =
+    /\b(?:karma|consequence|consequences|what\s+may\s+really\s+happen|really\s+happen)\b/i.test(input.promptText);
 
   if (asksForApologyRepair) {
     return [
@@ -5644,6 +5652,21 @@ export const buildMoralGraphObservationFallbackAnswer = (input: {
       "Repair direction: apologize if the snap was unfair, disproportionate, or avoidable. Keep the apology specific, short, and free of self-excusing pressure.",
       "Useful wording: name the action, name the effect, and state the repair. For example: \"I snapped earlier. That was not fair to you. I am sorry, and I will slow down before responding next time.\"",
       "Boundary: the reflection does not decide every fact of the conflict. If there was a real unresolved work issue, separate that issue from the apology and address it calmly afterward.",
+      "",
+      `Observation basis: ${summary}`,
+      `Claim boundary: ${boundary}`,
+    ].join("\n");
+  }
+
+  if (asksForKarmaReflection) {
+    return [
+      "The Moral Graph treats karma as a bounded reflection on consequence, feedback, and moral residue, not as a supernatural verdict or proof that the universe balances accounts.",
+      "",
+      `Relevant procedural lenses: ${badges}.`,
+      "",
+      "One grounded reading: actions can leave traces in people, relationships, habits, reputations, and future choices. Those traces can return as trust gained or lost, opportunities opened or closed, patterns reinforced, or pressure that eventually has to be repaired.",
+      "What may really happen: not guaranteed cosmic repayment, but ordinary feedback loops. If someone acts with care, accountability, and clarity, they often reduce hidden debt and preserve agency. If they act through avoidance, manipulation, or harm, the unresolved cost can move through the system until someone has to carry it.",
+      "Useful boundary: this reflection should not become blame, fatalism, or certainty about what someone deserves. It is better used as a prompt to ask what consequence is already observable, what repair is possible, and what pattern should stop being repeated.",
       "",
       `Observation basis: ${summary}`,
       `Claim boundary: ${boundary}`,
@@ -8448,6 +8471,7 @@ const buildCodexProviderTurnTranscriptEvents = (input: {
   gatewayCallResults: HelixWorkstationGatewayCallResult[];
   providerText: string;
   finalStatus: string;
+  includeFinalAnswerEvent?: boolean;
 }): Record<string, unknown>[] => {
   const events: Record<string, unknown>[] = [{
     id: `${input.turnId}:codex-runtime-selected`,
@@ -8588,21 +8612,23 @@ const buildCodexProviderTurnTranscriptEvents = (input: {
     assistant_answer: false,
     raw_content_included: false,
   });
-  events.push({
-    id: `${input.turnId}:codex-final-answer`,
-    role: "assistant",
-    type: "final_answer",
-    status: input.finalStatus,
-    text: input.providerText,
-    detail: "agent_provider_terminal_candidate",
-    lane: "codex_provider",
-    step_id: "final_answer",
-    turn_id: input.turnId,
-    source_event_type: "terminal_answer",
-    reconstructed: true,
-    assistant_answer: false,
-    raw_content_included: false,
-  });
+  if (input.includeFinalAnswerEvent !== false && input.providerText.trim()) {
+    events.push({
+      id: `${input.turnId}:codex-final-answer`,
+      role: "assistant",
+      type: "final_answer",
+      status: input.finalStatus,
+      text: input.providerText,
+      detail: "agent_provider_terminal_candidate",
+      lane: "codex_provider",
+      step_id: "final_answer",
+      turn_id: input.turnId,
+      source_event_type: "terminal_answer",
+      reconstructed: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  }
   return events;
 };
 
@@ -9319,6 +9345,7 @@ export const codexProvider: HelixAgentProvider = {
       gatewayCallResults: [],
       providerText: "Codex runtime is preparing workstation context.",
       finalStatus: "running",
+      includeFinalAnswerEvent: false,
     });
     emitCodexProviderProgressTranscriptEvents({
       emit: request.onTranscriptEvent,
@@ -9915,13 +9942,17 @@ export const codexProvider: HelixAgentProvider = {
     });
     let gatewayLifecycleTraces = gatewayCallResults.map((result) => result.tool_lifecycle_trace);
     let gatewayFollowupDecisions = gatewayCallResults.map((result) => result.tool_followup_decision);
+    const initialProviderTranscriptText = question
+      ? "Codex runtime received the Ask turn."
+      : "Codex runtime could not run because the Ask turn had no question.";
     const initialTranscriptEvents = buildCodexProviderTurnTranscriptEvents({
       turnId,
       providerLabel: codexProvider.label,
       body: request.body,
       gatewayCallResults,
-      providerText: "Codex runtime could not run because the Ask turn had no question.",
+      providerText: initialProviderTranscriptText,
       finalStatus: "final_failure",
+      includeFinalAnswerEvent: !question,
     });
     emitCodexProviderProgressTranscriptEvents({
       emit: request.onTranscriptEvent,
@@ -10571,6 +10602,7 @@ export const codexProvider: HelixAgentProvider = {
       gatewayCallResults,
       providerText: "Codex runtime is waiting for voice playback receipt evidence when the gateway handoff requires it.",
       finalStatus: "running",
+      includeFinalAnswerEvent: false,
     });
     emitCodexProviderProgressTranscriptEvents({
       emit: request.onTranscriptEvent,
@@ -10698,6 +10730,7 @@ export const codexProvider: HelixAgentProvider = {
       gatewayCallResults,
       providerText: "Codex runtime is evaluating the re-entered observation packet(s).",
       finalStatus: "running",
+      includeFinalAnswerEvent: false,
     });
     emitCodexProviderProgressTranscriptEvents({
       emit: request.onTranscriptEvent,
@@ -11690,6 +11723,7 @@ export const codexProvider: HelixAgentProvider = {
         gatewayCallResults,
         providerText: "Codex runtime is evaluating the runtime-requested capability lane observation.",
         finalStatus: "running",
+        includeFinalAnswerEvent: false,
       });
       emitCodexProviderProgressTranscriptEvents({
         emit: request.onTranscriptEvent,

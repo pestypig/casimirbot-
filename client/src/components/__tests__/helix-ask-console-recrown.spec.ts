@@ -2377,11 +2377,11 @@ describe("Helix Ask Console recrown boundary", () => {
 
   it("keeps active document handoff as a pure request-envelope helper", () => {
     const url =
-      "http://127.0.0.1:1498/desktop?panels=docs-viewer%2Cscientific-calculator&focus=docs-viewer&doc=docs/research/nhm2-current-status-whitepaper-2026-05-02.md";
+      "http://127.0.0.1:1498/desktop?panels=docs-viewer%2Cscientific-calculator&focus=docs-viewer&doc=docs/research/nhm2-current-status-whitepaper.md";
     const context = buildHelixAskContextBridgeSnapshot(url);
 
     expect(readDocPathFromDesktopUrl(url)).toBe(
-      "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      "docs/research/nhm2-current-status-whitepaper.md",
     );
     expect(buildHelixAskConsoleRequestEnvelope({
       question: "Summarize the current whitepaper.",
@@ -2391,18 +2391,18 @@ describe("Helix Ask Console recrown boundary", () => {
       question: "Summarize the current whitepaper.",
       agentRuntime: "codex",
       agent_runtime: "codex",
-      doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      doc_path: "docs/research/nhm2-current-status-whitepaper.md",
     });
     expect(buildHelixAskConsoleContextFiles({
-      docsViewerAnchorPath: "workspace://docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      docsViewerAnchorPath: "workspace://docs/research/nhm2-current-status-whitepaper.md",
       workspaceContextSnapshot: {
-        activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
-        active_doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
+        active_doc_path: "docs/research/nhm2-current-status-whitepaper.md",
         docContextPath: "docs/other.md",
         doc_context_path: "docs/third.md",
       },
     })).toEqual([
-      "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      "docs/research/nhm2-current-status-whitepaper.md",
       "docs/other.md",
       "docs/third.md",
     ]);
@@ -2517,8 +2517,8 @@ describe("Helix Ask Console recrown boundary", () => {
       source: "desktop_url_doc_param",
     });
     expect(readHelixAskDocViewerPathFromDesktopUrlForSnapshot(
-      "http://localhost:1498/desktop?doc=docs%2Fresearch%2Fnhm2-current-status-whitepaper-2026-05-02.md",
-    )).toBe("docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
+      "http://localhost:1498/desktop?doc=docs%2Fresearch%2Fnhm2-current-status-whitepaper.md",
+    )).toBe("docs/research/nhm2-current-status-whitepaper.md");
     expect(resolveHelixAskDocViewerSnapshotPathBinding({
       state: {
         currentPath: "",
@@ -2602,8 +2602,8 @@ describe("Helix Ask Console recrown boundary", () => {
   it("recrowns docs-viewer current-document anchor resolution without moving current-path reads", () => {
     expect(resolveDocsViewerAnchorPathCandidate({
       question: "Summarize the current NHM2 whitepaper.",
-      currentPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
-    })).toBe("docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
+      currentPath: "docs/research/nhm2-current-status-whitepaper.md",
+    })).toBe("docs/research/nhm2-current-status-whitepaper.md");
     expect(resolveDocsViewerAnchorPathCandidate({
       question: "Summarize the current document. document path: docs/research/explicit.md",
       currentPath: "docs/research/current.md",
@@ -7108,7 +7108,7 @@ describe("Helix Ask Console recrown boundary", () => {
       draft: "  summarize current doc  ",
       selectedRuntime: "codex",
       selectedLanguageModelProfile: "deep",
-      desktopUrl: "http://127.0.0.1:1498/desktop?doc=docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      desktopUrl: "http://127.0.0.1:1498/desktop?doc=docs/research/nhm2-current-status-whitepaper.md",
     });
     expect(submitPlan).toMatchObject({
       admission: {
@@ -7122,7 +7122,7 @@ describe("Helix Ask Console recrown boundary", () => {
         restEntries: [],
       },
       context: {
-        activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
         chat_referent_context_source_summary: {
           context_present: false,
         },
@@ -7133,7 +7133,7 @@ describe("Helix Ask Console recrown boundary", () => {
         agent_runtime: "codex",
         languageModelProfile: "deep",
         language_model_profile: "deep",
-        doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        doc_path: "docs/research/nhm2-current-status-whitepaper.md",
       },
     });
 
@@ -7166,7 +7166,7 @@ describe("Helix Ask Console recrown boundary", () => {
       draft: "  summarize current doc  ",
       selectedRuntime: "codex",
       selectedLanguageModelProfile: "deep",
-      desktopUrl: "http://127.0.0.1:1498/desktop?doc=docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      desktopUrl: "http://127.0.0.1:1498/desktop?doc=docs/research/nhm2-current-status-whitepaper.md",
     });
     expect(startHelixAskMinimalRuntimeTurn({
       state: createHelixAskMinimalRuntimeInitialState(),
@@ -7259,7 +7259,7 @@ describe("Helix Ask Console recrown boundary", () => {
       draft: "  summarize current doc  ",
       selectedRuntime: "codex",
       selectedLanguageModelProfile: "deep",
-      desktopUrl: "http://127.0.0.1:1498/desktop?doc=docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      desktopUrl: "http://127.0.0.1:1498/desktop?doc=docs/research/nhm2-current-status-whitepaper.md",
     });
     const payload = buildHelixAskMinimalRuntimeTurnPayload({
       submitPlan,
@@ -7278,11 +7278,11 @@ describe("Helix Ask Console recrown boundary", () => {
       turnId: "ask:test-turn",
       maxTokens: 8192,
       question: "summarize current doc",
-      doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
-      active_doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
-      contextFiles: ["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"],
+      doc_path: "docs/research/nhm2-current-status-whitepaper.md",
+      active_doc_path: "docs/research/nhm2-current-status-whitepaper.md",
+      contextFiles: ["docs/research/nhm2-current-status-whitepaper.md"],
       workspace_context_snapshot: {
-        activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
         chat_referent_context_source_summary: {
           context_present: false,
         },
@@ -7438,7 +7438,7 @@ describe("Helix Ask Console recrown boundary", () => {
       turnId: "ask:test-turn",
       maxTokens: 8192,
       question: "summarize current doc",
-      contextFiles: ["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"],
+      contextFiles: ["docs/research/nhm2-current-status-whitepaper.md"],
     };
     const streamRunner = createHelixAskMinimalRuntimeBackendRunner({
       runStream: async (runnerPayload, onEvent) => {

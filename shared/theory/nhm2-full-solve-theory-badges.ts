@@ -5,7 +5,7 @@ import {
 } from "../contracts/theory-badge-graph.v1";
 
 const NHM2_FULL_SOLVE_WHITEPAPER =
-  "docs/research/nhm2-current-status-whitepaper-2026-05-02.md";
+  "docs/research/nhm2-current-status-whitepaper.md";
 const NHM2_OBSERVABLE_EQUATION_MAP =
   "docs/research/nhm2-observable-equation-map.v1.json";
 const NHM2_OBSERVABLE_FIGURE_PLAN =

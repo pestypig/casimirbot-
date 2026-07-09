@@ -8,12 +8,12 @@ workflows.
 
 The current maintained NHM2 whitepaper is:
 
-- `nhm2-current-status-whitepaper-2026-05-02.md`
+- `nhm2-current-status-whitepaper.md`
 
 Its Calculator/equation sidecars are:
 
-- `nhm2-current-status-whitepaper-2026-05-02.equation-actions.json`
-- `nhm2-current-status-whitepaper-2026-05-02.equation-actions.source.json`
+- `nhm2-current-status-whitepaper.equation-actions.json`
+- `nhm2-current-status-whitepaper.equation-actions.source.json`
 
 Keep those files together. Do not split sidecars away from the paper they
 hydrate.

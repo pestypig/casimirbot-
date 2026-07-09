@@ -65,6 +65,16 @@ export type HelixWorkspaceDirectoryResolution = {
 const DOC_EXTENSIONS = new Set([".md", ".mdx", ".txt", ".json", ".yaml", ".yml"]);
 const MAX_DOC_BYTES = 64_000;
 const DEFAULT_LIMIT = 8;
+const DOCS_TAXONOMY_PATH = path.resolve(process.cwd(), "docs", "doc-taxonomy.v1.json");
+
+type DocsTaxonomyDocumentEntry = {
+  path: string;
+  canonical?: boolean;
+  docClass?: string;
+  bundleKind?: string;
+};
+
+let docsTaxonomyByPath: Map<string, DocsTaxonomyDocumentEntry> | null = null;
 
 const normalizeText = (value: string): string =>
   value
@@ -107,6 +117,37 @@ const stableId = (parts: unknown[]): string => {
   }
   return Math.abs(hash).toString(36);
 };
+
+const normalizeDocsTaxonomyPath = (value: string): string => value.replace(/\\/g, "/").replace(/^\/+/, "");
+
+const readDocsTaxonomyByPath = (): Map<string, DocsTaxonomyDocumentEntry> => {
+  if (docsTaxonomyByPath) return docsTaxonomyByPath;
+  const entries = new Map<string, DocsTaxonomyDocumentEntry>();
+  try {
+    const raw = readFileSync(DOCS_TAXONOMY_PATH, "utf8");
+    const parsed = JSON.parse(raw) as { documents?: unknown };
+    const documents = Array.isArray(parsed.documents) ? parsed.documents : [];
+    for (const documentEntry of documents) {
+      if (!documentEntry || typeof documentEntry !== "object") continue;
+      const candidate = documentEntry as Record<string, unknown>;
+      const filePath = typeof candidate.path === "string" ? normalizeDocsTaxonomyPath(candidate.path) : "";
+      if (!filePath) continue;
+      entries.set(filePath, {
+        path: filePath,
+        canonical: typeof candidate.canonical === "boolean" ? candidate.canonical : undefined,
+        docClass: typeof candidate.docClass === "string" ? candidate.docClass : undefined,
+        bundleKind: typeof candidate.bundleKind === "string" ? candidate.bundleKind : undefined,
+      });
+    }
+  } catch {
+    // Taxonomy metadata is optional; directory resolution still works without it.
+  }
+  docsTaxonomyByPath = entries;
+  return entries;
+};
+
+const readDocsTaxonomyEntry = (relativePath: string): DocsTaxonomyDocumentEntry | null =>
+  readDocsTaxonomyByPath().get(normalizeDocsTaxonomyPath(relativePath)) ?? null;
 
 const listDocFiles = (rootDir: string, relativeDir = "docs", depth = 0): string[] => {
   if (depth > 8) return [];
@@ -276,6 +317,17 @@ const buildDocCandidates = (rootDir: string, query: string): HelixWorkspaceDirec
       pathText: relativePath,
       bodyText: preview.text,
     });
+    const taxonomyEntry = readDocsTaxonomyEntry(relativePath);
+    const reasons = [...score.reasons];
+    let candidateScore = score.score;
+    if (taxonomyEntry?.canonical) {
+      candidateScore += 5000;
+      reasons.push("taxonomy_canonical_document");
+    }
+    if (taxonomyEntry?.bundleKind === "equation-action-whitepaper") {
+      candidateScore += 120;
+      reasons.push("taxonomy_equation_action_whitepaper");
+    }
     const pathRef = buildWorkstationPathRef(relativePath);
     return {
       uri: pathRef?.virtualUri ?? `workspace://workspace/${relativePath.split("/").map(encodeURIComponent).join("/")}`,
@@ -283,8 +335,8 @@ const buildDocCandidates = (rootDir: string, query: string): HelixWorkspaceDirec
       relative_path: relativePath,
       doc_path: normalizeWorkstationDocPath(relativePath) ?? relativePath,
       label,
-      score: score.score,
-      reasons: score.reasons,
+      score: Math.round(candidateScore * 10000) / 10000,
+      reasons,
       snippets: preview.snippets,
     };
   });
@@ -328,12 +380,17 @@ const buildDocEquationCandidates = (rootDir: string, query: string): HelixWorksp
         pathText: `${docPath}#${entry.equationId}`,
         bodyText: searchable,
       });
+      const taxonomyEntry = readDocsTaxonomyEntry(docPath);
       const preferredAction = entry.actions.find((action) => action.preferredBadgeId || action.calculatorPayloadRef) ?? entry.actions[0];
       const artifactId = preferredAction?.preferredBadgeId ?? preferredAction?.calculatorPayloadRef?.badgeId ?? preferredAction?.badgeIds?.[0];
       let equationScore = score.score + 5;
       const reasons = [...score.reasons, "doc_equation_action_manifest_match"];
+      if (taxonomyEntry?.canonical) {
+        equationScore += 5000;
+        reasons.push("taxonomy_canonical_document");
+      }
       if (hasDocEquationIntent(query)) {
-        equationScore += 30;
+        equationScore += 6000;
         reasons.push("explicit_doc_equation_intent");
       }
       if (/\bscalar\s+replay|replay\b/i.test(query) && preferredAction?.kind === "calculator_ingest") {
@@ -442,7 +499,7 @@ const candidateForSafePath = (rootDir: string, relativePath: string): HelixWorks
         equation_id: split.anchor,
         artifact_kind: "doc_equation_context/v1",
         label: `${path.basename(docPath).replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ")} #${split.anchor}`,
-        score: exists ? 100 : 45,
+        score: exists ? 10_000 : 45,
         reasons: [exists ? "exact_existing_doc_equation_path" : "safe_doc_equation_path_not_found"],
       };
     }
@@ -452,7 +509,7 @@ const candidateForSafePath = (rootDir: string, relativePath: string): HelixWorks
       relative_path: docPath,
       doc_path: docPath,
       label: path.basename(docPath).replace(/\.[^.]+$/, "").replace(/[-_]+/g, " "),
-      score: exists ? 100 : 45,
+      score: exists ? 10_000 : 45,
       reasons: [exists ? "exact_existing_doc_path" : "safe_doc_path_not_found"],
     };
   }

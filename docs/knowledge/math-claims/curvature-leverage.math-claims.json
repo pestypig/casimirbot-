@@ -85,7 +85,7 @@
       "sources": [
         {
           "kind": "spec",
-          "citation": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          "citation": "docs/research/nhm2-current-status-whitepaper.md",
           "equation": "T_required_ab = G_ab[g_NHM2] / 8pi",
           "note": "The full solve owns the metric-required tensor route and blocks source-mechanism promotion."
         },
@@ -97,7 +97,7 @@
       ],
       "repoBindings": [
         "shared/curvature-leverage.ts",
-        "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        "docs/research/nhm2-current-status-whitepaper.md",
         "docs/research/nhm2-observable-equation-map.v1.json"
       ],
       "clCeiling": "CL0",

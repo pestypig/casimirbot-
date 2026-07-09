@@ -4,7 +4,7 @@
 This week the Needle Hull lane moved from guarding a blockage to describing a narrower, calmer kind of pass. The repo did not announce a viable warp craft, and it did not erase the older full-loop timeout story. What it did do was tighten the grammar around a lower-alpha NHM2 campaign, give that campaign a more explicit manifest and frontier, and then place a formal Lean fence around what that pass does and does not mean. Panels, badge graphs, and frontier overlays joined the picture too, but mostly as windows onto the evidence. The mood is less ignition and more careful alignment: geometry, source accounting, observer scope, QEI dossiers, and claim locks trying to stay in one frame.
 
 ## Baseline
-For a first-time reader, this lane is CasimirBot's effort to turn speculative warp geometry into legible NHM2 modeling, constraint tracking, solver evidence, and claim-bounded review. The standing baseline in `docs/nhm2-closed-loop.md` and `docs/research/nhm2-current-status-whitepaper-2026-05-02.md` still treats NHM2 as a lapse-extended Natario-style diagnostic or reduced-order candidate lane, not a certified transport result. `WARP_AGENTS.md` remains the hard boundary: no physical-viability language without passing hard constraints and the repo's admissibility policy.
+For a first-time reader, this lane is CasimirBot's effort to turn speculative warp geometry into legible NHM2 modeling, constraint tracking, solver evidence, and claim-bounded review. The standing baseline in `docs/nhm2-closed-loop.md` and `docs/research/nhm2-current-status-whitepaper.md` still treats NHM2 as a lapse-extended Natario-style diagnostic or reduced-order candidate lane, not a certified transport result. `WARP_AGENTS.md` remains the hard boundary: no physical-viability language without passing hard constraints and the repo's admissibility policy.
 
 ## What changed this week
 The main shift was campaign organization around the `0p7000_observer_compatible_source` branch. Commits on June 18 and June 19 added or expanded `shared/contracts/nhm2-source-momentum-density-audit.v1.ts`, `shared/contracts/nhm2-campaign-profile-run-manifest.v1.ts`, `shared/contracts/nhm2-profile-campaign-frontier.v1.ts`, and the supporting tools in `tools/nhm2/`. The effect is practical: the repo can now treat a candidate profile as a governed campaign row with named evidence requirements for regional tensor residuals, momentum projection, QEI worldline dossier, observer-family checks, stability, and the final `nhm2_time_dependent_source_campaign/v1` harness. The tests in `tests/nhm2-profile-campaign-frontier.spec.ts` are especially candid about intent, forcing the frontier to stop on source-counterpart, momentum, or observer blockers before any "fast-looking" candidate is allowed to rank well.
@@ -29,7 +29,7 @@ The next validation step is to freeze and reproduce a non-`latest` `0p7000_obser
 - commit `3499d75f0` on 2026-06-18: `Add NHM2 residual validation signals`
 - commit `9e1859972` on 2026-06-19: `Add compound synthesis candidate campaign tooling`
 - commit `640f8b993` on 2026-06-20: `Add Lean campaign certificate wiring`
-- `docs/research/nhm2-current-status-whitepaper-2026-05-02.md`
+- `docs/research/nhm2-current-status-whitepaper.md`
 - `formal/lean/README.md`
 - `formal/lean/NHM2Formal/Certificate.lean`
 - `formal/lean/NHM2Formal/Generated/CurrentCampaignCertificate.lean`

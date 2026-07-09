@@ -80,16 +80,16 @@ describe("DocViewerPanel taxonomy UI", () => {
 
   const whitepaper = makeEntry({
     id: "nhm2-whitepaper",
-    route: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
-    relativePath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+    route: "/docs/research/nhm2-current-status-whitepaper.md",
+    relativePath: "docs/research/nhm2-current-status-whitepaper.md",
     subjectLabel: "Warp Mechanics",
-    title: "Nhm2 Current Status Whitepaper 2026 05 02",
+    title: "Nhm2 Current Status Whitepaper",
     docClass: "canonical-research",
     bundleKind: "equation-action-whitepaper",
     canonical: true,
     sidecars: [
-      "docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.json",
-      "docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.source.json",
+      "docs/research/nhm2-current-status-whitepaper.equation-actions.json",
+      "docs/research/nhm2-current-status-whitepaper.equation-actions.source.json",
     ],
     toolHints: {
       calculatorReady: true,
@@ -140,7 +140,7 @@ describe("DocViewerPanel taxonomy UI", () => {
     expect(onDocClassFilterChange).toHaveBeenCalledWith("canonical-research");
 
     const whitepaperButton = screen.getByRole("button", {
-      name: /Nhm2 Current Status Whitepaper 2026 05 02/i,
+      name: /Nhm2 Current Status Whitepaper/i,
     });
     expect(within(whitepaperButton).getByText("Canonical research")).toBeTruthy();
     expect(within(whitepaperButton).getByText("Calculator-ready")).toBeTruthy();
@@ -152,7 +152,7 @@ describe("DocViewerPanel taxonomy UI", () => {
     expect(onQueryChange).toHaveBeenCalledWith("NHM2 current status whitepaper");
 
     fireEvent.click(whitepaperButton);
-    expect(onSelect).toHaveBeenCalledWith("/docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
+    expect(onSelect).toHaveBeenCalledWith("/docs/research/nhm2-current-status-whitepaper.md");
   });
 
   it("matches entries by selected taxonomy filter", () => {
@@ -561,7 +561,7 @@ describe("DocViewerPanel taxonomy UI", () => {
         translationEligible={true}
         translationAccountLocale="en"
         translationTargetLanguage="es"
-        translationSourceId="document_markdown:docs/research/nhm2-current-status-whitepaper-2026-05-02.md"
+        translationSourceId="document_markdown:docs/research/nhm2-current-status-whitepaper.md"
         translationSourceHash="fnv1a32:whitepaper"
         translationSourceTextHash="fnv1a32:whitepaper"
         translationSourceTextCharCount={1200}

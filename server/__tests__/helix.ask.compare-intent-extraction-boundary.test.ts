@@ -66,7 +66,7 @@ describe("Helix Ask compare intent extraction boundary", () => {
     expect(readers.isAskTurnCreateCopyCompareIntent("create a note from the clipboard")).toBe(false);
     expect(readers.isAskTurnCompareCopyResultToClipboardIntent("compare this doc and copy the result to clipboard")).toBe(true);
     expect(readers.isAskTurnCompareCopyResultToClipboardIntent("copy the result to clipboard")).toBe(false);
-    expect(isAskTurnGenericDocCompareTarget("docs/research/nhm2-current-status-whitepaper-2026-05-02.md")).toBe(true);
+    expect(isAskTurnGenericDocCompareTarget("docs/research/nhm2-current-status-whitepaper.md")).toBe(true);
     expect(isAskTurnGenericDocCompareTarget("the current document")).toBe(true);
     expect(isAskTurnGenericDocCompareTarget("Field Notes")).toBe(false);
   });

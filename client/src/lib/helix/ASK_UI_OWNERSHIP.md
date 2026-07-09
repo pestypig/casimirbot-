@@ -327,7 +327,7 @@ These issues came from live Helix-mode UI testing and must be handled as behavio
 
 Evidence:
 
-- Browser URL had `doc=docs/research/nhm2-current-status-whitepaper-2026-05-02.md`.
+- Browser URL had `doc=docs/research/nhm2-current-status-whitepaper.md`.
 - UI visible focus included `docs-viewer` and `scientific-calculator`.
 - Prompt using "current NHM2 whitepaper" failed with: "I need retrieval before finalizing this claim. I do not yet have grounded evidence references for it."
 - The same prompt succeeds through the direct API when `doc_path` is supplied.

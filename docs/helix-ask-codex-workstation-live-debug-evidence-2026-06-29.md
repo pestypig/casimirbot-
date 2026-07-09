@@ -22,7 +22,7 @@ Authority boundary:
 
 ## Environment
 
-- URL tested: `http://localhost:1498/desktop?panels=docs-viewer%2Cscientific-calculator&focus=scientific-calculator&doc=docs%2Fresearch%2Fnhm2-current-status-whitepaper-2026-05-02.md`
+- URL tested: `http://localhost:1498/desktop?panels=docs-viewer%2Cscientific-calculator&focus=scientific-calculator&doc=docs%2Fresearch%2Fnhm2-current-status-whitepaper.md`
 - Server commit reported by debug export: `0858307ad931f853bbbd57dfb48248099fc38d24`
 - Runtime selected in UI: `Codex Workstation Mode`
 - Browser console warnings/errors during evidence pass: none observed
@@ -80,7 +80,7 @@ Observation:
 
 - schema: `helix.docs_search_observation.v1`
 - bounded document excerpt materialized from
-  `docs/research/nhm2-current-status-whitepaper-2026-05-02.md`
+  `docs/research/nhm2-current-status-whitepaper.md`
 
 Status:
 
@@ -202,9 +202,9 @@ Prompt:
 Visible trace included:
 
 - `Runtime selected: Codex Workstation Mode.`
-- `Context state: focused panel docs-viewer; retained doc docs/research/nhm2-current-status-whitepaper-2026-05-02.md.`
+- `Context state: focused panel docs-viewer; retained doc docs/research/nhm2-current-status-whitepaper.md.`
 - `Tool request: docs.search.`
-- `Tool observation: docs.search materialized a bounded document excerpt from docs/research/nhm2-current-status-whitepaper-2026-05-02.md.`
+- `Tool observation: docs.search materialized a bounded document excerpt from docs/research/nhm2-current-status-whitepaper.md.`
 - `Model re-entry: Codex received the workstation observation packet(s) before final answer.`
 
 Final answer quality:
@@ -227,7 +227,7 @@ Visible trace:
 
 - context state showed focused panel `scientific-calculator`
 - retained doc path was present:
-  `docs/research/nhm2-current-status-whitepaper-2026-05-02.md`
+  `docs/research/nhm2-current-status-whitepaper.md`
 - `docs.search` ran
 - tool observation reported `Docs search returned 0 evidence hit(s)`
 - model re-entry happened with that observation

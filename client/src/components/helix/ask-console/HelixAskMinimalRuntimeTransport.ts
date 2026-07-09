@@ -8,6 +8,7 @@ import {
 } from "./HelixAskRequestEnvelope";
 import {
   buildHelixAskHardBackendEntrypointRouteMetadata,
+  isConceptualToolExplanationWithoutExecution,
   requiresHelixAskBackendEntrypoint,
 } from "./HelixAskBackendEntrypointPolicy";
 import type { HelixAskMinimalRuntimeSubmitPlan } from "./HelixAskMinimalRuntimeSubmitPlan";
@@ -75,18 +76,23 @@ export function buildHelixAskMinimalRuntimeTurnPayload(args: {
   const envelope = args.submitPlan.envelope;
   if (!envelope?.question.trim()) return null;
   const question = envelope.question.trim();
+  const conceptualToolExplanationWithoutExecution =
+    isConceptualToolExplanationWithoutExecution(question);
   const requiresBackendAskEntrypoint =
-    args.submitPlan.pendingPrompt?.requiresBackendAskEntrypoint === true ||
-    requiresHelixAskBackendEntrypoint(question);
+    !conceptualToolExplanationWithoutExecution &&
+    (args.submitPlan.pendingPrompt?.requiresBackendAskEntrypoint === true ||
+      requiresHelixAskBackendEntrypoint(question));
   const routeMetadata =
-    args.submitPlan.pendingPrompt?.routeMetadata ??
-    (requiresBackendAskEntrypoint
-      ? buildHelixAskHardBackendEntrypointRouteMetadata({
-          question,
-          turnId: args.turnId,
-          threadId: args.sessionId ?? args.turnId,
-        })
-      : undefined);
+    conceptualToolExplanationWithoutExecution
+      ? undefined
+      : args.submitPlan.pendingPrompt?.routeMetadata ??
+        (requiresBackendAskEntrypoint
+          ? buildHelixAskHardBackendEntrypointRouteMetadata({
+              question,
+              turnId: args.turnId,
+              threadId: args.sessionId ?? args.turnId,
+            })
+          : undefined);
   const payload = buildHelixAskConsoleBackendTurnPayloadCore({
     sessionId: args.sessionId,
     agentRuntime: envelope.agent_runtime,
@@ -102,7 +108,9 @@ export function buildHelixAskMinimalRuntimeTurnPayload(args: {
     workspaceContextSnapshot: args.submitPlan.context as unknown as Record<string, unknown>,
     routeMetadata,
     bypassWorkstationDispatch: args.submitPlan.pendingPrompt?.bypassWorkstationDispatch,
-    forceReasoningDispatch: args.submitPlan.pendingPrompt?.forceReasoningDispatch === true || requiresBackendAskEntrypoint,
+    forceReasoningDispatch:
+      (!conceptualToolExplanationWithoutExecution && args.submitPlan.pendingPrompt?.forceReasoningDispatch === true) ||
+      requiresBackendAskEntrypoint,
     requiresBackendAskEntrypoint,
     suppressWorkstationPayloadActions: args.submitPlan.pendingPrompt?.suppressWorkstationPayloadActions,
   });

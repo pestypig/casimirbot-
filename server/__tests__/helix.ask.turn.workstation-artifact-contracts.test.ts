@@ -9,7 +9,7 @@ describe("workstation artifact contracts", () => {
     const extraction = extractDocEquationFromText({
       threadId: "helix-ask:desktop",
       turnId: "turn:doc-equation",
-      sourceDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      sourceDocPath: "/docs/research/nhm2-current-status-whitepaper.md",
       sourceTitle: "NHM2",
       text: [
         "# NHM2",

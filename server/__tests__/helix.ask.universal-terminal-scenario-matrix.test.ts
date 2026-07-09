@@ -186,7 +186,7 @@ describe("Helix Ask universal terminal scenario matrix", () => {
         workspace_context_snapshot: {
           sessionId: "helix-ask:desktop",
           activePanel: "live-answer-environment",
-          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper.md",
           hasDocContext: true,
           docContextValid: true,
         },
@@ -214,7 +214,7 @@ describe("Helix Ask universal terminal scenario matrix", () => {
         workspace_context_snapshot: {
           sessionId: "doc-target-thread",
           activePanel: "docs-viewer",
-          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper.md",
           hasDocContext: true,
           docContextValid: true,
         },

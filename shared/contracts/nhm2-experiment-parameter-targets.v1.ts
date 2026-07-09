@@ -120,7 +120,7 @@ export type BuildNhm2ExperimentParameterTargetsInput = {
 const DEFAULT_PROFILE_ID =
   "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1";
 
-const WHITEPAPER = "docs/research/nhm2-current-status-whitepaper-2026-05-02.md";
+const WHITEPAPER = "docs/research/nhm2-current-status-whitepaper.md";
 const ROADMAP_CONTRACT = "shared/contracts/nhm2-experiment-facing-theory-roadmap.v1.ts";
 
 const RESEARCH = {

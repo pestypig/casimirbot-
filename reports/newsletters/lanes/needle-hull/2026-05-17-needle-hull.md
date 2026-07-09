@@ -7,7 +7,7 @@ This week in the Needle Hull / NHM2 / Warp Solve lane was quiet in the best and 
 For a first-time reader, this lane is the repo's attempt to turn speculative warp-like geometry into a bounded NHM2 shift+lapse modeling stack with explicit stress-energy bookkeeping, observer audits, and policy gates. The baseline in `docs/nhm2-closed-loop.md` and `modules/warp/natario-warp.ts` remains conservative: NHM2 is a lapse-extended Natario-style candidate lane, not a certified transport result. The repo keeps metric evaluation, source closure, mission-time products, and visualization in separate evidentiary lanes so one surface does not impersonate another.
 
 ## What changed this week
-The only clear lane-specific repo movement in the last seven days was a May 11 update to `docs/research/nhm2-current-status-whitepaper-2026-05-02.md` in commit `1e7dbc00`. The added section, `4.10 Quantum-spacetime sidecar: ER_EPR_STAGE1 solver status`, is careful by design. It introduces the ER=EPR tiny-SYK sidecar as a model-internal quantum-spacetime diagnostic, then says plainly that it is not part of NHM2 source closure, not part of propulsion validation, and not a route for promoting warp claims. The whitepaper also keeps the harder red-team language from earlier in the month: the metric-required same-chart route is the stronger surface, while tile-effective counterpart authority, QEI evidence, convergence, and independent reproduction still block promotion.
+The only clear lane-specific repo movement in the last seven days was a May 11 update to `docs/research/nhm2-current-status-whitepaper.md` in commit `1e7dbc00`. The added section, `4.10 Quantum-spacetime sidecar: ER_EPR_STAGE1 solver status`, is careful by design. It introduces the ER=EPR tiny-SYK sidecar as a model-internal quantum-spacetime diagnostic, then says plainly that it is not part of NHM2 source closure, not part of propulsion validation, and not a route for promoting warp claims. The whitepaper also keeps the harder red-team language from earlier in the month: the metric-required same-chart route is the stronger surface, while tile-effective counterpart authority, QEI evidence, convergence, and independent reproduction still block promotion.
 
 Just as important is what did not change. `docs/research/nhm2-lapse-alpha-sweep-status-latest.md` still shows `stage1_centerline_alpha_0p7000_v1` as the first failure point with `failed_timeout` and `full_loop_unavailable`, and `docs/research/nhm2-frontier-distance-report.md` still treats `stage1_centerline_alpha_0p995_v1` as the anchor rather than a broad lower-alpha pass. `docs/audits/research/warp-nhm2-full-loop-audit-latest.md` also remains at `overallState | review |` with `blockingReasons | insufficient_provenance, policy_review_required |`. So this was not a new solve week. It was a clarification week.
 
@@ -28,12 +28,12 @@ The next validation step is still a fresh controlled rerun that carries a lower-
 - `docs/nhm2-closed-loop.md`
 - `modules/warp/natario-warp.ts`
 - commit `1e7dbc00` on 2026-05-11: `batch update`
-- `docs/research/nhm2-current-status-whitepaper-2026-05-02.md`
+- `docs/research/nhm2-current-status-whitepaper.md`
 - `docs/research/nhm2-lapse-alpha-sweep-status-latest.md`
 - `docs/research/nhm2-frontier-distance-report.md`
 - `docs/audits/research/warp-nhm2-full-loop-audit-latest.md`
 - `MATH_STATUS.md`
-- Atlas trace for `docs/research/nhm2-current-status-whitepaper-2026-05-02.md` linking to `docs/research/nhm2-observable-equation-map.v1.json` and ER/EPR claim files
+- Atlas trace for `docs/research/nhm2-current-status-whitepaper.md` linking to `docs/research/nhm2-observable-equation-map.v1.json` and ER/EPR claim files
 
 ## Quiet Ledger
 This week did not claim physical viability, a new lower-alpha pass, fresh source-closure resolution, certificate promotion, or any NHM2 uplift from the ER=EPR sidecar material. The lane still carries the same unresolved burdens as before: timeout-limited lower-alpha evidence, provenance mismatches across selected-family surfaces, and a full-loop audit that remains under review rather than closure.

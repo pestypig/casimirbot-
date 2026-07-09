@@ -48,7 +48,7 @@ describe("docs search taxonomy metadata", () => {
     const candidates = buildDocsSearchDocumentCandidates(
       [
         hit(
-          "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          "docs/research/nhm2-current-status-whitepaper.md",
           "NHM2 current status whitepaper.",
           "whitepaper",
         ),
@@ -58,7 +58,7 @@ describe("docs search taxonomy metadata", () => {
     );
 
     expect(candidates[0]).toMatchObject({
-      path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      path: "docs/research/nhm2-current-status-whitepaper.md",
       doc_class: "canonical-research",
       bundle_kind: "equation-action-whitepaper",
       canonical: true,
@@ -67,8 +67,8 @@ describe("docs search taxonomy metadata", () => {
       },
     });
     expect(candidates[0]?.sidecars).toEqual([
-      "docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.json",
-      "docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.source.json",
+      "docs/research/nhm2-current-status-whitepaper.equation-actions.json",
+      "docs/research/nhm2-current-status-whitepaper.equation-actions.source.json",
     ]);
   });
 });

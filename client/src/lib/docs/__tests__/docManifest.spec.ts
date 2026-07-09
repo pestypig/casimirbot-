@@ -130,7 +130,7 @@ describe("filterDocManifestEntries", () => {
 
   it("attaches taxonomy metadata for Calculator-ready canonical whitepapers", () => {
     const entry = DOC_MANIFEST.find(
-      (candidate) => candidate.relativePath === "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      (candidate) => candidate.relativePath === "docs/research/nhm2-current-status-whitepaper.md",
     );
 
     expect(entry).toMatchObject({
@@ -138,8 +138,8 @@ describe("filterDocManifestEntries", () => {
       bundleKind: "equation-action-whitepaper",
       canonical: true,
       sidecars: [
-        "docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.json",
-        "docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.source.json",
+        "docs/research/nhm2-current-status-whitepaper.equation-actions.json",
+        "docs/research/nhm2-current-status-whitepaper.equation-actions.source.json",
       ],
       toolHints: {
         calculatorReady: true,

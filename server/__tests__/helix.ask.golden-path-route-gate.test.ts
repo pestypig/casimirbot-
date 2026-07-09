@@ -483,7 +483,7 @@ describe("Helix Ask golden-path route gate", () => {
         turn_id: "ask:test:golden-route-ui-helix-payload",
         prompt:
           "Use the NHM2 whitepaper, calculate 6 * 7, reflect with the theory badge graph, apply civilization bounds, and check scholarly papers for corroboration.",
-        doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        doc_path: "docs/research/nhm2-current-status-whitepaper.md",
         query: "NHM2 Casimir tile",
         doc_content:
           "The NHM2 whitepaper discusses Casimir tile generation. A bounded diagnostic table mentions Casimir tile pressure internal normal attraction stack force claim boundary.",
@@ -769,7 +769,7 @@ describe("Helix Ask golden-path route gate", () => {
           HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
           HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
         ],
-        doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        doc_path: "docs/research/nhm2-current-status-whitepaper.md",
         query: "Casimir tile newtons load bearing",
         doc_content: "The Casimir tile generation table reports a load bearing force of 10 newtons per tile.",
         calculator_expression: "10 * 0.224809",

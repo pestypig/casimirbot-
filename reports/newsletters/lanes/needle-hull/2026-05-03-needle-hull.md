@@ -7,7 +7,7 @@ This week in the Needle Hull / NHM2 / Warp Solve lane felt less like a leap and 
 For a first-time reader, this lane is the repo's attempt to make speculative warp-like geometry legible as a bounded NHM2 shift+lapse modeling stack with explicit contracts, observer audits, and promotion gates. The standing baseline in `docs/nhm2-closed-loop.md` and `modules/warp/natario-warp.ts` is still conservative: NHM2 is a candidate research lane built on a Natario-style zero-expansion transport core, with stronger claims blocked until source closure, policy gates, and certificate integrity all line up. The repo treats same-chart metric evaluation, mission-time products, and visualization as distinct surfaces.
 
 ## What changed this week
-The largest change was documentary, but not merely cosmetic. `docs/research/nhm2-current-status-whitepaper-2026-05-02.md` now gathers the lane into one same-chart 3+1 narrative: mechanism-side Casimir source model, solve-backed shift+lapse geometry, Einstein-tensor stress-energy evaluation, and observer-facing timing and energy-condition diagnostics. Its most important contribution is boundary language. It repeatedly states that the framework is artifact-limited, that `0p7000` is runtime-blocked rather than physics-failed, and that global source-closure tightness is still review-level rather than a physical source proof.
+The largest change was documentary, but not merely cosmetic. `docs/research/nhm2-current-status-whitepaper.md` now gathers the lane into one same-chart 3+1 narrative: mechanism-side Casimir source model, solve-backed shift+lapse geometry, Einstein-tensor stress-energy evaluation, and observer-facing timing and energy-condition diagnostics. Its most important contribution is boundary language. It repeatedly states that the framework is artifact-limited, that `0p7000` is runtime-blocked rather than physics-failed, and that global source-closure tightness is still review-level rather than a physical source proof.
 
 The alpha-sweep lane also became more explicit about its frontier bookkeeping. `scripts/research/run-nhm2-lapse-alpha-sweep.ts`, `docs/research/nhm2-frontier-distance-report.md`, and `docs/research/nhm2-lapse-alpha-sweep-status-latest.md` now frame `stage1_centerline_alpha_0p995_v1` as the clocking-law anchor while treating lower-alpha rows as expected targets until their own fresh artifacts pass. In the current ledger, `stage1_centerline_alpha_0p7000_v1` remains the first failure point, with `failed_timeout`, `full_loop_unavailable`, and `selected_transport_timeout` called out directly. That is meaningful progress in accountability, even if it is not yet progress in promotion.
 
@@ -29,7 +29,7 @@ The next gate is still a fresh controlled rerun that gets `stage1_centerline_alp
 - `docs/nhm2-closed-loop.md`
 - `modules/warp/natario-warp.ts`
 - `scripts/research/run-nhm2-lapse-alpha-sweep.ts`
-- `docs/research/nhm2-current-status-whitepaper-2026-05-02.md`
+- `docs/research/nhm2-current-status-whitepaper.md`
 - `docs/research/nhm2-frontier-distance-report.md`
 - `docs/research/nhm2-lapse-alpha-sweep-status-latest.md`
 - `docs/audits/research/warp-nhm2-full-loop-audit-latest.md`

@@ -24,7 +24,7 @@ const ACCEPTANCE_PROMPTS = [
   "Create a note summarizing the active doc.",
 ] as const;
 
-const NHM2_DOC_PATH = "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md";
+const NHM2_DOC_PATH = "/docs/research/nhm2-current-status-whitepaper.md";
 
 const withEnv = async <T,>(env: Record<string, string | undefined>, fn: () => Promise<T>): Promise<T> => {
   const previous = new Map<string, string | undefined>();
@@ -339,8 +339,8 @@ describe("Helix Ask Codex-shaped debug parity", () => {
     expect(repairs.some((repair) => repair.repaired_to === "model.direct_answer")).toBe(true);
     expect(repairs.some((repair) => repair.repaired_to === "docs-viewer.locate_in_doc")).toBe(false);
     const workspaceDirectoryResolution = findArtifactPayload(debug, "workspace_directory_resolution");
-    expect(workspaceDirectoryResolution?.selected_doc_path).toBe("docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
-    expect(JSON.stringify(debug)).toContain("workspace://workspace/docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
+    expect(workspaceDirectoryResolution?.selected_doc_path).toBe("docs/research/nhm2-current-status-whitepaper.md");
+    expect(JSON.stringify(debug)).toContain("workspace://workspace/docs/research/nhm2-current-status-whitepaper.md");
     const loop = findArtifactPayload(debug, "agent_runtime_loop");
     expect(loop?.iterations?.some((iteration: any) => iteration.chosen_capability === "workspace-directory.resolve")).toBe(true);
     expect(loop?.iterations?.some((iteration: any) => iteration.chosen_capability === "docs-viewer.locate_in_doc")).toBe(false);

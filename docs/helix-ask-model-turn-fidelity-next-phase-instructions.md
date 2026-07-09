@@ -250,7 +250,7 @@ Primary failure signatures:
 ### Prompt C: Exact Path Summary
 
 ```txt
-Summarize /docs/research/nhm2-current-status-whitepaper-2026-05-02.md from docs in 5 bullets. Include the path.
+Summarize /docs/research/nhm2-current-status-whitepaper.md from docs in 5 bullets. Include the path.
 ```
 
 Expected path:

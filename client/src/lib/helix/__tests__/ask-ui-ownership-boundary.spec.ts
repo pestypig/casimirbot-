@@ -194,7 +194,7 @@ describe("Helix Ask UI ownership boundaries", () => {
     for (const behaviorQueueItem of [
       "HASK-BSQ-001",
       "Active document context handoff",
-      "doc=docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      "doc=docs/research/nhm2-current-status-whitepaper.md",
       "Request-envelope assembly",
       "HASK-BSQ-002",
       "Scoped Debug copy binds to stale prior turn",

@@ -390,19 +390,19 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(buildHelixAskConsoleContextFiles({
       docsViewerAnchorPath: null,
       workspaceContextSnapshot: {
-      activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
-      docContextPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
+      docContextPath: "docs/research/nhm2-current-status-whitepaper.md",
       },
-    })).toEqual(["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"]);
+    })).toEqual(["docs/research/nhm2-current-status-whitepaper.md"]);
 
     expect(buildHelixAskConsoleContextFiles({
       docsViewerAnchorPath: "docs/research/explicit.md",
       workspaceContextSnapshot: {
-        activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
       },
     })).toEqual([
       "docs/research/explicit.md",
-      "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      "docs/research/nhm2-current-status-whitepaper.md",
     ]);
   });
 
@@ -412,19 +412,19 @@ describe("HelixAskPill mic-first surface contract", () => {
       configurable: true,
       value: {
         location: {
-          search: "?doc=docs%2Fresearch%2Fnhm2-current-status-whitepaper-2026-05-02.md",
+          search: "?doc=docs%2Fresearch%2Fnhm2-current-status-whitepaper.md",
         },
       },
     });
     try {
       const urlDocPath = readDocViewerPathFromDesktopUrlForAskSnapshot();
-      expect(urlDocPath).toBe("docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
+      expect(urlDocPath).toBe("docs/research/nhm2-current-status-whitepaper.md");
       expect(buildHelixAskConsoleContextFiles({
         docsViewerAnchorPath: null,
         workspaceContextSnapshot: {
           activeDocPath: urlDocPath,
         },
-      })).toEqual(["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"]);
+      })).toEqual(["docs/research/nhm2-current-status-whitepaper.md"]);
     } finally {
       if (originalWindow === undefined) {
         delete (globalThis as Record<string, unknown>).window;

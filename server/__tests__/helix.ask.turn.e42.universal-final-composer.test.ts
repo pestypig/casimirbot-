@@ -89,7 +89,7 @@ describe("helix ask E42 universal final composer", () => {
       .post("/api/agi/ask/turn")
       .send({
         question:
-          "Find where /docs/research/nhm2-current-status-whitepaper-2026-05-02.md discusses assumptions. Return the section or nearby anchors and a short explanation.",
+          "Find where /docs/research/nhm2-current-status-whitepaper.md discusses assumptions. Return the section or nearby anchors and a short explanation.",
         mode: "read",
         debug: true,
         sessionId,

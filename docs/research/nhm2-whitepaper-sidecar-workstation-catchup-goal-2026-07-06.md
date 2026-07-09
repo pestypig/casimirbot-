@@ -14,13 +14,13 @@ authority, or external validation.
 
 ## Cited Context
 
-- Canonical paper: `docs/research/nhm2-current-status-whitepaper-2026-05-02.md`.
+- Canonical paper: `docs/research/nhm2-current-status-whitepaper.md`.
   `docs/research/README.md` names this as the current maintained NHM2
   whitepaper and says its calculator/equation sidecars must stay together.
 - Existing sidecars:
-  `docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.json`
+  `docs/research/nhm2-current-status-whitepaper.equation-actions.json`
   and
-  `docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.source.json`.
+  `docs/research/nhm2-current-status-whitepaper.equation-actions.source.json`.
 - Sidecar generator:
   `scripts/generate-doc-equation-actions.ts` builds the generated JSON from the
   markdown plus source sidecar, and `scripts/doc-equation-action-generator.ts`
@@ -77,7 +77,7 @@ coverage include:
    proof.
 
 2. Regenerate
-   `docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.json`
+   `docs/research/nhm2-current-status-whitepaper.equation-actions.json`
    with `npm run docs:equation-actions:generate`, then require
    `npm run docs:equation-actions:check` to pass.
 

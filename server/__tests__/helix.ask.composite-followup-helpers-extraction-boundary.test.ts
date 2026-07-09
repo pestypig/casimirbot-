@@ -40,7 +40,7 @@ describe("composite followup helpers extraction boundary", () => {
       {
         artifact_id: "open-1",
         kind: "doc_open_receipt",
-        payload: { path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md" },
+        payload: { path: "docs/research/nhm2-current-status-whitepaper.md" },
         extraField: "preserved",
       },
       {
@@ -56,7 +56,7 @@ describe("composite followup helpers extraction boundary", () => {
     expect(latest?.extraField).toBe("latest");
 
     expect(summarizeAskTurnCompositeArtifact(artifacts[0], "fallback")).toBe(
-      "Opened document: docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      "Opened document: docs/research/nhm2-current-status-whitepaper.md",
     );
     expect(summarizeAskTurnCompositeArtifact(artifacts[1], "fallback")).toBe("Located equation evidence.");
 

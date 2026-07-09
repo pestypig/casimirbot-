@@ -125,7 +125,7 @@ describe("helix ask E66 active document deictic summary", () => {
   it("treats UI-rewritten current-doc summary prompts as active-doc summary, not repo-code evidence", async () => {
     const app = createApp();
     const sessionId = `e66-ui-rewrite-doc-summary-${Date.now()}`;
-    const currentStatusPath = "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md";
+    const currentStatusPath = "/docs/research/nhm2-current-status-whitepaper.md";
 
     const response = await request(app)
       .post("/api/agi/ask/turn")
@@ -190,7 +190,7 @@ describe("helix ask E66 active document deictic summary", () => {
   it("keeps exact /docs path summary prompts in the docs summary lane", async () => {
     const app = createApp();
     const sessionId = `e66-exact-doc-path-summary-${Date.now()}`;
-    const currentStatusPath = "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md";
+    const currentStatusPath = "/docs/research/nhm2-current-status-whitepaper.md";
 
     const response = await request(app)
       .post("/api/agi/ask/turn")

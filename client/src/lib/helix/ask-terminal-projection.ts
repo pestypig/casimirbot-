@@ -76,10 +76,26 @@ function isProviderInstructionEchoFailureText(value: unknown): boolean {
   );
 }
 
+function isConceptualToolExplanationWithoutExecution(value: unknown): boolean {
+  const text = coerceText(value).trim();
+  if (!text) return false;
+  const asksForConcept =
+    /\b(?:what\s+is|what\s+does|explain|describe|define|meaning\s+of|looks?\s+like)\b/i.test(text);
+  const referencesToolOrCapability =
+    /\b(?:tool|capability|identifier|namespace|function|action|moral\s+graph\s+reflection|moral\s+graph\s+tool|internet[-_.\s]?search|scientific\s+calculator|image\s+lens|docs\s+viewer|repo\.search|scholarly[-_.\s]?research)\b/i.test(text);
+  const suppressesExecution =
+    /\b(?:do\s+not|don't|dont|without|not\s+to|no\s+need\s+to)\b[\s\S]{0,80}\b(?:run|execute|call|use|browse|search|open|inspect|reflect)\b/i.test(text) ||
+    /\b(?:conceptually|plain\s+english|just\s+explain|only\s+explain)\b/i.test(text);
+  const affirmativeExecution =
+    /\b(?:use|run|execute|call|open|search|browse|inspect|reflect\s+on|reflect\s+with|through|via)\s+(?:only\s+)?(?:the\s+)?(?:moral\s+graph|scientific\s+calculator|image\s+lens|docs\s+viewer|repo\.search|internet\s+search|scholarly\s+research)\b/i.test(text);
+  return asksForConcept && referencesToolOrCapability && suppressesExecution && !affirmativeExecution;
+}
+
 function isHardBackendEntrypointPrompt(value: unknown): boolean {
   const text = coerceText(value);
   if (!text) return false;
-  return /\b(?:moral-graph\.[a-z0-9_.-]+|moral\s+graph\s+(?:tool|reflection)|(?:use|with|through|via)\s+(?:the\s+)?moral\s+graph\b[\s\S]{0,160}\b(?:reflect|reflection|case|situation|dependency|repair|boundary|agency|badge|lens|roommate))\b/i.test(text);
+  if (isConceptualToolExplanationWithoutExecution(text)) return false;
+  return /\b(?:moral-graph\.[a-z0-9_.-]+|(?:use|with|through|via)\s+(?:only\s+)?(?:the\s+)?moral\s+graph\b[\s\S]{0,160}\b(?:reflect|reflection|case|situation|dependency|repair|boundary|agency|badge|lens|roommate))\b/i.test(text);
 }
 
 function hasMaterializedBackendEntrypointTerminal(

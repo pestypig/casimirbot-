@@ -104,6 +104,7 @@ import {
   HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT as RECROWNED_HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
   HELIX_ASK_ENTRYPOINT_GUARD_VERSION as RECROWNED_HELIX_ASK_ENTRYPOINT_GUARD_VERSION,
   buildHelixAskHardBackendEntrypointRouteMetadata,
+  isConceptualToolExplanationWithoutExecution as recrownedIsConceptualToolExplanationWithoutExecution,
   requiresHelixAskBackendEntrypoint as recrownedRequiresHelixAskBackendEntrypoint,
   shouldUseHelixAskBackendTurnEntrypoint as recrownedShouldUseHelixAskBackendTurnEntrypoint,
 } from "@/components/helix/ask-console/HelixAskBackendEntrypointPolicy";
@@ -3283,6 +3284,7 @@ export const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT =
 export const HELIX_ASK_ENTRYPOINT_GUARD_VERSION = RECROWNED_HELIX_ASK_ENTRYPOINT_GUARD_VERSION;
 
 export function requiresHelixAskBackendEntrypoint(question: string | null | undefined): boolean {
+  if (recrownedIsConceptualToolExplanationWithoutExecution(`${question ?? ""}`)) return false;
   return recrownedRequiresHelixAskBackendEntrypoint(question);
 }
 

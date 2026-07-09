@@ -11,7 +11,7 @@ const createApp = (): express.Express => {
   return app;
 };
 
-const docPath = "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md";
+const docPath = "/docs/research/nhm2-current-status-whitepaper.md";
 const architectureDocPath = "/docs/architecture/paper-ingestion-paperrun-contract-v1.md";
 
 const workspaceSnapshot = (sessionId: string) => ({

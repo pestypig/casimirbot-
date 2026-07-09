@@ -144,7 +144,7 @@ describe("helix ask E50 terminal consistency", () => {
 
   it("answers general concept questions directly despite ambient active-doc context", async () => {
     const app = createApp();
-    const activePath = "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md";
+    const activePath = "/docs/research/nhm2-current-status-whitepaper.md";
     const response = await request(app)
       .post("/api/agi/ask/turn")
       .send({
@@ -352,8 +352,8 @@ describe("helix ask E50 terminal consistency", () => {
         workspace_context_snapshot: {
           sessionId,
           activePanel: "docs-viewer",
-          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
-          docContextPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper.md",
+          docContextPath: "/docs/research/nhm2-current-status-whitepaper.md",
           hasDocContext: true,
           docContextValid: true,
           hasNoteContext: false,
@@ -408,7 +408,7 @@ describe("helix ask E50 terminal consistency", () => {
 
   it("honors explicit no-workspace constraints before workstation source targeting", async () => {
     const app = createApp();
-    const activePath = "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md";
+    const activePath = "/docs/research/nhm2-current-status-whitepaper.md";
     const sourceTarget = arbitrateAskSourceTarget({
       turnId: "e50-source-target",
       threadId: "e50-source-target-thread",
@@ -449,7 +449,7 @@ describe("helix ask E50 terminal consistency", () => {
 
   it("keeps general Doppler explanations model-only despite ambient document context", async () => {
     const app = createApp();
-    const activePath = "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md";
+    const activePath = "/docs/research/nhm2-current-status-whitepaper.md";
     const response = await request(app)
       .post("/api/agi/ask/turn")
       .send({

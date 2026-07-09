@@ -1,4 +1,4 @@
-﻿import express from "express";
+import express from "express";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 
@@ -174,8 +174,8 @@ describe("helix ask E52 panel control terminal contract", () => {
         workspace_context_snapshot: {
           sessionId,
           activePanel: "docs-viewer",
-          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
-          docContextPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper.md",
+          docContextPath: "/docs/research/nhm2-current-status-whitepaper.md",
           hasDocContext: true,
           docContextValid: true,
         },
@@ -203,8 +203,8 @@ describe("helix ask E52 panel control terminal contract", () => {
         workspace_context_snapshot: {
           sessionId,
           activePanel: "docs-viewer",
-          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
-          docContextPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper.md",
+          docContextPath: "/docs/research/nhm2-current-status-whitepaper.md",
           hasDocContext: true,
           docContextValid: true,
         },
@@ -246,7 +246,7 @@ describe("helix ask E52 panel control terminal contract", () => {
         sessionId: `e52-open-docs-panel-polite-${Date.now()}`,
         workspace_context_snapshot: {
           activePanel: "live-answer-environment",
-          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper.md",
           docContextValid: true,
         },
       })
@@ -289,7 +289,7 @@ describe("helix ask E52 panel control terminal contract", () => {
         sessionId: `e52-open-a-docs-panel-${Date.now()}`,
         workspace_context_snapshot: {
           activePanel: "docs-viewer",
-          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper.md",
           docContextValid: true,
         },
       })
@@ -333,7 +333,7 @@ describe("helix ask E52 panel control terminal contract", () => {
         sessionId: `e52-open-docs-panel-correction-${Date.now()}`,
         workspace_context_snapshot: {
           activePanel: "live-answer-environment",
-          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper.md",
           docContextValid: true,
         },
       })
@@ -372,7 +372,7 @@ describe("helix ask E52 panel control terminal contract", () => {
         sessionId: `e52-open-docs-for-me-${Date.now()}`,
         workspace_context_snapshot: {
           activePanel: "live-answer-environment",
-          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper.md",
           docContextValid: true,
         },
       })
@@ -1234,7 +1234,7 @@ describe("helix ask E52 panel control terminal contract", () => {
         reason: "Validate the NHM2 candidate before opening the document.",
         args: {
           query: "NHM2 white paper",
-          selected_path: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          selected_path: "/docs/research/nhm2-current-status-whitepaper.md",
         },
         expected_artifacts: ["doc_candidate_validation"],
         commentary: {
@@ -1251,7 +1251,7 @@ describe("helix ask E52 panel control terminal contract", () => {
         next_step: "next_action",
         chosen_capability: "docs-viewer.open_doc_by_path",
         reason: "The search observation is enough to open the known NHM2 whitepaper path.",
-        args: { path: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md" },
+        args: { path: "/docs/research/nhm2-current-status-whitepaper.md" },
         expected_artifacts: ["doc_open_receipt"],
         commentary: {
           turn_purpose: "Open the validated NHM2 document.",
@@ -1455,7 +1455,7 @@ describe("helix ask E52 panel control terminal contract", () => {
         next_step: "next_action",
         chosen_capability: "docs-viewer.open_doc_by_path",
         reason: "Open the selected NHM2 whitepaper path.",
-        args: { path: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md" },
+        args: { path: "/docs/research/nhm2-current-status-whitepaper.md" },
         expected_artifacts: ["doc_open_receipt"],
         confidence: 0.95,
       },

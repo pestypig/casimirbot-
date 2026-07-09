@@ -1725,7 +1725,7 @@ describe("Helix Ask golden path runtime", () => {
           "helix_ask_golden_path_runtime use docs-viewer.locate_in_doc for Casimir tile newtons load bearing",
         goldenPathRuntime: true,
         requested_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-        doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        doc_path: "docs/research/nhm2-current-status-whitepaper.md",
         doc_content: [
           "# NHM2 Current Status",
           "The Casimir tile generation table reports force output in newtons for each tile.",
@@ -1745,7 +1745,7 @@ describe("Helix Ask golden path runtime", () => {
       terminal_error_code: null,
       doc_location_matches: {
         capability_key: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-        doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        doc_path: "docs/research/nhm2-current-status-whitepaper.md",
         match_count: 1,
       },
       capability_plan: {
@@ -2043,7 +2043,7 @@ describe("Helix Ask golden path runtime", () => {
           HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
           HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
         ],
-        doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        doc_path: "docs/research/nhm2-current-status-whitepaper.md",
         query: "Casimir tile newtons load bearing",
         doc_content: [
           "# NHM2 Current Status",
@@ -2065,7 +2065,7 @@ describe("Helix Ask golden path runtime", () => {
       terminal_error_code: null,
       doc_location_matches: {
         capability_key: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-        doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        doc_path: "docs/research/nhm2-current-status-whitepaper.md",
         query: "Casimir tile newtons load bearing",
         match_count: 1,
       },
@@ -2080,7 +2080,7 @@ describe("Helix Ask golden path runtime", () => {
       workstation_actions: [
         {
           kind: "open_doc_at_line",
-          doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          doc_path: "docs/research/nhm2-current-status-whitepaper.md",
           line: 2,
           observation_ref: "ask:golden:docs-calculator-compound:doc_location_matches",
         },
@@ -2186,7 +2186,7 @@ describe("Helix Ask golden path runtime", () => {
           HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
           HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
         ],
-        doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        doc_path: "docs/research/nhm2-current-status-whitepaper.md",
         doc_content: [
           "# NHM2 Current Status",
           "The Casimir tile generation table reports internal normal attraction and stack force values for diagnostic comparison.",
@@ -2593,7 +2593,7 @@ describe("Helix Ask golden path runtime", () => {
           HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
         ],
         workspace_snapshot: {
-          activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
         },
         workspace_os_status: {
           status: "available",

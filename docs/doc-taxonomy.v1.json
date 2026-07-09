@@ -152,14 +152,14 @@
   ],
   "documents": [
     {
-      "path": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      "path": "docs/research/nhm2-current-status-whitepaper.md",
       "docClass": "canonical-research",
       "bundleKind": "equation-action-whitepaper",
       "canonical": true,
       "title": "NHM2 as a 3+1 Same-Chart Lapse-Shift Warp Metric Evaluation Framework",
       "sidecars": [
-        "docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.json",
-        "docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.source.json"
+        "docs/research/nhm2-current-status-whitepaper.equation-actions.json",
+        "docs/research/nhm2-current-status-whitepaper.equation-actions.source.json"
       ],
       "toolHints": {
         "preferMarkdownOverSidecars": true,

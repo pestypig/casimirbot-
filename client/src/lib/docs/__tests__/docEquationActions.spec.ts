@@ -11,15 +11,15 @@ import {
 import { useTheoryBadgeGraphPanelStore } from "@/store/useTheoryBadgeGraphPanelStore";
 import { selectActiveTheoryRunRow, useTheoryCompoundRunStore } from "@/store/useTheoryCompoundRunStore";
 
-const NHM2_WHITEPAPER = "docs/research/nhm2-current-status-whitepaper-2026-05-02.md";
+const NHM2_WHITEPAPER = "docs/research/nhm2-current-status-whitepaper.md";
 const NHM2_WHITEPAPER_PATH = path.resolve(process.cwd(), NHM2_WHITEPAPER);
 const NHM2_WHITEPAPER_ACTIONS_PATH = path.resolve(
   process.cwd(),
-  "docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.json",
+  "docs/research/nhm2-current-status-whitepaper.equation-actions.json",
 );
 const NHM2_WHITEPAPER_ACTION_SOURCE_PATH = path.resolve(
   process.cwd(),
-  "docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.source.json",
+  "docs/research/nhm2-current-status-whitepaper.equation-actions.source.json",
 );
 
 type TestDocEquationActionEntry = {
@@ -126,7 +126,7 @@ describe("doc equation actions", () => {
     expect(contexts[0]).toMatchObject({
       contractVersion: "doc_equation_context/v1",
       equationId: "nhm2-same-chart-full-tensor-ledger",
-      uri: "workspace://workspace/docs/research/nhm2-current-status-whitepaper-2026-05-02.md#nhm2-same-chart-full-tensor-ledger",
+      uri: "workspace://workspace/docs/research/nhm2-current-status-whitepaper.md#nhm2-same-chart-full-tensor-ledger",
       anchor: "nhm2-same-chart-full-tensor-ledger",
       actionId: "open-same-chart-full-tensor-artifact",
       actionKind: "artifact_backed_theory_run",

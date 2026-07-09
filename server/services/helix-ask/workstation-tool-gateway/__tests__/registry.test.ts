@@ -3476,18 +3476,18 @@ describe("Helix workstation tool gateway", () => {
     expect(observation.terms).toContain("whitepaper");
     expect((result.observation as { hit_count?: number }).hit_count).toBeGreaterThan(0);
     expect(hits.some((hit) =>
-      hit.filePath === "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      hit.filePath === "docs/research/nhm2-current-status-whitepaper.md",
     )).toBe(true);
     expect(observation.unique_document_count).toBeGreaterThan(0);
-    expect(candidates[0]?.path).toBe("docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
+    expect(candidates[0]?.path).toBe("docs/research/nhm2-current-status-whitepaper.md");
     expect(candidates[0]?.matched_terms).toEqual(expect.arrayContaining(["nhm2", "whitepaper"]));
     expect(candidates[0]).toMatchObject({
       doc_class: "canonical-research",
       bundle_kind: "equation-action-whitepaper",
       canonical: true,
       sidecars: [
-        "docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.json",
-        "docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.source.json",
+        "docs/research/nhm2-current-status-whitepaper.equation-actions.json",
+        "docs/research/nhm2-current-status-whitepaper.equation-actions.source.json",
       ],
       tool_hints: {
         calculatorReady: true,
@@ -3542,7 +3542,7 @@ describe("Helix workstation tool gateway", () => {
       document_candidates?: Array<{ path?: string }>;
     }).document_candidates ?? [];
     expect(result.ok).toBe(true);
-    expect(candidates[0]?.path).toBe("docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
+    expect(candidates[0]?.path).toBe("docs/research/nhm2-current-status-whitepaper.md");
     const sidecarIndex = candidates.findIndex((candidate) => candidate.path?.endsWith(".equation-actions.json"));
     expect(sidecarIndex === -1 || sidecarIndex > 0).toBe(true);
   });

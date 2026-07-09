@@ -41,7 +41,7 @@ const HELIX_EVIDENCE_GATE_TRANSFORM_TASK_RE =
 const HELIX_ASK_COMPARE_TRIGGER_RE = /\b(?:compare|contrast|difference|diff|what changed|changed since)\b/i;
 
 const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE =
-  /(?:^|\s)\/postulate\b|\b(?:postulate\.submit_proposal|scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\.search|docs\s+viewer|docs\s+search|narrator\.[a-z0-9_.-]+|panel[_\s-]?id\s*(?:=|:)\s*narrator|workstation-notes\.create_note|workstation-notes\.create|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|repo\.search|repo\s+search|moral-graph\.[a-z0-9_.-]+|moral\s+graph\s+(?:tool|reflection)|(?:use|with|through|via)\s+(?:the\s+)?moral\s+graph\b[\s\S]{0,120}\b(?:reflect|reflection|case|situation|dependency|repair|boundary|agency|badge|lens)|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|scholarly-research\.[a-z0-9_.-]+|scholarly_research\.[a-z0-9_.-]+|scholarly\s+research\s+tool|lookup_papers|fetch_full_text|extract_numeric_parameters|live_env\.[a-z0-9_.-]+|helix_ask\.[a-z0-9_.-]+|image[_\s-]?lens|visual_analysis\.inspect_image_region|visual_capture|scientific\s+(?:document|image|page)|document\s+image|attached\s+image.*(?:equation|latex|theory\s+graph))\b/i;
+  /(?:^|\s)\/postulate\b|\b(?:postulate\.submit_proposal|scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\.search|docs\s+viewer|docs\s+search|narrator\.[a-z0-9_.-]+|panel[_\s-]?id\s*(?:=|:)\s*narrator|workstation-notes\.create_note|workstation-notes\.create|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|repo\.search|repo\s+search|moral-graph\.[a-z0-9_.-]+|(?:use|with|through|via)\s+(?:only\s+)?(?:the\s+)?moral\s+graph\b[\s\S]{0,120}\b(?:reflect|reflection|case|situation|dependency|repair|boundary|agency|badge|lens)|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|scholarly-research\.[a-z0-9_.-]+|scholarly_research\.[a-z0-9_.-]+|scholarly\s+research\s+tool|lookup_papers|fetch_full_text|extract_numeric_parameters|live_env\.[a-z0-9_.-]+|helix_ask\.[a-z0-9_.-]+|image[_\s-]?lens|visual_analysis\.inspect_image_region|visual_capture|scientific\s+(?:document|image|page)|document\s+image|attached\s+image.*(?:equation|latex|theory\s+graph))\b/i;
 
 const HELIX_ASK_NOTE_CREATE_NEGATED_OR_CONTEXTUAL_RE =
   /\b(?:don't|do\s+not|dont|never|no\s+need\s+to|without|avoid|stop|cancel|should\s+i|would\s+it|could\s+it|when\s+i|when\s+you|if\s+i|if\s+you|before\s+i|after\s+i|last\s+time|previously|earlier|failed|failure|debug|quote|quoted|says?|said|screen\s+shows?)\b[\s\S]{0,120}\b(?:write|make|create|save|take|add)\s+(?:me\s+)?(?:a\s+|the\s+|new\s+)?note\b/i;
@@ -80,6 +80,21 @@ const stripQuotedPayloadsForBackendEntrypointPolicy = (text: string): string =>
     .replace(/"[\s\S]*?"/g, " quoted payload ")
     .replace(/'[\s\S]*?'/g, " quoted payload ");
 
+export const isConceptualToolExplanationWithoutExecution = (question: string): boolean => {
+  const normalized = question.trim();
+  if (!normalized) return false;
+  const asksForConcept =
+    /\b(?:what\s+is|what\s+does|explain|describe|define|meaning\s+of|looks?\s+like)\b/i.test(normalized);
+  const referencesToolOrCapability =
+    /\b(?:tool|capability|identifier|namespace|function|action|moral\s+graph\s+reflection|moral\s+graph\s+tool|internet[-_.\s]?search|scientific\s+calculator|image\s+lens|docs\s+viewer|repo\.search|scholarly[-_.\s]?research)\b/i.test(normalized);
+  const suppressesExecution =
+    /\b(?:do\s+not|don't|dont|without|not\s+to|no\s+need\s+to)\b[\s\S]{0,80}\b(?:run|execute|call|use|browse|search|open|inspect|reflect)\b/i.test(normalized) ||
+    /\b(?:conceptually|plain\s+english|just\s+explain|only\s+explain)\b/i.test(normalized);
+  const affirmativeExecution =
+    /\b(?:use|run|execute|call|open|search|browse|inspect|reflect\s+on|reflect\s+with|through|via)\s+(?:only\s+)?(?:the\s+)?(?:moral\s+graph|scientific\s+calculator|image\s+lens|docs\s+viewer|repo\.search|internet\s+search|scholarly\s+research)\b/i.test(normalized);
+  return asksForConcept && referencesToolOrCapability && suppressesExecution && !affirmativeExecution;
+};
+
 const isQuotedTransformOnlyForBackendEntrypointPolicy = (question: string): boolean => {
   if (!HELIX_EVIDENCE_GATE_TRANSFORM_TASK_RE.test(question)) return false;
   if (!/"[\s\S]+"/.test(question) && !/'[\s\S]+'/.test(question)) return false;
@@ -98,6 +113,7 @@ export function resolveHelixAskBackendEntrypointFamily(
   const normalized = value.trim();
   if (!normalized) return null;
   if (isQuotedTransformOnlyForBackendEntrypointPolicy(normalized)) return null;
+  if (isConceptualToolExplanationWithoutExecution(normalized)) return null;
   if (/(?:^|\s)\/postulate\b|\bpostulate\.submit_proposal\b/i.test(normalized)) {
     return {
       family: "postulate",
@@ -181,8 +197,8 @@ export function resolveHelixAskBackendEntrypointFamily(
     };
   }
   if (
-    /\b(?:moral-graph\.[a-z0-9_.-]+|moral\s+graph\s+(?:tool|reflection))\b/i.test(normalized) ||
-    /\b(?:use|with|through|via)\s+(?:the\s+)?moral\s+graph\b[\s\S]{0,120}\b(?:reflect|reflection|case|situation|dependency|repair|boundary|agency|badge|lens)\b/i.test(normalized)
+    /\bmoral-graph\.[a-z0-9_.-]+\b/i.test(normalized) ||
+    /\b(?:use|with|through|via)\s+(?:only\s+)?(?:the\s+)?moral\s+graph\b[\s\S]{0,120}\b(?:reflect|reflection|case|situation|dependency|repair|boundary|agency|badge|lens)\b/i.test(normalized)
   ) {
     const capability =
       normalized.match(/\bmoral-graph\.[a-z0-9_.-]+\b/i)?.[0] ??
@@ -339,6 +355,7 @@ export function requiresHelixAskBackendEntrypoint(question: string | null | unde
   const normalized = `${question ?? ""}`.trim();
   if (!normalized) return false;
   if (isQuotedTransformOnlyForBackendEntrypointPolicy(normalized)) return false;
+  if (isConceptualToolExplanationWithoutExecution(normalized)) return false;
   return HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE.test(normalized) || Boolean(resolveHelixAskBackendEntrypointFamily(normalized));
 }
 

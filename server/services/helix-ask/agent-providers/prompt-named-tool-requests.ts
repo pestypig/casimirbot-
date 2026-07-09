@@ -203,7 +203,8 @@ export const hasContextualMoralGraphReflectionMention = (prompt: string): boolea
     /\b(?:not\s+asking\s+(?:you\s+)?to|not\s+asking\s+for|don'?t|do\s+not|never|without)\b[\s\S]{0,100}\b(?:fetch|get|read|show|use|run|call|execute|reflect)\b[\s\S]{0,100}\b(?:moral\s+graph|moral\s+badge\s+graph|moral\s+badges?|moral-graph\.reflect_context|ideology\s+context)\b/i.test(unquoted) ||
     /\b(?:text|sentence|phrase|quote|screen|page|button|label|ui)\b[\s\S]{0,120}\b(?:says|shows|reads|contains|mentions|labeled|labelled|called|named)\b[\s\S]{0,120}\b(?:moral\s+graph|moral\s+badge\s+graph|moral-graph\.reflect_context|ideology\s+context)\b/i.test(unquoted) ||
     /\b(?:future|later|eventually|hypothetically|if|when|after|before|would|could|might)\b[\s\S]{0,140}\b(?:fetch|get|read|show|use|run|call|execute|reflect)\b[\s\S]{0,100}\b(?:moral\s+graph|moral\s+badge\s+graph|moral-graph\.reflect_context|ideology\s+context)\b/i.test(unquoted) ||
-    /\b(?:explain|describe|what\s+does|what\s+is|what\s+are)\b[\s\S]{0,120}\b(?:moral-graph\.reflect_context|helix_ask\.reflect_moral_graph)\b[\s\S]{0,120}\b(?:mean|means|do|does|is|are|would)\b/i.test(unquoted)
+    /\b(?:explain|describe|define|what\s+does|what\s+is|what\s+are)\b[\s\S]{0,140}\b(?:moral\s+graph(?:\s+reflection)?\s+tool|moral\s+graph\s+reflection|moral-graph\.reflect_context|helix_ask\.reflect_moral_graph)\b[\s\S]{0,140}\b(?:mean|means|do|does|is|are|would|tool|conceptually|identifier|capability)\b/i.test(unquoted) ||
+    /\b(?:moral\s+graph(?:\s+reflection)?\s+tool|moral\s+graph\s+reflection|moral-graph\.reflect_context|helix_ask\.reflect_moral_graph)\b[\s\S]{0,140}\b(?:explain|describe|define|conceptually|identifier|capability|do\s+not\s+(?:run|call|execute|use)|don't\s+(?:run|call|execute|use))\b/i.test(unquoted)
   );
 };
 

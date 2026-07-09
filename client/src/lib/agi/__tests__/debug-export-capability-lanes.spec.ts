@@ -399,6 +399,28 @@ describe("Helix Ask debug export capability lanes", () => {
     expect(exported.repair_target).toBe("prompt_submit_entrypoint");
   });
 
+  it("does not mark conceptual no-run tool explanations as missing backend entrypoint turns", () => {
+    const text = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "ask:moral-graph-concept-no-run",
+        question: "What is the Moral Graph reflection tool? Explain conceptually. Do not run it.",
+        content: "The Moral Graph reflection tool is a conceptual reflection surface.",
+      },
+      {
+        selected_final_answer: "The Moral Graph reflection tool is a conceptual reflection surface.",
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+      },
+    );
+
+    const exported = JSON.parse(text) as Record<string, unknown>;
+    expect(exported.selected_final_answer).toBe(
+      "The Moral Graph reflection tool is a conceptual reflection surface.",
+    );
+    expect(exported.terminal_error_code).not.toBe("backend_ask_entry_required");
+    expect(exported.ask_entrypoint_required).toBe(false);
+  });
+
   it("preserves normal Image Lens crop receipts and terminal presentation in copied debug export", () => {
     const finalAnswer = [
       "**equation_area**",

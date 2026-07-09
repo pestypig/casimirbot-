@@ -372,7 +372,7 @@ describe("Helix Ask tool admission acceptance matrix", () => {
     const question = [
       "Find where this topic is addressed in the current docs viewer context.",
       "Return a short \"Locations:\" list with anchors/sections and one-line evidence snippets.",
-      "Document path: docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      "Document path: docs/research/nhm2-current-status-whitepaper.md",
       "Locate query: \"Okay, can you open up Docs and read me the latest NHM2 white paper?\"",
     ].join("\n");
     const response = await request(app)
@@ -384,10 +384,10 @@ describe("Helix Ask tool admission acceptance matrix", () => {
         workspace_context_snapshot: {
           sessionId: "helix-ask:desktop",
           activePanel: "docs-viewer",
-          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper.md",
           hasDocContext: true,
           docContextValid: true,
-          docContextPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          docContextPath: "/docs/research/nhm2-current-status-whitepaper.md",
         },
       })
       .expect(200);

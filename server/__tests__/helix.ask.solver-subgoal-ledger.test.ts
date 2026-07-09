@@ -128,14 +128,14 @@ describe("Helix solver subgoal ledger", () => {
           evidence_refs: ["doc:candidate"],
         },
         workspace_snapshot: {
-          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper.md",
         },
         current_turn_artifact_ledger: [
           {
             artifact_id: "candidate:nhm2",
             kind: "doc_candidate_validation",
             payload: {
-              selected_doc_path: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+              selected_doc_path: "/docs/research/nhm2-current-status-whitepaper.md",
             },
           },
         ],

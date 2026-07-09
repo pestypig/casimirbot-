@@ -1449,7 +1449,7 @@ describe("Helix scholarly research tool admission", () => {
         turn_id: "ask:unknown-source-discovery",
         call_id: "call:docs-open",
         capability_key: "docs-viewer.open_doc_by_path",
-        args: { path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md" },
+        args: { path: "docs/research/nhm2-current-status-whitepaper.md" },
         assistant_answer: false,
         raw_content_included: false,
       },

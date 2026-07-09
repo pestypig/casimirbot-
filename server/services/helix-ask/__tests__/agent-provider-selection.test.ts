@@ -454,6 +454,31 @@ describe("Helix Ask agent provider selection", () => {
     });
   });
 
+  it("does not expose Codex progress transcript text as the terminal answer for conceptual no-run prompts", async () => {
+    const providerAnswer = "The Moral Graph reflection tool is a conceptual reflection surface, not something to run in this prompt.";
+    process.env.CODEX_AGENT_FAKE_STDOUT = providerAnswer;
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-conceptual-tool-no-run-progress-leak",
+        agent_runtime: "codex",
+        question: "What is the Moral Graph reflection tool? Explain conceptually. Do not run it.",
+      },
+      headers: {},
+    });
+
+    expect(result.text).toBe(providerAnswer);
+    expect((result.debug as any)?.workstation_gateway_call_results ?? []).toEqual([]);
+    expect(JSON.stringify(result.turn_transcript_events ?? [])).not.toContain("Codex runtime received the Ask turn");
+    expect(result.turn_transcript_events?.find((event: any) => event.source_event_type === "terminal_answer"))
+      .toMatchObject({
+        text: providerAnswer,
+      });
+  });
+
   it("returns Codex non-spawnable binary failures with provider debug metadata", async () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "helix-codex-provider-unspawnable-"));
     const candidate = path.join(tempDir, process.platform === "win32" ? "codex.exe" : "codex");
@@ -1591,7 +1616,7 @@ describe("Helix Ask agent provider selection", () => {
             mode: "read",
             arguments: {
               query: "physical viability locked out",
-              paths: ["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"],
+              paths: ["docs/research/nhm2-current-status-whitepaper.md"],
               max_hits: 2,
             },
           },
@@ -1657,7 +1682,7 @@ describe("Helix Ask agent provider selection", () => {
             mode: "read",
             arguments: {
               query: "physical viability locked out",
-              paths: ["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"],
+              paths: ["docs/research/nhm2-current-status-whitepaper.md"],
               max_hits: 2,
             },
           },
@@ -3217,12 +3242,12 @@ describe("Helix Ask agent provider selection", () => {
       body: {
         agent_runtime: "codex",
         question:
-          "Use docs.search for docs/research/nhm2-current-status-whitepaper-2026-05-02.md with query claim boundary, then use repo.search for workstation_gateway. Distinguish document evidence from implementation evidence.",
+          "Use docs.search for docs/research/nhm2-current-status-whitepaper.md with query claim boundary, then use repo.search for workstation_gateway. Distinguish document evidence from implementation evidence.",
         workspace_context_snapshot: {
           activePanel: "scientific-calculator",
           focusedPanel: "scientific-calculator",
           openPanels: ["docs-viewer", "scientific-calculator"],
-          activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
           hasDocContext: true,
         },
       },
@@ -3247,7 +3272,7 @@ describe("Helix Ask agent provider selection", () => {
         activePanel: "docs-viewer",
         focusedPanel: "docs-viewer",
         openPanels: ["docs-viewer", "scientific-calculator"],
-        activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
         hasDocContext: true,
       },
     };
@@ -3296,7 +3321,7 @@ describe("Helix Ask agent provider selection", () => {
       workspace_context_snapshot: {
         activePanel: "docs-viewer",
         focusedPanel: "docs-viewer",
-        activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
         hasDocContext: true,
       },
     };
@@ -3368,7 +3393,7 @@ describe("Helix Ask agent provider selection", () => {
         question,
         workspace_context_snapshot: {
           activePanel: "docs-viewer",
-          activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
           hasDocContext: true,
         },
       };
@@ -3385,7 +3410,7 @@ describe("Helix Ask agent provider selection", () => {
       workspace_context_snapshot: {
         activePanel: "docs-viewer",
         focusedPanel: "docs-viewer",
-        activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
         hasDocContext: true,
       },
     };
@@ -3471,10 +3496,10 @@ describe("Helix Ask agent provider selection", () => {
       turn_id: "ask:test:compound-docs-date-path-no-calculator",
       agent_runtime: "codex",
       question:
-        "Search the active document docs/research/nhm2-current-status-whitepaper-2026-05-02.md and summarize NHM2 current status in two bullets.",
+        "Search the active document docs/research/nhm2-current-status-whitepaper.md and summarize NHM2 current status in two bullets.",
       workspace_context_snapshot: {
         activePanelId: "docs-viewer",
-        activeDocumentPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        activeDocumentPath: "docs/research/nhm2-current-status-whitepaper.md",
         hasDocContext: true,
       },
     };
@@ -3494,7 +3519,7 @@ describe("Helix Ask agent provider selection", () => {
         "Use the active NHM2 document as context, then use the calculator for 12.5% of 54176 and answer with both pieces.",
       workspace_context_snapshot: {
         activePanelId: "docs-viewer",
-        activeDocumentPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        activeDocumentPath: "docs/research/nhm2-current-status-whitepaper.md",
         hasDocContext: true,
       },
     };
@@ -5105,7 +5130,7 @@ describe("Helix Ask agent provider selection", () => {
           activePanel: "scientific-calculator",
           focusedPanel: "scientific-calculator",
           openPanels: ["docs-viewer", "scientific-calculator"],
-          activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
           hasDocContext: true,
         },
       },
@@ -7303,7 +7328,7 @@ describe("Helix Ask agent provider selection", () => {
         question: "ok read last final answer aloud",
         workspace_context_snapshot: {
           active_panel: "docs-viewer",
-          active_doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          active_doc_path: "docs/research/nhm2-current-status-whitepaper.md",
           chat_referent_context: {
             schema: "helix.ask.chat_referent_context.v1",
             previous_assistant_final_answer: {

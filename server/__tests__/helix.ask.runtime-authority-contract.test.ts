@@ -1247,7 +1247,7 @@ describe("helix ask runtime authority contract", () => {
           source_scope: "current_turn",
           payload: {
             schema: "helix.doc_summary.v1",
-            path: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+            path: "/docs/research/nhm2-current-status-whitepaper.md",
           },
         },
       ],

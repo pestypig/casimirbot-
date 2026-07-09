@@ -6,7 +6,7 @@ import {
   stableStringifyDocEquationActionManifest,
 } from "./doc-equation-action-generator";
 
-const DEFAULT_DOC_PATH = "docs/research/nhm2-current-status-whitepaper-2026-05-02.md";
+const DEFAULT_DOC_PATH = "docs/research/nhm2-current-status-whitepaper.md";
 
 type CliOptions = {
   docPath: string;

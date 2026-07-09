@@ -193,7 +193,7 @@
           "equation": "spacetimeCL=proxy_only and mayPromoteToCL4=false"
         }
       ],
-      "repoBindings": ["shared/er-epr-tiny-syk-artifact.ts", "docs/research/nhm2-current-status-whitepaper-2026-05-02.md"]
+      "repoBindings": ["shared/er-epr-tiny-syk-artifact.ts", "docs/research/nhm2-current-status-whitepaper.md"]
     }
   ]
 }

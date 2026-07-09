@@ -181,6 +181,41 @@ describe("Helix Ask terminal projection", () => {
     );
   });
 
+  it("does not force backend entrypoint for conceptual tool explanations that suppress execution", () => {
+    const visible = buildVisibleResolvedTurn({
+      id: "reply-moral-graph-concept-no-run",
+      ok: true,
+      question: "What is the Moral Graph reflection tool? Explain conceptually. Do not run it.",
+      selected_final_answer: "The Moral Graph reflection tool is a conceptual reflection surface.",
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+    });
+
+    expect(visible.primary_terminal_label).toBe("final_answer");
+    expect(visible.terminal_error_code).toBeFalsy();
+    expect(visible.selected_final_answer).toBe(
+      "The Moral Graph reflection tool is a conceptual reflection surface.",
+    );
+  });
+
+  it("still treats explicit Moral Graph execution as backend entrypoint territory", () => {
+    const visible = buildVisibleResolvedTurn({
+      id: "reply-moral-graph-execute-missing-entrypoint",
+      ok: true,
+      question:
+        "Use only the Moral Graph. Reflect on whether I should apologize after snapping at a coworker. Do not use web, papers, calculator, image, or PDF context.",
+      selected_final_answer: "A stale provider draft should not be shown.",
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+    });
+
+    expect(visible.primary_terminal_label).toBe("final_failure");
+    expect(visible.terminal_error_code).toBe("backend_ask_entry_required");
+    expect(visible.selected_final_answer).toBe(
+      "This prompt requires the backend Ask solver path before a final answer can be shown.",
+    );
+  });
+
   it("does not let stale backend entrypoint flags hide a materialized workstation final", () => {
     const answer =
       "The scholarly chain reached a bounded result, but it did not fully bind a calculator expression.";

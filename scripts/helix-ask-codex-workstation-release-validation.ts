@@ -51,7 +51,7 @@ const workspaceSnapshot = {
   activePanel: "scientific-calculator",
   focusedPanel: "scientific-calculator",
   openPanels: ["docs-viewer", "scientific-calculator"],
-  activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+  activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
   hasDocContext: true,
 };
 
@@ -72,7 +72,7 @@ export const CODEX_WORKSTATION_RELEASE_SCENARIOS: Scenario[] = [
     id: "single_docs",
     category: "single",
     prompt:
-      "Use docs.search for docs/research/nhm2-current-status-whitepaper-2026-05-02.md with query claim boundary. Answer from the bounded document observation.",
+      "Use docs.search for docs/research/nhm2-current-status-whitepaper.md with query claim boundary. Answer from the bounded document observation.",
     expectedCapabilities: ["docs.search"],
   },
   {
@@ -115,7 +115,7 @@ export const CODEX_WORKSTATION_RELEASE_SCENARIOS: Scenario[] = [
     id: "compound_docs_calculator_theory",
     category: "compound",
     prompt:
-      "Codex workstation release validation: use docs.search for docs/research/nhm2-current-status-whitepaper-2026-05-02.md with query claim boundary; scientific-calculator.solve_expression with expression 8*9; theory-badge-graph.reflect_discussion_context for NHM2 claim boundary. Answer what those observations support and what remains unproven.",
+      "Codex workstation release validation: use docs.search for docs/research/nhm2-current-status-whitepaper.md with query claim boundary; scientific-calculator.solve_expression with expression 8*9; theory-badge-graph.reflect_discussion_context for NHM2 claim boundary. Answer what those observations support and what remains unproven.",
     expectedCapabilities: [
       "docs.search",
       "scientific-calculator.solve_expression",
@@ -127,14 +127,14 @@ export const CODEX_WORKSTATION_RELEASE_SCENARIOS: Scenario[] = [
     id: "compound_docs_repo",
     category: "compound",
     prompt:
-      "Use docs.search for docs/research/nhm2-current-status-whitepaper-2026-05-02.md with query claim boundary, then use repo.search for workstation_gateway. Distinguish document evidence from implementation evidence.",
+      "Use docs.search for docs/research/nhm2-current-status-whitepaper.md with query claim boundary, then use repo.search for workstation_gateway. Distinguish document evidence from implementation evidence.",
     expectedCapabilities: ["docs.search", "repo.search"],
   },
   {
     id: "compound_docs_scholarly",
     category: "provider_optional",
     prompt:
-      "Use docs.search for docs/research/nhm2-current-status-whitepaper-2026-05-02.md with query quantum inequality, then use scholarly-research.lookup_papers for quantum inequality warp constraints. Distinguish local document claims from paper corroboration.",
+      "Use docs.search for docs/research/nhm2-current-status-whitepaper.md with query quantum inequality, then use scholarly-research.lookup_papers for quantum inequality warp constraints. Distinguish local document claims from paper corroboration.",
     expectedCapabilities: ["docs.search", "scholarly-research.lookup_papers"],
     allowProviderMissing: true,
   },
@@ -164,7 +164,7 @@ export const CODEX_WORKSTATION_RELEASE_SCENARIOS: Scenario[] = [
     id: "compound_broad_no_internet",
     category: "compound",
     prompt:
-      "Use docs.search for docs/research/nhm2-current-status-whitepaper-2026-05-02.md with query claim boundary; scientific-calculator.solve_expression with expression 8*9; theory-badge-graph.reflect_discussion_context for NHM2 claim boundary; civilization-bounds.reflect_system_bounds for NHM2 engineering constraints; scholarly-research.lookup_papers for quantum inequality warp constraints; and repo.search for workstation_gateway. Do not use internet-search.search_web. Give a grounded release-confidence answer.",
+      "Use docs.search for docs/research/nhm2-current-status-whitepaper.md with query claim boundary; scientific-calculator.solve_expression with expression 8*9; theory-badge-graph.reflect_discussion_context for NHM2 claim boundary; civilization-bounds.reflect_system_bounds for NHM2 engineering constraints; scholarly-research.lookup_papers for quantum inequality warp constraints; and repo.search for workstation_gateway. Do not use internet-search.search_web. Give a grounded release-confidence answer.",
     expectedCapabilities: [
       "docs.search",
       "scientific-calculator.solve_expression",

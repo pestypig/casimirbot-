@@ -231,7 +231,7 @@ Expected: docs search, doc open/read, summary artifact, terminal summary. A doc
 open receipt alone is insufficient.
 
 ```txt
-Summarize /docs/research/nhm2-current-status-whitepaper-2026-05-02.md from docs in 5 bullets. Include the path.
+Summarize /docs/research/nhm2-current-status-whitepaper.md from docs in 5 bullets. Include the path.
 ```
 
 Expected: exact-source docs summary contract, summary artifact, terminal answer

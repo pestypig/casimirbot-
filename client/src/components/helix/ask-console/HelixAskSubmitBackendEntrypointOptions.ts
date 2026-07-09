@@ -2,6 +2,7 @@ import type { HelixAskRouteMetadata } from "./HelixAskRequestEnvelope";
 import {
   buildHelixAskHardBackendEntrypointRouteMetadata,
   buildHelixAskPastedTextResumeRecallRouteMetadata,
+  isConceptualToolExplanationWithoutExecution,
   requiresHelixAskBackendEntrypoint,
   shouldUseHelixAskBackendTurnEntrypoint,
 } from "./HelixAskBackendEntrypointPolicy";
@@ -29,9 +30,12 @@ export function buildHelixAskSubmitBackendEntrypointRoutePlan(args: {
   backendOwnedPastedTextResumeRecall?: boolean;
 }): HelixAskSubmitBackendEntrypointRoutePlan {
   const backendOwnedPastedTextResumeRecall = args.backendOwnedPastedTextResumeRecall === true;
+  const conceptualToolExplanationWithoutExecution =
+    isConceptualToolExplanationWithoutExecution(args.question);
   const hardBackendEntrypointRequired =
-    args.baseRunOptions?.requiresBackendAskEntrypoint === true ||
-    requiresHelixAskBackendEntrypoint(args.question);
+    !conceptualToolExplanationWithoutExecution &&
+    (args.baseRunOptions?.requiresBackendAskEntrypoint === true ||
+      requiresHelixAskBackendEntrypoint(args.question));
   const hardRouteMetadata = hardBackendEntrypointRequired
     ? buildHelixAskHardBackendEntrypointRouteMetadata({
         question: args.question,
@@ -46,11 +50,15 @@ export function buildHelixAskSubmitBackendEntrypointRoutePlan(args: {
         turnId: args.turnId,
         threadId: args.threadId,
       })
-    : hardRouteMetadata ?? args.baseRunOptions?.routeMetadata;
+    : conceptualToolExplanationWithoutExecution
+      ? undefined
+      : hardRouteMetadata ?? args.baseRunOptions?.routeMetadata;
   return {
     backendOwnedPastedTextResumeRecall,
     hardBackendEntrypointRequired,
-    forceReasoningDispatch: args.baseRunOptions?.forceReasoningDispatch === true || hardBackendEntrypointRequired,
+    forceReasoningDispatch:
+      (!conceptualToolExplanationWithoutExecution && args.baseRunOptions?.forceReasoningDispatch === true) ||
+      hardBackendEntrypointRequired,
     routeMetadata,
     useBackendAskTurnEntrypoint: shouldUseHelixAskBackendTurnEntrypoint({
       manualCanaryEnabled: args.manualCanaryEnabled,
@@ -67,6 +75,14 @@ export function mergeHelixAskSubmitBackendEntrypointRunOptions<
   turnId: string;
   threadId: string;
 }): TOptions | undefined {
+  if (isConceptualToolExplanationWithoutExecution(args.question)) {
+    if (!args.baseRunOptions) return undefined;
+    const { requiresBackendAskEntrypoint, forceReasoningDispatch, routeMetadata, ...rest } = args.baseRunOptions;
+    void requiresBackendAskEntrypoint;
+    void forceReasoningDispatch;
+    void routeMetadata;
+    return rest as TOptions;
+  }
   if (!requiresHelixAskBackendEntrypoint(args.question)) {
     return args.baseRunOptions;
   }

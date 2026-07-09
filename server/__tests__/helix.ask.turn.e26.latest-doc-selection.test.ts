@@ -87,9 +87,9 @@ describe("helix ask E26 latest doc selection", () => {
     expect(response.body?.terminal_error_code ?? null).toBeNull();
     expect(response.body?.final_status).not.toBe("final_failure");
     expect(response.body?.open_doc_selected_path ?? response.body?.latest_doc_selected_path).toBe(
-      "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      "/docs/research/nhm2-current-status-whitepaper.md",
     );
-    expect(answerText(response.body)).toContain("/docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
+    expect(answerText(response.body)).toContain("/docs/research/nhm2-current-status-whitepaper.md");
   }, 60000);
 
   it("does not apply latest-doc wording to explicit path opens", async () => {

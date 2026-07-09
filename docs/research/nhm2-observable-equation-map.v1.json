@@ -4,7 +4,7 @@
   "generatedAt": "2026-05-06T00:00:00.000Z",
   "sourceWhitepaperRefs": [
     {
-      "path": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      "path": "docs/research/nhm2-current-status-whitepaper.md",
       "sha256": "01b1818e933d049b92e1f0435a925e29d5c7c6f1064aa7b185f7d284b007a41a",
       "role": "status_whitepaper"
     },
@@ -254,7 +254,7 @@
       "blockerRefs": [
         {
           "blockerId": "transport_descriptor_not_speed",
-          "sourceArtifact": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          "sourceArtifact": "docs/research/nhm2-current-status-whitepaper.md",
           "status": "pass"
         }
       ],
@@ -293,7 +293,7 @@
       "blockerRefs": [
         {
           "blockerId": "same_chart_basis_required",
-          "sourceArtifact": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          "sourceArtifact": "docs/research/nhm2-current-status-whitepaper.md",
           "status": "review"
         }
       ],
@@ -371,7 +371,7 @@
       "blockerRefs": [
         {
           "blockerId": "regional_masks_required_for_closure",
-          "sourceArtifact": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          "sourceArtifact": "docs/research/nhm2-current-status-whitepaper.md",
           "status": "pass"
         }
       ],
@@ -587,7 +587,7 @@
       "blockerRefs": [
         {
           "blockerId": "full_tensor_observer_authority",
-          "sourceArtifact": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          "sourceArtifact": "docs/research/nhm2-current-status-whitepaper.md",
           "status": "review"
         }
       ],
@@ -812,7 +812,7 @@
       "blockerRefs": [
         {
           "blockerId": "schedule_not_thrust_law",
-          "sourceArtifact": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          "sourceArtifact": "docs/research/nhm2-current-status-whitepaper.md",
           "status": "pass"
         }
       ],
@@ -1007,7 +1007,7 @@
       "blockerRefs": [
         {
           "blockerId": "regional_direct_t00_semantic_misalignment",
-          "sourceArtifact": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          "sourceArtifact": "docs/research/nhm2-current-status-whitepaper.md",
           "status": "review"
         }
       ],
@@ -1223,7 +1223,7 @@
       "blockerRefs": [
         {
           "blockerId": "independent_reproduction_and_convergence_missing",
-          "sourceArtifact": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          "sourceArtifact": "docs/research/nhm2-current-status-whitepaper.md",
           "status": "review"
         }
       ],
@@ -1270,7 +1270,7 @@
       "blockerRefs": [
         {
           "blockerId": "source_to_geometry_closure_required",
-          "sourceArtifact": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          "sourceArtifact": "docs/research/nhm2-current-status-whitepaper.md",
           "status": "review"
         },
         {

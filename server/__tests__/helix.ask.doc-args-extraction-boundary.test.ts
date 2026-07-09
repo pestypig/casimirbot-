@@ -154,11 +154,11 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(resolveAskTurnWorkspaceActionDocPath({ args: { path: " " } })).toBeNull();
     expect(resolveAskTurnWorkspaceActionDocPath(null)).toBeNull();
     expect(
-      extractAskTurnDocPathArgs("Read docs/research/nhm2-current-status-whitepaper-2026-05-02.md, then ./notes/a.txt and docs/research/nhm2-current-status-whitepaper-2026-05-02.md"),
-    ).toEqual(["docs/research/nhm2-current-status-whitepaper-2026-05-02.md", "./notes/a.txt"]);
+      extractAskTurnDocPathArgs("Read docs/research/nhm2-current-status-whitepaper.md, then ./notes/a.txt and docs/research/nhm2-current-status-whitepaper.md"),
+    ).toEqual(["docs/research/nhm2-current-status-whitepaper.md", "./notes/a.txt"]);
     expect(extractAskTurnDocPathArgs("no explicit path here")).toEqual([]);
-    expect(resolveAskTurnDocPathArg("Read docs/research/nhm2-current-status-whitepaper-2026-05-02.md, then ./notes/a.txt")).toBe(
-      "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+    expect(resolveAskTurnDocPathArg("Read docs/research/nhm2-current-status-whitepaper.md, then ./notes/a.txt")).toBe(
+      "docs/research/nhm2-current-status-whitepaper.md",
     );
     expect(resolveAskTurnDocPathArg("Open the NHM2 deeper reformulation decision memo")).toBe(
       "/docs/research/nhm2-deeper-reformulation-decision-memo-2026-04-02.md",
@@ -171,8 +171,8 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(isAskTurnExplicitDocumentAcquisitionIntent("Open the docs viewer.")).toBe(false);
     expect(isAskTurnDocOpenBestIntent("Find and open the best matching NHM2 document.")).toBe(true);
     expect(isAskTurnDocOpenBestIntent("Summarize the current document.")).toBe(false);
-    expect(isAskTurnExplicitDocLocationPrompt("Where in docs/research/nhm2-current-status-whitepaper-2026-05-02.md does it discuss tile force?")).toBe(true);
-    expect(isAskTurnExplicitDocLocationPrompt("Summarize docs/research/nhm2-current-status-whitepaper-2026-05-02.md")).toBe(false);
+    expect(isAskTurnExplicitDocLocationPrompt("Where in docs/research/nhm2-current-status-whitepaper.md does it discuss tile force?")).toBe(true);
+    expect(isAskTurnExplicitDocLocationPrompt("Summarize docs/research/nhm2-current-status-whitepaper.md")).toBe(false);
     expect(isAskTurnActiveDocLocationPrompt("Where in this document does it mention Casimir tiles?")).toBe(true);
     expect(isAskTurnActiveDocLocationPrompt("Summarize this document in 3 bullets.")).toBe(false);
     expect(isAskTurnDocSummaryDetailRequested("Summarize this document with citations and exact claims.")).toBe(true);
