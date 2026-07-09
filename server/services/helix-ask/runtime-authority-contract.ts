@@ -1308,8 +1308,15 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
     payload.post_tool_authority_bridge = buildPostToolAuthorityBridge({ turnId, payload }) as unknown as Record<string, unknown>;
   }
   const committedRoute = readCommittedAskRoute(payload);
+  const committedRouteToolFamilies = readArray(committedRoute?.capability_policy?.allowed_tool_families)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
   const committedModelOnlyDirectAnswerTurn =
-    committedRoute?.route.source_target === "model_only" &&
+    (
+      committedRoute?.route.source_target === "model_only" ||
+      committedRoute?.route.source_target === "unknown" ||
+      committedRouteToolFamilies.includes("model_only")
+    ) &&
     committedRoute.canonical_goal.goal_kind === "model_only_concept" &&
     committedRoute.canonical_goal.required_terminal_kind === "direct_answer_text";
   const sourceCapabilityDiagnosticTurn = isSourceCapabilityDiagnosticTurn(payload);

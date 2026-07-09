@@ -1,5 +1,6 @@
 import type { HelixIntentKind } from "./intent-hypothesis";
 import type { ToolUseRestatementV1 } from "./internet-search-intent";
+import { helixTerminalKindIsSelfTerminal } from "@shared/helix-terminal-authority";
 
 type RecordLike = Record<string, unknown>;
 
@@ -58,6 +59,9 @@ const isReceiptKind = (value: string): boolean =>
 
 const isProjectionKind = (value: string): boolean =>
   /projection|panel_generated_answer|client_projection|live_card_projection|no_tool_direct/i.test(value);
+
+const isObservationTerminalKind = (value: string): boolean =>
+  /observation_report|source_observation|evidence_observation|named_receipt_evaluation/i.test(value);
 
 const readTerminalGoalFrame = (payload: RecordLike): { goalKind: string; requiredTerminalKind: string } => {
   const canonicalGoalFrame = readRecord(payload.canonical_goal_frame);
@@ -748,6 +752,11 @@ export function buildEvidenceReentryGate(input: {
     input.allowedTerminalProducts ?? [],
     input.payload,
   );
+  const allowedObservationTerminal =
+    helixTerminalKindIsSelfTerminal(input.terminalArtifactKind) &&
+    isObservationTerminalKind(input.terminalArtifactKind) &&
+    (input.allowedTerminalProducts ?? []).includes(input.terminalArtifactKind) &&
+    selectedEvidenceRefs.length > 0;
   const receiptsReentered = receiptRefs.filter((ref) =>
     evidenceRefSet.has(ref) ||
     (allowedReceiptTerminal &&
@@ -788,7 +797,7 @@ export function buildEvidenceReentryGate(input: {
       input.primaryIntent !== "status_question"
       ? "source_observation_terminal_without_selection"
       : "",
-    selectedEvidenceRefs.length > 0 && !input.finalArbitrationRan
+    selectedEvidenceRefs.length > 0 && !input.finalArbitrationRan && !allowedObservationTerminal
       ? "evidence_selected_but_finalizer_missing"
       : "",
     internetSearchEvidencePlanIncomplete({
@@ -804,7 +813,7 @@ export function buildEvidenceReentryGate(input: {
     schema: "helix.evidence_reentry_gate.v1",
     turn_id: input.turnId,
     required,
-    completed: violationCodes.length === 0 && (!required || input.finalArbitrationRan || allowedReceiptTerminal),
+    completed: violationCodes.length === 0 && (!required || input.finalArbitrationRan || allowedReceiptTerminal || allowedObservationTerminal),
     selected_evidence_refs: selectedEvidenceRefs,
     rejected_evidence_refs: rejectedEvidenceRefs,
     receipts_reentered: receiptsReentered,

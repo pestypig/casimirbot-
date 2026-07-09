@@ -7,6 +7,7 @@ export type HelixFollowupReasoningReason =
   | "procedure_memory_requires_post_evidence_reasoning"
   | "mixed_intent_requires_post_evidence_reasoning"
   | "conflicting_hypotheses_require_reasoning"
+  | "route_terminal_product_does_not_require_followup"
   | "pure_control_receipt"
   | "pure_status_receipt"
   | "simple_no_source_turn";
@@ -81,6 +82,7 @@ export function buildFollowupReasoningGate(input: {
   selectedEvidenceCount: number;
   conflictingHypotheses?: boolean;
   finalArbitrationRan: boolean;
+  routeFollowupReasoningRequired?: boolean;
 }): HelixFollowupReasoningGate {
   const reason = reasonFor({
     primaryIntent: input.primaryIntent,
@@ -90,6 +92,17 @@ export function buildFollowupReasoningGate(input: {
     selectedEvidenceCount: input.selectedEvidenceCount,
     conflictingHypotheses: input.conflictingHypotheses === true,
   });
+  if (input.routeFollowupReasoningRequired === false) {
+    return {
+      schema: "helix.followup_reasoning_gate.v1",
+      turn_id: input.turnId,
+      required: false,
+      completed: true,
+      reason: "route_terminal_product_does_not_require_followup",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
   const maySkip = reason === "pure_control_receipt" || reason === "pure_status_receipt" || reason === "simple_no_source_turn";
   const required = !maySkip;
   const completed = required ? input.finalArbitrationRan : true;

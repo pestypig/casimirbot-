@@ -108,6 +108,304 @@ describe("Helix Ask committed route contract", () => {
     expect(authority.allowed_terminal_artifact_kinds).toContain("agent_provider_terminal_candidate");
   });
 
+  it("selects a direct answer for model-only routes with unknown source target", () => {
+    const prompt = "theres a paper still in the image lens, can you see it?";
+    const testTurnId = "ask:test:model-only-unknown-source-direct-answer";
+    const promptInterpretation = interpretHelixAskPrompt(prompt);
+    const payload: Record<string, unknown> = {
+      turn_id: testTurnId,
+      tool_call_admission_decision: {
+        admitted_tool_families: ["model_only"],
+      },
+      canonical_goal_frame: {
+        goal_kind: "model_only_concept",
+        answer_scope: "model_only",
+        required_terminal_kind: "direct_answer_text",
+      },
+      goal_satisfaction_evaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+    };
+    payload.committed_ask_route = buildCommittedAskRoute({
+      turnId: testTurnId,
+      promptText: prompt,
+      selectedRoute: "/ask",
+      payload,
+      promptInterpretation,
+      intentArbitration: {
+        schema: "helix.intent_arbitration.v1",
+        selected_primary_intent_id: "intent:general",
+        selected_primary_intent_kind: "general_reasoning",
+        secondary_intent_ids: [],
+        contextual_tool_mentions: [],
+        executable_operator_commands: [],
+        route_candidates_allowed: ["/ask"],
+        route_candidates_suppressed: [],
+        terminal_products_allowed: ["direct_answer_text"],
+        terminal_products_forbidden: [],
+        ambiguity_status: "resolved",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    payload.route_evidence_authority = buildRouteEvidenceAuthority({
+      committedRoute: payload.committed_ask_route as ReturnType<typeof buildCommittedAskRoute>,
+      payload,
+    });
+    const answerText = "I can see there is still a paper loaded in Image Lens.";
+    const artifactLedger = [{
+      kind: "direct_answer_text",
+      artifact_id: `${testTurnId}:model_only:direct_answer_text`,
+      payload: {
+        schema: "helix.direct_answer_text.v1",
+        kind: "direct_answer_text",
+        text: answerText,
+        answer_text: answerText,
+      },
+    }];
+    payload.current_turn_artifact_ledger = artifactLedger;
+
+    const writer = applyHelixTerminalAuthoritySingleWriter({
+      turnId: testTurnId,
+      payload,
+      artifactLedger,
+    });
+
+    expect((payload.committed_ask_route as ReturnType<typeof buildCommittedAskRoute>).route.source_target).toBe("unknown");
+    expect(writer.selected_terminal_artifact_kind).toBe("direct_answer_text");
+    expect(writer.source).toBe("direct_answer_text");
+    expect(writer.visible_text).toBe(answerText);
+    expect(payload.terminal_artifact_kind).toBe("direct_answer_text");
+  });
+
+  it("reports a specific runtime failure when model-only direct answer artifact is missing", () => {
+    const prompt = "theres a paper still in the image lens, can you see it?";
+    const testTurnId = "ask:test:model-only-runtime-not-called";
+    const promptInterpretation = interpretHelixAskPrompt(prompt);
+    const payload: Record<string, unknown> = {
+      turn_id: testTurnId,
+      selected_final_answer: "I could not produce a terminal answer for this turn.",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      typed_failure: {
+        schema: "helix.typed_failure.v1",
+        error_code: "typed_failure",
+        text: "I could not produce a terminal answer for this turn.",
+      },
+      tool_call_admission_decision: {
+        admitted_tool_families: ["model_only"],
+      },
+      canonical_goal_frame: {
+        goal_kind: "model_only_concept",
+        answer_scope: "model_only",
+        required_terminal_kind: "direct_answer_text",
+      },
+      goal_satisfaction_evaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+    };
+    payload.committed_ask_route = buildCommittedAskRoute({
+      turnId: testTurnId,
+      promptText: prompt,
+      selectedRoute: "/ask",
+      payload,
+      promptInterpretation,
+      intentArbitration: {
+        schema: "helix.intent_arbitration.v1",
+        selected_primary_intent_id: "intent:general",
+        selected_primary_intent_kind: "general_reasoning",
+        secondary_intent_ids: [],
+        contextual_tool_mentions: [],
+        executable_operator_commands: [],
+        route_candidates_allowed: ["/ask"],
+        route_candidates_suppressed: [],
+        terminal_products_allowed: ["direct_answer_text"],
+        terminal_products_forbidden: [],
+        ambiguity_status: "resolved",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    payload.route_evidence_authority = buildRouteEvidenceAuthority({
+      committedRoute: payload.committed_ask_route as ReturnType<typeof buildCommittedAskRoute>,
+      payload,
+    });
+
+    const writer = applyHelixTerminalAuthoritySingleWriter({
+      turnId: testTurnId,
+      payload,
+      artifactLedger: [],
+    });
+
+    expect(writer.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("model_runtime_not_called");
+    expect(payload.selected_final_answer).toContain("required direct answer artifact");
+  });
+
+  it("selects a direct answer when the committed route is only present in the solver trace", () => {
+    const prompt = "theres a paper still in the image lens, can you see it?";
+    const testTurnId = "ask:test:model-only-trace-route-direct-answer";
+    const promptInterpretation = interpretHelixAskPrompt(prompt);
+    const routePayload: Record<string, unknown> = {
+      turn_id: testTurnId,
+      tool_call_admission_decision: {
+        admitted_tool_families: ["model_only"],
+      },
+      canonical_goal_frame: {
+        goal_kind: "model_only_concept",
+        answer_scope: "model_only",
+        required_terminal_kind: "direct_answer_text",
+      },
+    };
+    const committedRoute = buildCommittedAskRoute({
+      turnId: testTurnId,
+      promptText: prompt,
+      selectedRoute: "/ask",
+      payload: routePayload,
+      promptInterpretation,
+      intentArbitration: {
+        schema: "helix.intent_arbitration.v1",
+        selected_primary_intent_id: "intent:general",
+        selected_primary_intent_kind: "general_reasoning",
+        secondary_intent_ids: [],
+        contextual_tool_mentions: [],
+        executable_operator_commands: [],
+        route_candidates_allowed: ["/ask"],
+        route_candidates_suppressed: [],
+        terminal_products_allowed: ["direct_answer_text"],
+        terminal_products_forbidden: [],
+        ambiguity_status: "resolved",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    const routeEvidenceAuthority = buildRouteEvidenceAuthority({
+      committedRoute,
+      payload: routePayload,
+    });
+    const answerText = "Yes. The Image Lens panel still has a paper loaded.";
+    const artifactLedger = [{
+      kind: "direct_answer_text",
+      artifact_id: `${testTurnId}:model_only:direct_answer_text`,
+      payload: {
+        schema: "helix.direct_answer_text.v1",
+        kind: "direct_answer_text",
+        text: answerText,
+        answer_text: answerText,
+      },
+    }];
+    const payload: Record<string, unknown> = {
+      turn_id: testTurnId,
+      ask_turn_solver_trace: {
+        schema: "helix.ask_turn_solver_trace.v1",
+        turn_id: testTurnId,
+        committed_ask_route: committedRoute,
+        route_evidence_authority: routeEvidenceAuthority,
+      },
+      current_turn_artifact_ledger: artifactLedger,
+      goal_satisfaction_evaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+    };
+
+    const writer = applyHelixTerminalAuthoritySingleWriter({
+      turnId: testTurnId,
+      payload,
+      artifactLedger,
+    });
+
+    expect(payload.committed_ask_route).toMatchObject({
+      schema: "helix.committed_ask_route.v1",
+      canonical_goal: {
+        goal_kind: "model_only_concept",
+        required_terminal_kind: "direct_answer_text",
+      },
+    });
+    expect(payload.route_evidence_authority).toMatchObject({
+      schema: "helix.route_evidence_authority.v1",
+      required_terminal_kind: "direct_answer_text",
+    });
+    expect(writer.selected_terminal_artifact_kind).toBe("direct_answer_text");
+    expect(writer.source).toBe("direct_answer_text");
+    expect(writer.visible_text).toBe(answerText);
+  });
+
+  it("reports runtime-not-called when a trace-only model route has no direct answer artifact", () => {
+    const prompt = "theres a paper still in the image lens, can you see it?";
+    const testTurnId = "ask:test:model-only-trace-route-runtime-not-called";
+    const promptInterpretation = interpretHelixAskPrompt(prompt);
+    const routePayload: Record<string, unknown> = {
+      turn_id: testTurnId,
+      tool_call_admission_decision: {
+        admitted_tool_families: ["model_only"],
+      },
+      canonical_goal_frame: {
+        goal_kind: "model_only_concept",
+        answer_scope: "model_only",
+        required_terminal_kind: "direct_answer_text",
+      },
+    };
+    const committedRoute = buildCommittedAskRoute({
+      turnId: testTurnId,
+      promptText: prompt,
+      selectedRoute: "/ask",
+      payload: routePayload,
+      promptInterpretation,
+      intentArbitration: {
+        schema: "helix.intent_arbitration.v1",
+        selected_primary_intent_id: "intent:general",
+        selected_primary_intent_kind: "general_reasoning",
+        secondary_intent_ids: [],
+        contextual_tool_mentions: [],
+        executable_operator_commands: [],
+        route_candidates_allowed: ["/ask"],
+        route_candidates_suppressed: [],
+        terminal_products_allowed: ["direct_answer_text"],
+        terminal_products_forbidden: [],
+        ambiguity_status: "resolved",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    const routeEvidenceAuthority = buildRouteEvidenceAuthority({
+      committedRoute,
+      payload: routePayload,
+    });
+    const payload: Record<string, unknown> = {
+      turn_id: testTurnId,
+      selected_final_answer: "I could not produce a terminal answer for this turn.",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      typed_failure: {
+        schema: "helix.typed_failure.v1",
+        error_code: "typed_failure",
+        text: "I could not produce a terminal answer for this turn.",
+      },
+      ask_turn_solver_trace: {
+        schema: "helix.ask_turn_solver_trace.v1",
+        turn_id: testTurnId,
+        committed_ask_route: committedRoute,
+        route_evidence_authority: routeEvidenceAuthority,
+      },
+    };
+
+    const writer = applyHelixTerminalAuthoritySingleWriter({
+      turnId: testTurnId,
+      payload,
+      artifactLedger: [],
+    });
+
+    expect(writer.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("model_runtime_not_called");
+    expect(payload.selected_final_answer).toContain("required direct answer artifact");
+  });
+
   it("keeps quoted and negated tool-name explanations on a direct model terminal contract", () => {
     const prompt =
       "Explain the literal phrase `internet-search.search_web` as a software tool name. Do not browse, search, retrieve web evidence, or call tools.";

@@ -7,9 +7,15 @@ import {
   type HelixRouteEvidenceAuthorityTool,
   type HelixCommittedAskRouteToolAdmissionResult,
 } from "@shared/helix-committed-ask-route";
+import {
+  helixTerminalKindIsSelfTerminal,
+  helixToolOutputRoleForTerminalKind,
+  type HelixToolOutputRole,
+} from "@shared/helix-terminal-authority";
 import type { HelixPromptInterpretation } from "./prompt-interpretation";
 import type { HelixIntentArbitration } from "./intent-arbitration";
 import { applyCompoundTerminalPolicy } from "./compound-terminal-policy";
+import { explicitCapabilityContractForCapability } from "./explicit-capability-contract";
 import { buildToolUseRestatement } from "./internet-search-intent";
 
 type RecordLike = Record<string, unknown>;
@@ -28,6 +34,9 @@ const readStringArray = (value: unknown): string[] =>
     : [];
 
 const unique = (entries: string[]): string[] => Array.from(new Set(entries.filter(Boolean)));
+
+const uniqueOutputRoles = (entries: Array<HelixToolOutputRole | null | undefined>): HelixToolOutputRole[] =>
+  Array.from(new Set(entries.filter((entry): entry is HelixToolOutputRole => Boolean(entry))));
 
 const uniqueTools = (entries: HelixRouteEvidenceAuthorityTool[]): HelixRouteEvidenceAuthorityTool[] => {
   const seen = new Set<string>();
@@ -68,6 +77,11 @@ const MODEL_ONLY_FORBIDDEN_SOURCE_TERMINALS = [
 ];
 
 const DOCS_MARKDOWN_PATH_RE = /(?:^|[\s"'(])\/?docs\/[A-Za-z0-9_./-]+\.md\b/i;
+
+const terminalProductRequiresFollowupReasoning = (terminalProduct: string): boolean => {
+  const normalized = normalizeCommittedRouteTerminalKind(terminalProduct);
+  return Boolean(normalized && !helixTerminalKindIsSelfTerminal(normalized));
+};
 
 export const normalizeCommittedRouteTerminalKind = (kind: string | null | undefined): string => {
   const normalized = readString(kind).toLowerCase();
@@ -266,6 +280,29 @@ const readCapabilityCandidatesFromPayload = (payload: RecordLike): HelixRouteEvi
   return uniqueTools(entries);
 };
 
+const readExplicitCapabilityContractFromPayload = (payload: RecordLike) => {
+  const admission = readRecord(payload.tool_call_admission_decision);
+  const capabilityPlan = readRecord(payload.capability_plan);
+  const lifecycle = readRecord(payload.tool_lifecycle_trace);
+  const operational = readRecord(payload.operational_capability_trace);
+  for (const candidate of [
+    admission?.admitted_capability,
+    admission?.selected_capability,
+    admission?.requested_capability,
+    capabilityPlan?.selected_capability,
+    lifecycle?.admitted_capability,
+    lifecycle?.requested_capability,
+    operational?.policy_admitted_capability,
+    operational?.model_proposed_capability,
+  ]) {
+    const capability = readString(candidate);
+    if (!capability) continue;
+    const contract = explicitCapabilityContractForCapability(capability);
+    if (contract) return contract;
+  }
+  return null;
+};
+
 const readAdmittedToolsFromPayload = (payload: RecordLike): HelixRouteEvidenceAuthorityTool[] => {
   const admission = readRecord(payload.tool_call_admission_decision);
   const lifecycle = readRecord(payload.tool_lifecycle_trace);
@@ -335,8 +372,28 @@ const isCalculatorGatewayAdmission = (payload: RecordLike): boolean => {
 };
 
 export function readCommittedAskRoute(payload: RecordLike | null | undefined): HelixCommittedAskRoute | null {
-  const route = readRecord(payload?.committed_ask_route);
-  return route?.schema === HELIX_COMMITTED_ASK_ROUTE_SCHEMA ? (route as HelixCommittedAskRoute) : null;
+  const directRoute = readRecord(payload?.committed_ask_route);
+  if (directRoute?.schema === HELIX_COMMITTED_ASK_ROUTE_SCHEMA) {
+    return directRoute as HelixCommittedAskRoute;
+  }
+
+  const solverTrace = readRecord(payload?.ask_turn_solver_trace);
+  const traceRoute = readRecord(solverTrace?.committed_ask_route);
+  if (traceRoute?.schema === HELIX_COMMITTED_ASK_ROUTE_SCHEMA) {
+    return traceRoute as HelixCommittedAskRoute;
+  }
+
+  const debug = readRecord(payload?.debug);
+  const debugRoute = readRecord(debug?.committed_ask_route);
+  if (debugRoute?.schema === HELIX_COMMITTED_ASK_ROUTE_SCHEMA) {
+    return debugRoute as HelixCommittedAskRoute;
+  }
+
+  const debugTrace = readRecord(debug?.ask_turn_solver_trace);
+  const debugTraceRoute = readRecord(debugTrace?.committed_ask_route);
+  return debugTraceRoute?.schema === HELIX_COMMITTED_ASK_ROUTE_SCHEMA
+    ? (debugTraceRoute as HelixCommittedAskRoute)
+    : null;
 }
 
 export function buildCommittedAskRoute(input: {
@@ -350,6 +407,7 @@ export function buildCommittedAskRoute(input: {
 }): HelixCommittedAskRoute {
   const existing = readCommittedAskRoute(input.payload);
   if (existing) {
+    const explicitCapabilityContract = readExplicitCapabilityContractFromPayload(input.payload);
     const shouldRepairExistingCalculatorGatewayRoute =
       isCalculatorGatewayAdmission(input.payload) &&
       (
@@ -357,9 +415,13 @@ export function buildCommittedAskRoute(input: {
         existing.canonical_goal.required_terminal_kind === "scholarly_recovery_plan" ||
         existing.canonical_goal.goal_kind === "agent_provider_gateway_turn"
       );
+    const shouldRepairExistingExplicitCapabilityRoute =
+      Boolean(explicitCapabilityContract) &&
+      explicitCapabilityContract?.required_terminal_kind !== existing.canonical_goal.required_terminal_kind;
     const existingRawGoal = readCanonicalGoal(input.payload);
     const shouldRepairExistingModelOnlyRoute =
       !shouldRepairExistingCalculatorGatewayRoute &&
+      !shouldRepairExistingExplicitCapabilityRoute &&
       existing.canonical_goal.goal_kind === "unknown" &&
       existing.canonical_goal.required_terminal_kind === "unknown" &&
       (existing.route.source_target === "unknown" || existing.route.source_target === "model_only") &&
@@ -372,6 +434,12 @@ export function buildCommittedAskRoute(input: {
           ...Array.from(MODEL_ONLY_TERMINAL_ALIASES),
           "direct_answer_text",
         ])
+      : shouldRepairExistingExplicitCapabilityRoute && explicitCapabilityContract
+        ? unique([
+            ...existing.canonical_goal.allowed_terminal_artifact_kinds,
+            explicitCapabilityContract.required_terminal_kind,
+            "typed_failure",
+          ])
       : shouldRepairExistingCalculatorGatewayRoute
         ? unique([
             ...existing.canonical_goal.allowed_terminal_artifact_kinds,
@@ -384,11 +452,17 @@ export function buildCommittedAskRoute(input: {
           ...existing.canonical_goal.forbidden_terminal_artifact_kinds.filter((kind) => !MODEL_ONLY_TERMINAL_ALIASES.has(normalizeCommittedRouteTerminalKind(kind))),
           ...MODEL_ONLY_FORBIDDEN_SOURCE_TERMINALS,
         ])
+      : shouldRepairExistingExplicitCapabilityRoute && explicitCapabilityContract
+        ? existing.canonical_goal.forbidden_terminal_artifact_kinds.filter(
+            (kind) => normalizeCommittedRouteTerminalKind(kind) !== normalizeCommittedRouteTerminalKind(explicitCapabilityContract.required_terminal_kind),
+          )
       : shouldRepairExistingCalculatorGatewayRoute
         ? existing.canonical_goal.forbidden_terminal_artifact_kinds.filter((kind) => kind !== "workstation_tool_evaluation")
       : existing.canonical_goal.forbidden_terminal_artifact_kinds;
     const existingRequiredTerminalKind = shouldRepairExistingModelOnlyRoute
       ? "direct_answer_text"
+      : shouldRepairExistingExplicitCapabilityRoute && explicitCapabilityContract
+        ? explicitCapabilityContract.required_terminal_kind
       : shouldRepairExistingCalculatorGatewayRoute
         ? "workstation_tool_evaluation"
       : existing.canonical_goal.required_terminal_kind;
@@ -397,7 +471,12 @@ export function buildCommittedAskRoute(input: {
       forbidden: existingForbidden,
       requiredTerminalKind: existingRequiredTerminalKind,
     });
-    if (!compoundPolicy.policy.active && !shouldRepairExistingModelOnlyRoute && !shouldRepairExistingCalculatorGatewayRoute) return existing;
+    if (
+      !compoundPolicy.policy.active &&
+      !shouldRepairExistingModelOnlyRoute &&
+      !shouldRepairExistingCalculatorGatewayRoute &&
+      !shouldRepairExistingExplicitCapabilityRoute
+    ) return existing;
     const requiredTerminalProduct =
       compoundPolicy.requiredTerminalKind ||
       existing.terminal_product.required_terminal_product;
@@ -407,6 +486,8 @@ export function buildCommittedAskRoute(input: {
         ...existing.canonical_goal,
         goal_kind: shouldRepairExistingModelOnlyRoute
           ? "model_only_concept"
+          : shouldRepairExistingExplicitCapabilityRoute && explicitCapabilityContract
+            ? explicitCapabilityContract.plan_family
           : shouldRepairExistingCalculatorGatewayRoute
             ? "calculator_solve"
           : existing.canonical_goal.goal_kind,
@@ -414,14 +495,52 @@ export function buildCommittedAskRoute(input: {
         allowed_terminal_artifact_kinds: compoundPolicy.allowed,
         forbidden_terminal_artifact_kinds: compoundPolicy.forbidden,
       },
+      route: shouldRepairExistingExplicitCapabilityRoute && explicitCapabilityContract
+        ? {
+            ...existing.route,
+            source_target: explicitCapabilityContract.source_target,
+            target_kind: explicitCapabilityContract.source_target,
+            strength: "hard",
+            route_reason: "explicit_capability_contract",
+          }
+        : existing.route,
+      capability_policy: shouldRepairExistingExplicitCapabilityRoute && explicitCapabilityContract
+        ? {
+            ...existing.capability_policy,
+            allowed_tool_families: unique([
+              ...existing.capability_policy.allowed_tool_families,
+              ...explicitCapabilityContract.admission_families,
+              familyForSourceTarget(explicitCapabilityContract.source_target),
+            ]),
+            required_capability_families: unique([
+              ...existing.capability_policy.required_capability_families,
+              familyForSourceTarget(explicitCapabilityContract.source_target),
+            ]),
+          }
+        : existing.capability_policy,
       terminal_product: {
         ...existing.terminal_product,
+        evidence_reentry_required: shouldRepairExistingExplicitCapabilityRoute
+          ? true
+          : existing.terminal_product.evidence_reentry_required,
+        followup_reasoning_required: shouldRepairExistingExplicitCapabilityRoute
+          ? false
+          : existing.terminal_product.followup_reasoning_required,
         required_terminal_product: requiredTerminalProduct,
       },
     };
   }
 
   const route = readRouteSource(input.payload);
+  const explicitCapabilityContract = readExplicitCapabilityContractFromPayload(input.payload);
+  const effectiveRoute = explicitCapabilityContract
+    ? {
+        sourceTarget: explicitCapabilityContract.source_target,
+        targetKind: explicitCapabilityContract.source_target,
+        strength: "hard" as const,
+        reason: "explicit_capability_contract",
+      }
+    : route;
   const toolUseRestatement = buildToolUseRestatement(input.promptText);
   const routeContract = readRecord(input.payload.route_product_contract);
   const rawGoal = readCanonicalGoal(input.payload);
@@ -430,7 +549,8 @@ export function buildCommittedAskRoute(input: {
     (input.promptInterpretation?.negative_constraints?.length ?? 0) > 0;
   const routeContractSourceTarget = readString(routeContract?.source_target);
   const sourceContractForModelOnlyRoute =
-    route.sourceTarget === "model_only" &&
+    !explicitCapabilityContract &&
+    effectiveRoute.sourceTarget === "model_only" &&
     (
       sourceBackedTargets.has(routeContractSourceTarget) ||
       readStringArray(routeContract?.allowed_terminal_artifact_kinds).some((kind) =>
@@ -438,13 +558,15 @@ export function buildCommittedAskRoute(input: {
       )
     );
   const plainNoSourceModelOnlyRoute =
-    (route.sourceTarget === "unknown" || route.sourceTarget === "model_only") &&
+    !explicitCapabilityContract &&
+    (effectiveRoute.sourceTarget === "unknown" || effectiveRoute.sourceTarget === "model_only") &&
     rawGoal.goalKind === "unknown" &&
     rawGoal.requiredTerminalKind === "unknown" &&
     !routeContractSourceTarget &&
     toolUseRestatement.requiredToolFamilies.length === 0;
   const canonicalModelOnlyDirectAnswer =
-    (route.sourceTarget === "unknown" || route.sourceTarget === "model_only") &&
+    !explicitCapabilityContract &&
+    (effectiveRoute.sourceTarget === "unknown" || effectiveRoute.sourceTarget === "model_only") &&
     rawGoal.goalKind === "model_only_concept" &&
     normalizeCommittedRouteTerminalKind(rawGoal.requiredTerminalKind) === "direct_answer_text" &&
     toolUseRestatement.requiredToolFamilies.length === 0;
@@ -452,7 +574,8 @@ export function buildCommittedAskRoute(input: {
     canonicalModelOnlyDirectAnswer ||
     plainNoSourceModelOnlyRoute ||
     (
-      route.sourceTarget === "model_only" &&
+      !explicitCapabilityContract &&
+      effectiveRoute.sourceTarget === "model_only" &&
       (
         contextualSuppressionPresent ||
         sourceContractForModelOnlyRoute ||
@@ -461,6 +584,11 @@ export function buildCommittedAskRoute(input: {
     );
   const goal = shouldUseModelOnlyGoal
     ? { goalKind: "model_only_concept", requiredTerminalKind: "direct_answer_text" }
+    : explicitCapabilityContract
+      ? {
+          goalKind: explicitCapabilityContract.plan_family,
+          requiredTerminalKind: explicitCapabilityContract.required_terminal_kind,
+        }
     : rawGoal;
   const modelOnlyTerminalAliases =
     goal.goalKind === "model_only_concept" && goal.requiredTerminalKind === "direct_answer_text"
@@ -488,13 +616,14 @@ export function buildCommittedAskRoute(input: {
   const forbiddenTerminalKinds = compoundPolicy.forbidden;
   const suppressedFamilies = suppressedFamiliesFromPayload(input.payload, input.promptInterpretation);
   const allowedFamilies = unique([
-    ...allowedFamiliesFromPayload(input.payload, route.sourceTarget),
+    ...allowedFamiliesFromPayload(input.payload, effectiveRoute.sourceTarget),
+    ...(explicitCapabilityContract?.admission_families ?? []),
     ...toolUseRestatement.requiredToolFamilies,
   ])
     .filter((family) => !suppressedFamilies.includes(family));
-  const requiredFamily = familyForSourceTarget(route.sourceTarget);
+  const requiredFamily = familyForSourceTarget(effectiveRoute.sourceTarget);
   const negativeConstraints = input.promptInterpretation?.negative_constraints ?? [];
-  const sourceBacked = sourceBackedTargets.has(route.sourceTarget);
+  const sourceBacked = sourceBackedTargets.has(effectiveRoute.sourceTarget);
   const requiredTerminalProduct =
     compoundPolicy.requiredTerminalKind ||
     (goal.requiredTerminalKind !== "unknown"
@@ -515,7 +644,7 @@ export function buildCommittedAskRoute(input: {
   return {
     schema: HELIX_COMMITTED_ASK_ROUTE_SCHEMA,
     turn_id: input.turnId,
-    commit_id: `committed-route:${hashShort([input.turnId, input.promptText, route.sourceTarget, goal.goalKind, requiredTerminalProduct])}`,
+    commit_id: `committed-route:${hashShort([input.turnId, input.promptText, effectiveRoute.sourceTarget, goal.goalKind, requiredTerminalProduct])}`,
     prompt_hash: hashShort(input.promptText),
     committed_at_stage: "post_prompt_source_arbitration",
     prompt_intent: {
@@ -526,15 +655,15 @@ export function buildCommittedAskRoute(input: {
     },
     route: {
       selected_route: input.selectedRoute,
-      source_target: route.sourceTarget,
-      target_kind: route.targetKind,
-      strength: route.strength,
+      source_target: effectiveRoute.sourceTarget,
+      target_kind: effectiveRoute.targetKind,
+      strength: effectiveRoute.strength,
       source_identity:
         readString(readRecord(input.payload.source_target_exact_contract)?.requested_source_identity) ||
         readString(readRecord(input.payload.active_doc_identity)?.active_doc_path) ||
         readWorkspaceActiveDocPath(input.payload) ||
         null,
-      route_reason: route.reason,
+      route_reason: effectiveRoute.reason,
       stale_metadata_policy: "ignore_unless_matches_commit",
     },
     canonical_goal: {
@@ -558,7 +687,7 @@ export function buildCommittedAskRoute(input: {
     terminal_product: {
       terminal_authority_required: true,
       evidence_reentry_required: sourceBacked || readStringArray(routeContract?.required_artifact_refs).length > 0,
-      followup_reasoning_required: sourceBacked && !/receipt|typed_failure|request_user_input/i.test(requiredTerminalProduct),
+      followup_reasoning_required: sourceBacked && terminalProductRequiresFollowupReasoning(requiredTerminalProduct),
       required_terminal_product: requiredTerminalProduct,
     },
     transitions: [],
@@ -615,6 +744,10 @@ export function buildRouteEvidenceAuthority(input: {
     : [];
   const allowedTerminalArtifactKinds = route?.canonical_goal.allowed_terminal_artifact_kinds ?? [];
   const forbiddenTerminalArtifactKinds = route?.canonical_goal.forbidden_terminal_artifact_kinds ?? [];
+  const allowedTerminalOutputRoles = uniqueOutputRoles(
+    allowedTerminalArtifactKinds.map((kind) => helixToolOutputRoleForTerminalKind(kind)),
+  );
+  const requiredTerminalOutputRole = helixToolOutputRoleForTerminalKind(route?.canonical_goal.required_terminal_kind);
   return {
     schema: "helix.route_evidence_authority.v1",
     turn_id: route?.turn_id ?? readString(payload.turn_id) ?? "unknown-turn",
@@ -625,6 +758,8 @@ export function buildRouteEvidenceAuthority(input: {
     allowed_terminal_artifact_kinds: allowedTerminalArtifactKinds,
     forbidden_terminal_artifact_kinds: forbiddenTerminalArtifactKinds,
     required_terminal_kind: route?.canonical_goal.required_terminal_kind ?? null,
+    allowed_terminal_output_roles: allowedTerminalOutputRoles,
+    required_terminal_output_role: requiredTerminalOutputRole,
     terminal_product_allowed: Boolean(route && allowedTerminalArtifactKinds.length > 0),
     current_turn_only: true,
     assistant_answer: false,

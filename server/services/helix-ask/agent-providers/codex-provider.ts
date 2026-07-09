@@ -356,9 +356,15 @@ const asksToUseScientificImageEvidenceForSynthesis = (question: string): boolean
     /\b(?:scientific\s+image|image\s+lens|page[-\s]?grounded|promoted|exact\s+row|equation\s+row|equation\s+evidence|scientific\s+evidence|evidence\s+packet|sidecar|crop\s+ref|source(?:\/hash|\s+hash)?|evidence\s+depth|theory\s+badge\s+graph)\b/i.test(question)
   );
 
+const asksForCurrentImageLensPanelState = (question: string): boolean =>
+  /\b(?:current|active|loaded|visible|in\s+frame|frame|panel\s+state|what(?:'s|\s+is)?\s+in\s+frame|visually\s+describe)\b/i.test(question) &&
+  /\b(?:image\s+lens|panel|source|page|crop|frame)\b/i.test(question) &&
+  !/\b(?:theory\s+badge\s+graph|graph\s+reflection|postulate|candidate\s+postulate|calculator\s+payload|continuity\s+audit|evidence\s+depth|active\s+promoted\s+row\s+blockers|historical\s+non-promoted\s+row\s+blockers)\b/i.test(question);
+
 const asksForScientificImageEvidenceContinuity = (body: Record<string, unknown>): boolean => {
   const question = readQuestion(body).replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
   if (!question) return false;
+  if (asksForCurrentImageLensPanelState(question)) return false;
   if (asksToUseScientificImageEvidenceForSynthesis(question)) return false;
   const asksForEvidenceIdentity =
     /\b(?:which|what)\b[\s\S]{0,120}\b(?:paper|pdf|page|equation|crop\s+ref|crop|source|evidence\s+depth|sidecar|image\s+lens|prior\s+steps?|using)\b/i.test(question) ||
@@ -11708,8 +11714,18 @@ export const codexProvider: HelixAgentProvider = {
         moralGraphObservationFallbackText ??
         gatewayGuardedText,
     );
+    const imageLensObservationReportText =
+      imageLensObservationFallbackAnswer && isImageLensCapabilityLanePrompt(question)
+        ? imageLensObservationFallbackAnswer
+        : authorityGuardedText;
+    const imageLensObservationReportReady =
+      Boolean(imageLensObservationFallbackAnswer) &&
+      isImageLensCapabilityLanePrompt(question) &&
+      capabilityLaneContext.calls_succeeded &&
+      capabilityLaneContext.observation_packets.length > 0;
     const processOk =
       providerProcessOk ||
+      imageLensObservationReportReady ||
       Boolean(moralGraphObservationFallbackText && gatewayCallsSucceeded(gatewayCallResults) && capabilityLaneContext.calls_succeeded);
     const providerReentry = buildHelixProviderReasoningReentry({
       runtime: "codex",
@@ -11790,14 +11806,14 @@ export const codexProvider: HelixAgentProvider = {
     );
     const compoundTerminalAuthorized = Boolean(compoundTerminalAuthority) && !scholarlyTerminalPreemptsCompound;
     const imageLensObservationReportTerminalAuthority =
-      imageLensObservationFallbackAnswer && processOk
+      imageLensObservationFallbackAnswer && imageLensObservationReportReady
         ? buildHelixTurnTerminalAuthority({
             thread_id: threadId,
             turn_id: turnId,
             route: request.route || "/ask/turn",
             final_answer_source: "provider_image_lens_observation_report",
             terminal_artifact_kind: "image_lens_observation_report",
-            terminal_text: authorityGuardedText,
+            terminal_text: imageLensObservationReportText,
             terminal_item_id: `${turnId}:image_lens_observation_report`,
             terminal_kind: "answer",
             authority_origin: "image_lens_observation_receipts",
@@ -11858,6 +11874,9 @@ export const codexProvider: HelixAgentProvider = {
     const projectedText =
       normalizationFailureText ??
       (readString(theoryReflectionReceiptProjection?.answer.answer_text) ??
+        (imageLensObservationReportTerminalAuthority
+          ? imageLensObservationReportText
+          : null) ??
         (authorityGuardedText ||
           "I could not complete this Codex provider turn because Helix observation re-entry is required before provider text can become terminal authority."));
     const providerGatewayDebugSummary = buildProviderGatewayDebugSummary({

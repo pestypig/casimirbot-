@@ -1,3 +1,8 @@
+import {
+  helixToolOutputRoleForTerminalKind,
+  type HelixToolOutputRole,
+} from "@shared/helix-terminal-authority";
+
 export type HelixTerminalProductArtifactLike = {
   artifact_id?: unknown;
   kind?: unknown;
@@ -11,6 +16,7 @@ export type HelixTerminalProductMaterializerResult = {
   supportRefs?: string[];
   rejectedSupportRefs?: string[];
   artifact?: HelixTerminalProductArtifactLike;
+  outputRole?: HelixToolOutputRole | null;
 };
 
 export type HelixPostulateRuntimeReviewTerminal = {
@@ -34,6 +40,13 @@ const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : 
 
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.filter((value): value is string => Boolean(value))));
+
+const withOutputRole = (
+  result: HelixTerminalProductMaterializerResult,
+): HelixTerminalProductMaterializerResult => ({
+  ...result,
+  outputRole: result.outputRole ?? helixToolOutputRoleForTerminalKind(result.kind),
+});
 
 const isPromptContaminatedCalculatorExpression = (expression: string | null): boolean => {
   if (!expression) return false;
@@ -154,7 +167,9 @@ const imageLensRegionInspectionRecord = (value: unknown): Record<string, unknown
   if (!record) return null;
   const capability = [
     record.capability,
+    record.capability_id,
     record.capability_key,
+    record.capabilityId,
     record.tool_name,
     record.action,
     record.action_id,
@@ -290,26 +305,34 @@ const materializeImageLensObservationReportFromCurrentTurn = (input: {
     "image_lens_region";
   const bbox = formatImageLensBbox(readNestedRecordByKeys(source, ["bbox_px", "bboxPx", "bbox"]));
   const cropRef = readNestedStringByKeys(source, ["crop_ref", "cropRef", "crop_region_id", "cropRegionId", "ref_hash"]);
-  const extractionStatus = readNestedStringByKeys(source, ["extraction_status", "status"]);
+  const extractionStatus = readNestedStringByKeys(source, ["extraction_status"]);
+  const observationStatus = extractionStatus ? null : readNestedStringByKeys(source, ["status"]);
   const labelMatch = readNestedStringByKeys(source, ["label_match_status", "label_match"]);
   const exactAdmissibility = readNestedStringByKeys(source, ["exact_equation_admissibility"]);
   const exactRowPromotion = readNestedRecordByKeys(source, ["exact_row_promotion"]);
   const promotionStatus =
     readString(exactRowPromotion?.status) ??
-    readNestedStringByKeys(source, ["promotion_status", "exact_row_promotion_status", "status"]);
+    readNestedStringByKeys(source, ["promotion_status", "exact_row_promotion_status"]);
   const latexCandidate = readNestedStringByKeys(source, ["latex_candidate"]);
   const textCandidate = readNestedStringByKeys(source, ["text_candidate", "ocr_text_candidate"]);
   const uncertainty = readNestedStringByKeys(source, ["uncertainty", "uncertainty_text"]);
-  if (!bbox && !cropRef && !extractionStatus && !latexCandidate && !textCandidate) return null;
+  const sourceRef =
+    readNestedStringByKeys(source, ["artifact_id", "ref", "ref_id", "receipt_ref", "sidecar_id", "crop_ref", "cropRef"]) ??
+    readString(input.payload.terminal_artifact_id) ??
+    readString(readRecord(input.payload.terminal_answer_authority)?.terminal_item_id);
 
   const candidateBlocks = [
     textCandidate ? ["- text_candidate:", "```text", textCandidate, "```"].join("\n") : null,
     latexCandidate ? ["- latex_candidate:", "```latex", latexCandidate, "```"].join("\n") : null,
   ].filter((entry): entry is string => Boolean(entry));
+  const compactObservationOnly = !bbox && !cropRef && !extractionStatus && !latexCandidate && !textCandidate;
   const text = [
     "The runtime provider echoed Helix internal capability instructions after Image Lens observations re-entered, so I am using only the observation receipts below and not the echoed provider text.",
     "",
     `**${regionLabel}**`,
+    compactObservationOnly ? "- Observation status: Image Lens observation packet was produced, but the compact artifact did not include OCR/crop detail fields for terminal presentation." : null,
+    sourceRef ? `- Observation ref: ${sourceRef}` : null,
+    observationStatus ? `- Observation packet status: ${observationStatus}` : null,
     bbox ? `- Bbox: ${bbox}` : null,
     cropRef ? `- Crop ref: ${cropRef}` : null,
     extractionStatus ? `- Extraction status: ${extractionStatus}` : null,
@@ -322,15 +345,15 @@ const materializeImageLensObservationReportFromCurrentTurn = (input: {
     `- Uncertainty: ${uncertainty ?? "none returned"}`,
   ].filter(Boolean).join("\n");
 
-  return {
+  return withOutputRole({
     kind: "image_lens_observation_report",
     text,
     ref:
       readString(input.payload.terminal_artifact_id) ??
       readString(readRecord(input.payload.terminal_answer_authority)?.terminal_item_id) ??
-      readNestedStringByKeys(source, ["artifact_id", "receipt_ref", "sidecar_id", "crop_ref", "cropRef"]) ??
+      sourceRef ??
       null,
-  };
+  });
 };
 
 export const materializeImageLensObservationReportTerminal = (input: {
@@ -350,14 +373,14 @@ export const materializeImageLensObservationReportTerminal = (input: {
       readString(input.payload.text) ??
       readString(readRecord(input.payload.terminal_presentation)?.concise_text);
     if (text && !input.invalidText?.(text)) {
-      return {
+      return withOutputRole({
         kind: "image_lens_observation_report",
         text,
         ref:
           readString(input.payload.terminal_artifact_id) ??
           readString(readRecord(input.payload.terminal_answer_authority)?.terminal_item_id) ??
           null,
-      };
+      });
     }
   }
   return materializeImageLensObservationReportFromCurrentTurn(input);
@@ -527,7 +550,7 @@ export const materializeCalculatorWorkstationToolEvaluationFromReceiptTerminal =
     assistant_answer: false,
     raw_content_included: false,
   };
-  return {
+  return withOutputRole({
     kind: "workstation_tool_evaluation",
     text,
     ref: evaluationId,
@@ -537,7 +560,7 @@ export const materializeCalculatorWorkstationToolEvaluationFromReceiptTerminal =
       payload: evaluation,
     },
     supportRefs: uniqueStrings([receipt.ref, evaluationId]),
-  };
+  });
 };
 
 export const materializeTheoryContextReflectionTerminal = (input: {

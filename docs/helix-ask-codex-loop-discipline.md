@@ -293,6 +293,23 @@ terminal_text_preview is diagnostic preview only
 ambient sidecars are context until admitted by the current route
 ```
 
+That contract also defines the shared tool output roles:
+
+```txt
+self_terminal
+evidence_for_synthesis
+ambient_context
+candidate_next_step
+```
+
+Use those roles before adding tool-specific exceptions. A route may allow a
+bounded tool output to finish the turn as `self_terminal`, or it may require the
+same tool family to produce `evidence_for_synthesis` for a later model/runtime
+answer. Existing sidecars and panel state remain `ambient_context` until the
+current route admits them. Suggested repairs, templates, and follow-up
+capabilities are `candidate_next_step` until the next route admits and executes
+them.
+
 The practical consequence is that a source-backed or tool-backed turn is not
 complete when evidence exists. It is complete only when that evidence has
 re-entered reasoning, produced a support-backed terminal artifact, passed route

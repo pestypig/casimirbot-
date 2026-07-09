@@ -44,6 +44,7 @@ import {
 } from "./internet-search-intent";
 import { contextualToolSuppressionBlocksFamily } from "./contextual-tool-admission";
 import type { HelixCommittedAskRoute, HelixRouteEvidenceAuthority } from "@shared/helix-committed-ask-route";
+import { helixTerminalKindIsSelfTerminal } from "@shared/helix-terminal-authority";
 import {
   buildRouteEvidenceAuthority,
   buildCommittedAskRoute,
@@ -1321,6 +1322,7 @@ const buildRiskFlags = (input: {
   liveSourceIdentityAuditPresent: boolean;
   liveSourceIdentityOk: boolean;
   liveSourceIdentityTerminalAllowed: boolean;
+  routeApprovedSelfTerminalProduct: boolean;
 }): HelixAskTurnSolverRiskFlag[] => {
   const actualToolIds = input.actualToolCalls.map((entry) => readString(entry.tool_id)).filter(Boolean);
   const mutatingToolExecuted = input.actualToolCalls.some((entry) => entry.mutating === true);
@@ -1365,6 +1367,7 @@ const buildRiskFlags = (input: {
     input.finalAnswerSource !== "typed_failure" &&
     input.finalAnswerSource !== "request_user_input" &&
     !canonicalTerminalAllowed &&
+    !input.routeApprovedSelfTerminalProduct &&
     (
       !input.finalArbitrationRan ||
       !input.routeAuthorityOk ||
@@ -1463,6 +1466,11 @@ export function buildAskTurnSolverTrace(input: {
     reason: committedAskRoute.route.route_reason,
     strength: committedAskRoute.route.strength,
   };
+  const routeApprovedSelfTerminalProduct =
+    committedAskRoute.terminal_product.followup_reasoning_required === false &&
+    committedAskRoute.terminal_product.required_terminal_product === terminalArtifactKind &&
+    committedAskRoute.canonical_goal.allowed_terminal_artifact_kinds.includes(terminalArtifactKind) &&
+    helixTerminalKindIsSelfTerminal(terminalArtifactKind);
   const evidenceRequired =
     sourceRequiresEvidence(effectiveSourceTargetInfo.sourceTarget) ||
     repoConceptRequiresEvidence ||
@@ -1490,6 +1498,7 @@ export function buildAskTurnSolverTrace(input: {
   });
   const effectiveFinalArbitrationRan =
     finalArbitrationRan ||
+    routeApprovedSelfTerminalProduct ||
     capabilityHelpFinalArbitrationMaterialized ||
     compoundFinalArbitrationMaterialized;
   const evidenceReentryGate = buildEvidenceReentryGate({
@@ -1513,6 +1522,9 @@ export function buildAskTurnSolverTrace(input: {
     selectedEvidenceCount: evidenceReentryGate.selected_evidence_refs.length,
     conflictingHypotheses: intentHypotheses.length > 1 && secondary.length > 0,
     finalArbitrationRan: effectiveFinalArbitrationRan,
+    routeFollowupReasoningRequired: routeApprovedSelfTerminalProduct
+      ? false
+      : undefined,
   });
   const routeAuthorityOk =
     readBoolean(loopTrace?.route_authority_ok) ||
@@ -1618,6 +1630,7 @@ export function buildAskTurnSolverTrace(input: {
     liveSourceIdentityAuditPresent: Boolean(liveSourceIdentityAudit),
     liveSourceIdentityOk,
     liveSourceIdentityTerminalAllowed,
+    routeApprovedSelfTerminalProduct,
   });
   const completedSolverPath =
     effectiveFinalArbitrationRan &&

@@ -1,3 +1,5 @@
+import type { HelixToolOutputRole } from "./helix-terminal-authority";
+
 export const HELIX_COMMITTED_ASK_ROUTE_SCHEMA =
   "helix.committed_ask_route.v1" as const;
 
@@ -116,6 +118,8 @@ export type HelixRouteEvidenceAuthority = {
   allowed_terminal_artifact_kinds: string[];
   forbidden_terminal_artifact_kinds: string[];
   required_terminal_kind: string | null;
+  allowed_terminal_output_roles: HelixToolOutputRole[];
+  required_terminal_output_role: HelixToolOutputRole | null;
   terminal_product_allowed: boolean;
   current_turn_only: boolean;
   assistant_answer: false;

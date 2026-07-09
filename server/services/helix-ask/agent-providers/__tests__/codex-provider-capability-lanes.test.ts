@@ -99,6 +99,48 @@ describe("Codex provider capability lane adapter", () => {
     }
   });
 
+  it("does not turn current Image Lens panel-state questions into scientific evidence continuity", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    process.env.CODEX_AGENT_FAKE_STDOUT = "The current Image Lens panel has a PDF page loaded, but I need a current observation to visually describe the page content.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "1";
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-current-image-lens-panel-state",
+          question: "Look only at the current Image Lens panel state. Do not use prior scientific sidecars unless they describe the currently loaded Image Lens source. Tell me what source/page/crop is currently in frame, and say whether you can visually describe the page content from a current observation.",
+          workspace_context_snapshot: {
+            activePanel: "image-lens",
+            active_image_lens_source: {
+              source_id: "pdf-page-render:test",
+              source_image_ref: "sha256:test-page",
+              page_number: 5,
+            },
+          },
+        },
+      });
+      const debug = result.debug as Record<string, unknown>;
+
+      expect(result.answer).toContain("current Image Lens panel");
+      expect(result.answer).not.toContain("bounded conceptual reflection");
+      expect(result.answer).not.toContain("Evidence state: exact_row_promoted");
+      expect(debug.scientific_image_evidence_continuity_requested).not.toBe(true);
+    } finally {
+      if (previousStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      }
+      if (previousExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      }
+    }
+  });
+
   it("projects explicit note creation into the stream provider action envelope", async () => {
     const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
     const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
@@ -5441,7 +5483,7 @@ describe("Codex provider capability lane adapter", () => {
     process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
       sequence: [
         "model_visible_capability_lane_manifest visual_analysis.inspect_image_region",
-        "Promoted the requested full equation row from active page evidence.",
+        "I could not complete this turn because a tool observation required a follow-up model answer step, but no later terminal answer artifact was available.",
       ],
     });
     process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([{
@@ -5491,6 +5533,9 @@ describe("Codex provider capability lane adapter", () => {
       expect(result.ok).toBe(true);
       expect(result.final_answer_source).toBe("provider_image_lens_observation_report");
       expect(result.terminal_artifact_kind).toBe("image_lens_observation_report");
+      expect(result.selected_final_answer).not.toContain("tool observation required a follow-up model answer step");
+      expect(result.selected_final_answer).toContain("admissible_for_exact_equation");
+      expect(result.selected_final_answer).toContain("latex_candidate");
       expect(debug.terminal_authority_single_writer).toMatchObject({
         selectedArtifactKind: "image_lens_observation_report",
       });

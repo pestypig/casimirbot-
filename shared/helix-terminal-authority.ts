@@ -51,6 +51,37 @@ export type HelixTerminalCandidateSource =
   | "legacy_fallback"
   | "legacy_workspace_failure";
 
+export type HelixToolOutputRole =
+  | "self_terminal"
+  | "evidence_for_synthesis"
+  | "ambient_context"
+  | "candidate_next_step";
+
+const HELIX_SELF_TERMINAL_ARTIFACT_KINDS = new Set([
+  "image_lens_observation_report",
+  "image_lens_named_receipt_evaluation",
+  "note_update_receipt",
+  "workspace_action_receipt",
+  "workstation_tool_evaluation",
+  "typed_failure",
+  "request_user_input",
+]);
+
+export const helixToolOutputRoleForTerminalKind = (
+  kind: string | null | undefined,
+): HelixToolOutputRole | null => {
+  const normalized = typeof kind === "string" ? kind.trim().toLowerCase() : "";
+  if (!normalized) return null;
+  if (HELIX_SELF_TERMINAL_ARTIFACT_KINDS.has(normalized)) return "self_terminal";
+  if (/sidecar|context_pack|client_projection|panel_generated_answer|live_card_projection/i.test(normalized)) {
+    return "ambient_context";
+  }
+  return null;
+};
+
+export const helixTerminalKindIsSelfTerminal = (kind: string | null | undefined): boolean =>
+  helixToolOutputRoleForTerminalKind(kind) === "self_terminal";
+
 export type HelixTerminalCandidate = {
   schema: "helix.terminal_candidate.v1";
   candidate_id: string;
@@ -61,6 +92,7 @@ export type HelixTerminalCandidate = {
   terminal_eligible: boolean;
   assistant_answer: boolean;
   source: HelixTerminalCandidateSource;
+  output_role?: HelixToolOutputRole | null;
   created_at_stage:
     | "pre_runtime"
     | "runtime_iteration"
