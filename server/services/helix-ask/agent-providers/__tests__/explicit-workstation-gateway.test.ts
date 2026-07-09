@@ -396,6 +396,30 @@ describe("explicit workstation gateway derived calls", () => {
     });
   });
 
+  it("maps structured capability catalog admissions onto the executable catalog gateway", () => {
+    const requests = buildStructuredAdmissionWorkstationGatewayCallRequests({
+      question: "what tools are available to use with this agent?",
+      source_target_intent: {
+        selected_capability: "capability_catalog",
+        required_terminal_kind: "capability_help_summary",
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["helix_ask.inspect_capability_catalog"]);
+    expect(requests[0]).toMatchObject({
+      capability_id: "helix_ask.inspect_capability_catalog",
+      mode: "observe",
+      arguments: {
+        query: "what tools are available to use with this agent?",
+        source_target_intent: expect.objectContaining({
+          target_source: "capability_catalog",
+          target_kind: "capability_catalog_runtime",
+          alias_capability: "capability_catalog",
+        }),
+      },
+    });
+  });
+
   it("does not map quoted, negated, future, or unsafe docs-viewer alias prompts", () => {
     const prompts = [
       "The text says docs-viewer.locate_in_doc; explain that phrase only.",

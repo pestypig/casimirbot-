@@ -99,6 +99,47 @@ describe("Codex provider capability lane adapter", () => {
     }
   });
 
+  it("allows short plain model-only prompts to become direct answers", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Check complete.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-plain-check-direct-answer",
+          question: "check",
+          workspace_context_snapshot: {
+            activePanel: "image-lens",
+          },
+        },
+      });
+
+      expect(result).toMatchObject({
+        ok: true,
+        response_type: "final_answer",
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+      });
+      expect(result.answer).toBe("Check complete.");
+      expect(result.answer).not.toContain("retrieval before finalizing");
+      expect(result.answer).not.toContain("could not produce a terminal answer");
+    } finally {
+      if (previousStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      }
+      if (previousExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      }
+    }
+  });
+
   it("does not turn current Image Lens panel-state questions into scientific evidence continuity", async () => {
     const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
     const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
@@ -4117,7 +4158,8 @@ describe("Codex provider capability lane adapter", () => {
         final_answer_source: "typed_failure",
         terminal_artifact_kind: "typed_failure",
       });
-      expect(result.answer).toContain("could not retrieve the prior scientific image evidence sidecar");
+      expect(result.answer).toContain("scientific sidecar missing");
+      expect(result.answer).toContain("graph/calculator/postulate handoff blocked");
       expect(result.answer).not.toContain("model-only answer");
       expect(debug.fail_reason).toBe("scientific_image_evidence_sidecar_lookup_failed");
       expect(debug.scientific_image_evidence_continuation_lookup).toMatchObject({

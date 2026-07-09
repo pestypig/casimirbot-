@@ -193,7 +193,14 @@ const routeAllowsModelOnlyDirectAnswer = (body: Record<string, unknown>): boolea
     /\b(?:use|run|open|search|browse|look\s*up|lookup|find|crop|inspect|reflect|calculate|compute|solve|create|make|append|save|postulate|calculator|image\s+lens|pdf|doc|docs|paper|web|internet|moral\s+graph|theory\s+badge|note)\b/i.test(unquotedNormalized) &&
     !explicitNoToolDirectAnswer &&
     !literalOrExplanatoryToolNamePrompt;
-  return (explicitNoToolDirectAnswer || literalOrExplanatoryToolNamePrompt) && !explicitToolOrSourceRequest;
+  const plainModelOnlyPrompt =
+    question.length <= 160 &&
+    !explicitToolOrSourceRequest &&
+    !readSourceTargetIntentFromBody(body) &&
+    !readRecord(body.mandatory_next_tool ?? body.mandatoryNextTool) &&
+    !readRecord(body.capability_lane_call ?? body.capabilityLaneCall) &&
+    !/\b(?:live\s+source|workspace|panel|image|pdf|docs?|repo|search|calculator|graph|note|server|debug|status)\b/i.test(unquotedNormalized);
+  return (explicitNoToolDirectAnswer || literalOrExplanatoryToolNamePrompt || plainModelOnlyPrompt) && !explicitToolOrSourceRequest;
 };
 
 const SCHOLARLY_GATEWAY_CAPABILITIES = new Set<string>([
@@ -5624,6 +5631,24 @@ export const buildMoralGraphObservationFallbackAnswer = (input: {
   const boundary = claimNotes.length > 0
     ? claimNotes.slice(0, 3).join(" ")
     : "This is a procedural Moral Graph reflection, not a character verdict or external evidence claim.";
+  const asksForApologyRepair =
+    /\b(?:apolog(?:y|ize|ise|ized|ised)|snapp(?:ed|ing)|coworker|co-worker)\b/i.test(input.promptText);
+
+  if (asksForApologyRepair) {
+    return [
+      "The Moral Graph treats this as a bounded procedural reflection about repair after direct interpersonal harm.",
+      "",
+      `Relevant procedural lenses: ${badges}.`,
+      "",
+      "What is observable: you snapped at someone, which may have shifted cost, pressure, or embarrassment onto them.",
+      "Repair direction: apologize if the snap was unfair, disproportionate, or avoidable. Keep the apology specific, short, and free of self-excusing pressure.",
+      "Useful wording: name the action, name the effect, and state the repair. For example: \"I snapped earlier. That was not fair to you. I am sorry, and I will slow down before responding next time.\"",
+      "Boundary: the reflection does not decide every fact of the conflict. If there was a real unresolved work issue, separate that issue from the apology and address it calmly afterward.",
+      "",
+      `Observation basis: ${summary}`,
+      `Claim boundary: ${boundary}`,
+    ].join("\n");
+  }
 
   return [
     "The Moral Graph treats this as a bounded procedural reflection about disclosure under shared dependency.",
@@ -5638,6 +5663,58 @@ export const buildMoralGraphObservationFallbackAnswer = (input: {
     `Observation basis: ${summary}`,
     `Claim boundary: ${boundary}`,
   ].join("\n");
+};
+
+export const buildCodexMoralGraphReflectionReceiptAnswer = (input: {
+  turnId: string;
+  threadId: string;
+  route?: string | null;
+  promptText: string;
+  normalizedArtifacts: Array<Record<string, unknown>>;
+}): {
+  answer: Record<string, unknown>;
+  authority: ReturnType<typeof buildHelixTurnTerminalAuthority>;
+} | null => {
+  const text = buildMoralGraphObservationFallbackAnswer({
+    promptText: input.promptText,
+    normalizedArtifacts: input.normalizedArtifacts,
+  });
+  if (!text) return null;
+  const moralArtifacts = input.normalizedArtifacts.filter(isMoralGraphReflectionArtifact);
+  const selectedObservationRefs = uniqueStrings(
+    moralArtifacts
+      .map((artifact) => readString(artifact.artifact_id))
+      .filter((ref): ref is string => Boolean(ref)),
+  );
+  if (selectedObservationRefs.length === 0) return null;
+  const answer = {
+    schema: "helix.moral_graph_reflection_answer.v1",
+    answer_id: `${input.turnId}:codex_moral_graph_reflection_answer`,
+    turn_id: input.turnId,
+    source: "codex_provider_moral_graph_reflection_receipt",
+    answer_text: text,
+    text,
+    selected_observation_refs: selectedObservationRefs,
+    support_refs: selectedObservationRefs,
+    terminal_eligible: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  const authority = buildHelixTurnTerminalAuthority({
+    thread_id: input.threadId,
+    turn_id: input.turnId,
+    route: input.route || "/ask/turn",
+    final_answer_source: "moral_graph_reflection_answer",
+    terminal_artifact_kind: "model_synthesized_answer",
+    terminal_text: text,
+    terminal_item_id: readString(answer.answer_id) ?? `${input.turnId}:codex_moral_graph_reflection_answer`,
+    terminal_kind: "answer",
+    authority_origin: "codex_provider_moral_graph_reflection_receipt",
+    server_authoritative: true,
+    terminal_eligible: true,
+    assistant_answer: false,
+  });
+  return { answer, authority };
 };
 
 const buildCodexTheoryReflectionReceiptAnswer = (input: {
@@ -11876,9 +11953,24 @@ export const codexProvider: HelixAgentProvider = {
     const providerTerminalAuthorized = Boolean(
       imageLensObservationReportTerminalAuthority ?? providerReentry.terminalAnswerAuthority,
     );
+    const moralGraphReflectionReceiptProjection =
+      !compoundTerminalAuthorized &&
+      !scholarlyExploratoryTerminalAuthority &&
+      gatewayCallsSucceeded(gatewayCallResults)
+        ? buildCodexMoralGraphReflectionReceiptAnswer({
+            turnId,
+            threadId,
+            route: request.route,
+            promptText: question,
+            normalizedArtifacts: normalizedObservationArtifacts,
+          })
+        : null;
+    const moralGraphReflectionReceiptTerminalAuthority = moralGraphReflectionReceiptProjection?.authority ?? null;
+    const moralGraphReflectionReceiptTerminalAuthorized = Boolean(moralGraphReflectionReceiptTerminalAuthority);
     const theoryReflectionReceiptProjection =
       !compoundTerminalAuthorized &&
       !scholarlyExploratoryTerminalAuthority &&
+      !moralGraphReflectionReceiptTerminalAuthorized &&
       gatewayCallsSucceeded(gatewayCallResults)
         ? buildCodexTheoryReflectionReceiptAnswer({
             turnId,
@@ -11894,6 +11986,7 @@ export const codexProvider: HelixAgentProvider = {
     const directTerminalAuthority =
       !compoundTerminalAuthorized &&
       !providerTerminalAuthorized &&
+      !moralGraphReflectionReceiptTerminalAuthorized &&
       !theoryReflectionReceiptTerminalAuthorized &&
       gatewayCallResults.length === 0 &&
       capabilityLaneContext.observation_packets.length === 0 &&
@@ -11910,7 +12003,10 @@ export const codexProvider: HelixAgentProvider = {
     const normalizationFailureText = normalizationFailures[0]
       ? `I cannot complete this Codex provider turn because Helix could not normalize a provider gateway result: ${normalizationFailures[0]}.`
       : null;
-    const terminalProcessAcceptable = processOk || theoryReflectionReceiptTerminalAuthorized;
+    const terminalProcessAcceptable =
+      processOk ||
+      moralGraphReflectionReceiptTerminalAuthorized ||
+      theoryReflectionReceiptTerminalAuthorized;
     const ok =
       terminalProcessAcceptable &&
       normalizationFailures.length === 0 &&
@@ -11919,11 +12015,13 @@ export const codexProvider: HelixAgentProvider = {
       (compoundTerminalAuthorized ||
         Boolean(scholarlyExploratoryTerminalAuthority) ||
         providerTerminalAuthorized ||
+        moralGraphReflectionReceiptTerminalAuthorized ||
         theoryReflectionReceiptTerminalAuthorized ||
         directTerminalAuthorized);
     const projectedText =
       normalizationFailureText ??
-      (readString(theoryReflectionReceiptProjection?.answer.answer_text) ??
+      (readString(moralGraphReflectionReceiptProjection?.answer.answer_text) ??
+        readString(theoryReflectionReceiptProjection?.answer.answer_text) ??
         (imageLensObservationReportTerminalAuthority
           ? imageLensObservationReportText
           : null) ??
@@ -11946,6 +12044,7 @@ export const codexProvider: HelixAgentProvider = {
         imageLensObservationReportTerminalAuthority ??
         scholarlyExploratoryTerminalAuthority ??
         (compoundTerminalAuthorized ? compoundTerminalAuthority : null) ??
+        moralGraphReflectionReceiptTerminalAuthority ??
         directTerminalAuthority ??
         providerReentry.terminalAnswerAuthority,
       finalAnswerSource: compoundTerminalAuthorized
@@ -11954,6 +12053,8 @@ export const codexProvider: HelixAgentProvider = {
           ? "provider_image_lens_observation_report"
         : scholarlyExploratoryTerminalAuthority
           ? scholarlyProjectionTerminalArtifactKind
+        : moralGraphReflectionReceiptTerminalAuthority
+          ? "moral_graph_reflection_answer"
         : theoryReflectionReceiptTerminalAuthority
           ? "theory_context_reflection_answer"
         : providerReentry.terminalAnswerAuthority || directTerminalAuthority
@@ -11965,6 +12066,8 @@ export const codexProvider: HelixAgentProvider = {
           ? "image_lens_observation_report"
         : scholarlyExploratoryTerminalAuthority
           ? scholarlyProjectionTerminalArtifactKind
+        : moralGraphReflectionReceiptTerminalAuthority
+          ? "model_synthesized_answer"
         : theoryReflectionReceiptTerminalAuthority
           ? "theory_context_reflection_answer"
         : providerReentry.terminalAnswerAuthority || directTerminalAuthority
@@ -11975,6 +12078,8 @@ export const codexProvider: HelixAgentProvider = {
         ? "authorized_by_codex_provider_compound_synthesis"
         : scholarlyExploratoryTerminalAuthority
           ? "authorized_by_scholarly_response_mode"
+        : moralGraphReflectionReceiptTerminalAuthority
+          ? "authorized_by_moral_graph_reflection_receipt"
         : theoryReflectionReceiptTerminalAuthority
           ? "authorized_by_theory_reflection_receipt"
         : directTerminalAuthority
@@ -11995,6 +12100,8 @@ export const codexProvider: HelixAgentProvider = {
         ? "provider_image_lens_observation_report"
       : scholarlyExploratoryTerminalAuthority
         ? scholarlyProjectionTerminalArtifactKind
+      : moralGraphReflectionReceiptTerminalAuthority
+        ? "moral_graph_reflection_answer"
       : theoryReflectionReceiptTerminalAuthority
         ? "theory_context_reflection_answer"
       : providerReentry.terminalAnswerAuthority || directTerminalAuthority
@@ -12006,6 +12113,8 @@ export const codexProvider: HelixAgentProvider = {
         ? "image_lens_observation_report"
       : scholarlyExploratoryTerminalAuthority
         ? scholarlyProjectionTerminalArtifactKind
+      : moralGraphReflectionReceiptTerminalAuthority
+        ? "model_synthesized_answer"
       : theoryReflectionReceiptTerminalAuthority
         ? "theory_context_reflection_answer"
       : providerReentry.terminalAnswerAuthority || directTerminalAuthority
@@ -12015,6 +12124,8 @@ export const codexProvider: HelixAgentProvider = {
       ? "authorized_by_codex_provider_compound_synthesis"
       : scholarlyExploratoryTerminalAuthority
         ? "authorized_by_scholarly_response_mode"
+      : moralGraphReflectionReceiptTerminalAuthority
+        ? "authorized_by_moral_graph_reflection_receipt"
       : theoryReflectionReceiptTerminalAuthority
         ? "authorized_by_theory_reflection_receipt"
       : directTerminalAuthority
@@ -12024,6 +12135,7 @@ export const codexProvider: HelixAgentProvider = {
       (compoundTerminalAuthorized ? compoundTerminalAuthority : null) ??
       imageLensObservationReportTerminalAuthority ??
       scholarlyExploratoryTerminalAuthority ??
+      moralGraphReflectionReceiptTerminalAuthority ??
       theoryReflectionReceiptTerminalAuthority ??
       directTerminalAuthority ??
       providerReentry.terminalAnswerAuthority;
@@ -12131,6 +12243,21 @@ export const codexProvider: HelixAgentProvider = {
             assistant_answer: false,
             raw_content_included: false,
           }
+      : moralGraphReflectionReceiptTerminalAuthority
+        ? {
+            schema: "helix.terminal_presentation.v1",
+            turn_id: turnId,
+            concise_text: projectedText,
+            terminal_artifact_kind: "model_synthesized_answer",
+            final_answer_source: "moral_graph_reflection_answer",
+            terminal_authority_ref: readString(moralGraphReflectionReceiptTerminalAuthority.terminal_item_id),
+            selected_observation_refs:
+              readStringArray(moralGraphReflectionReceiptProjection?.answer.selected_observation_refs),
+            presentation_policy: "moral_graph_reflection_observation_boundary",
+            helix_style_rewrite_applied: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          }
       : theoryReflectionReceiptTerminalAuthority
         ? {
             schema: "helix.terminal_presentation.v1",
@@ -12186,6 +12313,7 @@ export const codexProvider: HelixAgentProvider = {
         compoundTerminalAuthorized ||
         Boolean(scholarlyExploratoryTerminalAuthority) ||
         providerTerminalAuthorized ||
+        moralGraphReflectionReceiptTerminalAuthorized ||
         theoryReflectionReceiptTerminalAuthorized ||
         directTerminalAuthorized,
     });
@@ -12382,6 +12510,20 @@ export const codexProvider: HelixAgentProvider = {
         ? { tool_followup_decision: railReentryProjection.toolFollowupDecision }
         : {}),
       ...(compoundAnswer ? { compound_evidence_synthesis_answer: compoundAnswer } : {}),
+      ...(moralGraphReflectionReceiptProjection
+        ? {
+            moral_graph_reflection_answer: moralGraphReflectionReceiptProjection.answer,
+            final_answer_draft: {
+              ...moralGraphReflectionReceiptProjection.answer,
+              schema: "helix.final_answer_draft.v1",
+              artifact_id:
+                readString(moralGraphReflectionReceiptProjection.answer.artifact_id) ??
+                readString(moralGraphReflectionReceiptProjection.answer.answer_id) ??
+                `${turnId}:moral_graph_reflection_answer`,
+              source: "codex_provider_moral_graph_reflection_receipt",
+            },
+          }
+        : {}),
       ...(theoryReflectionReceiptProjection
         ? {
             theory_reflection_receipt_answer: theoryReflectionReceiptProjection.answer,
@@ -12472,7 +12614,10 @@ export const codexProvider: HelixAgentProvider = {
           result.failReason ??
           (ok
             ? null
-            : compoundTerminalAuthorized || providerTerminalAuthorized || theoryReflectionReceiptTerminalAuthorized
+            : compoundTerminalAuthorized ||
+                providerTerminalAuthorized ||
+                moralGraphReflectionReceiptTerminalAuthorized ||
+                theoryReflectionReceiptTerminalAuthorized
               ? "codex_process_failed"
               : "helix_observation_reentry_required"),
         codex_exit_code: result.exitCode,
@@ -12506,6 +12651,7 @@ export const codexProvider: HelixAgentProvider = {
         capability_result: railContractProjection.capabilityResult,
         compound_capability_contract: codexCompoundSubgoalLedger,
         compound_evidence_synthesis_answer: compoundAnswer,
+        moral_graph_reflection_answer: moralGraphReflectionReceiptProjection?.answer ?? null,
         theory_reflection_receipt_answer: theoryReflectionReceiptProjection?.answer ?? null,
         current_turn_artifact_ledger: currentTurnArtifactLedger,
         tool_lifecycle_trace: railReentryProjection.toolLifecycleTrace,

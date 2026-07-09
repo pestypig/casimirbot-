@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyGatewayFailureAuthorityGuard,
+  buildCodexMoralGraphReflectionReceiptAnswer,
   buildMoralGraphObservationFallbackAnswer,
 } from "../codex-provider";
 
@@ -255,6 +256,43 @@ describe("Codex provider terminal pass-through", () => {
     expect(answer).toContain("Repair path:");
     expect(answer).toContain("dependency-transparency-gate");
     expect(answer).not.toMatch(/calculator|PDF|web evidence|internet search/i);
+  });
+
+  it("materializes Moral Graph observations as route-approved synthesized answers", () => {
+    const projection = buildCodexMoralGraphReflectionReceiptAnswer({
+      turnId: "ask:test:moral-graph-receipt-answer",
+      threadId: "helix-agent-provider",
+      route: "/ask",
+      promptText:
+        "Use only the Moral Graph. Reflect on whether I should apologize after snapping at a coworker. Do not use web, papers, calculator, image, or PDF context.",
+      normalizedArtifacts: [{
+        artifact_id: "ask:test:moral-graph-receipt-answer:codex_normalized:moral_graph_reflection:1",
+        kind: "moral_graph_reflection",
+        capability_key: "moral-graph.reflect_context",
+        payload_schema: "helix.moral_graph_reflection_observation.v1",
+        payload: {
+          schema: "helix.moral_graph_reflection_observation.v1",
+          located_badge_ids: [
+            "right-speech-and-accurate-formulation",
+            "repair-before-justification",
+          ],
+          claim_boundary_notes: ["procedural reflection only; not a final moral verdict"],
+          summary: "Moral Graph reflection located repair and accurate-formulation lenses.",
+        },
+      }],
+    });
+
+    expect(projection?.answer.answer_text).toContain("The Moral Graph treats this as");
+    expect(projection?.answer.answer_text).toContain("Repair direction:");
+    expect(projection?.answer.answer_text).not.toContain("Dependency:");
+    expect(projection?.answer.support_refs).toContain(
+      "ask:test:moral-graph-receipt-answer:codex_normalized:moral_graph_reflection:1",
+    );
+    expect(projection?.authority.terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(projection?.authority.final_answer_source).toBe("moral_graph_reflection_answer");
+    expect(projection?.authority.terminal_item_id).toBe(
+      "ask:test:moral-graph-receipt-answer:codex_moral_graph_reflection_answer",
+    );
   });
 
   it("preserves Codex explanation for calculator expression syntax blocks", () => {

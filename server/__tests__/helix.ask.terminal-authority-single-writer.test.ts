@@ -587,6 +587,119 @@ describe("Helix terminal authority single writer", () => {
     expect(String(payload.selected_final_answer)).not.toMatch(/scholarly|calculator|internet search|PDF\/full-text/i);
   });
 
+  it("allows a model-synthesized answer draft after Moral Graph observation re-entry when the route requires it", () => {
+    const turnId = "ask:test:moral-graph-model-synthesis";
+    const observationRef = `${turnId}:codex_normalized:moral_graph_reflection:1`;
+    const draftRef = `${turnId}:final_answer_draft:1`;
+    const answerText =
+      "Moral Graph reflection supports a repair-first apology because the direct harm is observable and the next step should preserve trust.";
+    const artifacts = [
+      {
+        artifact_id: observationRef,
+        kind: "moral_graph_reflection",
+        payload: {
+          schema: "helix.moral_graph_reflection_observation.v1",
+          turn_id: turnId,
+          capability_key: "moral-graph.reflect_context",
+          status: "succeeded",
+          summary: "Moral Graph observation completed.",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: draftRef,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          turn_id: turnId,
+          text: answerText,
+          answer_text: answerText,
+          support_refs: [observationRef],
+          assistant_answer: false,
+          terminal_eligible: true,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      response_type: "final_answer",
+      final_status: "completed",
+      selected_final_answer: answerText,
+      final_answer_source: "final_answer_draft",
+      terminal_artifact_kind: "model_synthesized_answer",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "moral_graph",
+        required_terminal_artifact_kind: "model_synthesized_answer",
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      route_evidence_authority: {
+        schema: "helix.route_evidence_authority.v1",
+        turn_id: turnId,
+        candidate_tools: [
+          {
+            capability_id: "moral-graph.reflect_context",
+            family: "moral_graph_reflection",
+            reason: "prompt_requested_moral_graph",
+          },
+        ],
+        admitted_tools: [
+          {
+            capability_id: "moral-graph.reflect_context",
+            family: "moral_graph_reflection",
+            reason: "current_route_admitted_moral_graph",
+            admission_ref: "route:test:moral_graph",
+          },
+        ],
+        rejected_tools: [
+          {
+            capability_id: "scholarly-research.lookup_papers",
+            family: "scholarly_research",
+            reason: "explicitly_suppressed_by_prompt",
+          },
+        ],
+        supporting_evidence_refs: [observationRef],
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+        forbidden_terminal_artifact_kinds: ["scholarly_research_answer", "internet_search_answer"],
+        required_terminal_kind: "model_synthesized_answer",
+        terminal_product_allowed: true,
+        current_turn_only: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "moral_graph_reflection",
+        requested_capability: "moral-graph.reflect_context",
+        required_terminal_kind: "model_synthesized_answer",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: artifacts,
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(result.source).toBe("final_answer_draft");
+    expect(result.visible_text).toBe(answerText);
+    expect(payload.terminal_error_code).toBeUndefined();
+    expect(payload.final_answer_source).toBe("final_answer_draft");
+    expect(payload.terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(payload.selected_final_answer).toBe(answerText);
+  });
+
   it("does not let route evidence authority admit a scholarly terminal for a Moral Graph turn", () => {
     const turnId = "ask:test:moral-graph-blocks-scholarly-terminal";
     const scholarlyText =

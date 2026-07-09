@@ -1003,6 +1003,59 @@ export function hasPostObservationModelDecision(payload: Record<string, unknown>
   return false;
 }
 
+const hasLedgerBackedPostObservationAnswerDraft = (payload: Record<string, unknown>): boolean => {
+  if (readString(payload.terminal_artifact_kind) !== "model_synthesized_answer") return false;
+  if (readString(payload.final_answer_source) !== "final_answer_draft") return false;
+  const canonicalGoal = readRecord(payload.canonical_goal_frame);
+  const routeProduct = readRecord(payload.route_product_contract);
+  const requiredTerminalKind =
+    readString(canonicalGoal?.required_terminal_kind) ??
+    readString(routeProduct?.required_terminal_kind) ??
+    readString(routeProduct?.required_terminal_artifact_kind);
+  if (requiredTerminalKind !== "model_synthesized_answer") return false;
+
+  const artifacts = readArray(payload.current_turn_artifact_ledger)
+    .map(readRecord)
+    .filter((artifact): artifact is Record<string, unknown> => Boolean(artifact));
+  const latestObservationIndex = artifacts.reduce((latest, artifact, index) => {
+    const sourceScope = readString(artifact.source_scope);
+    if (sourceScope === "prior_context" || sourceScope === "prior_turn_context" || sourceScope === "prior_artifact") {
+      return latest;
+    }
+    const artifactPayload = readRecord(artifact.payload);
+    const haystack = [
+      readString(artifact.kind),
+      readString(artifact.artifact_id),
+      readString(artifactPayload?.schema),
+      readString(artifactPayload?.kind),
+      readString(artifactPayload?.capability_key),
+      readString(artifactPayload?.tool_name),
+    ].filter(Boolean).join(" ");
+    return /moral_graph_reflection|ideology_context_reflection|procedural_moral_classification|helix\.moral_graph_reflection_observation\.v1|agent_step_observation_packet|runtime_tool_observation/i.test(haystack)
+      ? index
+      : latest;
+  }, -1);
+  if (latestObservationIndex < 0) return false;
+
+  return artifacts.slice(latestObservationIndex + 1).some((artifact) => {
+    const artifactPayload = readRecord(artifact.payload);
+    const kind = readString(artifact.kind);
+    const schema = readString(artifactPayload?.schema);
+    if (kind !== "final_answer_draft" && schema !== "helix.final_answer_draft.v1") return false;
+    const text = readString(artifactPayload?.text) ?? readString(artifactPayload?.answer_text);
+    if (!text) return false;
+    const supportRefs = [
+      ...readStringArray(artifactPayload?.support_refs),
+      ...readStringArray(artifactPayload?.evidence_refs),
+      ...readStringArray(artifactPayload?.observation_refs),
+      ...readStringArray(artifactPayload?.grounded_observation_refs),
+      ...readStringArray(artifactPayload?.grounded_in_observation_refs),
+    ];
+    const observationRef = readString(artifacts[latestObservationIndex]?.artifact_id);
+    return !observationRef || supportRefs.length === 0 || supportRefs.includes(observationRef);
+  });
+};
+
 export function hasDirectAnswerDraft(payload: Record<string, unknown>): boolean {
   if (readString(readRecord(payload.direct_answer_text)?.text)) return true;
   if (readString(readRecord(payload.final_answer_draft)?.text)) return true;
@@ -1332,15 +1385,16 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
   const noteReceiptTerminalAllowed = contractAuthorizedNoteReceiptTerminalAllowed(payload);
   const microDeckObservationBackedRoute = isMicroDeckObservationBackedRoute(payload);
   const microDeckCapability = selectedMicroDeckCapability(payload);
+  const ledgerBackedPostObservationAnswerDraft = hasLedgerBackedPostObservationAnswerDraft(payload);
   const repoEvidenceAnswerTerminal = repoEvidenceAnswerTerminalAllowed(payload);
   const checks = {
-    agent_runtime_loop: hasAgentRuntimeLoopDecisionChain(payload),
-    agent_step_decision: Boolean(readRecord(payload.agent_step_decision)) || hasAgentRuntimeLoopDecisionChain(payload),
+    agent_runtime_loop: hasAgentRuntimeLoopDecisionChain(payload) || ledgerBackedPostObservationAnswerDraft,
+    agent_step_decision: Boolean(readRecord(payload.agent_step_decision)) || hasAgentRuntimeLoopDecisionChain(payload) || ledgerBackedPostObservationAnswerDraft,
     runtime_tool_call: !microDeckObservationBackedRoute || hasRuntimeToolCallForSelectedCapability(payload, microDeckCapability),
     microdeck_selected_capability: !microDeckObservationBackedRoute || selectedCapabilityMatches(payload, microDeckCapability),
-    selected_capability_observation: repoEvidenceAnswerTerminal || hasSelectedCapabilityObservation(payload),
-    post_observation_model_decision: hasPostObservationModelDecision(payload),
-    goal_satisfaction_allows_terminal: goalSatisfactionAllowsTerminal(payload),
+    selected_capability_observation: repoEvidenceAnswerTerminal || hasSelectedCapabilityObservation(payload) || ledgerBackedPostObservationAnswerDraft,
+    post_observation_model_decision: hasPostObservationModelDecision(payload) || ledgerBackedPostObservationAnswerDraft,
+    goal_satisfaction_allows_terminal: goalSatisfactionAllowsTerminal(payload) || ledgerBackedPostObservationAnswerDraft,
     typed_failure_clean: hasCleanTypedFailure(payload),
   };
   const requiresRuntimeLoop =

@@ -258,6 +258,8 @@ export const buildToolUseRestatement = (promptText: string): ToolUseRestatementV
 export const detectInternetSearchIntent = (promptText: string): HelixInternetSearchIntent => {
   const prompt = promptText.trim();
   const restatement = buildToolUseRestatement(prompt);
+  const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
+  const internetSearchSuppressed = contextualToolSuppressionBlocksFamily(contextualSuppression, "internet_search");
   const explicitProviderCue = hasExplicitWebProviderCue(prompt);
   const searchAction = hasSearchActionCue(prompt);
   const currentWebCue = hasCurrentWebCue(prompt);
@@ -267,19 +269,25 @@ export const detectInternetSearchIntent = (promptText: string): HelixInternetSea
   const recencyDays = extractRecencyDays(prompt);
   const explicitWebSearchCue = /\b(?:search\s+(?:the\s+)?(?:web|internet)|look\s+up\s+online|check\s+online|google\s+it|google\s+search)\b/i.test(prompt);
   const searchRequested =
-    restatement.requiredToolFamilies.includes("internet_search") ||
-    !isExplanatoryOnlyPrompt(prompt) &&
-    !hasExplicitNoBrowseConstraint(prompt) &&
-    !isSuppliedTextOnlyTask(prompt) &&
-    (!scholarlyScope || explicitProviderCue || explicitWebSearchCue) &&
     (
-      explicitProviderCue ||
-      (searchAction && currentWebCue) ||
-      explicitWebSearchCue ||
-      (domains.length > 0 && searchAction)
-    ) &&
-    (!localScope || explicitProviderCue || /\b(?:web|internet|online|google)\b/i.test(prompt)) &&
-    (!hasLocalObservationScopeCue(prompt) || explicitProviderCue || /\b(?:web|internet|online|google)\b/i.test(prompt));
+      !internetSearchSuppressed &&
+      restatement.requiredToolFamilies.includes("internet_search")
+    ) ||
+    (
+      !internetSearchSuppressed &&
+      !isExplanatoryOnlyPrompt(prompt) &&
+      !hasExplicitNoBrowseConstraint(prompt) &&
+      !isSuppliedTextOnlyTask(prompt) &&
+      (!scholarlyScope || explicitProviderCue || explicitWebSearchCue) &&
+      (
+        explicitProviderCue ||
+        (searchAction && currentWebCue) ||
+        explicitWebSearchCue ||
+        (domains.length > 0 && searchAction)
+      ) &&
+      (!localScope || explicitProviderCue || /\b(?:web|internet|online|google)\b/i.test(prompt)) &&
+      (!hasLocalObservationScopeCue(prompt) || explicitProviderCue || /\b(?:web|internet|online|google)\b/i.test(prompt))
+    );
   const explicitCues = [
     explicitProviderCue ? "internet_search_provider" : "",
     searchAction ? "search_action" : "",

@@ -10,7 +10,7 @@ import { buildCapabilityResultGate } from "../services/helix-ask/capability-resu
 import { detectContextualToolAdmissionSuppression } from "../services/helix-ask/contextual-tool-admission";
 import { buildEvidenceReentryGate } from "../services/helix-ask/evidence-reentry-gate";
 import { materializeFinalAnswerDraftTerminal } from "../services/helix-ask/final-answer-draft-terminal-materializer";
-import { buildToolUseRestatement } from "../services/helix-ask/internet-search-intent";
+import { buildToolUseRestatement, detectInternetSearchIntent } from "../services/helix-ask/internet-search-intent";
 import { buildRouteProductContract } from "../services/helix-ask/route-product-contract";
 import { buildToolCallAdmissionDecision } from "../services/helix-ask/tool-call-admission";
 import { buildAskTurnSolverTrace } from "../services/helix-ask/ask-turn-solver";
@@ -209,6 +209,7 @@ describe("Helix internet search tool admission", () => {
     const restatement = buildToolUseRestatement(prompt);
     expect(restatement.requiredToolFamilies).not.toContain("internet_search");
     expect(restatement.negativeConstraints.length + restatement.quotedOrContextualMentions.length).toBeGreaterThan(0);
+    expect(detectInternetSearchIntent(prompt).searchRequested).toBe(false);
 
     const sourceTargetIntent = arbitrateAskSourceTarget({
       turnId: `ask:internet-adversarial:${reason}`,

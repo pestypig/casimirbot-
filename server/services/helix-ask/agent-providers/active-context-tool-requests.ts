@@ -43,6 +43,13 @@ import {
   isWorkspaceOsStatusSelection,
 } from "./prompt-named-tool-requests";
 
+const HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY = "helix_ask.inspect_capability_catalog" as const;
+
+const isCapabilityCatalogSelection = (selectedCapability: string): boolean =>
+  /^(?:helix_ask\.inspect_capability_catalog|helix\.ask\.inspect_capability_catalog|inspect_capability_catalog|capability_catalog|runtime_capability_catalog|capability_catalog_runtime)$/i.test(
+    selectedCapability,
+  );
+
 export const readWorkspaceSnapshot = (body: Record<string, unknown>): Record<string, unknown> | null =>
   readRecord(body.workspace_context_snapshot ?? body.workspaceContextSnapshot);
 
@@ -536,6 +543,31 @@ export const buildStructuredAdmissionWorkstationGatewayCallRequests = (
     }
     const query = readGatewayQuery(body, admission);
     if (!query) continue;
+    if (isCapabilityCatalogSelection(selectedCapability)) {
+      const key = `${HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY}:${query}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      requests.push({
+        schema: "helix.workstation_gateway.structured_admission_call_request.v1",
+        derivation_source: "helix_structured_source_target_admission",
+        capability_id: HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY,
+        mode: "observe",
+        arguments: {
+          query,
+          source_target_intent: {
+            ...sourceTargetIntent,
+            target_source: "capability_catalog",
+            target_kind: "capability_catalog_runtime",
+            alias_capability:
+              selectedCapability === HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY ? undefined : selectedCapability,
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      });
+      continue;
+    }
     if (
       selectedCapability === REPO_SEARCH_CAPABILITY ||
       REPO_SEARCH_ALIAS_CAPABILITIES.includes(selectedCapability as typeof REPO_SEARCH_ALIAS_CAPABILITIES[number])

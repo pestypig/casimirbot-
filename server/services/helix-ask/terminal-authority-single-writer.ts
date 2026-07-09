@@ -1381,6 +1381,18 @@ const readRouteEvidenceAuthority = (payload: Record<string, unknown>): Record<st
   return debugTraceAuthority?.schema === "helix.route_evidence_authority.v1" ? debugTraceAuthority : null;
 };
 
+const routeEvidenceAuthorityForbidsTerminalKind = (
+  payload: Record<string, unknown>,
+  kind: string,
+): boolean => {
+  const routeEvidenceAuthority = readRouteEvidenceAuthority(payload);
+  if (routeEvidenceAuthority?.schema !== "helix.route_evidence_authority.v1") return false;
+  return readArray(routeEvidenceAuthority.forbidden_terminal_artifact_kinds)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry))
+    .includes(kind);
+};
+
 const routeContractAllowedTerminalKinds = (payload: Record<string, unknown>): string[] =>
   {
     const committedRoute = readCommittedAskRoute(payload);
@@ -1411,7 +1423,7 @@ const routeContractAllowedTerminalKinds = (payload: Record<string, unknown>): st
         readString(routeEvidenceAuthority?.required_terminal_kind) ??
         readString(canonicalGoal?.required_terminal_kind) ??
         readString(readRecord(payload.route_product_contract)?.required_terminal_kind),
-    }).allowed;
+    }).allowed.filter((kind) => !routeEvidenceAuthorityForbidsTerminalKind(payload, kind));
   };
 
 const routeProductContractAllowedTerminalKinds = (payload: Record<string, unknown>): string[] =>
@@ -1460,6 +1472,7 @@ const hasCurrentTurnImageLensObservation = (payload: Record<string, unknown>): b
 };
 
 const routeContractExplicitlyAllowsTerminalKind = (payload: Record<string, unknown>, kind: string): boolean => {
+  if (routeEvidenceAuthorityForbidsTerminalKind(payload, kind)) return false;
   if (routeContractAllowedTerminalKinds(payload).includes(kind)) return true;
 
   if (
@@ -1560,6 +1573,7 @@ const routeContractAllowsTerminalKind = (
   payload: Record<string, unknown>,
   kind: string,
 ): boolean => {
+  if (routeEvidenceAuthorityForbidsTerminalKind(payload, kind)) return false;
   const canonicalGoal = readRecord(payload.canonical_goal_frame);
   if (
     kind === "model_synthesized_answer" &&
@@ -1590,7 +1604,7 @@ const routeContractAllowsTerminalKind = (
     const forbidden = readArray(routeEvidenceAuthority.forbidden_terminal_artifact_kinds)
       .map(readString)
       .filter((entry): entry is string => Boolean(entry));
-    if (forbidden.includes(kind) && !currentRouteExplicitlyAllowsKind) return false;
+    if (forbidden.includes(kind)) return false;
     if (
       kind !== "typed_failure" &&
       kind !== "request_user_input" &&
@@ -4644,6 +4658,11 @@ export function applyHelixTerminalAuthoritySingleWriter(
     artifacts.reduce((latest, artifact, index) => isAcceptedObservationPacket(artifact) ? index : latest, -1);
   const routeAllowsModelSynthesizedAnswer = routeContractAllowsTerminalKind(input.payload, "model_synthesized_answer");
   const moralGraphReflectionTerminalRoute = isMoralGraphReflectionTerminalRoute(input.payload);
+  const moralGraphModelSynthesizedAnswerCanSurface =
+    moralGraphReflectionTerminalRoute &&
+    itineraryObservationCriteriaSatisfied &&
+    routeAllowsModelSynthesizedAnswer &&
+    Boolean(selectedDraft);
   const deterministicReceiptFallbackCanSurface =
     Boolean(deterministicReceiptFallbackDraft) && earlyDeterministicReceiptFallbackCanSurface;
   const scholarlyAnswerSynthesisMissing =
@@ -4687,7 +4706,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     selectedDraft &&
     (
       !routeAllowsModelSynthesizedAnswer ||
-      (moralGraphReflectionTerminalRoute && draftMaterialization?.ok !== true)
+      (moralGraphReflectionTerminalRoute && draftMaterialization?.ok !== true && !moralGraphModelSynthesizedAnswerCanSurface)
     ) &&
     !noteMutationFinalDraftCanSurface
   ) {
@@ -4695,7 +4714,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
       ref: artifactId(selectedDraft.artifact) ?? undefined,
       kind: "model_synthesized_answer",
       source: "final_answer_draft",
-      reason: moralGraphReflectionTerminalRoute && draftMaterialization?.ok !== true
+      reason: moralGraphReflectionTerminalRoute && draftMaterialization?.ok !== true && !moralGraphModelSynthesizedAnswerCanSurface
         ? "missing_required_observation"
         : "route_contract_forbids_model_synthesized_answer",
     });
@@ -5934,7 +5953,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     !solverContinuationPending &&
     selectedDraft &&
     routeAllowsModelSynthesizedAnswer &&
-    !moralGraphReflectionTerminalRoute
+    (!moralGraphReflectionTerminalRoute || moralGraphModelSynthesizedAnswerCanSurface)
   ) {
     const text = artifactText(selectedDraft.artifact) ?? "I could not produce a terminal answer for this turn.";
     selectedArtifactRef = artifactId(selectedDraft.artifact);
