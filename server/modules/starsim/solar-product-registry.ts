@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { hashStableJson } from "../../utils/information-boundary";
 import {
@@ -103,6 +104,15 @@ const finalizeLoadedRegistry = (
   registry,
 });
 
+const resolveDefaultSolarProductRegistryPath = (): string => {
+  const cwdPath = path.resolve(process.cwd(), SOLAR_PRODUCT_REGISTRY_RELATIVE_PATH);
+  if (fs.existsSync(cwdPath)) {
+    return cwdPath;
+  }
+  const bundledPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), SOLAR_PRODUCT_REGISTRY_RELATIVE_PATH);
+  return bundledPath;
+};
+
 export const loadSolarProductRegistryFromPath = (filePath: string): LoadedStarSimSolarProductRegistry => {
   const sourceLabel = path.resolve(filePath);
   let raw: string;
@@ -126,7 +136,7 @@ export const loadSolarProductRegistryFromPath = (filePath: string): LoadedStarSi
 };
 
 const loadDefaultSolarProductRegistry = (): LoadedStarSimSolarProductRegistry => {
-  const absolutePath = path.resolve(process.cwd(), SOLAR_PRODUCT_REGISTRY_RELATIVE_PATH);
+  const absolutePath = resolveDefaultSolarProductRegistryPath();
   return loadSolarProductRegistryFromPath(absolutePath);
 };
 

@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { hashStableJson } from "../../utils/information-boundary";
 
@@ -232,6 +233,15 @@ const finalizeLoadedPack = (pack: StarSimSolarReferencePack, ref: string): Loade
   pack,
 });
 
+const resolveDefaultSolarReferencePackPath = (): string => {
+  const cwdPath = path.resolve(process.cwd(), SOLAR_REFERENCE_PACK_RELATIVE_PATH);
+  if (fs.existsSync(cwdPath)) {
+    return cwdPath;
+  }
+  const bundledPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), SOLAR_REFERENCE_PACK_RELATIVE_PATH);
+  return bundledPath;
+};
+
 export const loadSolarReferencePackFromPath = (filePath: string): LoadedStarSimSolarReferencePack => {
   const sourceLabel = path.resolve(filePath);
   let raw: string;
@@ -255,7 +265,7 @@ export const loadSolarReferencePackFromPath = (filePath: string): LoadedStarSimS
 };
 
 const loadDefaultSolarReferencePack = (): LoadedStarSimSolarReferencePack => {
-  const absolutePath = path.resolve(process.cwd(), SOLAR_REFERENCE_PACK_RELATIVE_PATH);
+  const absolutePath = resolveDefaultSolarReferencePackPath();
   return loadSolarReferencePackFromPath(absolutePath);
 };
 

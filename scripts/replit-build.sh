@@ -14,6 +14,10 @@ fi
 echo "[replit] building current checkout"
 VITE_HELIX_ASK_JOB_TIMEOUT_MS="${VITE_HELIX_ASK_JOB_TIMEOUT_MS:-1200000}" npm run build
 
+echo "[replit] packaging runtime data"
+mkdir -p dist/data/starsim
+cp data/starsim/*.json dist/data/starsim/
+
 if [ -f scripts/deploy-clean.cjs ]; then
   echo "[replit] cleaning deployment artifacts"
   node scripts/deploy-clean.cjs
