@@ -83,6 +83,9 @@ const stripQuotedPayloadsForBackendEntrypointPolicy = (text: string): string =>
 export const isConceptualToolExplanationWithoutExecution = (question: string): boolean => {
   const normalized = question.trim();
   if (!normalized) return false;
+  const asksAboutToolBehavior =
+    /\b(?:does|can|how\s+does)\s+(?:your|the|this)\s+(?:research[-\s]+papers?\s+|scholarly(?:[-\s]+research)?\s+)?tool\b[\s\S]{0,260}\b(?:select|pick|choose|parse|open|openable|check|use|fallback|escalat|image\s+lens|work)\b/i.test(normalized);
+  if (asksAboutToolBehavior) return true;
   const asksForConcept =
     /\b(?:what\s+is|what\s+does|explain|describe|define|meaning\s+of|looks?\s+like)\b/i.test(normalized);
   const referencesToolOrCapability =

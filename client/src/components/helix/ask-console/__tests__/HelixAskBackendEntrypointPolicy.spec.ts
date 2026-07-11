@@ -73,6 +73,19 @@ describe("Helix Ask backend entrypoint policy", () => {
     }
   });
 
+  it("does not promote a research-tool behavior question into an Image Lens command", () => {
+    const question =
+      "Does your research-paper tool select papers it can parse, or does it first check which papers are openable and then use Image Lens when visual extraction is needed?";
+
+    expect(requiresHelixAskBackendEntrypoint(question)).toBe(false);
+    expect(resolveHelixAskBackendEntrypointFamily(question)).toBeNull();
+    expect(buildHelixAskHardBackendEntrypointRouteMetadata({
+      question,
+      turnId: "turn-research-tool-behavior",
+      threadId: "thread-research-tool-behavior",
+    })).toBeNull();
+  });
+
   it("still requires backend Ask when the user explicitly asks to use a tool family", () => {
     const examples = [
       {
