@@ -1,3 +1,9 @@
+import {
+  hasCurrentTurnProviderTerminalPresentation,
+  resolveCurrentTurnProviderTerminalIdentity,
+} from "./terminal-identity-precedence";
+export { resolveCurrentTurnProviderTerminalIdentity } from "./terminal-identity-precedence";
+
 type RecordLike = Record<string, unknown>;
 
 type HelixAskCanonicalGoalFrame = any;
@@ -33,6 +39,7 @@ export type HelixAskTurnFinalizerDependencies = {
   auditHelixAskContextForPoison: DependencyValue;
   attachLiveSourceIdentityAuditForAskTurn: DependencyValue;
   applyHelixTerminalAuthoritySingleWriter: DependencyValue;
+  syncAskTurnProcedureTraceFromTerminalAuthority: DependencyValue;
   buildLoopParityTrace: DependencyValue;
   refreshCapabilityResultForPayload: DependencyValue;
   refreshCapabilityLifecycleLedgerForPayload: DependencyValue;
@@ -105,6 +112,7 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
     auditHelixAskContextForPoison,
     attachLiveSourceIdentityAuditForAskTurn,
     applyHelixTerminalAuthoritySingleWriter,
+    syncAskTurnProcedureTraceFromTerminalAuthority,
     buildLoopParityTrace,
     refreshCapabilityResultForPayload,
     refreshCapabilityLifecycleLedgerForPayload,
@@ -138,6 +146,12 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
 
   const finalizeHelixAskTurnPayload = (args: FinalizeHelixAskTurnPayloadInput): RecordLike => {
     const payload = args.payload;
+    const resolveFinalizerTerminalIdentity = () => resolveCurrentTurnProviderTerminalIdentity({
+      payload,
+      turnId: args.turnId,
+      fallbackTerminalArtifactKind: args.terminalArtifactKind,
+      fallbackFinalAnswerSource: args.finalAnswerSource,
+    });
     const canonicalGoalForFinalizer =
       payload.canonical_goal_frame && typeof payload.canonical_goal_frame === "object"
         ? (payload.canonical_goal_frame as HelixAskCanonicalGoalFrame)
@@ -780,6 +794,9 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
       );
     const finalizerNeedsCompletedCompoundSingleWriter =
       helixRuntimeFinalAnswerComposer.shouldApplyCompletedCompoundTerminalSingleWriterBridge(payload, finalizerTerminalSelectionArtifacts);
+    const finalizerDefersProviderSingleWriter =
+      hasCurrentTurnProviderTerminalPresentation(payload, args.turnId) &&
+      !(payload.terminal_authority_single_writer && typeof payload.terminal_authority_single_writer === "object");
     if (
       (finalizerNeedsWorkstationSingleWriter || finalizerNeedsFinalAnswerDraftSingleWriter || finalizerNeedsCompletedCompoundSingleWriter) &&
       (
@@ -788,6 +805,7 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
         helixRuntimeFinalAnswerComposer.shouldApplyHelixTerminalDraftSelectionGateForPayload(payload, finalizerTerminalSelectionArtifacts) ||
         finalizerHasWorkstationTerminalCandidate
       ) &&
+      !finalizerDefersProviderSingleWriter &&
       !(payload.terminal_authority_single_writer && typeof payload.terminal_authority_single_writer === "object")
     ) {
       applyHelixTerminalAuthoritySingleWriter({
@@ -801,8 +819,8 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
       turnId: args.turnId,
       promptText: args.prompt,
       selectedRoute: args.route,
-      terminalArtifactKind: readAskTurnString(payload.terminal_artifact_kind) ?? args.terminalArtifactKind,
-      finalAnswerSource: readAskTurnString(payload.final_answer_source) ?? args.finalAnswerSource,
+      terminalArtifactKind: resolveFinalizerTerminalIdentity().terminalArtifactKind,
+      finalAnswerSource: resolveFinalizerTerminalIdentity().finalAnswerSource,
       payload,
     });
     refreshCapabilityResultForPayload({
@@ -823,16 +841,16 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
       turnId: args.turnId,
       promptText: args.prompt,
       selectedRoute: args.route,
-      terminalArtifactKind: readAskTurnString(payload.terminal_artifact_kind) ?? args.terminalArtifactKind,
-      finalAnswerSource: readAskTurnString(payload.final_answer_source) ?? args.finalAnswerSource,
+      terminalArtifactKind: resolveFinalizerTerminalIdentity().terminalArtifactKind,
+      finalAnswerSource: resolveFinalizerTerminalIdentity().finalAnswerSource,
       payload,
       loopParityTrace: payload.loop_parity_trace as Record<string, unknown>,
     });
     refreshSolverArtifactReentryAuditForPayload({
       payload,
       turnId: args.turnId,
-      terminalArtifactKind: readAskTurnString(payload.terminal_artifact_kind) ?? args.terminalArtifactKind,
-      finalAnswerSource: readAskTurnString(payload.final_answer_source) ?? args.finalAnswerSource,
+      terminalArtifactKind: resolveFinalizerTerminalIdentity().terminalArtifactKind,
+      finalAnswerSource: resolveFinalizerTerminalIdentity().finalAnswerSource,
     });
     refreshSolverSubgoalLedgerForPayload({
       payload,
@@ -842,7 +860,7 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
     refreshCapabilityLifecycleLedgerForPayload({
       payload,
       turnId: args.turnId,
-      terminalArtifactKind: readAskTurnString(payload.terminal_artifact_kind) ?? args.terminalArtifactKind,
+      terminalArtifactKind: resolveFinalizerTerminalIdentity().terminalArtifactKind,
     });
     refreshOperationalRecordsForPayload({
       payload,
@@ -857,8 +875,8 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
       turnId: args.turnId,
       promptText: args.prompt,
       selectedRoute: args.route,
-      terminalArtifactKind: readAskTurnString(payload.terminal_artifact_kind) ?? args.terminalArtifactKind,
-      finalAnswerSource: readAskTurnString(payload.final_answer_source) ?? args.finalAnswerSource,
+      terminalArtifactKind: resolveFinalizerTerminalIdentity().terminalArtifactKind,
+      finalAnswerSource: resolveFinalizerTerminalIdentity().finalAnswerSource,
       payload,
       loopParityTrace: payload.loop_parity_trace as Record<string, unknown>,
     });
@@ -872,6 +890,17 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
       routeProductContract: routeProductContract as Record<string, unknown>,
       sourceTargetIntent: sourceTargetIntent as Record<string, unknown>,
     });
+    if (
+      finalizerDefersProviderSingleWriter &&
+      !(payload.terminal_authority_single_writer && typeof payload.terminal_authority_single_writer === "object")
+    ) {
+      applyHelixTerminalAuthoritySingleWriter({
+        payload,
+        turnId: args.turnId,
+        threadId: args.threadId,
+        artifactLedger: finalizerTerminalSelectionArtifacts,
+      });
+    }
     if (payload.debug && typeof payload.debug === "object") {
       const debug = payload.debug as Record<string, unknown>;
       debug.terminal_answer_authority = payload.terminal_answer_authority;
@@ -1012,33 +1041,33 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
       turnId: args.turnId,
       promptText: args.prompt,
       selectedRoute: readAskTurnString(payload.route_reason_code) ?? readAskTurnString(payload.route) ?? args.route,
-      terminalArtifactKind: readAskTurnString(payload.terminal_artifact_kind) ?? args.terminalArtifactKind,
-      finalAnswerSource: readAskTurnString(payload.final_answer_source) ?? args.finalAnswerSource,
+      terminalArtifactKind: resolveFinalizerTerminalIdentity().terminalArtifactKind,
+      finalAnswerSource: resolveFinalizerTerminalIdentity().finalAnswerSource,
       payload,
     });
     refreshCapabilityResultForPayload({
       payload,
-      terminalArtifactKind: readAskTurnString(payload.terminal_artifact_kind) ?? args.terminalArtifactKind,
+      terminalArtifactKind: resolveFinalizerTerminalIdentity().terminalArtifactKind,
     });
     refreshCapabilityLifecycleLedgerForPayload({
       payload,
       turnId: args.turnId,
-      terminalArtifactKind: readAskTurnString(payload.terminal_artifact_kind) ?? args.terminalArtifactKind,
+      terminalArtifactKind: resolveFinalizerTerminalIdentity().terminalArtifactKind,
     });
     payload.ask_turn_solver_trace = buildAskTurnSolverTrace({
       turnId: args.turnId,
       promptText: args.prompt,
       selectedRoute: readAskTurnString(payload.route_reason_code) ?? readAskTurnString(payload.route) ?? args.route,
-      terminalArtifactKind: readAskTurnString(payload.terminal_artifact_kind) ?? args.terminalArtifactKind,
-      finalAnswerSource: readAskTurnString(payload.final_answer_source) ?? args.finalAnswerSource,
+      terminalArtifactKind: resolveFinalizerTerminalIdentity().terminalArtifactKind,
+      finalAnswerSource: resolveFinalizerTerminalIdentity().finalAnswerSource,
       payload,
       loopParityTrace: payload.loop_parity_trace as Record<string, unknown>,
     });
     refreshSolverArtifactReentryAuditForPayload({
       payload,
       turnId: args.turnId,
-      terminalArtifactKind: readAskTurnString(payload.terminal_artifact_kind) ?? args.terminalArtifactKind,
-      finalAnswerSource: readAskTurnString(payload.final_answer_source) ?? args.finalAnswerSource,
+      terminalArtifactKind: resolveFinalizerTerminalIdentity().terminalArtifactKind,
+      finalAnswerSource: resolveFinalizerTerminalIdentity().finalAnswerSource,
     });
     refreshSolverSubgoalLedgerForPayload({
       payload,
@@ -1048,7 +1077,7 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
     refreshCapabilityLifecycleLedgerForPayload({
       payload,
       turnId: args.turnId,
-      terminalArtifactKind: readAskTurnString(payload.terminal_artifact_kind) ?? args.terminalArtifactKind,
+      terminalArtifactKind: resolveFinalizerTerminalIdentity().terminalArtifactKind,
     });
     refreshSolverRetryPoliciesForPayload({
       payload,
@@ -1058,8 +1087,8 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
       turnId: args.turnId,
       promptText: args.prompt,
       selectedRoute: readAskTurnString(payload.route_reason_code) ?? readAskTurnString(payload.route) ?? args.route,
-      terminalArtifactKind: readAskTurnString(payload.terminal_artifact_kind) ?? args.terminalArtifactKind,
-      finalAnswerSource: readAskTurnString(payload.final_answer_source) ?? args.finalAnswerSource,
+      terminalArtifactKind: resolveFinalizerTerminalIdentity().terminalArtifactKind,
+      finalAnswerSource: resolveFinalizerTerminalIdentity().finalAnswerSource,
       payload,
       loopParityTrace: payload.loop_parity_trace as Record<string, unknown>,
     });
@@ -1328,8 +1357,8 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
       }
     }
     const finalTraceRoute = readAskTurnString(payload.route_reason_code) ?? readAskTurnString(payload.route) ?? args.route;
-    const finalTraceTerminalKind = readAskTurnString(payload.terminal_artifact_kind) ?? args.terminalArtifactKind;
-    const finalTraceAnswerSource = readAskTurnString(payload.final_answer_source) ?? args.finalAnswerSource;
+    const finalTraceTerminalKind = resolveFinalizerTerminalIdentity().terminalArtifactKind;
+    const finalTraceAnswerSource = resolveFinalizerTerminalIdentity().finalAnswerSource;
     payload.loop_parity_trace = buildLoopParityTrace({
       turnId: args.turnId,
       promptText: args.prompt,
@@ -1347,6 +1376,15 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
       payload,
       loopParityTrace: payload.loop_parity_trace as Record<string, unknown>,
     });
+    if (typeof syncAskTurnProcedureTraceFromTerminalAuthority === "function") {
+      syncAskTurnProcedureTraceFromTerminalAuthority({
+        turnId: args.turnId,
+        payload,
+        artifacts: Array.isArray(payload.current_turn_artifact_ledger)
+          ? (payload.current_turn_artifact_ledger as HelixTurnArtifact[])
+          : [],
+      });
+    }
     if (
       /\bprocedure\s+memory\b/i.test(args.prompt) &&
       readAskTurnString(payload.terminal_artifact_kind) === "typed_failure" &&
@@ -1445,7 +1483,7 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
       payload,
       turnId: args.turnId,
       route: readAskTurnString(payload.route_reason_code) ?? readAskTurnString(payload.route) ?? args.route,
-      terminalArtifactKind: readAskTurnString(payload.terminal_artifact_kind) ?? args.terminalArtifactKind,
+      terminalArtifactKind: resolveFinalizerTerminalIdentity().terminalArtifactKind,
       selectedFinalAnswer: readAskTurnString(payload.selected_final_answer) ?? terminalEnvelope.terminal_text,
     });
     payload.terminal_presentation_coverage_audit = coverageAudit;
@@ -1478,6 +1516,7 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
       debug.solver_retry_policies = payload.solver_retry_policies;
       debug.loop_parity_trace = payload.loop_parity_trace;
       debug.ask_turn_solver_trace = payload.ask_turn_solver_trace;
+      debug.ask_turn_procedure_trace = payload.ask_turn_procedure_trace;
       debug.terminal_presentation_coverage_audit = coverageAudit;
       debug.tool_admission_coverage_audit = toolAdmissionCoverageAudit;
       if (sourceBindingStatuses.length > 0 && !Array.isArray(debug.source_binding_statuses)) {
@@ -1518,6 +1557,16 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
       debug.terminal_error_code = payload.terminal_error_code ?? null;
       debug.terminal_presentation = payload.terminal_presentation;
       debug.terminal_answer_authority = payload.terminal_answer_authority;
+      if (typeof syncAskTurnProcedureTraceFromTerminalAuthority === "function") {
+        syncAskTurnProcedureTraceFromTerminalAuthority({
+          turnId: args.turnId,
+          payload,
+          artifacts: Array.isArray(payload.current_turn_artifact_ledger)
+            ? (payload.current_turn_artifact_ledger as HelixTurnArtifact[])
+            : [],
+        });
+        debug.ask_turn_procedure_trace = payload.ask_turn_procedure_trace;
+      }
       if (payload.language_model_policy && typeof payload.language_model_policy === "object" && !Array.isArray(payload.language_model_policy)) {
         debug.language_model_policy = payload.language_model_policy;
         debug.language_model_debug_summary = payload.language_model_debug_summary ?? debug.language_model_debug_summary;

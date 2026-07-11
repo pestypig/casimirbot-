@@ -42,6 +42,13 @@ import {
   extractCalculatorMathTokenSequence,
   isWorkspaceOsStatusSelection,
 } from "./prompt-named-tool-requests";
+import {
+  extractExplicitDocsSectionRequest,
+  extractExplicitDocsLocateTerms,
+  extractUnquotedDocsMarkdownPaths,
+  isExplicitDocsPathLocatePrompt,
+  isExplicitDocsPathSummaryPrompt,
+} from "../docs-viewer-intent";
 
 const HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY = "helix_ask.inspect_capability_catalog" as const;
 
@@ -77,7 +84,10 @@ export const readWorkspaceActiveDocPath = (workspaceSnapshot: Record<string, unk
 
 export const isActiveDocsViewerDeicticPrompt = (prompt: string): boolean => {
   if (/\bbackground\s+only\b/i.test(prompt)) return false;
-  const unquotedPrompt = unquotePrompt(prompt);
+  const unquotedPrompt = unquotePrompt(prompt).replace(
+    /(?:^|[\s"'(])\/?docs\/[A-Za-z0-9_./-]+\.(?:md|mdx|txt)\b/gi,
+    " ",
+  );
   if (/\b(?:not|don'?t|do\s+not)\s+(?:asking\s+about|ask|answer|use|read|explain|interpret|summari[sz]e)\b.{0,100}\b(?:this|current|open|active|visible)\s+(?:doc|document|paper|white\s*paper|whitepaper)\b/i.test(unquotedPrompt)) return false;
   if (/\b(?:before|after|if|when)\b.{0,80}\b(?:open|focus|use|show|read|summari[sz]e)\b.{0,50}\b(?:doc|document|paper|white\s*paper|whitepaper)\b/i.test(unquotedPrompt)) return false;
   if (/\b(?:previous|last|earlier|historical)\b.{0,80}\b(?:doc|document|paper|white\s*paper|whitepaper)\b/i.test(unquotedPrompt)) return false;
@@ -89,19 +99,61 @@ export const isActiveDocsViewerDeicticPrompt = (prompt: string): boolean => {
   return mentionsCurrentDoc && asksForContent;
 };
 
+const DOCS_CONTENT_OPERATION_PATTERN =
+  /\b(?:open|read|summari[sz]e|summary|explain|describe|docs?|document|paper|white\s*paper|whitepaper)\b/i;
+
+const isImmediateExplicitDocsPathSummaryPrompt = (prompt: string): boolean => {
+  if (!isExplicitDocsPathSummaryPrompt(prompt) && !isExplicitDocsPathLocatePrompt(prompt)) return false;
+  const unquoted = unquotePrompt(prompt);
+  const locatePrompt = isExplicitDocsPathLocatePrompt(prompt);
+  const negatedLocateOperation = hasNegatedToolInstruction(
+    prompt,
+    /\b(?:find|locate|search|inspect|read)\b/i,
+  );
+  const negationIndex = unquoted.search(/\b(?:do\s+not|don't|dont|without|no\s+need\s+to|not\s+asking\s+to|avoid)\b/i);
+  const hasAffirmativeLocateBeforeNegation =
+    negationIndex > 0 && /\b(?:find|locate|search|inspect|read)\b/i.test(unquoted.slice(0, negationIndex));
+  const hasBoundedSectionScopeConstraint =
+    Boolean(extractExplicitDocsSectionRequest(prompt)) &&
+    /\b(?:do\s+not|don't|dont|avoid)\b[\s\S]{0,140}\b(?:substitute|outside|another\s+section|other\s+sections?|elsewhere)\b/i.test(unquoted);
+  const locateOperationIsActuallyNegated =
+    negatedLocateOperation && !(hasAffirmativeLocateBeforeNegation && hasBoundedSectionScopeConstraint);
+  if (locatePrompt ? locateOperationIsActuallyNegated : hasNegatedToolInstruction(prompt, DOCS_CONTENT_OPERATION_PATTERN)) {
+    return false;
+  }
+  if (
+    /\b(?:future|later|eventually|hypothetically|not\s+now)\b[\s\S]{0,180}\b(?:open|read|find|locate|search|summari[sz]e|summary|explain|describe)\b/i.test(unquoted) ||
+    /\b(?:before|after|if|when)\b[\s\S]{0,140}\b(?:open|read|find|locate|search|summari[sz]e|summary|explain|describe)\b/i.test(unquoted) ||
+    /\b(?:previously|earlier|historically|last\s+time)\b[\s\S]{0,180}\b(?:open|read|find|locate|search|summari[sz]e|summary|explain|describe)\b/i.test(unquoted) ||
+    /\b(?:screen|page|button|label|ui|text|sentence|phrase)\b[\s\S]{0,120}\b(?:says|shows|reads|contains|mentions|is\s+labeled)\b/i.test(unquoted)
+  ) return false;
+  return true;
+};
+
 export const buildActiveDocsContextWorkstationGatewayCallRequests = (
   body: Record<string, unknown>,
 ): Record<string, unknown>[] => {
   const prompt = readPrompt(body);
-  if (!prompt || !isActiveDocsViewerDeicticPrompt(prompt)) return [];
+  if (!prompt) return [];
+  const deicticPrompt = isActiveDocsViewerDeicticPrompt(prompt);
+  const explicitPathSummaryPrompt = isImmediateExplicitDocsPathSummaryPrompt(prompt);
+  if (!deicticPrompt && !explicitPathSummaryPrompt) return [];
   const workspaceSnapshot = readWorkspaceSnapshot(body);
   const activePanel = readWorkspaceActivePanel(workspaceSnapshot);
-  const activeDocPath = readWorkspaceActiveDocPath(workspaceSnapshot);
+  const explicitDocPath = explicitPathSummaryPrompt
+    ? normalizeDocPath(extractUnquotedDocsMarkdownPaths(prompt)[0])
+    : null;
+  const activeDocPath = explicitDocPath ?? readWorkspaceActiveDocPath(workspaceSnapshot);
   if (!activeDocPath) return [];
   const fileName = activeDocPath.split("/").pop()?.replace(/\.md$/i, "").replace(/[-_]+/g, " ").trim();
-  const query = fileName || activeDocPath;
+  const exactLocateTerms = explicitDocPath ? extractExplicitDocsLocateTerms(prompt) : [];
+  const sectionRequest = explicitDocPath ? extractExplicitDocsSectionRequest(prompt) : null;
+  const query = sectionRequest?.headings.join(" ") ??
+    (exactLocateTerms.length > 0 ? exactLocateTerms.join(" ") : fileName || activeDocPath);
   const derivationSource =
-    activePanel === "docs-viewer"
+    explicitDocPath
+      ? "helix_explicit_doc_path_context"
+      : activePanel === "docs-viewer"
       ? "helix_active_docs_viewer_context"
       : "helix_retained_active_doc_context";
   return [{
@@ -112,6 +164,16 @@ export const buildActiveDocsContextWorkstationGatewayCallRequests = (
     arguments: {
       query,
       paths: [activeDocPath],
+      ...(exactLocateTerms.length > 0 ? { exact_terms: exactLocateTerms, max_hits: 40 } : {}),
+      ...(sectionRequest
+        ? {
+            section_heading: sectionRequest.heading,
+            section_headings: sectionRequest.headings,
+            section_contains_terms: sectionRequest.contains_terms,
+            section_match_unit: sectionRequest.match_unit,
+            max_hits: 40,
+          }
+        : {}),
       source_target_intent: {
         source: derivationSource,
         target_source: "active_doc",
@@ -119,8 +181,9 @@ export const buildActiveDocsContextWorkstationGatewayCallRequests = (
         focused_panel: activePanel,
         active_panel: activePanel,
         active_doc_path: activeDocPath,
-        retained_source_context: activePanel !== "docs-viewer",
-        deictic_prompt: true,
+        retained_source_context: !explicitDocPath && activePanel !== "docs-viewer",
+        deictic_prompt: deicticPrompt,
+        explicit_doc_path: explicitDocPath,
       },
     },
   }];

@@ -82,7 +82,11 @@ export type HelixTerminalAuthority = {
   terminal_text_preview: string;
   authority_origin?:
     | "terminal_presentation"
+    | "repo_code_evidence_answer"
     | "selected_final_answer"
+    | "agent_provider_route_product_materializer"
+    | "workstation_tool_evaluation"
+    | "capability_help_summary"
     | "codex_no_tool_direct_answer"
     | "request_user_input"
     | "typed_failure"

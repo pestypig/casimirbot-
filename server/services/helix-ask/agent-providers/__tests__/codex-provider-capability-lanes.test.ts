@@ -3,8 +3,14 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  buildCodexCompoundSubgoalLedger,
+  classifyCodexProcessFailureForUser,
+  codexRouteAllowsTerminalKind,
   codexProvider,
+  explicitlyExcludesScientificImageContext,
+  extractCodexSemanticRouteProposalCandidate,
   resetScholarlyPdfWorkbenchVolatileMemoryForTest,
+  stripCodexSemanticRouteProposalMarkers,
 } from "../codex-provider";
 
 describe("Codex provider capability lane adapter", () => {
@@ -51,6 +57,179 @@ describe("Codex provider capability lane adapter", () => {
       delete process.env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED;
     } else {
       process.env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED = previousLiveTranslationExternalBackends;
+    }
+  });
+
+  it("does not classify repeated observations from one capability as compound reasoning", () => {
+    const ledger = buildCodexCompoundSubgoalLedger({
+      turnId: "ask:repeated-docs-observations",
+      normalizedArtifacts: [
+        {
+          artifact_id: "ask:repeated-docs-observations:doc:1",
+          capability_key: "docs.search",
+          kind: "doc_location_matches",
+        },
+        {
+          artifact_id: "ask:repeated-docs-observations:doc:2",
+          capability_key: "docs.search",
+          kind: "doc_location_matches",
+        },
+      ],
+      gatewayCallResults: [],
+    });
+
+    expect(ledger).toBeNull();
+  });
+
+  it("does not admit scholarly terminal modes onto a Docs-only committed route", () => {
+    const docsRoute = {
+      committed_ask_route: {
+        canonical_goal: {
+          required_terminal_kind: "doc_evidence_synthesis_answer",
+          allowed_terminal_artifact_kinds: ["doc_evidence_synthesis_answer", "typed_failure"],
+        },
+        terminal_product: {
+          required_terminal_product: "doc_evidence_synthesis_answer",
+          allowed_terminal_artifact_kinds: ["doc_evidence_synthesis_answer", "typed_failure"],
+        },
+      },
+    };
+    const scholarlyRoute = {
+      committed_ask_route: {
+        canonical_goal: {
+          required_terminal_kind: "scholarly_research_answer",
+          allowed_terminal_artifact_kinds: ["scholarly_research_answer", "typed_failure"],
+        },
+      },
+    };
+
+    expect(codexRouteAllowsTerminalKind(
+      docsRoute,
+      "scholarly_metadata_answer",
+      ["scholarly_research_answer"],
+    )).toBe(false);
+    expect(codexRouteAllowsTerminalKind(
+      scholarlyRoute,
+      "scholarly_metadata_answer",
+      ["scholarly_research_answer"],
+    )).toBe(true);
+  });
+
+  it("parses runtime semantic route proposals as non-terminal artifacts and strips marker text", () => {
+    const providerText = [
+      'HELIX_RUNTIME_SEMANTIC_ROUTE_PROPOSAL_JSON:{"proposed_route":"model_only_concept","proposed_tool_family":"model_only","confidence":"high","terminal_eligible":true,"assistant_answer":true,"reason_summary":"plain explanation"}',
+      "The tool identifier is just text here.",
+    ].join("\n");
+
+    const proposal = extractCodexSemanticRouteProposalCandidate(providerText, {
+      turnId: "turn-semantic-proposal-parser",
+      question: "Explain `internet-search.search_web`; do not run it.",
+    });
+
+    expect(proposal).toMatchObject({
+      schema: "helix.runtime_semantic_route_proposal.v1",
+      turn_id: "turn-semantic-proposal-parser",
+      proposal_source: "agent_runtime",
+      proposed_route: "model_only_concept",
+      proposed_tool_family: "model_only",
+      confidence: "high",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(stripCodexSemanticRouteProposalMarkers(providerText)).toBe("The tool identifier is just text here.");
+  });
+
+  it("turns an unsupported Codex model into a concise upgrade failure", () => {
+    const failure = classifyCodexProcessFailureForUser({
+      stdout: "Reading prompt from stdin...",
+      stderr:
+        "ERROR: The 'gpt-5.6-sol' model requires a newer version of Codex. Please upgrade to the latest app or CLI and try again.",
+      exitCode: 1,
+    });
+
+    expect(failure).toEqual({
+      error_code: "codex_cli_upgrade_required",
+      model: "gpt-5.6-sol",
+      text:
+        "Codex runtime could not start because the configured model `gpt-5.6-sol` requires a newer Codex app or CLI. Upgrade Codex, then restart the Helix server.",
+    });
+  });
+
+  it("treats explicitly excluded scientific context as dormant rather than a continuation request", () => {
+    expect(explicitlyExcludesScientificImageContext(
+      "Use only the Moral Graph. Reflect on whether I should apologize after snapping at a coworker. Do not use web, papers, calculator, image, PDF, or prior sidecar context.",
+    )).toBe(true);
+    expect(explicitlyExcludesScientificImageContext(
+      "Reflect the promoted Image Lens equation evidence to the Theory Badge Graph.",
+    )).toBe(false);
+  });
+
+  it("attaches provider semantic route proposals without making them visible terminal text", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    process.env.CODEX_AGENT_FAKE_STDOUT = [
+      'HELIX_RUNTIME_SEMANTIC_ROUTE_PROPOSAL_JSON:{"proposed_route":"model_only_concept","proposed_tool_family":"model_only","confidence":"high","terminal_eligible":true,"assistant_answer":true}',
+      "2 + 2 = 4",
+    ].join("\n");
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-provider-semantic-proposal",
+          question: "Answer normally with no tools: what is 2+2?",
+          route_evidence_authority: {
+            schema: "helix.route_evidence_authority.v1",
+            route_proposal_authority: {
+              route_source_comparison: {
+                schema: "helix.route_source_comparison.v1",
+                codex_semantic_proposal_ref: "turn-codex-provider-semantic-proposal:runtime_semantic_route_proposal:agent_runtime:test",
+                explicit_user_command_refs: ["turn-codex-provider-semantic-proposal:explicit_command"],
+                prompt_derived_policy_fallback_refs: ["turn-codex-provider-semantic-proposal:policy_fallback"],
+                ambient_context_refs: ["turn-codex-provider-semantic-proposal:active_panel"],
+                final_admitted_route_ref: "turn-codex-provider-semantic-proposal:route",
+              },
+            },
+          },
+        },
+      });
+      const proposal = result.runtime_semantic_route_proposal as Record<string, unknown>;
+      const debug = result.debug as Record<string, unknown>;
+
+      expect(result.answer).toBe("2 + 2 = 4");
+      expect(result.answer).not.toContain("HELIX_RUNTIME_SEMANTIC_ROUTE_PROPOSAL_JSON");
+      expect(proposal).toMatchObject({
+        schema: "helix.runtime_semantic_route_proposal.v1",
+        proposal_source: "agent_runtime",
+        proposed_route: "model_only_concept",
+        proposed_tool_family: "model_only",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      });
+      expect(debug.runtime_semantic_route_proposal).toMatchObject({
+        proposal_source: "agent_runtime",
+        terminal_eligible: false,
+      });
+      expect(debug.route_source_comparison).toMatchObject({
+        explicit_user_command_refs: ["turn-codex-provider-semantic-proposal:explicit_command"],
+        prompt_derived_policy_fallback_refs: ["turn-codex-provider-semantic-proposal:policy_fallback"],
+        ambient_context_refs: ["turn-codex-provider-semantic-proposal:active_panel"],
+        final_admitted_route_ref: "turn-codex-provider-semantic-proposal:route",
+      });
+    } finally {
+      if (previousStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      }
+      if (previousExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      }
     }
   });
 
@@ -207,8 +386,10 @@ describe("Codex provider capability lane adapter", () => {
       expect((result as any).action_envelope).toMatchObject({
         schema: "helix.ask.action_envelope.v1",
         source: "codex_workstation_gateway_action_receipts",
+        terminal_eligible: false,
         governance: expect.objectContaining({
           dispatch: "allow",
+          answer_authority: "none",
           terminal_eligible: false,
           assistant_answer: false,
           raw_content_included: false,
@@ -270,6 +451,14 @@ describe("Codex provider capability lane adapter", () => {
         entry?.chosen_capability === "workstation-notes.create_note" ||
         entry?.decision?.chosen_capability === "workstation-notes.create_note"
       )).toBe(true);
+      const gatewayIteration = debug?.agent_step_loop?.iterations?.find((entry: any) =>
+        entry?.chosen_capability === "workstation-notes.create_note"
+      );
+      expect(gatewayIteration).toMatchObject({
+        decision_source: "deterministic_policy",
+        decision_authority: "deterministic_policy",
+        decision_origin: "helix_gateway_admission",
+      });
     } finally {
       if (previousStdout === undefined) {
         delete process.env.CODEX_AGENT_FAKE_STDOUT;
@@ -309,6 +498,7 @@ describe("Codex provider capability lane adapter", () => {
       expect((result as any).action_envelope).toMatchObject({
         schema: "helix.ask.action_envelope.v1",
         source: "codex_workstation_gateway_action_receipts",
+        terminal_eligible: false,
         receipt_capability_ids: expect.arrayContaining(["workstation-notes.create_note"]),
       });
       expect(actions).toEqual(
@@ -4717,6 +4907,10 @@ describe("Codex provider capability lane adapter", () => {
       route: "/ask/turn",
       body: {
         turn_id: "turn-codex-image-lens-named-receipt-evaluation",
+        source_target_intent: {
+          target_source: "visual_capture",
+          requested_outputs: ["image_lens_named_receipt_evaluation"],
+        },
         question: [
           "Do not run scholarly lookup or internet retrieval. Use only the latest Image Lens observation receipt named crop_1.",
           "Evaluate crop_1 as an exact equation row for equation (7).",
@@ -4818,6 +5012,10 @@ describe("Codex provider capability lane adapter", () => {
       route: "/ask/turn",
       body: {
         turn_id: "turn-codex-image-lens-missing-named-receipt-evaluation",
+        source_target_intent: {
+          target_source: "visual_capture",
+          requested_outputs: ["image_lens_named_receipt_evaluation"],
+        },
         question: [
           "Do not run scholarly lookup or internet retrieval. Use only the latest Image Lens observation receipt named crop_1.",
           "Evaluate crop_1 as an exact equation row for equation (7).",

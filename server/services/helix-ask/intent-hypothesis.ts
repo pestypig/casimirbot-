@@ -130,7 +130,7 @@ export function buildHelixIntentHypotheses(input: {
   if (conversationMemoryRecall || promptInterpretation.content_question_detected) kinds.push("content_question");
   if (promptInterpretation.executable_operator_commands.length > 0 || sourceTargetToolCommand) kinds.push("control_command");
   if (promptInterpretation.status_question_detected) kinds.push("status_question");
-  if (!conversationMemoryRecall && (promptInterpretation.debug_or_history_question_detected || promptInterpretation.contextual_tool_mentions.length > 0)) kinds.push("debug_diagnosis");
+  if (!conversationMemoryRecall && promptInterpretation.debug_or_history_question_detected) kinds.push("debug_diagnosis");
   if (promptInterpretation.implementation_question_detected) kinds.push("implementation_question");
   if (procedureSpans.length > 0) kinds.push("procedure_memory_question");
   if (repoSpans.length > 0) kinds.push("repo_evidence_question");

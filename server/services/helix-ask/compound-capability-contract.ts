@@ -402,11 +402,20 @@ const argsHintForSubgoal = (input: {
   if (capability === "scholarly-research.fetch_full_text") {
     return scholarlyFullTextArgs(input.promptText, input.match, input.ordered);
   }
+  if (capability === "scholarly-research.extract_numeric_parameters") {
+    return {
+      text_evidence: boundedPromptArg(),
+      requested_variables: [],
+    };
+  }
   if (capability === "workstation-notes.create" || capability === "workstation-notes.create_note") {
     return workstationNoteCreateArgs(input.promptText, input.match, input.ordered);
   }
   if (capability === "workstation-notes.append_to_note") {
     return workstationNoteArgs(input.promptText, input.match, input.ordered);
+  }
+  if (capability === "text_to_speech.speak_text") {
+    return { text: boundedPromptArg() };
   }
   if (capability === "helix_ask.reflect_theory_context") {
     return {

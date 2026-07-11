@@ -1535,6 +1535,62 @@ const summarizeAgentRuntimeLoopForExport = (value: unknown): Record<string, unkn
   };
 };
 
+const summarizeAgentContinuationStateForExport = (value: unknown): Record<string, unknown> | null => {
+  const record = asRecord(value);
+  if (!record) return null;
+  const observationRefs = asRecord(record.observation_refs);
+  return {
+    schema: readString(record.schema),
+    turn_id: readString(record.turn_id),
+    state_id: readString(record.state_id),
+    sequence: typeof record.sequence === "number" ? record.sequence : null,
+    trigger: readString(record.trigger),
+    goal: record.goal ?? null,
+    observation_refs: observationRefs
+      ? {
+          existing: Array.isArray(observationRefs.existing) ? observationRefs.existing.slice(-12) : [],
+          new: Array.isArray(observationRefs.new) ? observationRefs.new.slice(-12) : [],
+          all: Array.isArray(observationRefs.all) ? observationRefs.all.slice(-20) : [],
+        }
+      : null,
+    missing_requirement_ids: Array.isArray(record.missing_requirement_ids)
+      ? record.missing_requirement_ids.slice(-16)
+      : [],
+    last_attempt: record.last_attempt ?? null,
+    next_admissible_affordances: Array.isArray(record.next_admissible_affordances)
+      ? record.next_admissible_affordances.slice(0, 12)
+      : [],
+    tried_action_fingerprints: Array.isArray(record.tried_action_fingerprints)
+      ? record.tried_action_fingerprints.slice(-16)
+      : [],
+    progress: record.progress ?? null,
+    budget: record.budget ?? null,
+    allowed_decisions: Array.isArray(record.allowed_decisions) ? record.allowed_decisions.slice(0, 6) : [],
+    authority: readString(record.authority),
+    terminal_eligible: record.terminal_eligible === true,
+    assistant_answer: record.assistant_answer === true,
+  };
+};
+
+const summarizeTerminalRejectionObservationForExport = (value: unknown): Record<string, unknown> | null => {
+  const record = asRecord(value);
+  if (!record) return null;
+  return {
+    schema: readString(record.schema),
+    turn_id: readString(record.turn_id),
+    observation_id: readString(record.observation_id),
+    rejected_candidate_kind: readString(record.rejected_candidate_kind),
+    rejected_candidate_ref: readString(record.rejected_candidate_ref),
+    rejection_reason: readString(record.rejection_reason),
+    recoverable: record.recoverable === true,
+    failure_class: readString(record.failure_class),
+    retryability: readString(record.retryability),
+    next_affordances: Array.isArray(record.next_affordances) ? record.next_affordances.slice(0, 6) : [],
+    terminal_eligible: record.terminal_eligible === true,
+    assistant_answer: record.assistant_answer === true,
+  };
+};
+
 const copyRailCriticalDebugFields = (
   target: Record<string, unknown>,
   source: Record<string, unknown>,
@@ -1555,6 +1611,10 @@ const copyRailCriticalDebugFields = (
     "goal_satisfaction_evaluation",
     "post_tool_authority_bridge",
     "ask_turn_solver_trace",
+    "ask_turn_procedure_trace",
+    "workspace_action_client_ack",
+    "client_receipt_terminal",
+    "client_receipt_terminal_authority",
     "solver_controller_decision",
     "solver_controller_summary",
     "agent_step_decision",
@@ -1563,6 +1623,9 @@ const copyRailCriticalDebugFields = (
     "language_model_policy",
     "language_model_debug_summary",
     "model_policy_debug_summary",
+    "agent_continuation_state",
+    "agent_continuation_states",
+    "terminal_rejection_observations",
   ].forEach((key) => assign(key, source[key] ?? debug?.[key]));
   const ledger = source.current_turn_artifact_ledger ?? debug?.current_turn_artifact_ledger;
   if (Array.isArray(ledger)) target.current_turn_artifact_ledger = summarizeDebugArtifactsForExport(ledger);
@@ -2972,6 +3035,37 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
   const agentRuntimeLoop =
     asRecord(payload.agent_runtime_loop ?? debug?.agent_runtime_loop ?? agentLoop?.agent_runtime_loop) ??
     findLedgerPayload(ledger, "agent_runtime_loop");
+  const continuationStateHistorySource = Array.isArray(payload.agent_continuation_states)
+    ? payload.agent_continuation_states
+    : Array.isArray(debug?.agent_continuation_states)
+      ? debug.agent_continuation_states
+      : Array.isArray(agentLoop?.agent_continuation_states)
+        ? agentLoop.agent_continuation_states
+        : collectLedgerPayloads(ledger, (artifact) => artifact.kind === "agent_continuation_state");
+  const agentContinuationStates = continuationStateHistorySource
+    .slice(-8)
+    .map(summarizeAgentContinuationStateForExport)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const agentContinuationState =
+    summarizeAgentContinuationStateForExport(
+      payload.agent_continuation_state ??
+        debug?.agent_continuation_state ??
+        agentLoop?.agent_continuation_state ??
+        findLedgerPayload(ledger, "agent_continuation_state"),
+    ) ??
+    agentContinuationStates.at(-1) ??
+    null;
+  const terminalRejectionHistorySource = Array.isArray(payload.terminal_rejection_observations)
+    ? payload.terminal_rejection_observations
+    : Array.isArray(debug?.terminal_rejection_observations)
+      ? debug.terminal_rejection_observations
+      : Array.isArray(agentLoop?.terminal_rejection_observations)
+        ? agentLoop.terminal_rejection_observations
+        : collectLedgerPayloads(ledger, (artifact) => artifact.kind === "terminal_rejection_observation");
+  const terminalRejectionObservations = terminalRejectionHistorySource
+    .slice(-8)
+    .map(summarizeTerminalRejectionObservationForExport)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
   const agentRuntimeLoopAdmission =
     asRecord(payload.agent_runtime_loop_admission ?? debug?.agent_runtime_loop_admission ?? agentLoop?.agent_runtime_loop_admission) ??
     findLedgerPayload(ledger, "agent_runtime_loop_admission");
@@ -3736,6 +3830,9 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     },
     solver_controller_summary: buildSolverControllerSummary(payload),
     canonical_goal_frame: canonicalGoalFrame,
+    agent_continuation_state: agentContinuationState,
+    agent_continuation_states: agentContinuationStates,
+    terminal_rejection_observations: terminalRejectionObservations,
     available_capabilities: availableCapabilities,
     agent_step_decision: agentStepDecision,
     observation_review: observationReview,
@@ -3751,6 +3848,11 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       debug?.ask_turn_solver_trace ??
       agentLoop?.ask_turn_solver_trace ??
       null,
+    ask_turn_procedure_trace:
+      payload.ask_turn_procedure_trace ??
+      debug?.ask_turn_procedure_trace ??
+      agentLoop?.ask_turn_procedure_trace ??
+      null,
     agent_runtime: agentRuntime,
     agent_runtime_selection_trace: agentRuntimeSelectionTrace,
     selected_agent_provider: selectedAgentProvider,
@@ -3762,6 +3864,9 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       language_model_policy: languageModelPolicy,
       language_model_debug_summary: languageModelDebugSummary,
       model_policy_debug_summary: modelPolicyDebugSummary,
+      agent_continuation_state: agentContinuationState,
+      agent_continuation_states: agentContinuationStates,
+      terminal_rejection_observations: terminalRejectionObservations,
     },
     provider_gateway_debug_summary: providerGatewayDebugSummary,
     workstation_gateway_manifest: workstationGatewayManifest,
@@ -3833,6 +3938,8 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       payload.workspace_action_client_ack ?? debug?.workspace_action_client_ack ?? null,
     client_receipt_terminal:
       payload.client_receipt_terminal ?? debug?.client_receipt_terminal ?? null,
+    client_receipt_terminal_authority:
+      payload.client_receipt_terminal_authority ?? debug?.client_receipt_terminal_authority ?? null,
     turn_transcript_events: Array.isArray(turnTranscriptEvents) ? turnTranscriptEvents : [],
     provider_terminal_candidate: providerTerminalCandidate,
     provider_reasoning_reentry: providerReasoningReentry,

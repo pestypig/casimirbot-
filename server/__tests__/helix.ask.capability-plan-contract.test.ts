@@ -1738,8 +1738,8 @@ describe("Helix capability plan contract", () => {
       capability_family: "docs",
       source_target: "docs_viewer",
       requested_capability: "docs-viewer.locate_in_doc",
-      requested_action: "docs-viewer.locate_in_doc",
-      selected_capability: "docs-viewer.locate_in_doc",
+      requested_action: "docs.search",
+      selected_capability: "docs.search",
       goal_kind: "locate_in_doc",
       required_terminal_kind: "doc_location_matches",
     });
@@ -1766,8 +1766,8 @@ describe("Helix capability plan contract", () => {
       capability_family: "docs",
       source_target: "docs_viewer",
       requested_capability: "docs-viewer.locate_in_doc",
-      requested_action: "docs-viewer.locate_in_doc",
-      selected_capability: "docs-viewer.locate_in_doc",
+      requested_action: "docs.search",
+      selected_capability: "docs.search",
       goal_kind: "locate_in_doc",
       required_terminal_kind: "doc_location_matches",
     });

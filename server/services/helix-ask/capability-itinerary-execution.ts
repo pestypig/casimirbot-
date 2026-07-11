@@ -755,7 +755,7 @@ export const isHelixCapabilityItineraryFamilyObserved = (
   }
   if (family === "capability_catalog") {
     return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>
-      /capability_registry|capability_help_summary/i.test([
+      /capability_registry|capability_help_summary|agent_runtime_loop|debug_evidence_diagnosis/i.test([
         artifactKind(artifact),
         artifactSchema(artifact),
         artifactId(artifact),

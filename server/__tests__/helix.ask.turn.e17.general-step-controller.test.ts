@@ -294,6 +294,35 @@ describe("helix ask turn e17 general step controller", () => {
     expect(response.body?.solver_controller_decision?.decision).toBe("allow_terminal");
   }, 45000);
 
+  it("answers scholarly parseability and Image Lens workflow questions through capability help", async () => {
+    const app = await createApp();
+    const sessionId = `e17-capability-scholarly-workflow-${Date.now()}`;
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question:
+          "Does your tool for research papers allow you to pick papers you are able to parse? Or do you check what papers are openable to then use Image Lens?",
+        mode: "read",
+        sessionId,
+        workspace_context_snapshot: baseWorkspace(sessionId),
+      })
+      .expect(200);
+
+    const text = answerText(response.body);
+    expect(text).toContain("scholarly-research.lookup_papers");
+    expect(text).toContain("scholarly-research.fetch_full_text");
+    expect(text).toContain("does not assume every candidate is parseable");
+    expect(text).toContain("Image Lens");
+    expect(text).toContain("should not become answer evidence");
+    expect(response.body?.dispatch_policy).toBe("conversation_only");
+    expect(response.body?.workspace_action).toBeNull();
+    expect(response.body?.terminal_artifact_kind).toBe("capability_help_summary");
+    expect(response.body?.final_answer_source).toBe("capability_help_summary");
+    expect(response.body?.final_answer_contract_pass).toBe(true);
+    expect(response.body?.solver_controller_decision?.decision).toBe("allow_terminal");
+  }, 45000);
+
   it("preserves active document identity routing", async () => {
     const app = await createApp();
     const sessionId = `e17-doc-identity-${Date.now()}`;

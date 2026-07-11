@@ -1,5 +1,6 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
 import { HELIX_SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA } from "../../../../../shared/helix-scholarly-research-observation";
+import { isAskTurnCapabilityHelpIntent } from "../../capability-catalog-intent";
 import { buildGoldenPathCapabilitySuccessPayload } from "../capability-success";
 import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-failure";
 import {
@@ -25,7 +26,9 @@ export type HelixAskGoldenPathScholarlyResearchDependencies = {
 
 export const isHelixAskGoldenPathScholarlyResearchRequested = (body: RecordLike): boolean => {
   if (isHelixAskGoldenPathCapabilityNamedInRequest(body, [HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY])) return true;
-  const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
+  const rawPrompt = readHelixAskGoldenPathPrompt(body);
+  if (isAskTurnCapabilityHelpIntent(rawPrompt)) return false;
+  const prompt = rawPrompt.toLowerCase();
   return (
     /\b(?:scholarly\s+research|scholarly\s+papers?|research\s+papers?|paper\s+metadata|papers?\s+for\s+corroboration|corroborat(?:e|ion)|peer[-\s]?reviewed|literature|preprints?|arxiv|crossref|openalex|semantic\s+scholar)\b/.test(prompt)
   );

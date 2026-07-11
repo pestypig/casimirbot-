@@ -27,6 +27,19 @@ const packet: HelixModelTurnPacket = {
     require_model_authored_terminal: true,
     deterministic_fallback_terminal_allowed: false,
   },
+  committed_ask_route: {
+    schema: "helix.committed_ask_route.v1",
+    turn_id: "turn-tool-1",
+    route: { source_target: "calculator_stream" },
+    canonical_goal: {
+      goal_kind: "calculator_solve",
+      required_terminal_kind: "final_answer_draft",
+    },
+    capability_policy: {
+      allowed_tool_families: ["scientific_calculator"],
+      suppressed_tool_families: [],
+    },
+  } as HelixModelTurnPacket["committed_ask_route"],
   assistant_answer: false,
   raw_content_included: false,
 };
@@ -98,7 +111,22 @@ describe("Helix Ask model turn tool continuation", () => {
 
   it("keeps tool observations non-terminal when follow-up model turn fails", async () => {
     const result = await runHelixModelTurnToolContinuation({
-      packet,
+      packet: {
+        ...packet,
+        committed_ask_route: {
+          schema: "helix.committed_ask_route.v1",
+          turn_id: "turn-tool-1",
+          route: { source_target: "repo_code" },
+          canonical_goal: {
+            goal_kind: "repo_evidence_question",
+            required_terminal_kind: "final_answer_draft",
+          },
+          capability_policy: {
+            allowed_tool_families: ["repo_code"],
+            suppressed_tool_families: [],
+          },
+        } as HelixModelTurnPacket["committed_ask_route"],
+      },
       payload: {},
       testResponseOverrides: [
         {
@@ -124,5 +152,95 @@ describe("Helix Ask model turn tool continuation", () => {
     expect(result.payload.final_answer_draft).toBeUndefined();
     expect(result.observation_artifacts[0].payload.terminal_eligible).toBe(false);
     expect(result.observation_artifacts[0].payload.post_tool_model_step_required).toBe(true);
+  });
+
+  it("blocks a runtime-authored docs request outside a committed Theory-only route", async () => {
+    const executed: string[] = [];
+    const theoryPacket = {
+      ...packet,
+      turn_id: "turn-theory-route-filter",
+      prompt_text:
+        "Reflect local adaptation through the Theory Badge Graph. Do not use web or paper evidence yet.",
+      committed_ask_route: {
+        schema: "helix.committed_ask_route.v1",
+        turn_id: "turn-theory-route-filter",
+        commit_id: "committed-route:theory-filter",
+        prompt_hash: "test",
+        committed_at_stage: "post_prompt_source_arbitration",
+        prompt_intent: {
+          primary_intent_kind: "general_reasoning",
+          secondary_intent_kinds: [],
+          interpretation_ref: "prompt_interpretation",
+          arbitration_ref: "intent_arbitration",
+        },
+        route: {
+          selected_route: "/ask",
+          source_target: "theory_locator",
+          target_kind: "theory_locator",
+          strength: "hard",
+          source_identity: null,
+          route_reason: "explicit_capability_contract",
+          stale_metadata_policy: "ignore_unless_matches_commit",
+        },
+        canonical_goal: {
+          goal_kind: "theory_locator",
+          required_terminal_kind: "theory_context_reflection_answer",
+          allowed_terminal_artifact_kinds: ["theory_context_reflection_answer"],
+          forbidden_terminal_artifact_kinds: ["tool_receipt"],
+        },
+        capability_policy: {
+          allowed_tool_families: ["workstation_tool_gateway", "theory_locator"],
+          suppressed_tool_families: [],
+          required_capability_families: ["theory_locator"],
+          mutating_families_allowed: false,
+        },
+        suppression: {
+          contextual_tool_mentions: [],
+          negative_constraints: [],
+          suppressed_families: [],
+          firewall_required: true,
+        },
+        terminal_product: {
+          terminal_authority_required: true,
+          evidence_reentry_required: true,
+          followup_reasoning_required: true,
+          required_terminal_product: "theory_context_reflection_answer",
+        },
+        transitions: [],
+        compatibility: {
+          source_goal_capability_terminal_compatible: true,
+          stale_metadata_ignored: false,
+          shortcut_firewall_applied: false,
+          violations: [],
+        },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    } satisfies HelixModelTurnPacket;
+
+    const result = await runHelixModelTurnToolContinuation({
+      packet: theoryPacket,
+      payload: {},
+      testResponseOverrides: [{
+        status: "tool_call_requested",
+        requested_tool_call: {
+          capability_id: "docs.search",
+          args: { query: "nhm2 current status whitepaper" },
+        },
+      }],
+      executeCapability: async (toolCall) => {
+        executed.push(toolCall.capability_id);
+        return { status: "succeeded" };
+      },
+    });
+
+    expect(executed).toEqual([]);
+    expect(result.status).toBe("tool_continuation_blocked");
+    expect(result.payload.committed_route_tool_admission).toMatchObject({
+      capability_id: "docs.search",
+      inferred_family: "docs_viewer",
+      allowed: false,
+      reason: "selected_capability_not_allowed_by_committed_route",
+    });
   });
 });

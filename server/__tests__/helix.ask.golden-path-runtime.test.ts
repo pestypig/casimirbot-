@@ -873,6 +873,20 @@ describe("Helix Ask golden path runtime", () => {
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
 
+  it("does not treat a scholarly tool behavior question as a paper lookup request", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      body: {
+        turn_id: "ask:golden:scholarly-capability-question",
+        prompt:
+          "Does your tool for research papers allow you to pick papers you are able to parse? Or do you check what papers are openable to then use Image Lens?",
+      },
+    });
+
+    expect(decision).toMatchObject({ handled: false });
+  });
+
   it("handles theory reflection as receipt-backed reflection answers", () => {
     process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
 

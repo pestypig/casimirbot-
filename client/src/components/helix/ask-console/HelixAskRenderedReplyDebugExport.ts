@@ -5,6 +5,7 @@ import {
 import { readAgentLoopAuditRecord } from "@/lib/helix/ask-runtime-authority-readers";
 import {
   collectHelixAskLegacyReplyTerminalTranscriptTexts,
+  debugPayloadMatchesHelixAskLegacyRenderedReply,
   extractHelixAskLegacyClickedTurnDebugScope,
   isHelixAskLegacyBackendDebugExportEligibleTurnId,
   isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted,
@@ -119,7 +120,12 @@ export function buildHelixAskReplyScopedDebugExportFromRenderedButton(args: {
     (!rendered.question || normalizedDebugReplyText(rendered.question) === normalizedDebugReplyText(args.reply.question)) &&
     renderedFinalMatchesReply;
   const replyRecord = args.reply as Record<string, unknown>;
-  const replyDebugRecord = renderedMatchesReply ? readAgentLoopAuditRecord(args.reply.debug) : null;
+  const rawReplyDebugRecord = renderedMatchesReply ? readAgentLoopAuditRecord(args.reply.debug) : null;
+  const replyDebugMatchesRenderedReply = Boolean(
+    rawReplyDebugRecord &&
+    debugPayloadMatchesHelixAskLegacyRenderedReply(args.reply, rawReplyDebugRecord),
+  );
+  const replyDebugRecord = replyDebugMatchesRenderedReply ? rawReplyDebugRecord : null;
   const backendTurnScopeTrusted = isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted({
     rendered,
     renderedMatchesReply,
@@ -137,7 +143,7 @@ export function buildHelixAskReplyScopedDebugExportFromRenderedButton(args: {
     (replyResolvedTurnIdTrusted ? replyResolvedTurnId : args.reply.id) ||
     null;
   const clientTurnId = rendered.clientTurnId || args.reply.id || null;
-  const includeReplyDebug = renderedMatchesReply && backendTurnScopeTrusted;
+  const includeReplyDebug = renderedMatchesReply && replyDebugMatchesRenderedReply && backendTurnScopeTrusted;
   const renderedModelPolicyDebugSummary = coerceRenderedDebugText(rendered.modelPolicyDebugSummary).trim();
   const renderedLanguageModelDebugSummary =
     /^AI:\s*/i.test(renderedModelPolicyDebugSummary) ? renderedModelPolicyDebugSummary : null;

@@ -3,6 +3,14 @@ import { HELIX_INTERNET_SEARCH_CAPABILITY } from "@shared/helix-internet-search-
 import { HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY } from "@shared/helix-scholarly-research-observation";
 import { HELIX_WORKSPACE_OS_STATUS_CAPABILITY } from "../workspace-os-status-intent";
 import { WORKSTATION_CONTEXT_FEED_QUERY_CAPABILITIES } from "../workstation-context-feed-query-tool-contracts";
+import {
+  HELIX_DOCS_OPEN_DOC_ALIAS_CAPABILITIES,
+  HELIX_DOCS_OPEN_DOC_CAPABILITY,
+  HELIX_DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY,
+  HELIX_DOCS_READ_VISIBLE_SURFACE_CAPABILITY,
+  HELIX_DOCS_SEARCH_ALIAS_CAPABILITIES,
+  HELIX_DOCS_SEARCH_CAPABILITY,
+} from "../docs-capability-contract";
 
 export { WORKSTATION_CONTEXT_FEED_QUERY_CAPABILITIES } from "../workstation-context-feed-query-tool-contracts";
 
@@ -19,21 +27,13 @@ export const REPO_SEARCH_CAPABILITY = "repo.search" as const;
 export const REPO_SEARCH_ALIAS_CAPABILITIES = [
   "repo-code.search_concept",
 ] as const;
-export const DOCS_SEARCH_CAPABILITY = "docs.search" as const;
-export const DOCS_READ_VISIBLE_SURFACE_CAPABILITY = "docs-viewer.read_visible_surface" as const;
-export const DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY = "docs-viewer.read_active_translation" as const;
-export const DOCS_OPEN_DOC_CAPABILITY = "docs-viewer.open_doc" as const;
+export const DOCS_SEARCH_CAPABILITY = HELIX_DOCS_SEARCH_CAPABILITY;
+export const DOCS_READ_VISIBLE_SURFACE_CAPABILITY = HELIX_DOCS_READ_VISIBLE_SURFACE_CAPABILITY;
+export const DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY = HELIX_DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY;
+export const DOCS_OPEN_DOC_CAPABILITY = HELIX_DOCS_OPEN_DOC_CAPABILITY;
 export const CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY = "scientific-calculator.read_visible_result" as const;
-export const DOCS_SEARCH_ALIAS_CAPABILITIES = [
-  "docs-viewer.search_docs",
-  "docs-viewer.locate_in_doc",
-  "docs-viewer.summarize_doc",
-  "docs-viewer.doc_equation_context",
-] as const;
-export const DOCS_OPEN_DOC_ALIAS_CAPABILITIES = [
-  "docs-viewer.open",
-  "docs-viewer.open_doc_by_path",
-] as const;
+export const DOCS_SEARCH_ALIAS_CAPABILITIES = HELIX_DOCS_SEARCH_ALIAS_CAPABILITIES;
+export const DOCS_OPEN_DOC_ALIAS_CAPABILITIES = HELIX_DOCS_OPEN_DOC_ALIAS_CAPABILITIES;
 export const INTERNET_SEARCH_CAPABILITY = HELIX_INTERNET_SEARCH_CAPABILITY;
 export const INTERNET_SEARCH_ALIAS_CAPABILITIES = [
   "internet_search.web_research",

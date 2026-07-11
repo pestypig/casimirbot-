@@ -1,5 +1,6 @@
 export type HelixTerminalCandidateSource =
   | "final_answer_draft"
+  | "agent_provider_terminal_candidate"
   | "doc_evidence_synthesis_answer"
   | "repo_code_evidence_answer"
   | "compound_evidence_synthesis_answer"
@@ -45,6 +46,8 @@ export type HelixTerminalCandidateSource =
   | "visual_frame_evidence"
   | "image_lens_observation_report"
   | "provider_image_lens_observation_report"
+  | "image_lens_named_receipt_evaluation"
+  | "postulate_runtime_review"
   | "agent_step_observation_packet"
   | "client_projection"
   | "deterministic_receipt_fallback"
@@ -136,7 +139,9 @@ export type HelixTerminalAuthoritySingleWriterRejectionReason =
   | "stale_solver_continuation_superseded_by_docs_terminal"
   | "stale_solver_continuation_superseded_by_scholarly_terminal"
   | "stale_solver_continuation_superseded_by_stage_play_terminal"
-  | "stale_solver_continuation_superseded_by_image_lens_observation_report";
+  | "stale_solver_continuation_superseded_by_image_lens_observation_report"
+  | "stale_solver_continuation_superseded_by_provider_terminal"
+  | "stale_solver_continuation_superseded_by_provider_route_product";
 
 export type TerminalAuthoritySingleWriterAuditRejectionReason =
   | "receipt_not_terminal_eligible"
@@ -183,6 +188,9 @@ export type HelixTerminalAuthoritySingleWriterResult = {
     | "visual_frame_evidence"
     | "image_lens_observation_report"
     | "provider_image_lens_observation_report"
+    | "image_lens_named_receipt_evaluation"
+    | "postulate_runtime_review"
+    | "agent_provider_terminal_candidate"
     | "live_environment_binding_diagnosis"
     | "capability_help_summary"
     | "workspace_directory_resolution"
@@ -228,6 +236,7 @@ export type HelixTerminalAuthoritySingleWriterResult = {
   selected_terminal_source_families?: string[];
   source:
     | "final_answer_draft"
+    | "agent_provider_terminal_candidate"
     | "doc_evidence_synthesis_answer"
     | "repo_code_evidence_answer"
     | "compound_evidence_synthesis_answer"
@@ -241,6 +250,8 @@ export type HelixTerminalAuthoritySingleWriterResult = {
     | "visual_frame_evidence"
     | "image_lens_observation_report"
     | "provider_image_lens_observation_report"
+    | "image_lens_named_receipt_evaluation"
+    | "postulate_runtime_review"
     | "live_environment_binding_diagnosis"
     | "capability_help_summary"
     | "workspace_directory_resolution"
@@ -312,6 +323,7 @@ export type HelixTerminalAuthoritySingleWriterResult = {
     materialized_terminal_artifact_kind?: string | null;
     materialized_terminal_artifact_ref?: string | null;
     materialization_blocked_reason?: string | null;
+    itinerary_observation_criteria_satisfied?: boolean;
     compound_materialized_draft_can_satisfy_terminal?: boolean;
     terminal_projection_kind_match?: boolean;
     terminal_projection_guard_applied?: boolean;

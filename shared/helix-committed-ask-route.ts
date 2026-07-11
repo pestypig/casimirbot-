@@ -112,9 +112,17 @@ export type HelixRouteEvidenceAuthority = {
   schema: "helix.route_evidence_authority.v1";
   turn_id: string;
   route_proposal_authority: {
-    semantic_route_proposal_source: "agent_runtime" | null;
+    semantic_route_proposal_source: "agent_runtime" | "runtime_intent_packet_projection" | null;
+    runtime_semantic_route_proposal_ref: string | null;
     classifier_hints: "hint_only";
     prompt_derived_gateway_requests: "policy_admission_fallback";
+    route_source_comparison: {
+      codex_semantic_proposal_ref: string | null;
+      explicit_user_command_refs: string[];
+      prompt_derived_policy_fallback_refs: string[];
+      ambient_context_refs: string[];
+      final_admitted_route_ref: string | null;
+    };
     boundary: "runtime_decides_steps_helix_validates_admission";
   };
   candidate_tools: HelixRouteEvidenceAuthorityTool[];

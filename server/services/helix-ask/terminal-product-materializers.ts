@@ -19,6 +19,23 @@ export type HelixTerminalProductMaterializerResult = {
   outputRole?: HelixToolOutputRole | null;
 };
 
+export type HelixProviderRouteProductEligibility = {
+  target_kind: string | null;
+  route_allows_target_kind: boolean;
+  provider_authored_target_kind: boolean;
+  provider_bridge_source: "top_level" | "current_turn_artifact" | "none";
+  provider_bridge_authorizes_candidate: boolean;
+  authority_matches_current_turn: boolean;
+  presentation_matches_current_turn: boolean;
+  authority_shape_valid: boolean;
+  presentation_shape_valid: boolean;
+  authority_ref_current_turn_scoped: boolean;
+  usable_text_present: boolean;
+  requested_support_ref_count: number;
+  current_turn_support_ref_count: number;
+  rejection_reason: string | null;
+};
+
 export type HelixPostulateRuntimeReviewTerminal = {
   text: string;
   terminalResult: Record<string, unknown>;
@@ -27,6 +44,18 @@ export type HelixPostulateRuntimeReviewTerminal = {
   debugPatch: Record<string, unknown>;
   artifact: HelixTerminalProductArtifactLike;
 };
+
+const PROVIDER_AUTHORED_ROUTE_PRODUCT_KINDS = new Set([
+  "model_synthesized_answer",
+  "doc_evidence_synthesis_answer",
+  "repo_code_evidence_answer",
+  "compound_evidence_synthesis_answer",
+  "compound_research_locator_answer",
+  "scholarly_research_answer",
+  "internet_search_answer",
+  "theory_context_reflection_answer",
+  "situation_room_live_job_setup_answer",
+]);
 
 const readRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -67,10 +96,129 @@ const artifactKind = (artifact: HelixTerminalProductArtifactLike): string =>
 const artifactId = (artifact: HelixTerminalProductArtifactLike): string | null =>
   readString(artifact.artifact_id) ??
   readString((artifact as Record<string, unknown>).artifact_ref) ??
-  readString(artifactPayload(artifact)?.artifact_id);
+    readString(artifactPayload(artifact)?.artifact_id);
+
+export const inspectAgentProviderRouteProductEligibility = (input: {
+  payload: Record<string, unknown>;
+  artifacts?: HelixTerminalProductArtifactLike[] | null;
+  turnId: string;
+  requiredTerminalKind: string | null | undefined;
+  routeAllowsTerminalKind: (kind: string) => boolean;
+  invalidText?: (text: string) => boolean;
+}): HelixProviderRouteProductEligibility => {
+  const targetKind = readString(input.requiredTerminalKind);
+  const routeAllowsTargetKind = Boolean(targetKind && input.routeAllowsTerminalKind(targetKind));
+  const providerAuthoredTargetKind = Boolean(targetKind && PROVIDER_AUTHORED_ROUTE_PRODUCT_KINDS.has(targetKind));
+  const topLevelAuthority = readRecord(input.payload.terminal_answer_authority);
+  const topLevelPresentation = readRecord(input.payload.terminal_presentation);
+  const persistedProviderBridge = (input.artifacts ?? [])
+    .slice()
+    .reverse()
+    .map((artifact) => ({ artifact, payload: artifactPayload(artifact) }))
+    .find(({ artifact, payload }) =>
+      artifactKind(artifact) === "provider_terminal_authority_bridge" &&
+      readString(payload?.turn_id) === input.turnId,
+    )?.payload ?? null;
+  const topLevelProviderBridge = readRecord(input.payload.provider_terminal_authority_bridge);
+  const providerBridge = topLevelProviderBridge ?? persistedProviderBridge;
+  const bridgeSource: HelixProviderRouteProductEligibility["provider_bridge_source"] = topLevelProviderBridge
+    ? "top_level"
+    : persistedProviderBridge
+      ? "current_turn_artifact"
+      : "none";
+  const bridgeAuthorizesCandidate =
+    readString(providerBridge?.turn_id) === input.turnId &&
+    providerBridge?.terminal_authority_granted === true &&
+    providerBridge?.final_visible_answer_authorized === true;
+  const authority = bridgeAuthorizesCandidate
+    ? readRecord(providerBridge?.terminal_answer_authority) ?? topLevelAuthority
+    : topLevelAuthority;
+  const presentation = bridgeAuthorizesCandidate
+    ? readRecord(providerBridge?.terminal_presentation) ?? topLevelPresentation
+    : topLevelPresentation;
+  const debug = readRecord(input.payload.debug);
+  const candidate =
+    readRecord(input.payload.provider_terminal_candidate) ??
+    readRecord(debug?.provider_terminal_candidate) ??
+    readRecord(providerBridge?.provider_terminal_candidate);
+  const authorityRef =
+    readString(authority?.terminal_item_id) ??
+    readString(authority?.terminal_artifact_ref) ??
+    readString(candidate?.candidate_id);
+  const authorityMatchesCurrentTurn = readString(authority?.turn_id) === input.turnId;
+  const presentationMatchesCurrentTurn = readString(presentation?.turn_id) === input.turnId;
+  const authorityShapeValid =
+    readString(authority?.terminal_kind) === "answer" &&
+    readString(authority?.terminal_artifact_kind) === "agent_provider_terminal_candidate" &&
+    readString(authority?.final_answer_source) === "agent_provider_terminal_candidate" &&
+    authority?.server_authoritative === true;
+  const presentationShapeValid =
+    readString(presentation?.final_answer_source) === "agent_provider_terminal_candidate";
+  const authorityRefCurrentTurnScoped = Boolean(authorityRef?.startsWith(`${input.turnId}:`));
+  const presentationText = readString(presentation?.concise_text);
+  const candidateText = readString(candidate?.candidate_text) ?? readString(candidate?.candidate_text_preview);
+  const text =
+    (presentationText && !input.invalidText?.(presentationText) ? presentationText : null) ??
+    candidateText ??
+    readString(input.payload.selected_final_answer) ??
+    readString(input.payload.answer) ??
+    readString(input.payload.text);
+  const usableTextPresent = Boolean(text && !input.invalidText?.(text));
+  const artifactLedger = input.artifacts ?? [];
+  const currentTurnArtifactRefs = new Set(
+    artifactLedger
+      .filter((artifact) => {
+        const payload = artifactPayload(artifact);
+        const sourceScope = artifactFieldString(artifact, "source_scope");
+        const artifactTurnId = readString(payload?.turn_id);
+        return (
+          !/prior_context|prior_turn_context|prior_artifact/i.test(sourceScope ?? "") &&
+          (!artifactTurnId || artifactTurnId === input.turnId)
+        );
+      })
+      .map(artifactId)
+      .filter((ref): ref is string => Boolean(ref)),
+  );
+  const requestedSupportRefs = uniqueStrings([
+    ...readArray(presentation?.selected_observation_refs).map(readString),
+    ...readArray(candidate?.grounded_in_observation_refs).map(readString),
+    ...readArray(candidate?.normalized_observation_refs).map(readString),
+  ]);
+  const currentTurnSupportRefCount = requestedSupportRefs.filter((ref) => currentTurnArtifactRefs.has(ref)).length;
+  const rejectionReason =
+    !targetKind ? "required_terminal_kind_missing" :
+    !providerAuthoredTargetKind ? "required_terminal_kind_not_provider_authored" :
+    !routeAllowsTargetKind ? "required_terminal_kind_not_route_allowed" :
+    !bridgeAuthorizesCandidate && bridgeSource !== "none" ? "provider_bridge_not_authorized" :
+    !authorityMatchesCurrentTurn ? "authority_turn_mismatch" :
+    !presentationMatchesCurrentTurn ? "presentation_turn_mismatch" :
+    !authorityShapeValid ? "authority_shape_invalid" :
+    !presentationShapeValid ? "presentation_shape_invalid" :
+    !authorityRefCurrentTurnScoped ? "authority_ref_not_current_turn_scoped" :
+    !usableTextPresent ? "authorized_text_missing_or_invalid" :
+    currentTurnSupportRefCount === 0 ? "current_turn_support_refs_missing" :
+    null;
+  return {
+    target_kind: targetKind,
+    route_allows_target_kind: routeAllowsTargetKind,
+    provider_authored_target_kind: providerAuthoredTargetKind,
+    provider_bridge_source: bridgeSource,
+    provider_bridge_authorizes_candidate: bridgeAuthorizesCandidate,
+    authority_matches_current_turn: authorityMatchesCurrentTurn,
+    presentation_matches_current_turn: presentationMatchesCurrentTurn,
+    authority_shape_valid: authorityShapeValid,
+    presentation_shape_valid: presentationShapeValid,
+    authority_ref_current_turn_scoped: authorityRefCurrentTurnScoped,
+    usable_text_present: usableTextPresent,
+    requested_support_ref_count: requestedSupportRefs.length,
+    current_turn_support_ref_count: currentTurnSupportRefCount,
+    rejection_reason: rejectionReason,
+  };
+};
 
 const artifactText = (artifact: HelixTerminalProductArtifactLike): string | null => {
   const payload = artifactPayload(artifact);
+  const record = artifact as Record<string, unknown>;
   return (
     readString(payload?.answer_text) ??
     readString(payload?.text) ??
@@ -78,7 +226,26 @@ const artifactText = (artifact: HelixTerminalProductArtifactLike): string | null
     readString(payload?.result_summary) ??
     readString(payload?.result_text) ??
     readString(payload?.visible_text) ??
-    readString(payload?.message)
+    readString(payload?.message) ??
+    readString(record.answer_text) ??
+    readString(record.text) ??
+    readString(record.summary) ??
+    readString(record.result_summary) ??
+    readString(record.result_text) ??
+    readString(record.visible_text) ??
+    readString(record.message) ??
+    readString(record.text_preview)
+  );
+};
+
+const artifactFieldString = (
+  artifact: HelixTerminalProductArtifactLike,
+  field: string,
+): string | null => {
+  const payload = artifactPayload(artifact);
+  return (
+    readString(payload?.[field]) ??
+    readString((artifact as Record<string, unknown>)[field])
   );
 };
 
@@ -475,6 +642,136 @@ export const materializeAgentProviderTerminalCandidate = (input: {
   };
 };
 
+export const materializeAgentProviderRouteProductTerminal = (input: {
+  payload: Record<string, unknown>;
+  artifacts?: HelixTerminalProductArtifactLike[] | null;
+  turnId: string;
+  requiredTerminalKind: string | null | undefined;
+  routeAllowsTerminalKind: (kind: string) => boolean;
+  invalidText?: (text: string) => boolean;
+}): HelixTerminalProductMaterializerResult | null => {
+  const targetKind = readString(input.requiredTerminalKind);
+  if (
+    !targetKind ||
+    !PROVIDER_AUTHORED_ROUTE_PRODUCT_KINDS.has(targetKind) ||
+    !input.routeAllowsTerminalKind(targetKind)
+  ) {
+    return null;
+  }
+
+  const topLevelAuthority = readRecord(input.payload.terminal_answer_authority);
+  const topLevelPresentation = readRecord(input.payload.terminal_presentation);
+  const persistedProviderBridge = (input.artifacts ?? [])
+    .slice()
+    .reverse()
+    .map((artifact) => ({ artifact, payload: artifactPayload(artifact) }))
+    .find(({ artifact, payload }) =>
+      artifactKind(artifact) === "provider_terminal_authority_bridge" &&
+      readString(payload?.turn_id) === input.turnId,
+    )?.payload ?? null;
+  const providerBridge =
+    readRecord(input.payload.provider_terminal_authority_bridge) ??
+    persistedProviderBridge;
+  const bridgeAuthority = readRecord(providerBridge?.terminal_answer_authority);
+  const bridgePresentation = readRecord(providerBridge?.terminal_presentation);
+  // A later writer pass can replace mutable top-level fields with a typed
+  // failure. A matching bridge is retained only when it explicitly records a
+  // current-turn provider authorization.
+  const bridgeAuthorizesCandidate =
+    readString(providerBridge?.turn_id) === input.turnId &&
+    providerBridge?.terminal_authority_granted === true &&
+    providerBridge?.final_visible_answer_authorized === true;
+  const authority = bridgeAuthorizesCandidate ? bridgeAuthority ?? topLevelAuthority : topLevelAuthority;
+  const presentation = bridgeAuthorizesCandidate ? bridgePresentation ?? topLevelPresentation : topLevelPresentation;
+  const debug = readRecord(input.payload.debug);
+  const candidate =
+    readRecord(input.payload.provider_terminal_candidate) ??
+    readRecord(debug?.provider_terminal_candidate) ??
+    readRecord(providerBridge?.provider_terminal_candidate);
+  const authorityRef =
+    readString(authority?.terminal_item_id) ??
+    readString(authority?.terminal_artifact_ref) ??
+    readString(candidate?.candidate_id);
+  if (
+    readString(authority?.turn_id) !== input.turnId ||
+    readString(presentation?.turn_id) !== input.turnId ||
+    readString(authority?.terminal_kind) !== "answer" ||
+    readString(authority?.terminal_artifact_kind) !== "agent_provider_terminal_candidate" ||
+    readString(authority?.final_answer_source) !== "agent_provider_terminal_candidate" ||
+    readString(presentation?.final_answer_source) !== "agent_provider_terminal_candidate" ||
+    authority?.server_authoritative !== true ||
+    !authorityRef?.startsWith(`${input.turnId}:`)
+  ) {
+    return null;
+  }
+
+  const presentationText = readString(presentation?.concise_text);
+  const candidateText =
+    readString(candidate?.candidate_text) ??
+    readString(candidate?.candidate_text_preview);
+  const text =
+    (presentationText && !input.invalidText?.(presentationText) ? presentationText : null) ??
+    candidateText ??
+    readString(input.payload.selected_final_answer) ??
+    readString(input.payload.answer) ??
+    readString(input.payload.text);
+  if (!text || input.invalidText?.(text)) return null;
+
+  const artifactLedger = input.artifacts ?? [];
+  const currentTurnArtifactRefs = new Set(
+    artifactLedger
+      .filter((artifact) => {
+        const payload = artifactPayload(artifact);
+        const sourceScope = artifactFieldString(artifact, "source_scope");
+        const artifactTurnId = readString(payload?.turn_id);
+        return (
+          !/prior_context|prior_turn_context|prior_artifact/i.test(sourceScope ?? "") &&
+          (!artifactTurnId || artifactTurnId === input.turnId)
+        );
+      })
+      .map(artifactId)
+      .filter((ref): ref is string => Boolean(ref)),
+  );
+  const requestedSupportRefs = uniqueStrings([
+    ...readArray(presentation?.selected_observation_refs).map(readString),
+    ...readArray(candidate?.grounded_in_observation_refs).map(readString),
+    ...readArray(candidate?.normalized_observation_refs).map(readString),
+  ]);
+  const supportRefs = requestedSupportRefs.filter((ref) => currentTurnArtifactRefs.has(ref));
+  if (supportRefs.length === 0) return null;
+
+  const rejectedSupportRefs = requestedSupportRefs.filter((ref) => !currentTurnArtifactRefs.has(ref));
+  const artifactRef = `${authorityRef}:route_product:${targetKind}`;
+  const artifactPayloadRecord = {
+    schema: "helix.provider_route_product.v1",
+    artifact_id: artifactRef,
+    turn_id: input.turnId,
+    kind: targetKind,
+    terminal_artifact_kind: targetKind,
+    answer_text: text,
+    text,
+    support_refs: supportRefs,
+    selected_observation_refs: supportRefs,
+    provider_terminal_candidate_ref: authorityRef,
+    provider_terminal_candidate_kind: "agent_provider_terminal_candidate",
+    terminal_eligible: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  return {
+    kind: targetKind,
+    text,
+    ref: artifactRef,
+    supportRefs,
+    rejectedSupportRefs,
+    artifact: {
+      artifact_id: artifactRef,
+      kind: targetKind,
+      payload: artifactPayloadRecord,
+    },
+  };
+};
+
 const readSuccessfulCalculatorReceiptArtifact = (
   artifacts: HelixTerminalProductArtifactLike[] | null | undefined,
 ): {
@@ -618,20 +915,53 @@ export const materializeTheoryContextReflectionTerminal = (input: {
   const receipt = [...artifacts].reverse().find((artifact) =>
     artifactKind(artifact) === "helix_theory_context_reflection_tool_receipt"
   );
-  const evaluation = [...artifacts].reverse().find((artifact) =>
-    artifactKind(artifact) === "workstation_tool_evaluation" &&
-    /theory_context_reflection|reflect_theory_context|supports_subgoal/i.test(JSON.stringify(artifactPayload(artifact) ?? {}))
-  );
-  if (!receipt || !evaluation) return null;
+  const supportObservation = [...artifacts].reverse().find((artifact) => {
+    const kind = artifactKind(artifact);
+    const payload = artifactPayload(artifact);
+    const topLevel = artifact as Record<string, unknown>;
+    const haystack = [
+      kind,
+      artifactFieldString(artifact, "schema"),
+      artifactFieldString(artifact, "payload_schema"),
+      artifactFieldString(artifact, "capability_id"),
+      artifactFieldString(artifact, "capability_key"),
+      artifactFieldString(artifact, "requested_capability"),
+      artifactFieldString(artifact, "selected_capability"),
+      artifactFieldString(artifact, "tool_name"),
+      artifactFieldString(artifact, "action"),
+      readString(payload?.observation_kind),
+      readString(readRecord(payload?.observation)?.kind),
+      readString(readRecord(payload?.observation)?.capability_key),
+      readString(readRecord(payload?.observation)?.capability_id),
+      readString(topLevel.observation_kind),
+      readString(readRecord(topLevel.observation)?.kind),
+      readString(readRecord(topLevel.observation)?.capability_key),
+      readString(readRecord(topLevel.observation)?.capability_id),
+      JSON.stringify(payload ?? {}),
+    ].filter(Boolean).join(" ");
+    if (
+      kind === "workstation_tool_evaluation" &&
+      /theory_context_reflection|reflect_theory_context|supports_subgoal|theory-badge-graph\.reflect_discussion_context/i.test(haystack)
+    ) {
+      return true;
+    }
+    return (
+      kind === "provider_gateway_observation_packet" &&
+      /theory-badge-graph\.reflect_discussion_context|helix_theory_context_reflection_tool_receipt|theory_context_reflection/i.test(haystack)
+    );
+  });
+  if (!receipt || !supportObservation) return null;
 
   const receiptRef = artifactId(receipt);
-  const evaluationRef = artifactId(evaluation) ?? readString(artifactPayload(evaluation)?.evaluation_id);
-  const supportRefs = uniqueStrings([receiptRef, evaluationRef]);
+  const supportObservationRef =
+    artifactId(supportObservation) ??
+    readString(artifactPayload(supportObservation)?.evaluation_id);
+  const supportRefs = uniqueStrings([receiptRef, supportObservationRef]);
   if (supportRefs.length < 2) return null;
 
   const text = input.synthesizeText({
     prompt: input.prompt ?? null,
-    evaluationSummary: artifactText(evaluation),
+    evaluationSummary: artifactText(supportObservation),
     receiptText: artifactText(receipt),
     scientificGuard: input.scientificGuard ?? null,
   });

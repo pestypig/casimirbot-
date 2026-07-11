@@ -20,4 +20,21 @@ describe("Helix Ask solver-controller payload adapter extraction boundary", () =
     expect(serviceSource).not.toContain("../../routes/agi.plan");
     expect(serviceSource).not.toContain("../routes/agi.plan");
   });
+
+  it("keeps note receipts observation-only until a current-turn terminal writer is authorized", () => {
+    const serviceSource = readFileSync(servicePath, "utf8");
+
+    expect(serviceSource).toContain("noteReceiptHasAuthorizedTerminalWriter");
+    expect(serviceSource).toContain("note_receipt_requires_runtime_terminal_writer");
+    expect(serviceSource).toContain("post_tool_model_step_required: true");
+    expect(serviceSource).toMatch(
+      /readAskTurnString\(terminalWriterForController\?\.turn_id\) === input\.turnId/,
+    );
+    expect(serviceSource).toMatch(
+      /readAskTurnString\(terminalAuthorityForController\?\.turn_id\) === input\.turnId/,
+    );
+    expect(serviceSource).toMatch(
+      /terminalAuthorityForController\?\.server_authoritative === true/,
+    );
+  });
 });

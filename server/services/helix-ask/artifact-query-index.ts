@@ -1490,6 +1490,21 @@ const buildToolTurnChainAudit = (input: {
       normalizedEqual(authorityTerminal, "agent_provider_terminal_candidate") &&
       visibleTerminalProjection.proven,
   );
+  const providerRouteProductMaterialization = readRecord(input.payload.provider_route_product_materialization);
+  const providerRouteProductReenteredObservation = Boolean(
+    observationRef &&
+      supportCount > 0 &&
+      readString(providerRouteProductMaterialization?.status) === "materialized" &&
+      normalizedEqual(
+        readString(providerRouteProductMaterialization?.materialized_terminal_artifact_kind),
+        materializedTerminal,
+      ) &&
+      readStringArray(providerRouteProductMaterialization?.selected_observation_refs).length > 0 &&
+      authorityTerminalEvidence.proven &&
+      visibleTerminalProjection.proven &&
+      normalizedEqual(authorityTerminal, materializedTerminal) &&
+      normalizedEqual(visibleTerminal, materializedTerminal),
+  );
   const reentryProofSource =
     readString(input.lifecycleTrace?.lifecycle_stage) === "reentered_solver"
       ? "tool_lifecycle_trace.lifecycle_stage"
@@ -1501,6 +1516,8 @@ const buildToolTurnChainAudit = (input: {
             ? "capability_help_summary_materialized_from_catalog_observation"
             : agentProviderTerminalReenteredObservation
               ? "agent_provider_terminal_candidate_with_support_refs"
+              : providerRouteProductReenteredObservation
+                ? "provider_route_product_materialization_with_support_refs"
           : observationRef && supportCount > 0 && finalDraftRef
             ? "final_answer_draft_with_support_refs"
             : null;

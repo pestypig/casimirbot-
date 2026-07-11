@@ -97,6 +97,8 @@ describe("AGI Realtime session route boundary", () => {
 
   afterEach(() => {
     setOpenAiRealtimeContractTransportForTests(null);
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("locks no-session and user accounts out of Realtime runtime controls", async () => {
@@ -537,6 +539,7 @@ describe("AGI Realtime session route boundary", () => {
         runtimeAgentMode: "live_voice",
         runtimeAgentAuthority: "suggest_actions",
         clientReceiptRefs: ["receipt:visible-consent:route"],
+        voice: null,
       });
       expect(response.body).toMatchObject({
         ok: true,
@@ -583,6 +586,105 @@ describe("AGI Realtime session route boundary", () => {
       const serialized = JSON.stringify(response.body);
       expect(serialized).not.toContain("route-server-key-must-not-leak");
       expect(serialized).not.toContain("route-ephemeral-secret-must-not-debug");
+      expect(serialized).not.toContain("OPENAI_API_KEY");
+      expect(serialized).not.toContain("v=0");
+    } finally {
+      if (previousDescriptor === undefined) delete process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED;
+      else process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED = previousDescriptor;
+      if (previousAdapter === undefined) delete process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED;
+      else process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED = previousAdapter;
+      if (previousTransport === undefined) delete process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED;
+      else process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED = previousTransport;
+      if (previousContract === undefined) delete process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED;
+      else process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED = previousContract;
+      if (previousKey === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = previousKey;
+    }
+  });
+
+  it("uses the default OpenAI client_secrets transport through mocked fetch without leaking secrets", async () => {
+    const previousDescriptor = process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED;
+    const previousAdapter = process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED;
+    const previousTransport = process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED;
+    const previousContract = process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED;
+    const previousKey = process.env.OPENAI_API_KEY;
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        id: "sess_route_default",
+        value: "route-default-ephemeral-secret",
+        expires_at_ms: 1783551100000,
+        raw_provider_response: "raw-provider-json-must-not-export",
+      }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED = "1";
+    process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED = "1";
+    process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED = "1";
+    process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED = "1";
+    process.env.OPENAI_API_KEY = "route-default-server-key-must-not-leak";
+    try {
+      const agent = await createDeveloperAgent();
+      const response = await agent
+        .post("/api/agi/realtime/session")
+        .send({
+          runtime_agent_mode: "live_voice",
+          runtime_agent_authority: "suggest_actions",
+          transport: "webrtc",
+          selected_realtime_voice: "marin",
+          visible_user_consent_receipt: "receipt:visible-consent:route-default",
+        })
+        .expect(200);
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe("https://api.openai.com/v1/realtime/client_secrets");
+      expect(init).toMatchObject({
+        method: "POST",
+        headers: {
+          Authorization: "Bearer route-default-server-key-must-not-leak",
+          "Content-Type": "application/json",
+        },
+      });
+      expect(JSON.parse(String(init?.body))).toEqual({
+        session: {
+          type: "realtime",
+          model: "gpt-realtime-2.1",
+          audio: {
+            output: {
+              voice: "marin",
+            },
+          },
+        },
+      });
+      expect(response.body).toMatchObject({
+        ok: true,
+        client_secret_requested: true,
+        client_secret_issued: true,
+        provider_session_ref: "sess_route_default",
+        openai_network_call_attempted: true,
+        ephemeral_credential_minted: true,
+        transport_plan: expect.objectContaining({
+          adapter_id: "openai_realtime",
+          adapter_state: "contract_ready",
+          provider_session_ref: "sess_route_default",
+          ephemeral_client_secret_expires_at_ms: 1783551100000,
+        }),
+        realtime_runtime_session_summary: expect.objectContaining({
+          live_session_admission_status: "openai_realtime_contract_ready",
+          provider_session_ref: "sess_route_default",
+          openai_network_call_attempted: true,
+          ephemeral_client_secret_expires_at_ms: 1783551100000,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        }),
+      });
+      const serialized = JSON.stringify(response.body);
+      expect(serialized).not.toContain("route-default-server-key-must-not-leak");
+      expect(serialized).not.toContain("route-default-ephemeral-secret");
+      expect(serialized).not.toContain("raw-provider-json-must-not-export");
       expect(serialized).not.toContain("OPENAI_API_KEY");
       expect(serialized).not.toContain("v=0");
     } finally {

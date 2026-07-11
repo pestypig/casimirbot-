@@ -131,7 +131,11 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
   switch (capability) {
     case "helix_ask.inspect_capability_catalog":
     case "helix_ask.reflect_workstation_tool_alignment":
+    case "runtime_evidence":
+    case "debug.inspect_current_turn":
       return "capability_help";
+    case "live_pipeline":
+      return "live_pipeline_control";
     case "scientific-calculator.solve_expression":
     case "scientific-calculator.solve_with_steps":
     case "scientific-calculator.solve":
@@ -168,6 +172,8 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
       return "scholarly_research_lookup";
     case "scholarly-research.fetch_full_text":
       return "scholarly_full_text_lookup";
+    case "scholarly-research.extract_numeric_parameters":
+      return "scholarly_numeric_parameter_extraction";
     case "live_env.check_live_source_mail":
     case "live_env.read_live_source_mail":
     case "live_env.read_processed_live_source_mail":
@@ -183,6 +189,8 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
     case "live_env.record_live_source_mail_decision":
     case "live_env.request_interim_voice_callout":
       return "processed_mail_voice_decision";
+    case "text_to_speech.speak_text":
+      return "voice_delivery";
     case "visual_analysis.inspect_image_region":
       return "image_lens_region_inspection";
     case "image_lens.inspect":
@@ -196,8 +204,11 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
     case "helix_ask.reflect_live_synthetic_data":
     case "helix_ask.reflect_context_attachments":
       return "context_attachment_reflection";
+    case "moral-graph.reflect_context":
     case "helix_ask.reflect_ideology_context":
       return "moral_graph_reflection";
+    case "moral-graph.reflect_living_substrate_context":
+      return "moral_living_substrate_reflection";
     case "helix_ask.bridge_theory_ideology_context":
       return "theory_ideology_bridge_reflection";
     case "helix_ask.build_civilization_scenario_frame":
@@ -219,7 +230,11 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
   switch (capability) {
     case "helix_ask.inspect_capability_catalog":
     case "helix_ask.reflect_workstation_tool_alignment":
+    case "runtime_evidence":
+    case "debug.inspect_current_turn":
       return "runtime_evidence";
+    case "live_pipeline":
+      return "live_environment_state";
     case "scientific-calculator.solve_expression":
     case "scientific-calculator.solve_with_steps":
     case "scientific-calculator.solve":
@@ -244,6 +259,7 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
       return "external_internet_search";
     case "scholarly-research.lookup_papers":
     case "scholarly-research.fetch_full_text":
+    case "scholarly-research.extract_numeric_parameters":
       return "external_scholarly_research";
     case "live_env.check_live_source_mail":
     case "live_env.read_live_source_mail":
@@ -259,6 +275,7 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
     case "live_env.summarize_live_source_current_state":
       return "live_source_mail";
     case "live_env.request_interim_voice_callout":
+    case "text_to_speech.speak_text":
       return "live_environment_state";
     case "visual_analysis.inspect_image_region":
       return "visual_capture";
@@ -272,9 +289,12 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
     case "helix_ask.reflect_live_synthetic_data":
     case "helix_ask.reflect_context_attachments":
       return "context_reflection";
+    case "moral-graph.reflect_context":
     case "helix_ask.reflect_ideology_context":
     case "helix_ask.bridge_theory_ideology_context":
       return "moral_graph_reflection";
+    case "moral-graph.reflect_living_substrate_context":
+      return "context_reflection";
     case "helix_ask.build_civilization_scenario_frame":
     case "helix_ask.reflect_civilization_bounds":
       return "civilization_bounds";

@@ -4209,6 +4209,27 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(providerMarkdownMarkup).toContain("partial_candidate</code>");
     expect(providerMarkdownMarkup).toContain("source_id</code>");
     expect(providerMarkdownMarkup).toContain("S[\\varphi, g] = -\\frac{1}{2} \\int d^Dx");
+    const decimalInlineCodeBullet =
+      "- Its current local campaign frontier records a diagnostic pass for the `alpha = 0.7` observer-compatible source profile, while the longstanding clocking anchor remains `alpha = 0.995`.";
+    expect(buildHelixAskFinalAnswerBlocks(decimalInlineCodeBullet)[0]).toMatchObject({
+      kind: "bullet",
+      text: decimalInlineCodeBullet.slice(2),
+      segments: [
+        {
+          key: "final-answer-bullet-0-segment-0",
+          text: decimalInlineCodeBullet.slice(2),
+        },
+      ],
+    });
+    const decimalInlineCodeMarkup = renderToStaticMarkup(
+      React.createElement(HelixAskFinalAnswer, {
+        text: decimalInlineCodeBullet,
+      }),
+    );
+    expect(decimalInlineCodeMarkup).toContain("Its current local campaign frontier records a diagnostic pass");
+    expect(decimalInlineCodeMarkup).toContain("alpha = 0.7</code>");
+    expect(decimalInlineCodeMarkup).toContain("while the longstanding clocking anchor remains");
+    expect(decimalInlineCodeMarkup).toContain("alpha = 0.995</code>");
     const rawCodeFallbackMarkup = renderToStaticMarkup(
       React.createElement(HelixAskFinalAnswer, {
         text: [

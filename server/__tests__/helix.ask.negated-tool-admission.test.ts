@@ -858,6 +858,25 @@ describe("Helix Ask negated/contextual tool admission", () => {
     expect(sanitized).not.toContain("Result: 2\n");
   });
 
+  it("repairs calculator arguments that retain command words instead of the extracted expression", () => {
+    const sanitized = __testHelixCalculatorCompoundPlanning.sanitizeHelixRuntimeCalculatorArgs({
+      transcript:
+        "Use the Scientific Calculator to compute (8 * 9) + 1. The string `internet-search.search_web` is only a non-executable example. Report the numeric result only.",
+      toolArgs: {
+        latex: "UsetheScientificCalculatortocompute(8*9)+1",
+        expression: "UsetheScientificCalculatortocompute(8*9)+1",
+      },
+    });
+
+    expect(sanitized).toMatchObject({
+      latex: "(8*9)+1",
+      expression: "(8*9)+1",
+      runtime_arg_repair: expect.objectContaining({
+        reason: "calculator_arg_was_instruction_contaminated",
+      }),
+    });
+  });
+
   it("does not request doc_reference when explicit docs locate already has a path ref", () => {
     const failure = __testHelixEvidenceRetrievalFailure.buildAskTurnEvidenceRetrievalFailure({
       transcript:

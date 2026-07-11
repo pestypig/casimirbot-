@@ -20,10 +20,27 @@ export type HelixAskCapabilityCatalogSummaryDependencies = {
 
 export const createAskTurnCapabilityHelpSummaryBuilder = (
   deps: HelixAskCapabilityCatalogSummaryDependencies,
-) => (workspaceSnapshot?: HelixAskCapabilityCatalogSummaryWorkspaceSnapshot): string => {
+) => (
+  workspaceSnapshot?: HelixAskCapabilityCatalogSummaryWorkspaceSnapshot,
+  question?: string,
+): string => {
   const activeDoc = deps.normalizeDocPath(workspaceSnapshot?.activeDocPath);
   const activeNote = deps.resolveWorkspaceNoteTitle(workspaceSnapshot);
   const catalog = deps.buildCapabilityCatalogObservation();
+  const asksAboutScholarlyImageLensWorkflow = Boolean(
+    question &&
+    /\b(?:research\s+papers?|scholarly|full[-\s]?text)\b/i.test(question) &&
+    /\b(?:parse|open|openable|image\s+lens|pick|select|choose|check)\b/i.test(question),
+  );
+  if (asksAboutScholarlyImageLensWorkflow) {
+    return [
+      "The research-paper workflow first searches and ranks candidate papers by the requested topic and available metadata; it does not assume every candidate is parseable.",
+      "- scholarly-research.lookup_papers discovers candidates. scholarly-research.fetch_full_text then checks whether a candidate has usable, machine-readable full text or another openable source.",
+      "- If text extraction is usable, Helix reasons from that text. If an available PDF page contains needed scanned text, equations, figures, or tables that text extraction cannot represent reliably, it can escalate the relevant page or region to Image Lens.",
+      "- A paper that cannot be opened or parsed remains an exploratory/recovery candidate and should not become answer evidence. extract_numeric_parameters can run only after usable scholarly evidence has been materialized.",
+      "So the practical order is: choose relevant candidates, verify access and parseability during full-text retrieval, then use Image Lens selectively when visual page evidence is necessary.",
+    ].join("\n");
+  }
   return [
     "Helix Ask can help you work across the workstation with two kinds of tools:",
     `- Information reflection: inspect or synthesize evidence from docs, repo/code, internet and scholarly sources, calculator traces, live-source mail, image lens regions, process graph snapshots, Moral/civilization context, and workspace OS status. Active examples include ${catalog.information_reflection.slice(0, 6).join("; ")}.`,

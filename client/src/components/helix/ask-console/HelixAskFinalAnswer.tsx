@@ -60,7 +60,11 @@ function coerceText(value: unknown): string {
 function buildHelixAskFinalAnswerTextSegments(keyPrefix: string, text: string): HelixAskFinalAnswerTextSegment[] {
   const normalized = text.trim();
   if (!normalized) return [];
-  const sentenceMatches = normalized.match(/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g) ?? [normalized];
+  // Keep punctuation that is not followed by whitespace (for example decimal
+  // points in `alpha = 0.7`) inside the sentence. The prior negated-character
+  // matcher could restart after each decimal point and silently discard every
+  // preceding character from the rendered answer.
+  const sentenceMatches = normalized.match(/.+?(?:[.!?]+(?=\s|$)|$)/g) ?? [normalized];
   const segments = sentenceMatches
     .map((segment) => segment.trim())
     .filter(Boolean)

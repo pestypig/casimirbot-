@@ -673,7 +673,14 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
-  if (selectedEvidenceCandidate?.target_source === "docs_viewer") {
+  const explicitDocsOperationSelected =
+    isExplicitDocsPathComparePrompt(prompt) ||
+    isExplicitDocsPathLocateSynthesisPrompt(prompt) ||
+    isExplicitDocsPathSummaryPrompt(prompt) ||
+    isCurrentOpenDocsViewerSummaryPrompt(prompt) ||
+    isDocsTopicSummaryPrompt(prompt) ||
+    isAffirmativeDocsSearchPrompt(prompt);
+  if (selectedEvidenceCandidate?.target_source === "docs_viewer" && !explicitDocsOperationSelected) {
     const localDocumentEvidence = isAffirmativeLocalDocumentEvidencePrompt(prompt);
     return toSourceTargetIntent({
       turnId: input.turnId,

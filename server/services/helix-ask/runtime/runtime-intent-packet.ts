@@ -1,6 +1,6 @@
 type RecordLike = Record<string, unknown>;
 
-type HelixTurnArtifact = {
+export type HelixTurnArtifact = {
   artifact_id: string;
   turn_id?: string;
   producer_item_id?: string;
@@ -72,6 +72,24 @@ type HelixRuntimeIntentPacket = {
   raw_content_included: false;
 };
 
+export type HelixRuntimeSemanticRouteProposal = {
+  schema: "helix.runtime_semantic_route_proposal.v1";
+  turn_id: string;
+  proposal_id: string;
+  prompt_hash: string;
+  proposal_source: "agent_runtime" | "runtime_intent_packet_projection";
+  proposed_route: string | null;
+  proposed_tool_family: string | null;
+  proposed_capability_id: string | null;
+  confidence: "low" | "medium" | "high" | "unknown";
+  uncertainty: string[];
+  reason_summary: string;
+  supporting_hint_refs: string[];
+  terminal_eligible: false;
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
 export type HelixRuntimeIntentPacketDependencies = {
   readString: (value: unknown) => string | null;
   resolveTerminalContract: (args: {
@@ -88,6 +106,111 @@ type ReadStringDependency = Pick<HelixRuntimeIntentPacketDependencies, "readStri
 
 const readRecord = (value: unknown): RecordLike | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as RecordLike) : null;
+
+const readFirstString = (record: RecordLike | null | undefined, keys: string[], readString: (value: unknown) => string | null): string | null => {
+  if (!record) return null;
+  for (const key of keys) {
+    const value = readString(record[key]);
+    if (value) return value;
+  }
+  return null;
+};
+
+const inferToolFamilyFromCapabilityId = (capabilityId: string | null): string | null => {
+  if (!capabilityId) return null;
+  const normalized = capabilityId.toLowerCase();
+  if (normalized.includes("moral")) return "moral_graph";
+  if (normalized.includes("theory") || normalized.includes("badge")) return "theory_graph";
+  if (normalized.includes("calculator") || normalized.includes("calc")) return "calculator";
+  if (normalized.includes("image") || normalized.includes("vision") || normalized.includes("visual")) return "image_lens";
+  if (normalized.includes("scholarly") || normalized.includes("paper")) return "scholarly_research";
+  if (normalized.includes("internet") || normalized.includes("web")) return "internet_search";
+  if (normalized.includes("repo") || normalized.includes("code")) return "repo";
+  if (normalized.includes("doc")) return "docs";
+  if (normalized.includes("note")) return "notes";
+  if (normalized.includes("model") || normalized.includes("direct")) return "model_only";
+  return null;
+};
+
+const inferToolFamilyFromGoalKind = (goalKind: string | null): string | null => {
+  if (!goalKind) return null;
+  const normalized = goalKind.toLowerCase();
+  if (normalized.includes("moral")) return "moral_graph";
+  if (normalized.includes("theory") || normalized.includes("badge")) return "theory_graph";
+  if (normalized.includes("calculator") || normalized.includes("calc")) return "calculator";
+  if (normalized.includes("image") || normalized.includes("visual")) return "image_lens";
+  if (normalized.includes("scholarly") || normalized.includes("paper")) return "scholarly_research";
+  if (normalized.includes("internet") || normalized.includes("web")) return "internet_search";
+  if (normalized.includes("repo") || normalized.includes("code")) return "repo";
+  if (normalized.includes("doc")) return "docs";
+  if (normalized.includes("note")) return "notes";
+  if (normalized.includes("model") || normalized.includes("answer") || normalized.includes("concept")) return "model_only";
+  return null;
+};
+
+const normalizeRuntimeSemanticRouteProposal = (args: {
+  value: unknown;
+  turnId: string;
+  promptHash: string;
+  dependencies: Pick<HelixRuntimeIntentPacketDependencies, "readString" | "hashPayloadShort">;
+}): HelixRuntimeSemanticRouteProposal | null => {
+  const record = readRecord(args.value);
+  if (!record || args.dependencies.readString(record.schema) !== "helix.runtime_semantic_route_proposal.v1") {
+    return null;
+  }
+  if (args.dependencies.readString(record.proposal_source) !== "agent_runtime") return null;
+  const proposalTurnId = args.dependencies.readString(record.turn_id);
+  if (proposalTurnId && proposalTurnId !== args.turnId) return null;
+  const proposedRoute = args.dependencies.readString(record.proposed_route);
+  const proposedCapabilityId = args.dependencies.readString(record.proposed_capability_id);
+  const proposedToolFamily =
+    args.dependencies.readString(record.proposed_tool_family) ??
+    inferToolFamilyFromCapabilityId(proposedCapabilityId) ??
+    inferToolFamilyFromGoalKind(proposedRoute);
+  const rawConfidence = args.dependencies.readString(record.confidence);
+  const confidence: HelixRuntimeSemanticRouteProposal["confidence"] =
+    rawConfidence === "low" || rawConfidence === "medium" || rawConfidence === "high" || rawConfidence === "unknown"
+      ? rawConfidence
+      : proposedRoute || proposedToolFamily || proposedCapabilityId
+        ? "medium"
+        : "unknown";
+  const uncertainty = Array.isArray(record.uncertainty)
+    ? record.uncertainty
+        .map((entry: unknown) => args.dependencies.readString(entry))
+        .filter((entry: string | null): entry is string => Boolean(entry))
+    : [];
+  const supportingHintRefs = Array.isArray(record.supporting_hint_refs)
+    ? record.supporting_hint_refs
+        .map((entry: unknown) => args.dependencies.readString(entry))
+        .filter((entry: string | null): entry is string => Boolean(entry))
+    : [];
+  return {
+    schema: "helix.runtime_semantic_route_proposal.v1",
+    turn_id: args.turnId,
+    proposal_id:
+      args.dependencies.readString(record.proposal_id) ??
+      `${args.turnId}:runtime_semantic_route_proposal:agent_runtime:${args.dependencies.hashPayloadShort([
+        args.turnId,
+        proposedRoute,
+        proposedToolFamily,
+        proposedCapabilityId,
+      ])}`,
+    prompt_hash: args.dependencies.readString(record.prompt_hash) ?? args.promptHash,
+    proposal_source: "agent_runtime",
+    proposed_route: proposedRoute,
+    proposed_tool_family: proposedToolFamily,
+    proposed_capability_id: proposedCapabilityId,
+    confidence,
+    uncertainty,
+    reason_summary:
+      args.dependencies.readString(record.reason_summary) ??
+      "Runtime provider supplied a semantic route proposal; Helix route admission still decides allowed tools and terminal products.",
+    supporting_hint_refs: supportingHintRefs,
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
 
 export const readHelixRuntimeCanonicalGoalFrame = (payload: RecordLike): HelixRuntimeIntentGoalFrame | null =>
   readRecord(payload.canonical_goal_frame) as HelixRuntimeIntentGoalFrame | null;
@@ -261,6 +384,66 @@ export const buildHelixRuntimeIntentPacket = (args: {
   };
 };
 
+export const buildHelixRuntimeSemanticRouteProposal = (args: {
+  packet: HelixRuntimeIntentPacket;
+  dependencies: Pick<HelixRuntimeIntentPacketDependencies, "readString" | "hashPayloadShort">;
+}): HelixRuntimeSemanticRouteProposal => {
+  const primaryCapability =
+    args.packet.available_capabilities?.capabilities?.find((capability: RecordLike & { goal_fit?: string }) => capability.goal_fit === "primary") ??
+    args.packet.available_capabilities?.capabilities?.[0] ??
+    null;
+  const proposedCapabilityId = readFirstString(
+    primaryCapability,
+    ["capability_id", "capabilityId", "id", "key", "name"],
+    args.dependencies.readString,
+  );
+  const proposedRoute =
+    args.dependencies.readString(args.packet.canonical_goal_frame?.goal_kind) ??
+    args.dependencies.readString(args.packet.canonical_goal_frame?.answer_scope) ??
+    args.packet.hints
+      .map((hint: HelixRuntimeIntentHint) => args.dependencies.readString(hint.value))
+      .find((value: string | null): value is string => Boolean(value)) ??
+    null;
+  const proposedToolFamily =
+    inferToolFamilyFromCapabilityId(proposedCapabilityId) ?? inferToolFamilyFromGoalKind(proposedRoute);
+  const supportingHintRefs = args.packet.hints.map((hint: HelixRuntimeIntentHint, index: number) => `${args.packet.turn_id}:runtime_intent_packet:hints:${hint.source}:${hint.hint_key || index}`);
+  const uncertainty: string[] = [];
+  if (!proposedRoute) uncertainty.push("no_canonical_goal_route_available");
+  if (!proposedCapabilityId && !proposedToolFamily) uncertainty.push("no_primary_capability_or_tool_family_available");
+  if (args.packet.hints.length > 0) uncertainty.push("classifier_and_planner_inputs_are_hint_only");
+  const confidence =
+    proposedRoute && proposedCapabilityId
+      ? "high"
+      : proposedRoute || proposedToolFamily
+        ? "medium"
+        : args.packet.hints.length > 0
+          ? "low"
+          : "unknown";
+  const promptHash = args.dependencies.hashPayloadShort([
+    args.packet.turn_id,
+    args.packet.user_prompt,
+    args.packet.canonical_goal_frame?.goal_kind,
+  ]);
+  return {
+    schema: "helix.runtime_semantic_route_proposal.v1",
+    turn_id: args.packet.turn_id,
+    proposal_id: `${args.packet.turn_id}:runtime_semantic_route_proposal`,
+    prompt_hash: promptHash,
+    proposal_source: "runtime_intent_packet_projection",
+    proposed_route: proposedRoute,
+    proposed_tool_family: proposedToolFamily,
+    proposed_capability_id: proposedCapabilityId,
+    confidence,
+    uncertainty,
+    reason_summary:
+      "Projected from the current runtime intent packet for audit comparison only; Helix route admission still decides allowed tools and terminal products.",
+    supporting_hint_refs: supportingHintRefs,
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
 export const appendHelixRuntimeIntentPacketToPayload = (args: {
   payload: RecordLike;
   turnId: string;
@@ -269,12 +452,29 @@ export const appendHelixRuntimeIntentPacketToPayload = (args: {
 }): HelixRuntimeIntentPacket | null => {
   const packet = buildHelixRuntimeIntentPacket(args);
   if (!packet) return null;
+  const promptHash = args.dependencies.hashPayloadShort([
+    packet.turn_id,
+    packet.user_prompt,
+    packet.canonical_goal_frame?.goal_kind,
+  ]);
+  const semanticRouteProposal =
+    normalizeRuntimeSemanticRouteProposal({
+      value: args.payload.runtime_semantic_route_proposal ?? args.payload.agent_runtime_semantic_route_proposal,
+      turnId: args.turnId,
+      promptHash,
+      dependencies: args.dependencies,
+    }) ??
+    buildHelixRuntimeSemanticRouteProposal({
+      packet,
+      dependencies: args.dependencies,
+    });
   args.payload.runtime_intent_packet = packet;
+  args.payload.runtime_semantic_route_proposal = semanticRouteProposal;
   const ledger = Array.isArray(args.payload.current_turn_artifact_ledger)
     ? (args.payload.current_turn_artifact_ledger as HelixTurnArtifact[])
     : [];
   args.payload.current_turn_artifact_ledger = args.dependencies.mergeLedgerArtifacts([
-    ...ledger.filter((artifact) => artifact.kind !== "runtime_intent_packet"),
+    ...ledger.filter((artifact: HelixTurnArtifact) => artifact.kind !== "runtime_intent_packet" && artifact.kind !== "runtime_semantic_route_proposal"),
     {
       artifact_id: `${args.turnId}:runtime_intent_packet`,
       turn_id: args.turnId,
@@ -289,10 +489,26 @@ export const appendHelixRuntimeIntentPacketToPayload = (args: {
       ]),
       payload: packet as unknown as RecordLike,
     },
+    {
+      artifact_id: semanticRouteProposal.proposal_id,
+      turn_id: args.turnId,
+      producer_item_id: "runtime_semantic_route_proposal",
+      kind: "runtime_semantic_route_proposal",
+      created_at_ms: args.dependencies.nowMs?.() ?? Date.now(),
+      source_scope: "current_turn",
+      goal_hash: args.dependencies.hashPayloadShort([
+        args.turnId,
+        "runtime_semantic_route_proposal",
+        semanticRouteProposal.proposed_route,
+        semanticRouteProposal.proposed_tool_family,
+      ]),
+      payload: semanticRouteProposal as unknown as RecordLike,
+    },
   ]);
   const debug = readRecord(args.payload.debug);
   if (debug) {
     debug.runtime_intent_packet = packet;
+    debug.runtime_semantic_route_proposal = semanticRouteProposal;
     debug.current_turn_artifact_ledger = args.payload.current_turn_artifact_ledger;
   }
   return packet;
@@ -317,7 +533,7 @@ export const refreshHelixRuntimeAuthorityAuditForIntentPacket = (args: {
       check.evidence = `${args.turnId}:runtime_intent_packet`;
     }
   }
-  audit.ok = checks.length > 0 ? checks.every((check) => check.passed === true) : audit.ok;
+  audit.ok = checks.length > 0 ? checks.every((check: RecordLike) => check.passed === true) : audit.ok;
   const debug = readRecord(args.payload.debug);
   if (debug) {
     debug.runtime_authority_audit = audit;
@@ -325,7 +541,7 @@ export const refreshHelixRuntimeAuthorityAuditForIntentPacket = (args: {
   const ledger = Array.isArray(args.payload.current_turn_artifact_ledger)
     ? (args.payload.current_turn_artifact_ledger as HelixTurnArtifact[])
     : [];
-  const auditArtifact = ledger.find((artifact) => artifact.kind === "runtime_authority_audit");
+  const auditArtifact = ledger.find((artifact: HelixTurnArtifact) => artifact.kind === "runtime_authority_audit");
   if (auditArtifact) {
     auditArtifact.payload = audit;
   }

@@ -73,6 +73,11 @@ import {
   isPaperBackedNumericBindingPhasePrompt,
   isTheoryFormulaDiscoveryPhasePrompt,
 } from "./prompt-named-tool-requests";
+import {
+  assertCapabilityAllowedByCommittedRoute,
+  readCommittedAskRoute,
+} from "../committed-ask-route";
+import { isAskTurnCapabilityHelpIntent } from "../capability-catalog-intent";
 
 const MORAL_SUBSTRATE_PRIMARY_CAPABILITY = "moral-graph.reflect_living_substrate_context" as const;
 const MORAL_GRAPH_PRIMARY_CAPABILITIES = new Set([
@@ -271,6 +276,24 @@ const filterContextuallySuppressedPromptRequests = (
     const capability = readString(request.capability_id) ?? readString(request.capabilityId);
     const family = contextualSuppressionFamilyForCapability(capability);
     return !family || !contextualToolSuppressionBlocksFamily(suppression, family);
+  });
+};
+
+const filterRequestsAllowedByCommittedRoute = (
+  body: Record<string, unknown>,
+  requests: Record<string, unknown>[],
+): Record<string, unknown>[] => {
+  const committedRoute = readCommittedAskRoute(body);
+  if (!committedRoute) return requests;
+  return requests.filter((request) => {
+    const capabilityId = readString(request.capability_id) ?? readString(request.capabilityId);
+    if (!capabilityId) return false;
+    return assertCapabilityAllowedByCommittedRoute({
+      committedRoute,
+      capabilityId,
+      args: readRecord(request.arguments ?? request.args),
+      fromShortcut: true,
+    }).allowed;
   });
 };
 
@@ -486,11 +509,13 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   includePlannerDerived?: boolean;
 }): Record<string, unknown>[] => {
   const explicit = readExplicitWorkstationGatewayCallRequests(input.body);
-  if (explicit.length > 0) return explicit;
+  if (explicit.length > 0) return filterRequestsAllowedByCommittedRoute(input.body, explicit);
   if (input.includePlannerDerived !== true) return [];
   const requests: Record<string, unknown>[] = [];
   const seen = new Set<string>();
   const prompt = readPrompt(input.body) ?? "";
+  const finalizeRequests = (candidates: Record<string, unknown>[]): Record<string, unknown>[] =>
+    filterRequestsAllowedByCommittedRoute(input.body, candidates).slice(0, 10);
   const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
   const appendPromptDerivedDedupe = (candidates: Record<string, unknown>[]): void => {
     appendDedupe(
@@ -512,6 +537,9 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
     );
   const structured = buildStructuredAdmissionWorkstationGatewayCallRequests(input.body);
   appendDedupe(requests, seen, structured);
+  if (isAskTurnCapabilityHelpIntent(prompt)) {
+    return finalizeRequests(requests);
+  }
   const compoundDependencyRequests = buildCompoundCapabilityDependencyGatewayCallRequests(input.body);
   appendDedupe(requests, seen, compoundDependencyRequests);
   const compoundDependencyCapabilities = new Set(
@@ -540,11 +568,11 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
     if (!promptNamedCapabilities.has(THEORY_CONTEXT_REFLECTION_CAPABILITY)) {
       appendPromptDerivedDedupe(buildPromptDerivedTheoryReflectionGatewayCallRequests(input.body));
     }
-    return requests.slice(0, 10);
+    return finalizeRequests(requests);
   }
   if (theoryFormulaDiscoveryPhase && promptNamedCapabilities.size === 0 && compoundDependencyCapabilities.size === 0) {
     appendPromptDerivedDedupe(buildPromptDerivedTheoryReflectionGatewayCallRequests(input.body));
-    return requests.slice(0, 10);
+    return finalizeRequests(requests);
   }
   const hasNamedDocsSearch = promptNamed.some((request) => readString(request.capability_id) === DOCS_SEARCH_CAPABILITY);
   const activeDocsContext = buildActiveDocsContextWorkstationGatewayCallRequests(input.body);
@@ -617,11 +645,11 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   if (!promptNamedCapabilities.has(REPO_SEARCH_CAPABILITY) && !compoundDependencyCapabilities.has(REPO_SEARCH_CAPABILITY)) {
     appendPromptDerivedDedupe(buildPromptDerivedRepoSearchGatewayCallRequests(input.body));
   }
-  return reduceMoralGraphRequestsToPrimary({
+  return finalizeRequests(reduceMoralGraphRequestsToPrimary({
     requests,
     prompt,
     promptNamedCapabilities,
-  }).slice(0, 10);
+  }));
 };
 
 export const hasWorkstationGatewayCallsForTurn = (input: {

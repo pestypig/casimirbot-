@@ -1,5 +1,5 @@
 const CAPABILITY_CATALOG_OBJECT_PATTERN =
-  "(?:helix\\s+ask|ask\\s+turn|this\\s+agent|the\\s+agent|ask|agent|live\\s+answer)[\\s\\S]{0,120}(?:tools?|tool\\s+calls?|tool\\s+call\\s+goals?|capabilities)|(?:tools?|tool\\s+calls?|tool\\s+call\\s+goals?|capabilities)[\\s\\S]{0,120}(?:helix\\s+ask|ask\\s+turn|this\\s+agent|the\\s+agent|ask|agent|live\\s+answer)";
+  "(?:helix\\s+ask|ask\\s+turn|this\\s+agent|the\\s+agent|ask|agent|live\\s+answer)[\\s\\S]{0,120}(?:tools?|tool\\s+calls?|tool\\s+call\\s+goals?|capabilities)|(?:tools?|tool\\s+calls?|tool\\s+call\\s+goals?|capabilities)[\\s\\S]{0,120}(?:helix\\s+ask|ask\\s+turn|this\\s+agent|the\\s+agent|ask|agent|live\\s+answer)|(?:your|the|this)\\s+(?:tool\\s+for\\s+research\\s+papers?|research\\s+papers?\\s+tool|scholarly(?:\\s+research)?\\s+tool)";
 
 const stripWholePromptWrappingQuotes = (promptText: string): string | null => {
   const trimmed = promptText.trim();
@@ -13,6 +13,7 @@ const stripWholePromptWrappingQuotes = (promptText: string): string | null => {
 
 const CAPABILITY_CATALOG_REQUEST_PATTERNS = [
   /\bwhat\s+tools\s+are\s+available\s+for\s+(?:the\s+)?helix\s+ask\s+to\s+use\b/i,
+  /\b(?:does|do|can|how\s+(?:does|do|can))\s+(?:your|the|this)\s+(?:tool\s+for\s+research\s+papers?|research\s+papers?\s+tool|scholarly(?:\s+research)?\s+tool)\b[\s\S]{0,240}\b(?:allow|able|pick|select|choose|parse|open|openable|image\s+lens|work|fallback|escalat|check)\b/i,
   /\bwhat\s+can\s+i\s+do\s+with\s+helix\s+ask\b/i,
   /\bwhat\s+can\s+(?:helix\s+ask|ask|this\s+agent|the\s+agent)\s+do\b/i,
   /\bhow\s+can\s+(?:helix\s+ask|ask|this\s+agent|the\s+agent)\s+help\b/i,
@@ -29,7 +30,7 @@ const CAPABILITY_CATALOG_REQUEST_PATTERNS = [
 const capabilityCatalogRequestMatchIndex = (promptText: string): number | null => {
   const prompt = promptText.trim();
   if (!prompt) return null;
-  const mentionsAskSurface = /\b(?:helix\s+ask|ask\s+turn|this\s+agent|the\s+agent|live\s+answer)\b/i.test(prompt);
+  const mentionsAskSurface = /\b(?:helix\s+ask|ask\s+turn|this\s+agent|the\s+agent|live\s+answer|(?:your|the|this)\s+(?:tool\s+for\s+research\s+papers?|research\s+papers?\s+tool|scholarly(?:\s+research)?\s+tool))\b/i.test(prompt);
   const patterns = mentionsAskSurface
     ? CAPABILITY_CATALOG_REQUEST_PATTERNS
     : [CAPABILITY_CATALOG_REQUEST_PATTERNS[0]];

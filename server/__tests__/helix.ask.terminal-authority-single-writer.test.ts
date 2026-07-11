@@ -7,6 +7,11 @@ import {
   syncHelixTypedFailureAuthorityPublicMirrors,
 } from "../services/helix-ask/terminal-authority-single-writer";
 import { buildArtifactQueryIndex } from "../services/helix-ask/artifact-query-index";
+import {
+  inspectAgentProviderRouteProductEligibility,
+  materializeAgentProviderRouteProductTerminal,
+} from "../services/helix-ask/terminal-product-materializers";
+import { buildAskTurnSolverTrace } from "../services/helix-ask/ask-turn-solver";
 
 const makePostToolObservation = (turnId: string) => ({
   artifact_id: `${turnId}:obs`,
@@ -436,6 +441,10 @@ describe("Helix terminal authority single writer", () => {
       selected_final_answer: answerText,
       final_answer_source: "agent_provider_terminal_candidate",
       terminal_artifact_kind: "agent_provider_terminal_candidate",
+      solver_continuation_observation: {
+        schema: "helix.solver_continuation_observation.v1",
+        required_next_step: "model.direct_answer",
+      },
       route_product_contract: {
         schema: "helix.route_product_contract.v1",
         source_target: "agent_provider_gateway_turn",
@@ -508,6 +517,12 @@ describe("Helix terminal authority single writer", () => {
     expect(payload.final_answer_source).toBe("agent_provider_terminal_candidate");
     expect(payload.terminal_artifact_kind).toBe("agent_provider_terminal_candidate");
     expect(payload.terminal_error_code).toBeUndefined();
+    expect(result.rejected_candidates).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: "typed_failure",
+        reason: "stale_solver_continuation_superseded_by_provider_terminal",
+      }),
+    ]));
     expect(payload.selected_terminal_support_refs).toEqual([observationRef]);
     expect(payload.terminal_synthesis_support_refs).toEqual([observationRef]);
     expect((payload.terminal_presentation as Record<string, unknown>).selected_observation_refs).toEqual([
@@ -519,6 +534,397 @@ describe("Helix terminal authority single writer", () => {
       staleScholarlyRef,
     ]);
     expect((payload.terminal_presentation as Record<string, unknown>).support_ref_filter).toBe("moral_graph_reflection_only");
+    expect(payload.ask_turn_procedure_trace).toMatchObject({
+      schema: "helix.ask_turn_procedure_trace.v1",
+      intent_class: "agent_provider_gateway_turn",
+      evidence_reentry_status: "reentered",
+      allowed_terminal_products: expect.arrayContaining(["agent_provider_terminal_candidate"]),
+      selected_terminal_product: expect.objectContaining({
+        kind: "agent_provider_terminal_candidate",
+        allowed_by_route: true,
+      }),
+      visible_answer_source: "agent_provider_terminal_candidate",
+      failure_rail: null,
+    });
+  });
+
+  it("materializes a grounded provider candidate as the route-required Docs synthesis product", () => {
+    const turnId = "ask:test:docs-provider-route-product";
+    const observationRefs = [
+      `${turnId}:workstation_gateway:docs.search:1`,
+      `${turnId}:workstation_gateway:docs.search:2`,
+    ];
+    const answerText = [
+      "The current whitepaper identifies three unresolved blockers.",
+      "1. Closure residual: the diagnostic is established, while closure remains proposed.",
+      "2. Source reconstruction: the document reports a proxy, not a validated stress-energy source.",
+      "3. Runtime validation: benchmark routes exist, but certification remains unproven.",
+    ].join("\n");
+    const artifacts = observationRefs.map((artifactId) => ({
+      artifact_id: artifactId,
+      kind: "provider_gateway_observation_packet",
+      payload: {
+        schema: "helix.agent_step_observation_packet.v1",
+        turn_id: turnId,
+        capability_key: "docs.search",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    }));
+    const providerCandidateRef = `${turnId}:agent_provider_terminal_candidate:codex:docs`;
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      current_turn_artifact_ledger: artifacts,
+      committed_ask_route: {
+        schema: "helix.committed_ask_route.v1",
+        turn_id: turnId,
+        prompt_hash: "hash:docs-provider-route-product",
+        canonical_goal: {
+          goal_kind: "docs",
+          required_terminal_kind: "model_synthesized_answer",
+          allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+          forbidden_terminal_artifact_kinds: [],
+        },
+        route: {
+          selected_route: "/ask",
+          source_target: "docs_viewer",
+          target_kind: "docs_viewer",
+          route_reason: "explicit_docs_path",
+          strength: "hard",
+        },
+        capability_policy: {
+          allowed_tool_families: ["docs_viewer"],
+          suppressed_tool_families: [],
+          required_capability_families: ["docs_viewer"],
+          mutating_families_allowed: false,
+        },
+        suppression: {
+          contextual_tool_mentions: [],
+          negative_constraints: [],
+          suppressed_families: [],
+          firewall_required: true,
+        },
+        terminal_product: {
+          terminal_authority_required: true,
+          evidence_reentry_required: true,
+          followup_reasoning_required: true,
+          required_terminal_product: "model_synthesized_answer",
+        },
+        transitions: [],
+        compatibility: {
+          source_goal_capability_terminal_compatible: true,
+          stale_metadata_ignored: false,
+          shortcut_firewall_applied: false,
+          violations: [],
+        },
+      },
+      canonical_goal_frame: {
+        goal_kind: "docs",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      route_evidence_authority: {
+        schema: "helix.route_evidence_authority.v1",
+        turn_id: turnId,
+        terminal_product_allowed: true,
+        // A legacy/advisory mirror can be stale. It must never override the
+        // concrete committed Docs route or canonical goal frame below.
+        required_terminal_kind: "unknown",
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+        forbidden_terminal_artifact_kinds: [],
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        thread_id: "thread:test",
+        turn_id: turnId,
+        route: "/ask",
+        terminal_kind: "answer",
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        terminal_item_id: providerCandidateRef,
+        server_authoritative: true,
+        terminal_eligible: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        turn_id: turnId,
+        concise_text: answerText,
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_authority_ref: providerCandidateRef,
+        selected_observation_refs: observationRefs,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      provider_terminal_candidate: {
+        schema: "helix.agent_provider_terminal_candidate.v1",
+        candidate_id: providerCandidateRef,
+        candidate_text: answerText,
+        grounded_in_observation_refs: observationRefs,
+        normalized_observation_refs: observationRefs,
+        evidence_reentry_required: true,
+        provider_reasoning_completed: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+      provider_reasoning_reentry: {
+        schema: "helix.provider_reasoning_reentry.v1",
+        turn_id: turnId,
+        status: "completed",
+        evidence_reentered: true,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+      provider_terminal_authority_bridge: {
+        schema: "helix.provider_terminal_authority_bridge.v1",
+        turn_id: turnId,
+        terminal_authority_granted: true,
+        final_visible_answer_authorized: true,
+        successful_gateway_observation_refs: observationRefs,
+        normalized_observation_refs: observationRefs,
+        terminal_answer_authority: null,
+        terminal_presentation: null,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+      route_authority_audit: {
+        route_authority_ok: true,
+      },
+      poison_audit: {
+        ok: true,
+      },
+      solver_continuation_observation: {
+        schema: "helix.solver_continuation_observation.v1",
+        required_next_step: "model.direct_answer",
+      },
+      tool_rail_failure_triage: {
+        schema: "helix.tool_rail_failure_triage.v1",
+        rail_status: "fail_closed",
+        first_broken_rail: "evidence_reentry",
+        rail_failure_code: "missing_evidence_reentry",
+        repair_target: "reentry_gate",
+        selected_capability: "docs.search",
+        executed_capability: "docs.search",
+      },
+    };
+    const committedRouteBlockedPayload = structuredClone(payload);
+    const blockedCommittedRoute = committedRouteBlockedPayload.committed_ask_route as Record<string, unknown>;
+    const blockedCanonicalGoal = blockedCommittedRoute.canonical_goal as Record<string, unknown>;
+    blockedCanonicalGoal.forbidden_terminal_artifact_kinds = ["model_synthesized_answer"];
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(result.source).toBe("final_answer_draft");
+    expect(result.visible_text).toBe(answerText);
+    expect(payload.terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(payload.final_answer_source).toBe("final_answer_draft");
+    expect(payload.selected_final_answer).toBe(answerText);
+    expect(payload.terminal_error_code).toBeUndefined();
+    expect(payload.provider_route_product_materialization).toMatchObject({
+      schema: "helix.provider_route_product_materialization.v1",
+      materialized_terminal_artifact_kind: "model_synthesized_answer",
+      selected_observation_refs: observationRefs,
+      status: "materialized",
+    });
+    expect(payload.terminal_answer_authority).toMatchObject({
+      terminal_kind: "answer",
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      server_authoritative: true,
+    });
+    expect(result.rejected_candidates).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: "typed_failure",
+        reason: "stale_solver_continuation_superseded_by_provider_route_product",
+      }),
+    ]));
+    expect(result.integrity.post_tool_model_step_satisfied).toBe(true);
+    const artifactIndex = buildArtifactQueryIndex({ turnId, payload });
+    expect(artifactIndex.tool_turn_chain_audit).toMatchObject({
+      reentry_executed: true,
+      reentry_proof_source: "provider_route_product_materialization_with_support_refs",
+      reentry_proven: true,
+      rail_status: "complete",
+      rail_failure_code: null,
+    });
+    expect(artifactIndex.codex_parity_agent_spine_rail_table).toMatchObject({
+      reentry_status: "reentered",
+      reentry_proof_source: "provider_route_product_materialization_with_support_refs",
+      reentry_proven: true,
+      rail_status: "complete",
+      rail_failure_code: null,
+      codex_parity_class: "complete",
+    });
+    const solverTrace = buildAskTurnSolverTrace({
+      turnId,
+      promptText: "Summarize the bounded NHM2 whitepaper from the selected Docs evidence.",
+      selectedRoute: "/ask",
+      terminalArtifactKind: String(payload.terminal_artifact_kind),
+      finalAnswerSource: String(payload.final_answer_source),
+      payload,
+      loopParityTrace: {
+        actual_tool_calls: observationRefs.map((resultRef) => ({
+          tool_id: "docs.search",
+          family: "docs_viewer",
+          admitted: true,
+          mutating: false,
+          result_ref: resultRef,
+        })),
+        observations_created: observationRefs.map((observationId) => ({
+          observation_id: observationId,
+          source_kind: "docs_viewer",
+        })),
+        evidence_selected_for_answer: observationRefs,
+        evidence_rejected_for_answer: [],
+      },
+    });
+    expect(solverTrace).toMatchObject({
+      completed_solver_path: true,
+      route_authority_ok: true,
+      terminal_authority_ok: true,
+      evidence_reentry: { completed: true },
+      evidence_reentry_gate: { violation_codes: [] },
+      followup_reasoning: { completed: true },
+      solver_short_circuit_flags: [],
+    });
+
+    const blockedResult = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload: committedRouteBlockedPayload,
+      artifactLedger: artifacts,
+    });
+    expect(blockedResult.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(committedRouteBlockedPayload.provider_route_product_materialization).toBeUndefined();
+    expect(committedRouteBlockedPayload.terminal_error_code).not.toBeUndefined();
+  });
+
+  it("preserves a current-turn authorized provider bridge when a later typed failure overwrites top-level terminal fields", () => {
+    const turnId = "ask:test:docs-provider-bridge-recovery";
+    const observationRef = `${turnId}:workstation_gateway:docs.search:1`;
+    const providerCandidateRef = `${turnId}:agent_provider_terminal_candidate:codex:docs`;
+    const answerText = "The document answer remains grounded in the current Docs observation.";
+    const authorizedAuthority = {
+      schema: "helix.turn_terminal_authority.v1",
+      thread_id: "thread:test",
+      turn_id: turnId,
+      route: "/ask",
+      terminal_kind: "answer",
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      terminal_item_id: providerCandidateRef,
+      server_authoritative: true,
+    };
+    const authorizedPresentation = {
+      schema: "helix.terminal_presentation.v1",
+      turn_id: turnId,
+      concise_text: answerText,
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_authority_ref: providerCandidateRef,
+      selected_observation_refs: [observationRef],
+    };
+    const artifacts = [{
+      artifact_id: observationRef,
+      kind: "provider_gateway_observation_packet",
+      payload: {
+        schema: "helix.agent_step_observation_packet.v1",
+        turn_id: turnId,
+        capability_key: "docs.search",
+        status: "succeeded",
+      },
+    }];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      current_turn_artifact_ledger: artifacts,
+      committed_ask_route: {
+        schema: "helix.committed_ask_route.v1",
+        turn_id: turnId,
+        prompt_hash: "hash:docs-provider-bridge-recovery",
+        route: { selected_route: "/ask", source_target: "docs_viewer" },
+        canonical_goal: {
+          goal_kind: "docs",
+          required_terminal_kind: "model_synthesized_answer",
+          allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+        },
+      },
+      canonical_goal_frame: { goal_kind: "docs", required_terminal_kind: "model_synthesized_answer" },
+      route_evidence_authority: {
+        turn_id: turnId,
+        terminal_product_allowed: true,
+        required_terminal_kind: "model_synthesized_answer",
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+      },
+      terminal_answer_authority: { terminal_kind: "failure", final_answer_source: "typed_failure" },
+      terminal_presentation: { turn_id: turnId, concise_text: "stale failure", terminal_artifact_kind: "typed_failure" },
+      provider_terminal_authority_bridge: {
+        turn_id: turnId,
+        terminal_authority_granted: true,
+        final_visible_answer_authorized: true,
+        terminal_answer_authority: authorizedAuthority,
+        terminal_presentation: authorizedPresentation,
+      },
+      provider_terminal_candidate: {
+        candidate_id: providerCandidateRef,
+        candidate_text: answerText,
+        grounded_in_observation_refs: [observationRef],
+        normalized_observation_refs: [observationRef],
+      },
+      solver_continuation_observation: { required_next_step: "model.direct_answer" },
+    };
+    const persistedBridge = payload.provider_terminal_authority_bridge as Record<string, unknown>;
+    delete payload.provider_terminal_authority_bridge;
+    artifacts.push({
+      artifact_id: `${turnId}:provider_terminal_authority_bridge:terminal_recovery`,
+      kind: "provider_terminal_authority_bridge",
+      payload: {
+        ...persistedBridge,
+        provider_terminal_candidate: payload.provider_terminal_candidate,
+      },
+    });
+
+    const materialized = materializeAgentProviderRouteProductTerminal({
+      payload,
+      artifacts,
+      turnId,
+      requiredTerminalKind: "model_synthesized_answer",
+      routeAllowsTerminalKind: (kind) => kind === "model_synthesized_answer",
+    });
+
+    expect(materialized).toMatchObject({
+      kind: "model_synthesized_answer",
+      text: answerText,
+      supportRefs: [observationRef],
+    });
+    expect(inspectAgentProviderRouteProductEligibility({
+      payload,
+      artifacts,
+      turnId,
+      requiredTerminalKind: "model_synthesized_answer",
+      routeAllowsTerminalKind: (kind) => kind === "model_synthesized_answer",
+    })).toMatchObject({
+      provider_bridge_source: "current_turn_artifact",
+      provider_bridge_authorizes_candidate: true,
+      authority_shape_valid: true,
+      presentation_shape_valid: true,
+      current_turn_support_ref_count: 1,
+      rejection_reason: null,
+    });
   });
 
   it("fails closed with a Moral Graph typed failure when no provider terminal candidate follows observation re-entry", () => {
@@ -585,6 +991,18 @@ describe("Helix terminal authority single writer", () => {
       raw_content_included: false,
     });
     expect(String(payload.selected_final_answer)).not.toMatch(/scholarly|calculator|internet search|PDF\/full-text/i);
+    expect(payload.ask_turn_procedure_trace).toMatchObject({
+      schema: "helix.ask_turn_procedure_trace.v1",
+      intent_class: "agent_provider_gateway_turn",
+      evidence_reentry_status: "not_reentered",
+      allowed_terminal_products: expect.arrayContaining(["agent_provider_terminal_candidate"]),
+      selected_terminal_product: expect.objectContaining({
+        kind: "typed_failure",
+        allowed_by_route: true,
+      }),
+      visible_answer_source: "typed_failure",
+      failure_rail: "evidence_not_reentered",
+    });
   });
 
   it("allows a model-synthesized answer draft after Moral Graph observation re-entry when the route requires it", () => {
@@ -698,6 +1116,19 @@ describe("Helix terminal authority single writer", () => {
     expect(payload.final_answer_source).toBe("final_answer_draft");
     expect(payload.terminal_artifact_kind).toBe("model_synthesized_answer");
     expect(payload.selected_final_answer).toBe(answerText);
+    expect(payload.ask_turn_procedure_trace).toMatchObject({
+      schema: "helix.ask_turn_procedure_trace.v1",
+      intent_class: "moral_graph_reflection",
+      evidence_reentry_status: "reentered",
+      admitted_capabilities: expect.arrayContaining(["moral-graph.reflect_context"]),
+      allowed_terminal_products: expect.arrayContaining(["model_synthesized_answer"]),
+      selected_terminal_product: expect.objectContaining({
+        kind: "model_synthesized_answer",
+        allowed_by_route: true,
+      }),
+      visible_answer_source: "final_answer_draft",
+      failure_rail: null,
+    });
   });
 
   it("does not let route evidence authority admit a scholarly terminal for a Moral Graph turn", () => {
@@ -1396,6 +1827,18 @@ describe("Helix terminal authority single writer", () => {
     expect(payload.final_answer_source).toBe("final_answer_draft");
     expect(payload.selected_final_answer).toBe(synthesizedText);
     expect((payload.terminal_presentation as Record<string, unknown>).concise_text).toBe(synthesizedText);
+    expect(payload.ask_turn_procedure_trace).toMatchObject({
+      schema: "helix.ask_turn_procedure_trace.v1",
+      intent_class: "post_tool_answer",
+      evidence_reentry_status: "reentered",
+      allowed_terminal_products: expect.arrayContaining(["model_synthesized_answer"]),
+      selected_terminal_product: expect.objectContaining({
+        kind: "model_synthesized_answer",
+        allowed_by_route: true,
+      }),
+      visible_answer_source: "final_answer_draft",
+      failure_rail: null,
+    });
   });
 
   it("does not select stale workstation artifacts when a contextual tool mention is suppressed", () => {
@@ -1498,6 +1941,249 @@ describe("Helix terminal authority single writer", () => {
     expect(payload.terminal_artifact_kind).toBe("direct_answer_text");
     expect(payload.final_answer_source).toBe("model_direct_answer");
     expect(payload.selected_final_answer).toBe(directText);
+    expect(payload.ask_turn_procedure_trace).toMatchObject({
+      schema: "helix.ask_turn_procedure_trace.v1",
+      intent_class: "model_only_concept",
+      evidence_reentry_status: "reentered",
+      allowed_terminal_products: expect.arrayContaining(["direct_answer_text"]),
+      selected_terminal_product: expect.objectContaining({
+        kind: "direct_answer_text",
+        allowed_by_route: true,
+      }),
+      visible_answer_source: "model_direct_answer",
+      failure_rail: null,
+    });
+  });
+
+  it("keeps quoted and negated internet-search tool identifiers model-only at terminal authority", () => {
+    const turnId = "ask:test:suppressed-internet-search-tool-name";
+    const directText =
+      "`internet-search.search_web` is a namespaced identifier: `internet-search` names the tool family and `search_web` names the operation.";
+    const staleSearchText =
+      "I cannot claim the requested workstation tool or UI action ran because internet-search.search_web failed: tavily_requires_TAVILY_API_KEY.";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:direct`,
+        kind: "direct_answer_text",
+        payload: {
+          schema: "helix.direct_answer_text.v1",
+          text: directText,
+          answer_text: directText,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: `${turnId}:stale_internet_search`,
+        kind: "internet_search_answer",
+        payload: {
+          schema: "helix.internet_search_answer.v1",
+          text: staleSearchText,
+          answer_text: staleSearchText,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt:
+        "Explain the literal phrase `internet-search.search_web` as a software tool name. Do not browse, search, retrieve web evidence, or call tools.",
+      current_turn_artifact_ledger: artifacts,
+      committed_ask_route: {
+        schema: "helix.committed_ask_route.v1",
+        turn_id: turnId,
+        commit_id: "commit:test:internet-search-suppressed",
+        prompt_hash: "hash:test:internet-search-suppressed",
+        committed_at_stage: "post_prompt_source_arbitration",
+        prompt_intent: {
+          primary_intent_kind: "content_question",
+          secondary_intent_kinds: [],
+        },
+        route: {
+          selected_route: "model_only_concept",
+          source_target: "model_only",
+          target_kind: "general_background",
+          strength: "hard",
+          route_reason: "quoted_and_negated_tool_identifier_suppressed",
+          stale_metadata_policy: "ignore_unless_matches_commit",
+        },
+        canonical_goal: {
+          goal_kind: "model_only_concept",
+          requested_capability: null,
+          required_terminal_kind: "direct_answer_text",
+          allowed_terminal_artifact_kinds: ["direct_answer_text", "typed_failure"],
+          forbidden_terminal_artifact_kinds: ["internet_search_answer", "workstation_tool_evaluation"],
+        },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        goal_kind: "model_only_concept",
+        answer_scope: "model_only",
+        required_terminal_kind: "direct_answer_text",
+      },
+      tool_call_admission_decision: {
+        requested_capability: "internet-search.search_web",
+        requested_capability_source: "quoted_or_negated_tool_identifier",
+        tool_admission_suppressed: true,
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+        terminal_contract: {
+          goal_kind: "model_only_concept",
+          required_terminal_kinds: ["direct_answer_text"],
+        },
+      },
+      selected_final_answer: staleSearchText,
+      terminal_artifact_kind: "internet_search_answer",
+      final_answer_source: "internet_search_answer",
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("direct_answer_text");
+    expect(result.visible_text).toBe(directText);
+    expect(payload.terminal_artifact_kind).toBe("direct_answer_text");
+    expect(payload.final_answer_source).toBe("model_direct_answer");
+    expect(payload.selected_final_answer).toBe(directText);
+    expect(String(payload.selected_final_answer)).not.toMatch(/tavily|retrieval|grounded evidence/i);
+    expect(payload.ask_turn_procedure_trace).toMatchObject({
+      schema: "helix.ask_turn_procedure_trace.v1",
+      intent_class: "model_only_concept",
+      evidence_reentry_status: "reentered",
+      allowed_terminal_products: expect.arrayContaining(["direct_answer_text"]),
+      selected_terminal_product: expect.objectContaining({
+        kind: "direct_answer_text",
+        allowed_by_route: true,
+      }),
+      visible_answer_source: "model_direct_answer",
+      failure_rail: null,
+    });
+  });
+
+  it.each([
+    {
+      label: "missing committed route",
+      payloadPatch: {},
+      expectedFailureRail: "route_not_selected",
+    },
+    {
+      label: "tool selected but not admitted",
+      payloadPatch: {
+        route_product_contract: {
+          schema: "helix.route_product_contract.v1",
+          allowed_terminal_artifact_kinds: ["typed_failure"],
+          required_terminal_kind: "model_synthesized_answer",
+        },
+        canonical_goal_frame: {
+          goal_kind: "tool_request",
+          required_terminal_kind: "model_synthesized_answer",
+        },
+        tool_call_admission_decision: {
+          requested_capability: "internet-search.search_web",
+          selected_capability: "internet-search.search_web",
+        },
+      },
+      expectedFailureRail: "tool_not_admitted",
+    },
+    {
+      label: "observation missing",
+      payloadPatch: {
+        route_product_contract: {
+          schema: "helix.route_product_contract.v1",
+          allowed_terminal_artifact_kinds: ["typed_failure"],
+          required_terminal_kind: "model_synthesized_answer",
+        },
+        canonical_goal_frame: {
+          goal_kind: "tool_request",
+          required_terminal_kind: "model_synthesized_answer",
+        },
+        terminal_error_code: "observation_missing",
+      },
+      expectedFailureRail: "observation_missing",
+    },
+    {
+      label: "evidence not re-entered",
+      payloadPatch: {
+        route_product_contract: {
+          schema: "helix.route_product_contract.v1",
+          allowed_terminal_artifact_kinds: ["typed_failure"],
+          required_terminal_kind: "model_synthesized_answer",
+        },
+        canonical_goal_frame: {
+          goal_kind: "tool_request",
+          required_terminal_kind: "model_synthesized_answer",
+        },
+        terminal_error_code: "missing_evidence_reentry",
+      },
+      expectedFailureRail: "evidence_not_reentered",
+    },
+    {
+      label: "terminal product not allowed",
+      payloadPatch: {
+        route_product_contract: {
+          schema: "helix.route_product_contract.v1",
+          allowed_terminal_artifact_kinds: ["typed_failure"],
+          required_terminal_kind: "model_synthesized_answer",
+        },
+        canonical_goal_frame: {
+          goal_kind: "tool_request",
+          required_terminal_kind: "model_synthesized_answer",
+        },
+        terminal_error_code: "route_terminal_product_not_allowed",
+      },
+      expectedFailureRail: "terminal_product_not_allowed",
+    },
+    {
+      label: "visible projection mismatch",
+      payloadPatch: {
+        route_product_contract: {
+          schema: "helix.route_product_contract.v1",
+          allowed_terminal_artifact_kinds: ["typed_failure"],
+          required_terminal_kind: "model_synthesized_answer",
+        },
+        canonical_goal_frame: {
+          goal_kind: "tool_request",
+          required_terminal_kind: "model_synthesized_answer",
+        },
+        terminal_error_code: "terminal_projection_mismatch",
+      },
+      expectedFailureRail: "visible_projection_mismatch",
+    },
+  ])("records procedure trace failure rail for $label", ({ payloadPatch, expectedFailureRail }) => {
+    const turnId = `ask:test:procedure-trace:${expectedFailureRail}`;
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      selected_final_answer: "I could not produce a terminal answer for this turn.",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      ...payloadPatch,
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: [],
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.ask_turn_procedure_trace).toMatchObject({
+      schema: "helix.ask_turn_procedure_trace.v1",
+      selected_terminal_product: expect.objectContaining({
+        kind: "typed_failure",
+      }),
+      visible_answer_source: "typed_failure",
+      failure_rail: expectedFailureRail,
+    });
   });
 
   it("quarantines workstation circuit observations until solver authority selects a terminal answer", () => {
@@ -2241,6 +2927,19 @@ describe("Helix terminal authority single writer", () => {
       materialized_terminal_artifact_kind: "workstation_tool_evaluation",
       materialized_terminal_artifact_ref: `${turnId}:workstation_tool_evaluation:1`,
     });
+    expect(payload.ask_turn_procedure_trace).toMatchObject({
+      schema: "helix.ask_turn_procedure_trace.v1",
+      intent_class: "calculator_solve",
+      evidence_reentry_status: "reentered",
+      admitted_capabilities: expect.arrayContaining(["scientific-calculator.solve_expression"]),
+      allowed_terminal_products: expect.arrayContaining(["workstation_tool_evaluation"]),
+      selected_terminal_product: expect.objectContaining({
+        kind: "workstation_tool_evaluation",
+        allowed_by_route: true,
+      }),
+      visible_answer_source: "workstation_tool_evaluation",
+      failure_rail: null,
+    });
 
     const index = buildArtifactQueryIndex({ turnId, payload });
     expect(index.tool_turn_chain_audit).toMatchObject({
@@ -2752,6 +3451,18 @@ describe("Helix terminal authority single writer", () => {
     expect(result.visible_text).toBe("Created note: hh");
     expect(payload.terminal_artifact_kind).toBe("note_update_receipt");
     expect(payload.final_answer_source).toBe("note_update_receipt");
+    expect(payload.ask_turn_procedure_trace).toMatchObject({
+      schema: "helix.ask_turn_procedure_trace.v1",
+      intent_class: "note_mutation",
+      evidence_reentry_status: "reentered",
+      allowed_terminal_products: expect.arrayContaining(["note_update_receipt"]),
+      selected_terminal_product: expect.objectContaining({
+        kind: "note_update_receipt",
+        allowed_by_route: true,
+      }),
+      visible_answer_source: "note_update_receipt",
+      failure_rail: null,
+    });
   });
 
   it("blocks receipt terminals for multi-subgoal compound synthesis turns", () => {
@@ -2909,6 +3620,29 @@ describe("Helix terminal authority single writer", () => {
     expect(payload.final_answer_source).toBe("typed_failure");
     expect(payload.terminal_error_code).toBe("post_tool_model_step_missing");
     expect(String(payload.selected_final_answer)).toContain("follow-up model answer step");
+    expect(payload.terminal_rejection_observations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          schema: "helix.terminal_rejection_observation.v1",
+          rejection_reason: "missing_post_tool_model_step",
+          recoverable: true,
+          retryability: "retryable",
+          terminal_eligible: false,
+          assistant_answer: false,
+        }),
+      ]),
+    );
+    expect(payload.agent_continuation_state).toMatchObject({
+      schema: "helix.agent_continuation_state.v1",
+      trigger: "terminal_rejection",
+      last_attempt: {
+        failure_class: "terminal_authority",
+        retryability: "retryable",
+      },
+      allowed_decisions: expect.arrayContaining(["retry", "answer"]),
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
   });
 
   it("rejects stale no-context model fallbacks after live-source observations exist", () => {
@@ -3777,6 +4511,208 @@ describe("Helix terminal authority single writer", () => {
     });
     expect(payload.final_answer_source).toBe("final_answer_draft");
     expect(payload.terminal_artifact_kind).toBe("compound_evidence_synthesis_answer");
+  });
+
+  it.each([
+    {
+      label: "all compound observations selected",
+      includeSecondObservation: true,
+      expectedKind: "compound_evidence_synthesis_answer",
+      expectedError: undefined,
+    },
+    {
+      label: "one compound observation omitted",
+      includeSecondObservation: false,
+      expectedKind: "typed_failure",
+      expectedError: "compound_subgoal_support_refs_missing",
+    },
+  ])("materializes provider compound synthesis when $label", ({
+    includeSecondObservation,
+    expectedKind,
+    expectedError,
+  }) => {
+    const turnId = `ask:test:provider-compound-route-product:${includeSecondObservation ? "complete" : "missing"}`;
+    const workspaceSubgoalId = `${turnId}:subgoal:workspace`;
+    const moralSubgoalId = `${turnId}:subgoal:moral`;
+    const workspaceObservationRef = `${turnId}:workspace_os_status_observation`;
+    const moralObservationRef = `${turnId}:moral_graph_reflection`;
+    const selectedObservationRefs = includeSecondObservation
+      ? [workspaceObservationRef, moralObservationRef]
+      : [workspaceObservationRef];
+    const answerText = "Workspace status and Moral Graph observations were jointly interpreted, with diagnostic boundaries preserved.";
+    const executionState = {
+      schema: "helix.capability_itinerary_execution_state.v1",
+      turn_id: turnId,
+      applies: true,
+      complete: true,
+      required_observation_families: ["workspace_diagnostic", "moral_graph"],
+      missing_observation_families: [],
+      compound_subgoal_ledger: [
+        {
+          subgoal_id: workspaceSubgoalId,
+          requested_capability: "workspace_os.status",
+          selected_capability: "workspace_os.status",
+          executed_capability: "workspace_os.status",
+          observation_kind: "workspace_os_status_observation",
+          observation_ref: workspaceObservationRef,
+          satisfaction: "satisfied",
+          rail_status: "complete",
+        },
+        {
+          subgoal_id: moralSubgoalId,
+          requested_capability: "moral-graph.reflect_context",
+          selected_capability: "moral-graph.reflect_context",
+          executed_capability: "moral-graph.reflect_context",
+          observation_kind: "moral_graph_reflection",
+          observation_ref: moralObservationRef,
+          satisfaction: "satisfied",
+          rail_status: "complete",
+        },
+      ],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:capability_itinerary_execution_state`,
+        kind: "capability_itinerary_execution_state",
+        payload: executionState,
+      },
+      {
+        artifact_id: workspaceObservationRef,
+        kind: "workspace_os_status_observation",
+        payload: {
+          schema: "helix.workspace_os_status_observation.v1",
+          turn_id: turnId,
+          capability_key: "workspace_os.status",
+          compound_subgoal_id: workspaceSubgoalId,
+          status: "succeeded",
+        },
+      },
+      {
+        artifact_id: moralObservationRef,
+        kind: "moral_graph_reflection",
+        payload: {
+          schema: "helix.moral_graph_reflection_observation.v1",
+          turn_id: turnId,
+          capability_key: "moral-graph.reflect_context",
+          compound_subgoal_id: moralSubgoalId,
+          status: "succeeded",
+        },
+      },
+    ];
+    const providerCandidateRef = `${turnId}:agent_provider_terminal_candidate:codex:compound`;
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      active_prompt: "Check workspace status, reflect through the Moral Graph, and synthesize what both observations support.",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "runtime_evidence",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+        allowed_terminal_artifact_kinds: [
+          "compound_evidence_synthesis_answer",
+          "model_synthesized_answer",
+          "typed_failure",
+        ],
+      },
+      canonical_goal_frame: {
+        goal_kind: "compound_tool",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+      },
+      compound_capability_contract: {
+        schema: "helix.compound_capability_contract.v1",
+        turn_id: turnId,
+        prompt_shape: "compound_capability",
+        requires_all_subgoals: true,
+        terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+        subgoals: [
+          {
+            subgoal_id: workspaceSubgoalId,
+            capability_family: "workspace_diagnostic",
+            requested_capability: "workspace_os.status",
+          },
+          {
+            subgoal_id: moralSubgoalId,
+            capability_family: "moral_graph",
+            requested_capability: "moral-graph.reflect_context",
+          },
+        ],
+      },
+      capability_itinerary_execution_state: executionState,
+      current_turn_artifact_ledger: artifacts,
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        thread_id: "thread:test",
+        turn_id: turnId,
+        route: "/ask",
+        terminal_kind: "answer",
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        terminal_item_id: providerCandidateRef,
+        server_authoritative: true,
+        terminal_eligible: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        turn_id: turnId,
+        concise_text: answerText,
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_authority_ref: providerCandidateRef,
+        selected_observation_refs: selectedObservationRefs,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      provider_terminal_candidate: {
+        schema: "helix.agent_provider_terminal_candidate.v1",
+        candidate_id: providerCandidateRef,
+        candidate_text: answerText,
+        grounded_in_observation_refs: selectedObservationRefs,
+        normalized_observation_refs: selectedObservationRefs,
+        evidence_reentry_required: true,
+        provider_reasoning_completed: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+      solver_continuation_observation: {
+        schema: "helix.solver_continuation_observation.v1",
+        required_next_step: "model.direct_answer",
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe(expectedKind);
+    expect(payload.terminal_artifact_kind).toBe(expectedKind);
+    expect(payload.terminal_error_code).toBe(expectedError);
+    if (includeSecondObservation) {
+      expect(result.visible_text).toBe(answerText);
+      expect(payload.provider_route_product_materialization).toMatchObject({
+        materialized_terminal_artifact_kind: "compound_evidence_synthesis_answer",
+        selected_observation_refs: [workspaceObservationRef, moralObservationRef],
+        status: "materialized",
+      });
+      expect(payload.provider_route_product_compound_support_coverage).toMatchObject({
+        applies: true,
+        ok: true,
+        missing_observation_refs: [],
+      });
+    } else {
+      expect(payload.provider_route_product_compound_support_coverage).toMatchObject({
+        applies: true,
+        ok: false,
+        missing_observation_refs: [moralObservationRef],
+      });
+      expect(String(payload.selected_final_answer)).toContain("provider-authored terminal synthesis");
+    }
   });
 
   it("allows compound calculator drafts grounded through workstation evaluation evidence refs", () => {

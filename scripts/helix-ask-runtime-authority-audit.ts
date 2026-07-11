@@ -11,6 +11,7 @@ type P2Bucket =
 
 type Finding = {
   severity: Severity;
+  procedural_role: ProceduralRole;
   p2_bucket?: P2Bucket;
   code: string;
   file: string;
@@ -18,6 +19,14 @@ type Finding = {
   text: string;
   reason: string;
 };
+
+type ProceduralRole =
+  | "authority_writer"
+  | "backend_serializer_or_materializer"
+  | "client_projection"
+  | "debug_only_mirror"
+  | "legacy_compatibility"
+  | "unclassified";
 
 const args = new Set(process.argv.slice(2));
 const strict = args.has("--strict");
@@ -103,16 +112,46 @@ function isClientProjectionFile(file: string): boolean {
   return file.startsWith("client/");
 }
 
+function proceduralRoleForFile(file: string): ProceduralRole {
+  if (file.startsWith("client/")) {
+    return file.includes("HelixAskPill") || file.includes("ask-console/")
+      ? "legacy_compatibility"
+      : "client_projection";
+  }
+  if (file === "server/services/helix-ask/terminal-authority-single-writer.ts" ||
+      file === "server/services/helix-ask/turn-terminal-authority.ts") {
+    return "authority_writer";
+  }
+  if (/server\/services\/helix-ask\/(?:turn-finalizer|solver-controller-payload-adapter|runtime-final-answer-composer|solver-hard-gate-terminal-candidate|terminal-product-materializers|scholarly-terminal-authority-refresh)\.ts$/.test(file)) {
+    return "backend_serializer_or_materializer";
+  }
+  if (/server\/services\/helix-ask\/(?:debug\/|golden-path\/|agent-providers\/provider-response-projection\.ts$)/.test(file) ||
+      file === "client/src/lib/agi/debugExport.ts") {
+    return "debug_only_mirror";
+  }
+  return "unclassified";
+}
+
 function isAuditSelfReference(file: string): boolean {
   return approvedAuditFiles.has(file);
 }
 
 function isClientProjectionCompatibilityLine(file: string, trimmed: string): boolean {
   if (!isClientProjectionFile(file)) return false;
-  if (/resolveHelixVisibleTerminal|terminalResolution|visibleTerminal|visibleResolvedTurn|debug|parity|snapshot|export|invariant/i.test(trimmed)) {
+  if (/resolveHelixVisibleTerminal|terminalResolution|visibleTerminal|visibleResolvedTurn|debug|parity|snapshot|export|invariant|chat_backend_observation|backend_ask|result\.(?:final_answer_source|terminal_artifact_kind|terminal_error_code)/i.test(trimmed)) {
     return true;
   }
   return /^\w[\w$]*:\s*/.test(trimmed);
+}
+
+function isGuardedCodexActionEnvelopeProjection(file: string, content: string, trimmed: string): boolean {
+  if (file !== "server/services/helix-ask/agent-providers/codex-provider.ts") return false;
+  if (!/action_envelope\s*:\s*actionEnvelope/.test(trimmed)) return false;
+  return (
+    content.includes('answer_authority: "none"') &&
+    content.includes("terminal_eligible: false") &&
+    content.includes("buildCodexActionEnvelopeFromReceipts")
+  );
 }
 
 function isReadOnlyDiagnosticFile(file: string): boolean {
@@ -140,6 +179,7 @@ function classifyFinding(file: string, content: string, lineNumber: number, line
     if (isClientProjectionFile(file)) {
       return {
         severity: "P2",
+        procedural_role: "client_projection",
         p2_bucket: isClientProjectionCompatibilityLine(file, trimmed)
           ? "P2_LEGACY_COMPATIBILITY"
           : "P2_REAL_PROJECTION_RISK",
@@ -152,6 +192,7 @@ function classifyFinding(file: string, content: string, lineNumber: number, line
     }
     return {
       severity: "P1",
+      procedural_role: proceduralRoleForFile(file),
       code: "terminal_write_outside_boundary",
       file,
       line: lineNumber,
@@ -161,10 +202,12 @@ function classifyFinding(file: string, content: string, lineNumber: number, line
   }
 
   if (actionWritePattern.test(trimmed)) {
+    if (isGuardedCodexActionEnvelopeProjection(file, content, trimmed)) return null;
     if (declarationDepth > 0 && isDeclarationOnlyLine(trimmed)) return null;
     if (lineHasRuntimeGuard(trimmed) || /debug|test|snapshot|type|interface/i.test(trimmed)) return null;
     return {
       severity: "P0",
+      procedural_role: proceduralRoleForFile(file),
       code: "action_write_without_agent_step_guard",
       file,
       line: lineNumber,
@@ -177,6 +220,7 @@ function classifyFinding(file: string, content: string, lineNumber: number, line
     if (isBoundaryCallDefinitionOrImport(trimmed)) return null;
     return {
       severity: "P1",
+      procedural_role: proceduralRoleForFile(file),
       code: "terminal_authority_boundary_callsite",
       file,
       line: lineNumber,
@@ -188,6 +232,7 @@ function classifyFinding(file: string, content: string, lineNumber: number, line
   if (shortcutPattern.test(trimmed) && !/candidate|forbidden|test|contract|type|interface/i.test(trimmed)) {
     return {
       severity: "P2",
+      procedural_role: proceduralRoleForFile(file),
       p2_bucket: isAuditSelfReference(file) ? "P2_AUDIT_SELF_REFERENCE" : "P2_LEGACY_COMPATIBILITY",
       code: "legacy_shortcut_marker",
       file,
@@ -234,14 +279,24 @@ const p2Buckets: Record<P2Bucket, number> = {
   P2_LEGACY_COMPATIBILITY: 0,
   P2_AUDIT_SELF_REFERENCE: 0,
 };
+const proceduralRoles: Record<ProceduralRole, number> = {
+  authority_writer: 0,
+  backend_serializer_or_materializer: 0,
+  client_projection: 0,
+  debug_only_mirror: 0,
+  legacy_compatibility: 0,
+  unclassified: 0,
+};
 for (const finding of findings) {
   if (finding.p2_bucket) p2Buckets[finding.p2_bucket] += 1;
+  proceduralRoles[finding.procedural_role] += 1;
 }
 
 if (json) {
-  console.log(JSON.stringify({ schema: "helix.ask.runtime_authority_audit.v1", finding_count: findings.length, counts: { P0: p0.length, P1: p1.length, P2: p2.length, ...p2Buckets }, findings }, null, 2));
+  console.log(JSON.stringify({ schema: "helix.ask.runtime_authority_audit.v1", finding_count: findings.length, counts: { P0: p0.length, P1: p1.length, P2: p2.length, ...p2Buckets, procedural_roles: proceduralRoles }, findings }, null, 2));
 } else {
   console.log(`Helix Ask runtime authority audit: ${findings.length} findings (P0=${p0.length}, P1=${p1.length}, P2=${p2.length}, P2_REAL_PROJECTION_RISK=${p2Buckets.P2_REAL_PROJECTION_RISK}, P2_ACTION_EXECUTION_RISK=${p2Buckets.P2_ACTION_EXECUTION_RISK})`);
+  console.log(`Procedural roles: ${Object.entries(proceduralRoles).map(([role, count]) => `${role}=${count}`).join(", ")}`);
   for (const finding of findings.slice(0, 120)) {
     console.log(`${finding.severity} ${finding.code} ${finding.file}:${finding.line}`);
     console.log(`  ${finding.text.slice(0, 220)}`);

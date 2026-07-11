@@ -1676,6 +1676,76 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(parsed.selected_final_answer).toBe(boundaryFinal);
   });
 
+  it("drops stale reply debug when the rendered Docs turn has newer prompt identity", () => {
+    const docsQuestion =
+      "According to the currently open status whitepaper, what are the unresolved technical blockers?";
+    const docsFinal =
+      "I could not produce a terminal answer because the selected terminal product did not match the committed Ask route.";
+    const staleQuestion =
+      "Reflect local adaptation through the Theory Badge Graph and keep it diagnostic.";
+    const staleTurnId = "ask:stale-theory-turn";
+    const questionNode = {
+      innerText: `1Questionquestion${docsQuestion}user prompt`,
+      textContent: `1Questionquestion${docsQuestion}user prompt`,
+      getAttribute: () => null,
+    };
+    const finalNode = {
+      innerText: `15Final answerfinal${docsFinal}typed failure`,
+      textContent: `15Final answerfinal${docsFinal}typed failure`,
+      getAttribute: (name: string) => name === "data-final-answer-text" ? docsFinal : null,
+    };
+    const visibleTurnContainer = {
+      innerText: "",
+      textContent: "",
+      parentElement: null,
+      querySelector: (selector: string) => {
+        if (selector.includes("question")) return questionNode;
+        if (selector.includes("final")) return finalNode;
+        return null;
+      },
+    } as unknown as HTMLElement;
+    const debugButton = {
+      innerText: "",
+      textContent: "",
+      parentElement: visibleTurnContainer,
+      getAttribute: (name: string) => {
+        if (name === "data-debug-copy-active-turn-id" || name === "data-turn-control-active-turn-id") return staleTurnId;
+        if (name === "data-debug-copy-client-turn-id" || name === "data-turn-control-client-turn-id") return "reply-docs-visible";
+        if (name === "data-debug-copy-question" || name === "data-turn-control-question") return docsQuestion;
+        if (name === "data-debug-copy-final-answer" || name === "data-turn-control-final-answer") return docsFinal;
+        return null;
+      },
+      querySelector: () => null,
+    } as unknown as HTMLElement;
+
+    const exportText = buildReplyScopedDebugExportFromRenderedButton({
+      id: "reply-docs-visible",
+      question: docsQuestion,
+      content: docsFinal,
+      debug: {
+        turn_id: staleTurnId,
+        active_prompt: staleQuestion,
+        selected_final_answer: "Theory context reflection answer.",
+        debug_export_ref: {
+          endpoint: `/api/agi/ask/turn/${encodeURIComponent(staleTurnId)}/debug-export`,
+          turn_id: staleTurnId,
+        },
+      },
+    } as any, debugButton, "rendered_button_scope");
+
+    expect(exportText).toBeTruthy();
+    const parsed = JSON.parse(exportText ?? "{}");
+    expect(parsed.active_turn_id).toBe("reply-docs-visible");
+    expect(parsed.active_prompt).toBe(docsQuestion);
+    expect(parsed.selected_final_answer).toBe(docsFinal);
+    expect(parsed.debug).not.toMatchObject({
+      active_prompt: staleQuestion,
+      selected_final_answer: "Theory context reflection answer.",
+    });
+    expect(parsed.debug_export_ref ?? null).toBeNull();
+    expect(parsed.backend_debug_response_ref ?? null).toBeNull();
+  });
+
   it("lets the visible row veto stale debug-copy button attributes", () => {
     const boundaryQuestion = "UI debug binding retest 178295-second prompt";
     const boundaryFinal = "Paper-backed values are needed before calculator use.";

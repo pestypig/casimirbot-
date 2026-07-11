@@ -58,6 +58,19 @@ export type HelixCompoundTerminalPolicy = {
 export const readCompoundTerminalPolicy = (
   payload: RecordLike | null | undefined,
 ): HelixCompoundTerminalPolicy => {
+  const canonicalGoalFrame = readRecord(payload?.canonical_goal_frame);
+  if (
+    readString(canonicalGoalFrame?.goal_kind) === "capability_help" ||
+    readString(canonicalGoalFrame?.required_terminal_kind) === "capability_help_summary"
+  ) {
+    return {
+      active: false,
+      allowed_terminal_artifact_kinds: [],
+      forbidden_terminal_artifact_kinds: [],
+      required_terminal_kind: null,
+      source: null,
+    };
+  }
   const runtimeIntentPacket = readRecord(payload?.runtime_intent_packet);
   const debug = readRecord(payload?.debug);
   const debugRuntimeIntentPacket = readRecord(debug?.runtime_intent_packet);

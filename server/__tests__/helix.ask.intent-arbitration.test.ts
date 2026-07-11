@@ -156,6 +156,28 @@ describe("Helix Ask intent arbitration", () => {
     expect(arbitration.selected_primary_intent_kind).toBe("debug_diagnosis");
   });
 
+  it("does not turn a Theory reflection constraint into debug diagnosis", () => {
+    const prompt =
+      "Reflect this idea through the Theory Badge Graph: which concepts support it and what remains speculative? Do not use web or paper evidence yet.";
+    const { arbitration, promptInterpretation, hypotheses } = runArbitration({
+      prompt,
+      selectedRoute: "/ask",
+      sourceTarget: "theory_locator",
+      routeCandidates: [{ route: "/ask", confidence: 0.82 }],
+      terminalProductsAllowed: ["theory_context_reflection_answer", "typed_failure"],
+    });
+
+    expect(promptInterpretation.contextual_tool_mentions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          reason: "negated",
+        }),
+      ]),
+    );
+    expect(hypotheses.map((entry) => entry.kind)).not.toContain("debug_diagnosis");
+    expect(arbitration.selected_primary_intent_kind).toBe("general_reasoning");
+  });
+
   it("uses debug/general reasoning with negative constraints to suppress mutating routes", () => {
     const { arbitration, promptInterpretation } = runArbitration({
       prompt: "Open nothing and run nothing; just reason from these debug facts.",

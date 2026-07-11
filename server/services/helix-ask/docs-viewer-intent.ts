@@ -42,6 +42,80 @@ export function extractUnquotedDocsMarkdownPaths(prompt: string): string[] {
     .filter((path, index, all) => all.indexOf(path) === index);
 }
 
+export function extractExplicitDocsLocateTerms(prompt: string): string[] {
+  const unquoted = maskQuotedSegments(prompt);
+  const locateClause = unquoted.match(
+    /\b(?:find|locate|search\s+for)\b[\s\S]{0,40}?\b(?:every\s+)?occurrences?\s+of\s+([\s\S]*?)(?=\s*\.\s*(?:for\s+each|return|provide|do\s+not|don't)\b|\s+for\s+each\b|$)/i,
+  )?.[1];
+  if (!locateClause) return [];
+
+  const terms = locateClause
+    .split(/\s*(?:,|\band\b|\bor\b)\s*/i)
+    .map((term) => term.trim().replace(/^[`'"“”]+|[`'"“”]+$/g, ""))
+    .map((term) => term.replace(/[.;:!?]+$/g, "").trim())
+    .filter((term) => term.length > 0 && term.length <= 200);
+  return Array.from(new Set(terms)).slice(0, 8);
+}
+
+export type ExplicitDocsSectionRequest = {
+  heading: string;
+  headings: string[];
+  contains_terms: string[];
+  match_unit: "line" | "sentence" | "paragraph";
+};
+
+export function extractExplicitDocsSectionRequest(prompt: string): ExplicitDocsSectionRequest | null {
+  const firstHeadingMatch = prompt.match(
+    /\bsections?\s+(?:titled\s+)?["'`“”‘’]([^"'`“”‘’\r\n]{1,240})["'`“”‘’]/i,
+  );
+  const firstHeading = firstHeadingMatch?.[1]?.trim().replace(/[,:;.!?]+$/g, "").trim();
+  if (!firstHeading || firstHeadingMatch?.index === undefined) return null;
+  const headings = [firstHeading];
+  let previousHeadingHadListComma = /,\s*$/.test(firstHeadingMatch[1] ?? "");
+  let remainder = prompt.slice(firstHeadingMatch.index + firstHeadingMatch[0].length);
+  while (headings.length < 4) {
+    const next = remainder.match(previousHeadingHadListComma
+      ? /^\s*(?:and\s+)?["'`“”‘’]([^"'`“”‘’\r\n]{1,240})["'`“”‘’]/i
+      : /^\s*(?:,|and)\s*["'`“”‘’]([^"'`“”‘’\r\n]{1,240})["'`“”‘’]/i);
+    const nextHeading = next?.[1]?.trim().replace(/[,:;.!?]+$/g, "").trim();
+    if (!next || !nextHeading) break;
+    headings.push(nextHeading);
+    previousHeadingHadListComma = /,\s*$/.test(next[1] ?? "");
+    remainder = remainder.slice(next[0].length);
+  }
+
+  const containsClauseMatches = Array.from(prompt.matchAll(
+    /\b(?:source\s+)?(sentences?|lines?|paragraphs?)\s+(?:that\s+)?contain(?:s|ing)?\s+([\s\S]*?)(?=\s+\band\b\s+(?:source\s+)?(?:sentences?|lines?|paragraphs?)\s+(?:that\s+)?contain(?:s|ing)?\b|\s+with\s+(?:complete|full|original|verbatim|line-numbered)\b|,\s*(?:preserv(?:e|ing)|keep(?:ing)?|report(?:ing)?|group(?:ing)?|return(?:ing)?|output(?:ting)?)\b|\.\s+(?=[A-Z])|\s*\.\s*(?:exclude|preserve|return|provide|include|group|output|do\s+not|don't)\b|\s+(?:exclude|preserve|return|provide|include|group|output|do\s+not|don't)\b|$)/gi,
+  ));
+  const containsClauses = containsClauseMatches.map((match) => match[2] ?? "");
+  const containsTerms = containsClauses
+    .flatMap((clause) => {
+      const quotedTerms = Array.from(clause.matchAll(
+        /[`"'“”‘’]([^`"'“”‘’\r\n]{1,200})[`"'“”‘’]/g,
+      )).map((match) => match[1] ?? "");
+      return quotedTerms.length > 0
+        ? quotedTerms
+        : clause.split(/\s*(?:,|\band\b|\bor\b)\s*/i);
+    })
+    .map((term) => term.trim().replace(/^[`'"“”‘’]+|[`'"“”‘’]+$/g, ""))
+    .map((term) => term.replace(
+      /^(?:the\s+)?(?:(?:exact|literal|case[-\s]?sensitive|lowercase|uppercase)\s+)*(?:term|token)\s+/i,
+      "",
+    ))
+    .map((term) => term.replace(/[.;:!?]+$/g, "").trim())
+    .filter((term) => term.length > 0 && term.length <= 200);
+  return {
+    heading: headings[0],
+    headings,
+    contains_terms: Array.from(new Set(containsTerms)).slice(0, 8),
+    match_unit: containsClauseMatches.some((match) => /^lines?$/i.test(match[1] ?? ""))
+      ? "line"
+      : containsClauseMatches.some((match) => /^paragraphs?$/i.test(match[1] ?? ""))
+        ? "paragraph"
+        : "sentence",
+  };
+}
+
 export function hasExplicitRepoCodeScope(prompt: string): boolean {
   return EXPLICIT_REPO_SCOPE_RE.test(prompt);
 }

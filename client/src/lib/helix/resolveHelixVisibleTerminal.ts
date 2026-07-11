@@ -422,6 +422,7 @@ export function resolveHelixVisibleTerminal(
   const selectedFinalAnswerIsBackendSelectedModelOnlyText =
     !terminalErrorCode &&
     !sourceCapabilityTurn &&
+    authorityVerified &&
     !envelope &&
     !terminalResultText &&
     !(

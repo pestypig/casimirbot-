@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { resolveMobileSurfaceSwipe } from "@/components/workstation/HelixWorkstationShell";
 
 describe("HelixWorkstationShell layout contract", () => {
   it("anchors the desktop workstation grid to the viewport", () => {
@@ -22,5 +23,13 @@ describe("HelixWorkstationShell layout contract", () => {
     expect(source).toContain("const chatStoreHydrated = useAgiChatStore((state) => state.hydrated)");
     expect(source).toContain("if (!chatStoreHydrated) return;");
     expect(source).toContain("ensureContextSession(HELIX_ASK_CONTEXT_ID.desktop");
+  });
+
+  it("switches mobile surfaces only for intentional horizontal swipes", () => {
+    expect(resolveMobileSurfaceSwipe({ surface: "ask", deltaX: 80, deltaY: 10 })).toBe("workstation");
+    expect(resolveMobileSurfaceSwipe({ surface: "workstation", deltaX: -80, deltaY: 10 })).toBe("ask");
+    expect(resolveMobileSurfaceSwipe({ surface: "ask", deltaX: -80, deltaY: 10 })).toBeNull();
+    expect(resolveMobileSurfaceSwipe({ surface: "ask", deltaX: 40, deltaY: 5 })).toBeNull();
+    expect(resolveMobileSurfaceSwipe({ surface: "ask", deltaX: 80, deltaY: 70 })).toBeNull();
   });
 });

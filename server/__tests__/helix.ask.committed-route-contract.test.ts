@@ -644,6 +644,39 @@ describe("Helix Ask committed route contract", () => {
     expect(admission.reason).toBe("capability_allowed_by_committed_route");
   });
 
+  it("admits an explicit capability's semantic family alongside its gateway transport family", () => {
+    const prompt = "Use only the Moral Graph. Reflect on whether I should apologize after snapping at a coworker.";
+    const committedRoute = buildCommittedAskRoute({
+      turnId: "ask:test:moral-graph-semantic-family",
+      promptText: prompt,
+      selectedRoute: "/ask",
+      payload: {
+        turn_id: "ask:test:moral-graph-semantic-family",
+        tool_call_admission_decision: {
+          requested_capability: "moral-graph.reflect_context",
+          selected_capability: "moral-graph.reflect_context",
+          admitted_tool_families: ["workstation_action"],
+        },
+      },
+    });
+
+    expect(committedRoute.route.source_target).toBe("moral_graph");
+    expect(committedRoute.capability_policy.allowed_tool_families).toEqual(
+      expect.arrayContaining(["workstation_action", "moral_graph_reflection"]),
+    );
+    expect(committedRoute.capability_policy.required_capability_families).toContain("moral_graph_reflection");
+    expect(assertCapabilityAllowedByCommittedRoute({
+      committedRoute,
+      capabilityId: "moral-graph.reflect_context",
+      fromShortcut: true,
+    })).toMatchObject({ allowed: true, inferred_family: "moral_graph_reflection" });
+    expect(assertCapabilityAllowedByCommittedRoute({
+      committedRoute,
+      capabilityId: "internet-search.search_web",
+      fromShortcut: true,
+    })).toMatchObject({ allowed: false, reason: "selected_capability_not_allowed_by_committed_route" });
+  });
+
   it("projects route evidence authority without turning candidates into terminal authority", () => {
     const committedRoute = buildCommittedAskRoute({
       turnId,

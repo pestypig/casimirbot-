@@ -19,6 +19,27 @@ const readActionEnvelope = (result: HelixAskMinimalRuntimeTransportResult): unkn
   return result.action_envelope ?? debug?.action_envelope ?? null;
 };
 
+export function isBackendAuthorizedWorkstationReceiptTerminal(
+  result: unknown,
+  receiptKind: string,
+): boolean {
+  if (!receiptKind.trim()) return false;
+  const record = readRecord(result);
+  const debug = readRecord(record?.debug);
+  const candidates = [
+    readRecord(record?.terminal_answer_authority),
+    readRecord(debug?.terminal_answer_authority),
+    readRecord(record?.terminal_answer_envelope),
+    readRecord(debug?.terminal_answer_envelope),
+  ];
+  return candidates.some((candidate) =>
+    candidate?.server_authoritative === true &&
+    candidate?.terminal_artifact_kind === receiptKind &&
+    candidate?.terminal_kind !== "failure" &&
+    candidate?.final_answer_source !== "typed_failure",
+  );
+}
+
 const buildClientAck = (
   result: HelixAskWorkstationActionDispatchResult,
   createdAtMs: number,
@@ -67,22 +88,27 @@ export async function applyHelixAskWorkstationActionsFromResult(args: {
     .map((entry) => buildClientAck(entry, Date.now()))
     .filter((entry): entry is Record<string, unknown> => Boolean(entry));
   const receiptTerminal = resolveHelixAskWorkstationReceiptTerminal(dispatchResults);
+  const receiptTerminalIsBackendAuthorized = Boolean(
+    receiptTerminal &&
+    isBackendAuthorizedWorkstationReceiptTerminal(args.result, receiptTerminal.receipt_kind),
+  );
   const debug = {
     ...(readRecord(args.result.debug) ?? {}),
     workspace_action_client_ack: clientAck,
     ...(receiptTerminal
       ? {
         client_receipt_terminal: receiptTerminal,
-        selected_final_answer: receiptTerminal.text,
-        final_answer_source: "client_workstation_receipt",
-        terminal_artifact_kind: receiptTerminal.receipt_kind,
+        ...(receiptTerminalIsBackendAuthorized
+          ? {}
+          : { client_receipt_terminal_authority: "observation_only" }),
       }
       : {}),
   };
 
-  if (!receiptTerminal) {
+  if (!receiptTerminal || !receiptTerminalIsBackendAuthorized) {
     return {
       ...args.result,
+      ...(receiptTerminal ? { client_receipt_terminal: receiptTerminal } : {}),
       debug,
       workspace_action_client_ack: clientAck,
     };
@@ -90,10 +116,6 @@ export async function applyHelixAskWorkstationActionsFromResult(args: {
 
   return {
     ...args.result,
-    text: receiptTerminal.text,
-    selected_final_answer: receiptTerminal.text,
-    final_answer_source: "client_workstation_receipt",
-    terminal_artifact_kind: receiptTerminal.receipt_kind,
     client_receipt_terminal: receiptTerminal,
     workspace_action_client_ack: clientAck,
     debug,

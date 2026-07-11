@@ -17,6 +17,7 @@ import {
 import { detectInternetSearchIntent } from "./internet-search-intent";
 import { detectRepoCodeEvidenceIntent } from "./repo-code-intent-detector";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
+import { isAskTurnCapabilityHelpIntent } from "./capability-catalog-intent";
 import {
   isStagePlayCheckpointRequestPrompt,
   isStagePlayJobPlanningPrompt,
@@ -235,6 +236,40 @@ export function buildAskEvidenceTargetArbitration(input: {
       reason_codes: candidate.reason_codes,
       reason: "route_metadata_stage_play_mail_wake",
       locked: true,
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+      terminal_product_constraints: candidate.terminal_product_constraints,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "admission_control",
+    };
+  }
+  if (isAskTurnCapabilityHelpIntent(prompt)) {
+    const candidate = makeCandidate({
+      candidateId: "runtime_evidence.capability_catalog_help",
+      targetSource: "runtime_evidence",
+      targetKind: "runtime_evidence",
+      strength: "hard",
+      score: 1,
+      reasonCodes: ["capability_help_catalog_request", "capability_catalog_precedence"],
+      requestedOutputs: ["tool_call_eligibility", "terminal_contract"],
+      capabilityKeys: ["helix_ask.inspect_capability_catalog"],
+      terminalProductConstraints: ["capability_help_summary", "typed_failure"],
+    });
+    return {
+      schema: HELIX_ASK_EVIDENCE_TARGET_ARBITRATION_SCHEMA,
+      turn_id: input.turnId,
+      thread_id: input.threadId,
+      prompt_intent_candidates: ["capability_help"],
+      evidence_target_candidates: [candidate],
+      source_targets: ["runtime_evidence"],
+      available_capabilities: candidate.capability_keys,
+      disallowed_capabilities: [],
+      selected_candidate_id: candidate.candidate_id,
+      selected_target_source: candidate.target_source,
+      selected_target_kind: candidate.target_kind,
+      confidence: "high",
+      reason_codes: candidate.reason_codes,
       must_enter_backend_ask: true,
       allow_no_tool_direct: false,
       terminal_product_constraints: candidate.terminal_product_constraints,

@@ -15,6 +15,10 @@ import {
   detectContextualToolAdmissionSuppression,
 } from "./contextual-tool-admission";
 import { WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS } from "./workstation-context-feed-query-tool-contracts";
+import {
+  HELIX_DOCS_OPEN_DOC_CAPABILITY,
+  HELIX_DOCS_SEARCH_CAPABILITY,
+} from "./docs-capability-contract";
 
 export type ExplicitCapabilityContract = {
   schema: "helix.explicit_capability_contract.v1";
@@ -417,6 +421,49 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   },
   {
     schema: "helix.explicit_capability_contract.v1",
+    capability: "runtime_evidence",
+    aliases: ["runtime-evidence", "runtime evidence"],
+    capability_family: "capability_catalog",
+    plan_family: "capability_catalog",
+    source_target: "runtime_evidence",
+    admission_families: ["capability_catalog", "runtime_evidence"],
+    required_observation_kinds: ["capability_registry"],
+    required_terminal_kind: "capability_help_summary",
+    allowed_substitutions: ["helix_ask.inspect_capability_catalog"],
+    forbidden_nearby_capabilities: ["repo-code.search_concept", "model.direct_answer"],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: "debug.inspect_current_turn",
+    aliases: ["debug.inspect-current-turn", "debug_current_turn", "diagnose_debug_or_runtime_evidence"],
+    capability_family: "capability_catalog",
+    plan_family: "capability_catalog",
+    source_target: "runtime_evidence",
+    admission_families: ["runtime_evidence"],
+    required_observation_kinds: ["agent_runtime_loop", "debug_evidence_diagnosis"],
+    required_terminal_kind: "capability_help_summary",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: ["repo-code.search_concept", "model.direct_answer"],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: "live_pipeline",
+    aliases: ["live-pipeline", "live_pipeline_control"],
+    capability_family: "live_environment",
+    plan_family: "live_environment",
+    source_target: "live_pipeline",
+    admission_families: ["live_pipeline"],
+    required_observation_kinds: [
+      "live_pipeline_receipt",
+      "visual_producer_cadence_receipt",
+      "tool_observation",
+    ],
+    required_terminal_kind: "workstation_tool_evaluation",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: ["model.direct_answer"],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
     capability: "scientific-calculator.solve_expression",
     aliases: [
       "calculator",
@@ -547,6 +594,7 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "docs-viewer.search_docs",
+    runtime_capability: HELIX_DOCS_SEARCH_CAPABILITY,
     aliases: ["docs_viewer.search_docs", "docs viewer search docs", "search docs"],
     capability_family: "docs_viewer",
     plan_family: "docs",
@@ -573,6 +621,7 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "docs-viewer.open_doc_by_path",
+    runtime_capability: HELIX_DOCS_OPEN_DOC_CAPABILITY,
     aliases: ["docs_viewer.open_doc_by_path", "docs viewer open doc by path", "open doc by path"],
     capability_family: "docs_viewer",
     plan_family: "docs",
@@ -586,6 +635,7 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "docs-viewer.locate_in_doc",
+    runtime_capability: HELIX_DOCS_SEARCH_CAPABILITY,
     aliases: [
       "docs_viewer.locate_in_doc",
       "docs_viewer locate",
@@ -609,6 +659,7 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "docs-viewer.summarize_doc",
+    runtime_capability: HELIX_DOCS_SEARCH_CAPABILITY,
     aliases: [
       "docs_viewer.summarize_doc",
       "docs_viewer summarize",
@@ -628,6 +679,7 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "docs-viewer.doc_equation_context",
+    runtime_capability: HELIX_DOCS_SEARCH_CAPABILITY,
     aliases: [
       "docs_viewer.doc_equation_context",
       "docs_viewer equation context",
@@ -1283,7 +1335,7 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
       "capability_lane_observation_packet",
       "helix.agent_step_observation_packet.v1",
     ],
-    required_terminal_kind: "agent_provider_terminal_candidate",
+    required_terminal_kind: "model_synthesized_answer",
     allowed_substitutions: ["live_env.request_interim_voice_callout"],
     forbidden_nearby_capabilities: ["model.direct_answer"],
     required_args: ["text"],
@@ -1305,6 +1357,7 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
       "theory_context_reflection",
       "theory_locator",
       "theory_badge_graph",
+      "theory badge graph",
     ],
     capability_family: "theory_locator",
     plan_family: "theory_locator",
@@ -1401,9 +1454,6 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
     capability: "moral-graph.reflect_context",
     aliases: [
       "helix_ask.reflect_moral_graph",
-      "helix_ask.reflect_ideology_context",
-      "reflect_ideology_context",
-      "ideology_context_reflection",
       "moral_badge_locator",
       "moral_graph_reflection",
       "moral graph reflection",
@@ -1430,10 +1480,6 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
     aliases: [
       "reflect_ideology_context",
       "ideology_context_reflection",
-      "moral_graph_reflection",
-      "moral graph reflection",
-      "moral_graph",
-      "moral graph",
     ],
     capability_family: "moral_graph_reflection",
     plan_family: "moral_graph_reflection",
@@ -1460,7 +1506,7 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
       "reflect_living_substrate_context",
       "reflect living substrate context",
     ],
-    capability_family: "moral_living_substrate_reflection",
+    capability_family: "context_reflection",
     plan_family: "context_reflection",
     source_target: "moral_graph",
     admission_families: ["context_reflection"],
@@ -1641,7 +1687,7 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
 const explicitCapabilityContracts: ExplicitCapabilityContract[] =
   explicitCapabilityContractDefinitions.map(normalizeExplicitCapabilityContract);
 
-const commandVerb = String.raw`(?:call|use|run|invoke|execute|inspect\s+using|locate\s+(?:in\s+doc\s+)?using|find\s+using)`;
+const commandVerb = String.raw`(?:call|use|run|invoke|execute|reflect(?:\s+on)?|inspect\s+using|locate\s+(?:in\s+doc\s+)?using|find\s+using)`;
 
 const uniqueStrings = (values: string[]): string[] => Array.from(new Set(values.filter(Boolean)));
 

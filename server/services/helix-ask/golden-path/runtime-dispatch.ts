@@ -1,4 +1,10 @@
-import { readRecord, type HelixAskGoldenPathRuntimeDecision, type RecordLike } from "./core";
+import { isAskTurnCapabilityHelpIntent } from "../capability-catalog-intent";
+import {
+  readHelixAskGoldenPathPrompt,
+  readRecord,
+  type HelixAskGoldenPathRuntimeDecision,
+  type RecordLike,
+} from "./core";
 import {
   createHelixAskGoldenPathRuntimeDependencies,
   type HelixAskGoldenPathRuntimeDependencies,
@@ -17,6 +23,10 @@ export const dispatchHelixAskGoldenPathRuntime = (args: {
     ...args.deps,
     ...(args.now ? { now: () => args.now as Date } : {}),
   });
+
+  if (!args.allowContractFallback && isAskTurnCapabilityHelpIntent(readHelixAskGoldenPathPrompt(body))) {
+    return { handled: false, reason: "capability_help_precedence" };
+  }
 
   for (const dispatchModule of orderedDispatchModules) {
     if (!dispatchModule.isRequested(body)) continue;

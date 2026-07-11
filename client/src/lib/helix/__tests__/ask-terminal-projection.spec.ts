@@ -189,6 +189,12 @@ describe("Helix Ask terminal projection", () => {
       selected_final_answer: "The Moral Graph reflection tool is a conceptual reflection surface.",
       final_answer_source: "agent_provider_terminal_candidate",
       terminal_artifact_kind: "agent_provider_terminal_candidate",
+      terminal_answer_authority: {
+        server_authoritative: true,
+        terminal_kind: "answer",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        final_answer_source: "agent_provider_terminal_candidate",
+      },
     });
 
     expect(visible.primary_terminal_label).toBe("final_answer");
@@ -502,9 +508,21 @@ describe("Helix Ask terminal projection", () => {
       text: staleFallback,
       selected_final_answer: answer,
       final_answer_source: "model_direct_answer",
+      terminal_answer_authority: {
+        server_authoritative: true,
+        terminal_kind: "answer",
+        terminal_artifact_kind: "direct_answer_text",
+        final_answer_source: "model_direct_answer",
+      },
       debug: {
         selected_final_answer: answer,
         final_answer_source: "model_direct_answer",
+        terminal_answer_authority: {
+          server_authoritative: true,
+          terminal_kind: "answer",
+          terminal_artifact_kind: "direct_answer_text",
+          final_answer_source: "model_direct_answer",
+        },
         workstation_gateway_call_results: [],
         workstation_gateway_observation_packets: [],
       },

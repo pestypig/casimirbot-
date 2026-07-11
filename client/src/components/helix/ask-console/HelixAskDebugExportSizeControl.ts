@@ -8,6 +8,62 @@ import { applyHelixAskBackendEntrypointFailureProjection } from "./HelixAskBacke
 
 export const HELIX_DEBUG_EXPORT_MAX_UI_CHARS = 750_000;
 
+const summarizeContinuationStateForUi = (value: unknown): Record<string, unknown> | null => {
+  const record = readAgentLoopAuditRecord(value);
+  if (!record) return null;
+  const observationRefs = readAgentLoopAuditRecord(record.observation_refs);
+  return {
+    schema: record.schema ?? null,
+    turn_id: record.turn_id ?? null,
+    state_id: record.state_id ?? null,
+    sequence: record.sequence ?? null,
+    trigger: record.trigger ?? null,
+    goal: record.goal ?? null,
+    observation_refs: observationRefs
+      ? {
+          existing: Array.isArray(observationRefs.existing) ? observationRefs.existing.slice(-12) : [],
+          new: Array.isArray(observationRefs.new) ? observationRefs.new.slice(-12) : [],
+          all: Array.isArray(observationRefs.all) ? observationRefs.all.slice(-20) : [],
+        }
+      : null,
+    missing_requirement_ids: Array.isArray(record.missing_requirement_ids)
+      ? record.missing_requirement_ids.slice(-16)
+      : [],
+    last_attempt: record.last_attempt ?? null,
+    next_admissible_affordances: Array.isArray(record.next_admissible_affordances)
+      ? record.next_admissible_affordances.slice(0, 12)
+      : [],
+    tried_action_fingerprints: Array.isArray(record.tried_action_fingerprints)
+      ? record.tried_action_fingerprints.slice(-16)
+      : [],
+    progress: record.progress ?? null,
+    budget: record.budget ?? null,
+    allowed_decisions: Array.isArray(record.allowed_decisions) ? record.allowed_decisions.slice(0, 6) : [],
+    authority: record.authority ?? null,
+    terminal_eligible: record.terminal_eligible === true,
+    assistant_answer: record.assistant_answer === true,
+  };
+};
+
+const summarizeTerminalRejectionForUi = (value: unknown): Record<string, unknown> | null => {
+  const record = readAgentLoopAuditRecord(value);
+  if (!record) return null;
+  return {
+    schema: record.schema ?? null,
+    turn_id: record.turn_id ?? null,
+    observation_id: record.observation_id ?? null,
+    rejected_candidate_kind: record.rejected_candidate_kind ?? null,
+    rejected_candidate_ref: record.rejected_candidate_ref ?? null,
+    rejection_reason: record.rejection_reason ?? null,
+    recoverable: record.recoverable === true,
+    failure_class: record.failure_class ?? null,
+    retryability: record.retryability ?? null,
+    next_affordances: Array.isArray(record.next_affordances) ? record.next_affordances.slice(0, 6) : [],
+    terminal_eligible: record.terminal_eligible === true,
+    assistant_answer: record.assistant_answer === true,
+  };
+};
+
 export function copyHelixRailCriticalDebugFieldsForUi(
   target: Record<string, unknown>,
   source: Record<string, unknown>,
@@ -31,6 +87,10 @@ export function copyHelixRailCriticalDebugFieldsForUi(
     "goal_satisfaction_evaluation",
     "post_tool_authority_bridge",
     "ask_turn_solver_trace",
+    "ask_turn_procedure_trace",
+    "workspace_action_client_ack",
+    "client_receipt_terminal",
+    "client_receipt_terminal_authority",
     "solver_controller_decision",
     "solver_controller_summary",
     "agent_step_decision",
@@ -47,6 +107,24 @@ export function copyHelixRailCriticalDebugFieldsForUi(
     "debug_export_ref",
     "backend_debug_response_ref",
   ].forEach((key) => assign(key, source[key] ?? debug?.[key]));
+  const continuationState = summarizeContinuationStateForUi(
+    source.agent_continuation_state ?? debug?.agent_continuation_state,
+  );
+  if (continuationState) target.agent_continuation_state = continuationState;
+  const continuationStatesSource = source.agent_continuation_states ?? debug?.agent_continuation_states;
+  if (Array.isArray(continuationStatesSource)) {
+    target.agent_continuation_states = continuationStatesSource
+      .slice(-8)
+      .map(summarizeContinuationStateForUi)
+      .filter(Boolean);
+  }
+  const terminalRejectionSource = source.terminal_rejection_observations ?? debug?.terminal_rejection_observations;
+  if (Array.isArray(terminalRejectionSource)) {
+    target.terminal_rejection_observations = terminalRejectionSource
+      .slice(-8)
+      .map(summarizeTerminalRejectionForUi)
+      .filter(Boolean);
+  }
   const ledgerSource = source.current_turn_artifact_ledger ?? debug?.current_turn_artifact_ledger;
   if (Array.isArray(ledgerSource)) target.current_turn_artifact_ledger = summarizeHelixDebugArtifactsForCopy(ledgerSource);
   const runtimeLoop = summarizeHelixAgentRuntimeLoopForCopy(source.agent_runtime_loop ?? debug?.agent_runtime_loop);
@@ -109,6 +187,7 @@ export function boundHelixDebugExportTextForUi(payload: string): string {
       "source_target_intent",
       "terminal_answer_authority",
       "terminal_presentation",
+      "ask_turn_procedure_trace",
       "runtime_goal_command",
       "runtime_goal_session",
       "runtime_goal_debug_export",

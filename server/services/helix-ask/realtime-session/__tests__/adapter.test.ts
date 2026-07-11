@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createOpenAiRealtimeSessionAdapter,
+  createDefaultOpenAiRealtimeContractTransport,
   disabledRealtimeSessionAdapter,
   openAiRealtimeSessionAdapterStub,
   selectRealtimeSessionAdapter,
@@ -17,6 +18,8 @@ import {
 describe("Realtime session adapter boundary", () => {
   afterEach(() => {
     setOpenAiRealtimeContractTransportForTests(null);
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("keeps every feature gate disabled by default", () => {
@@ -189,6 +192,7 @@ describe("Realtime session adapter boundary", () => {
       runtimeAgentMode: "live_voice",
       runtimeAgentAuthority: "suggest_actions",
       clientReceiptRefs: ["receipt:visible-consent:adapter"],
+      voice: null,
     });
     expect(result).toMatchObject({
       ok: true,
@@ -212,6 +216,172 @@ describe("Realtime session adapter boundary", () => {
       }),
     });
     expect(JSON.stringify(result)).not.toContain("server-key-must-not-leak");
+  });
+
+  it("calls OpenAI client_secrets with the GA realtime session shape through the default transport", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        id: "sess_adapter_default",
+        value: "ephemeral-default-secret",
+        expires_at: 1783551000,
+      }),
+    }));
+    const transport = createDefaultOpenAiRealtimeContractTransport(fetchMock);
+
+    const result = await transport({
+      apiKey: "server-key-must-not-leak",
+      model: "gpt-realtime-2.1",
+      requestedTransport: "webrtc",
+      runtimeAgentMode: "live_voice",
+      runtimeAgentAuthority: "suggest_actions",
+      clientReceiptRefs: ["receipt:visible-consent:default"],
+      safetyIdentifier: "hashed-user-id",
+      voice: "marin",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://api.openai.com/v1/realtime/client_secrets");
+    expect(init).toMatchObject({
+      method: "POST",
+      headers: {
+        Authorization: "Bearer server-key-must-not-leak",
+        "Content-Type": "application/json",
+        "OpenAI-Safety-Identifier": "hashed-user-id",
+      },
+    });
+    expect(JSON.parse(String(init?.body))).toEqual({
+      session: {
+        type: "realtime",
+        model: "gpt-realtime-2.1",
+        audio: {
+          output: {
+            voice: "marin",
+          },
+        },
+      },
+    });
+    expect(result).toEqual({
+      ok: true,
+      providerSessionRef: "sess_adapter_default",
+      ephemeralClientSecret: "ephemeral-default-secret",
+      ephemeralClientSecretExpiresAtMs: 1783551000000,
+    });
+    expect(JSON.stringify(result)).not.toContain("server-key-must-not-leak");
+  });
+
+  it("does not send unsafe OpenAI safety identifiers", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        value: "ephemeral-default-secret",
+        expires_at_ms: 1783551000000,
+      }),
+    }));
+
+    await createDefaultOpenAiRealtimeContractTransport(fetchMock)({
+      apiKey: "server-key-must-not-leak",
+      model: "gpt-realtime-2.1",
+      requestedTransport: "webrtc",
+      runtimeAgentMode: "live_voice",
+      runtimeAgentAuthority: "suggest_actions",
+      clientReceiptRefs: [],
+      safetyIdentifier: "not safe from browser",
+      voice: null,
+    });
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init?.headers).not.toHaveProperty("OpenAI-Safety-Identifier");
+  });
+
+  it("returns a typed failure for non-2xx OpenAI client_secrets responses without raw provider leakage", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 429,
+      json: async () => ({
+        error: {
+          message: "raw provider quota body must not leak",
+        },
+      }),
+    }));
+
+    const result = await createDefaultOpenAiRealtimeContractTransport(fetchMock)({
+      apiKey: "server-key-must-not-leak",
+      model: "gpt-realtime-2.1",
+      requestedTransport: "webrtc",
+      runtimeAgentMode: null,
+      runtimeAgentAuthority: null,
+      clientReceiptRefs: [],
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      failureReason: "openai_realtime_provider_http_429",
+    });
+    expect(JSON.stringify(result)).not.toContain("raw provider quota body must not leak");
+    expect(JSON.stringify(result)).not.toContain("server-key-must-not-leak");
+  });
+
+  it("returns a typed failure for malformed OpenAI client_secrets responses", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        id: "sess_missing_secret",
+        raw_provider_response: "must-not-leak",
+      }),
+    }));
+
+    const result = await createDefaultOpenAiRealtimeContractTransport(fetchMock)({
+      apiKey: "server-key-must-not-leak",
+      model: "gpt-realtime-2.1",
+      requestedTransport: "webrtc",
+      runtimeAgentMode: null,
+      runtimeAgentAuthority: null,
+      clientReceiptRefs: [],
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      failureReason: "openai_realtime_client_secret_missing",
+    });
+    expect(JSON.stringify(result)).not.toContain("must-not-leak");
+  });
+
+  it("returns typed failures for OpenAI client_secrets network and timeout errors", async () => {
+    const networkFetch = vi.fn(async () => {
+      throw new Error("raw network detail must not leak");
+    });
+    const timeoutFetch = vi.fn(async () => {
+      const error = new Error("raw timeout detail must not leak");
+      error.name = "AbortError";
+      throw error;
+    });
+    const request = {
+      apiKey: "server-key-must-not-leak",
+      model: "gpt-realtime-2.1",
+      requestedTransport: "webrtc" as const,
+      runtimeAgentMode: null,
+      runtimeAgentAuthority: null,
+      clientReceiptRefs: [],
+    };
+
+    const networkResult = await createDefaultOpenAiRealtimeContractTransport(networkFetch)(request);
+    const timeoutResult = await createDefaultOpenAiRealtimeContractTransport(timeoutFetch)(request);
+
+    expect(networkResult).toEqual({
+      ok: false,
+      failureReason: "openai_realtime_transport_network_error",
+    });
+    expect(timeoutResult).toEqual({
+      ok: false,
+      failureReason: "openai_realtime_transport_timeout",
+    });
+    expect(JSON.stringify([networkResult, timeoutResult])).not.toContain("raw");
+    expect(JSON.stringify([networkResult, timeoutResult])).not.toContain("server-key-must-not-leak");
   });
 
   it("returns a typed contract failure when the injected OpenAI transport rejects the contract", async () => {

@@ -11,6 +11,7 @@ import {
   readCommittedAskRoute,
 } from "./committed-ask-route";
 import { applyCompoundTerminalPolicy } from "./compound-terminal-policy";
+import { resolvePublishedWorkstationToolTerminal } from "./terminal-identity-precedence";
 
 type RecordLike = Record<string, unknown>;
 
@@ -49,36 +50,8 @@ const payloadArtifactPayloadByKind = (
 
 const resolveAuthoritativeWorkstationToolTerminal = (
   payload: RecordLike,
-): { terminalArtifactKind: "workstation_tool_evaluation"; finalAnswerSource: "workstation_tool_evaluation" } | null => {
-  const terminalAuthority = readRecord(payload.terminal_answer_authority);
-  const terminalWriter = readRecord(payload.terminal_authority_single_writer);
-  const terminalPresentation = readRecord(payload.terminal_presentation);
-  const resolvedSummary = readRecord(payload.resolved_turn_summary);
-  const authorityKind = readString(terminalAuthority?.terminal_artifact_kind);
-  const authoritySource = readString(terminalAuthority?.final_answer_source);
-  const writerKind =
-    readString(terminalWriter?.selected_terminal_artifact_kind) ??
-    readString(terminalWriter?.selectedArtifactKind);
-  const writerSource = readString(terminalWriter?.source);
-  const presentationKind = readString(terminalPresentation?.terminal_artifact_kind);
-  const resolvedKind = readString(resolvedSummary?.terminal_artifact_kind);
-  const resolvedSource = readString(resolvedSummary?.final_answer_source);
-  const authorityWorkstation =
-    authorityKind === "workstation_tool_evaluation" &&
-    authoritySource === "workstation_tool_evaluation" &&
-    readBoolean(terminalAuthority?.server_authoritative) === true;
-  const materializedWorkstation =
-    writerKind === "workstation_tool_evaluation" ||
-    writerSource === "workstation_tool_evaluation" ||
-    presentationKind === "workstation_tool_evaluation" ||
-    (resolvedKind === "workstation_tool_evaluation" && resolvedSource === "workstation_tool_evaluation");
-  return authorityWorkstation && materializedWorkstation
-    ? {
-        terminalArtifactKind: "workstation_tool_evaluation",
-        finalAnswerSource: "workstation_tool_evaluation",
-      }
-    : null;
-};
+): { terminalArtifactKind: "workstation_tool_evaluation"; finalAnswerSource: "workstation_tool_evaluation" } | null =>
+  resolvePublishedWorkstationToolTerminal(payload);
 
 const resolveAuthoritativeCapabilityHelpTerminal = (
   payload: RecordLike,

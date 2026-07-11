@@ -195,7 +195,7 @@ describe("Helix Ask capability itinerary", () => {
           artifact_id: `${turnId}:runtime_tool_call:2:docs`,
           kind: "runtime_tool_call",
           payload: {
-            capability_key: "docs-viewer.locate_in_doc",
+            capability_key: "docs.search",
             call_id: `${turnId}:runtime_tool_call:2:docs`,
             args: {
               query: "rule of thumb",
@@ -207,7 +207,7 @@ describe("Helix Ask capability itinerary", () => {
           artifact_id: `${turnId}:runtime_tool_call:2:docs:runtime_tool_call_validation`,
           kind: "runtime_tool_call_validation",
           payload: {
-            capability_key: "docs-viewer.locate_in_doc",
+            capability_key: "docs.search",
             call_id: `${turnId}:runtime_tool_call:2:docs`,
             valid: true,
             errors: [],
@@ -227,8 +227,8 @@ describe("Helix Ask capability itinerary", () => {
     const calculatorEntry = state.compound_subgoal_ledger.find((entry) => entry.subgoal_id === calculatorSubgoalId);
     expect(docsEntry).toMatchObject({
       requested_capability: "docs-viewer.locate_in_doc",
-      selected_capability: "docs-viewer.locate_in_doc",
-      executed_capability: "docs-viewer.locate_in_doc",
+      selected_capability: "docs.search",
+      executed_capability: "docs.search",
       observation_kind: "doc_location_matches",
       observation_ref: `${turnId}:agent_runtime_2_docs_viewer_locate_in_doc:doc_location_matches:1`,
       observation_provenance: "runtime_docs_location_observation",
@@ -761,7 +761,7 @@ describe("Helix Ask capability itinerary", () => {
         admittedFamilies: ["repo_code", "docs_viewer"],
         available: ["repo-code.search_concept", "docs-viewer.locate_in_doc"],
         expectedRequested: ["repo-code.search_concept", "docs-viewer.locate_in_doc"],
-        expectedRuntime: ["repo-code.search_concept", "docs-viewer.locate_in_doc"],
+        expectedRuntime: ["repo-code.search_concept", "docs.search"],
       },
       {
         turnId: "ask:visual-then-calculator",

@@ -796,7 +796,7 @@ export const buildCapabilityPlan = (input: {
   const effectiveRequestedCapabilityContract = contextualSuppressionBlocksPlan
     ? null
     : requestedCapabilityContract;
-  const compoundCapabilityContract = contextualSuppressionBlocksPlan
+  const compoundCapabilityContract = contextualSuppressionBlocksPlan || requiresCapabilityCatalog
     ? null
     : buildHelixCompoundCapabilityContract({
         turnId: input.turnId,

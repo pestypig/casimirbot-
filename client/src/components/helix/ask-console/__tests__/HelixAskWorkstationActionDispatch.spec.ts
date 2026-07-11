@@ -4,7 +4,10 @@ import {
   resolveHelixAskWorkstationReceiptTerminal,
   runHelixAskWorkstationActionWithReceiptLedger,
 } from "@/components/helix/ask-console/HelixAskWorkstationActionDispatch";
-import { applyHelixAskWorkstationActionsFromResult } from "@/components/helix/ask-console/HelixAskWorkstationActionBridge";
+import {
+  applyHelixAskWorkstationActionsFromResult,
+  isBackendAuthorizedWorkstationReceiptTerminal,
+} from "@/components/helix/ask-console/HelixAskWorkstationActionBridge";
 
 vi.mock("@/lib/workstation/workstationActionExecutor", () => ({
   executeWorkstationActionWithLedger: vi.fn(),
@@ -15,6 +18,28 @@ const mockedExecuteWorkstationActionWithLedger = vi.mocked(executeWorkstationAct
 describe("HelixAskWorkstationActionDispatch", () => {
   beforeEach(() => {
     mockedExecuteWorkstationActionWithLedger.mockReset();
+  });
+
+  it("requires backend terminal authority before a receipt can become a terminal product", () => {
+    expect(
+      isBackendAuthorizedWorkstationReceiptTerminal(
+        { debug: { client_receipt_terminal: { receipt_kind: "note_update_receipt" } } },
+        "note_update_receipt",
+      ),
+    ).toBe(false);
+    expect(
+      isBackendAuthorizedWorkstationReceiptTerminal(
+        {
+          terminal_answer_authority: {
+            server_authoritative: true,
+            terminal_kind: "answer",
+            terminal_artifact_kind: "note_update_receipt",
+            final_answer_source: "note_update_receipt",
+          },
+        },
+        "note_update_receipt",
+      ),
+    ).toBe(true);
   });
 
   it("projects note create terminal text only from a persisted note receipt", () => {
@@ -155,9 +180,9 @@ describe("HelixAskWorkstationActionDispatch", () => {
       },
     });
 
-    expect(result.selected_final_answer).toBe("Note saved.");
-    expect(result.final_answer_source).toBe("client_workstation_receipt");
-    expect(result.terminal_artifact_kind).toBe("note_update_receipt");
+    expect(result.selected_final_answer).toBe("I created the note.");
+    expect(result.final_answer_source).toBeUndefined();
+    expect(result.terminal_artifact_kind).toBeUndefined();
     expect(result.client_receipt_terminal).toMatchObject({
       turn_id: "turn-note",
       receipt_kind: "note_update_receipt",
@@ -175,12 +200,10 @@ describe("HelixAskWorkstationActionDispatch", () => {
       }),
     ]);
     expect(result.debug).toMatchObject({
-      selected_final_answer: "Note saved.",
-      final_answer_source: "client_workstation_receipt",
-      terminal_artifact_kind: "note_update_receipt",
       client_receipt_terminal: {
         receipt_kind: "note_update_receipt",
       },
+      client_receipt_terminal_authority: "observation_only",
     });
   });
 });

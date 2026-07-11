@@ -4146,6 +4146,80 @@ describe("Helix Ask agent provider selection", () => {
     expect(String((results[0].observation as any).active_document_observation.excerpt ?? "")).toContain("Helix Ask");
   });
 
+  it("materializes an explicit docs path before summarizing without relying on panel focus", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT =
+      "- NHM2 is presented as a diagnostic engineering direction.\n- Physical viability remains unproven.\n- The next work is bounded validation.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const body = {
+      turn_id: "ask:test:codex-explicit-doc-path-summary",
+      agent_runtime: "codex",
+      question:
+        "Open docs/research/nhm2-current-status-whitepaper.md and summarize its current status in three bullets.",
+      workspace_context_snapshot: {
+        activePanel: "scientific-calculator",
+        focusedPanel: "scientific-calculator",
+        openPanels: ["docs-viewer", "scientific-calculator"],
+      },
+    };
+
+    const requests = buildActiveDocsContextWorkstationGatewayCallRequests(body);
+    expect(requests).toEqual([
+      expect.objectContaining({
+        derivation_source: "helix_explicit_doc_path_context",
+        capability_id: "docs.search",
+        arguments: expect.objectContaining({
+          paths: ["docs/research/nhm2-current-status-whitepaper.md"],
+          source_target_intent: expect.objectContaining({
+            active_doc_path: "docs/research/nhm2-current-status-whitepaper.md",
+            explicit_doc_path: "docs/research/nhm2-current-status-whitepaper.md",
+            deictic_prompt: false,
+          }),
+        }),
+      }),
+    ]);
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body,
+      headers: {},
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.text).toBe(process.env.CODEX_AGENT_FAKE_STDOUT);
+    expect((result.debug as any)?.workstation_gateway_call_results?.[0]).toMatchObject({
+      capability_id: "docs.search",
+      observation: {
+        active_document_observation: {
+          path: "docs/research/nhm2-current-status-whitepaper.md",
+          excerpt: expect.any(String),
+        },
+      },
+    });
+    expect((result.debug as any)?.normalized_provider_observation_artifacts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "doc_search_results",
+          payload: expect.objectContaining({
+            active_document_path: "docs/research/nhm2-current-status-whitepaper.md",
+          }),
+        }),
+        expect.objectContaining({
+          kind: "retrieval_context",
+          payload: expect.objectContaining({
+            path: "docs/research/nhm2-current-status-whitepaper.md",
+            excerpt: expect.any(String),
+          }),
+        }),
+      ]),
+    );
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "tool_observation" &&
+      /bounded document excerpt from docs\/research\/nhm2-current-status-whitepaper\.md/i.test(String(event.text)),
+    )).toBe(true);
+  });
+
   it("materializes retained document context even when calculator is focused", async () => {
     process.env.CODEX_AGENT_FAKE_STDOUT = "- Retained doc claim boundary.\n- Still observation-backed.";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
@@ -5462,7 +5536,8 @@ describe("Helix Ask agent provider selection", () => {
         },
       },
     ]);
-    expect(result.text).toContain("no docs observation packet was materialized");
+    expect(result.ok).toBe(false);
+    expect(result.terminal_artifact_kind).toBe("typed_failure");
     expect(result.text).not.toContain("API parity matrix says");
     expect(result.turn_transcript_events?.some((event: any) =>
       event.source_event_type === "action_observation" &&
@@ -5470,7 +5545,7 @@ describe("Helix Ask agent provider selection", () => {
     )).toBe(true);
     expect(result.turn_transcript_events?.find((event: any) => event.source_event_type === "terminal_answer"))
       .toMatchObject({
-        text: result.text,
+        text: expect.stringContaining("no docs observation packet was materialized"),
         assistant_answer: false,
         raw_content_included: false,
       });
@@ -5932,7 +6007,8 @@ describe("Helix Ask agent provider selection", () => {
       headers: {},
     });
 
-    expect(result.text).toContain("no docs observation packet was materialized");
+    expect(result.ok).toBe(false);
+    expect(result.terminal_artifact_kind).toBe("typed_failure");
     expect(result.text).not.toContain("already known");
     expect(result.turn_transcript_events?.some((event: any) =>
       event.source_event_type === "model_reentry" &&

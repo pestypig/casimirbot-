@@ -15,6 +15,8 @@ import { committedRouteAllowsTerminalKind, readCommittedAskRoute } from "./commi
 import { isWorkstationObservationTerminalKind } from "./tool-family-terminal-policy";
 import { applyCompoundTerminalPolicy } from "./compound-terminal-policy";
 
+const UNAVAILABLE_TERMINAL_TEXT = "I could not produce a terminal answer for this turn.";
+
 export type HelixTerminalAnswerEnvelope = {
   schema: "helix.terminal_answer_envelope.v1";
   turn_id: string;
@@ -29,6 +31,7 @@ export type HelixTerminalAnswerEnvelope = {
     | "terminal_presentation"
     | "repo_code_evidence_answer"
     | "selected_final_answer"
+    | "agent_provider_route_product_materializer"
     | "workstation_tool_evaluation"
     | "capability_help_summary"
     | "request_user_input"
@@ -97,11 +100,15 @@ const readWorkstationToolEvaluationText = (payload: Record<string, unknown>): st
   );
 };
 
-const readSourceTarget = (payload: Record<string, unknown>): string =>
-  readCommittedAskRoute(payload)?.route.source_target ??
-  readString(readRecord(payload.route_product_contract)?.source_target) ??
-  readString(readRecord(payload.source_target_intent)?.target_source) ??
-  "unknown";
+const readSourceTarget = (payload: Record<string, unknown>): string => {
+  const committedRoute = readCommittedAskRoute(payload);
+  return (
+    committedRoute?.route?.source_target ??
+    readString(readRecord(payload.route_product_contract)?.source_target) ??
+    readString(readRecord(payload.source_target_intent)?.target_source) ??
+    "unknown"
+  );
+};
 
 const readTerminalArtifactKind = (payload: Record<string, unknown>): string =>
   readString(payload.terminal_artifact_kind) ?? "typed_failure";

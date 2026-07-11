@@ -278,6 +278,63 @@ const collectCompoundSynthesisEvidenceRefs = (input: {
   ]);
 };
 
+const collectProviderTerminalEvidenceRefs = (input: {
+  payload: RecordLike;
+  terminalArtifactKind: string;
+  finalAnswerSource: string;
+}): string[] => {
+  const terminalUsesProviderCandidate =
+    input.terminalArtifactKind === "agent_provider_terminal_candidate" ||
+    input.finalAnswerSource === "agent_provider_terminal_candidate";
+  if (!terminalUsesProviderCandidate) return [];
+  const presentation = readRecord(input.payload.terminal_presentation);
+  const presentationKind = readString(presentation?.terminal_artifact_kind);
+  const presentationSource = readString(presentation?.final_answer_source);
+  if (
+    presentationKind !== input.terminalArtifactKind &&
+    presentationSource !== input.finalAnswerSource
+  ) return [];
+  const ledgerRefs = new Set(
+    (Array.isArray(input.payload.current_turn_artifact_ledger)
+      ? input.payload.current_turn_artifact_ledger
+      : [])
+      .map((entry) => readString(readRecord(entry)?.artifact_id))
+      .filter(Boolean),
+  );
+  return unique(readStringArray(presentation?.selected_observation_refs))
+    .filter((ref) => ledgerRefs.has(ref));
+};
+
+const collectProviderRouteProductEvidenceRefs = (input: {
+  payload: RecordLike;
+  terminalArtifactKind: string;
+  finalAnswerSource: string;
+}): string[] => {
+  const materialization = readRecord(input.payload.provider_route_product_materialization);
+  if (
+    readString(materialization?.schema) !== "helix.provider_route_product_materialization.v1" ||
+    readString(materialization?.status) !== "materialized" ||
+    readString(materialization?.materialized_terminal_artifact_kind) !== input.terminalArtifactKind ||
+    input.terminalArtifactKind === "typed_failure" ||
+    input.finalAnswerSource === "typed_failure"
+  ) {
+    return [];
+  }
+  const presentation = readRecord(input.payload.terminal_presentation);
+  if (readString(presentation?.terminal_artifact_kind) !== input.terminalArtifactKind) return [];
+  const ledgerRefs = new Set(
+    (Array.isArray(input.payload.current_turn_artifact_ledger)
+      ? input.payload.current_turn_artifact_ledger
+      : [])
+      .map((entry) => readString(readRecord(entry)?.artifact_id))
+      .filter(Boolean),
+  );
+  return unique([
+    ...readStringArray(materialization?.selected_observation_refs),
+    ...readStringArray(presentation?.selected_observation_refs),
+  ]).filter((ref) => ledgerRefs.has(ref));
+};
+
 const collectDocsViewerEvidenceRefs = (input: {
   payload: RecordLike;
   terminalArtifactKind: string;
@@ -429,6 +486,77 @@ const collectMoralGraphEvidenceRefs = (input: {
     ...readStringArray(providerCandidate?.normalized_observation_refs),
     ...readStringArray(providerBridge?.gateway_observation_refs),
     ...readStringArray(providerBridge?.normalized_observation_refs),
+    ...ledgerRefs,
+  ].filter(Boolean));
+};
+
+const collectTheoryGraphEvidenceRefs = (input: {
+  payload: RecordLike;
+  terminalArtifactKind: string;
+  finalAnswerSource: string;
+}): string[] => {
+  const canonicalGoal = readRecord(input.payload.canonical_goal_frame);
+  const committedRoute = readRecord(input.payload.committed_ask_route);
+  const committedGoal = readRecord(committedRoute?.canonical_goal);
+  const routeProduct = readRecord(input.payload.route_product_contract);
+  const routeText = [
+    readString(canonicalGoal?.goal_kind),
+    readString(canonicalGoal?.requested_capability),
+    readString(canonicalGoal?.required_terminal_kind),
+    readString(committedGoal?.goal_kind),
+    readString(committedGoal?.required_terminal_kind),
+    ...readStringArray(committedGoal?.allowed_terminal_artifact_kinds),
+    ...readStringArray(routeProduct?.allowed_terminal_artifact_kinds),
+  ].join(" ");
+  const routeUsesTheoryGraph =
+    /theory_locator|theory[-_.:]?badge[-_.:]?graph|theory_context_reflection_answer/i.test(routeText);
+  const terminalUsesTheoryGraph =
+    /theory_context_reflection_answer/i.test(input.terminalArtifactKind) ||
+    /theory_context_reflection_answer/i.test(input.finalAnswerSource);
+  if (!routeUsesTheoryGraph && !terminalUsesTheoryGraph) return [];
+
+  const presentation = readRecord(input.payload.terminal_presentation);
+  const providerCandidate = readRecord(input.payload.provider_terminal_candidate);
+  const providerBridge = readRecord(input.payload.provider_terminal_authority_bridge);
+  const theoryAnswer = readRecord(input.payload.theory_context_reflection_answer);
+  const ledger = Array.isArray(input.payload.current_turn_artifact_ledger)
+    ? input.payload.current_turn_artifact_ledger
+    : [];
+  const ledgerRefs = ledger
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is RecordLike => Boolean(entry))
+    .filter((entry) => {
+      const payloadRecord = readRecord(entry.payload);
+      const text = [
+        readString(entry.kind),
+        readString(entry.capability_key),
+        readString(entry.payload_schema),
+        readString(payloadRecord?.schema),
+        readString(payloadRecord?.capability),
+        readString(payloadRecord?.capability_key),
+      ].join(" ");
+      return /helix_theory_context_reflection_tool_receipt|theory_context_reflection|theory-badge-graph\.reflect_discussion_context/i.test(text);
+    })
+    .flatMap((entry) => {
+      const payloadRecord = readRecord(entry.payload);
+      return [
+        readString(entry.artifact_id),
+        readString(payloadRecord?.artifact_id),
+        ...readStringArray(payloadRecord?.selected_observation_refs),
+        ...readStringArray(payloadRecord?.support_refs),
+        ...readStringArray(payloadRecord?.evidence_refs),
+        ...readStringArray(payloadRecord?.produced_artifact_refs),
+      ];
+    });
+  return unique([
+    ...readStringArray(presentation?.selected_observation_refs),
+    ...readStringArray(providerCandidate?.grounded_in_observation_refs),
+    ...readStringArray(providerCandidate?.normalized_observation_refs),
+    ...readStringArray(providerBridge?.gateway_observation_refs),
+    ...readStringArray(providerBridge?.normalized_observation_refs),
+    ...readStringArray(theoryAnswer?.selected_observation_refs),
+    ...readStringArray(theoryAnswer?.support_refs),
+    ...readStringArray(theoryAnswer?.evidence_refs),
     ...ledgerRefs,
   ].filter(Boolean));
 };
@@ -698,6 +826,16 @@ export function buildEvidenceReentryGate(input: {
       terminalArtifactKind: input.terminalArtifactKind,
       finalAnswerSource: input.finalAnswerSource,
     }),
+    ...collectProviderTerminalEvidenceRefs({
+      payload: input.payload,
+      terminalArtifactKind: input.terminalArtifactKind,
+      finalAnswerSource: input.finalAnswerSource,
+    }),
+    ...collectProviderRouteProductEvidenceRefs({
+      payload: input.payload,
+      terminalArtifactKind: input.terminalArtifactKind,
+      finalAnswerSource: input.finalAnswerSource,
+    }),
     ...collectRepoEvidenceRefs({
       payload: input.payload,
       terminalArtifactKind: input.terminalArtifactKind,
@@ -729,6 +867,11 @@ export function buildEvidenceReentryGate(input: {
       finalAnswerSource: input.finalAnswerSource,
     }),
     ...collectMoralGraphEvidenceRefs({
+      payload: input.payload,
+      terminalArtifactKind: input.terminalArtifactKind,
+      finalAnswerSource: input.finalAnswerSource,
+    }),
+    ...collectTheoryGraphEvidenceRefs({
       payload: input.payload,
       terminalArtifactKind: input.terminalArtifactKind,
       finalAnswerSource: input.finalAnswerSource,

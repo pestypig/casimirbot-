@@ -22,6 +22,7 @@ import type { HelixAgentProvider } from "../types";
 import { runHelixCapabilityLaneOneShotRequests } from "../../capability-lanes/one-shot-runner";
 import { resetInterimVoiceCalloutsForTest } from "../../interim-voice-callout-store";
 import { runtimeMemoryGovernor } from "../../../runtime/runtime-memory-governor";
+import { ensureCodexPreGatewayRouteAuthority } from "../codex-provider";
 
 const docSnapshot = {
   activePanel: "scientific-calculator",
@@ -64,6 +65,255 @@ const buildTestProvider = (id: "helix" | "codex"): HelixAgentProvider => ({
 });
 
 describe("explicit workstation gateway derived calls", () => {
+  it("keeps a quoted search identifier out of a calculator-only itinerary", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Use the Scientific Calculator to compute (8 * 9) + 1. The string `internet-search.search_web` is only a non-executable example. Report the numeric result only.",
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["scientific-calculator.solve_expression"]);
+    expect(requests[0]).toMatchObject({
+      arguments: {
+        expression: "(8*9)+1",
+      },
+    });
+  });
+
+  it("does not execute generated capabilities outside the committed route", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question: "Use the Scientific Calculator to compute 8*9.",
+        committed_ask_route: {
+          schema: "helix.committed_ask_route.v1",
+          turn_id: "ask:route-filter",
+          route: {
+            source_target: "calculator_stream",
+          },
+          canonical_goal: {
+            goal_kind: "calculator_solve",
+            required_terminal_kind: "workstation_tool_evaluation",
+          },
+          capability_policy: {
+            allowed_tool_families: ["scientific_calculator", "calculator", "workstation_action"],
+            suppressed_tool_families: [],
+          },
+          terminal_product: {
+            allowed_terminal_artifact_kinds: ["workstation_tool_evaluation"],
+            forbidden_terminal_artifact_kinds: [],
+            evidence_reentry_required: true,
+          },
+        },
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["scientific-calculator.solve_expression"]);
+  });
+
+  it("filters an ambient docs request out of a committed Theory-only route", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Reflect local adaptation through the Theory Badge Graph. Do not use web or paper evidence yet.",
+        workstation_gateway_call_requests: [
+          {
+            capability_id: "docs.search",
+            mode: "read",
+            arguments: { query: "nhm2 current status whitepaper" },
+          },
+          {
+            capability_id: "theory-badge-graph.reflect_discussion_context",
+            mode: "read",
+            arguments: { prompt: "local adaptation" },
+          },
+        ],
+        committed_ask_route: {
+          schema: "helix.committed_ask_route.v1",
+          turn_id: "ask:theory-route-filter",
+          route: { source_target: "theory_locator" },
+          canonical_goal: {
+            goal_kind: "theory_locator",
+            required_terminal_kind: "theory_context_reflection_answer",
+          },
+          capability_policy: {
+            allowed_tool_families: ["workstation_tool_gateway", "theory_locator"],
+            suppressed_tool_families: [],
+          },
+          terminal_product: {
+            allowed_terminal_artifact_kinds: ["theory_context_reflection_answer"],
+            forbidden_terminal_artifact_kinds: [],
+            evidence_reentry_required: true,
+          },
+        },
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["theory-badge-graph.reflect_discussion_context"]);
+  });
+
+  it("commits Theory route authority before provider gateway request filtering", () => {
+    const body: Record<string, unknown> = {
+      agent_runtime: "codex",
+      question:
+        "Reflect local adaptation through the Theory Badge Graph. Do not use web or paper evidence yet.",
+      tool_call_admission_decision: {
+        admitted_capability: "docs.search",
+        selected_capability: "docs.search",
+        requested_capability: "docs.search",
+        admitted_tool_families: ["docs_viewer"],
+      },
+      committed_ask_route: {
+        schema: "helix.committed_ask_route.v1",
+        turn_id: "ask:pre-gateway-theory-route",
+        route: { source_target: "docs_viewer" },
+        canonical_goal: {
+          goal_kind: "docs_viewer",
+          required_terminal_kind: "compound_evidence_synthesis_answer",
+          allowed_terminal_artifact_kinds: ["compound_evidence_synthesis_answer"],
+          forbidden_terminal_artifact_kinds: [],
+        },
+        capability_policy: {
+          allowed_tool_families: ["docs_viewer"],
+          suppressed_tool_families: [],
+          required_capability_families: ["docs_viewer"],
+        },
+        terminal_product: {
+          allowed_terminal_artifact_kinds: ["compound_evidence_synthesis_answer"],
+          forbidden_terminal_artifact_kinds: [],
+          evidence_reentry_required: true,
+          required_terminal_product: "compound_evidence_synthesis_answer",
+        },
+      },
+      capability_itinerary: {
+        terminal_success_criteria: {
+          compound_terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+          required_terminal_kind: "compound_evidence_synthesis_answer",
+        },
+        compound_capability_contract: {
+          subgoals: [
+            { capability_family: "docs_viewer", requested_capability: "docs.search" },
+            {
+              capability_family: "theory_locator",
+              requested_capability: "helix_ask.reflect_theory_context",
+            },
+          ],
+        },
+      },
+      workstation_gateway_call_requests: [
+        {
+          capability_id: "docs.search",
+          mode: "read",
+          arguments: { query: "nhm2 current status whitepaper" },
+        },
+        {
+          capability_id: "theory-badge-graph.reflect_discussion_context",
+          mode: "read",
+          arguments: { prompt: "local adaptation" },
+        },
+      ],
+    };
+
+    ensureCodexPreGatewayRouteAuthority({
+      body,
+      turnId: "ask:pre-gateway-theory-route",
+      selectedRoute: "/ask",
+    });
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body,
+    });
+
+    expect(body.committed_ask_route).toMatchObject({
+      route: { source_target: "theory_locator" },
+      canonical_goal: {
+        goal_kind: "theory_locator",
+        required_terminal_kind: "theory_context_reflection_answer",
+      },
+      terminal_product: {
+        required_terminal_product: "theory_context_reflection_answer",
+      },
+    });
+    expect(capabilities(requests)).toEqual(["theory-badge-graph.reflect_discussion_context"]);
+  });
+
+  it("repairs stale generic route authority from the admitted docs.search runtime capability", () => {
+    const body: Record<string, unknown> = {
+      agent_runtime: "codex",
+      question:
+        "According to the currently open NHM2 status whitepaper, what are the three most important unresolved technical blockers? Use only the current document.",
+      tool_call_admission_decision: {
+        requested_capability: "docs.search",
+        selected_capability: "docs.search",
+        admitted_capability: "docs.search",
+        admitted_tool_families: ["docs_viewer"],
+      },
+      committed_ask_route: {
+        schema: "helix.committed_ask_route.v1",
+        turn_id: "ask:pre-gateway-docs-route",
+        route: {
+          source_target: "agent_provider_gateway_turn",
+          target_kind: "agent_provider_gateway_turn",
+          strength: "hard",
+          route_reason: "source_target_admission_trace",
+        },
+        canonical_goal: {
+          goal_kind: "agent_provider_gateway_turn",
+          required_terminal_kind: "scholarly_exploratory_candidates",
+          allowed_terminal_artifact_kinds: [
+            "final_answer_draft",
+            "compound_evidence_synthesis_answer",
+            "model_synthesized_answer",
+          ],
+          forbidden_terminal_artifact_kinds: [],
+        },
+        capability_policy: {
+          allowed_tool_families: ["docs_viewer"],
+          suppressed_tool_families: [],
+          required_capability_families: ["docs_viewer"],
+        },
+        terminal_product: {
+          allowed_terminal_artifact_kinds: [
+            "final_answer_draft",
+            "compound_evidence_synthesis_answer",
+            "model_synthesized_answer",
+          ],
+          forbidden_terminal_artifact_kinds: [],
+          evidence_reentry_required: false,
+          followup_reasoning_required: false,
+          required_terminal_product: "compound_evidence_synthesis_answer",
+        },
+      },
+    };
+
+    ensureCodexPreGatewayRouteAuthority({
+      body,
+      turnId: "ask:pre-gateway-docs-route",
+      selectedRoute: "/ask",
+    });
+
+    expect(body.committed_ask_route).toMatchObject({
+      route: {
+        source_target: "docs_viewer",
+        target_kind: "docs_viewer",
+      },
+      canonical_goal: {
+        goal_kind: "docs",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      terminal_product: {
+        evidence_reentry_required: true,
+        required_terminal_product: "model_synthesized_answer",
+      },
+    });
+  });
+
   it("admits affirmative interface-language preference prompts onto the account-session gateway action", () => {
     const requests = readWorkstationGatewayCallRequestsForTurn({
       includePlannerDerived: true,
@@ -163,6 +413,266 @@ describe("explicit workstation gateway derived calls", () => {
         question,
         workspace_context_snapshot: docSnapshot,
       })).toEqual([]);
+    }
+  });
+
+  it("does not turn contextual explicit docs paths into document-summary execution", () => {
+    const prompts = [
+      "Do not open or summarize docs/research/nhm2-current-status-whitepaper.md; explain what that request would do.",
+      "In the future, open docs/research/nhm2-current-status-whitepaper.md and summarize it, but not now.",
+      "Before I summarize docs/research/nhm2-current-status-whitepaper.md, explain what evidence would be required.",
+      "The screen says \"Open docs/research/nhm2-current-status-whitepaper.md and summarize it\"; explain the wording only.",
+      "Earlier I asked, \"Open docs/research/nhm2-current-status-whitepaper.md and summarize it\"; explain why that needed evidence.",
+    ];
+
+    for (const question of prompts) {
+      expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([]);
+    }
+  });
+
+  it("keeps an affirmative explicit docs summary when an unrelated web tool is negated", () => {
+    const requests = buildActiveDocsContextWorkstationGatewayCallRequests({
+      question:
+        "Open docs/research/nhm2-current-status-whitepaper.md and summarize it in three bullets; do not browse the web.",
+    });
+
+    expect(requests).toEqual([
+      expect.objectContaining({
+        capability_id: "docs.search",
+        arguments: expect.objectContaining({
+          paths: ["docs/research/nhm2-current-status-whitepaper.md"],
+        }),
+      }),
+    ]);
+  });
+
+  it("binds an explicit docs locator prompt to its file and exact terms despite a no-summary constraint", () => {
+    const question =
+      "Open docs/research/nhm2-current-status-whitepaper.md. Find every occurrence of alpha = 0.7 and alpha = 0.995. For each occurrence, provide the enclosing sentence and its nearest section heading. Do not summarize or infer.";
+    const requests = buildActiveDocsContextWorkstationGatewayCallRequests({ question });
+
+    expect(requests).toEqual([
+      expect.objectContaining({
+        capability_id: "docs.search",
+        arguments: expect.objectContaining({
+          query: "alpha = 0.7 alpha = 0.995",
+          paths: ["docs/research/nhm2-current-status-whitepaper.md"],
+          exact_terms: ["alpha = 0.7", "alpha = 0.995"],
+          max_hits: 40,
+        }),
+      }),
+    ]);
+  });
+
+  it("binds a zero-result locator request even when it asks only for count and evidence locations", () => {
+    const question =
+      "Open docs/research/nhm2-current-status-whitepaper.md. Find every occurrence of alpha = 0.123456. Return only the occurrence count and evidence locations. Do not infer alternatives.";
+
+    expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([
+      expect.objectContaining({
+        capability_id: "docs.search",
+        arguments: expect.objectContaining({
+          query: "alpha = 0.123456",
+          paths: ["docs/research/nhm2-current-status-whitepaper.md"],
+          exact_terms: ["alpha = 0.123456"],
+        }),
+      }),
+    ]);
+  });
+
+  it("binds an explicit heading request to a bounded section observation", () => {
+    const question =
+      "Open docs/research/nhm2-current-status-whitepaper.md. Under section \u201c6.7 Twin Paradox trip clocking interpretation,\u201d extract every sentence containing alpha. Preserve the original wording and line numbers. Do not summarize.";
+
+    expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([
+      expect.objectContaining({
+        capability_id: "docs.search",
+        arguments: expect.objectContaining({
+          query: "6.7 Twin Paradox trip clocking interpretation",
+          paths: ["docs/research/nhm2-current-status-whitepaper.md"],
+          section_heading: "6.7 Twin Paradox trip clocking interpretation",
+          section_contains_terms: ["alpha"],
+        }),
+      }),
+    ]);
+  });
+
+  it("keeps section filter exclusions out of the literal contains terms", () => {
+    const question =
+      "Open docs/research/nhm2-current-status-whitepaper.md. Within section \u201c6.7 Twin Paradox trip clocking interpretation,\u201d return only complete prose sentences containing the literal lowercase token alpha. Exclude display equations, headings, identifiers, and sentence fragments. Preserve original wording and line numbers. Do not summarize.";
+
+    expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([
+      expect.objectContaining({
+        capability_id: "docs.search",
+        arguments: expect.objectContaining({
+          query: "6.7 Twin Paradox trip clocking interpretation",
+          paths: ["docs/research/nhm2-current-status-whitepaper.md"],
+          section_heading: "6.7 Twin Paradox trip clocking interpretation",
+          section_contains_terms: ["alpha"],
+        }),
+      }),
+    ]);
+  });
+
+  it("keeps repeated case-sensitive section contains clauses as separate terms", () => {
+    const question =
+      "Open docs/research/nhm2-current-status-whitepaper.md. Within section \u201c6.7 Twin Paradox trip clocking interpretation,\u201d find source lines containing alpha and source lines containing Alpha. Group results by the exact case-sensitive term and preserve line numbers. Do not summarize.";
+
+    expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([
+      expect.objectContaining({
+        capability_id: "docs.search",
+        arguments: expect.objectContaining({
+          section_heading: "6.7 Twin Paradox trip clocking interpretation",
+          section_contains_terms: ["alpha", "Alpha"],
+        }),
+      }),
+    ]);
+  });
+
+  it("binds a quoted section heading introduced by a boundary request", () => {
+    const question =
+      "Open docs/research/nhm2-current-status-whitepaper.md. Return the heading line number, first nonblank content line, and last nonblank content line belonging only to section \u201c6.7 Twin Paradox trip clocking interpretation.\u201d Do not include anything from section 6.8.";
+
+    expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([
+      expect.objectContaining({
+        capability_id: "docs.search",
+        arguments: expect.objectContaining({
+          query: "6.7 Twin Paradox trip clocking interpretation",
+          paths: ["docs/research/nhm2-current-status-whitepaper.md"],
+          section_heading: "6.7 Twin Paradox trip clocking interpretation",
+          section_contains_terms: [],
+        }),
+      }),
+    ]);
+  });
+
+  it("keeps an affirmative missing-section lookup despite a bounded no-substitution constraint", () => {
+    const question =
+      "Open docs/research/nhm2-current-status-whitepaper.md. Under section \u201c99.9 Deliberately Missing Section,\u201d find every source line containing alpha. Return only: heading found or not found, match count, and evidence locations. Do not substitute another section or search outside the named section.";
+
+    expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([
+      expect.objectContaining({
+        capability_id: "docs.search",
+        arguments: expect.objectContaining({
+          query: "99.9 Deliberately Missing Section",
+          paths: ["docs/research/nhm2-current-status-whitepaper.md"],
+          section_heading: "99.9 Deliberately Missing Section",
+          section_contains_terms: ["alpha"],
+        }),
+      }),
+    ]);
+  });
+
+  it("normalizes exact case-sensitive term wording for a different named section", () => {
+    const question =
+      "Open docs/research/nhm2-current-status-whitepaper.md. Within section \u201c6.8 Profile-scoped trip clocking index,\u201d return every source line containing the exact case-sensitive term alpha. Preserve complete lines and line numbers. Do not include evidence from other sections.";
+
+    expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([
+      expect.objectContaining({
+        capability_id: "docs.search",
+        arguments: expect.objectContaining({
+          section_heading: "6.8 Profile-scoped trip clocking index",
+          section_contains_terms: ["alpha"],
+          section_match_unit: "line",
+        }),
+      }),
+    ]);
+  });
+
+  it("stops a section term before a new Output instruction", () => {
+    const question =
+      "Open docs/research/nhm2-current-status-whitepaper.md. Within section \u201c6.8 Profile-scoped trip clocking index,\u201d return only source lines containing the exact case-sensitive term alpha. Output exactly the matching line number and complete source line. Do not output the section heading, explanatory text, or any nonmatching line.";
+
+    expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([
+      expect.objectContaining({
+        capability_id: "docs.search",
+        arguments: expect.objectContaining({
+          section_contains_terms: ["alpha"],
+          section_match_unit: "line",
+        }),
+      }),
+    ]);
+  });
+
+  it("binds two quoted section headings for a bounded comparison", () => {
+    const question =
+      "Open docs/research/nhm2-current-status-whitepaper.md. Compare only sections \u201c6.7 Twin Paradox trip clocking interpretation\u201d and \u201c6.8 Profile-scoped trip clocking index.\u201d For each section, list every source line containing the exact case-sensitive term alpha, preserving complete lines and line numbers. Keep results separated by section and use no evidence from elsewhere.";
+
+    expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([
+      expect.objectContaining({
+        capability_id: "docs.search",
+        arguments: expect.objectContaining({
+          section_heading: "6.7 Twin Paradox trip clocking interpretation",
+          section_headings: [
+            "6.7 Twin Paradox trip clocking interpretation",
+            "6.8 Profile-scoped trip clocking index",
+          ],
+          section_contains_terms: ["alpha"],
+          section_match_unit: "line",
+        }),
+      }),
+    ]);
+  });
+
+  it("keeps a backtick-quoted term exact before formatting instructions", () => {
+    const question =
+      "Open docs/research/nhm2-current-status-whitepaper.md. Compare only sections \u201c6.7 Twin Paradox trip clocking interpretation\u201d and \u201c99.9 Deliberately Missing Section.\u201d For each section, report whether its heading was found, then list every source line containing the exact case-sensitive term `alpha` with complete lines and line numbers. Report zero matches explicitly. Do not substitute another section or use evidence from elsewhere.";
+
+    expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([
+      expect.objectContaining({
+        arguments: expect.objectContaining({
+          section_headings: [
+            "6.7 Twin Paradox trip clocking interpretation",
+            "99.9 Deliberately Missing Section",
+          ],
+          section_contains_terms: ["alpha"],
+          section_match_unit: "line",
+        }),
+      }),
+    ]);
+  });
+
+  it("stops an unquoted term before a with-complete-lines format phrase", () => {
+    const question =
+      "Open docs/research/nhm2-current-status-whitepaper.md. Compare only sections \u201c6.7 Twin Paradox trip clocking interpretation\u201d and \u201c99.9 Deliberately Missing Section.\u201d For each section, report whether its heading was found, then list every source line containing the exact case-sensitive term alpha with complete lines and line numbers. Report zero matches explicitly. Do not substitute another section or use evidence from elsewhere.";
+
+    expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })[0]).toMatchObject({
+      arguments: {
+        section_contains_terms: ["alpha"],
+        section_match_unit: "line",
+      },
+    });
+  });
+
+  it("retains four headings when list commas appear inside curly quotes", () => {
+    const question =
+      "Open docs/research/nhm2-current-status-whitepaper.md. Check sections \u201c6.7 Twin Paradox trip clocking interpretation,\u201d \u201c6.8 Profile-scoped trip clocking index,\u201d \u201c98.8 Missing Section A,\u201d and \u201c99.9 Missing Section B.\u201d For each section, report heading found or not found and the count of source lines containing alpha. Do not substitute headings or use evidence from another section.";
+
+    expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })[0]).toMatchObject({
+      arguments: {
+        section_headings: [
+          "6.7 Twin Paradox trip clocking interpretation",
+          "6.8 Profile-scoped trip clocking index",
+          "98.8 Missing Section A",
+          "99.9 Missing Section B",
+        ],
+        section_contains_terms: ["alpha"],
+        section_match_unit: "line",
+      },
+    });
+  });
+
+  it("does not execute contextual explicit docs locator wording", () => {
+    const prompts = [
+      "Do not find or locate alpha = 0.7 in docs/research/nhm2-current-status-whitepaper.md.",
+      "Later, find every occurrence of alpha = 0.7 in docs/research/nhm2-current-status-whitepaper.md, but not now.",
+      "If we find alpha = 0.7 in docs/research/nhm2-current-status-whitepaper.md, explain the workflow first.",
+      "Earlier I asked to find alpha = 0.7 in docs/research/nhm2-current-status-whitepaper.md; explain why that needed evidence.",
+      "The screen says \"find alpha = 0.7 in docs/research/nhm2-current-status-whitepaper.md\"; explain the text only.",
+    ];
+
+    for (const question of prompts) {
+      expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([]);
     }
   });
 
@@ -418,6 +928,31 @@ describe("explicit workstation gateway derived calls", () => {
         }),
       },
     });
+  });
+
+  it("does not turn scholarly and Image Lens capability questions into research calls", () => {
+    const question =
+      "does your tool for research papers allow you to pick papers you are able to parse? or do you check what papers are openable to then use image lens?";
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: { question, agent_runtime: "codex" },
+    });
+
+    expect(requests).toEqual([]);
+  });
+
+  it("does not execute a catalog lookup for contextual capability-question wording", () => {
+    const prompts = [
+      "The screen says 'does your research paper tool use image lens?'; explain that sentence only.",
+      "Earlier I asked whether your research paper tool can use image lens; explain why it was ambiguous.",
+    ];
+    for (const question of prompts) {
+      const requests = readWorkstationGatewayCallRequestsForTurn({
+        includePlannerDerived: true,
+        body: { question, agent_runtime: "codex" },
+      });
+      expect(requests.some((request) => request.capability_id === "helix_ask.inspect_capability_catalog")).toBe(false);
+    }
   });
 
   it("does not map quoted, negated, future, or unsafe docs-viewer alias prompts", () => {

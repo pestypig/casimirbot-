@@ -31,6 +31,68 @@ const authorityPayload = (input: {
 });
 
 describe("Helix Ask evidence re-entry and follow-up gates", () => {
+  it("recognizes ledger-backed evidence selected by a provider-authored route product", () => {
+    const turnId = "turn:provider-route-product";
+    const observationRef = `${turnId}:workstation_gateway:docs.search:1`;
+    const gate = buildEvidenceReentryGate({
+      turnId,
+      payload: {
+        current_turn_artifact_ledger: [{
+          artifact_id: observationRef,
+          kind: "provider_gateway_observation_packet",
+          payload: {
+            schema: "helix.agent_step_observation_packet.v1",
+            turn_id: turnId,
+            capability_key: "docs.search",
+            status: "succeeded",
+          },
+        }],
+        provider_route_product_materialization: {
+          schema: "helix.provider_route_product_materialization.v1",
+          turn_id: turnId,
+          status: "materialized",
+          materialized_terminal_artifact_kind: "model_synthesized_answer",
+          selected_observation_refs: [observationRef],
+        },
+        terminal_presentation: {
+          schema: "helix.terminal_presentation.v1",
+          turn_id: turnId,
+          terminal_artifact_kind: "model_synthesized_answer",
+          final_answer_source: "final_answer_draft",
+          selected_observation_refs: [observationRef],
+        },
+      },
+      loopTrace: {
+        actual_tool_calls: [{
+          tool_id: "docs.search",
+          family: "docs_viewer",
+          admitted: true,
+          mutating: false,
+          result_ref: observationRef,
+        }],
+        observations_created: [{
+          observation_id: observationRef,
+          source_kind: "docs_viewer",
+        }],
+        evidence_selected_for_answer: [],
+        evidence_rejected_for_answer: [],
+      },
+      primaryIntent: "content_question",
+      terminalArtifactKind: "model_synthesized_answer",
+      finalAnswerSource: "final_answer_draft",
+      finalArbitrationRan: true,
+      sourceEvidenceRequired: true,
+      allowedTerminalProducts: ["model_synthesized_answer", "typed_failure"],
+    });
+
+    expect(gate).toMatchObject({
+      required: true,
+      completed: true,
+      selected_evidence_refs: [observationRef],
+      violation_codes: [],
+    });
+  });
+
   it("flags receipt terminal output for content prompts when the receipt did not re-enter", () => {
     const gate = buildEvidenceReentryGate({
       turnId: "turn:receipt-content",
@@ -335,6 +397,115 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
     expect(gate.completed).toBe(true);
   });
 
+  it("selects current-turn Docs observations from an authorized provider terminal presentation", () => {
+    const turnId = "turn:docs-provider-answer";
+    const docsRef = `${turnId}:workstation_gateway:docs.search:packet`;
+    const gate = buildEvidenceReentryGate({
+      turnId,
+      payload: {
+        terminal_presentation: {
+          schema: "helix.terminal_presentation.v1",
+          terminal_artifact_kind: "agent_provider_terminal_candidate",
+          final_answer_source: "agent_provider_terminal_candidate",
+          selected_observation_refs: [docsRef, "turn:prior:docs.search:stale"],
+        },
+        current_turn_artifact_ledger: [
+          {
+            artifact_id: docsRef,
+            kind: "provider_gateway_observation_packet",
+            capability_key: "docs.search",
+          },
+        ],
+      },
+      loopTrace: {
+        actual_tool_calls: [],
+        observations_created: [{ observation_id: docsRef, source_kind: "docs.search" }],
+        evidence_selected_for_answer: [],
+        evidence_rejected_for_answer: [],
+      },
+      primaryIntent: "content_question",
+      terminalArtifactKind: "agent_provider_terminal_candidate",
+      finalAnswerSource: "agent_provider_terminal_candidate",
+      finalArbitrationRan: true,
+      sourceEvidenceRequired: true,
+      allowedTerminalProducts: ["model_synthesized_answer", "typed_failure"],
+    });
+
+    expect(gate.selected_evidence_refs).toEqual([docsRef]);
+    expect(gate.violation_codes).toEqual([]);
+    expect(gate.completed).toBe(true);
+  });
+
+  it("selects Theory Graph observations for a route-authorized Theory answer", () => {
+    const turnId = "turn:theory-graph-provider-answer";
+    const theoryRef = `${turnId}:codex_normalized:helix_theory_context_reflection_tool_receipt:1`;
+    const packetRef = `${turnId}:workstation_gateway:theory-badge-graph.reflect_discussion_context:packet`;
+    const gate = buildEvidenceReentryGate({
+      turnId,
+      payload: {
+        committed_ask_route: {
+          schema: "helix.committed_ask_route.v1",
+          canonical_goal: {
+            goal_kind: "theory_locator",
+            required_terminal_kind: "theory_context_reflection_answer",
+            allowed_terminal_artifact_kinds: ["theory_context_reflection_answer"],
+          },
+        },
+        canonical_goal_frame: {
+          schema: "helix.canonical_goal_frame.v1",
+          goal_kind: "theory_locator",
+          requested_capability: "theory-badge-graph.reflect_discussion_context",
+          required_terminal_kind: "theory_context_reflection_answer",
+        },
+        theory_context_reflection_answer: {
+          schema: "helix.theory_context_reflection_answer.v1",
+          selected_observation_refs: [theoryRef],
+          support_refs: [packetRef],
+        },
+        current_turn_artifact_ledger: [
+          {
+            artifact_id: theoryRef,
+            kind: "helix_theory_context_reflection_tool_receipt",
+            capability_key: "theory-badge-graph.reflect_discussion_context",
+            payload: {
+              schema: "helix.theory_context_reflection_observation.v1",
+              artifact_id: theoryRef,
+            },
+          },
+          {
+            artifact_id: packetRef,
+            kind: "provider_gateway_observation_packet",
+            capability_key: "theory-badge-graph.reflect_discussion_context",
+            payload_schema: "helix.agent_step_observation_packet.v1",
+          },
+        ],
+      },
+      loopTrace: {
+        actual_tool_calls: [{
+          tool_id: "theory-badge-graph.reflect_discussion_context",
+          family: "theory_locator",
+          admitted: true,
+          mutating: false,
+          result_ref: theoryRef,
+        }],
+        observations_created: [{ observation_id: theoryRef, source_kind: "theory_locator" }],
+        evidence_selected_for_answer: [],
+        evidence_rejected_for_answer: [],
+      },
+      primaryIntent: "general_reasoning",
+      terminalArtifactKind: "theory_context_reflection_answer",
+      finalAnswerSource: "theory_context_reflection_answer",
+      finalArbitrationRan: true,
+      sourceEvidenceRequired: true,
+      allowedTerminalProducts: ["theory_context_reflection_answer", "typed_failure"],
+    });
+
+    expect(gate.selected_evidence_refs).toEqual(expect.arrayContaining([theoryRef, packetRef]));
+    expect(gate.receipts_not_reentered).toEqual([]);
+    expect(gate.violation_codes).toEqual([]);
+    expect(gate.completed).toBe(true);
+  });
+
   it("keeps solver final arbitration aligned with authoritative workstation terminal metadata", () => {
     const payload = {
       ...authorityPayload({
@@ -406,6 +577,73 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
     expect(trace.final_arbitration.final_answer_source).toBe("workstation_tool_evaluation");
     expect(payload.terminal_artifact_kind).toBe("workstation_tool_evaluation");
     expect(payload.final_answer_source).toBe("workstation_tool_evaluation");
+  });
+
+  it("lets a current-turn provider answer supersede stale workstation terminal metadata", () => {
+    const turnId = "turn:docs-provider-supersedes-workstation";
+    const docsRef = `${turnId}:workstation_gateway:docs.search:packet`;
+    const payload = {
+      ...authorityPayload({
+        sourceTarget: "docs_viewer",
+        allowed: ["model_synthesized_answer", "typed_failure"],
+      }),
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      final_answer_source: "workstation_tool_evaluation",
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        final_answer_source: "workstation_tool_evaluation",
+        server_authoritative: true,
+      },
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        selected_terminal_artifact_kind: "workstation_tool_evaluation",
+        source: "workstation_tool_evaluation",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        turn_id: turnId,
+        terminal_artifact_kind: "model_synthesized_answer",
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_authority_ref: `${turnId}:agent_provider_terminal_candidate:codex:test`,
+        selected_observation_refs: [docsRef],
+      },
+      current_turn_artifact_ledger: [{
+        artifact_id: docsRef,
+        kind: "provider_gateway_observation_packet",
+        capability_key: "docs.search",
+      }],
+    };
+
+    const trace = buildAskTurnSolverTrace({
+      turnId,
+      promptText: "Use only the current document and summarize its unresolved blockers.",
+      selectedRoute: "agent_provider_gateway_turn",
+      terminalArtifactKind: "agent_provider_terminal_candidate",
+      finalAnswerSource: "agent_provider_terminal_candidate",
+      payload,
+      loopParityTrace: {
+        actual_tool_calls: [],
+        observations_created: [{ observation_id: docsRef, source_kind: "docs.search" }],
+        evidence_selected_for_answer: [],
+        evidence_rejected_for_answer: [],
+        terminal_selection_ran_after_observations: true,
+        route_authority_ok: true,
+        poison_audit_ok: true,
+        terminal_authority_ok: true,
+      },
+    });
+
+    expect(trace.final_arbitration).toMatchObject({
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      final_answer_source: "agent_provider_terminal_candidate",
+    });
+    expect(trace.evidence_reentry_gate).toMatchObject({
+      completed: true,
+      violation_codes: [],
+      selected_evidence_refs: [docsRef],
+    });
+    expect(trace.solver_risk_flags).not.toContain("tool_result_terminal_without_reasoning");
   });
 
   it("keeps the original negated cadence prompt on content intent without receipt terminal authority", () => {

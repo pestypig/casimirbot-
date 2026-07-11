@@ -53,6 +53,8 @@ import {
   readCommittedAskRoute,
 } from "./committed-ask-route";
 import { applyCompoundTerminalPolicy } from "./compound-terminal-policy";
+import { appendHelixRuntimeIntentPacketToPayload, type HelixTurnArtifact } from "./runtime/runtime-intent-packet";
+import { resolvePublishedWorkstationToolTerminal } from "./terminal-identity-precedence";
 
 type RecordLike = Record<string, unknown>;
 
@@ -249,8 +251,55 @@ const readBoolean = (value: unknown): boolean => value === true;
 
 const readStringArray = (value: unknown): string[] =>
   Array.isArray(value)
-    ? value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+    ? value.filter((entry: unknown): entry is string => typeof entry === "string" && entry.trim().length > 0)
     : [];
+
+const mergeCurrentTurnArtifacts = (artifacts: HelixTurnArtifact[]): HelixTurnArtifact[] => {
+  const seen = new Set<string>();
+  const merged: HelixTurnArtifact[] = [];
+  for (const artifact of artifacts) {
+    const artifactId = readString(artifact.artifact_id);
+    const kind = readString(artifact.kind);
+    const key = artifactId || `${kind}:${merged.length}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(artifact);
+  }
+  return merged;
+};
+
+const appendRuntimeIntentPacketForSolver = (input: {
+  payload: RecordLike;
+  turnId: string;
+  promptText: string;
+}): void => {
+  appendHelixRuntimeIntentPacketToPayload({
+    payload: input.payload,
+    turnId: input.turnId,
+    prompt: input.promptText,
+    dependencies: {
+      readString: (value: unknown) => readString(value) || null,
+      hashPayloadShort: hashShort,
+      mergeLedgerArtifacts: (artifacts: HelixTurnArtifact[]) =>
+        mergeCurrentTurnArtifacts(artifacts),
+      resolveTerminalContract: ({ canonicalGoalFrame }: { canonicalGoalFrame: RecordLike }) => {
+        const requiredTerminalKinds = readStringArray(canonicalGoalFrame.required_terminal_kinds);
+        const forbiddenTerminalKinds = readStringArray(canonicalGoalFrame.forbidden_terminal_kinds);
+        const requiredTerminalKind = readString(canonicalGoalFrame.required_terminal_kind);
+        return {
+          required_actions: readStringArray(canonicalGoalFrame.required_actions),
+          required_evidence: readStringArray(canonicalGoalFrame.required_evidence),
+          required_terminal_kinds: requiredTerminalKinds.length > 0
+            ? requiredTerminalKinds
+            : requiredTerminalKind
+              ? [requiredTerminalKind]
+              : [],
+          forbidden_terminal_kinds: forbiddenTerminalKinds,
+        };
+      },
+    },
+  });
+};
 
 const isContextualToolReferenceSuppressed = (payload: RecordLike): boolean => {
   const capabilityPlan = readRecord(payload.capability_plan);
@@ -276,34 +325,7 @@ const resolveAuthoritativeWorkstationToolTerminal = (
   if (isContextualToolReferenceSuppressed(payload) || hasBlockingToolRailFailure(payload)) {
     return null;
   }
-  const terminalAuthority = readRecord(payload.terminal_answer_authority);
-  const terminalWriter = readRecord(payload.terminal_authority_single_writer);
-  const terminalPresentation = readRecord(payload.terminal_presentation);
-  const resolvedSummary = readRecord(payload.resolved_turn_summary);
-  const authorityKind = readString(terminalAuthority?.terminal_artifact_kind);
-  const authoritySource = readString(terminalAuthority?.final_answer_source);
-  const writerKind =
-    readString(terminalWriter?.selected_terminal_artifact_kind) ||
-    readString(terminalWriter?.selectedArtifactKind);
-  const writerSource = readString(terminalWriter?.source);
-  const presentationKind = readString(terminalPresentation?.terminal_artifact_kind);
-  const resolvedKind = readString(resolvedSummary?.terminal_artifact_kind);
-  const resolvedSource = readString(resolvedSummary?.final_answer_source);
-  const authorityWorkstation =
-    authorityKind === "workstation_tool_evaluation" &&
-    authoritySource === "workstation_tool_evaluation" &&
-    readBoolean(terminalAuthority?.server_authoritative);
-  const materializedWorkstation =
-    writerKind === "workstation_tool_evaluation" ||
-    writerSource === "workstation_tool_evaluation" ||
-    presentationKind === "workstation_tool_evaluation" ||
-    (resolvedKind === "workstation_tool_evaluation" && resolvedSource === "workstation_tool_evaluation");
-  return authorityWorkstation && materializedWorkstation
-    ? {
-        terminalArtifactKind: "workstation_tool_evaluation",
-        finalAnswerSource: "workstation_tool_evaluation",
-      }
-    : null;
+  return resolvePublishedWorkstationToolTerminal(payload);
 };
 
 const unique = <T>(entries: T[]): T[] => Array.from(new Set(entries));
@@ -558,6 +580,53 @@ const compoundSynthesisTerminalPathMaterialized = (input: {
       writerKind === "compound_evidence_synthesis_answer" ||
       presentationKind === "compound_evidence_synthesis_answer" ||
       resolvedKind === "compound_evidence_synthesis_answer"
+    )
+  );
+};
+
+const providerTerminalPathMaterialized = (input: {
+  payload: RecordLike;
+  terminalArtifactKind: string;
+  finalAnswerSource: string;
+}): boolean => {
+  const terminalUsesProviderCandidate =
+    input.terminalArtifactKind === "agent_provider_terminal_candidate" ||
+    input.finalAnswerSource === "agent_provider_terminal_candidate";
+  const providerRouteProductMaterialization = readRecord(input.payload.provider_route_product_materialization);
+  const providerBridge = readRecord(input.payload.provider_terminal_authority_bridge);
+  const providerReasoningReentry = readRecord(input.payload.provider_reasoning_reentry);
+  const terminalWriter = readRecord(input.payload.terminal_authority_single_writer);
+  const terminalAuthority = readRecord(input.payload.terminal_answer_authority);
+  const terminalPresentation = readRecord(input.payload.terminal_presentation);
+  const selectedProviderRouteProductRef =
+    readString(terminalWriter?.selected_terminal_artifact_ref) ||
+    readString(terminalWriter?.selectedArtifactRef);
+  const terminalUsesConvertedProviderRouteProduct =
+    input.terminalArtifactKind === "model_synthesized_answer" &&
+    input.finalAnswerSource === "final_answer_draft" &&
+    readString(providerRouteProductMaterialization?.status) === "materialized" &&
+    readString(providerRouteProductMaterialization?.materialized_terminal_artifact_kind) === "model_synthesized_answer" &&
+    readString(providerRouteProductMaterialization?.materialized_terminal_artifact_ref) === selectedProviderRouteProductRef &&
+    Boolean(selectedProviderRouteProductRef?.startsWith(`${readString(input.payload.turn_id) ?? ""}:agent_provider_terminal_candidate:`)) &&
+    providerBridge?.terminal_authority_granted === true &&
+    providerBridge?.final_visible_answer_authorized === true &&
+    readString(providerReasoningReentry?.status) === "completed" &&
+    providerReasoningReentry?.evidence_reentered === true &&
+    readBoolean(providerReasoningReentry?.solver_completed) === true &&
+    readBoolean(providerReasoningReentry?.goal_satisfaction_compatible) === true &&
+    readBoolean(terminalAuthority?.server_authoritative) === true &&
+    readString(terminalAuthority?.terminal_artifact_kind) === "model_synthesized_answer" &&
+    readString(terminalPresentation?.terminal_artifact_kind) === "model_synthesized_answer";
+  if (!terminalUsesProviderCandidate && !terminalUsesConvertedProviderRouteProduct) return false;
+  if (!terminalMatchesCanonicalGoalContract(input.payload, "model_synthesized_answer")) return false;
+  const presentation = readRecord(input.payload.terminal_presentation);
+  if (readStringArray(presentation?.selected_observation_refs).length === 0) return false;
+  if (terminalUsesConvertedProviderRouteProduct) return true;
+  return (
+    readBoolean(terminalAuthority?.server_authoritative) &&
+    (
+      readString(terminalAuthority?.terminal_artifact_kind) === "agent_provider_terminal_candidate" ||
+      readString(terminalAuthority?.final_answer_source) === "agent_provider_terminal_candidate"
     )
   );
 };
@@ -1451,6 +1520,11 @@ export function buildAskTurnSolverTrace(input: {
     secondaryIntentKinds: secondary,
   });
   input.payload.committed_ask_route = committedAskRoute;
+  appendRuntimeIntentPacketForSolver({
+    payload: input.payload,
+    turnId: input.turnId,
+    promptText,
+  });
   const committedRouteCompatibility = evaluateCommittedAskRouteCompatibility({
     committedRoute: committedAskRoute,
     payload: input.payload,
@@ -1496,11 +1570,17 @@ export function buildAskTurnSolverTrace(input: {
     terminalArtifactKind,
     finalAnswerSource,
   });
+  const providerFinalArbitrationMaterialized = providerTerminalPathMaterialized({
+    payload: input.payload,
+    terminalArtifactKind,
+    finalAnswerSource,
+  });
   const effectiveFinalArbitrationRan =
     finalArbitrationRan ||
     routeApprovedSelfTerminalProduct ||
     capabilityHelpFinalArbitrationMaterialized ||
-    compoundFinalArbitrationMaterialized;
+    compoundFinalArbitrationMaterialized ||
+    providerFinalArbitrationMaterialized;
   const evidenceReentryGate = buildEvidenceReentryGate({
     turnId: input.turnId,
     payload: input.payload,
@@ -1529,7 +1609,8 @@ export function buildAskTurnSolverTrace(input: {
   const routeAuthorityOk =
     readBoolean(loopTrace?.route_authority_ok) ||
     readBoolean(readRecord(input.payload.route_authority_audit)?.route_authority_ok) ||
-    compoundFinalArbitrationMaterialized;
+    compoundFinalArbitrationMaterialized ||
+    providerFinalArbitrationMaterialized;
   const poisonAuditOk =
     readBoolean(loopTrace?.poison_audit_ok) ||
     readBoolean(readRecord(input.payload.poison_audit)?.ok) ||

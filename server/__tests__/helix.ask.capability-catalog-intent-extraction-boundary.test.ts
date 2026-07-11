@@ -35,4 +35,22 @@ describe("Helix Ask capability catalog intent extraction boundary", () => {
     expect(isAskTurnCapabilityHelpIntent("What can this workspace agent do?")).toBe(true);
     expect(isAskTurnCapabilityHelpIntent("Summarize this document")).toBe(false);
   });
+
+  it("routes an immediate scholarly parsing and Image Lens behavior question to capability help", () => {
+    const prompt =
+      "Does your tool for research papers allow you to pick papers you are able to parse? Or do you check what papers are openable to then use Image Lens?";
+
+    expect(isAskCapabilityCatalogPrompt(prompt)).toBe(true);
+    expect(isAskTurnCapabilityCatalogAvailabilityPrompt(prompt)).toBe(true);
+    expect(isAskTurnCapabilityHelpIntent(prompt)).toBe(true);
+  });
+
+  it.each([
+    "Earlier I asked: does your tool for research papers allow you to pick papers you are able to parse?",
+    "The screen says 'does your tool for research papers allow you to pick papers you are able to parse?'",
+    "Do not answer whether your tool for research papers can pick openable papers.",
+  ])("does not execute capability help from contextual or negated wording: %s", (prompt) => {
+    expect(isAskCapabilityCatalogPrompt(prompt)).toBe(false);
+    expect(isAskTurnCapabilityHelpIntent(prompt)).toBe(false);
+  });
 });

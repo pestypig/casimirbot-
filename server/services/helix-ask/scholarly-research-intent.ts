@@ -32,6 +32,11 @@ const BARE_ARXIV_PATTERN = /\b\d{4}\.\d{4,5}(?:v\d+)?\b/i;
 const trimIdentifier = (value: string): string =>
   value.trim().replace(/[)\].,;:!?]+$/g, "");
 
+// Tool names and examples are frequently quoted in prompts that explicitly say not to run them.
+// Intent cues must be read from the operator text, not from those literal examples.
+const stripQuotedPromptSegments = (promptText: string): string =>
+  promptText.replace(/"[^"\n]*"|'[^'\n]*'|`[^`\n]*`/g, " ");
+
 export const extractScholarlyDoi = (promptText: string): string | null => {
   const match = promptText.match(DOI_PATTERN)?.[0];
   return match ? trimIdentifier(match).toLowerCase() : null;
@@ -46,10 +51,11 @@ export const extractScholarlyArxivId = (promptText: string): string | null => {
 };
 
 const hasLocalDocsScopeCue = (promptText: string): boolean =>
-  /\b(?:docs?\s+viewer|documents?\s+viewer|current\s+(?:doc|document|paper)|active\s+(?:doc|document|paper)|document\s+path\s*:|locate\s+query\s*:|\/docs\/|from\s+(?:our|local|the)\s+docs?)\b/i.test(promptText);
+  /\b(?:docs?\s+viewer|documents?\s+viewer|(?:current(?:ly)?|open|active|visible)\s+(?:doc|document|paper|white\s*paper|whitepaper)|document\s+path\s*:|locate\s+query\s*:|from\s+(?:our|local|the)\s+docs?)\b/i.test(promptText) ||
+  /(?:^|[\s"'(])\/?docs\/[A-Za-z0-9_./-]+(?:\.mdx?|\.txt)?\b/i.test(promptText);
 
 const hasLookupActionCue = (promptText: string): boolean =>
-  /\b(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|pull|query|get|resolve|repair|collect|cite|check|cross-?check)\b/i.test(promptText);
+  /\b(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|pull|query|get|resolve|repair|collect|check|cross-?check)\b/i.test(promptText);
 
 const hasScholarlyProviderCue = (promptText: string): boolean =>
   /\b(?:arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|core\s+api)\b/i.test(promptText);
@@ -61,7 +67,7 @@ const hasPaperCorpusCue = (promptText: string): boolean =>
   /\b(?:scholarly\s+research|research[-\s]+papers?|research[-\s]+paper\s+evidence|paper[-\s]+backed|paper\s+metadata|journal\s+(?:article|articles|paper|papers)|peer[-\s]?reviewed|literature|preprints?|scholarly\s+(?:papers?|articles?|sources?))\b/i.test(promptText);
 
 export const hasScholarlyFullTextCue = (promptText: string): boolean =>
-  /\b(?:pdfs?|full[-\s]?text|paper\s+text|article\s+text|paper[-\s]+backed\s+(?:numeric|numerical|formula|variable|calculator)|research[-\s]+paper\s+(?:numeric|numerical|formula|variable)\s+evidence|source[-\s]backed\s+(?:numeric|numerical|expression|calculator)|formula\s+(?:variable\s+)?binding|bind\s+(?:the\s+)?(?:formula\s+)?variables?|calculator\s+binding|extract\s+(?:text|sections?|passages?|chunks?|science|scientific\s+content)|show\s+(?:me\s+)?(?:the\s+)?science|scientific\s+content|scientific\s+evidence(?:\s+packet)?|main\s+equations?|show\s+(?:me\s+)?(?:the\s+)?equations?|read\s+(?:the\s+)?(?:paper|pdf|article)|pages?|page\s+images?|figures?|tables?|equations?|methods?|results?|discussion|conclusion)\b/i.test(promptText);
+  /\b(?:pdfs?|full[-\s]?text|paper\s+text|article\s+text|paper[-\s]+backed\s+(?:numeric|numerical|formula|variable|calculator)|research[-\s]+paper\s+(?:numeric|numerical|formula|variable)\s+evidence|source[-\s]backed\s+(?:numeric|numerical|expression|calculator)|formula\s+(?:variable\s+)?binding|bind\s+(?:the\s+)?(?:formula\s+)?variables?|calculator\s+binding|extract\s+(?:text|sections?|passages?|chunks?|science|scientific\s+content)|show\s+(?:me\s+)?(?:the\s+)?science|scientific\s+content|scientific\s+evidence(?:\s+packet)?|main\s+equations?|show\s+(?:me\s+)?(?:the\s+)?equations?|read\s+(?:the\s+)?(?:paper|pdf|article)|pages?|page\s+images?|figures?|tables?|equations?|(?:paper|article)\s+(?:methods?|results?|discussion|conclusion)|(?:methods?|results?|discussion|conclusion)\s+(?:section|of\s+(?:the\s+)?(?:paper|article)))\b/i.test(promptText);
 
 export const hasScholarlyPageImageCue = (promptText: string): boolean =>
   /\b(?:render|inspect|ocr|parse|crop|page\s+images?|pdf\s+pages?|image\s+lens|displayed\s+equations?|equation[-\s]+like\s+rows?|exact\s+equation\s+rows?)\b/i.test(promptText);
@@ -271,19 +277,30 @@ export const extractScholarlyIntent = (promptText: string): HelixScholarlyIntent
 
 export const detectScholarlyResearchIntent = (promptText: string): HelixScholarlyResearchIntent => {
   const prompt = promptText.trim();
+  const admissionPrompt = stripQuotedPromptSegments(prompt);
   const scholarlyIntent = extractScholarlyIntent(prompt);
   const chainPlan = buildScholarlyCapabilityChainPlan(scholarlyIntent);
   const doi = extractScholarlyDoi(prompt);
   const arxivId = extractScholarlyArxivId(prompt);
-  const providerCue = hasScholarlyProviderCue(prompt);
-  const citationCue = hasCitationCue(prompt);
-  const corpusCue = hasPaperCorpusCue(prompt);
-  const fullTextCue = hasScholarlyFullTextCue(prompt);
-  const lookupAction = hasLookupActionCue(prompt);
-  const localDocsScope = hasLocalDocsScopeCue(prompt);
+  const providerCue = hasScholarlyProviderCue(admissionPrompt);
+  const citationCue = hasCitationCue(admissionPrompt);
+  const corpusCue = hasPaperCorpusCue(admissionPrompt);
+  const fullTextCue = hasScholarlyFullTextCue(admissionPrompt);
+  const lookupAction = hasLookupActionCue(admissionPrompt);
+  const localDocsScope = hasLocalDocsScopeCue(admissionPrompt);
   const externalIdentifier = Boolean(doi || arxivId);
+  // A citation request can be entirely local (for example, citing headings in
+  // the currently open document). Preserve that explicit source scope unless
+  // the user also asks for an external scholarly provider, identifier, or
+  // lookup action.
+  const localDocumentOnly =
+    localDocsScope &&
+    !externalIdentifier &&
+    !providerCue &&
+    !lookupAction;
   const researchRequested =
-    !isExplanatoryOnlyPrompt(prompt) &&
+    !localDocumentOnly &&
+    !isExplanatoryOnlyPrompt(admissionPrompt) &&
     (
       externalIdentifier ||
       (lookupAction && (providerCue || citationCue || corpusCue || fullTextCue)) ||
@@ -302,7 +319,7 @@ export const detectScholarlyResearchIntent = (promptText: string): HelixScholarl
     lookupAction ? "research_lookup_action" : "",
   ].filter(Boolean);
   const mode: HelixScholarlyResearchIntentMode =
-    citationCue && /\breferences?|bibliograph|bibtex/i.test(prompt)
+    citationCue && /\breferences?|bibliograph|bibtex/i.test(admissionPrompt)
       ? "reference_lookup"
       : citationCue
         ? "citation_lookup"

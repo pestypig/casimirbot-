@@ -1,9 +1,14 @@
+import crypto from "node:crypto";
 import type {
   HelixRealtimeSessionAction,
   HelixRealtimeSessionTransport,
   HelixRealtimeSessionTransportPlan,
 } from "@shared/helix-realtime-session";
 import { buildRealtimeSessionTransportPlan } from "./config";
+
+const OPENAI_REALTIME_CLIENT_SECRETS_URL = "https://api.openai.com/v1/realtime/client_secrets";
+const DEFAULT_OPENAI_REALTIME_MODEL = "gpt-realtime-2.1";
+const OPENAI_REALTIME_CLIENT_SECRET_TIMEOUT_MS = 10_000;
 
 const readRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -12,6 +17,15 @@ const readRecord = (value: unknown): Record<string, unknown> =>
 
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
+
+const readNumber = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
 
 const readClientReceiptRefs = (body: unknown): string[] => {
   const record = readRecord(body);
@@ -66,6 +80,8 @@ export type HelixRealtimeOpenAiContractRequest = {
   runtimeAgentMode: string | null;
   runtimeAgentAuthority: string | null;
   clientReceiptRefs: string[];
+  safetyIdentifier?: string | null;
+  voice?: string | null;
 };
 
 export type HelixRealtimeOpenAiContractResult = {
@@ -79,6 +95,20 @@ export type HelixRealtimeOpenAiContractResult = {
 export type HelixRealtimeOpenAiContractTransport = (
   request: HelixRealtimeOpenAiContractRequest,
 ) => Promise<HelixRealtimeOpenAiContractResult>;
+
+type HelixRealtimeFetch = (
+  input: string,
+  init?: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+    signal?: AbortSignal;
+  },
+) => Promise<{
+  ok: boolean;
+  status: number;
+  json(): Promise<unknown>;
+}>;
 
 export type HelixRealtimeSessionAdapter = {
   id: HelixRealtimeSessionTransportPlan["adapter_id"];
@@ -186,16 +216,161 @@ export const openAiRealtimeSessionAdapterStub: HelixRealtimeSessionAdapter = {
 const readOpenAiApiKey = (env?: NodeJS.ProcessEnv): string | null =>
   readString(env?.OPENAI_API_KEY);
 
-const defaultOpenAiContractTransport: HelixRealtimeOpenAiContractTransport = async () => ({
-  ok: false,
-  failureReason: "openai_realtime_transport_not_configured",
-});
+const isSafeOpenAiSafetyIdentifier = (value: string | null): value is string =>
+  Boolean(value && /^[A-Za-z0-9._:-]{8,128}$/.test(value));
+
+const buildFallbackOpenAiRealtimeProviderSessionRef = (
+  request: Pick<HelixRealtimeOpenAiContractRequest, "model" | "requestedTransport" | "clientReceiptRefs">,
+  expiresAtMs: number | null,
+): string => {
+  const digest = crypto
+    .createHash("sha256")
+    .update([
+      request.model,
+      request.requestedTransport,
+      request.clientReceiptRefs.join("|"),
+      String(expiresAtMs ?? "no-expiry"),
+    ].join(":"))
+    .digest("hex")
+    .slice(0, 16);
+  return `openai-realtime:client_secret:${digest}`;
+};
+
+const readOpenAiRealtimeSecretValue = (record: Record<string, unknown>): string | null => {
+  const clientSecretRecord = readRecord(record.client_secret ?? record.clientSecret);
+  return (
+    readString(record.value) ??
+    readString(record.secret) ??
+    readString(record.client_secret) ??
+    readString(record.clientSecret) ??
+    readString(clientSecretRecord.value) ??
+    readString(clientSecretRecord.secret)
+  );
+};
+
+const readOpenAiRealtimeSecretExpiresAtMs = (record: Record<string, unknown>): number | null => {
+  const clientSecretRecord = readRecord(record.client_secret ?? record.clientSecret);
+  const ms =
+    readNumber(record.expires_at_ms ?? record.expiresAtMs) ??
+    readNumber(clientSecretRecord.expires_at_ms ?? clientSecretRecord.expiresAtMs);
+  if (ms !== null) return Math.trunc(ms);
+  const seconds =
+    readNumber(record.expires_at ?? record.expiresAt) ??
+    readNumber(clientSecretRecord.expires_at ?? clientSecretRecord.expiresAt);
+  return seconds === null ? null : Math.trunc(seconds * 1000);
+};
+
+const readOpenAiRealtimeProviderSessionRef = (record: Record<string, unknown>): string | null => {
+  const sessionRecord = readRecord(record.session);
+  return (
+    readString(record.id) ??
+    readString(record.session_id ?? record.sessionId) ??
+    readString(record.provider_session_ref ?? record.providerSessionRef) ??
+    readString(sessionRecord.id) ??
+    readString(sessionRecord.session_id ?? sessionRecord.sessionId)
+  );
+};
+
+export const createDefaultOpenAiRealtimeContractTransport = (
+  fetchImpl: HelixRealtimeFetch = globalThis.fetch as HelixRealtimeFetch,
+): HelixRealtimeOpenAiContractTransport => async (request) => {
+  if (typeof fetchImpl !== "function") {
+    return {
+      ok: false,
+      failureReason: "openai_realtime_transport_not_configured",
+    };
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), OPENAI_REALTIME_CLIENT_SECRET_TIMEOUT_MS);
+  const session: Record<string, unknown> = {
+    type: "realtime",
+    model: request.model || DEFAULT_OPENAI_REALTIME_MODEL,
+  };
+  if (readString(request.voice)) {
+    session.audio = {
+      output: {
+        voice: readString(request.voice),
+      },
+    };
+  }
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${request.apiKey}`,
+    "Content-Type": "application/json",
+  };
+  if (isSafeOpenAiSafetyIdentifier(readString(request.safetyIdentifier))) {
+    headers["OpenAI-Safety-Identifier"] = readString(request.safetyIdentifier) as string;
+  }
+  try {
+    const response = await fetchImpl(OPENAI_REALTIME_CLIENT_SECRETS_URL, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ session }),
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      return {
+        ok: false,
+        failureReason: `openai_realtime_provider_http_${response.status}`,
+      };
+    }
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      return {
+        ok: false,
+        failureReason: "openai_realtime_provider_response_invalid",
+      };
+    }
+    const record = readRecord(payload);
+    const secretValue = readOpenAiRealtimeSecretValue(record);
+    if (!secretValue) {
+      return {
+        ok: false,
+        failureReason: "openai_realtime_client_secret_missing",
+      };
+    }
+    const expiresAtMs = readOpenAiRealtimeSecretExpiresAtMs(record);
+    return {
+      ok: true,
+      providerSessionRef:
+        readOpenAiRealtimeProviderSessionRef(record) ??
+        buildFallbackOpenAiRealtimeProviderSessionRef(request, expiresAtMs),
+      ephemeralClientSecret: secretValue,
+      ephemeralClientSecretExpiresAtMs: expiresAtMs,
+    };
+  } catch (error) {
+    const name = readString(readRecord(error).name);
+    return {
+      ok: false,
+      failureReason: name === "AbortError"
+        ? "openai_realtime_transport_timeout"
+        : "openai_realtime_transport_network_error",
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
+const defaultOpenAiContractTransport: HelixRealtimeOpenAiContractTransport =
+  (request) => createDefaultOpenAiRealtimeContractTransport()(request);
 
 const readSelectedRealtimeModel = (body: unknown): string => {
   const record = readRecord(body);
   return (
     readString(record.selected_model_or_service ?? record.selectedModelOrService ?? record.selected_realtime_model) ??
-    "gpt-realtime"
+    DEFAULT_OPENAI_REALTIME_MODEL
+  );
+};
+
+const readSelectedRealtimeVoice = (body: unknown): string | null => {
+  const record = readRecord(body);
+  return readString(
+    record.selected_realtime_voice ??
+    record.selectedRealtimeVoice ??
+    record.realtime_voice ??
+    record.realtimeVoice ??
+    record.voice,
   );
 };
 
@@ -255,6 +430,7 @@ export const createOpenAiRealtimeSessionAdapter = (
         readRecord(args.body).runtime_agent_authority ?? readRecord(args.body).runtimeAgentAuthority,
       ),
       clientReceiptRefs: readClientReceiptRefs(args.body),
+      voice: readSelectedRealtimeVoice(args.body),
     };
     const result = await transport(request);
     if (!result.ok) {

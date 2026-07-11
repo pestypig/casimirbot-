@@ -10,6 +10,23 @@ const arbitrate = (promptText: string) =>
   });
 
 describe("Helix Ask evidence target arbitration", () => {
+  it("gives capability help precedence over scholarly and Image Lens lexical cues", () => {
+    const arbitration = buildAskEvidenceTargetArbitration({
+      turnId: "ask:test:capability-help-precedence",
+      threadId: "thread:test:capability-help-precedence",
+      promptText:
+        "Does your tool for research papers allow you to pick papers you are able to parse? Or do you check what papers are openable to then use Image Lens?",
+    });
+
+    expect(arbitration).toMatchObject({
+      selected_target_source: "runtime_evidence",
+      selected_target_kind: "runtime_evidence",
+      available_capabilities: ["helix_ask.inspect_capability_catalog"],
+      terminal_product_constraints: ["capability_help_summary", "typed_failure"],
+      reason_codes: expect.arrayContaining(["capability_catalog_precedence"]),
+    });
+  });
+
   it("lets Stage Play mail wake route metadata lock the live-source mailbox target before prompt scoring", () => {
     const arbitration = buildAskEvidenceTargetArbitration({
       turnId: "turn:stage-play-mail-wake-metadata",

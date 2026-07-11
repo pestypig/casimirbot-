@@ -1657,6 +1657,228 @@ const readBoundedDocsExcerpt = (paths: string[]): {
   };
 };
 
+type DocsExactLocationMatch = {
+  path: string;
+  term: string;
+  occurrence_index: number;
+  line: number;
+  heading: string | null;
+  sentence: string;
+};
+
+type DocsSectionObservation = {
+  schema: "helix.docs_section_observation.v1";
+  path: string;
+  requested_heading: string;
+  matched_heading: string;
+  heading_line: number;
+  section_start_line: number;
+  section_end_line: number;
+  section_excerpt: string;
+  section_excerpt_char_count: number;
+  section_lines: Array<{ line: number; text: string }>;
+  contains_terms: string[];
+  match_unit: "line" | "sentence" | "paragraph";
+  contains_matches: Array<{ term: string; line: number; source_line: string; sentence: string }>;
+  contains_match_count: number;
+  truncated: boolean;
+};
+
+const readDocsExactTerms = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? Array.from(new Set(value
+        .map((entry) => typeof entry === "string" ? entry.trim() : "")
+        .filter((entry) => entry.length > 0 && entry.length <= 200)))
+        .slice(0, 8)
+    : [];
+
+const sentenceContainingOffset = (paragraph: string, offset: number): string => {
+  const segmenter = new Intl.Segmenter("en", { granularity: "sentence" });
+  for (const segment of segmenter.segment(paragraph)) {
+    const start = segment.index;
+    const end = start + segment.segment.length;
+    if (offset >= start && offset < end) return segment.segment.trim();
+  }
+  return paragraph.trim();
+};
+
+const normalizeDocsHeading = (value: string): string =>
+  value
+    .replace(/[`*_~]+/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLocaleLowerCase("en");
+
+const readBoundedDocsSection = (
+  paths: string[],
+  requestedHeading: string | null,
+  containsTerms: string[],
+  matchUnit: "line" | "sentence" | "paragraph",
+): DocsSectionObservation | null => {
+  const exactPath = paths.find((entry) => /^docs\/.+\.md$/i.test(entry));
+  if (!exactPath || !requestedHeading) return null;
+  const workspaceRoot = process.cwd();
+  const absolutePath = path.resolve(workspaceRoot, exactPath);
+  const docsRoot = path.resolve(workspaceRoot, "docs");
+  if (absolutePath !== docsRoot && !absolutePath.startsWith(`${docsRoot}${path.sep}`)) return null;
+
+  let text = "";
+  try {
+    text = readFileSync(absolutePath, "utf8").replace(/\r\n?/g, "\n");
+  } catch {
+    return null;
+  }
+  const lines = text.split("\n");
+  const requestedKey = normalizeDocsHeading(requestedHeading);
+  let headingIndex = -1;
+  let headingLevel = 0;
+  let matchedHeading = "";
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = lines[index]?.match(/^\s{0,3}(#{1,6})\s+(.+?)\s*$/);
+    if (!match || normalizeDocsHeading(match[2] ?? "") !== requestedKey) continue;
+    headingIndex = index;
+    headingLevel = match[1]?.length ?? 0;
+    matchedHeading = match[2]?.trim() ?? requestedHeading;
+    break;
+  }
+  if (headingIndex < 0) return null;
+
+  let endIndexExclusive = lines.length;
+  for (let index = headingIndex + 1; index < lines.length; index += 1) {
+    const match = lines[index]?.match(/^\s{0,3}(#{1,6})\s+(.+?)\s*$/);
+    if (match && (match[1]?.length ?? 7) <= headingLevel) {
+      endIndexExclusive = index;
+      break;
+    }
+  }
+
+  const maxLines = 240;
+  const maxChars = 16_000;
+  const availableLines = lines.slice(headingIndex, endIndexExclusive);
+  const boundedLines: Array<{ line: number; text: string }> = [];
+  let usedChars = 0;
+  for (let index = 0; index < availableLines.length && boundedLines.length < maxLines; index += 1) {
+    const sourceLine = availableLines[index] ?? "";
+    const addedChars = sourceLine.length + (boundedLines.length > 0 ? 1 : 0);
+    if (usedChars + addedChars > maxChars) break;
+    boundedLines.push({ line: headingIndex + index + 1, text: sourceLine });
+    usedChars += addedChars;
+  }
+  const sectionExcerpt = boundedLines.map((entry) => entry.text).join("\n");
+  const containsMatches: DocsSectionObservation["contains_matches"] = [];
+  for (const entry of boundedLines) {
+    for (const term of containsTerms) {
+      let searchFrom = 0;
+      while (containsMatches.length < 100) {
+        const offset = entry.text.indexOf(term, searchFrom);
+        if (offset < 0) break;
+        const sentence = sentenceContainingOffset(entry.text, offset);
+        const duplicate = containsMatches.some((match) =>
+          match.term === term && match.line === entry.line &&
+          (matchUnit === "line" || match.sentence === sentence),
+        );
+        if (!duplicate) {
+          containsMatches.push({
+            term,
+            line: entry.line,
+            source_line: entry.text,
+            sentence: matchUnit === "line" ? entry.text : sentence,
+          });
+        }
+        searchFrom = offset + Math.max(1, term.length);
+      }
+    }
+  }
+
+  return {
+    schema: "helix.docs_section_observation.v1",
+    path: exactPath,
+    requested_heading: requestedHeading,
+    matched_heading: matchedHeading,
+    heading_line: headingIndex + 1,
+    section_start_line: headingIndex + 1,
+    section_end_line: endIndexExclusive,
+    section_excerpt: sectionExcerpt,
+    section_excerpt_char_count: sectionExcerpt.length,
+    section_lines: boundedLines,
+    contains_terms: containsTerms,
+    match_unit: matchUnit,
+    contains_matches: containsMatches,
+    contains_match_count: containsMatches.length,
+    truncated: boundedLines.length < availableLines.length,
+  };
+};
+
+const readDocsExactLocationMatches = (paths: string[], exactTerms: string[]): DocsExactLocationMatch[] => {
+  const exactPath = paths.find((entry) => /^docs\/.+\.md$/i.test(entry));
+  if (!exactPath || exactTerms.length === 0) return [];
+  const workspaceRoot = process.cwd();
+  const absolutePath = path.resolve(workspaceRoot, exactPath);
+  const docsRoot = path.resolve(workspaceRoot, "docs");
+  if (absolutePath !== docsRoot && !absolutePath.startsWith(`${docsRoot}${path.sep}`)) return [];
+
+  let text = "";
+  try {
+    text = readFileSync(absolutePath, "utf8").replace(/\r\n?/g, "\n");
+  } catch {
+    return [];
+  }
+  const lines = text.split("\n");
+  const lineStarts: number[] = [];
+  let cursor = 0;
+  for (const line of lines) {
+    lineStarts.push(cursor);
+    cursor += line.length + 1;
+  }
+  const headingForLine = (lineIndex: number): string | null => {
+    for (let index = lineIndex; index >= 0; index -= 1) {
+      const heading = lines[index]?.match(/^\s{0,3}#{1,6}\s+(.+?)\s*$/)?.[1]?.trim();
+      if (heading) return heading;
+    }
+    return null;
+  };
+  const lineForOffset = (offset: number): number => {
+    let low = 0;
+    let high = lineStarts.length - 1;
+    while (low <= high) {
+      const mid = Math.floor((low + high) / 2);
+      if ((lineStarts[mid] ?? 0) <= offset) low = mid + 1;
+      else high = mid - 1;
+    }
+    return Math.max(0, high);
+  };
+
+  const matches: DocsExactLocationMatch[] = [];
+  for (const term of exactTerms) {
+    let searchFrom = 0;
+    let occurrenceIndex = 0;
+    while (matches.length < 100) {
+      const offset = text.indexOf(term, searchFrom);
+      if (offset < 0) break;
+      const paragraphStartMarker = text.lastIndexOf("\n\n", offset);
+      const paragraphStart = paragraphStartMarker < 0 ? 0 : paragraphStartMarker + 2;
+      const paragraphEndMarker = text.indexOf("\n\n", offset + term.length);
+      const paragraphEnd = paragraphEndMarker < 0 ? text.length : paragraphEndMarker;
+      const paragraph = text.slice(paragraphStart, paragraphEnd).replace(/\n+/g, " ").trim();
+      const lineIndex = lineForOffset(offset);
+      const sourceLine = lines[lineIndex]?.trim() ?? "";
+      matches.push({
+        path: exactPath,
+        term,
+        occurrence_index: occurrenceIndex,
+        line: lineIndex + 1,
+        heading: headingForLine(lineIndex),
+        sentence: sourceLine.startsWith("|")
+          ? sourceLine
+          : sentenceContainingOffset(paragraph, offset - paragraphStart),
+      });
+      occurrenceIndex += 1;
+      searchFrom = offset + Math.max(1, term.length);
+    }
+  }
+  return matches;
+};
+
 const readBoundedTranslationBlocks = (value: unknown): Array<Record<string, unknown>> => {
   const entries = Array.isArray(value) ? value : [];
   return entries
@@ -5644,6 +5866,19 @@ export const callWorkstationGatewayCapability = async (
     const args = readArguments(input.arguments);
     const query = normalizeRepoSearchQuery(args.query);
     const paths = readDocsSearchPaths(args.paths);
+    const exactTerms = readDocsExactTerms(args.exact_terms ?? args.exactTerms);
+    const sectionHeading = clipObservationText(args.section_heading ?? args.sectionHeading, 240);
+    const requestedSectionHeadings = readDocsExactTerms(args.section_headings ?? args.sectionHeadings);
+    const sectionHeadings = Array.from(new Set([
+      ...requestedSectionHeadings,
+      ...(sectionHeading ? [sectionHeading] : []),
+    ])).slice(0, 4);
+    const sectionContainsTerms = readDocsExactTerms(args.section_contains_terms ?? args.sectionContainsTerms);
+    const requestedSectionMatchUnit = clipObservationText(args.section_match_unit ?? args.sectionMatchUnit, 20);
+    const sectionMatchUnit: "line" | "sentence" | "paragraph" =
+      requestedSectionMatchUnit === "line" || requestedSectionMatchUnit === "paragraph"
+        ? requestedSectionMatchUnit
+        : "sentence";
     const maxHits = readRepoSearchMaxHits(args.max_hits ?? args.maxHits);
     const blockedReason = !query
       ? "missing_query"
@@ -5742,6 +5977,28 @@ export const callWorkstationGatewayCapability = async (
     );
     const activeDocumentObservation = readBoundedDocsExcerpt(paths) ??
       (compoundReadAloudResolvedPath ? readBoundedDocsExcerpt([compoundReadAloudResolvedPath]) : null);
+    const exactLocationMatches = readDocsExactLocationMatches(paths, exactTerms);
+    const sectionObservations = sectionHeadings
+      .map((heading) => readBoundedDocsSection(paths, heading, sectionContainsTerms, sectionMatchUnit))
+      .filter((entry): entry is DocsSectionObservation => Boolean(entry));
+    const sectionLookups = sectionHeadings.map((heading) => {
+      const found = sectionObservations.find((entry) => entry.requested_heading === heading) ?? null;
+      return {
+          schema: "helix.docs_section_lookup.v1",
+          path: paths.find((entry) => /^docs\/.+\.md$/i.test(entry)) ?? null,
+          requested_heading: heading,
+          heading_found: Boolean(found),
+          status: found ? "found" : "not_found",
+          contains_terms: sectionContainsTerms,
+          match_unit: sectionMatchUnit,
+          observation_role: "evidence_not_assistant_answer",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        };
+    });
+    const sectionObservation = sectionObservations[0] ?? null;
+    const sectionLookup = sectionLookups[0] ?? null;
     const evidence = formatRepoSearchEvidence(
       {
         ...result,
@@ -5778,6 +6035,13 @@ export const callWorkstationGatewayCapability = async (
             raw_content_included: false,
           }
         : null,
+      exact_terms: exactTerms,
+      exact_location_matches: exactLocationMatches,
+      exact_location_match_count: exactLocationMatches.length,
+      section_observation: sectionObservation,
+      section_lookup: sectionLookup,
+      section_observations: sectionObservations,
+      section_lookups: sectionLookups,
       evidence_observations: evidence.observations,
       truncated,
       error: result.error,

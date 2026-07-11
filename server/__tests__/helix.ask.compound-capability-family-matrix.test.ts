@@ -127,8 +127,8 @@ const expectedTerminalKindsByFamily: Record<string, string[]> = {
   theory_locator: ["theory_context_reflection_answer"],
   moral_graph_reflection: ["model_synthesized_answer"],
   civilization_bounds: ["model_synthesized_answer"],
-  visual_capture: ["situation_context_pack"],
-  workstation: ["model_synthesized_answer", "workstation_tool_evaluation"],
+  visual_capture: ["situation_context_pack", "image_lens_observation_report"],
+  workstation: ["model_synthesized_answer", "workstation_tool_evaluation", "note_update_receipt"],
 };
 
 const argValuePresent = (value: unknown): boolean => {
@@ -280,7 +280,7 @@ const completedArtifactsForItinerary = (
           status: "completed",
           produced_affordance_kinds: producedAffordanceKinds,
           consumed_affordance_kinds: consumedAffordanceKinds,
-          ...(runtime === "docs-viewer.locate_in_doc"
+          ...(requested === "docs-viewer.locate_in_doc"
             ? {
                 status: "located",
                 match_count: 1,
@@ -563,7 +563,7 @@ describe("Helix Ask compound capability family matrix", () => {
     expect(state.missing_required_capabilities).toContain("docs-viewer.locate_in_doc");
     expect(ledgerEntry).toMatchObject({
       requested_capability: "docs-viewer.locate_in_doc",
-      selected_capability: "docs-viewer.locate_in_doc",
+      selected_capability: "docs.search",
       executed_capability: null,
       observation_kind: null,
       observation_ref: null,
@@ -874,6 +874,31 @@ describe("Helix Ask compound capability family matrix", () => {
       forbidden: [],
       requiredTerminalKind: "workstation_tool_evaluation",
     });
+  });
+
+  it("does not let lexical tool mentions override a capability-help terminal contract", () => {
+    const payload = {
+      canonical_goal_frame: {
+        goal_kind: "capability_help",
+        required_terminal_kind: "capability_help_summary",
+      },
+      compound_capability_contract: {
+        subgoals: [
+          { requested_capability: "helix_ask.inspect_capability_catalog", capability_family: "capability_catalog" },
+          { requested_capability: "image_lens.inspect", capability_family: "visual_capture" },
+        ],
+      },
+    };
+
+    const applied = applyCompoundTerminalPolicy(payload, {
+      allowed: ["capability_help_summary", "typed_failure"],
+      forbidden: [],
+      requiredTerminalKind: "capability_help_summary",
+    });
+
+    expect(applied.policy.active).toBe(false);
+    expect(applied.requiredTerminalKind).toBe("capability_help_summary");
+    expect(applied.allowed).toEqual(["capability_help_summary", "typed_failure"]);
   });
 
   it("does not let stale itinerary criteria activate compound terminal policy for one subgoal", () => {

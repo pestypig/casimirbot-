@@ -104,10 +104,64 @@ must not act as a private planner or terminal answer source.
 
 Debug exports should preserve this distinction. Route evidence authority uses
 `route_proposal_authority.prompt_derived_gateway_requests =
-"policy_admission_fallback"` and `classifier_hints = "hint_only"` until a
-runtime-authored semantic route proposal exists. A future semantic proposal from
-Codex should be explicit, current-turn scoped, and still pass Helix admission
-before any workstation capability runs.
+"policy_admission_fallback"` and `classifier_hints = "hint_only"`.
+
+### Runtime Semantic Route Proposal (staged)
+
+Codex Workstation Mode may emit a current-turn
+`helix.runtime_semantic_route_proposal.v1` artifact. It records a proposed
+route, capability/tool family, confidence, uncertainty, reason summary, and a
+prompt hash. The provider-normalized artifact is always:
+
+```txt
+proposal_source = "agent_runtime"
+terminal_eligible = false
+assistant_answer = false
+```
+
+It is advisory context, not an execution request, a source of supporting
+evidence, or an answer. Helix must independently validate any proposed route
+against the account, capability, evidence, and route-product contracts before a
+workstation capability can run. A proposal alone must not override explicit
+no-tool/no-run constraints, contextual or quoted tool names, or the final
+terminal authority decision.
+
+`route_evidence_authority.route_proposal_authority.route_source_comparison`
+compares the current Codex proposal with explicit user-command refs,
+prompt-derived policy-fallback refs, ambient-context refs, and the final
+admitted route ref. That comparison is diagnostic only. The solver-owned route
+evidence authority is the single source of truth; provider and client debug
+projections may mirror it but must not rebuild it from local or stale state.
+
+This is the first stage of semantic proposal adoption. Later stages may let a
+validated proposal replace individual prompt-derived fallback selections, one
+route family at a time, only after adversarial no-run and route-mismatch tests
+prove that the policy boundary holds.
+
+### First-Event Requirement for Primary Proposals
+
+The staged artifact emitted beside a provider's first answer is useful for
+audit and follow-up admission, but it cannot retroactively choose the route
+that admitted that same provider invocation. Helix must not solve that timing
+problem by running a second hidden "planning" model call.
+
+For a semantic proposal to become primary before a capability runs, the native
+Codex runtime adapter must expose it as a structured first-turn event, before
+any tool request. The intended flow is:
+
+```txt
+Codex first event: semantic route proposal
+-> Helix validates policy, account, evidence, and route-product constraints
+-> Codex tool request or direct answer
+-> Helix admits or rejects the requested capability
+-> observation re-enters Codex
+-> route-approved terminal product
+```
+
+Until that native first-event handoff exists, prompt-derived route selection
+remains a policy fallback and the provider-emitted proposal remains
+diagnostic-only. This avoids turning Helix into a private planner or creating a
+second sampling loop outside Codex ownership.
 
 Future agent onboarding should improve this shared contract instead of adding
 private side channels. If a new provider needs more workstation affordances,
@@ -288,6 +342,43 @@ Required loop:
 7. Ask model again.
 8. Repeat until answer, ask_user, fail_closed, or budget exhaustion.
 
+Every sampling/re-entry step must also receive the latest non-terminal
+`helix.agent_continuation_state.v1`. This is the shared adapter summary of what
+changed after the prior attempt; it is not another planner and it cannot answer
+or execute a tool. It records:
+
+```txt
+goal status
+existing and newly observed refs
+missing requirements
+last capability attempt and failure class
+retryability
+next admitted affordances
+already-tried action fingerprints
+progress since the previous decision
+soft-budget pressure and hard resource boundary
+allowed decisions: act, retry, ask_user, answer, fail
+```
+
+The state must be tool-family neutral. Docs, Image Lens, research, graphs,
+calculators, workstation actions, and compounds publish the same contract.
+Adding a new tool-specific continuation loop or budget extension is a contract
+violation unless the shared state cannot represent a real new resource class.
+
+Recoverable terminal rejection is also an observation. For example,
+`missing_post_tool_model_step`, `missing_evidence_reentry`, or
+`route_requires_synthesis` must re-enter Codex as a
+`helix.terminal_rejection_observation.v1` before becoming visible failure when
+the hard resource boundary still permits recovery. A route-forbidden,
+permission-forbidden, or non-retryable rejection remains final.
+
+Budgets guard resources; they do not decide whether reasoning is true, complete,
+or hopeless. A soft budget may extend when the continuation state proves new
+observations, resolved requirements, an untried admitted affordance, or a
+retryable failure. Repeated identical attempts without progress stop extending.
+The hard boundary then requires Codex to choose a bounded answer, ask the user,
+or report the grounded failure.
+
 A normal final answer requires:
 
 - model selected `answer`
@@ -375,6 +466,62 @@ completing the chain or failing closed with a typed reason. Codex parity here
 means preserving item order and authority: tool output becomes structured input
 to the next model step, and the turn completes only after the terminal item is
 actually selected and projected.
+
+### Compatibility Tool Names Do Not Own Procedure
+
+Older planner names may remain available while a tool family is migrated. For
+Docs, examples include `docs-viewer.search_docs`, `locate_in_doc`, and
+`summarize_doc`, while the Codex workstation gateway uses canonical capabilities
+such as `docs.search`, `docs-viewer.read_visible_surface`, and
+`docs-viewer.open_doc`.
+
+Compatibility names may translate arguments or transport an admitted call. They
+must normalize to the canonical capability before lifecycle and authority
+evaluation. They must not independently choose the route, required evidence,
+follow-up requirement, terminal kind, or visible answer.
+
+The terminal precedence rule is shared across all tool families:
+
+```txt
+current-turn provider terminal with selected current-turn observation refs
+-> supersedes an earlier gateway/workstation evaluation
+-> evidence gate validates those selected refs against the current-turn ledger
+-> route contract validates the terminal product
+-> single writer publishes exactly that product
+```
+
+The provider terminal candidate is transport, not the route product. When
+Codex completes reasoning after one or more observations, Helix may materialize
+that current-turn provider candidate as the provider-authored terminal kind
+required by the committed route:
+
+```txt
+agent_provider_terminal_candidate (transport)
++ current-turn ledger-backed observation refs
++ committed route requiring a provider-authored synthesis kind
+-> route-required terminal product
+-> evidence re-entry gate
+-> single writer
+```
+
+This rule is tool-family neutral. It applies to model, Docs, repo, research,
+graph-reflection, and compound synthesis products without adding prompt-phrase
+exceptions for each tool. It does not convert receipts, client projections,
+debug mirrors, or prior-turn sidecars into answers. Pure self-terminal products
+and control products retain their own materializers. For compound routes, the
+provider product is eligible only when its current-turn support refs cover every
+satisfied subgoal observation; partial support must fail closed with the missing
+subgoal refs named in debug.
+
+A pure self-terminal tool route, such as a route-authorized calculator result,
+remains authoritative when no later provider terminal has selected its
+observation. This is a temporal and evidentiary rule, not a Docs-specific
+exception.
+
+New extraction work should move canonical admission, evidence identity, and
+terminal-precedence decisions out of `server/routes/agi.plan.ts` into focused
+`server/services/helix-ask` modules. Keep only request wiring, compatibility
+argument translation, and response transport in the route file.
 
 ## Shared Tool Family Boundary
 

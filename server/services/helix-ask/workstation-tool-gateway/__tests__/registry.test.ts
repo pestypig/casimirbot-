@@ -3496,6 +3496,292 @@ describe("Helix workstation tool gateway", () => {
     });
   });
 
+  it("returns every exact docs occurrence with its enclosing sentence and nearest heading", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: DOCS_SEARCH_CAPABILITY,
+      arguments: {
+        query: "alpha = 0.7 alpha = 0.995",
+        paths: ["docs/research/nhm2-current-status-whitepaper.md"],
+        exact_terms: ["alpha = 0.7", "alpha = 0.995"],
+        max_hits: 40,
+      },
+      turnId: "ask:test:gateway-docs-exact-alpha-locators",
+      iteration: 4,
+    });
+
+    const observation = result.observation as {
+      exact_terms?: string[];
+      exact_location_match_count?: number;
+      exact_location_matches?: Array<{
+        path?: string;
+        term?: string;
+        line?: number;
+        heading?: string | null;
+        sentence?: string;
+      }>;
+    };
+    const matches = observation.exact_location_matches ?? [];
+    expect(result.ok).toBe(true);
+    expect(observation.exact_terms).toEqual(["alpha = 0.7", "alpha = 0.995"]);
+    expect(observation.exact_location_match_count).toBe(matches.length);
+    expect(matches).toHaveLength(3);
+    expect(matches).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        path: "docs/research/nhm2-current-status-whitepaper.md",
+        term: "alpha = 0.7",
+        line: 5,
+        heading: "Abstract",
+        sentence: expect.stringContaining("`alpha = 0.7`"),
+      }),
+      expect.objectContaining({
+        path: "docs/research/nhm2-current-status-whitepaper.md",
+        term: "alpha = 0.995",
+        line: 1053,
+        heading: "6.7 Twin Paradox trip clocking interpretation",
+        sentence: expect.stringContaining("For `alpha = 0.995`"),
+      }),
+    ]));
+    expect(matches.every((match) => Boolean(match.heading) && Boolean(match.sentence))).toBe(true);
+  });
+
+  it("materializes a grounded zero-result exact docs observation", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: DOCS_SEARCH_CAPABILITY,
+      arguments: {
+        query: "alpha = 0.123456",
+        paths: ["docs/research/nhm2-current-status-whitepaper.md"],
+        exact_terms: ["alpha = 0.123456"],
+        max_hits: 40,
+      },
+      turnId: "ask:test:gateway-docs-zero-exact-alpha-locator",
+      iteration: 4,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      observation: {
+        schema: "helix.docs_search_observation.v1",
+        paths: ["docs/research/nhm2-current-status-whitepaper.md"],
+        exact_terms: ["alpha = 0.123456"],
+        exact_location_matches: [],
+        exact_location_match_count: 0,
+        active_document_observation: expect.objectContaining({
+          path: "docs/research/nhm2-current-status-whitepaper.md",
+        }),
+      },
+    });
+  });
+
+  it("materializes the complete named section with original line metadata", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: DOCS_SEARCH_CAPABILITY,
+      arguments: {
+        query: "6.7 Twin Paradox trip clocking interpretation",
+        paths: ["docs/research/nhm2-current-status-whitepaper.md"],
+        section_heading: "6.7 Twin Paradox trip clocking interpretation",
+        section_contains_terms: ["alpha"],
+        max_hits: 40,
+      },
+      turnId: "ask:test:gateway-docs-named-section",
+      iteration: 4,
+    });
+
+    const section = (result.observation as any).section_observation;
+    expect(result.ok).toBe(true);
+    expect(section).toMatchObject({
+      schema: "helix.docs_section_observation.v1",
+      path: "docs/research/nhm2-current-status-whitepaper.md",
+      matched_heading: "6.7 Twin Paradox trip clocking interpretation",
+      heading_line: 999,
+      section_start_line: 999,
+      section_end_line: 1074,
+      contains_terms: ["alpha"],
+      truncated: false,
+    });
+    expect(section.section_excerpt).toContain("For `alpha = 0.995`, this gives about `0.099875`.");
+    expect(section.section_lines).toEqual(expect.arrayContaining([
+      { line: 1053, text: expect.stringContaining("For `alpha = 0.995`") },
+    ]));
+    expect(section.contains_matches).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        term: "alpha",
+        line: 1053,
+        sentence: "For `alpha = 0.995`, this gives about `0.099875`.",
+      }),
+    ]));
+  });
+
+  it("keeps case-sensitive section terms and their line matches separate", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: DOCS_SEARCH_CAPABILITY,
+      arguments: {
+        query: "6.7 Twin Paradox trip clocking interpretation",
+        paths: ["docs/research/nhm2-current-status-whitepaper.md"],
+        section_heading: "6.7 Twin Paradox trip clocking interpretation",
+        section_contains_terms: ["alpha", "Alpha"],
+      },
+      turnId: "ask:test:gateway-docs-case-sensitive-section-terms",
+      iteration: 4,
+    });
+
+    const section = (result.observation as any).section_observation;
+    expect(section.contains_terms).toEqual(["alpha", "Alpha"]);
+    expect(section.contains_matches.filter((entry: any) => entry.term === "alpha").map((entry: any) => entry.line)).toEqual([
+      1007, 1012, 1021, 1050, 1053,
+    ]);
+    expect(section.contains_matches.filter((entry: any) => entry.term === "Alpha").map((entry: any) => entry.line)).toEqual([
+      1024, 1061, 1073,
+    ]);
+  });
+
+  it("materializes a typed not-found lookup for an absent named section", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: DOCS_SEARCH_CAPABILITY,
+      arguments: {
+        query: "99.9 Deliberately Missing Section",
+        paths: ["docs/research/nhm2-current-status-whitepaper.md"],
+        section_heading: "99.9 Deliberately Missing Section",
+        section_contains_terms: ["alpha"],
+      },
+      turnId: "ask:test:gateway-docs-missing-named-section",
+      iteration: 4,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      observation: {
+        section_observation: null,
+        section_lookup: {
+          schema: "helix.docs_section_lookup.v1",
+          path: "docs/research/nhm2-current-status-whitepaper.md",
+          requested_heading: "99.9 Deliberately Missing Section",
+          heading_found: false,
+          status: "not_found",
+          contains_terms: ["alpha"],
+        },
+      },
+    });
+  });
+
+  it("returns the exact lowercase alpha line from section 6.8", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: DOCS_SEARCH_CAPABILITY,
+      arguments: {
+        query: "6.8 Profile-scoped trip clocking index",
+        paths: ["docs/research/nhm2-current-status-whitepaper.md"],
+        section_heading: "6.8 Profile-scoped trip clocking index",
+        section_contains_terms: ["alpha"],
+        section_match_unit: "line",
+      },
+      turnId: "ask:test:gateway-docs-section-6p8-alpha",
+      iteration: 4,
+    });
+
+    expect((result.observation as any).section_observation).toMatchObject({
+      matched_heading: "6.8 Profile-scoped trip clocking index",
+      section_start_line: 1075,
+      section_end_line: 1091,
+      contains_terms: ["alpha"],
+      match_unit: "line",
+      contains_match_count: 3,
+      contains_matches: [
+        expect.objectContaining({ term: "alpha", line: 1087 }),
+        expect.objectContaining({ term: "alpha", line: 1088 }),
+        expect.objectContaining({ term: "alpha", line: 1090 }),
+      ],
+      truncated: false,
+    });
+  });
+
+  it("materializes two independently bounded section observations", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: DOCS_SEARCH_CAPABILITY,
+      arguments: {
+        query: "6.7 Twin Paradox trip clocking interpretation 6.8 Profile-scoped trip clocking index",
+        paths: ["docs/research/nhm2-current-status-whitepaper.md"],
+        section_headings: [
+          "6.7 Twin Paradox trip clocking interpretation",
+          "6.8 Profile-scoped trip clocking index",
+        ],
+        section_contains_terms: ["alpha"],
+        section_match_unit: "line",
+      },
+      turnId: "ask:test:gateway-docs-two-sections",
+      iteration: 4,
+    });
+
+    const observation = result.observation as any;
+    expect(observation.section_lookups).toEqual([
+      expect.objectContaining({ requested_heading: "6.7 Twin Paradox trip clocking interpretation", status: "found" }),
+      expect.objectContaining({ requested_heading: "6.8 Profile-scoped trip clocking index", status: "found" }),
+    ]);
+    expect(observation.section_observations).toEqual([
+      expect.objectContaining({
+        matched_heading: "6.7 Twin Paradox trip clocking interpretation",
+        section_start_line: 999,
+        section_end_line: 1074,
+        contains_match_count: 5,
+        truncated: false,
+      }),
+      expect.objectContaining({
+        matched_heading: "6.8 Profile-scoped trip clocking index",
+        section_start_line: 1075,
+        section_end_line: 1091,
+        contains_match_count: 3,
+        truncated: false,
+      }),
+    ]);
+  });
+
+  it("materializes four independent section lookups with mixed found states", async () => {
+    const headings = [
+      "6.7 Twin Paradox trip clocking interpretation",
+      "6.8 Profile-scoped trip clocking index",
+      "98.8 Missing Section A",
+      "99.9 Missing Section B",
+    ];
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: DOCS_SEARCH_CAPABILITY,
+      arguments: {
+        query: headings.join(" "),
+        paths: ["docs/research/nhm2-current-status-whitepaper.md"],
+        section_headings: headings,
+        section_contains_terms: ["alpha"],
+        section_match_unit: "line",
+      },
+      turnId: "ask:test:gateway-docs-four-sections",
+      iteration: 4,
+    });
+
+    const observation = result.observation as any;
+    expect(observation.section_lookups.map((entry: any) => [entry.requested_heading, entry.status])).toEqual([
+      [headings[0], "found"],
+      [headings[1], "found"],
+      [headings[2], "not_found"],
+      [headings[3], "not_found"],
+    ]);
+    expect(observation.section_observations.map((entry: any) => [entry.matched_heading, entry.contains_match_count])).toEqual([
+      [headings[0], 5],
+      [headings[1], 3],
+    ]);
+  });
+
   it("reports unique docs candidates separately from repeated line hits", async () => {
     const result = await callWorkstationGatewayCapability({
       agentRuntime: "codex",

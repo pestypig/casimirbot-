@@ -35,6 +35,16 @@ const readStringArray = (value: unknown): string[] =>
 
 const unique = (entries: string[]): string[] => Array.from(new Set(entries.filter(Boolean)));
 
+const readLedgerArtifactRefsByKind = (payload: RecordLike, kind: string): string[] => {
+  const ledger: unknown[] = Array.isArray(payload.current_turn_artifact_ledger) ? payload.current_turn_artifact_ledger : [];
+  return unique(
+    ledger
+      .map((entry: unknown) => readRecord(entry))
+      .filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry && readString(entry.kind) === kind))
+      .map((entry: RecordLike) => readString(entry.artifact_id)),
+  );
+};
+
 const uniqueOutputRoles = (entries: Array<HelixToolOutputRole | null | undefined>): HelixToolOutputRole[] =>
   Array.from(new Set(entries.filter((entry): entry is HelixToolOutputRole => Boolean(entry))));
 
@@ -116,7 +126,7 @@ const sourceBackedTargets = new Set([
 ]);
 
 export const inferCommittedRouteToolFamily = (capabilityId: string): string => {
-  if (/docs[_-]?viewer|docs-viewer|doc[_-]?viewer/i.test(capabilityId)) return "docs_viewer";
+  if (/^docs\.|docs[_-]?viewer|docs-viewer|doc[_-]?viewer/i.test(capabilityId)) return "docs_viewer";
   if (/scholarly[-_.]?research|lookup[_-]?papers|fetch[_-]?full[_-]?text|semantic[-_.]?scholar|openalex|pubmed|crossref/i.test(capabilityId)) return "scholarly_research";
   if (/internet[-_.]?search|web[-_.]?research|web\.search/i.test(capabilityId)) return "internet_search";
   if (/text[-_.]?to[-_.]?speech|speak[_-]?text|voice[-_.]?delivery|voice[-_.]?output|request[_-]?interim[_-]?voice[_-]?callout|narrator[_-]?say/i.test(capabilityId)) return "voice_delivery";
@@ -149,6 +159,9 @@ const familyForSourceTarget = (sourceTarget: string): string => {
   if (sourceTarget === "workspace_directory") return "workspace_directory";
   if (sourceTarget === "workspace_diagnostic") return "workspace_diagnostic";
   if (sourceTarget === "theory_locator") return "theory_locator";
+  if (sourceTarget === "theory_badge_graph") return "theory_locator";
+  if (sourceTarget === "moral_graph") return "moral_graph_reflection";
+  if (sourceTarget === "civilization_bounds") return "civilization_bounds";
   if (sourceTarget === "context_reflection") return "context_reflection";
   if (sourceTarget === "calculator_stream") return "scientific_calculator";
   if (sourceTarget === "active_note") return "notes";
@@ -510,10 +523,12 @@ export function buildCommittedAskRoute(input: {
             allowed_tool_families: unique([
               ...existing.capability_policy.allowed_tool_families,
               ...explicitCapabilityContract.admission_families,
+              explicitCapabilityContract.capability_family,
               familyForSourceTarget(explicitCapabilityContract.source_target),
             ]),
             required_capability_families: unique([
               ...existing.capability_policy.required_capability_families,
+              explicitCapabilityContract.capability_family,
               familyForSourceTarget(explicitCapabilityContract.source_target),
             ]),
           }
@@ -618,6 +633,7 @@ export function buildCommittedAskRoute(input: {
   const allowedFamilies = unique([
     ...allowedFamiliesFromPayload(input.payload, effectiveRoute.sourceTarget),
     ...(explicitCapabilityContract?.admission_families ?? []),
+    ...(explicitCapabilityContract ? [explicitCapabilityContract.capability_family] : []),
     ...toolUseRestatement.requiredToolFamilies,
   ])
     .filter((family) => !suppressedFamilies.includes(family));
@@ -724,6 +740,18 @@ export function buildRouteEvidenceAuthority(input: {
 }): HelixRouteEvidenceAuthority {
   const payload = input.payload ?? {};
   const route = input.committedRoute ?? readCommittedAskRoute(payload);
+  const runtimeSemanticRouteProposal = readRecord(payload.runtime_semantic_route_proposal);
+  const runtimeSemanticRouteProposalRef =
+    readString(runtimeSemanticRouteProposal?.proposal_id) ||
+    readLedgerArtifactRefsByKind(payload, "runtime_semantic_route_proposal")[0] ||
+    null;
+  const rawRuntimeSemanticRouteProposalSource = readString(runtimeSemanticRouteProposal?.proposal_source);
+  const runtimeSemanticRouteProposalSource: "agent_runtime" | "runtime_intent_packet_projection" | null =
+    rawRuntimeSemanticRouteProposalSource === "agent_runtime"
+      ? "agent_runtime"
+      : rawRuntimeSemanticRouteProposalSource === "runtime_intent_packet_projection"
+      ? "runtime_intent_packet_projection"
+      : null;
   const candidateTools = readCapabilityCandidatesFromPayload(payload);
   const admittedFromPayload = readAdmittedToolsFromPayload(payload);
   const admittedFromRoute = route
@@ -763,9 +791,22 @@ export function buildRouteEvidenceAuthority(input: {
     schema: "helix.route_evidence_authority.v1",
     turn_id: route?.turn_id ?? readString(payload.turn_id) ?? "unknown-turn",
     route_proposal_authority: {
-      semantic_route_proposal_source: null,
+      semantic_route_proposal_source: runtimeSemanticRouteProposalSource,
+      runtime_semantic_route_proposal_ref: runtimeSemanticRouteProposalRef,
       classifier_hints: "hint_only",
       prompt_derived_gateway_requests: "policy_admission_fallback",
+      route_source_comparison: {
+        codex_semantic_proposal_ref:
+          runtimeSemanticRouteProposalSource === "agent_runtime" ? runtimeSemanticRouteProposalRef : null,
+        explicit_user_command_refs: readLedgerArtifactRefsByKind(payload, "explicit_user_command"),
+        prompt_derived_policy_fallback_refs: readLedgerArtifactRefsByKind(payload, "prompt_derived_gateway_request"),
+        ambient_context_refs: [
+          ...readLedgerArtifactRefsByKind(payload, "scientific_image_evidence_sidecar"),
+          ...readLedgerArtifactRefsByKind(payload, "workspace_context_snapshot"),
+          ...readLedgerArtifactRefsByKind(payload, "active_panel_context"),
+        ],
+        final_admitted_route_ref: route ? route.commit_id : null,
+      },
       boundary: "runtime_decides_steps_helix_validates_admission",
     },
     candidate_tools: candidateTools,

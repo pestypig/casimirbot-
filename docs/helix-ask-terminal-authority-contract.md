@@ -76,6 +76,45 @@ visible projection discipline
 Do not recreate Codex runtime mechanics inside Helix Ask. Add thin adapters and
 Helix policy contracts instead.
 
+## Continuation And Recovery Contract
+
+After every tool/gateway/capability attempt, Helix publishes one non-terminal
+`helix.agent_continuation_state.v1` into the current-turn ledger and supplies it
+to the next Codex sampling step. The state consolidates existing fragmented
+hints, observations, missing requirements, failure details, admissible next
+affordances, action fingerprints, progress, and resource boundaries. It does
+not select the next step.
+
+```text
+deterministic admission and execution
+-> observation or typed failure
+-> continuation state
+-> Codex chooses act | retry | ask_user | answer | fail
+-> Helix validates that choice against current route and safety boundaries
+```
+
+This establishes the precedence rule:
+
+```text
+explicit operation contract first
+generic evidence/continuation fallback second
+committed prohibition always final
+```
+
+A recoverable terminal rejection must not immediately become the visible
+answer. Terminal authority records it as
+`helix.terminal_rejection_observation.v1`; Codex may then produce a corrected
+route-approved terminal candidate while resources remain. This recovery does
+not permit a forbidden terminal kind, mutate route admission, or promote a
+receipt into answer authority.
+
+Soft budgets are progress checkpoints. They may extend under one shared rule
+when current-turn evidence shows progress, an untried admitted affordance, or a
+retryable failure. Tool names and route families do not receive private budget
+exceptions. A hard resource boundary is still enforced, but reaching it means
+Codex must provide the best bounded answer, ask for required user input, or
+report the grounded failure; it is not evidence that the user goal is false.
+
 ## Terminal Product Materializers
 
 Terminal product materializers convert an already-authorized artifact into a

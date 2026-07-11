@@ -241,6 +241,11 @@ import { buildHelixAskMoodAvatarState } from "@/components/helix/ask-console/Hel
 import { buildHelixAskComposerActionToolbarState } from "@/components/helix/ask-console/HelixAskComposerActionToolbarState";
 import { buildHelixAskComposerTextareaState } from "@/components/helix/ask-console/HelixAskComposerTextareaState";
 import {
+  createHelixAskComposerInputFrameScheduler,
+  type HelixAskComposerInputFrameInput,
+  type HelixAskComposerInputFrameScheduler,
+} from "@/components/helix/ask-console/HelixAskComposerInputFrame";
+import {
   persistHelixAskAgentRuntime,
   readStoredHelixAskAgentRuntime,
 } from "@/components/helix/ask-console/HelixAskRuntimePreference";
@@ -1088,6 +1093,7 @@ import {
 import { buildSituationRoomCaptureContext } from "@/lib/helix/situation-capture-context";
 import { dispatchHelixWorkstationActions, coerceHelixWorkstationActions, extractHelixWorkstationActionBlocks, type HelixWorkstationAction } from "@/lib/workstation/workstationActionContract";
 import { resolveHelixAskWorkstationReceiptTerminal, runHelixAskWorkstationActionWithReceiptLedger, type HelixAskWorkstationActionDispatchResult } from "@/components/helix/ask-console/HelixAskWorkstationActionDispatch";
+import { isBackendAuthorizedWorkstationReceiptTerminal } from "@/components/helix/ask-console/HelixAskWorkstationActionBridge";
 import {
   getWorkstationPanelCapabilities,
   WORKSTATION_V1_PANEL_CAPABILITIES,
@@ -6941,6 +6947,8 @@ export function HelixAskPill({
   const askPromptHistorySubmittedRef = useRef<string[]>([]);
   const askPromptHistoryCursorRef = useRef<number | null>(null);
   const askPromptHistoryDraftBeforeNavigationRef = useRef("");
+  const askComposerInputFrameRef = useRef<HelixAskComposerInputFrameScheduler | null>(null);
+  const processAskComposerInputRef = useRef<(input: HelixAskComposerInputFrameInput) => void>(() => undefined);
   const [askSlashCommandOpen, setAskSlashCommandOpen] = useState(false);
   const [askSlashCommandQuery, setAskSlashCommandQuery] = useState("");
   const [askSlashCommandSelectedIndex, setAskSlashCommandSelectedIndex] = useState(0);
@@ -11272,6 +11280,24 @@ export function HelixAskPill({
     askPromptHistoryCursorRef.current = null;
     askPromptHistoryDraftBeforeNavigationRef.current = "";
   }, []);
+  const processAskComposerInput = useCallback((input: HelixAskComposerInputFrameInput) => {
+    resetAskPromptHistoryCursor();
+    syncAskDraftValue(input.value, { target: input.target });
+    updateAskSlashCommandMenuFromTextarea(input.target);
+  }, [resetAskPromptHistoryCursor, syncAskDraftValue, updateAskSlashCommandMenuFromTextarea]);
+  processAskComposerInputRef.current = processAskComposerInput;
+  if (!askComposerInputFrameRef.current) {
+    askComposerInputFrameRef.current = createHelixAskComposerInputFrameScheduler({
+      onFrame: (input) => processAskComposerInputRef.current(input),
+    });
+  }
+  const scheduleAskComposerInput = useCallback((value: string, target: HTMLTextAreaElement) => {
+    // The native textarea has already painted this value. Keep submit paths current
+    // immediately, then move nonvisual parent work to the next presentation frame.
+    askDraftRef.current = value;
+    askComposerInputFrameRef.current?.schedule({ value, target });
+  }, []);
+  useEffect(() => () => askComposerInputFrameRef.current?.clear(), []);
   const insertAskSlashCommandMenuItem = useCallback((item: HelixAskSlashCommandMenuItem) => {
     const target = askInputRef.current;
     const currentValue = target?.value ?? askDraftRef.current;
@@ -19945,8 +19971,19 @@ export function HelixAskPill({
           const actionEnvelopeApplication = await applyGovernedActionEnvelope(responseActionEnvelope, { question: questionText, mode: responseMode, suppressSecondaryDocsActions: suppressPayloadActionsAfterDocOpen, turnId: traceId, traceId });
           const actionEnvelopeHandled = actionEnvelopeApplication.handled;
           if (actionEnvelopeApplication.receiptTerminal) {
-            responseText = actionEnvelopeApplication.receiptTerminal.text;
-            responseDebug = { ...(responseDebug ?? {}), client_receipt_terminal: actionEnvelopeApplication.receiptTerminal, selected_final_answer: responseText, final_answer_source: "client_workstation_receipt", terminal_artifact_kind: actionEnvelopeApplication.receiptTerminal.receipt_kind };
+            const receiptTerminal = actionEnvelopeApplication.receiptTerminal;
+            const receiptTerminalIsBackendAuthorized = isBackendAuthorizedWorkstationReceiptTerminal(
+              { ...(responseEnvelope ?? {}), debug: responseDebug },
+              receiptTerminal.receipt_kind,
+            );
+            if (receiptTerminalIsBackendAuthorized) responseText = receiptTerminal.text;
+            responseDebug = {
+              ...(responseDebug ?? {}),
+              client_receipt_terminal: receiptTerminal,
+              ...(receiptTerminalIsBackendAuthorized
+                ? {}
+                : { client_receipt_terminal_authority: "observation_only" }),
+            };
           }
           if (!actionEnvelopeHandled && !suppressPayloadActionsAfterDocOpen) {
             applyWorkstationActionsFromPayload(responseDebug);
@@ -21541,9 +21578,28 @@ export function HelixAskPill({
           const actionEnvelopeApplication = await applyGovernedActionEnvelope(responseActionEnvelope, { question: trimmed, mode: responseMode, suppressSecondaryDocsActions: suppressPayloadActionsAfterDocOpen, turnId: runAskTurnId, traceId });
           const actionEnvelopeHandled = actionEnvelopeApplication.handled;
           if (actionEnvelopeApplication.receiptTerminal) {
-            responseText = actionEnvelopeApplication.receiptTerminal.text;
-            responseDebug = { ...(responseDebug ?? {}), client_receipt_terminal: actionEnvelopeApplication.receiptTerminal, selected_final_answer: responseText, final_answer_source: "client_workstation_receipt", terminal_artifact_kind: actionEnvelopeApplication.receiptTerminal.receipt_kind };
-            responseDebugWithClientMode = responseDebugWithClientMode ? { ...responseDebugWithClientMode, client_receipt_terminal: actionEnvelopeApplication.receiptTerminal, selected_final_answer: responseText, final_answer_source: "client_workstation_receipt", terminal_artifact_kind: actionEnvelopeApplication.receiptTerminal.receipt_kind } : responseDebugWithClientMode;
+            const receiptTerminal = actionEnvelopeApplication.receiptTerminal;
+            const receiptTerminalIsBackendAuthorized = isBackendAuthorizedWorkstationReceiptTerminal(
+              { ...(responseEnvelope ?? {}), debug: responseDebug },
+              receiptTerminal.receipt_kind,
+            );
+            if (receiptTerminalIsBackendAuthorized) responseText = receiptTerminal.text;
+            responseDebug = {
+              ...(responseDebug ?? {}),
+              client_receipt_terminal: receiptTerminal,
+              ...(receiptTerminalIsBackendAuthorized
+                ? {}
+                : { client_receipt_terminal_authority: "observation_only" }),
+            };
+            responseDebugWithClientMode = responseDebugWithClientMode
+              ? {
+                  ...responseDebugWithClientMode,
+                  client_receipt_terminal: receiptTerminal,
+                  ...(receiptTerminalIsBackendAuthorized
+                    ? {}
+                    : { client_receipt_terminal_authority: "observation_only" }),
+                }
+              : responseDebugWithClientMode;
           }
           if (!suppressWorkstationPayloadActions && !actionEnvelopeHandled && !suppressPayloadActionsAfterDocOpen) {
             applyWorkstationActionsFromPayload(responseDebug);
@@ -22842,6 +22898,7 @@ export function HelixAskPill({
   const handleAskSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
+      askComposerInputFrameRef.current?.flush();
       void primeVoiceAudioPlayback();
       const rawInput = askInputRef.current?.value ?? "";
       const entries = parseQueuedQuestions(rawInput);
@@ -23488,13 +23545,12 @@ export function HelixAskPill({
     className: composerViewModel.textareaClassName,
     placeholder: currentPlaceholder,
     onPaste: handleAskPaste,
-    onKeyDown: handleAskComposerKeyDown,
+    onKeyDown: (event) => {
+      askComposerInputFrameRef.current?.flush();
+      handleAskComposerKeyDown(event);
+    },
     onInputValue: (value, target) => {
-      resetAskPromptHistoryCursor();
-      syncAskDraftValue(value, {
-        target,
-      });
-      updateAskSlashCommandMenuFromTextarea(target);
+      scheduleAskComposerInput(value, target);
     },
     onSubmitRequested: (form) => form?.requestSubmit?.(),
   });

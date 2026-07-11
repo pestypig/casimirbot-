@@ -49,14 +49,24 @@ describe("Helix Ask debug-export terminal projection mirrors", () => {
     expect(payload?.terminal_error_code ?? null).toBeNull();
     expect(payload?.terminal_presentation?.terminal_artifact_kind).toBe("capability_help_summary");
     expect(payload?.terminal_authority_single_writer?.selected_terminal_artifact_kind).toBe("capability_help_summary");
+    expect(payload?.ask_turn_procedure_trace).toMatchObject({
+      schema: "helix.ask_turn_procedure_trace.v1",
+      selected_terminal_product: {
+        kind: "capability_help_summary",
+        allowed_by_route: true,
+      },
+      visible_answer_source: ask.body.final_answer_source,
+      failure_rail: null,
+    });
     expect(payload?.debug?.terminal_artifact_kind).toBe("capability_help_summary");
     expect(payload?.debug?.final_answer_source).toBe(ask.body.final_answer_source);
     expect(payload?.debug?.terminal_error_code ?? null).toBeNull();
+    expect(payload?.debug?.ask_turn_procedure_trace).toEqual(payload?.ask_turn_procedure_trace);
     expect(payload?.codex_parity_agent_spine_rail_table).toMatchObject({
       selected_terminal_kind: "capability_help_summary",
       visible_terminal_kind: "capability_help_summary",
       rail_status: "complete",
       first_broken_rail: null,
     });
-  });
+  }, 60000);
 });

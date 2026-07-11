@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, MessageSquarePlus, Trash2 } from "lucide-react";
 import { WorkstationStage } from "@/components/workstation/WorkstationStage";
 import { HelixAskDock } from "@/components/workstation/HelixAskDock";
@@ -23,6 +23,24 @@ import type { PanelDefinition } from "@/lib/desktop/panelRegistry";
 
 const HELIX_CONVERSATION_TRACE_PANEL_ID = "workstation-workflow-timeline";
 const HELIX_CHAT_CONTEXT_PREFIX = "helix-ask-chat:";
+const MOBILE_SURFACE_SWIPE_THRESHOLD_PX = 64;
+const MOBILE_SURFACE_SWIPE_AXIS_RATIO = 1.25;
+
+export function resolveMobileSurfaceSwipe({
+  surface,
+  deltaX,
+  deltaY,
+}: {
+  surface: "ask" | "workstation";
+  deltaX: number;
+  deltaY: number;
+}): "ask" | "workstation" | null {
+  if (Math.abs(deltaX) < MOBILE_SURFACE_SWIPE_THRESHOLD_PX) return null;
+  if (Math.abs(deltaX) < Math.abs(deltaY) * MOBILE_SURFACE_SWIPE_AXIS_RATIO) return null;
+  if (surface === "ask" && deltaX > 0) return "workstation";
+  if (surface === "workstation" && deltaX < 0) return "ask";
+  return null;
+}
 
 function formatSessionDate(value: string): string {
   const parsed = Date.parse(value);
@@ -66,6 +84,7 @@ export function HelixWorkstationShell({
   const [mobileSurface, setMobileSurface] = useState<"ask" | "workstation">("ask");
   const [resizePreviewWidth, setResizePreviewWidth] = useState<number | null>(null);
   const resizeStartWidthRef = useRef(chatDock.widthPx);
+  const mobileSwipeStartRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
   const { userSettings } = useHelixStartSettings();
   const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
   const { t } = useInterfaceText(interfaceLanguage.code);
@@ -93,6 +112,34 @@ export function HelixWorkstationShell({
     },
     [handleOpenConversation],
   );
+
+  const handleMobileSwipePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!event.isPrimary || (event.pointerType !== "touch" && event.pointerType !== "pen")) return;
+    mobileSwipeStartRef.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+    };
+  }, []);
+
+  const handleMobileSwipePointerEnd = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const start = mobileSwipeStartRef.current;
+      mobileSwipeStartRef.current = null;
+      if (!start || start.pointerId !== event.pointerId) return;
+      const nextSurface = resolveMobileSurfaceSwipe({
+        surface: mobileSurface,
+        deltaX: event.clientX - start.x,
+        deltaY: event.clientY - start.y,
+      });
+      if (nextSurface) setMobileSurface(nextSurface);
+    },
+    [mobileSurface],
+  );
+
+  const handleMobileSwipePointerCancel = useCallback(() => {
+    mobileSwipeStartRef.current = null;
+  }, []);
 
   const helixSessions = useMemo(() => listHelixAskChatSessions(sessions), [sessions]);
   const activeSession = useMemo(
@@ -197,7 +244,10 @@ export function HelixWorkstationShell({
     const showingWorkstation = mobileSurface === "workstation";
     return (
       <div
-        className="relative z-10 h-full min-h-0 w-full overflow-hidden"
+        className="relative z-10 h-full min-h-0 w-full touch-pan-y overflow-hidden"
+        onPointerDown={handleMobileSwipePointerDown}
+        onPointerUp={handleMobileSwipePointerEnd}
+        onPointerCancel={handleMobileSwipePointerCancel}
       >
         <section
           aria-hidden={showingWorkstation}

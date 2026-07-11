@@ -4095,4 +4095,85 @@ describe("Helix Ask debug export capability lanes", () => {
       visible_lane_does_not_mean_executed: true,
     });
   });
+
+  it("exports bounded non-terminal continuation and rejection diagnostics", () => {
+    const states = Array.from({ length: 12 }, (_, index) => ({
+      schema: "helix.agent_continuation_state.v1",
+      turn_id: "ask:continuation-debug",
+      state_id: `ask:continuation-debug:state:${index + 1}`,
+      sequence: index + 1,
+      trigger: index === 11 ? "final_review" : "post_attempt",
+      goal: { status: "in_progress", satisfied: false, terminal_product_allowed: true },
+      observation_refs: {
+        existing: [`observation:${index}`],
+        new: [`observation:${index + 1}`],
+        all: [`observation:${index}`, `observation:${index + 1}`],
+      },
+      missing_requirement_ids: ["agent_authored_answer"],
+      last_attempt: null,
+      next_admissible_affordances: [],
+      tried_action_fingerprints: [],
+      progress: { made_progress: true, no_progress_repeat_count: 0 },
+      budget: { soft: { pressure: "none" }, hard: { exhausted: false } },
+      allowed_decisions: ["answer", "fail"],
+      authority: "runtime_agent_decides_within_admitted_boundaries",
+      terminal_eligible: false,
+      assistant_answer: false,
+    }));
+    const rejections = Array.from({ length: 10 }, (_, index) => ({
+      schema: "helix.terminal_rejection_observation.v1",
+      turn_id: "ask:continuation-debug",
+      observation_id: `ask:continuation-debug:rejection:${index + 1}`,
+      rejected_candidate_kind: "tool_observation",
+      rejected_candidate_ref: `candidate:${index + 1}`,
+      rejection_reason: "missing_post_tool_model_step",
+      recoverable: true,
+      failure_class: "terminal_authority",
+      retryability: "retryable",
+      next_affordances: [{ decision: "answer" }],
+      terminal_eligible: false,
+      assistant_answer: false,
+    }));
+    const text = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "ask:continuation-debug",
+        question: "Continue from admitted observations.",
+        content: "Bounded answer.",
+      },
+      {
+        turn_id: "ask:continuation-debug",
+        selected_final_answer: "Bounded answer.",
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        agent_continuation_state: states.at(-1),
+        agent_continuation_states: states,
+        terminal_rejection_observations: rejections,
+        current_turn_artifact_ledger: [],
+        debug: { turn_id: "ask:continuation-debug" },
+      },
+    );
+
+    const exported = JSON.parse(text) as Record<string, any>;
+    expect(exported.agent_continuation_state).toMatchObject({
+      schema: "helix.agent_continuation_state.v1",
+      sequence: 12,
+      observation_refs: {
+        existing: ["observation:11"],
+        new: ["observation:12"],
+        all: ["observation:11", "observation:12"],
+      },
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+    expect(exported.agent_continuation_states).toHaveLength(8);
+    expect(exported.agent_continuation_states[0]?.sequence).toBe(5);
+    expect(exported.terminal_rejection_observations).toHaveLength(8);
+    expect(exported.terminal_rejection_observations.at(-1)).toMatchObject({
+      observation_id: "ask:continuation-debug:rejection:10",
+      recoverable: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+    expect(exported.debug.agent_continuation_state).toEqual(exported.agent_continuation_state);
+  });
 });

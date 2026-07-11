@@ -44,6 +44,9 @@ export type HelixAgentRunResult = {
   tool_output_refs?: string[];
   final_answer_source?: string | null;
   terminal_artifact_kind?: string | null;
+  terminal_error_code?: string | null;
+  terminal_failure_text?: string | null;
+  typed_failure?: Record<string, unknown> | null;
   current_turn_artifact_ledger?: Record<string, unknown> | null;
   compound_evidence_synthesis_answer?: Record<string, unknown>;
   compound_capability_contract?: Record<string, unknown>;

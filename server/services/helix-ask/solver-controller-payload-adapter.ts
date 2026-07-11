@@ -160,6 +160,12 @@ export const createSolverControllerPayloadAdapter = (dependencies: SolverControl
     );
     const terminalWriterSourceForController = readAskTurnString(terminalWriterForController?.source);
     const terminalWriterVisibleTextForController = readAskTurnString(terminalWriterForController?.visible_text);
+    const terminalAuthorityForController =
+      payload.terminal_answer_authority &&
+      typeof payload.terminal_answer_authority === "object" &&
+      !Array.isArray(payload.terminal_answer_authority)
+        ? (payload.terminal_answer_authority as Record<string, unknown>)
+        : null;
     const terminalWriterMaterializedKindForController = readAskTurnString(
       terminalWriterIntegrityForController?.materialized_terminal_artifact_kind,
     );
@@ -1296,7 +1302,23 @@ export const createSolverControllerPayloadAdapter = (dependencies: SolverControl
       )
         ? ({ kind: "note_update_receipt", title: resolveAskTurnNoteTargetWithWorkspace(input.prompt, readRecord(payload.workspace_context_snapshot) as HelixAskTurnWorkspaceSessionSnapshot | null) } as Record<string, unknown>)
         : null);
-    if (controllerNoteReceipt) {
+    // A persistence receipt is an observation. It may only become visible final
+    // prose after an already-authorized runtime terminal writer has selected a
+    // compatible answer product. Do not let this adapter manufacture a model
+    // answer from the receipt while the Codex follow-up step is still pending.
+    const noteReceiptHasAuthorizedTerminalWriter =
+      Boolean(controllerNoteReceipt) &&
+      Boolean(terminalWriterForController) &&
+      readAskTurnString(terminalWriterForController?.turn_id) === input.turnId &&
+      terminalWriterIntegrityForController?.single_writer_applied === true &&
+      readAskTurnString(terminalAuthorityForController?.turn_id) === input.turnId &&
+      terminalAuthorityForController?.server_authoritative === true &&
+      terminalAuthorityForController?.terminal_eligible !== false &&
+      terminalWriterKindForController !== "note_update_receipt" &&
+      terminalWriterKindForController !== "workspace_action_receipt" &&
+      terminalWriterKindForController !== "tool_receipt" &&
+      Boolean(terminalWriterVisibleTextForController);
+    if (controllerNoteReceipt && noteReceiptHasAuthorizedTerminalWriter) {
       const workspaceSnapshot =
         payload.workspace_context_snapshot && typeof payload.workspace_context_snapshot === "object"
           ? (payload.workspace_context_snapshot as HelixAskTurnWorkspaceSessionSnapshot)
@@ -1379,6 +1401,22 @@ export const createSolverControllerPayloadAdapter = (dependencies: SolverControl
         debug.general_controller_final_decision = "finalize";
         debug.general_controller_stop_reason = "terminal_artifact_satisfied";
         debug.general_controller_decisions = payload.general_controller_decisions;
+      }
+    } else if (controllerNoteReceipt) {
+      payload.note_receipt_terminal_projection = {
+        schema: "helix.note_receipt_terminal_projection.v1",
+        turn_id: input.turnId,
+        receipt_kind: "note_update_receipt",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+        projection_status: "observation_only",
+        reason: "note_receipt_requires_runtime_terminal_writer",
+        post_tool_model_step_required: true,
+      };
+      if (payload.debug && typeof payload.debug === "object" && !Array.isArray(payload.debug)) {
+        (payload.debug as Record<string, unknown>).note_receipt_terminal_projection =
+          payload.note_receipt_terminal_projection;
       }
     }
     const pendingRequestCandidate =
