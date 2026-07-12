@@ -6,6 +6,7 @@ import {
   buildCommittedAskRoute,
   buildRouteEvidenceAuthority,
   committedRouteAllowsTerminalKind,
+  inferCommittedRouteToolFamily,
 } from "../services/helix-ask/committed-ask-route";
 import { interpretHelixAskPrompt } from "../services/helix-ask/prompt-interpretation";
 import { auditRouteAuthority } from "../services/helix-ask/route-authority-audit";
@@ -53,6 +54,14 @@ const docsRouteContract = {
 };
 
 describe("Helix Ask committed route contract", () => {
+  it.each([
+    "workstation.active_context",
+    "workstation.readable_surface.observe",
+    "account_session.set_interface_language",
+  ])("classifies workstation gateway capability %s for committed-route admission", (capability) => {
+    expect(inferCommittedRouteToolFamily(capability)).toBe("workstation_action");
+  });
+
   it("keeps route evidence authority terminal allowance consistent with the required terminal kind", () => {
     const authority = buildRouteEvidenceAuthority({
       committedRoute: {

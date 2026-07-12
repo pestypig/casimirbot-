@@ -11,6 +11,7 @@ export type CompoundCapabilityScenario = {
   seed?: "visual_capture";
   expectedRequested: ExpectedValue[];
   expectedRuntime: ExpectedValue[];
+  expectedExecuted?: ExpectedValue[];
   expectedInputBindingFromCapabilities?: Array<string | string[] | null>;
   expectedCalculatorExpression?: string;
   expectedSubgoalSatisfaction?: ExpectedValue[];
@@ -163,7 +164,7 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
     prompt:
       "Use docs-viewer.locate_in_doc to locate the rule of thumb in docs/helix-ask-codex-loop-discipline.md, then run scientific-calculator.solve_expression with this exact expression: 19+23.",
     expectedRequested: ["docs-viewer.locate_in_doc", "scientific-calculator.solve_expression"],
-    expectedRuntime: ["docs-viewer.locate_in_doc", "scientific-calculator.solve_expression"],
+    expectedRuntime: ["docs.search", "scientific-calculator.solve_expression"],
     expectedInputBindingFromCapabilities: [null, "docs-viewer.locate_in_doc"],
     expectedCalculatorExpression: "19+23",
     expectedTerminalKind: "doc_evidence_synthesis_answer",
@@ -173,7 +174,7 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
     prompt:
       "Call docs-viewer.doc_equation_context for query: Alcubierre metric equation, then run scientific-calculator.solve_expression with this exact expression: 12*4+5.",
     expectedRequested: ["docs-viewer.doc_equation_context", "scientific-calculator.solve_expression"],
-    expectedRuntime: ["docs-viewer.doc_equation_context", "scientific-calculator.solve_expression"],
+    expectedRuntime: ["docs.search", "scientific-calculator.solve_expression"],
     expectedInputBindingFromCapabilities: [null, "docs-viewer.doc_equation_context"],
     expectedCalculatorExpression: "12*4+5",
     expectedTerminalKind: "doc_evidence_synthesis_answer",
@@ -183,7 +184,7 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
     prompt:
       "Call workspace-directory.resolve for docs/helix-ask-codex-loop-discipline.md, then use docs-viewer.locate_in_doc to locate the rule of thumb in docs/helix-ask-codex-loop-discipline.md.",
     expectedRequested: ["workspace-directory.resolve", "docs-viewer.locate_in_doc"],
-    expectedRuntime: ["workspace-directory.resolve", "docs-viewer.locate_in_doc"],
+    expectedRuntime: ["workspace-directory.resolve", "docs.search"],
     expectedInputBindingFromCapabilities: [null, "workspace-directory.resolve"],
     expectedTerminalKind: "doc_evidence_synthesis_answer",
   },
@@ -347,7 +348,7 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
     prompt:
       "Use repo-code.search_concept to find where terminal authority is enforced, plus docs-viewer.locate_in_doc to locate the same rule in docs/helix-ask-codex-loop-discipline.md.",
     expectedRequested: ["repo-code.search_concept", "docs-viewer.locate_in_doc"],
-    expectedRuntime: ["repo-code.search_concept", "docs-viewer.locate_in_doc"],
+    expectedRuntime: ["repo-code.search_concept", "docs.search"],
     expectedInputBindingFromCapabilities: [null, null],
     expectedTerminalKind: "doc_evidence_synthesis_answer",
   },
@@ -383,7 +384,7 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
       "scientific-calculator.solve_expression",
     ],
     expectedRuntime: [
-      "docs-viewer.locate_in_doc",
+      "docs.search",
       "helix_ask.reflect_theory_context",
       "scientific-calculator.solve_expression",
     ],
@@ -476,15 +477,34 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
       "scholarly-research.lookup_papers",
       "scholarly-research.fetch_full_text",
       "scholarly-research.extract_numeric_parameters",
+      "scientific-calculator.solve_expression",
     ],
     expectedRuntime: [
       "scholarly-research.lookup_papers",
       "scholarly-research.fetch_full_text",
       "scholarly-research.extract_numeric_parameters",
+      "scientific-calculator.solve_expression",
     ],
-    expectedSubgoalSatisfaction: ["satisfied", "satisfied", "failed"],
-    expectedRailStatus: ["complete", "complete", "fail_closed"],
+    expectedInputBindingFromCapabilities: [
+      null,
+      "scholarly-research.lookup_papers",
+      "scholarly-research.fetch_full_text",
+      [
+        "scholarly-research.lookup_papers",
+        "scholarly-research.fetch_full_text",
+        "scholarly-research.extract_numeric_parameters",
+      ],
+    ],
+    expectedExecuted: [
+      "scholarly-research.lookup_papers",
+      "scholarly-research.fetch_full_text",
+      "scholarly-research.extract_numeric_parameters",
+      null,
+    ],
+    expectedSubgoalSatisfaction: ["satisfied", "satisfied", "failed", "missing"],
+    expectedRailStatus: ["complete", "complete", "fail_closed", "fail_closed"],
     expectedTerminalErrorCode: null,
+    expectedTerminalKind: "model_synthesized_answer",
   },
   {
     id: "scholarly_default_lookup_agent_decision",
@@ -492,12 +512,13 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
       "Retrieve research papers for tokamak thermal pressure values, calculate the tokamak thermal pressure proxy from the theory badge graph for n_m3 and T_eV, and reflect the claim boundary through the theory badge graph.",
     expectedRequested: [
       "scholarly-research.lookup_papers",
-      "theory-badge-graph.reflect_discussion_context",
+      "helix_ask.reflect_theory_context",
     ],
     expectedRuntime: [
       "scholarly-research.lookup_papers",
-      "theory-badge-graph.reflect_discussion_context",
+      "helix_ask.reflect_theory_context",
     ],
+    expectedInputBindingFromCapabilities: [null, "scholarly-research.lookup_papers"],
     forbiddenRuntime: [
       "scholarly-research.fetch_full_text",
       "scholarly-research.extract_numeric_parameters",
@@ -515,12 +536,13 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
       "Use scholarly-research.lookup_papers for DIII-D or EAST tokamak operating parameters: electron density, electron temperature, toroidal magnetic field, plasma current, and confinement/transport parameter table. Then use scholarly-research.fetch_full_text on the best accessible tokamak paper and scholarly-research.extract_numeric_parameters only if the paper is relevant. Reflect the theory badge graph and calculate beta only after cited values are bound.",
     expectedRequested: [
       "scholarly-research.lookup_papers",
-      "theory-badge-graph.reflect_discussion_context",
+      "helix_ask.reflect_theory_context",
     ],
     expectedRuntime: [
       "scholarly-research.lookup_papers",
-      "theory-badge-graph.reflect_discussion_context",
+      "helix_ask.reflect_theory_context",
     ],
+    expectedInputBindingFromCapabilities: [null, "scholarly-research.lookup_papers"],
     forbiddenRuntime: [
       "scholarly-research.fetch_full_text",
       "scholarly-research.extract_numeric_parameters",
@@ -637,7 +659,7 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
     prompt:
       "Use docs-viewer.locate_in_doc to cite the rule of thumb, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
     expectedRequested: ["docs-viewer.locate_in_doc", "scientific-calculator.solve_expression"],
-    expectedRuntime: ["docs-viewer.locate_in_doc", null],
+    expectedRuntime: ["docs.search", null],
     expectedInputBindingFromCapabilities: [null, "docs-viewer.locate_in_doc"],
     expectedSubgoalSatisfaction: ["satisfied", "failed"],
     expectedRailStatus: ["complete", "fail_closed"],
@@ -653,7 +675,7 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
     prompt:
       "Use docs-viewer.locate_in_doc to cite the rule of thumb, then call scientific-calculator.solve_expression.",
     expectedRequested: ["docs-viewer.locate_in_doc", "scientific-calculator.solve_expression"],
-    expectedRuntime: ["docs-viewer.locate_in_doc", null],
+    expectedRuntime: ["docs.search", null],
     expectedInputBindingFromCapabilities: [null, "docs-viewer.locate_in_doc"],
     expectedSubgoalSatisfaction: ["satisfied", "failed"],
     expectedRailStatus: ["complete", "fail_closed"],
@@ -1279,6 +1301,9 @@ export const evaluateCompoundCapabilityScenario = (input: {
     const unresolvedInputBindings = readArray(ledgerEntry?.unresolved_input_bindings).map(readRecord).filter(Boolean);
     const expectedInputBindingFromCapability = input.scenario.expectedInputBindingFromCapabilities?.[index];
     const expectedRuntime = index < input.scenario.expectedRuntime.length ? input.scenario.expectedRuntime[index] : expected;
+    const expectedExecuted = input.scenario.expectedExecuted && index < input.scenario.expectedExecuted.length
+      ? input.scenario.expectedExecuted[index]
+      : expectedRuntime;
     const expectedSatisfaction =
       input.scenario.expectedSubgoalSatisfaction && index < input.scenario.expectedSubgoalSatisfaction.length
         ? input.scenario.expectedSubgoalSatisfaction[index]
@@ -1326,7 +1351,7 @@ export const evaluateCompoundCapabilityScenario = (input: {
     if (runtime !== contractRuntime) {
       failures.push(`subgoal_${index + 1}_runtime_mismatch:${runtime ?? "null"}!=${contractRuntime ?? "null"}`);
     }
-    if (!matchesExpected(executed, expectedRuntime)) {
+    if (!matchesExpected(executed, expectedExecuted)) {
       failures.push(`subgoal_${index + 1}_executed_mismatch:${executed ?? "null"}`);
     }
     if (!ledgerArgs && !acceptsRailOnlyTrace) failures.push(`subgoal_${index + 1}_args_missing`);
@@ -1482,7 +1507,7 @@ export const evaluateCompoundCapabilityScenario = (input: {
       if (railRuntime !== runtime) {
         failures.push(`subgoal_${index + 1}_rail_runtime_mismatch:${railRuntime ?? "null"}!=${runtime ?? "null"}`);
       }
-      if (!matchesExpected(railExecuted, expectedRuntime)) {
+      if (!matchesExpected(railExecuted, expectedExecuted)) {
         failures.push(`subgoal_${index + 1}_rail_executed_mismatch:${railExecuted ?? "null"}`);
       }
       if (expectedSatisfaction === "satisfied") {

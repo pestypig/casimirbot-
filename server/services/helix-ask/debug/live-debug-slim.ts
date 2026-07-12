@@ -805,13 +805,11 @@ export const createHelixAskLiveDebugSlimBuilder = (
         payload.turn_transcript_reconstructed_fallback_count ?? debug.turn_transcript_reconstructed_fallback_count ?? null,
       turn_transcript_reconstructed_fallback:
         payload.turn_transcript_reconstructed_fallback ?? debug.turn_transcript_reconstructed_fallback ?? null,
-      terminal_presentation: payload.terminal_presentation ?? debug.terminal_presentation ?? null,
       final_status: payload.final_status ?? debug.final_status ?? null,
       response_type: payload.response_type ?? debug.response_type ?? null,
       final_answer_source: payload.final_answer_source ?? debug.final_answer_source ?? null,
       terminal_artifact_kind: payload.terminal_artifact_kind ?? debug.terminal_artifact_kind ?? null,
       terminal_error_code: payload.terminal_error_code ?? debug.terminal_error_code ?? null,
-      terminal_answer_authority: payload.terminal_answer_authority ?? debug.terminal_answer_authority ?? null,
       terminal_authority_single_writer: payload.terminal_authority_single_writer ?? debug.terminal_authority_single_writer ?? null,
       terminal_candidate_rejections:
         slimTerminalCandidateRejections,

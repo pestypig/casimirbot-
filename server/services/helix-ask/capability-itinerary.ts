@@ -17,6 +17,7 @@ import {
 } from "./contextual-tool-admission";
 import { buildToolUseRestatement, detectInternetSearchIntent } from "./internet-search-intent";
 import { buildHelixCompoundCapabilityContract } from "./compound-capability-contract";
+import { isAskTurnCapabilityHelpIntent } from "./capability-catalog-intent";
 import { detectRepoCodeEvidenceIntent } from "./repo-code-intent-detector";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
 import {
@@ -244,6 +245,9 @@ const stepForCompoundSubgoal = (input: {
   const requiredObservationKinds = Array.isArray(input.subgoal.required_observation_kinds)
     ? input.subgoal.required_observation_kinds.map(readString).filter(Boolean)
     : observationKindsFor(family, input.promptText);
+  const frontierObservationKinds = family === "theory_locator" && theoryFrontierRequested(input.promptText)
+    ? observationKindsFor(family, input.promptText)
+    : [];
   return {
     step_id:
       readString(input.subgoal.subgoal_id) ||
@@ -272,11 +276,13 @@ const stepForCompoundSubgoal = (input: {
     missing_affordance_kinds: Array.isArray(input.subgoal.missing_affordance_kinds)
       ? input.subgoal.missing_affordance_kinds.map(readString).filter(Boolean)
       : [],
-    purpose: requestedCapability
+    purpose: family === "theory_locator" && frontierObservationKinds.length > 0
+      ? "Build non-terminal theory frontier placement evidence, exact contract status, and badge/chunk mappings before synthesis."
+      : requestedCapability
       ? `Execute explicit compound capability subgoal ${requestedCapability}.`
       : "Execute the explicit compound capability subgoal.",
     execution_group: "evidence",
-    required_observation_kinds: requiredObservationKinds,
+    required_observation_kinds: unique([...requiredObservationKinds, ...frontierObservationKinds]),
     contribution_role: readString(input.subgoal.contribution_role) || null,
     terminal_contribution_kind: readString(input.subgoal.terminal_contribution_kind) || readString(input.subgoal.required_terminal_kind) || null,
     forbidden_nearby_capabilities: Array.isArray(input.subgoal.forbidden_nearby_capabilities)
@@ -384,10 +390,20 @@ export function buildHelixCapabilityItinerary(input: {
   availableCapabilities?: unknown;
 }): HelixCapabilityItinerary {
   const admission = readRecord(input.toolCallAdmissionDecision);
-  const compoundCapabilityContract = buildHelixCompoundCapabilityContract({
+  const capabilityHelpIntent = isAskTurnCapabilityHelpIntent(input.promptText);
+  const capabilityHelpHasSeparateAction = /[?!.]\s*(?:then\s+)?(?:use|call|run|open|inspect|search|create|append|set|start|stop)\b/i.test(
+    input.promptText,
+  );
+  const candidateCompoundCapabilityContract = buildHelixCompoundCapabilityContract({
     turnId: input.turnId,
     promptText: input.promptText,
   });
+  const candidateCompoundSubgoals = Array.isArray(candidateCompoundCapabilityContract?.subgoals)
+    ? candidateCompoundCapabilityContract.subgoals
+    : [];
+  const compoundCapabilityContract = capabilityHelpIntent && !capabilityHelpHasSeparateAction
+    ? null
+    : candidateCompoundCapabilityContract;
   const admittedFamilies = (Array.isArray(admission?.admitted_tool_families)
     ? admission.admitted_tool_families
     : []) as HelixCapabilityItineraryFamily[];
@@ -413,22 +429,30 @@ export function buildHelixCapabilityItinerary(input: {
     readString(subgoal.requested_capability).startsWith("repo-code.") ||
     readString(subgoal.runtime_capability).startsWith("repo-code.")
   );
-  const researchFamilies = localAdmissionSuppressesGenericResearch
+  const researchFamilies = capabilityHelpIntent || localAdmissionSuppressesGenericResearch
     ? []
     : requestedResearchFamilies(input.promptText);
-  const repoFamilies = requestedRepoFamilies(input.promptText).filter((family) =>
+  const nonCompoundResearchFamilies = researchFamilies.filter((family) => !compoundFamilies.includes(family));
+  const repoFamilies = (capabilityHelpIntent ? [] : requestedRepoFamilies(input.promptText)).filter((family) =>
     family !== "repo_code" ||
     compoundSubgoals.length === 0 ||
     compoundRequestsRepoCode ||
     explicitRepoEvidenceCueAllowedInCompound(input.promptText)
   );
-  const docsFamilies = requestedDocsFamilies(input.promptText);
+  const docsFamilies = capabilityHelpIntent ? [] : requestedDocsFamilies(input.promptText);
   const locatorFamilies: HelixCapabilityItineraryFamily[] =
-    theoryLocatorRequested(input.promptText) || isTheoryFrontierVectorFieldTracePrompt(input.promptText)
+    !capabilityHelpIntent && (theoryLocatorRequested(input.promptText) || isTheoryFrontierVectorFieldTracePrompt(input.promptText))
     ? ["theory_locator"]
     : [];
   const frontierRequested = theoryFrontierRequested(input.promptText);
-  const relevantFamilies = unique([...compoundFamilies, ...researchFamilies, ...repoFamilies, ...docsFamilies, ...locatorFamilies]);
+  const relevantFamilies = unique([
+    ...nonCompoundResearchFamilies,
+    ...compoundFamilies,
+    ...researchFamilies,
+    ...repoFamilies,
+    ...docsFamilies,
+    ...locatorFamilies,
+  ]);
   const compoundSteps = compoundSubgoals.map((subgoal) => {
     const family = itineraryFamilyForContractSubgoal(subgoal);
     const runtimeCapability = readString(subgoal.runtime_capability) || readString(subgoal.requested_capability);
@@ -451,9 +475,7 @@ export function buildHelixCapabilityItinerary(input: {
   const nonCompoundFamilies = relevantFamilies.filter((family) =>
     !compoundFamilies.includes(family)
   );
-  const plannedSteps = [
-    ...compoundSteps,
-    ...nonCompoundFamilies.map((family) => {
+  const nonCompoundSteps = nonCompoundFamilies.map((family) => {
       const status = statusForFamily({
         family,
         admittedFamilies,
@@ -461,8 +483,12 @@ export function buildHelixCapabilityItinerary(input: {
         availableCapabilities: input.availableCapabilities,
       });
       return stepForFamily({ family, promptText: input.promptText, status });
-    }),
-  ];
+    });
+  const plannedSteps = relevantFamilies.flatMap((family) => {
+    const matchingCompoundSteps = compoundSteps.filter((step) => step.tool_family === family);
+    if (matchingCompoundSteps.length > 0) return matchingCompoundSteps;
+    return nonCompoundSteps.filter((step) => step.tool_family === family);
+  });
   const admittedItineraryFamilies = plannedSteps
     .filter((step) => step.status === "admitted" || step.status === "planned")
     .map((step) => step.tool_family);

@@ -564,8 +564,8 @@ describe("Helix Ask negated/contextual tool admission", () => {
     });
     expect(plan).toMatchObject({
       capability_family: "docs",
-      requested_action: "docs-viewer.locate_in_doc",
-      selected_capability: "docs-viewer.locate_in_doc",
+      requested_action: "docs.search",
+      selected_capability: "docs.search",
       requested_capability: "docs-viewer.locate_in_doc",
     });
     expect(__testHelixAgentStepActionResolution.resolveHelixAgentStepActionForCapability({
@@ -706,7 +706,7 @@ describe("Helix Ask negated/contextual tool admission", () => {
         target_source: "model_only",
         allow_no_tool_direct: true,
       });
-      expect(admission).toMatchObject({
+      expect(admission, promptText).toMatchObject({
         source_target: "model_only",
         required: false,
         admitted_tool_families: ["model_only"],
@@ -968,7 +968,7 @@ describe("Helix Ask negated/contextual tool admission", () => {
     expect(sourceTargetIntent.target_source).toBe("scholarly_research");
     expect(sourceTargetIntent.allow_no_tool_direct).toBe(false);
     expect(admission).toMatchObject({
-      source_target: "scholarly_research",
+      source_target: "theory_locator",
       required: true,
       admitted_tool_families: expect.arrayContaining(["scholarly_research", "theory_locator"]),
     });

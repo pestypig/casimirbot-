@@ -8,6 +8,61 @@ import { getHelixCausalTurnTimeline } from "../services/helix-ask/causal-turn-ti
 const turnId = "ask:test-post-tool-authority";
 
 describe("Helix Ask post-tool authority bridge", () => {
+  it("preserves capability-help route-product identity after a catalog-backed answer draft", () => {
+    const capabilityTurnId = `${turnId}:capability-help`;
+    const answerText = "The research-paper workflow checks accessible full text before choosing whether visual parsing is needed.";
+    const payload: Record<string, unknown> = {
+      turn_id: capabilityTurnId,
+      active_prompt: "How does the research-paper tool decide which papers it can parse?",
+      canonical_goal_frame: {
+        goal_kind: "capability_help",
+        required_terminal_kind: "capability_help_summary",
+      },
+      route_product_contract: {
+        source_target: "runtime_evidence",
+        allowed_terminal_artifact_kinds: ["capability_help_summary", "typed_failure"],
+        forbidden_terminal_artifact_kinds: ["model_synthesized_answer"],
+      },
+      agent_step_decision: { chosen_capability: "model.direct_answer" },
+      terminal_artifact_kind: "capability_help_summary",
+      final_answer_source: "capability_help_summary",
+      selected_final_answer: answerText,
+      capability_help_summary: {
+        schema: "helix.capability_help_summary.v1",
+        answer_text: answerText,
+        text: answerText,
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: `${capabilityTurnId}:capability_registry`,
+          kind: "capability_registry",
+          source_scope: "current_turn",
+          payload: { schema: "helix.capability_registry.v1" },
+        },
+        {
+          artifact_id: `${capabilityTurnId}:final_answer_draft`,
+          kind: "final_answer_draft",
+          source_scope: "current_turn",
+          payload: { schema: "helix.final_answer_draft.v1", text: answerText },
+        },
+      ],
+    };
+
+    const bridge = applyPostToolAuthorityBridgeRepair({ turnId: capabilityTurnId, payload });
+
+    expect(bridge).toMatchObject({
+      route_family: "capability_catalog",
+      required_terminal_kind: "capability_help_summary",
+      terminal_repair_action: "none",
+      observation_support_status: "supports_answer",
+    });
+    expect(payload).toMatchObject({
+      terminal_artifact_kind: "capability_help_summary",
+      final_answer_source: "capability_help_summary",
+      selected_final_answer: answerText,
+    });
+  });
+
   it("lets calculator result plus final draft support a synthesized terminal answer", () => {
     const payload: Record<string, unknown> = {
       turn_id: turnId,

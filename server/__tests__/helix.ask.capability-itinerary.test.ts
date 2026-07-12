@@ -51,6 +51,31 @@ const availableCapabilities = (keys: string[]) => ({
 });
 
 describe("Helix Ask capability itinerary", () => {
+  it("does not plan research or Image Lens execution for a capability behavior question", () => {
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:itinerary-capability-help",
+      promptText:
+        "Does your research-paper tool select papers it can parse, or does it first check which papers are openable and then use Image Lens when visual extraction is needed?",
+      toolCallAdmissionDecision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        turn_id: "ask:itinerary-capability-help",
+        source_target: "runtime_evidence",
+        required: true,
+        admitted_tool_families: ["capability_catalog", "runtime_evidence"],
+        forbidden_terminal_artifact_kinds: [],
+        forbidden_routes: [],
+        reason: "capability_catalog_prompt_requires_runtime_catalog_observation",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+
+    expect(itinerary.compound_capability_contract).toBeUndefined();
+    expect(itinerary.relevant_tool_families).not.toContain("scholarly_research");
+    expect(itinerary.relevant_tool_families).not.toContain("visual_capture");
+    expect(itinerary.terminal_success_criteria.required_capabilities).toEqual([]);
+  });
+
   it("attaches execution state from ledger-only capability itinerary artifacts", () => {
     const turnId = "ask:itinerary-ledger-only-attach";
     const capabilityItinerary = {
@@ -1185,8 +1210,8 @@ describe("Helix Ask capability itinerary", () => {
           required_observation_kinds: ["scholarly_research_observation"],
         }),
         expect.objectContaining({
-          step_id: "locate_theory_context",
           tool_family: "theory_locator",
+          requested_capability: "helix_ask.reflect_theory_context",
           status: "planned",
           required_observation_kinds: ["helix_theory_context_reflection_tool_receipt", "theory_context_reflection"],
         }),
@@ -1312,8 +1337,8 @@ describe("Helix Ask capability itinerary", () => {
           purpose: expect.stringContaining("literature must not promote theory edges"),
         }),
         expect.objectContaining({
-          step_id: "locate_theory_context",
           tool_family: "theory_locator",
+          requested_capability: "helix_ask.reflect_theory_context",
           required_observation_kinds: expect.arrayContaining([
             "theory_frontier_search",
             "theory_frontier_candidate",

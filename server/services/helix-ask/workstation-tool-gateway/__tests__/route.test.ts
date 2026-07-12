@@ -14,6 +14,7 @@ const DOCS_OPEN_DOC_CAPABILITY = "docs-viewer.open_doc";
 const REPO_SEARCH_CAPABILITY = "repo.search";
 const DOCS_SEARCH_CAPABILITY = "docs.search";
 const VOICE_INTERIM_CALLOUT_CAPABILITY = "live_env.request_interim_voice_callout";
+const SET_INTERFACE_LANGUAGE_CAPABILITY = "account_session.set_interface_language";
 
 const createApp = (): express.Express => {
   const app = express();
@@ -131,6 +132,61 @@ describe("AGI workstation tool gateway route", () => {
     );
   });
 
+  it("projects only release-ready interface languages to public accounts", async () => {
+    const response = await request(createApp())
+      .get("/api/agi/workstation-tool-gateway/capabilities?agent_runtime=codex&mode=act")
+      .expect(200);
+
+    const languageCapability = response.body.capabilities.find(
+      (entry: { capability_id: string }) => entry.capability_id === SET_INTERFACE_LANGUAGE_CAPABILITY,
+    );
+    expect(languageCapability.input_schema.properties.language.enum).toEqual(["en", "de", "ar"]);
+  });
+
+  it("blocks developer-preview interface languages for public accounts with a typed failure", async () => {
+    const response = await request(createApp())
+      .post("/api/agi/workstation-tool-gateway/call")
+      .send({
+        agent_runtime: "codex",
+        mode: "act",
+        capability_id: SET_INTERFACE_LANGUAGE_CAPABILITY,
+        arguments: { language: "haw" },
+      })
+      .expect(400);
+
+    expect(response.body).toMatchObject({
+      ok: false,
+      error: "interface_language_preview_locked",
+      account_policy: { account_type: "user" },
+      observation: {
+        status: "blocked",
+        supported_language_codes: ["en", "de", "ar"],
+      },
+    });
+  });
+
+  it("keeps preview interface languages available to developer accounts", async () => {
+    const agent = await createDeveloperAgent();
+    const response = await agent
+      .post("/api/agi/workstation-tool-gateway/call")
+      .send({
+        agent_runtime: "codex",
+        mode: "act",
+        capability_id: SET_INTERFACE_LANGUAGE_CAPABILITY,
+        arguments: { language: "haw" },
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      account_policy: { account_type: "developer" },
+      observation: {
+        language: "haw",
+        status: "succeeded",
+      },
+    });
+  });
+
   it("exposes the same read/observe manifest for a future provider runtime", async () => {
     const agent = await createDeveloperAgent();
     const response = await agent
@@ -155,16 +211,19 @@ describe("AGI workstation tool gateway route", () => {
     );
     for (const capability of response.body.capabilities) {
       expect(capability).toMatchObject({
-        mutating: false,
         code_mutation: false,
         shell_access: false,
         output_observation_schema: expect.stringMatching(/^helix\..+(?:_observation|_receipt|_tool_result)\.v1$/),
-        terminal_eligible: false,
         post_tool_model_step_required: true,
         assistant_answer: false,
         raw_content_included: false,
       });
       expect(["observe", "read", "act", "verify"]).toContain(capability.mode);
+      if (capability.capability_id === "account_session.set_interface_language") {
+        expect(capability).toMatchObject({ mutating: true, terminal_eligible: true, mode: "act" });
+      } else {
+        expect(capability).toMatchObject({ mutating: false, terminal_eligible: false });
+      }
     }
   });
 

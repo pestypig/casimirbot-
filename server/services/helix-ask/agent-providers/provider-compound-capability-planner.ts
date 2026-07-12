@@ -1285,6 +1285,12 @@ const buildScholarlyResearchWorkflowRequests = (body: Record<string, unknown>): 
   if (!prompt) return [];
   if (isScientificImageEvidenceRefRevisionPrompt(prompt)) return [];
   if (isResearchQuantifyReflectPrompt(prompt, body)) return [];
+  const unquoted = unquotePrompt(prompt);
+  if (
+    /\b(?:do\s+not|don't|dont|without|avoid|not\s+asking\s+to)\b[^.!?;\n]{0,100}\b(?:retrieve|search|find|fetch|open|parse|extract|use)\b[^.!?;\n]{0,80}\b(?:research|papers?|scholarly|arxiv|doi|full[-\s]?text)\b/i.test(unquoted)
+  ) {
+    return [];
+  }
   const intent = detectScholarlyResearchIntent(prompt);
   if (!intent.researchRequested) return [];
   if (intent.scholarlyIntent.requested_workflow === "metadata_search" || intent.scholarlyIntent.requested_workflow === "doi_lookup") {

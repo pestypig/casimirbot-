@@ -27,4 +27,27 @@ describe("scholarly research intent", () => {
 
     expect(intent.researchRequested).toBe(false);
   });
+
+  it("keeps local docs and repo citation requests on their explicit evidence tools", () => {
+    const prompts = [
+      "Use docs-viewer.locate_in_doc to find the section in the open document. Answer only from the docs-viewer observation and cite the document evidence.",
+      "Use repo-code.search_concept to find terminal authority. Answer only from repo/code evidence and cite file paths.",
+    ];
+
+    for (const prompt of prompts) {
+      expect(detectScholarlyResearchIntent(prompt).researchRequested).toBe(false);
+    }
+  });
+
+  it("keeps full-text suitability checks metadata-only when fetching and Image Lens are negated", () => {
+    const intent = detectScholarlyResearchIntent(
+      "Find research papers about quantum inequality sampling constraints. Explain which returned papers have a structured source suitable for attempting full-text parsing. Do not use Image Lens and do not fetch full text.",
+    );
+
+    expect(intent.researchRequested).toBe(true);
+    expect(intent.fullTextRequested).toBe(false);
+    expect(intent.scholarlyIntent.requested_workflow).toBe("metadata_search");
+    expect(intent.scholarlyIntent.requires_full_text).toBe(false);
+    expect(intent.scholarlyIntent.requested_outputs).toEqual(["paper_metadata"]);
+  });
 });

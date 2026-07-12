@@ -26,6 +26,7 @@ export type FinalAnswerDraftTerminalMaterializerResult = {
   ok: boolean;
   materialized_terminal_artifact_ref?: string;
   materialized_terminal_artifact_kind?:
+    | "capability_help_summary"
     | "compound_evidence_synthesis_answer"
     | "model_synthesized_answer"
     | "repo_code_evidence_answer"
@@ -990,6 +991,91 @@ export function materializeFinalAnswerDraftTerminal(input: {
       final_answer_draft_ref: draft.ref,
       ok: false,
       blocked_reason: compoundReadinessBlockedReason,
+      route_allowed_terminal_artifact_kinds: routeAllowed,
+      final_answer_draft_quality_gate: qualityGate,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+
+  if (routeFamily === "capability_catalog") {
+    const targetKind = "capability_help_summary";
+    if (!contractAllows(input.payload, contract, targetKind)) {
+      return {
+        schema: "helix.final_answer_draft_terminal_materializer_result.v1",
+        turn_id: input.turnId,
+        final_answer_draft_ref: draft.ref,
+        ok: false,
+        blocked_reason: "route_contract_forbids_model_synthesized_answer",
+        route_allowed_terminal_artifact_kinds: routeAllowed,
+        final_answer_draft_quality_gate: qualityGate,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
+    const capabilityRegistryRefs = artifactLedger
+      .filter((artifact) => artifactKind(artifact) === "capability_registry")
+      .map(artifactId)
+      .filter((ref): ref is string => Boolean(ref));
+    if (capabilityRegistryRefs.length === 0) {
+      return {
+        schema: "helix.final_answer_draft_terminal_materializer_result.v1",
+        turn_id: input.turnId,
+        final_answer_draft_ref: draft.ref,
+        ok: false,
+        blocked_reason: "source_support_refs_missing",
+        route_allowed_terminal_artifact_kinds: routeAllowed,
+        final_answer_draft_quality_gate: qualityGate,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
+    const ref = materializedRef(input.turnId, targetKind);
+    const supportRefs = unique([
+      ...capabilityRegistryRefs,
+      ...collectFinalAnswerDraftSupportRefs({ draftPayload, artifactLedger }),
+    ]);
+    const terminalPayload = {
+      schema: "helix.capability_help_summary.v1",
+      artifact_id: ref,
+      turn_id: input.turnId,
+      kind: targetKind,
+      text: draft.text,
+      answer_text: draft.text,
+      terminal_artifact_kind: targetKind,
+      capability_catalog_ref: capabilityRegistryRefs[0],
+      support_refs: supportRefs,
+      support_refs_count: supportRefs.length,
+      subgoal_observation_refs: capabilityRegistryRefs,
+      subgoal_observation_refs_count: capabilityRegistryRefs.length,
+      source_families: ["capability_catalog"],
+      model_authored: true,
+      model_step_capability: "model.synthesize_from_capability_catalog",
+      final_answer_draft_ref: draft.ref,
+      terminal_eligible: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    input.payload.capability_help_summary = terminalPayload;
+    const terminalArtifact = {
+      artifact_id: ref,
+      kind: targetKind,
+      payload: terminalPayload,
+    };
+    if (!artifactLedger.some((artifact) => artifactId(artifact) === ref)) {
+      artifactLedger.push(terminalArtifact);
+    }
+    if (!input.artifactLedger.some((artifact) => artifactId(artifact) === ref)) {
+      input.artifactLedger.push(terminalArtifact);
+    }
+    input.payload.current_turn_artifact_ledger = artifactLedger;
+    return {
+      schema: "helix.final_answer_draft_terminal_materializer_result.v1",
+      turn_id: input.turnId,
+      final_answer_draft_ref: draft.ref,
+      ok: true,
+      materialized_terminal_artifact_ref: ref,
+      materialized_terminal_artifact_kind: targetKind,
       route_allowed_terminal_artifact_kinds: routeAllowed,
       final_answer_draft_quality_gate: qualityGate,
       assistant_answer: false,

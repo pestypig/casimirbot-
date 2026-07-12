@@ -41,16 +41,19 @@ describe("Helix workstation tool gateway provider parity", () => {
     );
     for (const capability of codexManifest.capabilities) {
       expect(capability).toMatchObject({
-        mutating: false,
         code_mutation: false,
         shell_access: false,
         output_observation_schema: expect.stringMatching(/^helix\..+(?:_observation|_receipt|_tool_result)\.v1$/),
-        terminal_eligible: false,
         post_tool_model_step_required: true,
         assistant_answer: false,
         raw_content_included: false,
       });
-      expect(["observe", "read", "act"]).toContain(capability.mode);
+      expect(["observe", "read", "act", "verify"]).toContain(capability.mode);
+      if (capability.capability_id === "account_session.set_interface_language") {
+        expect(capability).toMatchObject({ mutating: true, terminal_eligible: true, mode: "act" });
+      } else {
+        expect(capability).toMatchObject({ mutating: false, terminal_eligible: false });
+      }
     }
   });
 

@@ -46,6 +46,23 @@ describe("Helix Ask capability catalog intent extraction boundary", () => {
   });
 
   it.each([
+    "Does the scientific calculator support symbolic variables?",
+    "Can Docs Viewer open Markdown files by path?",
+    "How does your repo search tool select matching files?",
+    "Does the internet search tool return source links?",
+    "Can the Moral Graph tool inspect a situation without changing it?",
+    "Does Image Lens read equations from selected regions?",
+    "Can the workstation notes tool append instead of creating a note?",
+    "How does your workspace diagnostic tool check status?",
+    "Does the live-source tool read mail before recording a decision?",
+    "Can the narrator tool return a receipt without speaking automatically?",
+    "Does the Postulate Board workflow create a review before submission?",
+  ])("routes cross-family behavior questions through capability help: %s", (prompt) => {
+    expect(isAskCapabilityCatalogPrompt(prompt)).toBe(true);
+    expect(isAskTurnCapabilityHelpIntent(prompt)).toBe(true);
+  });
+
+  it.each([
     "Earlier I asked: does your tool for research papers allow you to pick papers you are able to parse?",
     "The screen says 'does your tool for research papers allow you to pick papers you are able to parse?'",
     "Do not answer whether your tool for research papers can pick openable papers.",

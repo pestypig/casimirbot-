@@ -35,6 +35,7 @@ export const moralGraphReflectionManifest: HelixWorkstationCapabilityManifest = 
       include_locator: { type: "boolean" },
       include_fruition: { type: "boolean" },
       include_procedural_classification: { type: "boolean" },
+      include_civic_trust_traversability: { type: "boolean" },
       include_recommended_actions: { type: "boolean" },
       include_admissions: { type: "boolean" },
       source_target_intent: { type: "object" },
@@ -124,6 +125,7 @@ export async function buildMoralGraphReflectionGatewayObservation(
       includeLocator: args.include_locator !== false,
       includeFruition: args.include_fruition !== false,
       includeProceduralClassification: args.include_procedural_classification !== false,
+      includeCivicTrustTraversability: args.include_civic_trust_traversability !== false,
     },
   });
   const locator = output.locator;
@@ -156,6 +158,9 @@ export async function buildMoralGraphReflectionGatewayObservation(
     probability_terrain: locator?.probabilityTerrain,
     procedural_classification: output.proceduralClassification,
     fruition: output.fruition,
+    civic_trust_traversability: output.civicTrustTraversability,
+    civic_trust_activated_badge_ids: output.civicTrustTraversability?.activatedBadgeIds ?? [],
+    civic_trust_missing_evidence: output.civicTrustTraversability?.missingEvidence ?? [],
     claim_boundary_notes: claimBoundaryNotes,
     recommended_action_ids: output.reflection.recommended_actions.map((action) => action.id).slice(0, 12),
     admissions_included: output.admissions.length > 0,

@@ -3638,6 +3638,9 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     !terminalIsTypedFailure &&
     effectiveTerminalArtifactKind === "model_synthesized_answer" &&
     effectiveFinalAnswerSource === "final_answer_draft";
+  const replyScopedVisibleFinalAnswer = isReplyScopedDebugProjection
+    ? readString(payload.selectedDebugFinalAnswer)
+    : null;
   const selectedFinalAnswer =
     terminalAuthorityVerified
       ? terminalAuthorityText
@@ -3648,7 +3651,8 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
         terminalAuthorityText ??
         readString(terminalPresentation?.concise_text)
       : terminalIsTypedFailure
-      ? (effectiveTerminalErrorCode === "backend_ask_entry_required"
+      ? replyScopedVisibleFinalAnswer ??
+        (effectiveTerminalErrorCode === "backend_ask_entry_required"
           ? "This prompt requires the backend Ask solver path before a final answer can be shown."
           : effectiveTerminalErrorCode === "backend_debug_materialization"
             ? "Backend Ask was reached, but no server terminal artifact or debug artifact was materialized for this turn."

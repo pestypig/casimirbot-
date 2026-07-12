@@ -930,6 +930,34 @@ describe("explicit workstation gateway derived calls", () => {
     });
   });
 
+  it("keeps structured repo admission authoritative over capability names in the query", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        question: "Where is workspace_os.status implemented?",
+        source_target_intent: {
+          selected_capability: "repo-code.search_concept",
+          target_source: "repo_code",
+          args: { query: "workspace_os.status" },
+        },
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["repo.search"]);
+    expect(requests[0]).toMatchObject({
+      derivation_source: "helix_structured_source_target_admission",
+      capability_id: "repo.search",
+      arguments: {
+        query: "workspace_os.status",
+        source_target_intent: expect.objectContaining({
+          target_source: "repo_code",
+          target_kind: "repo_search",
+          alias_capability: "repo-code.search_concept",
+        }),
+      },
+    });
+  });
+
   it("does not turn scholarly and Image Lens capability questions into research calls", () => {
     const question =
       "does your tool for research papers allow you to pick papers you are able to parse? or do you check what papers are openable to then use image lens?";
@@ -3944,5 +3972,25 @@ describe("explicit workstation gateway derived calls", () => {
         },
       });
     }
+  });
+
+  it("does not derive another workstation call during provider reasoning resume", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        provider_reasoning_resume: true,
+        question: "Summarize the observation and provide the final answer.",
+        workspace_context_snapshot: {
+          activePanel: "docs-viewer",
+          focusedPanel: "docs-viewer",
+          openPanels: ["docs-viewer"],
+          activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
+          hasDocContext: true,
+        },
+      },
+    });
+
+    expect(requests).toEqual([]);
   });
 });

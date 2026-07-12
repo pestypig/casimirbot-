@@ -8,6 +8,8 @@ import type {
   IdeologyContextReflectionV1,
 } from "@shared/ideology-context-reflection";
 import type { MoralBadgeLocatorV1 } from "@shared/moral-badge-locator";
+import type { CivicTrustTraversabilityV1 } from "@shared/civic-trust-traversability";
+import { buildCivicTrustTraversabilityV1 } from "@shared/moral-graph/build-civic-trust-traversability";
 import { loadIdeologyGraphFromFile } from "@shared/moral-graph/load-ideology-graph";
 import { reflectIdeologyContext } from "@shared/moral-graph/reflect-ideology-context";
 import { mapIdeologyReflectionToRecommendedActionAdmission } from "@shared/moral-graph/map-ideology-recommendations-to-admission";
@@ -41,6 +43,7 @@ const MoralGraphToolInputSchema = z.object({
       includeLocator: z.boolean().optional(),
       includeFruition: z.boolean().optional(),
       includeProceduralClassification: z.boolean().optional(),
+      includeCivicTrustTraversability: z.boolean().optional(),
     })
     .optional(),
 });
@@ -56,6 +59,7 @@ export type HelixAskMoralGraphReflectionToolInput = {
     includeLocator?: boolean;
     includeFruition?: boolean;
     includeProceduralClassification?: boolean;
+    includeCivicTrustTraversability?: boolean;
   };
 };
 
@@ -64,6 +68,7 @@ export type HelixAskMoralGraphReflectionToolOutput = {
   proceduralClassification?: ProceduralMoralClassificationV1;
   locator?: MoralBadgeLocatorV1;
   fruition?: FruitionProcedureExpressionV1;
+  civicTrustTraversability?: CivicTrustTraversabilityV1;
   admissions: HelixRecommendedActionAdmissionV1[];
 };
 
@@ -123,12 +128,25 @@ export async function runHelixAskMoralGraphReflectionTool(
         objective: reflection.input.summary,
       })
     : undefined;
+  const locatedBadgeIds = locator
+    ? [...locator.locatedBadges.exact, ...locator.locatedBadges.likely, ...locator.locatedBadges.inferred].map(
+        (badge) => badge.nodeId,
+      )
+    : [];
+  const civicTrustTraversability = input.options?.includeCivicTrustTraversability === false
+    ? null
+    : buildCivicTrustTraversabilityV1({
+        text: input.text,
+        refs: input.refs,
+        activatedBadgeIds: locatedBadgeIds,
+      });
 
   return {
     reflection,
     ...(proceduralClassification ? { proceduralClassification } : {}),
     ...(locator ? { locator } : {}),
     ...(fruition ? { fruition } : {}),
+    ...(civicTrustTraversability ? { civicTrustTraversability } : {}),
     admissions,
   };
 }
@@ -151,6 +169,7 @@ export const moralGraphReflectionSpec: ToolSpecShape = {
           includeLocator: { type: "boolean" },
           includeFruition: { type: "boolean" },
           includeProceduralClassification: { type: "boolean" },
+          includeCivicTrustTraversability: { type: "boolean" },
         },
       },
     },
@@ -163,6 +182,7 @@ export const moralGraphReflectionSpec: ToolSpecShape = {
       proceduralClassification: { type: "object" },
       locator: { type: "object" },
       fruition: { type: "object" },
+      civicTrustTraversability: { type: "object" },
       admissions: { type: "array", items: { type: "object" } },
     },
     required: ["reflection", "admissions"],

@@ -103,8 +103,19 @@ export const readStringArray = (value: unknown): string[] => {
   return value.map((item) => readString(item)).filter((item): item is string => Boolean(item));
 };
 
-export const readHelixAskGoldenPathRequestedCapabilities = (body: RecordLike): string[] =>
-  readStringArray(body.requested_capabilities ?? body.requestedCapabilities);
+export const readHelixAskGoldenPathRequestedCapabilities = (body: RecordLike): string[] => {
+  const sourceTargetIntent = readRecord(body.source_target_intent ?? body.sourceTargetIntent);
+  const structuredCapability = readString(
+    sourceTargetIntent?.selected_capability ??
+    sourceTargetIntent?.selectedCapability ??
+    sourceTargetIntent?.requested_capability ??
+    sourceTargetIntent?.requestedCapability,
+  );
+  return Array.from(new Set([
+    ...readStringArray(body.requested_capabilities ?? body.requestedCapabilities),
+    ...(structuredCapability ? [structuredCapability] : []),
+  ]));
+};
 
 export const readHelixAskGoldenPathRequestedCapability = (body: RecordLike): string | null =>
   readString(body.requested_capability) ??

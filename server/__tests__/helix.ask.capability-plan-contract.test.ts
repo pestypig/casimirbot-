@@ -307,6 +307,40 @@ describe("Helix capability plan contract", () => {
     });
   });
 
+  it("admits affirmative note mutation verbs without admitting contextual variants", () => {
+    const affirmative = buildCapabilityPlan({
+      turnId: "ask:put-location-in-note",
+      promptText: "Find where centerline alpha is mentioned and put it in that note.",
+      sourceTargetIntent: baseSourceTarget("active_note", "active_note"),
+      toolCallAdmissionDecision: toolAdmission("active_note", ["notes"]),
+      canonicalGoalFrame: canonicalGoal("note_mutation", "model_synthesized_answer"),
+    });
+
+    expect(affirmative).toMatchObject({
+      mutating: true,
+      operator_command_required: true,
+      operator_command_present: true,
+      admission_status: "admitted",
+    });
+
+    for (const promptText of [
+      "Do not put the location in that note; explain the workflow only.",
+      "If I later put the location in that note, what would happen?",
+      "Before I put the location in that note, explain the evidence format.",
+      "I put the location in that note yesterday; explain what the receipt means.",
+      '"Put the location in that note" is a quoted command; explain it.',
+    ]) {
+      const contextual = buildCapabilityPlan({
+        turnId: "ask:contextual-put-location-in-note",
+        promptText,
+        sourceTargetIntent: baseSourceTarget("active_note", "active_note"),
+        toolCallAdmissionDecision: toolAdmission("active_note", ["notes"]),
+        canonicalGoalFrame: canonicalGoal("note_mutation", "model_synthesized_answer"),
+      });
+      expect(contextual.operator_command_present).toBe(false);
+    }
+  });
+
   it("routes set_rate history questions through debug evidence without admitting a new live-source mutation", () => {
     const plan = buildCapabilityPlan({
       turnId: "ask:set-rate-debug",

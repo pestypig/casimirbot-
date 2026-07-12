@@ -4,7 +4,7 @@ export const hawMessages = {
   "panel.title.accountSession": "Moʻokāki a me nā kau",
   "panel.title.clipboardHistory": "Moʻolelo Clipboard",
   "panel.title.casimirTiles": "Nā Tile Casimir",
-  "panel.title.codeAdmin": "Administrateur des codes",
+  "panel.title.codeAdmin": "Luna Hoʻokele Code",
   "panel.title.collapseMonitor": "Collapse Monitor",
   "panel.title.docsViewer": "Docs a me Papers",
   "panel.title.endpoints": "Nā Endpoint",

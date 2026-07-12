@@ -54,6 +54,9 @@ const hasLocalDocsScopeCue = (promptText: string): boolean =>
   /\b(?:docs?\s+viewer|documents?\s+viewer|(?:current(?:ly)?|open|active|visible)\s+(?:doc|document|paper|white\s*paper|whitepaper)|document\s+path\s*:|locate\s+query\s*:|from\s+(?:our|local|the)\s+docs?)\b/i.test(promptText) ||
   /(?:^|[\s"'(])\/?docs\/[A-Za-z0-9_./-]+(?:\.mdx?|\.txt)?\b/i.test(promptText);
 
+const hasLocalRepoScopeCue = (promptText: string): boolean =>
+  /\b(?:repo[-_. ]code\.(?:search_concept|search)|repo\.search|repo\/code\s+evidence|repository\s+evidence|cite\s+file\s+paths?)\b/i.test(promptText);
+
 const hasLookupActionCue = (promptText: string): boolean =>
   /\b(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|pull|query|get|resolve|repair|collect|check|cross-?check)\b/i.test(promptText);
 
@@ -68,6 +71,9 @@ const hasPaperCorpusCue = (promptText: string): boolean =>
 
 export const hasScholarlyFullTextCue = (promptText: string): boolean =>
   /\b(?:pdfs?|full[-\s]?text|paper\s+text|article\s+text|paper[-\s]+backed\s+(?:numeric|numerical|formula|variable|calculator)|research[-\s]+paper\s+(?:numeric|numerical|formula|variable)\s+evidence|source[-\s]backed\s+(?:numeric|numerical|expression|calculator)|formula\s+(?:variable\s+)?binding|bind\s+(?:the\s+)?(?:formula\s+)?variables?|calculator\s+binding|extract\s+(?:text|sections?|passages?|chunks?|science|scientific\s+content)|show\s+(?:me\s+)?(?:the\s+)?science|scientific\s+content|scientific\s+evidence(?:\s+packet)?|main\s+equations?|show\s+(?:me\s+)?(?:the\s+)?equations?|read\s+(?:the\s+)?(?:paper|pdf|article)|pages?|page\s+images?|figures?|tables?|equations?|(?:paper|article)\s+(?:methods?|results?|discussion|conclusion)|(?:methods?|results?|discussion|conclusion)\s+(?:section|of\s+(?:the\s+)?(?:paper|article)))\b/i.test(promptText);
+
+const hasNegatedScholarlyFullTextAction = (promptText: string): boolean =>
+  /\b(?:do\s+not|don't|dont|without|avoid|not\s+asking\s+to)\b[\s\S]{0,100}\b(?:fetch|retrieve|read|open|parse|extract)\b[\s\S]{0,80}\b(?:pdf|full[-\s]?text|paper\s+text|article\s+text|paper|article)\b/i.test(promptText);
 
 export const hasScholarlyPageImageCue = (promptText: string): boolean =>
   /\b(?:render|inspect|ocr|parse|crop|page\s+images?|pdf\s+pages?|image\s+lens|displayed\s+equations?|equation[-\s]+like\s+rows?|exact\s+equation\s+rows?)\b/i.test(promptText);
@@ -191,8 +197,9 @@ const requestedWorkflowForPrompt = (prompt: string, doi: string | null): HelixSc
   if (hasScholarlyNumericEvidenceCue(prompt) && !hasScholarlyEquationRowExtractionCue(prompt)) {
     return "numeric_extraction";
   }
-  if (/\b(?:fetch|retrieve|get|pull)\b[\s\S]{0,100}\b(?:research\s+)?papers?\b/i.test(prompt)) return "full_text_summary";
-  if (hasScholarlyFullTextCue(prompt)) return "full_text_summary";
+  const fullTextActionNegated = hasNegatedScholarlyFullTextAction(prompt);
+  if (!fullTextActionNegated && /\b(?:fetch|retrieve|get|pull)\b[\s\S]{0,100}\b(?:research\s+)?papers?\b/i.test(prompt)) return "full_text_summary";
+  if (!fullTextActionNegated && hasScholarlyFullTextCue(prompt)) return "full_text_summary";
   if (/\b(?:references?|bibliograph(?:y|ies)|bibtex)\b/i.test(prompt)) return "bibliography_repair";
   if (doi) return "doi_lookup";
   return "metadata_search";
@@ -285,21 +292,24 @@ export const detectScholarlyResearchIntent = (promptText: string): HelixScholarl
   const providerCue = hasScholarlyProviderCue(admissionPrompt);
   const citationCue = hasCitationCue(admissionPrompt);
   const corpusCue = hasPaperCorpusCue(admissionPrompt);
-  const fullTextCue = hasScholarlyFullTextCue(admissionPrompt);
+  const fullTextCue =
+    hasScholarlyFullTextCue(admissionPrompt) &&
+    !hasNegatedScholarlyFullTextAction(admissionPrompt);
   const lookupAction = hasLookupActionCue(admissionPrompt);
   const localDocsScope = hasLocalDocsScopeCue(admissionPrompt);
+  const localRepoScope = hasLocalRepoScopeCue(admissionPrompt);
   const externalIdentifier = Boolean(doi || arxivId);
   // A citation request can be entirely local (for example, citing headings in
   // the currently open document). Preserve that explicit source scope unless
   // the user also asks for an external scholarly provider, identifier, or
   // lookup action.
-  const localDocumentOnly =
-    localDocsScope &&
+  const localEvidenceOnly =
+    (localDocsScope || localRepoScope) &&
     !externalIdentifier &&
     !providerCue &&
-    !lookupAction;
+    !corpusCue;
   const researchRequested =
-    !localDocumentOnly &&
+    !localEvidenceOnly &&
     !isExplanatoryOnlyPrompt(admissionPrompt) &&
     (
       externalIdentifier ||
@@ -308,7 +318,7 @@ export const detectScholarlyResearchIntent = (promptText: string): HelixScholarl
       (citationCue && corpusCue) ||
       (fullTextCue && (providerCue || corpusCue || citationCue || externalIdentifier))
     ) &&
-    (!localDocsScope || externalIdentifier || providerCue || citationCue);
+    (!(localDocsScope || localRepoScope) || externalIdentifier || providerCue || corpusCue);
   const explicitCues = [
     doi ? "doi" : "",
     arxivId ? "arxiv_id" : "",

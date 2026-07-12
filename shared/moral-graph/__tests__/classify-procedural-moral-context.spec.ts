@@ -34,6 +34,10 @@ const nodeIds = [
   "agency-preserving-disclosure",
   "shame-avoidance-loop",
   "fallout-transfer-check",
+  "familiarity-anonymity-balance",
+  "trust-medium-translation",
+  "domain-bounded-accountability",
+  "contestable-reentry-threshold",
 ] as const;
 
 const graphDocument: IdeologyGraphDocument = {
@@ -294,5 +298,27 @@ describe("procedural Moral context classifier", () => {
       moral_finality: false,
     });
     expect(JSON.stringify(classification)).not.toMatch(/bad person|morally approved|morally failed/i);
+  });
+
+  it("classifies civic trust translation as evidence scope and contestable access, not moral worth", () => {
+    const classification = classify(
+      [
+        "Do not infer patience from rural or urban population density; inspect repeated contact and network overlap.",
+        "Trace relational trust into an institutional trust channel and formal record.",
+        "A credit score must stay domain-bounded accountability evidence, not character or moral worth.",
+        "An excluded applicant needs a contestable re-entry threshold with criteria, appeal, repair, and review.",
+      ].join(" "),
+    );
+
+    expect(validateProceduralMoralClassificationV1(classification)).toEqual([]);
+    expect(classification.classifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ moralRootId: "familiarity-anonymity-balance" }),
+        expect.objectContaining({ moralRootId: "trust-medium-translation" }),
+        expect.objectContaining({ moralRootId: "domain-bounded-accountability" }),
+        expect.objectContaining({ moralRootId: "contestable-reentry-threshold" }),
+      ]),
+    );
+    expect(classification.authority).toMatchObject({ character_verdict: false, moral_finality: false });
   });
 });

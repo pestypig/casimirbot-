@@ -195,6 +195,12 @@ const emptyGate = (reason: string): HelixCompoundPromptCoverageGate => ({
 export const evaluateCompoundPromptCoverageGate = (
   input: HelixCompoundPromptCoverageGateInput,
 ): HelixCompoundPromptCoverageGate => {
+  if (
+    readString(input.terminalArtifactKind) === "capability_help_summary" ||
+    readString(input.finalAnswerSource) === "capability_help_summary"
+  ) {
+    return emptyGate("capability_help_terminal");
+  }
   const contract = coerceContract(input.contract, input.promptText);
   if (!contract) return emptyGate("compound_prompt_contract_missing");
 

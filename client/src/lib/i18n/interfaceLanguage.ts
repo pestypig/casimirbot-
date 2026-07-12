@@ -1,9 +1,11 @@
 import { getInterfaceCatalogReviewedCount } from "@/lib/i18n/messages/targetCatalogs";
 import { INTERFACE_MESSAGE_IDS } from "@/lib/i18n/messages/types";
 import {
+  isPublicInterfaceLanguageCode,
   SHARED_INTERFACE_LANGUAGE_CODES,
   type SharedInterfaceLanguageCode,
 } from "@shared/interface-language-codes";
+import type { HelixAccountType } from "@shared/helix-account-session";
 
 export type InterfaceLanguageCode = SharedInterfaceLanguageCode;
 
@@ -17,6 +19,7 @@ export type InterfaceLanguageOption = {
   writingSystem: "Latn" | "Jpan" | "Kore" | "Hans" | "Arab";
   direction: "ltr" | "rtl";
   translationMode: InterfaceLanguageTranslationMode;
+  releaseStatus: "public" | "developer_preview";
   readiness: string;
 };
 
@@ -31,6 +34,7 @@ export const INTERFACE_LANGUAGE_OPTIONS: InterfaceLanguageOption[] = [
     writingSystem: "Latn",
     direction: "ltr",
     translationMode: "source",
+    releaseStatus: "public",
     readiness: "Source UI language",
   },
   {
@@ -41,6 +45,7 @@ export const INTERFACE_LANGUAGE_OPTIONS: InterfaceLanguageOption[] = [
     writingSystem: "Latn",
     direction: "ltr",
     translationMode: "procedural_catalog",
+    releaseStatus: "developer_preview",
     readiness: "Procedural localization seed",
   },
   {
@@ -51,6 +56,7 @@ export const INTERFACE_LANGUAGE_OPTIONS: InterfaceLanguageOption[] = [
     writingSystem: "Latn",
     direction: "ltr",
     translationMode: "procedural_catalog",
+    releaseStatus: "developer_preview",
     readiness: "Catalog shell; English fallback observable",
   },
   {
@@ -61,6 +67,7 @@ export const INTERFACE_LANGUAGE_OPTIONS: InterfaceLanguageOption[] = [
     writingSystem: "Latn",
     direction: "ltr",
     translationMode: "procedural_catalog",
+    releaseStatus: "developer_preview",
     readiness: "Catalog shell; English fallback observable",
   },
   {
@@ -71,6 +78,7 @@ export const INTERFACE_LANGUAGE_OPTIONS: InterfaceLanguageOption[] = [
     writingSystem: "Latn",
     direction: "ltr",
     translationMode: "procedural_catalog",
+    releaseStatus: "public",
     readiness: "Catalog shell; English fallback observable",
   },
   {
@@ -81,6 +89,7 @@ export const INTERFACE_LANGUAGE_OPTIONS: InterfaceLanguageOption[] = [
     writingSystem: "Latn",
     direction: "ltr",
     translationMode: "procedural_catalog",
+    releaseStatus: "developer_preview",
     readiness: "Catalog shell; English fallback observable",
   },
   {
@@ -91,6 +100,7 @@ export const INTERFACE_LANGUAGE_OPTIONS: InterfaceLanguageOption[] = [
     writingSystem: "Jpan",
     direction: "ltr",
     translationMode: "procedural_catalog",
+    releaseStatus: "developer_preview",
     readiness: "Catalog shell; English fallback observable",
   },
   {
@@ -101,6 +111,7 @@ export const INTERFACE_LANGUAGE_OPTIONS: InterfaceLanguageOption[] = [
     writingSystem: "Kore",
     direction: "ltr",
     translationMode: "procedural_catalog",
+    releaseStatus: "developer_preview",
     readiness: "Catalog shell; English fallback observable",
   },
   {
@@ -111,6 +122,7 @@ export const INTERFACE_LANGUAGE_OPTIONS: InterfaceLanguageOption[] = [
     writingSystem: "Hans",
     direction: "ltr",
     translationMode: "procedural_catalog",
+    releaseStatus: "developer_preview",
     readiness: "Catalog shell; English fallback observable",
   },
   {
@@ -121,6 +133,7 @@ export const INTERFACE_LANGUAGE_OPTIONS: InterfaceLanguageOption[] = [
     writingSystem: "Arab",
     direction: "rtl",
     translationMode: "procedural_catalog",
+    releaseStatus: "public",
     readiness: "Catalog shell; English fallback observable",
   },
   {
@@ -131,6 +144,7 @@ export const INTERFACE_LANGUAGE_OPTIONS: InterfaceLanguageOption[] = [
     writingSystem: "Latn",
     direction: "ltr",
     translationMode: "procedural_catalog",
+    releaseStatus: "developer_preview",
     readiness: "Catalog shell; English fallback observable",
   },
 ];
@@ -156,6 +170,15 @@ export function isInterfaceLanguageCode(value: unknown): value is InterfaceLangu
 export function getInterfaceLanguageOption(value: unknown): InterfaceLanguageOption {
   const code = normalizeInterfaceLanguageCode(value);
   return INTERFACE_LANGUAGE_OPTIONS.find((option) => option.code === code) ?? INTERFACE_LANGUAGE_OPTIONS[0];
+}
+
+export function getInterfaceLanguageOptionsForAccount(
+  accountType: HelixAccountType | null | undefined,
+): InterfaceLanguageOption[] {
+  if (accountType === "developer") return INTERFACE_LANGUAGE_OPTIONS;
+  return INTERFACE_LANGUAGE_OPTIONS.filter((option) =>
+    isPublicInterfaceLanguageCode(option.code),
+  );
 }
 
 export function getInterfaceLanguageReadiness(option: InterfaceLanguageOption): string {

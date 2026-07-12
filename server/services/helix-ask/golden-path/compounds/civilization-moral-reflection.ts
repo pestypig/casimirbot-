@@ -1,4 +1,5 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
+import { buildCivicTrustTraversabilityV1 } from "@shared/moral-graph/build-civic-trust-traversability";
 import { readCompactCivilizationBoundsToolResult } from "../capabilities/civilization-bounds-reflection";
 import { readCompactMoralGraphReflectionToolResult } from "../capabilities/moral-graph-reflection";
 import {
@@ -151,6 +152,7 @@ export const buildHelixAskGoldenPathCivilizationBoundsMoralReflectionCompoundPay
     });
   const routeGateArtifactId = buildHelixAskGoldenPathRouteGateArtifactId(turnId);
   const civilizationObservationArtifactId = `${turnId}:helix_civilization_bounds_tool_result`;
+  const civicTrustObservationArtifactId = `${turnId}:helix_civic_trust_traversability_result`;
   const moralObservationArtifactId = `${turnId}:helix_moral_graph_reflection_tool_result`;
   const terminalArtifactId = `${turnId}:compound_evidence_synthesis_answer`;
   const terminalResultId = buildHelixAskGoldenPathTerminalResultId(turnId);
@@ -161,6 +163,13 @@ export const buildHelixAskGoldenPathCivilizationBoundsMoralReflectionCompoundPay
   const roadmap = readRecord(civilizationResult?.roadmap);
   const moralResult = readCompactMoralGraphReflectionToolResult(args.body) ?? promptProducedMoralResult;
   const reflection = readRecord(moralResult?.reflection);
+  const suppliedCivicTrustTraversability = readRecord(
+    moralResult?.civicTrustTraversability ?? moralResult?.civic_trust_traversability,
+  );
+  const civicTrustTraversability = suppliedCivicTrustTraversability ?? buildCivicTrustTraversabilityV1({
+    text: promptText,
+    refs: readStringArray(args.body.refs),
+  });
 
   const makeFailurePayload = (params: {
     errorCode: "missing_civilization_bounds_tool_result" | "missing_moral_graph_reflection_tool_result";
@@ -353,12 +362,24 @@ export const buildHelixAskGoldenPathCivilizationBoundsMoralReflectionCompoundPay
     locator,
     fruition,
     admissions,
+    ...(civicTrustTraversability ? { civic_trust_traversability: civicTrustTraversability } : {}),
     evidence_refs: moralEvidenceRefs,
     ...moralReflectionLayers,
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,
   };
+  const civicTrustReceipt = civicTrustTraversability
+    ? {
+        schema: "helix.civic_trust_traversability_observation.v1",
+        kind: "helix_civic_trust_traversability_result",
+        artifact: civicTrustTraversability,
+        evidence_refs: readStringArray(civicTrustTraversability.missingEvidence).slice(0, 12),
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      }
+    : null;
   const compoundCapabilityContract = buildGoldenPathCompoundCapabilityContract({
     turnId,
     subgoals: [
@@ -407,13 +428,18 @@ export const buildHelixAskGoldenPathCivilizationBoundsMoralReflectionCompoundPay
     hashGoalFrame: deps.hashGoalFrame,
     buildGoalSatisfactionEvaluationArtifact: deps.buildGoalSatisfactionEvaluationArtifact,
     answerText,
-    supportArtifactRefs: [civilizationObservationArtifactId, moralObservationArtifactId],
+    supportArtifactRefs: [
+      civilizationObservationArtifactId,
+      ...(civicTrustReceipt ? [civicTrustObservationArtifactId] : []),
+      moralObservationArtifactId,
+    ],
     status: "civilization_bounds_moral_reflection_compound",
     route: "golden_path_runtime / civilization_bounds_moral_reflection_compound",
     observedArtifactRef: civilizationObservationArtifactId,
     requiredObservationKinds,
     observationFields: {
       helix_civilization_bounds_tool_result: civilizationReceipt,
+      ...(civicTrustReceipt ? { helix_civic_trust_traversability_result: civicTrustReceipt } : {}),
       helix_moral_graph_reflection_tool_result: moralReceipt,
     },
     observationLedgerArtifacts: ({ goalHash }) =>
@@ -429,6 +455,15 @@ export const buildHelixAskGoldenPathCivilizationBoundsMoralReflectionCompoundPay
             terminalEligible: false,
             payload: civilizationReceipt,
           },
+          ...(civicTrustReceipt
+            ? [{
+                artifactId: civicTrustObservationArtifactId,
+                kind: "helix_civic_trust_traversability_result",
+                producerItemId: HELIX_GOLDEN_PATH_MORAL_GRAPH_REFLECTION_CAPABILITY,
+                terminalEligible: false,
+                payload: civicTrustReceipt,
+              }]
+            : []),
           {
             artifactId: moralObservationArtifactId,
             kind: "helix_moral_graph_reflection_tool_result",

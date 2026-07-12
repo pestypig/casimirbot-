@@ -22,6 +22,7 @@ rollback/no-op, and re-entry contract exists for the specific control.
 ## Capability IDs
 
 ```txt
+live_pipeline
 live_env.start_agent_goal_session
 live_env.change_workstation_preset
 live_env.set_visual_preset

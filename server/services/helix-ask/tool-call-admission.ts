@@ -110,6 +110,9 @@ const hasConcreteCalculatorExpression = (prompt: string): boolean =>
   /\bscientific-calculator\.solve(?:_expression|_with_steps)?\b/i.test(prompt) ||
   /\b(?:with\s+(?:this\s+exact\s+)?expression|expression\s+is|expression)\s*:?\s*[0-9][0-9eE\s.+\-*/^%()[\]]{1,120}/i.test(prompt);
 
+const hasAffirmativeCalculatorExpressionPayload = (prompt: string): boolean =>
+  /\b(?:run|use|call|calculate|compute|solve|evaluate)\b[^.!?;\n]{0,100}\bcalculator\b[^.!?;\n]{0,100}\bexpression\s*:\s*[0-9][0-9eE\s.+\-*/^%()[\]]{1,120}/i.test(prompt);
+
 const isConditionalPriorEvidenceCalculatorFollowup = (prompt: string): boolean => {
   const conditional = /\b(?:if|when|provided\s+that|only\s+if|assuming)\b/i.test(prompt);
   const priorEvidence = /\b(?:previous|prior|above|last|earlier)\b[\s\S]{0,100}\b(?:answers?|evidence|result|retrieval|values?|variables?)\b/i.test(prompt);
@@ -394,13 +397,28 @@ export function buildToolCallAdmissionDecision(input: {
     promptExplicitCapabilityMatches.map((match) => match.contract),
   );
   const promptExplicitCapabilityContract = extractExplicitCapabilityContract(promptText);
-  const explicitCapabilityContract =
+  const candidateExplicitCapabilityContract =
     promptExplicitCapabilityContract ??
     explicitCapabilityContractForCapability(mandatoryToolName);
+  const contextualModelOnlySuppression =
+    Boolean(contextualSuppression) &&
+    (sourceTarget === "model_only" || sourceTarget === "general_background") &&
+    !hasAffirmativeCalculatorExpressionPayload(promptText);
   const explicitCapabilityContractsForAdmission = uniqueExplicitCapabilityContracts([
     ...promptExplicitCapabilityContracts,
-    explicitCapabilityContract,
-  ]);
+    candidateExplicitCapabilityContract,
+  ]).filter((contract) =>
+    !contextualModelOnlySuppression ||
+    !contract.admission_families.some((family) =>
+      contextualToolSuppressionBlocksFamily(contextualSuppression, family)
+    )
+  );
+  const explicitCapabilityContract = candidateExplicitCapabilityContract &&
+    explicitCapabilityContractsForAdmission.some((contract) =>
+      contract.capability === candidateExplicitCapabilityContract.capability
+    )
+    ? candidateExplicitCapabilityContract
+    : null;
   const explicitCapabilityAdmissionFamilies = unique(
     explicitCapabilityContractsForAdmission.flatMap((contract) => contract.admission_families),
   );

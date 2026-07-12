@@ -59,17 +59,17 @@ const uniqueStrings = (values: string[]): string[] => Array.from(new Set(values.
 
 const normalize = (value: string): string => value.trim().toLowerCase().replace(/\s+/g, " ");
 
-const commandVerbPattern = /\b(?:click|press|tap|open|close|start|stop|set|change|update|run|repair|attach|select|choose|submit|use|solve|evaluate|compute|calculate|check|verify)\b/i;
+const commandVerbPattern = /\b(?:click|press|tap|open|close|start|stop|set|change|update|run|repair|attach|select|choose|submit|use|solve|evaluate|compute|calculate|check|verify|create|add|append|put|save|write|store)\b/i;
 const contextualCommandPattern =
-  /\b(?:before|after|if|when|why|did|last|previous|haven'?t|not\s+yet|without)\b[\s\S]{0,80}\b(?:click|press|tap|open|start|set|change|update|run|repair|attach|use|solve|evaluate|compute|calculate|check|verify)\b/i;
+  /\b(?:before|after|if|when|why|did|last|previous|haven'?t|not\s+yet|without)\b[\s\S]{0,80}\b(?:click|press|tap|open|start|set|change|update|run|repair|attach|use|solve|evaluate|compute|calculate|check|verify|create|add|append|put|save|write|store)\b/i;
 
 const hasOperatorCommand = (promptText: string): boolean => {
   const prompt = promptText.trim();
   if (!commandVerbPattern.test(prompt)) return false;
   if (contextualCommandPattern.test(prompt)) return false;
-  return /^(?:please\s+)?(?:click|press|tap|open|close|start|stop|set|change|update|run|repair|attach|select|choose|submit|use|solve|evaluate|compute|calculate|check|verify)\b/i.test(prompt) ||
-    /^(?:please\s+)?(?:you\s+have\s+to|can\s+you|could\s+you|would\s+you)\s+(?:click|press|tap|open|close|start|stop|set|change|update|run|repair|attach|select|choose|submit|use|solve|evaluate|compute|calculate|check|verify)\b/i.test(prompt) ||
-    /\b(?:and|then)\s+(?:click|press|tap|open|close|start|stop|set|change|update|run|repair|attach|select|choose|submit|use|solve|evaluate|compute|calculate|check|verify)\b/i.test(prompt);
+  return /^(?:please\s+)?(?:click|press|tap|open|close|start|stop|set|change|update|run|repair|attach|select|choose|submit|use|solve|evaluate|compute|calculate|check|verify|create|add|append|put|save|write|store)\b/i.test(prompt) ||
+    /^(?:please\s+)?(?:you\s+have\s+to|can\s+you|could\s+you|would\s+you)\s+(?:click|press|tap|open|close|start|stop|set|change|update|run|repair|attach|select|choose|submit|use|solve|evaluate|compute|calculate|check|verify|create|add|append|put|save|write|store)\b/i.test(prompt) ||
+    /\b(?:and|then)\s+(?:click|press|tap|open|close|start|stop|set|change|update|run|repair|attach|select|choose|submit|use|solve|evaluate|compute|calculate|check|verify|create|add|append|put|save|write|store)\b/i.test(prompt);
 };
 
 const isAffirmativeAgentGoalSessionCommand = (promptText: string): boolean => {

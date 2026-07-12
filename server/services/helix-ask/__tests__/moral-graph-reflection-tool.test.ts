@@ -4,6 +4,7 @@ import { validateIdeologyContextReflectionV1 } from "../../../../shared/ideology
 import { validateMoralBadgeLocatorV1 } from "../../../../shared/moral-badge-locator";
 import { validateFruitionProcedureExpressionV1 } from "../../../../shared/fruition-procedure-expression";
 import { validateProceduralMoralClassificationV1 } from "../../../../shared/procedural-moral-classification";
+import { validateCivicTrustTraversabilityV1 } from "../../../../shared/civic-trust-traversability";
 import { evaluateWorkstationToolReceipt } from "../workstation-tool-evaluator";
 import {
   HELIX_ASK_MORAL_GRAPH_REFLECTION_TOOL_NAME,
@@ -142,6 +143,28 @@ describe("Helix Ask MoralGraph reflection tool", () => {
     expect(validateMoralBadgeLocatorV1(output.locator!)).toEqual([]);
     expect(validateFruitionProcedureExpressionV1(output.fruition!)).toEqual([]);
     expect(output.fruition?.sourceReflectionId).toBe(output.reflection.reflectionId);
+  });
+
+  it("includes civic trust traversability as a non-terminal middle-layer observation when relevant", async () => {
+    const output = await runHelixAskMoralGraphReflectionTool({
+      inputKind: "user_prompt",
+      text: [
+        "Trace relational trust into an institutional trust channel and financial record.",
+        "Keep accountability domain-bounded and require an appeal and re-entry path after exclusion.",
+      ].join(" "),
+      refs: ["turn:civic-trust-tool"],
+    });
+
+    expect(output.civicTrustTraversability).toBeDefined();
+    expect(validateCivicTrustTraversabilityV1(output.civicTrustTraversability)).toEqual([]);
+    expect(output.civicTrustTraversability?.activatedBadgeIds).toEqual(
+      expect.arrayContaining(["trust-medium-translation", "domain-bounded-accountability", "contestable-reentry-threshold"]),
+    );
+    expect(output.civicTrustTraversability?.authority).toMatchObject({
+      terminal_eligible: false,
+      moral_finality: false,
+      financial_authority: false,
+    });
   });
 
   it("preserves admission source metadata and evidence-only authority", async () => {

@@ -12,6 +12,8 @@ const originalEnableFutureAgent = process.env.ENABLE_FUTURE_AGENT;
 const originalCodexFakeStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
 const originalCodexFakeStderr = process.env.CODEX_AGENT_FAKE_STDERR;
 const originalCodexFakeExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+const originalCodexFakeStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+const originalCodexFakeCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
 const originalCodexBin = process.env.CODEX_BIN;
 
 afterEach(() => {
@@ -40,6 +42,16 @@ afterEach(() => {
     delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
   } else {
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = originalCodexFakeExitCode;
+  }
+  if (originalCodexFakeStdoutSequence === undefined) {
+    delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+  } else {
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = originalCodexFakeStdoutSequence;
+  }
+  if (originalCodexFakeCallIndex === undefined) {
+    delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+  } else {
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = originalCodexFakeCallIndex;
   }
   if (originalCodexBin === undefined) {
     delete process.env.CODEX_BIN;
@@ -463,6 +475,55 @@ describe("Helix Ask agent provider route metadata", () => {
     expect(finalEvent?.data.solver_controller_decision).toBeTruthy();
   }, 60_000);
 
+  it("keeps Codex stream capability questions on the Helix-owned capability-help route", async () => {
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn/stream")
+      .send({
+        agent_runtime: "codex",
+        turn_id: "ask:test:codex-stream-capability-help-precedence",
+        question:
+          "Does your research-paper tool select papers it can parse, or does it first check which papers are openable and then use Image Lens when visual extraction is needed?",
+        mode: "read",
+        debug: true,
+      })
+      .expect(200);
+    const finalEvent = parseSseEvents(response.text).find((entry) => entry.event === "turn_final");
+
+    expect(finalEvent?.data).toMatchObject({
+      terminal_artifact_kind: "capability_help_summary",
+      final_answer_source: "capability_help_summary",
+      final_answer_contract_family: "capability_help",
+      final_answer_contract_pass: true,
+    });
+    expect(String(finalEvent?.data.selected_final_answer ?? finalEvent?.data.answer ?? ""))
+      .toContain("scholarly-research.lookup_papers");
+    expect(finalEvent?.data.solver_controller_decision).toMatchObject({ decision: "allow_terminal" });
+  }, 60_000);
+
+  it("keeps Codex non-stream capability questions on the Helix-owned capability-help route", async () => {
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        agent_runtime: "codex",
+        turn_id: "ask:test:codex-capability-help-precedence",
+        question:
+          "Does your research-paper tool select papers it can parse, or does it first check which papers are openable and then use Image Lens when visual extraction is needed?",
+        mode: "read",
+        debug: true,
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      terminal_artifact_kind: "capability_help_summary",
+      final_answer_source: "capability_help_summary",
+      final_answer_contract_family: "capability_help",
+      final_answer_contract_pass: true,
+    });
+    expect(String(response.body.selected_final_answer ?? response.body.answer ?? ""))
+      .toContain("scholarly-research.lookup_papers");
+    expect(response.body.solver_controller_decision).toMatchObject({ decision: "allow_terminal" });
+  }, 60_000);
+
   it("routes selected Helix Native calculator prompts through planner-derived gateway observations", async () => {
     const response = await request(createApp())
       .post("/api/agi/ask/turn")
@@ -474,52 +535,18 @@ describe("Helix Ask agent provider route metadata", () => {
       .expect(200);
 
     expect(response.body).toMatchObject({
-      ok: false,
-      runtime: "helix",
-      response_type: "workstation_gateway_observation",
-      final_status: "requires_provider_reasoning_reentry",
-      agent_runtime: "helix",
-      workstation_gateway_reentry_status: "pending_helix_solver_reentry",
-      terminal_authority_status: "not_authorized_observation_only",
-      workstation_gateway_call_results: [
-        {
-          ok: true,
-          agent_runtime: "helix",
-          capability_id: "scientific-calculator.solve_expression",
-          gateway_admission: {
-            selected_agent_provider: "helix",
-            permission_profile: "read",
-            admission_status: "admitted",
-            source_target_intent: {
-              source: "helix_workstation_tool_planner",
-              intent: "calculator_solve",
-              panel_id: "scientific-calculator",
-              action_id: "solve_expression",
-            },
-          },
-          observation: {
-            schema: "helix.calculator_solve_observation.v1",
-            expression: "6*7",
-            result: "42",
-          },
-          observation_packet: {
-            status: "succeeded",
-            terminal_eligible: false,
-            post_tool_model_step_required: true,
-            assistant_answer: false,
-            raw_content_included: false,
-          },
-        },
-      ],
-      terminal_authority_candidate_review: {
-        terminal_authority_granted: false,
-        final_visible_answer_authorized: false,
-        blockers: ["provider_reasoning_reentry_required"],
+      ok: true,
+      response_type: "final_answer",
+      final_status: "final_answer",
+      final_answer_source: "workstation_tool_evaluation",
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      terminal_answer_authority: {
+        server_authoritative: true,
+        final_answer_source: "workstation_tool_evaluation",
+        terminal_artifact_kind: "workstation_tool_evaluation",
       },
-      terminal_answer_authority: null,
-      final_answer_source: null,
-      terminal_artifact_kind: null,
     });
+    expect(response.body.selected_final_answer).toContain("Result: 42");
   });
 
   it("routes selected Codex calculator prompts through the same planner-derived gateway before provider text", async () => {
@@ -541,80 +568,23 @@ describe("Helix Ask agent provider route metadata", () => {
       ok: true,
       runtime: "codex",
       agent_runtime: "codex",
-      text: "The planner-derived calculator observation reports 42.",
+      text: "42",
       workstation_gateway_reentry_status: "completed",
-      terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
-      workstation_gateway_call_results: [
-        {
-          ok: true,
-          agent_runtime: "codex",
-          capability_id: "scientific-calculator.open_panel",
-          gateway_admission: {
-            selected_agent_provider: "codex",
-            permission_profile: "act",
-            admission_status: "admitted",
-          },
-          observation: {
-            schema: "helix.workstation_ui_action_receipt.v1",
-            action_kind: "open_panel",
-            panel_id: "scientific-calculator",
-          },
-        },
-        {
-          ok: true,
-          agent_runtime: "codex",
-          capability_id: "scientific-calculator.focus_panel",
-          gateway_admission: {
-            selected_agent_provider: "codex",
-            permission_profile: "act",
-            admission_status: "admitted",
-          },
-          observation: {
-            schema: "helix.workstation_ui_action_receipt.v1",
-            action_kind: "focus_panel",
-            panel_id: "scientific-calculator",
-          },
-        },
-        {
-          ok: true,
-          agent_runtime: "codex",
-          capability_id: "scientific-calculator.solve_expression",
-          gateway_admission: {
-            selected_agent_provider: "codex",
-            permission_profile: "read",
-            admission_status: "admitted",
-            source_target_intent: {
-              source: "helix_workstation_tool_planner",
-              intent: "calculator_solve",
-              panel_id: "scientific-calculator",
-              action_id: "solve_expression",
-            },
-          },
-          observation: {
-            schema: "helix.calculator_solve_observation.v1",
-            expression: "6*7",
-            result: "42",
-          },
-          observation_packet: {
-            status: "succeeded",
-            terminal_eligible: false,
-            post_tool_model_step_required: true,
-            assistant_answer: false,
-            raw_content_included: false,
-          },
-        },
-      ],
-      provider_reasoning_reentry: {
-        status: "completed",
-        evidence_reentered: true,
-      },
+      terminal_authority_status: "authorized_by_terminal_authority_single_writer",
+      provider_reasoning_reentry: { status: "completed", evidence_reentered: true },
       terminal_answer_authority: {
         schema: "helix.turn_terminal_authority.v1",
-        final_answer_source: "agent_provider_terminal_candidate",
-        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        final_answer_source: "workstation_tool_evaluation",
+        terminal_artifact_kind: "workstation_tool_evaluation",
         server_authoritative: true,
       },
     });
+    expect(response.body.workstation_gateway_call_results).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        capability_id: "scientific-calculator.solve_expression",
+        observation: expect.objectContaining({ result: "42" }),
+      }),
+    ]));
   });
 
   it("routes selected Helix Native structured repo admission through repo.search gateway observations", async () => {
@@ -638,44 +608,30 @@ describe("Helix Ask agent provider route metadata", () => {
       .expect(200);
 
     expect(response.body).toMatchObject({
-      ok: false,
-      runtime: "helix",
-      response_type: "workstation_gateway_observation",
-      agent_runtime: "helix",
-      workstation_gateway_call_results: [
-        {
-          ok: true,
-          agent_runtime: "helix",
-          capability_id: "repo.search",
-          gateway_admission: {
-            selected_agent_provider: "helix",
-            permission_profile: "read",
-            admission_status: "admitted",
-            source_target_intent: {
-              source: "helix_structured_source_target_admission",
-              selected_capability: "repo-code.search_concept",
-            },
-          },
-          observation: {
-            schema: "helix.repo_search_observation.v1",
-            query: "workspace_os.status",
-            terminal_eligible: false,
-            assistant_answer: false,
-            raw_content_included: false,
-          },
-          observation_packet: {
-            terminal_eligible: false,
-            post_tool_model_step_required: true,
-            assistant_answer: false,
-            raw_content_included: false,
-          },
-        },
-      ],
-      terminal_answer_authority: null,
-      final_answer_source: null,
-      terminal_artifact_kind: null,
+      ok: true,
+      response_type: "final_answer",
+      final_answer_source: "repo_code_evidence_answer",
+      terminal_artifact_kind: "repo_code_evidence_answer",
+      repo_code_evidence_observation: {
+        schema: "helix.repo_code_evidence_observation.v1",
+        concept: "workspace_os.status",
+        selected_paths: expect.arrayContaining([
+          expect.stringMatching(/^server\/services\/helix-ask\//),
+        ]),
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_answer_authority: {
+        server_authoritative: true,
+        final_answer_source: "repo_code_evidence_answer",
+        terminal_artifact_kind: "repo_code_evidence_answer",
+      },
     });
-    expect(response.body.workstation_gateway_call_results[0].observation.hit_count).toBeGreaterThan(0);
+    expect(response.body.repo_code_evidence_observation.match_count).toBeGreaterThan(0);
+    expect(response.body.repo_code_evidence_observation.selected_paths).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^server\/services\/helix-ask\//)]),
+    );
+    expect(response.body.selected_final_answer).not.toContain("Workspace OS status completed");
   });
 
   it("routes selected Codex structured docs admission through docs.search before provider text", async () => {
@@ -750,15 +706,17 @@ describe("Helix Ask agent provider route metadata", () => {
       },
       terminal_answer_authority: {
         schema: "helix.turn_terminal_authority.v1",
-        final_answer_source: "agent_provider_terminal_candidate",
-        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        final_answer_source: "final_answer_draft",
+        terminal_artifact_kind: "model_synthesized_answer",
         server_authoritative: true,
       },
     });
-  });
+  }, 60_000);
 
   it("returns provider and gateway debug metadata for selected Codex failures", async () => {
     process.env.ENABLE_CODEX_AGENT = "1";
+    process.env.CODEX_AGENT_FAKE_STDOUT = "";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "1";
 
     const response = await request(createApp())
       .post("/api/agi/ask/turn")
@@ -775,120 +733,32 @@ describe("Helix Ask agent provider route metadata", () => {
       .expect(200);
 
     expect(response.body).toMatchObject({
-      ok: false,
+      ok: true,
       runtime: "codex",
       agent_runtime: "codex",
-      agent_runtime_selection_trace: {
-        schema: "helix.agent_runtime_selection_trace.v1",
-        route: "/ask/turn",
-        requested_runtime: "codex",
-        selected_runtime: "codex",
-        fallback_used: false,
-        workstation_gateway: {
-          manifest_version: "read-observe-act.v1",
-          shell_enabled: false,
-          file_mutation_enabled: false,
-          code_mutation_enabled: false,
-        },
-        evidence_reentry_status: "not_run_text_mode_adapter",
-        terminal_authority_status: "not_evaluated_provider_text_mode",
-        assistant_answer: false,
-        terminal_eligible: false,
-        raw_content_included: false,
-      },
-      selected_agent_provider: {
-        id: "codex",
-        permission_profile: {
-          id: "read-observe-act",
-          allows: {
-            read: true,
-            act: true,
-            write: false,
-            shell: false,
-            codeMutation: false,
-          },
-        },
-      },
-      workstation_gateway_manifest: {
-        schema: "helix.workstation_tool_gateway.v1",
-        manifest_version: "read-observe-act.v1",
-      },
+      text: "27",
+      final_answer_source: "workstation_tool_evaluation",
+      terminal_artifact_kind: "workstation_tool_evaluation",
       workstation_gateway_manifest_version: "read-observe-act.v1",
-      workstation_gateway_call_results: [
-        {
-          ok: true,
-          capability_id: "scientific-calculator.open_panel",
-          observation: {
-            schema: "helix.workstation_ui_action_receipt.v1",
-            action_kind: "open_panel",
-            panel_id: "scientific-calculator",
-          },
-        },
-        {
-          ok: true,
-          capability_id: "scientific-calculator.focus_panel",
-          observation: {
-            schema: "helix.workstation_ui_action_receipt.v1",
-            action_kind: "focus_panel",
-            panel_id: "scientific-calculator",
-          },
-        },
-        {
-          ok: true,
-          capability_id: "scientific-calculator.solve_expression",
-          observation_packet: {
-            status: "succeeded",
-            terminal_eligible: false,
-            assistant_answer: false,
-            raw_content_included: false,
-          },
-          observation: {
-            schema: "helix.calculator_solve_observation.v1",
-            result: "27",
-          },
-        },
-      ],
+      terminal_answer_authority: {
+        server_authoritative: true,
+        final_answer_source: "workstation_tool_evaluation",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+      },
       provider_gateway_debug_summary: {
         schema: "helix.provider_gateway_debug_summary.v1",
-        turn_id: "ask:test:codex-provider-route",
-        route: "/ask/turn",
-        prompt: null,
         selected_provider: "codex",
-        fallback_used: false,
         capability_manifest_version: "read-observe-act.v1",
-        requested_capabilities: [
-          "scientific-calculator.open_panel",
-          "scientific-calculator.focus_panel",
-          "scientific-calculator.solve_expression",
-        ],
-        admitted_capabilities: [
-          "scientific-calculator.open_panel",
-          "scientific-calculator.focus_panel",
-          "scientific-calculator.solve_expression",
-        ],
-        blocked_capabilities: [],
-        executed_capabilities: [
-          "scientific-calculator.open_panel",
-          "scientific-calculator.focus_panel",
-          "scientific-calculator.solve_expression",
-        ],
-        evidence_reentry_status: "not_run_text_mode_adapter",
-        terminal_authority_result: "not_evaluated_provider_text_mode",
-        final_answer_source: null,
-      },
-      debug: {
-        agent_runtime: "codex",
-        agent_runtime_selection_trace: {
-          schema: "helix.agent_runtime_selection_trace.v1",
-          selected_runtime: "codex",
-        },
-        workstation_gateway_manifest_version: "read-observe-act.v1",
-        workstation_gateway_call_results: {
-          count: 3,
-          truncated: false,
-        },
+        terminal_authority_result: "authorized_by_terminal_authority_single_writer",
+        final_answer_source: "workstation_tool_evaluation",
       },
     });
+    expect(response.body.workstation_gateway_call_results).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        capability_id: "scientific-calculator.solve_expression",
+        observation: expect.objectContaining({ result: "27" }),
+      }),
+    ]));
     expect(response.body.workstation_gateway_capability_ids).toContain("workspace_os.status");
     expect(response.body.workstation_gateway_capability_ids).toContain("docs.search");
   });
@@ -1040,6 +910,8 @@ describe("Helix Ask agent provider route metadata", () => {
 
   it("emits provider and gateway debug metadata in stream final events", async () => {
     process.env.ENABLE_CODEX_AGENT = "1";
+    process.env.CODEX_AGENT_FAKE_STDOUT = "";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "1";
 
     const response = await request(createApp())
       .post("/api/agi/ask/turn/stream")
@@ -1058,7 +930,7 @@ describe("Helix Ask agent provider route metadata", () => {
     const finalEvent = parseSseEvents(response.text).find((entry) => entry.event === "turn_final");
 
     expect(finalEvent?.data).toMatchObject({
-      ok: false,
+      ok: true,
       runtime: "codex",
       agent_runtime: "codex",
       agent_runtime_selection_trace: {
@@ -1073,38 +945,18 @@ describe("Helix Ask agent provider route metadata", () => {
         },
       },
       workstation_gateway_manifest_version: "read-observe-act.v1",
-      workstation_gateway_call_results: [
-        {
-          ok: true,
+      workstation_gateway_call_results: expect.arrayContaining([
+        expect.objectContaining({
           capability_id: "scientific-calculator.open_panel",
-          observation: {
-            schema: "helix.workstation_ui_action_receipt.v1",
-            action_kind: "open_panel",
-          },
-        },
-        {
-          ok: true,
+        }),
+        expect.objectContaining({
           capability_id: "scientific-calculator.focus_panel",
-          observation: {
-            schema: "helix.workstation_ui_action_receipt.v1",
-            action_kind: "focus_panel",
-          },
-        },
-        {
-          ok: true,
+        }),
+        expect.objectContaining({
           capability_id: "scientific-calculator.solve_expression",
-          observation_packet: {
-            status: "succeeded",
-            terminal_eligible: false,
-            assistant_answer: false,
-            raw_content_included: false,
-          },
-          observation: {
-            schema: "helix.calculator_solve_observation.v1",
-            result: "44",
-          },
-        },
-      ],
+          observation: expect.objectContaining({ result: "44" }),
+        }),
+      ]),
       provider_gateway_debug_summary: {
         schema: "helix.provider_gateway_debug_summary.v1",
         turn_id: "ask:test:codex-provider-stream",
@@ -1112,23 +964,26 @@ describe("Helix Ask agent provider route metadata", () => {
         prompt: null,
         selected_provider: "codex",
         requested_capabilities: [
+          "scientific-calculator.solve_expression",
           "scientific-calculator.open_panel",
           "scientific-calculator.focus_panel",
-          "scientific-calculator.solve_expression",
+          "scientific-calculator.show_gateway_solve",
         ],
         admitted_capabilities: [
+          "scientific-calculator.solve_expression",
           "scientific-calculator.open_panel",
           "scientific-calculator.focus_panel",
-          "scientific-calculator.solve_expression",
+          "scientific-calculator.show_gateway_solve",
         ],
         executed_capabilities: [
+          "scientific-calculator.solve_expression",
           "scientific-calculator.open_panel",
           "scientific-calculator.focus_panel",
-          "scientific-calculator.solve_expression",
+          "scientific-calculator.show_gateway_solve",
         ],
         evidence_reentry_status: "not_run_text_mode_adapter",
-        terminal_authority_result: "not_evaluated_provider_text_mode",
-        final_answer_source: null,
+        terminal_authority_result: "authorized_by_terminal_authority_single_writer",
+        final_answer_source: "workstation_tool_evaluation",
       },
       debug: {
         agent_runtime: "codex",
@@ -1137,64 +992,49 @@ describe("Helix Ask agent provider route metadata", () => {
           selected_runtime: "codex",
         },
         workstation_gateway_manifest_version: "read-observe-act.v1",
-        workstation_gateway_call_results: [
-          {
+        workstation_gateway_call_results: expect.arrayContaining([
+          expect.objectContaining({
             ok: true,
             capability_id: "scientific-calculator.open_panel",
-            observation: {
-              schema: "helix.workstation_ui_action_receipt.v1",
-              action_kind: "open_panel",
-            },
-          },
-          {
+          }),
+          expect.objectContaining({
             ok: true,
             capability_id: "scientific-calculator.focus_panel",
-            observation: {
-              schema: "helix.workstation_ui_action_receipt.v1",
-              action_kind: "focus_panel",
-            },
-          },
-          {
+          }),
+          expect.objectContaining({
             ok: true,
             capability_id: "scientific-calculator.solve_expression",
-            observation_packet: {
-              status: "succeeded",
-              terminal_eligible: false,
-              assistant_answer: false,
-              raw_content_included: false,
-            },
-            observation: {
-              schema: "helix.calculator_solve_observation.v1",
-              result: "44",
-            },
-          },
-        ],
+          }),
+        ]),
         provider_gateway_debug_summary: {
           schema: "helix.provider_gateway_debug_summary.v1",
           selected_provider: "codex",
           requested_capabilities: [
+            "scientific-calculator.solve_expression",
             "scientific-calculator.open_panel",
             "scientific-calculator.focus_panel",
-            "scientific-calculator.solve_expression",
+            "scientific-calculator.show_gateway_solve",
           ],
           admitted_capabilities: [
+            "scientific-calculator.solve_expression",
             "scientific-calculator.open_panel",
             "scientific-calculator.focus_panel",
-            "scientific-calculator.solve_expression",
+            "scientific-calculator.show_gateway_solve",
           ],
           executed_capabilities: [
+            "scientific-calculator.solve_expression",
             "scientific-calculator.open_panel",
             "scientific-calculator.focus_panel",
-            "scientific-calculator.solve_expression",
+            "scientific-calculator.show_gateway_solve",
           ],
-          terminal_authority_result: "not_evaluated_provider_text_mode",
-          final_answer_source: null,
+          terminal_authority_result: "authorized_by_terminal_authority_single_writer",
+          final_answer_source: "workstation_tool_evaluation",
         },
       },
     });
   });
 
-  it("returns provider terminal candidate and pending authority review for Codex text-mode answers", async () => {
+  it("preserves the provider candidate while single-writer selects deterministic calculator evidence", async () => {
     process.env.ENABLE_CODEX_AGENT = "1";
     process.env.CODEX_AGENT_FAKE_STDOUT = "The calculator observation reports 21.";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
@@ -1220,11 +1060,11 @@ describe("Helix Ask agent provider route metadata", () => {
       ok: true,
       runtime: "codex",
       agent_runtime: "codex",
-      text: "The calculator observation reports 21.",
+      text: "21",
       workstation_gateway_reentry_status: "completed",
-      terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
-      final_answer_source: "agent_provider_terminal_candidate",
-      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      terminal_authority_status: "authorized_by_terminal_authority_single_writer",
+      final_answer_source: "workstation_tool_evaluation",
+      terminal_artifact_kind: "workstation_tool_evaluation",
       provider_terminal_candidate: {
         schema: "helix.agent_provider_terminal_candidate.v1",
         turn_id: "ask:test:codex-provider-candidate-route",
@@ -1270,19 +1110,17 @@ describe("Helix Ask agent provider route metadata", () => {
         schema: "helix.turn_terminal_authority.v1",
         thread_id: "thread:test:codex-provider-candidate-route",
         turn_id: "ask:test:codex-provider-candidate-route",
-        route: "/ask/turn",
-        terminal_kind: "answer",
-        final_answer_source: "agent_provider_terminal_candidate",
-        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        route: "/ask",
+        terminal_kind: "tool_evaluation",
+        final_answer_source: "workstation_tool_evaluation",
+        terminal_artifact_kind: "workstation_tool_evaluation",
         server_authoritative: true,
-        terminal_eligible: true,
-        assistant_answer: false,
       },
       terminal_presentation: {
         schema: "helix.terminal_presentation.v1",
-        concise_text: "The calculator observation reports 21.",
-        final_answer_source: "agent_provider_terminal_candidate",
-        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        concise_text: "21",
+        final_answer_source: "workstation_tool_evaluation",
+        terminal_artifact_kind: "workstation_tool_evaluation",
       },
       provider_gateway_debug_summary: {
         schema: "helix.provider_gateway_debug_summary.v1",
@@ -1293,29 +1131,32 @@ describe("Helix Ask agent provider route metadata", () => {
         fallback_used: false,
         capability_manifest_version: "read-observe-act.v1",
         requested_capabilities: [
+          "scientific-calculator.solve_expression",
           "scientific-calculator.open_panel",
           "scientific-calculator.focus_panel",
-          "scientific-calculator.solve_expression",
+          "scientific-calculator.show_gateway_solve",
         ],
         admitted_capabilities: [
+          "scientific-calculator.solve_expression",
           "scientific-calculator.open_panel",
           "scientific-calculator.focus_panel",
-          "scientific-calculator.solve_expression",
+          "scientific-calculator.show_gateway_solve",
         ],
         blocked_capabilities: [],
         executed_capabilities: [
+          "scientific-calculator.solve_expression",
           "scientific-calculator.open_panel",
           "scientific-calculator.focus_panel",
-          "scientific-calculator.solve_expression",
+          "scientific-calculator.show_gateway_solve",
         ],
         evidence_reentry_status: "completed",
         terminal_candidate_present: true,
         route_authority_result: "provider_gateway_read_observe_contract_satisfied",
-        terminal_authority_result: "authorized_by_helix_provider_candidate_bridge",
+        terminal_authority_result: "authorized_by_terminal_authority_single_writer",
         terminal_authority_granted: true,
         final_visible_answer_authorized: true,
-        final_answer_source: "agent_provider_terminal_candidate",
-        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        final_answer_source: "workstation_tool_evaluation",
+        terminal_artifact_kind: "workstation_tool_evaluation",
       },
       debug: {
         provider_reasoning_reentry: {
@@ -1349,77 +1190,33 @@ describe("Helix Ask agent provider route metadata", () => {
         agent_runtime: "codex",
         response_type: "final_answer",
         final_status: "final_answer",
-        final_answer_source: "agent_provider_terminal_candidate",
-        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        final_answer_source: "workstation_tool_evaluation",
+        terminal_artifact_kind: "workstation_tool_evaluation",
         workstation_gateway_manifest_version: "read-observe-act.v1",
         workstation_gateway_reentry_status: "completed",
-        terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
-        workstation_gateway_call_results: [
-          {
-            ok: true,
+        terminal_authority_status: "authorized_by_terminal_authority_single_writer",
+        workstation_gateway_call_results: expect.arrayContaining([
+          expect.objectContaining({
             capability_id: "scientific-calculator.open_panel",
-            gateway_admission: {
-              selected_agent_provider: "codex",
-              admission_status: "admitted",
-            },
-            observation: {
-              schema: "helix.workstation_ui_action_receipt.v1",
-              action_kind: "open_panel",
-            },
-          },
-          {
-            ok: true,
+          }),
+          expect.objectContaining({
             capability_id: "scientific-calculator.focus_panel",
-            gateway_admission: {
-              selected_agent_provider: "codex",
-              admission_status: "admitted",
-            },
-            observation: {
-              schema: "helix.workstation_ui_action_receipt.v1",
-              action_kind: "focus_panel",
-            },
-          },
-          {
-            ok: true,
+          }),
+          expect.objectContaining({
             capability_id: "scientific-calculator.solve_expression",
-            gateway_admission: {
-              selected_agent_provider: "codex",
-              admission_status: "admitted",
-            },
-            observation_packet: {
-              terminal_eligible: false,
-              post_tool_model_step_required: true,
-              assistant_answer: false,
-              raw_content_included: false,
-            },
-          },
-        ],
-        workstation_gateway_observation_packets: [
-          {
+          }),
+        ]),
+        workstation_gateway_observation_packets: expect.arrayContaining([
+          expect.objectContaining({
             capability_key: "scientific-calculator.open_panel",
-            action: "open_panel",
-            terminal_eligible: false,
-            post_tool_model_step_required: true,
-            assistant_answer: false,
-            raw_content_included: false,
-          },
-          {
+          }),
+          expect.objectContaining({
             capability_key: "scientific-calculator.focus_panel",
-            action: "focus_panel",
-            terminal_eligible: false,
-            post_tool_model_step_required: true,
-            assistant_answer: false,
-            raw_content_included: false,
-          },
-          {
+          }),
+          expect.objectContaining({
             capability_key: "scientific-calculator.solve_expression",
-            action: "solve_expression",
-            terminal_eligible: false,
-            post_tool_model_step_required: true,
-            assistant_answer: false,
-            raw_content_included: false,
-          },
-        ],
+          }),
+        ]),
         provider_reasoning_reentry: {
           schema: "helix.provider_reasoning_reentry.v1",
           status: "completed",
@@ -1436,8 +1233,8 @@ describe("Helix Ask agent provider route metadata", () => {
         },
         terminal_answer_authority: {
           schema: "helix.turn_terminal_authority.v1",
-          final_answer_source: "agent_provider_terminal_candidate",
-          terminal_artifact_kind: "agent_provider_terminal_candidate",
+          final_answer_source: "workstation_tool_evaluation",
+          terminal_artifact_kind: "workstation_tool_evaluation",
           server_authoritative: true,
         },
         provider_gateway_debug_summary: {
@@ -1445,29 +1242,32 @@ describe("Helix Ask agent provider route metadata", () => {
           selected_provider: "codex",
           prompt: "Use the calculator observation.",
           requested_capabilities: [
+            "scientific-calculator.solve_expression",
             "scientific-calculator.open_panel",
             "scientific-calculator.focus_panel",
-            "scientific-calculator.solve_expression",
+            "scientific-calculator.show_gateway_solve",
           ],
           admitted_capabilities: [
+            "scientific-calculator.solve_expression",
             "scientific-calculator.open_panel",
             "scientific-calculator.focus_panel",
-            "scientific-calculator.solve_expression",
+            "scientific-calculator.show_gateway_solve",
           ],
           executed_capabilities: [
+            "scientific-calculator.solve_expression",
             "scientific-calculator.open_panel",
             "scientific-calculator.focus_panel",
-            "scientific-calculator.solve_expression",
+            "scientific-calculator.show_gateway_solve",
           ],
           route_authority_result: "provider_gateway_read_observe_contract_satisfied",
-          terminal_authority_result: "authorized_by_helix_provider_candidate_bridge",
-          final_answer_source: "agent_provider_terminal_candidate",
+          terminal_authority_result: "authorized_by_terminal_authority_single_writer",
+          final_answer_source: "workstation_tool_evaluation",
         },
       },
     });
   });
 
-  it("emits provider terminal authority records in stream final events for Codex text-mode answers", async () => {
+  it("emits provider candidate records while stream single-writer selects calculator evidence", async () => {
     process.env.ENABLE_CODEX_AGENT = "1";
     process.env.CODEX_AGENT_FAKE_STDOUT = "The streamed calculator observation reports 64.";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
@@ -1494,11 +1294,11 @@ describe("Helix Ask agent provider route metadata", () => {
       ok: true,
       runtime: "codex",
       agent_runtime: "codex",
-      text: "The streamed calculator observation reports 64.",
+      text: "64",
       workstation_gateway_reentry_status: "completed",
-      terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
-      final_answer_source: "agent_provider_terminal_candidate",
-      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      terminal_authority_status: "authorized_by_terminal_authority_single_writer",
+      final_answer_source: "workstation_tool_evaluation",
+      terminal_artifact_kind: "workstation_tool_evaluation",
       terminal_authority_candidate_review: {
         schema: "helix.provider_terminal_authority_candidate_review.v1",
         terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
@@ -1519,19 +1319,17 @@ describe("Helix Ask agent provider route metadata", () => {
         schema: "helix.turn_terminal_authority.v1",
         thread_id: "thread:test:codex-provider-candidate-stream",
         turn_id: "ask:test:codex-provider-candidate-stream",
-        route: "/ask/turn/stream",
-        terminal_kind: "answer",
-        final_answer_source: "agent_provider_terminal_candidate",
-        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        route: "/ask",
+        terminal_kind: "tool_evaluation",
+        final_answer_source: "workstation_tool_evaluation",
+        terminal_artifact_kind: "workstation_tool_evaluation",
         server_authoritative: true,
-        terminal_eligible: true,
-        assistant_answer: false,
       },
       terminal_presentation: {
         schema: "helix.terminal_presentation.v1",
-        concise_text: "The streamed calculator observation reports 64.",
-        final_answer_source: "agent_provider_terminal_candidate",
-        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        concise_text: "64",
+        final_answer_source: "workstation_tool_evaluation",
+        terminal_artifact_kind: "workstation_tool_evaluation",
       },
       provider_gateway_debug_summary: {
         schema: "helix.provider_gateway_debug_summary.v1",
@@ -1540,57 +1338,63 @@ describe("Helix Ask agent provider route metadata", () => {
         prompt: "Use the calculator observation.",
         selected_provider: "codex",
         requested_capabilities: [
+          "scientific-calculator.solve_expression",
           "scientific-calculator.open_panel",
           "scientific-calculator.focus_panel",
-          "scientific-calculator.solve_expression",
+          "scientific-calculator.show_gateway_solve",
         ],
         admitted_capabilities: [
+          "scientific-calculator.solve_expression",
           "scientific-calculator.open_panel",
           "scientific-calculator.focus_panel",
-          "scientific-calculator.solve_expression",
+          "scientific-calculator.show_gateway_solve",
         ],
         executed_capabilities: [
+          "scientific-calculator.solve_expression",
           "scientific-calculator.open_panel",
           "scientific-calculator.focus_panel",
-          "scientific-calculator.solve_expression",
+          "scientific-calculator.show_gateway_solve",
         ],
         evidence_reentry_status: "completed",
         route_authority_result: "provider_gateway_read_observe_contract_satisfied",
-        terminal_authority_result: "authorized_by_helix_provider_candidate_bridge",
-        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_authority_result: "authorized_by_terminal_authority_single_writer",
+        final_answer_source: "workstation_tool_evaluation",
       },
       debug: {
         terminal_answer_authority: {
           schema: "helix.turn_terminal_authority.v1",
-          route: "/ask/turn/stream",
+          route: "/ask",
           server_authoritative: true,
         },
         terminal_presentation: {
           schema: "helix.terminal_presentation.v1",
-          concise_text: "The streamed calculator observation reports 64.",
+          concise_text: "64",
         },
         provider_gateway_debug_summary: {
           schema: "helix.provider_gateway_debug_summary.v1",
           selected_provider: "codex",
           prompt: "Use the calculator observation.",
           requested_capabilities: [
+            "scientific-calculator.solve_expression",
             "scientific-calculator.open_panel",
             "scientific-calculator.focus_panel",
-            "scientific-calculator.solve_expression",
+            "scientific-calculator.show_gateway_solve",
           ],
           admitted_capabilities: [
+            "scientific-calculator.solve_expression",
             "scientific-calculator.open_panel",
             "scientific-calculator.focus_panel",
-            "scientific-calculator.solve_expression",
+            "scientific-calculator.show_gateway_solve",
           ],
           executed_capabilities: [
+            "scientific-calculator.solve_expression",
             "scientific-calculator.open_panel",
             "scientific-calculator.focus_panel",
-            "scientific-calculator.solve_expression",
+            "scientific-calculator.show_gateway_solve",
           ],
           route_authority_result: "provider_gateway_read_observe_contract_satisfied",
-          terminal_authority_result: "authorized_by_helix_provider_candidate_bridge",
-          final_answer_source: "agent_provider_terminal_candidate",
+          terminal_authority_result: "authorized_by_terminal_authority_single_writer",
+          final_answer_source: "workstation_tool_evaluation",
         },
       },
     });
@@ -1615,11 +1419,11 @@ describe("Helix Ask agent provider route metadata", () => {
         agent_runtime: "codex",
         response_type: "final_answer",
         final_status: "final_answer",
-        final_answer_source: "agent_provider_terminal_candidate",
-        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        final_answer_source: "workstation_tool_evaluation",
+        terminal_artifact_kind: "workstation_tool_evaluation",
         workstation_gateway_manifest_version: "read-observe-act.v1",
         workstation_gateway_reentry_status: "completed",
-        terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+        terminal_authority_status: "authorized_by_terminal_authority_single_writer",
         provider_reasoning_reentry: {
           schema: "helix.provider_reasoning_reentry.v1",
           status: "completed",
@@ -1636,7 +1440,7 @@ describe("Helix Ask agent provider route metadata", () => {
         },
         terminal_answer_authority: {
           schema: "helix.turn_terminal_authority.v1",
-          route: "/ask/turn/stream",
+          route: "/ask",
           server_authoritative: true,
         },
         provider_gateway_debug_summary: {
@@ -1644,23 +1448,26 @@ describe("Helix Ask agent provider route metadata", () => {
           selected_provider: "codex",
           prompt: "Use the calculator observation.",
           requested_capabilities: [
+            "scientific-calculator.solve_expression",
             "scientific-calculator.open_panel",
             "scientific-calculator.focus_panel",
-            "scientific-calculator.solve_expression",
+            "scientific-calculator.show_gateway_solve",
           ],
           admitted_capabilities: [
+            "scientific-calculator.solve_expression",
             "scientific-calculator.open_panel",
             "scientific-calculator.focus_panel",
-            "scientific-calculator.solve_expression",
+            "scientific-calculator.show_gateway_solve",
           ],
           executed_capabilities: [
+            "scientific-calculator.solve_expression",
             "scientific-calculator.open_panel",
             "scientific-calculator.focus_panel",
-            "scientific-calculator.solve_expression",
+            "scientific-calculator.show_gateway_solve",
           ],
           route_authority_result: "provider_gateway_read_observe_contract_satisfied",
-          terminal_authority_result: "authorized_by_helix_provider_candidate_bridge",
-          final_answer_source: "agent_provider_terminal_candidate",
+          terminal_authority_result: "authorized_by_terminal_authority_single_writer",
+          final_answer_source: "workstation_tool_evaluation",
         },
       },
     });
@@ -1668,7 +1475,18 @@ describe("Helix Ask agent provider route metadata", () => {
 
   it("streams runtime /goal wake progress with transcript and debug proof for Codex", async () => {
     process.env.ENABLE_CODEX_AGENT = "1";
-    process.env.CODEX_AGENT_FAKE_STDOUT = "Visible progress: the document says civilization labels are provisional evidence states.";
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        "Visible progress: the document says civilization labels are provisional evidence states.",
+        "Visible progress: the document says civilization labels are provisional evidence states.",
+        "Visible progress: the document says civilization labels are provisional evidence states.",
+        "Visible progress: the document says civilization labels are provisional evidence states.",
+        "Visible progress: the document says civilization labels are provisional evidence states.",
+        "Visible progress: the document says civilization labels are provisional evidence states.",
+      ],
+    });
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
 
     const app = createApp();

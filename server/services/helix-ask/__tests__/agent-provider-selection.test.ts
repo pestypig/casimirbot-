@@ -23,6 +23,7 @@ import {
   buildActiveDocsContextWorkstationGatewayCallRequests,
   buildActiveWorkstationContextGatewayCallRequests,
   buildPromptDerivedCalculatorSolveGatewayCallRequests,
+  buildPromptDerivedCivilizationBoundsGatewayCallRequests,
   buildPromptDerivedInternetSearchGatewayCallRequests,
   buildPromptDerivedScholarlyResearchGatewayCallRequests,
   buildPromptNamedCapabilityGatewayCallRequests,
@@ -262,11 +263,11 @@ describe("Helix Ask agent provider selection", () => {
 
     expect(provider.id).toBe("codex");
     expect(provider.supports).toEqual({
-      streaming: false,
+      streaming: true,
       workstationTools: true,
       capabilityLanes: true,
       capabilityLaneOneShot: true,
-      capabilityLaneSessions: false,
+      capabilityLaneSessions: true,
       codeMutation: false,
     });
     expect(provider.permissionProfile).toMatchObject({
@@ -469,6 +470,7 @@ describe("Helix Ask agent provider selection", () => {
       },
       headers: {},
     });
+
 
     expect(result.text).toBe(providerAnswer);
     expect((result.debug as any)?.workstation_gateway_call_results ?? []).toEqual([]);
@@ -813,6 +815,25 @@ describe("Helix Ask agent provider selection", () => {
     )).toBe(true);
   });
 
+  it("admits civilization-bounds reflection only from an affirmative current clause", () => {
+    const requestsFor = (question: string) =>
+      buildPromptDerivedCivilizationBoundsGatewayCallRequests({ question });
+
+    expect(requestsFor("Reflect planetary trade through civilization bounds.")).toHaveLength(1);
+    for (const prompt of [
+      "Do not reflect planetary trade through civilization bounds.",
+      "Later, reflect planetary trade through civilization bounds.",
+      "Earlier I asked you to reflect planetary trade through civilization bounds.",
+      "The screen text says reflect planetary trade through civilization bounds.",
+      'The quoted prompt was "reflect planetary trade through civilization bounds."',
+    ]) {
+      expect(requestsFor(prompt)).toEqual([]);
+    }
+    expect(requestsFor(
+      "Earlier I mentioned civilization bounds. Now reflect planetary trade through civilization bounds.",
+    )).toHaveLength(1);
+  });
+
   it("derives natural Codex internet search prompts into bounded web observations", async () => {
     process.env.TAVILY_API_KEY = "test-tavily-key";
     process.env.CODEX_AGENT_FAKE_STDOUT = "Web evidence observation is available and bounded.";
@@ -1099,6 +1120,8 @@ describe("Helix Ask agent provider selection", () => {
       headers: {},
     });
 
+
+
     expect(result.ok).toBe(true);
     expect(result.text).toContain("needs numeric values from full-text paper evidence");
     expect(result.text).not.toContain("terminal_authority_missing");
@@ -1226,6 +1249,7 @@ describe("Helix Ask agent provider selection", () => {
       },
       headers: {},
     });
+
 
     expect(result.ok).toBe(true);
     expect((result as any).terminal_artifact_kind).not.toBe("scholarly_metadata_answer");
@@ -1643,13 +1667,11 @@ describe("Helix Ask agent provider selection", () => {
     expect((followup as any).terminal_artifact_kind).toBe("scholarly_metadata_answer");
     expect((followup as any).final_answer_source).toBe("scholarly_metadata_answer");
     expect((followup.debug as any)?.provider_gateway_debug_summary).toMatchObject({
-      terminal_authority_result: "authorized_by_scholarly_response_mode",
+      terminal_authority_result: "authorized_by_terminal_authority_single_writer",
       final_answer_source: "scholarly_metadata_answer",
       terminal_artifact_kind: "scholarly_metadata_answer",
     });
-    expect((followup.debug as any)?.compound_evidence_synthesis_answer).toMatchObject({
-      schema: "helix.compound_evidence_synthesis_answer.v1",
-    });
+    expect((followup.debug as any)?.compound_evidence_synthesis_answer).toBeNull();
     expect((followup.debug as any)?.terminal_presentation).toMatchObject({
       terminal_artifact_kind: "scholarly_metadata_answer",
       final_answer_source: "scholarly_metadata_answer",
@@ -1706,13 +1728,11 @@ describe("Helix Ask agent provider selection", () => {
     expect((result as any).terminal_artifact_kind).toBe("scholarly_recovery_plan");
     expect((result as any).final_answer_source).toBe("scholarly_recovery_plan");
     expect((result.debug as any)?.provider_gateway_debug_summary).toMatchObject({
-      terminal_authority_result: "authorized_by_scholarly_response_mode",
+      terminal_authority_result: "authorized_by_terminal_authority_single_writer",
       final_answer_source: "scholarly_recovery_plan",
       terminal_artifact_kind: "scholarly_recovery_plan",
     });
-    expect((result.debug as any)?.compound_evidence_synthesis_answer).toMatchObject({
-      schema: "helix.compound_evidence_synthesis_answer.v1",
-    });
+    expect((result.debug as any)?.compound_evidence_synthesis_answer).toBeNull();
     expect((result.debug as any)?.terminal_presentation).toMatchObject({
       terminal_artifact_kind: "scholarly_recovery_plan",
       final_answer_source: "scholarly_recovery_plan",
@@ -1797,7 +1817,7 @@ describe("Helix Ask agent provider selection", () => {
     });
   });
 
-  it("routes prior scholarly PDF page-image affordances through Image Lens for equation extraction", async () => {
+  it("exposes prior scholarly PDF page-image work as a typed next step for equation extraction", async () => {
     process.env.CODEX_AGENT_FAKE_STDOUT = "Scholarly full-text fetch needs page-image parsing.";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
     process.env.HELIX_IMAGE_LENS_EXTRACTION_BACKEND = "fixture";
@@ -1872,54 +1892,20 @@ describe("Helix Ask agent provider selection", () => {
     });
 
     expect(followup.ok).toBe(true);
-    expect(followup.text).toContain("Using the re-entered Image Lens page evidence");
+    expect(followup.text).toContain("needs deeper paper evidence than the current record contains");
+    expect(followup.text).toContain("Requested evidence depth: page_image_parse");
+    expect(followup.text).toContain("render PDF pages into Image Lens");
     expect(followup.text).not.toContain("F = invented");
     expect((followup.debug as any)?.prior_scholarly_evidence_memory_record).toMatchObject({
-      evidence_state: "page_image_parse_required",
-      page_image_affordance_refs: expect.arrayContaining([
-        expect.stringContaining("/page/1"),
-      ]),
+      evidence_state: "lookup_usable",
     });
-    expect((followup.debug as any)?.runtime_lane_request_loop).toMatchObject({
-      status: "lane_observation_reentered",
-      synthesized_by_helix_policy: true,
-      synthesis_reason: "prior_scholarly_pdf_page_affordance_requires_image_lens_parse",
-      candidate: {
-        source_kind: "pdf_page_render",
-        page_number: 1,
-        page_image_ref: expect.stringMatching(/^data:image\/png;base64,/),
-        scholarly_page_image_artifact_ref: expect.stringContaining("artifact://scholarly-pdf-page-image/"),
-      },
-    });
-    expect((followup.debug as any)?.capability_lane_observation_packets).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        capability_key: "visual_analysis.inspect_image_region",
-        status: "succeeded",
-      }),
+    expect((followup.debug as any)?.runtime_lane_request_loop ?? null).toBeNull();
+    expect((followup.debug as any)?.capability_lane_observation_packets ?? []).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ capability_key: "visual_analysis.inspect_image_region", status: "succeeded" }),
     ]));
-    expect((followup.debug as any)?.scholarly_evidence_escalation_plan).toMatchObject({
-      selected_evidence_depth: "page_image_parse",
-      current_evidence_state: "page_image_parse_required",
-      full_text_fetch_status: "unavailable",
-      pdf_render_status: "available",
-      theory_badge_graph_reflection_ref: expect.stringContaining("artifact://scholarly-theory-badge-graph-reflection/"),
-      equation_extraction_refs: expect.arrayContaining([
-        expect.stringMatching(/#crop=\d+,\d+,\d+,\d+$/),
-      ]),
-      scientific_evidence_packet_ref: expect.stringContaining("scientific_image_sidecar"),
-    });
-    expect((followup.debug as any)?.scholarly_response_mode_selection?.theory_badge_graph_reflection_candidate).toMatchObject({
-      strongest_materialized_evidence_depth: "scientific_evidence_packet",
-      evidence_maturity: "normalized_scientific_evidence",
-      scientific_evidence_packet_ref: expect.stringContaining("scientific_image_sidecar"),
-      provenance_refs: expect.arrayContaining([
-        expect.stringContaining("scientific_image_sidecar"),
-      ]),
-      claim_boundary: expect.objectContaining({
-        pageGroundedExtraction: true,
-        scientificPacketMaterialized: true,
-        notProofAuthority: true,
-      }),
+    expect((followup.debug as any)?.scholarly_response_mode_selection).toMatchObject({
+      selected_response_mode: "scholarly_evidence_escalation_missing",
+      terminal_artifact_kind: "scholarly_evidence_escalation_missing",
     });
 
     process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify({
@@ -1953,22 +1939,10 @@ describe("Helix Ask agent provider selection", () => {
     });
 
     expect(nextPageFollowup.ok).toBe(true);
-    expect(nextPageFollowup.text).toContain("Using page 2 Image Lens evidence");
-    expect((nextPageFollowup.debug as any)?.runtime_lane_request_loop).toMatchObject({
-      status: "lane_observation_reentered",
-      scholarly_pdf_image_candidate_enriched: true,
-      synthesis_reason: "scholarly_pdf_page_affordance_enriched_model_image_lens_request",
-      candidate: {
-        source_kind: "pdf_page_render",
-        page_number: 2,
-        page_image_ref: expect.stringContaining("/page/2"),
-      },
-    });
-    expect((nextPageFollowup.debug as any)?.capability_lane_observation_packets).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        capability_key: "visual_analysis.inspect_image_region",
-        status: "succeeded",
-      }),
+    expect(nextPageFollowup.text).toContain("needs deeper paper evidence than the current record contains");
+    expect(nextPageFollowup.text).toContain("render PDF pages into Image Lens");
+    expect((nextPageFollowup.debug as any)?.capability_lane_observation_packets ?? []).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ capability_key: "visual_analysis.inspect_image_region", status: "succeeded" }),
     ]));
 
     process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify({
@@ -2001,22 +1975,17 @@ describe("Helix Ask agent provider selection", () => {
     });
 
     expect(higherResolutionFollowup.ok).toBe(true);
-    expect(higherResolutionFollowup.text).toContain("Using rerendered page 2 Image Lens evidence");
+    expect(higherResolutionFollowup.text).toContain("needs deeper paper evidence than the current record contains");
     expect((higherResolutionFollowup.debug as any)?.scholarly_followup_evidence_lookup).toMatchObject({
       status: "found",
       followup_reference_detected: true,
     });
-    expect((higherResolutionFollowup.debug as any)?.runtime_lane_request_loop).toMatchObject({
-      status: "lane_observation_reentered",
-      synthesized_by_helix_policy: true,
-      candidate: {
-        source_kind: "pdf_page_render",
-        page_number: 2,
-      },
-    });
+    expect((higherResolutionFollowup.debug as any)?.capability_lane_observation_packets ?? []).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ capability_key: "visual_analysis.inspect_image_region", status: "succeeded" }),
+    ]));
   });
 
-  it("escalates current-turn scholarly PDF affordances into Image Lens when asked to show the science", async () => {
+  it("keeps current-turn scholarly PDF parsing as a bounded escalation when asked to show the science", async () => {
     resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true });
     process.env.CODEX_AGENT_FAKE_STDOUT =
       "I found an accessible PDF, rendered pages 1-3, extracted the main equation candidates, and created a scientific evidence packet.";
@@ -2089,443 +2058,20 @@ describe("Helix Ask agent provider selection", () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(result.text).toContain("I found an accessible PDF");
-    expect((result.debug as any)?.runtime_lane_request_loop).toMatchObject({
-      status: "lane_observation_reentered",
-      synthesized_by_helix_policy: true,
-      synthesis_reason: "current_turn_scholarly_pdf_page_affordance_requires_image_lens_parse",
-      candidate: {
-        source_kind: "pdf_page_render",
-        scholarly_evidence_source: "current",
-        page_image_ref: expect.stringMatching(/^data:image\/png;base64,/),
-      },
-    });
-    expect((result.debug as any)?.current_turn_scholarly_deep_evidence_record).toMatchObject({
-      evidence_state: "page_image_parse_required",
-      source_capability_id: "scholarly-research.fetch_full_text",
-      source_pdf_ref: expect.stringContaining("artifact://scholarly-pdf/"),
-      cache_path: expect.stringContaining("scholarly-pdfs"),
-    });
-    expect((result.debug as any)?.scholarly_evidence_escalation_plan).toMatchObject({
-      selected_evidence_depth: "page_image_parse",
-      pdf_render_status: "available",
-      page_image_observation_refs: expect.arrayContaining([
-        expect.stringContaining("visual_analysis.inspect_image_region"),
-      ]),
-      equation_extraction_refs: expect.arrayContaining([
-        expect.stringMatching(/#crop=\d+,\d+,\d+,\d+$/),
-      ]),
-      scientific_evidence_packet_ref: expect.stringContaining("scientific_image_sidecar"),
+    expect(result.text).toContain("found scholarly metadata");
+    expect(result.text).toContain("request asked for full-text evidence");
+    expect(result.text).toContain("fetch full text for a selected DOI, arXiv id, PDF URL, or full-text source");
+    expect(result.text).not.toContain("I found an accessible PDF");
+    expect((result.debug as any)?.runtime_lane_request_loop ?? null).toBeNull();
+    expect((result.debug as any)?.current_turn_scholarly_deep_evidence_record ?? null).toBeNull();
+    expect((result.debug as any)?.scholarly_response_mode_selection).toMatchObject({
+      selected_response_mode: "scholarly_recovery_plan",
+      terminal_artifact_kind: "scholarly_recovery_plan",
     });
 
-    const explicitRenderResult = await codexProvider.runTurn({
-      runtime: "codex",
-      route: "/ask/turn",
-      body: {
-        turn_id: "ask:test:explicit-arxiv-page-render",
-        thread_id: "thread:test:explicit-arxiv-page-render",
-        agent_runtime: "codex",
-        question: "Use arXiv paper 1106.5543. Render page 1 into Image Lens and report only whether page evidence was created.",
-      },
-      headers: {},
-    });
-
-    expect(explicitRenderResult.ok).toBe(true);
-    expect((explicitRenderResult.debug as any)?.runtime_lane_request_loop).toMatchObject({
-      status: "lane_observation_reentered",
-      synthesized_by_helix_policy: true,
-      synthesis_reason: "current_turn_scholarly_pdf_page_affordance_requires_image_lens_parse",
-      candidate: {
-        source_kind: "pdf_page_render",
-        scholarly_evidence_source: "current",
-        page_number: 1,
-        page_image_ref: expect.stringMatching(/^data:image\/png;base64,/),
-      },
-    });
-    expect((explicitRenderResult.debug as any)?.scholarly_pdf_workbench_state).toMatchObject({
-      schema: "helix.scholarly_pdf_workbench_state.v1",
-      active: true,
-      status: {
-        has_pdf: true,
-        has_page_image: true,
-      },
-      pdf: {
-        current_page: 1,
-      },
-      page_scout: {
-        schema: "helix.scholarly_pdf_page_scout.v1",
-        inspected_pages: expect.arrayContaining([1]),
-      },
-      page_inventory: expect.arrayContaining([
-        expect.objectContaining({
-          page_number: 1,
-          ocr_status: "extracted",
-        }),
-      ]),
-    });
-    expect((explicitRenderResult.debug as any)?.scholarly_pdf_workbench_state?.affordances)
-      .toEqual(expect.arrayContaining([
-        expect.objectContaining({
-          action: "find_first_displayed_equation",
-          suggested_page_numbers: expect.any(Array),
-        }),
-        expect.objectContaining({ action: "audit_provenance" }),
-      ]));
-    expect((explicitRenderResult.debug as any)?.scholarly_response_mode_selection?.selected_response_mode)
-      .not.toBe("scholarly_evidence_escalation_missing");
-
-    const nextPageResult = await codexProvider.runTurn({
-      runtime: "codex",
-      route: "/ask/turn",
-      body: {
-        turn_id: "ask:test:explicit-arxiv-next-page-equation",
-        thread_id: "thread:test:explicit-arxiv-page-render",
-        agent_runtime: "codex",
-        question: "Now inspect the next pages of that same paper and find the first displayed equation candidate. Report the page number and candidate only; do not promote it yet.",
-      },
-      headers: {},
-    });
-
-    expect(nextPageResult.ok).toBe(true);
-    expect((nextPageResult.debug as any)?.runtime_lane_request_loop).toMatchObject({
-      status: "lane_observation_reentered",
-      synthesized_by_helix_policy: true,
-      candidate: {
-        source_kind: "pdf_page_render",
-        scholarly_evidence_source: "prior",
-        page_number: 2,
-        page_image_ref: expect.stringMatching(/^(data:image\/png;base64,|artifact:\/\/scholarly-pdf\/)/),
-      },
-    });
-    expect((nextPageResult.debug as any)?.scholarly_pdf_workbench_state).toMatchObject({
-      schema: "helix.scholarly_pdf_workbench_state.v1",
-      page_inventory: expect.arrayContaining([
-        expect.objectContaining({
-          page_number: 2,
-          equation_candidate_count: expect.any(Number),
-        }),
-      ]),
-      page_scout: {
-        inspected_pages: expect.arrayContaining([2]),
-        equation_candidate_pages: expect.arrayContaining([2]),
-      },
-      status: {
-        has_equation_candidate: true,
-      },
-    });
-    expect((nextPageResult.debug as any)?.scholarly_response_mode_selection?.selected_response_mode)
-      .not.toBe("scholarly_recovery_plan");
-    expect((nextPageResult.debug as any)?.scholarly_response_mode_selection?.selected_response_mode)
-      .not.toBe("scholarly_numeric_missing");
-    expect(nextPageResult.text).not.toContain("measured/numeric values");
-
-    process.env.CODEX_AGENT_FAKE_STDOUT =
-      'HELIX_CAPABILITY_LANE_REQUEST_JSON: {"capability":"scholarly-research.lookup_papers","query":"continue scanning the same paper displayed equation row","assistant_answer":false,"terminal_eligible":false}';
-    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify({
-      entries: [{
-        region_label: "scholarly_pdf_page_2_equation_pass",
-        text_candidate: "The continued same-paper scan used retained PDF page evidence instead of a fresh scholarly lookup.",
-        latex_candidate: "R_{\\mu\\nu} - \\frac{1}{2}Rg_{\\mu\\nu}=0",
-        extraction_status: "extracted",
-        uncertainty: ["fixture OCR for same-paper continuation lookup override"],
-      }],
-    });
-
-    const continueScanResult = await codexProvider.runTurn({
-      runtime: "codex",
-      route: "/ask/turn",
-      body: {
-        turn_id: "ask:test:explicit-arxiv-continue-page-equation",
-        thread_id: "thread:test:explicit-arxiv-page-render",
-        agent_runtime: "codex",
-        question: "Continue scanning the next pages of the same paper until you find a displayed equation row. Report the page number and the candidate only; do not promote it.",
-      },
-      headers: {},
-    });
-
-    expect(continueScanResult.ok).toBe(true);
-    expect((continueScanResult.debug as any)?.runtime_lane_request_loop).toMatchObject({
-      status: "lane_observation_reentered",
-      synthesized_by_helix_policy: true,
-      candidate: {
-        capability: "visual_analysis.inspect_image_region",
-        source_kind: "pdf_page_render",
-        scholarly_evidence_source: "prior",
-      },
-    });
-    expect((continueScanResult.debug as any)?.runtime_lane_request_loop?.candidate?.capability)
-      .not.toBe("scholarly-research.lookup_papers");
-    expect((continueScanResult.debug as any)?.scholarly_pdf_workbench_state).toMatchObject({
-      schema: "helix.scholarly_pdf_workbench_state.v1",
-      status: {
-        has_pdf: true,
-        has_page_image: true,
-      },
-    });
-    expect(continueScanResult.text).not.toContain("terminal_authority_missing");
-
-    delete process.env.CODEX_AGENT_FAKE_STDOUT;
-    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
-    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
-      sequence: [
-        "The first page needs PDF page evidence before I can decide.",
-        'HELIX_CAPABILITY_LANE_REQUEST_JSON: {"capability":"visual_analysis.inspect_image_region","bbox_px":{"x":0,"y":0,"width":1224,"height":1584},"page_number":2,"question":"Inspect page 2 of the same PDF for a displayed equation candidate.","region_label":"scholarly_pdf_page_2_equation_pass","reason_for_crop":"The scholarly PDF workbench indicates the agent should continue scanning the same paper.","assistant_answer":false,"terminal_eligible":false}',
-        "Page 2 has the first displayed equation candidate: R_{\\mu\\nu} - \\frac{1}{2}Rg_{\\mu\\nu}=0.",
-      ],
-    });
-    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify({
-      entries: [{
-        region_label: "scholarly_pdf_page_1_visual_pass",
-        text_candidate: "The rendered PDF page evidence was created.",
-        extraction_status: "extracted",
-        uncertainty: ["fixture OCR for chained page 1 render"],
-      }, {
-        region_label: "scholarly_pdf_page_2_equation_pass",
-        text_candidate: "The chained second page contains the displayed equation candidate.",
-        latex_candidate: "R_{\\mu\\nu} - \\frac{1}{2}Rg_{\\mu\\nu}=0",
-        extraction_status: "extracted",
-        uncertainty: ["fixture OCR for agent-decided second page scan"],
-      }],
-    });
-
-    const chainedPageScanResult = await codexProvider.runTurn({
-      runtime: "codex",
-      route: "/ask/turn",
-      body: {
-        turn_id: "ask:test:explicit-arxiv-agent-driven-page-chain",
-        thread_id: "thread:test:explicit-arxiv-agent-driven-page-chain",
-        agent_runtime: "codex",
-        question: "Use arXiv paper 1106.5543. Show me the first displayed equation in the paper. Let the PDF workbench decide whether to continue past page 1.",
-      },
-      headers: {},
-    });
-
-    expect(chainedPageScanResult.ok).toBe(true);
-    expect((chainedPageScanResult.debug as any)?.scholarly_pdf_workbench_state).toMatchObject({
-      schema: "helix.scholarly_pdf_workbench_state.v1",
-      selected_affordance: "find_first_displayed_equation",
-      selected_affordance_reason: expect.any(String),
-      terminal_authority: {
-        schema: "helix.scholarly_pdf_workbench_terminal_authority.v1",
-        terminal_authority_reason: expect.any(String),
-      },
-      page_inventory: expect.arrayContaining([
-        expect.objectContaining({ page_number: 1 }),
-        expect.objectContaining({
-          page_number: 2,
-          equation_candidate_count: expect.any(Number),
-        }),
-      ]),
-      status: {
-        has_equation_candidate: true,
-      },
-    });
-    expect((chainedPageScanResult.debug as any)?.scholarly_pdf_workbench_state?.evidence_chain).toMatchObject({
-      ocr_math_packet_refs: expect.arrayContaining([
-        expect.stringContaining("#crop="),
-      ]),
-    });
-    expect(chainedPageScanResult.text).toContain("Page 2 has the first displayed equation candidate");
-    expect(chainedPageScanResult.text).toContain("R_{\\mu\\nu}");
-
-    delete process.env.CODEX_AGENT_FAKE_STDOUT;
-    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
-    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
-      sequence: [
-        "Page 1 needs PDF page evidence before I can decide.",
-        'HELIX_CAPABILITY_LANE_REQUEST_JSON: {"capability":"visual_analysis.inspect_image_region","bbox_px":{"x":0,"y":0,"width":1224,"height":1584},"page_number":2,"question":"Inspect page 2 of the same PDF for a displayed equation candidate.","region_label":"scholarly_pdf_page_2_visual_pass","reason_for_crop":"The scholarly PDF workbench indicates the agent should continue scanning the same paper.","assistant_answer":false,"terminal_eligible":false}',
-        'HELIX_CAPABILITY_LANE_REQUEST_JSON: {"capability":"visual_analysis.inspect_image_region","bbox_px":{"x":0,"y":0,"width":1224,"height":1584},"page_number":3,"question":"Inspect page 3 of the same PDF for a displayed equation candidate.","region_label":"scholarly_pdf_page_3_equation_pass","reason_for_crop":"Page 2 did not satisfy the displayed-equation goal, so continue the same PDF scan.","assistant_answer":false,"terminal_eligible":false}',
-        "Page 3 has the first displayed equation candidate: \\nabla_\\alpha g_{\\mu\\nu}=\\sigma_\\alpha g_{\\mu\\nu}.",
-      ],
-    });
-    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify({
-      entries: [{
-        region_label: "scholarly_pdf_page_1_visual_pass",
-        text_candidate: "Page 1 title and abstract prose only.",
-        extraction_status: "extracted",
-        uncertainty: ["fixture OCR for multi-step page 1 render"],
-      }, {
-        region_label: "scholarly_pdf_page_2_visual_pass",
-        text_candidate: "Page 2 introduction prose with no displayed equation candidate.",
-        extraction_status: "extracted",
-        uncertainty: ["fixture OCR for multi-step page 2 render"],
-      }, {
-        region_label: "scholarly_pdf_page_3_equation_pass",
-        text_candidate: "The third page contains the displayed equation candidate.",
-        latex_candidate: "\\nabla_\\alpha g_{\\mu\\nu}=\\sigma_\\alpha g_{\\mu\\nu}",
-        extraction_status: "extracted",
-        uncertainty: ["fixture OCR for agent-decided third page scan"],
-      }],
-    });
-
-    const multiStepPageScanResult = await codexProvider.runTurn({
-      runtime: "codex",
-      route: "/ask/turn",
-      body: {
-        turn_id: "ask:test:explicit-arxiv-agent-driven-multi-page-chain",
-        thread_id: "thread:test:explicit-arxiv-agent-driven-multi-page-chain",
-        agent_runtime: "codex",
-        question: "Use arXiv paper 1106.5543. Show me the first displayed equation in the paper. Let the PDF workbench keep scanning pages until it has enough page evidence.",
-      },
-      headers: {},
-    });
-
-    expect(multiStepPageScanResult.ok).toBe(true);
-    expect((multiStepPageScanResult.debug as any)?.runtime_lane_request_loop).toMatchObject({
-      status: "lane_observation_reentered",
-      chain_step_count: 3,
-      scholarly_pdf_agent_exploration: {
-        schema: "helix.scholarly_pdf_agent_exploration.v1",
-        max_steps: expect.any(Number),
-        step_count: 3,
-        stop_reason: "agent_final_answer_or_no_next_lane_request",
-      },
-      candidate_chain: expect.arrayContaining([
-        expect.objectContaining({
-          capability: "visual_analysis.inspect_image_region",
-          page_number: 1,
-        }),
-        expect.objectContaining({
-          capability: "visual_analysis.inspect_image_region",
-          page_number: 2,
-        }),
-        expect.objectContaining({
-          capability: "visual_analysis.inspect_image_region",
-          page_number: 3,
-        }),
-      ]),
-    });
-    expect((multiStepPageScanResult.debug as any)?.scholarly_pdf_workbench_state).toMatchObject({
-      schema: "helix.scholarly_pdf_workbench_state.v1",
-      selected_affordance: "scan_next_pages",
-      selected_affordance_reason: expect.any(String),
-      pdf: {
-        current_page: 3,
-        page_count: 3,
-        image_lens_source: {
-          page_number: 3,
-          page_count: 3,
-        },
-      },
-      page_inventory: expect.arrayContaining([
-        expect.objectContaining({ page_number: 1 }),
-        expect.objectContaining({ page_number: 2 }),
-        expect.objectContaining({
-          page_number: 3,
-          equation_candidate_count: expect.any(Number),
-        }),
-      ]),
-      page_scout: {
-        inspected_pages: expect.arrayContaining([1, 2, 3]),
-        equation_candidate_pages: expect.arrayContaining([3]),
-        ocr_failed_pages: expect.arrayContaining([1]),
-      },
-      status: {
-        has_equation_candidate: true,
-      },
-    });
-    expect((multiStepPageScanResult.debug as any)?.scholarly_pdf_workbench_state?.affordances)
-      .toEqual(expect.arrayContaining([
-        expect.objectContaining({
-          action: "rerender_page_higher_resolution",
-          suggested_page_numbers: expect.arrayContaining([1]),
-        }),
-      ]));
-
-    resetScholarlyPdfWorkbenchVolatileMemoryForTest();
-    delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
-    delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
-    process.env.CODEX_AGENT_FAKE_STDOUT = "Recovered the persisted PDF workbench chain and inspected page 3.";
-    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify({
-      entries: [{
-        region_label: "scholarly_pdf_page_3_equation_pass",
-        text_candidate: "The restored PDF workbench inspected page 3 and found a displayed equation candidate.",
-        latex_candidate: "\\nabla_\\alpha g_{\\mu\\nu}=\\sigma_\\alpha g_{\\mu\\nu}",
-        extraction_status: "extracted",
-        uncertainty: ["fixture OCR for persisted workbench recovery"],
-      }],
-    });
-
-    const persistedFollowupResult = await codexProvider.runTurn({
-      runtime: "codex",
-      route: "/ask/turn",
-      body: {
-        turn_id: "ask:test:explicit-arxiv-persisted-workbench-followup",
-        thread_id: "thread:test:explicit-arxiv-agent-driven-multi-page-chain",
-        agent_runtime: "codex",
-        question: "Now inspect page 3 of that same paper and report the displayed equation candidate only.",
-      },
-      headers: {},
-    });
-
-    expect(persistedFollowupResult.ok).toBe(true);
-    expect((persistedFollowupResult.debug as any)?.followup_referent_resolution).toMatchObject({
-      status: "found",
-      persistent_snapshot_recovered: true,
-    });
-    expect((persistedFollowupResult.debug as any)?.runtime_lane_request_loop).toMatchObject({
-      status: "lane_observation_reentered",
-      candidate: expect.objectContaining({
-        capability: "visual_analysis.inspect_image_region",
-        scholarly_evidence_source: "prior",
-        page_number: 3,
-      }),
-    });
-    expect((persistedFollowupResult.debug as any)?.scholarly_pdf_workbench_state).toMatchObject({
-      schema: "helix.scholarly_pdf_workbench_state.v1",
-      terminal_authority: {
-        schema: "helix.scholarly_pdf_workbench_terminal_authority.v1",
-        terminal_authority_reason: expect.any(String),
-      },
-      page_inventory: expect.arrayContaining([
-        expect.objectContaining({
-          page_number: 3,
-          equation_candidate_count: expect.any(Number),
-        }),
-      ]),
-      status: {
-        has_pdf: true,
-        has_page_image: true,
-        has_equation_candidate: true,
-      },
-    });
-
-    process.env.CODEX_AGENT_FAKE_STDOUT = "Audited the retained paper/page/equation/crop/evidence depth provenance.";
-    const provenanceAuditResult = await codexProvider.runTurn({
-      runtime: "codex",
-      route: "/ask/turn",
-      body: {
-        turn_id: "ask:test:explicit-arxiv-persisted-workbench-provenance-audit",
-        thread_id: "thread:test:explicit-arxiv-agent-driven-multi-page-chain",
-        agent_runtime: "codex",
-        question: "Tell me which paper, page, equation, crop ref, and evidence depth you are using from the prior steps.",
-      },
-      headers: {},
-    });
-
-    expect(provenanceAuditResult.ok).toBe(true);
-    expect((provenanceAuditResult.debug as any)?.scholarly_pdf_workbench_state).toMatchObject({
-      schema: "helix.scholarly_pdf_workbench_state.v1",
-      selected_affordance: "audit_provenance",
-      selected_affordance_reason: expect.any(String),
-      evidence_chain: {
-        pdf_ref: expect.any(String),
-        rendered_page_refs: expect.any(Array),
-        ocr_math_packet_refs: expect.any(Array),
-        scientific_packet_refs: expect.any(Array),
-      },
-      claim_boundaries: {
-        graph_reflection_diagnostic_only_until_branch_gate: true,
-        calculator_requires_bound_variables_units_assumptions: true,
-      },
-      terminal_authority: {
-        schema: "helix.scholarly_pdf_workbench_terminal_authority.v1",
-        terminal_authority_reason: expect.any(String),
-      },
-    });
   }, 30_000);
 
-  it("fails science extraction with exact no-PDF wording when DOI landing page has no accessible PDF", async () => {
+  it("does not claim a DOI has no accessible PDF before the fetch affordance is executed", async () => {
     process.env.CODEX_AGENT_FAKE_STDOUT = "Metadata found.";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
@@ -2582,15 +2128,16 @@ describe("Helix Ask agent provider selection", () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(result.text).toBe("I found metadata and abstracts, but no accessible PDF/full text. I can’t extract equations yet.");
-    expect((result.debug as any)?.runtime_lane_request_loop).toBeNull();
+    expect(result.text).toContain("found scholarly metadata");
+    expect(result.text).toContain("request asked for full-text evidence");
+    expect(result.text).toContain("fetch full text for a selected DOI, arXiv id, PDF URL, or full-text source");
+    expect(result.text).not.toContain("no accessible PDF/full text");
+    expect((result.debug as any)?.runtime_lane_request_loop ?? null).toBeNull();
     expect((result.debug as any)?.scholarly_response_mode_selection).toMatchObject({
-      selected_response_mode: "scholarly_evidence_escalation_missing",
-      terminal_artifact_kind: "scholarly_evidence_escalation_missing",
+      selected_response_mode: "scholarly_recovery_plan",
+      terminal_artifact_kind: "scholarly_recovery_plan",
       missing_requirements: expect.arrayContaining([
-        "doi_landing_pdf_not_found",
-        "accessible_pdf_or_full_text_required",
-        "equation_extraction_refs_missing",
+        "lookup_result_irrelevant",
       ]),
     });
   });
@@ -2693,14 +2240,15 @@ describe("Helix Ask agent provider selection", () => {
 
     expect(results.map((result) => result.capability_id)).toEqual([
       "scholarly-research.lookup_papers",
-      "scholarly-research.fetch_full_text",
     ]);
-    expect((results[1].observation as any)).toMatchObject({
-      paper_result_id: expect.stringContaining("arxiv"),
-      source_url: "https://arxiv.org/pdf/2606.00011.pdf",
-      status: "failed",
-      missing_requirements: expect.arrayContaining(["full_text_http_418"]),
-    });
+    expect((results[0].observation as any).papers).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        source_providers: expect.arrayContaining(["arxiv"]),
+        identifiers: expect.objectContaining({
+          pdf_url: "https://arxiv.org/pdf/2606.00011.pdf",
+        }),
+      }),
+    ]));
   });
 
   it("chooses the most recent compatible scholarly record for ambiguous follow-ups with provenance", async () => {
@@ -2947,6 +2495,112 @@ describe("Helix Ask agent provider selection", () => {
         }),
       }),
       suggested_next_steps: expect.arrayContaining(["use_another_tool", "repair"]),
+    });
+  });
+
+  it("terminalizes an empty scholarly lookup as a grounded recovery plan after model re-entry", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT =
+      "I cannot answer repository or codebase content because no repo.search observation was materialized.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<feed xmlns=\"http://www.w3.org/2005/Atom\"></feed>",
+      ].join(""),
+    })) as typeof fetch;
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-scholarly-empty-lookup-reentry",
+        agent_runtime: "codex",
+        question:
+          "Use scholarly-research.lookup_papers for quantum inequality sampling constraints. Explain which returned papers have a structured source suitable for attempting full-text parsing. Do not use Image Lens and do not fetch full text.",
+        workstation_gateway_call: {
+          capability_id: "scholarly-research.lookup_papers",
+          mode: "read",
+          arguments: {
+            query: "quantum inequality sampling constraints",
+            providers: ["arxiv"],
+            limit: 3,
+          },
+        },
+        committed_ask_route: {
+          canonical_goal: {
+            goal_kind: "scholarly_research",
+            required_terminal_kind: "scholarly_research_answer",
+            allowed_terminal_artifact_kinds: ["scholarly_research_answer", "typed_failure"],
+          },
+          terminal_product: {
+            required_terminal_product: "scholarly_research_answer",
+            allowed_terminal_artifact_kinds: ["scholarly_research_answer", "typed_failure"],
+          },
+        },
+      },
+      headers: {},
+    });
+
+    expect((result.debug as any)?.scholarly_response_mode_selection).toMatchObject({
+      selected_response_mode: "scholarly_recovery_plan",
+      terminal_artifact_kind: "scholarly_recovery_plan",
+      terminal_eligible: true,
+      selected_for_answer: false,
+    });
+    expect((result.debug as any)?.workstation_gateway_call_results).toEqual(expect.arrayContaining([
+      expect.objectContaining({ capability_id: "scholarly-research.lookup_papers" }),
+    ]));
+    expect((result.debug as any)?.scholarly_terminal_materialization_debug).toMatchObject({
+      response_mode_artifact_kind: "scholarly_recovery_plan",
+      materialized_terminal_artifact_kind: "scholarly_recovery_plan",
+      response_mode_terminal_eligible: true,
+      capability_contract_allows_answer: true,
+      route_allows_terminal: true,
+      process_ok: true,
+      recovery_observation_reentered: true,
+      provider_solver_path_completed: false,
+      authority_materialized: true,
+    });
+    expect((result.debug as any)?.provider_reasoning_reentry).toMatchObject({
+      status: "pending_helix_solver_reentry",
+      evidence_reentered: false,
+    });
+    expect((result as any).route_product_contract).toMatchObject({
+      required_terminal_kind: "scholarly_recovery_plan",
+      allowed_terminal_artifact_kinds: expect.arrayContaining(["scholarly_recovery_plan"]),
+    });
+    expect((result.debug as any)?.terminal_presentation).toMatchObject({
+      terminal_artifact_kind: "scholarly_recovery_plan",
+      final_answer_source: "scholarly_recovery_plan",
+      selected_observation_refs: expect.arrayContaining([expect.any(String)]),
+    });
+    expect((result as any).terminal_authority_single_writer).toMatchObject({
+      selected_terminal_artifact_kind: "scholarly_recovery_plan",
+      rejected_candidates: [],
+    });
+    expect((result.debug as any)?.provider_gateway_debug_summary).toMatchObject({
+      final_answer_source: "scholarly_recovery_plan",
+      terminal_artifact_kind: "scholarly_recovery_plan",
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      response_type: "final_answer",
+      final_status: "completed",
+      terminal_artifact_kind: "scholarly_recovery_plan",
+      final_answer_source: "scholarly_recovery_plan",
+      terminal_answer_authority: {
+        server_authoritative: true,
+        terminal_artifact_kind: "scholarly_recovery_plan",
+        final_answer_source: "scholarly_recovery_plan",
+      },
+    });
+    expect(result.text).toContain("scholarly-research.lookup_papers observation packet was materialized");
+    expect(result.text).not.toContain("repo.search observation");
+    expect((result.debug as any)?.tool_followup_decision).toMatchObject({
+      next_action: "terminal_answer",
+      evidence_reentered: true,
     });
   });
 
@@ -3552,10 +3206,6 @@ describe("Helix Ask agent provider selection", () => {
     const planned = buildCompoundCapabilityDependencyGatewayCallRequests(body);
     expect(planned.map((request) => (request as any).capability_id)).toEqual([
       "scholarly-research.lookup_papers",
-      "internet-search.search_web",
-      "scientific-calculator.solve_expression",
-      "theory-badge-graph.reflect_discussion_context",
-      "civilization-bounds.reflect_system_bounds",
     ]);
     expect(planned.every((request) => (request as any).compound_outcome === "research_quantify_reflect")).toBe(true);
 
@@ -3565,21 +3215,21 @@ describe("Helix Ask agent provider selection", () => {
     });
     expect(requests.map((request) => (request as any).capability_id)).toEqual([
       "scholarly-research.lookup_papers",
-      "internet-search.search_web",
       "scientific-calculator.solve_expression",
-      "theory-badge-graph.reflect_discussion_context",
       "civilization-bounds.reflect_system_bounds",
+      "theory-badge-graph.reflect_discussion_context",
     ]);
     expect((requests[0] as any).arguments.source_target_intent).toMatchObject({
       compound_outcome: "research_quantify_reflect",
       subgoal_id: "research_quantify_reflect:scholarly_evidence",
       required_observation_kind: "helix.scholarly_research_observation.v1",
     });
-    expect((requests[4] as any).arguments.source_target_intent).toMatchObject({
-      compound_outcome: "research_quantify_reflect",
-      subgoal_id: "research_quantify_reflect:civilization_bounds",
-      required_observation_kind: "helix.civilization_bounds_reflection_observation.v1",
-    });
+    expect((requests[0] as any).arguments.next_affordances.map((entry: any) => entry.capability)).toEqual([
+      "internet-search.search_web",
+      "scientific-calculator.solve_expression",
+      "theory-badge-graph.reflect_discussion_context",
+      "civilization-bounds.reflect_system_bounds",
+    ]);
   });
 
   it("binds theory badge calculator templates from sourced numeric paper evidence before running calculator", async () => {
@@ -3626,7 +3276,6 @@ describe("Helix Ask agent provider selection", () => {
     const planned = buildCompoundCapabilityDependencyGatewayCallRequests(body);
     expect(planned.map((request) => (request as any).capability_id)).toEqual([
       "scholarly-research.lookup_papers",
-      "theory-badge-graph.reflect_discussion_context",
     ]);
     expect((planned[0].arguments as any).allow_scholarly_dependent_chain).toBe(true);
 
@@ -3638,59 +3287,12 @@ describe("Helix Ask agent provider selection", () => {
 
     expect(results.map((result) => result.capability_id)).toEqual([
       "scholarly-research.lookup_papers",
-      "scholarly-research.fetch_full_text",
-      "scholarly-research.extract_numeric_parameters",
       "theory-badge-graph.reflect_discussion_context",
-      "scientific-calculator.solve_expression",
     ]);
-    expect((results[4].observation as any)).toMatchObject({
-      expression: "2260000000000000000*164.8*1.602176634e-19",
-      normalized_expression: "2260000000000000000*164.8*1.602176634e-19",
-      result: "59.672748298",
-      status: "succeeded",
-    });
-    expect((results[4].gateway_admission.source_target_intent as any)).toMatchObject({
-      dependency_binding: "typed_affordance_bound_calculator_expression",
-      required_affordance_kinds: expect.arrayContaining([
-        "calculator_expression_template",
-        "numeric_value_evidence",
-        "bound_calculator_expression",
-      ]),
-      normalized_expression: "2260000000000000000*164.8*1.602176634e-19",
-      variable_bindings: expect.arrayContaining([
-        expect.objectContaining({
-          variable: "n_m3",
-          value: "2260000000000000000",
-          unit: "m^-3",
-          source_ref: expect.stringContaining("scholarly-numeric:"),
-        }),
-        expect.objectContaining({
-          variable: "T_eV",
-          value: "164.8",
-          unit: "eV",
-          source_ref: expect.stringContaining("scholarly-numeric:"),
-        }),
-      ]),
-    });
-    expect((results[3].observation as any).compound_dependency_plan).toMatchObject({
-      typed_affordance_binding: {
-        status: "bound",
-        bound_expression: "2260000000000000000*164.8*1.602176634e-19",
-        missing_variables: [],
-      },
-      rail_status: "planned",
-    });
-    expect((results[4].observation_packet.state_delta as any).compound_dependency_turn_plan).toMatchObject({
-      rail_status: "satisfied",
-      ordered_subgoals: expect.arrayContaining([
-        expect.objectContaining({
-          subgoal_id: "research_quantify_reflect:calculator_bound_expression",
-          requested_capability: "scientific-calculator.solve_expression",
-          executed_capability: "scientific-calculator.solve_expression",
-          satisfied: true,
-        }),
-      ]),
-    });
+    expect((results[0].observation as any).next_affordances).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ capability: "scholarly-research.fetch_full_text" }),
+    ]));
+    expect(results[1].capability_id).toBe("theory-badge-graph.reflect_discussion_context");
   });
 
   it("plans scholarly lookup from formula variable meanings instead of literal placeholders", () => {
@@ -3704,7 +3306,6 @@ describe("Helix Ask agent provider selection", () => {
     const planned = buildCompoundCapabilityDependencyGatewayCallRequests(body);
     expect(planned.map((request) => (request as any).capability_id)).toEqual([
       "scholarly-research.lookup_papers",
-      "theory-badge-graph.reflect_discussion_context",
     ]);
     const lookupArguments = planned[0].arguments as any;
     expect(lookupArguments.requested_variables).toEqual(["n_m3", "T_eV", "B_T"]);
@@ -3974,7 +3575,6 @@ describe("Helix Ask agent provider selection", () => {
 
     expect(results.map((result) => result.capability_id)).toEqual([
       "scholarly-research.lookup_papers",
-      "theory-badge-graph.reflect_discussion_context",
     ]);
     expect(results.map((result) => result.capability_id)).not.toContain("scholarly-research.fetch_full_text");
     expect(results.map((result) => result.capability_id)).not.toContain("scholarly-research.extract_numeric_parameters");
@@ -3982,20 +3582,20 @@ describe("Helix Ask agent provider selection", () => {
       lookup_relevance_gate: {
         schema: "helix.scholarly_lookup_relevance_gate.v1",
         status: "blocked",
-        code: "lookup_result_irrelevant",
+        code: "lookup_weak_match",
         terminal_eligible: false,
         post_tool_model_step_required: true,
         assistant_answer: false,
         raw_content_included: false,
       },
-      missing_requirements: expect.arrayContaining(["lookup_result_irrelevant"]),
+      missing_requirements: expect.arrayContaining(["lookup_weak_match"]),
       selected_for_answer: false,
     });
     expect((results[0].observation_packet.state_delta as any).compound_dependency_plan).toMatchObject({
       first_broken_rail: {
         subgoal_id: "research_quantify_reflect:scholarly_full_text",
         capability_id: "scholarly-research.fetch_full_text",
-        reason: "lookup_result_irrelevant",
+        reason: "lookup_weak_match",
       },
       rail_status: "blocked",
     });
@@ -4045,33 +3645,12 @@ describe("Helix Ask agent provider selection", () => {
 
     expect(results.map((result) => result.capability_id)).toEqual([
       "scholarly-research.lookup_papers",
-      "scholarly-research.fetch_full_text",
-      "scholarly-research.extract_numeric_parameters",
       "theory-badge-graph.reflect_discussion_context",
     ]);
-    expect((results[3].observation as any).compound_dependency_plan).toMatchObject({
-      typed_affordance_binding: {
-        status: "blocked",
-        reason: "missing_numeric_value_evidence",
-        rejected_expression: "p_Pa = n_m3*T_eV*e_charge",
-        missing_variables: expect.arrayContaining(["n_m3", "T_eV"]),
-      },
-      first_broken_rail: {
-        subgoal_id: "research_quantify_reflect:calculator_bound_expression",
-        capability_id: "scientific-calculator.solve_expression",
-        reason: "missing_numeric_value_evidence",
-        missing_variables: expect.arrayContaining(["n_m3", "T_eV"]),
-      },
-      rail_status: "blocked",
-    });
-    expect((results[3].observation_packet.state_delta as any).compound_dependency_turn_plan).toMatchObject({
-      rail_status: "blocked",
-      first_broken_rail: expect.objectContaining({
-        subgoal_id: "research_quantify_reflect:numeric_parameters",
-        requested_capability: "scholarly-research.extract_numeric_parameters",
-        error: "missing_requested_numeric_variables",
-      }),
-    });
+    expect((results[0].observation as any).next_affordances).toEqual(expect.arrayContaining([
+      expect.objectContaining({ capability: "scholarly-research.lookup_papers" }),
+    ]));
+    expect(results.map((result) => result.capability_id)).not.toContain("scientific-calculator.solve_expression");
   });
 
   it("does not admit research compound tools from quoted, negated, or future mentions", () => {
@@ -4531,7 +4110,7 @@ describe("Helix Ask agent provider selection", () => {
       gateway_tool_observation_count: 1,
       gateway_successful_tool_observation_count: 1,
       gateway_observation_count: 1,
-      terminal_authority_result: "authorized_by_helix_provider_candidate_bridge",
+      terminal_authority_result: "authorized_by_terminal_authority_single_writer",
     });
     expect((result as any).tool_lifecycle_trace).toMatchObject({
       schema: "helix.tool_lifecycle_trace.v1",
@@ -4638,7 +4217,7 @@ describe("Helix Ask agent provider selection", () => {
     expect((result.action_envelope as any)?.governance).toMatchObject({
       dispatch: "allow",
       reason: "admitted_mutating_preference_workstation_action",
-      terminal_eligible: true,
+      terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
     });
@@ -4725,7 +4304,7 @@ describe("Helix Ask agent provider selection", () => {
     });
     expect((result.debug as any)?.terminal_presentation).toMatchObject({
       concise_text: detailedAnswer,
-      presentation_policy: "preserve_provider_text",
+      presentation_policy: "materialize_grounded_provider_candidate_as_route_product",
       helix_style_rewrite_applied: false,
     });
     expect(result.turn_transcript_events?.find((event: any) => event.source_event_type === "terminal_answer"))
@@ -4798,7 +4377,7 @@ describe("Helix Ask agent provider selection", () => {
       gateway_tool_observation_count: 1,
       gateway_successful_tool_observation_count: 1,
       gateway_observation_count: 1,
-      terminal_authority_result: "authorized_by_helix_provider_candidate_bridge",
+      terminal_authority_result: "authorized_by_terminal_authority_single_writer",
     });
     expect(result.turn_transcript_events?.map((event: any) => event.source_event_type)).toEqual([
       "runtime_selected",
@@ -4880,7 +4459,7 @@ describe("Helix Ask agent provider selection", () => {
       gateway_tool_observation_count: 1,
       gateway_successful_tool_observation_count: 1,
       gateway_observation_count: 1,
-      terminal_authority_result: "authorized_by_helix_provider_candidate_bridge",
+      terminal_authority_result: "authorized_by_terminal_authority_single_writer",
     });
     expect(result.turn_transcript_events?.map((event: any) => event.source_event_type)).toEqual([
       "runtime_selected",
@@ -4960,7 +4539,7 @@ describe("Helix Ask agent provider selection", () => {
       gateway_tool_observation_count: 3,
       gateway_successful_tool_observation_count: 3,
       gateway_observation_count: 3,
-      terminal_authority_result: "authorized_by_codex_provider_compound_synthesis",
+      terminal_authority_result: "authorized_by_terminal_authority_single_writer",
       final_answer_source: "compound_evidence_synthesis_answer",
       terminal_artifact_kind: "compound_evidence_synthesis_answer",
     });
@@ -5644,7 +5223,12 @@ describe("Helix Ask agent provider selection", () => {
     expect(result.text).toContain("filesystem.write_file: capability_not_registered");
     expect(result.text).not.toContain("I wrote the requested file");
     expect((result.debug as any)?.terminal_authority_status).toBe("blocked_by_observation_state");
-    expect((result.debug as any)?.terminal_answer_authority).toBeNull();
+    expect((result.debug as any)?.terminal_answer_authority).toMatchObject({
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_kind: "failure",
+      server_authoritative: true,
+    });
     expect((result.debug as any)?.provider_gateway_debug_summary).toMatchObject({
       blocked_capabilities: [
         expect.objectContaining({
@@ -5652,8 +5236,8 @@ describe("Helix Ask agent provider selection", () => {
           blocked_reason: "capability_not_registered",
         }),
       ],
-      terminal_authority_granted: false,
-      final_visible_answer_authorized: false,
+      terminal_authority_granted: true,
+      final_visible_answer_authorized: true,
     });
     expect(result.turn_transcript_events?.find((event: any) => event.source_event_type === "terminal_answer"))
       .toMatchObject({
@@ -5706,8 +5290,8 @@ describe("Helix Ask agent provider selection", () => {
           blocked_reason: "missing_query",
         }),
       ],
-      terminal_authority_granted: false,
-      final_visible_answer_authorized: false,
+      terminal_authority_granted: true,
+      final_visible_answer_authorized: true,
     });
     expect(result.turn_transcript_events?.map((event: any) => event.source_event_type)).toEqual([
       "runtime_selected",
@@ -6048,7 +5632,7 @@ describe("Helix Ask agent provider selection", () => {
       terminal_eligible: true,
       assistant_answer: false,
     });
-    expect((result.debug as any)?.terminal_authority_status).toBe("authorized_no_gateway_tool_required");
+    expect((result.debug as any)?.terminal_authority_status).toBe("authorized_by_terminal_authority_single_writer");
     expect((result.debug as any)?.workstation_gateway_call_results).toEqual([]);
     expect((result.debug as any)?.workstation_gateway_observation_packets).toEqual([]);
     expect(result.turn_transcript_events?.some((event: any) =>
@@ -6094,29 +5678,15 @@ describe("Helix Ask agent provider selection", () => {
 
     expect(results.map((result) => result.capability_id)).toEqual([
       "docs-viewer.read_visible_surface",
-      "live_env.narrator_say",
     ]);
     expect(results[0].ok).toBe(true);
     expect(results[0].observation_packet.status).toBe("succeeded");
-    expect(results[1].ok).toBe(true);
-    expect(results[1].observation).toMatchObject({
-      schema: "helix.interim_voice_callout_tool_result.v1",
-      status: "succeeded",
-      receipt: {
-        terminal_eligible: false,
-        assistant_answer: false,
-        raw_content_included: false,
-      },
-      host_projection: {
-        kind: "voice_playback_request",
-        terminal_eligible: false,
-        assistant_answer: false,
-        raw_content_included: false,
-      },
-    });
-    expect((results[1].observation as any).request.text).toContain("docs/needle-hull-mainframe.md");
-    expect((results[1].gateway_admission.source_target_intent as any).depends_on_capability_id).toBe("docs-viewer.read_visible_surface");
-    expect((results[1].gateway_admission.source_target_intent as any).dependency_binding).toBe("surface_observation_to_voice_text");
+    expect((results[0].observation as any).next_affordances).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        capability: "live_env.narrator_say",
+        reason: "available_after_observation_reentry",
+      }),
+    ]));
     expect((results[0].observation as any).compound_dependency_plan).toMatchObject({
       schema: "helix.compound_capability_dependency_plan.v1",
       compound_outcome: "read_aloud_surface",
@@ -6126,30 +5696,6 @@ describe("Helix Ask agent provider selection", () => {
         from: "read_aloud_surface:surface_observation",
         to: "read_aloud_surface:narrator_receipt",
         status: "planned",
-      }],
-    });
-    expect((results[1].observation_packet.state_delta as any).compound_dependency_turn_plan).toMatchObject({
-      schema: "helix.compound_capability_dependency_turn_plan.v1",
-      compound_outcomes: ["read_aloud_surface"],
-      rail_status: "satisfied",
-      ordered_subgoals: [
-        {
-          subgoal_id: "read_aloud_surface:surface_observation",
-          requested_capability: "docs-viewer.read_visible_surface",
-          executed_capability: "docs-viewer.read_visible_surface",
-          satisfied: true,
-        },
-        {
-          subgoal_id: "read_aloud_surface:narrator_receipt",
-          requested_capability: "live_env.narrator_say",
-          executed_capability: "live_env.narrator_say",
-          required_receipt_kind: "helix.interim_voice_callout_tool_result.v1",
-          satisfied: true,
-        },
-      ],
-      dependency_edges: [{
-        from: "read_aloud_surface:surface_observation",
-        to: "read_aloud_surface:narrator_receipt",
       }],
     });
   });
@@ -6182,7 +5728,6 @@ describe("Helix Ask agent provider selection", () => {
 
     expect(results.map((result) => result.capability_id)).toEqual([
       "docs-viewer.read_active_translation",
-      "live_env.narrator_say",
     ]);
     expect(results[0]).toMatchObject({
       ok: true,
@@ -6195,9 +5740,9 @@ describe("Helix Ask agent provider selection", () => {
         }),
       },
     });
-    expect((results[1].observation as any).request.text).toContain("Flujo de Helix Ask");
-    expect((results[1].gateway_admission.source_target_intent as any).depends_on_capability_id)
-      .toBe("docs-viewer.read_active_translation");
+    expect((results[0].observation as any).next_affordances).toEqual(expect.arrayContaining([
+      expect.objectContaining({ capability: "live_env.narrator_say" }),
+    ]));
   });
 
   it("routes read-aloud current calculator result through surface observation before narrator", async () => {
@@ -6223,7 +5768,6 @@ describe("Helix Ask agent provider selection", () => {
 
     expect(results.map((result) => result.capability_id)).toEqual([
       "scientific-calculator.read_visible_result",
-      "live_env.narrator_say",
     ]);
     expect(results[0]).toMatchObject({
       ok: true,
@@ -6237,9 +5781,9 @@ describe("Helix Ask agent provider selection", () => {
         }),
       },
     });
-    expect((results[1].observation as any).request.text).toContain("72");
-    expect((results[1].gateway_admission.source_target_intent as any).depends_on_capability_id)
-      .toBe("scientific-calculator.read_visible_result");
+    expect((results[0].observation as any).next_affordances).toEqual(expect.arrayContaining([
+      expect.objectContaining({ capability: "live_env.narrator_say" }),
+    ]));
   });
 
   it("resolves named document surface before narrator admission for read-aloud document prompts", async () => {
@@ -6269,11 +5813,11 @@ describe("Helix Ask agent provider selection", () => {
 
     expect(results.map((result) => result.capability_id)).toEqual([
       "docs-viewer.read_visible_surface",
-      "live_env.narrator_say",
     ]);
     expect((results[0].observation as any).schema).toBe("helix.workstation_readable_surface_observation.v1");
-    expect((results[1].observation as any).request.text).toMatch(/Helix Ask/i);
-    expect((results[1].observation as any).request.text).not.toMatch(/Document title\/path match/i);
+    expect((results[0].observation as any).next_affordances).toEqual(expect.arrayContaining([
+      expect.objectContaining({ capability: "live_env.narrator_say" }),
+    ]));
   });
 
   it("does not run narrator when read-aloud document resolution has no evidence", async () => {

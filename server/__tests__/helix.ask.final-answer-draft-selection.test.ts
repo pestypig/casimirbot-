@@ -279,6 +279,142 @@ const addMoralGraphRuntimeProof = (payload: Record<string, unknown>, observation
 };
 
 describe("final_answer_draft terminal selection", () => {
+  it("materializes a grounded capability-catalog draft as capability_help_summary", () => {
+    const turnId = "ask:test:capability-help-draft-materialization";
+    const registryRef = `${turnId}:capability_registry`;
+    const draftRef = `${turnId}:final_answer_draft`;
+    const answerText = [
+      "The research-paper workflow checks candidate relevance and available metadata before full-text retrieval.",
+      "scholarly-research.fetch_full_text establishes parseability, and Image Lens is used selectively for visual page evidence.",
+    ].join("\n");
+    const contract = {
+      schema: "helix.route_product_contract.v1",
+      source_target: "runtime_evidence",
+      allowed_terminal_artifact_kinds: ["capability_help_summary", "typed_failure"],
+      forbidden_terminal_artifact_kinds: ["model_synthesized_answer", "direct_answer_text"],
+    };
+    const artifacts = [
+      {
+        artifact_id: registryRef,
+        kind: "capability_registry",
+        payload: {
+          schema: "helix.capability_registry.v1",
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+      },
+      {
+        artifact_id: draftRef,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          kind: "final_answer_draft",
+          text: answerText,
+          support_refs: [registryRef],
+          artifact_refs: [registryRef],
+          authority: "llm_post_observation_composer",
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      active_prompt:
+        "Does your research-paper tool choose parseable papers before using Image Lens? Answer from the capability contract.",
+      canonical_goal_frame: {
+        goal_kind: "capability_help",
+        required_terminal_kind: "capability_help_summary",
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      capability_plan: {
+        selected_capability: "helix_ask.inspect_capability_catalog",
+      },
+      agent_step_decision: {
+        chosen_capability: "model.direct_answer",
+        next_step: "answer",
+        decision_timing: "post_observation",
+        decision_authority: "llm",
+      },
+      agent_runtime_loop: {
+        executed_tool_call_count: 0,
+        iterations: [{
+          chosen_capability: "model.direct_answer",
+          next_step: "answer",
+          decision_timing: "post_observation",
+          decision_authority: "llm",
+          observation_role: "model_answer_draft",
+        }],
+      },
+      tool_turn_chain_audit: {
+        rail_status: "fail_closed",
+        rail_failure_code: "terminal_not_materialized",
+        first_broken_rail: "terminal_materialization",
+        repair_target: "terminal_materializer",
+        selected_capability: "helix_ask.inspect_capability_catalog",
+        executed_capability: "helix_ask.inspect_capability_catalog",
+      },
+      route_product_contract: contract,
+      current_turn_artifact_ledger: artifacts,
+      terminal_error_code: "terminal_not_materialized",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      selected_final_answer: answerText.slice(0, 240),
+      typed_failure: {
+        error_code: "terminal_not_materialized",
+        message: answerText,
+        text: answerText.slice(0, 240),
+      },
+    };
+
+    const result = materializeFinalAnswerDraftTerminal({
+      turnId,
+      payload,
+      artifactLedger: artifacts,
+      routeProductContract: contract,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      materialized_terminal_artifact_kind: "capability_help_summary",
+      materialized_terminal_artifact_ref: `${turnId}:capability_help_summary:from_final_answer_draft`,
+    });
+    expect(payload.capability_help_summary).toMatchObject({
+      schema: "helix.capability_help_summary.v1",
+      text: answerText,
+      answer_text: answerText,
+      support_refs: expect.arrayContaining([registryRef]),
+      terminal_eligible: true,
+    });
+    expect(artifacts).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        artifact_id: `${turnId}:capability_help_summary:from_final_answer_draft`,
+        kind: "capability_help_summary",
+      }),
+    ]));
+
+    const terminal = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+    expect(terminal.selected_terminal_artifact_kind).toBe("capability_help_summary");
+    expect(terminal.visible_text).toBe(answerText);
+    expect(payload).toMatchObject({
+      terminal_artifact_kind: "capability_help_summary",
+      final_answer_source: "capability_help_summary",
+      selected_final_answer: answerText,
+      terminal_presentation: {
+        terminal_artifact_kind: "capability_help_summary",
+        concise_text: answerText,
+      },
+    });
+    expect(payload.typed_failure).toBeUndefined();
+  });
   it("materializes capability help summary from a runtime capability registry observation", () => {
     const turnId = "ask:test:catalog-observation-materializes-help";
     const registryRef = `${turnId}:capability_registry`;

@@ -1636,6 +1636,229 @@
       }
     },
     {
+      "id": "familiarity-anonymity-balance",
+      "slug": "familiarity-anonymity-balance",
+      "title": "Familiarity-Anonymity Balance",
+      "excerpt": "Repeated familiarity may support patience while anonymity may protect privacy and fresh starts; neither establishes moral superiority.",
+      "bodyMD": "Settlement density is context, not a moral verdict. Repeated contact can support reciprocal memory and repair, but can also enable gatekeeping or permanent reputation. Anonymity can weaken personal context, but can also protect privacy, plural association, and fresh starts.\n\nAnti-pattern: treating rural density as virtue, urban density as distrust, familiarity as proof, or anonymity as disposability.\n\nMinimal artifact: Familiarity-Anonymity Field with repeated contact, network overlap, newcomer access, privacy and exit options, service alternatives, and institutional reach.",
+      "tags": [
+        "trust",
+        "familiarity",
+        "anonymity",
+        "density",
+        "privacy",
+        "balance"
+      ],
+      "aliases": [
+        "density is context",
+        "repeated contact",
+        "network overlap",
+        "newcomer access",
+        "fresh start"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "interdependence-yin-yang-balance"
+        },
+        {
+          "rel": "see-also",
+          "to": "recognition-before-transcendence"
+        },
+        {
+          "rel": "see-also",
+          "to": "inherited-conditioning-check"
+        }
+      ],
+      "references": [
+        {
+          "kind": "doc",
+          "title": "Ideology Graph",
+          "path": "docs/ethos/ideology.json"
+        }
+      ],
+      "summary": "Repeated familiarity may support patience while anonymity may protect privacy and fresh starts; neither establishes moral superiority.",
+      "proceduralLanguage": {
+        "pattern": "Density, familiarity, anonymity, or local reputation is being used to explain trust.",
+        "move": "Separate density from repeated contact, network overlap, newcomer access, privacy, alternatives, and institutional reach.",
+        "missingCheck": "Which observed mechanism, rather than settlement density itself, is carrying trust or exclusion?",
+        "antiPattern": "Treating familiarity or anonymity as proof of moral quality."
+      }
+    },
+    {
+      "id": "trust-medium-translation",
+      "slug": "trust-medium-translation",
+      "title": "Trust-Medium Translation",
+      "excerpt": "Identify how trust moves among familiarity, reputation, contracts, records, law, and public institutions.",
+      "bodyMD": "As coordination scales beyond repeated personal familiarity, trust changes medium. Contracts, records, money, law, and institutions do not remove trust; they relocate it into standards, provenance, settlement, enforcement, correction, and appeal.\n\nAnti-pattern: treating contracts as moral character, institutions as trustless, personal familiarity as high-stakes proof, or financial records as total reputation.\n\nMinimal artifact: Trust Translation Note naming the source channel, destination channel, dependency scope, translation loss, and fallback or appeal path.",
+      "tags": [
+        "trust",
+        "translation",
+        "institution",
+        "contract",
+        "reputation",
+        "balance"
+      ],
+      "aliases": [
+        "trust medium",
+        "trust channel",
+        "relational trust",
+        "institutional trust",
+        "community reputation"
+      ],
+      "children": [
+        "domain-bounded-accountability"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "fairness-due-process-and-justification"
+        },
+        {
+          "rel": "see-also",
+          "to": "interbeing-systems"
+        },
+        {
+          "rel": "see-also",
+          "to": "external-interface-integrity"
+        }
+      ],
+      "references": [
+        {
+          "kind": "doc",
+          "title": "Ideology Graph",
+          "path": "docs/ethos/ideology.json"
+        }
+      ],
+      "summary": "Identify how trust moves among familiarity, reputation, contracts, records, law, and public institutions.",
+      "proceduralLanguage": {
+        "pattern": "Trust is moving from a relational channel into a formal record, contract, threshold, or institution.",
+        "move": "Name what the new medium preserves, what context it loses, and what contestability replaces that loss.",
+        "missingCheck": "Where did trust change medium, and what correction or appeal path remains?",
+        "antiPattern": "Treating a formal trust channel as a complete judgment of human worth."
+      }
+    },
+    {
+      "id": "domain-bounded-accountability",
+      "slug": "domain-bounded-accountability",
+      "title": "Domain-Bounded Accountability",
+      "excerpt": "Accountability evidence applies only to the observed domain, exposure, parties, and time period.",
+      "bodyMD": "A witness, contract record, repair record, or financial history may support a narrow claim inside the domain where it was observed. It cannot establish universal trustworthiness or moral worth. Evidentiary weight depends on direct exposure, provenance, time, dispute state, and correction or repair history.\n\nAnti-pattern: credit as moral worth, prestige as truth, references as global character, or cross-domain trust totalization.\n\nMinimal artifact: Domain-Bounded Trust Receipt with domain, observer exposure, time window, provenance, dispute state, and repair history.",
+      "tags": [
+        "trust",
+        "accountability",
+        "evidence",
+        "provenance",
+        "time_window",
+        "anti_totalization"
+      ],
+      "aliases": [
+        "domain bounded trust",
+        "observer exposure",
+        "witness exposure",
+        "accountability domain",
+        "financial record is not moral worth"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "trust-medium-translation"
+        },
+        {
+          "rel": "see-also",
+          "to": "data-dignity"
+        },
+        {
+          "rel": "see-also",
+          "to": "provenance-protocol"
+        },
+        {
+          "rel": "see-also",
+          "to": "goalpost-integrity"
+        },
+        {
+          "rel": "see-also",
+          "to": "financial-fog-warning"
+        }
+      ],
+      "references": [
+        {
+          "kind": "doc",
+          "title": "Ideology Graph",
+          "path": "docs/ethos/ideology.json"
+        }
+      ],
+      "summary": "Accountability evidence applies only to the observed domain, exposure, parties, and time period.",
+      "proceduralLanguage": {
+        "pattern": "A bounded performance record or witness statement is being generalized into broad trust or character.",
+        "move": "Restrict the claim to the observed domain, exposure, parties, provenance, and time window.",
+        "missingCheck": "What did this evidence directly observe, and what domains remain unsupported?",
+        "antiPattern": "Converting a narrow record into universal trustworthiness or human worth."
+      }
+    },
+    {
+      "id": "contestable-reentry-threshold",
+      "slug": "contestable-reentry-threshold",
+      "title": "Contestable Re-entry Threshold",
+      "excerpt": "Consequential exclusion requires visible criteria, reasons, appeal, repair, review, and a possible re-entry state.",
+      "bodyMD": "An access decision must remain a bounded decision, not become a permanent identity. Legitimate thresholds expose their purpose, criteria, evidence, reasons, appeal path, repair or re-entry path, review date, and retention limit.\n\nAnti-pattern: permanent reject identity, opaque denial, unappealable scores, or stale-record exclusion.\n\nMinimal artifact: Re-entry Threshold Receipt with published criteria, decision reason, supporting evidence, appeal, repair, review, and sunset conditions.",
+      "tags": [
+        "trust",
+        "threshold",
+        "appeal",
+        "repair",
+        "reentry",
+        "due_process",
+        "action_gate"
+      ],
+      "aliases": [
+        "reentry threshold",
+        "re-entry path",
+        "contestable exclusion",
+        "appeal path",
+        "fresh start after failure"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "fairness-due-process-and-justification"
+        },
+        {
+          "rel": "see-also",
+          "to": "integration-ladder"
+        },
+        {
+          "rel": "see-also",
+          "to": "scarcity-justice"
+        },
+        {
+          "rel": "see-also",
+          "to": "impermanence-entropy-and-revision"
+        },
+        {
+          "rel": "see-also",
+          "to": "data-dignity"
+        }
+      ],
+      "references": [
+        {
+          "kind": "doc",
+          "title": "Ideology Graph",
+          "path": "docs/ethos/ideology.json"
+        }
+      ],
+      "summary": "Consequential exclusion requires visible criteria, reasons, appeal, repair, review, and a possible re-entry state.",
+      "proceduralLanguage": {
+        "pattern": "A consequential access denial risks becoming permanent, opaque, or identity-shaped.",
+        "move": "Expose the threshold purpose, evidence, reason, appeal, repair, review, and retention lifecycle.",
+        "missingCheck": "What makes this decision contestable, correctable, reviewable, and open to re-entry?",
+        "antiPattern": "Turning a bounded access decision into a permanent judgment of the person."
+      }
+    },
+    {
       "id": "unseen-harm-inquiry",
       "slug": "unseen-harm-inquiry",
       "title": "Unseen Harm Inquiry",

@@ -157,6 +157,7 @@ import {
   HELIX_DEBUG_EXPORT_MAX_UI_CHARS,
   boundHelixDebugExportTextForUi,
 } from "@/components/helix/ask-console/HelixAskDebugExportSizeControl";
+import { buildHelixDebugExportEnvelopeFromMasterPayload } from "@/lib/agi/debugExport";
 import {
   resolveHelixAskBackendEntrypointFailureProjection,
 } from "@/components/helix/ask-console/HelixAskBackendEntrypointProjection";
@@ -3741,6 +3742,35 @@ describe("Helix Ask Console recrown boundary", () => {
         value: originalFetch,
       });
     }
+  });
+
+  it("keeps a rendered typed failure aligned with the visible turn instead of a stale repo fallback", () => {
+    const visibleFailure =
+      "I could not complete this turn because a tool observation required a follow-up model answer step, but no later terminal answer artifact was available.";
+    const staleRepoFailure =
+      "I cannot answer repository or codebase content from this turn because no repo.search observation packet was materialized.";
+    const exported = JSON.parse(buildHelixDebugExportEnvelopeFromMasterPayload({
+      id: "client:scholarly-reentry",
+      question: "Use scholarly-research.lookup_papers for quantum inequality sampling constraints.",
+      content: visibleFailure,
+    }, {
+      debug_export_source: "rendered_reply_dom",
+      debug_export_rebuild_reason: "rendered_button_scope",
+      selectedDebugFinalAnswer: visibleFailure,
+      selected_final_answer: staleRepoFailure,
+      terminal_failure_text: staleRepoFailure,
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: "post_tool_model_step_missing",
+    }));
+
+    expect(exported.selected_final_answer).toBe(visibleFailure);
+    expect(exported.selected_final_answer).not.toContain("repo.search observation packet");
+    expect(exported.ui_debug_parity_harness).toMatchObject({
+      visible_final_answer: visibleFailure,
+      selected_final_answer: visibleFailure,
+      ui_answer_equals_selected_final_answer: true,
+    });
   });
 
   it("owns legacy turn control button state projection without side effects", () => {

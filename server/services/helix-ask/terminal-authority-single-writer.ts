@@ -167,6 +167,7 @@ const syncTerminalAnswerAuthorityFromSingleWriterResult = (
           ? "selected_final_answer"
           : finalAnswerSource,
     server_authoritative: terminalKind !== "tool_receipt",
+    terminal_eligible: terminalKind !== "tool_receipt",
     assistant_answer: false,
     raw_content_included: false,
     single_writer_synchronized: true,
@@ -610,7 +611,10 @@ const failureLikeDirectAnswerText = (text: string): boolean =>
 
 const readDirectAnswerRepairText = (payload: Record<string, unknown>): string | null => {
   const draft = readRecord(payload.final_answer_draft);
+  const directAnswer = readRecord(payload.direct_answer_text);
   return (
+    readString(directAnswer?.answer_text) ??
+    readString(directAnswer?.text) ??
     readString(payload.answer) ??
     readString(payload.text) ??
     readString(payload.selected_final_answer) ??
@@ -697,10 +701,75 @@ const applyDirectAnswerContractRepairPublicMirrors = (payload: Record<string, un
   return true;
 };
 
+const applyCapabilityHelpContractRepairPublicMirrors = (payload: Record<string, unknown>): boolean => {
+  const canonicalGoal = readRecord(payload.canonical_goal_frame);
+  const solverDecision = readRecord(payload.solver_controller_decision);
+  if (
+    payload.final_answer_contract_pass !== true ||
+    readString(payload.final_answer_contract_family) !== "capability_help" ||
+    readString(canonicalGoal?.required_terminal_kind) !== "capability_help_summary" ||
+    readString(solverDecision?.decision) !== "allow_terminal" ||
+    readString(solverDecision?.selected_terminal_artifact_kind) !== "capability_help_summary"
+  ) {
+    return false;
+  }
+  const text = readDirectAnswerRepairText(payload);
+  if (!text || failureLikeDirectAnswerText(text)) return false;
+  const authority = readRecord(payload.terminal_answer_authority);
+  const presentation = readRecord(payload.terminal_presentation);
+  const resolvedTurnSummary = readRecord(payload.resolved_turn_summary);
+
+  payload.ok = true;
+  payload.response_type = "final_answer";
+  payload.final_status = "final_answer";
+  payload.status = "final_answer";
+  payload.final_answer_source = "capability_help_summary";
+  payload.terminal_artifact_kind = "capability_help_summary";
+  payload.selected_final_answer = text;
+  payload.answer = text;
+  payload.text = text;
+  payload.assistant_answer = text;
+  delete payload.terminal_error_code;
+  delete payload.terminal_failure_text;
+  delete payload.typed_failure;
+
+  payload.terminal_answer_authority = {
+    ...(authority ?? {}),
+    terminal_kind: "answer",
+    final_answer_source: "capability_help_summary",
+    terminal_artifact_kind: "capability_help_summary",
+    terminal_text_preview: text,
+    terminal_text_hash: hashHelixTerminalText(text),
+    server_authoritative: authority?.server_authoritative !== false,
+  };
+  if (resolvedTurnSummary) {
+    payload.resolved_turn_summary = {
+      ...resolvedTurnSummary,
+      final_status: "final_answer",
+      terminal_artifact_kind: "capability_help_summary",
+      terminal_error_code: null,
+      final_answer_source: "capability_help_summary",
+    };
+  }
+  if (presentation) {
+    payload.terminal_presentation = {
+      ...presentation,
+      terminal_artifact_kind: "capability_help_summary",
+      concise_text: text,
+      assistant_answer: text,
+      raw_content_included: false,
+    };
+  }
+  return true;
+};
+
 export function syncHelixTypedFailureAuthorityPublicMirrors(
   payload: Record<string, unknown>,
 ): boolean {
   const authority = readRecord(payload.terminal_answer_authority);
+  if (typedFailureAuthorityApplies(authority) && applyCapabilityHelpContractRepairPublicMirrors(payload)) {
+    return true;
+  }
   if (typedFailureAuthorityApplies(authority) && applyDirectAnswerContractRepairPublicMirrors(payload)) {
     return true;
   }
@@ -881,7 +950,9 @@ const textHash = (value: string): string => {
 };
 
 const isStaleWorkspaceFailureText = (value: unknown): boolean =>
-  /(?:workspace_step_failed|Failed to execute)/i.test(readString(value) ?? "");
+  /(?:workspace_step_failed|Failed to execute|Codex runtime did not return output before the provider adapter stopped waiting)/i.test(
+    readString(value) ?? "",
+  );
 
 const isPostToolModelStepMissingFailureText = (value: unknown): boolean =>
   /tool observation required a follow-up model answer step|no later terminal answer artifact was available/i.test(readString(value) ?? "");
@@ -1832,6 +1903,14 @@ const hasCurrentTurnImageLensObservation = (payload: Record<string, unknown>): b
 
 const routeContractExplicitlyAllowsTerminalKind = (payload: Record<string, unknown>, kind: string): boolean => {
   if (routeEvidenceAuthorityForbidsTerminalKind(payload, kind)) return false;
+  if (
+    kind === "direct_answer_text" &&
+    readString(payload.dispatch_policy) === "direct_answer_only" &&
+    (readString(payload.route_reason_code) === "conversation:simple" || readString(payload.route) === "conversation:simple") &&
+    readString(payload.final_answer_source) === "no_tool_direct"
+  ) {
+    return true;
+  }
   const committedRoute = readCommittedAskRoute(payload);
   if (committedRoute?.schema === HELIX_COMMITTED_ASK_ROUTE_SCHEMA) {
     const canonicalGoal = readRecord(committedRoute.canonical_goal);
@@ -2406,6 +2485,7 @@ const goalContractAllowsReceiptTerminal = (
   kind: string | null | undefined,
 ): kind is string => {
   if (!isContractAuthorizedReceiptTerminalKind(kind)) return false;
+  if (readString(payload.terminal_error_code) === "required_source_observation_missing") return false;
   if (committedRouteForbiddenTerminalKinds(payload).includes(kind)) return false;
   if (!terminalContractKindValues(payload).includes(kind)) return false;
   const canonicalGoal = readRecord(payload.canonical_goal_frame);
@@ -2420,14 +2500,24 @@ const goalContractAllowsReceiptTerminal = (
   ) {
     return false;
   }
-  return goalSatisfactionAllowsTerminal(payload) || goalObservedResultsSupportKind(payload, kind);
+  const contractExplicitlyRequiresKind =
+    readString(canonicalGoal?.required_terminal_kind) === kind ||
+    readString(routeProduct?.required_terminal_kind) === kind;
+  return contractExplicitlyRequiresKind || goalSatisfactionAllowsTerminal(payload) || goalObservedResultsSupportKind(payload, kind);
 };
 
 const artifactMatchesReceiptTerminalKind = (artifact: ArtifactLike, kind: string): boolean => {
   const payload = artifactPayload(artifact);
   const result = readRecord(payload?.result);
   const observation = readRecord(payload?.observation);
-  return [
+  const statuses = [
+    readString((artifact as Record<string, unknown>).status),
+    readString(payload?.status),
+    readString(result?.status),
+    readString(observation?.status),
+  ].filter((entry): entry is string => Boolean(entry));
+  if (statuses.some((status) => /^(?:failed|blocked|rejected|error|missing_input)$/i.test(status))) return false;
+  const exactKindMatch = [
     artifactKind(artifact),
     artifactSchema(artifact),
     readString(payload?.kind),
@@ -2440,6 +2530,16 @@ const artifactMatchesReceiptTerminalKind = (artifact: ArtifactLike, kind: string
   ]
     .filter((entry): entry is string => Boolean(entry))
     .includes(kind);
+  if (exactKindMatch) return true;
+  if (kind !== "doc_open_receipt") return false;
+  const actionId =
+    readString(payload?.action_id) ??
+    readString(payload?.action_kind) ??
+    readString(payload?.action) ??
+    readString(result?.action_id) ??
+    readString(observation?.action_id) ??
+    readString(readRecord(payload?.workstation_action)?.action_id);
+  return artifactKind(artifact) === "workspace_action_receipt" && actionId === "open_doc";
 };
 
 const receiptTerminalText = (
@@ -2799,11 +2899,16 @@ const committedModelOnlyDirectAnswerRoute = (payload: Record<string, unknown>): 
   );
 };
 
+const deterministicSimpleDirectAnswerRoute = (payload: Record<string, unknown>): boolean =>
+  readString(payload.dispatch_policy) === "direct_answer_only" &&
+  (readString(payload.route_reason_code) === "conversation:simple" || readString(payload.route) === "conversation:simple") &&
+  readString(payload.final_answer_source) === "no_tool_direct";
+
 const findLatestDirectAnswerTerminal = (
   payload: Record<string, unknown>,
   artifacts: ArtifactLike[],
 ): { artifact: ArtifactLike; text: string; ref: string | null } | null => {
-  if (!committedModelOnlyDirectAnswerRoute(payload)) return null;
+  if (!committedModelOnlyDirectAnswerRoute(payload) && !deterministicSimpleDirectAnswerRoute(payload)) return null;
   const result = materializeDirectAnswerTextTerminal({
     payload,
     artifacts,
@@ -3550,7 +3655,10 @@ const documentTerminalText = (artifact: ArtifactLike): string | null => {
     return ["Active doc:", `Document: ${title}`, `Path: ${path}`, "", "Open active doc"].join("\n");
   }
   if (kind === "doc_location_matches" || kind === "doc_evidence_location" || kind === "doc_location_result") {
-    const matches = readArray(payload?.matches)
+    const matches = [
+      ...readArray(payload?.matches),
+      ...readArray(payload?.locations),
+    ]
       .map(readRecord)
       .filter((entry): entry is Record<string, unknown> => Boolean(entry))
       .slice(0, 6);
@@ -3564,6 +3672,7 @@ const documentTerminalText = (artifact: ArtifactLike): string | null => {
         `${index + 1}`;
       const snippet =
         readString(match.snippet) ??
+        readString(match.evidence_snippet) ??
         readString(match.text) ??
         readString(match.heading) ??
         readString(match.section) ??
@@ -4538,9 +4647,58 @@ export function recordLegacyTerminalCandidate(input: {
   };
 }
 
+export const shouldRefreshHelixTerminalAuthorityAfterSatisfiedGoal = (input: {
+  payload: Record<string, unknown>;
+  artifactLedger?: ArtifactLike[] | null;
+}): boolean => {
+  const writer = readRecord(input.payload.terminal_authority_single_writer);
+  if (readString(writer?.selected_terminal_artifact_kind) !== "typed_failure") return false;
+
+  const canonicalGoal = readRecord(input.payload.canonical_goal_frame);
+  const requiredTerminalKind = readString(canonicalGoal?.required_terminal_kind);
+  if (!requiredTerminalKind || requiredTerminalKind === "typed_failure") return false;
+
+  const goalEvaluation = readRecord(input.payload.goal_satisfaction_evaluation);
+  const satisfactionReport = readRecord(input.payload.satisfaction_report);
+  const goalSatisfied =
+    readString(goalEvaluation?.satisfaction) === "satisfied" ||
+    readString(goalEvaluation?.next_decision) === "allow_terminal" ||
+    satisfactionReport?.satisfied === true;
+  if (!goalSatisfied || !routeContractAllowsTerminalKind(input.payload, requiredTerminalKind)) return false;
+
+  const terminalFailureCode =
+    readString(input.payload.terminal_error_code) ??
+    readString(readRecord(input.payload.typed_failure)?.error_code);
+  if (
+    terminalFailureCode !== "terminal_not_materialized" &&
+    terminalFailureCode !== "terminal_authority_missing" &&
+    terminalFailureCode !== "terminal_projection_mismatch"
+  ) {
+    return false;
+  }
+
+  return (input.artifactLedger ?? []).some((artifact) =>
+    artifactKind(artifact) === requiredTerminalKind && Boolean(artifactText(artifact)),
+  );
+};
+
 export function applyHelixTerminalAuthoritySingleWriter(
   input: SingleWriterInput,
 ): HelixTerminalAuthoritySingleWriterResult {
+  const initialPayloadIsFailure =
+    readString(input.payload.terminal_artifact_kind) === "typed_failure" ||
+    input.payload.ok === false ||
+    readString(input.payload.final_status) === "final_failure" ||
+    Boolean(readString(input.payload.fail_reason));
+  const initialTypedFailureText = initialPayloadIsFailure
+    ? readString(readRecord(input.payload.typed_failure)?.answer_text) ??
+      readString(readRecord(input.payload.typed_failure)?.text) ??
+      readString(readRecord(input.payload.typed_failure)?.message) ??
+      readString(input.payload.terminal_failure_text) ??
+      readString(input.payload.selected_final_answer) ??
+      readString(input.payload.answer) ??
+      readString(input.payload.text)
+    : null;
   const hydratedCommittedRoute = readCommittedAskRoute(input.payload);
   let terminalAuthorityRouteHydrationSource: string | null = null;
   if (hydratedCommittedRoute && !readRecord(input.payload.committed_ask_route)) {
@@ -5025,6 +5183,70 @@ export function applyHelixTerminalAuthoritySingleWriter(
         routeContractAllowedTerminalKinds(input.payload).includes("tool_receipt")
       )
     );
+  const currentTerminalAuthority = readRecord(input.payload.terminal_answer_authority);
+  const currentTerminalPresentation = readRecord(input.payload.terminal_presentation);
+  const currentProviderReasoningReentry = readRecord(input.payload.provider_reasoning_reentry);
+  const currentScholarlyTerminalKind = readString(currentTerminalAuthority?.terminal_artifact_kind);
+  const routeCheckedScholarlyTerminalKinds = new Set([
+    "scholarly_research_answer",
+    "scholarly_metadata_answer",
+    "scholarly_numeric_missing",
+    "scholarly_recovery_plan",
+    "scholarly_evidence_escalation_missing",
+    "scholarly_exploratory_candidates",
+    "scholarly_parse_required",
+  ]);
+  const currentScholarlyTerminalText = readString(currentTerminalPresentation?.concise_text);
+  const currentScholarlyObservationRefs = readArray(currentTerminalPresentation?.selected_observation_refs)
+    .map(readString)
+    .filter((ref): ref is string => Boolean(ref));
+  const currentScholarlyNormalizedObservationRefs = readArray(
+    currentProviderReasoningReentry?.normalized_observation_refs,
+  )
+    .map(readString)
+    .filter((ref): ref is string => Boolean(ref));
+  const currentScholarlyEvidenceNormalized = Boolean(
+    currentProviderReasoningReentry?.evidence_reentry_required === true &&
+    currentScholarlyNormalizedObservationRefs.length > 0 &&
+    Number(currentProviderReasoningReentry?.normalized_observation_packet_count ?? 0) > 0
+  );
+  const currentScholarlyTerminalReady = Boolean(
+    readString(currentTerminalAuthority?.terminal_kind) === "answer" &&
+    currentScholarlyTerminalKind &&
+    routeCheckedScholarlyTerminalKinds.has(currentScholarlyTerminalKind) &&
+    readString(currentTerminalAuthority?.final_answer_source) === currentScholarlyTerminalKind &&
+    currentTerminalAuthority?.server_authoritative === true &&
+    currentScholarlyEvidenceNormalized &&
+    currentScholarlyTerminalText &&
+    currentScholarlyObservationRefs.length > 0 &&
+    (
+      routeEvidenceAuthorityAllowsTerminalProduct(input.payload, currentScholarlyTerminalKind) ||
+      routeContractExplicitlyAllowsTerminalKind(input.payload, currentScholarlyTerminalKind)
+    )
+  );
+  const scholarlyFollowupEvidenceLookup =
+    readRecord(input.payload.scholarly_followup_evidence_lookup) ??
+    readRecord(readRecord(input.payload.debug)?.scholarly_followup_evidence_lookup);
+  const currentScholarlyMissingFollowupRecoveryReady = Boolean(
+    scholarlyFollowupEvidenceLookup?.followup_reference_detected === true &&
+    readString(scholarlyFollowupEvidenceLookup?.status) === "missing" &&
+    currentScholarlyTerminalKind === "scholarly_recovery_plan" &&
+    readString(currentTerminalAuthority?.terminal_kind) === "answer" &&
+    readString(currentTerminalAuthority?.final_answer_source) === "scholarly_recovery_plan" &&
+    currentTerminalAuthority?.server_authoritative === true &&
+    currentScholarlyTerminalText &&
+    (
+      routeEvidenceAuthorityAllowsTerminalProduct(input.payload, "scholarly_recovery_plan") ||
+      routeContractExplicitlyAllowsTerminalKind(input.payload, "scholarly_recovery_plan")
+    )
+  );
+  const currentScholarlyTerminalCanSurface = Boolean(
+    currentScholarlyTerminalReady || currentScholarlyMissingFollowupRecoveryReady
+  );
+  const currentScholarlyFollowupTerminalReady = Boolean(
+    currentScholarlyTerminalCanSurface &&
+    scholarlyFollowupEvidenceLookup?.followup_reference_detected === true
+  );
   const solverContinuationPending =
     rawSolverContinuationPending &&
     !(
@@ -5042,6 +5264,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
       Boolean(selectedImageLensObservationReport) ||
       Boolean(selectedImageLensNamedReceiptEvaluation) ||
       Boolean(selectedProviderTerminalCandidate) ||
+      currentScholarlyTerminalCanSurface ||
       providerRouteProductCanSurface
     );
   if (solverContinuationPending) {
@@ -5233,7 +5456,8 @@ export function applyHelixTerminalAuthoritySingleWriter(
       !routeAllowsModelSynthesizedAnswer ||
       (moralGraphReflectionTerminalRoute && draftMaterialization?.ok !== true && !moralGraphModelSynthesizedAnswerCanSurface)
     ) &&
-    !noteMutationFinalDraftCanSurface
+    !noteMutationFinalDraftCanSurface &&
+    draftMaterialization?.materialized_terminal_artifact_kind !== "capability_help_summary"
   ) {
     rejectedCandidates.push({
       ref: artifactId(selectedDraft.artifact) ?? undefined,
@@ -5346,6 +5570,27 @@ export function applyHelixTerminalAuthoritySingleWriter(
       rawTerminalBlockingToolRailFailure.repairTarget === "terminal_materializer" ||
       rawTerminalBlockingToolRailFailure.repairTarget === "terminal_authority" ||
       rawTerminalBlockingToolRailFailure.repairTarget === "presenter_boundary"
+    )
+  );
+  const scholarlyResponseModeSupersedesToolRailFailure = Boolean(
+    currentScholarlyTerminalCanSurface &&
+    rawTerminalBlockingToolRailFailure &&
+    (
+      rawTerminalBlockingToolRailFailure.selectedCapability.startsWith("scholarly-research.") ||
+      rawTerminalBlockingToolRailFailure.executedCapability.startsWith("scholarly-research.")
+    ) &&
+    (
+      rawTerminalBlockingToolRailFailure.railFailureCode === "typed_affordance_binding_missing" ||
+      rawTerminalBlockingToolRailFailure.railFailureCode === "observation_missing" ||
+      rawTerminalBlockingToolRailFailure.railFailureCode === "terminal_not_materialized" ||
+      rawTerminalBlockingToolRailFailure.railFailureCode === "terminal_projection_mismatch" ||
+      rawTerminalBlockingToolRailFailure.railFailureCode === "terminal_authority_missing" ||
+      rawTerminalBlockingToolRailFailure.railFailureCode === "missing_evidence_reentry" ||
+      rawTerminalBlockingToolRailFailure.firstBrokenRail === "typed_affordance_binding" ||
+      rawTerminalBlockingToolRailFailure.firstBrokenRail === "evidence_reentry" ||
+      rawTerminalBlockingToolRailFailure.firstBrokenRail === "terminal_materialization" ||
+      rawTerminalBlockingToolRailFailure.firstBrokenRail === "terminal_authority" ||
+      rawTerminalBlockingToolRailFailure.firstBrokenRail === "visible_projection"
     )
   );
   const noteMutationDraftSupersedesToolRailFailure =
@@ -5478,6 +5723,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     );
   const terminalBlockingToolRailFailure =
     providerRouteProductSupersedesToolRailFailure ||
+    scholarlyResponseModeSupersedesToolRailFailure ||
     noteMutationDraftSupersedesToolRailFailure ||
     repoDraftSupersedesToolRailFailure ||
     compoundDraftSupersedesToolRailFailure ||
@@ -5498,6 +5744,29 @@ export function applyHelixTerminalAuthoritySingleWriter(
     goalAllowsTerminal
       ? null
       : rawTerminalBlockingToolRailFailure;
+
+  const materializeCurrentScholarlyTerminal = (): void => {
+    if (!currentScholarlyTerminalKind || !currentScholarlyTerminalText) return;
+    selectedArtifactRef = readString(currentTerminalAuthority?.terminal_item_id) ??
+      `${input.turnId}:${currentScholarlyTerminalKind}`;
+    selectedArtifactKind = currentScholarlyTerminalKind;
+    selectedSource = currentScholarlyTerminalKind;
+    quarantineStaleRequestUserInput(input.payload);
+    input.payload.ok = true;
+    input.payload.response_type = "final_answer";
+    input.payload.final_status = "final_answer";
+    input.payload.status = "final_answer";
+    input.payload.terminal_artifact_kind = currentScholarlyTerminalKind;
+    input.payload.final_answer_source = currentScholarlyTerminalKind;
+    input.payload.selected_final_answer = currentScholarlyTerminalText;
+    input.payload.answer = currentScholarlyTerminalText;
+    input.payload.text = currentScholarlyTerminalText;
+    input.payload.assistant_answer = currentScholarlyTerminalText;
+    input.payload.terminal_artifact_id = selectedArtifactRef;
+    delete input.payload.terminal_error_code;
+    delete input.payload.terminal_failure_text;
+    delete input.payload.typed_failure;
+  };
 
   if (terminalBlockingToolRailFailure) {
     const terminalErrorCode = terminalBlockingToolRailFailure.railFailureCode;
@@ -5862,6 +6131,13 @@ export function applyHelixTerminalAuthoritySingleWriter(
       assistant_answer: false,
       raw_content_included: false,
     };
+  } else if (
+    !solverContinuationPending &&
+    currentScholarlyFollowupTerminalReady &&
+    !selectedImageLensObservationReport &&
+    !selectedImageLensNamedReceiptEvaluation
+  ) {
+    materializeCurrentScholarlyTerminal();
   } else if (!solverContinuationPending && requiredNoteReceiptStepArtifact && requiredNoteReceiptStepText) {
     selectedArtifactRef = readString(requiredNoteReceiptStepArtifact.artifact_id) ?? null;
     selectedArtifactKind = "note_update_receipt";
@@ -5898,7 +6174,12 @@ export function applyHelixTerminalAuthoritySingleWriter(
         reason: "later_valid_final_answer_draft",
       });
     }
-  } else if (!solverContinuationPending && selectedWorkstationToolEvaluation && !compoundSynthesisTerminalReady) {
+  } else if (
+    !solverContinuationPending &&
+    selectedWorkstationToolEvaluation &&
+    !compoundSynthesisTerminalReady &&
+    !providerRouteProductCanSurface
+  ) {
     const workstationTerminalText = synthesizeWorkstationToolEvaluationTerminalText({
       turnId: input.turnId,
       payload: input.payload,
@@ -5968,7 +6249,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
         reason: "later_valid_final_answer_draft",
       });
     }
-  } else if (!solverContinuationPending && selectedReceiptTerminal) {
+  } else if (!solverContinuationPending && selectedReceiptTerminal && !providerRouteProductCanSurface) {
     selectedArtifactRef = selectedReceiptTerminal.ref;
     selectedArtifactKind = selectedReceiptTerminal.kind as HelixTerminalAuthoritySingleWriterResult["selected_terminal_artifact_kind"];
     selectedSource = selectedReceiptTerminal.kind as HelixTerminalAuthoritySingleWriterResult["source"];
@@ -6376,6 +6657,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     };
     delete input.payload.terminal_error_code;
     delete input.payload.terminal_failure_text;
+    delete input.payload.typed_failure;
   } else if (!solverContinuationPending && selectedDirectAnswerTerminal && !compoundSynthesisTerminalReady) {
     selectedArtifactRef = selectedDirectAnswerTerminal.ref;
     selectedArtifactKind = "direct_answer_text";
@@ -6454,8 +6736,11 @@ export function applyHelixTerminalAuthoritySingleWriter(
     delete input.payload.terminal_error_code;
     delete input.payload.terminal_failure_text;
   } else if (
-    !solverContinuationPending &&
     selectedGoalArtifact &&
+    (
+      !solverContinuationPending ||
+      (isDocumentTerminalArtifactKind(selectedGoalArtifact.kind) && goalAllowsTerminal)
+    ) &&
     (
       !compoundSynthesisTerminalReady ||
       (
@@ -6719,7 +7004,9 @@ export function applyHelixTerminalAuthoritySingleWriter(
           prompt: theoryContextPromptText(input.payload),
         })
       : null;
-    if (routeEvidenceTheoryRecovery?.kind === "theory_context_reflection_answer") {
+    if (currentScholarlyTerminalCanSurface && currentScholarlyTerminalText && currentScholarlyTerminalKind) {
+      materializeCurrentScholarlyTerminal();
+    } else if (routeEvidenceTheoryRecovery?.kind === "theory_context_reflection_answer") {
       selectedArtifactRef = routeEvidenceTheoryRecovery.ref;
       selectedArtifactKind = "theory_context_reflection_answer";
       selectedSource = "theory_context_reflection_answer";
@@ -7121,6 +7408,18 @@ export function applyHelixTerminalAuthoritySingleWriter(
   }
   let appliedEnvelope = applyTerminalAnswerEnvelope(input.payload, envelope);
   if (
+    appliedEnvelope.terminal_artifact_kind === "typed_failure" &&
+    initialTypedFailureText &&
+    !isHelixGenericTypedFailureText(initialTypedFailureText)
+  ) {
+    envelope = {
+      ...appliedEnvelope,
+      terminal_text: initialTypedFailureText,
+      terminal_text_hash: hashHelixTerminalText(initialTypedFailureText),
+    };
+    appliedEnvelope = applyTerminalAnswerEnvelope(input.payload, envelope);
+  }
+  if (
     appliedEnvelope.terminal_artifact_kind &&
     appliedEnvelope.terminal_artifact_kind !== "typed_failure" &&
     appliedEnvelope.terminal_artifact_kind !== "request_user_input" &&
@@ -7365,6 +7664,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
         usableDraftMaterialization ||
         selectedProviderTerminalCandidate ||
         providerRouteProductCanSurface ||
+        currentScholarlyTerminalCanSurface ||
         selectedGoalArtifact ||
         selectedReceiptTerminal ||
         (selectedDraft && routeAllowsModelSynthesizedAnswer)
@@ -7391,6 +7691,26 @@ export function applyHelixTerminalAuthoritySingleWriter(
       deterministic_receipt_fallback_can_surface: deterministicReceiptFallbackCanSurface,
       stage_play_reflection_observation_observed: stagePlayReflectionObservationObserved,
       early_deterministic_receipt_fallback_can_surface: earlyDeterministicReceiptFallbackCanSurface,
+      scholarly_response_mode_terminal: {
+        kind: currentScholarlyTerminalKind ?? null,
+        authority_kind: readString(currentTerminalAuthority?.terminal_kind) ?? null,
+        authority_source: readString(currentTerminalAuthority?.final_answer_source) ?? null,
+        server_authoritative: currentTerminalAuthority?.server_authoritative === true,
+        evidence_normalized: currentScholarlyEvidenceNormalized,
+        presentation_text_present: Boolean(currentScholarlyTerminalText),
+        selected_observation_ref_count: currentScholarlyObservationRefs.length,
+        route_evidence_allows: currentScholarlyTerminalKind
+          ? routeEvidenceAuthorityAllowsTerminalProduct(input.payload, currentScholarlyTerminalKind)
+          : false,
+        route_contract_allows: currentScholarlyTerminalKind
+          ? routeContractExplicitlyAllowsTerminalKind(input.payload, currentScholarlyTerminalKind)
+          : false,
+        ready: currentScholarlyTerminalReady,
+        missing_followup_recovery_ready: currentScholarlyMissingFollowupRecoveryReady,
+        can_surface: currentScholarlyTerminalCanSurface,
+        supersedes_tool_rail_failure: scholarlyResponseModeSupersedesToolRailFailure,
+      },
+      compound_terminal_policy: readCompoundTerminalPolicy(input.payload),
       provider_route_product_eligibility: providerRouteProductEligibility,
     },
   };
@@ -7439,6 +7759,20 @@ export function applyHelixTerminalAuthoritySingleWriter(
   };
 
   syncTerminalAnswerAuthorityFromSingleWriterResult(input.payload, result);
+  const synchronizedFinalAnswerSource = readString(input.payload.final_answer_source) ?? readString(result.source);
+  const synchronizedTerminalArtifactKind =
+    readString(input.payload.terminal_artifact_kind) ?? readString(result.selected_terminal_artifact_kind);
+  const synchronizeProviderGatewaySummary = (summary: Record<string, unknown> | null): void => {
+    if (!summary || !synchronizedFinalAnswerSource || !synchronizedTerminalArtifactKind) return;
+    summary.final_answer_source = synchronizedFinalAnswerSource;
+    summary.terminal_artifact_kind = synchronizedTerminalArtifactKind;
+    summary.terminal_authority_result = "authorized_by_terminal_authority_single_writer";
+    summary.terminal_authority_granted = true;
+    summary.final_visible_answer_authorized = true;
+    summary.final_visible_answer_source = synchronizedFinalAnswerSource;
+  };
+  synchronizeProviderGatewaySummary(readRecord(input.payload.provider_gateway_debug_summary));
+  synchronizeProviderGatewaySummary(readRecord(readRecord(input.payload.debug)?.provider_gateway_debug_summary));
   input.payload.terminal_authority_single_writer = result;
   input.payload.terminal_candidate_rejections = auditRejectedCandidates;
   input.payload.legacy_terminal_candidates = legacyCandidates;

@@ -33,7 +33,13 @@ export const isHelixAskGoldenPathRepoSearchConceptRequested = (body: RecordLike)
 };
 
 export const readRepoSearchConcept = (body: RecordLike): string | null => {
+  const sourceTargetIntent = readRecord(body.source_target_intent ?? body.sourceTargetIntent);
+  const structuredArgs = readRecord(sourceTargetIntent?.args ?? sourceTargetIntent?.arguments);
   const direct =
+    readString(structuredArgs?.query) ??
+    readString(structuredArgs?.concept) ??
+    readString(structuredArgs?.search_concept) ??
+    readString(structuredArgs?.searchConcept) ??
     readString(body.concept) ??
     readString(body.query) ??
     readString(body.search_concept) ??
@@ -78,6 +84,21 @@ export const readRepoSearchFixtureFiles = (body: RecordLike): GoldenPathRepoSear
     .slice(0, 40);
 };
 
+const readRepoSearchPathScopes = (body: RecordLike): string[] => {
+  const sourceTargetIntent = readRecord(body.source_target_intent ?? body.sourceTargetIntent);
+  const structuredArgs = readRecord(sourceTargetIntent?.args ?? sourceTargetIntent?.arguments);
+  const rawPaths = structuredArgs?.paths ?? structuredArgs?.path ?? body.paths ?? body.path;
+  const values = Array.isArray(rawPaths) ? rawPaths : [rawPaths];
+  return values
+    .map(readString)
+    .filter((value): value is string => Boolean(value))
+    .map((value) => value.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/+$/, ""))
+    .filter((value) => Boolean(value) && value !== "." && !value.startsWith("../") && !path.isAbsolute(value));
+};
+
+const repoPathMatchesScopes = (filePath: string, scopes: string[]): boolean =>
+  scopes.length === 0 || scopes.some((scope) => filePath === scope || filePath.startsWith(`${scope}/`));
+
 const GOLDEN_PATH_REPO_TEXT_FILE_RE =
   /\.(?:ts|tsx|js|jsx|mjs|cjs|mts|cts|md|mdx|json|jsonc|py|txt|css|scss|html|yml|yaml)$/i;
 
@@ -91,8 +112,7 @@ const enumerateGoldenPathRepoFilesFromGit = (): string[] => {
       .split(/\r?\n/g)
       .map((entry) => entry.trim().replace(/\\/g, "/"))
       .filter((entry) => GOLDEN_PATH_REPO_TEXT_FILE_RE.test(entry))
-      .filter((entry) => !/(^|\/)(?:node_modules|dist|build|coverage|\.git)(\/|$)/i.test(entry))
-      .slice(0, 600);
+      .filter((entry) => !/(^|\/)(?:node_modules|dist|build|coverage|\.git)(\/|$)/i.test(entry));
   } catch {
     return [];
   }
@@ -125,12 +145,14 @@ const enumerateGoldenPathRepoFilesFromFs = (): string[] => {
 };
 
 export const readGoldenPathRepoSearchFiles = (body: RecordLike): GoldenPathRepoSearchFile[] => {
+  const pathScopes = readRepoSearchPathScopes(body);
   const fixtures = readRepoSearchFixtureFiles(body);
-  if (fixtures.length > 0) return fixtures;
+  if (fixtures.length > 0) return fixtures.filter((file) => repoPathMatchesScopes(file.path, pathScopes));
   const repoRoot = process.cwd();
   const selectedFiles = enumerateGoldenPathRepoFilesFromGit();
   const out: GoldenPathRepoSearchFile[] = [];
   for (const relativePath of selectedFiles.length > 0 ? selectedFiles : enumerateGoldenPathRepoFilesFromFs()) {
+    if (!repoPathMatchesScopes(relativePath, pathScopes)) continue;
     const absolutePath = path.resolve(repoRoot, relativePath);
     const relative = path.relative(repoRoot, absolutePath);
     if (relative.startsWith("..") || path.isAbsolute(relative)) continue;

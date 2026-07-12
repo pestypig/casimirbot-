@@ -37,6 +37,7 @@ export type HelixPostToolAuthorityBridge = {
     | "unknown";
   required_terminal_kind:
     | "model_synthesized_answer"
+    | "capability_help_summary"
     | "doc_evidence_synthesis_answer"
     | "repo_code_evidence_answer"
     | "scholarly_research_answer"
@@ -508,7 +509,7 @@ const inferRouteFamily = (payload: RecordLike, capability: string): HelixPostToo
   const toolChain = artifactLedger(payload).map((artifact) => artifactToolName(artifact)).filter(Boolean).join(" ");
   const haystack = `${sourceTarget} ${targetSource} ${goalKind} ${phaseGoal} ${capability} ${toolChain} ${readString(payload.route_reason_code)} ${readString(payload.route)} ${prompt}`;
   if (/live_source_mailbox|live_source_processed_mail_interpretation|processed_mail_voice_decision|stage_play_live_source_mail_read_result|stage_play_processed_mail_packet|stage_play_live_source_mail_loop_reflection|record_live_source_mail_decision|check_live_source_mail|read_live_source_mail|read_processed_live_source_mail|process_live_source_mail|reflect_live_source_mail_loop/i.test(haystack)) return "live_source_mailbox";
-  if (/capability_catalog|capability_registry|capability_help_summary|inspect_capability_catalog/i.test(haystack)) return "capability_catalog";
+  if (/capability_catalog|capability_registry|capability_help(?:_summary)?|inspect_capability_catalog/i.test(haystack)) return "capability_catalog";
   if (/workspace_directory|workspace-directory\.resolve|workspace_directory_resolution/i.test(haystack)) return "workspace_directory";
   if (/workspace_diagnostic|workspace_os\.status|workspace_os_status|workspace[- ]status/i.test(haystack)) return "workspace_diagnostic";
   if (/scholarly_research|scholarly-research|doi|arxiv|citation|journal/i.test(haystack)) return "scholarly_research";
@@ -558,6 +559,43 @@ export function buildPostToolAuthorityBridge(input: {
       terminal_repair_action: "materialize_model_synthesized_answer",
       pending_requirements: [],
       reason: "calculator_result_and_answer_draft_support_goal",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+  if (routeFamily === "capability_catalog") {
+    const capabilityHelpSummary = readRecord(input.payload.capability_help_summary);
+    const capabilityHelpText =
+      readString(capabilityHelpSummary?.answer_text) ||
+      readString(capabilityHelpSummary?.text);
+    const supportsAnswer = Boolean(
+      toolObservationRefs.length > 0 &&
+      (capabilityHelpText || finalDraftText(input.payload)),
+    );
+    return {
+      schema: HELIX_POST_TOOL_AUTHORITY_BRIDGE_SCHEMA,
+      turn_id: input.turnId,
+      applies: toolObservationRefs.length > 0 || answerDraftRefs.length > 0 || Boolean(capabilityHelpText),
+      selected_capability: capability || undefined,
+      tool_observation_refs: toolObservationRefs,
+      answer_draft_refs: answerDraftRefs,
+      observation_support_status: supportsAnswer
+        ? "supports_answer"
+        : toolObservationRefs.length > 0
+          ? "not_enough_information"
+          : "not_applicable",
+      route_family: "capability_catalog",
+      required_terminal_kind: "capability_help_summary",
+      terminal_repair_action: "none",
+      pending_requirements: supportsAnswer ? [] : [{
+        code: toolObservationRefs.length > 0 ? "missing_post_tool_answer_draft" : "missing_live_source",
+        message: toolObservationRefs.length > 0
+          ? "Capability-catalog evidence is present, but no capability-help answer draft has been materialized."
+          : "No current-turn capability registry observation was found.",
+      }],
+      reason: supportsAnswer
+        ? "capability_catalog_observation_and_summary_support_goal"
+        : "capability_catalog_support_incomplete",
       assistant_answer: false,
       raw_content_included: false,
     };

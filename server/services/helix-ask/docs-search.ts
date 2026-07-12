@@ -302,12 +302,13 @@ export const buildDocsSearchDocumentCandidates = (
       const pathTitleScore = docsPathTitleScore(filePath, query);
       const coverageBonus = matchedTerms.length * 30 + Math.min(pathHits.length, 8) * 5;
       const mdBonus = /\.md$/i.test(filePath) ? 100 : 0;
+      const canonicalBonus = taxonomyEntry?.canonical === true ? 5000 : 0;
       const latestDateBonus = latestPathDateScore > 0 && docsSearchPathDateScore(filePath) === latestPathDateScore ? 500 : 0;
-      const sidecarPenalty = /\.(?:json|source)$/i.test(filePath) ? 1000 : 0;
+      const sidecarPenalty = /\.(?:json|source)$/i.test(filePath) ? 5000 : 0;
       return {
         path: filePath,
         title: docsPathTitle(filePath),
-        score: pathTitleScore + bestHitScore + coverageBonus + mdBonus + latestDateBonus - sidecarPenalty,
+        score: pathTitleScore + bestHitScore + coverageBonus + mdBonus + canonicalBonus + latestDateBonus - sidecarPenalty,
         ...(docClass ? { doc_class: docClass } : {}),
         ...(taxonomyEntry?.bundleKind ? { bundle_kind: taxonomyEntry.bundleKind } : {}),
         ...(typeof taxonomyEntry?.canonical === "boolean" ? { canonical: taxonomyEntry.canonical } : {}),

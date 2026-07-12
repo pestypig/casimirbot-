@@ -95,12 +95,15 @@ describe("Helix Ask golden path runtime", () => {
     const dispatchSource = readFileSync(dispatchPath, "utf8");
     const runtimeModulesSource = readFileSync(runtimeModulesPath, "utf8");
 
-    expect(dispatchSource).toContain("orderedDispatchModules");
-    expect(dispatchSource).toContain("for (const dispatchModule of orderedDispatchModules)");
+    expect(dispatchSource).toContain("compoundDispatchModules");
+    expect(dispatchSource).toContain("singleCapabilityDispatchModules");
+    expect(dispatchSource).toContain("for (const dispatchModule of compoundDispatchModules)");
+    expect(dispatchSource).toContain("for (const dispatchModule of singleCapabilityDispatchModules)");
     expect(dispatchSource).toContain("dispatchModule.isRequested(body)");
     expect(dispatchSource).toContain("dispatchModule.buildPayload({ body, deps })");
     expect(dispatchSource).toContain("buildHelixAskGoldenPathRuntimeContractPayload");
-    expect(runtimeModulesSource).toContain("const orderedDispatchModules");
+    expect(runtimeModulesSource).toContain("const compoundDispatchModules");
+    expect(runtimeModulesSource).toContain("const singleCapabilityDispatchModules");
     expect(dispatchSource).not.toContain("terminal_artifact_kind");
     expect(dispatchSource).not.toContain("current_turn_artifact_ledger");
     expect(dispatchSource).not.toContain("selected_final_answer");
@@ -339,6 +342,21 @@ describe("Helix Ask golden path runtime", () => {
         selected_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
         executed_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
       },
+    });
+  });
+
+  it("leaves unsupported natural two-family compounds on the full solver path", () => {
+    const decision = runHelixAskGoldenPathRuntime({
+      env: {},
+      body: {
+        prompt:
+          "Use scholarly papers and citations to research microtubule coherence, then place it on the theory badge graph with uncertainty mode.",
+      },
+    });
+
+    expect(decision).toEqual({
+      handled: false,
+      reason: "two_family_compound_requires_full_solver",
     });
   });
 
@@ -1903,6 +1921,52 @@ describe("Helix Ask golden path runtime", () => {
       "repo_code_evidence_answer",
     ]);
     expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
+  it("honors structured repo query and path scope before prompt lexical cues", () => {
+    const decision = runHelixAskGoldenPathRuntime({
+      env: {},
+      now: new Date("2026-06-28T12:32:30.000Z"),
+      body: {
+        turn_id: "ask:golden:structured-repo-search",
+        question: "Where is workspace_os.status implemented?",
+        source_target_intent: {
+          schema: "helix.ask_source_target_intent.v1",
+          target_source: "repo_code",
+          selected_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+          args: {
+            query: "workspace_os.status",
+            paths: ["server/services/helix-ask"],
+          },
+        },
+        repo_files: [
+          {
+            path: "server/services/helix-ask/workspace-os-status-intent.ts",
+            content: "export const HELIX_WORKSPACE_OS_STATUS_CAPABILITY = 'workspace_os.status';",
+          },
+          {
+            path: ".tmp-unrelated.json",
+            content: "workspace_os.status",
+          },
+        ],
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("structured repo admission should select the repo golden path");
+    expect(decision.payload).toMatchObject({
+      terminal_artifact_kind: "repo_code_evidence_answer",
+      final_answer_source: "repo_code_evidence_answer",
+      repo_code_evidence_observation: {
+        concept: "workspace_os.status",
+        match_count: 1,
+        evidence: [
+          expect.objectContaining({
+            file_path: "server/services/helix-ask/workspace-os-status-intent.ts",
+          }),
+        ],
+      },
+    });
   });
 
   it("fails closed when repo concept search has no evidence", () => {

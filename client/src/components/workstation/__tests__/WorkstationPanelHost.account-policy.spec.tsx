@@ -53,7 +53,7 @@ describe("WorkstationPanelHost account policy", () => {
 
     render(<WorkstationPanelHost panelId="code-admin" />);
 
-    expect(screen.getByText("Ua laka \u02bbia \u02bbo Code Admin")).toBeTruthy();
+    expect(screen.getByText("Ua laka \u02bbia \u02bbo Luna Ho\u02bbokele Code")).toBeTruthy();
     expect(screen.getByText(/M\u0101lama \u02bbia k\u0113ia hi\u02bbohi\u02bbona workstation/)).toBeTruthy();
   });
 });

@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it } from "vitest";
-import { getInterfaceLanguageReadiness, INTERFACE_LANGUAGE_OPTIONS } from "@/lib/i18n/interfaceLanguage";
+import {
+  getInterfaceLanguageOptionsForAccount,
+  getInterfaceLanguageReadiness,
+  INTERFACE_LANGUAGE_OPTIONS,
+} from "@/lib/i18n/interfaceLanguage";
 import { createInterfaceTextResolver } from "@/lib/i18n/interfaceText";
 import { getInterfacePanelTitle } from "@/lib/i18n/panelTitles";
 import { enMessages } from "@/lib/i18n/messages/en";
@@ -40,6 +44,15 @@ describe("interface catalog integrity", () => {
       expect(interfaceSourceMessages[id].defaultMessage.trim()).not.toBe("");
       expect(enMessages[id]).toBe(interfaceSourceMessages[id].defaultMessage);
     }
+  });
+
+  it("keeps preview catalogs developer-only while exposing release-clean public options", () => {
+    expect(getInterfaceLanguageOptionsForAccount("user").map((option) => option.code)).toEqual([
+      "en",
+      "de",
+      "ar",
+    ]);
+    expect(getInterfaceLanguageOptionsForAccount("developer")).toEqual(INTERFACE_LANGUAGE_OPTIONS);
   });
 
   it("keeps target catalogs schema-bound and placeholder-compatible while partial", () => {

@@ -32,7 +32,7 @@ export type GoldenPathDispatchModule = {
   }) => RecordLike;
 };
 
-export const orderedDispatchModules: readonly GoldenPathDispatchModule[] = [
+export const compoundDispatchModules: readonly GoldenPathDispatchModule[] = [
   CatalogWorkspace,
   VisualCalculator,
   CompoundItinerary,
@@ -40,6 +40,9 @@ export const orderedDispatchModules: readonly GoldenPathDispatchModule[] = [
   RepoDocs,
   InternetTheoryReflection,
   CivilizationMoralReflection,
+];
+
+export const singleCapabilityDispatchModules: readonly GoldenPathDispatchModule[] = [
   ProcessedLiveSourceMail,
   StagePlayReflection,
   InternetSearch,
@@ -54,4 +57,9 @@ export const orderedDispatchModules: readonly GoldenPathDispatchModule[] = [
   WorkspaceDirectory,
   CapabilityCatalog,
   WorkspaceStatus,
+];
+
+export const orderedDispatchModules: readonly GoldenPathDispatchModule[] = [
+  ...compoundDispatchModules,
+  ...singleCapabilityDispatchModules,
 ];

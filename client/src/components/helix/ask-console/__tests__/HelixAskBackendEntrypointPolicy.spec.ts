@@ -86,6 +86,23 @@ describe("Helix Ask backend entrypoint policy", () => {
     })).toBeNull();
   });
 
+  it.each([
+    "Does the scientific calculator support symbolic variables?",
+    "Can Docs Viewer open Markdown files by path?",
+    "How does your repo search tool select matching files?",
+    "Does the internet search tool return source links?",
+    "Can the Moral Graph tool inspect a situation without changing it?",
+    "Does Image Lens read equations from selected regions?",
+    "Can the workstation notes tool append instead of creating a note?",
+    "How does your workspace diagnostic tool check status?",
+    "Does the live-source tool read mail before recording a decision?",
+    "Can the narrator tool return a receipt without speaking automatically?",
+    "Does the Postulate Board workflow create a review before submission?",
+  ])("keeps cross-family capability behavior wording non-executing: %s", (question) => {
+    expect(requiresHelixAskBackendEntrypoint(question)).toBe(false);
+    expect(resolveHelixAskBackendEntrypointFamily(question)).toBeNull();
+  });
+
   it("still requires backend Ask when the user explicitly asks to use a tool family", () => {
     const examples = [
       {

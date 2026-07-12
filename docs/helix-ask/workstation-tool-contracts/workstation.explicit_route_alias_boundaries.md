@@ -101,6 +101,8 @@ future_provider=false
 Explicit read/observe candidates:
 
 ```txt
+runtime_evidence
+debug.inspect_current_turn
 helix_ask.inspect_capability_catalog
 helix_ask.reflect_workstation_tool_alignment
 repo-code.search_concept

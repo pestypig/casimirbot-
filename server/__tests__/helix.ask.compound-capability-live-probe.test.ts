@@ -78,7 +78,8 @@ const invalidCalculatorArgsFailClosedDebug = (overrides: Record<string, unknown>
     subgoals: [
       {
         requested_capability: "docs-viewer.locate_in_doc",
-        executed_capability: "docs-viewer.locate_in_doc",
+        runtime_capability: "docs.search",
+        executed_capability: "docs.search",
         args: { query: "rule of thumb" },
         observation_kind: "doc_location_matches",
         observation_ref: "obs:doc-location",
@@ -164,6 +165,19 @@ const fixtureContractTermsForCapability = (
         required_terminal_kind: "doc_equation_context",
         allowed_substitutions: [],
       };
+    case "docs.search":
+      return {
+        required_observation_kinds: [
+          "doc_search_results",
+          "retrieval_context",
+          "doc_location_result",
+          "doc_location_matches",
+          "doc_evidence_location",
+          "doc_equation_context",
+        ],
+        required_terminal_kind: "model_synthesized_answer",
+        allowed_substitutions: [],
+      };
     case "workspace_os.status":
       return {
         required_observation_kinds: ["workspace_os_status_observation"],
@@ -201,7 +215,14 @@ const fixtureContractTermsForCapability = (
         required_terminal_kind: "scholarly_research_answer",
         allowed_substitutions: [],
       };
+    case "scholarly-research.extract_numeric_parameters":
+      return {
+        required_observation_kinds: ["scholarly_numeric_parameter_observation"],
+        required_terminal_kind: "scholarly_research_answer",
+        allowed_substitutions: [],
+      };
     case "helix_ask.reflect_theory_context":
+    case "theory-badge-graph.reflect_discussion_context":
       return {
         required_observation_kinds: ["helix_theory_context_reflection_tool_receipt", "theory_context_reflection"],
         required_terminal_kind: "theory_context_reflection_answer",
@@ -400,6 +421,8 @@ const fixtureRequiredArgsForCapability = (capability: string): string[] => {
       return ["query"];
     case "scholarly-research.fetch_full_text":
       return ["paper_result_or_source"];
+    case "scholarly-research.extract_numeric_parameters":
+      return ["text_evidence"];
     case "live_env.draft_micro_reasoner_preset":
       return ["scenario_text"];
     case "live_env.route_micro_reasoner_prompt":
@@ -437,6 +460,8 @@ const fixtureOptionalArgsForCapability = (capability: string): string[] => {
       return ["candidate_prompts"];
     case "scholarly-research.fetch_full_text":
       return ["paper_result_id", "paper_id", "result_id", "doi", "arxiv_id", "arxivId", "source_url", "pdf_url", "full_text_url", "url"];
+    case "scholarly-research.extract_numeric_parameters":
+      return ["source_ref", "full_text_observation", "requested_variables", "variables"];
     case "image_lens.inspect":
     case "situation-room.describe_visual_capture":
       return ["view_state", "source_id", "regions"];
@@ -1089,7 +1114,8 @@ const workspaceDirectoryThenDocsDebug = (overrides: Record<string, unknown> = {}
       },
       {
         requested_capability: "docs-viewer.locate_in_doc",
-        executed_capability: "docs-viewer.locate_in_doc",
+        runtime_capability: "docs.search",
+        executed_capability: "docs.search",
         args: {
           query: "rule of thumb",
           path: "docs/helix-ask-codex-loop-discipline.md",
@@ -1137,7 +1163,8 @@ const docsThenCalculatorDebug = (overrides: Record<string, unknown> = {}) => {
     subgoals: [
       {
         requested_capability: "docs-viewer.locate_in_doc",
-        executed_capability: "docs-viewer.locate_in_doc",
+        runtime_capability: "docs.search",
+        executed_capability: "docs.search",
         args: {
           query: "rule of thumb",
           path: "docs/helix-ask-codex-loop-discipline.md",
@@ -1196,7 +1223,8 @@ const docsEquationContextThenCalculatorDebug = (overrides: Record<string, unknow
     subgoals: [
       {
         requested_capability: "docs-viewer.doc_equation_context",
-        executed_capability: "docs-viewer.doc_equation_context",
+        runtime_capability: "docs.search",
+        executed_capability: "docs.search",
         args: {
           query: "Alcubierre metric equation",
         },
@@ -1313,7 +1341,8 @@ const repoPlusDocsDebug = (overrides: Record<string, unknown> = {}) => {
       },
       {
         requested_capability: "docs-viewer.locate_in_doc",
-        executed_capability: "docs-viewer.locate_in_doc",
+        runtime_capability: "docs.search",
+        executed_capability: "docs.search",
         args: {
           query: "same rule",
           path: "docs/helix-ask-codex-loop-discipline.md",
@@ -1454,7 +1483,8 @@ const docsReflectionCalculatorDebug = (overrides: Record<string, unknown> = {}) 
     subgoals: [
       {
         requested_capability: "docs-viewer.locate_in_doc",
-        executed_capability: "docs-viewer.locate_in_doc",
+        runtime_capability: "docs.search",
+        executed_capability: "docs.search",
         args: {
           query: "receipts are observations",
         },
@@ -2537,6 +2567,169 @@ const moralGraphReflectionBridgeDebug = (overrides: Record<string, unknown> = {}
   });
 };
 
+const scholarlyNumericParametersThenCalculatorDebug = (overrides: Record<string, unknown> = {}) => {
+  const turnId = "ask:test:scholarly-numeric-parameters";
+  const lookupSubgoalId = `${turnId}:compound_capability_subgoal:1:scholarly-research_lookup_papers`;
+  const fullTextSubgoalId = `${turnId}:compound_capability_subgoal:2:scholarly-research_fetch_full_text`;
+  const fullTextBindingId = `${fullTextSubgoalId}:input_binding:1`;
+  const numericSubgoalId = `${turnId}:compound_capability_subgoal:3:scholarly-research_extract_numeric_parameters`;
+  const numericBindingId = `${numericSubgoalId}:input_binding:1`;
+  const calculatorSubgoalId = `${turnId}:compound_capability_subgoal:4:scientific-calculator_solve_expression`;
+  const calculatorBindingSources = [
+    [lookupSubgoalId, "scholarly-research.lookup_papers", "scholarly_research_observation"],
+    [fullTextSubgoalId, "scholarly-research.fetch_full_text", "scholarly_full_text_observation"],
+    [numericSubgoalId, "scholarly-research.extract_numeric_parameters", "scholarly_numeric_parameter_observation"],
+  ] as const;
+  return compoundDebug({
+    turnId,
+    subgoals: [
+      {
+        requested_capability: "scholarly-research.lookup_papers",
+        executed_capability: "scholarly-research.lookup_papers",
+        args: { query: "tokamak unit-bearing plasma density temperature magnetic field" },
+        observation_kind: "scholarly_research_observation",
+        observation_ref: "obs:scholarly-lookup",
+      },
+      {
+        requested_capability: "scholarly-research.fetch_full_text",
+        executed_capability: "scholarly-research.fetch_full_text",
+        args: { paper_result_or_source: "obs:scholarly-lookup" },
+        input_bindings: [{
+          binding_id: fullTextBindingId,
+          arg_name: "paper_result_or_source",
+          binding_kind: "source_ref",
+          from_subgoal_id: lookupSubgoalId,
+          from_capability: "scholarly-research.lookup_papers",
+          required_observation_kinds: ["scholarly_research_observation"],
+          required: true,
+          status: "bound",
+        }],
+        bound_input_refs: [{
+          binding_id: fullTextBindingId,
+          arg_name: "paper_result_or_source",
+          binding_kind: "source_ref",
+          from_subgoal_id: lookupSubgoalId,
+          from_capability: "scholarly-research.lookup_papers",
+          ref: "obs:scholarly-lookup",
+        }],
+        observation_kind: "scholarly_full_text_observation",
+        observation_ref: "obs:scholarly-full-text",
+      },
+      {
+        requested_capability: "scholarly-research.extract_numeric_parameters",
+        executed_capability: "scholarly-research.extract_numeric_parameters",
+        args: {
+          text_evidence: "obs:scholarly-full-text",
+          requested_variables: ["n_m3", "T_eV", "B_T"],
+        },
+        input_bindings: [{
+          binding_id: numericBindingId,
+          arg_name: "text_evidence",
+          binding_kind: "source_ref",
+          from_subgoal_id: fullTextSubgoalId,
+          from_capability: "scholarly-research.fetch_full_text",
+          required_observation_kinds: ["scholarly_full_text_observation"],
+          required: true,
+          status: "bound",
+        }],
+        bound_input_refs: [{
+          binding_id: numericBindingId,
+          arg_name: "text_evidence",
+          binding_kind: "source_ref",
+          from_subgoal_id: fullTextSubgoalId,
+          from_capability: "scholarly-research.fetch_full_text",
+          ref: "obs:scholarly-full-text",
+        }],
+        observation_kind: null,
+        observation_ref: null,
+        satisfaction: "failed",
+        rail_status: "fail_closed",
+        first_broken_rail: "observation_binding",
+        rail_failure_code: "numeric_parameter_evidence_incomplete",
+        repair_target: "scholarly_numeric_parameter_evidence",
+      },
+      {
+        requested_capability: "scientific-calculator.solve_expression",
+        executed_capability: null,
+        args: {},
+        input_bindings: calculatorBindingSources.map(([fromSubgoalId, fromCapability, observationKind], index) => ({
+          binding_id: `${calculatorSubgoalId}:input_binding:${index + 1}`,
+          arg_name: "support_refs",
+          binding_kind: "support_ref",
+          from_subgoal_id: fromSubgoalId,
+          from_capability: fromCapability,
+          required_observation_kinds: [observationKind],
+          required: true,
+          status: "pending",
+        })),
+        unresolved_input_bindings: calculatorBindingSources.map(([fromSubgoalId, fromCapability, observationKind], index) => ({
+          binding_id: `${calculatorSubgoalId}:input_binding:${index + 1}`,
+          arg_name: "support_refs",
+          binding_kind: "support_ref",
+          from_subgoal_id: fromSubgoalId,
+          from_capability: fromCapability,
+          required_observation_kinds: [observationKind],
+          required: true,
+          status: "pending",
+        })),
+        observation_kind: null,
+        observation_ref: null,
+        satisfaction: "missing",
+        rail_status: "fail_closed",
+        first_broken_rail: "input_binding",
+        rail_failure_code: "required_numeric_evidence_unavailable",
+        repair_target: "scholarly_numeric_parameter_evidence",
+      },
+    ],
+    overrides,
+  });
+};
+
+const scholarlyLookupTheoryObservationDebug = (overrides: Record<string, unknown> = {}) => {
+  const turnId = "ask:test:scholarly-lookup-theory-observation";
+  const lookupSubgoalId = `${turnId}:compound_capability_subgoal:1:scholarly-research_lookup_papers`;
+  const reflectionSubgoalId = `${turnId}:compound_capability_subgoal:2:theory-badge-graph_reflect_discussion_context`;
+  const bindingId = `${reflectionSubgoalId}:input_binding:1`;
+  return compoundDebug({
+    turnId,
+    subgoals: [
+      {
+        requested_capability: "scholarly-research.lookup_papers",
+        executed_capability: "scholarly-research.lookup_papers",
+        args: { query: "tokamak operating parameters" },
+        observation_kind: "scholarly_research_observation",
+        observation_ref: "obs:scholarly-lookup",
+      },
+      {
+        requested_capability: "helix_ask.reflect_theory_context",
+        executed_capability: "helix_ask.reflect_theory_context",
+        args: { prompt: "reflect the bounded claim against the theory badge graph" },
+        input_bindings: [{
+          binding_id: bindingId,
+          arg_name: "source_ref",
+          binding_kind: "source_ref",
+          from_subgoal_id: lookupSubgoalId,
+          from_capability: "scholarly-research.lookup_papers",
+          required_observation_kinds: ["scholarly_research_observation"],
+          required: true,
+          status: "bound",
+        }],
+        bound_input_refs: [{
+          binding_id: bindingId,
+          arg_name: "source_ref",
+          binding_kind: "source_ref",
+          from_subgoal_id: lookupSubgoalId,
+          from_capability: "scholarly-research.lookup_papers",
+          ref: "obs:scholarly-lookup",
+        }],
+        observation_kind: "theory_context_reflection",
+        observation_ref: "obs:theory-reflection",
+      },
+    ],
+    overrides,
+  });
+};
+
 const deterministicDebugFixtureByScenarioId = {
   workspace_then_calculator: workspaceThenCalculatorDebug,
   docs_then_calculator: docsThenCalculatorDebug,
@@ -2558,6 +2751,9 @@ const deterministicDebugFixtureByScenarioId = {
   internet_reflection_calculator: internetReflectionCalculatorDebug,
   scholarly_reflection_calculator: scholarlyReflectionCalculatorDebug,
   scholarly_full_text_reflection_calculator: scholarlyFullTextReflectionCalculatorDebug,
+  scholarly_numeric_parameters_then_calculator: scholarlyNumericParametersThenCalculatorDebug,
+  scholarly_default_lookup_agent_decision: scholarlyLookupTheoryObservationDebug,
+  scholarly_irrelevant_lookup_blocks_dependent_chain: scholarlyLookupTheoryObservationDebug,
   context_reflection_calculator: contextReflectionCalculatorDebug,
   theory_frontier_trace_calculator: theoryFrontierTraceCalculatorDebug,
   live_synthetic_data_reflection_calculator: liveSyntheticDataReflectionCalculatorDebug,
@@ -2886,7 +3082,7 @@ describe("Helix Ask compound capability live probe", () => {
       "scientific-calculator.solve_expression",
     ]);
     expect(result.executed_capabilities).toEqual([
-      "docs-viewer.locate_in_doc",
+      "docs.search",
       "scientific-calculator.solve_expression",
     ]);
     expect(result.observation_kinds).toEqual([
@@ -2922,7 +3118,7 @@ describe("Helix Ask compound capability live probe", () => {
       "scientific-calculator.solve_expression",
     ]);
     expect(result.executed_capabilities).toEqual([
-      "docs-viewer.doc_equation_context",
+      "docs.search",
       "scientific-calculator.solve_expression",
     ]);
     expect(result.observation_kinds).toEqual([
@@ -2959,7 +3155,7 @@ describe("Helix Ask compound capability live probe", () => {
     ]);
     expect(result.executed_capabilities).toEqual([
       "workspace-directory.resolve",
-      "docs-viewer.locate_in_doc",
+      "docs.search",
     ]);
   });
 
@@ -3055,7 +3251,7 @@ describe("Helix Ask compound capability live probe", () => {
     ]);
     expect(result.executed_capabilities).toEqual([
       "repo-code.search_concept",
-      "docs-viewer.locate_in_doc",
+      "docs.search",
     ]);
     expect(result.observation_kinds).toEqual([
       "repo_code_evidence_observation",
@@ -3125,7 +3321,7 @@ describe("Helix Ask compound capability live probe", () => {
       "scientific-calculator.solve_expression",
     ]);
     expect(result.executed_capabilities).toEqual([
-      "docs-viewer.locate_in_doc",
+      "docs.search",
       "helix_ask.reflect_theory_context",
       "scientific-calculator.solve_expression",
     ]);
@@ -4200,7 +4396,7 @@ describe("Helix Ask compound capability live probe", () => {
     expect(result.ok).toBe(true);
     expect(result.terminal_error_code).toBe("invalid_arg:latex_is_prose");
     expect(result.final_answer_source).toBe("typed_failure");
-    expect(result.executed_capabilities).toEqual(["docs-viewer.locate_in_doc", null]);
+    expect(result.executed_capabilities).toEqual(["docs.search", null]);
     expect(result.subgoal_satisfactions).toEqual(["satisfied", "failed"]);
     expect(result.subgoal_rail_statuses).toEqual(["complete", "fail_closed"]);
     expect(result.subgoal_first_broken_rails).toEqual([null, "capability_execution"]);
@@ -4235,7 +4431,7 @@ describe("Helix Ask compound capability live probe", () => {
     expect(result.ok).toBe(true);
     expect(result.terminal_error_code).toBe("missing_required_arg:latex");
     expect(result.final_answer_source).toBe("typed_failure");
-    expect(result.executed_capabilities).toEqual(["docs-viewer.locate_in_doc", null]);
+    expect(result.executed_capabilities).toEqual(["docs.search", null]);
     expect(result.subgoal_satisfactions).toEqual(["satisfied", "failed"]);
     expect(result.subgoal_rail_statuses).toEqual(["complete", "fail_closed"]);
     expect(result.subgoal_first_broken_rails).toEqual([null, "capability_execution"]);

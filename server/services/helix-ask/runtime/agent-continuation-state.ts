@@ -281,13 +281,18 @@ const classifyRetryability = (args: {
   message: string | null;
 }): HelixAgentContinuationRetryability => {
   if (args.status === "succeeded") return "not_applicable";
+  const text = `${args.code ?? ""} ${args.message ?? ""}`.toLowerCase();
+  if (
+    /runtime_capability_not_admitted_by_tool_policy|runtime_tool_forbidden_by_tool_policy|route_contract_forbidden/.test(text)
+  ) {
+    return "non_retryable";
+  }
   const explicit = readString(args.record?.retryability);
   if (["retryable", "non_retryable", "requires_user_input", "unknown"].includes(explicit ?? "")) {
     return explicit as HelixAgentContinuationRetryability;
   }
   if (readBoolean(args.record?.repairable) === true || readBoolean(args.record?.retryable) === true) return "retryable";
   if (readBoolean(args.record?.retryable) === false) return "non_retryable";
-  const text = `${args.code ?? ""} ${args.message ?? ""}`.toLowerCase();
   if (args.failureClass === "permission" || /requires_user|missing_user|confirmation_required/.test(text)) {
     return "requires_user_input";
   }
@@ -594,7 +599,16 @@ export const buildHelixAgentContinuationState = (
   const affordances = collectAffordances(args.payload, args.turnId, triedFingerprints);
   const previousAffordanceIds = new Set(previousState?.next_admissible_affordances.map((entry: HelixAgentContinuationAffordance) => entry.affordance_id) ?? []);
   const newAffordanceCount = affordances.filter((entry: HelixAgentContinuationAffordance) => !previousAffordanceIds.has(entry.affordance_id)).length;
-  const madeProgress = newObservations.length > 0 || resolvedRequirements.length > 0 || newAffordanceCount > 0;
+  const failedAttemptHasOnlyBookkeepingObservations = Boolean(
+    lastAttempt &&
+    (lastAttempt.status === "failed" || lastAttempt.status === "blocked") &&
+    resolvedRequirements.length === 0 &&
+    newAffordanceCount === 0,
+  );
+  const madeProgress =
+    (newObservations.length > 0 && !failedAttemptHasOnlyBookkeepingObservations) ||
+    resolvedRequirements.length > 0 ||
+    newAffordanceCount > 0;
   const repeatedFingerprint = Boolean(
     previousState?.last_attempt?.action_fingerprint &&
     lastAttempt?.action_fingerprint &&
@@ -613,6 +627,7 @@ export const buildHelixAgentContinuationState = (
     addedRequirements.length > 0 ? "requirements_added" : null,
     newAffordanceCount > 0 ? "new_affordance" : null,
     repeatedFingerprint && !madeProgress ? "repeated_action_without_progress" : null,
+    failedAttemptHasOnlyBookkeepingObservations ? "failed_attempt_observation_only" : null,
     budget.soft.pressure !== "none" ? `soft_budget_${budget.soft.pressure}` : null,
     budget.hard.exhausted ? "hard_resource_boundary_exhausted" : null,
     !previousState ? "initial_continuation_state" : null,

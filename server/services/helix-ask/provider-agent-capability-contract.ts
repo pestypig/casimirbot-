@@ -260,6 +260,8 @@ export const PROVIDER_AGENT_CAPABILITY_CLASSIFICATIONS: readonly ProviderAgentCa
     }),
   ),
   ...[
+    "runtime_evidence",
+    "debug.inspect_current_turn",
     "helix_ask.inspect_capability_catalog",
     "helix_ask.reflect_workstation_tool_alignment",
     "workspace-directory.resolve",
@@ -281,6 +283,12 @@ export const PROVIDER_AGENT_CAPABILITY_CLASSIFICATIONS: readonly ProviderAgentCa
       notes: "Explicit route contract exists, but this exact capability id is not a provider gateway manifest id; graduate only with an explicit gateway alias/observation contract.",
     }),
   ),
+  explicit("live_pipeline", {
+    availability: "blocked_pending_contract",
+    permissionClass: "mutating_control",
+    requiredContractBeforeGateway: mutatingControlChecklist,
+    notes: "Abstract live-pipeline control surface; provider execution remains blocked until an affirmative-command, permission, structured receipt, and negative-admission contract is complete.",
+  }),
   ...[
     "scientific-calculator.open",
     "scientific-calculator.start_equation_live_source",

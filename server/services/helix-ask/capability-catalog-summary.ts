@@ -29,7 +29,7 @@ export const createAskTurnCapabilityHelpSummaryBuilder = (
   const catalog = deps.buildCapabilityCatalogObservation();
   const asksAboutScholarlyImageLensWorkflow = Boolean(
     question &&
-    /\b(?:research\s+papers?|scholarly|full[-\s]?text)\b/i.test(question) &&
+    /\b(?:research[-\s]+papers?|scholarly|full[-\s]?text)\b/i.test(question) &&
     /\b(?:parse|open|openable|image\s+lens|pick|select|choose|check)\b/i.test(question),
   );
   if (asksAboutScholarlyImageLensWorkflow) {

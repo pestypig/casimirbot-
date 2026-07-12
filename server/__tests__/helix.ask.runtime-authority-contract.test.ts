@@ -16,6 +16,74 @@ import { buildRouteProductContract } from "../services/helix-ask/route-product-c
 import { resolveToolFamilyContract } from "../services/helix-ask/tool-family-contract";
 
 describe("helix ask runtime authority contract", () => {
+  it("retains capability-catalog observation authority after the model selects the answer step", () => {
+    const payload = {
+      canonical_goal_frame: {
+        goal_kind: "capability_help",
+        required_terminal_kind: "capability_help_summary",
+      },
+      route_product_contract: {
+        allowed_terminal_artifact_kinds: ["capability_help_summary", "typed_failure"],
+      },
+      terminal_artifact_kind: "capability_help_summary",
+      final_answer_source: "capability_help_summary",
+      capability_plan: {
+        selected_capability: "helix_ask.inspect_capability_catalog",
+      },
+      tool_turn_chain_audit: {
+        selected_capability: "helix_ask.inspect_capability_catalog",
+        executed_capability: "helix_ask.inspect_capability_catalog",
+      },
+      agent_step_decision: {
+        chosen_capability: "model.direct_answer",
+        next_step: "answer",
+        decision_timing: "post_observation",
+        decision_authority: "llm",
+      },
+      agent_runtime_loop: {
+        executed_tool_call_count: 0,
+        iterations: [{
+          chosen_capability: "model.direct_answer",
+          next_step: "answer",
+          decision_timing: "post_observation",
+          decision_authority: "llm",
+          observation_role: "model_answer_draft",
+        }],
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "ask:test:capability_registry",
+          kind: "capability_registry",
+          payload: { schema: "helix.capability_registry.v1" },
+        },
+        {
+          artifact_id: "ask:test:capability_help_summary",
+          kind: "capability_help_summary",
+          payload: {
+            schema: "helix.capability_help_summary.v1",
+            text: "Capability help is grounded in the current runtime catalog.",
+          },
+        },
+      ],
+    };
+
+    expect(hasSelectedCapabilityObservation(payload)).toBe(true);
+    expect(evaluateTerminalBoundaryEligibility(payload)).toMatchObject({
+      eligible: true,
+      severity: "pass",
+      checks: {
+        selected_capability_observation: true,
+        post_observation_model_decision: true,
+        goal_satisfaction_allows_terminal: true,
+      },
+      blocking_reasons: [],
+    });
+  });
+
   it("requires model-only direct answers to include a model answer step and answer draft", () => {
     const report = evaluateTerminalBoundaryEligibility({
       canonical_goal_frame: { goal_kind: "model_only_concept" },

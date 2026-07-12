@@ -140,6 +140,7 @@ export const inferCommittedRouteToolFamily = (capabilityId: string): string => {
   if (/reflect[_-]?ideology[_-]?context|bridge[_-]?theory[_-]?ideology|moral[-_.]?graph|ideology_context_reflection/i.test(capabilityId)) return "moral_graph_reflection";
   if (/civilization[-_.]?bounds|civilization[-_.]?scenario|reflect[_-]?civilization|build[_-]?civilization/i.test(capabilityId)) return "civilization_bounds";
   if (/reflect[_-]?context[_-]?attachments|reflect[_-]?live[_-]?synthetic[_-]?data|context[_-]?reflection/i.test(capabilityId)) return "context_reflection";
+  if (/^(?:workstation\.|account_session\.)/i.test(capabilityId)) return "workstation_action";
   if (/click|open|close|panel|workspace-action|workspace_action/i.test(capabilityId)) return "workstation_action";
   if (/workstation-notes|note/i.test(capabilityId)) return "notes";
   if (/repo|code|source-tree/i.test(capabilityId)) return "repo_code";

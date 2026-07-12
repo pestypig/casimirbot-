@@ -12,7 +12,7 @@ const VAGUE_RULE_PATTERNS = [
 
 describe("Moral wisdom procedural principle catalog", () => {
   it("requires every principle mapping to carry procedural source, rule, trace, and boundaries", () => {
-    expect(MORAL_WISDOM_PRINCIPLES.length).toBe(35);
+    expect(MORAL_WISDOM_PRINCIPLES.length).toBe(39);
 
     for (const principle of MORAL_WISDOM_PRINCIPLES) {
       expect(principle.sourceIdeologyNodeId).toBe(principle.id);
@@ -130,6 +130,27 @@ describe("Moral wisdom procedural principle catalog", () => {
       proceduralRole: "constraint",
       evidenceNeeds: ["transferred_burden_map", "affected_party_consent", "urgency_or_cost_shift"],
       refusesAuthority: ["delayed_conflict_as_reduced_harm", "externalized_fallout_without_consent"],
+    });
+  });
+
+  it("models civic trust traversal badges without global character or trust authority", () => {
+    expect(getMoralWisdomPrinciple("familiarity-anonymity-balance")).toMatchObject({
+      proceduralRole: "balancer",
+      procedureOperator: "balances",
+      refusesAuthority: expect.arrayContaining(["rural_density_as_virtue", "urban_density_as_distrust"]),
+    });
+    expect(getMoralWisdomPrinciple("trust-medium-translation")).toMatchObject({
+      proceduralRole: "balancer",
+      evidenceNeeds: expect.arrayContaining(["source_trust_channel", "translation_loss"]),
+    });
+    expect(getMoralWisdomPrinciple("domain-bounded-accountability")).toMatchObject({
+      proceduralRole: "evidence_requirement",
+      refusesAuthority: expect.arrayContaining(["credit_as_moral_worth", "cross_domain_trust_totalization"]),
+    });
+    expect(getMoralWisdomPrinciple("contestable-reentry-threshold")).toMatchObject({
+      proceduralRole: "action_gate",
+      procedureOperator: "requires",
+      refusesAuthority: expect.arrayContaining(["permanent_reject_identity", "unappealable_score"]),
     });
   });
 });

@@ -410,6 +410,8 @@ alias is preserved in `source_target_intent.alias_capability`; reflections
 remain diagnostic observations and are not proof or terminal authority.
 
 ```txt
+runtime_evidence
+debug.inspect_current_turn
 helix_ask.inspect_capability_catalog
 helix_ask.reflect_workstation_tool_alignment
 workspace-directory.resolve
@@ -760,6 +762,7 @@ agents until explicit permission, confirmation, receipt, and negative-admission
 tests exist:
 
 ```txt
+live_pipeline
 live_env.start_agent_goal_session
 live_env.change_workstation_preset
 live_env.set_visual_preset

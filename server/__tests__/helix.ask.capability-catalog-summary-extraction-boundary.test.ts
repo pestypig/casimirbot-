@@ -48,4 +48,30 @@ describe("Helix Ask capability catalog summary extraction boundary", () => {
     expect(summary).toContain("Image Lens");
     expect(summary).toContain("should not become answer evidence");
   });
+
+  it("keeps the hyphenated exact UI capability question on the focused scholarly summary", () => {
+    const buildSummary = createAskTurnCapabilityHelpSummaryBuilder({
+      normalizeDocPath: () => "docs/irrelevant-open-document.md",
+      resolveWorkspaceNoteTitle: () => "irrelevant active note",
+      buildCapabilityCatalogObservation: () => ({
+        active_dynamic_tool_count: 4,
+        information_reflection: [],
+        utility: [],
+        explicit_reflection_families: [],
+        explicit_utility_families: [],
+      }),
+      workstationToolAlignmentCapability: "workstation.inspect_tool_alignment",
+      liveSyntheticDataReflectionCapability: "live-source.inspect_synthetic_data",
+    });
+
+    const summary = buildSummary(
+      null,
+      "Does your research-paper tool let you choose papers it can parse, or do you first check which papers are openable and then use Image Lens? Answer only from your capability contract. Do not retrieve a paper or call a tool.",
+    );
+
+    expect(summary).toContain("scholarly-research.fetch_full_text");
+    expect(summary).toContain("use Image Lens selectively");
+    expect(summary).not.toContain("Current doc context");
+    expect(summary).not.toContain("Current note context");
+  });
 });

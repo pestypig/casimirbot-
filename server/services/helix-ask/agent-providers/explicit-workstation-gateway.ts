@@ -60,6 +60,7 @@ import {
 } from "./active-context-tool-requests";
 import {
   buildPromptDerivedCalculatorSolveGatewayCallRequests,
+  buildPromptDerivedCivilizationBoundsGatewayCallRequests,
   buildPromptDerivedInternetSearchGatewayCallRequests,
   buildPromptDerivedMoralGraphReflectionGatewayCallRequests,
   buildPromptDerivedRepoSearchGatewayCallRequests,
@@ -494,6 +495,7 @@ export {
 } from "./active-context-tool-requests";
 export {
   buildPromptDerivedCalculatorSolveGatewayCallRequests,
+  buildPromptDerivedCivilizationBoundsGatewayCallRequests,
   buildPromptDerivedInternetSearchGatewayCallRequests,
   buildPromptDerivedMoralGraphReflectionGatewayCallRequests,
   buildPromptDerivedRepoSearchGatewayCallRequests,
@@ -510,6 +512,7 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
 }): Record<string, unknown>[] => {
   const explicit = readExplicitWorkstationGatewayCallRequests(input.body);
   if (explicit.length > 0) return filterRequestsAllowedByCommittedRoute(input.body, explicit);
+  if (input.body.provider_reasoning_resume === true || input.body.providerReasoningResume === true) return [];
   if (input.includePlannerDerived !== true) return [];
   const requests: Record<string, unknown>[] = [];
   const seen = new Set<string>();
@@ -537,7 +540,10 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
     );
   const structured = buildStructuredAdmissionWorkstationGatewayCallRequests(input.body);
   appendDedupe(requests, seen, structured);
-  if (isAskTurnCapabilityHelpIntent(prompt)) {
+  if (
+    isAskTurnCapabilityHelpIntent(prompt) &&
+    buildPromptDerivedWorkspaceStatusGatewayCallRequests(input.body).length === 0
+  ) {
     return finalizeRequests(requests);
   }
   const compoundDependencyRequests = buildCompoundCapabilityDependencyGatewayCallRequests(input.body);
@@ -547,6 +553,21 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
       .map((request) => readString(request.capability_id) ?? readString(request.capabilityId))
       .filter((capability): capability is string => Boolean(capability)),
   );
+  // A structured source-target admission is the authoritative route decision for
+  // the turn. Keep independently admitted compound dependencies, but do not let
+  // lexical capability names or active-panel context append a competing source.
+  // For example, a repo-code query about where `workspace_os.status` is
+  // implemented must remain a repo search rather than executing workspace status.
+  const hasPrimaryStructuredAdmission = Boolean(
+    readRecord(input.body.source_target_intent ?? input.body.sourceTargetIntent),
+  );
+  if (hasPrimaryStructuredAdmission && structured.length > 0) {
+    return finalizeRequests(reduceMoralGraphRequestsToPrimary({
+      requests,
+      prompt,
+      promptNamedCapabilities: new Set<string>(),
+    }));
+  }
 
   const promptNamed = filterContextuallySuppressedPromptRequests(
     buildPromptNamedCapabilityGatewayCallRequests(input.body),
@@ -621,6 +642,9 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
     compoundDependencyCapabilities.size === 0
   ) {
     appendPromptDerivedDedupe(buildPromptDerivedTheoryReflectionGatewayCallRequests(input.body));
+  }
+  if (!promptNamedCapabilities.has(CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY)) {
+    appendPromptDerivedDedupe(buildPromptDerivedCivilizationBoundsGatewayCallRequests(input.body));
   }
   if (
     promptNamedCapabilities.size === 0 &&

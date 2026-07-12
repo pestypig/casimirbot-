@@ -2666,7 +2666,7 @@ function hasCivilizationComparisonCue(prompt: string): boolean {
 }
 
 function hasCivilizationProceduralWorldCue(prompt: string): boolean {
-  return /\b(?:civilization|civilis(?:ation|ed)|societ(?:y|ies)|nation(?:s|al)?|countr(?:y|ies)|state(?:s)?|polity|world\s+map|earth\s+map|planetary|global|geopolitical|borders?|trade\s+routes?|shipping\s+lanes?|ports?|chokepoints?|supply\s+chains?|infrastructure|roads?|rails?|air\s+routes?|dependency\s+(?:edge|edges|graph|analysis)|dependencies|route\s+candidates?|observed\s+flows?|physical\s+substrate|tectonic\s+plates?|weather\s+fronts?|tides?|currents?|seismic|earthquakes?|live\s+(?:sources?|measurements?|data)|historical\s+(?:sources?|measurements?|records?)|source[-\s]?backed|procedural\s+(?:world|evidence|map|atlas|system|order|dependencies)|ground(?:ing|ed)?\s+(?:against|in|to|with)|material\s+base|environmental\s+fields?)\b/i.test(
+  return /\b(?:civilization|civilis(?:ation|ed)|societ(?:y|ies)|nation(?:s|al)?|countr(?:y|ies)|nation[-\s]?states?|member\s+states?|sovereign\s+states?|state\s+actors?|polity|world\s+map|earth\s+map|planetary|global|geopolitical|borders?|trade\s+routes?|shipping\s+lanes?|ports?|chokepoints?|supply\s+chains?|infrastructure|roads?|rails?|air\s+routes?|dependency\s+(?:edge|edges|graph|analysis)|dependencies|route\s+candidates?|observed\s+flows?|physical\s+substrate|tectonic\s+plates?|weather\s+fronts?|tides?|currents?|seismic|earthquakes?|live\s+(?:sources?|measurements?|data)|historical\s+(?:sources?|measurements?|records?)|source[-\s]?backed|procedural\s+(?:world|evidence|map|atlas|system|order|dependencies)|ground(?:ing|ed)?\s+(?:against|in|to|with)|material\s+base|environmental\s+fields?)\b/i.test(
     prompt,
   );
 }

@@ -253,6 +253,47 @@ describe("agent continuation state", () => {
     });
   });
 
+  it("treats tool-policy rejection as non-retryable bookkeeping rather than progress", () => {
+    const payload: Record<string, unknown> = {
+      goal_satisfaction_evaluation: {
+        satisfaction: "unsatisfied",
+        missing_requirement_ids: ["evidence"],
+      },
+      agent_loop_budget: budget(),
+      current_turn_artifact_ledger: [
+        artifact({
+          id: "ask:continuation:policy-rejection",
+          kind: "runtime_tool_observation",
+          payload: { status: "invalid_args" },
+        }),
+      ],
+    };
+
+    const state = buildHelixAgentContinuationState({
+      payload,
+      turnId: "ask:continuation",
+      trigger: "invalid_tool_call_observation",
+      lastAttempt: {
+        attempt_id: "attempt:policy-rejection",
+        capability_id: "live_env.read_processed_live_source_mail",
+        status: "failed",
+        failure_class: "permission",
+        failure_code: "invalid_args",
+        failure_message:
+          "runtime_capability_not_admitted_by_tool_policy:live_env.read_processed_live_source_mail:live_environment, runtime_tool_forbidden_by_tool_policy:live_env.read_processed_live_source_mail",
+        retryability: "retryable",
+      },
+    });
+
+    expect(state.last_attempt?.retryability).toBe("non_retryable");
+    expect(state.progress).toMatchObject({
+      made_progress: false,
+      new_observation_count: 1,
+      reason_codes: expect.arrayContaining(["failed_attempt_observation_only"]),
+    });
+    expect(state.allowed_decisions).not.toContain("retry");
+  });
+
   it("tracks compound observations and remaining subgoals without privileging a tool order", () => {
     const firstPayload: Record<string, unknown> = {
       goal_satisfaction_evaluation: {

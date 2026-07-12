@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyHelixTerminalAuthoritySingleWriter,
   applyTerminalProjectionKindGuard,
+  shouldRefreshHelixTerminalAuthorityAfterSatisfiedGoal,
   syncDocEvidenceSynthesisSingleWriterFromTerminalAuthority,
   syncHelixTypedFailureAuthorityPublicMirrors,
 } from "../services/helix-ask/terminal-authority-single-writer";
@@ -1619,6 +1620,188 @@ describe("Helix terminal authority single writer", () => {
       terminal_error_code: "post_tool_model_step_missing",
       final_answer_source: "typed_failure",
     });
+  });
+
+  it("repairs stale failure authority when capability help passed terminal arbitration", () => {
+    const helpText = "The scholarly lookup selects candidates first; Image Lens is used only for visual extraction.";
+    const payload: Record<string, unknown> = {
+      selected_final_answer: helpText,
+      answer: helpText,
+      final_answer_contract_pass: true,
+      final_answer_contract_family: "capability_help",
+      canonical_goal_frame: { required_terminal_kind: "capability_help_summary" },
+      solver_controller_decision: {
+        decision: "allow_terminal",
+        selected_terminal_artifact_kind: "capability_help_summary",
+      },
+      terminal_error_code: "tool_execution_rejected",
+      typed_failure: { error_code: "tool_execution_rejected" },
+      terminal_answer_authority: {
+        terminal_kind: "failure",
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+        server_authoritative: true,
+      },
+      resolved_turn_summary: { final_status: "final_failure" },
+      terminal_presentation: { terminal_artifact_kind: "typed_failure" },
+    };
+
+    expect(syncHelixTypedFailureAuthorityPublicMirrors(payload)).toBe(true);
+    expect(payload).toMatchObject({
+      ok: true,
+      final_status: "final_answer",
+      terminal_artifact_kind: "capability_help_summary",
+      final_answer_source: "capability_help_summary",
+      selected_final_answer: helpText,
+    });
+    expect(payload.terminal_error_code).toBeUndefined();
+    expect(payload.typed_failure).toBeUndefined();
+  });
+
+  it("refreshes a stale 240-character failure preview after capability help satisfies its terminal contract", () => {
+    const turnId = "ask:test:capability-help-stale-terminal-writer";
+    const answerText = [
+      "The research-paper workflow first searches and ranks candidate papers; it does not assume every candidate is parseable.",
+      "- scholarly-research.lookup_papers discovers candidates. scholarly-research.fetch_full_text checks for usable full text.",
+      "- Image Lens is used selectively when scanned text, equations, figures, or tables require visual inspection.",
+    ].join("\n");
+    expect(answerText.length).toBeGreaterThan(240);
+
+    const registryArtifact = {
+      artifact_id: `${turnId}:capability_registry`,
+      kind: "capability_registry",
+      payload: {
+        schema: "helix.capability_registry.v1",
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+    };
+    const summaryArtifact = {
+      artifact_id: `${turnId}:capability_help_summary`,
+      kind: "capability_help_summary",
+      payload: {
+        schema: "helix.capability_help_summary.v1",
+        kind: "capability_help_summary",
+        text: answerText,
+        support_refs: [registryArtifact.artifact_id],
+        terminal_eligible: true,
+        assistant_answer: false,
+      },
+    };
+    const artifacts = [registryArtifact, summaryArtifact];
+    const clippedFailure = answerText.slice(0, 240);
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      canonical_goal_frame: {
+        goal_kind: "capability_help",
+        required_terminal_kind: "capability_help_summary",
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        allowed_terminal_artifact_kinds: ["capability_help_summary", "typed_failure"],
+        forbidden_terminal_artifact_kinds: ["direct_answer_text", "model_synthesized_answer"],
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      tool_call_admission_decision: {
+        admitted_capability: "helix_ask.inspect_capability_catalog",
+        selected_capability: "helix_ask.inspect_capability_catalog",
+      },
+      capability_plan: {
+        selected_capability: "helix_ask.inspect_capability_catalog",
+      },
+      agent_step_decision: {
+        chosen_capability: "model.direct_answer",
+        next_step: "answer",
+        decision_timing: "post_observation",
+        decision_authority: "llm",
+      },
+      agent_runtime_loop: {
+        executed_tool_call_count: 0,
+        iterations: [{
+          chosen_capability: "model.direct_answer",
+          next_step: "answer",
+          decision_timing: "post_observation",
+          decision_authority: "llm",
+          observation_role: "model_answer_draft",
+        }],
+      },
+      satisfaction_report: {
+        satisfied: true,
+        terminal_artifact_kind: "capability_help_summary",
+      },
+      current_turn_artifact_ledger: artifacts,
+      terminal_error_code: "terminal_not_materialized",
+      selected_final_answer: clippedFailure,
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      typed_failure: {
+        error_code: "terminal_not_materialized",
+        message: answerText,
+        text: clippedFailure,
+      },
+      terminal_authority_single_writer: {
+        selected_terminal_artifact_kind: "typed_failure",
+        visible_text: clippedFailure,
+      },
+      tool_turn_chain_audit: {
+        rail_status: "fail_closed",
+        rail_failure_code: "terminal_not_materialized",
+        first_broken_rail: "terminal_materialization",
+        repair_target: "terminal_materializer",
+        selected_capability: "helix_ask.inspect_capability_catalog",
+        executed_capability: "helix_ask.inspect_capability_catalog",
+      },
+    };
+
+    expect(shouldRefreshHelixTerminalAuthorityAfterSatisfiedGoal({ payload, artifactLedger: artifacts })).toBe(true);
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("capability_help_summary");
+    expect(result.visible_text).toBe(answerText);
+    expect(payload).toMatchObject({
+      ok: true,
+      final_status: "final_answer",
+      terminal_artifact_kind: "capability_help_summary",
+      final_answer_source: "capability_help_summary",
+      selected_final_answer: answerText,
+      terminal_presentation: {
+        terminal_artifact_kind: "capability_help_summary",
+        concise_text: answerText,
+      },
+    });
+    expect(payload.terminal_error_code).toBeUndefined();
+    expect(payload.typed_failure).toBeUndefined();
+  });
+
+  it("does not refresh a stale writer when the required terminal artifact is missing", () => {
+    const payload: Record<string, unknown> = {
+      canonical_goal_frame: {
+        goal_kind: "tool_request",
+        required_terminal_kind: "workstation_tool_evaluation",
+      },
+      route_product_contract: {
+        allowed_terminal_artifact_kinds: ["workstation_tool_evaluation", "typed_failure"],
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      terminal_error_code: "terminal_not_materialized",
+      terminal_authority_single_writer: {
+        selected_terminal_artifact_kind: "typed_failure",
+      },
+    };
+
+    expect(shouldRefreshHelixTerminalAuthorityAfterSatisfiedGoal({ payload, artifactLedger: [] })).toBe(false);
   });
 
   it("selects a post-observation final draft over stale workspace failure mirrors", () => {

@@ -2,7 +2,11 @@ import React from "react";
 import { Archive, ChevronDown, Database, KeyRound, Languages, Link2, LogIn, LogOut, RefreshCw, ShieldCheck, UserCircle } from "lucide-react";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
-import { getInterfaceLanguageOption, getInterfaceLanguageReadiness, INTERFACE_LANGUAGE_OPTIONS } from "@/lib/i18n/interfaceLanguage";
+import {
+  getInterfaceLanguageOption,
+  getInterfaceLanguageOptionsForAccount,
+  getInterfaceLanguageReadiness,
+} from "@/lib/i18n/interfaceLanguage";
 import { writeInterfaceLanguagePreference } from "@/lib/i18n/interfaceLanguagePreference";
 import { useInterfaceText, type InterfaceTextResolver } from "@/lib/i18n/interfaceText";
 import type { InterfaceMessageId } from "@/lib/i18n/messages/types";
@@ -274,6 +278,9 @@ export default function AccountSessionPanel() {
     state.buildRegistrySnapshot(),
   );
   const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const interfaceLanguageOptions = getInterfaceLanguageOptionsForAccount(
+    status.account_policy?.account_type ?? status.session?.account_policy?.account_type ?? "user",
+  );
   const interfaceText = useInterfaceText(interfaceLanguage.code);
   const t = interfaceText.t;
 
@@ -642,7 +649,7 @@ export default function AccountSessionPanel() {
             aria-label={interfaceText.t("account.language.interfaceLabel")}
             className="h-8 min-w-0 flex-1 rounded border border-white/15 bg-slate-950 px-2 text-xs text-white outline-none focus:border-cyan-400"
           >
-            {INTERFACE_LANGUAGE_OPTIONS.map((option) => (
+            {interfaceLanguageOptions.map((option) => (
               <option key={option.code} value={option.code}>
                 {t("account.language.optionReadiness", {
                   label: option.label,

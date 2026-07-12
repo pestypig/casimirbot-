@@ -10,7 +10,11 @@ import {
   type HelixAskGoldenPathRuntimeDependencies,
 } from "./runtime-dependencies";
 import { buildHelixAskGoldenPathRuntimeContractPayload } from "./runtime-contract-payload";
-import { orderedDispatchModules } from "./runtime-modules";
+import {
+  compoundDispatchModules,
+  singleCapabilityDispatchModules,
+} from "./runtime-modules";
+import { detectedItineraryAdapterCount } from "./itinerary/compound-itinerary";
 
 export const dispatchHelixAskGoldenPathRuntime = (args: {
   body: RecordLike;
@@ -28,7 +32,23 @@ export const dispatchHelixAskGoldenPathRuntime = (args: {
     return { handled: false, reason: "capability_help_precedence" };
   }
 
-  for (const dispatchModule of orderedDispatchModules) {
+  for (const dispatchModule of compoundDispatchModules) {
+    if (!dispatchModule.isRequested(body)) continue;
+    return {
+      handled: true,
+      payload: dispatchModule.buildPayload({ body, deps }),
+    };
+  }
+
+  // Dedicated two-family modules above keep their deterministic contracts.
+  // An unsupported natural two-family combination must stay on the full solver
+  // path; letting the first matching single-family module claim it silently
+  // drops the other required observation family.
+  if (!args.allowContractFallback && detectedItineraryAdapterCount(body) === 2) {
+    return { handled: false, reason: "two_family_compound_requires_full_solver" };
+  }
+
+  for (const dispatchModule of singleCapabilityDispatchModules) {
     if (!dispatchModule.isRequested(body)) continue;
     return {
       handled: true,

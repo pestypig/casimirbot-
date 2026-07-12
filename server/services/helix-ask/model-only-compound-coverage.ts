@@ -164,6 +164,32 @@ export function evaluateCompoundPromptCoverageGateFromAnswerArtifacts(input: {
   selected_answer_source: "final_answer_draft" | "direct_answer_text" | "provided_final_answer_text" | "none";
   model_only_compound_coverage_from_answer: HelixModelOnlyCompoundCoverageFromAnswer;
 } {
+  const canonicalGoal = readRecord(input.payload.canonical_goal_frame);
+  if (readString(canonicalGoal?.required_terminal_kind) === "capability_help_summary") {
+    const gate = evaluateCompoundPromptCoverageGate({
+      terminalArtifactKind: "capability_help_summary",
+      finalAnswerSource: "capability_help_summary",
+    });
+    return {
+      gate,
+      selected_answer_source: "none",
+      model_only_compound_coverage_from_answer: {
+        schema: "helix.model_only_compound_coverage_from_answer.v1",
+        turn_id: input.turnId,
+        applies: false,
+        passed: true,
+        required_count: 0,
+        answered_count: 0,
+        unresolved_requirement_ids: [],
+        coverage_source: "none",
+        route_scope: input.routeScope === "model_only" ? "model_only_allowed" : "source_targeted_forbidden",
+        reason: "canonical capability-help goals do not create compound execution obligations",
+        compound_prompt_coverage_gate: gate,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+  }
   const evidenceBackedAnswerText = readEvidenceBackedAnswerTextFromArtifacts(input.artifactLedger);
   const coverage = input.routeScope === "model_only"
     ? evaluateModelOnlyCompoundCoverageFromAnswer({

@@ -649,18 +649,18 @@ describe("Helix Ask response-boundary terminal mirrors", () => {
       status: "final_failure",
       terminal_artifact_kind: "typed_failure",
       final_answer_source: "typed_failure",
-      terminal_error_code: "typed_failure",
+      terminal_error_code: "terminal_authority_missing",
     });
     expect(normalized.debug).toMatchObject({
-      terminal_error_code: "typed_failure",
+      terminal_error_code: "terminal_authority_missing",
     });
     expect(envelope).toMatchObject({
-      terminal_error_code: "typed_failure",
+      terminal_error_code: "terminal_authority_missing",
       terminal_artifact_kind: "typed_failure",
       final_answer_source: "typed_failure",
     });
     expect(envelope?.resolved_turn_summary).toMatchObject({
-      terminal_error_code: "typed_failure",
+      terminal_error_code: "terminal_authority_missing",
       terminal_artifact_kind: "typed_failure",
       final_answer_source: "typed_failure",
     });

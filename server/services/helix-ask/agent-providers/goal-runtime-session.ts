@@ -407,6 +407,8 @@ const stripToolRequestsForProviderResume = (body: RecordLike): RecordLike => {
     laneCall: _laneCallCamel,
     workstation_gateway_call: _workstationGatewayCall,
     workstationGatewayCall: _workstationGatewayCallCamel,
+    workstation_gateway_calls: _workstationGatewayCalls,
+    workstationGatewayCalls: _workstationGatewayCallsCamel,
     ...rest
   } = body;
   return rest;
@@ -807,6 +809,7 @@ export class HelixRuntimeGoalSessionStore {
               thread_id: session.runtime_session_id,
               threadId: session.runtime_session_id,
               agent_runtime: provider.id,
+              provider_reasoning_resume: true,
               question:
                 buildProviderGoalResumeQuestion({
                   session: updated,

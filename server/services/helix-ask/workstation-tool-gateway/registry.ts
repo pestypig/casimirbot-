@@ -97,6 +97,8 @@ import {
   type ScientificImageEvidenceSidecarV1,
 } from "@shared/scientific-evidence-adaptor";
 import {
+  isPublicInterfaceLanguageCode,
+  PUBLIC_INTERFACE_LANGUAGE_CODES,
   SHARED_INTERFACE_LANGUAGE_CODES,
   type SharedInterfaceLanguageCode,
 } from "@shared/interface-language-codes";
@@ -4123,7 +4125,26 @@ export const listWorkstationGatewayCapabilities = (
   manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
   agent_runtime: cleanString(input.agentRuntime, "codex"),
   mode: normalizeMode(input.mode),
-  capabilities: Array.from(capabilities.values()),
+  capabilities: Array.from(capabilities.values()).map((manifest) => {
+    if (
+      input.accountType === "user" &&
+      manifest.capability_id === ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY
+    ) {
+      return {
+        ...manifest,
+        input_schema: {
+          ...manifest.input_schema,
+          properties: {
+            ...readRecord(manifest.input_schema.properties),
+            language: { type: "string", enum: [...PUBLIC_INTERFACE_LANGUAGE_CODES] },
+            interface_language: { type: "string", enum: [...PUBLIC_INTERFACE_LANGUAGE_CODES] },
+            interfaceLanguage: { type: "string", enum: [...PUBLIC_INTERFACE_LANGUAGE_CODES] },
+          },
+        },
+      };
+    }
+    return manifest;
+  }),
   assistant_answer: false,
   raw_content_included: false,
 });
@@ -5393,14 +5414,20 @@ export const callWorkstationGatewayCapability = async (
     const args = readArguments(input.arguments);
     const requestedLanguage = args.language ?? args.interface_language ?? args.interfaceLanguage;
     const language = readInterfaceLanguageCode(requestedLanguage);
-    const hasLanguage = Boolean(language);
+    const previewLocked = Boolean(
+      language && input.accountType === "user" && !isPublicInterfaceLanguageCode(language),
+    );
+    const hasLanguage = Boolean(language) && !previewLocked;
+    const blockedReason = previewLocked
+      ? "interface_language_preview_locked"
+      : "unsupported_interface_language";
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: hasLanguage ? "admitted" : "blocked",
-      reason: hasLanguage ? "mutating_workstation_preference_action" : "unsupported_interface_language",
-      blockedReason: hasLanguage ? undefined : "unsupported_interface_language",
+      reason: hasLanguage ? "mutating_workstation_preference_action" : blockedReason,
+      blockedReason: hasLanguage ? undefined : blockedReason,
       sourceTargetIntent: args.source_target_intent,
     });
     const workstationAction = hasLanguage
@@ -5425,7 +5452,9 @@ export const callWorkstationGatewayCapability = async (
       preference_key: "interfaceLanguage",
       language,
       requested_language: typeof requestedLanguage === "string" ? requestedLanguage : null,
-      supported_language_codes: [...SHARED_INTERFACE_LANGUAGE_CODES],
+      supported_language_codes: input.accountType === "user"
+        ? [...PUBLIC_INTERFACE_LANGUAGE_CODES]
+        : [...SHARED_INTERFACE_LANGUAGE_CODES],
       workstation_action: workstationAction,
       terminal_artifact_kind: "workspace_action_receipt",
       terminal_eligible: hasLanguage,
@@ -5442,11 +5471,15 @@ export const callWorkstationGatewayCapability = async (
       status: hasLanguage ? "succeeded" : "blocked",
       summary: hasLanguage
         ? `Account Session interface language action admitted for ${language}.`
-        : "Account Session interface language action was blocked because the language code is unsupported.",
+        : previewLocked
+          ? "Account Session interface language action was blocked because the catalog is developer preview only."
+          : "Account Session interface language action was blocked because the language code is unsupported.",
       observation,
       missingRequirements: hasLanguage ? [] : [{
-        code: "unsupported_interface_language",
-        message: "Provide a supported interface language code.",
+        code: blockedReason,
+        message: previewLocked
+          ? "Choose a public-release interface language or use a developer account for preview catalogs."
+          : "Provide a supported interface language code.",
         repair_action: "ask_user",
         rejected_expression: typeof requestedLanguage === "string" ? requestedLanguage : null,
       }],
@@ -5462,7 +5495,7 @@ export const callWorkstationGatewayCapability = async (
       agentRuntime,
       admission,
       observationPacket,
-      error: hasLanguage ? undefined : "unsupported_interface_language",
+      error: hasLanguage ? undefined : blockedReason,
       terminalEligible: hasLanguage,
     });
     return {
@@ -5486,7 +5519,7 @@ export const callWorkstationGatewayCapability = async (
       post_tool_model_step_required: true,
       assistant_answer: false,
       raw_content_included: false,
-      error: hasLanguage ? undefined : "unsupported_interface_language",
+      error: hasLanguage ? undefined : blockedReason,
     };
   }
 

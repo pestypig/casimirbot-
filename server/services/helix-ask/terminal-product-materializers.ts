@@ -53,6 +53,9 @@ const PROVIDER_AUTHORED_ROUTE_PRODUCT_KINDS = new Set([
   "compound_research_locator_answer",
   "scholarly_research_answer",
   "internet_search_answer",
+  "workspace_status_answer",
+  "capability_help_summary",
+  "workstation_tool_evaluation",
   "theory_context_reflection_answer",
   "situation_room_live_job_setup_answer",
 ]);
@@ -97,6 +100,18 @@ const artifactId = (artifact: HelixTerminalProductArtifactLike): string | null =
   readString(artifact.artifact_id) ??
   readString((artifact as Record<string, unknown>).artifact_ref) ??
     readString(artifactPayload(artifact)?.artifact_id);
+
+const artifactObservationSucceeded = (artifact: HelixTerminalProductArtifactLike): boolean => {
+  const payload = artifactPayload(artifact);
+  const observation = readRecord(payload?.observation);
+  if ((artifact as Record<string, unknown>).ok === false || payload?.ok === false) return false;
+  const statuses = [
+    readString((artifact as Record<string, unknown>).status),
+    readString(payload?.status),
+    readString(observation?.status),
+  ].filter((status): status is string => Boolean(status));
+  return statuses.every((status) => !/^(?:failed|blocked|missing_input|needs_confirmation|error)$/i.test(status));
+};
 
 export const inspectAgentProviderRouteProductEligibility = (input: {
   payload: Record<string, unknown>;
@@ -742,8 +757,29 @@ export const materializeAgentProviderRouteProductTerminal = (input: {
 
   const rejectedSupportRefs = requestedSupportRefs.filter((ref) => !currentTurnArtifactRefs.has(ref));
   const artifactRef = `${authorityRef}:route_product:${targetKind}`;
+  const targetSchema = targetKind === "compound_evidence_synthesis_answer"
+    ? "helix.compound_evidence_synthesis_answer.v1"
+    : targetKind === "compound_research_locator_answer"
+      ? "helix.compound_research_locator_answer.v1"
+      : targetKind === "doc_evidence_synthesis_answer"
+        ? "helix.doc_evidence_synthesis_answer.v1"
+        : targetKind === "repo_code_evidence_answer"
+          ? "helix.repo_code_evidence_answer.v1"
+          : targetKind === "scholarly_research_answer"
+            ? "helix.scholarly_research_answer.v1"
+            : targetKind === "internet_search_answer"
+              ? "helix.internet_search_answer.v1"
+              : targetKind === "capability_help_summary"
+                ? "helix.capability_help_summary.v1"
+                : targetKind === "workspace_status_answer"
+                  ? "helix.workspace_status_answer.v1"
+                  : targetKind === "workstation_tool_evaluation"
+                    ? "helix.workstation_tool_evaluation.v1"
+                  : targetKind === "theory_context_reflection_answer"
+                    ? "helix.theory_context_reflection_answer.v1"
+                    : "helix.provider_route_product.v1";
   const artifactPayloadRecord = {
-    schema: "helix.provider_route_product.v1",
+    schema: targetSchema,
     artifact_id: artifactRef,
     turn_id: input.turnId,
     kind: targetKind,
@@ -913,9 +949,11 @@ export const materializeTheoryContextReflectionTerminal = (input: {
   }
 
   const receipt = [...artifacts].reverse().find((artifact) =>
-    artifactKind(artifact) === "helix_theory_context_reflection_tool_receipt"
+    artifactKind(artifact) === "helix_theory_context_reflection_tool_receipt" &&
+    artifactObservationSucceeded(artifact)
   );
   const supportObservation = [...artifacts].reverse().find((artifact) => {
+    if (!artifactObservationSucceeded(artifact)) return false;
     const kind = artifactKind(artifact);
     const payload = artifactPayload(artifact);
     const topLevel = artifact as Record<string, unknown>;

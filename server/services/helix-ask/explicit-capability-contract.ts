@@ -429,7 +429,7 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
     admission_families: ["capability_catalog", "runtime_evidence"],
     required_observation_kinds: ["capability_registry"],
     required_terminal_kind: "capability_help_summary",
-    allowed_substitutions: ["helix_ask.inspect_capability_catalog"],
+    allowed_substitutions: [],
     forbidden_nearby_capabilities: ["repo-code.search_concept", "model.direct_answer"],
   },
   {
@@ -1735,6 +1735,44 @@ const negatedCommandMentionsCapabilityAt = (prompt: string, matchIndex: number):
   ).test(clausePrefix);
 };
 
+const capabilityMentionIsExplanatoryQuestionAt = (prompt: string, matchIndex: number): boolean => {
+  const boundaryIndex = Math.max(
+    prompt.lastIndexOf(".", matchIndex - 1),
+    prompt.lastIndexOf("?", matchIndex - 1),
+    prompt.lastIndexOf("!", matchIndex - 1),
+    prompt.lastIndexOf(";", matchIndex - 1),
+    prompt.lastIndexOf("\n", matchIndex - 1),
+  );
+  const nextBoundaryCandidates = ["?", ";", ".", "!", "\n"]
+    .map((boundary) => prompt.indexOf(boundary, matchIndex))
+    .filter((index) => index >= matchIndex && index - matchIndex <= 240);
+  const clauseEnd = nextBoundaryCandidates.length > 0
+    ? Math.min(...nextBoundaryCandidates)
+    : Math.min(prompt.length, matchIndex + 240);
+  const clause = prompt.slice(boundaryIndex + 1, clauseEnd + 1);
+  const asksAboutCapability =
+    /\b(?:does?|can|could|would|will|is|are)\b|\bdo\s+you\b|\b(?:allow|let)(?:s|ted)?\s+you\b/i.test(clause);
+  const namesToolOrWorkflowInClause =
+    /\b(?:your|the|this|that)\s+(?:(?:research[-\s]?paper|scholarly|paper)\s+)?(?:tool|agent|workflow|capabilit(?:y|ies))\b/i.test(clause) ||
+    /\b(?:tool|agent|workflow)\s+for\s+(?:research|scholarly)\s+papers?\b/i.test(clause);
+  const continuesPriorCapabilityQuestion = /^\s*or\s+do\s+you\b/i.test(clause);
+  const priorQuestionContext = prompt.slice(Math.max(0, boundaryIndex - 240), boundaryIndex + 1);
+  const priorQuestionNamesToolOrWorkflow =
+    /\b(?:your|the|this|that)\s+(?:(?:research[-\s]?paper|scholarly|paper)\s+)?(?:tool|agent|workflow|capabilit(?:y|ies))\b/i.test(priorQuestionContext) ||
+    /\b(?:tool|agent|workflow)\s+for\s+(?:research|scholarly)\s+papers?\b/i.test(priorQuestionContext);
+  const historicalCapabilityReference =
+    /\b(?:earlier|previously|historically|last\s+turn|before)\b[\s\S]{0,120}\b(?:asked|mentioned|said|discussed|wondered)\b/i.test(clause) &&
+    namesToolOrWorkflowInClause;
+  const explanatoryCapabilityQuestion =
+    clause.includes("?") &&
+    asksAboutCapability &&
+    (
+      namesToolOrWorkflowInClause ||
+      (continuesPriorCapabilityQuestion && priorQuestionNamesToolOrWorkflow)
+    );
+  return explanatoryCapabilityQuestion || historicalCapabilityReference;
+};
+
 const compoundCommandChainMentionsCapabilityAt = (prompt: string, matchIndex: number): boolean => {
   const before = prompt.slice(Math.max(0, matchIndex - 120), matchIndex);
   const clausePrefix = before.split(/[.!?;\n]/).pop() ?? before;
@@ -1851,6 +1889,10 @@ export const extractExplicitCapabilityContracts = (
       for (const match of prompt.matchAll(matcher)) {
         const matchIndex = typeof match.index === "number" ? match.index : -1;
         if (matchIndex < 0) continue;
+        if (
+          contract.capability !== "helix_ask.inspect_capability_catalog" &&
+          capabilityMentionIsExplanatoryQuestionAt(prompt, matchIndex)
+        ) continue;
         const commandMention = commandMentionsCapabilityAt(prompt, name, matchIndex);
         const compoundMention = compoundCommandChainMentionsCapabilityAt(prompt, matchIndex);
         if ((commandMention || compoundMention) && negatedCommandMentionsCapabilityAt(prompt, matchIndex)) continue;

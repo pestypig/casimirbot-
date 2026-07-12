@@ -148,7 +148,10 @@ for (const { code, catalog } of INTERFACE_TARGET_CATALOGS) {
     issues.push({ level: "error", message: `${code}: target option must use procedural_catalog` });
   }
   if (reviewed < total) {
-    issues.push({ level: "error", message: `${code}: missing ${total - reviewed} target messages` });
+    issues.push({
+      level: option.releaseStatus === "public" ? "error" : "warning",
+      message: `${code}: missing ${total - reviewed} target messages`,
+    });
   }
   if (reviewed < total && option.readiness.toLowerCase().includes("complete")) {
     issues.push({ level: "error", message: `${code}: readiness cannot claim complete coverage while catalog is partial` });

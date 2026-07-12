@@ -1,4 +1,5 @@
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
+import type { HelixAccountType } from "@shared/helix-account-session";
 import type { HelixAgentStepObservationPacket } from "@shared/helix-agent-step-observation-packet";
 import type {
   HelixToolFollowupDecision,
@@ -43,6 +44,7 @@ export type HelixWorkstationCapabilityManifest = {
 export type HelixWorkstationGatewayListInput = {
   agentRuntime?: HelixAgentRuntimeId | string | null;
   mode?: HelixWorkstationGatewayMode | string | null;
+  accountType?: HelixAccountType | null;
 };
 
 export type HelixWorkstationGatewayListResult = {
@@ -63,6 +65,7 @@ export type HelixWorkstationGatewayCallInput = {
   approvalToken?: string | null;
   turnId?: string | null;
   iteration?: number | null;
+  accountType?: HelixAccountType | null;
 };
 
 export type HelixWorkstationGatewayAdmissionRecord = {

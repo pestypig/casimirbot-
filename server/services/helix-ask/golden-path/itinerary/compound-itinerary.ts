@@ -34,7 +34,10 @@ const selectedItineraryAdapters = (body: RecordLike) =>
     .filter((adapter) => adapter.detectIntent(body))
     .sort((left, right) => left.order - right.order);
 
-export const isRequested = (body: RecordLike): boolean => selectedItineraryAdapters(body).length >= 3;
+export const detectedItineraryAdapterCount = (body: RecordLike): number =>
+  selectedItineraryAdapters(body).length;
+
+export const isRequested = (body: RecordLike): boolean => detectedItineraryAdapterCount(body) >= 3;
 
 const observationFieldsFor = (observations: readonly GoldenPathItineraryObservation[]): RecordLike =>
   observations.reduce<RecordLike>((fields, observation) => {

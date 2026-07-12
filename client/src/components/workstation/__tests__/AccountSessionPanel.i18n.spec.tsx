@@ -10,6 +10,7 @@ import {
 } from "@/lib/agi/proposals";
 import { hawMessages } from "@/lib/i18n/messages/haw";
 import { INTERFACE_MESSAGE_IDS } from "@/lib/i18n/messages/types";
+import { HELIX_DEVELOPER_ACCOUNT_POLICY } from "@shared/helix-account-session";
 
 vi.mock("@/components/auth/GoogleSignInButton", () => ({
   GoogleSignInButton: () => <button type="button">Google sign-in mock</button>,
@@ -87,6 +88,11 @@ const statusBodyWithMappedStates = {
       revoked_at: null,
     },
   ],
+};
+
+const developerStatusBody = {
+  ...statusBody,
+  account_policy: HELIX_DEVELOPER_ACCOUNT_POLICY,
 };
 
 const archiveRows = [
@@ -176,7 +182,7 @@ describe("AccountSessionPanel interface language", () => {
 
   it("renders reviewed Hawaiian catalog entries when the account setting selects Hawaiian", async () => {
     localStorage.setItem("helix-start-settings", JSON.stringify({ interfaceLanguage: "haw" }));
-    vi.stubGlobal("fetch", mockFetch());
+    vi.stubGlobal("fetch", mockFetch(developerStatusBody));
 
     render(<AccountSessionPanel />);
 
@@ -192,6 +198,22 @@ describe("AccountSessionPanel interface language", () => {
     ).toBeInTheDocument();
     expect(document.documentElement.lang).toBe("haw");
     expect(document.documentElement.dir).toBe("ltr");
+  });
+
+  it("hides developer-preview catalogs from public account selection", async () => {
+    vi.stubGlobal("fetch", mockFetch());
+
+    render(<AccountSessionPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("combobox")).toHaveValue("en");
+    });
+    expect(screen.getByRole("option", { name: /English/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /German/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Arabic/ })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Hawaiian/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Spanish/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Wolof/ })).not.toBeInTheDocument();
   });
 
   it("renders known backend states through localized display labels instead of raw enum values", async () => {
@@ -219,7 +241,7 @@ describe("AccountSessionPanel interface language", () => {
 
   it("broadcasts interface language changes so workstation chrome updates in the same tab", async () => {
     localStorage.setItem("helix-start-settings", JSON.stringify({ interfaceLanguage: "haw" }));
-    vi.stubGlobal("fetch", mockFetch());
+    vi.stubGlobal("fetch", mockFetch(developerStatusBody));
     const observedLanguages: string[] = [];
     const handleLanguageChanged = ((event: CustomEvent<{ language: string }>) => {
       observedLanguages.push(event.detail.language);

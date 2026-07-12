@@ -40,6 +40,17 @@ const HELIX_EVIDENCE_GATE_TRANSFORM_TASK_RE =
 
 const HELIX_ASK_COMPARE_TRIGGER_RE = /\b(?:compare|contrast|difference|diff|what changed|changed since)\b/i;
 
+const HELIX_ASK_CAPABILITY_BEHAVIOR_TOOL_LABEL =
+  "(?:research[-\\s]+papers?|scholarly(?:[-\\s]+research)?|scientific[-\\s]+calculator|calculator|docs?(?:[-\\s]+viewer)?|repo(?:[-\\s]+search)?|internet[-\\s]+search|moral[-\\s]+graph|image[-\\s]+lens|visual[-\\s]+capture|workstation[-\\s]+notes?|notes?|workspace(?:[-\\s]+diagnostic)?|live[-\\s]+source|live[-\\s]+environment|narrator|voice|postulate(?:[-\\s]+board)?|helix[-\\s]+ask)";
+
+const HELIX_ASK_CAPABILITY_BEHAVIOR_SUBJECT =
+  `(?:(?:(?:the|this)\\s+)?${HELIX_ASK_CAPABILITY_BEHAVIOR_TOOL_LABEL}|(?:your|the|this)\\s+(?:${HELIX_ASK_CAPABILITY_BEHAVIOR_TOOL_LABEL}\\s+)?(?:tool|capability|workflow))`;
+
+const HELIX_ASK_CAPABILITY_BEHAVIOR_QUESTION_RE = new RegExp(
+  `\\b(?:does|do|can|could|how\\s+(?:does|do|can))\\s+${HELIX_ASK_CAPABILITY_BEHAVIOR_SUBJECT}\\b[\\s\\S]{0,260}\\b(?:allow|able|support|select|pick|choose|parse|open|openable|check|use|fallback|escalat|inspect|read|search|create|append|mutat|control|work|access|route|return)\\w*\\b`,
+  "i",
+);
+
 const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE =
   /(?:^|\s)\/postulate\b|\b(?:postulate\.submit_proposal|scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\.search|docs\s+viewer|docs\s+search|narrator\.[a-z0-9_.-]+|panel[_\s-]?id\s*(?:=|:)\s*narrator|workstation-notes\.create_note|workstation-notes\.create|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|repo\.search|repo\s+search|moral-graph\.[a-z0-9_.-]+|(?:use|with|through|via)\s+(?:only\s+)?(?:the\s+)?moral\s+graph\b[\s\S]{0,120}\b(?:reflect|reflection|case|situation|dependency|repair|boundary|agency|badge|lens)|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|scholarly-research\.[a-z0-9_.-]+|scholarly_research\.[a-z0-9_.-]+|scholarly\s+research\s+tool|lookup_papers|fetch_full_text|extract_numeric_parameters|live_env\.[a-z0-9_.-]+|helix_ask\.[a-z0-9_.-]+|image[_\s-]?lens|visual_analysis\.inspect_image_region|visual_capture|scientific\s+(?:document|image|page)|document\s+image|attached\s+image.*(?:equation|latex|theory\s+graph))\b/i;
 
@@ -83,9 +94,7 @@ const stripQuotedPayloadsForBackendEntrypointPolicy = (text: string): string =>
 export const isConceptualToolExplanationWithoutExecution = (question: string): boolean => {
   const normalized = question.trim();
   if (!normalized) return false;
-  const asksAboutToolBehavior =
-    /\b(?:does|can|how\s+does)\s+(?:your|the|this)\s+(?:research[-\s]+papers?\s+|scholarly(?:[-\s]+research)?\s+)?tool\b[\s\S]{0,260}\b(?:select|pick|choose|parse|open|openable|check|use|fallback|escalat|image\s+lens|work)\b/i.test(normalized);
-  if (asksAboutToolBehavior) return true;
+  if (HELIX_ASK_CAPABILITY_BEHAVIOR_QUESTION_RE.test(normalized)) return true;
   const asksForConcept =
     /\b(?:what\s+is|what\s+does|explain|describe|define|meaning\s+of|looks?\s+like)\b/i.test(normalized);
   const referencesToolOrCapability =

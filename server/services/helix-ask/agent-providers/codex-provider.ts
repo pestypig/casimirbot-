@@ -49,6 +49,21 @@ import {
 import {
   detectScholarlyResearchIntent,
 } from "../scholarly-research-intent";
+import { arbitrateAskSourceTarget } from "../ask-source-target-arbitrator";
+import { buildToolCallAdmissionDecision } from "../tool-call-admission";
+import {
+  buildActiveCalculatorContextWorkstationGatewayCallRequests,
+  buildActiveDocsContextWorkstationGatewayCallRequests,
+  buildActiveWorkstationContextGatewayCallRequests,
+} from "./active-context-tool-requests";
+import {
+  buildPromptDerivedCalculatorSolveGatewayCallRequests,
+  buildPromptDerivedCivilizationBoundsGatewayCallRequests,
+  buildPromptDerivedRepoSearchGatewayCallRequests,
+  buildPromptDerivedWorkspaceStatusGatewayCallRequests,
+  buildPromptNamedCapabilityGatewayCallRequests,
+} from "./prompt-named-tool-requests";
+import { buildCompoundCapabilityDependencyGatewayCallRequests } from "./provider-compound-capability-planner";
 import {
   finalizeScientificWorkflowAnswer,
 } from "../scientific-workflow-answer-finalizer";
@@ -59,8 +74,10 @@ import { planWorkstationToolUse } from "../workstation-tool-planner";
 import {
   buildCommittedAskRoute,
   buildRouteEvidenceAuthority,
+  inferCommittedRouteToolFamily,
   readCommittedAskRoute,
 } from "../committed-ask-route";
+import { readExplicitWorkstationGatewayCallRequests } from "./explicit-tool-requests";
 import {
   appendHelixAgentContinuationStateToPayload,
   appendHelixTerminalRejectionObservationToPayload,
@@ -464,7 +481,13 @@ const asksForScientificImageEvidenceContinuity = (body: Record<string, unknown>)
   const refersToScientificVisualChain =
     /\b(?:prior\s+steps?|previous|last|earlier|latest|just\s+found|promoted|exact\s+row|equation\s+row|page\s+\d+|crop\s+ref|image\s+lens|sidecar|page\s+evidence|scientific\s+image|visual\s+evidence|source\s+image\s+hash|active\s+promoted\s+row\s+blockers|historical\s+non-promoted\s+row\s+blockers)\b/i.test(question);
   const asksForGraphOrCalculatorEvidence =
-    /\b(?:theory\s+badge\s+graph|theory\s+graph\s+reflection|badge\s+graph\s+reflection|calculator\s+payload|evidence\s+chain|claim\s+boundary)\b/i.test(question) &&
+    (
+      /\b(?:theory\s+badge\s+graph|theory\s+graph\s+reflection|badge\s+graph\s+reflection|calculator\s+payload|evidence\s+chain)\b/i.test(question) ||
+      (
+        /\bclaim\s+boundary\b/i.test(question) &&
+        /\b(?:scientific\s+image|image\s+lens|page[-\s]?grounded|equation\s+evidence|evidence\s+packet|sidecar|crop\s+ref|source\s+hash)\b/i.test(question)
+      )
+    ) &&
     /\b(?:what|which|using|evidence|source|why|authority|depth)\b/i.test(question);
   const asksForContinuityAudit =
     /\b(?:scientific\s+image\s+lens\s+evidence\s+continuity\s+audit|scientific\s+image\s+evidence\s+continuity\s+audit|evidence\s+continuity\s+audit|continuity\s+audit)\b/i.test(question) &&
@@ -624,7 +647,14 @@ const isScholarlyFollowupReferencePrompt = (question: string): boolean => {
   const unquoted = question.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
   const hasExplicitPaperReferent = SCHOLARLY_FOLLOWUP_REFERENCE_PATTERN.test(unquoted);
   const hasPageFollowupCue = SCHOLARLY_PAGE_FOLLOWUP_PATTERN.test(unquoted);
-  if (detectScholarlyResearchIntent(unquoted).researchRequested && !hasExplicitPaperReferent && !hasPageFollowupCue) return false;
+  const scholarlyResearchRequested = detectScholarlyResearchIntent(unquoted).researchRequested;
+  const hasPriorPaperReferent =
+    /\b(?:what\s+you\s+found|you\s+found|paper\s+you\s+found|papers?\s+you\s+found|same\s+(?:paper|pdf)|this\s+(?:paper|pdf)|that\s+(?:paper|pdf|result)|those\s+papers|prior\s+(?:paper|record|result)|previous\s+(?:paper|record|result)|earlier\s+(?:paper|record|result)|again|follow-?up|resolved?\s+(?:that|the)\s+follow-?up)\b/i.test(unquoted);
+  if (
+    scholarlyResearchRequested &&
+    !hasPageFollowupCue &&
+    (!hasExplicitPaperReferent || !hasPriorPaperReferent)
+  ) return false;
   const hasExactEquationRowPromotionCue =
     /\b(?:crop|promote|retry|use)\b[\s\S]{0,120}\b(?:exact\s+(?:equation\s+)?row|row\s+crop|exact\s+equation\s+admissibility)\b/i.test(unquoted);
   const hasPageRenderInspectionCue =
@@ -4695,6 +4725,11 @@ const shouldRetryCodexCapabilityLaneRequest = (input: {
 
 const isImageLensCapabilityLanePrompt = (question: string): boolean => {
   const normalized = question.trim().toLowerCase();
+  const imageLensNegated = promptNegatesCapabilityLaneEvidenceFamily(
+    question,
+    /\b(?:images?|image\s+lens|image-lens|visual|crop|bbox|screenshot|attached\s+image|visible\s+image)\b/i,
+  );
+  if (imageLensNegated) return false;
   return (
     /\b(?:image\s+lens|image-lens|attached\s+image|image\s+attachment|visible\s+image|current\s+image|scientific\s+(?:document|image|page|paper)|document\s+image|visual_analysis\.inspect_image_region)\b/.test(normalized) &&
     /\b(?:crop|bbox|bounding\s+box|region|area|look\s+closely|inspect|read|ocr|latex|equation|figure)\b/.test(normalized)
@@ -5754,9 +5789,23 @@ export const buildCodexCompoundSubgoalLedger = (input: {
   normalizedArtifacts: Array<Record<string, unknown>>;
   gatewayCallResults: HelixWorkstationGatewayCallResult[];
 }): Record<string, unknown> | null => {
-  if (input.normalizedArtifacts.length < 2) return null;
+  const evidenceArtifacts = input.normalizedArtifacts.filter((artifact) => {
+    const artifactPayload = readRecord(artifact.payload);
+    if (
+      readString(artifact.kind) === "workspace_action_receipt" ||
+      readString(artifactPayload?.kind) === "workspace_action_receipt" ||
+      readString(artifactPayload?.schema) === WORKSTATION_UI_ACTION_RECEIPT_SCHEMA
+    ) {
+      return false;
+    }
+    const capability = readString(artifact.capability_key);
+    if (!capability) return false;
+    const sourceResults = input.gatewayCallResults.filter((result) => result.capability_id === capability);
+    return sourceResults.length === 0 || sourceResults.some((result) => !isWorkstationActionReceipt(result));
+  });
+  if (evidenceArtifacts.length < 2) return null;
   const artifactsByCapability = new Map<string, Array<Record<string, unknown>>>();
-  for (const artifact of input.normalizedArtifacts) {
+  for (const artifact of evidenceArtifacts) {
     const capability = readString(artifact.capability_key) ?? "unknown";
     const artifacts = artifactsByCapability.get(capability) ?? [];
     artifacts.push(artifact);
@@ -7693,7 +7742,8 @@ const buildScholarlyResearchResponseModeProjection = (input: {
       executed_scholarly_capability_chain: executedScholarlyCapabilityChain,
       terminal_evidence_requirement: scholarlyIntent.scholarlyIntent.terminal_evidence_requirement,
       query_normalization_reasons: scholarlyIntent.scholarlyIntent.query_normalization_reasons,
-      terminal_artifact_kind: "typed_failure",
+      terminal_artifact_kind: "scholarly_recovery_plan",
+      terminal_eligible: true,
       assistant_answer: false,
       raw_content_included: false,
     },
@@ -8385,10 +8435,15 @@ const selectRailReentryGatewayResult = (
   gatewayCallResults: HelixWorkstationGatewayCallResult[],
 ): HelixWorkstationGatewayCallResult | null => {
   const successfulEvidenceResults = gatewayCallResults.filter(isSuccessfulEvidenceGatewayResult);
+  const scholarlyRecoveryEvidenceResult = gatewayCallResults.find((result) =>
+    isScholarlyGatewayResult(result) &&
+    result.observation_packet.produced_artifact_refs.length > 0
+  );
   return (
     successfulEvidenceResults.find((result) => result.capability_id === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) ??
     successfulEvidenceResults.find((result) => result.capability_id === "docs.search") ??
     successfulEvidenceResults[0] ??
+    scholarlyRecoveryEvidenceResult ??
     gatewayCallResults.find((result) => result.ok === true) ??
     null
   );
@@ -8997,6 +9052,125 @@ export const ensureCodexPreGatewayRouteAuthority = (input: {
   selectedRoute?: string | null;
 }): void => {
   const promptText = readQuestion(input.body);
+  const scholarlyFollowupReference = isScholarlyFollowupReferencePrompt(promptText);
+  if (!readRecord(input.body.source_target_intent ?? input.body.sourceTargetIntent)) {
+    input.body.source_target_intent = scholarlyFollowupReference
+      ? {
+          schema: "helix.ask_source_target_intent.v1",
+          turn_id: input.turnId,
+          thread_id: readThreadId(input.body),
+          target_source: "scholarly_research",
+          target_kind: "scholarly_research_followup",
+          strength: "hard",
+          explicit_cues: ["scholarly_followup_reference"],
+          reasons: ["prior_scholarly_evidence_referent_requires_scholarly_route"],
+          requested_outputs: ["scholarly_paper_refs", "typed_failure"],
+          suppressed_routes: ["model_only_concept", "no_tool_direct", "panel_generated_answer"],
+          precedence_reason: "scholarly_followup_reference",
+          must_enter_backend_ask: true,
+          allow_client_shortcut: false,
+          allow_no_tool_direct: false,
+          confidence: 0.96,
+          assistant_answer: false,
+          raw_content_included: false,
+        }
+      : arbitrateAskSourceTarget({
+          turnId: input.turnId,
+          threadId: readThreadId(input.body),
+          promptText,
+        });
+  }
+  const inferredSourceTarget = readString(readRecord(input.body.source_target_intent)?.target_source);
+  if (inferredSourceTarget === "scholarly_research" && !readRecord(input.body.route_product_contract)) {
+    input.body.route_product_contract = {
+      schema: "helix.route_product_contract.v1",
+      source_target: "scholarly_research",
+      goal_kind: scholarlyFollowupReference ? "scholarly_research_followup" : "scholarly_research_lookup",
+      allowed_terminal_artifact_kinds: [
+        "scholarly_research_answer",
+        "scholarly_metadata_answer",
+        "scholarly_numeric_missing",
+        "scholarly_recovery_plan",
+        "scholarly_evidence_escalation_missing",
+        "scholarly_exploratory_candidates",
+        "scholarly_parse_required",
+        "typed_failure",
+      ],
+      forbidden_terminal_artifact_kinds: [
+        "direct_answer_text",
+        "model_only_concept",
+        "no_tool_direct",
+        "panel_generated_answer",
+      ],
+      precedence_reason: scholarlyFollowupReference
+        ? "scholarly_followup_reference"
+        : "scholarly_research_source_admission",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+  if (!readRecord(input.body.tool_call_admission_decision ?? input.body.toolCallAdmissionDecision)) {
+    input.body.tool_call_admission_decision = buildToolCallAdmissionDecision({
+      turnId: input.turnId,
+      sourceTargetIntent: readRecord(input.body.source_target_intent),
+      routeProductContract: readRecord(input.body.route_product_contract),
+      canonicalGoalFrame: readRecord(input.body.canonical_goal_frame),
+      promptText,
+    });
+  }
+  const explicitPreGatewayRequests = readExplicitWorkstationGatewayCallRequests(input.body);
+  const allPreGatewayDerivedCapabilities = Array.from(new Set([
+    ...explicitPreGatewayRequests,
+    ...buildActiveCalculatorContextWorkstationGatewayCallRequests(input.body),
+    ...buildActiveDocsContextWorkstationGatewayCallRequests(input.body),
+    ...buildActiveWorkstationContextGatewayCallRequests(input.body),
+    ...buildPromptNamedCapabilityGatewayCallRequests(input.body),
+    ...buildPromptDerivedCalculatorSolveGatewayCallRequests(input.body),
+    ...buildPromptDerivedCivilizationBoundsGatewayCallRequests(input.body),
+    ...buildPromptDerivedRepoSearchGatewayCallRequests(input.body),
+    ...buildPromptDerivedWorkspaceStatusGatewayCallRequests(input.body),
+    ...buildCompoundCapabilityDependencyGatewayCallRequests(input.body),
+  ]
+    .map((request) => readString(request.capability_id) ?? readString(request.capabilityId))
+    .filter((capability): capability is string => Boolean(capability))));
+  const preGatewayDerivedCapabilities = scholarlyFollowupReference
+    ? allPreGatewayDerivedCapabilities.filter((capability) => /^scholarly-research\./i.test(capability))
+    : allPreGatewayDerivedCapabilities;
+  if (preGatewayDerivedCapabilities.length > 0) {
+    const admission = readRecord(input.body.tool_call_admission_decision) ?? {};
+    const preGatewayFamilies = preGatewayDerivedCapabilities.map(inferCommittedRouteToolFamily);
+    const solePreGatewayContract = preGatewayDerivedCapabilities.length === 1
+      ? explicitCapabilityContractForCapability(preGatewayDerivedCapabilities[0])
+      : null;
+    input.body.tool_call_admission_decision = {
+      ...admission,
+      required: true,
+      requested_capability: preGatewayDerivedCapabilities.length === 1 ? preGatewayDerivedCapabilities[0] : null,
+      selected_capability: preGatewayDerivedCapabilities.length === 1 ? preGatewayDerivedCapabilities[0] : null,
+      admitted_capability: preGatewayDerivedCapabilities.length === 1 ? preGatewayDerivedCapabilities[0] : null,
+      admitted_tool_families: Array.from(new Set([
+        ...readStringArray(admission.admitted_tool_families),
+        ...preGatewayFamilies,
+      ])),
+      ...(solePreGatewayContract
+        ? {
+            requested_capability_family: solePreGatewayContract.capability_family,
+            required_observation_kinds_for_requested_capability:
+              solePreGatewayContract.required_observation_kinds,
+            source_target: solePreGatewayContract.source_target,
+            effective_source_target: solePreGatewayContract.source_target,
+            mandatory_next_tool_name: null,
+            mandatory_capability_family: null,
+            mandatory_capability_admitted: false,
+            compound_requested_capabilities: [],
+            compound_required_observation_kinds: [],
+            compound_explicit_capability_admission_families: [],
+            route_arbitration: undefined,
+          }
+        : {}),
+      reason: "bounded_prompt_derived_observation_admitted_before_route_commit",
+    };
+  }
   const existing = readCommittedAskRoute(input.body);
   const explicitPromptContracts = extractExplicitCapabilityContracts(promptText);
   const uniqueExplicitContracts = Array.from(
@@ -9004,9 +9178,12 @@ export const ensureCodexPreGatewayRouteAuthority = (input: {
       explicitPromptContracts.map((match) => [match.contract.capability, match.contract]),
     ).values(),
   );
-  const explicitPromptContract = uniqueExplicitContracts.length === 1
-    ? uniqueExplicitContracts[0]
+  const preGatewayExplicitContract = preGatewayDerivedCapabilities.length === 1
+    ? explicitCapabilityContractForCapability(preGatewayDerivedCapabilities[0])
     : null;
+  const explicitPromptContract = preGatewayExplicitContract ?? (
+    uniqueExplicitContracts.length === 1 ? uniqueExplicitContracts[0] : null
+  );
   const existingMatchesExplicitPrompt = Boolean(
     existing &&
     explicitPromptContract &&
@@ -9017,9 +9194,69 @@ export const ensureCodexPreGatewayRouteAuthority = (input: {
   const shouldRebuildForExplicitPrompt = Boolean(
     explicitPromptContract && !existingMatchesExplicitPrompt,
   );
+  const explicitMultiCapabilityRoute = explicitPreGatewayRequests.length > 1;
   const priorAdmission = readRecord(input.body.tool_call_admission_decision) ?? {};
   const runtimeIntentPacket = readRecord(input.body.runtime_intent_packet);
-  const routeSeedBody: Record<string, unknown> = shouldRebuildForExplicitPrompt
+  const routeSeedBody: Record<string, unknown> = scholarlyFollowupReference
+    ? {
+        ...input.body,
+        committed_ask_route: undefined,
+        ask_turn_solver_trace: undefined,
+        debug: undefined,
+        capability_itinerary: undefined,
+        compound_capability_contract: undefined,
+        capability_itinerary_execution_state: undefined,
+        compound_capability_synthesis_readiness: undefined,
+        canonical_goal_frame: {
+          schema: "helix.canonical_goal_frame.v1",
+          turn_id: input.turnId,
+          goal_kind: "scholarly_research_followup",
+          required_terminal_kind: "scholarly_research_answer",
+          allowed_terminal_artifact_kinds: [
+            "scholarly_research_answer",
+            "scholarly_metadata_answer",
+            "scholarly_numeric_missing",
+            "scholarly_recovery_plan",
+            "scholarly_evidence_escalation_missing",
+            "scholarly_exploratory_candidates",
+            "scholarly_parse_required",
+            "typed_failure",
+          ],
+        },
+      }
+    : explicitMultiCapabilityRoute
+    ? {
+        ...input.body,
+        committed_ask_route: undefined,
+        ask_turn_solver_trace: undefined,
+        debug: undefined,
+        canonical_goal_frame: {
+          schema: "helix.canonical_goal_frame.v1",
+          turn_id: input.turnId,
+          goal_kind: "compound_evidence_synthesis",
+          required_terminal_kind: "compound_evidence_synthesis_answer",
+          allowed_terminal_artifact_kinds: ["compound_evidence_synthesis_answer", "typed_failure"],
+        },
+        route_product_contract: {
+          schema: "helix.route_product_contract.v1",
+          source_target: "compound_evidence",
+          goal_kind: "compound_evidence_synthesis",
+          required_terminal_kind: "compound_evidence_synthesis_answer",
+          allowed_terminal_artifact_kinds: ["compound_evidence_synthesis_answer", "typed_failure"],
+        },
+        tool_call_admission_decision: {
+          ...priorAdmission,
+          required: true,
+          requested_capability: null,
+          selected_capability: null,
+          admitted_capability: null,
+          admitted_tool_families: Array.from(new Set(preGatewayDerivedCapabilities.map(inferCommittedRouteToolFamily))),
+          compound_requested_capabilities: preGatewayDerivedCapabilities,
+          route_arbitration: undefined,
+          mandatory_next_tool_name: null,
+        },
+      }
+    : shouldRebuildForExplicitPrompt
     ? {
         ...input.body,
         committed_ask_route: undefined,
@@ -12390,6 +12627,11 @@ export const codexProvider: HelixAgentProvider = {
       text: workstationGuardedText,
       gatewayCallResults,
     });
+    const boundedMissingSourceGuardActive =
+      (isDeicticDocumentContentQuestion(question) && !hasDocsContentObservation(gatewayCallResults)) ||
+      (isRepoContentQuestion(question) && !hasRepoSearchObservation(gatewayCallResults)) ||
+      (isInternetSearchContentQuestion(question) && !hasInternetSearchObservation(gatewayCallResults)) ||
+      (isScholarlyResearchContentQuestion(question) && !hasScholarlyResearchObservation(gatewayCallResults));
     const providerProcessOk =
       result.exitCode === 0 &&
       text.length > 0 &&
@@ -12431,9 +12673,18 @@ export const codexProvider: HelixAgentProvider = {
     const docsContentEvidenceSatisfied =
       !isDeicticDocumentContentQuestion(question) ||
       hasDocsContentObservation(gatewayCallResults);
+    const scholarlyRecoveryObservationReentered =
+      processOk &&
+      isScholarlyResearchContentQuestion(question) &&
+      scholarlyResearchGatewayResults(gatewayCallResults).length > 0 &&
+      normalizedObservationArtifacts.some((artifact) =>
+        readString(artifact.kind) === "scholarly_research_observation" &&
+        readString(artifact.capability_key) === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY
+      );
     const providerSolverPathCompleted =
       processOk &&
-      gatewayCallsSucceeded(gatewayCallResults) &&
+      !boundedMissingSourceGuardActive &&
+      (gatewayCallsSucceeded(gatewayCallResults) || scholarlyRecoveryObservationReentered) &&
       capabilityLaneContext.calls_succeeded &&
       docsContentEvidenceSatisfied;
     const providerReentry = buildHelixProviderReasoningReentry({
@@ -12480,17 +12731,32 @@ export const codexProvider: HelixAgentProvider = {
       route: request.route,
       compoundAnswer,
     });
-    const scholarlyProjectionTerminalArtifactKind =
+    const scholarlyResponseModeArtifactKind =
       scholarlyResponseModeProjection.projection
         ? readString(scholarlyResponseModeProjection.projection.terminal_artifact_kind)
         : null;
+    const scholarlyCapabilityContractAllowsAnswer =
+      scholarlyResearchGatewayResults(gatewayCallResults).length > 0;
+    const scholarlyFollowupRecoveryTerminal = Boolean(
+      scholarlyResponseModeArtifactKind &&
+      [
+        "scholarly_numeric_missing",
+        "scholarly_metadata_answer",
+        "scholarly_recovery_plan",
+        "scholarly_evidence_escalation_missing",
+        "scholarly_exploratory_candidates",
+        "scholarly_parse_required",
+      ].includes(scholarlyResponseModeArtifactKind) &&
+      scholarlyFollowupEvidenceLookup?.followup_reference_detected === true
+    );
+    const scholarlyProjectionTerminalArtifactKind = scholarlyResponseModeArtifactKind;
     const scholarlyProjectionTerminalEligible =
       readBoolean(scholarlyResponseModeProjection.projection?.terminal_eligible) === true;
     const scholarlyProjectionAllowedByRoute = codexRouteAllowsTerminalKind(
       request.body,
       scholarlyProjectionTerminalArtifactKind,
       ["scholarly_research_answer"],
-    );
+    ) || scholarlyCapabilityContractAllowsAnswer || scholarlyFollowupRecoveryTerminal;
     const scholarlyExploratoryTerminalAuthority =
       scholarlyResponseModeProjection.projection &&
       scholarlyProjectionTerminalEligible &&
@@ -12594,6 +12860,7 @@ export const codexProvider: HelixAgentProvider = {
       theoryReflectionReceiptTerminalAuthorized;
     const ok =
       terminalProcessAcceptable &&
+      !boundedMissingSourceGuardActive &&
       normalizationFailures.length === 0 &&
       (gatewayCallsSucceeded(gatewayCallResults) || Boolean(scholarlyExploratoryTerminalAuthority)) &&
       capabilityLaneContext.calls_succeeded &&
@@ -12679,9 +12946,19 @@ export const codexProvider: HelixAgentProvider = {
       providerText: projectedText,
       finalStatus: ok ? "completed" : "final_failure",
     });
+    const codexProcessFailureIsTerminal = Boolean(
+      codexProcessFailure &&
+      !compoundTerminalAuthorized &&
+      !imageLensObservationReportTerminalAuthority &&
+      !scholarlyExploratoryTerminalAuthority &&
+      !moralGraphReflectionReceiptTerminalAuthority &&
+      !theoryReflectionReceiptTerminalAuthority &&
+      !directTerminalAuthority &&
+      !providerReentry.terminalAnswerAuthority
+    );
     const finalAnswerSource = compoundTerminalAuthorized
       ? "compound_evidence_synthesis_answer"
-      : codexProcessFailure
+      : codexProcessFailureIsTerminal
         ? "typed_failure"
       : imageLensObservationReportTerminalAuthority
         ? "provider_image_lens_observation_report"
@@ -12696,7 +12973,7 @@ export const codexProvider: HelixAgentProvider = {
         : null;
     const terminalArtifactKind = compoundTerminalAuthorized
       ? "compound_evidence_synthesis_answer"
-      : codexProcessFailure
+      : codexProcessFailureIsTerminal
         ? "typed_failure"
       : imageLensObservationReportTerminalAuthority
         ? "image_lens_observation_report"
@@ -12995,9 +13272,9 @@ export const codexProvider: HelixAgentProvider = {
       selected_final_answer: projectedText,
       final_answer_source: finalAnswerSource,
       terminal_artifact_kind: terminalArtifactKind,
-      terminal_error_code: codexProcessFailure?.error_code ?? null,
-      terminal_failure_text: codexProcessFailure?.text ?? null,
-      ...(codexProcessFailure
+      terminal_error_code: codexProcessFailureIsTerminal ? codexProcessFailure?.error_code ?? null : null,
+      terminal_failure_text: codexProcessFailureIsTerminal ? codexProcessFailure?.text ?? null : null,
+      ...(codexProcessFailureIsTerminal && codexProcessFailure
         ? {
             typed_failure: {
               schema: "helix.typed_failure.v1",
@@ -13013,6 +13290,10 @@ export const codexProvider: HelixAgentProvider = {
         : {}),
       terminal_answer_authority: terminalAnswerAuthority,
       terminal_presentation: terminalPresentation,
+      provider_terminal_candidate: providerReentry.providerTerminalCandidate,
+      provider_reasoning_reentry: providerReentry.providerReasoningReentry,
+      terminal_authority_candidate_review: providerReentry.terminalAuthorityCandidateReview,
+      provider_terminal_authority_bridge: providerReentry.providerTerminalAuthorityBridge,
       agent_continuation_state: providerContinuationState,
       agent_continuation_states: request.body.agent_continuation_states,
       ...(routeEvidenceAuthority ? { route_evidence_authority: routeEvidenceAuthority } : {}),
@@ -13320,6 +13601,20 @@ export const codexProvider: HelixAgentProvider = {
         provider_terminal_authority_bridge: providerReentry.providerTerminalAuthorityBridge,
         terminal_answer_authority: terminalAnswerAuthority,
         terminal_presentation: terminalPresentation,
+        scholarly_terminal_materialization_debug: {
+          response_mode_artifact_kind: scholarlyResponseModeArtifactKind,
+          materialized_terminal_artifact_kind: scholarlyProjectionTerminalArtifactKind,
+          response_mode_terminal_eligible: scholarlyProjectionTerminalEligible,
+          capability_contract_allows_answer: scholarlyCapabilityContractAllowsAnswer,
+          route_allows_terminal: scholarlyProjectionAllowedByRoute,
+          process_ok: processOk,
+          recovery_observation_reentered: scholarlyRecoveryObservationReentered,
+          provider_solver_path_completed: providerSolverPathCompleted,
+          authority_materialized: Boolean(scholarlyExploratoryTerminalAuthority),
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
         scholarly_response_mode_selection: scholarlyResponseModeProjection.projection,
         scholarly_evidence_escalation_plan: projectedScholarlyEscalationPlan,
         scholarly_response_mode: readString(scholarlyResponseModeProjection.projection?.selected_response_mode),
@@ -13349,7 +13644,6 @@ export const codexProvider: HelixAgentProvider = {
         workstation_actions: hostWorkstationAffordances.workstation_actions,
         support_refs: hostWorkstationAffordances.support_refs,
         tool_output_refs: hostWorkstationAffordances.tool_output_refs,
-        workstation_artifact_admission_trace: workstationArtifactAdmissionTrace,
         agent_step_loop: agentStepLoop,
         turn_transcript_events: turnTranscriptEvents,
         turn_transcript_event_count: turnTranscriptEvents.length,
@@ -13360,6 +13654,28 @@ export const codexProvider: HelixAgentProvider = {
         stderr: result.stderr,
       },
     };
+    if (boundedMissingSourceGuardActive) {
+      responsePayload.ok = false;
+      responsePayload.response_type = "final_failure";
+      responsePayload.final_status = "final_failure";
+      responsePayload.terminal_artifact_kind = "typed_failure";
+      responsePayload.final_answer_source = "typed_failure";
+      responsePayload.terminal_error_code = "required_source_observation_missing";
+      responsePayload.terminal_failure_text = authorityGuardedText;
+      responsePayload.text = authorityGuardedText;
+      responsePayload.answer = authorityGuardedText;
+      responsePayload.selected_final_answer = authorityGuardedText;
+      (responsePayload as Record<string, unknown>).typed_failure = {
+        schema: "helix.typed_failure.v1",
+        error_code: "required_source_observation_missing",
+        message: authorityGuardedText,
+        text: authorityGuardedText,
+        answer_text: authorityGuardedText,
+        terminal_eligible: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
     let providerTerminalWriterResult = applyHelixTerminalAuthoritySingleWriter({
       payload: responsePayload as Record<string, unknown>,
       turnId,
@@ -13401,6 +13717,7 @@ export const codexProvider: HelixAgentProvider = {
         : currentTurnArtifactLedger;
       const initialProviderBridge = providerReentry.providerTerminalAuthorityBridge;
       if (
+        !boundedMissingSourceGuardActive &&
         readString(readRecord(terminalAnswerAuthority)?.terminal_kind) === "answer" &&
         readString(readRecord(terminalAnswerAuthority)?.terminal_artifact_kind) === "agent_provider_terminal_candidate" &&
         readString(readRecord(terminalAnswerAuthority)?.final_answer_source) === "agent_provider_terminal_candidate"
@@ -13440,6 +13757,9 @@ export const codexProvider: HelixAgentProvider = {
       }
       if (
         docsContentEvidenceSatisfied &&
+        gatewayCallsSucceeded(gatewayCallResults) &&
+        !boundedMissingSourceGuardActive &&
+        !/\bno\s+[a-z0-9_.-]+\s+observation packet was materialized\b/i.test(authorityGuardedText) &&
         rejectionContinuationState.allowed_decisions.includes("retry") &&
         !rejectionContinuationState.budget.hard.exhausted &&
         providerTerminalWriterResult.selected_terminal_artifact_kind === "typed_failure"
@@ -13572,6 +13892,22 @@ export const codexProvider: HelixAgentProvider = {
           providerSummary.final_visible_answer_authorized = true;
           providerSummary.final_visible_answer_source = responsePayload.final_answer_source;
         }
+      }
+      responsePayload.turn_transcript_events = (responsePayload.turn_transcript_events ?? []).map((event) =>
+        readString(event.source_event_type) === "terminal_answer"
+          ? {
+              ...event,
+              text: providerWriterText,
+              detail: providerWriterKind,
+              final_answer_source: responsePayload.final_answer_source,
+              terminal_artifact_kind: providerWriterKind,
+            }
+          : event,
+      );
+      responsePayload.turn_transcript_event_count = responsePayload.turn_transcript_events.length;
+      if (debug) {
+        debug.turn_transcript_events = responsePayload.turn_transcript_events;
+        debug.turn_transcript_event_count = responsePayload.turn_transcript_event_count;
       }
     }
     return responsePayload;

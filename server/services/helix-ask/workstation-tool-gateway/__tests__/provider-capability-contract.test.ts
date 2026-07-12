@@ -180,6 +180,7 @@ const reviewedSharedCapabilityLaneClassifications = [
 
 const reviewedNonSharedProviderCapabilityClassifications = [
   "client.read_aloud|client_projection_only|user_confirmed_side_effect|client_projection",
+  "debug.inspect_current_turn|safe_to_graduate_next|read_observe|explicit_contract",
   "docs-viewer.identify_current_doc|safe_to_graduate_next|read_observe|explicit_contract",
   "docs-viewer.validate_doc_candidates|safe_to_graduate_next|read_observe|explicit_contract",
   "helix.theory.frontierVectorFieldTrace|safe_to_graduate_next|read_observe|explicit_contract",
@@ -229,10 +230,12 @@ const reviewedNonSharedProviderCapabilityClassifications = [
   "live_env.update_live_answer_projection|blocked_pending_contract|mutating_control|live_environment",
   "live_env.update_live_source_immersion_state|helix_native_only|ui_projection|live_environment",
   "live_env.update_micro_reasoner_prompt|helix_native_only|ui_projection|live_environment",
+  "live_pipeline|blocked_pending_contract|mutating_control|explicit_contract",
   "narrator.bind_stream|blocked_pending_contract|user_confirmed_side_effect|live_environment_alias",
   "narrator.say|requires_confirmation_contract|user_confirmed_side_effect|live_environment_alias",
   "narrator_bind_stream|blocked_pending_contract|user_confirmed_side_effect|live_environment_alias",
   "narrator_say|requires_confirmation_contract|user_confirmed_side_effect|live_environment_alias",
+  "runtime_evidence|safe_to_graduate_next|read_observe|explicit_contract",
   "scientific-calculator.open|blocked_pending_contract|user_confirmed_side_effect|explicit_contract",
   "scientific-calculator.start_equation_live_source|blocked_pending_contract|user_confirmed_side_effect|explicit_contract",
   "situation-room.describe_visual_capture|safe_to_graduate_next|read_observe|explicit_contract",

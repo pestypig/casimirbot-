@@ -1884,6 +1884,18 @@ describe("compound capability synthesis readiness", () => {
     expect(contract?.subgoals[0]?.terminal_contribution_kind).toBe("capability_help_summary");
   });
 
+  it("does not create an Image Lens subgoal from an explanatory research workflow question", () => {
+    const contract = buildHelixCompoundCapabilityContract({
+      turnId: "ask:test:research-paper-capability-question",
+      promptText:
+        "Does your research-paper tool let you choose papers it can parse, or do you first check which papers are openable and then use Image Lens? Answer only from your capability contract. Do not retrieve a paper or call a tool.",
+    });
+
+    expect(contract?.required_capabilities).toEqual(["helix_ask.inspect_capability_catalog"]);
+    expect(contract?.requires_all_subgoals).toBe(false);
+    expect(contract?.subgoals.some((subgoal) => subgoal.requested_capability === "image_lens.inspect")).toBe(false);
+  });
+
   it("makes explicit catalog prompts dominate repo fallback contracts", () => {
     const arbitration = resolveAskCapabilityContractArbitration({
       turnId: "ask:test:catalog-dominance",

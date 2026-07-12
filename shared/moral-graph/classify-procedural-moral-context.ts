@@ -186,6 +186,66 @@ const PROCEDURAL_MORAL_PATTERN_RULES: readonly ProceduralMoralPatternRule[] = [
     reasonCodes: ["fallout_transfer_check", "consideration_debt"],
   },
   {
+    id: "familiarity-anonymity-balance",
+    cues: [
+      /\b(?:familiarity[-\s]?anonymity balance|repeated contact|network overlap|newcomer access)\b/i,
+      /\b(?:rural|urban|city|population density)\b[\s\S]{0,100}\b(?:patience|trust|moral|virtue|anonymity)\b/i,
+    ],
+    observedPattern: "unclear_evidence",
+    moralRootId: "familiarity-anonymity-balance",
+    proceduralMove: "ask_for_concrete_evidence",
+    explanation:
+      "Density and familiarity are treated as context variables; ask about repeated contact, network overlap, newcomer access, privacy, and alternatives before drawing a social conclusion.",
+    missingEvidence: ["repeated_contact_context", "network_overlap", "newcomer_access", "privacy_and_exit_options", "service_alternatives"],
+    warnings: ["avoid_density_essentialism", "avoid_familiarity_as_proof"],
+    reasonCodes: ["familiarity_anonymity_balance", "density_is_context_not_verdict"],
+  },
+  {
+    id: "trust-medium-translation",
+    cues: [
+      /\b(?:trust medium|trust channel|relational trust|institutional trust|community reputation)\b/i,
+      /\b(?:personal promise|shared reputation|formal record|contract|financial record)\b[\s\S]{0,80}\b(?:trust|access|threshold)\b/i,
+    ],
+    observedPattern: "unclear_evidence",
+    moralRootId: "trust-medium-translation",
+    proceduralMove: "ask_for_concrete_evidence",
+    explanation:
+      "Trust-medium translation asks what trust channel is operating, what context is lost during translation, and which correction or appeal path remains.",
+    missingEvidence: ["source_trust_channel", "destination_trust_channel", "dependency_scope", "translation_loss", "fallback_and_appeal_path"],
+    warnings: ["avoid_contract_as_character", "avoid_financial_record_as_total_reputation"],
+    reasonCodes: ["trust_medium_translation", "institutional_context_preservation"],
+  },
+  {
+    id: "domain-bounded-accountability",
+    cues: [
+      /\b(?:domain[-\s]?bounded accountability|observer exposure|witness exposure|accountability domain)\b/i,
+      /\b(?:credit score|financial history|reference|endorsement)\b[\s\S]{0,100}\b(?:character|worth|trustworthy|accountability)\b/i,
+    ],
+    observedPattern: "practice_commitment",
+    moralRootId: "domain-bounded-accountability",
+    proceduralMove: "ask_for_concrete_evidence",
+    explanation:
+      "Accountability evidence is restricted to the observed domain, exposure, parties, provenance, and time window rather than generalized into moral worth.",
+    missingEvidence: ["accountability_domain", "observer_exposure", "time_window", "source_provenance", "dispute_or_correction_state", "repair_history"],
+    warnings: ["avoid_financial_totalization", "avoid_cross_domain_character_claim"],
+    reasonCodes: ["domain_bounded_accountability", "evidence_scope_required"],
+  },
+  {
+    id: "contestable-reentry-threshold",
+    cues: [
+      /\b(?:contestable re[-\s]?entry|re[-\s]?entry threshold|appeal path|repair path|review date)\b/i,
+      /\b(?:excluded|exclusion|denied access|rejected)\b[\s\S]{0,100}\b(?:criteria|appeal|repair|review|permanent|stigma)\b/i,
+    ],
+    observedPattern: "unconsidered_harm",
+    moralRootId: "contestable-reentry-threshold",
+    proceduralMove: "identify_affected_parties",
+    explanation:
+      "A consequential exclusion is converted from an identity label into a bounded access decision with visible criteria, reasons, appeal, repair, and review.",
+    missingEvidence: ["published_threshold", "decision_reason", "supporting_evidence", "appeal_path", "repair_or_reentry_path", "review_or_sunset_date"],
+    warnings: ["avoid_permanent_reject_identity", "avoid_stale_record_exclusion"],
+    reasonCodes: ["contestable_reentry_threshold", "due_process_for_exclusion"],
+  },
+  {
     id: "willful-avoidance-risk",
     cues: [/\b(?:willful avoidance|avoiding knowing|refuse to know|don't want to know|do not want to know|look away|looked away|ignore warning|ignored warning)\b/i],
     observedPattern: "willful_avoidance_risk",

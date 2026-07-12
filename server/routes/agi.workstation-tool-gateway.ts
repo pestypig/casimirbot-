@@ -86,6 +86,7 @@ workstationToolGatewayRouter.get("/workstation-tool-gateway/capabilities", async
   const requestedList = listWorkstationGatewayCapabilities({
     agentRuntime: effectiveRuntime,
     mode: requestedMode,
+    accountType: accountPolicy.account_type,
   });
   const allowedCapabilities = requestedList.capabilities.filter((capability) =>
     resolveHelixWorkstationCapabilityAccess(accountPolicy, {
@@ -203,6 +204,7 @@ workstationToolGatewayRouter.post("/workstation-tool-gateway/call", async (req: 
     approvalToken: readString(body.approval_token) ?? readString(body.approvalToken),
     turnId: readString(body.turn_id) ?? readString(body.turnId),
     iteration: typeof body.iteration === "number" ? body.iteration : null,
+    accountType: accountPolicy.account_type,
   });
   return res.status(result.ok ? 200 : 400).json({
     ...result,

@@ -139,7 +139,7 @@ describe("Helix scholarly research tool admission", () => {
       })
       .expect(200);
 
-    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("scholarly_research_lookup");
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("compound_research_locator");
     expect(response.body?.source_target_intent?.target_source).toBe("scholarly_research");
     expect(response.body?.tool_call_admission_decision?.admitted_tool_families).toEqual(
       expect.arrayContaining(["scholarly_research", "theory_locator"]),
@@ -2398,7 +2398,7 @@ describe("Helix scholarly research tool admission", () => {
         totalPages: 3,
         pages: [
           { page: 1, text: "Abstract. Warp field mechanics are summarized here." },
-          { page: 2, text: "Methods. The paper derives a compact field metric and extraction procedure." },
+          { page: 2, text: "Methods. The paper derives a compact field metric and extraction procedure, then documents the boundary conditions and numerical validation steps used for the reported constraints." },
           { page: 3, text: "Results. The model reports constraints and caveats for the proposed field." },
         ],
       }),

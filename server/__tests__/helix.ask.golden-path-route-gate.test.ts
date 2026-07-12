@@ -715,6 +715,52 @@ describe("Helix Ask golden-path route gate", () => {
     expect(response.body.current_turn_artifact_ledger?.filter((artifact: { kind?: string }) => artifact.kind === "compound_evidence_synthesis_answer")).toHaveLength(1);
   });
 
+  it("materializes civic trust traversability between civilization bounds and Moral Graph observations", async () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+    const app = createApp();
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        turn_id: "ask:test:golden-civic-trust-middle-layer",
+        prompt: [
+          "helix_ask_golden_path_runtime use helix_ask.reflect_civilization_bounds and helix_ask.reflect_ideology_context.",
+          "Trace relational trust into an institutional trust channel and financial record.",
+          "Keep accountability domain-bounded and require an appeal and re-entry path after exclusion.",
+        ].join(" "),
+        goldenPathRuntime: true,
+        requested_capabilities: [
+          HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+          HELIX_GOLDEN_PATH_MORAL_GRAPH_REFLECTION_CAPABILITY,
+        ],
+      })
+      .expect(200);
+
+    const ledger = response.body.current_turn_artifact_ledger ?? [];
+    const observationKinds = ledger
+      .map((artifact: { kind?: string }) => artifact.kind)
+      .filter((kind: string | undefined) => kind?.startsWith("helix_"));
+    expect(observationKinds).toEqual([
+      "helix_civilization_bounds_tool_result",
+      "helix_civic_trust_traversability_result",
+      "helix_moral_graph_reflection_tool_result",
+    ]);
+    expect(response.body.helix_civic_trust_traversability_result).toMatchObject({
+      kind: "helix_civic_trust_traversability_result",
+      assistant_answer: false,
+      terminal_eligible: false,
+      artifact: {
+        schemaVersion: "civic_trust_traversability/v1",
+        authority: {
+          moral_finality: false,
+          character_verdict: false,
+          financial_authority: false,
+          global_trust_score_allowed: false,
+        },
+      },
+    });
+  });
+
   it("routes stream turns through the golden-path runtime before legacy carryover", async () => {
     process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
     const app = createApp();

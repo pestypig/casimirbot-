@@ -789,8 +789,20 @@ export function hasSelectedCapabilityObservation(payload: Record<string, unknown
     const artifactId = readString(record?.artifact_id);
     if (record && artifactId) artifactById.set(artifactId, record);
   }
+  const capabilityPlan = readRecord(payload.capability_plan);
+  const toolTurnChainAudit = readRecord(payload.tool_turn_chain_audit);
+  const capabilityCatalogSelectionProven =
+    selectedCapabilityMatches(payload, "helix_ask.inspect_capability_catalog") ||
+    capabilityKeyMatchesExpected(
+      readString(capabilityPlan?.selected_capability),
+      "helix_ask.inspect_capability_catalog",
+    ) ||
+    capabilityKeyMatchesExpected(
+      readString(toolTurnChainAudit?.executed_capability),
+      "helix_ask.inspect_capability_catalog",
+    );
   if (
-    selectedCapabilityMatches(payload, "helix_ask.inspect_capability_catalog") &&
+    capabilityCatalogSelectionProven &&
     artifacts
       .map(readRecord)
       .some((artifact) =>

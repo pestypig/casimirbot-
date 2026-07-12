@@ -1002,6 +1002,44 @@ export const buildPromptDerivedTheoryReflectionGatewayCallRequests = (
   }];
 };
 
+export const buildPromptDerivedCivilizationBoundsGatewayCallRequests = (
+  body: Record<string, unknown>,
+): Record<string, unknown>[] => {
+  const prompt = readPrompt(body);
+  if (!prompt) return [];
+  if (hasPromptNamedCapability(prompt, CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY)) return [];
+  const unquoted = unquotePrompt(prompt);
+  const affirmativeClause = unquoted
+    .split(/[.!?;\n]+/)
+    .map((clause) => clause.trim())
+    .filter(Boolean)
+    .find((clause) => {
+      const requestsReflection =
+        /\breflect\b[\s\S]{0,120}\b(?:civilization\s+bounds?|civilization\s+roadmap|system\s+bounds?)\b/i.test(clause) ||
+        /\b(?:civilization\s+bounds?|civilization\s+roadmap)\b[\s\S]{0,120}\breflect(?:ion)?\b/i.test(clause);
+      if (!requestsReflection) return false;
+      if (/\b(?:do\s+not|don't|dont|never|without|avoid|not\s+asking\s+to|no\s+need\s+to)\b/i.test(clause)) return false;
+      return !/\b(?:if|when|would|could|might|hypothetically|later|next\s+time|in\s+the\s+future|previously|earlier|last\s+turn|historically|screen|visible|label|button|phrase|text)\b/i.test(clause);
+    });
+  if (!affirmativeClause) return [];
+  return [{
+    schema: "helix.workstation_gateway.prompt_derived_civilization_bounds_call_request.v1",
+    derivation_source: "helix_prompt_derived_civilization_bounds_reflection",
+    capability_id: CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+    mode: "read",
+    arguments: {
+      prompt,
+      include_bridge_context: true,
+      include_collaboration_bounds: true,
+      source_target_intent: {
+        source: "helix_prompt_derived_civilization_bounds_reflection",
+        target_source: "civilization_bounds",
+        target_kind: "civilization_bounds_reflection",
+      },
+    },
+  }];
+};
+
 export const buildPromptDerivedMoralGraphReflectionGatewayCallRequests = (
   body: Record<string, unknown>,
 ): Record<string, unknown>[] => {

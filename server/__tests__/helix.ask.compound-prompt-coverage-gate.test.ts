@@ -4,6 +4,7 @@ import {
   evaluateCompoundPromptCoverageGate,
   type HelixCompoundPromptCoverageGateInput,
 } from "../services/helix-ask/compound-prompt-coverage-gate";
+import { evaluateCompoundPromptCoverageGateFromAnswerArtifacts } from "../services/helix-ask/model-only-compound-coverage";
 import type { HelixCompoundPromptContract } from "../services/helix-ask/prompt-interpretation";
 
 const contractWith = (ids: string[]): HelixCompoundPromptContract => ({
@@ -41,6 +42,46 @@ const gate = (input: Partial<HelixCompoundPromptCoverageGateInput>) =>
   });
 
 describe("compound prompt coverage gate", () => {
+  it("does not construct a stale execution gate for a canonical capability-help goal", () => {
+    const result = evaluateCompoundPromptCoverageGateFromAnswerArtifacts({
+      turnId: "ask:test:capability-help-coverage",
+      payload: {
+        canonical_goal_frame: {
+          required_terminal_kind: "capability_help_summary",
+        },
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+      },
+      artifactLedger: [],
+      promptText: "Does the paper tool use Image Lens?",
+      contract: contractWith(["RESEARCH_PAPER_TOOL", "IMAGE_LENS"]),
+      routeScope: "source_targeted",
+    });
+
+    expect(result.gate).toMatchObject({
+      applies: false,
+      passed: true,
+      decision: "NOT_APPLICABLE",
+      reason: "capability_help_terminal",
+    });
+  });
+
+  it("does not reinterpret capability-help nouns as compound execution requirements", () => {
+    const result = evaluateCompoundPromptCoverageGate({
+      contract: contractWith(["RESEARCH_PAPER_TOOL", "IMAGE_LENS"]),
+      finalAnswerText: "The research workflow uses Image Lens only when visual extraction is needed.",
+      terminalArtifactKind: "capability_help_summary",
+      finalAnswerSource: "capability_help_summary",
+    });
+
+    expect(result).toMatchObject({
+      applies: false,
+      passed: true,
+      decision: "NOT_APPLICABLE",
+      reason: "capability_help_terminal",
+    });
+  });
+
   it("fails terminal authority when compound coverage misses a required item", () => {
     const result = gate({
       finalAnswerText: "[REQ:R1] Answer one.\n[REQ:R2] Answer two.",

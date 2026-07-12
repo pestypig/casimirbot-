@@ -110,11 +110,16 @@ export const readHardToolSelectedCapability = (
   metadata: HardToolBackendEntrypointRouteMetadata | null | undefined,
 ): string | null => {
   const mandatoryNextTool = readHardToolMandatoryNextTool(metadata);
+  const sourceTargetIntent = readHardRouteRecord(metadata?.source_target_intent);
   return (
     readHardRouteText(mandatoryNextTool?.tool_name) ??
     readHardRouteText(mandatoryNextTool?.selected_capability) ??
     readHardRouteText(mandatoryNextTool?.capability) ??
     readHardRouteText(mandatoryNextTool?.required_capability) ??
+    readHardRouteText(sourceTargetIntent?.selected_capability) ??
+    readHardRouteText(sourceTargetIntent?.selectedCapability) ??
+    readHardRouteText(sourceTargetIntent?.requested_capability) ??
+    readHardRouteText(sourceTargetIntent?.requestedCapability) ??
     null
   );
 };

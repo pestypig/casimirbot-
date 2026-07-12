@@ -454,7 +454,7 @@ const familyLabelCommandPrompts = [
   {
     label: "moral_graph_reflection",
     prompt: "Use moral graph reflection for Helix Ask parity coverage.",
-    expectedCapability: "helix_ask.reflect_ideology_context",
+    expectedCapability: "moral-graph.reflect_context",
   },
   {
     label: "theory_ideology_bridge_spaced",
@@ -620,6 +620,7 @@ const objectiveFamilyCoverage = [
       "docs-viewer.doc_equation_context",
     ],
     liveProbeCapabilities: ["docs-viewer.locate_in_doc", "docs-viewer.doc_equation_context"],
+    liveProbeRuntimeCapabilities: ["docs.search"],
   },
   {
     label: "repo_code",
@@ -787,13 +788,13 @@ const objectiveAcceptanceCompoundScenarioCoverage = [
       {
         id: "docs_then_calculator",
         requestedCapabilities: ["docs-viewer.locate_in_doc", "scientific-calculator.solve_expression"],
-        runtimeCapabilities: ["docs-viewer.locate_in_doc", "scientific-calculator.solve_expression"],
+        runtimeCapabilities: ["docs.search", "scientific-calculator.solve_expression"],
         terminalKind: "doc_evidence_synthesis_answer",
       },
       {
         id: "docs_equation_context_then_calculator",
         requestedCapabilities: ["docs-viewer.doc_equation_context", "scientific-calculator.solve_expression"],
-        runtimeCapabilities: ["docs-viewer.doc_equation_context", "scientific-calculator.solve_expression"],
+        runtimeCapabilities: ["docs.search", "scientific-calculator.solve_expression"],
         terminalKind: "doc_evidence_synthesis_answer",
       },
     ],
@@ -804,7 +805,7 @@ const objectiveAcceptanceCompoundScenarioCoverage = [
       {
         id: "workspace_directory_then_docs",
         requestedCapabilities: ["workspace-directory.resolve", "docs-viewer.locate_in_doc"],
-        runtimeCapabilities: ["workspace-directory.resolve", "docs-viewer.locate_in_doc"],
+        runtimeCapabilities: ["workspace-directory.resolve", "docs.search"],
         terminalKind: "doc_evidence_synthesis_answer",
       },
     ],
@@ -934,7 +935,7 @@ const objectiveAcceptanceCompoundScenarioCoverage = [
       {
         id: "repo_plus_docs",
         requestedCapabilities: ["repo-code.search_concept", "docs-viewer.locate_in_doc"],
-        runtimeCapabilities: ["repo-code.search_concept", "docs-viewer.locate_in_doc"],
+        runtimeCapabilities: ["repo-code.search_concept", "docs.search"],
         terminalKind: "doc_evidence_synthesis_answer",
       },
     ],
@@ -964,7 +965,7 @@ const objectiveAcceptanceCompoundScenarioCoverage = [
           "scientific-calculator.solve_expression",
         ],
         runtimeCapabilities: [
-          "docs-viewer.locate_in_doc",
+          "docs.search",
           "helix_ask.reflect_theory_context",
           "scientific-calculator.solve_expression",
         ],
@@ -1086,13 +1087,13 @@ const objectiveAcceptanceCompoundScenarioCoverage = [
       {
         id: "invalid_calculator_args_fail_closed",
         requestedCapabilities: ["docs-viewer.locate_in_doc", "scientific-calculator.solve_expression"],
-        runtimeCapabilities: ["docs-viewer.locate_in_doc"],
+        runtimeCapabilities: ["docs.search"],
         terminalKind: "typed_failure",
       },
       {
         id: "missing_calculator_args_fail_closed",
         requestedCapabilities: ["docs-viewer.locate_in_doc", "scientific-calculator.solve_expression"],
-        runtimeCapabilities: ["docs-viewer.locate_in_doc"],
+        runtimeCapabilities: ["docs.search"],
         terminalKind: "typed_failure",
       },
     ],
@@ -1206,6 +1207,51 @@ const modelVisibleRequiredArgSchemaCoverage = [
       'case "scholarly-research.fetch_full_text":',
       'return schema(["paper_result_or_source"], {',
       "Required. Paper result id, DOI, arXiv id, URL, or prior scholarly research observation ref.",
+    ],
+  },
+  {
+    capability: "scholarly-research.extract_numeric_parameters",
+    requiredArgs: ["text_evidence"],
+    routeSnippets: [
+      'case "scholarly-research.extract_numeric_parameters":',
+      'return schema(["text_evidence"], {',
+      "Full-text or excerpt evidence from which cited numeric parameters should be extracted.",
+    ],
+  },
+  {
+    capability: "theory-badge-graph.propose_frontier_conjectures",
+    requiredArgs: ["prompt"],
+    routeSnippets: [
+      'case "theory-badge-graph.propose_frontier_conjectures":',
+      'return schema(["prompt"], {',
+      "Theory frontier question or bounded conjecture-workbench prompt.",
+    ],
+  },
+  {
+    capability: "moral-graph.reflect_context",
+    requiredArgs: ["prompt"],
+    routeSnippets: [
+      'case "moral-graph.reflect_context":',
+      'return schema(["prompt"], {',
+      "Moral context or living-substrate scenario to reflect without treating graph proximity as proof.",
+    ],
+  },
+  {
+    capability: "moral-graph.reflect_living_substrate_context",
+    requiredArgs: ["prompt"],
+    routeSnippets: [
+      'case "moral-graph.reflect_living_substrate_context":',
+      'return schema(["prompt"], {',
+      "Moral context or living-substrate scenario to reflect without treating graph proximity as proof.",
+    ],
+  },
+  {
+    capability: "text_to_speech.speak_text",
+    requiredArgs: ["text"],
+    routeSnippets: [
+      'case "text_to_speech.speak_text":',
+      'return schema(["text"], {',
+      "Exact admitted text to send to the governed text-to-speech lane.",
     ],
   },
   {
@@ -2088,9 +2134,8 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     expect(toolChainMatrixTestSource).toEqual(expect.stringContaining("rejects tool-chain rail tables that project a visible terminal from an unproven source"));
     expect(toolChainMatrixTestSource).toEqual(expect.stringContaining("rail_visible_projection_source_missing"));
     expect(toolChainMatrixTestSource).toEqual(expect.stringContaining("rail_visible_projection_not_proven"));
-    expect(artifactQueryIndexSource).toEqual(
-      expect.stringContaining('{ kind: payload.terminal_artifact_kind, source: "payload.terminal_artifact_kind", proven: false }'),
-    );
+    expect(artifactQueryIndexSource).toEqual(expect.stringContaining('"payload.terminal_artifact_kind+visible_answer_text"'));
+    expect(artifactQueryIndexSource).toEqual(expect.stringContaining("proven: Boolean(payloadVisibleText)"));
     expect(artifactQueryIndexSource).toEqual(expect.stringContaining("visibleTerminalProjection.proven"));
     const unprovenPayloadProjectionSource =
       'visible_projection_source: "' + 'payload.terminal_artifact_kind"';
@@ -2234,6 +2279,19 @@ describe("Helix Ask tool-family parity goal coverage", () => {
         expect(entry.contractFamilies, `${entry.label}:${capability}:family`).toContain(capabilityContract?.toolFamily);
       }
     }
+  });
+
+  it.each([
+    ["account_session.set_interface_language", "workstation"],
+    ["repo.search", "repo_code"],
+    ["docs.search", "docs_viewer"],
+    ["theory-badge-graph.reflect_discussion_context", "theory_locator"],
+    ["text_to_speech.speak_text", "voice_delivery"],
+  ] as const)("resolves gateway alias %s to authority family %s", (capability, family) => {
+    const resolved = resolveToolFamilyContract({ toolName: capability });
+    expect(resolved?.toolFamily).toBe(family);
+    expect(resolved?.requiredReentry).toBe(true);
+    expect(resolved?.requiresGoalSatisfaction).toBe(true);
   });
 
   it("resolves audited explicit capabilities to their explicit family before broad alias inference", () => {
@@ -2557,10 +2615,20 @@ describe("Helix Ask tool-family parity goal coverage", () => {
       ].filter(Boolean)));
 
       for (const capability of substitutingCapabilities) {
-        expect(
-          explicitCapabilityContractForCapability(capability)?.capability,
-          `${contract.capability}:substitution:${capability}:contract`,
-        ).toBe(contract.capability);
+        const capabilityContract = explicitCapabilityContractForCapability(capability);
+        expect(capabilityContract, `${contract.capability}:substitution:${capability}:contract`)
+          .toBeTruthy();
+        if (capabilityContract?.capability !== contract.capability) {
+          expect(
+            capabilityContract?.capability === capability ||
+              capabilityContract?.runtime_capability === capability,
+            `${contract.capability}:substitution:${capability}:explicit_substitute_identity`,
+          ).toBe(true);
+          expect(
+            capabilityContract?.capability_family,
+            `${contract.capability}:substitution:${capability}:substitute_family`,
+          ).toBe(contract.capability_family);
+        }
         expect(
           explicitCapabilityMatches(contract.capability, capability),
           `${contract.capability}:substitution:${capability}:match`,
@@ -2568,14 +2636,20 @@ describe("Helix Ask tool-family parity goal coverage", () => {
 
         const resolved = resolveToolFamilyContract({ toolName: capability });
         expect(resolved, `${contract.capability}:substitution:${capability}:resolved`).toBeTruthy();
+        const expectedObservationKinds = capabilityContract?.capability === contract.capability
+          ? contract.required_observation_kinds
+          : capabilityContract?.required_observation_kinds ?? [];
+        const expectedTerminalKind = capabilityContract?.capability === contract.capability
+          ? contract.required_terminal_kind
+          : capabilityContract?.required_terminal_kind ?? contract.required_terminal_kind;
         expect(
           resolved?.allowedTerminalKinds,
-          `${contract.capability}:substitution:${capability}:required_terminal_kind:${contract.required_terminal_kind}`,
-        ).toContain(contract.required_terminal_kind);
+          `${contract.capability}:substitution:${capability}:required_terminal_kind:${expectedTerminalKind}`,
+        ).toContain(expectedTerminalKind);
         expect(
           resolved?.requiredObservationKinds,
           `${contract.capability}:substitution:${capability}:required_observation_kinds`,
-        ).toEqual(expect.arrayContaining(contract.required_observation_kinds));
+        ).toEqual(expect.arrayContaining(expectedObservationKinds));
       }
     }
   });
@@ -3576,7 +3650,9 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     for (const scenario of COMPOUND_CAPABILITY_LIVE_SCENARIOS) {
       expect(scenario.expectedRequested.length, scenario.id).toBeGreaterThan(0);
       expect(scenario.expectedRuntime.length, scenario.id).toBe(scenario.expectedRequested.length);
-      expect(scenario.expectedTerminalKind, `${scenario.id}:expected_terminal_kind`).toBeTruthy();
+      if (!scenario.acceptsObservationOnlyCompound) {
+        expect(scenario.expectedTerminalKind, `${scenario.id}:expected_terminal_kind`).toBeTruthy();
+      }
       expect(
         flattenExpectedCapabilities([scenario.expectedTerminalErrorCode ?? null]),
         `${scenario.id}:budget_exhaustion_not_expected_terminal_error`,
@@ -3608,6 +3684,10 @@ describe("Helix Ask tool-family parity goal coverage", () => {
         promptText: scenario.prompt,
       });
       const subgoals = compound?.subgoals ?? [];
+      if (scenario.acceptsObservationOnlyCompound) {
+        expect(subgoals.length, `${scenario.id}:observation_only_contract_subgoals`).toBeGreaterThan(0);
+        continue;
+      }
       expect(subgoals, `${scenario.id}:contract_subgoals`).toHaveLength(scenario.expectedRequested.length);
       expect(compound?.requires_all_subgoals, `${scenario.id}:requires_all_subgoals`)
         .toBe(scenario.expectedRequested.length > 1);

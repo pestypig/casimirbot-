@@ -163,6 +163,33 @@ describe("Helix capability contract arbitration", () => {
     }
   });
 
+  it("keeps research-paper and Image Lens workflow questions explanatory", () => {
+    const prompts = [
+      "Does your research-paper tool let you choose papers it can parse, or do you first check which papers are openable and then use Image Lens? Answer only from your capability contract. Do not retrieve a paper or call a tool.",
+      "does your tool for research papers allow you to pick papers you are able to parse? or do you check what papers are openable to then use image lens?",
+      "In the future, will your research-paper tool use Image Lens after checking which papers are openable?",
+      "Earlier I asked whether your research-paper tool would use Image Lens; explain the workflow now.",
+      "The screen says, ‘Does your research-paper tool use Image Lens?’ Explain that capability question only.",
+    ];
+
+    for (const promptText of prompts) {
+      const capabilities = extractExplicitCapabilityContracts(promptText)
+        .map((entry) => entry.contract.capability);
+      expect(capabilities, promptText).not.toContain("image_lens.inspect");
+      expect(capabilities, promptText).not.toContain("scholarly-research.lookup_papers");
+      expect(capabilities, promptText).not.toContain("scholarly-research.fetch_full_text");
+    }
+  });
+
+  it("preserves a later affirmative Image Lens command after a capability question", () => {
+    const capabilities = extractExplicitCapabilityContracts(
+      "Does your research-paper tool use Image Lens for scanned equations? Then use Image Lens to inspect the attached page.",
+    ).map((entry) => entry.contract.capability);
+
+    expect(capabilities).toContain("helix_ask.inspect_capability_catalog");
+    expect(capabilities.filter((capability) => capability === "image_lens.inspect")).toHaveLength(1);
+  });
+
   it("covers the named explicit tool-call parity surface with contracts and extraction", () => {
     const cases = [
       [

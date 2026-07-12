@@ -1,6 +1,10 @@
 import { enMessages } from "../client/src/lib/i18n/messages/en";
 import { INTERFACE_TARGET_CATALOGS } from "../client/src/lib/i18n/messages/targetCatalogs";
 import { INTERFACE_MESSAGE_IDS, type InterfaceMessageId } from "../client/src/lib/i18n/messages/types";
+import {
+  isPublicInterfaceLanguageCode,
+  type SharedInterfaceLanguageCode,
+} from "../shared/interface-language-codes";
 
 type BucketReport = {
   missingStrings: number;
@@ -13,6 +17,7 @@ type BucketReport = {
 
 type LocaleReport = {
   code: string;
+  releaseStatus: "public" | "developer_preview";
   targetMessages: number;
   sourceMessages: number;
   missingStrings: number;
@@ -104,6 +109,9 @@ const locales: LocaleReport[] = INTERFACE_TARGET_CATALOGS.map(({ code, catalog }
 
   return {
     code,
+    releaseStatus: isPublicInterfaceLanguageCode(code as SharedInterfaceLanguageCode)
+      ? "public"
+      : "developer_preview",
     targetMessages: Object.keys(catalog).length,
     sourceMessages: INTERFACE_MESSAGE_IDS.length,
     missingStrings,
@@ -121,7 +129,8 @@ const locales: LocaleReport[] = INTERFACE_TARGET_CATALOGS.map(({ code, catalog }
 });
 
 const hasBlockingGaps = locales.some(
-  (locale) => locale.missingStrings > 0 || locale.exactEnglishStrings > 0,
+  (locale) => locale.releaseStatus === "public" &&
+    (locale.missingStrings > 0 || locale.exactEnglishStrings > 0),
 );
 
 const summary = {
