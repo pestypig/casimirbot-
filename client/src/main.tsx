@@ -15,7 +15,7 @@ const markBootShellMounted = () => {
 };
 
 const buildStamp = import.meta.env.DEV
-  ? `dev-${Date.now().toString()}`
+  ? "dev"
   : typeof __APP_BUILD__ === "string"
     ? __APP_BUILD__
     : "prod";

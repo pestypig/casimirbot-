@@ -9,6 +9,7 @@ export FAST_BOOT="${FAST_BOOT:-0}"
 export ENABLE_AGI="${ENABLE_AGI:-1}"
 export ENABLE_ESSENCE="${ENABLE_ESSENCE:-1}"
 export HELIX_ASK_GOLDEN_PATH_RUNTIME="${HELIX_ASK_GOLDEN_PATH_RUNTIME:-1}"
+export HMR_PROTOCOL="${HMR_PROTOCOL:-wss}"
 
 echo "[replit] dev preview root: $(pwd)"
 echo "[replit] dev preview: PORT=${PORT} HOST=${HOST} FAST_BOOT=${FAST_BOOT} ENABLE_AGI=${ENABLE_AGI} ENABLE_ESSENCE=${ENABLE_ESSENCE}"

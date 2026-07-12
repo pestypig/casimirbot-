@@ -135,7 +135,7 @@ export async function setupVite(app: Express, server: Server) {
       );
       const page = await vite.transformIndexHtml(url, template);
       const finalPage = hmrDisabled ? stripViteHmrClient(page) : page;
-      res.status(200).set({ "Content-Type": "text/html" }).end(finalPage);
+      res.status(200).set({ "Content-Type": "text/html", "Cache-Control": "no-store" }).end(finalPage);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
       next(e);
