@@ -64,6 +64,25 @@ ${args.body}
     </div>
     <div id="handoff-cover" aria-hidden="true"></div>
     <script>
+      function helixResolveClientTarget(target) {
+        try {
+          var params = new URLSearchParams(window.location.search || "");
+          if (params.get("desktop") === "1") return "/desktop";
+          if (params.get("mobile") === "1") return "/mobile";
+        } catch (_) {}
+        if (target !== "/desktop") return target;
+        var ua = navigator.userAgent || "";
+        var uaDataMobile = !!(navigator.userAgentData && navigator.userAgentData.mobile);
+        var uaMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua) ||
+          (ua.indexOf("Macintosh") !== -1 && (/Mobile/i.test(ua) || navigator.maxTouchPoints > 1));
+        var viewportMobile = window.innerWidth <= 900;
+        var screenWidth = window.screen && Number(window.screen.width) || Infinity;
+        var screenHeight = window.screen && Number(window.screen.height) || Infinity;
+        var shortEdge = Math.min(screenWidth, screenHeight);
+        var longEdge = Math.max(screenWidth, screenHeight);
+        var compactTouchDevice = navigator.maxTouchPoints > 0 && shortEdge <= 1024 && longEdge <= 1400;
+        return uaDataMobile || uaMobile || viewportMobile || compactTouchDevice ? "/mobile" : target;
+      }
       function helixHandoffTo(target) {
         document.body.classList.add("is-handoff");
         var navigated = false;
@@ -124,7 +143,7 @@ export function renderRootRedirectHtml(target: string) {
       <p>Redirecting to <a href="${safeTarget}">${safeTarget}</a>.</p>`,
     script: `    <script>
       (function() {
-        helixHandoffTo(${JSON.stringify(target)});
+        helixHandoffTo(helixResolveClientTarget(${JSON.stringify(target)}));
       })();
     </script>`,
   });
@@ -186,7 +205,7 @@ export function renderRootBootHtml(target: string) {
       <p id="boot-error"></p>`,
     script: `    <script>
       (function() {
-        var target = ${JSON.stringify(target)};
+        var target = helixResolveClientTarget(${JSON.stringify(target)});
         var retryMs = 500;
         var handoffStarted = false;
         function handoff() {

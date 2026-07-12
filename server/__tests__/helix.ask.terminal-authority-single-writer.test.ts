@@ -1622,6 +1622,124 @@ describe("Helix terminal authority single writer", () => {
     });
   });
 
+  it("keeps a full scholarly provider-failure explanation when authority stores only a preview", () => {
+    const fullFailureText = [
+      "The scholarly lookup did not return any usable, topic-relevant papers.",
+      "It failed with `semantic_scholar_http_429`; its fallback candidates were rejected as weak matches.",
+      "Therefore I cannot provide paper titles, identifiers, or access details from this observation without inventing results. No full text was fetched and no parseability was inferred.",
+    ].join("\n\n");
+    expect(fullFailureText.length).toBeGreaterThan(240);
+    const payload: Record<string, unknown> = {
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "semantic_scholar_http_429",
+      terminal_failure_text: fullFailureText,
+      selected_final_answer: fullFailureText,
+      typed_failure: {
+        schema: "helix.typed_failure.v1",
+        error_code: "semantic_scholar_http_429",
+        message: fullFailureText,
+        text: fullFailureText,
+        answer_text: fullFailureText,
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        terminal_kind: "failure",
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+        terminal_text_preview: fullFailureText.slice(0, 240),
+        server_authoritative: true,
+      },
+      resolved_turn_summary: { final_status: "final_answer" },
+      terminal_presentation: {
+        terminal_artifact_kind: "typed_failure",
+        concise_text: fullFailureText.slice(0, 240),
+      },
+    };
+
+    expect(syncHelixTypedFailureAuthorityPublicMirrors(payload)).toBe(true);
+    expect(payload).toMatchObject({
+      ok: false,
+      response_type: "final_failure",
+      final_status: "final_failure",
+      terminal_error_code: "semantic_scholar_http_429",
+      selected_final_answer: fullFailureText,
+      terminal_failure_text: fullFailureText,
+      typed_failure: {
+        message: fullFailureText,
+        text: fullFailureText,
+        answer_text: fullFailureText,
+      },
+      terminal_presentation: { concise_text: fullFailureText },
+    });
+    expect((payload.terminal_answer_authority as Record<string, unknown>).terminal_text_preview)
+      .toBe(fullFailureText.slice(0, 240));
+  });
+
+  it("blocks a metadata terminal when a required scholarly full-text subgoal was dropped", () => {
+    const turnId = "ask:test:scholarly-full-text-subgoal-dropped";
+    const metadataText = "One scholarly metadata record was found, but no full text was fetched.";
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      response_type: "final_answer",
+      final_status: "completed",
+      selected_final_answer: metadataText,
+      final_answer_source: "scholarly_research_answer",
+      terminal_artifact_kind: "scholarly_research_answer",
+      compound_prompt_coverage_gate: {
+        schema: "helix.compound_prompt_coverage_gate.v1",
+        decision: "FAIL_CLOSED",
+        missing_required_capabilities: ["scholarly-research.fetch_full_text"],
+      },
+      compound_subgoal_rail_statuses: [
+        {
+          subgoal_id: "scholarly_research_workflow:scholarly_evidence",
+          requested_capability: "scholarly-research.lookup_papers",
+          executed_capability: "scholarly-research.lookup_papers",
+          satisfaction: "satisfied",
+          rail_status: "complete",
+          observation_ref: `${turnId}:scholarly_lookup`,
+        },
+        {
+          subgoal_id: "scholarly_research_workflow:scholarly_full_text",
+          requested_capability: "scholarly-research.fetch_full_text",
+          satisfaction: "blocked",
+          rail_status: "blocked",
+          rail_failure_code: "compound_subgoal_dropped",
+          first_broken_rail: "capability_execution",
+          repair_target: "agent_step_selection",
+        },
+      ],
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "scholarly_research",
+        allowed_terminal_artifact_kinds: ["scholarly_research_answer", "typed_failure"],
+        required_terminal_artifact_kind: "scholarly_research_answer",
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "scholarly_full_text",
+        required_terminal_kind: "scholarly_research_answer",
+      },
+      current_turn_artifact_ledger: [],
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: [],
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(result.visible_text).toContain("scholarly-research.fetch_full_text was dropped before execution");
+    expect(payload.terminal_error_code).toBe("compound_subgoal_dropped");
+    expect(payload.first_incomplete_compound_subgoal_id)
+      .toBe("scholarly_research_workflow:scholarly_full_text");
+    expect(payload.selected_final_answer).not.toBe(metadataText);
+  });
+
   it("repairs stale failure authority when capability help passed terminal arbitration", () => {
     const helpText = "The scholarly lookup selects candidates first; Image Lens is used only for visual extraction.";
     const payload: Record<string, unknown> = {

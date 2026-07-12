@@ -350,6 +350,31 @@ describe("Helix Ask UI ownership boundaries", () => {
     }
   });
 
+  it("recrowns microphone default and persistence authority while capture runtime stays local", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const microphonePreference = read(
+      "client/src/components/helix/ask-console/HelixAskMicrophonePreference.ts",
+    );
+    const readAloud = read("client/src/lib/helix/ask-read-aloud-display.ts");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+
+    expect(map).toContain("Microphone arm preference");
+    expect(map).toContain("Default-off resolution plus v2 preference storage/read/write authority are recrowned");
+    expect(pill).toContain('from "@/components/helix/ask-console/HelixAskMicrophonePreference"');
+    expect(pill).toContain("useState<MicArmState>(readStoredHelixAskMicArmState)");
+    expect(pill).toContain("persistHelixAskMicArmState(micArmState)");
+    expect(pill).not.toContain("MIC_PERSIST_KEY");
+    expect(pill).not.toContain("helix.ask.micCaptureEnabled.v2");
+    expect(pill).not.toContain("window.localStorage.setItem(MIC_PERSIST_KEY");
+    expect(microphonePreference).toContain("export function resolveInitialMicArmState");
+    expect(microphonePreference).toContain("export function readStoredHelixAskMicArmState");
+    expect(microphonePreference).toContain("export function persistHelixAskMicArmState");
+    expect(microphonePreference).toContain("HELIX_ASK_MICROPHONE_PREFERENCE_STORAGE_KEY");
+    expect(microphonePreference).not.toContain("navigator.mediaDevices");
+    expect(microphonePreference).not.toContain("startVoiceCaptureLoop");
+    expect(readAloud).not.toContain("resolveInitialMicArmState");
+  });
+
   it("keeps auto-speak eligibility and terminal-preservation policy local while mode inference is recrowned", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
@@ -2898,7 +2923,6 @@ describe("Helix Ask UI ownership boundaries", () => {
       "buildReadAloudStateMapTransition",
       "buildVoiceAutoSpeakUtteranceId",
       "filterReadAloudQueueForReply",
-      "resolveInitialMicArmState",
       "resolveReadAloudButtonPressAction",
       "transitionReadAloudState",
       "shouldStopReadAloudOnButtonPress",

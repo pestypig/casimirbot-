@@ -1,6 +1,12 @@
 import { isWorkspaceOsStatusPrompt, workspaceOsStatusReasonCodes } from "../workspace-os-status-intent";
 import { detectInternetSearchIntent } from "../internet-search-intent";
-import { detectScholarlyResearchIntent } from "../scholarly-research-intent";
+import {
+  detectScholarlyResearchIntent,
+  extractScholarlyArxivId,
+  extractScholarlyDoi,
+  extractScholarlySourceUrl,
+  hasDirectScholarlyFullTextSourceIntent,
+} from "../scholarly-research-intent";
 import { moralGraphPolicyAllowsProceduralBadgeReflection } from "../../../../shared/moral-graph/moral-graph-agent-invocation-policy";
 import {
   SHARED_INTERFACE_LANGUAGE_CODES,
@@ -28,6 +34,7 @@ import {
   PROMPT_NAMED_CAPABILITIES,
   REPO_SEARCH_ALIAS_CAPABILITIES,
   REPO_SEARCH_CAPABILITY,
+  SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
   SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
   SITUATION_STAGE_STATE_READ_CAPABILITIES,
   STAGE_PLAY_BUILDER_READ_CAPABILITIES,
@@ -593,6 +600,32 @@ export const buildPromptNamedCapabilityGatewayCallRequests = (
         alias_capability: promptNamedCivilizationReflectionAlias,
       },
     });
+  }
+
+  if (
+    hasDirectScholarlyFullTextSourceIntent(prompt) &&
+    !hasNegatedToolInstruction(prompt, /\bscholarly-research\.fetch_full_text\b/i)
+  ) {
+    const sourceUrl = extractScholarlySourceUrl(prompt);
+    const arxivId = extractScholarlyArxivId(prompt);
+    const doi = extractScholarlyDoi(prompt);
+    const resolvedSourceUrl = sourceUrl ??
+      (arxivId ? `https://arxiv.org/abs/${arxivId}` : null) ??
+      (doi ? `https://doi.org/${doi}` : null);
+    if (resolvedSourceUrl) {
+      addNamedRequest(SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY, "read", {
+        source_url: resolvedSourceUrl,
+        source_target_intent: {
+          target_source: "scholarly_research",
+          target_kind: "research_paper_full_text",
+          strength: "hard",
+          explicit_cues: ["prompt_named_capability", "explicit_paper_source"],
+          terminal_evidence_requirement: "full_text",
+          ...(arxivId ? { arxiv_id: arxivId } : {}),
+          ...(doi ? { doi } : {}),
+        },
+      });
+    }
   }
 
   if (

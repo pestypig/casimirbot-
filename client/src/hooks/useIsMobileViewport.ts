@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
+import {
+  MOBILE_BREAKPOINT_PX,
+  TABLET_COARSE_BREAKPOINT_PX,
+  resolveMobileDeviceSignals,
+} from "@shared/mobile-device-detection";
 
-const MOBILE_BREAKPOINT_PX = 900;
-const TABLET_COARSE_BREAKPOINT_PX = 1200;
 const MOBILE_WIDTH_QUERY = `(max-width: ${MOBILE_BREAKPOINT_PX}px)`;
 const TABLET_COARSE_WIDTH_QUERY = `(max-width: ${TABLET_COARSE_BREAKPOINT_PX}px)`;
 const PRIMARY_COARSE_POINTER_QUERY = "(hover: none) and (pointer: coarse)";
 const ANY_COARSE_POINTER_QUERY = "(any-pointer: coarse)";
-const MOBILE_UA_REGEX =
-  /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
-
 const computeIsMobile = (
   widthQuery?: MediaQueryList,
   tabletWidthQuery?: MediaQueryList,
@@ -29,17 +29,25 @@ const computeIsMobile = (
     anyPointerQuery?.matches ??
     window.matchMedia(ANY_COARSE_POINTER_QUERY).matches;
 
-  const coarsePointerMatch = primaryPointerMatch || anyPointerMatch;
-  const coarseTabletMatch = coarsePointerMatch && (widthMatch || tabletWidthMatch);
+  const browserNavigator = typeof navigator !== "undefined" ? navigator : null;
+  const userAgentDataMobile = (
+    browserNavigator as Navigator & { userAgentData?: { mobile?: boolean } }
+  )?.userAgentData?.mobile;
 
-  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
-  const uaSuggestsMobile =
-    MOBILE_UA_REGEX.test(ua) ||
-    (ua.includes("Macintosh") &&
-      typeof navigator !== "undefined" &&
-      navigator.maxTouchPoints > 1);
-
-  return widthMatch || coarseTabletMatch || uaSuggestsMobile;
+  return resolveMobileDeviceSignals({
+    userAgent: browserNavigator?.userAgent,
+    userAgentDataMobile,
+    maxTouchPoints: browserNavigator?.maxTouchPoints,
+    viewportWidth: widthMatch
+      ? MOBILE_BREAKPOINT_PX
+      : tabletWidthMatch
+        ? TABLET_COARSE_BREAKPOINT_PX
+        : window.innerWidth,
+    screenWidth: window.screen?.width,
+    screenHeight: window.screen?.height,
+    primaryCoarsePointer: primaryPointerMatch,
+    anyCoarsePointer: anyPointerMatch,
+  });
 };
 
 const addMediaListener = (query: MediaQueryList, listener: () => void) => {

@@ -249,6 +249,12 @@ import {
   persistHelixAskAgentRuntime,
   readStoredHelixAskAgentRuntime,
 } from "@/components/helix/ask-console/HelixAskRuntimePreference";
+import {
+  persistHelixAskMicArmState,
+  readStoredHelixAskMicArmState,
+  resolveInitialMicArmState,
+} from "@/components/helix/ask-console/HelixAskMicrophonePreference";
+export { resolveInitialMicArmState };
 import { readActiveDocVisibleTranslationContext } from "@/lib/docs/visibleTranslationContext";
 import {
   readHelixAskVisualCaptureAudioPreference,
@@ -692,7 +698,6 @@ import {
   isInterimVoicePlaybackUtteranceKind,
   isManualVoicePlaybackUtterance,
   isMissionVoiceOutputModeEnabled,
-  resolveInitialMicArmState,
   resolveReadAloudButtonPressAction,
   shouldEnableVoiceRollout,
   shouldStopReadAloudOnButtonPress,
@@ -710,7 +715,6 @@ export {
   isInterimVoicePlaybackUtteranceKind,
   isManualVoicePlaybackUtterance,
   isMissionVoiceOutputModeEnabled,
-  resolveInitialMicArmState,
   resolveReadAloudButtonPressAction,
   shouldEnableVoiceRollout,
   shouldStopReadAloudOnButtonPress,
@@ -2442,7 +2446,6 @@ type ExplorationRuntimeState = {
   updatedAtMs: number;
 };
 
-const MIC_PERSIST_KEY = "helix.ask.micCaptureEnabled.v1";
 const MIC_SPEECH_START_MS = 120;
 const MIC_SOFT_PAUSE_MS = 450;
 const MIC_END_TURN_MS = 1200;
@@ -7115,14 +7118,7 @@ export function HelixAskPill({
       return next;
     });
   }, []);
-  const [micArmState, setMicArmState] = useState<MicArmState>(() => {
-    if (typeof window === "undefined") return "on";
-    try {
-      return resolveInitialMicArmState(window.localStorage.getItem(MIC_PERSIST_KEY));
-    } catch {
-      return "on";
-    }
-  });
+  const [micArmState, setMicArmState] = useState<MicArmState>(readStoredHelixAskMicArmState);
   const micArmStateRef = useRef<MicArmState>(micArmState);
   const [voiceInputState, setVoiceInputState] = useState<MicRuntimeState>("listening");
   const [voiceInputError, setVoiceInputError] = useState<string | null>(null);
@@ -18930,12 +18926,7 @@ export function HelixAskPill({
   }, [primeVoiceAudioPlayback]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(MIC_PERSIST_KEY, micArmState);
-    } catch {
-      // no-op
-    }
+    persistHelixAskMicArmState(micArmState);
   }, [micArmState]);
 
   useEffect(() => {

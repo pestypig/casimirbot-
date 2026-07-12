@@ -65,6 +65,35 @@ const buildTestProvider = (id: "helix" | "codex"): HelixAgentProvider => ({
 });
 
 describe("explicit workstation gateway derived calls", () => {
+  it("deduplicates repeated explicit scholarly lookup requests before dispatch", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question: "Use scholarly-research.lookup_papers for quantum inequality sampling constraints.",
+        workstation_gateway_calls: [
+          {
+            capability_id: "scholarly-research.lookup_papers",
+            mode: "read",
+            arguments: { query: "quantum inequality sampling constraints", limit: 3 },
+          },
+          {
+            capability_id: "scholarly-research.lookup_papers",
+            mode: "read",
+            arguments: { query: "quantum inequality sampling constraints", limit: 3 },
+          },
+          {
+            capability_id: "scholarly-research.lookup_papers",
+            mode: "read",
+            arguments: { query: "quantum inequality sampling constraints", limit: 3 },
+          },
+        ],
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["scholarly-research.lookup_papers"]);
+  });
+
   it("keeps a quoted search identifier out of a calculator-only itinerary", () => {
     const requests = readWorkstationGatewayCallRequestsForTurn({
       includePlannerDerived: true,
@@ -1860,6 +1889,51 @@ describe("explicit workstation gateway derived calls", () => {
       derivation_source: "helix_prompt_named_capability",
       arguments: {
         query: "public corroboration",
+      },
+    });
+  });
+
+  it("routes an explicitly named full-text fetch directly from an arXiv PDF URL", () => {
+    const prompt =
+      "Use scholarly-research.fetch_full_text directly on https://arxiv.org/pdf/2401.12345. Report only whether machine-readable full text was obtained. Do not run scholarly-research.lookup_papers or use Image Lens.";
+
+    const namedRequests = buildPromptNamedCapabilityGatewayCallRequests({ question: prompt });
+    expect(capabilities(namedRequests)).toEqual(["scholarly-research.fetch_full_text"]);
+    expect(namedRequests[0]).toMatchObject({
+      derivation_source: "helix_prompt_named_capability",
+      arguments: {
+        source_url: "https://arxiv.org/pdf/2401.12345",
+        source_target_intent: {
+          target_source: "scholarly_research",
+          target_kind: "research_paper_full_text",
+          arxiv_id: "2401.12345",
+        },
+      },
+    });
+
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: { agent_runtime: "codex", question: prompt },
+    });
+    expect(capabilities(requests)).toEqual(["scholarly-research.fetch_full_text"]);
+  });
+
+  it("keeps lookup-first routing when the operator explicitly requests lookup then full text", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Use scholarly-research.lookup_papers to resolve https://arxiv.org/abs/2401.12345, then use scholarly-research.fetch_full_text and report whether machine-readable full text was obtained.",
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["scholarly-research.lookup_papers"]);
+    expect(requests[0]).toMatchObject({
+      derivation_source: "helix_scholarly_workflow_planner",
+      dependent_capability_id: "scholarly-research.fetch_full_text",
+      arguments: {
+        allow_scholarly_dependent_chain: true,
       },
     });
   });

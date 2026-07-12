@@ -50,6 +50,21 @@ export const extractScholarlyArxivId = (promptText: string): string | null => {
   return bare ? trimIdentifier(bare) : null;
 };
 
+export const extractScholarlySourceUrl = (promptText: string): string | null => {
+  const match = promptText.match(/https?:\/\/[^\s"'`<>]+/i)?.[0];
+  return match ? trimIdentifier(match) : null;
+};
+
+export const hasDirectScholarlyFullTextSourceIntent = (promptText: string): boolean => {
+  const sourceUrl = extractScholarlySourceUrl(promptText);
+  const hasIdentifier = Boolean(sourceUrl || extractScholarlyDoi(promptText) || extractScholarlyArxivId(promptText));
+  if (!hasIdentifier || !/\bscholarly-research\.fetch_full_text\b/i.test(promptText)) return false;
+  const directFetch = /\bscholarly-research\.fetch_full_text\b[^.!?;\n]{0,120}\b(?:directly|from|on)\b/i.test(promptText);
+  const lookupNegated = /\b(?:do\s+not|don't|dont|without|avoid)\b[^.!?;\n]{0,120}\bscholarly-research\.lookup_papers\b/i.test(promptText);
+  const lookupAbsent = !/\bscholarly-research\.lookup_papers\b/i.test(promptText);
+  return directFetch && (lookupNegated || lookupAbsent);
+};
+
 const hasLocalDocsScopeCue = (promptText: string): boolean =>
   /\b(?:docs?\s+viewer|documents?\s+viewer|(?:current(?:ly)?|open|active|visible)\s+(?:doc|document|paper|white\s*paper|whitepaper)|document\s+path\s*:|locate\s+query\s*:|from\s+(?:our|local|the)\s+docs?)\b/i.test(promptText) ||
   /(?:^|[\s"'(])\/?docs\/[A-Za-z0-9_./-]+(?:\.mdx?|\.txt)?\b/i.test(promptText);
@@ -197,7 +212,10 @@ const requestedWorkflowForPrompt = (prompt: string, doi: string | null): HelixSc
   if (hasScholarlyNumericEvidenceCue(prompt) && !hasScholarlyEquationRowExtractionCue(prompt)) {
     return "numeric_extraction";
   }
-  const fullTextActionNegated = hasNegatedScholarlyFullTextAction(prompt);
+  const fullTextCapabilityNegated =
+    /\b(?:do\s+not|don't|dont|without|avoid|not\s+asking\s+to)\b[^.!?;\n]{0,120}\bscholarly-research\.fetch_full_text\b/i.test(prompt);
+  const fullTextActionNegated = hasNegatedScholarlyFullTextAction(prompt) || fullTextCapabilityNegated;
+  if (!fullTextActionNegated && /\bscholarly-research\.fetch_full_text\b/i.test(prompt)) return "full_text_summary";
   if (!fullTextActionNegated && /\b(?:fetch|retrieve|get|pull)\b[\s\S]{0,100}\b(?:research\s+)?papers?\b/i.test(prompt)) return "full_text_summary";
   if (!fullTextActionNegated && hasScholarlyFullTextCue(prompt)) return "full_text_summary";
   if (/\b(?:references?|bibliograph(?:y|ies)|bibtex)\b/i.test(prompt)) return "bibliography_repair";
@@ -217,12 +235,15 @@ const terminalRequirementForWorkflow = (
 export const buildScholarlyCapabilityChainPlan = (
   intent: HelixScholarlyIntent,
 ): HelixScholarlyCapabilityChainPlan => {
-  const planned = ["scholarly-research.lookup_papers"];
-  if (
+  const directFullTextSource = hasDirectScholarlyFullTextSourceIntent(intent.original_prompt);
+  const planned = directFullTextSource
+    ? ["scholarly-research.fetch_full_text"]
+    : ["scholarly-research.lookup_papers"];
+  if (!directFullTextSource && (
     intent.requested_workflow === "full_text_summary" ||
     intent.requested_workflow === "numeric_extraction" ||
     intent.requested_workflow === "numeric_calculation"
-  ) {
+  )) {
     planned.push("scholarly-research.fetch_full_text");
   }
   if (

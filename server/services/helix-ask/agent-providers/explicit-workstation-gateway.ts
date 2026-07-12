@@ -19,6 +19,7 @@ import {
   INTERNET_SEARCH_CAPABILITY,
   MORAL_GRAPH_REFLECTION_CAPABILITY,
   REPO_SEARCH_CAPABILITY,
+  SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
   SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
   TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY,
   VISUAL_OBSERVER_COMPARE_PROFILES_CAPABILITY,
@@ -511,7 +512,11 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   includePlannerDerived?: boolean;
 }): Record<string, unknown>[] => {
   const explicit = readExplicitWorkstationGatewayCallRequests(input.body);
-  if (explicit.length > 0) return filterRequestsAllowedByCommittedRoute(input.body, explicit);
+  if (explicit.length > 0) {
+    const deduplicated: Record<string, unknown>[] = [];
+    appendDedupe(deduplicated, new Set<string>(), explicit);
+    return filterRequestsAllowedByCommittedRoute(input.body, deduplicated);
+  }
   if (input.body.provider_reasoning_resume === true || input.body.providerReasoningResume === true) return [];
   if (input.includePlannerDerived !== true) return [];
   const requests: Record<string, unknown>[] = [];
@@ -656,6 +661,7 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   }
   if (
     !promptNamedCapabilities.has(SCHOLARLY_RESEARCH_SEARCH_CAPABILITY) &&
+    !promptNamedCapabilities.has(SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY) &&
     (compoundDependencyCapabilities.size === 0 || allowsCompoundAdjunctCapabilities)
   ) {
     appendPromptDerivedDedupe(buildPromptDerivedScholarlyResearchGatewayCallRequests(input.body));

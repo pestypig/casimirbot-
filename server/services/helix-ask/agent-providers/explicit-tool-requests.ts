@@ -1,6 +1,9 @@
 import crypto from "node:crypto";
 import { HELIX_INTERNET_SEARCH_CAPABILITY } from "@shared/helix-internet-search-observation";
-import { HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY } from "@shared/helix-scholarly-research-observation";
+import {
+  HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+  HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+} from "@shared/helix-scholarly-research-observation";
 import { HELIX_WORKSPACE_OS_STATUS_CAPABILITY } from "../workspace-os-status-intent";
 import { WORKSTATION_CONTEXT_FEED_QUERY_CAPABILITIES } from "../workstation-context-feed-query-tool-contracts";
 import {
@@ -39,6 +42,7 @@ export const INTERNET_SEARCH_ALIAS_CAPABILITIES = [
   "internet_search.web_research",
 ] as const;
 export const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY;
+export const SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY = HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY;
 export const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context" as const;
 export const THEORY_CONTEXT_REFLECTION_ALIAS_CAPABILITIES = [
   "helix_ask.reflect_theory_context",
@@ -114,6 +118,7 @@ export const PROMPT_NAMED_CAPABILITIES = [
   MORAL_GRAPH_REFLECTION_CAPABILITY,
   MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY,
   SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+  SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
   INTERNET_SEARCH_CAPABILITY,
   ...INTERNET_SEARCH_ALIAS_CAPABILITIES,
   ...THEORY_CONTEXT_REFLECTION_ALIAS_CAPABILITIES,

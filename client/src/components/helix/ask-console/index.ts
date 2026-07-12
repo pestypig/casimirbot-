@@ -800,6 +800,13 @@ export type {
 } from "./HelixAskChatPersistence";
 export type { HelixAskLegacyChatAddMessage } from "./HelixAskLegacyChatPersistenceBinding";
 export type { HelixAskRuntimePreferenceStorage } from "./HelixAskRuntimePreference";
+export {
+  HELIX_ASK_MICROPHONE_PREFERENCE_STORAGE_KEY,
+  persistHelixAskMicArmState,
+  readStoredHelixAskMicArmState,
+  resolveInitialMicArmState,
+} from "./HelixAskMicrophonePreference";
+export type { HelixAskMicrophonePreferenceStorage } from "./HelixAskMicrophonePreference";
 export type {
   HelixAskVisualCapturePreferenceStorage,
   HelixAskVisualCapturePreferenceTarget,

@@ -782,10 +782,11 @@ export function syncHelixTypedFailureAuthorityPublicMirrors(
   const typedFailure = readRecord(payload.typed_failure);
   const localizedFailureText = buildHelixLocalizedTypedFailureTextForPayload(payload);
   const candidateFailureText =
-    readString(authority?.terminal_text_preview) ??
+    readString(typedFailure?.message) ??
     readString(typedFailure?.text) ??
     readString(typedFailure?.answer_text) ??
     readString(payload.terminal_failure_text) ??
+    readString(authority?.terminal_text_preview) ??
     readString(payload.selected_final_answer) ??
     localizedFailureText;
   const liveSourceFailureRepair = liveSourceModelSynthesisMissingFailure(payload, candidateFailureText);
@@ -852,7 +853,7 @@ export function syncHelixTypedFailureAuthorityPublicMirrors(
     terminal_kind: "failure",
     final_answer_source: "typed_failure",
     terminal_artifact_kind: "typed_failure",
-    terminal_text_preview: failureText,
+    terminal_text_preview: failureText.slice(0, 240),
     terminal_text_hash: hashHelixTerminalText(failureText),
     server_authoritative: authority?.server_authoritative !== false,
   };

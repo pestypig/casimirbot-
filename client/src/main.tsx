@@ -73,7 +73,6 @@ const syncBuildStamp = async () => {
     if (stored && stored !== buildStamp) {
       await Promise.all([clearRuntimeCaches(), unregisterServiceWorkers()]);
       window.localStorage.setItem(BUILD_STORAGE_KEY, buildStamp);
-      scheduleReloadOnce();
       return;
     }
     if (!stored) {
@@ -173,9 +172,6 @@ if (typeof window !== "undefined" && "serviceWorker" in navigator) {
                 reloadOnUpdate();
               }
             });
-          });
-          navigator.serviceWorker.addEventListener("controllerchange", () => {
-            scheduleReloadOnce();
           });
           reloadOnUpdate();
           return reg.update();

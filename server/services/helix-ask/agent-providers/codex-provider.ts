@@ -417,7 +417,15 @@ const asksForCurrentImageLensExactRowExtraction = (
 // An explicit no-use clause is an admission boundary, not evidence that the
 // excluded source should be resumed. This keeps ambient sidecars dormant.
 export const explicitlyExcludesScientificImageContext = (question: string): boolean => {
-  const exclusionClauses = question.match(/\b(?:do\s+not|don't|without|exclude|avoid)\b[^.!?;\n]{0,240}/gi) ?? [];
+  // A dotted capability identifier inside a negation clause is not a sentence
+  // boundary. Normalize those internal dots before finding the clause so
+  // `Do not run scholarly-research.lookup_papers or use Image Lens` keeps the
+  // entire exclusion authoritative.
+  const clauseSafeQuestion = question.replace(
+    /\b[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+)+\b/g,
+    (identifier) => identifier.replace(/\./g, "_"),
+  );
+  const exclusionClauses = clauseSafeQuestion.match(/\b(?:do\s+not|don't|without|exclude|avoid)\b[^.!?;\n]{0,240}/gi) ?? [];
   return exclusionClauses.some((clause) =>
     /\b(?:scientific(?:\s+(?:image|evidence))?|image\s+lens|(?:prior\s+)?sidecars?|pdfs?|papers?|crops?|equations?)\b/i.test(clause)
   );

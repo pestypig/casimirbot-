@@ -1,6 +1,7 @@
 import type { HelixWorkstationGatewayCallResult } from "../workstation-tool-gateway/types";
 import {
   detectScholarlyResearchIntent,
+  hasDirectScholarlyFullTextSourceIntent,
 } from "../scholarly-research-intent";
 import { isExistingTranslationSurfaceReadPrompt } from "./active-context-tool-requests";
 
@@ -1283,6 +1284,7 @@ const buildResearchQuantifyReflectRequests = (body: Record<string, unknown>): Re
 const buildScholarlyResearchWorkflowRequests = (body: Record<string, unknown>): Record<string, unknown>[] => {
   const prompt = readPrompt(body);
   if (!prompt) return [];
+  if (hasDirectScholarlyFullTextSourceIntent(prompt)) return [];
   if (isScientificImageEvidenceRefRevisionPrompt(prompt)) return [];
   if (isResearchQuantifyReflectPrompt(prompt, body)) return [];
   const unquoted = unquotePrompt(prompt);

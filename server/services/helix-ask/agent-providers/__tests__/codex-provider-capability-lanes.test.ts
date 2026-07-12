@@ -163,6 +163,12 @@ describe("Codex provider capability lane adapter", () => {
     expect(explicitlyExcludesScientificImageContext(
       "Reflect the promoted Image Lens equation evidence to the Theory Badge Graph.",
     )).toBe(false);
+    expect(explicitlyExcludesScientificImageContext(
+      "Use scholarly-research.fetch_full_text directly on https://arxiv.org/pdf/2401.12345. Do not run scholarly-research.lookup_papers or use Image Lens.",
+    )).toBe(true);
+    expect(explicitlyExcludesScientificImageContext(
+      "Do not run scholarly-research.lookup_papers. Now use Image Lens to inspect the current page.",
+    )).toBe(false);
   });
 
   it("attaches provider semantic route proposals without making them visible terminal text", async () => {

@@ -25,6 +25,7 @@ import {
   renderRootRedirectHtml,
   renderStartupRetryHtml,
 } from "./startup-screen";
+import { resolveMobileDeviceSignals } from "@shared/mobile-device-detection";
 
 type LatticeWatcherHandle = {
   close(): Promise<void>;
@@ -340,9 +341,6 @@ const headerValue = (value: string | string[] | undefined): string => {
   return Array.isArray(value) ? value.join(",") : value;
 };
 
-const MOBILE_UA_REGEX =
-  /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
-
 const normalizeHealthPath = (value?: string): string => {
   if (!value) return "/";
   const base = value.split("?")[0] || "/";
@@ -425,14 +423,10 @@ const resolveRootRedirectOverride = (req: Request): string | null => {
 
 const isMobileRequest = (req: Request): boolean => {
   const mobileHint = headerValue(req.headers["sec-ch-ua-mobile"]).trim();
-  if (mobileHint === "?1") return true;
-  if (mobileHint === "?0") return false;
-
-  const ua = headerValue(req.headers["user-agent"]);
-  if (!ua) return false;
-  if (MOBILE_UA_REGEX.test(ua)) return true;
-  const uaLower = ua.toLowerCase();
-  return uaLower.includes("macintosh") && uaLower.includes("mobile");
+  return resolveMobileDeviceSignals({
+    mobileHint,
+    userAgent: headerValue(req.headers["user-agent"]),
+  });
 };
 
 const resolveRootRedirectTarget = (req: Request): string => {

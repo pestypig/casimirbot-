@@ -3999,9 +3999,9 @@ describe("HelixAskPill mic helper behavior", () => {
     ).toBe(false);
   });
 
-  it("defaults a fresh voice session to armed while respecting an explicit off setting", () => {
-    expect(resolveInitialMicArmState(null)).toBe("on");
-    expect(resolveInitialMicArmState(undefined)).toBe("on");
+  it("defaults a fresh voice session to disarmed while respecting an explicit on setting", () => {
+    expect(resolveInitialMicArmState(null)).toBe("off");
+    expect(resolveInitialMicArmState(undefined)).toBe("off");
     expect(resolveInitialMicArmState("on")).toBe("on");
     expect(resolveInitialMicArmState("off")).toBe("off");
   });

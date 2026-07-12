@@ -225,6 +225,28 @@ Second live trace follow-up:
 - Focused capability materialization/bridge tests: 54/54 pass. Terminal/runtime authority aggregate: 118/118 pass. Full E17: 13/13 pass. API parity: 28/28 pass. Prompt-solving benchmark: 25/25 pass. Terminal/UI equivalence: 48/48 pass. Debug-export projection: pass. Server build: pass with the same four unrelated warnings. Discipline quick check: pass with advisory warnings.
 - One broader client resolver test remains red in the pre-existing quoted-tool-name legacy-shadow scenario (`legacy_shadow` versus `selected_final_answer`); the 17-test Ask terminal projection suite passes and this failure is outside the capability-help server patch.
 
+Scholarly provider-failure follow-up:
+
+- A live `scholarly-research.lookup_papers` turn correctly reported `semantic_scholar_http_429` and rejected weak fallback matches, but terminal authority projected only the 240-character preview while the UI showed a longer recovery explanation.
+- The typed-failure public-mirror synchronizer now prefers the complete typed-failure message/text or `terminal_failure_text`; `terminal_text_preview` remains a bounded diagnostic fallback and is never allowed to replace a full failure artifact.
+- Three identical explicit scholarly lookup requests were dispatched in the same turn. Explicit workstation gateway requests now pass through the shared request-key deduplicator before admission, collapsing repeated scholarly lookup requests to one call while preserving distinct non-equivalent requests.
+- Verification: terminal-writer plus explicit-gateway suites 195/195 pass; scholarly tool suite 32/32 pass; focused provider recovery 3/3 pass; response-boundary mirrors 9/9 pass; API parity 28/28 pass; capability plan/lifecycle 83/83 pass; prompt-solving benchmark 25/25 pass; server build and discipline quick checks pass. The server retains the same four unrelated warnings.
+
+Direct scholarly full-text routing follow-up:
+
+- A direct operator request for `scholarly-research.fetch_full_text` on an explicit arXiv PDF URL was incorrectly rewritten into `scholarly-research.lookup_papers`. The lookup returned exact metadata, but the required fetch subgoal never executed; metadata was then surfaced even though the full-text requirement remained unsatisfied.
+- Explicit direct-source fetches now admit `scholarly-research.fetch_full_text` with the gateway-native `source_url` argument. They do not synthesize a lookup subgoal when lookup is absent or explicitly negated. Prompts that affirmatively request lookup and then fetch retain the lookup-first compound workflow.
+- Scholarly capability-chain intent now treats an affirmative named `fetch_full_text` call as a full-text workflow. Direct-source chains begin with fetch, while discovery chains remain lookup then fetch. ArXiv/DOI identity is retained in source-target provenance rather than sent as gateway fields that the fetch manifest does not admit.
+- Terminal authority regression coverage confirms that a required dropped full-text subgoal produces a typed `compound_subgoal_dropped` failure and cannot terminate with metadata alone.
+- Verification: explicit gateway plus terminal-writer suites 198/198 pass; scholarly intent 7/7 pass; discipline quick static checks pass; server build passes with the same four unrelated warnings. The broader scholarly-tool, prompt-solving benchmark, and API parity Vitest processes were terminated by the Windows paging-file limit before reporting a verdict and remain required on a host with sufficient memory or after the retained local server is safely stopped.
+
+Direct full-text/Image Lens negation collision follow-up:
+
+- The live direct-fetch retest correctly requested, admitted, and executed exactly one `scholarly-research.fetch_full_text` call and selected eight bounded chunks. No lookup or Image Lens call executed.
+- Post-observation reasoning was nevertheless preempted by the scientific-image continuity shortcut. Its explicit Image Lens exclusion scanner stopped at the internal dot in the earlier negated capability identifier `scholarly-research.lookup_papers`, so `Do not run scholarly-research.lookup_papers or use Image Lens` was incorrectly treated as an Image Lens continuity request.
+- Dotted identifiers are now normalized only for exclusion-clause boundary parsing. Internal capability dots no longer terminate a negation clause, while a real sentence-ending period still ends the clause; the following affirmative sentence can therefore request Image Lens normally.
+- Focused routing, terminal, and dotted-negation regressions pass 4/4. Discipline quick static checks pass. The first server build attempt hit the Windows paging-file limit; the bounded `GOMAXPROCS=1` rerun passes with the same four unrelated warnings.
+
 ## Release blockers
 
 ### Resolved P0 — provider-wrapper final-answer and continuation baseline
@@ -308,6 +330,7 @@ The current server was not restarted, so it does not prove the checked-out patch
    - “Open `docs/research/nhm2-current-status-whitepaper.md` and summarize its current status in three bullets.” Expected: one bounded docs observation, model re-entry, one terminal answer, exact active-doc link.
    - “Within sections 6.7 and 6.8, list exact case-sensitive `alpha` and `Alpha` matches with line numbers.” Expected: complete scoped evidence without truncation or section substitution.
    - “Use `scholarly-research.lookup_papers` for quantum inequality sampling constraints and explain which returned papers are openable for full-text parsing.” Expected: lookup observation, follow-up model answer, typed provider limitation if full text is unavailable—not a missing-terminal message.
+   - “Use `scholarly-research.fetch_full_text` directly on `https://arxiv.org/pdf/2401.12345`. Report only whether machine-readable full text was obtained, its extraction status, and any failure reason. Do not run `scholarly-research.lookup_papers` or use Image Lens.” Expected: exactly one full-text fetch call, no lookup call, bounded full-text observation or typed fetch failure, and no metadata-only terminal.
    - “Find the `alpha = 0.995` sentence in section 6.7 and add its location to a note.” Expected: locate evidence, exactly one note mutation receipt, no duplicate action.
    - “The text says `create a note`; explain that phrase, but do not create one.” Expected: no note mutation.
    - Ask the research capability question immediately after a document turn. Expected: no stale document route or evidence leakage.

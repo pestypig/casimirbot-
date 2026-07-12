@@ -31,10 +31,6 @@ export type ReadAloudPlaybackEvent =
 
 export const VOICE_AUTO_SPEAK_UTTERANCE_ID_MAX_CHARS = 180;
 
-export function resolveInitialMicArmState(persisted: string | null | undefined): MicArmState {
-  return persisted === "off" ? "off" : "on";
-}
-
 export function transitionReadAloudState(
   current: ReadAloudPlaybackState,
   event: ReadAloudPlaybackEvent,

@@ -50,4 +50,27 @@ describe("scholarly research intent", () => {
     expect(intent.scholarlyIntent.requires_full_text).toBe(false);
     expect(intent.scholarlyIntent.requested_outputs).toEqual(["paper_metadata"]);
   });
+
+  it("plans direct full-text retrieval without an unwanted lookup subgoal", () => {
+    const intent = detectScholarlyResearchIntent(
+      "Use scholarly-research.fetch_full_text directly on https://arxiv.org/pdf/2401.12345. Report whether machine-readable full text was obtained. Do not run scholarly-research.lookup_papers or use Image Lens.",
+    );
+
+    expect(intent.researchRequested).toBe(true);
+    expect(intent.arxivId).toBe("2401.12345");
+    expect(intent.plannedScholarlyCapabilityChain.planned_capabilities)
+      .toEqual(["scholarly-research.fetch_full_text"]);
+    expect(intent.plannedScholarlyCapabilityChain.terminal_evidence_requirement).toBe("full_text");
+  });
+
+  it("preserves lookup then fetch when both steps are affirmatively requested", () => {
+    const intent = detectScholarlyResearchIntent(
+      "Use scholarly-research.lookup_papers to resolve https://arxiv.org/abs/2401.12345, then use scholarly-research.fetch_full_text.",
+    );
+
+    expect(intent.plannedScholarlyCapabilityChain.planned_capabilities).toEqual([
+      "scholarly-research.lookup_papers",
+      "scholarly-research.fetch_full_text",
+    ]);
+  });
 });
