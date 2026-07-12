@@ -7,7 +7,7 @@ import {
   resolveHelixWorkstationCapabilityAccess,
 } from "@shared/helix-account-session";
 import type { HelixWorkstationGatewayMode } from "../services/helix-ask/workstation-tool-gateway/types";
-import { getAccountCapabilityPolicy } from "../services/helix-account/account-session-store";
+import { getAccountCapabilityPolicy, getAccountSessionById } from "../services/helix-account/account-session-store";
 import { readHelixSessionCookie } from "../services/helix-account/session-cookie";
 import {
   callWorkstationGatewayCapability,
@@ -132,7 +132,11 @@ workstationToolGatewayRouter.get("/workstation-tool-gateway/capabilities", async
 
 workstationToolGatewayRouter.post("/workstation-tool-gateway/call", async (req: Request, res: Response) => {
   const body = readRecord(req.body);
-  const accountPolicy = await accountPolicyForRequest(req);
+  const sessionId = readHelixSessionCookie(req.headers.cookie);
+  const [accountPolicy, accountSession] = await Promise.all([
+    getAccountCapabilityPolicy(sessionId),
+    getAccountSessionById(sessionId),
+  ]);
   const requestedMode = readString(body.mode);
   const effectiveMode = capHelixWorkstationModeForPolicy(accountPolicy, requestedMode);
   const requestedRuntime = readString(body.agent_runtime) ?? readString(body.agentRuntime);
@@ -205,6 +209,7 @@ workstationToolGatewayRouter.post("/workstation-tool-gateway/call", async (req: 
     turnId: readString(body.turn_id) ?? readString(body.turnId),
     iteration: typeof body.iteration === "number" ? body.iteration : null,
     accountType: accountPolicy.account_type,
+    profileId: accountSession?.profile.profile_id ?? null,
   });
   return res.status(result.ok ? 200 : 400).json({
     ...result,

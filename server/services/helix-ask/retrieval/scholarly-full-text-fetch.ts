@@ -14,6 +14,7 @@ import {
   type HelixScholarlyPdfVisualCandidate,
 } from "@shared/helix-scholarly-research-observation";
 import { runScholarlyResearchLookup } from "./scholarly-research-lookup";
+import { saveResearchLibraryExtraction } from "../../helix-account/research-library-store";
 
 type RecordLike = Record<string, unknown>;
 
@@ -61,6 +62,7 @@ export type RunScholarlyFullTextFetchInput = {
   cachePdf?: boolean;
   cacheRoot?: string | null;
   openAccessRecoveryAttempt?: boolean;
+  researchLibraryProfileId?: string | null;
 };
 
 const DEFAULT_MAX_PAGES = 40;
@@ -777,6 +779,7 @@ export async function runScholarlyFullTextFetch(
             sourceKind = contentType.includes("html") ? "html" : "unknown";
             const text = contentType.includes("html") ? stripHtml(decoded) : decoded;
             const sourceHash = hashBuffer(bytes);
+            cacheIntegrityHash = sourceHash;
             sourcePdfRef = `artifact://scholarly-full-text/${sourceHash}`;
             extraction = {
               totalPages: 1,
@@ -890,6 +893,44 @@ export async function runScholarlyFullTextFetch(
     reason: evidenceState === "page_image_parse_required" ? "page_image_parse_required" : "full_text_unavailable",
   });
 
+  let researchLibraryDocumentRef: string | null = null;
+  let researchLibraryPersistenceStatus: "saved" | "not_requested" | "failed" = "not_requested";
+  let researchLibraryPersistenceReason: string | null = null;
+  const researchLibraryProfileId = readString(input.researchLibraryProfileId);
+  if (
+    researchLibraryProfileId &&
+    sourcePdfRef &&
+    cacheIntegrityHash &&
+    pages.length > 0 &&
+    (evidenceState === "full_text_usable" || evidenceState === "page_image_parse_required")
+  ) {
+    try {
+      const saved = await saveResearchLibraryExtraction({
+        profile_id: researchLibraryProfileId,
+        title: paper?.title ?? sourceUrl ?? "Extracted research paper",
+        source_url: sourceUrl,
+        source_kind: sourceKind,
+        source_pdf_ref: sourcePdfRef,
+        source_integrity_hash: cacheIntegrityHash,
+        paper_result_id: paper?.result_id,
+        query,
+        extraction_status: evidenceState,
+        pages: pages.map((page) => ({
+          page: page.page,
+          text: page.text,
+          text_char_count: page.text.length,
+          extraction_status: page.text.trim() ? "text" : "empty",
+          source_text_ref: `${sourcePdfRef}#page=${page.page}&text`,
+        })),
+      });
+      researchLibraryDocumentRef = saved.document_id;
+      researchLibraryPersistenceStatus = "saved";
+    } catch (error) {
+      researchLibraryPersistenceStatus = "failed";
+      researchLibraryPersistenceReason = error instanceof Error ? error.message : "research_library_persistence_failed";
+    }
+  }
+
   return {
     schema: HELIX_SCHOLARLY_FULL_TEXT_OBSERVATION_SCHEMA,
     artifact_id: `${input.callId ?? input.turnId}:scholarly_full_text_observation`,
@@ -917,5 +958,8 @@ export async function runScholarlyFullTextFetch(
     assistant_answer: false,
     raw_content_included: false,
     context_policy: "compact_context_pack_only",
+    ...(researchLibraryDocumentRef ? { research_library_document_ref: researchLibraryDocumentRef } : {}),
+    research_library_persistence_status: researchLibraryPersistenceStatus,
+    ...(researchLibraryPersistenceReason ? { research_library_persistence_reason: researchLibraryPersistenceReason } : {}),
   };
 }

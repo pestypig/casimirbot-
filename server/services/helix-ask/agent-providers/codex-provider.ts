@@ -416,15 +416,24 @@ const asksForCurrentImageLensExactRowExtraction = (
 
 // An explicit no-use clause is an admission boundary, not evidence that the
 // excluded source should be resumed. This keeps ambient sidecars dormant.
+const normalizeDottedIdentifiersForClauseParsing = (question: string): string =>
+  question.replace(
+    /\b[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+)+\b/g,
+    (identifier) => identifier.replace(/\./g, "_"),
+  );
+
+const stripNegatedOperatorClauses = (question: string): string =>
+  normalizeDottedIdentifiersForClauseParsing(question).replace(
+    /\b(?:do\s+not|don't|without|exclude|avoid)\b(?:(?!\b(?:but|however|instead)\b)[^.!?;\n]){0,240}/gi,
+    " ",
+  );
+
 export const explicitlyExcludesScientificImageContext = (question: string): boolean => {
   // A dotted capability identifier inside a negation clause is not a sentence
   // boundary. Normalize those internal dots before finding the clause so
   // `Do not run scholarly-research.lookup_papers or use Image Lens` keeps the
   // entire exclusion authoritative.
-  const clauseSafeQuestion = question.replace(
-    /\b[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+)+\b/g,
-    (identifier) => identifier.replace(/\./g, "_"),
-  );
+  const clauseSafeQuestion = normalizeDottedIdentifiersForClauseParsing(question);
   const exclusionClauses = clauseSafeQuestion.match(/\b(?:do\s+not|don't|without|exclude|avoid)\b[^.!?;\n]{0,240}/gi) ?? [];
   return exclusionClauses.some((clause) =>
     /\b(?:scientific(?:\s+(?:image|evidence))?|image\s+lens|(?:prior\s+)?sidecars?|pdfs?|papers?|crops?|equations?)\b/i.test(clause)
@@ -5114,10 +5123,12 @@ const renderScholarlyPdfPageImageDataUrl = (input: {
   };
 };
 
-const isScholarlyVisualEscalationQuestion = (question: string): boolean =>
-  /\b(?:extract|read|use|take|parse|ocr|inspect|render|compare|put|create|continue|scan|scanning|search|find)\b[\s\S]{0,180}\b(?:equations?|equation\s+rows?|formulae?|formulas?|figures?|tables?|page\s*(?:number\s*)?\d{1,3}|next\s+pages?|following\s+pages?|subsequent\s+pages?|page\s+images?|page\s+evidence|pdf\s+pages?|image\s+lens|scientific\s+evidence\s+packet|theory\s+badge\s+graph)\b/i.test(question) ||
-  /\b(?:show\s+(?:me\s+)?(?:the\s+)?science|scientific\s+content|main\s+equations?|show\s+(?:me\s+)?(?:the\s+)?equations?|scientific\s+evidence(?:\s+packet)?)\b/i.test(question) ||
-  /\b(?:equations?|formulae?|formulas?|figures?|tables?|page\s*(?:number\s*)?\d{1,3}|page\s+images?|page\s+evidence|pdf\s+pages?|image\s+lens)\b[\s\S]{0,160}\b(?:from|in|of|on|into)\s+(?:that|the|this|image\s+lens)\b/i.test(question);
+const isScholarlyVisualEscalationQuestion = (question: string): boolean => {
+  const affirmativeQuestion = stripNegatedOperatorClauses(question);
+  return /\b(?:extract|read|use|take|parse|ocr|inspect|render|compare|put|create|continue|scan|scanning|search|find)\b[\s\S]{0,180}\b(?:equations?|equation\s+rows?|formulae?|formulas?|figures?|tables?|page\s*(?:number\s*)?\d{1,3}|next\s+pages?|following\s+pages?|subsequent\s+pages?|page\s+images?|page\s+evidence|pdf\s+pages?|image\s+lens|scientific\s+evidence\s+packet|theory\s+badge\s+graph)\b/i.test(affirmativeQuestion) ||
+    /\b(?:show\s+(?:me\s+)?(?:the\s+)?science|scientific\s+content|main\s+equations?|show\s+(?:me\s+)?(?:the\s+)?equations?|scientific\s+evidence(?:\s+packet)?)\b/i.test(affirmativeQuestion) ||
+    /\b(?:equations?|formulae?|formulas?|figures?|tables?|page\s*(?:number\s*)?\d{1,3}|page\s+images?|page\s+evidence|pdf\s+pages?|image\s+lens)\b[\s\S]{0,160}\b(?:from|in|of|on|into)\s+(?:that|the|this|image\s+lens)\b/i.test(affirmativeQuestion);
+};
 
 const isScholarlyLookupCandidate = (
   candidate: Record<string, unknown> | Record<string, unknown>[] | null,
@@ -7281,6 +7292,8 @@ const scholarlyFullTextGatewayResults = (
 const hasScholarlyResearchObservation = (gatewayCallResults: HelixWorkstationGatewayCallResult[]): boolean =>
   scholarlyResearchGatewayResults(gatewayCallResults).some((result) =>
     result.ok === true && isScholarlyGatewayResultSelectedForAnswer(result),
+  ) || scholarlyFullTextGatewayResults(gatewayCallResults).some((result) =>
+    result.ok === true && Boolean(readScholarlyGatewayEvidenceState(result)),
   );
 
 const describeScholarlyResearchObservationFailure = (
@@ -7365,7 +7378,7 @@ const formatScholarlyPaperMetadataResult = (
   ].filter((entry): entry is string => Boolean(entry)).join("\n");
 };
 
-const buildScholarlyResearchResponseModeProjection = (input: {
+export const buildScholarlyResearchResponseModeProjection = (input: {
   question: string;
   text: string;
   gatewayCallResults: HelixWorkstationGatewayCallResult[];
@@ -7414,7 +7427,7 @@ const buildScholarlyResearchResponseModeProjection = (input: {
   ) {
     return { text: input.text, projection: null };
   }
-  if (scholarlyResults.length === 0) {
+  if (scholarlyResults.length === 0 && fullTextResults.length === 0) {
     return {
       text: [
         "I cannot answer scholarly paper content from this turn because no scholarly-research.lookup_papers observation packet was materialized.",
@@ -7667,6 +7680,38 @@ const buildScholarlyResearchResponseModeProjection = (input: {
     };
   }
 
+  if (scholarlyIntent.scholarlyIntent.requires_full_text && evidenceState === "full_text_usable") {
+    return {
+      text: input.text,
+      projection: {
+        schema: "helix.scholarly_response_mode_selection.v1",
+        scholarly_response_mode: "scholarly_research_answer",
+        allowed_response_modes: ["scholarly_research_answer", "scholarly_recovery_plan"],
+        selected_response_mode: "scholarly_research_answer",
+        evidence_state: "full_text_usable",
+        selected_for_answer: true,
+        selected_for_exploration: false,
+        candidate_relevance_reasons: candidateRelevanceReasons,
+        rejected_candidate_reasons: rejectedCandidateReasons,
+        next_affordances: nextAffordances,
+        recovery_queries: recoveryQueries,
+        recovery_query_basis: recoveryQueryBasis,
+        missing_requirements: missingRequirements,
+        scholarly_intent: scholarlyIntent.scholarlyIntent,
+        scholarly_query: scholarlyIntent.normalizedQuery,
+        requested_workflow: scholarlyIntent.scholarlyIntent.requested_workflow,
+        planned_scholarly_capability_chain: scholarlyIntent.plannedScholarlyCapabilityChain,
+        executed_scholarly_capability_chain: executedScholarlyCapabilityChain,
+        terminal_evidence_requirement: scholarlyIntent.scholarlyIntent.terminal_evidence_requirement,
+        query_normalization_reasons: scholarlyIntent.scholarlyIntent.query_normalization_reasons,
+        terminal_artifact_kind: "scholarly_research_answer",
+        terminal_eligible: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+  }
+
   if (selectedResponseMode === "scholarly_exploratory_candidates" && papers.length > 0) {
     const candidateLines = papers
       .slice(0, 5)
@@ -7895,30 +7940,33 @@ const scholarlyVisualEvidenceFromLanePackets = (
   };
 };
 
-const scholarlyFollowupRequestedModes = (question: string): string[] => uniqueStrings([
-  /\b(?:theory\s+badge\s+graph|badge\s+graph|theory\s+reflection|reflect(?:ion)?|relevance\s+to\s+(?:the\s+)?theory)\b/i.test(question)
+export const scholarlyFollowupRequestedModes = (question: string): string[] => {
+  const affirmativeQuestion = stripNegatedOperatorClauses(question);
+  return uniqueStrings([
+  /\b(?:theory\s+badge\s+graph|badge\s+graph|theory\s+reflection|reflect(?:ion)?|relevance\s+to\s+(?:the\s+)?theory)\b/i.test(affirmativeQuestion)
     ? "theory_badge_graph_reflection"
     : "",
-  /\b(?:equations?|formulae?|formulas?|derive|derivation|variables?|parameter\s+binding)\b/i.test(question)
+  /\b(?:equations?|formulae?|formulas?|derive|derivation|variables?|parameter\s+binding)\b/i.test(affirmativeQuestion)
     ? "equation_extraction"
     : "",
-  isScholarlyNumericFollowupQuestion(question) ? "numeric_extraction" : "",
-  /\b(?:scientific\s+evidence\s+packet|evidence\s+packet|sidecar|scientific\s+evidence|proof\s+packet)\b/i.test(question)
+  isScholarlyNumericFollowupQuestion(affirmativeQuestion) ? "numeric_extraction" : "",
+  /\b(?:scientific\s+evidence\s+packet|evidence\s+packet|sidecar|scientific\s+evidence|proof\s+packet)\b/i.test(affirmativeQuestion)
     ? "scientific_evidence_packet"
     : "",
-  /\b(?:show\s+(?:me\s+)?(?:the\s+)?science|scientific\s+content|main\s+equations?|show\s+(?:me\s+)?(?:the\s+)?equations?)\b/i.test(question)
+  /\b(?:show\s+(?:me\s+)?(?:the\s+)?science|scientific\s+content|main\s+equations?|show\s+(?:me\s+)?(?:the\s+)?equations?)\b/i.test(affirmativeQuestion)
     ? "page_image_parse"
     : "",
-  /\b(?:page\s+images?|screenshots?|render(?:ed)?\s+pages?|pdf\s+pages?|image\s+lens|ocr|figures?|tables?|plots?)\b/i.test(question)
+  /\b(?:page\s+images?|screenshots?|render(?:ed)?\s+pages?|pdf\s+pages?|image\s+lens|ocr|figures?|tables?|plots?)\b/i.test(affirmativeQuestion)
     ? "page_image_parse"
     : "",
-  /\b(?:full[-\s]?text|fetched\s+text|read\s+(?:the\s+)?(?:paper|pdf|article)|paper\s+content|detailed\s+(?:argument|result|conclusion))\b/i.test(question)
+  /\b(?:full[-\s]?text|fetched\s+text|read\s+(?:the\s+)?(?:paper|pdf|article)|paper\s+content|detailed\s+(?:argument|result|conclusion))\b/i.test(affirmativeQuestion)
     ? "full_text"
     : "",
-  /\b(?:tell\s+me|summari[sz]e|explain|relevance|relevant)\b/i.test(question)
+  /\b(?:tell\s+me|summari[sz]e|explain|relevance|relevant)\b/i.test(affirmativeQuestion)
     ? "metadata_context"
     : "",
-]);
+  ]);
+};
 
 const recordHasFullTextEvidence = (record: ScholarlyFollowupEvidenceMemoryRecord | null): boolean =>
   ["full_text_usable", "numeric_evidence_usable", "answer_ready"].includes(record?.evidence_state ?? "");
@@ -12744,7 +12792,8 @@ export const codexProvider: HelixAgentProvider = {
         ? readString(scholarlyResponseModeProjection.projection.terminal_artifact_kind)
         : null;
     const scholarlyCapabilityContractAllowsAnswer =
-      scholarlyResearchGatewayResults(gatewayCallResults).length > 0;
+      scholarlyResearchGatewayResults(gatewayCallResults).length > 0 ||
+      scholarlyFullTextGatewayResults(gatewayCallResults).length > 0;
     const scholarlyFollowupRecoveryTerminal = Boolean(
       scholarlyResponseModeArtifactKind &&
       [

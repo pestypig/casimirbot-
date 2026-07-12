@@ -7418,6 +7418,7 @@ export const callWorkstationGatewayCapability = async (
       sourceUrl,
       maxPages: readFiniteNumber(args.max_pages ?? args.maxPages),
       maxChunks: readFiniteNumber(args.max_chunks ?? args.maxChunks),
+      researchLibraryProfileId: cleanString(input.profileId) || null,
     });
     const observation = {
       ...fullTextObservation,

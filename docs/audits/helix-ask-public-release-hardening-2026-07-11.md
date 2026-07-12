@@ -247,6 +247,28 @@ Direct full-text/Image Lens negation collision follow-up:
 - Dotted identifiers are now normalized only for exclusion-clause boundary parsing. Internal capability dots no longer terminate a negation clause, while a real sentence-ending period still ends the clause; the following affirmative sentence can therefore request Image Lens normally.
 - Focused routing, terminal, and dotted-negation regressions pass 4/4. Discipline quick static checks pass. The first server build attempt hit the Windows paging-file limit; the bounded `GOMAXPROCS=1` rerun passes with the same four unrelated warnings.
 
+Full-text response-mode negation follow-up:
+
+- The next live retest materialized a valid terminal and again executed only `scholarly-research.fetch_full_text`. The full-text observation was successful: `full_text_usable`, 17 parsed pages, eight bounded selected chunks, and no fetch missing requirements.
+- Scholarly response-mode selection still treated the negated phrase `use Image Lens` as a positive `page_image_parse` request. Because page-image depth outranked full-text depth, terminal authority surfaced `scholarly_evidence_escalation_missing` despite already-usable full text.
+- Scholarly follow-up mode selection and visual-escalation detection now operate on affirmative operator text with negated clauses removed. Dotted capability identifiers remain clause-internal, contrast boundaries remain usable, and a later affirmative sentence can still request Image Lens.
+- Focused negation/mode tests pass 2/2, and the existing equation/scientific-packet plus page-image escalation regressions pass 2/2. The earlier direct-routing/terminal set remains 4/4 green.
+
+Direct full-text terminal-authority follow-up:
+
+- The next live retest retained `full_text_usable` evidence but terminal authority returned `scholarly_answer_synthesis_failed_after_full_text_observed`. The candidate had been rewritten to claim that no `lookup_papers` observation existed, even though the direct `fetch_full_text` observation was current-turn, normalized, and successful.
+- Scholarly observation authority now recognizes both lookup observations and direct full-text observations. A successful `full_text_usable` result explicitly selects `scholarly_research_answer`, preserves the model-authored evidence-grounded answer, and admits the full-text capability contract as terminal support without requiring a synthetic lookup.
+- Deterministic response-mode coverage and a full provider integration regression both pass 2/2. The integration proves exactly one direct fetch, completed evidence re-entry, granted terminal authority, and `scholarly_research_answer` as both terminal artifact kind and final source.
+- Fresh keyed-server validation passed: exactly one `scholarly-research.fetch_full_text` request was requested, admitted, and executed; evidence state was `full_text_usable`; 17 pages and eight bounded chunks were materialized; evidence re-entry completed; terminal authority granted `scholarly_research_answer`; and lookup/Image Lens call counts were both zero. The visible, selected, and authoritative answer reported successful extraction with no failure reason.
+
+### Private Research Library MVP
+
+- Successful scholarly full-text extraction now optionally persists every page-aligned text result when the Ask or gateway request has an authoritative signed-in profile. The compact scholarly observation retains page refs, selected bounded excerpts, and a private library document ref; it does not embed the complete extracted paper.
+- Research Library records are profile-keyed, encrypted at rest with the profile-storage key contract, deduplicated by source integrity hash, quota bounded, soft-deletable, and removed with profile deletion. Anonymous/no-session turns remain usable for extraction but do not write into a shared anonymous library.
+- Docs Viewer now exposes a separate `My Research Library` section, polls/focus-refreshes its private index, and opens saved page-aligned text with source URL, integrity hash, extraction status, and page boundaries. Canonical repository docs remain separate.
+- Focused verification passed: `research-library-store.test.ts` 4/4; `doc-viewer-taxonomy-ui.spec.tsx` 19/19; low-memory server bundle PASS; Docs Viewer syntax bundle PASS; Helix Ask discipline quick static checks PASS.
+- Deliberately deferred: library-document translation admission, Image Lens sidecar attachment UI, per-document export/delete controls, and fresh-server live UI validation. These should build on stable `document_id` plus page refs rather than copying source text into sidecars.
+
 ## Release blockers
 
 ### Resolved P0 — provider-wrapper final-answer and continuation baseline

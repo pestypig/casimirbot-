@@ -155,6 +155,55 @@ describe("DocViewerPanel taxonomy UI", () => {
     expect(onSelect).toHaveBeenCalledWith("/docs/research/nhm2-current-status-whitepaper.md");
   });
 
+  it("renders and opens profile-private research extractions separately from canonical docs", () => {
+    const onSelectResearchDocument = vi.fn();
+    const { __testDocViewerTaxonomy, DirectoryRail } = DocViewerPanelModule;
+    render(
+      <DirectoryRail
+        entries={[]}
+        total={0}
+        filteredCount={0}
+        query=""
+        docClassFilter="all"
+        taxonomyCounts={__testDocViewerTaxonomy.buildDocTaxonomyCounts([])}
+        onQueryChange={vi.fn()}
+        onDocClassFilterChange={vi.fn()}
+        onSelect={vi.fn()}
+        researchLibraryStatus="ready"
+        researchLibraryDocuments={[{
+          schema: "helix.research_library_document.v1",
+          document_id: "research:test-paper",
+          profile_id: "profile:test",
+          title: "Distributionally Robust Receive Combining",
+          source_url: "https://arxiv.org/pdf/2401.12345",
+          source_kind: "pdf",
+          source_pdf_ref: "artifact://scholarly-pdf/test.pdf",
+          source_integrity_hash: "abc123",
+          paper_result_id: "arxiv:2401.12345",
+          query: "receive combining",
+          page_count: 17,
+          text_char_count: 42000,
+          extraction_status: "full_text_usable",
+          language: null,
+          sidecar_refs: [],
+          created_at: "2026-07-12T00:00:00.000Z",
+          updated_at: "2026-07-12T00:00:00.000Z",
+          private: true,
+          raw_content_included: false,
+        }]}
+        onSelectResearchDocument={onSelectResearchDocument}
+        variant="full"
+        t={t}
+      />,
+    );
+
+    expect(screen.getByTestId("research-library-section")).toBeTruthy();
+    expect(screen.getByText("Private")).toBeTruthy();
+    const paper = screen.getByRole("button", { name: /Distributionally Robust Receive Combining/i });
+    fireEvent.click(paper);
+    expect(onSelectResearchDocument).toHaveBeenCalledWith("research:test-paper");
+  });
+
   it("matches entries by selected taxonomy filter", () => {
     const { __testDocViewerTaxonomy } = DocViewerPanelModule;
 

@@ -27,6 +27,7 @@ import { migration025 } from "./migrations/025_mission_board";
 import { migration026 } from "./migrations/026_helix_accounts";
 import { migration027 } from "./migrations/027_helix_account_credentials";
 import { migration028 } from "./migrations/028_helix_account_recovery";
+import { migration029 } from "./migrations/029_helix_research_library";
 import type { MigrationContext } from "./migrations/migration";
 
 const MIGRATIONS = [
@@ -58,6 +59,7 @@ const MIGRATIONS = [
   migration026,
   migration027,
   migration028,
+  migration029,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

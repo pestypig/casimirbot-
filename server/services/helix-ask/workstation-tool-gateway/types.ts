@@ -45,6 +45,7 @@ export type HelixWorkstationGatewayListInput = {
   agentRuntime?: HelixAgentRuntimeId | string | null;
   mode?: HelixWorkstationGatewayMode | string | null;
   accountType?: HelixAccountType | null;
+  profileId?: string | null;
 };
 
 export type HelixWorkstationGatewayListResult = {

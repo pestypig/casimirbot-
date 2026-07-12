@@ -273,6 +273,9 @@ export type HelixScholarlyFullTextObservation = {
   assistant_answer: false;
   raw_content_included: false;
   context_policy: "compact_context_pack_only";
+  research_library_document_ref?: string;
+  research_library_persistence_status?: "saved" | "not_requested" | "failed";
+  research_library_persistence_reason?: string;
 };
 
 export type HelixScholarlyNumericParameterEvidence = {

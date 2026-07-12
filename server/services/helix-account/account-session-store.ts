@@ -1260,6 +1260,10 @@ export async function deleteAccountProfile(sessionId?: string | null): Promise<H
     [previous.profile.profile_id],
   );
   await getPool().query(
+    `UPDATE helix_research_library_documents SET deleted_at = now(), updated_at = now() WHERE profile_id = $1`,
+    [previous.profile.profile_id],
+  );
+  await getPool().query(
     `UPDATE helix_account_credentials SET revoked_at = now(), updated_at = now() WHERE profile_id = $1`,
     [previous.profile.profile_id],
   );
@@ -1285,6 +1289,7 @@ export async function resetAccountSessionStore(): Promise<void> {
   await getPool().query(`DELETE FROM helix_email_outbox`);
   await getPool().query(`DELETE FROM helix_account_sign_in_attempts`);
   await getPool().query(`DELETE FROM helix_account_profile_storage`);
+  await getPool().query(`DELETE FROM helix_research_library_documents`);
   await getPool().query(`DELETE FROM helix_account_sessions`);
   await getPool().query(`DELETE FROM helix_account_credentials`);
   await getPool().query(`DELETE FROM helix_account_linked_providers`);

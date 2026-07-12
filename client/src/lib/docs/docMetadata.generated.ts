@@ -55,7 +55,7 @@ export const DOC_FILE_METADATA: Record<string, DocFileMetadata> = {
   "docs/audits/deadline-handoff-status-memo-2026-02-20.md": {"mtimeMs":1771616490126,"mtimeIso":"2026-02-20T19:41:30.126Z","sizeBytes":3366},
   "docs/audits/first-class-root-lane-gap-research-brief.md": {"mtimeMs":1783000366231,"mtimeIso":"2026-07-02T13:52:46.231Z","sizeBytes":21290},
   "docs/audits/forest-wide-first-class-lane-audit-2026-02-19.md": {"mtimeMs":1771476350696,"mtimeIso":"2026-02-19T04:45:50.696Z","sizeBytes":10190},
-  "docs/audits/helix-ask-public-release-hardening-2026-07-11.md": {"mtimeMs":1783881689210,"mtimeIso":"2026-07-12T18:41:29.210Z","sizeBytes":30314},
+  "docs/audits/helix-ask-public-release-hardening-2026-07-11.md": {"mtimeMs":1783884750206,"mtimeIso":"2026-07-12T19:32:30.206Z","sizeBytes":34320},
   "docs/audits/helix-ask-quality/helix-ask-equation-architecture-adjudication-2026-03-17.md": {"mtimeMs":1773770584971,"mtimeIso":"2026-03-17T18:03:04.971Z","sizeBytes":22682},
   "docs/audits/helix-ask-quality/helix-ask-equation-falsifiability-decision-2026-03-17.md": {"mtimeMs":1773768298096,"mtimeIso":"2026-03-17T17:24:58.096Z","sizeBytes":6290},
   "docs/audits/helix-results/README.md": {"mtimeMs":1771455293387,"mtimeIso":"2026-02-18T22:54:53.387Z","sizeBytes":257},

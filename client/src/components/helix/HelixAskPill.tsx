@@ -249,11 +249,7 @@ import {
   persistHelixAskAgentRuntime,
   readStoredHelixAskAgentRuntime,
 } from "@/components/helix/ask-console/HelixAskRuntimePreference";
-import {
-  persistHelixAskMicArmState,
-  readStoredHelixAskMicArmState,
-  resolveInitialMicArmState,
-} from "@/components/helix/ask-console/HelixAskMicrophonePreference";
+import { resolveInitialMicArmState } from "@/components/helix/ask-console/HelixAskMicrophoneSessionState";
 export { resolveInitialMicArmState };
 import { readActiveDocVisibleTranslationContext } from "@/lib/docs/visibleTranslationContext";
 import {
@@ -7118,7 +7114,7 @@ export function HelixAskPill({
       return next;
     });
   }, []);
-  const [micArmState, setMicArmState] = useState<MicArmState>(readStoredHelixAskMicArmState);
+  const [micArmState, setMicArmState] = useState<MicArmState>(resolveInitialMicArmState);
   const micArmStateRef = useRef<MicArmState>(micArmState);
   const [voiceInputState, setVoiceInputState] = useState<MicRuntimeState>("listening");
   const [voiceInputError, setVoiceInputError] = useState<string | null>(null);
@@ -18924,10 +18920,6 @@ export function HelixAskPill({
       window.removeEventListener("click", unlockOnGesture);
     };
   }, [primeVoiceAudioPlayback]);
-
-  useEffect(() => {
-    persistHelixAskMicArmState(micArmState);
-  }, [micArmState]);
 
   useEffect(() => {
     if (micArmState === "on") {

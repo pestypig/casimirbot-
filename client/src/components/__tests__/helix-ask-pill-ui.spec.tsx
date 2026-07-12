@@ -3999,11 +3999,8 @@ describe("HelixAskPill mic helper behavior", () => {
     ).toBe(false);
   });
 
-  it("defaults a fresh voice session to disarmed while respecting an explicit on setting", () => {
-    expect(resolveInitialMicArmState(null)).toBe("off");
-    expect(resolveInitialMicArmState(undefined)).toBe("off");
-    expect(resolveInitialMicArmState("on")).toBe("on");
-    expect(resolveInitialMicArmState("off")).toBe("off");
+  it("defaults every fresh voice session to disarmed", () => {
+    expect(resolveInitialMicArmState()).toBe("off");
   });
 
   it("formats read-aloud as a start-stop toggle", () => {

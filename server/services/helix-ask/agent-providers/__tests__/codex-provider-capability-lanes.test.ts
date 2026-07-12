@@ -1,15 +1,17 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildCodexCompoundSubgoalLedger,
+  buildScholarlyResearchResponseModeProjection,
   classifyCodexProcessFailureForUser,
   codexRouteAllowsTerminalKind,
   codexProvider,
   explicitlyExcludesScientificImageContext,
   extractCodexSemanticRouteProposalCandidate,
   resetScholarlyPdfWorkbenchVolatileMemoryForTest,
+  scholarlyFollowupRequestedModes,
   stripCodexSemanticRouteProposalMarkers,
 } from "../codex-provider";
 
@@ -169,6 +171,128 @@ describe("Codex provider capability lane adapter", () => {
     expect(explicitlyExcludesScientificImageContext(
       "Do not run scholarly-research.lookup_papers. Now use Image Lens to inspect the current page.",
     )).toBe(false);
+  });
+
+  it("does not promote negated Image Lens text into scholarly page-image mode", () => {
+    expect(scholarlyFollowupRequestedModes(
+      "Use scholarly-research.fetch_full_text directly on https://arxiv.org/pdf/2401.12345. Report whether machine-readable full text was obtained. Do not run lookup_papers or use Image Lens.",
+    )).toEqual(["full_text"]);
+    expect(scholarlyFollowupRequestedModes(
+      "Do not run scholarly-research.lookup_papers. Now use Image Lens to inspect the current PDF page.",
+    )).toEqual(["page_image_parse"]);
+    expect(scholarlyFollowupRequestedModes(
+      "Use full text, but do not use Image Lens.",
+    )).toEqual(["full_text"]);
+  });
+
+  it("preserves a model-authored answer grounded in direct usable full-text evidence", () => {
+    const modelAnswer = [
+      "Machine-readable full text obtained: yes.",
+      "Extraction status: `full_text_usable`.",
+      "Pages parsed: 17. Failure reason: none.",
+    ].join("\n");
+    const projection = buildScholarlyResearchResponseModeProjection({
+      question:
+        "Use scholarly-research.fetch_full_text directly on https://arxiv.org/pdf/2401.12345. Report whether machine-readable full text was obtained. Do not run lookup_papers or use Image Lens.",
+      text: modelAnswer,
+      gatewayCallResults: [{
+        ok: true,
+        capability_id: "scholarly-research.fetch_full_text",
+        gateway_admission: {
+          requested_capability: "scholarly-research.fetch_full_text",
+        },
+        observation: {
+          schema: "helix.scholarly_full_text_observation.v1",
+          evidence_state: "full_text_usable",
+          selected_for_answer: true,
+          pages_parsed: 17,
+          selected_chunks: [{ text_excerpt: "bounded evidence" }],
+          missing_requirements: [],
+        },
+        observation_packet: {
+          state_delta: {
+            evidence_state: "full_text_usable",
+            selected_for_answer: true,
+          },
+          produced_artifact_refs: ["artifact://scholarly-full-text/test"],
+        },
+      } as any],
+    });
+
+    expect(projection.text).toBe(modelAnswer);
+    expect(projection.projection).toMatchObject({
+      selected_response_mode: "scholarly_research_answer",
+      evidence_state: "full_text_usable",
+      selected_for_answer: true,
+      terminal_artifact_kind: "scholarly_research_answer",
+      terminal_eligible: true,
+      executed_scholarly_capability_chain: ["scholarly-research.fetch_full_text"],
+    });
+  });
+
+  it("authorizes a direct full-text status answer without requiring a lookup observation", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    const previousFetch = globalThis.fetch;
+    const modelAnswer = [
+      "Machine-readable full text obtained: yes.",
+      "Extraction status: `full_text_usable`.",
+      "Failure reason: none.",
+    ].join("\n");
+    process.env.CODEX_AGENT_FAKE_STDOUT = modelAnswer;
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    const htmlBytes = new TextEncoder().encode(
+      `<html><body><article>${"Accessible scholarly full-text evidence. ".repeat(120)}</article></body></html>`,
+    );
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: () => "text/html; charset=utf-8" },
+      arrayBuffer: async () => htmlBytes.buffer.slice(
+        htmlBytes.byteOffset,
+        htmlBytes.byteOffset + htmlBytes.byteLength,
+      ),
+    })) as typeof fetch;
+
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "ask:test:direct-full-text-without-lookup",
+          thread_id: "thread:test:direct-full-text-without-lookup",
+          agent_runtime: "codex",
+          question:
+            "Use scholarly-research.fetch_full_text directly on https://example.test/paper. Report only whether machine-readable full text was obtained, its extraction status, and any failure reason. Do not run lookup_papers or use Image Lens.",
+        },
+        headers: {},
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.text).toBe(modelAnswer);
+      expect((result as any).terminal_artifact_kind).toBe("scholarly_research_answer");
+      expect((result as any).final_answer_source).toBe("scholarly_research_answer");
+      expect((result.debug as any)?.provider_gateway_debug_summary).toMatchObject({
+        requested_capabilities: ["scholarly-research.fetch_full_text"],
+        executed_capabilities: ["scholarly-research.fetch_full_text"],
+        evidence_reentry_status: "completed",
+        terminal_authority_granted: true,
+        terminal_artifact_kind: "scholarly_research_answer",
+      });
+      expect((result.debug as any)?.workstation_gateway_call_results).toEqual([
+        expect.objectContaining({
+          capability_id: "scholarly-research.fetch_full_text",
+          ok: true,
+          observation: expect.objectContaining({ evidence_state: "full_text_usable" }),
+        }),
+      ]);
+    } finally {
+      globalThis.fetch = previousFetch;
+      if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      else process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      if (previousExitCode === undefined) delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      else process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+    }
   });
 
   it("attaches provider semantic route proposals without making them visible terminal text", async () => {

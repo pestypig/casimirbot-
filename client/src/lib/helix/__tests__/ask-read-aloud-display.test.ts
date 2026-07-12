@@ -17,17 +17,8 @@ import {
   shouldStopReadAloudOnButtonPress,
   transitionReadAloudState,
 } from "../ask-read-aloud-display";
-import { resolveInitialMicArmState } from "@/components/helix/ask-console/HelixAskMicrophonePreference";
 
 describe("ask read-aloud display helpers", () => {
-  it("defaults mic arm state to off unless persistence explicitly enables it", () => {
-    expect(resolveInitialMicArmState(null)).toBe("off");
-    expect(resolveInitialMicArmState(undefined)).toBe("off");
-    expect(resolveInitialMicArmState("on")).toBe("on");
-    expect(resolveInitialMicArmState("off")).toBe("off");
-    expect(resolveInitialMicArmState("disabled")).toBe("off");
-  });
-
   it("maps playback events to read-aloud UI state", () => {
     expect(transitionReadAloudState("idle", "request")).toBe("loading");
     expect(transitionReadAloudState("loading", "audio")).toBe("playing");

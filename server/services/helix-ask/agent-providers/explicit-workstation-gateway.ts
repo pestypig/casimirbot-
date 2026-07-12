@@ -698,6 +698,7 @@ export const runExplicitWorkstationGatewayCalls = async (input: {
   });
   const turnId = input.turnId ?? readHelixAgentTurnId(input.body);
   const results: HelixWorkstationGatewayCallResult[] = [];
+  const profileId = readString(input.body.research_library_owner_id);
   for (const [index, request] of requests.entries()) {
     const result = await callWorkstationGatewayCapability({
       agentRuntime: input.agentRuntime,
@@ -707,6 +708,7 @@ export const runExplicitWorkstationGatewayCalls = async (input: {
       approvalToken: readString(request.approval_token) ?? readString(request.approvalToken),
       turnId,
       iteration: typeof request.iteration === "number" ? request.iteration : index + 1,
+      profileId,
     });
     results.push(result);
     const dependentVoiceRequest = buildDependentCompoundCapabilityGatewayCallRequest({
@@ -746,6 +748,7 @@ export const runExplicitWorkstationGatewayCalls = async (input: {
           arguments: readRecord(nextDependentRequest.arguments) ?? {},
         turnId,
         iteration: results.length + 1,
+        profileId,
         });
         results.push(dependentResult);
         const followupDependentRequest = buildDependentCompoundCapabilityGatewayCallRequest({

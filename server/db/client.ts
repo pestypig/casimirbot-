@@ -21,6 +21,7 @@ const localPersistenceTables = [
   "helix_account_credentials",
   "helix_account_sign_in_attempts",
   "helix_email_outbox",
+  "helix_research_library_documents",
 ] as const;
 
 type LocalSnapshot = {

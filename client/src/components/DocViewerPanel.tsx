@@ -95,6 +95,15 @@ import type { InterfaceMessageId } from "@/lib/i18n/messages/types";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
 import {
+  listResearchLibraryDocuments,
+  readResearchLibraryDocument,
+  researchLibraryDocumentToMarkdown,
+} from "@/lib/docs/researchLibraryClient";
+import type {
+  HelixResearchLibraryDocument,
+  HelixResearchLibraryDocumentSummary,
+} from "@shared/helix-research-library";
+import {
   hashDocumentSource,
   segmentMarkdownForTranslation,
   type DocumentTranslationUnit,
@@ -465,6 +474,10 @@ export function DocViewerPanel() {
   );
   const { t } = useInterfaceText(interfaceLanguage.code);
   const [query, setQuery] = React.useState("");
+  const [researchLibraryDocuments, setResearchLibraryDocuments] = React.useState<HelixResearchLibraryDocumentSummary[]>([]);
+  const [researchLibraryStatus, setResearchLibraryStatus] = React.useState<"loading" | "ready" | "signed_out" | "error">("loading");
+  const [researchLibraryError, setResearchLibraryError] = React.useState<string | null>(null);
+  const [activeResearchDocument, setActiveResearchDocument] = React.useState<HelixResearchLibraryDocument | null>(null);
   const [docClassFilter, setDocClassFilter] = React.useState<DocTaxonomyFilter>("all");
   const [html, setHtml] = React.useState<string>("");
   const [rawMarkdown, setRawMarkdown] = React.useState<string>("");
@@ -511,6 +524,81 @@ export function DocViewerPanel() {
   const documentTranslationChunkIndexRef = React.useRef(0);
   const translationScopeKeyRef = React.useRef<string | null>(null);
   const currentEntry = React.useMemo(() => (currentPath ? findDocEntry(currentPath) : null), [currentPath]);
+  const displayEntry = React.useMemo<DocManifestEntry | null>(() => {
+    if (!activeResearchDocument) return currentEntry;
+    const relativePath = `My Research Library / ${activeResearchDocument.title}`;
+    return {
+      id: activeResearchDocument.document_id,
+      route: `/research-library/${encodeURIComponent(activeResearchDocument.document_id)}`,
+      relativePath,
+      folderChain: ["My Research Library"],
+      folderLabel: "My Research Library",
+      subjectLabel: "Private research extraction",
+      catalogDate: activeResearchDocument.updated_at.slice(0, 10),
+      catalogDateSource: null,
+      fileMtimeIso: activeResearchDocument.updated_at,
+      fileMtimeMs: Date.parse(activeResearchDocument.updated_at),
+      sizeBytes: activeResearchDocument.text_char_count,
+      docClass: null,
+      bundleKind: "private-research-extraction",
+      canonical: false,
+      sidecars: activeResearchDocument.sidecar_refs.map((sidecar) => sidecar.artifact_ref),
+      toolHints: { source: "research_library", private: true },
+      title: activeResearchDocument.title,
+      searchText: `${activeResearchDocument.title} ${relativePath}`.toLowerCase(),
+      loader: async () => researchLibraryDocumentToMarkdown(activeResearchDocument),
+    };
+  }, [activeResearchDocument, currentEntry]);
+
+  React.useEffect(() => {
+    const controller = new AbortController();
+    const refresh = (showLoading: boolean) => {
+      if (showLoading) setResearchLibraryStatus("loading");
+      setResearchLibraryError(null);
+      void listResearchLibraryDocuments(controller.signal)
+        .then((documents) => {
+          if (controller.signal.aborted) return;
+          setResearchLibraryDocuments(documents);
+          setResearchLibraryStatus("ready");
+        })
+        .catch((error) => {
+          if (controller.signal.aborted) return;
+          const message = error instanceof Error ? error.message : "Research Library unavailable";
+          setResearchLibraryStatus(message.includes("Sign in") || message.includes("profile_session_required") ? "signed_out" : "error");
+          setResearchLibraryError(message);
+        });
+    };
+    refresh(true);
+    const refreshOnFocus = () => refresh(false);
+    const interval = window.setInterval(() => refresh(false), 15_000);
+    window.addEventListener("focus", refreshOnFocus);
+    return () => {
+      controller.abort();
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshOnFocus);
+    };
+  }, []);
+
+  const handleSelectResearchDocument = React.useCallback((documentId: string) => {
+    setLoading(true);
+    setError(null);
+    void readResearchLibraryDocument(documentId)
+      .then((document) => {
+        setActiveResearchDocument(document);
+        setResearchLibraryDocuments((current) => current.map((entry) => {
+          if (entry.document_id !== document.document_id) return entry;
+          const { pages: _pages, ...summary } = document;
+          return { ...summary, raw_content_included: false };
+        }));
+      })
+      .catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Research document could not be loaded."))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSelectCanonicalDoc = React.useCallback((path: string) => {
+    setActiveResearchDocument(null);
+    viewDoc(path);
+  }, [viewDoc]);
   const rawMarkdownSourceHash = React.useMemo(
     () => (rawMarkdown ? hashDocumentSource(rawMarkdown) : null),
     [rawMarkdown],
@@ -795,8 +883,12 @@ export function DocViewerPanel() {
     return renderDocumentMarkdownToHtml(inlineTranslationMarkdown, currentEntry.relativePath);
   }, [currentEntry, html, inlineTranslationMarkdown]);
   const docScrollMemoryKey = React.useMemo(
-    () => (mode === "doc" && currentPath ? `docs-viewer:doc:${currentPath}` : "docs-viewer:directory"),
-    [currentPath, mode],
+    () => activeResearchDocument
+      ? `docs-viewer:research-library:${activeResearchDocument.document_id}`
+      : mode === "doc" && currentPath
+        ? `docs-viewer:doc:${currentPath}`
+        : "docs-viewer:directory",
+    [activeResearchDocument, currentPath, mode],
   );
 
   React.useEffect(() => {
@@ -815,6 +907,15 @@ export function DocViewerPanel() {
   }, [applyIntent]);
 
   React.useEffect(() => {
+    if (activeResearchDocument) {
+      const raw = researchLibraryDocumentToMarkdown(activeResearchDocument);
+      setRawMarkdown(raw);
+      setHtml(renderDocumentMarkdownToHtml(raw, displayEntry?.relativePath));
+      setLoadedDocId(activeResearchDocument.document_id);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     if (mode !== "doc" || !currentEntry) {
       setHtml("");
       setRawMarkdown("");
@@ -854,7 +955,7 @@ export function DocViewerPanel() {
     return () => {
       canceled = true;
     };
-  }, [mode, currentEntry, t]);
+  }, [activeResearchDocument, displayEntry?.relativePath, mode, currentEntry, t]);
 
   React.useEffect(() => {
     if (!currentEntry || !rawMarkdown || !rawMarkdownSourceHash || translationUnits.length === 0) {
@@ -1819,6 +1920,7 @@ export function DocViewerPanel() {
     if (isAutoReading) {
       setFollowLiveRead(false);
     }
+    setActiveResearchDocument(null);
     viewDirectory();
   }, [isAutoReading, viewDirectory]);
 
@@ -2047,7 +2149,7 @@ export function DocViewerPanel() {
 
   return (
     <div className="flex h-full w-full min-w-0 overflow-hidden bg-slate-950/90 text-slate-100">
-      {mode === "directory" ? (
+      {mode === "directory" && !activeResearchDocument ? (
         <DirectoryRail
           entries={grouped}
           total={DOC_MANIFEST.length}
@@ -2058,7 +2160,11 @@ export function DocViewerPanel() {
           taxonomyCounts={taxonomyCounts}
           onQueryChange={setQuery}
           onDocClassFilterChange={setDocClassFilter}
-          onSelect={viewDoc}
+          onSelect={handleSelectCanonicalDoc}
+          researchLibraryDocuments={researchLibraryDocuments}
+          researchLibraryStatus={researchLibraryStatus}
+          researchLibraryError={researchLibraryError}
+          onSelectResearchDocument={handleSelectResearchDocument}
           variant="full"
           scrollMemoryKey="docs-viewer:directory"
           t={t}
@@ -2066,8 +2172,8 @@ export function DocViewerPanel() {
       ) : (
         <div className="flex min-w-0 flex-1 flex-col">
           <PanelHeader
-            mode={mode}
-            entry={currentEntry}
+            mode={activeResearchDocument ? "doc" : mode}
+            entry={displayEntry}
             anchor={anchor}
             isAutoReading={isAutoReading}
             autoReadError={autoReadError}
@@ -2131,7 +2237,7 @@ export function DocViewerPanel() {
                   </Button>
                 )}
               </div>
-            ) : currentEntry ? (
+            ) : displayEntry ? (
               <article
                 className="prose prose-invert max-w-none overflow-x-hidden px-6 py-6 [&_*]:max-w-full [&_a]:break-words [&_code]:whitespace-pre-wrap [&_pre]:overflow-x-auto [&_table]:block [&_table]:overflow-x-auto"
                 onClick={handleDocMathClick}
@@ -2165,6 +2271,10 @@ type DirectoryRailProps = {
   onQueryChange: (value: string) => void;
   onDocClassFilterChange: (value: DocTaxonomyFilter) => void;
   onSelect: (path: string) => void;
+  researchLibraryDocuments?: HelixResearchLibraryDocumentSummary[];
+  researchLibraryStatus?: "loading" | "ready" | "signed_out" | "error";
+  researchLibraryError?: string | null;
+  onSelectResearchDocument?: (documentId: string) => void;
   variant?: "rail" | "full";
   scrollMemoryKey?: string;
   t: Translate;
@@ -2181,6 +2291,10 @@ export function DirectoryRail({
   onQueryChange,
   onDocClassFilterChange,
   onSelect,
+  researchLibraryDocuments = [],
+  researchLibraryStatus = "ready",
+  researchLibraryError = null,
+  onSelectResearchDocument,
   variant = "rail",
   scrollMemoryKey,
   t,
@@ -2190,6 +2304,12 @@ export function DirectoryRail({
   const rememberPanelScroll = useWorkstationSessionMemoryStore((state) => state.rememberPanelScroll);
   const readPanelScroll = useWorkstationSessionMemoryStore((state) => state.readPanelScroll);
   const isFull = variant === "full";
+  const normalizedLibraryQuery = query.trim().toLowerCase();
+  const visibleResearchLibraryDocuments = researchLibraryDocuments.filter((document) =>
+    !normalizedLibraryQuery ||
+    document.title.toLowerCase().includes(normalizedLibraryQuery) ||
+    (document.source_url ?? "").toLowerCase().includes(normalizedLibraryQuery)
+  );
 
   React.useLayoutEffect(() => {
     if (!scrollMemoryKey || !scrollRef.current) return;
@@ -2287,6 +2407,43 @@ export function DirectoryRail({
         className={cn("flex-1 overflow-y-auto px-2 py-3", isFull && "px-3")}
         onScroll={handleRailScroll}
       >
+        <div className="mb-5 rounded-lg border border-violet-400/20 bg-violet-400/[0.04] p-2" data-testid="research-library-section">
+          <div className="mb-1 flex items-center justify-between gap-2 text-[11px] uppercase tracking-wide text-violet-200">
+            <span className="flex items-center gap-2"><Folder className="h-3 w-3" />My Research Library</span>
+            <span className="rounded bg-violet-400/10 px-1.5 py-0.5 text-[9px] text-violet-200">Private</span>
+          </div>
+          {researchLibraryStatus === "loading" ? (
+            <p className="py-2 text-xs text-slate-400">Loading saved extractions…</p>
+          ) : researchLibraryStatus === "signed_out" ? (
+            <p className="py-2 text-xs text-slate-400">Sign in to save and reopen extracted papers.</p>
+          ) : researchLibraryStatus === "error" ? (
+            <p className="py-2 text-xs text-amber-300" title={researchLibraryError ?? undefined}>Research Library unavailable.</p>
+          ) : visibleResearchLibraryDocuments.length === 0 ? (
+            <p className="py-2 text-xs text-slate-400">
+              {researchLibraryDocuments.length === 0
+                ? "Successful full-text paper extractions will appear here."
+                : "No saved extraction matches this search."}
+            </p>
+          ) : (
+            <ul className="space-y-1.5">
+              {visibleResearchLibraryDocuments.map((document) => (
+                <li key={document.document_id}>
+                  <button
+                    type="button"
+                    className="w-full rounded-lg px-2 py-1.5 text-left text-slate-200 transition-colors hover:bg-violet-400/10"
+                    onClick={() => onSelectResearchDocument?.(document.document_id)}
+                  >
+                    <p className="break-words text-sm font-medium leading-tight">{document.title}</p>
+                    <p className="mt-0.5 text-[10px] uppercase tracking-wide text-violet-300/80">
+                      {document.page_count} pages · {document.extraction_status.replaceAll("_", " ")}
+                    </p>
+                    <p className="truncate text-[11px] text-slate-400">{document.source_url ?? document.source_pdf_ref ?? document.document_id}</p>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
         {entries.map((group) => (
           <div key={group.label} className="mb-4">
             <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wide text-slate-500">

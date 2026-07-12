@@ -350,28 +350,29 @@ describe("Helix Ask UI ownership boundaries", () => {
     }
   });
 
-  it("recrowns microphone default and persistence authority while capture runtime stays local", () => {
+  it("recrowns per-session microphone default authority while capture runtime stays local", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
-    const microphonePreference = read(
-      "client/src/components/helix/ask-console/HelixAskMicrophonePreference.ts",
+    const microphoneSessionState = read(
+      "client/src/components/helix/ask-console/HelixAskMicrophoneSessionState.ts",
     );
     const readAloud = read("client/src/lib/helix/ask-read-aloud-display.ts");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
 
-    expect(map).toContain("Microphone arm preference");
-    expect(map).toContain("Default-off resolution plus v2 preference storage/read/write authority are recrowned");
-    expect(pill).toContain('from "@/components/helix/ask-console/HelixAskMicrophonePreference"');
-    expect(pill).toContain("useState<MicArmState>(readStoredHelixAskMicArmState)");
-    expect(pill).toContain("persistHelixAskMicArmState(micArmState)");
+    expect(map).toContain("Microphone arm session state");
+    expect(map).toContain("Per-loaded-session default-off authority is recrowned");
+    expect(map).toContain("never restored from browser or account storage");
+    expect(pill).toContain('from "@/components/helix/ask-console/HelixAskMicrophoneSessionState"');
+    expect(pill).toContain("useState<MicArmState>(resolveInitialMicArmState)");
     expect(pill).not.toContain("MIC_PERSIST_KEY");
     expect(pill).not.toContain("helix.ask.micCaptureEnabled.v2");
-    expect(pill).not.toContain("window.localStorage.setItem(MIC_PERSIST_KEY");
-    expect(microphonePreference).toContain("export function resolveInitialMicArmState");
-    expect(microphonePreference).toContain("export function readStoredHelixAskMicArmState");
-    expect(microphonePreference).toContain("export function persistHelixAskMicArmState");
-    expect(microphonePreference).toContain("HELIX_ASK_MICROPHONE_PREFERENCE_STORAGE_KEY");
-    expect(microphonePreference).not.toContain("navigator.mediaDevices");
-    expect(microphonePreference).not.toContain("startVoiceCaptureLoop");
+    expect(pill).not.toContain("persistHelixAskMicArmState");
+    expect(pill).not.toContain("readStoredHelixAskMicArmState");
+    expect(microphoneSessionState).toContain("export function resolveInitialMicArmState");
+    expect(microphoneSessionState).toContain('return "off"');
+    expect(microphoneSessionState).not.toContain("localStorage");
+    expect(microphoneSessionState).not.toContain("Storage");
+    expect(microphoneSessionState).not.toContain("navigator.mediaDevices");
+    expect(microphoneSessionState).not.toContain("startVoiceCaptureLoop");
     expect(readAloud).not.toContain("resolveInitialMicArmState");
   });
 
