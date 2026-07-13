@@ -21,6 +21,8 @@ const buildStamp = import.meta.env.DEV
     : "prod";
 
 const BUILD_STORAGE_KEY = "__helix_build_stamp";
+const ORIGIN_RESET_PARAM = "resetOrigin";
+const ORIGIN_RESET_DONE_PARAM = "originReset";
 
 // Stamp build token at app boot
 (window as any).__APP_WARP_BUILD = buildStamp;
@@ -64,6 +66,59 @@ const unregisterServiceWorkers = async () => {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
   const regs = await navigator.serviceWorker.getRegistrations();
   await Promise.all(regs.map((reg) => reg.unregister()));
+};
+
+const clearIndexedDatabases = async () => {
+  if (typeof window === "undefined" || !("indexedDB" in window)) return;
+  const indexedDb = window.indexedDB as IDBFactory & {
+    databases?: () => Promise<Array<{ name?: string | null }>>;
+  };
+  if (typeof indexedDb.databases !== "function") return;
+  const databases = await indexedDb.databases();
+  await Promise.all(
+    databases.map(
+      ({ name }) =>
+        new Promise<void>((resolve) => {
+          if (!name) {
+            resolve();
+            return;
+          }
+          const request = indexedDb.deleteDatabase(name);
+          request.onsuccess = () => resolve();
+          request.onerror = () => resolve();
+          request.onblocked = () => resolve();
+        }),
+    ),
+  );
+};
+
+const shouldResetOriginState = () => {
+  if (typeof window === "undefined") return false;
+  const params = new URLSearchParams(window.location.search);
+  return params.get(ORIGIN_RESET_PARAM) === "1";
+};
+
+const reloadAfterOriginReset = () => {
+  const url = new URL(window.location.href);
+  url.searchParams.delete(ORIGIN_RESET_PARAM);
+  url.searchParams.set(ORIGIN_RESET_DONE_PARAM, buildStamp);
+  window.location.replace(url.toString());
+};
+
+const resetOriginState = async () => {
+  if (typeof window === "undefined") return;
+  await Promise.all([clearRuntimeCaches(), unregisterServiceWorkers(), clearIndexedDatabases()]);
+  try {
+    window.localStorage.clear();
+  } catch {
+    // ignore storage failures
+  }
+  try {
+    window.sessionStorage.clear();
+  } catch {
+    // ignore storage failures
+  }
+  reloadAfterOriginReset();
 };
 
 const syncBuildStamp = async () => {
@@ -111,11 +166,15 @@ if (typeof window !== "undefined" && import.meta.env?.PROD) {
   void syncBuildStamp();
 }
 
-createRoot(document.getElementById("root")!).render(
-  <AppErrorBoundary>
-    <App />
-  </AppErrorBoundary>,
-);
+if (shouldResetOriginState()) {
+  void resetOriginState();
+} else {
+  createRoot(document.getElementById("root")!).render(
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>,
+  );
+}
 
 if (typeof window !== "undefined") {
   window.requestAnimationFrame(() => {
