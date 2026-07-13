@@ -864,7 +864,14 @@ export const buildHelixModelPromptContext = (input: {
               excerpt: compactText(readString(chunkRecord?.text_excerpt) ?? "", cfg.exactExcerptMaxChars),
             };
           });
-          return [...spanExcerpts, ...scholarlyChunkExcerpts];
+          const savedResearchPageExcerpts = readArray(payload?.selected_pages).map((page: unknown) => {
+            const pageRecord = readRecord(page);
+            return {
+              ref: readString(pageRecord?.source_text_ref),
+              excerpt: compactText(readString(pageRecord?.text_excerpt) ?? "", cfg.exactExcerptMaxChars),
+            };
+          });
+          return [...spanExcerpts, ...scholarlyChunkExcerpts, ...savedResearchPageExcerpts];
         })
         .filter((entry: { ref: string | null; excerpt: string }) => entry.ref && entry.excerpt)
         .slice(0, 8)
@@ -878,6 +885,8 @@ export const buildHelixModelPromptContext = (input: {
         const chunkRecord = readRecord(chunk);
         return readString(chunkRecord?.source_text_ref) ?? readString(chunkRecord?.citation_ref);
       }),
+      ...readArray(payload?.selected_pages).map((page: unknown) =>
+        readString(readRecord(page)?.source_text_ref)),
     ].filter((entry): entry is string => Boolean(entry));
   });
   const terminalContractCompact = compactRouteOrTerminalContractForModel(input.terminalContract);

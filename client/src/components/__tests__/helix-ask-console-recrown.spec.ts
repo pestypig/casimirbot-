@@ -3068,6 +3068,33 @@ describe("Helix Ask Console recrown boundary", () => {
       replyScopedFallbackPayload: scopedDebugPayload,
       payloadMatchesExpectedReply: () => true,
     })).toContain("ask:latest");
+    const identityMatchedBackendExport = JSON.stringify({
+      active_turn_id: "ask:latest",
+      active_prompt: "Latest question?",
+      selected_final_answer: "Server diagnostic answer that differs from the UI failure.",
+      debug_export_source: "backend_endpoint",
+      backend_debug_response_status: "fetched",
+      ask_turn_solver_trace: { completed: false },
+    });
+    expect(selectHelixAskLegacyReplyScopedDebugExportPayload({
+      exportPayload: identityMatchedBackendExport,
+      replyScopedFallbackPayload: JSON.stringify({
+        active_turn_id: "ask:latest",
+        active_prompt: "Latest question?",
+        selected_final_answer: "Backend Ask was reached, but no server terminal artifact or debug artifact was materialized for this turn.",
+        debug_export_source: "rendered_reply_dom",
+      }),
+      payloadMatchesExpectedReply: () => false,
+    })).toBe(identityMatchedBackendExport);
+    expect(selectHelixAskLegacyReplyScopedDebugExportPayload({
+      exportPayload: identityMatchedBackendExport,
+      replyScopedFallbackPayload: JSON.stringify({
+        active_turn_id: "ask:different",
+        active_prompt: "Different question?",
+        debug_export_source: "rendered_reply_dom",
+      }),
+      payloadMatchesExpectedReply: () => false,
+    })).toContain("ask:different");
     const latestQuestion = "UI debug binding retest latest prompt";
     const latestFinal = "Latest visible final answer from Codex runtime.";
     const questionNode = {

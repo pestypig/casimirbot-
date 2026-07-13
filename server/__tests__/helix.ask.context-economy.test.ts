@@ -222,6 +222,46 @@ describe("Helix Ask context economy", () => {
     });
   });
 
+  it("re-enters bounded saved-page text through the exact-excerpt escape hatch", () => {
+    const equationText = [
+      "max_R Tr[-R_xs^H R_x^-1 R_xs + R_s]",
+      "s.t. Tr[R + R_hat - 2(R_hat^1/2 R R_hat^1/2)^1/2] <= epsilon_0^2 (47)",
+      "R >= 0, R_x > 0.",
+    ].join("\n");
+    const context = buildHelixModelPromptContext({
+      turnId: "turn-research-exact-page",
+      userGoal: "Compare the exact machine-readable page-8 transcription row by row.",
+      requiresExactExcerpts: true,
+      selectedArtifacts: [{
+        artifact_id: "obs:research-exact-page",
+        kind: "research_library_observation",
+        payload: {
+          schema: "helix.research_library_observation.v1",
+          artifact_id: "obs:research-exact-page",
+          capability: "research-library.read_document",
+          evidence_state: "full_text_usable",
+          selected_pages: [{
+            page: 8,
+            text_excerpt: equationText,
+            source_text_ref: "artifact://paper.pdf#page=8&text",
+          }],
+          missing_requirements: [],
+        },
+      }],
+    });
+
+    expect(context.exact_excerpts).toEqual([{
+      ref: "artifact://paper.pdf#page=8&text",
+      excerpt: equationText.replace(/\s+/g, " "),
+    }]);
+    expect(context.economy_report.exact_excerpt_refs_included).toEqual([
+      "artifact://paper.pdf#page=8&text",
+    ]);
+    expect(context.economy_report.raw_span_refs_available).toEqual([
+      "artifact://paper.pdf#page=8&text",
+    ]);
+  });
+
   it("marks empty docs locate artifacts as failed compact observations", () => {
     const context = buildHelixModelPromptContext({
       turnId: "turn-empty-doc-location",

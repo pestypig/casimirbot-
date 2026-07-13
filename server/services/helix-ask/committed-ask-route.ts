@@ -103,6 +103,7 @@ export const normalizeCommittedRouteTerminalKind = (kind: string | null | undefi
 
 const sourceBackedTargets = new Set([
   "visual_capture",
+  "scientific_image_evidence",
   "procedure_memory",
   "conversation_memory",
   "situation_epoch",
@@ -168,6 +169,7 @@ const familyForSourceTarget = (sourceTarget: string): string => {
   if (sourceTarget === "active_note") return "notes";
   if (sourceTarget === "workstation_state" || sourceTarget === "workstation_panel" || sourceTarget === "workspace_panel") return "workstation_action";
   if (sourceTarget === "visual_capture" || sourceTarget === "situation_epoch" || sourceTarget === "visual_scene_memory") return "visual_capture";
+  if (sourceTarget === "scientific_image_evidence") return "visual_analysis";
   if (sourceTarget === "procedure_memory") return "procedure_memory";
   if (sourceTarget === "conversation_memory") return "conversation_memory";
   return "";
@@ -422,6 +424,13 @@ export function buildCommittedAskRoute(input: {
   const existing = readCommittedAskRoute(input.payload);
   if (existing) {
     const explicitCapabilityContract = readExplicitCapabilityContractFromPayload(input.payload);
+    const hardSourceTargetIntent = readRecord(input.payload.source_target_intent);
+    const hardSourceTarget = readString(hardSourceTargetIntent?.target_source);
+    const shouldRepairExistingScientificImageComparisonRoute =
+      hardSourceTargetIntent?.strength === "hard" &&
+      hardSourceTargetIntent?.reuse_retained_scientific_image_sidecar === true &&
+      hardSourceTarget === "scientific_image_evidence" &&
+      (existing.route.source_target === "unknown" || existing.route.source_target === "model_only");
     const shouldRepairExistingCalculatorGatewayRoute =
       isCalculatorGatewayAdmission(input.payload) &&
       (
@@ -460,6 +469,14 @@ export function buildCommittedAskRoute(input: {
             "workstation_tool_evaluation",
             "typed_failure",
           ])
+      : shouldRepairExistingScientificImageComparisonRoute
+        ? unique([
+            ...existing.canonical_goal.allowed_terminal_artifact_kinds,
+            "scholarly_research_answer",
+            "agent_provider_terminal_candidate",
+            "model_synthesized_answer",
+            "typed_failure",
+          ])
       : existing.canonical_goal.allowed_terminal_artifact_kinds;
     const existingForbidden = shouldRepairExistingModelOnlyRoute
       ? unique([
@@ -472,6 +489,14 @@ export function buildCommittedAskRoute(input: {
           )
       : shouldRepairExistingCalculatorGatewayRoute
         ? existing.canonical_goal.forbidden_terminal_artifact_kinds.filter((kind) => kind !== "workstation_tool_evaluation")
+      : shouldRepairExistingScientificImageComparisonRoute
+        ? existing.canonical_goal.forbidden_terminal_artifact_kinds.filter((kind) =>
+            ![
+              "scholarly_research_answer",
+              "agent_provider_terminal_candidate",
+              "model_synthesized_answer",
+            ].includes(normalizeCommittedRouteTerminalKind(kind)),
+          )
       : existing.canonical_goal.forbidden_terminal_artifact_kinds;
     const existingRequiredTerminalKind = shouldRepairExistingModelOnlyRoute
       ? "direct_answer_text"
@@ -479,6 +504,8 @@ export function buildCommittedAskRoute(input: {
         ? explicitCapabilityContract.required_terminal_kind
       : shouldRepairExistingCalculatorGatewayRoute
         ? "workstation_tool_evaluation"
+      : shouldRepairExistingScientificImageComparisonRoute
+        ? "scholarly_research_answer"
       : existing.canonical_goal.required_terminal_kind;
     const compoundPolicy = applyCompoundTerminalPolicy(input.payload, {
       allowed: existingAllowed,
@@ -489,7 +516,8 @@ export function buildCommittedAskRoute(input: {
       !compoundPolicy.policy.active &&
       !shouldRepairExistingModelOnlyRoute &&
       !shouldRepairExistingCalculatorGatewayRoute &&
-      !shouldRepairExistingExplicitCapabilityRoute
+      !shouldRepairExistingExplicitCapabilityRoute &&
+      !shouldRepairExistingScientificImageComparisonRoute
     ) return existing;
     const requiredTerminalProduct =
       compoundPolicy.requiredTerminalKind ||
@@ -504,6 +532,8 @@ export function buildCommittedAskRoute(input: {
             ? explicitCapabilityContract.plan_family
           : shouldRepairExistingCalculatorGatewayRoute
             ? "calculator_solve"
+          : shouldRepairExistingScientificImageComparisonRoute
+            ? "scholarly_research_lookup"
           : existing.canonical_goal.goal_kind,
         required_terminal_kind: requiredTerminalProduct,
         allowed_terminal_artifact_kinds: compoundPolicy.allowed,
@@ -517,6 +547,14 @@ export function buildCommittedAskRoute(input: {
             strength: "hard",
             route_reason: "explicit_capability_contract",
           }
+        : shouldRepairExistingScientificImageComparisonRoute
+          ? {
+              ...existing.route,
+              source_target: "scientific_image_evidence",
+              target_kind: "scientific_image_evidence_sidecar",
+              strength: "hard",
+              route_reason: "retained_scientific_image_text_comparison",
+            }
         : existing.route,
       capability_policy: shouldRepairExistingExplicitCapabilityRoute && explicitCapabilityContract
         ? {
@@ -533,13 +571,28 @@ export function buildCommittedAskRoute(input: {
               familyForSourceTarget(explicitCapabilityContract.source_target),
             ]),
           }
+        : shouldRepairExistingScientificImageComparisonRoute
+          ? {
+              ...existing.capability_policy,
+              allowed_tool_families: unique([
+                ...existing.capability_policy.allowed_tool_families,
+                "visual_analysis",
+                "scholarly_research",
+              ]),
+              required_capability_families: unique([
+                ...existing.capability_policy.required_capability_families,
+                "visual_analysis",
+              ]),
+            }
         : existing.capability_policy,
       terminal_product: {
         ...existing.terminal_product,
-        evidence_reentry_required: shouldRepairExistingExplicitCapabilityRoute
+        evidence_reentry_required: shouldRepairExistingExplicitCapabilityRoute || shouldRepairExistingScientificImageComparisonRoute
           ? true
           : existing.terminal_product.evidence_reentry_required,
-        followup_reasoning_required: shouldRepairExistingExplicitCapabilityRoute
+        followup_reasoning_required: shouldRepairExistingScientificImageComparisonRoute
+          ? true
+          : shouldRepairExistingExplicitCapabilityRoute
           ? false
           : existing.terminal_product.followup_reasoning_required,
         required_terminal_product: requiredTerminalProduct,

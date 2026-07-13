@@ -1,6 +1,7 @@
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type {
@@ -9,6 +10,7 @@ import type {
   HelixAgentRuntimeEvent,
 } from "./types";
 import type { HelixAgentStepObservationPacket } from "@shared/helix-agent-step-observation-packet";
+import { asksForScientificImageTextEvidenceComparison } from "@shared/helix-scientific-image-intent";
 import {
   buildScientificImageEvidenceSidecar,
   SCIENTIFIC_EVIDENCE_PACKET_SCHEMA,
@@ -220,6 +222,14 @@ export const codexRouteAllowsTerminalKind = (
     readString(canonicalGoal?.required_terminal_kind) ?? "",
   ]);
   return [kind, ...aliases].some((candidate) => allowedKinds.has(candidate));
+};
+
+export const asksForImageTextEvidenceComparison = (question: string): boolean => {
+  return asksForScientificImageTextEvidenceComparison(question);
+};
+
+export const imageLensObservationReportCanSelfTerminal = (question: string): boolean => {
+  return !asksForImageTextEvidenceComparison(question);
 };
 
 const routeAllowsModelOnlyDirectAnswer = (body: Record<string, unknown>): boolean => {
@@ -454,6 +464,7 @@ const asksForScientificImageTheoryContinuation = (body: Record<string, unknown>)
   if (hasCurrentTurnImageInput(body)) return false;
   const question = readQuestion(body);
   if (explicitlyExcludesScientificImageContext(question)) return false;
+  if (asksForImageTextEvidenceComparison(question)) return true;
   if (asksForCurrentImageLensExactRowExtraction(body, question)) return false;
   const scholarlyIntent = detectScholarlyResearchIntent(question);
   const createsScholarlyPageImageEvidence =
@@ -490,10 +501,24 @@ const asksForCurrentImageLensPanelState = (question: string): boolean =>
   /\b(?:image\s+lens|panel|source|page|crop|frame)\b/i.test(question) &&
   !/\b(?:theory\s+badge\s+graph|graph\s+reflection|postulate|candidate\s+postulate|calculator\s+payload|continuity\s+audit|evidence\s+depth|active\s+promoted\s+row\s+blockers|historical\s+non-promoted\s+row\s+blockers)\b/i.test(question);
 
-const asksForScientificImageEvidenceContinuity = (body: Record<string, unknown>): boolean => {
+export const asksForFreshScientificImageCapture = (question: string): boolean => {
+  const affirmativeQuestion = stripNegatedOperatorClauses(
+    question
+      .replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ")
+      .replace(/\b(?:previously|earlier|historically|last\s+time)\b[^.!?;\n]{0,240}/gi, " ")
+      .replace(/\b(?:if|when|later|in\s+the\s+future|eventually|would|could|might)\b[^.!?;\n]{0,240}/gi, " "),
+  );
+  return (
+    /\b(?:render|inspect|capture|ocr|extract|create|materialize|retain|save)\b/i.test(affirmativeQuestion) &&
+    /\b(?:paper|pdf|page\s*(?:number\s*)?\d{1,3}|image\s+lens|bounded\s+crop|bbox|x\s*=\s*\d+)\b/i.test(affirmativeQuestion)
+  );
+};
+
+export const asksForScientificImageEvidenceContinuity = (body: Record<string, unknown>): boolean => {
   const question = readQuestion(body).replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
   if (!question) return false;
   if (explicitlyExcludesScientificImageContext(question)) return false;
+  if (asksForFreshScientificImageCapture(question)) return false;
   if (
     /\bmoral\s+graph\b/i.test(question) &&
     !/\b(?:scientific|image\s+lens|pdf|page|crop|equation|sidecar|source\s+(?:id|hash)|theory\s+badge\s+graph)\b/i.test(question)
@@ -2524,8 +2549,20 @@ export const resetScholarlyPdfWorkbenchVolatileMemoryForTest = (options?: { pers
   scientificImageContinuationSidecars.clear();
   scientificImageGraphReflectionMemory.clear();
   if (options?.persistent) {
+    const explicitMemoryDir = process.env.HELIX_SCHOLARLY_PDF_WORKBENCH_MEMORY_DIR?.trim();
+    if (!explicitMemoryDir) return;
+    const resolvedMemoryDir = path.resolve(explicitMemoryDir);
+    const resolvedTempDir = path.resolve(os.tmpdir());
+    const tempRelativePath = path.relative(resolvedTempDir, resolvedMemoryDir);
+    if (
+      !tempRelativePath
+      || tempRelativePath.startsWith("..")
+      || path.isAbsolute(tempRelativePath)
+    ) {
+      return;
+    }
     try {
-      fs.rmSync(scholarlyPdfWorkbenchMemoryDir(), { recursive: true, force: true });
+      fs.rmSync(resolvedMemoryDir, { recursive: true, force: true });
     } catch {
       // Test cleanup only; failed durable cleanup should not affect in-memory reset.
     }
@@ -2646,6 +2683,7 @@ const scientificImageEvidenceObjectIsLabelOnly = (value: unknown): boolean => {
 
 const SCIENTIFIC_IMAGE_EXACT_ROW_PROMOTION_REASON_LABELS = new Set([
   "requested_label_matched",
+  "unlabeled_row_no_equation_label_observed",
   "single_clean_row",
   "extracted_latex_candidate_present",
   "no_truncation_or_ellipsis",
@@ -3415,7 +3453,24 @@ const retryScientificImageSidecarIfNeeded = async (input: {
   sidecar: ScientificImageEvidenceSidecarV1;
   sourceMaterial: ScientificImageSourceMaterial | null;
   iterationStart: number;
+  retryMode?: "automatic" | "reuse_only";
 }): Promise<ScientificImageRetryResult> => {
+  if (input.retryMode === "reuse_only") {
+    return {
+      sidecar: input.sidecar,
+      retryDebug: scientificImageRetryDebugProjection({
+        status: "suppressed_for_cross_evidence_comparison",
+        priorSidecar: input.sidecar,
+        sourceMaterial: input.sourceMaterial,
+        candidates: [],
+        finalSidecar: input.sidecar,
+        failureReason: "retained_crop_evidence_reused_without_exact_row_retry",
+        targetEquation: retryTargetEquationFromSidecar(input.sidecar),
+      }),
+      observationPackets: [],
+      fatal_error: null,
+    };
+  }
   let workingSidecar = input.sidecar;
   let workingSourceMaterial = input.sourceMaterial;
   let retryCandidateSidecar = workingSidecar;
@@ -4171,9 +4226,9 @@ const enrichImageLensRegionCandidateFromBody = (
   return enriched;
 };
 
-const imageLensRequestedEquationLabels = (question: string): string[] => {
+const collectImageLensEquationLabels = (value: string): Set<string> => {
   const labels = new Set<string>();
-  const normalized = question.trim();
+  const normalized = value.trim();
   for (const match of normalized.matchAll(/\((\d+)\.(\d+)\)\s*(?:through|thru|to|-|–|—)\s*\((\d+)\.(\d+)\)/gi)) {
     const startMajor = Number.parseInt(match[1] ?? "", 10);
     const startMinor = Number.parseInt(match[2] ?? "", 10);
@@ -4198,7 +4253,26 @@ const imageLensRequestedEquationLabels = (question: string): string[] => {
   for (const match of normalized.matchAll(/\bequation\s*\(\s*(\d{1,3})\s*\)/gi)) {
     labels.add(match[1] ?? "");
   }
-  return Array.from(labels).filter(Boolean);
+  return labels;
+};
+
+const imageLensExcludedEquationLabels = (question: string): Set<string> => {
+  const excluded = new Set<string>();
+  const withoutQuotedContext = question.replace(/(["`])[^"`\r\n]*\1/g, " ");
+  const exclusionPattern = /\b(?:exclude(?:d|s|ing)?|omit(?:ted|s|ting)?|without|but\s+not|do\s+not\s+(?:include|capture|inspect|extract|read|transcribe))\b[^.!?;\r\n]{0,180}/gi;
+  for (const match of withoutQuotedContext.matchAll(exclusionPattern)) {
+    for (const label of collectImageLensEquationLabels(match[0] ?? "")) {
+      excluded.add(label);
+    }
+  }
+  return excluded;
+};
+
+const imageLensRequestedEquationLabels = (question: string): string[] => {
+  const withoutQuotedContext = question.replace(/(["`])[^"`\r\n]*\1/g, " ");
+  const labels = collectImageLensEquationLabels(withoutQuotedContext);
+  const excluded = imageLensExcludedEquationLabels(question);
+  return Array.from(labels).filter((label) => Boolean(label) && !excluded.has(label));
 };
 
 const imageLensCandidateRegionLabel = (candidate: Record<string, unknown>): string | null =>
@@ -4282,12 +4356,11 @@ const buildImageLensEquationRegionCandidates = (
   const labels = imageLensRequestedEquationLabels(question);
   if (labels.length === 0) return [];
   const exactRowRequested =
-    /\b(?:exact\s+(?:equation\s+)?row|row\s+crop|equation\s+row|exact\s+equation\s+admissibility|promote)\b/i.test(question);
+    /\b(?:exact\s+(?:equation\s+)?row|row\s+crop|equation\s+row|exact\s+equation\s+admissibility)\b/i.test(question);
   const explicitMultiRegion =
     exactRowRequested ||
-    /\b(?:separate|separately)\b[\s\S]{0,50}\b(?:crops?|regions?|rows?)\b/i.test(question) ||
-    /\b(?:each|multiple|all)\b[\s\S]{0,80}\b(?:crops?|regions?|equations?|rows?)\b/i.test(question) ||
-    /\b(?:crops?|regions?|rows?)\b[\s\S]{0,50}\b(?:each|separate|separately|multiple|all)\b/i.test(question) ||
+    /\b(?:separate|separately)\b[\s\S]{0,50}\b(?:crops?|regions?)\b/i.test(question) ||
+    /\b(?:crops?|regions?)\b[\s\S]{0,50}\b(?:separate|separately)\b/i.test(question) ||
     labels.length > 1;
   if (!explicitMultiRegion) return [];
   const dimensions =
@@ -5185,7 +5258,7 @@ const synthesizeImageLensRegionLaneCandidate = (
     capability: VISUAL_ANALYSIS_INSPECT_IMAGE_REGION_CAPABILITY,
     bbox_px: exactRowRequested
       ? exactRowSeedBbox
-      : {
+      : promptBbox ?? {
           x: 0,
           y: 0,
           width: fallbackWidth,
@@ -5340,6 +5413,11 @@ export const synthesizeScholarlyPageImageLaneCandidate = (input: {
     pageNumber,
     memoryId: input.record.memory_id,
   });
+  const promptBbox = readImageLensPromptBbox(input.question);
+  const renderedDimensions = renderedPage?.dimensions ?? null;
+  const boundedPromptBbox = promptBbox && imageLensBboxFitsDimensions(promptBbox, renderedDimensions)
+    ? promptBbox
+    : null;
   const sourceId = `pdf-page-render:${hashScientificImageSourceShort([input.record.memory_id, sourceRef, pageNumber])}`;
   const wantsEquation = /\b(?:equations?|formulae?|formulas?|derive|derivation|symbolic|latex)\b/i.test(input.question);
   return {
@@ -5356,11 +5434,11 @@ export const synthesizeScholarlyPageImageLaneCandidate = (input: {
     scholarly_page_image_artifact_ref: renderedPage?.artifactRef,
     scholarly_page_image_path: renderedPage?.imagePath,
     source_dimensions_px: renderedPage?.dimensions ?? undefined,
-    bbox_px: renderedPage?.dimensions
+    bbox_px: boundedPromptBbox ?? (renderedPage?.dimensions
       ? { x: 0, y: 0, width: renderedPage.dimensions.width, height: renderedPage.dimensions.height }
       : renderedPage
         ? { x: 0, y: 0, width: 1, height: 1 }
-        : { x: 0, y: 0, width: 1600, height: 2200 },
+        : { x: 0, y: 0, width: 1600, height: 2200 }),
     question: [
       input.question,
       input.source === "current"
@@ -10414,6 +10492,7 @@ export const codexProvider: HelixAgentProvider = {
     let currentTurnScholarlyDeepEvidenceLookup: ScholarlyFollowupEvidenceLookup | null = null;
     let priorScholarlyEvidenceArtifact: Record<string, unknown> | null = null;
     let priorScholarlyEvidencePacket: HelixAgentStepObservationPacket | null = null;
+    const scientificImageCrossEvidenceComparison = asksForImageTextEvidenceComparison(question);
     const scientificImageContinuationRequired = asksForScientificImageTheoryContinuation(request.body);
     const scientificImageEvidenceContinuityRequested = asksForScientificImageEvidenceContinuity(request.body);
     const scientificImageContinuityPrelookup =
@@ -10570,6 +10649,7 @@ export const codexProvider: HelixAgentProvider = {
           sidecar: lookup.sidecar,
           sourceMaterial: lookup.sourceMaterial,
           iterationStart: capabilityLaneContext.observation_packets.length + evidenceGatewayCallResults.length + 1,
+          retryMode: scientificImageCrossEvidenceComparison ? "reuse_only" : "automatic",
         });
         scientificImageEvidenceRetry = retryResult.retryDebug;
         if (retryResult.observationPackets.length > 0) {
@@ -10631,7 +10711,7 @@ export const codexProvider: HelixAgentProvider = {
           lookup: lookup.lookup,
           retryDebug: scientificImageEvidenceRetry,
         });
-        const continuationBridge = scientificImageContinuationFailure
+        const continuationBridge = scientificImageContinuationFailure || scientificImageCrossEvidenceComparison
           ? { gatewayResults: [], bridge: null }
           : await runScientificImageTheoryReflectionFromSidecar({
               body: request.body,
@@ -10675,6 +10755,30 @@ export const codexProvider: HelixAgentProvider = {
             scientific_image_evidence_continuation_lookup: lookup.lookup,
             scientific_image_evidence_retry: scientificImageEvidenceRetry,
             scientific_image_sidecar_gateway_bridge: continuationBridge.bridge,
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          };
+        }
+        if (scientificImageCrossEvidenceComparison && !runtimeLaneRequestLoop) {
+          runtimeLaneRequestLoop = {
+            schema: "helix.runtime_agent_lane_request_loop.v1",
+            legacy_schema: "helix.codex_runtime_lane_request_loop.v1",
+            runtime_provider_adapter: "codex",
+            status: "prior_scientific_image_sidecar_reentered_for_cross_evidence_comparison",
+            retry: scientificImageEvidenceRetry,
+            requested_by_runtime_provider: false,
+            synthesized_by_helix_policy: true,
+            image_lens_region_candidate_augmented: false,
+            synthesis_reason: "reuse_retained_crop_for_machine_text_visual_comparison",
+            selected_runtime_agent_provider: "codex",
+            candidate: null,
+            capability_lane_call_results: capabilityLaneDebugProjection.capability_lane_call_results,
+            capability_lane_backend_selections: capabilityLaneDebugProjection.capability_lane_backend_selections,
+            capability_lane_observation_packets: capabilityLaneDebugProjection.capability_lane_observation_packets,
+            capability_lane_reentry_status: capabilityLaneDebugProjection.capability_lane_reentry_status,
+            scientific_image_evidence_continuation_lookup: lookup.lookup,
+            scientific_image_sidecar_gateway_bridge: null,
             terminal_eligible: false,
             assistant_answer: false,
             raw_content_included: false,
@@ -12870,7 +12974,8 @@ export const codexProvider: HelixAgentProvider = {
           capabilityLaneObservationPackets: capabilityLaneContext.observation_packets,
         })
         : null;
-    const promptLeakRecoveredImageLensAnswer = providerPromptLeakDetected
+    const imageLensObservationReportSelfTerminalAllowed = imageLensObservationReportCanSelfTerminal(question);
+    const promptLeakRecoveredImageLensAnswer = providerPromptLeakDetected && imageLensObservationReportSelfTerminalAllowed
       ? imageLensObservationFallbackAnswer
       : null;
     const text = promptLeakRecoveredImageLensAnswer ??
@@ -12988,6 +13093,7 @@ export const codexProvider: HelixAgentProvider = {
         : authorityGuardedText;
     const imageLensObservationReportReady =
       Boolean(imageLensObservationFallbackAnswer) &&
+      imageLensObservationReportSelfTerminalAllowed &&
       isImageLensCapabilityLanePrompt(question) &&
       capabilityLaneContext.calls_succeeded &&
       capabilityLaneContext.observation_packets.length > 0;
@@ -13686,11 +13792,16 @@ export const codexProvider: HelixAgentProvider = {
             schema: "helix.provider_prompt_leak_guard.v1",
             status: promptLeakRecoveredImageLensAnswer
               ? "recovered_with_image_lens_observation_report"
-              : "blocked_prompt_leak_terminal_candidate",
+              : "routed_to_terminal_rejection_observation",
             leaked_marker_detected: true,
             detected_marker_ids: providerPromptLeakMarkerIds,
             final_model_prompt_diagnostics: result.prompt_diagnostics,
             recovered_with_observation_only_image_lens_report: Boolean(promptLeakRecoveredImageLensAnswer),
+            routed_to_terminal_rejection_observation: Boolean(
+              providerPromptLeakDetected &&
+              !promptLeakRecoveredImageLensAnswer &&
+              capabilityLaneContext.observation_packets.length > 0
+            ),
             terminal_eligible: false,
             assistant_answer: false,
             raw_content_included: false,
@@ -14011,7 +14122,7 @@ export const codexProvider: HelixAgentProvider = {
       threadId,
       artifactLedger: currentTurnArtifactLedger,
     });
-    const recoverableWriterRejection = Array.isArray(providerTerminalWriterResult.rejected_candidates)
+    const writerRecoverableRejection = Array.isArray(providerTerminalWriterResult.rejected_candidates)
       ? providerTerminalWriterResult.rejected_candidates
           .map((entry: unknown) => readRecord(entry))
           .filter((entry: Record<string, unknown> | null): entry is Record<string, unknown> => Boolean(entry))
@@ -14023,6 +14134,18 @@ export const codexProvider: HelixAgentProvider = {
           }))
           .find((observation) => observation.recoverable) ?? null
       : null;
+    const promptLeakRejectionObservation =
+      providerPromptLeakDetected &&
+      !promptLeakRecoveredImageLensAnswer &&
+      capabilityLaneContext.observation_packets.length > 0
+        ? buildHelixTerminalRejectionObservation({
+            turnId,
+            candidateKind: "agent_provider_terminal_candidate",
+            candidateRef: `${turnId}:provider_prompt_leak_terminal_candidate`,
+            reason: "missing_post_tool_model_step",
+          })
+        : null;
+    const recoverableWriterRejection = writerRecoverableRejection ?? promptLeakRejectionObservation;
     if (recoverableWriterRejection) {
       const responseRecord = responsePayload as Record<string, unknown>;
       appendHelixTerminalRejectionObservationToPayload({
@@ -14110,7 +14233,13 @@ export const codexProvider: HelixAgentProvider = {
         onNativeEvent: emitCodexNativeRuntimeEvent,
       });
       const terminalRecoveryText = terminalRecoveryResult.stdout.trim() || terminalRecoveryResult.stderr.trim();
-      if (terminalRecoveryText && terminalRecoveryResult.exitCode === 0 && !terminalRecoveryResult.timedOut) {
+      const terminalRecoveryPromptLeakMarkerIds = detectProviderPromptLeakMarkers(terminalRecoveryText);
+      if (
+        terminalRecoveryText &&
+        terminalRecoveryResult.exitCode === 0 &&
+        !terminalRecoveryResult.timedOut &&
+        terminalRecoveryPromptLeakMarkerIds.length === 0
+      ) {
         const retryProviderReentry = buildHelixProviderReasoningReentry({
           runtime: "codex",
           providerLabel: codexProvider.label,

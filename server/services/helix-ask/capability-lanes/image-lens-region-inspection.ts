@@ -163,6 +163,65 @@ const readVisualLayoutCandidate = (value: unknown): ImageLensVisualLayoutCandida
   };
 };
 
+const recoverDisplayedLinesFromBoundedCandidates = (input: {
+  request: ImageLensRegionInspectionRequestV1;
+  extraction: ImageLensRegionExtractionResult;
+}): ImageLensRegionExtractionResult => {
+  const layout = input.extraction.visual_layout_candidate;
+  const declaredLineCount = layout?.displayed_line_count;
+  if (
+    (input.request.equation_capture_mode !== "exact_block" &&
+      input.request.equation_capture_mode !== "context") ||
+    !layout ||
+    layout.displayed_lines.length > 0 ||
+    declaredLineCount === null ||
+    declaredLineCount < 2
+  ) {
+    return input.extraction;
+  }
+
+  const boundedBlockLines: string[] = [];
+  let blockStarted = false;
+  for (const rawLine of (input.extraction.text_candidate ?? "").split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) {
+      if (blockStarted) break;
+      continue;
+    }
+    blockStarted = true;
+    boundedBlockLines.push(line);
+  }
+
+  const boundedLatexLines = (input.extraction.latex_candidate ?? "")
+    .split(/\s+\\\s+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const recoveredLines = boundedBlockLines.length === declaredLineCount
+    ? boundedBlockLines
+    : boundedBlockLines.length <= 1 && boundedLatexLines.length === declaredLineCount
+      ? boundedLatexLines
+      : null;
+  if (!recoveredLines || recoveredLines.some((line) => line.length > 500)) {
+    return input.extraction;
+  }
+
+  const recoveryNote = recoveredLines === boundedBlockLines
+    ? "displayed_lines_recovered_from_bounded_ocr_block"
+    : "displayed_lines_recovered_from_bounded_latex_structure";
+
+  return {
+    ...input.extraction,
+    visual_layout_candidate: {
+      ...layout,
+      displayed_lines: recoveredLines,
+      notes: uniqueStrings([
+        ...layout.notes,
+        recoveryNote,
+      ]).slice(0, 16),
+    },
+  };
+};
+
 const bboxKey = (bbox: DocumentImageBboxPxV1): string =>
   `${bbox.x},${bbox.y},${bbox.width},${bbox.height}`;
 
@@ -1013,11 +1072,15 @@ export const runImageLensRegionInspection = async (input: {
   const evidenceId = `${turnId}:image_lens_region_inspection:${hashShort({ regionId, cropImageRef })}`;
   const generatedAt = new Date().toISOString();
   const normalizedRequest = { ...input.request, source_id: normalizedSourceId };
-  const extraction = await resolveImageLensRegionExtraction({
+  const rawExtraction = await resolveImageLensRegionExtraction({
     request: normalizedRequest,
     bbox,
     cropImageRef,
     env: input.env,
+  });
+  const extraction = recoverDisplayedLinesFromBoundedCandidates({
+    request: normalizedRequest,
+    extraction: rawExtraction,
   });
   if (extraction.materialization_error_code === "missing_inline_crop_or_source_image_data") {
     const observationRef = `${turnId}:capability_lane:${IMAGE_LENS_REGION_INSPECTION_CAPABILITY}:${hashShort({

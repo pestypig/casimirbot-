@@ -408,6 +408,19 @@ const readBbox = (value: unknown): DocumentImageBboxPxV1 | null => {
   return { x, y, width, height };
 };
 
+const inferRequestedEquationLabelFromExactBlockIntent = (value: string): string | null => {
+  const positiveTarget = value.split(/\b(?:excluding|exclude|without|but\s+not)\b/i, 1)[0] ?? "";
+  const patterns = [
+    /\b(?:equation(?:\s+block)?|block)\s+(?:labeled?\s*)?\(\s*([a-z0-9][a-z0-9._'-]*)\s*\)/i,
+    /\blabeled?\s*\(\s*([a-z0-9][a-z0-9._'-]*)\s*\)/i,
+  ];
+  for (const pattern of patterns) {
+    const match = positiveTarget.match(pattern);
+    if (match?.[1]) return match[1];
+  }
+  return null;
+};
+
 const toImageLensRegionInspectionRequest = (
   call: RecordLike,
   turnId: string | null,
@@ -418,7 +431,7 @@ const toImageLensRegionInspectionRequest = (
     readBbox(call.bbox_px) ??
     readBbox(call.bboxPx) ??
     { x: 0, y: 0, width: 1, height: 1 };
-  const requestedEquationLabel =
+  const explicitRequestedEquationLabel =
     readString(call.requested_equation_label ?? call.requestedEquationLabel) || null;
   const captureModeRaw = readString(call.equation_capture_mode ?? call.equationCaptureMode);
   const captureIntentText = [
@@ -431,9 +444,14 @@ const toImageLensRegionInspectionRequest = (
       ? captureModeRaw
       : /\b(?:complete|entire|full|multi[-\s]?line|displayed)\b[^.!?;\n]{0,100}\b(?:equation|display)\s+block\b|\bequation\s+block\b/i.test(captureIntentText)
         ? "exact_block"
-        : requestedEquationLabel
+        : explicitRequestedEquationLabel
           ? "exact_row"
           : "context";
+  const requestedEquationLabel = explicitRequestedEquationLabel ?? (
+    equationCaptureMode === "exact_block"
+      ? inferRequestedEquationLabelFromExactBlockIntent(captureIntentText)
+      : null
+  );
   return {
     schema: IMAGE_LENS_REGION_INSPECTION_REQUEST_SCHEMA,
     capability: IMAGE_LENS_REGION_INSPECTION_CAPABILITY,

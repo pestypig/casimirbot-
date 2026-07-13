@@ -139,6 +139,47 @@ describe("Research Library prompt routing", () => {
     });
   });
 
+  it("treats a hyphenated saved-paper page selector as the requested page", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      body: {
+        question:
+          "For saved paper https://arxiv.org/pdf/2401.12345, compare the machine-readable page-8 transcription of equation (47) against the Image Lens crop.",
+      },
+      includePlannerDerived: false,
+    });
+
+    expect(requests[0]).toMatchObject({
+      capability_id: "research-library.read_document",
+      arguments: {
+        page_start: 8,
+        page_end: 8,
+        search_term: "(47)",
+      },
+    });
+  });
+
+  it.each([
+    ["quoted", "The UI showed \"page-8 equation (47)\". From the saved paper, read page 9 equation (48)."],
+    ["historical", "Earlier I asked for page-8 equation (47). From the saved paper, read page 9 equation (48)."],
+    ["conditional", "If needed, inspect page-8 equation (47); for now read page 9 equation (48) from the saved paper."],
+    ["future", "Later compare page-8 equation (47). For now read page 9 equation (48) from the saved paper."],
+    ["negated", "Do not inspect page-8 equation (47); read page 9 equation (48) from the saved paper."],
+  ])("does not let a %s page mention override the active saved-page selector", (_case, question) => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      body: { question },
+      includePlannerDerived: false,
+    });
+
+    expect(requests[0]).toMatchObject({
+      capability_id: "research-library.read_document",
+      arguments: {
+        page_start: 9,
+        page_end: 9,
+        search_term: "(48)",
+      },
+    });
+  });
+
   it("does not infer case-sensitive execution from a negated or contextual mention", () => {
     const requests = readWorkstationGatewayCallRequestsForTurn({
       body: {

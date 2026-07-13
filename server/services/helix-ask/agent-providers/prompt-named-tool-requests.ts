@@ -1394,16 +1394,23 @@ export const buildPromptDerivedResearchLibraryGatewayCallRequests = (
   const savedPaperReferentRequested =
     /\b(?:that|this|the|same|previous|prior|recent|last)\b[\s\S]{0,50}\b(?:saved\s+)?(?:research\s+library\s+)?(?:paper|pdf|document|extraction)\b/i.test(prompt);
   if (!sourceUrl && !documentId && !savedPaperReferentRequested) return [];
-  const pageRange = prompt.match(/\bpages?\s+(\d+)\s*(?:-|through|to)\s*(\d+)\b/i);
+  const pageSelectorPrompt = unquotePrompt(prompt)
+    .replace(/\b(?:previously|earlier|historically|last\s+time)\b[^.!?;\n]{0,240}/gi, " ")
+    .replace(/\b(?:if|when)\b[^.!?;\n]{0,240}/gi, " ")
+    .replace(/\b(?:later|in\s+the\s+future|eventually)\b[^.!?;\n]{0,240}/gi, " ")
+    .replace(/\b(?:do\s+not|don't|dont|without)\b[^.!?;\n]{0,160}/gi, " ");
+  const pageRange = pageSelectorPrompt.match(/\bpages?\s+(\d+)\s*(?:-|through|to)\s*(\d+)\b/i);
   const pageList = !pageRange
-    ? prompt.match(/\bpages\s+(\d+(?:\s*,\s*\d+)*(?:\s*,?\s*(?:and|&)\s*\d+)?)\b/i)
+    ? pageSelectorPrompt.match(/\bpages\s+(\d+(?:\s*,\s*\d+)*(?:\s*,?\s*(?:and|&)\s*\d+)?)\b/i)
     : null;
   const pageNumbers = pageList
     ? Array.from(new Set((pageList[1].match(/\d+/g) ?? []).map(Number))).filter((page) => page > 0).slice(0, 40)
     : [];
-  const singlePage = prompt.match(/\bpage\s+(\d+)\b/i);
+  const singlePage = pageSelectorPrompt.match(/\bpage(?:\s*-\s*|\s+)(\d+)\b/i);
   const quotedSearch = prompt.match(/\b(?:occurrences?|containing|contains?|search\s+for|find)\b[^“”"']{0,40}[“"]([^”"]+)[”"]|\b(?:occurrences?|containing|contains?|search\s+for|find)\b[^']{0,40}'([^']+)'/i);
-  const rawSearchTerm = quotedSearch?.[1] ?? quotedSearch?.[2] ?? null;
+  const requestedEquationLabel = pageSelectorPrompt.match(/\bequation\s*(\(\s*\d+\s*\))/i)?.[1]
+    ?.replace(/\s+/g, "") ?? null;
+  const rawSearchTerm = quotedSearch?.[1] ?? quotedSearch?.[2] ?? requestedEquationLabel;
   const exactSearchRequested = /\b(?:exact|verbatim|including\s+punctuation)\b/i.test(prompt);
   const searchTerm = rawSearchTerm
     ? (exactSearchRequested ? rawSearchTerm : rawSearchTerm.replace(/[.,;:!?]+$/g, "")).trim()

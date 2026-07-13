@@ -1,4 +1,5 @@
 import type { HelixAskRouteMetadata } from "@/lib/helix/ask-prompt-launch";
+import { asksForScientificImageTextEvidenceComparison } from "@shared/helix-scientific-image-intent";
 
 export const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE = "backend_ask_entry_required";
 export const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT =
@@ -305,6 +306,22 @@ export function resolveHelixAskBackendEntrypointFamily(
       explicitCue: "image_lens_named_observation_receipt",
       requestedOutputs: [
         "image_lens_named_receipt_evaluation",
+        "typed_failure",
+      ],
+    };
+  }
+  if (asksForScientificImageTextEvidenceComparison(normalized)) {
+    return {
+      family: "scientific_image",
+      sourceTarget: "scientific_image_evidence",
+      targetKind: "scientific_image_evidence_sidecar",
+      requiredToolFamily: "visual_analysis",
+      selectedCapability: null,
+      explicitCue: "affirmative_scientific_image_text_comparison",
+      requestedOutputs: [
+        "scientific_evidence_sidecar",
+        "machine_text_visual_comparison",
+        "model_authored_synthesis",
         "typed_failure",
       ],
     };

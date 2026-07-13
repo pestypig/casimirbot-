@@ -6,6 +6,7 @@ import {
   type HelixAskSourceTargetStrength,
 } from "@shared/helix-ask-source-target-intent";
 import type { HelixActiveWorkspaceSourceResolution } from "@shared/helix-active-workspace-source-resolution";
+import { asksForScientificImageTextEvidenceComparison } from "@shared/helix-scientific-image-intent";
 import { detectRepoCodeEvidenceIntent } from "./repo-code-intent-detector";
 import {
   isSceneEpochReplayPrompt,
@@ -625,6 +626,31 @@ export function arbitrateAskSourceTarget(input: {
   const selectedEvidenceCandidate = evidenceTargetArbitration.evidence_target_candidates.find(
     (candidate) => candidate.candidate_id === evidenceTargetArbitration.selected_candidate_id,
   );
+  if (asksForScientificImageTextEvidenceComparison(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "scientific_image_evidence",
+      targetKind: "scientific_image_evidence",
+      strength: "hard",
+      explicitCues: ["affirmative_scientific_image_text_comparison"],
+      reasons: [
+        "retained_machine_readable_text_and_image_lens_comparison_requested",
+        "affirmative_comparison_precedes_contextual_non_promotion_clause",
+      ],
+      requestedOutputs: ["current_visual_state", "typed_failure"],
+      suppressedRoutes: [
+        "model_only_concept",
+        "no_tool_direct",
+        "fresh_image_lens_capture",
+        "client_shortcut",
+      ],
+      precedenceReason: "affirmative_scientific_image_text_comparison",
+      confidence: 0.99,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
   if (isHistoricalRuntimeEvidencePrompt(prompt)) {
     return toSourceTargetIntent({
       turnId: input.turnId,

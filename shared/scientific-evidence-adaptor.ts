@@ -532,6 +532,9 @@ const detectScientificQualityFlags = (input: {
   if (input.evidenceRole === "exact_equation_candidate") {
     if (isLabelOnlyExactEquationCandidate(input)) flags.push("label_only_equation_locator");
     if (containsMultipleDisplayedEquationCandidates(input)) flags.push("candidate_contains_multiple_display_equations");
+    if (!input.requestedEquationLabel && input.observedEquationLabels.length > 0) {
+      flags.push("observed_equation_label_without_requested_binding");
+    }
     if (input.labelMatchStatus === "missing_observed_label") flags.push("missing_requested_equation_label");
     if (input.labelMatchStatus === "mismatched") flags.push("mismatched_equation_label");
     if (input.labelMatchStatus === "ambiguous") flags.push("ambiguous_equation_label");
@@ -600,6 +603,7 @@ const qualityFlagReason = (flag: string): string => {
     case "malformed_latex_candidate": return "The LaTeX candidate is malformed.";
     case "label_only_equation_locator": return "The crop contains only an equation label locator, not the equation row.";
     case "candidate_contains_multiple_display_equations": return "The crop contains multiple displayed equation candidates and must be narrowed before exact-row use.";
+    case "observed_equation_label_without_requested_binding": return "The exact-row crop observed an equation label that was not bound by the request.";
     case "row_crop_too_broad_for_exact_equation": return "The row crop is too broad to treat as one exact equation row.";
     case "degenerate_crop_dimensions": return "The crop dimensions are degenerate and cannot support exact extraction.";
     case "exact_row_crop_too_small_for_reliable_math_ocr": return "The exact row crop is too small for reliable math OCR.";
@@ -623,6 +627,7 @@ const evidencePacketRef = (packet: ScientificEvidencePacketV1): string =>
 
 const SCIENTIFIC_IMAGE_EXACT_ROW_PROMOTION_REASON_VALUES = new Set([
   "requested_label_matched",
+  "unlabeled_row_no_equation_label_observed",
   "single_clean_row",
   "extracted_latex_candidate_present",
   "no_truncation_or_ellipsis",
@@ -889,7 +894,11 @@ export function buildScientificEvidencePacket(input: CandidateInput): Scientific
           ? "admissible_for_exact_equation"
           : "partial_candidate";
   const promotionReasons = exactEquationAdmissibility === "admissible_for_exact_equation" && !isExactBlock
-    ? ["requested_label_matched", "single_clean_row", "extracted_latex_candidate_present"]
+    ? [
+        requestedEquationLabel ? "requested_label_matched" : "unlabeled_row_no_equation_label_observed",
+        "single_clean_row",
+        "extracted_latex_candidate_present",
+      ]
     : evidenceRole === "context_only"
       ? ["context_crop_not_exact_equation_row"]
       : [

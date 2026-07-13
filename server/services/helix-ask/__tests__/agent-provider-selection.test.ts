@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -67,15 +67,26 @@ const ENV_KEYS = [
   "HELIX_IMAGE_LENS_EXTRACTION_BACKEND",
   "PDFTOPPM_BIN",
   "TAVILY_API_KEY",
+  "HELIX_SCHOLARLY_PDF_WORKBENCH_MEMORY_DIR",
 ] as const;
 const originalEnv = new Map<string, string | undefined>();
 const originalFetch = globalThis.fetch;
+let scholarlyWorkbenchTestMemoryDir: string | null = null;
 
 for (const key of ENV_KEYS) {
   originalEnv.set(key, process.env[key]);
 }
 
+beforeEach(() => {
+  scholarlyWorkbenchTestMemoryDir = fs.mkdtempSync(path.join(os.tmpdir(), "helix-agent-provider-workbench-test-"));
+  process.env.HELIX_SCHOLARLY_PDF_WORKBENCH_MEMORY_DIR = scholarlyWorkbenchTestMemoryDir;
+});
+
 afterEach(() => {
+  if (scholarlyWorkbenchTestMemoryDir) {
+    fs.rmSync(scholarlyWorkbenchTestMemoryDir, { recursive: true, force: true });
+    scholarlyWorkbenchTestMemoryDir = null;
+  }
   for (const key of ENV_KEYS) {
     const original = originalEnv.get(key);
     if (original === undefined) {

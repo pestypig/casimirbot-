@@ -414,6 +414,26 @@ export function selectHelixAskLegacyReplyScopedDebugExportPayload(
 ): string {
   if (args.payloadMatchesExpectedReply(args.exportPayload)) return args.exportPayload;
   const fallbackPayload = coerceControlText(args.replyScopedFallbackPayload).trim();
+  if (fallbackPayload) {
+    try {
+      const authoritative = JSON.parse(args.exportPayload) as Record<string, unknown>;
+      const fallback = JSON.parse(fallbackPayload) as Record<string, unknown>;
+      const fetchedBackendPayload =
+        coerceControlText(authoritative.debug_export_source).trim() === "backend_endpoint" &&
+        coerceControlText(authoritative.backend_debug_response_status).trim() === "fetched";
+      const authoritativeTurnId = normalizeHelixAskLegacyBackendTurnId(
+        authoritative.active_turn_id ?? authoritative.backend_turn_id,
+      );
+      const fallbackTurnId = normalizeHelixAskLegacyBackendTurnId(
+        fallback.active_turn_id ?? fallback.backend_turn_id,
+      );
+      if (fetchedBackendPayload && authoritativeTurnId && authoritativeTurnId === fallbackTurnId) {
+        return args.exportPayload;
+      }
+    } catch {
+      // Fall back to the rendered reply-scoped payload below.
+    }
+  }
   return fallbackPayload || args.exportPayload;
 }
 

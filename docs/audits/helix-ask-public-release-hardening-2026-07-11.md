@@ -461,3 +461,216 @@ The current server was not restarted, so it does not prove the checked-out patch
    - Developer: full panel/capability superset and all localization previews remain available.
 
 8. Do not promote unless every scenario has a terminal artifact or typed failure, no stale prior-turn artifact is selected, no duplicate mutation occurs, and the dependency/security/typecheck blockers above are resolved or explicitly waived by the release owner.
+
+## 2026-07-13 exact-block live-trace follow-up
+
+The operator-run UI turn `ask:5e16f3fc-18b5-4d83-bc8f-fd14abe53fa2` reached Image Lens with `equation_capture_mode=exact_block`, observed label `47`, and detected five displayed lines, but remained partial for two normalization defects:
+
+- the admitted runtime request named block `(47)` and explicitly excluded `(48)`, while `requested_equation_label` was lost and therefore normalized as `label_match_status=not_applicable`;
+- the vision receipt declared `displayed_line_count=5` but returned an empty `displayed_lines` array even though the bounded OCR text contained exactly five nonblank block lines before the following prose boundary.
+
+The copied attachment was a rendered-DOM fallback export and did not contain the capability events. The authoritative backend debug export endpoint for the same turn returned the full 543,115-byte trace and established the facts above.
+
+The repair is classified as `evidence normalization`. Exact-block request normalization now carries a positively named equation label from the admitted crop question/reason while ignoring labels after exclusion clauses. Exact-block layout normalization may recover `displayed_lines` only from the first bounded OCR block when its nonblank line count exactly equals the detector's declared count. Count mismatches remain partial and fail closed.
+
+Verification:
+
+- Image Lens one-shot and vision-parser tests: 28/28 PASS with one worker, including positive `(47)` inference/recovery and a 5-vs-6 mismatch rejection.
+- Server bundle: PASS; the four pre-existing duplicate-key/dead-case warnings remain unchanged.
+- `npm run helix:ask:discipline:quick` with classification `evidence normalization`: PASS.
+- Casimir verification: not applicable; this patch changes non-physics evidence normalization only.
+
+Fresh-server UI validation remains required because the operator server was not restarted by the agent. Repeat the same exact-block prompt after the operator starts the patched server; expected diagnostics are `requested_equation_label=47`, `label_match_status=matched`, five materialized displayed lines, and promoted exact-block status when no independent quality flag remains.
+
+### Excluded equation-label admission follow-up
+
+The later operator turn `ask:2bef13b3-a1b2-4b57-afd5-dc7e89f5ccfc` correctly executed the requested page-8 crop for equation `(47)`, but prompt-derived multi-region augmentation also created a second `equation_48` crop even though the prompt explicitly said to exclude equation `(48)`. The first receipt retained `requested_equation_label=47`; its `requested_label=false` diagnostic meant the label was not visually observed, not that the request identity was absent.
+
+Root cause: `imageLensRequestedEquationLabels` collected every `equation (N)` phrase before the multi-region augmentation gate and did not subtract labels found in negative/exclusion clauses. The repair removes labels named under `exclude`, `without`, `do not include/capture/inspect/extract/read/transcribe`, and `but not` constraints, and ignores equation labels contained only in quoted/backticked context. It does not weaken the evidence quality gate: the requested `(47)` crop remains partial when OCR omits visible rows or the label.
+
+Verification:
+
+- Focused Codex provider augmentation tests: 2/2 PASS, covering excluded, contextual/screen-visible, quoted, historical, future, and mixed-intent equation-label language.
+- Server bundle: PASS with the same four pre-existing warnings.
+- `npm run helix:ask:discipline:quick` under `prompt interpretation, tool admission`: PASS with the existing advisory shortcut warning on the provider surface.
+- The required prompt-solving benchmark attempted with one worker but executed zero tests because Windows could not load Sharp: `ERR_DLOPEN_FAILED: The paging file is too small for this operation to complete.` This is recorded as a machine-memory blocker, not a product pass or failure.
+- Casimir verification: not applicable; no warp/GR, adapter certificate, constraint-pack, or proof-maturity surface changed.
+
+### Row-completeness language must not synthesize another crop
+
+The follow-up comparison prompt produced the valid user-bounded page-8 crop and then an incorrect synthesized `equation_47` exact-row crop at the generic heuristic bbox `x=73,y=570,width=1077,height=87`. That second crop landed inside the following equation block. Two lexical shortcuts caused it: `all three visual rows` satisfied the generic `all ... rows` multi-region regex, and negated `do not promote` satisfied the generic `promote` exact-row regex.
+
+The augmentation gate now treats row completeness as an output/evidence requirement. It synthesizes additional equation crops only for multiple distinct admitted equation labels, explicit `separate crop/region` language, or an explicit exact-row/row-crop request. Generic `promote` wording and `all/each rows` no longer create crop execution.
+
+Focused provider regression tests pass 2/2, including the exact cross-source comparison prompt. Server build and discipline quick pass with the pre-existing warnings noted above. The broader prompt benchmark remains unexecuted because of the recorded Windows paging-file/Sharp load failure.
+
+### Post-observation prompt leak must re-enter reasoning
+
+The next operator turn `ask:90b5e1f0-52af-4ed5-855e-563880bdc292` confirmed the crop-routing repairs: exactly one user-bounded crop executed and no synthetic `(48)` or stale exact-row crop appeared. The remaining failure was downstream. After the Image Lens observation re-entered, the runtime provider echoed internal capability instructions. The leak guard removed that provider text but then promoted its observation-only fallback report as `image_lens_observation_report`, even though the committed scholarly route required a comparison answer and the solver trace recorded `followup_reasoning.completed=false`, `route_authority_ok=false`, and `completed_solver_path=false`.
+
+This repair is classified as `follow-up reasoning`, `terminal authority`, and `presentation`:
+
+- a raw crop/OCR request may still use the bounded Image Lens observation report as a route-approved self-terminal product;
+- an affirmative cross-evidence comparison between machine-readable text and Image Lens evidence cannot use that receipt report as the answer;
+- a prompt leak after observation re-entry becomes the existing recoverable `missing_post_tool_model_step` terminal-rejection observation and enters the existing continuation path;
+- a second leaked recovery candidate is rejected rather than promoted;
+- debug/public mirror synchronization refuses to normalize an Image Lens observation report when it conflicts with the committed terminal product or required follow-up reasoning is incomplete.
+
+Verification:
+
+- Focused provider comparison, prompt-leak continuation, and extraction-control tests: 3/3 PASS.
+- Contextual/negated/future/historical/quoted/mixed comparison-admission cases: PASS in the focused provider test.
+- Capability plan and lifecycle contracts: 83/83 PASS.
+- Terminal-equivalence harness: 6/6 PASS.
+- Focused API parity fail-closed projection case: 1/1 PASS. The full API parity file began with 3 passing tests, then its worker exited unexpectedly under the current machine memory limit; this is not recorded as a full-suite pass.
+- Server bundle: PASS with the same four pre-existing warnings.
+- `npm run helix:ask:discipline:quick`: PASS with the existing advisory shortcut warning and the declared classifications above.
+- Casimir verification: not applicable; this changes non-physics evidence/terminal policy only.
+
+Fresh-server UI validation remains required. Repeat the same comparison prompt after the operator restarts the patched server. Expected: one bounded crop, a model-authored row-by-row comparison (or a typed bounded failure), no internal capability text, and no observation-receipt dump as the successful terminal answer.
+
+### Saved-page exact text must survive cross-evidence re-entry
+
+The operator turn `ask:472ff7db-df7d-4dad-b203-c38dba77e1cb` proved that the previous terminal repair worked: the authoritative backend trace recorded `completed_solver_path=true`, `followup_reasoning.completed=true`, `route_authority_ok=true`, and `terminal_authority_ok=true`, and it returned a bounded model-authored failure instead of an Image Lens receipt dump. The remaining failure moved earlier into evidence normalization/re-entry: the Research Library observation was labeled `full_text_usable`, but the model did not receive the exact machine-readable equation text needed for the row-by-row comparison.
+
+Two bounded defects caused the gap:
+
+- the prompt named `page-8`, while the saved-paper router recognized only `page 8`, so the gateway ranked several pages instead of binding to page 8;
+- exact composer context admitted scholarly `selected_chunks` but omitted Research Library `selected_pages`, leaving saved-page text only in the lossy compact finding projection.
+
+The repair is classified as `prompt interpretation`, `evidence normalization`, and `evidence re-entry`. Hyphenated page selectors now bind to the requested saved page. Quoted, historical, conditional, future, and negated page mentions are removed before choosing the active page. Bounded Research Library `selected_pages` now participate in the existing exact-excerpt escape hatch and raw-span reference ledger; full documents and raw receipts remain excluded.
+
+The cached source PDF independently confirms the context bound: page 8 contains 9,876 extracted characters and equation `(47)` begins at approximately character 960. An affirmative equation label now also becomes the bounded saved-text anchor, so the gateway centers its 1,200-character excerpt on `(47)` instead of spending the budget on preceding page prose. The full page and 17-page document remain excluded from model re-entry.
+
+Verification:
+
+- Research Library routing plus context-economy regressions: 27/27 PASS, including the exact live prompt shape and quoted/historical/conditional/future/negated page-selector adversaries.
+- Focused API parity re-entry proof case: 1/1 PASS (27 unrelated cases skipped).
+- Server bundle: PASS with the same four pre-existing warnings.
+- `npm run helix:ask:discipline:quick`: PASS with existing advisory warnings and the classifications above.
+- The full prompt benchmark and a repeated terminal-equivalence run were both attempted in one-worker mode, but the Vitest worker exited under the device memory limit before a valid suite verdict. The focused affected-surface tests are the recorded contract verdict; the worker exits are not product failures or passes.
+- Casimir verification: not applicable; this changes non-physics saved-evidence routing and model context only.
+
+Fresh-server UI validation remains required. Re-run the exact comparison prompt after the operator restarts the patched server. Expected: one Research Library page-8 observation, one user-bounded Image Lens crop, exact machine-readable page-8 text present in the model re-entry context, and a model-authored agreements/mismatches answer. If the saved page lacks `(47)`, the turn must instead return a typed bounded missing-evidence result rather than claiming the whole page was comparison-ready.
+
+### Context comparison rows must survive Image Lens normalization
+
+The operator turn `ask:12c73519-70a5-4e27-9357-a4c3141d32d5` confirms the saved-page re-entry repair worked. Its authoritative backend trace records `completed_solver_path=true`, `followup_reasoning.completed=true`, `evidence_reentry.completed=true`, `route_authority_ok=true`, `terminal_authority_ok=true`, and a model-authored scholarly terminal. The remaining bounded failure was in the Image Lens observation: the provider returned complete OCR/LaTeX candidates and `displayed_line_count=5`, but normalized `displayed_lines=[]`. The final model therefore could not perform the requested row comparison.
+
+The prompt correctly remained `equation_capture_mode=context`: “do not promote exact-block evidence unless...” is a conditional evidence constraint, not an affirmative exact-block capture request. The repair is classified as `evidence normalization`. When a context or exact-block observation has an empty displayed-line array, normalization may recover lines only when either the bounded OCR block or the flattened LaTeX structural separators produce exactly the provider-declared line count. Any count disagreement, overlong line, missing layout, or exact-row request remains unchanged and fails closed. Context evidence remains `context_only`; recovery does not change label authority, exact-block eligibility, or promotion state.
+
+For the live candidate the normalized rows are five display lines, not the prompt's conceptual “three rows”: optimizer header, objective, constraint marker, Wasserstein constraint plus `(47)`, and domain constraints. Follow-up reasoning can now report that row-count discrepancy and compare bounded symbols without inventing visual rows.
+
+Verification:
+
+- Image Lens one-shot contract: 29/29 PASS with one worker, including the live flattened-LaTeX context shape, existing exact-block recovery, exact-block count mismatch rejection, and context count mismatch rejection.
+- Server bundle: PASS with the same four pre-existing duplicate-key/dead-case warnings.
+- `npm run helix:ask:discipline:quick` under `evidence normalization`: PASS with the existing advisory shortcut warning on the separately modified provider surface.
+- Casimir verification: not applicable; this patch changes non-physics evidence normalization only.
+
+Fresh-server UI validation remains required because the agent did not restart the operator's keyed server. Re-run the same comparison prompt after restarting the patched server. Expected: one bounded context crop, five materialized display lines, a model-authored agreements/mismatches answer (including the three-vs-five row-count discrepancy), and no exact-block promotion unless a separate affirmative exact-block request passes every promotion gate.
+
+### Cross-evidence comparison must reuse the retained crop
+
+The next operator turn `ask:056e74e5-23a9-4707-89db-21b972d041b0` exposed a different admission failure. The exact live prompt said to use the saved machine-readable page-8 text and the existing Image Lens crop for a row-by-row comparison. Instead, Helix treated generic `compare` language as Theory Badge Graph continuation, converted the retained context crop into seven overlapping `equation_row_search_*` retries, and selected an Image Lens observation report after the runtime provider leaked capability instructions. The authoritative backend trace recorded `completed_solver_path=false`, `followup_reasoning.completed=false`, and `route_authority_ok=false` even though the report was projected as a normal final answer.
+
+The retry receipts also exposed an evidence-identity bug. Several exact-row packets had `requested_equation_label=null` and `label_match_status=not_applicable` but were promoted with the reason `requested_label_matched`. One promoted crop observed `(4)` while the user requested equation `(47)`. An observation label without a request binding cannot establish equation identity.
+
+This repair is classified as `intent arbitration`, `evidence normalization`, `follow-up reasoning`, and `terminal authority`:
+
+- affirmative text-versus-image comparisons are recognized even when phrased as “using A and B, compare...” rather than “compare A against B”;
+- quoted, historical, conditional/future, and negated comparison language remains non-executable;
+- a retained context crop is re-entered for comparison with `retry_candidate_count=0`; no exact-row band search or Theory Badge Graph bridge is synthesized;
+- the observation report cannot self-terminal a cross-evidence comparison, so a prompt leak must enter the existing recoverable follow-up reasoning path;
+- an exact-row crop that observes an equation label without a requested-label binding remains partial with `observed_equation_label_without_requested_binding`;
+- a genuinely unlabeled row may still promote, but its positive reason is `unlabeled_row_no_equation_label_observed`, not `requested_label_matched`.
+
+Verification:
+
+- Focused cross-evidence, retry-suppression, prompt-leak, durable-sidecar continuity, and unbound-label contracts: 6/6 PASS with one worker.
+- Image Lens one-shot contract: 29/29 PASS with one worker.
+- Server bundle: PASS with the same four pre-existing duplicate-key/dead-case warnings.
+- `npm run helix:ask:discipline:quick` under the declared classifications: PASS with the existing advisory shortcut warning on the provider surface.
+- Prompt-solving benchmark: 6 cases passed before the single worker exited unexpectedly; the file did not produce a valid full-suite verdict.
+- Terminal-equivalence and focused API-parity attempts exited after startup without a test verdict under the current device memory pressure.
+- The broad provider capability-lane file produced 60/84 passing tests. Its 24 failures span pre-existing/state-sensitive translation, voice, route-version, receipt-presentation, and older terminal expectations; the affected focused contracts above pass and this broad run is not recorded as a release pass.
+- Casimir verification: not applicable; this patch changes non-physics evidence admission and terminal policy only.
+
+Fresh-server UI validation remains required. After restarting the patched keyed server, repeat the exact comparison prompt. Expected: the retained page-8 crop is reused, `scientific_image_evidence_retry.status=suppressed_for_cross_evidence_comparison`, zero `equation_row_search_*` observations, no unbound-label promotion, and either a model-authored row comparison or the typed follow-up failure if the provider again fails to author the post-evidence answer.
+
+### Cross-evidence routing must not depend on client metadata
+
+The next operator turn `ask:69ad78c9-45b0-4a9a-87cd-cb096ad49321` did not reach the retained-crop logic at all. The authoritative backend trace contained only the initial `agent_continuation_state`, with `resolved_route_label=unknown`, no admitted capabilities, no source-target intent, no provider sampling, and failure rail `route_not_selected`. The visible recovery copy claimed that the scientific sidecar was missing, but no sidecar lookup had run; that copy was therefore a downstream interpretation of an uncommitted turn rather than evidence of sidecar loss.
+
+The current client classifier recognizes the exact prompt as a scientific Image Lens comparison, which means a stale bundle, alternate submit path, or missing client route envelope can still strand an otherwise valid public Ask turn. Helix owns prompt interpretation and source admission, so this hard route cannot rely exclusively on client-supplied metadata.
+
+This repair is classified as `prompt interpretation`, `source admission`, `evidence re-entry`, and `terminal authority`:
+
+- a shared affirmative comparison classifier now governs client, server, and provider interpretation;
+- quoted, negated, historical, conditional, and future comparison mentions remain non-executing;
+- `/ask/turn` and `/ask/turn/stream` reconstruct a hard `scientific_image_evidence` route when the client omitted it;
+- source-target arbitration gives that affirmative comparison precedence over a later `do not promote...` evidence-quality clause, so contextual suppression cannot downgrade the route to `model_only`;
+- the reconstructed route explicitly requests the retained scientific sidecar and model-authored comparison synthesis;
+- neither the reconstructed server route nor the client route emits `mandatory_next_tool`, so route recovery cannot trigger a fresh Image Lens crop or overlapping exact-row searches.
+
+Verification:
+
+- Shared classifier, server route metadata, and client backend-entrypoint contracts: 22/22 PASS.
+- Focused provider comparison and retained-crop reuse contracts: 2/2 PASS.
+- Focused route-level API parity: 1/1 PASS (28 unrelated cases skipped). The server committed `scientific_image_evidence`, suppressed `fresh_image_lens_capture`, and did not require a new tool call when client metadata was absent.
+- Server bundle: PASS with the same four pre-existing duplicate-key/dead-case warnings.
+- `npm run helix:ask:discipline:quick`: PASS with the declared classifications and existing advisory shortcut warnings.
+- Casimir verification: not applicable; this is non-physics prompt routing and evidence re-entry policy.
+
+Fresh-server UI validation remains required. Repeat the exact comparison prompt after restarting the keyed server and refreshing the UI bundle. Expected: a committed `scientific_image_evidence` route even if the client envelope is absent, a real `scientific_image_evidence_continuation_lookup`, zero fresh `equation_row_search_*` observations, and either a model-authored row comparison or a typed lookup failure that names the actual lookup state.
+
+### Test cleanup must not delete persisted scientific evidence
+
+The fresh-server operator turn `ask:82bd026a-40a9-46d9-83ed-6f42ac1e6ddc` returned the scientific-workflow missing-sidecar answer even though earlier turns had created and reused a valid sidecar for the same saved paper. This time the missing-sidecar state was real: the durable `artifacts/helix/scholarly-pdf-workbench-memory` directory was absent after restart.
+
+The loss was caused by the focused provider verification itself. `resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true })` resolved the normal production/profile workbench path when no test override was configured, and the provider test deleted that directory during setup and cleanup. The client retained the loaded page source, but the restarted server could no longer reload the scientific sidecar, so graph reflection, calculator handoff, Postulate Board review, and the requested cross-evidence comparison all failed closed.
+
+This repair is classified as `evidence re-entry` and `terminal authority`, with a test-isolation release safeguard:
+
+- volatile resets still clear in-process test maps;
+- persistent reset is permitted only when a test explicitly configures a workbench directory beneath the operating-system temp directory;
+- the default repository/profile workbench path and any explicit non-temp path are never recursively deleted by the test helper;
+- both provider suites that request persistent cleanup receive isolated temp stores and remove only those stores;
+- the existing retained-sidecar comparison route remains unchanged and is verified independently from storage cleanup.
+
+The lost sidecar is not reconstructed from historical debug text because that could promote stale or partial scientific evidence. One new bounded Image Lens capture is required to seed the durable store after the patched server is restarted; subsequent comparison turns should reuse it without new row-search crops.
+
+The live turn also exposed a separate observability inconsistency: the client projected a missing-sidecar answer while the exported backend trace recorded an uncommitted/legacy route and no terminal artifact. That stream/debug persistence mismatch is not evidence that the routing repair failed, and it remains a distinct release-hardening item.
+
+Verification:
+
+- Persistent reset isolation, non-temp deletion refusal, and retained-crop reuse: 3/3 PASS.
+- Durable signed-in sidecar recovery and continuity-audit reuse after simulated restart: 2/2 PASS.
+- The second provider suite's current-turn scholarly PDF escalation under isolated storage: 1/1 PASS.
+- Streamed UI route reconstruction with stale client `model_only` metadata: 1/1 PASS.
+- Server bundle: PASS with the same four pre-existing duplicate-key/dead-case warnings.
+- `npm run helix:ask:discipline:quick`: PASS with the existing advisory shortcut warnings and the declared classifications.
+- `git diff --check`: PASS; line-ending notices only.
+- Casimir verification: not applicable; this changes non-physics test storage isolation and evidence re-entry safety.
+
+### Fresh Image Lens capture must outrank continuity reporting
+
+The operator turn `ask:b8d0455a-c870-46c0-af48-712713ad3587` explicitly requested a fresh page-8 render, the bounded crop `x=120, y=205, width=500, height=120`, and retention of the resulting scientific Image Lens sidecar. The authoritative server export shows that Helix instead classified the prompt as an evidence-continuity audit, executed only `research-library.read_document`, never executed `visual_analysis.inspect_image_region`, and never sampled a follow-up model answer. The visible client then failed closed with `Backend Ask was reached, but no server terminal artifact or debug artifact was materialized for this turn.`
+
+The copied export introduced a second observability failure. Its source remained `rendered_reply_dom` with `backend_debug_response_status=ref_advertised`, even though the turn-specific backend debug endpoint returned the full authoritative trace. The reply guard could discard a fetched backend payload when the server diagnostic answer differed from the UI typed failure and silently restore the DOM fallback.
+
+This repair is classified as `prompt interpretation`, `tool admission`, `evidence normalization`, `evidence re-entry`, `terminal authority`, and `presentation`:
+
+- affirmative render/inspect/capture/extract/materialize language now takes precedence over report-only continuity wording;
+- quoted, historical, future/conditional, and negated capture language remains non-executing;
+- a user-provided valid page crop is preserved by both saved-paper and current Image Lens lane synthesis instead of expanding to the whole page;
+- an identity-matched fetched backend debug export is retained even when its diagnostic answer differs from the visible typed failure; a different turn ID still fails closed to the rendered reply payload.
+
+Focused verification:
+
+- Fresh-capture precedence, adversarial non-execution, and bounded saved-PDF crop synthesis: 3/3 PASS.
+- Debug-copy fetched-backend retention and mismatched-turn rejection: 2/2 focused tests PASS (within the two selected client cases).
+- Broader server build, discipline classifier, and diff checks are recorded in the final verification pass below.
+- Casimir verification: not applicable; this changes non-physics Ask routing, evidence capture admission, and debug presentation.
+
+Fresh-server UI validation remains required because the operator's keyed server was not restarted. After restart and refresh, repeat the exact prompt. Expected: `visual_analysis.inspect_image_region` executes once with the exact `120,205,500,120` crop; a retained sidecar reports its source/page/crop/status/promotion fields; and Copy Debug reports `debug_export_source=backend_endpoint` with `backend_debug_response_status=fetched`.

@@ -1164,17 +1164,18 @@ describe("provider-neutral capability lane one-shot runner", () => {
           bbox_px: { x: 80, y: 120, width: 1060, height: 300 },
           source_width_px: 1224,
           source_height_px: 1584,
-          question: "Inspect the complete displayed equation block (47), including every line and its label.",
-          reason_for_crop: "The complete multi-line equation block must be bounded separately from equation (48).",
+          question: "Inspect and capture the complete multi-line displayed equation block labeled (47), including every displayed line and label, excluding equation (48).",
+          reason_for_crop: "Capture equation block (47) and exclude equation (48).",
           region_label: "equation_47_block",
           region_kind: "equation",
-          requested_equation_label: "47",
-          equation_capture_mode: "exact_block",
           text_candidate: [
-            "max_R Tr[-R_xs^H R_x^-1 R_xs + R_s]",
+            "max_R",
+            "Tr[-R_xs^H R_x^-1 R_xs + R_s]",
             "s.t.",
             "Tr[R + Rhat - 2(Rhat^1/2 R Rhat^1/2)^1/2] <= epsilon_0^2 (47)",
-            "R >= 0, R_x > 0.",
+            "R >= 0, R_x > 0 (47)",
+            "",
+            "The first constraint quantifies covariance uncertainty.",
           ].join("\n"),
           latex_candidate: [
             "\\begin{aligned}",
@@ -1184,8 +1185,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
             "\\end{aligned}",
           ].join("\n"),
           visual_layout_candidate: {
-            displayed_line_count: 6,
-            displayed_lines: ["max_R", "objective", "s.t.", "trace constraint", "R >= 0", "R_x > 0 (47)"],
+            displayed_line_count: 5,
+            displayed_lines: [],
             horizontal_alignment: "aligned_at_relation",
             structure: "aligned_block",
             equation_bbox_px: { x: 20, y: 18, width: 1010, height: 250 },
@@ -1201,7 +1202,20 @@ describe("provider-neutral capability lane one-shot runner", () => {
 
     expect(result.call_results).toHaveLength(1);
     expect(result.call_results[0]?.receipt).toMatchObject({
+      requested_equation_label: "47",
       equation_capture_mode: "exact_block",
+      label_match_status: "matched",
+      visual_layout_candidate: expect.objectContaining({
+        displayed_line_count: 5,
+        displayed_lines: [
+          "max_R",
+          "Tr[-R_xs^H R_x^-1 R_xs + R_s]",
+          "s.t.",
+          "Tr[R + Rhat - 2(Rhat^1/2 R Rhat^1/2)^1/2] <= epsilon_0^2 (47)",
+          "R >= 0, R_x > 0 (47)",
+        ],
+        notes: expect.arrayContaining(["displayed_lines_recovered_from_bounded_ocr_block"]),
+      }),
       exact_equation_admissibility: "admissible_for_exact_equation",
       exact_row_promotion: expect.objectContaining({ status: "not_applicable" }),
       exact_block_promotion: expect.objectContaining({
@@ -1226,6 +1240,155 @@ describe("provider-neutral capability lane one-shot runner", () => {
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
+    });
+  });
+
+  it("keeps an inferred exact-block label but does not recover mismatched displayed lines", async () => {
+    const result = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-image-lens-exact-equation-block-mismatch",
+        capability_lane_call: {
+          capability: "visual_analysis.inspect_image_region",
+          source_id: "scholarly-pdf:2401.12345:page-8",
+          source_kind: "pdf_page_render",
+          source_image_ref: "artifact://scholarly-pdf/example.pdf#page=8&image",
+          page_number: 8,
+          bbox_px: { x: 80, y: 120, width: 1060, height: 300 },
+          question: "Capture the complete equation block labeled (47), excluding equation (48).",
+          reason_for_crop: "The bounded crop must exclude (48).",
+          region_kind: "equation",
+          text_candidate: ["max_R", "objective", "s.t.", "constraint", "(47)", "", "Problem (47) follows."].join("\n"),
+          latex_candidate: "\\max_R objective \\\\ s.t. constraint \\tag{47}",
+          visual_layout_candidate: {
+            displayed_line_count: 6,
+            displayed_lines: [],
+            horizontal_alignment: "left",
+            structure: "multi_line",
+            equation_bbox_px: { x: 20, y: 18, width: 1010, height: 250 },
+            notes: [],
+          },
+          extraction_status: "extracted",
+          uncertainty: [],
+        },
+      },
+      env: { OPENAI_API_KEY: "test-openai" } as NodeJS.ProcessEnv,
+    });
+
+    expect(result.call_results[0]?.receipt).toMatchObject({
+      requested_equation_label: "47",
+      equation_capture_mode: "exact_block",
+      label_match_status: "matched",
+      visual_layout_candidate: expect.objectContaining({
+        displayed_line_count: 6,
+        displayed_lines: [],
+      }),
+      exact_block_promotion: expect.objectContaining({
+        status: "partial",
+        reasons: expect.arrayContaining(["displayed_lines_incomplete"]),
+      }),
+    });
+  });
+
+  it("recovers context comparison rows from bounded flattened LaTeX without promoting exact-block authority", async () => {
+    const result = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-image-lens-context-equation-comparison",
+        capability_lane_call: {
+          capability: "visual_analysis.inspect_image_region",
+          source_id: "scholarly-pdf:2401.12345:page-8",
+          source_kind: "pdf_page_render",
+          source_image_ref: "artifact://scholarly-pdf/example.pdf#page=8&image",
+          page_number: 8,
+          bbox_px: { x: 120, y: 205, width: 500, height: 120 },
+          source_width_px: 1224,
+          source_height_px: 1584,
+          question: "Compare the OCR symbols row by row. Do not promote exact-block evidence unless all rows and label (47) agree.",
+          reason_for_crop: "Compare the bounded equation context with saved page text.",
+          region_label: "scholarly_pdf_page_8_equation_pass",
+          region_kind: "equation",
+          equation_capture_mode: "context",
+          text_candidate: "max R Tr [− R^h_s R^−1_x R_xs + R_s] s.t. Tr [R + Rhat − 2(Rhat^1/2 R Rhat^1/2)^1/2] <= epsilon^2_0 (47) R >= 0, R_x > 0.",
+          latex_candidate: "max R \\ Tr [-R_h R_x^{-1} R_{xs} + R_s] \\ \\mathrm{s.t.} \\ Tr [R + \\hat{R} - 2(\\hat{R}^{1/2} R \\hat{R}^{1/2})^{1/2}] \\leq \\epsilon_0^2 (47) \\ R \\succeq 0, R_x \\succ 0.",
+          visual_layout_candidate: {
+            displayed_line_count: 5,
+            displayed_lines: [],
+            horizontal_alignment: "left",
+            structure: "multi_line",
+            equation_bbox_px: { x: 0, y: 0, width: 500, height: 120 },
+            notes: [],
+          },
+          extraction_status: "extracted",
+          uncertainty: [],
+        },
+      },
+      env: { OPENAI_API_KEY: "test-openai" } as NodeJS.ProcessEnv,
+    });
+
+    expect(result.call_results[0]?.receipt).toMatchObject({
+      equation_capture_mode: "context",
+      label_match_status: "not_applicable",
+      visual_layout_candidate: expect.objectContaining({
+        displayed_line_count: 5,
+        displayed_lines: [
+          "max R",
+          "Tr [-R_h R_x^{-1} R_{xs} + R_s]",
+          "\\mathrm{s.t.}",
+          "Tr [R + \\hat{R} - 2(\\hat{R}^{1/2} R \\hat{R}^{1/2})^{1/2}] \\leq \\epsilon_0^2 (47)",
+          "R \\succeq 0, R_x \\succ 0.",
+        ],
+        notes: expect.arrayContaining(["displayed_lines_recovered_from_bounded_latex_structure"]),
+      }),
+      exact_block_promotion: expect.objectContaining({
+        status: "not_applicable",
+        reasons: expect.arrayContaining(["not_an_exact_equation_block_request"]),
+      }),
+      evidence_role: "context_only",
+    });
+  });
+
+  it("does not invent context comparison rows when the declared layout count disagrees", async () => {
+    const result = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-image-lens-context-equation-comparison-mismatch",
+        capability_lane_call: {
+          capability: "visual_analysis.inspect_image_region",
+          source_id: "scholarly-pdf:2401.12345:page-8",
+          source_kind: "pdf_page_render",
+          source_image_ref: "artifact://scholarly-pdf/example.pdf#page=8&image",
+          page_number: 8,
+          bbox_px: { x: 120, y: 205, width: 500, height: 120 },
+          question: "Compare the bounded OCR context row by row.",
+          region_kind: "equation",
+          equation_capture_mode: "context",
+          text_candidate: ["max R", "objective", "s.t.", "constraint (47)", "domain"].join("\n"),
+          latex_candidate: "max R \\ objective \\ constraint (47) \\ domain",
+          visual_layout_candidate: {
+            displayed_line_count: 4,
+            displayed_lines: [],
+            horizontal_alignment: "left",
+            structure: "multi_line",
+            equation_bbox_px: { x: 0, y: 0, width: 500, height: 120 },
+            notes: [],
+          },
+          extraction_status: "extracted",
+          uncertainty: [],
+        },
+      },
+      env: { OPENAI_API_KEY: "test-openai" } as NodeJS.ProcessEnv,
+    });
+
+    expect(result.call_results[0]?.receipt).toMatchObject({
+      equation_capture_mode: "context",
+      visual_layout_candidate: expect.objectContaining({
+        displayed_line_count: 4,
+        displayed_lines: [],
+        notes: [],
+      }),
+      exact_block_promotion: expect.objectContaining({ status: "not_applicable" }),
+      evidence_role: "context_only",
     });
   });
 
@@ -1507,6 +1670,29 @@ describe("provider-neutral capability lane one-shot runner", () => {
       retry_debug: expect.objectContaining({ retry_count: 0 }),
     });
 
+    const unboundObservedLabel = buildScientificEvidencePacket({
+      cropRegionId: "equation_row_search_5",
+      sourceRefHash: "test-source",
+      sourceKind: "image_lens_source",
+      bboxPx: { x: 150, y: 258, width: 440, height: 36 },
+      regionLabel: "equation_row_search_5",
+      textCandidate: "s.t. Tr[R + R - 2(R^{1/2}RR^{1/2})^{1/2}] <= epsilon_0^2 (4)",
+      latexCandidate: "\\mathrm{s.t.}\\;\\operatorname{Tr}[R + R - 2(R^{1/2}RR^{1/2})^{1/2}] \\leq \\epsilon_0^2 (4)",
+      extractionStatus: "extracted",
+      uncertainty: [],
+    });
+    expect(unboundObservedLabel).toMatchObject({
+      requested_equation_label: null,
+      observed_equation_labels: ["4"],
+      label_match_status: "not_applicable",
+      exact_equation_admissibility: "partial_candidate",
+      exact_row_promotion: expect.objectContaining({
+        status: "partial",
+        reasons: expect.arrayContaining(["observed_equation_label_without_requested_binding"]),
+      }),
+      quality_flags: expect.arrayContaining(["observed_equation_label_without_requested_binding"]),
+    });
+
     const mismatched = buildScientificEvidencePacket({
       cropRegionId: "equation_3.52",
       sourceRefHash: "test-source",
@@ -1729,7 +1915,7 @@ describe("provider-neutral capability lane one-shot runner", () => {
         bbox_px: { x: 2, y: 3, width: 40, height: 50 },
         extraction_status: "failed",
         uncertainty: expect.arrayContaining([
-          "No Image Lens OCR/math extraction backend returned text_candidate or latex_candidate for this crop.",
+          "No Image Lens OCR/math/layout extraction backend returned text_candidate, latex_candidate, or visual_layout_candidate for this crop.",
           expect.stringContaining("local_quality_gate"),
         ]),
         document_region_receipt: {
@@ -1741,7 +1927,7 @@ describe("provider-neutral capability lane one-shot runner", () => {
       observation: {
         extraction_status: "failed",
         uncertainty: expect.arrayContaining([
-          "No Image Lens OCR/math extraction backend returned text_candidate or latex_candidate for this crop.",
+          "No Image Lens OCR/math/layout extraction backend returned text_candidate, latex_candidate, or visual_layout_candidate for this crop.",
           expect.stringContaining("local_quality_gate"),
         ]),
       },

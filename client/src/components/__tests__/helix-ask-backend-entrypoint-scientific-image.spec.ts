@@ -167,6 +167,32 @@ describe("Helix Ask backend entrypoint scientific image policy", () => {
     });
   });
 
+  it("routes saved-text/Image-Lens comparisons without forcing a fresh crop", () => {
+    const prompt =
+      "Using the saved machine-readable page-8 text and the Image Lens crop, compare equation (47) row by row. Report the actual detected display-row count, symbol/subscript agreements, and mismatches. Do not promote exact-block evidence unless every displayed line and label agrees.";
+    const resolution = resolveHelixAskBackendEntrypointFamily(prompt);
+    const metadata = buildHelixAskHardBackendEntrypointRouteMetadata({
+      question: prompt,
+      turnId: "turn:retained-image-comparison",
+      threadId: "thread:retained-image-comparison",
+    });
+
+    expect(requiresHelixAskBackendEntrypoint(prompt)).toBe(true);
+    expect(resolution).toMatchObject({
+      family: "scientific_image",
+      sourceTarget: "scientific_image_evidence",
+      targetKind: "scientific_image_evidence_sidecar",
+      selectedCapability: null,
+      explicitCue: "affirmative_scientific_image_text_comparison",
+      requestedOutputs: expect.arrayContaining([
+        "scientific_evidence_sidecar",
+        "machine_text_visual_comparison",
+        "model_authored_synthesis",
+      ]),
+    });
+    expect(metadata).not.toHaveProperty("mandatory_next_tool");
+  });
+
   it("keeps scientific image extraction-only prompts out of theory and calculator routing", () => {
     const prompt = "Here is a scientific document image. Extract the equations and LaTeX candidates.";
     const resolution = resolveHelixAskBackendEntrypointFamily(prompt);

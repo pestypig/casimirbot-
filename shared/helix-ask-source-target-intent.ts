@@ -3,6 +3,7 @@ export const HELIX_ASK_SOURCE_TARGET_INTENT_SCHEMA =
 
 export type HelixAskSourceTarget =
   | "visual_capture"
+  | "scientific_image_evidence"
   | "world_event"
   | "docs_viewer"
   | "audio_transcript"

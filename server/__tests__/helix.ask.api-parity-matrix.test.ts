@@ -98,6 +98,16 @@ const resetAll = (): void => {
   });
 };
 
+const parseSseEvents = (text: string): Array<{ event: string; data: Record<string, unknown> }> =>
+  text
+    .split(/\n\n+/)
+    .map((block) => block.trim())
+    .filter(Boolean)
+    .map((block) => ({
+      event: block.match(/^event:\s*(.+)$/m)?.[1]?.trim() ?? "message",
+      data: JSON.parse(block.match(/^data:\s*(.+)$/m)?.[1]?.trim() ?? "{}") as Record<string, unknown>,
+    }));
+
 const expectNullableStringField = (record: Record<string, unknown>, key: string): void => {
   expect(record).toHaveProperty(key);
   const value = record[key];
@@ -517,6 +527,82 @@ const buildCompleteCapabilityCatalogAskTurn = (railTable: Record<string, unknown
 
 describe("Helix Ask API parity matrix", () => {
   beforeEach(resetAll);
+
+  it("reconstructs the retained scientific-image comparison route when client metadata is absent", async () => {
+    const app = createApp();
+    const prompt =
+      "Using the saved machine-readable page-8 text and the Image Lens crop, compare equation (47) row by row. Report the actual detected display-row count, symbol/subscript agreements, and mismatches. Do not promote exact-block evidence unless every displayed line and label agrees.";
+    const ask = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: "helix-ask:api-parity:scientific-image-route-recovery",
+        question: prompt,
+        mode: "read",
+        debug: true,
+      })
+      .expect(200);
+    const debug = await request(app)
+      .get(`/api/agi/ask/turn/${encodeURIComponent(ask.body.turn_id)}/debug-export`)
+      .expect(200);
+    const payload = debug.body?.payload ?? {};
+    const committedRoute = payload.ask_turn_solver_trace?.committed_ask_route;
+
+    expect(payload.ask_turn_procedure_trace).toMatchObject({
+      route_proposal: expect.objectContaining({
+        source: expect.not.stringMatching(/uncommitted_or_legacy/),
+      }),
+    });
+    expect(committedRoute).toMatchObject({
+      route: {
+        source_target: "scientific_image_evidence",
+      },
+    });
+    expect(payload.source_target_intent).toMatchObject({
+      target_source: "scientific_image_evidence",
+      suppressed_routes: expect.arrayContaining(["fresh_image_lens_capture"]),
+    });
+    expect(payload.source_target_intent).not.toHaveProperty("mandatory_next_tool");
+  }, 20_000);
+
+  it("reconstructs the retained scientific-image comparison route on the UI stream path", async () => {
+    const app = createApp();
+    const prompt =
+      "Using the saved machine-readable page-8 text and the Image Lens crop, compare equation (47) row by row. Report the actual detected display-row count, symbol/subscript agreements, and mismatches. Do not promote exact-block evidence unless every displayed line and label agrees.";
+    const stream = await request(app)
+      .post("/api/agi/ask/turn/stream")
+      .send({
+        sessionId: "helix-ask:api-parity:scientific-image-stream-route-recovery",
+        question: prompt,
+        mode: "read",
+        debug: true,
+        source_target_intent: {
+          schema: "helix.ask_source_target_intent.v1",
+          target_source: "model_only",
+          target_kind: "general_background",
+          strength: "hard",
+          must_enter_backend_ask: false,
+          allow_client_shortcut: true,
+          allow_no_tool_direct: true,
+        },
+        })
+      .expect(200);
+    const turnFinal = parseSseEvents(stream.text).find((entry) => entry.event === "turn_final")?.data;
+    expect(turnFinal?.turn_id).toEqual(expect.any(String));
+    const debug = await request(app)
+      .get(`/api/agi/ask/turn/${encodeURIComponent(String(turnFinal?.turn_id))}/debug-export`)
+      .expect(200);
+    const payload = debug.body?.payload ?? {};
+
+    expect(payload.ask_turn_solver_trace?.committed_ask_route).toMatchObject({
+      route: {
+        source_target: "scientific_image_evidence",
+      },
+    });
+    expect(payload.source_target_intent).toMatchObject({
+      target_source: "scientific_image_evidence",
+      suppressed_routes: expect.arrayContaining(["fresh_image_lens_capture"]),
+    });
+  }, 30_000);
 
   it.each(enabledParityScenarios)("$id stays procedural through top-level Ask", async (scenario) => {
     const app = createApp();

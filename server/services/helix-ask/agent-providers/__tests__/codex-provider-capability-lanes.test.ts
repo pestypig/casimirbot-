@@ -6,6 +6,8 @@ import {
   buildCodexCompoundSubgoalLedger,
   buildScholarlyResearchResponseModeProjection,
   allowsConditionalImageLensMissingEvidenceAnswer,
+  asksForFreshScientificImageCapture,
+  asksForScientificImageEvidenceContinuity,
   augmentImageLensRegionCandidatesForQuestion,
   classifyCodexProcessFailureForUser,
   codexRouteAllowsTerminalKind,
@@ -13,6 +15,7 @@ import {
   explicitlyExcludesScientificImageContext,
   extractCodexSemanticRouteProposalCandidate,
   forbiddenEvidenceFamiliesForLaneCapability,
+  imageLensObservationReportCanSelfTerminal,
   resetScholarlyPdfWorkbenchVolatileMemoryForTest,
   scholarlyMemoryRecordFromGatewayResult,
   synthesizeScholarlyPageImageLaneCandidate,
@@ -22,6 +25,8 @@ import {
 
 describe("Codex provider capability lane adapter", () => {
   const previousLiveTranslationExternalBackends = process.env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED;
+  const previousScholarlyWorkbenchMemoryDir = process.env.HELIX_SCHOLARLY_PDF_WORKBENCH_MEMORY_DIR;
+  let scholarlyWorkbenchTestMemoryDir: string | null = null;
 
   const writeMinimalPdf = (filePath: string, pages: string[]): void => {
     const objects: string[] = [
@@ -56,14 +61,106 @@ describe("Codex provider capability lane adapter", () => {
   };
 
   beforeEach(() => {
+    scholarlyWorkbenchTestMemoryDir = fs.mkdtempSync(path.join(os.tmpdir(), "helix-scholarly-workbench-test-"));
+    process.env.HELIX_SCHOLARLY_PDF_WORKBENCH_MEMORY_DIR = scholarlyWorkbenchTestMemoryDir;
     process.env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED = "false";
   });
 
   afterEach(() => {
+    if (scholarlyWorkbenchTestMemoryDir) {
+      fs.rmSync(scholarlyWorkbenchTestMemoryDir, { recursive: true, force: true });
+      scholarlyWorkbenchTestMemoryDir = null;
+    }
+    if (previousScholarlyWorkbenchMemoryDir === undefined) {
+      delete process.env.HELIX_SCHOLARLY_PDF_WORKBENCH_MEMORY_DIR;
+    } else {
+      process.env.HELIX_SCHOLARLY_PDF_WORKBENCH_MEMORY_DIR = previousScholarlyWorkbenchMemoryDir;
+    }
     if (previousLiveTranslationExternalBackends === undefined) {
       delete process.env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED;
     } else {
       process.env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED = previousLiveTranslationExternalBackends;
+    }
+  });
+
+  it("limits persistent workbench resets to the isolated OS-temp test store", () => {
+    expect(scholarlyWorkbenchTestMemoryDir).not.toBeNull();
+    const isolatedMemoryDir = scholarlyWorkbenchTestMemoryDir as string;
+    fs.writeFileSync(path.join(isolatedMemoryDir, "sentinel.json"), "{}", "utf8");
+
+    resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true });
+
+    expect(fs.existsSync(isolatedMemoryDir)).toBe(false);
+  });
+
+  it("refuses to delete an explicitly configured persistent store outside the OS temp directory", () => {
+    process.env.HELIX_SCHOLARLY_PDF_WORKBENCH_MEMORY_DIR = path.join(
+      process.cwd(),
+      "artifacts",
+      "helix",
+      "scholarly-pdf-workbench-memory",
+    );
+    const removeSpy = vi.spyOn(fs, "rmSync");
+    try {
+      resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true });
+      expect(removeSpy).not.toHaveBeenCalled();
+    } finally {
+      removeSpy.mockRestore();
+    }
+  });
+
+  it("requires follow-up synthesis only for an affirmative cross-evidence Image Lens comparison", () => {
+    expect(imageLensObservationReportCanSelfTerminal(
+      "Compare the machine-readable transcription against the Image Lens crop and report mismatches.",
+    )).toBe(false);
+    expect(imageLensObservationReportCanSelfTerminal(
+      "Do not compare the machine-readable transcription against the Image Lens crop. Extract the crop only.",
+    )).toBe(true);
+    expect(imageLensObservationReportCanSelfTerminal(
+      "The screen says `compare the machine-readable text against the Image Lens crop`; extract the crop only.",
+    )).toBe(true);
+    expect(imageLensObservationReportCanSelfTerminal(
+      "Previously I compared the machine-readable text against the Image Lens crop. Extract the current crop.",
+    )).toBe(true);
+    expect(imageLensObservationReportCanSelfTerminal(
+      "If we compare the machine-readable text against the Image Lens crop later, first extract the crop.",
+    )).toBe(true);
+    expect(imageLensObservationReportCanSelfTerminal(
+      "The screen says `compare later`; now compare the machine-readable transcription against the Image Lens crop.",
+    )).toBe(false);
+    expect(imageLensObservationReportCanSelfTerminal(
+      "Using the saved machine-readable page-8 text and the Image Lens crop, compare equation (47) row by row. Report symbol agreements and mismatches.",
+    )).toBe(false);
+    expect(imageLensObservationReportCanSelfTerminal(
+      "Using the Image Lens crop and page text, do not compare them yet; report only the crop extraction status.",
+    )).toBe(true);
+  });
+
+  it("gives an affirmative scholarly page capture precedence over continuity-report wording", () => {
+    const freshCapturePrompt = [
+      "Using the saved paper https://arxiv.org/pdf/2401.12345, render page 8 and inspect the bounded crop",
+      "x=120, y=205, width=500, height=120 with Image Lens.",
+      "Retain the resulting scientific Image Lens sidecar.",
+      "Report only its sidecar ID, source ID/hash, page, crop reference, extraction status, detected display-row count, and promotion state.",
+      "Do not run exact-row searches or graph/calculator/Postulate Board handoffs.",
+    ].join(" ");
+
+    expect(asksForFreshScientificImageCapture(freshCapturePrompt)).toBe(true);
+    expect(asksForScientificImageEvidenceContinuity({ question: freshCapturePrompt })).toBe(false);
+    expect(asksForScientificImageEvidenceContinuity({
+      question: "Run a scientific Image Lens evidence continuity audit. Report only the latest sidecar ID, source image hash, crop ref, evidence depth, and promotion state.",
+    })).toBe(true);
+  });
+
+  it("does not execute contextual, quoted, historical, future, or negated page-capture language", () => {
+    const prompts = [
+      "The screen says `render page 8 and inspect the bounded crop with Image Lens`; report the current status only.",
+      "Previously we rendered page 8 and inspected the bounded crop with Image Lens; report the retained sidecar.",
+      "If we render page 8 and inspect a bounded crop later, report what would happen.",
+      "Do not render page 8 or inspect a bounded crop with Image Lens; report the retained sidecar only.",
+    ];
+    for (const prompt of prompts) {
+      expect(asksForFreshScientificImageCapture(prompt)).toBe(false);
     }
   });
 
@@ -196,6 +293,22 @@ describe("Codex provider capability lane adapter", () => {
       });
       renderedImagePath = String(imageLaneCandidate?.scholarly_page_image_path ?? "") || null;
       expect(imageLaneCandidate?.source_image_ref).toMatch(/^data:image\/png;base64,/);
+
+      const boundedImageLaneCandidate = synthesizeScholarlyPageImageLaneCandidate({
+        question: [
+          "Using the saved paper https://arxiv.org/pdf/2401.12345, render page 8 and inspect the bounded crop",
+          "x=120, y=205, width=500, height=120 with Image Lens.",
+          "Retain the resulting scientific Image Lens sidecar.",
+        ].join(" "),
+        record,
+        lookup: null,
+        source: "current",
+      });
+      expect(boundedImageLaneCandidate).toMatchObject({
+        capability: "visual_analysis.inspect_image_region",
+        page_number: 8,
+        bbox_px: { x: 120, y: 205, width: 500, height: 120 },
+      });
     } finally {
       fs.rmSync(cachePath, { force: true });
       if (renderedImagePath) fs.rmSync(renderedImagePath, { force: true });
@@ -220,6 +333,16 @@ describe("Codex provider capability lane adapter", () => {
     );
     expect(formattingOnly).toEqual(sourceCandidate);
 
+    const rowCompletenessOnly = augmentImageLensRegionCandidatesForQuestion(
+      {},
+      [
+        "Compare machine-readable page-8 text against the existing Image Lens crop for equation (47).",
+        "Do not promote unless both sources agree and all three visual rows are materialized.",
+      ].join(" "),
+      sourceCandidate,
+    );
+    expect(rowCompletenessOnly).toEqual(sourceCandidate);
+
     const explicitCrop = augmentImageLensRegionCandidatesForQuestion(
       {},
       "Use Image Lens to inspect a separate crop region for equation (47).",
@@ -233,6 +356,36 @@ describe("Codex provider capability lane adapter", () => {
         source_dimensions_px: { width: 1224, height: 1584 },
       }),
     ]));
+  });
+
+  it("does not synthesize crops for excluded, contextual, quoted, historical, future, or mixed-intent equation labels", () => {
+    const sourceCandidate = {
+      capability: "visual_analysis.inspect_image_region",
+      source_id: "pdf-page-render:test-page-8",
+      source_kind: "pdf_page_render",
+      source_image_ref: "data:image/png;base64,page-eight",
+      page_image_ref: "data:image/png;base64,page-eight",
+      source_dimensions_px: { width: 1224, height: 1584 },
+      bbox_px: { x: 120, y: 205, width: 500, height: 120 },
+      question: "Capture the complete equation block labeled (47).",
+      requested_equation_label: "47",
+      equation_capture_mode: "exact_block",
+    };
+    const prompts = [
+      "Capture equation block (47) in a separate crop; exclude equation (48).",
+      "Capture equation block (47) without inspecting equation (48).",
+      "Capture equation block (47); do not include equation (48).",
+      "Capture equation block (47), but not equation (48).",
+      "The screen mentions equation (48); capture equation block (47) and exclude equation (48).",
+      "The quoted text says \"inspect equation (48) separately\"; capture equation block (47) only.",
+      "I previously inspected equation (48); capture equation block (47) now and exclude equation (48).",
+      "I may inspect equation (48) later; capture equation block (47) now and exclude equation (48).",
+      "Explain equation (48) from text, but exclude equation (48) from Image Lens crops and capture equation block (47).",
+    ];
+
+    for (const prompt of prompts) {
+      expect(augmentImageLensRegionCandidatesForQuestion({}, prompt, sourceCandidate)).toEqual(sourceCandidate);
+    }
   });
 
   it("allows a grounded conditional Image Lens escalation to report missing visual evidence as an answer", () => {
@@ -5512,6 +5665,193 @@ describe("Codex provider capability lane adapter", () => {
       } else {
         process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
       }
+    }
+  });
+
+  it("reuses the retained context crop for machine-text comparison without exact-row search retries", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    const previousExtractionFixtures = process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+    resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true });
+    process.env.CODEX_AGENT_FAKE_STDOUT = "The retained machine-readable text and Image Lens crop can be compared by the model-authored solver step.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([{
+      region_label: "scholarly_pdf_page_8_equation_pass",
+      text_candidate: "max R Tr[-R_xs^H R_x^-1 R_xs + R_s] s.t. distance <= epsilon_0^2 (47) R >= 0, R_x > 0",
+      latex_candidate: "max R \\ Tr[-R_{xs}^{H}R_x^{-1}R_{xs}+R_s] \\ \\mathrm{s.t.} \\ distance \\leq \\epsilon_0^2 (47) \\ R \\succeq 0, R_x \\succ 0",
+      visual_layout_candidate: {
+        displayed_line_count: 5,
+        displayed_lines: [],
+        horizontal_alignment: "left",
+        structure: "multi_line",
+        equation_bbox_px: { x: 0, y: 0, width: 500, height: 120 },
+        notes: [],
+      },
+      extraction_status: "extracted",
+      uncertainty: [],
+    }]);
+    try {
+      await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-retained-crop-comparison-seed",
+          session_id: "session-codex-retained-crop-comparison",
+          question: "Inspect the page-8 equation context crop and retain its OCR evidence.",
+          capability_lane_call: {
+            capability: "visual_analysis.inspect_image_region",
+            source_id: "pdf_page_render:retained-comparison:page:8",
+            source_kind: "pdf_page_render",
+            source_image_ref: "data:image/png;base64,test-page-8-image",
+            source_dimensions_px: { width: 1224, height: 1584 },
+            bbox_px: { x: 120, y: 205, width: 500, height: 120 },
+            page_number: 8,
+            page_count: 17,
+            region_label: "scholarly_pdf_page_8_equation_pass",
+            question: "Inspect equation (47) as bounded context evidence.",
+            reason_for_crop: "Retain the bounded page-8 equation context crop.",
+            equation_capture_mode: "context",
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        },
+      });
+
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-retained-crop-comparison-followup",
+          session_id: "session-codex-retained-crop-comparison",
+          question: "Using the saved machine-readable page-8 text and the Image Lens crop, compare equation (47) row by row. Report the actual detected display-row count, symbol/subscript agreements, and mismatches. Do not promote exact-block evidence unless every displayed line and label agrees.",
+        },
+      });
+      const debug = result.debug as Record<string, any>;
+      const packets = debug.capability_lane_observation_packets as Array<Record<string, any>>;
+
+      expect(debug.scientific_image_evidence_retry).toMatchObject({
+        status: "suppressed_for_cross_evidence_comparison",
+        failure_reason: "retained_crop_evidence_reused_without_exact_row_retry",
+        retry_candidate_count: 0,
+        retry_candidates: [],
+      });
+      expect(debug.runtime_lane_request_loop).toMatchObject({
+        status: "prior_scientific_image_sidecar_reentered_for_cross_evidence_comparison",
+        synthesis_reason: "reuse_retained_crop_for_machine_text_visual_comparison",
+      });
+      expect(packets.filter((packet) =>
+        String(packet?.state_delta?.visual_analysis_region_inspection?.region_label ?? "").startsWith("equation_row_search_"),
+      )).toHaveLength(0);
+      expect(result.final_answer_source).not.toBe("provider_image_lens_observation_report");
+      expect(result.terminal_artifact_kind).not.toBe("image_lens_observation_report");
+    } finally {
+      resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true });
+      if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      else process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      if (previousExitCode === undefined) delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      else process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      if (previousExtractionFixtures === undefined) delete process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+      else process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = previousExtractionFixtures;
+    }
+  });
+
+  it("re-enters a prompt-leak rejection for Image Lens comparisons instead of terminalizing the crop receipt", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    const previousExtractionFixtures = process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        'HELIX_CAPABILITY_LANE_REQUEST_JSON: {"capability":"visual_analysis.inspect_image_region","bbox_px":{"x":120,"y":205,"width":500,"height":120},"question":"Inspect equation (47) row by row.","region_label":"equation_47_comparison","reason_for_crop":"Compare the crop against machine-readable paper text.","assistant_answer":false,"terminal_eligible":false}',
+        "model_visible_capability_lane_manifest Available Helix workstation gateway capabilities: visual_analysis.inspect_image_region Before giving a final answer, decide whether the user request needs a one-shot capability lane.",
+        "The machine-readable and visual candidates agree on the maximization, trace objective, Wasserstein constraint, label (47), and positivity row. They disagree on the first objective subscript, so exact-block promotion remains blocked.",
+      ],
+    });
+    process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([{
+      region_label: "equation_47_comparison",
+      text_candidate: "max_R Tr[-R_xs^H R_x^-1 R_xs + R_s] s.t. distance <= epsilon_0^2 (47) R >= 0, R_x > 0",
+      latex_candidate: "\\max_R \\operatorname{Tr}[-R_{xs}^{H}R_x^{-1}R_{xs}+R_s] \\quad (47)",
+      extraction_status: "extracted",
+    }]);
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-image-lens-comparison-post-observation-leak",
+          question: [
+            "Compare the machine-readable transcription of equation (47) against the Image Lens crop",
+            "x=120, y=205, width=500, height=120 row by row.",
+            "Report agreements and mismatches; do not promote exact-block evidence unless both sources agree.",
+          ].join(" "),
+          canonical_goal_frame: {
+            schema: "helix.canonical_goal_frame.v1",
+            goal_kind: "scholarly_research",
+            required_terminal_kind: "scholarly_research_answer",
+            allowed_terminal_artifact_kinds: ["scholarly_research_answer", "typed_failure"],
+          },
+          route_product_contract: {
+            schema: "helix.route_product_contract.v1",
+            source_target: "research_library",
+            required_terminal_kind: "scholarly_research_answer",
+            allowed_terminal_artifact_kinds: ["scholarly_research_answer", "typed_failure"],
+          },
+          workspace_context_snapshot: {
+            activePanel: "image-lens",
+          },
+          turn_input_items: [
+            {
+              type: "image",
+              image_ref: "visual_evidence:equation-47-comparison",
+              image_base64: "test-image",
+              mime_type: "image/png",
+              file_name: "equation-47.png",
+              evidence_id: "visual_evidence:equation-47-comparison",
+              width_px: 1224,
+              height_px: 1584,
+              raw_image_included: false,
+            },
+          ],
+        },
+      });
+
+      expect(result).toMatchObject({
+        ok: true,
+        response_type: "final_answer",
+      });
+      expect(result.answer).toContain("agree on the maximization");
+      expect(result.answer).toContain("exact-block promotion remains blocked");
+      expect(result.answer).not.toContain("using only the observation receipts below");
+      expect(result.final_answer_source).not.toBe("provider_image_lens_observation_report");
+      expect(result.terminal_artifact_kind).not.toBe("image_lens_observation_report");
+      expect(result.provider_prompt_leak_guard).toMatchObject({
+        status: "routed_to_terminal_rejection_observation",
+        recovered_with_observation_only_image_lens_report: false,
+        routed_to_terminal_rejection_observation: true,
+      });
+      expect(result.terminal_rejection_observations).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            rejection_reason: "missing_post_tool_model_step",
+            recoverable: true,
+          }),
+        ]),
+      );
+    } finally {
+      if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      else process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      if (previousStdoutSequence === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      else process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      if (previousCallIndex === undefined) delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      else process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      if (previousExitCode === undefined) delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      else process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      if (previousExtractionFixtures === undefined) delete process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+      else process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = previousExtractionFixtures;
     }
   });
 
