@@ -418,6 +418,22 @@ const toImageLensRegionInspectionRequest = (
     readBbox(call.bbox_px) ??
     readBbox(call.bboxPx) ??
     { x: 0, y: 0, width: 1, height: 1 };
+  const requestedEquationLabel =
+    readString(call.requested_equation_label ?? call.requestedEquationLabel) || null;
+  const captureModeRaw = readString(call.equation_capture_mode ?? call.equationCaptureMode);
+  const captureIntentText = [
+    readString(call.question),
+    readString(call.reason_for_crop ?? call.reasonForCrop),
+    readString(call.region_label ?? call.regionLabel),
+  ].filter(Boolean).join(" ");
+  const equationCaptureMode: ImageLensRegionInspectionRequestV1["equation_capture_mode"] =
+    captureModeRaw === "exact_block" || captureModeRaw === "exact_row" || captureModeRaw === "context"
+      ? captureModeRaw
+      : /\b(?:complete|entire|full|multi[-\s]?line|displayed)\b[^.!?;\n]{0,100}\b(?:equation|display)\s+block\b|\bequation\s+block\b/i.test(captureIntentText)
+        ? "exact_block"
+        : requestedEquationLabel
+          ? "exact_row"
+          : "context";
   return {
     schema: IMAGE_LENS_REGION_INSPECTION_REQUEST_SCHEMA,
     capability: IMAGE_LENS_REGION_INSPECTION_CAPABILITY,
@@ -439,6 +455,9 @@ const toImageLensRegionInspectionRequest = (
       readString(call.scholarly_source_pdf_ref ?? call.scholarlySourcePdfRef) || null,
     scholarly_pdf_cache_path:
       readString(call.scholarly_pdf_cache_path ?? call.scholarlyPdfCachePath) || null,
+    source_dimensions_px: (
+      readRecord(call.source_dimensions_px ?? call.sourceDimensionsPx) as ImageLensRegionInspectionRequestV1["source_dimensions_px"]
+    ) ?? null,
     bbox_px: bbox,
     crop_ref:
       readString(call.crop_ref ?? call.cropRef) || null,
@@ -451,8 +470,8 @@ const toImageLensRegionInspectionRequest = (
       readString(call.reason_for_crop ?? call.reasonForCrop) || null,
     region_label:
       readString(call.region_label ?? call.regionLabel) || null,
-    requested_equation_label:
-      readString(call.requested_equation_label ?? call.requestedEquationLabel) || null,
+    requested_equation_label: requestedEquationLabel,
+    equation_capture_mode: equationCaptureMode,
     parent_region_id:
       readString(call.parent_region_id ?? call.parentRegionId) || null,
     detail:
@@ -465,6 +484,9 @@ const toImageLensRegionInspectionRequest = (
       readString(call.text_candidate ?? call.textCandidate) || null,
     latex_candidate:
       readString(call.latex_candidate ?? call.latexCandidate) || null,
+    visual_layout_candidate: (
+      readRecord(call.visual_layout_candidate ?? call.visualLayoutCandidate) as ImageLensRegionInspectionRequestV1["visual_layout_candidate"]
+    ) ?? null,
     extraction_status:
       readString(call.extraction_status ?? call.extractionStatus) as ImageLensRegionInspectionRequestV1["extraction_status"] || null,
     table_candidate_ref:

@@ -10,6 +10,9 @@ export type FinalAnswerDraftQualityViolation =
   | "missing_support_refs_for_internet_search_route"
   | "missing_support_refs_for_source_route"
   | "contradicts_observed_scholarly_full_text"
+  | "invalid_page_evidence_links"
+  | "missing_requested_page_boundaries"
+  | "invalid_conditional_visual_evidence_answer"
   | "unsupported_repo_claim"
   | "receipt_like_answer"
   | "fallback_like_answer";
@@ -301,14 +304,14 @@ export const inferFinalAnswerDraftRouteFamily = (input: {
     const kind = readString(artifact.kind);
     const payload = readRecord(artifact.payload);
     const schema = readString(payload?.schema);
-    return /repo_code_evidence_observation|scholarly_research_observation|scholarly_full_text_observation|internet_search_observation/i.test([kind, schema].join(" "));
+    return /repo_code_evidence_observation|scholarly_research_observation|scholarly_full_text_observation|research_library_observation|internet_search_observation/i.test([kind, schema].join(" "));
   })) {
     return ledger.some((artifact: ArtifactLike) => {
       const kind = readString(artifact.kind);
       const payload = readRecord(artifact.payload);
       const schema = readString(payload?.schema);
       if (/internet_search_observation/i.test([kind, schema].join(" "))) return true;
-      return /scholarly_research_observation|scholarly_full_text_observation/i.test([kind, schema].join(" "));
+      return /scholarly_research_observation|scholarly_full_text_observation|research_library_observation/i.test([kind, schema].join(" "));
     })
       ? ledger.some((artifact: ArtifactLike) => {
           const kind = readString(artifact.kind);
@@ -334,7 +337,7 @@ export const collectFinalAnswerDraftSupportRefs = (input: {
     const payload = readRecord(artifact.payload);
     const kind = readString(artifact.kind);
     const schema = readString(payload?.schema);
-    if (!/repo_code_evidence_observation|scholarly_research_observation|scholarly_full_text_observation|internet_search_observation|helix_theory_context_reflection_tool_receipt|theory_context_reflection|reflect_theory_context|helix_theory_frontier_vector_field_tool_receipt|theory_frontier_vector_field|frontierVectorFieldTrace|moral_graph_reflection|moral-graph\.reflect_context|helix\.moral_graph_reflection_observation\.v1|ideology_context_reflection|procedural_moral_classification|capability_registry|capability_catalog|workspace_os_status_observation|workspace_status|doc_|docs|calculator|workspace_action|agent_step_observation/i.test([kind, schema].join(" "))) return [];
+    if (!/repo_code_evidence_observation|scholarly_research_observation|scholarly_full_text_observation|research_library_observation|internet_search_observation|helix_theory_context_reflection_tool_receipt|theory_context_reflection|reflect_theory_context|helix_theory_frontier_vector_field_tool_receipt|theory_frontier_vector_field|frontierVectorFieldTrace|moral_graph_reflection|moral-graph\.reflect_context|helix\.moral_graph_reflection_observation\.v1|ideology_context_reflection|procedural_moral_classification|capability_registry|capability_catalog|workspace_os_status_observation|workspace_status|doc_|docs|calculator|workspace_action|agent_step_observation/i.test([kind, schema].join(" "))) return [];
     return [
       readString(artifact.artifact_id),
       ...readArray(payload?.evidence_refs).map(readString),
@@ -427,7 +430,7 @@ const isRefusalLike = (text: string): boolean =>
 
 const isScholarlyFullTextObservation = (artifact: ArtifactLike): boolean => {
   const payload = readRecord(artifact.payload);
-  return /scholarly_full_text_observation/i.test([
+  return /scholarly_full_text_observation|research_library_observation/i.test([
     readString(artifact.kind),
     readString(payload?.schema),
   ].join(" "));
@@ -443,6 +446,7 @@ const hasObservedScholarlyFullText = (artifacts?: ArtifactLike[] | null): boolea
       pagesParsed > 0 ||
       readArray(payload.selected_chunks).length > 0 ||
       readArray(payload.page_text_refs).length > 0 ||
+      readArray(payload.selected_pages).length > 0 ||
       Boolean(readString(payload.source_url) ?? readString(payload.source_pdf_ref))
     );
   });
@@ -510,6 +514,129 @@ const docsCalculatorConnectionCovered = (text: string): boolean =>
   textIncludesAny(text, [/\b(?:calculator|calculation|expression|computed|evaluated|result)\b/i]) &&
   textIncludesAny(text, [/\b(?:because|therefore|connection|connect(?:s|ed)?|relates?|grounds?|shows?|uses?|used|means|link(?:s|ed)?)\b/i]);
 
+const explicitlyRequestedPageNumbers = (prompt: string): number[] => {
+  const pages = new Set<number>();
+  for (const match of prompt.matchAll(/\bpages?\s+(\d+)\s*(?:-|to|through)\s*(\d+)\b/gi)) {
+    const start = Number(match[1]);
+    const end = Number(match[2]);
+    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < start || end - start > 100) continue;
+    for (let page = start; page <= end; page += 1) pages.add(page);
+  }
+  for (const match of prompt.matchAll(/\bpages?\s+(\d+(?:\s*(?:,|and|&)\s*\d+)+)/gi)) {
+    for (const page of match[1].match(/\d+/g) ?? []) pages.add(Number(page));
+  }
+  for (const match of prompt.matchAll(/\bpage\s+(\d+)\b/gi)) pages.add(Number(match[1]));
+  return [...pages].filter((page) => Number.isInteger(page) && page > 0).sort((a, b) => a - b);
+};
+
+const everyRequestedPageExplicitlyReportsZeroOccurrences = (prompt: string, text: string): boolean => {
+  const requestedPages = explicitlyRequestedPageNumbers(prompt);
+  if (requestedPages.length === 0) return false;
+  const zeroPages = new Set(
+    Array.from(text.matchAll(/\bpage\s+(\d+)\s*:\s*(?:\*\*)?0(?:\*\*)?\s+(?:exact\s+)?(?:case[-\s]?sensitive\s+)?occurrences?\b/gi))
+      .map((match) => Number(match[1])),
+  );
+  return requestedPages.every((page) => zeroPages.has(page));
+};
+
+const pageBoundarySentenceContractSatisfied = (
+  prompt: string,
+  text: string,
+  artifactLedger?: ArtifactLike[] | null,
+): boolean => {
+  if (
+    !/\bfirst\s+and\s+last\s+nonblank\s+sentences?\b/i.test(prompt) ||
+    !/\bexactly\s+as\s+extracted\b/i.test(prompt)
+  ) return true;
+  const requestedPages = explicitlyRequestedPageNumbers(prompt);
+  if (requestedPages.length === 0) return false;
+  const boundaryPages = (artifactLedger ?? []).flatMap((artifact) => {
+    const payload = readRecord(artifact.payload) ?? readRecord(artifact);
+    const kind = [readString(artifact.kind), readString(payload?.schema)].filter(Boolean).join(" ");
+    if (!/research_library_observation|helix\.research_library_observation\.v1/i.test(kind)) return [];
+    return readArray(payload?.selected_pages).map(readRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  });
+  return requestedPages.every((page) => {
+    const boundary = boundaryPages.find((entry) => Number(entry.page) === page);
+    const first = readString(boundary?.first_nonblank_sentence);
+    const last = readString(boundary?.last_nonblank_sentence);
+    return Boolean(first && last && text.includes(first) && text.includes(last));
+  });
+};
+
+const isConditionalVisualEvidencePrompt = (prompt: string): boolean =>
+    /\buse\s+Image\s+Lens\s+only\s+if\b[\s\S]{0,120}\b(?:necessary|required)\b/i.test(prompt) &&
+    /\bif\b[\s\S]{0,100}\b(?:page[-\s]?image|visual)\s+evidence\b[\s\S]{0,100}\b(?:cannot|can't|unavailable|missing)\b[\s\S]{0,140}\b(?:report|state|name)\b[\s\S]{0,60}\b(?:exact\s+)?missing\s+requirement\b/i.test(prompt);
+
+const conditionalVisualEvidenceContractSatisfied = (
+  prompt: string,
+  text: string,
+  artifactLedger?: ArtifactLike[] | null,
+): boolean => {
+  if (!isConditionalVisualEvidencePrompt(prompt)) return true;
+  if (!/(?:^|\n)#{0,3}\s*Text\s+evidence\b/i.test(text)) return false;
+  if (!/(?:^|\n)#{0,3}\s*Visual\s+evidence\b/i.test(text)) return false;
+
+  const hasVisualObservation = (artifactLedger ?? []).some((artifact) => {
+    const payload = readRecord(artifact.payload) ?? readRecord(artifact);
+    const identity = [readString(artifact.kind), readString(payload?.schema)].filter(Boolean).join(" ");
+    return /(?:image_lens|visual_analysis|scientific_image_(?:region_)?observation|pdf_page_render_observation)/i.test(identity);
+  });
+  if (hasVisualObservation) return true;
+
+  const namesMissingVisualRequirement =
+    /\b(?:no|missing|without|unavailable|cannot|can't|could\s+not|not\s+(?:available|materialized|performed|supplied))\b[\s\S]{0,180}\b(?:page[-\s]?image|rendered\s+page|Image\s+Lens\s+source|source\s+ID|bbox|bounding\s+box|visual\s+(?:evidence|inspection|finding))\b/i.test(text);
+  const unsupportedPositiveVisualClaim = Array.from(text.matchAll(
+    /\b(?:visual|Image\s+Lens|page[-\s]?image|render(?:ed)?\s+page)\b[\s\S]{0,80}?\b(?:confirm(?:s|ed)?|verif(?:y|ies|ied)|shows?|demonstrates?|proves?|observed)\b/gi,
+  )).some((match) =>
+    !/\b(?:no|not|cannot|can't|could\s+not|without|unavailable|missing)\b/i.test(match[0]),
+  );
+  return namesMissingVisualRequirement && !unsupportedPositiveVisualClaim;
+};
+
+const pageEvidenceLinkContractSatisfied = (prompt: string, text: string): boolean => {
+  const pageEvidenceRequested =
+    /\bpage[-\s]?grounded\s+(?:evidence|references?|locations?)\b/i.test(prompt) ||
+    /\bevidence\s+(?:links?|locations?|references?)\b/i.test(prompt) && /\bpages?\s+\d+/i.test(prompt);
+  const perBulletRequirement = prompt.match(
+    /\bevery\s+bullet[\s\S]{0,100}\bexactly\s+(one|two|three|\d+)\s+(?:page[-\s]?grounded\s+)?evidence\s+(?:references?|links?)\b/i,
+  );
+  if (!pageEvidenceRequested && !perBulletRequirement) return true;
+
+  const links = Array.from(text.matchAll(/\[([^\]]+)\]\((artifact:\/\/[^)\s]+)\)/gi)).map((match) => {
+    const labelPage = match[1].match(/\bpage\s*(\d+)\b/i)?.[1];
+    const targetPage = match[2].match(/#page=(\d+)(?:&|$)/i)?.[1];
+    return {
+      labelPage: labelPage ? Number(labelPage) : null,
+      targetPage: targetPage ? Number(targetPage) : null,
+      url: match[2],
+    };
+  });
+  if (/(?:â€¦|…|\.\.\.)[^\s`)]*#page=\d+(?:&|$)/i.test(text)) return false;
+  if (links.some((link) => link.targetPage == null || !/#page=\d+&text(?:\b|[&#])/i.test(link.url))) return false;
+  if (links.some((link) => link.labelPage != null && link.labelPage !== link.targetPage)) return false;
+
+  const reportsPositivePageEvidence = /\b[1-9]\d*\s+(?:exact\s+)?(?:case[-\s]?sensitive\s+)?occurrences?\b/i.test(text);
+  const allRequestedPagesReportZero = everyRequestedPageExplicitlyReportsZeroOccurrences(prompt, text);
+  if (
+    (pageEvidenceRequested || reportsPositivePageEvidence) &&
+    links.length === 0 &&
+    !(allRequestedPagesReportZero && !reportsPositivePageEvidence && !perBulletRequirement)
+  ) return false;
+  if (!perBulletRequirement) return true;
+
+  const countWords: Record<string, number> = { one: 1, two: 2, three: 3 };
+  const requiredCount = countWords[perBulletRequirement[1].toLowerCase()] ?? Number(perBulletRequirement[1]);
+  const requiredPages = Array.from(prompt.matchAll(/\bone\s+to\s+page\s+(\d+)\b/gi)).map((match) => Number(match[1]));
+  const bullets = text.split(/\n\s*\n/).filter((block) => /^\s*[-*]\s+/m.test(block));
+  if (bullets.length === 0) return false;
+  return bullets.every((bullet) => {
+    const bulletTargets = Array.from(bullet.matchAll(/\[[^\]]+\]\(artifact:\/\/[^)\s]*#page=(\d+)(?:&|$)[^)]*\)/gi))
+      .map((match) => Number(match[1]));
+    return bulletTargets.length === requiredCount && requiredPages.every((page) => bulletTargets.includes(page));
+  });
+};
+
 const sourceBackedModelSynthesisRouteFamilies = new Set<FinalAnswerDraftRouteFamily>([
   "capability_catalog",
   "context_reflection",
@@ -542,13 +669,31 @@ export function evaluateFinalAnswerDraftQualityGate(input: {
     artifactLedger: input.artifactLedger,
   });
   const violations: FinalAnswerDraftQualityViolation[] = [];
+  const prompt = input.promptText ?? readString(input.payload?.active_prompt) ?? "";
+  const conditionalVisualEvidenceSatisfied = conditionalVisualEvidenceContractSatisfied(
+    prompt,
+    text,
+    input.artifactLedger,
+  );
   if (!text) violations.push("empty_draft");
   if (isFallbackLike(text)) violations.push("fallback_like_answer");
   if (isReceiptLike(text)) violations.push("receipt_like_answer");
-  if (isRefusalLike(text) && !readString(input.payload?.terminal_error_code)) {
+  if (
+    isRefusalLike(text) &&
+    !readString(input.payload?.terminal_error_code) &&
+    !(isConditionalVisualEvidencePrompt(prompt) && conditionalVisualEvidenceSatisfied)
+  ) {
     violations.push("refusal_without_error");
   }
-  const prompt = input.promptText ?? readString(input.payload?.active_prompt) ?? "";
+  if (!pageEvidenceLinkContractSatisfied(prompt, text)) {
+    violations.push("invalid_page_evidence_links");
+  }
+  if (!pageBoundarySentenceContractSatisfied(prompt, text, input.artifactLedger)) {
+    violations.push("missing_requested_page_boundaries");
+  }
+  if (!conditionalVisualEvidenceSatisfied) {
+    violations.push("invalid_conditional_visual_evidence_answer");
+  }
   if (routeFamily === "model_only" && isCompoundComparisonPrompt(prompt) && !compoundComparisonCovered(text)) {
     violations.push("missing_required_prompt_parts");
   }

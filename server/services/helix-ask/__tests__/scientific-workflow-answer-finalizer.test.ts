@@ -113,4 +113,31 @@ describe("scientific workflow answer finalizer", () => {
     expect(answer).toContain("does not prove");
     expect(answer).toContain("promoted exact rows: 1");
   });
+
+  it("preserves promoted complete equation blocks as bounded exact evidence", () => {
+    const answer = finalizeScientificWorkflowAnswer({
+      promptText: "How is this complete equation block relevant to the current theory graph?",
+      rawText: "Evidence depth: `exact_block_promoted`.",
+      sidecar: buildSidecar({
+        evidence_depth: "exact_block_promoted",
+        exact_equation_summary: {
+          admissible_row_count: 0,
+          promoted_row_count: 0,
+          partial_row_count: 0,
+          rejected_row_count: 0,
+          admissible_block_count: 1,
+          promoted_block_count: 1,
+          partial_block_count: 0,
+          rejected_block_count: 0,
+          promotion_blockers: [],
+        },
+      }),
+    });
+
+    expect(answer).toContain("bounded conceptual reflection");
+    expect(answer).toContain("Evidence state: exact_block_promoted");
+    expect(answer).toContain("promoted exact rows: 0");
+    expect(answer).toContain("promoted exact blocks: 1");
+    expect(answer).not.toContain("not a promoted full equation row");
+  });
 });

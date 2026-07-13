@@ -721,6 +721,49 @@ describe("Helix terminal authority single writer", () => {
     const blockedCommittedRoute = committedRouteBlockedPayload.committed_ask_route as Record<string, unknown>;
     const blockedCanonicalGoal = blockedCommittedRoute.canonical_goal as Record<string, unknown>;
     blockedCanonicalGoal.forbidden_terminal_artifact_kinds = ["model_synthesized_answer"];
+    const conditionalVisualPayload = structuredClone(payload);
+    const conditionalVisualPrompt = [
+      "Using that same saved paper, inspect only page 8.",
+      "First use the saved machine-readable text to locate the equation labeled (47).",
+      "Then use Image Lens only if visual inspection is necessary to verify the equation's displayed layout.",
+      "Return separate Text evidence and Visual evidence sections with page-grounded references.",
+      "If page-image evidence cannot be materialized, report the exact missing requirement instead of inventing visual findings.",
+    ].join(" ");
+    const conditionalVisualAnswer = [
+      "### Text evidence",
+      "Saved machine-readable page-8 text locates equation **(47)** and its constraints. [Saved paper, page 8 text](artifact://paper.pdf#page=8&text)",
+      "### Visual evidence",
+      "No Image Lens inspection was run: the saved text was sufficient, and no page-image artifact was materialized.",
+      "Exact missing requirement: a **rendered page-8 image reference or an Image Lens source ID with pixel bounds**. Without that, I cannot verify visual layout details such as alignment, line breaks, or display positioning.",
+    ].join("\n\n");
+    conditionalVisualPayload.active_prompt = conditionalVisualPrompt;
+    const conditionalCommittedRoute = conditionalVisualPayload.committed_ask_route as Record<string, unknown>;
+    const conditionalCanonicalGoal = conditionalCommittedRoute.canonical_goal as Record<string, unknown>;
+    conditionalCanonicalGoal.goal_kind = "scholarly_research";
+    conditionalCanonicalGoal.required_terminal_kind = "scholarly_research_answer";
+    conditionalCanonicalGoal.allowed_terminal_artifact_kinds = ["scholarly_research_answer", "typed_failure"];
+    const conditionalRoute = conditionalCommittedRoute.route as Record<string, unknown>;
+    conditionalRoute.source_target = "research_library";
+    conditionalRoute.target_kind = "research_library";
+    const conditionalTerminalProduct = conditionalCommittedRoute.terminal_product as Record<string, unknown>;
+    conditionalTerminalProduct.required_terminal_product = "scholarly_research_answer";
+    (conditionalVisualPayload.canonical_goal_frame as Record<string, unknown>).required_terminal_kind =
+      "scholarly_research_answer";
+    const conditionalRouteAuthority = conditionalVisualPayload.route_evidence_authority as Record<string, unknown>;
+    conditionalRouteAuthority.required_terminal_kind = "scholarly_research_answer";
+    conditionalRouteAuthority.allowed_terminal_artifact_kinds = ["scholarly_research_answer", "typed_failure"];
+    (conditionalVisualPayload.provider_terminal_candidate as Record<string, unknown>).candidate_text =
+      conditionalVisualAnswer;
+    (conditionalVisualPayload.terminal_presentation as Record<string, unknown>).concise_text =
+      conditionalVisualAnswer;
+
+    const qualityBlockedPayload = structuredClone(payload);
+    qualityBlockedPayload.active_prompt =
+      "Return the page count with page-grounded evidence locations.";
+    (qualityBlockedPayload.provider_terminal_candidate as Record<string, unknown>).candidate_text =
+      "- Page 8: 7 occurrences — `…pdf#page=8&text`";
+    (qualityBlockedPayload.terminal_presentation as Record<string, unknown>).concise_text =
+      "- Page 8: 7 occurrences — `…pdf#page=8&text`";
 
     const result = applyHelixTerminalAuthoritySingleWriter({
       turnId,
@@ -741,6 +784,11 @@ describe("Helix terminal authority single writer", () => {
       materialized_terminal_artifact_kind: "model_synthesized_answer",
       selected_observation_refs: observationRefs,
       status: "materialized",
+    });
+    expect(payload.provider_route_product_quality_gate).toMatchObject({
+      schema: "helix.final_answer_draft_quality_gate.v1",
+      ok: true,
+      violations: [],
     });
     expect(payload.terminal_answer_authority).toMatchObject({
       terminal_kind: "answer",
@@ -813,6 +861,37 @@ describe("Helix terminal authority single writer", () => {
     expect(blockedResult.selected_terminal_artifact_kind).toBe("typed_failure");
     expect(committedRouteBlockedPayload.provider_route_product_materialization).toBeUndefined();
     expect(committedRouteBlockedPayload.terminal_error_code).not.toBeUndefined();
+
+    const qualityBlockedResult = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload: qualityBlockedPayload,
+      artifactLedger: artifacts,
+    });
+    expect(qualityBlockedResult.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(qualityBlockedPayload.provider_route_product_quality_gate).toMatchObject({
+      ok: false,
+      violations: expect.arrayContaining(["invalid_page_evidence_links"]),
+    });
+    expect(qualityBlockedResult.rejected_candidates).toEqual(expect.arrayContaining([
+      expect.objectContaining({ reason: "route_requires_synthesis" }),
+    ]));
+
+    const conditionalVisualResult = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload: conditionalVisualPayload,
+      artifactLedger: artifacts,
+    });
+    expect(conditionalVisualResult.selected_terminal_artifact_kind).toBe("scholarly_research_answer");
+    expect(conditionalVisualResult.visible_text).toBe(conditionalVisualAnswer);
+    expect(conditionalVisualPayload.provider_route_product_quality_gate).toMatchObject({
+      ok: true,
+      violations: [],
+    });
+    expect(conditionalVisualResult.rejected_candidates).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ reason: "route_requires_synthesis" }),
+    ]));
   });
 
   it("preserves a current-turn authorized provider bridge when a later typed failure overwrites top-level terminal fields", () => {

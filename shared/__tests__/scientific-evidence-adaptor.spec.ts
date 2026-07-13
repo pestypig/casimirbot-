@@ -140,6 +140,144 @@ describe("scientific evidence adaptor", () => {
     });
   });
 
+  it("promotes a complete labeled multi-line equation block without pretending it is one row", () => {
+    const exactBlock = buildScientificEvidencePacket({
+      cropRegionId: "equation_47_block",
+      sourceRefHash: "sha256:equation-47-block",
+      sourceKind: "pdf_page_render",
+      pageNumber: 8,
+      bboxPx: { x: 80, y: 120, width: 1060, height: 300 },
+      sourceDimensionsPx: { width: 1224, height: 1584 },
+      requestedEquationLabel: "47",
+      regionLabel: "equation_47_block",
+      equationCaptureMode: "exact_block",
+      textCandidate: [
+        "max_R Tr[-R_xs^H R_x^-1 R_xs + R_s]",
+        "s.t.",
+        "Tr[R + Rhat - 2(Rhat^1/2 R Rhat^1/2)^1/2] <= epsilon_0^2 (47)",
+        "R >= 0, R_x > 0.",
+      ].join("\n"),
+      latexCandidate: [
+        "\\begin{aligned}",
+        "\\max_R\\quad &\\operatorname{Tr}[-R_{xs}^{H}R_x^{-1}R_{xs}+R_s]\\\\",
+        "\\text{s.t.}\\quad &\\operatorname{Tr}[R+\\hat R-2(\\hat R^{1/2}R\\hat R^{1/2})^{1/2}]\\le\\epsilon_0^2 \\tag{47}\\\\",
+        "&R\\succeq0,\\quad R_x>0.",
+        "\\end{aligned}",
+      ].join("\n"),
+      visualLayoutCandidate: {
+        displayed_line_count: 6,
+        displayed_lines: [
+          "max_R",
+          "Tr[-R_xs^H R_x^-1 R_xs + R_s]",
+          "s.t.",
+          "Wasserstein trace constraint",
+          "R >= 0",
+          "R_x > 0 (47)",
+        ],
+        horizontal_alignment: "aligned_at_relation",
+        structure: "aligned_block",
+        equation_bbox_px: { x: 20, y: 18, width: 1010, height: 250 },
+        notes: [],
+      },
+      uncertainty: [],
+      extractionStatus: "extracted",
+    });
+    const sidecar = buildScientificImageEvidenceSidecar({
+      sidecarId: "sidecar:equation-47-block",
+      packets: [exactBlock],
+    });
+
+    expect(exactBlock).toMatchObject({
+      equation_capture_mode: "exact_block",
+      exact_equation_admissibility: "admissible_for_exact_equation",
+      exact_row_promotion: {
+        status: "not_applicable",
+        reasons: ["multi_line_exact_equation_block_uses_block_promotion"],
+      },
+      block_quality_diagnostics: expect.objectContaining({
+        displayed_line_count: 6,
+        displayed_lines_complete: true,
+        visual_structure: "aligned_block",
+        equation_bbox_present: true,
+        requested_label_present: true,
+        neighboring_equation_label_count: 0,
+        complete_block_candidate: true,
+      }),
+      exact_block_promotion: {
+        status: "promoted",
+        reasons: expect.arrayContaining([
+          "requested_label_matched",
+          "complete_multi_line_equation_block",
+          "displayed_lines_complete",
+        ]),
+      },
+    });
+    expect(sidecar).toMatchObject({
+      evidence_depth: "exact_block_promoted",
+      active_promoted_row: null,
+      active_promoted_block: expect.objectContaining({
+        crop_region_id: "equation_47_block",
+        evidence_depth: "exact_block_promoted",
+      }),
+      exact_equation_summary: expect.objectContaining({
+        promoted_row_count: 0,
+        promoted_block_count: 1,
+        admissible_block_count: 1,
+        partial_block_count: 0,
+        rejected_block_count: 0,
+      }),
+    });
+    expect(sidecar.promoted_equation_ref).toContain("sha256:equation-47-block#crop=80,120,1060,300");
+  });
+
+  it("does not promote an equation block when neighboring labels or layout fields make it ambiguous", () => {
+    const ambiguousBlock = buildScientificEvidencePacket({
+      cropRegionId: "equation_47_48_block",
+      sourceRefHash: "sha256:equation-47-48-block",
+      sourceKind: "pdf_page_render",
+      pageNumber: 8,
+      bboxPx: { x: 80, y: 120, width: 1060, height: 520 },
+      sourceDimensionsPx: { width: 1224, height: 1584 },
+      requestedEquationLabel: "47",
+      regionLabel: "equation_47_block",
+      equationCaptureMode: "exact_block",
+      textCandidate: "objective and constraints (47)\nfollowing reformulation (48)",
+      latexCandidate: "\\max_R f(R) \\tag{47}\n\\min_V g(V) \\tag{48}",
+      visualLayoutCandidate: {
+        displayed_line_count: 6,
+        displayed_lines: [],
+        horizontal_alignment: "left",
+        structure: "multi_line",
+        equation_bbox_px: null,
+        notes: [],
+      },
+      uncertainty: [],
+      extractionStatus: "extracted",
+    });
+
+    expect(ambiguousBlock).toMatchObject({
+      equation_capture_mode: "exact_block",
+      label_match_status: "ambiguous",
+      exact_equation_admissibility: "inadmissible_for_exact_equation",
+      exact_row_promotion: expect.objectContaining({ status: "not_applicable" }),
+      exact_block_promotion: expect.objectContaining({
+        status: "rejected",
+        reasons: expect.arrayContaining([
+          "label_match_status:ambiguous",
+          "displayed_lines_incomplete",
+          "equation_bbox_missing",
+          "neighboring_equation_label_observed",
+        ]),
+      }),
+      block_quality_diagnostics: expect.objectContaining({
+        displayed_lines_complete: false,
+        equation_bbox_present: false,
+        neighboring_equation_label_count: 1,
+        complete_block_candidate: false,
+      }),
+    });
+  });
+
   it("treats label-only equation crops as locators instead of selected equation evidence", () => {
     const labelOnly = buildScientificEvidencePacket({
       cropRegionId: "image_lens_region:label-only-7",

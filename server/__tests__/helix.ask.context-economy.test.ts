@@ -184,6 +184,44 @@ describe("Helix Ask context economy", () => {
     );
   });
 
+  it("preserves admitted saved-page sentence boundaries for exact synthesis", () => {
+    const context = buildHelixModelPromptContext({
+      turnId: "turn-research-boundaries",
+      userGoal: "Return the first and last nonblank sentences exactly as extracted from page 8.",
+      selectedArtifacts: [{
+        artifact_id: "obs:research-boundaries",
+        kind: "research_library_observation",
+        payload: {
+          schema: "helix.research_library_observation.v1",
+          artifact_id: "obs:research-boundaries",
+          turn_id: "turn-research-boundaries",
+          capability: "research-library.read_document",
+          evidence_state: "full_text_usable",
+          selected_pages: [{
+            page: 8,
+            text_excerpt: "8 1 ∼ 6. First actual sentence has enough words.",
+            first_nonblank_sentence: "First actual sentence has enough words.",
+            last_nonblank_sentence: "Last actual sentence also has enough words.",
+            source_text_ref: "artifact://paper.pdf#page=8&text",
+          }],
+          missing_requirements: [],
+        },
+      }],
+    });
+
+    expect(context.compact_observations[0]).toMatchObject({
+      status: "succeeded",
+      found: expect.arrayContaining([
+        "p. 8 exact first nonblank sentence: First actual sentence has enough words.",
+        "p. 8 exact last nonblank sentence: Last actual sentence also has enough words.",
+      ]),
+      support_refs: expect.arrayContaining([
+        "obs:research-boundaries",
+        "artifact://paper.pdf#page=8&text",
+      ]),
+    });
+  });
+
   it("marks empty docs locate artifacts as failed compact observations", () => {
     const context = buildHelixModelPromptContext({
       turnId: "turn-empty-doc-location",

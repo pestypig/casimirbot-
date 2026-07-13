@@ -6,6 +6,7 @@ import {
   HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
 } from "@shared/helix-scholarly-research-observation";
 import type { HelixToolCallAdmissionFamily } from "@shared/helix-tool-call-admission";
+import { HELIX_RESEARCH_LIBRARY_READ_CAPABILITY } from "@shared/helix-research-library";
 import {
   askCapabilityCatalogPromptMatchIndex,
   isAskCapabilityCatalogPrompt,
@@ -757,6 +758,32 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
     required_terminal_kind: "internet_search_answer",
     allowed_substitutions: [],
     forbidden_nearby_capabilities: ["model.direct_answer"],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: HELIX_RESEARCH_LIBRARY_READ_CAPABILITY,
+    aliases: [
+      "research_library.read_document",
+      "research library",
+      "saved full-text evidence",
+      "saved full text evidence",
+      "existing full-text evidence",
+      "existing full text evidence",
+      "saved research extraction",
+    ],
+    capability_family: "scholarly_research",
+    plan_family: "scholarly_research",
+    source_target: "research_library",
+    admission_families: ["scholarly_research"],
+    required_observation_kinds: ["research_library_observation"],
+    required_terminal_kind: "scholarly_research_answer",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: [
+      HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+      HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      "internet_search.web_research",
+      "model.direct_answer",
+    ],
   },
   {
     schema: "helix.explicit_capability_contract.v1",

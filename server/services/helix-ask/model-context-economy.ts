@@ -505,9 +505,31 @@ export const compactScholarlyFullTextArtifactForModel = (input: {
   const payload = readRecord(artifact?.payload) ?? artifact;
   if (!payload) return null;
   const cfg = config();
-  const chunks = readArray(payload.selected_chunks).map((entry: unknown) => readRecord(entry)).filter(Boolean) as Record<string, unknown>[];
-  const pageRefs = readArray(payload.page_text_refs).map((entry: unknown) => readRecord(entry)).filter(Boolean) as Record<string, unknown>[];
+  const savedPages = readArray(payload.selected_pages).map((entry: unknown) => readRecord(entry)).filter(Boolean) as Record<string, unknown>[];
+  const chunks = [
+    ...readArray(payload.selected_chunks).map((entry: unknown) => readRecord(entry)).filter(Boolean) as Record<string, unknown>[],
+    ...savedPages.map((page) => ({
+      page_start: page.page,
+      page_end: page.page,
+      text_excerpt: page.text_excerpt,
+      first_nonblank_sentence: page.first_nonblank_sentence,
+      last_nonblank_sentence: page.last_nonblank_sentence,
+      source_text_ref: page.source_text_ref,
+      citation_ref: page.source_text_ref,
+      section_hint: "saved Research Library page",
+    })),
+  ];
+  const pageRefs = [
+    ...readArray(payload.page_text_refs).map((entry: unknown) => readRecord(entry)).filter(Boolean) as Record<string, unknown>[],
+    ...savedPages.map((page) => ({ text_ref: page.source_text_ref, page: page.page })),
+  ];
   const visualCandidates = readArray(payload.visual_candidates).map((entry: unknown) => readRecord(entry)).filter(Boolean) as Record<string, unknown>[];
+  const searchTerm = readString(payload.search_term);
+  const matchCount = Number(payload.match_count);
+  const matchPages = readArray(payload.match_pages).filter((entry): entry is number => typeof entry === "number" && Number.isFinite(entry));
+  const completedSavedSearch = Boolean(
+    searchTerm && Number.isFinite(matchCount) && readString(payload.evidence_state) === "full_text_usable",
+  );
   const observationRef = readString(payload.artifact_id) ?? readString(artifact?.artifact_id) ?? `${input.turnId}:scholarly_full_text_observation`;
   const supportRefs = unique([
     readString(artifact?.artifact_id),
@@ -517,13 +539,32 @@ export const compactScholarlyFullTextArtifactForModel = (input: {
     ...chunks.flatMap((entry: Record<string, unknown>) => [readString(entry.source_text_ref), readString(entry.citation_ref)]),
   ], 128);
   const found = chunks.length
-    ? chunks.slice(0, cfg.observationMaxFindings).map((chunk: Record<string, unknown>) => {
+    ? [
+        ...(completedSavedSearch
+          ? [`Saved full-text scan for "${searchTerm}" found ${matchCount} match(es) on page(s): ${matchPages.length ? matchPages.join(", ") : "none"}.`]
+          : []),
+        ...chunks.flatMap((chunk: Record<string, unknown>) => {
+          const page = typeof chunk.page_start === "number" ? `p. ${chunk.page_start}` : "page unknown";
+          const first = readString(chunk.first_nonblank_sentence);
+          const last = readString(chunk.last_nonblank_sentence);
+          return [
+            first ? `${page} exact first nonblank sentence: ${first}` : null,
+            last ? `${page} exact last nonblank sentence: ${last}` : null,
+          ].filter((entry): entry is string => Boolean(entry));
+        }),
+        ...chunks.slice(0, cfg.observationMaxFindings).map((chunk: Record<string, unknown>) => {
         const page = typeof chunk.page_start === "number" ? `p. ${chunk.page_start}` : "page unknown";
         const section = readString(chunk.section_hint);
         const excerpt = readString(chunk.text_excerpt) ?? "";
         return compactText([page, section, excerpt].filter(Boolean).join(" - "), 520);
-      })
-    : [compactText(`No full-text chunks were selected for ${readString(payload.title) ?? readString(payload.query) ?? "the requested paper"}.`, 320)];
+      }),
+      ].slice(0, cfg.observationMaxFindings)
+    : [compactText(
+        completedSavedSearch
+          ? `Saved full-text scan for "${searchTerm}" found ${matchCount} matches; matching pages: ${matchPages.length ? matchPages.join(", ") : "none"}.`
+          : `No full-text chunks were selected for ${readString(payload.title) ?? readString(payload.query) ?? "the requested paper"}.`,
+        320,
+      )];
   const proves = chunks.length
     ? chunks.slice(0, cfg.observationMaxProves).map((chunk: Record<string, unknown>) => {
         const page = typeof chunk.page_start === "number" ? `page ${chunk.page_start}` : "selected page";
@@ -542,17 +583,21 @@ export const compactScholarlyFullTextArtifactForModel = (input: {
     observation_ref: observationRef,
     source: "scholarly_research",
     source_target: "scholarly_research",
-    capability_key: "scholarly-research.fetch_full_text",
-    status: chunks.length > 0 ? "succeeded" : "failed",
+    capability_key: readString(payload.capability) ?? "scholarly-research.fetch_full_text",
+    status: chunks.length > 0 || completedSavedSearch ? "succeeded" : "failed",
     user_requested: compactText(input.userRequested ?? readString(payload.query) ?? "", 320),
     found,
-    proves: proves.length ? proves : ["Full-text fetch completed, but no selected text chunks were available for synthesis."],
+    proves: proves.length
+      ? proves
+      : completedSavedSearch
+        ? [`The saved full-text scan completed with ${matchCount} match(es) across ${matchPages.length} page(s).`]
+        : ["Full-text fetch completed, but no selected text chunks were available for synthesis."],
     support_refs: supportRefs,
     missing_or_uncertain: [
       ...readStringArray(payload.missing_requirements),
       ...visualUncertainty,
     ].slice(0, cfg.observationMaxFindings),
-    suggested_next_steps: chunks.length ? ["answer", "use_another_tool", "repair"] : ["repair", "use_another_tool", "fail_closed"],
+    suggested_next_steps: chunks.length || completedSavedSearch ? ["answer", "use_another_tool", "repair"] : ["repair", "use_another_tool", "fail_closed"],
     raw_debug_ref: `${observationRef}:raw_full_text_payload`,
     exact_excerpt_refs: chunks.map((entry: Record<string, unknown>) => readString(entry.source_text_ref)).filter((entry): entry is string => Boolean(entry)).slice(0, 8),
     terminal_eligible: false,
@@ -745,7 +790,7 @@ export const buildHelixModelPromptContext = (input: {
           userRequested: input.userGoal,
         });
       }
-      if (/scholarly_full_text_observation/i.test(kind ?? "")) {
+      if (/scholarly_full_text_observation|research_library_observation/i.test(kind ?? "")) {
         return compactScholarlyFullTextArtifactForModel({
           turnId: input.turnId,
           artifact,

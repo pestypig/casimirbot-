@@ -202,6 +202,7 @@ const artifactKindMatchesCapability = (
   if (capability === "repo-code.search_concept") return /repo_code_evidence_observation|helix\.repo_code_evidence_observation\.v1|repo_search/i.test(joined);
   if (capability === "scholarly-research.lookup_papers") return /scholarly_research_observation|helix\.scholarly_research_observation\.v1|scholarly_research/i.test(joined);
   if (capability === "scholarly-research.fetch_full_text") return /scholarly_full_text_observation|helix\.scholarly_full_text_observation\.v1|scholarly_research/i.test(joined);
+  if (capability === "research-library.read_document") return /research_library_observation|helix\.research_library_observation\.v1|profile_research_library/i.test(joined);
   if (capability === "internet_search.web_research" || capability === "internet-search.search_web") {
     return /internet_search_observation|web_research_observation|helix\.internet_search_observation\.v1|internet_search|web_research/i.test(joined);
   }
@@ -366,6 +367,9 @@ const capabilityFamilyForArtifact = (artifact: Record<string, unknown> | null): 
   if (/scholarly_full_text_observation|helix\.scholarly_full_text_observation\.v1/i.test(joined)) {
     return "scholarly-research.fetch_full_text";
   }
+  if (/research_library_observation|helix\.research_library_observation\.v1|profile_research_library/i.test(joined)) {
+    return "research-library.read_document";
+  }
   if (/scholarly_research_observation|helix\.scholarly_research_observation\.v1|scholarly_research/i.test(joined)) {
     return "scholarly-research.lookup_papers";
   }
@@ -467,6 +471,7 @@ const selectedRepoEvidenceCapabilityHasCurrentTurnObservation = (
     capability !== "repo-code.search_concept" &&
     capability !== "scholarly-research.lookup_papers" &&
     capability !== "scholarly-research.fetch_full_text" &&
+    capability !== "research-library.read_document" &&
     capability !== "internet_search.web_research" &&
     capability !== "internet-search.search_web"
   ) return false;

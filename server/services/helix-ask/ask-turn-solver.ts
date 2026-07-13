@@ -601,13 +601,24 @@ const providerTerminalPathMaterialized = (input: {
   const selectedProviderRouteProductRef =
     readString(terminalWriter?.selected_terminal_artifact_ref) ||
     readString(terminalWriter?.selectedArtifactRef);
-  const terminalUsesConvertedProviderRouteProduct =
-    input.terminalArtifactKind === "model_synthesized_answer" &&
-    input.finalAnswerSource === "final_answer_draft" &&
+  const providerTerminalCandidateRef =
+    readString(providerRouteProductMaterialization?.provider_terminal_candidate_ref) ||
+    readString(providerBridge?.provider_terminal_candidate_ref) ||
+    readString(providerReasoningReentry?.provider_terminal_candidate_ref);
+  const materializedProviderRouteProductRef =
+    readString(providerRouteProductMaterialization?.materialized_terminal_artifact_ref);
+  const materializedProviderRouteProductKind =
+    readString(providerRouteProductMaterialization?.materialized_terminal_artifact_kind);
+  const materializedSupportRefs = readStringArray(providerRouteProductMaterialization?.selected_observation_refs);
+  const presentationSupportRefs = readStringArray(terminalPresentation?.selected_observation_refs);
+  const terminalUsesMaterializedProviderRouteProduct =
     readString(providerRouteProductMaterialization?.status) === "materialized" &&
-    readString(providerRouteProductMaterialization?.materialized_terminal_artifact_kind) === "model_synthesized_answer" &&
-    readString(providerRouteProductMaterialization?.materialized_terminal_artifact_ref) === selectedProviderRouteProductRef &&
-    Boolean(selectedProviderRouteProductRef?.startsWith(`${readString(input.payload.turn_id) ?? ""}:agent_provider_terminal_candidate:`)) &&
+    materializedProviderRouteProductKind === input.terminalArtifactKind &&
+    materializedProviderRouteProductRef === selectedProviderRouteProductRef &&
+    Boolean(providerTerminalCandidateRef) &&
+    Boolean(materializedProviderRouteProductRef?.startsWith(`${providerTerminalCandidateRef}:route_product:`)) &&
+    materializedSupportRefs.length > 0 &&
+    presentationSupportRefs.some((ref) => materializedSupportRefs.includes(ref)) &&
     providerBridge?.terminal_authority_granted === true &&
     providerBridge?.final_visible_answer_authorized === true &&
     readString(providerReasoningReentry?.status) === "completed" &&
@@ -615,13 +626,16 @@ const providerTerminalPathMaterialized = (input: {
     readBoolean(providerReasoningReentry?.solver_completed) === true &&
     readBoolean(providerReasoningReentry?.goal_satisfaction_compatible) === true &&
     readBoolean(terminalAuthority?.server_authoritative) === true &&
-    readString(terminalAuthority?.terminal_artifact_kind) === "model_synthesized_answer" &&
-    readString(terminalPresentation?.terminal_artifact_kind) === "model_synthesized_answer";
-  if (!terminalUsesProviderCandidate && !terminalUsesConvertedProviderRouteProduct) return false;
+    readString(terminalAuthority?.terminal_artifact_kind) === input.terminalArtifactKind &&
+    readString(terminalAuthority?.final_answer_source) === input.finalAnswerSource &&
+    readString(terminalPresentation?.terminal_artifact_kind) === input.terminalArtifactKind &&
+    readString(terminalPresentation?.final_answer_source) === input.finalAnswerSource;
+  if (!terminalUsesProviderCandidate && !terminalUsesMaterializedProviderRouteProduct) return false;
+  if (presentationSupportRefs.length === 0) return false;
+  if (terminalUsesMaterializedProviderRouteProduct) {
+    return terminalMatchesCanonicalGoalContract(input.payload, input.terminalArtifactKind);
+  }
   if (!terminalMatchesCanonicalGoalContract(input.payload, "model_synthesized_answer")) return false;
-  const presentation = readRecord(input.payload.terminal_presentation);
-  if (readStringArray(presentation?.selected_observation_refs).length === 0) return false;
-  if (terminalUsesConvertedProviderRouteProduct) return true;
   return (
     readBoolean(terminalAuthority?.server_authoritative) &&
     (

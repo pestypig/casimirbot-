@@ -415,6 +415,44 @@ describe("agent continuation state", () => {
     expect(state.allowed_decisions).toEqual(expect.arrayContaining(["retry", "answer"]));
   });
 
+  it("reopens a previously satisfied goal when terminal authority rejects the answer", () => {
+    const payload: Record<string, unknown> = {
+      debug: {},
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        missing_requirement_ids: [],
+      },
+      final_status: "completed",
+      agent_loop_budget: budget(),
+      current_turn_artifact_ledger: [],
+    };
+    const observation = buildHelixTerminalRejectionObservation({
+      turnId: "ask:continuation",
+      candidateKind: "scholarly_research_answer",
+      candidateRef: "ask:continuation:scholarly_research_answer:1",
+      reason: "route_requires_synthesis",
+    });
+    appendHelixTerminalRejectionObservationToPayload({ payload, observation });
+    const state = buildHelixAgentContinuationState({
+      payload,
+      turnId: "ask:continuation",
+      trigger: "terminal_rejection",
+      lastAttempt: observation,
+    });
+
+    expect(state.goal).toEqual({
+      status: "in_progress",
+      satisfied: false,
+      terminal_product_allowed: false,
+    });
+    expect(state.last_attempt).toMatchObject({
+      failure_class: "terminal_authority",
+      failure_code: "route_requires_synthesis",
+      retryability: "retryable",
+    });
+    expect(state.allowed_decisions).toEqual(expect.arrayContaining(["retry", "answer"]));
+  });
+
   it("treats the hard boundary as a resource stop while retaining answer authority", () => {
     const payload: Record<string, unknown> = {
       goal_satisfaction_evaluation: {

@@ -144,6 +144,7 @@ import {
   extractHelixAskLegacyClickedTurnDebugScope,
   isHelixAskLegacyBackendDebugExportEligibleTurnId,
   isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted,
+  normalizeHelixAskLegacyBackendTurnId,
   resolveHelixAskLegacyClickedDebugReply,
   resolveHelixAskLegacyDebugExportBackendTarget,
   resolveHelixAskLegacyDebugExportClientTurnId,
@@ -3187,6 +3188,24 @@ describe("Helix Ask Console recrown boundary", () => {
     } as unknown as HTMLElement;
     expect(debugPayloadMatchesHelixAskLegacyRenderedTurnPayload(scopedLatestDebugPayload, latestDebugButton)).toBe(true);
     expect(debugPayloadMatchesHelixAskLegacyRenderedTurnPayload(staleDebugPayload, latestDebugButton)).toBe(false);
+    const fetchedBackendMarkdownPayload = JSON.stringify({
+      active_turn_id: "ask:latest-visible",
+      client_active_turn_id: "reply-visible",
+      selectedDebugQuestion: latestQuestion,
+      selected_final_answer: `**${latestFinal}**`,
+      debug_export_source: "backend_endpoint",
+      backend_debug_response_status: "fetched",
+    });
+    const staleFetchedBackendPayload = JSON.stringify({
+      active_turn_id: "ask:eaf320-stale",
+      client_active_turn_id: "reply-stale",
+      selectedDebugQuestion: latestQuestion,
+      selected_final_answer: `**${latestFinal}**`,
+      debug_export_source: "backend_endpoint",
+      backend_debug_response_status: "fetched",
+    });
+    expect(debugPayloadMatchesHelixAskLegacyRenderedTurnPayload(fetchedBackendMarkdownPayload, latestDebugButton)).toBe(true);
+    expect(debugPayloadMatchesHelixAskLegacyRenderedTurnPayload(staleFetchedBackendPayload, latestDebugButton)).toBe(false);
     expect(isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted({
       rendered: {
         activeTurnId: "ask:latest-visible",
@@ -3537,7 +3556,26 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(isHelixAskLegacyBackendDebugExportEligibleTurnId("ask:latest")).toBe(true);
     expect(isHelixAskLegacyBackendDebugExportEligibleTurnId("chat:ask:latest")).toBe(true);
     expect(isHelixAskLegacyBackendDebugExportEligibleTurnId("turn-old")).toBe(false);
+    expect(normalizeHelixAskLegacyBackendTurnId(
+      "helix-chat-turn:53379b0b-93de-41b5-b6f7-46de25dd90ad:ask:09872050-9595-49d5-ac1d-54d79dbea20b",
+    )).toBe("ask:09872050-9595-49d5-ac1d-54d79dbea20b");
 
+    expect(resolveHelixAskLegacyDebugExportBackendTarget({
+      active_turn_id: "helix-chat-turn:client:ask:nested-backend-turn",
+      debug_export_rebuild_reason: "rendered_button_scope",
+      debug_export_ref: {
+        endpoint: "/api/agi/ask/turn/ask%3Anested-backend-turn/debug-export",
+        turn_id: "ask:nested-backend-turn",
+      },
+    })).toEqual({
+      activeTurnId: "ask:nested-backend-turn",
+      backendRef: {
+        endpoint: "/api/agi/ask/turn/ask%3Anested-backend-turn/debug-export",
+        turn_id: "ask:nested-backend-turn",
+      },
+      endpoint: "/api/agi/ask/turn/ask%3Anested-backend-turn/debug-export",
+      status: "ready",
+    });
     expect(resolveHelixAskLegacyDebugExportBackendTarget({
       active_turn_id: "ask:latest",
       debug_export_rebuild_reason: "rendered_button_scope",
@@ -3646,6 +3684,20 @@ describe("Helix Ask Console recrown boundary", () => {
         selected_final_answer: "Recovered Image Lens observation report.",
       },
     )).toBe(true);
+    expect(debugPayloadMatchesHelixAskLegacyRenderedReply(
+      {
+        id: "helix-chat-turn:client:ask:nested-backend-turn",
+        question: "Inspect the saved paper.",
+        content: "Grounded answer.",
+      },
+      {
+        active_turn_id: "ask:nested-backend-turn",
+        debug_export_source: "backend_endpoint",
+        backend_debug_response_status: "fetched",
+        active_prompt: "Inspect the saved paper.",
+        selected_final_answer: "Grounded answer.",
+      },
+    )).toBe(true);
     expect(resolveHelixAskLegacyDebugExportClientTurnId({
       client_active_turn_id: "client-active",
       clientSelectedDebugTurnId: "client-selected",
@@ -3658,6 +3710,9 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(resolveHelixAskLegacyDebugExportClientTurnId({
       reply: { id: "reply-id" },
     })).toBe("reply-id");
+    expect(resolveHelixAskLegacyDebugExportClientTurnId({
+      active_turn_id: "helix-chat-turn:client:ask:nested-backend-turn",
+    })).toBe("helix-chat-turn:client:ask:nested-backend-turn");
     expect(resolveHelixAskLegacyDebugExportClientTurnId({})).toBeNull();
 
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
@@ -3683,6 +3738,69 @@ describe("Helix Ask Console recrown boundary", () => {
       "runAskTurnStream",
     ]) {
       expect(controlsSource).not.toContain(forbidden);
+    }
+  });
+
+  it("keeps a fetched backend debug export when the rendered client id nests the same Ask turn", async () => {
+    const originalFetch = globalThis.fetch;
+    const clientTurnId = "helix-chat-turn:53379b0b-93de-41b5-b6f7-46de25dd90ad:ask:09872050-9595-49d5-ac1d-54d79dbea20b";
+    const backendTurnId = "ask:09872050-9595-49d5-ac1d-54d79dbea20b";
+    const prompt = "Inspect equation (47) in the saved paper.";
+    const endpoint = `/api/agi/ask/turn/${encodeURIComponent(backendTurnId)}/debug-export`;
+    const fetchCalls: string[] = [];
+    Object.defineProperty(globalThis, "fetch", {
+      configurable: true,
+      value: vi.fn(async (input: unknown) => {
+        fetchCalls.push(String(input));
+        return {
+          ok: true,
+          status: 200,
+          json: vi.fn(async () => ({
+            payload: {
+              schema: "helix.ask.debug_export.v1",
+              active_turn_id: backendTurnId,
+              active_prompt: prompt,
+              selected_final_answer: "Page-grounded answer.",
+              ask_turn_solver_trace: { completed: true },
+            },
+          })),
+        } as unknown as Response;
+      }),
+    });
+
+    try {
+      const resolved = await resolveHelixAskAuthoritativeDebugExportPayload(JSON.stringify({
+        schema: "helix.ask.debug_export.v1",
+        active_turn_id: clientTurnId,
+        active_prompt: prompt,
+        debug_export_source: "rendered_reply_dom",
+        debug_export_rebuild_reason: "rendered_button_scope",
+        backend_debug_response_status: "ref_advertised",
+        backend_debug_response_ref: {
+          endpoint,
+          turn_id: backendTurnId,
+        },
+      }));
+      const parsed = JSON.parse(resolved) as Record<string, unknown>;
+
+      expect(fetchCalls).toEqual([endpoint]);
+      expect(parsed).toMatchObject({
+        active_turn_id: backendTurnId,
+        client_active_turn_id: clientTurnId,
+        ui_client_active_turn_id: clientTurnId,
+        debug_export_source: "backend_endpoint",
+        backend_debug_response_status: "fetched",
+        ask_turn_solver_trace: { completed: true },
+      });
+      expect(debugPayloadMatchesHelixAskLegacyRenderedReply(
+        { id: clientTurnId, question: prompt, content: "Page-grounded answer." },
+        parsed,
+      )).toBe(true);
+    } finally {
+      Object.defineProperty(globalThis, "fetch", {
+        configurable: true,
+        value: originalFetch,
+      });
     }
   });
 

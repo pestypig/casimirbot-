@@ -19,6 +19,7 @@ import {
   latestDirectAnswerSequence,
   materializeFinalAnswerDraftTerminal,
 } from "./final-answer-draft-terminal-materializer";
+import { evaluateFinalAnswerDraftQualityGate } from "./final-answer-draft-quality-gate";
 import { attachHelixCapabilityItineraryExecutionState } from "./capability-itinerary-execution";
 import {
   buildHelixLocalizedTypedFailureTextForPayload,
@@ -781,14 +782,24 @@ export function syncHelixTypedFailureAuthorityPublicMirrors(
     : null;
   const typedFailure = readRecord(payload.typed_failure);
   const localizedFailureText = buildHelixLocalizedTypedFailureTextForPayload(payload);
-  const candidateFailureText =
-    readString(typedFailure?.message) ??
-    readString(typedFailure?.text) ??
-    readString(typedFailure?.answer_text) ??
-    readString(payload.terminal_failure_text) ??
-    readString(authority?.terminal_text_preview) ??
-    readString(payload.selected_final_answer) ??
-    localizedFailureText;
+  const staleConsistencyFailure =
+    compoundCoverageFailedClosed &&
+    readString(typedFailure?.error_code) === "terminal_consistency_violation";
+  const candidateFailureText = staleConsistencyFailure
+    ? readString(authority?.terminal_text_preview) ??
+      readString(typedFailure?.message) ??
+      readString(typedFailure?.text) ??
+      readString(typedFailure?.answer_text) ??
+      readString(payload.terminal_failure_text) ??
+      readString(payload.selected_final_answer) ??
+      localizedFailureText
+    : readString(typedFailure?.message) ??
+      readString(typedFailure?.text) ??
+      readString(typedFailure?.answer_text) ??
+      readString(payload.terminal_failure_text) ??
+      readString(authority?.terminal_text_preview) ??
+      readString(payload.selected_final_answer) ??
+      localizedFailureText;
   const liveSourceFailureRepair = liveSourceModelSynthesisMissingFailure(payload, candidateFailureText);
   const compoundSubgoalRailFailureText = compoundSubgoalRailFailure
     ? compoundSubgoalRailFailureTerminalText(compoundSubgoalRailFailure)
@@ -3010,7 +3021,7 @@ const stagePlayReceiptTextForDraft = (artifact: ArtifactLike): string => {
 };
 
 const isScholarlyFullTextObservation = (artifact: ArtifactLike): boolean =>
-  /scholarly_full_text_observation/i.test([artifactKind(artifact), artifactSchema(artifact)].join(" "));
+  /scholarly_full_text_observation|research_library_observation/i.test([artifactKind(artifact), artifactSchema(artifact)].join(" "));
 
 const hasObservedScholarlyFullText = (artifacts: ArtifactLike[]): boolean =>
   artifacts.some((artifact) => {
@@ -3022,6 +3033,7 @@ const hasObservedScholarlyFullText = (artifacts: ArtifactLike[]): boolean =>
       pagesParsed > 0 ||
       readArray(payload.selected_chunks).length > 0 ||
       readArray(payload.page_text_refs).length > 0 ||
+      readArray(payload.selected_pages).length > 0 ||
       Boolean(readString(payload.source_url) ?? readString(payload.source_pdf_ref))
     );
   });
@@ -5025,10 +5037,32 @@ export function applyHelixTerminalAuthoritySingleWriter(
     Boolean(selectedProviderRouteProduct) &&
     providerRouteProductCompoundSupportCoverage.applies &&
     !providerRouteProductCompoundSupportCoverage.ok;
+  const providerRouteProductQualityGate = selectedProviderRouteProduct
+    ? evaluateFinalAnswerDraftQualityGate({
+        turnId: input.turnId,
+        finalAnswerDraftRef: selectedProviderRouteProduct.ref ?? `${input.turnId}:provider_route_product`,
+        draftText: selectedProviderRouteProduct.text,
+        draftPayload: readRecord(selectedProviderRouteProduct.artifact?.payload),
+        promptText: promptTextForTerminalAuthority(input.payload),
+        routeProductContract: readRecord(input.payload.route_product_contract),
+        payload: input.payload,
+        artifactLedger: artifacts,
+      })
+    : null;
   const providerRouteProductCanSurface =
     Boolean(selectedProviderRouteProduct) &&
     itineraryObservationCriteriaSatisfied &&
-    !providerRouteProductCompoundSupportMissing;
+    !providerRouteProductCompoundSupportMissing &&
+    providerRouteProductQualityGate?.ok !== false;
+  if (selectedProviderRouteProduct && providerRouteProductQualityGate?.ok === false) {
+    rejectedCandidates.push({
+      ref: selectedProviderRouteProduct.ref ?? undefined,
+      kind: selectedProviderRouteProduct.kind,
+      source: selectedProviderRouteProduct.kind,
+      reason: "route_requires_synthesis",
+    });
+  }
+  input.payload.provider_route_product_quality_gate = providerRouteProductQualityGate;
   input.payload.provider_route_product_materialization_diagnostic = {
     schema: "helix.provider_route_product_materialization_diagnostic.v1",
     turn_id: input.turnId,
@@ -5037,6 +5071,8 @@ export function applyHelixTerminalAuthoritySingleWriter(
     provider_route_product_eligibility: providerRouteProductEligibility,
     itinerary_observation_criteria_satisfied: itineraryObservationCriteriaSatisfied,
     compound_support_missing: providerRouteProductCompoundSupportMissing,
+    quality_gate_ok: providerRouteProductQualityGate?.ok ?? null,
+    quality_gate_violations: providerRouteProductQualityGate?.violations ?? [],
     provider_bridge_artifact_count: artifacts.filter(
       (artifact) => artifactKind(artifact) === "provider_terminal_authority_bridge",
     ).length,

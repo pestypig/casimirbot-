@@ -59,6 +59,7 @@ export type ScientificEvidencePacketV1 = {
   };
   bbox_px: { x: number; y: number; width: number; height: number };
   evidence_role: "context_only" | "exact_equation_candidate";
+  equation_capture_mode?: "context" | "exact_row" | "exact_block";
   requested_equation_label: string | null;
   observed_equation_labels: string[];
   label_match_status: ScientificEquationLabelMatchStatusV1;
@@ -76,6 +77,19 @@ export type ScientificEvidencePacketV1 = {
     source_quality_flags: string[];
   };
   exact_row_promotion: {
+    status: "promoted" | "partial" | "rejected" | "not_applicable";
+    reasons: string[];
+  };
+  block_quality_diagnostics?: {
+    displayed_line_count: number | null;
+    displayed_lines_complete: boolean;
+    visual_structure: string | null;
+    equation_bbox_present: boolean;
+    requested_label_present: boolean | null;
+    neighboring_equation_label_count: number;
+    complete_block_candidate: boolean;
+  };
+  exact_block_promotion?: {
     status: "promoted" | "partial" | "rejected" | "not_applicable";
     reasons: string[];
   };
@@ -128,10 +142,18 @@ export type PromotedScientificImageEvidenceV1 = {
   requested_label: string | null;
   observed_label: string | null;
   observed_labels: string[];
-  evidence_depth: "exact_row_promoted" | "exact_row_admissible" | "exact_row_partial" | "page_image_ocr_math_candidate";
+  evidence_depth:
+    | "exact_block_promoted"
+    | "exact_block_admissible"
+    | "exact_block_partial"
+    | "exact_row_promoted"
+    | "exact_row_admissible"
+    | "exact_row_partial"
+    | "page_image_ocr_math_candidate";
   admissibility: ScientificEvidencePacketV1["admissibility"]["status"];
   exact_equation_admissibility: ScientificExactEquationAdmissibilityV1;
   exact_row_promotion: ScientificEvidencePacketV1["exact_row_promotion"];
+  exact_block_promotion?: ScientificEvidencePacketV1["exact_block_promotion"];
   active_blockers: string[];
   promotion_reasons: string[];
   claim_boundary: "observation_only_not_proof";
@@ -162,9 +184,11 @@ export type ScientificImageEvidenceSidecarV1 = {
     confidence: number;
     row_quality_diagnostics?: ScientificEvidencePacketV1["row_quality_diagnostics"];
     exact_row_promotion?: ScientificEvidencePacketV1["exact_row_promotion"];
+    exact_block_promotion?: ScientificEvidencePacketV1["exact_block_promotion"];
   }>;
   primary_packet_ref: string | null;
   active_promoted_row: PromotedScientificImageEvidenceV1 | null;
+  active_promoted_block?: PromotedScientificImageEvidenceV1 | null;
   selected_evidence_object: PromotedScientificImageEvidenceV1 | null;
   promoted_equation_ref: string | null;
   promoted_equation_latex: string | null;
@@ -191,6 +215,10 @@ export type ScientificImageEvidenceSidecarV1 = {
     rejected_row_count: number;
     context_only_count: number;
     promoted_row_count: number;
+    admissible_block_count?: number;
+    partial_block_count?: number;
+    rejected_block_count?: number;
+    promoted_block_count?: number;
     requested_labels: string[];
     observed_labels: string[];
     rejected_reasons: string[];
@@ -287,6 +315,7 @@ export type ScientificEvidenceGraphReflectionV1 = {
     | "abstract_or_snippet"
     | "page_grounded_ocr"
     | "promoted_exact_equation_row"
+    | "promoted_exact_equation_block"
     | "multi_equation_derivation_candidate"
     | "calculator_template_candidate";
   evidence_object_class:
@@ -362,6 +391,13 @@ type CandidateInput = {
   pageNumber?: number | null;
   bboxPx: ScientificEvidencePacketV1["bbox_px"];
   sourceDimensionsPx?: { width: number; height: number } | null;
+  equationCaptureMode?: "context" | "exact_row" | "exact_block" | null;
+  visualLayoutCandidate?: {
+    displayed_line_count?: number | null;
+    displayed_lines?: string[] | null;
+    structure?: string | null;
+    equation_bbox_px?: { x: number; y: number; width: number; height: number } | null;
+  } | null;
 };
 
 const DOMAIN_PATTERNS: Record<ScientificEvidenceDomainV1, Array<{ pattern: RegExp; reason: string; weight: number }>> = {
@@ -598,6 +634,9 @@ const scientificImageEvidenceDepthForPacket = (
   packet: ScientificEvidencePacketV1 | null,
 ): PromotedScientificImageEvidenceV1["evidence_depth"] | "missing" => {
   if (!packet) return "missing";
+  if (packet.exact_block_promotion?.status === "promoted") return "exact_block_promoted";
+  if (packet.equation_capture_mode === "exact_block" && packet.exact_equation_admissibility === "admissible_for_exact_equation") return "exact_block_admissible";
+  if (packet.equation_capture_mode === "exact_block") return "exact_block_partial";
   if (packet.exact_row_promotion.status === "promoted") return "exact_row_promoted";
   if (packet.exact_equation_admissibility === "admissible_for_exact_equation") return "exact_row_admissible";
   if (packet.evidence_role === "exact_equation_candidate") return "exact_row_partial";
@@ -606,14 +645,22 @@ const scientificImageEvidenceDepthForPacket = (
 
 const activeBlockersForScientificPacket = (packet: ScientificEvidencePacketV1 | null): string[] =>
   packet
-    ? unique(packet.exact_row_promotion.reasons.filter((reason) =>
-        !SCIENTIFIC_IMAGE_EXACT_ROW_PROMOTION_REASON_VALUES.has(reason)))
+    ? packet.equation_capture_mode === "exact_block"
+      ? packet.exact_block_promotion?.status === "promoted"
+        ? []
+        : unique(packet.exact_block_promotion?.reasons ?? [])
+      : unique(packet.exact_row_promotion.reasons.filter((reason) =>
+          !SCIENTIFIC_IMAGE_EXACT_ROW_PROMOTION_REASON_VALUES.has(reason)))
     : [];
 
 const promotionReasonsForScientificPacket = (packet: ScientificEvidencePacketV1 | null): string[] =>
   packet
-    ? unique(packet.exact_row_promotion.reasons.filter((reason) =>
-        SCIENTIFIC_IMAGE_EXACT_ROW_PROMOTION_REASON_VALUES.has(reason)))
+    ? unique(packet.equation_capture_mode === "exact_block"
+        ? packet.exact_block_promotion?.status === "promoted"
+          ? packet.exact_block_promotion.reasons
+          : []
+        : packet.exact_row_promotion.reasons.filter((reason) =>
+            SCIENTIFIC_IMAGE_EXACT_ROW_PROMOTION_REASON_VALUES.has(reason)))
     : [];
 
 const isLabelOnlyScientificPacket = (packet: ScientificEvidencePacketV1): boolean =>
@@ -635,6 +682,7 @@ const selectStructuredScientificImageEvidencePacket = (
     const score = (packet: ScientificEvidencePacketV1): number => {
       if (isNonSelectableScientificImagePacket(packet)) return -10_000;
       let total = 0;
+      if (packet.exact_block_promotion?.status === "promoted") total += 12_000;
       if (packet.exact_row_promotion.status === "promoted") total += 10_000;
       if (packet.exact_equation_admissibility === "admissible_for_exact_equation") total += 4_000;
       if (packet.evidence_role === "exact_equation_candidate") total += 1_000;
@@ -679,6 +727,7 @@ const buildPromotedScientificImageEvidence = (
     admissibility: packet.admissibility.status,
     exact_equation_admissibility: packet.exact_equation_admissibility,
     exact_row_promotion: packet.exact_row_promotion,
+    exact_block_promotion: packet.exact_block_promotion,
     active_blockers: activeBlockersForScientificPacket(packet),
     promotion_reasons: promotionReasonsForScientificPacket(packet),
     claim_boundary: "observation_only_not_proof",
@@ -745,7 +794,10 @@ export function buildScientificEvidencePacket(input: CandidateInput): Scientific
   const observedEquationLabels = extractObservedEquationLabels(text);
   const labelMatchStatus = classifyLabelMatch(requestedEquationLabel, observedEquationLabels);
   const evidenceRole = scientificEvidenceRole(input);
-  const qualityFlags = detectScientificQualityFlags({
+  const equationCaptureMode = input.equationCaptureMode ??
+    (evidenceRole === "exact_equation_candidate" ? "exact_row" : "context");
+  const isExactBlock = equationCaptureMode === "exact_block";
+  const rawQualityFlags = detectScientificQualityFlags({
     text: textCandidate ?? "",
     latex: latexCandidate ?? "",
     evidenceRole,
@@ -761,15 +813,68 @@ export function buildScientificEvidencePacket(input: CandidateInput): Scientific
     evidenceRole,
     hasCandidate,
   });
+  const rowOnlyQualityFlags = new Set([
+    "row_crop_contains_multiple_equation_lines",
+    "row_crop_too_broad_for_exact_equation",
+    "exact_row_crop_too_small_for_reliable_math_ocr",
+    "exact_row_crop_area_too_small",
+  ]);
+  const qualityFlags = isExactBlock
+    ? rawQualityFlags.filter((flag) => !rowOnlyQualityFlags.has(flag))
+    : rawQualityFlags;
   const allQualityFlags = unique([...qualityFlags, ...sourceQualityFlags]);
   const qualityRejectionReasons = allQualityFlags.map(qualityFlagReason);
   const forcedUncertainty = unique([
     ...(input.uncertainty ?? []),
     ...qualityRejectionReasons.map((reason) => `local_quality_gate: ${reason}`),
   ]);
+  const visualLayout = input.visualLayoutCandidate ?? null;
+  const displayedLineCount = visualLayout?.displayed_line_count ??
+    (visualLayout?.displayed_lines?.length ? visualLayout.displayed_lines.length : null);
+  const displayedLinesComplete = Boolean(
+    displayedLineCount && displayedLineCount > 1 &&
+    visualLayout?.displayed_lines?.length === displayedLineCount
+  );
+  const blockStructure = visualLayout?.structure ?? null;
+  const blockStructureSupported = ["multi_line", "aligned_block", "cases", "matrix"].includes(blockStructure ?? "");
+  const equationBboxPresent = Boolean(visualLayout?.equation_bbox_px);
+  const requestedLabelPresent = requestedEquationLabel
+    ? observedEquationLabels.includes(requestedEquationLabel)
+    : null;
+  const neighboringEquationLabelCount = requestedEquationLabel
+    ? observedEquationLabels.filter((label) => label !== requestedEquationLabel).length
+    : observedEquationLabels.length > 1 ? observedEquationLabels.length - 1 : 0;
+  const completeBlockCandidate = Boolean(
+    isExactBlock &&
+    hasCandidate &&
+    latexCandidate &&
+    status === "extracted" &&
+    labelMatchStatus === "matched" &&
+    displayedLinesComplete &&
+    blockStructureSupported &&
+    equationBboxPresent &&
+    neighboringEquationLabelCount === 0 &&
+    allQualityFlags.length === 0
+  );
+  const hardBlockRejection = Boolean(
+    !hasCandidate ||
+    status === "failed" ||
+    status === "not_run" ||
+    labelMatchStatus === "mismatched" ||
+    labelMatchStatus === "ambiguous" ||
+    neighboringEquationLabelCount > 0 ||
+    allQualityFlags.includes("label_only_equation_locator") ||
+    allQualityFlags.includes("candidate_contains_multiple_display_equations")
+  );
   const exactEquationAdmissibility: ScientificExactEquationAdmissibilityV1 =
     evidenceRole === "context_only"
       ? "partial_candidate"
+      : isExactBlock
+        ? hardBlockRejection
+          ? "inadmissible_for_exact_equation"
+          : completeBlockCandidate
+            ? "admissible_for_exact_equation"
+            : "partial_candidate"
       : !hasCandidate ||
         status === "failed" ||
         status === "not_run" ||
@@ -783,7 +888,7 @@ export function buildScientificEvidencePacket(input: CandidateInput): Scientific
           status === "extracted"
           ? "admissible_for_exact_equation"
           : "partial_candidate";
-  const promotionReasons = exactEquationAdmissibility === "admissible_for_exact_equation"
+  const promotionReasons = exactEquationAdmissibility === "admissible_for_exact_equation" && !isExactBlock
     ? ["requested_label_matched", "single_clean_row", "extracted_latex_candidate_present"]
     : evidenceRole === "context_only"
       ? ["context_crop_not_exact_equation_row"]
@@ -795,11 +900,42 @@ export function buildScientificEvidencePacket(input: CandidateInput): Scientific
   const exactRowPromotion: ScientificEvidencePacketV1["exact_row_promotion"] =
     evidenceRole === "context_only"
       ? { status: "not_applicable", reasons: promotionReasons }
+      : isExactBlock
+        ? { status: "not_applicable", reasons: ["multi_line_exact_equation_block_uses_block_promotion"] }
       : exactEquationAdmissibility === "admissible_for_exact_equation"
         ? { status: "promoted", reasons: promotionReasons }
         : exactEquationAdmissibility === "partial_candidate"
           ? { status: "partial", reasons: unique(promotionReasons) }
           : { status: "rejected", reasons: unique(promotionReasons) };
+  const blockPromotionReasons = !isExactBlock
+    ? ["not_an_exact_equation_block_request"]
+    : completeBlockCandidate
+      ? [
+          "requested_label_matched",
+          "complete_multi_line_equation_block",
+          "displayed_lines_complete",
+          "equation_bbox_present",
+          "single_requested_equation_label_observed",
+          "extracted_latex_candidate_present",
+        ]
+      : unique([
+          ...(labelMatchStatus === "matched" ? [] : [`label_match_status:${labelMatchStatus}`]),
+          ...(status === "extracted" ? [] : [`extraction_status:${status}`]),
+          ...(latexCandidate ? [] : ["latex_candidate_missing"]),
+          ...(displayedLinesComplete ? [] : ["displayed_lines_incomplete"]),
+          ...(blockStructureSupported ? [] : ["multi_line_block_structure_missing"]),
+          ...(equationBboxPresent ? [] : ["equation_bbox_missing"]),
+          ...(neighboringEquationLabelCount === 0 ? [] : ["neighboring_equation_label_observed"]),
+          ...allQualityFlags,
+        ]);
+  const exactBlockPromotion: NonNullable<ScientificEvidencePacketV1["exact_block_promotion"]> =
+    !isExactBlock
+      ? { status: "not_applicable", reasons: blockPromotionReasons }
+      : completeBlockCandidate
+        ? { status: "promoted", reasons: blockPromotionReasons }
+        : hardBlockRejection
+          ? { status: "rejected", reasons: blockPromotionReasons }
+          : { status: "partial", reasons: blockPromotionReasons };
   const confidence =
     primaryDomain === "unknown_math" || !hasCandidate || status === "failed" || status === "not_run"
       ? 0
@@ -830,6 +966,7 @@ export function buildScientificEvidencePacket(input: CandidateInput): Scientific
     },
     bbox_px: input.bboxPx,
     evidence_role: evidenceRole,
+    equation_capture_mode: equationCaptureMode,
     requested_equation_label: requestedEquationLabel,
     observed_equation_labels: observedEquationLabels,
     label_match_status: labelMatchStatus,
@@ -858,6 +995,16 @@ export function buildScientificEvidencePacket(input: CandidateInput): Scientific
       source_quality_flags: sourceQualityFlags,
     },
     exact_row_promotion: exactRowPromotion,
+    block_quality_diagnostics: {
+      displayed_line_count: displayedLineCount,
+      displayed_lines_complete: displayedLinesComplete,
+      visual_structure: blockStructure,
+      equation_bbox_present: equationBboxPresent,
+      requested_label_present: requestedLabelPresent,
+      neighboring_equation_label_count: neighboringEquationLabelCount,
+      complete_block_candidate: completeBlockCandidate,
+    },
+    exact_block_promotion: exactBlockPromotion,
     quality_flags: allQualityFlags,
     quality_rejection_reasons: qualityRejectionReasons,
     retry_debug: buildRetryDebug(allQualityFlags),
@@ -902,21 +1049,30 @@ export function buildScientificImageEvidenceSidecar(input: {
   const admissibleCount = packets.filter((packet) => packet.admissibility.status === "admissible_observation").length;
   const unverifiedCount = packets.filter((packet) => packet.admissibility.status === "unverified_math_observation").length;
   const inadmissibleCount = packets.filter((packet) => packet.admissibility.status === "inadmissible_for_exact_mapping").length;
-  const exactRows = packets.filter((packet) => packet.evidence_role === "exact_equation_candidate");
+  const exactCandidates = packets.filter((packet) => packet.evidence_role === "exact_equation_candidate");
+  const exactBlocks = exactCandidates.filter((packet) => packet.equation_capture_mode === "exact_block");
+  const exactRows = exactCandidates.filter((packet) => packet.equation_capture_mode !== "exact_block");
   const admissibleExactRowCount = exactRows.filter((packet) => packet.exact_equation_admissibility === "admissible_for_exact_equation").length;
   const partialExactRowCount = exactRows.filter((packet) => packet.exact_equation_admissibility === "partial_candidate").length;
   const rejectedExactRowCount = exactRows.filter((packet) => packet.exact_equation_admissibility === "inadmissible_for_exact_equation").length;
-  const exactRejectedReasons = unique(exactRows.flatMap((packet) => packet.quality_rejection_reasons));
+  const exactRejectedReasons = unique(exactCandidates.flatMap((packet) => packet.quality_rejection_reasons));
   const promotedExactRowCount = exactRows.filter((packet) => packet.exact_row_promotion.status === "promoted").length;
+  const admissibleExactBlockCount = exactBlocks.filter((packet) => packet.exact_equation_admissibility === "admissible_for_exact_equation").length;
+  const partialExactBlockCount = exactBlocks.filter((packet) => packet.exact_equation_admissibility === "partial_candidate").length;
+  const rejectedExactBlockCount = exactBlocks.filter((packet) => packet.exact_equation_admissibility === "inadmissible_for_exact_equation").length;
+  const promotedExactBlockCount = exactBlocks.filter((packet) => packet.exact_block_promotion?.status === "promoted").length;
   const promotionBlockers = unique(exactRows
     .filter((packet) => packet.exact_row_promotion.status !== "promoted")
-    .flatMap((packet) => packet.exact_row_promotion.reasons));
+    .flatMap((packet) => packet.exact_row_promotion.reasons)
+    .concat(exactBlocks
+      .filter((packet) => packet.exact_block_promotion?.status !== "promoted")
+      .flatMap((packet) => packet.exact_block_promotion?.reasons ?? [])));
   const confidenceMax = normalizeScore(Math.max(0, ...packets.map((packet) => packet.confidence)));
   const confidenceAvg = normalizeScore(
     packets.length ? packets.reduce((sum, packet) => sum + packet.confidence, 0) / packets.length : 0,
   );
   const status: ScientificImageEvidenceSidecarV1["admissibility"]["status"] =
-    promotedExactRowCount > 0
+    promotedExactRowCount > 0 || promotedExactBlockCount > 0
       ? "admissible_observation"
       : unverifiedCount > 0 || admissibleCount > 0
         ? "unverified_math_observation"
@@ -925,7 +1081,9 @@ export function buildScientificImageEvidenceSidecar(input: {
     packets.length ? `${packets.length} Image Lens scientific evidence packet(s) normalized.` : "No Image Lens scientific evidence packets were supplied.",
     `${admissibleCount} packet(s) admissible, ${unverifiedCount} unverified, ${inadmissibleCount} inadmissible.`,
     ...(status === "admissible_observation"
-      ? ["At least one clean exact equation row was promoted for candidate graph reflection."]
+      ? [promotedExactBlockCount > 0
+          ? "At least one complete labeled multi-line equation block was promoted for candidate graph reflection."
+          : "At least one clean exact equation row was promoted for candidate graph reflection."]
       : status === "unverified_math_observation"
         ? ["Only unverified math observations or context crops were available; graph/calculator handoff must remain restricted until an exact row is promoted."]
         : ["No crop observation is admissible for exact graph or calculator mapping."]),
@@ -941,10 +1099,16 @@ export function buildScientificImageEvidenceSidecar(input: {
   const selectedEvidenceObject = buildPromotedScientificImageEvidence(selectedEvidencePacket, sidecarId);
   const primaryPacketRef = selectedEvidenceObject?.packet_ref ?? (primaryPacket ? evidencePacketRef(primaryPacket) : null);
   const activeBlockers = selectedEvidenceObject?.active_blockers ?? [];
-  const historicalBlockers = unique(exactRows
-    .filter((packet) => packet !== selectedEvidencePacket || packet.exact_row_promotion.status !== "promoted")
+  const historicalBlockers = unique(exactCandidates
+    .filter((packet) => packet !== selectedEvidencePacket || (
+      packet.equation_capture_mode === "exact_block"
+        ? packet.exact_block_promotion?.status !== "promoted"
+        : packet.exact_row_promotion.status !== "promoted"
+    ))
     .flatMap((packet) => [
-      ...packet.exact_row_promotion.reasons,
+      ...(packet.equation_capture_mode === "exact_block"
+        ? packet.exact_block_promotion?.reasons ?? []
+        : packet.exact_row_promotion.reasons),
       ...packet.quality_flags,
     ])
     .filter((reason) => !SCIENTIFIC_IMAGE_EXACT_ROW_PROMOTION_REASON_VALUES.has(reason)));
@@ -979,13 +1143,15 @@ export function buildScientificImageEvidenceSidecar(input: {
       confidence: packet.confidence,
       row_quality_diagnostics: packet.row_quality_diagnostics,
       exact_row_promotion: packet.exact_row_promotion,
+      exact_block_promotion: packet.exact_block_promotion,
     })),
     primary_packet_ref: primaryPacketRef,
     active_promoted_row: selectedEvidenceObject?.evidence_depth === "exact_row_promoted" ? selectedEvidenceObject : null,
+    active_promoted_block: selectedEvidenceObject?.evidence_depth === "exact_block_promoted" ? selectedEvidenceObject : null,
     selected_evidence_object: selectedEvidenceObject,
-    promoted_equation_ref: selectedEvidenceObject?.evidence_depth === "exact_row_promoted" ? selectedEvidenceObject.packet_ref : null,
-    promoted_equation_latex: selectedEvidenceObject?.evidence_depth === "exact_row_promoted" ? selectedEvidenceObject.latex_candidate : null,
-    promoted_equation_text: selectedEvidenceObject?.evidence_depth === "exact_row_promoted" ? selectedEvidenceObject.text_candidate : null,
+    promoted_equation_ref: selectedEvidenceObject?.evidence_depth === "exact_row_promoted" || selectedEvidenceObject?.evidence_depth === "exact_block_promoted" ? selectedEvidenceObject.packet_ref : null,
+    promoted_equation_latex: selectedEvidenceObject?.evidence_depth === "exact_row_promoted" || selectedEvidenceObject?.evidence_depth === "exact_block_promoted" ? selectedEvidenceObject.latex_candidate : null,
+    promoted_equation_text: selectedEvidenceObject?.evidence_depth === "exact_row_promoted" || selectedEvidenceObject?.evidence_depth === "exact_block_promoted" ? selectedEvidenceObject.text_candidate : null,
     active_blockers: activeBlockers,
     historical_blockers: historicalBlockers,
     evidence_depth: selectedEvidenceObject?.evidence_depth ?? "missing",
@@ -1008,6 +1174,10 @@ export function buildScientificImageEvidenceSidecar(input: {
       rejected_row_count: rejectedExactRowCount,
       context_only_count: packets.filter((packet) => packet.evidence_role === "context_only").length,
       promoted_row_count: promotedExactRowCount,
+      admissible_block_count: admissibleExactBlockCount,
+      partial_block_count: partialExactBlockCount,
+      rejected_block_count: rejectedExactBlockCount,
+      promoted_block_count: promotedExactBlockCount,
       requested_labels: unique(exactRows.map((packet) => packet.requested_equation_label ?? "")),
       observed_labels: unique(exactRows.flatMap((packet) => packet.observed_equation_labels)),
       rejected_reasons: exactRejectedReasons,
@@ -1181,7 +1351,9 @@ export function buildScientificBranchGate(input: {
   const branchHints = evidence.admissibility;
   const exactSummary = input.sidecar?.exact_equation_summary ?? null;
   const exactEvidenceRequired = Boolean(input.sidecar) && input.requireAdmissibleEvidence === true;
-  const insufficientExactEquationEvidence = exactEvidenceRequired && (exactSummary?.admissible_row_count ?? 0) < 1;
+  const admissibleExactEquationCount =
+    (exactSummary?.admissible_row_count ?? 0) + (exactSummary?.admissible_block_count ?? 0);
+  const insufficientExactEquationEvidence = exactEvidenceRequired && admissibleExactEquationCount < 1;
   const promptContextEvidence = isPromptContextScientificEvidence(evidence);
   const directImageEvidenceRequired =
     SCIENTIFIC_IMAGE_EVIDENCE_PROMPT_RE.test(input.prompt) ||
@@ -1242,8 +1414,9 @@ export function buildScientificBranchGate(input: {
           : []),
         ...(insufficientExactEquationEvidence
           ? [
-              "insufficient_exact_equation_evidence: no Image Lens equation row crop is admissible for exact comparison.",
+              "insufficient_exact_equation_evidence: no Image Lens equation row or complete equation block is admissible for exact comparison.",
               `Exact equation rows: admissible=${exactSummary?.admissible_row_count ?? 0}; partial=${exactSummary?.partial_row_count ?? 0}; rejected=${exactSummary?.rejected_row_count ?? 0}.`,
+              `Exact equation blocks: admissible=${exactSummary?.admissible_block_count ?? 0}; partial=${exactSummary?.partial_block_count ?? 0}; rejected=${exactSummary?.rejected_block_count ?? 0}.`,
             ]
           : []),
         ...(promptContextEvidence ? ["Prompt-context fallback packets cannot admit graph or calculator branches for source-targeted image prompts."] : []),
@@ -1316,7 +1489,10 @@ export function buildScientificBranchGate(input: {
     notes: [
       `Scientific branch gate detected ${evidence.primary_domain}.`,
       ...(branchHints.status === "admissible_observation" ? [] : [`Evidence admissibility is ${branchHints.status}.`]),
-      ...(exactSummary ? [`Exact equation rows: admissible=${exactSummary.admissible_row_count}; partial=${exactSummary.partial_row_count}; rejected=${exactSummary.rejected_row_count}.`] : []),
+      ...(exactSummary ? [
+        `Exact equation rows: admissible=${exactSummary.admissible_row_count}; partial=${exactSummary.partial_row_count}; rejected=${exactSummary.rejected_row_count}.`,
+        `Exact equation blocks: admissible=${exactSummary.admissible_block_count ?? 0}; partial=${exactSummary.partial_block_count ?? 0}; rejected=${exactSummary.rejected_block_count ?? 0}.`,
+      ] : []),
       ...(rejectedCalculatorPayloadIds.length ? ["Incompatible calculator payloads were suppressed before handoff."] : []),
       ...(rejectedBadgeIds.length ? ["Incompatible badge ids were marked rejected before synthesis."] : []),
     ],
@@ -1433,11 +1609,18 @@ const detectScientificEvidenceDepth = (input: {
   ) {
     return "calculator_template_candidate";
   }
-  const promoted = input.sidecar?.exact_equation_summary.promoted_row_count ?? 0;
+  const promotedRows = input.sidecar?.exact_equation_summary.promoted_row_count ?? 0;
+  const promotedBlocks = input.sidecar?.exact_equation_summary.promoted_block_count ?? 0;
   const equationPacketCount = input.sidecar?.packets.filter((packet) => packet.evidence_role === "exact_equation_candidate").length ?? 0;
   if (equationPacketCount > 1) return "multi_equation_derivation_candidate";
   if (
-    promoted > 0 ||
+    promotedBlocks > 0 ||
+    input.evidence.exact_block_promotion?.status === "promoted"
+  ) {
+    return "promoted_exact_equation_block";
+  }
+  if (
+    promotedRows > 0 ||
     input.evidence.exact_equation_admissibility === "admissible_for_exact_equation" ||
     input.evidence.exact_row_promotion.status === "promoted"
   ) {
@@ -1568,7 +1751,7 @@ const upgradeRequirementsForReflection = (input: {
   ...(input.evidenceDepth === "metadata_lookup" ? ["Materialize abstract/snippet or full-text evidence before scientific claims."] : []),
   ...(input.evidenceDepth === "abstract_or_snippet" ? ["Fetch full text or render PDF pages for page-grounded evidence."] : []),
   ...(input.evidenceDepth === "page_grounded_ocr" ? ["Crop and promote exact equation rows before graph or calculator use."] : []),
-  ...(input.evidenceDepth === "promoted_exact_equation_row"
+  ...(["promoted_exact_equation_row", "promoted_exact_equation_block"].includes(input.evidenceDepth)
     ? [
         "Extract neighboring definitions, assumptions, and boundary conditions.",
         "Extract derived stress-energy, energy-density, force, or pressure equations if present.",
@@ -1585,6 +1768,9 @@ const upgradeRequirementsForReflection = (input: {
     : []),
   ...((input.sidecar?.exact_equation_summary.partial_row_count ?? 0) > 0
     ? ["Retry partial equation rows with exact row crops before promotion."]
+    : []),
+  ...((input.sidecar?.exact_equation_summary.partial_block_count ?? 0) > 0
+    ? ["Retry partial equation blocks with one complete labeled block crop before promotion."]
     : []),
 ]);
 
@@ -1605,7 +1791,7 @@ const nextAffordancesForReflection = (input: {
         reason: "Crop exact equation rows and promote only if exact equation admissibility passes.",
       }]
     : []),
-  ...(input.evidenceDepth === "promoted_exact_equation_row"
+  ...(["promoted_exact_equation_row", "promoted_exact_equation_block"].includes(input.evidenceDepth)
     ? [{
         capability: "visual_analysis.inspect_image_region",
         reason: "Inspect adjacent rows/pages for definitions, boundary conditions, and derived equations.",

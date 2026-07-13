@@ -4,6 +4,16 @@ export const HELIX_RESEARCH_LIBRARY_DOCUMENT_SCHEMA =
 export const HELIX_RESEARCH_LIBRARY_LIST_SCHEMA =
   "helix.research_library_list.v1" as const;
 
+export const HELIX_RESEARCH_LIBRARY_READ_CAPABILITY =
+  "research-library.read_document" as const;
+
+export const HELIX_RESEARCH_LIBRARY_OBSERVATION_SCHEMA =
+  "helix.research_library_observation.v1" as const;
+
+export const isSavedResearchLibraryEvidencePrompt = (prompt: string): boolean =>
+  /\b(?:existing|saved|previously\s+(?:saved|extracted)|already\s+extracted|research\s+library|private\s+library)\b[\s\S]{0,120}\b(?:full[-\s]?text|paper|pdf|evidence|extraction|document)\b/i.test(prompt) ||
+  /\b(?:use|read|search|from)\b[\s\S]{0,80}\b(?:research\s+library|saved\s+(?:paper|extraction|document))\b/i.test(prompt);
+
 export type HelixResearchLibraryPage = {
   page: number;
   text: string;
@@ -57,3 +67,38 @@ export type HelixResearchLibraryList = {
   raw_content_included: false;
 };
 
+export type HelixResearchLibraryEvidencePage = {
+  page: number;
+  text_excerpt: string;
+  source_text_ref: string;
+  text_char_count: number;
+  first_nonblank_sentence?: string;
+  last_nonblank_sentence?: string;
+};
+
+export type HelixResearchLibraryObservation = {
+  schema: typeof HELIX_RESEARCH_LIBRARY_OBSERVATION_SCHEMA;
+  artifact_id: string;
+  turn_id: string;
+  capability: typeof HELIX_RESEARCH_LIBRARY_READ_CAPABILITY;
+  document: HelixResearchLibraryDocumentSummary;
+  selected_pages: HelixResearchLibraryEvidencePage[];
+  requested_source_url: string | null;
+  requested_document_id: string | null;
+  resolved_document_id?: string | null;
+  requested_query: string | null;
+  page_numbers: number[] | null;
+  page_start: number | null;
+  page_end: number | null;
+  page_boundary_mode?: "first_last_nonblank_sentence" | null;
+  search_term?: string | null;
+  match_count?: number;
+  match_pages?: number[];
+  evidence_state: "full_text_usable" | "saved_full_text_missing";
+  selected_for_answer: boolean;
+  missing_requirements: string[];
+  terminal_eligible: false;
+  post_tool_model_step_required: true;
+  assistant_answer: false;
+  raw_content_included: false;
+};

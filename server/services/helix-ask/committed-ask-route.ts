@@ -127,7 +127,7 @@ const sourceBackedTargets = new Set([
 
 export const inferCommittedRouteToolFamily = (capabilityId: string): string => {
   if (/^docs\.|docs[_-]?viewer|docs-viewer|doc[_-]?viewer/i.test(capabilityId)) return "docs_viewer";
-  if (/scholarly[-_.]?research|lookup[_-]?papers|fetch[_-]?full[_-]?text|semantic[-_.]?scholar|openalex|pubmed|crossref/i.test(capabilityId)) return "scholarly_research";
+  if (/research[-_.]?library|scholarly[-_.]?research|lookup[_-]?papers|fetch[_-]?full[_-]?text|semantic[-_.]?scholar|openalex|pubmed|crossref/i.test(capabilityId)) return "scholarly_research";
   if (/internet[-_.]?search|web[-_.]?research|web\.search/i.test(capabilityId)) return "internet_search";
   if (/text[-_.]?to[-_.]?speech|speak[_-]?text|voice[-_.]?delivery|voice[-_.]?output|request[_-]?interim[_-]?voice[_-]?callout|narrator[_-]?say/i.test(capabilityId)) return "voice_delivery";
   if (/scientific[-_.]?calculator|calculator|calculate|compute|solve/i.test(capabilityId)) return "scientific_calculator";

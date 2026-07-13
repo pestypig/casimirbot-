@@ -50,6 +50,7 @@ export type HelixCapabilityLaneProviderAdapterContext = {
   capability_lane_turn_timeline: HelixCapabilityLaneProviderTimelineEvent[];
   artifact_ledger: Array<Record<string, unknown>>;
   prompt_observation_block: string;
+  reentry_observation_block: string;
   calls_succeeded: boolean;
   terminal_eligible: false;
   assistant_answer: false;
@@ -188,6 +189,30 @@ const readStringArray = (value: unknown): string[] =>
   Array.isArray(value)
     ? value.map(readString).filter(Boolean)
     : [];
+
+const MODEL_VISIBLE_STRING_LIMIT = 16_000;
+
+export const compactCapabilityLaneModelValue = (value: unknown, depth = 0): unknown => {
+  if (depth > 16 || value === null || value === undefined) return value;
+  if (typeof value === "string") {
+    if (/^(?:data:image\/|blob:)/i.test(value.trim())) {
+      return `[inline_image_payload_omitted:${value.length}_chars]`;
+    }
+    return value.length <= MODEL_VISIBLE_STRING_LIMIT
+      ? value
+      : `${value.slice(0, MODEL_VISIBLE_STRING_LIMIT)}...[model-visible value truncated]`;
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => compactCapabilityLaneModelValue(entry, depth + 1));
+  }
+  if (typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .map(([key, entry]) => [key, compactCapabilityLaneModelValue(entry, depth + 1)]),
+    );
+  }
+  return value;
+};
 
 const readScientificImageEvidenceSidecarFromPacket = (
   packet: HelixAgentStepObservationPacket,
@@ -1029,6 +1054,37 @@ export const buildHelixCapabilityLaneProviderAdapterContext = async (input: {
     goalDispatchAdmissions,
     goalDispatchReadiness,
   });
+  const reentryCallSummaries = oneShot.call_results.map((result) => {
+    const record = readRecord(result) ?? {};
+    const observation = readRecord(record.observation);
+    const receipt = readRecord(record.receipt);
+    const resultValues = Object.fromEntries(
+      Object.entries(record).filter(([key]) => ![
+        "lane_resolve_trace",
+        "observation",
+        "observation_packet",
+        "receipt",
+      ].includes(key)),
+    );
+    return {
+      ...resultValues,
+      capability: readString(record.capability),
+      ok: record.ok === true,
+      status: readString(record.status) || (record.ok === true ? "succeeded" : "failed"),
+      observation_ref:
+        readString(record.observation_ref) ||
+        readString(observation?.observation_ref) ||
+        null,
+      receipt_ref:
+        readString(record.receipt_ref) ||
+        readString(receipt?.receipt_ref) ||
+        null,
+      selected_backend_provider: readString(record.selected_backend_provider) || null,
+      error: readString(record.error) || null,
+      terminal_eligible: false,
+      assistant_answer: false,
+    };
+  });
   return {
     schema: "helix.capability_lane.provider_adapter_context.v1",
     one_shot: oneShot,
@@ -1053,7 +1109,7 @@ export const buildHelixCapabilityLaneProviderAdapterContext = async (input: {
     projection_receipts: projectionReceipts,
     capability_lane_turn_timeline: timeline,
     artifact_ledger: artifactLedger,
-    prompt_observation_block: JSON.stringify({
+    prompt_observation_block: JSON.stringify(compactCapabilityLaneModelValue({
       model_visible_capability_lane_manifest: modelVisibleCapabilityLaneManifest,
       capability_lane_call_results: oneShot.call_results,
       capability_lane_observation_packets: oneShot.observation_packets,
@@ -1069,7 +1125,18 @@ export const buildHelixCapabilityLaneProviderAdapterContext = async (input: {
       capability_lane_goal_dispatch_admissions: goalDispatchAdmissions,
       capability_lane_goal_dispatch_readiness: goalDispatchReadiness,
       capability_lane_reentry_status: oneShot.debug_projection.capability_lane_reentry_status,
-    }, null, 2),
+    }), null, 2),
+    reentry_observation_block: JSON.stringify(compactCapabilityLaneModelValue({
+      capability_lane_call_summaries: reentryCallSummaries,
+      capability_lane_observation_packets: oneShot.observation_packets,
+      capability_lane_projection_receipts: projectionReceipts,
+      capability_lane_session_results: sessions.session_results,
+      capability_lane_goal_binding_results: goalBindings.goal_binding_results,
+      capability_lane_goal_dispatch_plans: goalDispatchPlans,
+      capability_lane_goal_dispatch_admissions: goalDispatchAdmissions,
+      capability_lane_goal_dispatch_readiness: goalDispatchReadiness,
+      capability_lane_reentry_status: oneShot.debug_projection.capability_lane_reentry_status,
+    }), null, 2),
     calls_succeeded:
       (oneShot.call_results.length === 0 ||
         oneShot.call_results.every((result) =>

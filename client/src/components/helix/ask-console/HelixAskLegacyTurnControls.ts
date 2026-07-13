@@ -272,12 +272,26 @@ export function resolveHelixAskLegacyClickedDebugReply<TReply extends { id?: str
 export function resolveHelixAskLegacyDebugExportClientTurnId(
   parsedPayload: Record<string, unknown>,
 ): string | null {
+  const rawActiveTurnId = coerceControlText(parsedPayload.active_turn_id).trim();
+  const nestedClientTurnId =
+    rawActiveTurnId && rawActiveTurnId !== normalizeHelixAskLegacyBackendTurnId(rawActiveTurnId)
+      ? rawActiveTurnId
+      : null;
   return (
     coerceControlText(parsedPayload.client_active_turn_id).trim() ||
     coerceControlText(parsedPayload.clientSelectedDebugTurnId).trim() ||
     coerceControlText(readControlRecord(parsedPayload.reply)?.id).trim() ||
+    nestedClientTurnId ||
     null
   );
+}
+
+export function normalizeHelixAskLegacyBackendTurnId(value: unknown): string | null {
+  const text = coerceControlText(value).trim();
+  if (!text) return null;
+  if (text.startsWith("ask:")) return text;
+  const match = text.match(/(?:^|:)(ask:[^:]+)/i);
+  return match?.[1] ?? null;
 }
 
 export function buildHelixAskReplyCopyText(reply: HelixAskLegacyReplyForControls | null | undefined): string {
@@ -356,10 +370,17 @@ export function selectHelixAskLegacyGuardedDebugExportPayload(
       .map((candidate) => coerceControlText(candidate).trim())
       .filter(Boolean);
     const renderedActiveTurnId = coerceControlText(rendered.activeTurnId).trim();
+    const canonicalRenderedActiveTurnId = normalizeHelixAskLegacyBackendTurnId(renderedActiveTurnId);
     if (
       renderedActiveTurnId &&
       activeTurnCandidates.length > 0 &&
-      !activeTurnCandidates.some((candidate) => candidate === renderedActiveTurnId)
+      !activeTurnCandidates.some((candidate) =>
+        candidate === renderedActiveTurnId ||
+        Boolean(
+          canonicalRenderedActiveTurnId &&
+          normalizeHelixAskLegacyBackendTurnId(candidate) === canonicalRenderedActiveTurnId
+        )
+      )
     ) {
       return scopedPayload;
     }
@@ -594,6 +615,7 @@ export function debugPayloadMatchesHelixAskLegacyRenderedTurnPayload(
     const parsedCurrentTurn = readAgentLoopAuditRecord(parsed.currentTurn);
     const visibleAnswerState = readAgentLoopAuditRecord(parsed.visibleAnswerState);
     const renderedActiveTurnId = coerceControlText(rendered.activeTurnId).trim();
+    const canonicalRenderedActiveTurnId = normalizeHelixAskLegacyBackendTurnId(renderedActiveTurnId);
     const renderedClientTurnId = coerceControlText(rendered.clientTurnId).trim();
     const turnCandidates = [
       parsed.active_turn_id,
@@ -607,7 +629,13 @@ export function debugPayloadMatchesHelixAskLegacyRenderedTurnPayload(
     if (
       renderedActiveTurnId &&
       turnCandidates.length > 0 &&
-      !turnCandidates.some((candidate) => candidate === renderedActiveTurnId)
+      !turnCandidates.some((candidate) =>
+        candidate === renderedActiveTurnId ||
+        Boolean(
+          canonicalRenderedActiveTurnId &&
+          normalizeHelixAskLegacyBackendTurnId(candidate) === canonicalRenderedActiveTurnId
+        )
+      )
     ) {
       return false;
     }
@@ -625,6 +653,25 @@ export function debugPayloadMatchesHelixAskLegacyRenderedTurnPayload(
       !clientTurnCandidates.some((candidate) => candidate === renderedClientTurnId)
     ) {
       return false;
+    }
+    const fetchedBackendPayload =
+      coerceControlText(parsed.debug_export_source).trim() === "backend_endpoint" &&
+      coerceControlText(parsed.backend_debug_response_status).trim() === "fetched";
+    const activeTurnIdentityMatched = Boolean(
+      renderedActiveTurnId &&
+      turnCandidates.some((candidate) =>
+        candidate === renderedActiveTurnId ||
+        Boolean(
+          canonicalRenderedActiveTurnId &&
+          normalizeHelixAskLegacyBackendTurnId(candidate) === canonicalRenderedActiveTurnId
+        )
+      ),
+    );
+    const clientTurnIdentityMatched = Boolean(
+      renderedClientTurnId && clientTurnCandidates.some((candidate) => candidate === renderedClientTurnId),
+    );
+    if (fetchedBackendPayload && (activeTurnIdentityMatched || clientTurnIdentityMatched)) {
+      return true;
     }
     const answerCandidates = [
       parsed.selected_final_answer,
@@ -706,6 +753,7 @@ export function debugPayloadMatchesHelixAskLegacyRenderedReply(
   parsed: Record<string, unknown>,
 ): boolean {
   const expectedTurnId = resolveHelixAskLegacyReplyDebugTurnId(reply);
+  const canonicalExpectedTurnId = normalizeHelixAskLegacyBackendTurnId(expectedTurnId);
   const parsedDebug = readAgentLoopAuditRecord(parsed.debug);
   const parsedReply = readAgentLoopAuditRecord(parsed.reply);
   const parsedCurrentTurn = readAgentLoopAuditRecord(parsed.currentTurn);
@@ -724,12 +772,18 @@ export function debugPayloadMatchesHelixAskLegacyRenderedReply(
   const expectedTurnMatched = Boolean(
     expectedTurnId &&
     turnCandidates.length > 0 &&
-    turnCandidates.some((candidate) => candidate === expectedTurnId),
+    turnCandidates.some((candidate) =>
+      candidate === expectedTurnId ||
+      Boolean(
+        canonicalExpectedTurnId &&
+        normalizeHelixAskLegacyBackendTurnId(candidate) === canonicalExpectedTurnId
+      )
+    ),
   );
   if (
     expectedTurnId &&
     turnCandidates.length > 0 &&
-    !turnCandidates.some((candidate) => candidate === expectedTurnId)
+    !expectedTurnMatched
   ) {
     return false;
   }
@@ -765,7 +819,8 @@ export function isHelixAskLegacyBackendDebugExportEligibleTurnId(turnId: string)
 export function resolveHelixAskLegacyDebugExportBackendTarget(
   parsedPayload: Record<string, unknown>,
 ): HelixAskLegacyDebugExportBackendTarget {
-  const activeTurnId = coerceControlText(parsedPayload.active_turn_id).trim();
+  const rawActiveTurnId = coerceControlText(parsedPayload.active_turn_id).trim();
+  const activeTurnId = normalizeHelixAskLegacyBackendTurnId(rawActiveTurnId) ?? rawActiveTurnId;
   const rebuildReason = coerceControlText(parsedPayload.debug_export_rebuild_reason).trim();
   const isReplyScopedRebuild =
     rebuildReason === "empty_payload" ||
@@ -794,7 +849,8 @@ export function resolveHelixAskLegacyDebugExportBackendTarget(
     : null;
   const matchingBackendRef = refCandidates.find((entry) => {
     const candidateTurnId = coerceControlText(entry.turn_id).trim();
-    return Boolean(activeTurnId && candidateTurnId === activeTurnId);
+    const canonicalCandidateTurnId = normalizeHelixAskLegacyBackendTurnId(candidateTurnId) ?? candidateTurnId;
+    return Boolean(activeTurnId && canonicalCandidateTurnId === activeTurnId);
   });
   if (isReplyScopedRebuild && !matchingBackendRef && !activeTurnFallbackRef) {
     return {
@@ -818,7 +874,8 @@ export function resolveHelixAskLegacyDebugExportBackendTarget(
     };
   }
   const backendTurnId = coerceControlText(backendRef?.turn_id).trim();
-  if (backendTurnId && activeTurnId && backendTurnId !== activeTurnId) {
+  const canonicalBackendTurnId = normalizeHelixAskLegacyBackendTurnId(backendTurnId) ?? backendTurnId;
+  if (canonicalBackendTurnId && activeTurnId && canonicalBackendTurnId !== activeTurnId) {
     return {
       activeTurnId,
       backendRef,

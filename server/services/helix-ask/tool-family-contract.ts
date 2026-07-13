@@ -2,6 +2,7 @@ import {
   HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
   HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
 } from "@shared/helix-scholarly-research-observation";
+import { HELIX_RESEARCH_LIBRARY_READ_CAPABILITY } from "@shared/helix-research-library";
 
 import { WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS } from "./workstation-context-feed-query-tool-contracts";
 
@@ -125,6 +126,7 @@ export const TOOL_FAMILY_DEFAULT_CONTRACTS: Record<ToolFamily, ToolFamilyContrac
       "scholarly_research_observation",
       "scholarly_full_text_observation",
       "scholarly_numeric_parameter_observation",
+      "research_library_observation",
     ],
     allowedTerminalKinds: ["scholarly_research_answer", "compound_research_locator_answer", ...evidenceOnlyTerminalKinds],
     requiredReentry: true,
@@ -136,6 +138,7 @@ export const TOOL_FAMILY_DEFAULT_CONTRACTS: Record<ToolFamily, ToolFamilyContrac
       "scholarly-research.fetch_full_text",
       "scholarly_research.lookup_papers",
       "scholarly_research.fetch_full_text",
+      "research-library.read_document",
       "scholarly research",
     ],
   }),
@@ -1388,6 +1391,22 @@ export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
     requiredReentry: true,
     requiresGoalSatisfaction: true,
     aliases: ["web.search", "web.run", "internet.search"],
+  }),
+  contract({
+    toolName: HELIX_RESEARCH_LIBRARY_READ_CAPABILITY,
+    toolFamily: "scholarly_research",
+    authority: "evidence_only",
+    mutating: false,
+    requiredObservationKinds: ["research_library_observation"],
+    allowedTerminalKinds: ["scholarly_research_answer", "compound_research_locator_answer", ...evidenceOnlyTerminalKinds],
+    requiredReentry: true,
+    requiresGoalSatisfaction: true,
+    aliases: [
+      "research_library.read_document",
+      "research library",
+      "saved full text evidence",
+      "existing full text evidence",
+    ],
   }),
   contract({
     toolName: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,

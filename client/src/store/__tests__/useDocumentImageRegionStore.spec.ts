@@ -79,4 +79,23 @@ describe("document image region store", () => {
     expect(useDocumentImageRegionStore.getState().naturalSize).toEqual({ width: 1224, height: 1584 });
     expect(useDocumentImageRegionStore.getState().cropDraft).toEqual({ x: 73, y: 570, width: 1077, height: 87 });
   });
+
+  it("keeps oversized rendered pages in memory without filling localStorage", () => {
+    window.localStorage.setItem(
+      "helix:image-lens:last-document-source:v1",
+      JSON.stringify({ sourceImageUrl: "data:image/png;base64,stale" }),
+    );
+    const sourceImageUrl = `data:image/png;base64,${"a".repeat(300_000)}`;
+
+    useDocumentImageRegionStore.getState().setSourceImage({
+      sourceImageUrl,
+      sourceAttachmentId: "pdf-page-render:large",
+      sourceKind: "pdf_page_render",
+      sourceId: "pdf-page-render:large",
+      pageNumber: 8,
+    });
+
+    expect(useDocumentImageRegionStore.getState().source?.sourceImageUrl).toBe(sourceImageUrl);
+    expect(window.localStorage.getItem("helix:image-lens:last-document-source:v1")).toBeNull();
+  });
 });

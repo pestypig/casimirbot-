@@ -43,6 +43,14 @@ import { runInternetSearch } from "../retrieval/internet-search";
 import { runScholarlyResearchLookup } from "../retrieval/scholarly-research-lookup";
 import { runScholarlyFullTextFetch } from "../retrieval/scholarly-full-text-fetch";
 import { runScholarlyNumericParameterExtraction } from "../retrieval/scholarly-numeric-parameters";
+import {
+  HELIX_RESEARCH_LIBRARY_OBSERVATION_SCHEMA,
+  HELIX_RESEARCH_LIBRARY_READ_CAPABILITY,
+} from "@shared/helix-research-library";
+import {
+  findResearchLibraryDocument,
+  listResearchLibraryDocuments,
+} from "../../helix-account/research-library-store";
 import { recordInterimVoiceCalloutRequest } from "../interim-voice-callout-store";
 import {
   isVoiceClientHandoffReceipt,
@@ -161,6 +169,8 @@ const INTERNET_SEARCH_CAPABILITY = HELIX_INTERNET_SEARCH_CAPABILITY;
 const INTERNET_SEARCH_OBSERVATION_SCHEMA = HELIX_INTERNET_SEARCH_OBSERVATION_SCHEMA;
 const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY;
 const SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA = HELIX_SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA;
+const RESEARCH_LIBRARY_READ_CAPABILITY = HELIX_RESEARCH_LIBRARY_READ_CAPABILITY;
+const RESEARCH_LIBRARY_OBSERVATION_SCHEMA = HELIX_RESEARCH_LIBRARY_OBSERVATION_SCHEMA;
 const SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY = HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY;
 const SCHOLARLY_FULL_TEXT_OBSERVATION_SCHEMA = HELIX_SCHOLARLY_FULL_TEXT_OBSERVATION_SCHEMA;
 const SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY = HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY;
@@ -3176,6 +3186,49 @@ const internetSearchManifest: HelixWorkstationCapabilityManifest = {
   raw_content_included: false,
 };
 
+const researchLibraryReadManifest: HelixWorkstationCapabilityManifest = {
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: RESEARCH_LIBRARY_READ_CAPABILITY,
+  label: "Read saved research document",
+  description:
+    "Reads bounded page text from a signed-in profile's encrypted Research Library by exact document id, source URL, or integrity hash. It never refetches the paper and cannot answer by itself.",
+  panel_id: "docs-viewer",
+  action_id: "read_research_library_document",
+  mode: "read",
+  mutating: false,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: true,
+  terminal_eligible: false,
+  permission_profile_required: "read",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: [],
+    properties: {
+      document_id: { type: "string" },
+      source_url: { type: "string" },
+      source_integrity_hash: { type: "string" },
+      query: { type: "string" },
+      resolve_single_profile_document: { type: "boolean" },
+      page_numbers: { type: "array", items: { type: "number" } },
+      page_start: { type: "number" },
+      page_end: { type: "number" },
+      max_pages: { type: "number" },
+      search_term: { type: "string" },
+      case_sensitive: { type: "boolean" },
+      source_target_intent: { type: "object" },
+    },
+  },
+  output_observation_schema: RESEARCH_LIBRARY_OBSERVATION_SCHEMA,
+  observation_schema: RESEARCH_LIBRARY_OBSERVATION_SCHEMA,
+  safety_tags: ["read_or_observe", "profile_scoped", "saved_research", "page_evidence", "non_terminal", "no_network", "no_shell", "no_code_mutation"],
+  assistant_answer: false,
+  raw_content_included: false,
+};
+
 const scholarlyResearchSearchManifest: HelixWorkstationCapabilityManifest = {
   schema: "helix.workstation_tool_gateway.capability.v1",
   capability_id: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
@@ -4089,6 +4142,7 @@ const rawCapabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   [repoSearchManifest.capability_id, repoSearchManifest],
   [docsSearchManifest.capability_id, docsSearchManifest],
   [internetSearchManifest.capability_id, internetSearchManifest],
+  [researchLibraryReadManifest.capability_id, researchLibraryReadManifest],
   [scholarlyResearchSearchManifest.capability_id, scholarlyResearchSearchManifest],
   [scholarlyFullTextFetchManifest.capability_id, scholarlyFullTextFetchManifest],
   [scholarlyNumericParameterExtractManifest.capability_id, scholarlyNumericParameterExtractManifest],
@@ -7089,6 +7143,221 @@ export const callWorkstationGatewayCapability = async (
     };
   }
 
+  if (manifest.capability_id === RESEARCH_LIBRARY_READ_CAPABILITY) {
+    const args = readArguments(input.arguments);
+    const profileId = cleanString(input.profileId);
+    const documentId = optionalString(args.document_id ?? args.documentId);
+    const sourceUrl = optionalString(args.source_url ?? args.sourceUrl);
+    const sourceIntegrityHash = optionalString(args.source_integrity_hash ?? args.sourceIntegrityHash);
+    const resolveSingleProfileDocument =
+      args.resolve_single_profile_document === true || args.resolveSingleProfileDocument === true;
+    const query = optionalString(args.query ?? args.prompt);
+    const searchTerm = optionalString(args.search_term ?? args.searchTerm);
+    const rawPageNumbers = args.page_numbers ?? args.pageNumbers;
+    const pageNumbers = Array.isArray(rawPageNumbers)
+      ? Array.from(new Set(rawPageNumbers
+          .map((page) => readFiniteNumber(page))
+          .filter((page): page is number => page != null && page > 0)
+          .map((page) => Math.floor(page))))
+        .slice(0, 40)
+      : [];
+    const pageNumberSet = new Set(pageNumbers);
+    const pageStart = readFiniteNumber(args.page_start ?? args.pageStart);
+    const pageEnd = readFiniteNumber(args.page_end ?? args.pageEnd);
+    const requestedMaxPages = Math.floor(readFiniteNumber(args.max_pages ?? args.maxPages) ?? 4);
+    const maxPages = Math.max(1, Math.min(40, pageNumbers.length > 0
+      ? Math.max(requestedMaxPages, pageNumbers.length)
+      : requestedMaxPages));
+    const caseSensitive = args.case_sensitive === true || args.caseSensitive === true;
+    const pageBoundaryMode = optionalString(args.page_boundary_mode ?? args.pageBoundaryMode);
+    const pageBoundarySentencesRequested = pageBoundaryMode === "first_last_nonblank_sentence";
+    const noExactSource = !documentId && !sourceUrl && !sourceIntegrityHash;
+    const missingSource = noExactSource && !resolveSingleProfileDocument;
+    const profileDocuments = profileId && noExactSource && resolveSingleProfileDocument
+      ? (await listResearchLibraryDocuments(profileId)).documents
+      : [];
+    const ambiguousSavedReferent = noExactSource && resolveSingleProfileDocument && profileDocuments.length > 1;
+    const resolvedDocumentId = documentId ?? (
+      noExactSource && resolveSingleProfileDocument && profileDocuments.length === 1
+        ? profileDocuments[0]?.document_id ?? null
+        : null
+    );
+    const document = profileId && !missingSource && !ambiguousSavedReferent && (!noExactSource || resolvedDocumentId)
+      ? await findResearchLibraryDocument({
+          profile_id: profileId,
+          document_id: resolvedDocumentId,
+          source_url: sourceUrl,
+          source_integrity_hash: sourceIntegrityHash,
+        })
+      : null;
+    const blockedReason = !profileId
+      ? "profile_session_required"
+      : missingSource
+        ? "saved_research_source_required"
+        : ambiguousSavedReferent
+          ? "saved_research_referent_ambiguous"
+        : !document
+          ? "saved_research_document_not_found"
+          : null;
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: blockedReason ? "blocked" : "admitted",
+      reason: blockedReason ? "research_library_read_blocked" : "profile_scoped_read_only_gateway_capability",
+      blockedReason: blockedReason ?? undefined,
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const allPages = document?.pages ?? [];
+    const rangePages = allPages.filter((page) => pageNumbers.length > 0
+      ? pageNumberSet.has(page.page)
+      : (pageStart == null || page.page >= pageStart) && (pageEnd == null || page.page <= pageEnd));
+    const normalizedSearchTerm = searchTerm
+      ? (caseSensitive ? searchTerm : searchTerm.toLowerCase()).replace(/\s+/g, " ").trim()
+      : null;
+    const matchCounts = searchTerm
+      ? rangePages.map((page) => {
+          const pageText = page.text.replace(/\s+/g, " ").trim();
+          const haystack = caseSensitive ? pageText : pageText.toLowerCase();
+          let count = 0;
+          let cursor = 0;
+          while (normalizedSearchTerm && (cursor = haystack.indexOf(normalizedSearchTerm, cursor)) >= 0) {
+            count += 1;
+            cursor += Math.max(1, normalizedSearchTerm.length);
+          }
+          return { page: page.page, count };
+        })
+      : [];
+    const queryTerms = (query ?? "")
+      .toLowerCase()
+      .replace(/https?:\/\/\S+/g, " ")
+      .split(/[^a-z0-9]+/)
+      .filter((term) => term.length >= 4)
+      .filter((term) => !["using", "existing", "full", "text", "evidence", "report", "include", "page", "grounded", "references", "from", "this", "that"].includes(term));
+    const rankedPages = rangePages
+      .map((page) => ({
+        page,
+        score: queryTerms.reduce((score, term) => score + (page.text.toLowerCase().includes(term) ? 1 : 0), 0),
+      }))
+      .sort((left, right) => right.score - left.score || left.page.page - right.page.page);
+    const metadataRequested = /\b(?:title|authors?|abstract|metadata)\b/i.test(query ?? "");
+    const selectedPageNumbers = new Set<number>();
+    if (searchTerm) {
+      matchCounts.filter((entry) => entry.count > 0).slice(0, maxPages).forEach((entry) => selectedPageNumbers.add(entry.page));
+    } else {
+      if (metadataRequested && rangePages.some((page) => page.page === 1)) selectedPageNumbers.add(1);
+      rankedPages.slice(0, maxPages).forEach(({ page }) => selectedPageNumbers.add(page.page));
+    }
+    const selectedPages = rangePages
+      .filter((page) => selectedPageNumbers.has(page.page))
+      .slice(0, maxPages)
+      .map((page) => {
+        const compactPageText = page.text.replace(/\s+/g, " ").trim();
+        const searchablePageText = caseSensitive ? compactPageText : compactPageText.toLowerCase();
+        const matchIndex = normalizedSearchTerm ? searchablePageText.indexOf(normalizedSearchTerm) : -1;
+        const excerptStart = matchIndex >= 0 ? Math.max(0, matchIndex - 300) : 0;
+        const textualSentences = pageBoundarySentencesRequested
+          ? Array.from(page.text.matchAll(/[^.!?]+[.!?]+(?:["'’”\)\]]*)/gu))
+              .map((match) => match[0].trim())
+              .filter((sentence) => {
+                const words = sentence.match(/\p{L}[\p{L}\p{M}'’\-]*/gu) ?? [];
+                const letters = sentence.match(/\p{L}/gu) ?? [];
+                return words.length >= 4 && letters.length >= 12;
+              })
+          : [];
+        const firstBoundarySentence = textualSentences[0]?.replace(
+          new RegExp(`^${page.page}\\s+(?=\\p{L})`, "u"),
+          "",
+        );
+        return {
+          page: page.page,
+          text_excerpt: compactPageText.slice(excerptStart, excerptStart + (searchTerm ? 1200 : 5000)),
+          source_text_ref: page.source_text_ref,
+          text_char_count: page.text_char_count,
+          ...(textualSentences.length > 0
+            ? {
+                first_nonblank_sentence: firstBoundarySentence,
+                last_nonblank_sentence: textualSentences[textualSentences.length - 1],
+              }
+            : {}),
+        };
+      });
+    const completedSearch = Boolean(document && !blockedReason && searchTerm);
+    const selectedForAnswer = Boolean(document && (selectedPages.length > 0 || completedSearch));
+    const observation = {
+      schema: RESEARCH_LIBRARY_OBSERVATION_SCHEMA,
+      artifact_id: `${turnId}:research_library_observation:${iteration}`,
+      turn_id: turnId,
+      capability: RESEARCH_LIBRARY_READ_CAPABILITY,
+      ...(document ? { document: (() => { const { pages: _pages, ...summary } = document; return { ...summary, raw_content_included: false }; })() } : {}),
+      selected_pages: selectedPages,
+      requested_source_url: sourceUrl,
+      requested_document_id: documentId,
+      resolved_document_id: resolvedDocumentId,
+      requested_query: query,
+      page_numbers: pageNumbers.length > 0 ? pageNumbers : null,
+      page_start: pageStart,
+      page_end: pageEnd,
+      page_boundary_mode: pageBoundarySentencesRequested ? pageBoundaryMode : null,
+      ...(searchTerm ? {
+        search_term: searchTerm,
+        match_count: matchCounts.reduce((sum, entry) => sum + entry.count, 0),
+        match_pages: matchCounts.filter((entry) => entry.count > 0).map((entry) => entry.page),
+      } : {}),
+      evidence_state: selectedForAnswer ? "full_text_usable" : "saved_full_text_missing",
+      evidence_origin: "profile_research_library",
+      selected_for_answer: selectedForAnswer,
+      missing_requirements: blockedReason ? [blockedReason] : selectedForAnswer ? [] : ["saved_research_page_evidence_missing"],
+      status: selectedForAnswer ? "succeeded" : blockedReason ? "blocked" : "failed",
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "docs-viewer",
+      action: "read_research_library_document",
+      status: selectedForAnswer ? "succeeded" : blockedReason ? "blocked" : "failed",
+      summary: selectedForAnswer
+        ? searchTerm
+          ? `Completed a private Research Library scan with ${matchCounts.reduce((sum, entry) => sum + entry.count, 0)} match(es) across ${matchCounts.filter((entry) => entry.count > 0).length} page(s).`
+          : `Read ${selectedPages.length} bounded page excerpt(s) from the private Research Library.`
+        : "Private Research Library evidence was unavailable for the requested exact source.",
+      observation,
+      missingRequirements: observation.missing_requirements.map((code) => ({
+        code,
+        message: code === "profile_session_required"
+          ? "Sign in before reading private saved research evidence."
+          : "The requested saved research source or page evidence was not found.",
+        repair_action: code === "profile_session_required" ? "ask_user" as const : "repair" as const,
+      })),
+    });
+    const error = blockedReason ?? (selectedForAnswer ? undefined : "saved_research_page_evidence_missing");
+    const trace = buildGatewayTrace({ turnId, capabilityId: manifest.capability_id, agentRuntime, admission, observationPacket, error });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: selectedForAnswer,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      ...(error ? { error } : {}),
+    };
+  }
+
   if (manifest.capability_id === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY) {
     const args = readArguments(input.arguments);
     const query = normalizeExternalSearchQuery(args.query ?? args.search_query ?? args.prompt ?? args.doi ?? args.arxiv_id);
@@ -7978,6 +8247,7 @@ export const callWorkstationGatewayCapability = async (
         ? [
             `scientific_image_sidecar=${scientificEvidenceSidecar.sidecar_id}; sidecar_admissibility=${scientificEvidenceSidecar.admissibility.status}; evidence_source=${scientificEvidenceInput.source}`,
             `exact_equation_rows=admissible:${scientificEvidenceSidecar.exact_equation_summary.admissible_row_count}; partial:${scientificEvidenceSidecar.exact_equation_summary.partial_row_count}; rejected:${scientificEvidenceSidecar.exact_equation_summary.rejected_row_count}`,
+            `exact_equation_blocks=admissible:${scientificEvidenceSidecar.exact_equation_summary.admissible_block_count ?? 0}; partial:${scientificEvidenceSidecar.exact_equation_summary.partial_block_count ?? 0}; rejected:${scientificEvidenceSidecar.exact_equation_summary.rejected_block_count ?? 0}`,
           ]
         : [`scientific_image_sidecar=missing; evidence_source=${scientificEvidenceInput.source}`]),
       "calculator_template_boundary=admitted calculator payloads are diagnostic templates unless variables, units, assumptions, and source refs are bound.",

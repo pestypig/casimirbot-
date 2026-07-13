@@ -36,6 +36,21 @@ const repoContract = (turnId: string) => ({
   raw_content_included: false,
 });
 
+const researchLibraryObservation = (turnId: string) => ({
+  artifact_id: `${turnId}:research_library_observation`,
+  kind: "research_library_observation",
+  payload: {
+    schema: "helix.research_library_observation.v1",
+    artifact_id: `${turnId}:research_library_observation`,
+    selected_for_answer: true,
+    selected_pages: [{
+      page: 8,
+      source_text_ref: "artifact://paper.pdf#page=8&text",
+      text_excerpt: "Wasserstein evidence",
+    }],
+  },
+});
+
 const scholarlyContract = (turnId: string) => ({
   schema: "helix.route_product_contract.v1",
   turn_id: turnId,
@@ -279,6 +294,172 @@ const addMoralGraphRuntimeProof = (payload: Record<string, unknown>, observation
 };
 
 describe("final_answer_draft terminal selection", () => {
+  it("rejects abbreviated or mislabeled scholarly page evidence links", () => {
+    const turnId = "ask:test:invalid-page-evidence-links";
+    const artifact = researchLibraryObservation(turnId);
+    const gate = evaluateFinalAnswerDraftQualityGate({
+      turnId,
+      finalAnswerDraftRef: `${turnId}:draft`,
+      draftText: "- Page 8: 7 exact case-sensitive occurrences — `…pdf#page=8&text`\n- [Page 8](artifact://paper.pdf#page=9&text)",
+      draftPayload: { support_refs: [artifact.artifact_id] },
+      promptText:
+        "Within only pages 8 and 9, return the count per page and page-grounded evidence locations.",
+      routeProductContract: scholarlyContract(turnId),
+      payload: { active_prompt: "Return page-grounded evidence locations." },
+      artifactLedger: [artifact],
+    });
+
+    expect(gate.ok).toBe(false);
+    expect(gate.violations).toContain("invalid_page_evidence_links");
+  });
+
+  it("allows no match-location links only when every requested page explicitly reports zero occurrences", () => {
+    const turnId = "ask:test:zero-page-evidence-links";
+    const artifact = researchLibraryObservation(turnId);
+    const prompt =
+      "Within only pages 8 and 9, return the count per page and complete page-grounded evidence locations.";
+    const evaluate = (draftText: string) => evaluateFinalAnswerDraftQualityGate({
+      turnId,
+      finalAnswerDraftRef: `${turnId}:draft`,
+      draftText,
+      draftPayload: { support_refs: [artifact.artifact_id] },
+      promptText: prompt,
+      routeProductContract: scholarlyContract(turnId),
+      payload: { active_prompt: prompt },
+      artifactLedger: [artifact],
+    });
+
+    const completeZeroGate = evaluate([
+      "Page 8: **0** occurrences — no page-grounded match locations.",
+      "Page 9: **0** occurrences — no page-grounded match locations.",
+    ].join("\n\n"));
+    const partialZeroGate = evaluate("Page 8: **0** occurrences — no page-grounded match locations.");
+    const positiveWithoutLinkGate = evaluate([
+      "Page 8: **1** occurrence — page-grounded evidence unavailable.",
+      "Page 9: **0** occurrences — no page-grounded match locations.",
+    ].join("\n\n"));
+
+    expect(completeZeroGate.violations).not.toContain("invalid_page_evidence_links");
+    expect(partialZeroGate.violations).toContain("invalid_page_evidence_links");
+    expect(positiveWithoutLinkGate.violations).toContain("invalid_page_evidence_links");
+  });
+
+  it("requires exact admitted sentence boundaries for saved-page boundary prompts", () => {
+    const turnId = "ask:test:page-boundary-sentences";
+    const artifact = researchLibraryObservation(turnId);
+    artifact.payload.selected_pages[0] = {
+      ...artifact.payload.selected_pages[0],
+      first_nonblank_sentence: "First actual sentence has enough words.",
+      last_nonblank_sentence: "Last actual sentence also has enough words.",
+    };
+    const prompt =
+      "From only page 8, return the first and last nonblank sentences exactly as extracted, followed by one complete page-grounded evidence link.";
+    const evaluate = (draftText: string) => evaluateFinalAnswerDraftQualityGate({
+      turnId,
+      finalAnswerDraftRef: `${turnId}:draft`,
+      draftText,
+      draftPayload: { support_refs: [artifact.artifact_id] },
+      promptText: prompt,
+      routeProductContract: scholarlyContract(turnId),
+      payload: { active_prompt: prompt },
+      artifactLedger: [artifact],
+    });
+    const validGate = evaluate([
+      "First actual sentence has enough words.",
+      "Last actual sentence also has enough words.",
+      "[Page 8](artifact://paper.pdf#page=8&text)",
+    ].join("\n\n"));
+    const fragmentGate = evaluate([
+      "8 1 ∼ 6.",
+      "Last actual sentence also has enough words.",
+      "[Page 8](artifact://paper.pdf#page=8&text)",
+    ].join("\n\n"));
+
+    expect(validGate.violations).not.toContain("missing_requested_page_boundaries");
+    expect(fragmentGate.violations).toContain("missing_requested_page_boundaries");
+  });
+
+  it("allows conditional Image Lens fallback only with an explicit grounded missing-visual report", () => {
+    const turnId = "ask:test:conditional-visual-evidence";
+    const artifact = researchLibraryObservation(turnId);
+    const prompt = [
+      "Use saved text first, then use Image Lens only if visual inspection is necessary.",
+      "If page-image evidence cannot be materialized, report the exact missing requirement.",
+      "Return separate Text evidence and Visual evidence sections with page-grounded references.",
+    ].join(" ");
+    const evaluate = (draftText: string, artifacts = [artifact]) => evaluateFinalAnswerDraftQualityGate({
+      turnId,
+      finalAnswerDraftRef: `${turnId}:draft`,
+      draftText,
+      draftPayload: { support_refs: [artifact.artifact_id] },
+      promptText: prompt,
+      routeProductContract: scholarlyContract(turnId),
+      payload: { active_prompt: prompt },
+      artifactLedger: artifacts,
+    });
+    const groundedMissing = evaluate([
+      "## Text evidence",
+      "Equation (47) is present. [Page 8](artifact://paper.pdf#page=8&text)",
+      "## Visual evidence",
+      "No page-image evidence was materialized because no rendered page or Image Lens source ID was supplied.",
+    ].join("\n\n"));
+    const inventedVisual = evaluate([
+      "## Text evidence",
+      "Equation (47) is present. [Page 8](artifact://paper.pdf#page=8&text)",
+      "## Visual evidence",
+      "Image Lens visually confirmed the displayed layout, although no rendered page source was available.",
+    ].join("\n\n"));
+    const missingSection = evaluate([
+      "## Text evidence",
+      "Equation (47) is present. [Page 8](artifact://paper.pdf#page=8&text)",
+      "No rendered page was supplied.",
+    ].join("\n\n"));
+    const liveProviderAnswer = evaluate([
+      "### Text evidence",
+      "Saved machine-readable page-8 text locates equation **(47)** and its constraints. [Saved paper, page 8 text](artifact://paper.pdf#page=8&text)",
+      "### Visual evidence",
+      "No Image Lens inspection was run: the saved text was sufficient, and no page-image artifact was materialized.",
+      "Exact missing requirement: a **rendered page-8 image reference or an Image Lens source ID with pixel bounds**. Without that, I cannot verify visual layout details such as alignment, line breaks, or display positioning.",
+    ].join("\n\n"));
+
+    expect(groundedMissing.violations).not.toContain("invalid_conditional_visual_evidence_answer");
+    expect(liveProviderAnswer.violations).toEqual([]);
+    expect(inventedVisual.violations).toContain("invalid_conditional_visual_evidence_answer");
+    expect(missingSection.violations).toContain("invalid_conditional_visual_evidence_answer");
+  });
+
+  it("enforces explicit per-bullet page reference counts and identities", () => {
+    const turnId = "ask:test:per-bullet-page-evidence-links";
+    const artifact = researchLibraryObservation(turnId);
+    const prompt =
+      "Every bullet must end with exactly two evidence references: one to page 8 and one to page 9.";
+    const validBullet =
+      "- Comparison. [Page 8](artifact://paper.pdf#page=8&text) [Page 9](artifact://paper.pdf#page=9&text)";
+    const invalidGate = evaluateFinalAnswerDraftQualityGate({
+      turnId,
+      finalAnswerDraftRef: `${turnId}:invalid-draft`,
+      draftText: `${validBullet}\n\n- Incomplete. [Page 8](artifact://paper.pdf#page=8&text)`,
+      draftPayload: { support_refs: [artifact.artifact_id] },
+      promptText: prompt,
+      routeProductContract: scholarlyContract(turnId),
+      payload: { active_prompt: prompt },
+      artifactLedger: [artifact],
+    });
+    const validGate = evaluateFinalAnswerDraftQualityGate({
+      turnId,
+      finalAnswerDraftRef: `${turnId}:valid-draft`,
+      draftText: `${validBullet}\n\n${validBullet}`,
+      draftPayload: { support_refs: [artifact.artifact_id] },
+      promptText: prompt,
+      routeProductContract: scholarlyContract(turnId),
+      payload: { active_prompt: prompt },
+      artifactLedger: [artifact],
+    });
+
+    expect(invalidGate.violations).toContain("invalid_page_evidence_links");
+    expect(validGate.violations).not.toContain("invalid_page_evidence_links");
+  });
+
   it("materializes a grounded capability-catalog draft as capability_help_summary", () => {
     const turnId = "ask:test:capability-help-draft-materialization";
     const registryRef = `${turnId}:capability_registry`;

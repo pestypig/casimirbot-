@@ -39,6 +39,21 @@ export type SaveResearchLibraryExtractionInput = {
 
 const clean = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 const iso = (value: Date | string): string => value instanceof Date ? value.toISOString() : value;
+const canonicalResearchSourceUrl = (value: unknown): string => {
+  const raw = clean(value);
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    url.hash = "";
+    if (url.hostname.toLowerCase() === "arxiv.org") {
+      const match = url.pathname.match(/^\/(?:abs|pdf)\/([^/?#]+?)(?:\.pdf)?$/i);
+      if (match?.[1]) return `https://arxiv.org/pdf/${match[1]}`;
+    }
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return raw;
+  }
+};
 
 const encryptionKey = (): { key: Buffer; keyId: string } => {
   const configured = clean(process.env.HELIX_PROFILE_STORAGE_ENCRYPTION_KEY);
@@ -201,6 +216,37 @@ export async function readResearchLibraryDocument(
   return { ...parseMetadata(row), pages: decryptPages(row.encrypted_content), raw_content_included: true };
 }
 
+export async function findResearchLibraryDocument(input: {
+  profile_id: string;
+  document_id?: string | null;
+  source_url?: string | null;
+  source_integrity_hash?: string | null;
+}): Promise<HelixResearchLibraryDocument | null> {
+  const profileId = clean(input.profile_id);
+  const documentId = clean(input.document_id);
+  const sourceUrl = clean(input.source_url);
+  const integrityHash = clean(input.source_integrity_hash);
+  if (!profileId || (!documentId && !sourceUrl && !integrityHash)) return null;
+  await ensureDatabase();
+  const { rows } = await getPool().query<ResearchLibraryRow>(
+    `SELECT * FROM helix_research_library_documents
+     WHERE profile_id = $1 AND deleted_at IS NULL
+     ORDER BY updated_at DESC LIMIT 200`,
+    [profileId],
+  );
+  const canonicalSourceUrl = canonicalResearchSourceUrl(sourceUrl);
+  const row = rows.find((candidate) => {
+    const metadata = typeof candidate.metadata === "string" ? JSON.parse(candidate.metadata) : candidate.metadata;
+    return (
+      (!documentId || candidate.document_id === documentId) &&
+      (!integrityHash || candidate.source_integrity_hash === integrityHash) &&
+      (!canonicalSourceUrl || canonicalResearchSourceUrl(metadata.source_url) === canonicalSourceUrl)
+    );
+  });
+  if (!row) return null;
+  return { ...parseMetadata(row), pages: decryptPages(row.encrypted_content), raw_content_included: true };
+}
+
 export async function deleteResearchLibraryDocument(profileId: string, documentId: string): Promise<boolean> {
   await ensureDatabase();
   const result = await getPool().query(
@@ -210,4 +256,3 @@ export async function deleteResearchLibraryDocument(profileId: string, documentI
   );
   return (result.rowCount ?? 0) > 0;
 }
-

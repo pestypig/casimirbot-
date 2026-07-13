@@ -72,9 +72,11 @@ const deriveScientificPostulateEvidenceFallbacks = (args: {
   const graphReflectionRefs = [...(args.context.graphReflectionRefs ?? [])];
   const calculatorCheckRefs = [...(args.context.calculatorCheckRefs ?? [])];
   const cropRefs = args.context.cropRefs ?? [];
+  const hasExactBlockPromotion = /\bexact_block_promoted\b|\bpromoted\s+exact\s+blocks?\b|\bactive\s+promoted\s+block\s+blockers\s*:\s*`?none/i.test(args.evidenceText);
   const hasExactRowPromotion = /\bexact_row_promoted\b|\bpromoted\s+exact\s+rows?\b|\bactive\s+promoted\s+row\s+blockers\s*:\s*`?none/i.test(args.evidenceText);
-  if (hasExactRowPromotion && promotedEquationRowRefs.length === 0) {
-    cropRefs.forEach((ref) => promotedEquationRowRefs.push(`promoted_equation_row:${ref}`));
+  if ((hasExactRowPromotion || hasExactBlockPromotion) && promotedEquationRowRefs.length === 0) {
+    const prefix = hasExactBlockPromotion ? "promoted_equation_block" : "promoted_equation_row";
+    cropRefs.forEach((ref) => promotedEquationRowRefs.push(`${prefix}:${ref}`));
   }
   if (/\bTheory Badge Graph reflection completed\b|\bdiagnostic graph reflection\b|\bgraph reflection\b/i.test(args.evidenceText) && graphReflectionRefs.length === 0) {
     graphReflectionRefs.push(`graph_reflection:diagnostic:${args.originatingAnswerId ?? "current-ask-context"}`);

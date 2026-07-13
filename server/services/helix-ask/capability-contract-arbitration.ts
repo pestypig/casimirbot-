@@ -172,6 +172,8 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
       return "scholarly_research_lookup";
     case "scholarly-research.fetch_full_text":
       return "scholarly_full_text_lookup";
+    case "research-library.read_document":
+      return "scholarly_saved_full_text_read";
     case "scholarly-research.extract_numeric_parameters":
       return "scholarly_numeric_parameter_extraction";
     case "live_env.check_live_source_mail":
@@ -261,6 +263,8 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
     case "scholarly-research.fetch_full_text":
     case "scholarly-research.extract_numeric_parameters":
       return "external_scholarly_research";
+    case "research-library.read_document":
+      return "profile_scholarly_evidence";
     case "live_env.check_live_source_mail":
     case "live_env.read_live_source_mail":
     case "live_env.read_processed_live_source_mail":

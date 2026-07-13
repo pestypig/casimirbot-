@@ -2286,6 +2286,7 @@ const compactPromotedScientificImageEvidence = (
     admissibility: readString(record.admissibility),
     exact_equation_admissibility: readString(record.exact_equation_admissibility),
     exact_row_promotion_status: readString(asRecord(record.exact_row_promotion)?.status),
+    exact_block_promotion_status: readString(asRecord(record.exact_block_promotion)?.status),
     active_blockers: readStringArray(record.active_blockers).slice(0, 16),
     promotion_reasons: readStringArray(record.promotion_reasons).slice(0, 16),
     claim_boundary: readString(record.claim_boundary),
@@ -2313,6 +2314,9 @@ const scientificImageEvidenceSelectionReasonForDebug = (
   ) {
     return "label_only_locator_requires_row_expansion";
   }
+  if (depth === "exact_block_promoted") return "latest_promoted_exact_block";
+  if (depth === "exact_block_admissible") return "latest_admissible_exact_block";
+  if (depth === "exact_block_partial") return "latest_partial_exact_block";
   if (depth === "exact_row_promoted") return "latest_promoted_exact_row";
   if (depth === "exact_row_admissible") return "latest_admissible_exact_row";
   if (depth === "exact_row_partial") return "latest_partial_exact_row";

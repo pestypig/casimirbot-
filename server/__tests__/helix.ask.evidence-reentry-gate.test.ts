@@ -93,6 +93,202 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
     });
   });
 
+  it("completes the solver spine for a grounded provider route product after model re-entry", () => {
+    const turnId = "turn:provider-scholarly-route-product";
+    const normalizedRef = `${turnId}:codex_normalized:research_library_observation:1`;
+    const packetRef = `${turnId}:workstation_gateway:research-library.read_document:packet`;
+    const candidateRef = `${turnId}:agent_provider_terminal_candidate:codex:abc123`;
+    const routeProductRef = `${candidateRef}:route_product:scholarly_research_answer`;
+    const trace = buildAskTurnSolverTrace({
+      turnId,
+      promptText: "Use only pages 8 and 9 from that same saved Research Library paper.",
+      selectedRoute: "/ask",
+      terminalArtifactKind: "scholarly_research_answer",
+      finalAnswerSource: "scholarly_research_answer",
+      payload: {
+        turn_id: turnId,
+        source_target_intent: {
+          target_source: "scholarly_research",
+          target_kind: "saved_scholarly_full_text",
+          strength: "hard",
+        },
+        canonical_goal_frame: {
+          schema: "helix.canonical_goal_frame.v1",
+          goal_kind: "agent_provider_gateway_turn",
+          requested_capability: "research-library.read_document",
+          required_terminal_kind: "scholarly_research_answer",
+        },
+        route_product_contract: {
+          schema: "helix.route_product_contract.v1",
+          source_target: "agent_provider_gateway_turn",
+          required_terminal_kind: "scholarly_research_answer",
+          allowed_terminal_artifact_kinds: ["scholarly_research_answer", "typed_failure"],
+        },
+        provider_route_product_materialization: {
+          schema: "helix.provider_route_product_materialization.v1",
+          status: "materialized",
+          provider_terminal_candidate_ref: candidateRef,
+          materialized_terminal_artifact_kind: "scholarly_research_answer",
+          materialized_terminal_artifact_ref: routeProductRef,
+          selected_observation_refs: [packetRef, normalizedRef],
+        },
+        provider_reasoning_reentry: {
+          schema: "helix.provider_reasoning_reentry.v1",
+          status: "completed",
+          provider_terminal_candidate_ref: candidateRef,
+          evidence_reentered: true,
+          solver_completed: true,
+          goal_satisfaction_compatible: true,
+        },
+        provider_terminal_authority_bridge: {
+          schema: "helix.provider_terminal_authority_bridge.v1",
+          provider_terminal_candidate_ref: candidateRef,
+          terminal_authority_granted: true,
+          final_visible_answer_authorized: true,
+        },
+        terminal_authority_single_writer: {
+          selected_terminal_artifact_kind: "scholarly_research_answer",
+          selected_terminal_artifact_ref: routeProductRef,
+        },
+        terminal_answer_authority: {
+          schema: "helix.turn_terminal_authority.v1",
+          terminal_artifact_kind: "scholarly_research_answer",
+          final_answer_source: "scholarly_research_answer",
+          server_authoritative: true,
+        },
+        terminal_presentation: {
+          schema: "helix.terminal_presentation.v1",
+          terminal_artifact_kind: "scholarly_research_answer",
+          final_answer_source: "scholarly_research_answer",
+          selected_observation_refs: [packetRef, normalizedRef],
+        },
+        current_turn_artifact_ledger: [
+          {
+            artifact_id: normalizedRef,
+            kind: "research_library_observation",
+            payload: { artifact_id: normalizedRef, selected_for_answer: true },
+          },
+          {
+            artifact_id: packetRef,
+            kind: "provider_gateway_observation_packet",
+            payload: { artifact_id: packetRef, selected_for_answer: true },
+          },
+        ],
+      },
+      loopParityTrace: {
+        actual_tool_calls: [{
+          tool_id: "research-library.read_document",
+          family: "scholarly_research",
+          admitted: true,
+          mutating: false,
+          result_ref: packetRef,
+        }],
+        observations_created: [
+          { observation_id: packetRef, source_kind: "scholarly_research" },
+          { observation_id: normalizedRef, source_kind: "scholarly_research" },
+        ],
+        evidence_selected_for_answer: [],
+        evidence_rejected_for_answer: [],
+        poison_audit_ok: true,
+        terminal_authority_ok: true,
+      },
+    });
+
+    expect(trace).toMatchObject({
+      completed_solver_path: true,
+      route_authority_ok: true,
+      terminal_authority_ok: true,
+      evidence_reentry: { required: true, completed: true },
+      followup_reasoning: { required: true, completed: true },
+      solver_risk_flags: [],
+      solver_short_circuit_flags: [],
+    });
+  });
+
+  it("fails closed when a provider route product lacks completed model re-entry", () => {
+    const turnId = "turn:provider-route-product-without-reentry";
+    const observationRef = `${turnId}:workstation_gateway:research-library.read_document:packet`;
+    const candidateRef = `${turnId}:agent_provider_terminal_candidate:codex:def456`;
+    const routeProductRef = `${candidateRef}:route_product:scholarly_research_answer`;
+    const trace = buildAskTurnSolverTrace({
+      turnId,
+      promptText: "Summarize the saved Research Library paper.",
+      selectedRoute: "/ask",
+      terminalArtifactKind: "scholarly_research_answer",
+      finalAnswerSource: "scholarly_research_answer",
+      payload: {
+        turn_id: turnId,
+        source_target_intent: { target_source: "scholarly_research", strength: "hard" },
+        canonical_goal_frame: {
+          goal_kind: "agent_provider_gateway_turn",
+          required_terminal_kind: "scholarly_research_answer",
+        },
+        route_product_contract: {
+          source_target: "agent_provider_gateway_turn",
+          required_terminal_kind: "scholarly_research_answer",
+          allowed_terminal_artifact_kinds: ["scholarly_research_answer", "typed_failure"],
+        },
+        provider_route_product_materialization: {
+          status: "materialized",
+          provider_terminal_candidate_ref: candidateRef,
+          materialized_terminal_artifact_kind: "scholarly_research_answer",
+          materialized_terminal_artifact_ref: routeProductRef,
+          selected_observation_refs: [observationRef],
+        },
+        provider_reasoning_reentry: {
+          status: "pending_helix_solver_reentry",
+          provider_terminal_candidate_ref: candidateRef,
+          evidence_reentered: false,
+          solver_completed: false,
+          goal_satisfaction_compatible: false,
+        },
+        provider_terminal_authority_bridge: {
+          provider_terminal_candidate_ref: candidateRef,
+          terminal_authority_granted: true,
+          final_visible_answer_authorized: true,
+        },
+        terminal_authority_single_writer: {
+          selected_terminal_artifact_kind: "scholarly_research_answer",
+          selected_terminal_artifact_ref: routeProductRef,
+        },
+        terminal_answer_authority: {
+          terminal_artifact_kind: "scholarly_research_answer",
+          final_answer_source: "scholarly_research_answer",
+          server_authoritative: true,
+        },
+        terminal_presentation: {
+          terminal_artifact_kind: "scholarly_research_answer",
+          final_answer_source: "scholarly_research_answer",
+          selected_observation_refs: [observationRef],
+        },
+        current_turn_artifact_ledger: [{
+          artifact_id: observationRef,
+          kind: "provider_gateway_observation_packet",
+          payload: { artifact_id: observationRef, selected_for_answer: true },
+        }],
+      },
+      loopParityTrace: {
+        actual_tool_calls: [{
+          tool_id: "research-library.read_document",
+          family: "scholarly_research",
+          admitted: true,
+          mutating: false,
+          result_ref: observationRef,
+        }],
+        observations_created: [{ observation_id: observationRef, source_kind: "scholarly_research" }],
+        evidence_selected_for_answer: [],
+        evidence_rejected_for_answer: [],
+        poison_audit_ok: true,
+        terminal_authority_ok: true,
+      },
+    });
+
+    expect(trace.completed_solver_path).toBe(false);
+    expect(trace.route_authority_ok).toBe(false);
+    expect(trace.evidence_reentry_gate.completed).toBe(false);
+    expect(trace.evidence_reentry_gate.violation_codes.length).toBeGreaterThan(0);
+  });
+
   it("flags receipt terminal output for content prompts when the receipt did not re-enter", () => {
     const gate = buildEvidenceReentryGate({
       turnId: "turn:receipt-content",

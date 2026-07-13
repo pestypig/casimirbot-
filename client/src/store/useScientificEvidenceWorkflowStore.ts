@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
+import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 import type { ScientificEvidenceWorkflowStatus } from "@/components/helix/ask-console/ScientificEvidenceWorkflowStatus";
 
 export type { ScientificEvidenceWorkflowStatus } from "@/components/helix/ask-console/ScientificEvidenceWorkflowStatus";
@@ -7,6 +7,7 @@ export type { ScientificEvidenceWorkflowStatus } from "@/components/helix/ask-co
 const SCIENTIFIC_EVIDENCE_WORKFLOW_STORAGE_KEY = "helix:scientific-evidence-workflow-status:v1";
 const MAX_WORKFLOW_STATUSES = 12;
 const MAX_REF_COUNT = 24;
+const MAX_REF_CHARS = 1_024;
 const MAX_LATEX_CHARS = 2_000;
 
 type WorkflowStatusKeyInput = {
@@ -37,8 +38,17 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
+const compactEvidenceRef = (value: unknown): string | null => {
+  const normalized = readString(value);
+  if (!normalized) return null;
+  // Display payloads belong in the in-memory Image Lens source, not in the
+  // compact workflow ledger persisted by Zustand.
+  if (/^(?:data:image\/|blob:)/i.test(normalized)) return null;
+  return normalized.length <= MAX_REF_CHARS ? normalized : null;
+};
+
 const unique = (...groups: Array<Array<string | null | undefined> | undefined>): string[] =>
-  Array.from(new Set(groups.flatMap((group) => group ?? []).map((value) => readString(value)).filter(Boolean) as string[])).slice(0, MAX_REF_COUNT);
+  Array.from(new Set(groups.flatMap((group) => group ?? []).map((value) => compactEvidenceRef(value)).filter(Boolean) as string[])).slice(0, MAX_REF_COUNT);
 
 const truncateLatex = (value: string | null): string | null => {
   if (!value) return null;
@@ -53,7 +63,9 @@ const evidenceDepthRank: Record<ScientificEvidenceWorkflowStatus["evidenceDepth"
   page_image_observation: 2,
   page_image_ocr_math_candidate: 3,
   exact_row_partial: 4,
-  exact_row_promoted: 5,
+  exact_block_partial: 5,
+  exact_row_promoted: 6,
+  exact_block_promoted: 7,
 };
 
 const promotedRowRank: Record<ScientificEvidenceWorkflowStatus["promotedRowState"], number> = {
@@ -82,6 +94,12 @@ function chooseByRank<T extends string>(left: T, right: T, rank: Record<T, numbe
 function normalizeStatus(status: ScientificEvidenceWorkflowStatus): ScientificEvidenceWorkflowStatus {
   return {
     ...status,
+    sourceId: compactEvidenceRef(status.sourceId),
+    sourceKind: compactEvidenceRef(status.sourceKind),
+    sourceImageHash: compactEvidenceRef(status.sourceImageHash),
+    cropRef: compactEvidenceRef(status.cropRef),
+    cropRegionRef: compactEvidenceRef(status.cropRegionRef),
+    sidecarId: compactEvidenceRef(status.sidecarId),
     promotedEquationLatex: truncateLatex(status.promotedEquationLatex),
     postulateReadyRefs: {
       evidenceSidecarRefs: unique(status.postulateReadyRefs.evidenceSidecarRefs),
@@ -232,6 +250,25 @@ function clampPersistedStatuses(statuses: Record<string, ScientificEvidenceWorkf
   return Object.fromEntries(ranked.slice(0, MAX_WORKFLOW_STATUSES));
 }
 
+const quotaSafeLocalStorage: StateStorage = {
+  getItem: (name) => window.localStorage.getItem(name),
+  setItem: (name, value) => {
+    try {
+      window.localStorage.setItem(name, value);
+    } catch {
+      // Persistence is a recovery aid. A quota failure must never abort the
+      // active Ask turn or discard its authoritative in-memory workflow state.
+      try {
+        window.localStorage.removeItem(name);
+        window.localStorage.setItem(name, value);
+      } catch {
+        // Keep the current in-memory state when the browser remains full.
+      }
+    }
+  },
+  removeItem: (name) => window.localStorage.removeItem(name),
+};
+
 export const useScientificEvidenceWorkflowStore = create<ScientificEvidenceWorkflowState>()(
   persist(
     (set, get) => ({
@@ -253,9 +290,10 @@ export const useScientificEvidenceWorkflowStore = create<ScientificEvidenceWorkf
         return key;
       },
       mergeStatus: (status, scope) => {
-        const key = workflowStatusKey({ status, ...scope });
+        const normalized = normalizeStatus(status);
+        const key = workflowStatusKey({ status: normalized, ...scope });
         set((state) => {
-          const merged = mergeWorkflowStatus(state.statuses[key], status);
+          const merged = mergeWorkflowStatus(state.statuses[key], normalized);
           const statuses = {
             ...state.statuses,
             [key]: merged,
@@ -275,7 +313,7 @@ export const useScientificEvidenceWorkflowStore = create<ScientificEvidenceWorkf
     }),
     {
       name: SCIENTIFIC_EVIDENCE_WORKFLOW_STORAGE_KEY,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => quotaSafeLocalStorage),
       partialize: (state) => ({
         statuses: clampPersistedStatuses(state.statuses, state.activeKey),
         activeKey: state.activeKey,

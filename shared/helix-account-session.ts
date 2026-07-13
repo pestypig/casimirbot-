@@ -140,6 +140,7 @@ export const HELIX_USER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
     "docs.search",
     "scholarly-research.lookup_papers",
     "scholarly-research.fetch_full_text",
+    "research-library.read_document",
     "scholarly-research.extract_numeric_parameters",
     "theory-badge-graph.reflect_discussion_context",
     "theory-badge-graph.propose_frontier_conjectures",

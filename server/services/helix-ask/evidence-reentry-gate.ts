@@ -603,7 +603,7 @@ const capabilityItineraryEvidencePatterns: Array<{ family: string; pattern: RegE
   },
   {
     family: "scholarly_research",
-    pattern: /scholarly_research_observation|scholarly_full_text_observation|lookup_papers|fetch_full_text/i,
+    pattern: /scholarly_research_observation|scholarly_full_text_observation|research_library_observation|lookup_papers|fetch_full_text|research-library\.read_document/i,
   },
   {
     family: "theory_locator",

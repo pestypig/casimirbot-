@@ -60,6 +60,10 @@ import {
   unquotePrompt,
 } from "./explicit-tool-requests";
 import { appendDedupe } from "./gateway-request-dedupe";
+import {
+  HELIX_RESEARCH_LIBRARY_READ_CAPABILITY,
+  isSavedResearchLibraryEvidencePrompt,
+} from "@shared/helix-research-library";
 
 export const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -1374,6 +1378,76 @@ export const buildPromptDerivedScholarlyResearchGatewayCallRequests = (
         scholarly_intent: intent.scholarlyIntent,
         planned_scholarly_capability_chain: intent.plannedScholarlyCapabilityChain,
         terminal_evidence_requirement: intent.scholarlyIntent.terminal_evidence_requirement,
+      },
+    },
+  }];
+};
+
+export const buildPromptDerivedResearchLibraryGatewayCallRequests = (
+  body: Record<string, unknown>,
+): Record<string, unknown>[] => {
+  const prompt = readPrompt(body);
+  if (!prompt) return [];
+  if (!isSavedResearchLibraryEvidencePrompt(prompt)) return [];
+  const sourceUrl = extractScholarlySourceUrl(prompt);
+  const documentId = prompt.match(/\bresearch:[A-Za-z0-9_-]{8,}\b/)?.[0] ?? null;
+  const savedPaperReferentRequested =
+    /\b(?:that|this|the|same|previous|prior|recent|last)\b[\s\S]{0,50}\b(?:saved\s+)?(?:research\s+library\s+)?(?:paper|pdf|document|extraction)\b/i.test(prompt);
+  if (!sourceUrl && !documentId && !savedPaperReferentRequested) return [];
+  const pageRange = prompt.match(/\bpages?\s+(\d+)\s*(?:-|through|to)\s*(\d+)\b/i);
+  const pageList = !pageRange
+    ? prompt.match(/\bpages\s+(\d+(?:\s*,\s*\d+)*(?:\s*,?\s*(?:and|&)\s*\d+)?)\b/i)
+    : null;
+  const pageNumbers = pageList
+    ? Array.from(new Set((pageList[1].match(/\d+/g) ?? []).map(Number))).filter((page) => page > 0).slice(0, 40)
+    : [];
+  const singlePage = prompt.match(/\bpage\s+(\d+)\b/i);
+  const quotedSearch = prompt.match(/\b(?:occurrences?|containing|contains?|search\s+for|find)\b[^“”"']{0,40}[“"]([^”"]+)[”"]|\b(?:occurrences?|containing|contains?|search\s+for|find)\b[^']{0,40}'([^']+)'/i);
+  const rawSearchTerm = quotedSearch?.[1] ?? quotedSearch?.[2] ?? null;
+  const exactSearchRequested = /\b(?:exact|verbatim|including\s+punctuation)\b/i.test(prompt);
+  const searchTerm = rawSearchTerm
+    ? (exactSearchRequested ? rawSearchTerm : rawSearchTerm.replace(/[.,;:!?]+$/g, "")).trim()
+    : null;
+  const caseSensitiveSearchRequested = Boolean(searchTerm) &&
+    /\bfind\b[\s\S]{0,100}\bexact\s+case[-\s]?sensitive\s+occurrences?\b/i.test(prompt) &&
+    !/\b(?:do\s+not|don't|not|without)\b[\s\S]{0,30}\bcase[-\s]?sensitive\b/i.test(prompt);
+  const pageBoundarySentencesRequested =
+    /\bfirst\s+and\s+last\s+nonblank\s+sentences?\b/i.test(prompt) &&
+    /\bexactly\s+as\s+extracted\b/i.test(prompt);
+  const everyMatchingPageRequested = /\b(?:every|each|all)\s+(?:matching\s+)?pages?\b/i.test(prompt);
+  return [{
+    schema: "helix.workstation_gateway.prompt_derived_research_library_call_request.v1",
+    derivation_source: "helix_prompt_derived_research_library",
+    capability_id: HELIX_RESEARCH_LIBRARY_READ_CAPABILITY,
+    mode: "read",
+    arguments: {
+      ...(sourceUrl ? { source_url: sourceUrl } : {}),
+      ...(documentId ? { document_id: documentId } : {}),
+      ...(!sourceUrl && !documentId && savedPaperReferentRequested
+        ? { resolve_single_profile_document: true }
+        : {}),
+      query: prompt,
+      ...(pageRange ? { page_start: Number(pageRange[1]), page_end: Number(pageRange[2]) } : {}),
+      ...(!pageRange && pageNumbers.length > 0 ? { page_numbers: pageNumbers, max_pages: pageNumbers.length } : {}),
+      ...(!pageRange && pageNumbers.length === 0 && singlePage ? { page_start: Number(singlePage[1]), page_end: Number(singlePage[1]) } : {}),
+      ...(searchTerm ? { search_term: searchTerm } : {}),
+      ...(caseSensitiveSearchRequested ? { case_sensitive: true } : {}),
+      ...(pageBoundarySentencesRequested
+        ? { page_boundary_mode: "first_last_nonblank_sentence" }
+        : {}),
+      ...(everyMatchingPageRequested ? { max_pages: 40 } : {}),
+      source_target_intent: {
+        source: "helix_prompt_derived_research_library",
+        target_source: "research_library",
+        target_kind: "saved_scholarly_full_text",
+        strength: "hard",
+        requested_outputs: searchTerm
+          ? ["saved_page_text", "match_count", "page_grounded_references"]
+          : ["saved_page_text", "page_grounded_references"],
+        exact_source_url: sourceUrl,
+        exact_document_id: documentId,
+        saved_document_referent: savedPaperReferentRequested,
+        no_network_retrieval: true,
       },
     },
   }];

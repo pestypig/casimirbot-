@@ -4,7 +4,10 @@ import { runtimeMemoryGovernor } from "../../../runtime/runtime-memory-governor"
 import type { HelixAgentProvider } from "../../agent-providers/types";
 import { resetInterimVoiceCalloutsForTest } from "../../interim-voice-callout-store";
 import { createHelixCapabilityLaneGoalBindingStore } from "../goal-binding";
-import { buildHelixCapabilityLaneProviderAdapterContext } from "../provider-adapter-context";
+import {
+  buildHelixCapabilityLaneProviderAdapterContext,
+  compactCapabilityLaneModelValue,
+} from "../provider-adapter-context";
 import { createHelixCapabilityLaneSessionStore } from "../session-manager";
 
 const buildProvider = (id: "helix" | "codex"): HelixAgentProvider => ({
@@ -37,6 +40,18 @@ const buildProvider = (id: "helix" | "codex"): HelixAgentProvider => ({
     response_type: "test",
     final_status: "test",
   }),
+});
+
+it("omits inline image payloads from model-visible capability re-entry", () => {
+  const compacted = compactCapabilityLaneModelValue({
+    source_image_ref: `data:image/png;base64,${"a".repeat(500_000)}`,
+    text_candidate: "equation (47) extracted text",
+  });
+  const serialized = JSON.stringify(compacted);
+  expect(serialized).not.toContain("data:image");
+  expect(serialized).toContain("inline_image_payload_omitted");
+  expect(serialized).toContain("equation (47) extracted text");
+  expect(serialized.length).toBeLessThan(1_000);
 });
 
 const body = {
@@ -317,6 +332,50 @@ describe("capability lane provider adapter context", () => {
     expect(codex.prompt_observation_block).toContain("lane_observation");
     expect(codex.prompt_observation_block).toContain("capability_lane_session_debug_summaries");
     expect(codex.prompt_observation_block).toContain("capability_lane_reentry_status");
+    expect(codex.reentry_observation_block).toContain("hello workstation");
+    expect(codex.reentry_observation_block).toContain("utility_text.normalize_text");
+    expect(codex.reentry_observation_block).toContain("capability_lane_observation_packets");
+    expect(codex.reentry_observation_block).toContain("capability_lane_reentry_status");
+    expect(codex.reentry_observation_block).not.toContain("model_visible_capability_lane_manifest");
+    expect(codex.reentry_observation_block).not.toContain("lane_outputs_are_not_final_answers");
+    expect(codex.reentry_observation_block).not.toContain("capability_lane_session_debug_summaries");
+  });
+
+  it("keeps successive capability observation reentry blocks free of planning scaffolds", async () => {
+    const contexts = await Promise.all([
+      buildHelixCapabilityLaneProviderAdapterContext({
+        provider: buildProvider("codex"),
+        body: {
+          turn_id: "turn-provider-adapter-reentry-step-1",
+          capability_lane_call: {
+            capability: "utility_text.normalize_text",
+            text: "first crop observation",
+            normalization_mode: "lowercase",
+          },
+        },
+      }),
+      buildHelixCapabilityLaneProviderAdapterContext({
+        provider: buildProvider("codex"),
+        body: {
+          turn_id: "turn-provider-adapter-reentry-step-2",
+          capability_lane_call: {
+            capability: "utility_text.normalize_text",
+            text: "second narrower crop observation",
+            normalization_mode: "lowercase",
+          },
+        },
+      }),
+    ]);
+
+    expect(contexts[0].reentry_observation_block).toContain("first crop observation");
+    expect(contexts[1].reentry_observation_block).toContain("second narrower crop observation");
+    for (const context of contexts) {
+      expect(context.reentry_observation_block).toContain("capability_lane_observation_packets");
+      expect(context.reentry_observation_block).toContain("capability_lane_reentry_status");
+      expect(context.reentry_observation_block).not.toContain("model_visible_capability_lane_manifest");
+      expect(context.reentry_observation_block).not.toContain("lane_outputs_are_not_final_answers");
+      expect(context.reentry_observation_block).not.toContain("capability_lane_session_debug_summaries");
+    }
   });
 
   it("keeps pending text-to-speech playback visible as executed non-terminal evidence", async () => {

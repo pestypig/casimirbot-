@@ -8,6 +8,7 @@ import type {
 } from "@shared/contracts/document-image-region-receipt.v1";
 
 const MAX_DOCUMENT_IMAGE_RECEIPTS = 40;
+const MAX_PERSISTED_IMAGE_URL_CHARS = 256_000;
 const DOCUMENT_IMAGE_SOURCE_STORAGE_KEY = "helix:image-lens:last-document-source:v1";
 
 export type DocumentImageSourceState = {
@@ -114,6 +115,19 @@ const readPersistedSourceImage = (): DocumentImageSourceState | null => {
 
 const persistSourceImage = (source: DocumentImageSourceState): void => {
   if (typeof window === "undefined" || !isDisplayableImageRef(source.sourceImageUrl)) return;
+  if (
+    /^(?:data:image\/|blob:)/i.test(source.sourceImageUrl.trim()) &&
+    source.sourceImageUrl.length > MAX_PERSISTED_IMAGE_URL_CHARS
+  ) {
+    // A rendered PDF page can be several megabytes. Keep it available in the
+    // active store, but do not let a recovery snapshot consume localStorage.
+    try {
+      window.localStorage.removeItem(DOCUMENT_IMAGE_SOURCE_STORAGE_KEY);
+    } catch {
+      // The in-memory source remains authoritative.
+    }
+    return;
+  }
   try {
     window.localStorage.setItem(DOCUMENT_IMAGE_SOURCE_STORAGE_KEY, JSON.stringify({
       ...source,

@@ -121,6 +121,7 @@ const reviewedSharedProviderGatewayCapabilityIds = [
   "repo.search",
   "docs.search",
   "internet-search.search_web",
+  "research-library.read_document",
   "scholarly-research.lookup_papers",
   "scholarly-research.fetch_full_text",
   "scholarly-research.extract_numeric_parameters",

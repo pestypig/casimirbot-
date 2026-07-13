@@ -619,7 +619,19 @@ export const buildHelixAgentContinuationState = (
     : previousState
       ? previousState.progress.no_progress_repeat_count + (repeatedFingerprint || lastAttempt ? 1 : 0)
       : 0;
-  const goal = normalizeGoalStatus(args.payload);
+  const normalizedGoal = normalizeGoalStatus(args.payload);
+  const recoverableTerminalRejectionPending = Boolean(
+    args.trigger === "terminal_rejection" &&
+    lastAttempt?.failure_class === "terminal_authority" &&
+    lastAttempt.retryability === "retryable",
+  );
+  const goal = recoverableTerminalRejectionPending
+    ? {
+        status: "in_progress" as const,
+        satisfied: false,
+        terminalProductAllowed: false,
+      }
+    : normalizedGoal;
   const budget = readBudget(args.payload);
   const reasonCodes = uniqueStrings([
     newObservations.length > 0 ? "new_observation" : null,

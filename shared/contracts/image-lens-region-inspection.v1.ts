@@ -53,6 +53,33 @@ export const IMAGE_LENS_REGION_EXTRACTION_STATUS_VALUES = [
 export type ImageLensRegionExtractionStatusV1 =
   (typeof IMAGE_LENS_REGION_EXTRACTION_STATUS_VALUES)[number];
 
+export const IMAGE_LENS_VISUAL_ALIGNMENT_VALUES = [
+  "left",
+  "center",
+  "right",
+  "aligned_at_relation",
+  "mixed",
+  "unknown",
+] as const;
+
+export const IMAGE_LENS_VISUAL_STRUCTURE_VALUES = [
+  "single_line",
+  "multi_line",
+  "aligned_block",
+  "cases",
+  "matrix",
+  "unknown",
+] as const;
+
+export type ImageLensVisualLayoutCandidateV1 = {
+  displayed_line_count: number | null;
+  displayed_lines: string[];
+  horizontal_alignment: (typeof IMAGE_LENS_VISUAL_ALIGNMENT_VALUES)[number];
+  structure: (typeof IMAGE_LENS_VISUAL_STRUCTURE_VALUES)[number];
+  equation_bbox_px: DocumentImageBboxPxV1 | null;
+  notes: string[];
+};
+
 export type ImageLensRegionInspectionRequestV1 = {
   schema: typeof IMAGE_LENS_REGION_INSPECTION_REQUEST_SCHEMA;
   capability: typeof IMAGE_LENS_REGION_INSPECTION_CAPABILITY;
@@ -75,6 +102,7 @@ export type ImageLensRegionInspectionRequestV1 = {
   reason_for_crop?: string | null;
   region_label?: string | null;
   requested_equation_label?: string | null;
+  equation_capture_mode?: "context" | "exact_row" | "exact_block" | null;
   parent_region_id?: string | null;
   detail?: ImageLensRegionInspectionDetailV1 | null;
   region_kind?: DocumentImageRegionKindV1 | null;
@@ -82,6 +110,7 @@ export type ImageLensRegionInspectionRequestV1 = {
   summary?: string | null;
   text_candidate?: string | null;
   latex_candidate?: string | null;
+  visual_layout_candidate?: ImageLensVisualLayoutCandidateV1 | null;
   extraction_status?: ImageLensRegionExtractionStatusV1 | null;
   table_candidate_ref?: string | null;
   uncertainty?: string[];
@@ -110,6 +139,7 @@ export type ImageLensRegionInspectionReceiptV1 = {
   summary: string;
   text_candidate?: string;
   latex_candidate?: string;
+  visual_layout_candidate?: ImageLensVisualLayoutCandidateV1;
   extraction_status: ImageLensRegionExtractionStatusV1;
   table_candidate_ref?: string;
   uncertainty: string[];
@@ -118,11 +148,13 @@ export type ImageLensRegionInspectionReceiptV1 = {
   reason_for_crop: string | null;
   region_label?: string | null;
   requested_equation_label?: string | null;
+  equation_capture_mode?: ScientificEvidencePacketV1["equation_capture_mode"];
   observed_equation_labels?: string[];
   label_match_status?: ScientificEvidencePacketV1["label_match_status"];
   exact_equation_admissibility?: ScientificEvidencePacketV1["exact_equation_admissibility"];
   row_quality_diagnostics?: ScientificEvidencePacketV1["row_quality_diagnostics"];
   exact_row_promotion?: ScientificEvidencePacketV1["exact_row_promotion"];
+  exact_block_promotion?: ScientificEvidencePacketV1["exact_block_promotion"];
   evidence_role?: ScientificEvidencePacketV1["evidence_role"];
   quality_flags?: string[];
   quality_rejection_reasons?: string[];
@@ -165,6 +197,7 @@ export type ImageLensRegionInspectionObservationV1 = {
   summary: string;
   text_candidate?: string;
   latex_candidate?: string;
+  visual_layout_candidate?: ImageLensVisualLayoutCandidateV1;
   extraction_status: ImageLensRegionExtractionStatusV1;
   uncertainty: string[];
   observed_equation_labels?: string[];
@@ -172,6 +205,8 @@ export type ImageLensRegionInspectionObservationV1 = {
   exact_equation_admissibility?: ScientificEvidencePacketV1["exact_equation_admissibility"];
   row_quality_diagnostics?: ScientificEvidencePacketV1["row_quality_diagnostics"];
   exact_row_promotion?: ScientificEvidencePacketV1["exact_row_promotion"];
+  exact_block_promotion?: ScientificEvidencePacketV1["exact_block_promotion"];
+  equation_capture_mode?: ScientificEvidencePacketV1["equation_capture_mode"];
   evidence_role?: ScientificEvidencePacketV1["evidence_role"];
   quality_flags?: string[];
   quality_rejection_reasons?: string[];
@@ -237,6 +272,25 @@ function validateStringArray(path: string, value: unknown, issues: string[]): vo
   });
 }
 
+function validateVisualLayoutCandidate(path: string, value: unknown, issues: string[]): void {
+  if (!isRecord(value)) {
+    issues.push(`${path} must be an object`);
+    return;
+  }
+  if (value.displayed_line_count !== null && (!isFiniteNumber(value.displayed_line_count) || value.displayed_line_count < 0)) {
+    issues.push(`${path}.displayed_line_count must be a non-negative number or null`);
+  }
+  validateStringArray(`${path}.displayed_lines`, value.displayed_lines, issues);
+  if (!includes(IMAGE_LENS_VISUAL_ALIGNMENT_VALUES, value.horizontal_alignment)) {
+    issues.push(`${path}.horizontal_alignment must be one of ${IMAGE_LENS_VISUAL_ALIGNMENT_VALUES.join(", ")}`);
+  }
+  if (!includes(IMAGE_LENS_VISUAL_STRUCTURE_VALUES, value.structure)) {
+    issues.push(`${path}.structure must be one of ${IMAGE_LENS_VISUAL_STRUCTURE_VALUES.join(", ")}`);
+  }
+  if (value.equation_bbox_px !== null) validateBbox(`${path}.equation_bbox_px`, value.equation_bbox_px, issues);
+  validateStringArray(`${path}.notes`, value.notes, issues);
+}
+
 export function validateImageLensRegionInspectionRequestV1(value: unknown): string[] {
   const issues: string[] = [];
   if (!isRecord(value)) return ["request must be an object"];
@@ -271,6 +325,9 @@ export function validateImageLensRegionInspectionRequestV1(value: unknown): stri
     }
   }
   if (value.uncertainty !== undefined) validateStringArray("uncertainty", value.uncertainty, issues);
+  if (value.visual_layout_candidate !== undefined && value.visual_layout_candidate !== null) {
+    validateVisualLayoutCandidate("visual_layout_candidate", value.visual_layout_candidate, issues);
+  }
   if (value.assistant_answer !== false) issues.push("assistant_answer must be false");
   if (value.terminal_eligible !== false) issues.push("terminal_eligible must be false");
   return issues;
@@ -307,6 +364,9 @@ export function validateImageLensRegionInspectionReceiptV1(value: unknown): stri
     issues.push(`extraction_status must be one of ${IMAGE_LENS_REGION_EXTRACTION_STATUS_VALUES.join(", ")}`);
   }
   validateStringArray("uncertainty", value.uncertainty, issues);
+  if (value.visual_layout_candidate !== undefined) {
+    validateVisualLayoutCandidate("visual_layout_candidate", value.visual_layout_candidate, issues);
+  }
   if (!isNonEmptyString(value.evidence_id)) issues.push("evidence_id must be a non-empty string");
   if (value.detail !== undefined && !includes(IMAGE_LENS_REGION_INSPECTION_DETAIL_VALUES, value.detail)) {
     issues.push(`detail must be one of ${IMAGE_LENS_REGION_INSPECTION_DETAIL_VALUES.join(", ")}`);

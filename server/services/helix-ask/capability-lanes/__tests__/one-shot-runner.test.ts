@@ -974,6 +974,14 @@ describe("provider-neutral capability lane one-shot runner", () => {
         region_kind: "equation",
         text_candidate: "T00 = rho",
         latex_candidate: "T_{00}=\\rho",
+        visual_layout_candidate: {
+          displayed_line_count: 2,
+          displayed_lines: ["T00 =", "rho"],
+          horizontal_alignment: "aligned_at_relation",
+          structure: "aligned_block",
+          equation_bbox_px: { x: 8, y: 10, width: 96, height: 42 },
+          notes: ["relation symbols share a vertical alignment column"],
+        },
         extraction_status: "extracted",
         uncertainty: ["OCR is candidate-only"],
         requested_backend_provider: "openai_compatible",
@@ -1008,6 +1016,12 @@ describe("provider-neutral capability lane one-shot runner", () => {
         bbox_px: { x: 4, y: 8, width: 120, height: 64 },
         text_candidate: "T00 = rho",
         latex_candidate: "T_{00}=\\rho",
+        visual_layout_candidate: {
+          displayed_line_count: 2,
+          horizontal_alignment: "aligned_at_relation",
+          structure: "aligned_block",
+          equation_bbox_px: { x: 8, y: 10, width: 96, height: 42 },
+        },
         extraction_status: "extracted",
         scientific_evidence_packet: {
           schema: "helix.scientific_evidence_packet.v1",
@@ -1062,6 +1076,11 @@ describe("provider-neutral capability lane one-shot runner", () => {
           crop_image_ref: "ephemeral://image/source#crop=4,8,120,64",
           text_candidate: "T00 = rho",
           latex_candidate: "T_{00}=\\rho",
+          visual_layout_candidate: expect.objectContaining({
+            displayed_line_count: 2,
+            horizontal_alignment: "aligned_at_relation",
+            structure: "aligned_block",
+          }),
           extraction_status: "extracted",
           uncertainty: ["OCR is candidate-only"],
           scientific_evidence_packet: expect.objectContaining({
@@ -1128,6 +1147,85 @@ describe("provider-neutral capability lane one-shot runner", () => {
         source_id: "image-lens-source:test",
         extraction_status: "extracted",
       },
+    });
+  });
+
+  it("propagates exact equation block promotion through the Image Lens receipt and observation", async () => {
+    const result = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-image-lens-exact-equation-block",
+        capability_lane_call: {
+          capability: "visual_analysis.inspect_image_region",
+          source_id: "scholarly-pdf:2401.12345:page-8",
+          source_kind: "pdf_page_render",
+          source_image_ref: "artifact://scholarly-pdf/example.pdf#page=8&image",
+          page_number: 8,
+          bbox_px: { x: 80, y: 120, width: 1060, height: 300 },
+          source_width_px: 1224,
+          source_height_px: 1584,
+          question: "Inspect the complete displayed equation block (47), including every line and its label.",
+          reason_for_crop: "The complete multi-line equation block must be bounded separately from equation (48).",
+          region_label: "equation_47_block",
+          region_kind: "equation",
+          requested_equation_label: "47",
+          equation_capture_mode: "exact_block",
+          text_candidate: [
+            "max_R Tr[-R_xs^H R_x^-1 R_xs + R_s]",
+            "s.t.",
+            "Tr[R + Rhat - 2(Rhat^1/2 R Rhat^1/2)^1/2] <= epsilon_0^2 (47)",
+            "R >= 0, R_x > 0.",
+          ].join("\n"),
+          latex_candidate: [
+            "\\begin{aligned}",
+            "\\max_R\\quad &\\operatorname{Tr}[-R_{xs}^{H}R_x^{-1}R_{xs}+R_s]\\\\",
+            "\\text{s.t.}\\quad &\\operatorname{Tr}[R+\\hat R-2(\\hat R^{1/2}R\\hat R^{1/2})^{1/2}]\\le\\epsilon_0^2 \\tag{47}\\\\",
+            "&R\\succeq0,\\quad R_x>0.",
+            "\\end{aligned}",
+          ].join("\n"),
+          visual_layout_candidate: {
+            displayed_line_count: 6,
+            displayed_lines: ["max_R", "objective", "s.t.", "trace constraint", "R >= 0", "R_x > 0 (47)"],
+            horizontal_alignment: "aligned_at_relation",
+            structure: "aligned_block",
+            equation_bbox_px: { x: 20, y: 18, width: 1010, height: 250 },
+            notes: [],
+          },
+          extraction_status: "extracted",
+          uncertainty: [],
+          requested_backend_provider: "openai_compatible",
+        },
+      },
+      env: { OPENAI_API_KEY: "test-openai" } as NodeJS.ProcessEnv,
+    });
+
+    expect(result.call_results).toHaveLength(1);
+    expect(result.call_results[0]?.receipt).toMatchObject({
+      equation_capture_mode: "exact_block",
+      exact_equation_admissibility: "admissible_for_exact_equation",
+      exact_row_promotion: expect.objectContaining({ status: "not_applicable" }),
+      exact_block_promotion: expect.objectContaining({
+        status: "promoted",
+        reasons: expect.arrayContaining(["complete_multi_line_equation_block"]),
+      }),
+      scientific_evidence_packet: expect.objectContaining({
+        equation_capture_mode: "exact_block",
+        exact_block_promotion: expect.objectContaining({ status: "promoted" }),
+        block_quality_diagnostics: expect.objectContaining({ complete_block_candidate: true }),
+      }),
+    });
+    expect(result.observation_packets[0]).toMatchObject({
+      capability_key: "visual_analysis.inspect_image_region",
+      status: "succeeded",
+      state_delta: {
+        visual_analysis_region_inspection: expect.objectContaining({
+          equation_capture_mode: "exact_block",
+          exact_block_promotion: expect.objectContaining({ status: "promoted" }),
+        }),
+      },
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
     });
   });
 

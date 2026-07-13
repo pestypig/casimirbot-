@@ -65,6 +65,7 @@ import {
   buildPromptDerivedInternetSearchGatewayCallRequests,
   buildPromptDerivedMoralGraphReflectionGatewayCallRequests,
   buildPromptDerivedRepoSearchGatewayCallRequests,
+  buildPromptDerivedResearchLibraryGatewayCallRequests,
   buildPromptDerivedScholarlyResearchGatewayCallRequests,
   buildPromptDerivedTheoryReflectionGatewayCallRequests,
   buildPromptDerivedVoiceGatewayCallRequests,
@@ -80,6 +81,7 @@ import {
   readCommittedAskRoute,
 } from "../committed-ask-route";
 import { isAskTurnCapabilityHelpIntent } from "../capability-catalog-intent";
+import { HELIX_RESEARCH_LIBRARY_READ_CAPABILITY } from "@shared/helix-research-library";
 
 const MORAL_SUBSTRATE_PRIMARY_CAPABILITY = "moral-graph.reflect_living_substrate_context" as const;
 const MORAL_GRAPH_PRIMARY_CAPABILITIES = new Set([
@@ -177,6 +179,28 @@ const promptNegatesExternalEvidence = (prompt: string): boolean =>
     unquotePrompt(prompt),
   );
 
+const gatewayCapabilityNegatedByPrompt = (prompt: string, capability: string | null): boolean => {
+  if (!capability) return false;
+  const clauseSafePrompt = unquotePrompt(prompt).replace(
+    /\b[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+)+\b/g,
+    (identifier) => identifier.replace(/\./g, "_"),
+  );
+  const clauses = clauseSafePrompt.match(
+    /\b(?:do\s+not|don't|dont|without|exclude|avoid|no\s+need\s+to|not\s+asking\s+to)\b(?:(?!\b(?:but|however|instead)\b)[^.!?;\n]){0,280}/gi,
+  ) ?? [];
+  if (capability === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY) {
+    return clauses.some((clause) => /\b(?:scholarly-research_lookup_papers|lookup[_\s-]*papers|run\s+(?:the\s+)?(?:scholarly\s+)?lookup)\b/i.test(clause));
+  }
+  if (capability === SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY) {
+    return clauses.some((clause) => /\b(?:scholarly-research_fetch_full_text|fetch[_\s-]*full[_\s-]*text|refetch(?:\s+the)?\s+(?:pdf|paper)|fetch(?:\s+the)?\s+(?:pdf|paper))\b/i.test(clause));
+  }
+  if (/image[-_.]?lens|visual[-_.]?analysis.*image/i.test(capability)) {
+    return clauses.some((clause) => /\b(?:image\s+lens|image-lens|visual\s+analysis)\b/i.test(clause));
+  }
+  const normalizedCapability = capability.replace(/\./g, "_").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return clauses.some((clause) => new RegExp(`\\b${normalizedCapability}\\b`, "i").test(clause));
+};
+
 const promptExplicitlyRequestsExternalEvidence = (prompt: string): boolean => {
   if (promptNegatesExternalEvidence(prompt)) return false;
   const unquoted = unquotePrompt(prompt);
@@ -233,7 +257,7 @@ const contextualSuppressionFamilyForCapability = (
   ) return "docs_viewer";
   if (capability === REPO_SEARCH_CAPABILITY) return "repo_code";
   if (capability === INTERNET_SEARCH_CAPABILITY) return "internet_search";
-  if (capability === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY) return "scholarly_research";
+  if (capability === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY || capability === HELIX_RESEARCH_LIBRARY_READ_CAPABILITY) return "scholarly_research";
   if (capability === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) return "scientific_calculator";
   if (
     capability === CALCULATOR_ACTIVE_CONTEXT_CAPABILITY ||
@@ -500,6 +524,7 @@ export {
   buildPromptDerivedInternetSearchGatewayCallRequests,
   buildPromptDerivedMoralGraphReflectionGatewayCallRequests,
   buildPromptDerivedRepoSearchGatewayCallRequests,
+  buildPromptDerivedResearchLibraryGatewayCallRequests,
   buildPromptDerivedScholarlyResearchGatewayCallRequests,
   buildPromptDerivedTheoryReflectionGatewayCallRequests,
   buildPromptDerivedVoiceGatewayCallRequests,
@@ -515,15 +540,39 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   if (explicit.length > 0) {
     const deduplicated: Record<string, unknown>[] = [];
     appendDedupe(deduplicated, new Set<string>(), explicit);
-    return filterRequestsAllowedByCommittedRoute(input.body, deduplicated);
+    const prompt = readPrompt(input.body) ?? "";
+    const admittedExplicit = filterRequestsAllowedByCommittedRoute(input.body, deduplicated).filter((request) => {
+      const capability = readString(request.capability_id) ?? readString(request.capabilityId);
+      return !gatewayCapabilityNegatedByPrompt(prompt, capability);
+    });
+    if (admittedExplicit.length > 0) return admittedExplicit;
+    return filterRequestsAllowedByCommittedRoute(
+      input.body,
+      buildPromptDerivedResearchLibraryGatewayCallRequests(input.body),
+    );
   }
   if (input.body.provider_reasoning_resume === true || input.body.providerReasoningResume === true) return [];
+  const directResearchLibraryRequests = buildPromptDerivedResearchLibraryGatewayCallRequests(input.body);
+  if (directResearchLibraryRequests.length > 0) {
+    const prompt = readPrompt(input.body) ?? "";
+    return filterRequestsAllowedByCommittedRoute(input.body, directResearchLibraryRequests)
+      .filter((request) => {
+        const capability = readString(request.capability_id) ?? readString(request.capabilityId);
+        return !gatewayCapabilityNegatedByPrompt(prompt, capability);
+      })
+      .slice(0, 10);
+  }
   if (input.includePlannerDerived !== true) return [];
   const requests: Record<string, unknown>[] = [];
   const seen = new Set<string>();
   const prompt = readPrompt(input.body) ?? "";
   const finalizeRequests = (candidates: Record<string, unknown>[]): Record<string, unknown>[] =>
-    filterRequestsAllowedByCommittedRoute(input.body, candidates).slice(0, 10);
+    filterRequestsAllowedByCommittedRoute(input.body, candidates)
+      .filter((request) => {
+        const capability = readString(request.capability_id) ?? readString(request.capabilityId);
+        return !gatewayCapabilityNegatedByPrompt(prompt, capability);
+      })
+      .slice(0, 10);
   const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
   const appendPromptDerivedDedupe = (candidates: Record<string, unknown>[]): void => {
     appendDedupe(
@@ -659,7 +708,10 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   ) {
     appendPromptDerivedDedupe(buildPlannerDerivedWorkstationGatewayCallRequests(input.body));
   }
+  const researchLibraryRequests = buildPromptDerivedResearchLibraryGatewayCallRequests(input.body);
+  appendPromptDerivedDedupe(researchLibraryRequests);
   if (
+    researchLibraryRequests.length === 0 &&
     !promptNamedCapabilities.has(SCHOLARLY_RESEARCH_SEARCH_CAPABILITY) &&
     !promptNamedCapabilities.has(SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY) &&
     (compoundDependencyCapabilities.size === 0 || allowsCompoundAdjunctCapabilities)

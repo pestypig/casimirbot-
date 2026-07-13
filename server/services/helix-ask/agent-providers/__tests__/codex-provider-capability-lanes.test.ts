@@ -5,12 +5,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildCodexCompoundSubgoalLedger,
   buildScholarlyResearchResponseModeProjection,
+  allowsConditionalImageLensMissingEvidenceAnswer,
+  augmentImageLensRegionCandidatesForQuestion,
   classifyCodexProcessFailureForUser,
   codexRouteAllowsTerminalKind,
   codexProvider,
   explicitlyExcludesScientificImageContext,
   extractCodexSemanticRouteProposalCandidate,
+  forbiddenEvidenceFamiliesForLaneCapability,
   resetScholarlyPdfWorkbenchVolatileMemoryForTest,
+  scholarlyMemoryRecordFromGatewayResult,
+  synthesizeScholarlyPageImageLaneCandidate,
   scholarlyFollowupRequestedModes,
   stripCodexSemanticRouteProposalMarkers,
 } from "../codex-provider";
@@ -81,6 +86,213 @@ describe("Codex provider capability lane adapter", () => {
     });
 
     expect(ledger).toBeNull();
+  });
+
+  it("keeps an affirmative saved-PDF Image Lens command admitted when only text inference and refetch are negated", () => {
+    const visualCapability = "visual_analysis.inspect_image_region";
+    const prompt = [
+      "Using the same saved paper, inspect equation (47) on page 8.",
+      "This task explicitly requires visual verification of its displayed layout.",
+      "Materialize page 8 as an image and use Image Lens to inspect the equation region.",
+      "Do not infer visual layout from extracted text.",
+      "Do not refetch the PDF or run lookup_papers.",
+    ].join(" ");
+
+    expect(forbiddenEvidenceFamiliesForLaneCapability(prompt, visualCapability)).toEqual([]);
+    expect(forbiddenEvidenceFamiliesForLaneCapability(
+      "Do not use Image Lens; answer only from saved text.",
+      visualCapability,
+    )).toEqual(["visual_evidence"]);
+    expect(forbiddenEvidenceFamiliesForLaneCapability(
+      "Do not render or inspect PDF pages; use metadata only.",
+      visualCapability,
+    )).toEqual(["page_evidence"]);
+    expect(forbiddenEvidenceFamiliesForLaneCapability(
+      'Explain the quoted instruction "Do not use Image Lens" without executing it.',
+      visualCapability,
+    )).toEqual([]);
+    expect(forbiddenEvidenceFamiliesForLaneCapability(
+      "Use the saved PDF page in Image Lens, but do not refetch the PDF.",
+      "scholarly-research.fetch_full_text",
+    )).toEqual(["external_evidence"]);
+    expect(forbiddenEvidenceFamiliesForLaneCapability([
+      "Use Image Lens to inspect the complete displayed equation block labeled (47) on page 8.",
+      "Include the objective, every constraint line, and the visible label in one crop.",
+      "Do not crop it as a single equation row.",
+      "Do not refetch the PDF or run lookup_papers.",
+    ].join(" "), visualCapability)).toEqual([]);
+    expect(forbiddenEvidenceFamiliesForLaneCapability(
+      "Do not crop the image or use Image Lens; answer from saved text only.",
+      visualCapability,
+    )).toEqual(["visual_evidence"]);
+  });
+
+  it("bridges a private Research Library PDF observation into renderable scholarly workbench memory", () => {
+    const integrityHash = "a".repeat(64);
+    const cacheRoot = path.resolve(process.cwd(), "artifacts", "helix", "scholarly-pdfs");
+    const cachePath = path.join(cacheRoot, `${integrityHash}.pdf`);
+    let renderedImagePath: string | null = null;
+    fs.mkdirSync(cacheRoot, { recursive: true });
+    writeMinimalPdf(cachePath, [
+      "Page 1", "Page 2", "Page 3", "Page 4",
+      "Page 5", "Page 6", "Page 7", "Equation (47) page 8",
+    ]);
+    try {
+      const sourcePdfRef = `artifact://scholarly-pdf/${integrityHash}.pdf`;
+      const observationRef = "ask:test:research-library-render-bridge:observation";
+      const record = scholarlyMemoryRecordFromGatewayResult({
+        body: { session_id: "session-research-library-render-bridge" },
+        turnId: "ask:test:research-library-render-bridge",
+        result: {
+          ok: true,
+          capability_id: "research-library.read_document",
+          gateway_admission: { requested_capability: "research-library.read_document" },
+          artifact_refs: [observationRef],
+          observation: {
+            status: "succeeded",
+            selected_for_answer: true,
+            evidence_state: "full_text_usable",
+            document: {
+              source_integrity_hash: integrityHash,
+              source_pdf_ref: sourcePdfRef,
+              source_url: "https://arxiv.org/pdf/test",
+            },
+            selected_pages: [{
+              page: 8,
+              text_excerpt: "Equation (47): x = y",
+              source_text_ref: `${sourcePdfRef}#page=8&text`,
+            }],
+          },
+          observation_packet: { produced_artifact_refs: [observationRef], state_delta: {} },
+        } as any,
+      });
+
+      expect(record).toMatchObject({
+        source_capability_id: "research-library.read_document",
+        evidence_state: "full_text_usable",
+        selected_for_answer: true,
+        evidence_grade: "answer_grade",
+        source_pdf_ref: sourcePdfRef,
+        cache_path: cachePath,
+        page_text_refs: [`${sourcePdfRef}#page=8&text`],
+        equation_evidence_refs: [`${sourcePdfRef}#page=8&text`],
+      });
+      const imageLaneCandidate = synthesizeScholarlyPageImageLaneCandidate({
+        question: "Materialize page 8 and use Image Lens to inspect equation (47).",
+        record,
+        lookup: null,
+        source: "current",
+      });
+      expect(imageLaneCandidate).toMatchObject({
+        capability: "visual_analysis.inspect_image_region",
+        source_kind: "pdf_page_render",
+        scholarly_evidence_source: "current",
+        page_number: 8,
+        scholarly_source_pdf_ref: sourcePdfRef,
+        scholarly_pdf_cache_path: cachePath,
+        scholarly_page_image_artifact_ref: expect.stringContaining("/page/8.png"),
+        source_dimensions_px: { width: 1224, height: 1584 },
+        bbox_px: { x: 0, y: 0, width: 1224, height: 1584 },
+      });
+      renderedImagePath = String(imageLaneCandidate?.scholarly_page_image_path ?? "") || null;
+      expect(imageLaneCandidate?.source_image_ref).toMatch(/^data:image\/png;base64,/);
+    } finally {
+      fs.rmSync(cachePath, { force: true });
+      if (renderedImagePath) fs.rmSync(renderedImagePath, { force: true });
+    }
+  });
+
+  it("does not turn separate text and visual evidence formatting into an extra crop", () => {
+    const sourceCandidate = {
+      capability: "visual_analysis.inspect_image_region",
+      source_id: "pdf-page-render:test-page-8",
+      source_kind: "pdf_page_render",
+      source_image_ref: "data:image/png;base64,page-eight",
+      page_image_ref: "data:image/png;base64,page-eight",
+      source_dimensions_px: { width: 1224, height: 1584 },
+      bbox_px: { x: 0, y: 0, width: 1224, height: 1584 },
+      question: "Inspect equation (47) on page 8.",
+    };
+    const formattingOnly = augmentImageLensRegionCandidatesForQuestion(
+      {},
+      "Use Image Lens to inspect equation (47) and report separate Text evidence and Visual evidence references.",
+      sourceCandidate,
+    );
+    expect(formattingOnly).toEqual(sourceCandidate);
+
+    const explicitCrop = augmentImageLensRegionCandidatesForQuestion(
+      {},
+      "Use Image Lens to inspect a separate crop region for equation (47).",
+      sourceCandidate,
+    );
+    expect(explicitCrop).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        requested_equation_label: "47",
+        source_id: "pdf-page-render:test-page-8",
+        source_image_ref: "data:image/png;base64,page-eight",
+        source_dimensions_px: { width: 1224, height: 1584 },
+      }),
+    ]));
+  });
+
+  it("allows a grounded conditional Image Lens escalation to report missing visual evidence as an answer", () => {
+    const question = [
+      "Use saved text first.",
+      "Then use Image Lens only if visual inspection is necessary.",
+      "If page-image evidence cannot be materialized, report the exact missing requirement.",
+    ].join(" ");
+    const providerText = [
+      "## Text evidence",
+      "Equation (47) is present in the saved page text.",
+      "## Visual evidence",
+      "No visual inspection was performed.",
+      "Exact missing requirement: a rendered page source with source_id and bbox_px.",
+    ].join("\n");
+
+    expect(allowsConditionalImageLensMissingEvidenceAnswer({
+      question,
+      providerText,
+      gatewayObservationCount: 1,
+    })).toBe(true);
+    expect(allowsConditionalImageLensMissingEvidenceAnswer({
+      question,
+      providerText: providerText.replace("No visual inspection was performed.", "No Image Lens inspection was performed."),
+      gatewayObservationCount: 1,
+    })).toBe(true);
+    expect(allowsConditionalImageLensMissingEvidenceAnswer({
+      question,
+      providerText: providerText
+        .replace("No visual inspection was performed.", "No visual finding is available.")
+        .replace("Exact missing requirement:", "The exact missing requirement is"),
+      gatewayObservationCount: 1,
+      visualObservationCount: 0,
+    })).toBe(true);
+    expect(allowsConditionalImageLensMissingEvidenceAnswer({
+      question,
+      providerText,
+      gatewayObservationCount: 0,
+    })).toBe(false);
+    expect(allowsConditionalImageLensMissingEvidenceAnswer({
+      question,
+      providerText,
+      gatewayObservationCount: 1,
+      visualObservationCount: 1,
+    })).toBe(false);
+    expect(allowsConditionalImageLensMissingEvidenceAnswer({
+      question: "Use Image Lens on the currently loaded page and return the crop observation.",
+      providerText,
+      gatewayObservationCount: 1,
+    })).toBe(false);
+    expect(allowsConditionalImageLensMissingEvidenceAnswer({
+      question: 'Explain the quoted phrase "use Image Lens only if necessary" without running a visual tool.',
+      providerText,
+      gatewayObservationCount: 1,
+    })).toBe(false);
+    expect(allowsConditionalImageLensMissingEvidenceAnswer({
+      question,
+      providerText: providerText.replace("No visual inspection was performed.", "Visual inspection confirmed the layout."),
+      gatewayObservationCount: 1,
+    })).toBe(true);
   });
 
   it("does not admit scholarly terminal modes onto a Docs-only committed route", () => {
@@ -4915,6 +5127,9 @@ describe("Codex provider capability lane adapter", () => {
     const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
     const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
     const previousExtractionFixtures = process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+    const previousCapturePromptPath = process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH;
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-provider-image-lens-reentry-prompt-"));
+    const capturePromptPath = path.join(tempDir, "prompt.txt");
     delete process.env.CODEX_AGENT_FAKE_STDOUT;
     process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
       sequence: [
@@ -4938,6 +5153,7 @@ describe("Codex provider capability lane adapter", () => {
     ]);
     process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH = capturePromptPath;
     try {
       const result = await codexProvider.runTurn({
         runtime: "codex",
@@ -4975,8 +5191,9 @@ describe("Codex provider capability lane adapter", () => {
         selected_final_answer: result.selected_final_answer,
         terminal_presentation: result.terminal_presentation,
         provider_terminal_candidate: debug.provider_terminal_candidate,
-        provider_prompt_leak_guard: result.provider_prompt_leak_guard,
       });
+      const initialPrompt = fs.readFileSync(capturePromptPath, "utf8");
+      const reentryPrompt = fs.readFileSync(path.join(tempDir, "prompt.2.txt"), "utf8");
 
       expect(result).toMatchObject({
         ok: true,
@@ -4998,10 +5215,29 @@ describe("Codex provider capability lane adapter", () => {
       expect(result.provider_prompt_leak_guard).toMatchObject({
         status: "recovered_with_image_lens_observation_report",
         recovered_with_observation_only_image_lens_report: true,
+        detected_marker_ids: expect.arrayContaining([
+          "model_visible_capability_lane_manifest",
+          "workstation_gateway_capabilities_heading",
+          "one_shot_capability_lane_instruction",
+        ]),
+        final_model_prompt_diagnostics: {
+          protected_marker_ids: [],
+          raw_prompt_included: false,
+        },
       });
+      expect(result.provider_prompt_leak_guard.final_model_prompt_diagnostics.char_count).toBeLessThan(200_000);
       expect(visibleAndRawText).not.toContain("Available Helix workstation gateway capabilities");
       expect(visibleAndRawText).not.toContain("model_visible_capability_lane_manifest");
       expect(result.answer).not.toContain("No visual observation receipt was produced");
+      expect(initialPrompt).toContain("Available Helix workstation gateway capabilities:");
+      expect(reentryPrompt).toContain("You are continuing the same Helix Codex Workstation Mode turn after an admitted capability observation.");
+      expect(reentryPrompt).toContain("Capability lane observation block after Helix execution:");
+      expect(reentryPrompt).not.toContain("Available Helix workstation gateway capabilities:");
+      expect(reentryPrompt).not.toContain("Model-visible Helix capability lane manifest:");
+      expect(reentryPrompt).not.toContain("model_visible_capability_lane_manifest");
+      expect(reentryPrompt).not.toContain("lane_outputs_are_not_final_answers");
+      expect(reentryPrompt).not.toContain("capability_lane_session_debug_summaries");
+      expect(reentryPrompt).not.toContain("Helix request context JSON:");
     } finally {
       if (previousStdout === undefined) {
         delete process.env.CODEX_AGENT_FAKE_STDOUT;
@@ -5028,6 +5264,12 @@ describe("Codex provider capability lane adapter", () => {
       } else {
         process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = previousExtractionFixtures;
       }
+      if (previousCapturePromptPath === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH;
+      } else {
+        process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH = previousCapturePromptPath;
+      }
+      fs.rmSync(tempDir, { recursive: true, force: true });
     }
   });
 
@@ -5985,9 +6227,10 @@ describe("Codex provider capability lane adapter", () => {
       });
 
       expect(result).toMatchObject({
-        ok: true,
-        response_type: "final_answer",
-        final_status: "completed",
+        ok: false,
+        response_type: "final_failure",
+        final_status: "final_failure",
+        terminal_artifact_kind: "typed_failure",
       });
       expect(result.answer).toContain("active Image Lens page source");
       expect(result.answer).toContain("active_image_lens_source");

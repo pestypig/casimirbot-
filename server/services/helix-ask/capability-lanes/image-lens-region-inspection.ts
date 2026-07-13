@@ -27,6 +27,7 @@ import {
   type ImageLensRegionInspectionReceiptV1,
   type ImageLensRegionInspectionRequestV1,
   type ImageLensRegionInspectionResultV1,
+  type ImageLensVisualLayoutCandidateV1,
 } from "@shared/contracts/image-lens-region-inspection.v1";
 import type {
   HelixCapabilityLaneBackendSelectionDecision,
@@ -70,6 +71,7 @@ type ImageLensRegionExtractionResult = {
   extraction_status: ImageLensRegionExtractionStatusV1;
   text_candidate?: string;
   latex_candidate?: string;
+  visual_layout_candidate?: ImageLensVisualLayoutCandidateV1;
   table_candidate_ref?: string;
   uncertainty: string[];
   backend_ref: string | null;
@@ -116,6 +118,50 @@ const readStringArray = (value: unknown): string[] =>
   Array.isArray(value)
     ? value.map((entry) => readString(entry)).filter((entry): entry is string => Boolean(entry))
     : [];
+
+const readVisualLayoutCandidate = (value: unknown): ImageLensVisualLayoutCandidateV1 | null => {
+  const record = readRecord(value);
+  if (!record) return null;
+  const displayedLines = readStringArray(record.displayed_lines ?? record.displayedLines).slice(0, 24);
+  const lineCountRaw = record.displayed_line_count ?? record.displayedLineCount;
+  const displayedLineCount = typeof lineCountRaw === "number" && Number.isFinite(lineCountRaw) && lineCountRaw >= 0
+    ? Math.floor(lineCountRaw)
+    : displayedLines.length > 0
+      ? displayedLines.length
+      : null;
+  const alignmentRaw = readString(record.horizontal_alignment ?? record.horizontalAlignment) ?? "unknown";
+  const horizontalAlignment: ImageLensVisualLayoutCandidateV1["horizontal_alignment"] =
+    alignmentRaw === "left" || alignmentRaw === "center" || alignmentRaw === "right" ||
+    alignmentRaw === "aligned_at_relation" || alignmentRaw === "mixed"
+      ? alignmentRaw
+      : "unknown";
+  const structureRaw = readString(record.structure) ?? "unknown";
+  const structure: ImageLensVisualLayoutCandidateV1["structure"] =
+    structureRaw === "single_line" || structureRaw === "multi_line" || structureRaw === "aligned_block" ||
+    structureRaw === "cases" || structureRaw === "matrix"
+      ? structureRaw
+      : "unknown";
+  const bboxRecord = readRecord(record.equation_bbox_px ?? record.equationBboxPx);
+  const bboxValues = bboxRecord
+    ? [bboxRecord.x, bboxRecord.y, bboxRecord.width, bboxRecord.height]
+    : [];
+  const equationBbox = bboxRecord && bboxValues.every((entry) => typeof entry === "number" && Number.isFinite(entry)) &&
+    Number(bboxRecord.width) > 0 && Number(bboxRecord.height) > 0
+    ? normalizeBbox(bboxRecord as DocumentImageBboxPxV1)
+    : null;
+  const notes = readStringArray(record.notes).slice(0, 16);
+  if (displayedLineCount === null && displayedLines.length === 0 && horizontalAlignment === "unknown" && structure === "unknown" && !equationBbox && notes.length === 0) {
+    return null;
+  }
+  return {
+    displayed_line_count: displayedLineCount,
+    displayed_lines: displayedLines,
+    horizontal_alignment: horizontalAlignment,
+    structure,
+    equation_bbox_px: equationBbox,
+    notes,
+  };
+};
 
 const bboxKey = (bbox: DocumentImageBboxPxV1): string =>
   `${bbox.x},${bbox.y},${bbox.width},${bbox.height}`;
@@ -203,7 +249,11 @@ const resolveCropImagePayload = async (input: {
 
 const buildExtractionPrompt = (request: ImageLensRegionInspectionRequestV1, bbox: DocumentImageBboxPxV1): string => [
   "You are extracting observation-only evidence from one cropped Image Lens region.",
-  "Return only JSON with keys: text_candidate, latex_candidate, uncertainty.",
+  "Return only JSON with keys: text_candidate, latex_candidate, visual_layout_candidate, uncertainty.",
+  "visual_layout_candidate is required and must not be omitted. It must contain displayed_line_count, displayed_lines, horizontal_alignment, structure, equation_bbox_px, and notes; when layout cannot be established, return the object with null/unknown fields and explain why in notes.",
+  "Use horizontal_alignment values left, center, right, aligned_at_relation, mixed, or unknown; use structure values single_line, multi_line, aligned_block, cases, matrix, or unknown.",
+  "equation_bbox_px is relative to this crop. When the target equation is visibly located, return four finite numeric fields: x, y, width, and height. Never return an equation_bbox_px object containing null coordinates; return equation_bbox_px as null and explain the missing bound in notes instead.",
+  "Describe only visible line breaks and alignment; use null/unknown when pixels do not establish them.",
   "Use null when a field is not readable. Use uncertainty as an array of short strings.",
   "For equations or symbolic math, preserve symbols as closely as possible in latex_candidate.",
   "Do not infer content outside the crop. Do not provide a final answer.",
@@ -265,6 +315,43 @@ const extractLooseUncertainty = (text: string): string[] => {
     .filter((entry): entry is string => Boolean(entry && entry.trim()));
 };
 
+const extractLooseJsonObject = (text: string, key: string): Record<string, unknown> | null => {
+  const keyMatch = new RegExp(`"${key}"\\s*:\\s*{`).exec(text);
+  if (!keyMatch) return null;
+  const start = text.indexOf("{", keyMatch.index);
+  if (start < 0) return null;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+    if (char === "{") depth += 1;
+    if (char !== "}") continue;
+    depth -= 1;
+    if (depth !== 0) continue;
+    try {
+      return readRecord(JSON.parse(text.slice(start, index + 1)));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
+
 const parseLooseExtractionObjectFromText = (text: string): Record<string, unknown> | null => {
   const normalized = text.replace(/\u200B/g, "");
   const objectText = normalized.includes("{") && normalized.includes("}")
@@ -272,16 +359,18 @@ const parseLooseExtractionObjectFromText = (text: string): Record<string, unknow
     : normalized;
   const textCandidate = extractLooseJsonString(objectText, "text_candidate");
   const latexCandidate = extractLooseLatexCandidate(objectText);
+  const visualLayoutCandidate = extractLooseJsonObject(objectText, "visual_layout_candidate");
   const uncertainty = extractLooseUncertainty(objectText);
-  if (!textCandidate && !latexCandidate && uncertainty.length === 0) return null;
+  if (!textCandidate && !latexCandidate && !visualLayoutCandidate && uncertainty.length === 0) return null;
   return {
     ...(textCandidate ? { text_candidate: textCandidate } : {}),
     ...(latexCandidate ? { latex_candidate: latexCandidate } : {}),
+    ...(visualLayoutCandidate ? { visual_layout_candidate: visualLayoutCandidate } : {}),
     uncertainty,
   };
 };
 
-const extractionFromVisionText = (
+export const extractionFromVisionText = (
   text: string,
   backendRef: string,
 ): ImageLensRegionExtractionResult => {
@@ -289,8 +378,9 @@ const extractionFromVisionText = (
   const textCandidate = readString(parsed?.text_candidate ?? parsed?.textCandidate) ?? undefined;
   const latexCandidate = readString(parsed?.latex_candidate ?? parsed?.latexCandidate) ?? undefined;
   const tableCandidateRef = readString(parsed?.table_candidate_ref ?? parsed?.tableCandidateRef) ?? undefined;
+  const visualLayoutCandidate = readVisualLayoutCandidate(parsed?.visual_layout_candidate ?? parsed?.visualLayoutCandidate) ?? undefined;
   const uncertainty = readStringArray(parsed?.uncertainty);
-  const hasCandidate = Boolean(textCandidate || latexCandidate || tableCandidateRef);
+  const hasCandidate = Boolean(textCandidate || latexCandidate || tableCandidateRef || visualLayoutCandidate);
   if (!parsed) {
     return {
       extraction_status: "partial",
@@ -304,7 +394,8 @@ const extractionFromVisionText = (
     ...(textCandidate ? { text_candidate: textCandidate } : {}),
     ...(latexCandidate ? { latex_candidate: latexCandidate } : {}),
     ...(tableCandidateRef ? { table_candidate_ref: tableCandidateRef } : {}),
-    uncertainty: uncertainty.length ? uncertainty : hasCandidate ? [] : ["Vision backend returned JSON without text_candidate or latex_candidate."],
+    ...(visualLayoutCandidate ? { visual_layout_candidate: visualLayoutCandidate } : {}),
+    uncertainty: uncertainty.length ? uncertainty : hasCandidate ? [] : ["Vision backend returned JSON without text_candidate, latex_candidate, or visual_layout_candidate."],
     backend_ref: backendRef,
   };
 };
@@ -352,7 +443,8 @@ const extractionFromFixture = (
   const textCandidate = readString(fixture.text_candidate ?? fixture.textCandidate) ?? undefined;
   const latexCandidate = readString(fixture.latex_candidate ?? fixture.latexCandidate) ?? undefined;
   const tableCandidateRef = readString(fixture.table_candidate_ref ?? fixture.tableCandidateRef) ?? undefined;
-  const hasCandidate = Boolean(textCandidate || latexCandidate || tableCandidateRef);
+  const visualLayoutCandidate = readVisualLayoutCandidate(fixture.visual_layout_candidate ?? fixture.visualLayoutCandidate) ?? undefined;
+  const hasCandidate = Boolean(textCandidate || latexCandidate || tableCandidateRef || visualLayoutCandidate);
   return {
     extraction_status: normalizeExtractionStatus(
       fixture.extraction_status ?? fixture.extractionStatus,
@@ -361,6 +453,7 @@ const extractionFromFixture = (
     ...(textCandidate ? { text_candidate: textCandidate } : {}),
     ...(latexCandidate ? { latex_candidate: latexCandidate } : {}),
     ...(tableCandidateRef ? { table_candidate_ref: tableCandidateRef } : {}),
+    ...(visualLayoutCandidate ? { visual_layout_candidate: visualLayoutCandidate } : {}),
     uncertainty: readStringArray(fixture.uncertainty),
     backend_ref: readString(fixture.backend_ref ?? fixture.backendRef) ?? "fixture",
   };
@@ -383,8 +476,9 @@ const resolveImageLensRegionExtraction = async (input: {
   const requestTextCandidate = readString(input.request.text_candidate) ?? undefined;
   const requestLatexCandidate = readString(input.request.latex_candidate) ?? undefined;
   const requestTableCandidateRef = readString(input.request.table_candidate_ref) ?? undefined;
+  const requestVisualLayoutCandidate = readVisualLayoutCandidate(input.request.visual_layout_candidate) ?? undefined;
   const requestUncertainty = input.request.uncertainty ?? [];
-  const hasRequestCandidate = Boolean(requestTextCandidate || requestLatexCandidate || requestTableCandidateRef);
+  const hasRequestCandidate = Boolean(requestTextCandidate || requestLatexCandidate || requestTableCandidateRef || requestVisualLayoutCandidate);
   if (hasRequestCandidate || input.request.extraction_status) {
     return {
       extraction_status: normalizeExtractionStatus(
@@ -396,6 +490,7 @@ const resolveImageLensRegionExtraction = async (input: {
       ...(requestTextCandidate ? { text_candidate: requestTextCandidate } : {}),
       ...(requestLatexCandidate ? { latex_candidate: requestLatexCandidate } : {}),
       ...(requestTableCandidateRef ? { table_candidate_ref: requestTableCandidateRef } : {}),
+      ...(requestVisualLayoutCandidate ? { visual_layout_candidate: requestVisualLayoutCandidate } : {}),
       uncertainty: requestUncertainty,
       backend_ref: "runtime_supplied_candidate",
     };
@@ -451,7 +546,7 @@ const resolveImageLensRegionExtraction = async (input: {
   return {
     extraction_status: "failed",
     uncertainty: [
-      "No Image Lens OCR/math extraction backend returned text_candidate or latex_candidate for this crop.",
+      "No Image Lens OCR/math/layout extraction backend returned text_candidate, latex_candidate, or visual_layout_candidate for this crop.",
     ],
     backend_ref: null,
   };
@@ -577,6 +672,8 @@ const buildReceipt = (input: {
     extractionStatus: input.extraction.extraction_status,
     requestedEquationLabel: input.request.requested_equation_label ?? null,
     regionLabel: input.request.region_label ?? null,
+    equationCaptureMode: input.request.equation_capture_mode ?? null,
+    visualLayoutCandidate: input.extraction.visual_layout_candidate ?? null,
   });
   const scientificEvidenceSidecar = buildScientificImageEvidenceSidecar({
     sidecarId: `${input.evidenceId}:scientific_image_sidecar`,
@@ -601,6 +698,7 @@ const buildReceipt = (input: {
     summary,
     ...(input.extraction.text_candidate ? { text_candidate: input.extraction.text_candidate } : {}),
     ...(input.extraction.latex_candidate ? { latex_candidate: input.extraction.latex_candidate } : {}),
+    ...(input.extraction.visual_layout_candidate ? { visual_layout_candidate: input.extraction.visual_layout_candidate } : {}),
     extraction_status: input.extraction.extraction_status,
     ...(input.extraction.table_candidate_ref ? { table_candidate_ref: input.extraction.table_candidate_ref } : {}),
     uncertainty: scientificEvidencePacket.uncertainty,
@@ -609,11 +707,13 @@ const buildReceipt = (input: {
     reason_for_crop: input.request.reason_for_crop ?? null,
     ...(input.request.region_label ? { region_label: input.request.region_label } : {}),
     ...(input.request.requested_equation_label ? { requested_equation_label: input.request.requested_equation_label } : {}),
+    equation_capture_mode: scientificEvidencePacket.equation_capture_mode,
     observed_equation_labels: scientificEvidencePacket.observed_equation_labels,
     label_match_status: scientificEvidencePacket.label_match_status,
     exact_equation_admissibility: scientificEvidencePacket.exact_equation_admissibility,
     row_quality_diagnostics: scientificEvidencePacket.row_quality_diagnostics,
     exact_row_promotion: scientificEvidencePacket.exact_row_promotion,
+    exact_block_promotion: scientificEvidencePacket.exact_block_promotion,
     evidence_role: scientificEvidencePacket.evidence_role,
     quality_flags: scientificEvidencePacket.quality_flags,
     quality_rejection_reasons: scientificEvidencePacket.quality_rejection_reasons,
@@ -706,6 +806,7 @@ const buildObservationPacket = (input: {
           evidence_id: input.receipt.evidence_id,
           text_candidate: input.receipt.text_candidate ?? null,
           latex_candidate: input.receipt.latex_candidate ?? null,
+          visual_layout_candidate: input.receipt.visual_layout_candidate ?? null,
           extraction_status: input.receipt.extraction_status,
           uncertainty: input.receipt.uncertainty,
           observed_equation_labels: input.receipt.observed_equation_labels ?? [],
@@ -713,6 +814,8 @@ const buildObservationPacket = (input: {
           exact_equation_admissibility: input.receipt.exact_equation_admissibility ?? null,
           row_quality_diagnostics: input.receipt.row_quality_diagnostics ?? null,
           exact_row_promotion: input.receipt.exact_row_promotion ?? null,
+          exact_block_promotion: input.receipt.exact_block_promotion ?? null,
+          equation_capture_mode: input.receipt.equation_capture_mode ?? null,
           evidence_role: input.receipt.evidence_role ?? null,
           quality_flags: input.receipt.quality_flags ?? [],
           quality_rejection_reasons: input.receipt.quality_rejection_reasons ?? [],
@@ -995,6 +1098,7 @@ export const runImageLensRegionInspection = async (input: {
     summary: receipt.summary,
     ...(receipt.text_candidate ? { text_candidate: receipt.text_candidate } : {}),
     ...(receipt.latex_candidate ? { latex_candidate: receipt.latex_candidate } : {}),
+    ...(receipt.visual_layout_candidate ? { visual_layout_candidate: receipt.visual_layout_candidate } : {}),
     extraction_status: receipt.extraction_status,
     uncertainty: receipt.uncertainty,
     observed_equation_labels: receipt.observed_equation_labels,
@@ -1002,6 +1106,8 @@ export const runImageLensRegionInspection = async (input: {
     exact_equation_admissibility: receipt.exact_equation_admissibility,
     row_quality_diagnostics: receipt.row_quality_diagnostics,
     exact_row_promotion: receipt.exact_row_promotion,
+    exact_block_promotion: receipt.exact_block_promotion,
+    equation_capture_mode: receipt.equation_capture_mode,
     evidence_role: receipt.evidence_role,
     quality_flags: receipt.quality_flags,
     quality_rejection_reasons: receipt.quality_rejection_reasons,

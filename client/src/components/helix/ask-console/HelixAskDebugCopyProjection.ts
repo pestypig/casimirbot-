@@ -22,6 +22,7 @@ import type {
 } from "./HelixAskDebugDrawerState";
 import {
   isHelixAskLegacyBackendDebugExportEligibleTurnId,
+  normalizeHelixAskLegacyBackendTurnId,
   resolveHelixAskLegacyDebugExportBackendTarget,
   resolveHelixAskLegacyDebugExportClientTurnId,
 } from "./HelixAskLegacyTurnControls";
@@ -48,11 +49,7 @@ function readDebugBoolean(value: unknown): boolean | null {
 }
 
 export function normalizeHelixAskBackendTurnDebugExportTurnId(value: unknown): string | null {
-  const text = coerceDebugCopyText(value).trim();
-  if (!text) return null;
-  if (text.startsWith("ask:")) return text;
-  const match = text.match(/(?:^|:)(ask:[^:]+)/i);
-  return match?.[1] ?? null;
+  return normalizeHelixAskLegacyBackendTurnId(value);
 }
 
 export function buildHelixAskBackendTurnDebugExportRef(value: unknown): Record<string, string> | null {
@@ -204,7 +201,9 @@ export async function resolveHelixAskAuthoritativeDebugExportPayload(localPayloa
         backend_debug_response_ref: backendRef,
       });
     }
-    const authoritativeTurnId = coerceDebugCopyText(authoritativePayload.active_turn_id).trim();
+    const rawAuthoritativeTurnId = coerceDebugCopyText(authoritativePayload.active_turn_id).trim();
+    const authoritativeTurnId =
+      normalizeHelixAskLegacyBackendTurnId(rawAuthoritativeTurnId) ?? rawAuthoritativeTurnId;
     if (activeTurnId && authoritativeTurnId && authoritativeTurnId !== activeTurnId) {
       return projectHelixAskBackendDebugResolution(parsed, "turn_mismatch", {
         backend_debug_response_ref: backendRef,

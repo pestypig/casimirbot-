@@ -130,6 +130,7 @@ docs-viewer.open_doc
 repo.search
 docs.search
 internet-search.search_web
+research-library.read_document
 scholarly-research.lookup_papers
 scholarly-research.fetch_full_text
 scholarly-research.extract_numeric_parameters
@@ -299,6 +300,7 @@ capability uses:
 | `helix.internet_search_observation.v1` | Internet search observations. |
 | `helix.scholarly_research_observation.v1` | Scholarly paper lookup observations. |
 | `helix.scholarly_full_text_observation.v1` | Scholarly full-text observations with bounded chunks. |
+| `helix.research_library_observation.v1` | Profile-scoped bounded page evidence read from an encrypted saved research extraction without network retrieval. |
 | `helix.scholarly_numeric_parameter_observation.v1` | Scholarly numeric parameter observations with cited values and units. |
 | `helix.civilization_bounds_reflection_observation.v1` | Civilization-bounds reflection observations. |
 | `helix.theory_context_reflection_observation.v1` | Theory badge graph reflection observations. |

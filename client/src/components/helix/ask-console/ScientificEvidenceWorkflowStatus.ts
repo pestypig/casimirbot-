@@ -19,7 +19,9 @@ export type ScientificEvidenceWorkflowStatus = {
     | "page_image_observation"
     | "page_image_ocr_math_candidate"
     | "exact_row_partial"
-    | "exact_row_promoted";
+    | "exact_row_promoted"
+    | "exact_block_partial"
+    | "exact_block_promoted";
   promotedRowState: "missing" | "partial" | "promoted" | "rejected";
   promotedEquationLatex: string | null;
   graphReflectionStatus: "missing" | "diagnostic_reflected";
@@ -47,6 +49,8 @@ export const cropRefFromScientificEvidenceSource = (
 const readTextEvidenceFlags = (text: string) => ({
   hasExactRowPromoted: /\bexact_row_promoted\b|\bexact row promotion:\s*promoted\b|\bpromoted exact rows?\b|\bactive promoted row blockers\s*:\s*`?none/i.test(text),
   hasExactRowPartial: /\bexact_row_partial\b|\bexact row promotion:\s*partial\b|\bpartial_candidate\b/i.test(text),
+  hasExactBlockPromoted: /\bexact_block_promoted\b|\bexact block promotion:\s*promoted\b|\bpromoted exact blocks?\b/i.test(text),
+  hasExactBlockPartial: /\bexact_block_partial\b|\bexact block promotion:\s*partial\b/i.test(text),
   hasGraphReflection: /\bTheory Badge Graph reflection completed\b|\bdiagnostic graph reflection\b|\bgraph reflection\b/i.test(text),
   hasCalculatorTemplate:
     /\bcalculator template admissibility\b|\bCalculator status:\s*(?:template_admissible|template_only)\b|\btemplate_admissible\b|\btemplate_only\b/i.test(text),
@@ -98,6 +102,7 @@ export function buildScientificEvidenceWorkflowStatus(args: {
   const promotedEquationRowRefs = unique([
     source?.evidenceId,
     source?.scientificEvidenceSidecarId && source?.regionId ? `promoted_equation_row:${source.regionId}` : null,
+    flags.hasExactBlockPromoted && cropRef ? `promoted_equation_block:${cropRef}` : null,
     flags.hasExactRowPromoted && cropRef ? `promoted_equation_row:${cropRef}` : null,
     ...(args.evidenceContext?.promotedEquationRowRefs ?? []),
   ]);
@@ -109,23 +114,27 @@ export function buildScientificEvidenceWorkflowStatus(args: {
   const uncertaintyReductionRefs = unique(args.evidenceContext?.uncertaintyReductionRefs ?? []);
   const promotedEquationLatex = receipt?.extraction?.latexCandidate ?? null;
   const promotedRowState =
-    promotedEquationRowRefs.length > 0 || flags.hasExactRowPromoted
+    promotedEquationRowRefs.length > 0 || flags.hasExactRowPromoted || flags.hasExactBlockPromoted
       ? "promoted"
-      : flags.hasExactRowPartial || Boolean(promotedEquationLatex)
+      : flags.hasExactRowPartial || flags.hasExactBlockPartial || Boolean(promotedEquationLatex)
         ? "partial"
         : "missing";
   const evidenceDepth =
-    promotedRowState === "promoted"
-      ? "exact_row_promoted"
-      : promotedRowState === "partial"
-        ? "exact_row_partial"
-        : receipt?.extraction?.latexCandidate || receipt?.extraction?.textCandidate
-          ? "page_image_ocr_math_candidate"
-          : receipt
-            ? "page_image_observation"
-            : source
-              ? "page_loaded"
-              : "missing";
+    flags.hasExactBlockPromoted
+      ? "exact_block_promoted"
+      : flags.hasExactBlockPartial
+        ? "exact_block_partial"
+        : promotedRowState === "promoted"
+          ? "exact_row_promoted"
+          : promotedRowState === "partial"
+            ? "exact_row_partial"
+            : receipt?.extraction?.latexCandidate || receipt?.extraction?.textCandidate
+              ? "page_image_ocr_math_candidate"
+              : receipt
+                ? "page_image_observation"
+                : source
+                  ? "page_loaded"
+                  : "missing";
   const calculatorTemplateStatus =
     flags.hasCalculationReady
       ? "calculation_ready"
