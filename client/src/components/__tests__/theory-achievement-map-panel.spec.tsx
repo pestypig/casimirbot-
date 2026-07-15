@@ -84,6 +84,11 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     const initialWordmarkFontSize = Number(
       screen.getAllByTestId("theory-biome-cell-wordmark")[0].getAttribute("data-font-size"),
     );
+    fireEvent.click(screen.getByRole("button", { name: "Rest Energy" }));
+    const popup = await screen.findByTestId("theory-badge-tooltip");
+    const initialPopupScale = Number(
+      popup.getAttribute("data-popup-screen-scale"),
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Zoom out" }));
 
@@ -91,6 +96,9 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
       expect(Number(scrollport.getAttribute("data-zoom-level"))).toBeLessThan(initialZoom);
       expect(Number(screen.getAllByTestId("theory-biome-cell-wordmark")[0].getAttribute("data-font-size"))).toBeGreaterThan(
         initialWordmarkFontSize,
+      );
+      expect(Number(screen.getByTestId("theory-badge-tooltip").getAttribute("data-popup-screen-scale"))).toBeGreaterThan(
+        initialPopupScale,
       );
     });
     expect(animationFrameSpy).not.toHaveBeenCalled();
@@ -408,9 +416,11 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     expect(screen.queryByRole("button", { name: "Load Theory Run" })).toBeNull();
     const restEnergy = await screen.findByRole("button", { name: "Rest Energy" });
     expect(restEnergy).not.toHaveAttribute("title");
+    fireEvent.mouseEnter(restEnergy);
     const tooltipId = restEnergy.getAttribute("aria-describedby");
     expect(tooltipId).toBeTruthy();
-    const tooltip = tooltipId ? document.getElementById(tooltipId) : null;
+    const tooltip = await screen.findByTestId("theory-badge-tooltip");
+    expect(tooltip.id).toBe(tooltipId);
     expect(tooltip).toHaveAttribute("role", "tooltip");
     expect(tooltip).toHaveTextContent("Rest Energy");
     expect(tooltip).toHaveTextContent("E_0=mc^2");
@@ -584,6 +594,28 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     expect(
       Array.from(document.querySelectorAll("[data-badge-visual-state='intermediate']")).length,
     ).toBeGreaterThan(0);
+  });
+
+  it("keeps the energy-frequency badge available after selecting an element", async () => {
+    renderPanel();
+
+    fireEvent.click(await screen.findByRole("button", { name: "H hydrogen Element-Origin Context" }));
+
+    await waitFor(() => {
+      const energyFrequency = screen.getByRole("button", { name: "Quantum Energy-Frequency Relation" });
+      expect(energyFrequency).toHaveAttribute("data-badge-visual-state", "connectable");
+      expect(energyFrequency).not.toBeDisabled();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Quantum Energy-Frequency Relation" }));
+
+    await waitFor(() => {
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedBadgeIds).toEqual([
+        "element.h.origin",
+        "physics.quantum.energy_frequency",
+      ]);
+    });
+    expect(screen.getAllByTestId("theory-badge-connection-edge").length).toBeGreaterThan(0);
   });
 
   it("marks selected badges outside the computed trace as no-path pins", async () => {

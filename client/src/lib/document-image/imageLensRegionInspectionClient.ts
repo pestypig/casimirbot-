@@ -60,6 +60,8 @@ export function applyImageLensRegionInspectionReceipt(
       pageNumber: receipt.page_number,
       pageCount: receipt.page_count ?? null,
       pageImageRef: receipt.page_image_ref ?? null,
+      naturalSize: receipt.source_dimensions_px ?? null,
+      sourceDimensionsPx: receipt.source_dimensions_px ?? null,
       sourceId,
       evidenceId: receipt.evidence_id,
       regionId: receipt.region_id,

@@ -182,18 +182,6 @@ function buildUsageSummary(): HelixAccountUsageSummary {
   };
 }
 
-function parsePolicy(value: SessionRow["account_policy"], accountType: HelixAccountType): HelixAccountCapabilityPolicy {
-  if (typeof value === "string") {
-    try {
-      const parsed = JSON.parse(value);
-      return parsed && typeof parsed === "object" ? parsed : policyForAccountType(accountType);
-    } catch {
-      return policyForAccountType(accountType);
-    }
-  }
-  return value && typeof value === "object" ? value : policyForAccountType(accountType);
-}
-
 function sessionFromRow(row: SessionRow): HelixAccountSession {
   const accountType = normalizeAccountType(row.account_type) ?? "user";
   return {
@@ -219,7 +207,9 @@ function sessionFromRow(row: SessionRow): HelixAccountSession {
       created_at: iso(row.account_created_at),
       updated_at: iso(row.account_updated_at),
     },
-    account_policy: parsePolicy(row.account_policy, accountType),
+    // Authorization follows the current account-type policy. The stored JSON is
+    // a session snapshot and must not preserve retired locks after deployment.
+    account_policy: policyForAccountType(accountType),
     status: row.status === "signed_out" ? "signed_out" : "active",
     memory_scope: row.memory_scope === "session_only" ? "session_only" : "profile",
     created_at: iso(row.created_at),

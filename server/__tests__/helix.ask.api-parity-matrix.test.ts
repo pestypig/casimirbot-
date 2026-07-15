@@ -557,11 +557,67 @@ describe("Helix Ask API parity matrix", () => {
         source_target: "scientific_image_evidence",
       },
     });
+    expect(committedRoute?.capability_policy?.required_capability_families ?? [])
+      .not.toContain("visual_analysis");
     expect(payload.source_target_intent).toMatchObject({
       target_source: "scientific_image_evidence",
       suppressed_routes: expect.arrayContaining(["fresh_image_lens_capture"]),
     });
     expect(payload.source_target_intent).not.toHaveProperty("mandatory_next_tool");
+    expect(String(payload.selected_final_answer ?? "")).not.toContain("Reattach it and resend");
+  }, 20_000);
+
+  it("overrides conflicting client research-library metadata for retained scientific-image comparison", async () => {
+    const app = createApp();
+    const prompt =
+      "Using the saved machine-readable page-8 text and the latest retained scientific Image Lens sidecar for https://arxiv.org/pdf/2401.12345, compare equation (47) row by row. Report symbol and subscript agreements and mismatches. Do not render the PDF again, do not run a new Image Lens crop, and do not promote exact evidence unless the two sources agree.";
+    const ask = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: "helix-ask:api-parity:scientific-image-conflicting-research-route",
+        question: prompt,
+        mode: "read",
+        debug: true,
+        source_target_intent: {
+          schema: "helix.ask_source_target_intent.v1",
+          target_source: "research_library",
+          target_kind: "saved_research_document",
+          strength: "hard",
+          requested_capability: "research-library.read_document",
+          must_enter_backend_ask: true,
+          allow_client_shortcut: false,
+        },
+      })
+      .expect(200);
+    const debug = await request(app)
+      .get(`/api/agi/ask/turn/${encodeURIComponent(ask.body.turn_id)}/debug-export`)
+      .expect(200);
+    const payload = debug.body?.payload ?? {};
+    const committedRoute = payload.ask_turn_solver_trace?.committed_ask_route;
+
+    expect(committedRoute).toMatchObject({
+      route: {
+        source_target: "scientific_image_evidence",
+        strength: "hard",
+      },
+      terminal_product: {
+        evidence_reentry_required: true,
+        followup_reasoning_required: true,
+      },
+    });
+    expect(committedRoute?.capability_policy?.required_capability_families ?? [])
+      .not.toContain("visual_analysis");
+    expect(payload.source_target_intent).toMatchObject({
+      target_source: "scientific_image_evidence",
+      reuse_retained_scientific_image_sidecar: true,
+      suppressed_routes: expect.arrayContaining(["fresh_image_lens_crop"]),
+    });
+    expect(payload.canonical_goal_frame).toMatchObject({
+      goal_kind: "scholarly_research",
+      required_terminal_kind: "scholarly_research_answer",
+    });
+    expect(payload.ask_turn_procedure_trace?.route_proposal?.requested_capability)
+      .not.toBe("research-library.read_document");
   }, 20_000);
 
   it("reconstructs the retained scientific-image comparison route on the UI stream path", async () => {
@@ -598,6 +654,8 @@ describe("Helix Ask API parity matrix", () => {
         source_target: "scientific_image_evidence",
       },
     });
+    expect(payload.ask_turn_solver_trace?.committed_ask_route?.capability_policy?.required_capability_families ?? [])
+      .not.toContain("visual_analysis");
     expect(payload.source_target_intent).toMatchObject({
       target_source: "scientific_image_evidence",
       suppressed_routes: expect.arrayContaining(["fresh_image_lens_capture"]),

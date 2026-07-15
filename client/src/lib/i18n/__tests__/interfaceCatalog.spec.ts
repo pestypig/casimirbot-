@@ -46,12 +46,8 @@ describe("interface catalog integrity", () => {
     }
   });
 
-  it("keeps preview catalogs developer-only while exposing release-clean public options", () => {
-    expect(getInterfaceLanguageOptionsForAccount("user").map((option) => option.code)).toEqual([
-      "en",
-      "de",
-      "ar",
-    ]);
+  it("exposes the same interface language catalogs to user and developer accounts", () => {
+    expect(getInterfaceLanguageOptionsForAccount("user")).toEqual(INTERFACE_LANGUAGE_OPTIONS);
     expect(getInterfaceLanguageOptionsForAccount("developer")).toEqual(INTERFACE_LANGUAGE_OPTIONS);
   });
 

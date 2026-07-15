@@ -440,12 +440,12 @@ export const COSMIC_DISTANCE_LADDER_EDGES: TheoryBadgeEdgeV1[] = [
     claimBoundaryNote: "Local calibration still needs astrometric uncertainty context.",
   },
   {
-    id: "quantum_wavelength_to_redshift",
-    from: "physics.quantum.momentum_wavelength",
+    id: "atomic_line_identification_to_spectral_redshift",
+    from: "stellar.spectroscopy.atomic_line_identification_context",
     to: "cosmic.spectral.redshift",
-    relation: "requires",
-    label: "Spectral redshift depends on wavelength as the observable coordinate.",
-    claimBoundaryNote: "Line identification is assumed before redshift interpretation.",
+    relation: "documents",
+    label: "A calibrated rest-frame spectral-line identification supplies the wavelength reference used for redshift.",
+    claimBoundaryNote: "Line identification and propagation context are required before cosmological interpretation.",
   },
   {
     id: "speed_of_light_to_hubble_distance",

@@ -1701,6 +1701,42 @@ describe("Helix scholarly research tool admission", () => {
     });
   });
 
+  it("recovers scholarly admission from an affirmative prompt when a payload refresh drops the source target", () => {
+    const promptText = "Find scholarly references supporting the quantum-inequality claims we discussed. Search arXiv and the other scholarly providers, and fetch the best three accessible sources.";
+    const admission = buildToolCallAdmissionDecision({
+      turnId: "ask:scholarly-missing-source-target",
+      sourceTargetIntent: null,
+      routeProductContract: null,
+      promptText,
+    });
+
+    expect(admission).toMatchObject({
+      source_target: "scholarly_research",
+      required: true,
+      admitted_tool_families: ["scholarly_research"],
+      reason: "scholarly_research_requires_external_paper_evidence_path",
+    });
+  });
+
+  it.each([
+    "Do not search arXiv for quantum inequalities; just explain what the database is.",
+    '"Search arXiv for quantum inequalities" is a prompt I used yesterday; explain why it failed.',
+    "If I searched scholarly providers for quantum inequalities, what would happen?",
+  ])("does not recover scholarly admission from a contextual command when the source target is missing: %s", (promptText) => {
+    const admission = buildToolCallAdmissionDecision({
+      turnId: "ask:scholarly-contextual-missing-source-target",
+      sourceTargetIntent: null,
+      routeProductContract: null,
+      promptText,
+    });
+
+    expect(admission).toMatchObject({
+      required: false,
+      admitted_tool_families: ["model_only"],
+    });
+    expect(admission.admitted_tool_families).not.toContain("scholarly_research");
+  });
+
   it("suppresses contextual scholarly lookup mentions instead of executing from lexical DOI cues", () => {
     const prompts = [
       ["Do not look up DOI 10.1103/PhysRevD.84.024020; just explain what a DOI is.", "negated_tool_instruction"],

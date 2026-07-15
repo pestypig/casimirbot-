@@ -72,6 +72,10 @@ import {
   moralGraphReflectionManifest,
 } from "./moral-graph-reflection";
 import {
+  buildScientificCalculatorTheoryRunContextGatewayObservation,
+  scientificCalculatorTheoryRunContextManifest,
+} from "./scientific-calculator-theory-run-context";
+import {
   HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
   type HelixLiveEnvironmentToolName,
 } from "@shared/helix-live-agent-step";
@@ -4131,6 +4135,7 @@ const rawCapabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   [docsReadVisibleSurfaceManifest.capability_id, docsReadVisibleSurfaceManifest],
   [docsReadActiveTranslationManifest.capability_id, docsReadActiveTranslationManifest],
   [calculatorReadVisibleResultManifest.capability_id, calculatorReadVisibleResultManifest],
+  [scientificCalculatorTheoryRunContextManifest.capability_id, scientificCalculatorTheoryRunContextManifest],
   [calculatorOpenPanelManifest.capability_id, calculatorOpenPanelManifest],
   [calculatorFocusPanelManifest.capability_id, calculatorFocusPanelManifest],
   [calculatorShowGatewaySolveManifest.capability_id, calculatorShowGatewaySolveManifest],
@@ -4336,6 +4341,66 @@ export const callWorkstationGatewayCapability = async (
       assistant_answer: false,
       raw_content_included: false,
       error: blockedReason,
+    };
+  }
+
+  if (manifest.capability_id === scientificCalculatorTheoryRunContextManifest.capability_id) {
+    const args = readArguments(input.arguments);
+    const gatewayResult = buildScientificCalculatorTheoryRunContextGatewayObservation(args);
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: gatewayResult.admissionStatus,
+      reason: gatewayResult.admissionReason,
+      blockedReason: gatewayResult.blockedReason,
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const producedAffordances = buildGatewayProducedAffordances({
+      capabilityId: manifest.capability_id,
+      observation: gatewayResult.observation,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: gatewayResult.panelId,
+      action: gatewayResult.action,
+      status: gatewayResult.observationStatus,
+      summary: gatewayResult.summary,
+      observation: gatewayResult.observation,
+      missingRequirements: gatewayResult.missingRequirements,
+      producedAffordances,
+      producedAffordanceKinds: manifest.produces_affordances,
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: gatewayResult.error,
+      terminalEligible: false,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: gatewayResult.ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: gatewayResult.observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      produced_affordances: producedAffordances,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      ...(gatewayResult.error ? { error: gatewayResult.error } : {}),
     };
   }
 

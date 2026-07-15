@@ -22,6 +22,9 @@ export type HelixAskChatReferentContextBuildResult = {
     source_count: number;
     total_reply_count: number;
     readable_reply_count: number;
+    retained_candidate_count: number;
+    topic_retained_candidate_count: number;
+    explicit_topic_term_count: number;
     selected_source_name: string | null;
     context_present: boolean;
     assistant_answer: false;
@@ -31,6 +34,47 @@ export type HelixAskChatReferentContextBuildResult = {
 };
 
 const HELIX_ASK_LAST_REFERENT_REPLY_STORAGE_KEY = "helix.ask.lastReferentReply.v1";
+const HELIX_ASK_RECENT_REFERENT_CANDIDATE_LIMIT = 8;
+const HELIX_ASK_TOPIC_REFERENT_CANDIDATE_LIMIT = 4;
+const HELIX_ASK_RECENT_REFERENT_CANDIDATE_TEXT_LIMIT = 4000;
+
+const HELIX_ASK_REFERENT_TOPIC_STOP_WORDS = new Set([
+  "claim", "concept", "discussion", "evidence", "finding", "paper", "physic",
+  "physical", "physics", "point", "previous", "prior", "reference", "research",
+  "response", "scholarly", "science", "scientific", "source", "topic",
+]);
+
+const normalizeReferentTopicToken = (token: string): string => {
+  const normalized = token.toLowerCase();
+  if (normalized.endsWith("ies") && normalized.length > 4) return `${normalized.slice(0, -3)}y`;
+  if (normalized.endsWith("s") && normalized.length > 4 && !normalized.endsWith("ss")) {
+    return normalized.slice(0, -1);
+  }
+  return normalized;
+};
+
+const referentTopicTerms = (value: string): string[] =>
+  [...new Set(value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(/\s+/)
+    .map(normalizeReferentTopicToken)
+    .filter((token) => token.length >= 3 && !HELIX_ASK_REFERENT_TOPIC_STOP_WORDS.has(token)))];
+
+const explicitReferentTopicTerms = (promptText: string | null | undefined): string[] => {
+  const prompt = String(promptText ?? "").replace(/\s+/g, " ").trim();
+  if (!prompt) return [];
+  const patterns = [
+    /\b(?:supporting|for|about|on)\s+(?:the\s+)?([a-z0-9][a-z0-9\s-]{1,100}?)\s+(?:claims?|points?|topics?|concepts?)\s+(?:that\s+)?(?:we|you)\s+(?:just\s+)?(?:discussed|were\s+(?:just\s+)?discussing|have\s+been\s+discussing|talked\s+about|were\s+talking\s+about)\b/i,
+    /\b(?:supporting|for|about|on)\s+(?:the\s+)?([a-z0-9][a-z0-9\s-]{1,100}?)\s+(?:claims?|points?|topics?|concepts?)\s+(?:from|in)\s+(?:(?:the|our|your)\s+)?(?:earlier|previous|prior|last)\s+(?:answer|response|discussion|conversation)\b/i,
+  ];
+  for (const pattern of patterns) {
+    const phrase = prompt.match(pattern)?.[1]?.trim() ?? "";
+    const terms = referentTopicTerms(phrase);
+    if (terms.length > 0) return terms;
+  }
+  return [];
+};
 
 const readRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
@@ -107,13 +151,54 @@ export function writePersistedHelixAskReferentReply(
 
 export function buildHelixAskChatReferentContext(
   replies: readonly HelixAskChatReferentReplyLike[],
+  promptText?: string | null,
 ): Record<string, unknown> | null {
-  const previousReply =
-    [...replies].reverse().find((reply) => Boolean(readHelixAskReplyFinalAnswerText(reply))) ?? null;
-  const previousAnswer = readHelixAskReplyFinalAnswerText(previousReply);
-  if (!previousReply || !previousAnswer) return null;
+  const readableReplies = [...replies]
+    .reverse()
+    .map((reply) => ({ reply, text: readHelixAskReplyFinalAnswerText(reply) }))
+    .filter((entry): entry is { reply: HelixAskChatReferentReplyLike; text: string } => Boolean(entry.text));
+  const previousEntry = readableReplies[0] ?? null;
+  if (!previousEntry) return null;
+  const previousReply = previousEntry.reply;
+  const previousAnswer = previousEntry.text;
   const replyId = previousReply.turn_id || previousReply.id || `reply:${stableHelixProjectionHash(previousAnswer)}`;
   const sourceRef = `chat.final_answer.previous:${replyId}`;
+  const seenTextHashes = new Set<string>();
+  const uniqueReadableReplies = readableReplies.flatMap(({ reply, text }) => {
+      const textHash = stableHelixProjectionHash(text);
+      if (seenTextHashes.has(textHash)) return [];
+      seenTextHashes.add(textHash);
+      return [{ reply, text, textHash, recencyRank: seenTextHashes.size - 1 }];
+    });
+  const topicTerms = explicitReferentTopicTerms(promptText);
+  const requiredTopicMatches = Math.max(1, Math.ceil(topicTerms.length * 0.6));
+  const recentEntries = uniqueReadableReplies.slice(0, HELIX_ASK_RECENT_REFERENT_CANDIDATE_LIMIT);
+  const topicalReserveEntries = topicTerms.length > 0
+    ? uniqueReadableReplies
+        .slice(HELIX_ASK_RECENT_REFERENT_CANDIDATE_LIMIT)
+        .filter(({ text }) => {
+          const candidateTerms = new Set(referentTopicTerms(text));
+          return topicTerms.filter((term) => candidateTerms.has(term)).length >= requiredTopicMatches;
+        })
+        .slice(0, HELIX_ASK_TOPIC_REFERENT_CANDIDATE_LIMIT)
+    : [];
+  const recentAssistantFinalAnswers = [...recentEntries, ...topicalReserveEntries]
+    .map(({ reply, text, textHash, recencyRank }) => {
+      const candidateReplyId = reply.turn_id || reply.id || `reply:${textHash}`;
+      const candidateText = text.slice(0, HELIX_ASK_RECENT_REFERENT_CANDIDATE_TEXT_LIMIT);
+      return {
+        role: "assistant",
+        reply_id: candidateReplyId,
+        source_ref: `chat.final_answer.recent:${candidateReplyId}`,
+        text: candidateText,
+        text_hash: stableHelixProjectionHash(candidateText),
+        source_role: "recent_terminal_assistant_answer_candidate",
+        recency_rank: recencyRank,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      };
+    });
   return {
     schema: "helix.ask.chat_referent_context.v1",
     previous_assistant_final_answer: {
@@ -138,6 +223,9 @@ export function buildHelixAskChatReferentContext(
       terminal_eligible: false,
       raw_content_included: false,
     },
+    recent_assistant_final_answers: recentAssistantFinalAnswers,
+    topic_retained_candidate_count: topicalReserveEntries.length,
+    explicit_topic_terms: topicTerms,
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,
@@ -146,6 +234,7 @@ export function buildHelixAskChatReferentContext(
 
 export function buildHelixAskChatReferentContextFromSources(
   sources: readonly HelixAskChatReferentContextSource[],
+  promptText?: string | null,
 ): HelixAskChatReferentContextBuildResult {
   const orderedEntries = sources.flatMap((source) =>
     source.replies.map((reply) => ({
@@ -155,7 +244,12 @@ export function buildHelixAskChatReferentContextFromSources(
     })),
   );
   const selectedEntry = [...orderedEntries].reverse().find((entry) => Boolean(entry.text)) ?? null;
-  const context = selectedEntry ? buildHelixAskChatReferentContext([selectedEntry.reply]) : null;
+  const context = selectedEntry
+    ? buildHelixAskChatReferentContext(orderedEntries.map((entry) => entry.reply), promptText)
+    : null;
+  const retainedCandidateCount = Array.isArray(context?.recent_assistant_final_answers)
+    ? context.recent_assistant_final_answers.length
+    : 0;
   return {
     context,
     source_summary: {
@@ -163,6 +257,14 @@ export function buildHelixAskChatReferentContextFromSources(
       source_count: sources.length,
       total_reply_count: orderedEntries.length,
       readable_reply_count: orderedEntries.filter((entry) => Boolean(entry.text)).length,
+      retained_candidate_count: retainedCandidateCount,
+      topic_retained_candidate_count:
+        typeof context?.topic_retained_candidate_count === "number"
+          ? context.topic_retained_candidate_count
+          : 0,
+      explicit_topic_term_count: Array.isArray(context?.explicit_topic_terms)
+        ? context.explicit_topic_terms.length
+        : 0,
       selected_source_name: selectedEntry?.sourceName ?? null,
       context_present: Boolean(context),
       assistant_answer: false,
@@ -176,11 +278,19 @@ export function buildHelixAskChatReferentContextForSubmit(input: {
   durableReplies: readonly HelixAskChatReferentReplyLike[];
   visibleReplies: readonly HelixAskChatReferentReplyLike[];
   includePersistedReply?: boolean;
+  promptText?: string | null;
 }): HelixAskChatReferentContextBuildResult {
   const persistedReply = input.includePersistedReply === false
     ? null
     : readPersistedHelixAskReferentReply();
+  // Sources are ordered from fallback to preferred because the source combiner
+  // selects the last readable entry. A persisted answer must never outrank the
+  // current visible transcript or the durable session that owns the turn.
   return buildHelixAskChatReferentContextFromSources([
+    {
+      source_name: "persisted_last_terminal_answer",
+      replies: persistedReply ? [persistedReply] : [],
+    },
     {
       source_name: "durable_chat_session",
       replies: input.durableReplies,
@@ -189,9 +299,5 @@ export function buildHelixAskChatReferentContextForSubmit(input: {
       source_name: "visible_ask_transcript",
       replies: input.visibleReplies,
     },
-    {
-      source_name: "persisted_last_terminal_answer",
-      replies: persistedReply ? [persistedReply] : [],
-    },
-  ]);
+  ], input.promptText);
 }

@@ -84,6 +84,53 @@ function firstText(...values: unknown[]): string {
   return "";
 }
 
+function readAskTurnAdmissionTerminal(args: {
+  record: RecordLike | null;
+  debug: RecordLike | null;
+  summary: RecordLike | null;
+  terminalArtifactKind: string | null;
+  finalAnswerSource: string | null;
+}): {
+  text: string;
+  status: "queued" | "rejected";
+  reason: string;
+} | null {
+  if (args.terminalArtifactKind !== "ask_turn_admission" && args.finalAnswerSource !== "ask_turn_admission") {
+    return null;
+  }
+
+  const admission = firstRecord(args.record?.ask_turn_admission, args.debug?.ask_turn_admission);
+  const runtimeMemoryAdmission = firstRecord(
+    args.record?.runtime_memory_governor_admission,
+    args.record?.ask_turn_runtime_memory_governor,
+    args.debug?.runtime_memory_governor_admission,
+    args.debug?.ask_turn_runtime_memory_governor,
+  );
+  const routeReasonCode = firstText(args.record?.route_reason_code, args.debug?.route_reason_code);
+  const resolvedRouteLabel = firstText(
+    args.summary?.resolved_route_label,
+    args.record?.route,
+    args.debug?.route,
+  );
+  const explicitStatus = firstText(admission?.status);
+  const status: "queued" | "rejected" =
+    explicitStatus === "queued" ||
+    /(?:^|\/)\s*queued\s*$/i.test(resolvedRouteLabel) ||
+    firstText(args.record?.response_type, args.debug?.response_type) === "queued"
+      ? "queued"
+      : "rejected";
+  const routeReasonMatch = routeReasonCode.match(/^ask_turn_admission\s*\/\s*(.+)$/i);
+  const reason =
+    firstText(admission?.reason) ||
+    firstText(routeReasonMatch?.[1]) ||
+    (runtimeMemoryAdmission?.admitted === false ? "memory_hard_pressure" : "capacity_unavailable");
+  const text =
+    firstText(args.record?.text, args.record?.answer, args.debug?.text, args.debug?.answer) ||
+    `Ask turn ${status}: ${reason}.`;
+
+  return { text, status, reason };
+}
+
 function firstTerminalErrorCode(...values: unknown[]): string {
   const codes = values.map((value) => firstText(value)).filter(Boolean);
   return codes.find((code) => code !== "terminal_projection_mismatch") ?? codes[0] ?? "";
@@ -154,6 +201,24 @@ function renderTypedFailureFallback(code?: string | null): string {
   return normalized ? `I could not complete that turn.\nCause: ${normalized}.` : "I could not complete that turn.";
 }
 
+function renderRouteTerminalProductFailure(
+  authority: RecordLike | null,
+  terminalArtifactKind: string | null,
+): string {
+  const selectedKind = readString(terminalArtifactKind);
+  const requiredKind = readString(authority?.required_terminal_kind);
+  const allowedKinds = [...readStringSet(authority?.allowed_terminal_artifact_kinds)];
+  if (!selectedKind) return renderTypedFailureFallback("route_terminal_product_not_allowed");
+
+  const mismatch = requiredKind
+    ? `this turn's route required \`${requiredKind}\`, but the solver produced \`${selectedKind}\``
+    : `the solver produced \`${selectedKind}\`, which this turn's route did not admit`;
+  const allowedLine = allowedKinds.length > 0
+    ? `\nAllowed terminal products: ${allowedKinds.map((kind) => `\`${kind}\``).join(", ")}.`
+    : "";
+  return `I could not present the completed result because ${mismatch}.${allowedLine}\nCause: route_terminal_product_not_allowed.`;
+}
+
 export function formatHelixVisibleTerminalSourceLabel(
   input: HelixVisibleTerminalSourceLabelInput,
 ): string {
@@ -207,6 +272,7 @@ export function formatHelixVisibleTerminalSourceLabel(
     internet_search_answer: "internet search answer",
     repo_code_evidence_answer: "repo code evidence answer",
     typed_failure: "typed failure",
+    ask_turn_admission: "ask turn admission",
   };
 
   if (terminalKind && kindLabelByTerminalKind[terminalKind]) {
@@ -442,8 +508,30 @@ export function resolveHelixVisibleTerminal(
     !firstText(presentation?.concise_text) &&
     Boolean(selectedFinalAnswer);
 
+  const askTurnAdmissionTerminal = readAskTurnAdmissionTerminal({
+    record,
+    debug,
+    summary,
+    terminalArtifactKind,
+    finalAnswerSource: rawFinalAnswerSource,
+  });
+  if (askTurnAdmissionTerminal) {
+    const rejected = askTurnAdmissionTerminal.status === "rejected";
+    return {
+      text: askTurnAdmissionTerminal.text,
+      source: "ask_turn_admission",
+      backendTerminalText: askTurnAdmissionTerminal.text,
+      terminalKind: rejected ? "failure" : "checkpoint_receipt",
+      terminalArtifactKind: "ask_turn_admission",
+      finalAnswerSource: "ask_turn_admission",
+      terminalErrorCode: rejected ? askTurnAdmissionTerminal.reason : null,
+      authorityVerified: true,
+      usedLegacyShadow: false,
+    };
+  }
+
   if (!routeEvidenceAuthorityAllowsTerminalKind(routeEvidenceAuthority, terminalArtifactKind)) {
-    const text = renderTypedFailureFallback("route_terminal_product_not_allowed");
+    const text = renderRouteTerminalProductFailure(routeEvidenceAuthority, terminalArtifactKind);
     return {
       text,
       source: "typed_failure",

@@ -93,6 +93,64 @@ const parseSseEvents = (text: string): Array<{ event: string; data: Record<strin
     });
 
 describe("Helix Ask agent provider route metadata", () => {
+  it("carries named Image Lens receipt terminal authority through the stream final payload", async () => {
+    process.env.ENABLE_CODEX_AGENT = "1";
+    const turnId = "ask:test:named-image-lens-receipt-stream-terminal";
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn/stream")
+      .send({
+        agent_runtime: "codex",
+        turn_id: turnId,
+        question:
+          "Do not rerender, refetch, or run another crop. Use only the latest Image Lens observation receipt named equation_47. Return exactly: source ID; page number; bbox; capture mode; label-match status; exact-block promotion status and reasons.",
+        route_metadata: {
+          source: "hard_backend_entrypoint_policy",
+          source_target_intent: {
+            target_source: "scientific_image_evidence",
+            target_kind: "scientific_image_named_receipt",
+            must_enter_backend_ask: true,
+            allow_client_shortcut: false,
+            allow_no_tool_direct: false,
+            requested_outputs: ["image_lens_named_receipt_evaluation", "typed_failure"],
+          },
+        },
+        debug: true,
+      })
+      .expect(200);
+    const finalEvent = parseSseEvents(response.text).find((entry) => entry.event === "turn_final");
+
+    expect(finalEvent?.data).toMatchObject({
+      turn_id: turnId,
+      final_answer_source: "image_lens_named_receipt_evaluation",
+      terminal_artifact_kind: "image_lens_named_receipt_evaluation",
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        server_authoritative: true,
+        final_answer_source: "image_lens_named_receipt_evaluation",
+        terminal_artifact_kind: "image_lens_named_receipt_evaluation",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        final_answer_source: "image_lens_named_receipt_evaluation",
+        terminal_artifact_kind: "image_lens_named_receipt_evaluation",
+      },
+      route_evidence_authority: {
+        schema: "helix.route_evidence_authority.v1",
+        allowed_terminal_artifact_kinds: expect.arrayContaining([
+          "image_lens_named_receipt_evaluation",
+          "typed_failure",
+        ]),
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        required_terminal_kind: "image_lens_named_receipt_evaluation",
+      },
+    });
+    expect(String(finalEvent?.data.selected_final_answer)).toContain(
+      "named_observation_receipt_not_found_in_current_turn_context",
+    );
+  }, 60_000);
+
   it("promotes Codex launch failures into the visible response debug envelope", async () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "helix-codex-route-unspawnable-"));
     const candidate = path.join(tempDir, process.platform === "win32" ? "codex.exe" : "codex");

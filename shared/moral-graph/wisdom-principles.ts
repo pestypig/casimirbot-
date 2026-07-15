@@ -1,20 +1,8 @@
-import type { FruitionProceduralOperatorV1, FruitionProceduralRoleV1 } from "../fruition-procedure-expression";
+import type { MoralWisdomPrinciple } from "./principle-types";
+import { CIVIC_ORDER_MORAL_PRINCIPLES } from "./principles/civic-order-principles";
+import { PROVISIONING_MORAL_PRINCIPLES } from "./principles/provisioning-principles";
 
-export type MoralWisdomPrinciple = {
-  id: string;
-  sourceIdeologyNodeId: string;
-  label: string;
-  glyph: string;
-  summary: string;
-  proceduralRole: FruitionProceduralRoleV1;
-  procedureOperator: FruitionProceduralOperatorV1;
-  proceduralRule: string;
-  traceBehavior: string;
-  actionEffect: string;
-  evidenceNeeds: string[];
-  refusesAuthority: string[];
-  tags: string[];
-};
+export type { MoralWisdomPrinciple } from "./principle-types";
 
 export const MORAL_WISDOM_ROOT_ID = "wisdom-first-principles";
 
@@ -604,6 +592,8 @@ export const MORAL_WISDOM_PRINCIPLES: readonly MoralWisdomPrinciple[] = [
     refusesAuthority: ["permanent_reject_identity", "opaque_denial", "unappealable_score", "stale_record_exclusion"],
     tags: ["trust", "threshold", "appeal", "repair", "reentry", "due_process", "action_gate"],
   },
+  ...CIVIC_ORDER_MORAL_PRINCIPLES,
+  ...PROVISIONING_MORAL_PRINCIPLES,
 ] as const;
 
 export function getMoralWisdomPrinciple(id: string): MoralWisdomPrinciple | undefined {

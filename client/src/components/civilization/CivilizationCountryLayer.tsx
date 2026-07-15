@@ -1,12 +1,13 @@
 import React from "react";
 import { Geographies, Geography, Marker } from "react-simple-maps";
+import type { CivilizationProvisioningLensV1 } from "@shared/civilization-provisioning-network";
 import {
-  CIVILIZATION_NATION_PARAMETER_SCOPES,
   CIVILIZATION_NATION_STATE_VECTORS,
   type CivilizationNationParameterScope,
   type CivilizationNationStateVector,
 } from "@/data/civilizationNationStateVectors";
 import { CIVILIZATION_MAP_PALETTE } from "./civilizationMapPalette";
+import { civilizationLensColor, readCivilizationLens } from "./civilizationLensModel";
 
 const SCOPE_RISK_ORIENTED = new Set<CivilizationNationParameterScope>([
   "security_exposure",
@@ -14,17 +15,6 @@ const SCOPE_RISK_ORIENTED = new Set<CivilizationNationParameterScope>([
   "information_legitimacy_pressure",
   "environmental_pressure",
 ]);
-
-export function civilizationBalanceScore(vector: CivilizationNationStateVector): number {
-  const scores = CIVILIZATION_NATION_PARAMETER_SCOPES.map((scope) => {
-    const value = vector.parameters[scope];
-    if (value === null) return null;
-    return SCOPE_RISK_ORIENTED.has(scope) ? 1 - value : value;
-  }).filter((value): value is number => value !== null);
-
-  if (scores.length === 0) return 0;
-  return scores.reduce((sum, value) => sum + value, 0) / scores.length;
-}
 
 export function parameterColor(scope: CivilizationNationParameterScope, value: number | null): string {
   if (value === null) return "#64748b";
@@ -41,13 +31,6 @@ export function parameterColor(scope: CivilizationNationParameterScope, value: n
   return "#ef4444";
 }
 
-function balanceColor(score: number): string {
-  if (score >= 0.68) return "#22c55e";
-  if (score >= 0.52) return "#eab308";
-  if (score >= 0.36) return "#f97316";
-  return "#ef4444";
-}
-
 function eventPulseScore(vector: CivilizationNationStateVector): number {
   return Math.max(
     vector.eventPulse.politicalViolence30d,
@@ -58,15 +41,17 @@ function eventPulseScore(vector: CivilizationNationStateVector): number {
 }
 
 function markerRadius(vector: CivilizationNationStateVector): number {
-  return 6 + Math.max(vector.confidence, eventPulseScore(vector) * 0.75) * 8;
+  return 6 + vector.confidence * 8;
 }
 
 export function CivilizationCountryLayer({
   geographyUrl,
+  lens,
   selectedIso3s,
   onToggleCountry,
 }: {
   geographyUrl: string;
+  lens: CivilizationProvisioningLensV1;
   selectedIso3s: string[];
   onToggleCountry: (iso3: string) => void;
 }) {
@@ -110,16 +95,18 @@ export function CivilizationCountryLayer({
       {CIVILIZATION_NATION_STATE_VECTORS.map((vector) => {
         const selected = selectedIso3s.includes(vector.countryIso3);
         const pulse = eventPulseScore(vector);
-        const missing = vector.missingObservations.length > 0;
+        const reading = readCivilizationLens(vector, lens);
+        const missing = vector.missingObservations.length > 0 || reading.evidenceState !== "bound";
         const radius = markerRadius(vector);
-        const score = civilizationBalanceScore(vector);
-        const fill = balanceColor(score);
+        const fill = civilizationLensColor(reading);
         return (
           <Marker
             key={vector.countryIso3}
             data-testid="civilization-bounds-badge"
             data-country-iso={vector.countryIso3}
-            aria-label={`${vector.label} civilization vector`}
+            data-evidence-lens={lens}
+            data-evidence-state={reading.evidenceState}
+            aria-label={`${vector.label} ${reading.label} civilization evidence`}
             coordinates={[vector.coordinates.lon, vector.coordinates.lat]}
             onClick={() => onToggleCountry(vector.countryIso3)}
             style={{

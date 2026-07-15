@@ -1730,6 +1730,144 @@ describe("Helix Ask tool lifecycle trace", () => {
     });
   });
 
+  it("authorizes a completed scholarly lookup-to-full-text compound transition", () => {
+    const turnId = "ask:test:scholarly-lookup-to-full-text-chain";
+    const lookupRef = `${turnId}:scholarly_lookup`;
+    const fullTextRef = `${turnId}:scholarly_full_text`;
+    const terminalKind = "compound_evidence_synthesis_answer";
+    const compoundSubgoalLedger = [
+      {
+        subgoal_id: `${turnId}:subgoal:1:lookup`,
+        order: 1,
+        requested_capability: "scholarly-research.lookup_papers",
+        runtime_capability: "scholarly-research.lookup_papers",
+        selected_capability: "scholarly-research.lookup_papers",
+        executed_capability: "scholarly-research.lookup_papers",
+        observation_kind: "scholarly_research_observation",
+        observation_ref: lookupRef,
+        support_refs: [lookupRef],
+        satisfaction: "satisfied",
+        rail_status: "complete",
+        rail_failure_code: null,
+      },
+      {
+        subgoal_id: `${turnId}:subgoal:2:full-text`,
+        order: 2,
+        requested_capability: "scholarly-research.fetch_full_text",
+        runtime_capability: "scholarly-research.fetch_full_text",
+        selected_capability: "scholarly-research.fetch_full_text",
+        executed_capability: "scholarly-research.fetch_full_text",
+        observation_kind: "scholarly_full_text_observation",
+        observation_ref: fullTextRef,
+        support_refs: [fullTextRef],
+        satisfaction: "satisfied",
+        rail_status: "complete",
+        rail_failure_code: null,
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      active_prompt:
+        "Use scholarly-research.lookup_papers, then fetch the best accessible source with scholarly-research.fetch_full_text.",
+      tool_call_admission_decision: {
+        requested_capability: "scholarly-research.lookup_papers",
+        requested_capability_source: "explicit_user_command",
+        required_observation_kinds_for_requested_capability: ["scholarly_research_observation"],
+      },
+      capability_plan: {
+        requested_capability: "scholarly-research.lookup_papers",
+        selected_capability: "scholarly-research.fetch_full_text",
+      },
+      operational_capability_trace: {
+        model_proposed_capability: "scholarly-research.fetch_full_text",
+        executed_capability: "scholarly-research.fetch_full_text",
+      },
+      tool_lifecycle_trace: {
+        requested_capability: "scholarly-research.fetch_full_text",
+        admitted_capability: "scholarly-research.fetch_full_text",
+        executed_capability: "scholarly-research.fetch_full_text",
+        lifecycle_stage: "reentered_solver",
+      },
+      route_product_contract: {
+        required_terminal_artifact_kind: terminalKind,
+        allowed_terminal_artifact_kinds: [terminalKind],
+      },
+      canonical_goal_frame: {
+        goal_kind: "compound_evidence_synthesis",
+        required_terminal_kind: terminalKind,
+      },
+      terminal_artifact_kind: terminalKind,
+      terminal_answer_authority: {
+        terminal_artifact_kind: terminalKind,
+        support_refs: [lookupRef, fullTextRef],
+      },
+      terminal_authority_single_writer: {
+        selected_terminal_artifact_kind: terminalKind,
+        terminal_artifact_kind: terminalKind,
+        support_refs: [lookupRef, fullTextRef],
+      },
+      terminal_presentation: {
+        terminal_artifact_kind: terminalKind,
+      },
+      final_answer_draft: {
+        artifact_id: `${turnId}:final_answer_draft`,
+        support_refs: [lookupRef, fullTextRef],
+      },
+      capability_itinerary_execution_state: {
+        schema: "helix.capability_itinerary_execution_state.v1",
+        applies: true,
+        complete: true,
+        compound_subgoal_ledger: compoundSubgoalLedger,
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: lookupRef,
+          kind: "scholarly_research_observation",
+          payload: {
+            schema: "helix.scholarly_research_observation.v1",
+            capability: "scholarly-research.lookup_papers",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: fullTextRef,
+          kind: "scholarly_full_text_observation",
+          payload: {
+            schema: "helix.scholarly_full_text_observation.v1",
+            capability: "scholarly-research.fetch_full_text",
+            evidence_state: "full_text_usable",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: `${turnId}:final_answer_draft`,
+          kind: "final_answer_draft",
+          payload: {
+            support_refs: [lookupRef, fullTextRef],
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    const index = buildArtifactQueryIndex({ turnId, payload });
+
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      requested_capability: "scholarly-research.lookup_papers",
+      selected_capability: "scholarly-research.fetch_full_text",
+      executed_capability: "scholarly-research.fetch_full_text",
+      requested_selected_direct_match: false,
+      requested_executed_direct_match: false,
+      compound_transition_authorized: true,
+      requested_selected_match: true,
+      selected_executed_match: true,
+      rail_status: "complete",
+      rail_failure_code: null,
+    });
+  });
+
   it("does not count explicitly non-authoritative terminal records as rail proof", () => {
     const payload: Record<string, unknown> = {
       tool_call_admission_decision: {

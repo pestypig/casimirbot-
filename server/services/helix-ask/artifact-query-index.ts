@@ -1364,25 +1364,64 @@ const buildToolTurnChainAudit = (input: {
     nonModelToolCapability(runtimeToolCall?.capability_key),
   );
   const executedCapability = toolExecutionRejected ? null : rawExecutedCapability;
-  const requestedSelectedMatch =
+  const requestedSelectedDirectMatch =
     requestedCapability && selectedCapability
       ? explicitCapabilityMatches(requestedCapability, selectedCapability)
       : requestedCapability
         ? false
         : null;
-  const requestedExecutedMatch =
+  const requestedExecutedDirectMatch =
     requestedCapability && executedCapability
       ? explicitCapabilityMatches(requestedCapability, executedCapability)
       : requestedCapability
         ? false
         : null;
-  const selectedExecutedMatch =
+  const selectedExecutedDirectMatch =
     selectedCapability && executedCapability
       ? normalizedEqual(selectedCapability, executedCapability) ||
-        Boolean(requestedCapability && requestedSelectedMatch === true && requestedExecutedMatch === true)
+        Boolean(
+          requestedCapability &&
+          requestedSelectedDirectMatch === true &&
+          requestedExecutedDirectMatch === true
+        )
       : selectedCapability
         ? false
         : null;
+  const compoundSubgoalRailStatuses =
+    input.compoundSubgoalRailStatuses?.length
+      ? input.compoundSubgoalRailStatuses
+      : compoundSubgoalRailStatusesFromContract(input.payload);
+  const compoundCapabilityIsCovered = (capability: string | null): boolean =>
+    Boolean(
+      capability &&
+      compoundSubgoalRailStatuses.some((entry) =>
+        [
+          readNullableString(entry.requested_capability),
+          readNullableString(entry.runtime_capability),
+          readNullableString(entry.selected_capability),
+          readNullableString(entry.executed_capability),
+        ].some((candidate) => Boolean(candidate && explicitCapabilityMatches(capability, candidate))),
+      ),
+    );
+  const compoundTransitionAuthorized = Boolean(
+    compoundSubgoalRailStatuses.length > 1 &&
+    compoundSubgoalRailStatuses.every(compoundSubgoalHasSatisfiedObservation) &&
+    compoundCapabilityIsCovered(requestedCapability) &&
+    compoundCapabilityIsCovered(selectedCapability) &&
+    compoundCapabilityIsCovered(executedCapability),
+  );
+  const requestedSelectedMatch =
+    compoundTransitionAuthorized && requestedCapability && selectedCapability
+      ? true
+      : requestedSelectedDirectMatch;
+  const requestedExecutedMatch =
+    compoundTransitionAuthorized && requestedCapability && executedCapability
+      ? true
+      : requestedExecutedDirectMatch;
+  const selectedExecutedMatch =
+    compoundTransitionAuthorized && selectedCapability && executedCapability
+      ? true
+      : selectedExecutedDirectMatch;
   const selectedSubstitutionRuleId = explicitCapabilitySubstitutionRuleId(
     requestedCapability,
     selectedCapability,
@@ -1601,10 +1640,6 @@ const buildToolTurnChainAudit = (input: {
     Boolean(finalDraftRef) &&
     Boolean(materializedTerminal) &&
     !["typed_failure", "direct_answer_text", "tool_receipt"].some((kind) => normalizedEqual(kind, materializedTerminal));
-  const compoundSubgoalRailStatuses =
-    input.compoundSubgoalRailStatuses?.length
-      ? input.compoundSubgoalRailStatuses
-      : compoundSubgoalRailStatusesFromContract(input.payload);
   const firstIncompleteCompoundSubgoal = compoundSubgoalRailStatuses.find((entry) =>
     !compoundSubgoalHasSatisfiedObservation(entry)
   ) ?? null;
@@ -1707,6 +1742,9 @@ const buildToolTurnChainAudit = (input: {
     compound_rail_failure_code: compoundRailFailureCodeRaw,
     compound_repair_target: compoundRepairTarget,
     requested_selected_match: requestedSelectedMatch,
+    requested_selected_direct_match: requestedSelectedDirectMatch,
+    requested_executed_direct_match: requestedExecutedDirectMatch,
+    compound_transition_authorized: compoundTransitionAuthorized,
     selected_executed_match: selectedExecutedMatch,
     substitution_rule_applied: Boolean(substitutionRuleId),
     substitution_rule_id: substitutionRuleId,

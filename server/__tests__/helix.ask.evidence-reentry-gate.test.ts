@@ -205,6 +205,121 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
     });
   });
 
+  it("completes a model-only deictic diagnosis after authorized provider reasoning without evidence", () => {
+    const turnId = "turn:model-only-deictic-provider-answer";
+    const candidateRef = `${turnId}:agent_provider_terminal_candidate:codex:abc123`;
+    const trace = buildAskTurnSolverTrace({
+      turnId,
+      promptText:
+        "Based on those two failure causes you just described, explain which one prevented the requested answer and which one merely affected the available evidence. Do not run a tool and do not ask me to paste the previous answer.",
+      selectedRoute: "/ask",
+      terminalArtifactKind: "agent_provider_terminal_candidate",
+      finalAnswerSource: "agent_provider_terminal_candidate",
+      payload: {
+        turn_id: turnId,
+        source_target_intent: {
+          target_source: "model_only",
+          target_kind: "general_background",
+          strength: "soft",
+        },
+        committed_ask_route: {
+          schema: "helix.committed_ask_route.v1",
+          route: {
+            source_target: "model_only",
+            target_kind: "general_background",
+            strength: "soft",
+          },
+          canonical_goal: {
+            goal_kind: "model_only_concept",
+            required_terminal_kind: "direct_answer_text",
+            allowed_terminal_artifact_kinds: [
+              "direct_answer_text",
+              "model_synthesized_answer",
+              "agent_provider_terminal_candidate",
+            ],
+            forbidden_terminal_artifact_kinds: [],
+          },
+          capability_policy: {
+            allowed_tool_families: ["model_only"],
+            suppressed_tool_families: [],
+            required_capability_families: [],
+            mutating_families_allowed: false,
+          },
+          suppression: {
+            contextual_tool_mentions: [],
+            negative_constraints: [],
+            suppressed_families: [],
+            firewall_required: true,
+          },
+          terminal_product: {
+            terminal_authority_required: true,
+            evidence_reentry_required: false,
+            followup_reasoning_required: false,
+            required_terminal_product: "direct_answer_text",
+          },
+          transitions: [],
+          compatibility: {
+            source_goal_capability_terminal_compatible: true,
+            stale_metadata_ignored: false,
+            shortcut_firewall_applied: false,
+            violations: [],
+          },
+        },
+        provider_reasoning_reentry: {
+          schema: "helix.provider_reasoning_reentry.v1",
+          status: "completed",
+          provider_terminal_candidate_ref: candidateRef,
+          evidence_reentry_required: false,
+          evidence_reentered: true,
+          solver_completed: true,
+          goal_satisfaction_compatible: true,
+        },
+        provider_terminal_authority_bridge: {
+          schema: "helix.provider_terminal_authority_bridge.v1",
+          provider_terminal_candidate_ref: candidateRef,
+          terminal_authority_granted: true,
+          final_visible_answer_authorized: true,
+        },
+        terminal_authority_single_writer: {
+          selected_terminal_artifact_kind: "agent_provider_terminal_candidate",
+          selected_terminal_artifact_ref: candidateRef,
+        },
+        terminal_answer_authority: {
+          schema: "helix.turn_terminal_authority.v1",
+          terminal_artifact_kind: "agent_provider_terminal_candidate",
+          final_answer_source: "agent_provider_terminal_candidate",
+          server_authoritative: true,
+        },
+        terminal_presentation: {
+          schema: "helix.terminal_presentation.v1",
+          terminal_artifact_kind: "agent_provider_terminal_candidate",
+          final_answer_source: "agent_provider_terminal_candidate",
+          selected_observation_refs: [],
+        },
+        poison_audit: { ok: true },
+      },
+      loopParityTrace: {
+        actual_tool_calls: [],
+        observations_created: [],
+        evidence_selected_for_answer: [],
+        evidence_rejected_for_answer: [],
+        poison_audit_ok: true,
+        terminal_authority_ok: true,
+      },
+    });
+
+    expect(trace).toMatchObject({
+      selected_primary_intent: "debug_diagnosis",
+      route_authority_ok: true,
+      terminal_authority_ok: true,
+      evidence_reentry: { required: false, completed: true },
+      followup_reasoning: { required: true, completed: true },
+      completed_solver_path: true,
+      solver_risk_flags: [],
+      solver_short_circuit_flags: [],
+    });
+  });
+
   it("fails closed when a provider route product lacks completed model re-entry", () => {
     const turnId = "turn:provider-route-product-without-reentry";
     const observationRef = `${turnId}:workstation_gateway:research-library.read_document:packet`;

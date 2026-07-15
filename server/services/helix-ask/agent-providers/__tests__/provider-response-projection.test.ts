@@ -43,6 +43,7 @@ const buildPayload = (input: {
   route: HelixAgentRunRoute;
   turnId: string;
   providerResult: HelixAgentRunResult;
+  requestBody?: Record<string, unknown>;
 }) => {
   const gatewayManifest = listWorkstationGatewayCapabilities({
     agentRuntime: input.provider.id,
@@ -58,6 +59,7 @@ const buildPayload = (input: {
   return buildHelixAgentProviderAskPayload({
     provider: input.provider,
     providerResult: input.providerResult,
+    requestBody: input.requestBody,
     runtimeSelectionTrace,
     gatewayManifest,
     turnId: input.turnId,
@@ -65,6 +67,148 @@ const buildPayload = (input: {
 };
 
 describe("agent provider response projection", () => {
+  it("projects bounded conversational referent diagnostics to payload and debug", () => {
+    const provider = buildProvider("codex");
+    const providerResult: HelixAgentRunResult = {
+      ok: true,
+      runtime: "codex",
+      text: "Specific follow-up answer.",
+      response_type: "final_answer",
+      final_status: "completed",
+      debug: {
+        conversational_referent_resolution: {
+          schema: "helix.ask.conversational_referent_resolution.v1",
+          referent_detected: true,
+          resolved_source_ref: "chat.final_answer.previous:turn-current",
+          resolution_confidence: "high",
+          raw_content_included: false,
+        },
+        chat_referent_context_presence: {
+          schema: "helix.ask.chat_referent_context_presence.v1",
+          present: true,
+          previous_assistant_final_answer_ref: "chat.final_answer.previous:turn-current",
+          previous_assistant_final_answer_hash: "hash-current",
+          raw_content_included: false,
+        },
+        chat_referent_context_source_summary: {
+          schema: "helix.ask.chat_referent_context_source_summary.v1",
+          selected_source_name: "visible_ask_transcript",
+          total_reply_count: 4,
+          readable_reply_count: 4,
+          context_present: true,
+          raw_content_included: false,
+        },
+      },
+    };
+
+    const payload = buildPayload({
+      provider,
+      route: "/ask/turn",
+      turnId: "turn-referent-projection",
+      providerResult,
+    });
+    const debug = payload.debug as Record<string, unknown>;
+
+    expect(payload.conversational_referent_resolution).toMatchObject({
+      resolved_source_ref: "chat.final_answer.previous:turn-current",
+      resolution_confidence: "high",
+    });
+    expect(payload.chat_referent_context_presence).toMatchObject({
+      previous_assistant_final_answer_ref: "chat.final_answer.previous:turn-current",
+    });
+    expect(payload.chat_referent_context_source_summary).toMatchObject({
+      selected_source_name: "visible_ask_transcript",
+      context_present: true,
+    });
+    expect(debug.conversational_referent_resolution).toEqual(
+      payload.conversational_referent_resolution,
+    );
+    expect(debug.chat_referent_context_source_summary).toEqual(
+      payload.chat_referent_context_source_summary,
+    );
+  });
+
+  it("preserves the committed request route on provider responses and debug mirrors", () => {
+    const provider = buildProvider("codex");
+    const committedRoute = {
+      schema: "helix.committed_ask_route.v1",
+      turn_id: "turn-route-projection",
+    };
+    const routeEvidenceAuthority = {
+      schema: "helix.route_evidence_authority.v1",
+      turn_id: "turn-route-projection",
+    };
+    const routeProductContract = {
+      schema: "helix.route_product_contract.v1",
+      source_target: "visual_capture",
+      required_terminal_kind: "image_lens_named_receipt_evaluation",
+      allowed_terminal_artifact_kinds: ["image_lens_named_receipt_evaluation", "typed_failure"],
+    };
+    const payload = buildPayload({
+      provider,
+      route: "/ask/turn",
+      turnId: "turn-route-projection",
+      providerResult: {
+        ok: true,
+        runtime: "codex",
+        response_type: "final_answer",
+        final_status: "completed",
+        text: "model-authored answer",
+      },
+      requestBody: {
+        committed_ask_route: committedRoute,
+        route_evidence_authority: routeEvidenceAuthority,
+        route_product_contract: routeProductContract,
+      },
+    });
+
+    expect(payload.committed_ask_route).toEqual(committedRoute);
+    expect(payload.route_evidence_authority).toEqual(routeEvidenceAuthority);
+    expect(payload.route_product_contract).toEqual(routeProductContract);
+    expect((payload.debug as Record<string, unknown>).committed_ask_route).toEqual(committedRoute);
+    expect((payload.debug as Record<string, unknown>).route_evidence_authority).toEqual(routeEvidenceAuthority);
+    expect((payload.debug as Record<string, unknown>).route_product_contract).toEqual(routeProductContract);
+  });
+
+  it("preserves provider-selected terminal authority when the debug mirror omits it", () => {
+    const provider = buildProvider("codex");
+    const terminalAuthority = {
+      schema: "helix.turn_terminal_authority.v1",
+      server_authoritative: true,
+      terminal_kind: "answer",
+      terminal_artifact_kind: "scholarly_research_answer",
+      final_answer_source: "scientific_image_evidence_continuity_summary",
+      terminal_text: "Recovered scientific evidence packet.",
+    };
+    const payload = buildPayload({
+      provider,
+      route: "/ask/turn",
+      turnId: "turn-provider-terminal-fallback",
+      providerResult: {
+        ok: true,
+        runtime: "codex",
+        response_type: "final_answer",
+        final_status: "completed",
+        answer: "Recovered scientific evidence packet.",
+        selected_final_answer: "Recovered scientific evidence packet.",
+        final_answer_source: "scientific_image_evidence_continuity_summary",
+        terminal_artifact_kind: "scholarly_research_answer",
+        terminal_answer_authority: terminalAuthority,
+        debug: {
+          terminal_authority_status: "selected",
+        },
+      } as HelixAgentRunResult,
+    });
+    const debug = payload.debug as Record<string, unknown>;
+
+    expect(payload.final_answer_source).toBe("scientific_image_evidence_continuity_summary");
+    expect(payload.terminal_artifact_kind).toBe("scholarly_research_answer");
+    expect(payload.terminal_answer_authority).toEqual(terminalAuthority);
+    expect(debug.final_answer_source).toBe("scientific_image_evidence_continuity_summary");
+    expect(debug.terminal_artifact_kind).toBe("scholarly_research_answer");
+    expect(debug.terminal_answer_authority).toEqual(terminalAuthority);
+  });
+
   it("projects Codex non-stream payload and debug fields with capability lane metadata", () => {
     const provider = buildProvider("codex");
     const providerResult: HelixAgentRunResult = {

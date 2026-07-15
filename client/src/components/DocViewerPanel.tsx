@@ -64,12 +64,21 @@ import {
 } from "@/lib/workstation/proceduralPlaybackContract";
 import { emitHelixAskLiveEvent } from "@/lib/helix/liveEventsBus";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
-import { dispatchScientificCalculatorMathPicked } from "@/lib/scientific-calculator/events";
 import {
   executeDocEquationAction,
   getDocEquationActionEntryForLatex,
+  getDocEquationCalculatorActions,
   getDocEquationTheoryActions,
 } from "@/lib/docs/docEquationActions";
+import {
+  buildDocScalarCalculatorLaunch,
+  dispatchDocCalculatorLaunch,
+} from "@/lib/docs/docCalculatorLaunch";
+import { buildDocRuntimeCalculatorLaunch } from "@/lib/docs/docRuntimeCommandRegistry";
+import {
+  renderDocRuntimeCodeBlock,
+  renderDocRuntimeCodeSpan,
+} from "@/lib/docs/docRuntimeSidecarMarkup";
 import {
   markInteraction,
   runWhenQuiet,
@@ -349,7 +358,11 @@ export function handleDocMathPick(context: DocMathPickContext): void {
   if (customDispatch) {
     customDispatch(detail);
   } else {
-    dispatchScientificCalculatorMathPicked(detail);
+    dispatchDocCalculatorLaunch(buildDocScalarCalculatorLaunch({
+      latex,
+      docPath: detail.sourcePath,
+      anchor: detail.anchor,
+    }));
   }
   const clipboardWrite = context.clipboardWrite;
   if (clipboardWrite) {
@@ -422,6 +435,14 @@ marked.use({
       },
     },
   ],
+  renderer: {
+    code(token) {
+      return renderDocRuntimeCodeBlock(token.text, token.lang, activeMarkedDocPath);
+    },
+    codespan(token) {
+      return renderDocRuntimeCodeSpan(token.text, activeMarkedDocPath);
+    },
+  },
 });
 
 const DOC_AUTO_READ_PROVIDER = "elevenlabs";
@@ -2117,6 +2138,18 @@ export function DocViewerPanel() {
     (event: React.MouseEvent<HTMLElement>) => {
       const target = event.target as HTMLElement | null;
       if (!target) return;
+      const runtimeAction = target.closest("[data-doc-runtime-command-id]") as HTMLElement | null;
+      const runtimeContainer = runtimeAction?.closest("[data-doc-runtime-command]") as HTMLElement | null;
+      const commandText = runtimeContainer?.dataset.docRuntimeCommand?.trim();
+      if (runtimeAction && commandText) {
+        const launch = buildDocRuntimeCalculatorLaunch({ commandText, docPath: currentPath, anchor });
+        if (launch) {
+          event.preventDefault();
+          event.stopPropagation();
+          dispatchDocCalculatorLaunch(launch);
+        }
+        return;
+      }
       const source = target.closest("[data-doc-math-latex]") as HTMLElement | null;
       if (!source) return;
       const latex = source.dataset.docMathLatex?.trim();
@@ -3837,7 +3870,7 @@ function translationStateMatchesCurrentSource(args: {
   return args.stateSourceHash === args.currentSourceHash;
 }
 
-function renderDocumentMarkdownToHtml(markdown: string, docPath?: string | null): string {
+export function renderDocumentMarkdownToHtml(markdown: string, docPath?: string | null): string {
   let rendered: string | Promise<string>;
   try {
     activeMarkedDocPath = docPath ?? null;
@@ -4038,22 +4071,30 @@ function renderDocMath(expression: string, displayMode: boolean, docPath?: strin
       ? "doc-math-clickable doc-math-clickable-display"
       : "doc-math-clickable doc-math-clickable-inline";
     const equationActionEntry = getDocEquationActionEntryForLatex(docPath, expression);
+    const calculatorActions = getDocEquationCalculatorActions(equationActionEntry);
     const theoryActions = getDocEquationTheoryActions(equationActionEntry);
-    const actionMarkup = theoryActions
-      .map((action) => {
+    const genericCalculatorMarkup = calculatorActions.length === 0
+      ? '<span class="doc-equation-action-chip" data-doc-calculator-ingest="true" role="button" tabindex="0" title="Open in Scientific Calculator">C</span>'
+      : "";
+    const registeredActionMarkup = [
+      ...calculatorActions.map((action) => ({ action, glyph: "C" })),
+      ...theoryActions.map((action) => ({ action, glyph: "T" })),
+    ]
+      .map(({ action, glyph }) => {
         const title = action.claimBoundaryNote
           ? `${action.label}: ${action.claimBoundaryNote}`
           : action.label;
-        return `<span class="doc-equation-action-chip" data-doc-equation-action-id="${escapeHtml(action.actionId)}" role="button" tabindex="0" title="${escapeHtml(title)}">T</span>`;
+        return `<span class="doc-equation-action-chip" data-doc-equation-action-id="${escapeHtml(action.actionId)}" role="button" tabindex="0" title="${escapeHtml(title)}">${glyph}</span>`;
       })
       .join("");
+    const actionMarkup = `${genericCalculatorMarkup}${registeredActionMarkup}`;
     const equationIdAttr = equationActionEntry
       ? ` data-doc-equation-id="${escapeHtml(equationActionEntry.equationId)}"`
       : "";
     if (displayMode) {
-      return `<div class="${className}"${equationIdAttr} data-doc-math-latex="${escapedExpression}" role="button" tabindex="0" title="Copy LaTeX to clipboard and ingest in calculator">${actionMarkup}${rendered}</div>`;
+      return `<div class="${className}"${equationIdAttr} data-doc-math-latex="${escapedExpression}" role="button" tabindex="0" title="Open in Scientific Calculator and copy LaTeX">${actionMarkup}${rendered}</div>`;
     }
-    return `<span class="${className}"${equationIdAttr} data-doc-math-latex="${escapedExpression}" role="button" tabindex="0" title="Copy LaTeX to clipboard and ingest in calculator">${rendered}${actionMarkup}</span>`;
+    return `<span class="${className}"${equationIdAttr} data-doc-math-latex="${escapedExpression}" role="button" tabindex="0" title="Open in Scientific Calculator and copy LaTeX">${rendered}${actionMarkup}</span>`;
   } catch {
     return `<code>${escapeHtml(expression)}</code>`;
   }

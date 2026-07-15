@@ -129,6 +129,63 @@ describe("resolveHelixVisibleTerminal", () => {
     expect(terminal.source).toBe("terminal_answer_authority");
   });
 
+  it("shows an authorized retained scientific packet as the scholarly route product", () => {
+    const packetAnswer =
+      "Scientific evidence packet ref: `sha256:packet#crop=120,205,500,120`. Exact-equation admissibility: `partial_candidate`.";
+    const terminal = resolveHelixVisibleTerminal({
+      selected_final_answer: packetAnswer,
+      final_answer_source: "scientific_image_evidence_continuity_summary",
+      terminal_artifact_kind: "scholarly_research_answer",
+      route_evidence_authority: {
+        schema: "helix.route_evidence_authority.v1",
+        terminal_product_allowed: true,
+        required_terminal_kind: "scholarly_research_answer",
+        allowed_terminal_artifact_kinds: ["scholarly_research_answer", "typed_failure"],
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        server_authoritative: true,
+        terminal_kind: "answer",
+        terminal_text_preview: packetAnswer,
+        final_answer_source: "scientific_image_evidence_continuity_summary",
+        terminal_artifact_kind: "scholarly_research_answer",
+      },
+    });
+
+    expect(terminal.text).toBe(packetAnswer);
+    expect(terminal.source).toBe("terminal_answer_authority");
+    expect(terminal.terminalArtifactKind).toBe("scholarly_research_answer");
+    expect(terminal.finalAnswerSource).toBe("scientific_image_evidence_continuity_summary");
+    expect(terminal.terminalErrorCode).toBeNull();
+  });
+
+  it("explains which selected terminal product a route rejected", () => {
+    const terminal = resolveHelixVisibleTerminal({
+      selected_final_answer: "Receipt evaluated: `equation_47`.",
+      final_answer_source: "image_lens_named_receipt_evaluation",
+      terminal_artifact_kind: "image_lens_named_receipt_evaluation",
+      route_evidence_authority: {
+        schema: "helix.route_evidence_authority.v1",
+        terminal_product_allowed: true,
+        required_terminal_kind: "image_lens_observation_report",
+        allowed_terminal_artifact_kinds: ["image_lens_observation_report", "typed_failure"],
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        server_authoritative: true,
+        terminal_kind: "answer",
+        terminal_text_preview: "Receipt evaluated: `equation_47`.",
+        final_answer_source: "image_lens_named_receipt_evaluation",
+        terminal_artifact_kind: "image_lens_named_receipt_evaluation",
+      },
+    });
+
+    expect(terminal.text).toContain("route required `image_lens_observation_report`");
+    expect(terminal.text).toContain("solver produced `image_lens_named_receipt_evaluation`");
+    expect(terminal.text).toContain("Allowed terminal products: `image_lens_observation_report`, `typed_failure`");
+    expect(terminal.terminalErrorCode).toBe("route_terminal_product_not_allowed");
+  });
+
   it("prefers terminal envelope text over stale model-synthesis selected_final_answer", () => {
     const terminal = resolveHelixVisibleTerminal({
       selected_final_answer: "stale model synthesis",

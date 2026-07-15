@@ -94,6 +94,51 @@ describe("explicit workstation gateway derived calls", () => {
     expect(capabilities(requests)).toEqual(["scholarly-research.lookup_papers"]);
   });
 
+  it("preserves distinct scholarly claim queries while deduplicating exact repeats", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question: "Search the four claims separately and fetch the best three accessible sources.",
+        workstation_gateway_calls: [
+          {
+            capability_id: "scholarly-research.lookup_papers",
+            mode: "read",
+            arguments: { query: "worldline quantum inequalities sampling functions", limit: 3 },
+          },
+          {
+            capability_id: "scholarly-research.lookup_papers",
+            mode: "read",
+            arguments: { query: "negative energy magnitude duration scaling", limit: 3 },
+          },
+          {
+            capability_id: "scholarly-research.lookup_papers",
+            mode: "read",
+            arguments: { query: "quantum interest positive energy overcompensation", limit: 3 },
+          },
+          {
+            capability_id: "scholarly-research.lookup_papers",
+            mode: "read",
+            arguments: { query: "quantum inequalities wormholes warp drives", limit: 3 },
+          },
+          {
+            capability_id: "scholarly-research.lookup_papers",
+            mode: "read",
+            arguments: { query: "worldline quantum inequalities sampling functions", limit: 3 },
+          },
+        ],
+      },
+    });
+
+    expect(requests).toHaveLength(4);
+    expect(requests.map((request) => (request.arguments as Record<string, unknown>).query)).toEqual([
+      "worldline quantum inequalities sampling functions",
+      "negative energy magnitude duration scaling",
+      "quantum interest positive energy overcompensation",
+      "quantum inequalities wormholes warp drives",
+    ]);
+  });
+
   it("keeps a quoted search identifier out of a calculator-only itinerary", () => {
     const requests = readWorkstationGatewayCallRequestsForTurn({
       includePlannerDerived: true,
@@ -1936,6 +1981,207 @@ describe("explicit workstation gateway derived calls", () => {
         allow_scholarly_dependent_chain: true,
       },
     });
+  });
+
+  it("plans up to three distinct accessible full-text fetches when explicitly requested", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Find research papers about quantum inequality sampling constraints in curved spacetime. Fetch the best three accessible sources and summarize only from full text.",
+      },
+    });
+    const lookupRequest = requests[0];
+    expect(lookupRequest).toMatchObject({
+      capability_id: "scholarly-research.lookup_papers",
+      arguments: {
+        requested_full_text_count: 3,
+        allow_scholarly_dependent_chain: true,
+      },
+    });
+
+    const papers = [1, 2, 3].map((ordinal) => ({
+      result_id: `paper:qei-${ordinal}`,
+      title: `Quantum inequality sampling constraints in curved spacetime ${ordinal}`,
+      abstract: "Quantum inequality sampling constraints bound negative energy in curved spacetime.",
+      identifiers: {
+        arxiv_id: `2607.0000${ordinal}`,
+        pdf_url: `https://arxiv.org/pdf/2607.0000${ordinal}.pdf`,
+      },
+    }));
+    const lookupResult = {
+      capability_id: "scholarly-research.lookup_papers",
+      ok: true,
+      gateway_admission: { source_target_intent: {} },
+      observation: {
+        schema: "helix.scholarly_research_observation.v1",
+        query: "quantum inequality sampling constraints curved spacetime",
+        papers,
+      },
+      observation_packet: {
+        produced_artifact_refs: ["observation:lookup"],
+        state_delta: {},
+        suggested_next_steps: [],
+      },
+    } as any;
+
+    const fetchOne = buildDependentCompoundCapabilityGatewayCallRequest({
+      request: lookupRequest,
+      result: lookupResult,
+      results: [lookupResult],
+      turnId: "turn:three-full-texts",
+    });
+    expect(fetchOne).toMatchObject({
+      capability_id: "scholarly-research.fetch_full_text",
+      arguments: {
+        paper_result_id: "paper:qei-1",
+        requested_full_text_count: 3,
+        full_text_fetch_index: 1,
+        selected_full_text_paper_ids: ["paper:qei-1"],
+      },
+    });
+
+    const makeFetchResult = (paperResultId: string) => ({
+      capability_id: "scholarly-research.fetch_full_text",
+      ok: true,
+      observation: { evidence_state: "full_text_usable", paper_result_id: paperResultId },
+      observation_packet: { produced_artifact_refs: [`observation:${paperResultId}`], state_delta: {} },
+    } as any);
+    const fetchOneResult = makeFetchResult("paper:qei-1");
+    const fetchTwo = buildDependentCompoundCapabilityGatewayCallRequest({
+      request: fetchOne!,
+      result: fetchOneResult,
+      results: [lookupResult, fetchOneResult],
+      turnId: "turn:three-full-texts",
+    });
+    expect(fetchTwo).toMatchObject({
+      capability_id: "scholarly-research.fetch_full_text",
+      arguments: {
+        paper_result_id: "paper:qei-2",
+        full_text_fetch_index: 2,
+        selected_full_text_paper_ids: ["paper:qei-1", "paper:qei-2"],
+      },
+    });
+
+    const fetchTwoResult = makeFetchResult("paper:qei-2");
+    const fetchThree = buildDependentCompoundCapabilityGatewayCallRequest({
+      request: fetchTwo!,
+      result: fetchTwoResult,
+      results: [lookupResult, fetchOneResult, fetchTwoResult],
+      turnId: "turn:three-full-texts",
+    });
+    expect(fetchThree).toMatchObject({
+      capability_id: "scholarly-research.fetch_full_text",
+      arguments: {
+        paper_result_id: "paper:qei-3",
+        full_text_fetch_index: 3,
+        selected_full_text_paper_ids: ["paper:qei-1", "paper:qei-2", "paper:qei-3"],
+      },
+    });
+
+    const fetchThreeResult = makeFetchResult("paper:qei-3");
+    expect(buildDependentCompoundCapabilityGatewayCallRequest({
+      request: fetchThree!,
+      result: fetchThreeResult,
+      results: [lookupResult, fetchOneResult, fetchTwoResult, fetchThreeResult],
+      turnId: "turn:three-full-texts",
+    })).toBeNull();
+  });
+
+  it("aggregates resolved claim lookups before choosing three accessible full-text sources", () => {
+    const body = {
+      agent_runtime: "codex",
+      question: [
+        "Use the scientific claims in your immediately previous answer.",
+        "Decompose them separately, search arXiv and the other scholarly providers,",
+        "return a diverse claim-to-citation map, identify accessible full text,",
+        "and fetch the best three accessible sources.",
+        "Distinguish metadata-only evidence from full-text evidence.",
+      ].join(" "),
+      workspace_context_snapshot: {
+        chat_referent_context: {
+          schema: "helix.ask.chat_referent_context.v1",
+          previous_assistant_final_answer: {
+            role: "assistant",
+            reply_id: "reply-claim-portfolio",
+            source_ref: "chat.final_answer.previous:reply-claim-portfolio",
+            text: [
+              "- Quantum inequalities bound sampled negative energy along an observer worldline.",
+              "- Longer sampling durations tighten negative-energy magnitude limits.",
+              "- Quantum interest requires compensating positive-energy pulses.",
+              "- Quantum inequalities constrain traversable wormhole and warp-drive geometries.",
+            ].join("\n"),
+          },
+        },
+      },
+    };
+    const lookups = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body,
+    }).filter((request) => request.capability_id === "scholarly-research.lookup_papers");
+
+    expect(lookups).toHaveLength(4);
+    const portfolioCloser = lookups.at(-1)!;
+    expect(portfolioCloser).toMatchObject({
+      compound_outcome: "scholarly_research_workflow",
+      dependent_capability_id: "scholarly-research.fetch_full_text",
+      arguments: {
+        requested_full_text_count: 3,
+        scholarly_claim_portfolio: true,
+      },
+    });
+
+    const lookupResults = lookups.map((request: any, index) => {
+      const resultId = `paper:claim-${index + 1}`;
+      return {
+        capability_id: "scholarly-research.lookup_papers",
+        ok: true,
+        gateway_admission: { source_target_intent: request.arguments.source_target_intent },
+        observation: {
+          schema: "helix.scholarly_research_observation.v1",
+          query: request.arguments.query,
+          papers: [{
+            result_id: resultId,
+            title: request.arguments.query,
+            abstract: request.arguments.query,
+            provider: "arxiv",
+            identifiers: {
+              arxiv_id: `2607.1000${index + 1}`,
+              pdf_url: `https://arxiv.org/pdf/2607.1000${index + 1}.pdf`,
+            },
+          }],
+        },
+        observation_packet: {
+          produced_artifact_refs: [`observation:claim-${index + 1}`],
+          state_delta: {},
+          suggested_next_steps: [],
+        },
+      } as any;
+    });
+
+    const firstFetch = buildDependentCompoundCapabilityGatewayCallRequest({
+      request: portfolioCloser,
+      result: lookupResults.at(-1)!,
+      results: lookupResults,
+      turnId: "turn:claim-portfolio",
+    });
+
+    expect(firstFetch).toMatchObject({
+      capability_id: "scholarly-research.fetch_full_text",
+      arguments: {
+        requested_full_text_count: 3,
+        full_text_fetch_index: 1,
+        paper_result_id: "paper:claim-1",
+        selected_full_text_paper_ids: ["paper:claim-1"],
+      },
+    });
+    expect((firstFetch as any).arguments.papers.map((paper: any) => paper.result_id)).toEqual([
+      "paper:claim-1",
+      "paper:claim-2",
+      "paper:claim-3",
+      "paper:claim-4",
+    ]);
   });
 
   it("routes explicit arXiv PDF page Image Lens extraction as scholarly full-text workflow, not numeric extraction", () => {

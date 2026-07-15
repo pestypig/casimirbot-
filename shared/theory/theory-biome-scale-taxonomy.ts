@@ -83,6 +83,19 @@ function uniqueTokens(badge: TheoryBadgeV1): Set<string> {
   );
 }
 
+function primaryTokens(badge: TheoryBadgeV1): Set<string> {
+  return new Set(
+    [
+      badge.id,
+      ...badge.subjects,
+      ...badge.tags,
+      ...badge.equationFamilies,
+      ...badge.hintKeys.subjects,
+      ...badge.hintKeys.equationFamilies,
+    ].map((token: string) => token.toLowerCase()),
+  );
+}
+
 function hasAny(tokens: Set<string>, values: string[]): boolean {
   return values.some((value: string) =>
     [...tokens].some((token: string) => token === value || token.includes(value)),
@@ -90,7 +103,7 @@ function hasAny(tokens: Set<string>, values: string[]): boolean {
 }
 
 function inferDomainKey(tokens: Set<string>, badge: TheoryBadgeV1): string {
-  if (badge.level === "claim_boundary" || hasAny(tokens, ["claim_boundary", "boundary"])) return "claim_boundary";
+  if (badge.level === "claim_boundary") return "claim_boundary";
   if (
     hasAny(tokens, [
       "relativity_history",
@@ -133,12 +146,26 @@ function inferDomainKey(tokens: Set<string>, badge: TheoryBadgeV1): string {
   ) {
     return "evolutionary_biophysics";
   }
+  if (
+    hasAny(tokens, [
+      "atomic_physics",
+      "atomic_spectroscopy",
+      "atomic_line",
+      "element_identity",
+      "ionization_charge_state",
+      "electronic_level",
+      "transition_gap",
+      "level_population",
+    ])
+  ) {
+    return "atomic_spectroscopy";
+  }
   if (hasAny(tokens, ["astrochemistry", "fullerene", "pah", "aromatic_carbon"])) return "astrochemistry";
   if (hasAny(tokens, ["prebiotic", "biophysics", "membrane", "rna_world"])) return "prebiotic_biophysics";
   if (hasAny(tokens, ["solar", "helioseismology", "sunquake", "nanoflare"])) return "solar";
   if (hasAny(tokens, ["stellar", "starsim", "nucleosynthesis", "hydrostatic"])) return "stellar";
   if (hasAny(tokens, ["atomic_line", "spectroscopy", "molecular_band"])) return "atomic_spectroscopy";
-  if (hasAny(tokens, ["quantum", "planck", "energy_frequency"])) return "quantum";
+  if (hasAny(tokens, ["quantum", "planck", "energy_frequency", "photon", "radiation", "radiation_mode", "field_state"])) return "quantum";
   if (hasAny(tokens, ["first_principles", "foundation", "units", "dimensions", "constants"])) return "foundation";
   return "general";
 }
@@ -158,17 +185,68 @@ export function inferTheoryBiomeCoordinateSeed(badge: TheoryBadgeV1): {
   reasons: string[];
 } {
   const tokens = uniqueTokens(badge);
-  const domainKey = inferDomainKey(tokens, badge);
+  const coreTokens = primaryTokens(badge);
+  const primaryDomainKey = inferDomainKey(coreTokens, badge);
+  const domainKey = primaryDomainKey === "general" ? inferDomainKey(tokens, badge) : primaryDomainKey;
   const fidelity = inferFidelity(badge);
   const reasons: string[] = [`domain:${domainKey}`, `fidelity:${fidelity}`];
 
-  if (badge.level === "claim_boundary" || hasAny(tokens, ["claim_boundary", "boundary"])) {
+  if (badge.level === "claim_boundary") {
     return {
       scaleLog10M: null,
       scaleBand: "claim_boundary",
       domainKey,
       fidelity: "claim_boundary",
       reasons: [...reasons, "claim-boundary ridge"],
+    };
+  }
+
+  if (
+    badge.id === "physics.radiation.massless_photon_kinematics_context" ||
+    badge.id === "physics.radiation.mode_context" ||
+    badge.id === "physics.radiation.quantum_field_state_context" ||
+    badge.id === "physics.energy.amount_to_density_context"
+  ) {
+    return {
+      scaleLog10M: null,
+      scaleBand: "abstract_formal",
+      domainKey,
+      fidelity,
+      reasons: [...reasons, "scale-free formal relation"],
+    };
+  }
+
+  if (
+    domainKey === "atomic_spectroscopy" ||
+    hasAny(coreTokens, [
+      "atomic_physics",
+      "atomic_line",
+      "element_identity",
+      "ionization_charge_state",
+      "electronic_level",
+      "transition_gap",
+      "level_population",
+    ])
+  ) {
+    return {
+      scaleLog10M: -10,
+      scaleBand: "atomic",
+      domainKey,
+      fidelity,
+      reasons: [...reasons, "atomic-state or spectroscopy metadata"],
+    };
+  }
+
+  if (
+    (domainKey === "stellar" || domainKey === "solar") &&
+    hasAny(coreTokens, ["stellar", "starsim", "nucleosynthesis", "hydrostatic", "solar", "helioseismology"])
+  ) {
+    return {
+      scaleLog10M: hasAny(coreTokens, ["solar", "helioseismology", "sunquake", "nanoflare"]) ? 9 : 10,
+      scaleBand: "stellar",
+      domainKey,
+      fidelity,
+      reasons: [...reasons, "strong stellar/solar scale metadata"],
     };
   }
 

@@ -12,7 +12,7 @@ const VAGUE_RULE_PATTERNS = [
 
 describe("Moral wisdom procedural principle catalog", () => {
   it("requires every principle mapping to carry procedural source, rule, trace, and boundaries", () => {
-    expect(MORAL_WISDOM_PRINCIPLES.length).toBe(39);
+    expect(MORAL_WISDOM_PRINCIPLES.length).toBe(51);
 
     for (const principle of MORAL_WISDOM_PRINCIPLES) {
       expect(principle.sourceIdeologyNodeId).toBe(principle.id);
@@ -152,5 +152,38 @@ describe("Moral wisdom procedural principle catalog", () => {
       procedureOperator: "requires",
       refusesAuthority: expect.arrayContaining(["permanent_reject_identity", "unappealable_score"]),
     });
+  });
+
+  it("models civic-order participation without inferring consent or legitimacy", () => {
+    expect(getMoralWisdomPrinciple("participation-consent-separation")).toMatchObject({
+      proceduralRole: "evidence_requirement",
+      refusesAuthority: expect.arrayContaining(["participation_as_consent", "dependence_as_loyalty"]),
+    });
+    expect(getMoralWisdomPrinciple("voice-exit-contestability")).toMatchObject({
+      proceduralRole: "action_gate",
+      evidenceNeeds: expect.arrayContaining(["formal_exit_path", "feasible_exit_evidence"]),
+    });
+    expect(getMoralWisdomPrinciple("adherence-legitimacy-separation")?.refusesAuthority).toContain(
+      "popularity_as_legitimacy",
+    );
+    expect(getMoralWisdomPrinciple("coordination-pluralism")?.refusesAuthority).toContain("ideology_rank");
+  });
+
+  it("models provisioning as a rights-bounded vector rather than a scalar rank", () => {
+    expect(getMoralWisdomPrinciple("need-before-allocation")).toMatchObject({
+      proceduralRole: "first_principle",
+      refusesAuthority: expect.arrayContaining(["biology_as_policy", "universal_budget"]),
+    });
+    expect(getMoralWisdomPrinciple("efficiency-without-erasure")?.refusesAuthority).toEqual(
+      expect.arrayContaining(["overall_efficiency_score", "civilization_balance_score"]),
+    );
+    expect(getMoralWisdomPrinciple("mandate-bounded-hierarchy")).toMatchObject({
+      proceduralRole: "action_gate",
+      evidenceNeeds: expect.arrayContaining(["authority_scope", "review_path"]),
+    });
+    expect(getMoralWisdomPrinciple("cooperation-without-assimilation")?.refusesAuthority).toContain(
+      "cooperation_as_assimilation",
+    );
+    expect(getMoralWisdomPrinciple("specialization-without-caste")?.refusesAuthority).toContain("role_as_caste");
   });
 });

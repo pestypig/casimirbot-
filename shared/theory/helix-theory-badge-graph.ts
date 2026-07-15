@@ -84,6 +84,12 @@ import {
 import {
   buildCrossScaleConnectiveTissueTheoryBadgesV1,
 } from "./cross-scale-connective-tissue-theory-badges";
+import {
+  buildAtomicRadiationStateTheoryBadgesV1,
+} from "./atomic-radiation-state-theory-badges";
+import {
+  buildFoundationalPhysicsBridgeTheoryBadgesV1,
+} from "./foundational-physics-bridge-theory-badges";
 
 const DIAGNOSTIC_BOUNDARY: TheoryBadgeClaimBoundaryV1 = {
   diagnosticOnly: true,
@@ -955,6 +961,8 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
   const phasesOfMatter = buildPhaseOfMatterTheoryBadgesV1();
   const collectiveModeSynchrony = buildCollectiveModeSynchronyTheoryBadgesV1();
   const crossScaleConnectiveTissue = buildCrossScaleConnectiveTissueTheoryBadgesV1();
+  const atomicRadiationStates = buildAtomicRadiationStateTheoryBadgesV1();
+  const foundationalPhysicsBridges = buildFoundationalPhysicsBridgeTheoryBadgesV1();
 
   return buildTheoryBadgeGraphV1({
     graphId: "nhm2-theory-badge-graph",
@@ -988,6 +996,8 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...phasesOfMatter.badges,
       ...collectiveModeSynchrony.badges,
       ...crossScaleConnectiveTissue.badges,
+      ...atomicRadiationStates.badges,
+      ...foundationalPhysicsBridges.badges,
     ],
     edges: [
       ...FIRST_PRINCIPLES_THEORY_EDGES,
@@ -1016,6 +1026,8 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...phasesOfMatter.edges,
       ...collectiveModeSynchrony.edges,
       ...crossScaleConnectiveTissue.edges,
+      ...atomicRadiationStates.edges,
+      ...foundationalPhysicsBridges.edges,
     ],
   });
 }

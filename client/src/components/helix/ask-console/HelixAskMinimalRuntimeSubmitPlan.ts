@@ -45,6 +45,7 @@ export function buildHelixAskMinimalRuntimeSubmitPlan(args: {
   });
   const baseContext = buildHelixAskContextBridgeSnapshot(args.desktopUrl ?? "");
   const chatReferentContextBuild = buildHelixAskChatReferentContextForSubmit({
+    promptText: admission.firstEntry ?? args.draft,
     durableReplies: args.durableReplies ?? [],
     visibleReplies: args.visibleReplies ?? [],
   });

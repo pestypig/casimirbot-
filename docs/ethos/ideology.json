@@ -9753,6 +9753,222 @@
           "environment"
         ]
       }
+    },
+    {
+      "id": "participation-consent-separation",
+      "slug": "participation-consent-separation",
+      "title": "Participation-Consent Separation",
+      "excerpt": "Participation, use, payment, dependence, and compliance do not by themselves establish consent.",
+      "bodyMD": "Separate participation functions from consent, endorsement, and loyalty. Record dependency and alternatives before strengthening a consent claim.",
+      "tags": ["civic_order", "participation", "consent", "dependency", "anti_inference"],
+      "aliases": ["participation is not consent", "payment is not consent", "dependence is not loyalty", "compliance is not endorsement"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "wisdom-first-principles" }],
+      "summary": "Separate participation functions and dependency from consent or endorsement.",
+      "proceduralLanguage": {
+        "pattern": "Presence, use, payment, compliance, or dependence is being treated as agreement.",
+        "move": "Name the participation function, dependency, alternatives, and explicit consent evidence separately.",
+        "missingCheck": "What direct evidence establishes consent rather than necessity, habit, benefit, or fear?",
+        "antiPattern": "Inferring consent, endorsement, or loyalty from participation alone."
+      }
+    },
+    {
+      "id": "inherited-order-participation",
+      "slug": "inherited-order-participation",
+      "title": "Inherited Order Participation",
+      "excerpt": "Separate inherited entry into an order from a person's present chosen position within it.",
+      "bodyMD": "Birth, residence, employment, contract, migration, and membership describe entry conditions. They do not settle a person's current endorsement or identity.",
+      "tags": ["civic_order", "inheritance", "conditioning", "participation", "identity"],
+      "aliases": ["born into the system", "inherited order", "raised in the order", "socialized into the system"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "wisdom-first-principles" }],
+      "summary": "Separate entry conditions from present chosen participation.",
+      "proceduralLanguage": {
+        "pattern": "An inherited or unavoidable entry condition is being treated as present endorsement.",
+        "move": "Trace entry mode, maturation context, alternatives at entry, and present chosen position.",
+        "missingCheck": "Which current choices or constraints distinguish inherited presence from endorsement?",
+        "antiPattern": "Treating birth or inherited participation as consent or fixed identity."
+      }
+    },
+    {
+      "id": "proximity-norm-reciprocity",
+      "slug": "proximity-norm-reciprocity",
+      "title": "Proximity, Norm, and Reciprocity",
+      "excerpt": "Inspect how local proximity, custom, enforcement, and reciprocity reproduce a norm.",
+      "bodyMD": "A local regularity can be descriptive, expected, codified, enforced, contested, or drifting. Its scope and reciprocal effects must be observed before it becomes a moral rule.",
+      "tags": ["civic_order", "norms", "proximity", "reciprocity", "contestability"],
+      "aliases": ["local norm", "shared custom", "peer expectation", "norm reciprocity"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "wisdom-first-principles" }],
+      "summary": "Decompose local norms into source, status, scope, effects, enforcement, and dissent.",
+      "proceduralLanguage": {
+        "pattern": "A local custom or repeated pattern is being treated as a general moral rule.",
+        "move": "Name the norm source, status, affected parties, exceptions, enforcement, dissent, and review.",
+        "missingCheck": "Who experiences the norm as reciprocal support, exclusion, or coercion?",
+        "antiPattern": "Treating custom, proximity, or regularity as justice."
+      }
+    },
+    {
+      "id": "voice-exit-contestability",
+      "slug": "voice-exit-contestability",
+      "title": "Voice, Exit, and Contestability",
+      "excerpt": "Distinguish formal voice or exit from paths that remain usable under real costs and retaliation risk.",
+      "bodyMD": "Formal rights do not establish practical agency when voice, exit, appeal, repair, or re-entry are inaccessible, unaffordable, or retaliated against.",
+      "tags": ["civic_order", "voice", "exit", "appeal", "repair", "action_gate"],
+      "aliases": ["feasible exit", "formal exit", "voice path", "retaliation risk", "contestability path"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "wisdom-first-principles" }],
+      "summary": "Test whether formal voice and exit are feasible in practice.",
+      "proceduralLanguage": {
+        "pattern": "A formal option is being treated as proof of voluntary participation.",
+        "move": "Trace actual costs, alternatives, retaliation, appeal, repair, and re-entry.",
+        "missingCheck": "Can the affected person use the path without disproportionate cost or retaliation?",
+        "antiPattern": "Treating formal exit as feasible exit or dissent as nonparticipation."
+      }
+    },
+    {
+      "id": "adherence-legitimacy-separation",
+      "slug": "adherence-legitimacy-separation",
+      "title": "Adherence-Legitimacy Separation",
+      "excerpt": "Popularity, compliance, stability, and repeated adherence do not establish legitimacy or justice.",
+      "bodyMD": "Adherence signals can describe how an order persists. Legitimacy requires separate evidence about reasons, rights, jurisdiction, contestability, and review.",
+      "tags": ["civic_order", "legitimacy", "adherence", "justice", "due_process"],
+      "aliases": ["popularity is not legitimacy", "stability is not justice", "adherence is not legitimacy"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "wisdom-first-principles" }],
+      "summary": "Keep descriptive adherence separate from legitimacy and justice claims.",
+      "proceduralLanguage": {
+        "pattern": "Popularity, stability, or compliance is being used as proof of legitimacy.",
+        "move": "Separate support signals from rights, reasons, contestability, and review evidence.",
+        "missingCheck": "What justificatory evidence exists beyond repeated adherence?",
+        "antiPattern": "Treating popularity as legitimacy, compliance as approval, or stability as justice."
+      }
+    },
+    {
+      "id": "coordination-pluralism",
+      "slug": "coordination-pluralism",
+      "title": "Coordination Pluralism",
+      "excerpt": "Decompose labeled orders into the allocation, authority, and accountability channels actually in use.",
+      "bodyMD": "Real orders normally combine market, public, cooperative, administrative, customary, contractual, and mutual-aid channels. Labels remain non-authoritative profiles rather than complete mechanisms or ranks.",
+      "tags": ["civic_order", "coordination", "pluralism", "allocation", "authority", "accountability"],
+      "aliases": ["coordination profile", "allocation channel", "authority channel", "accountability channel"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "wisdom-first-principles" }],
+      "summary": "Compare observable coordination channels without ideology totalization.",
+      "proceduralLanguage": {
+        "pattern": "A political or economic label is being treated as a complete mechanism.",
+        "move": "Map allocation, authority, and accountability channels and their roles.",
+        "missingCheck": "Which channels actually govern the case, and where are their fallbacks or constraints?",
+        "antiPattern": "Ranking ideology labels or reducing a mixed order to one coordination mode."
+      }
+    },
+    {
+      "id": "need-before-allocation",
+      "slug": "need-before-allocation",
+      "title": "Need Before Allocation",
+      "excerpt": "Identify bounded viability needs and affected agents before choosing an allocation procedure.",
+      "bodyMD": "Living systems can identify continuity questions about energy, matter, water, habitat, repair, information, distribution, care, waste, and resilience. Those observations do not prescribe budgets or political forms.",
+      "tags": ["provisioning", "viability", "need", "coverage", "first_principle"],
+      "aliases": ["viability needs", "need primitive", "need before budget", "biology is not policy"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "wisdom-first-principles" }],
+      "summary": "Start allocation reflection from bounded need and coverage evidence.",
+      "proceduralLanguage": {
+        "pattern": "A need, organism analogy, or dependency is being used to prescribe an allocation policy.",
+        "move": "Bind the need, threshold, coverage, affected agents, and time horizon before comparing procedures.",
+        "missingCheck": "Which bounded continuity requirement is evidenced, and which policy choice remains open?",
+        "antiPattern": "Deriving a universal budget, hierarchy, tax, or government form from biology."
+      }
+    },
+    {
+      "id": "efficiency-without-erasure",
+      "slug": "efficiency-without-erasure",
+      "title": "Efficiency Without Erasure",
+      "excerpt": "Treat efficiency as a vector of flows, resilience, rights, maintenance, and distribution rather than one score.",
+      "bodyMD": "A selected lens can expose quantity, loss, latency, reliability, buffers, substitutes, burdens, benefits, externalities, and rights. A hidden aggregate erases those tradeoffs.",
+      "tags": ["provisioning", "efficiency", "vector", "distribution", "anti_scalar"],
+      "aliases": ["no overall efficiency score", "no civilization balance score", "pareto frontier", "selected evidence lens"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "wisdom-first-principles" }],
+      "summary": "Use explicit evidence lenses and Pareto tradeoffs instead of a scalar rank.",
+      "proceduralLanguage": {
+        "pattern": "A system or civilization is being ranked by one aggregate efficiency or balance score.",
+        "move": "Select a lens and preserve distribution, externalities, rights, maintenance, and missing evidence.",
+        "missingCheck": "Which objective and affected groups does the selected lens represent or omit?",
+        "antiPattern": "Calling a hidden aggregate an objective civilization ranking."
+      }
+    },
+    {
+      "id": "mandate-bounded-hierarchy",
+      "slug": "mandate-bounded-hierarchy",
+      "title": "Mandate-Bounded Hierarchy",
+      "excerpt": "Delegated authority must remain bounded by function, evidence, safety, review, exit, and retraining paths.",
+      "bodyMD": "Specialization can support continuity without granting unbounded authority. The role, demand, assignment, safety, compensation, mobility, and review lifecycle remain explicit.",
+      "tags": ["provisioning", "hierarchy", "mandate", "role", "review", "action_gate"],
+      "aliases": ["delegated authority", "bounded mandate", "role delegation", "authority scope"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "wisdom-first-principles" }],
+      "summary": "Bound delegated role authority to an evidenced function and review lifecycle.",
+      "proceduralLanguage": {
+        "pattern": "A specialized role is being used to justify open-ended authority.",
+        "move": "Trace demand, assignment, authority scope, safety, compensation, exit, retraining, and review.",
+        "missingCheck": "What ends, revises, or contests the mandate?",
+        "antiPattern": "Treating specialization as unbounded power or personal worth."
+      }
+    },
+    {
+      "id": "legible-rules-bounded-confidentiality",
+      "slug": "legible-rules-bounded-confidentiality",
+      "title": "Legible Rules, Bounded Confidentiality",
+      "excerpt": "Keep governing rules and review paths legible while limiting confidentiality to a justified scope.",
+      "bodyMD": "Some information may require confidentiality, but the governing rule, burden, reason, duration, and review mechanism should remain bounded and contestable.",
+      "tags": ["provisioning", "legibility", "confidentiality", "transparency", "review"],
+      "aliases": ["legible rules", "bounded confidentiality", "secret privilege", "confidentiality scope"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "wisdom-first-principles" }],
+      "summary": "Preserve justified confidentiality without allowing opaque privilege.",
+      "proceduralLanguage": {
+        "pattern": "Confidentiality is being used to hide governing rules, burdens, or operational evidence.",
+        "move": "Name the withheld information, risk basis, scope, duration, and independent review.",
+        "missingCheck": "Which rule remains publicly legible and who can contest the confidentiality boundary?",
+        "antiPattern": "Treating secrecy as unreviewable privilege."
+      }
+    },
+    {
+      "id": "cooperation-without-assimilation",
+      "slug": "cooperation-without-assimilation",
+      "title": "Cooperation Without Assimilation",
+      "excerpt": "Cross-jurisdiction cooperation should preserve distinct agency, standards negotiation, dispute, and continuity paths.",
+      "bodyMD": "Shared infrastructure and research can combine contributions and benefits while retaining jurisdictional agency, negotiated standards, knowledge policy, dispute paths, and continuity obligations.",
+      "tags": ["provisioning", "cooperation", "jurisdiction", "pluralism", "non_domination"],
+      "aliases": ["cross-jurisdiction cooperation", "shared research project", "shared infrastructure project", "retained agency"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "wisdom-first-principles" }],
+      "summary": "Build shared capacity without converting cooperation into assimilation.",
+      "proceduralLanguage": {
+        "pattern": "A shared project may collapse distinct participants into one authority or identity.",
+        "move": "Trace contributions, benefits, maintenance, standards, knowledge policy, dispute, exit, and continuity.",
+        "missingCheck": "Which agency and obligations remain distinct after coordination?",
+        "antiPattern": "Treating cooperation as assimilation, superiority, or exitless coordination."
+      }
+    },
+    {
+      "id": "specialization-without-caste",
+      "slug": "specialization-without-caste",
+      "title": "Specialization Without Caste",
+      "excerpt": "Treat specialization as a revisable function assignment, not a fixed identity or rank of human worth.",
+      "bodyMD": "Useful specialization remains mobile and reviewable through safety, compensation, retraining, exit, and anti-inheritance protections.",
+      "tags": ["provisioning", "specialization", "mobility", "anti_caste", "dignity"],
+      "aliases": ["specialization without caste", "inherited occupation", "role mobility", "retraining path"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "wisdom-first-principles" }],
+      "summary": "Keep specialized roles revisable and separate from identity or worth.",
+      "proceduralLanguage": {
+        "pattern": "A useful role is hardening into inherited status, fixed identity, or rank.",
+        "move": "Trace assignment, mobility, safety, compensation, retraining, exit, and review.",
+        "missingCheck": "Can the role be changed or exited without loss of dignity or basic continuity?",
+        "antiPattern": "Treating occupation as caste, identity, or human worth."
+      }
     }
   ]
 }

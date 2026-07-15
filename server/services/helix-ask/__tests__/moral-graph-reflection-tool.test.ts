@@ -5,6 +5,8 @@ import { validateMoralBadgeLocatorV1 } from "../../../../shared/moral-badge-loca
 import { validateFruitionProcedureExpressionV1 } from "../../../../shared/fruition-procedure-expression";
 import { validateProceduralMoralClassificationV1 } from "../../../../shared/procedural-moral-classification";
 import { validateCivicTrustTraversabilityV1 } from "../../../../shared/civic-trust-traversability";
+import { validateCivicOrderParticipationV1 } from "../../../../shared/civic-order-participation";
+import { validateCivilizationProvisioningNetworkV1 } from "../../../../shared/civilization-provisioning-network";
 import { evaluateWorkstationToolReceipt } from "../workstation-tool-evaluator";
 import {
   HELIX_ASK_MORAL_GRAPH_REFLECTION_TOOL_NAME,
@@ -164,6 +166,41 @@ describe("Helix Ask MoralGraph reflection tool", () => {
       terminal_eligible: false,
       moral_finality: false,
       financial_authority: false,
+    });
+  });
+
+  it("includes civic participation and provisioning as independent evidence-only observations", async () => {
+    const output = await runHelixAskMoralGraphReflectionTool({
+      inputKind: "user_prompt",
+      text: [
+        "A tenant participates in an inherited civic order through rent and public services,",
+        "but formal exit is not feasible and participation must not be treated as consent.",
+        "Trace the water and energy resource flows, transport energy, maintenance, and public provision",
+        "without an overall civilization balance score or universal budget.",
+      ].join(" "),
+      refs: ["turn:civic-provisioning-tool"],
+    });
+
+    expect(output.civicOrderParticipation).toBeDefined();
+    expect(validateCivicOrderParticipationV1(output.civicOrderParticipation)).toEqual([]);
+    expect(output.civicOrderParticipation?.activatedBadgeIds).toEqual(
+      expect.arrayContaining(["participation-consent-separation", "voice-exit-contestability"]),
+    );
+    expect(output.civicOrderParticipation?.authority).toMatchObject({
+      terminal_eligible: false,
+      consent_inference: false,
+      legitimacy_finality: false,
+    });
+
+    expect(output.civilizationProvisioningNetwork).toBeDefined();
+    expect(validateCivilizationProvisioningNetworkV1(output.civilizationProvisioningNetwork)).toEqual([]);
+    expect(output.civilizationProvisioningNetwork?.moralNodeIds).toEqual(
+      expect.arrayContaining(["need-before-allocation", "efficiency-without-erasure"]),
+    );
+    expect(output.civilizationProvisioningNetwork?.authority).toMatchObject({
+      terminal_eligible: false,
+      biological_policy_derivation: false,
+      overall_efficiency_score_allowed: false,
     });
   });
 

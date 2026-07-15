@@ -331,6 +331,104 @@ const cases: BenchmarkCase[] = [
 describe("Helix Ask prompt-only adversarial problem-solving benchmark", () => {
   beforeEach(resetAll);
 
+  it("demotes an anaphoric scholarly request with a failure-only antecedent before source admission", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: "helix-ask:prompt-solving:failure-only-referent",
+        question: "Find scholarly references supporting the scientific claims we just discussed. Fetch the best three accessible sources.",
+        mode: "read",
+        debug: true,
+        workspace_context_snapshot: {
+          chat_referent_context: {
+            schema: "helix.ask.chat_referent_context.v1",
+            previous_assistant_final_answer: {
+              role: "assistant",
+              reply_id: "reply-failure-only",
+              source_ref: "chat.final_answer.previous:reply-failure-only",
+              text: "I could not complete that turn. Cause: terminal_authority_missing.",
+            },
+          },
+        },
+      })
+      .expect(200);
+
+    expect(response.body.canonical_goal_frame).toMatchObject({
+      goal_kind: "model_only_concept",
+      answer_scope: "model_only",
+      required_terminal_kind: "direct_answer_text",
+      classifier_reasons: expect.arrayContaining([
+        "conversational_referent_resolved_before_source_admission",
+        "referent_cannot_supply_requested_evidence",
+      ]),
+    });
+    expect(response.body.workstation_gateway_call_results ?? []).toHaveLength(0);
+  }, 60_000);
+
+  it("preserves scholarly source admission when a blocked referent still names an explicit current-turn topic", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: "helix-ask:prompt-solving:explicit-topic-fallback",
+        question: "Find scholarly references supporting the quantum-inequality claims we discussed. Search arXiv and the other scholarly providers, and fetch the best three accessible sources.",
+        mode: "read",
+        debug: true,
+        workspace_context_snapshot: {
+          chat_referent_context: {
+            schema: "helix.ask.chat_referent_context.v1",
+            previous_assistant_final_answer: {
+              role: "assistant",
+              reply_id: "reply-unrelated-runtime",
+              source_ref: "chat.final_answer.previous:reply-unrelated-runtime",
+              text: "Runtime verification can switch a neural-network controller to a safe backup.",
+            },
+          },
+        },
+      })
+      .expect(200);
+
+    expect(response.body.canonical_goal_frame?.goal_kind).not.toBe("model_only_concept");
+    expect(response.body.canonical_goal_frame?.classifier_reasons ?? []).not.toContain(
+      "referent_cannot_supply_requested_evidence",
+    );
+    expect(response.body.tool_call_admission_decision).toMatchObject({
+      source_target: "scholarly_research",
+      required: true,
+      admitted_tool_families: expect.arrayContaining(["scholarly_research"]),
+    });
+  }, 60_000);
+
+  it("does not demote an anaphoric scholarly request when the retained answer contains a scientific claim", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: "helix-ask:prompt-solving:scientific-referent",
+        question: "Find scholarly references supporting the scientific claims we just discussed. Fetch the best three accessible sources.",
+        mode: "read",
+        debug: true,
+        workspace_context_snapshot: {
+          chat_referent_context: {
+            schema: "helix.ask.chat_referent_context.v1",
+            previous_assistant_final_answer: {
+              role: "assistant",
+              reply_id: "reply-scientific",
+              source_ref: "chat.final_answer.previous:reply-scientific",
+              text: "Quantum inequalities constrain weighted negative-energy averages over finite sampling intervals.",
+            },
+          },
+        },
+      })
+      .expect(200);
+
+    expect(response.body.canonical_goal_frame?.classifier_reasons ?? []).not.toContain(
+      "referent_cannot_supply_requested_evidence",
+    );
+    expect(response.body.canonical_goal_frame?.goal_kind).not.toBe("model_only_concept");
+  }, 60_000);
+
   it("contains at least 20 prompt-only cases", () => {
     expect(cases.length).toBeGreaterThanOrEqual(20);
   });

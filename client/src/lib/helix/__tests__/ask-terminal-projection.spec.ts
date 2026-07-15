@@ -152,6 +152,46 @@ describe("Helix Ask terminal projection", () => {
     expect(visible.selected_final_answer).not.toBe(preview);
   });
 
+  it("projects a server admission rejection instead of the backend materialization fallback", () => {
+    const visible = buildVisibleResolvedTurn({
+      id: "ask:memory-pressure-rejection",
+      turn_id: "ask:memory-pressure-rejection",
+      ok: false,
+      response_type: "final_answer",
+      selected_final_answer: "",
+      final_answer_source: "ask_turn_admission",
+      terminal_artifact_kind: "ask_turn_admission",
+      route_reason_code: "ask_turn_admission / memory_hard_pressure",
+      runtime_memory_governor_admission: {
+        admitted: false,
+        action: "reject_memory_pressure",
+        reason: "heap_used_limit",
+        pressure_state: "hard_pressure",
+      },
+      resolved_turn_summary: {
+        final_status: "final_answer",
+        resolved_route_label: "ask_turn_admission / rejected",
+        terminal_artifact_kind: "ask_turn_admission",
+        final_answer_source: "ask_turn_admission",
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        terminal_kind: "answer",
+        final_answer_source: "ask_turn_admission",
+        terminal_artifact_kind: "ask_turn_admission",
+        authority_origin: "ask_turn_admission",
+        server_authoritative: true,
+        assistant_answer: false,
+      },
+    });
+
+    expect(visible.primary_terminal_label).toBe("final_failure");
+    expect(visible.primary_source_label).toBe("ask turn admission");
+    expect(visible.terminal_error_code).toBe("memory_hard_pressure");
+    expect(visible.selected_final_answer).toBe("Ask turn rejected: memory_hard_pressure.");
+    expect(visible.selected_final_answer).not.toContain("no server terminal artifact");
+  });
+
   it("blocks workstation evaluation projection when the backend Ask entrypoint is missing", () => {
     const visible = buildVisibleResolvedTurn({
       id: "reply-client-projection-scholar-fetch",

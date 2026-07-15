@@ -53,6 +53,7 @@ import {
 } from "./compound-dependency-requests";
 import {
   buildActiveCalculatorContextWorkstationGatewayCallRequests,
+  buildActiveTheoryRuntimeContextWorkstationGatewayCallRequests,
   buildActiveDocsContextWorkstationGatewayCallRequests,
   buildActiveWorkstationContextGatewayCallRequests,
   buildPlannerDerivedWorkstationGatewayCallRequests,
@@ -512,6 +513,7 @@ export {
 } from "./compound-dependency-requests";
 export {
   buildActiveCalculatorContextWorkstationGatewayCallRequests,
+  buildActiveTheoryRuntimeContextWorkstationGatewayCallRequests,
   buildActiveDocsContextWorkstationGatewayCallRequests,
   buildActiveWorkstationContextGatewayCallRequests,
   buildPlannerDerivedWorkstationGatewayCallRequests,
@@ -665,6 +667,7 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   }
   const activeCalculatorContext = buildActiveCalculatorContextWorkstationGatewayCallRequests(input.body);
   appendPromptDerivedDedupe(activeCalculatorContext);
+  appendPromptDerivedDedupe(buildActiveTheoryRuntimeContextWorkstationGatewayCallRequests(input.body));
   const activeWorkstationContext = buildActiveWorkstationContextGatewayCallRequests(input.body);
   appendPromptDerivedDedupe(activeWorkstationContext);
   appendPromptDerivedDedupe(buildPromptDerivedReadableSurfaceGatewayCallRequests(input.body));

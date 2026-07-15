@@ -109,6 +109,7 @@ const readGoalDispatchReadiness = (
 
 const buildProviderProjectionFields = (input: {
   provider: HelixAgentProvider;
+  providerResult: Record<string, unknown>;
   providerDebug: Record<string, unknown>;
   runtimeSelectionTrace: HelixAgentRuntimeSelectionTrace;
   gatewayManifest: HelixWorkstationGatewayListResult;
@@ -164,14 +165,38 @@ const buildProviderProjectionFields = (input: {
     workstation_gateway_observation_packets: input.providerDebug.workstation_gateway_observation_packets ?? [],
     tool_lifecycle_traces: input.providerDebug.tool_lifecycle_traces ?? [],
     tool_followup_decisions: input.providerDebug.tool_followup_decisions ?? [],
-    provider_terminal_candidate: input.providerDebug.provider_terminal_candidate ?? null,
-    provider_reasoning_reentry: input.providerDebug.provider_reasoning_reentry ?? null,
-    terminal_authority_candidate_review: input.providerDebug.terminal_authority_candidate_review ?? null,
-    provider_terminal_authority_bridge: input.providerDebug.provider_terminal_authority_bridge ?? null,
-    terminal_answer_authority: input.providerDebug.terminal_answer_authority ?? null,
-    terminal_presentation: input.providerDebug.terminal_presentation ?? null,
-    final_answer_source: input.providerDebug.final_answer_source ?? null,
-    terminal_artifact_kind: input.providerDebug.terminal_artifact_kind ?? null,
+    provider_terminal_candidate:
+      input.providerDebug.provider_terminal_candidate ?? input.providerResult.provider_terminal_candidate ?? null,
+    provider_reasoning_reentry:
+      input.providerDebug.provider_reasoning_reentry ?? input.providerResult.provider_reasoning_reentry ?? null,
+    terminal_authority_candidate_review:
+      input.providerDebug.terminal_authority_candidate_review ??
+      input.providerResult.terminal_authority_candidate_review ??
+      null,
+    provider_terminal_authority_bridge:
+      input.providerDebug.provider_terminal_authority_bridge ??
+      input.providerResult.provider_terminal_authority_bridge ??
+      null,
+    conversational_referent_resolution:
+      input.providerDebug.conversational_referent_resolution ??
+      input.providerResult.conversational_referent_resolution ??
+      null,
+    chat_referent_context_presence:
+      input.providerDebug.chat_referent_context_presence ??
+      input.providerResult.chat_referent_context_presence ??
+      null,
+    chat_referent_context_source_summary:
+      input.providerDebug.chat_referent_context_source_summary ??
+      input.providerResult.chat_referent_context_source_summary ??
+      null,
+    terminal_answer_authority:
+      input.providerDebug.terminal_answer_authority ?? input.providerResult.terminal_answer_authority ?? null,
+    terminal_presentation:
+      input.providerDebug.terminal_presentation ?? input.providerResult.terminal_presentation ?? null,
+    final_answer_source:
+      input.providerDebug.final_answer_source ?? input.providerResult.final_answer_source ?? null,
+    terminal_artifact_kind:
+      input.providerDebug.terminal_artifact_kind ?? input.providerResult.terminal_artifact_kind ?? null,
     provider_gateway_debug_summary: input.providerDebug.provider_gateway_debug_summary ?? null,
     fail_reason: input.providerDebug.fail_reason ?? null,
     codex_exit_code: input.providerDebug.codex_exit_code ?? null,
@@ -189,13 +214,27 @@ export const buildHelixAgentProviderAskPayload = (input: {
   provider: HelixAgentProvider;
   providerResult: HelixAgentRunResult;
   providerDebug?: Record<string, unknown>;
+  requestBody?: Record<string, unknown>;
   runtimeSelectionTrace: HelixAgentRuntimeSelectionTrace;
   gatewayManifest: HelixWorkstationGatewayListResult;
   turnId: string;
 }): Record<string, unknown> => {
   const providerDebug = input.providerDebug ?? toDebugRecord(input.providerResult.debug);
+  const requestCommittedRoute = toDebugRecord(input.requestBody?.committed_ask_route);
+  const requestRouteEvidenceAuthority = toDebugRecord(input.requestBody?.route_evidence_authority);
+  const requestRouteProductContract = toDebugRecord(input.requestBody?.route_product_contract);
+  const committedRouteProjection = requestCommittedRoute.schema === "helix.committed_ask_route.v1"
+    ? { committed_ask_route: requestCommittedRoute }
+    : {};
+  const routeEvidenceAuthorityProjection = requestRouteEvidenceAuthority.schema === "helix.route_evidence_authority.v1"
+    ? { route_evidence_authority: requestRouteEvidenceAuthority }
+    : {};
+  const routeProductContractProjection = requestRouteProductContract.schema === "helix.route_product_contract.v1"
+    ? { route_product_contract: requestRouteProductContract }
+    : {};
   const projectionFields = buildProviderProjectionFields({
     provider: input.provider,
+    providerResult: toDebugRecord(input.providerResult),
     providerDebug,
     runtimeSelectionTrace: input.runtimeSelectionTrace,
     gatewayManifest: input.gatewayManifest,
@@ -204,10 +243,16 @@ export const buildHelixAgentProviderAskPayload = (input: {
   return {
     ...input.providerResult,
     turn_id: input.turnId,
+    ...committedRouteProjection,
+    ...routeEvidenceAuthorityProjection,
+    ...routeProductContractProjection,
     ...projectionFields,
     debug: {
       ...providerDebug,
       turn_id: input.turnId,
+      ...committedRouteProjection,
+      ...routeEvidenceAuthorityProjection,
+      ...routeProductContractProjection,
       ...projectionFields,
     },
   };

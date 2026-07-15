@@ -14,14 +14,9 @@ export const SHARED_INTERFACE_LANGUAGE_CODES = [
 
 export type SharedInterfaceLanguageCode = (typeof SHARED_INTERFACE_LANGUAGE_CODES)[number];
 
-// Only catalogs that pass the strict completeness and exact-English coverage
-// gate are exposed to public accounts. Developer accounts retain the full set
-// so localization work can continue without becoming a public product promise.
-export const PUBLIC_INTERFACE_LANGUAGE_CODES = [
-  "en",
-  "de",
-  "ar",
-] as const satisfies readonly SharedInterfaceLanguageCode[];
+// Account type does not change the available workstation languages. Catalog
+// readiness is reported in the UI, but every account can select every catalog.
+export const PUBLIC_INTERFACE_LANGUAGE_CODES = SHARED_INTERFACE_LANGUAGE_CODES;
 
 const publicInterfaceLanguageCodes = new Set<SharedInterfaceLanguageCode>(
   PUBLIC_INTERFACE_LANGUAGE_CODES,

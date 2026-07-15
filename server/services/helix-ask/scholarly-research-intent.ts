@@ -178,6 +178,8 @@ const stripInstructionText = (promptText: string): { query: string; reasons: str
   }
   const replacements: Array<[RegExp, string]> = [
     [/\bscholarly-research\.(?:lookup_papers|fetch_full_text|extract_numeric_parameters)\b/gi, " "],
+    [/\s*[.;]\s*(?:fetch|open|read|parse)\s+(?:the\s+)?(?:(?:best|top)\s+)?(?:one|two|three|1|2|3|up\s+to\s+\d+)\s+(?:accessible\s+)?(?:sources?|papers?|articles?|pdfs?|full[-\s]?texts?)\b[^.;]*/gi, " "],
+    [/\s*[.;]\s*(?:return|provide|identify|report|decompose|group|map)\b[^.;]*/gi, " "],
     [/\b(?:search|find|look\s*up|lookup|retrieve|collect|get)\s+(?:a\s+)?(?:scholarly\s+)?(?:research\s+)?(?:papers?|articles?|sources?)\s+(?:for|on|about|with)?\b/gi, " "],
     [/\b(?:search|find|look\s*up|lookup|retrieve|collect|get)\s+(?:a\s+)?(?:scholarly\s+)?(?:paper|article)\s+(?:for|on|about|with)?\b/gi, " "],
     [/\b(?:scholarly\s+research\s+papers?|research\s+papers?|paper\s+evidence|scholarly\s+papers?|paper\s+records?|paper\s+record|papers?|article)\b/gi, " "],

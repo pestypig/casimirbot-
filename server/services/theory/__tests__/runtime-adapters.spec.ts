@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { isTheoryRuntimeReceiptV1 } from "../../../../shared/contracts/theory-runtime-receipt.v1";
 import {
   buildTheoryRuntimeCommand,
+  executeTheoryRuntimeCommand,
   runSmallRuntimeAdaptersForCompoundRun,
   runTheoryRuntimeAdapter,
   type TheoryRuntimeExecutionResult,
@@ -49,8 +50,18 @@ describe("small theory runtime adapters", () => {
       generatedAt: "2026-05-29T00:00:00.000Z",
     });
 
-    expect(command.command).toMatch(/^npm(\.cmd)?$/);
-    expect(command.args).toEqual(["run", "-s", "solar:pipeline"]);
+    if (process.platform === "win32") {
+      if (command.command === process.execPath) {
+        expect(command.args[0]?.toLowerCase()).toMatch(/(?:^|[\\/])npm-cli\.js$/);
+        expect(command.args.slice(1)).toEqual(["run", "-s", "solar:pipeline"]);
+      } else {
+        expect(command.command.toLowerCase()).toMatch(/(?:^|[\\/])cmd\.exe$/);
+        expect(command.args).toEqual(["/d", "/s", "/c", "npm.cmd", "run", "-s", "solar:pipeline"]);
+      }
+    } else {
+      expect(command.command).toBe("npm");
+      expect(command.args).toEqual(["run", "-s", "solar:pipeline"]);
+    }
     expect(command.npmScript).toBe("solar:pipeline");
     expect(command.cwd).toBe(path.resolve(tempRoot));
   });
@@ -92,6 +103,59 @@ describe("small theory runtime adapters", () => {
     expect(receipt.claimBoundary.promotionAllowed).toBe(false);
     expect(isTheoryRuntimeReceiptV1(receipt)).toBe(true);
   });
+
+  it.runIf(process.platform === "win32")(
+    "executes the registered Windows npm launcher without spawn EINVAL",
+    async () => {
+      const receipt = await runTheoryRuntimeAdapter({
+        runtimeId: "solar.manifest",
+        graphId: "test.graph",
+        badgeIds: ["solar.runtime.spectrum_analysis"],
+        projectRoot: path.resolve("."),
+      });
+
+      expect(receipt.outputs.warnings.join(" ")).not.toMatch(/spawn EINVAL/i);
+      expect(receipt.provenance.startedAt).toBeTruthy();
+      expect(receipt.provenance.completedAt).toBeTruthy();
+      expect(isTheoryRuntimeReceiptV1(receipt)).toBe(true);
+    },
+    20_000,
+  );
+
+  it.runIf(process.platform === "win32")(
+    "terminates the full Windows runtime process tree before returning a timeout",
+    async () => {
+      const descendantPidPath = path.join(tempRoot, "descendant.pid");
+      const parentScript = [
+        'const { spawn } = require("node:child_process")',
+        'const fs = require("node:fs")',
+        'const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore", windowsHide: true })',
+        `fs.writeFileSync(${JSON.stringify(descendantPidPath)}, String(child.pid))`,
+        'setInterval(() => {}, 1000)',
+      ].join(";");
+
+      const execution = await executeTheoryRuntimeCommand({
+        command: process.execPath,
+        args: ["-e", parentScript],
+        cwd: tempRoot,
+        npmScript: "test:runtime-process-tree",
+        timeoutMs: 300,
+      });
+      const descendantPid = Number(await fs.readFile(descendantPidPath, "utf8"));
+      const processExists = (pid: number): boolean => {
+        try {
+          process.kill(pid, 0);
+          return true;
+        } catch {
+          return false;
+        }
+      };
+
+      expect(execution.timedOut).toBe(true);
+      expect(processExists(descendantPid)).toBe(false);
+    },
+    10_000,
+  );
 
   it("returns a timeout receipt when the adapter execution times out", async () => {
     const receipt = await runTheoryRuntimeAdapter(

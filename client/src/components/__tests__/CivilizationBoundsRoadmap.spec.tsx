@@ -78,6 +78,7 @@ describe("CivilizationBoundsRoadmap", () => {
     expect(screen.getAllByTestId("civilization-environmental-flow").length).toBeGreaterThan(0);
     expect(screen.getAllByTestId("civilization-tectonic-plate-boundary").length).toBeGreaterThan(0);
     expect(screen.queryByTestId("civilization-bounds-country-inspector")).toBeNull();
+    expect(screen.getByLabelText("Civilization evidence lens")).toBeTruthy();
     expect(screen.queryAllByTestId("civilization-bounds-edge")).toHaveLength(0);
     expect(screen.queryAllByTestId("civilization-route-candidate")).toHaveLength(0);
 
@@ -125,11 +126,32 @@ describe("CivilizationBoundsRoadmap", () => {
     expect(inspector.textContent).toContain("Material");
     expect(inspector.textContent).toContain("Governance");
     expect(inspector.textContent).toContain("confidence");
+    expect(inspector.textContent).toContain("selected lens");
+    expect(inspector.textContent).toContain("Resource flow");
+    expect(inspector.textContent).toContain("material base");
     expect(inspector.textContent).toContain("missing");
     expect(inspector.textContent).toContain("sources");
     expect(screen.getAllByTestId("civilization-bounds-edge").length).toBeGreaterThan(0);
     expect(screen.getAllByTestId("civilization-route-candidate").length).toBeGreaterThan(0);
     expect(inspector.textContent).not.toMatch(/Host early|Mass-produce|Build one of the global/i);
+    expect(inspector.textContent).not.toMatch(/\bbalance\b/i);
+  });
+
+  it("changes marker color semantics by explicit evidence lens and leaves unbound lenses visible", () => {
+    render(<CivilizationBoundsRoadmap />);
+
+    const selector = screen.getByLabelText("Civilization evidence lens");
+    const marker = screen.getAllByTestId("civilization-bounds-badge")[0];
+    expect(marker.getAttribute("data-evidence-lens")).toBe("resource_flow");
+    expect(marker.getAttribute("data-evidence-state")).toBe("bound");
+
+    fireEvent.change(selector, { target: { value: "transport_energy" } });
+    expect(screen.getAllByTestId("civilization-bounds-badge")[0].getAttribute("data-evidence-lens")).toBe(
+      "transport_energy",
+    );
+    expect(screen.getAllByTestId("civilization-bounds-badge")[0].getAttribute("data-evidence-state")).toBe(
+      "unbound",
+    );
   });
 
   it("compares selected countries and surfaces direct dependency relations", () => {

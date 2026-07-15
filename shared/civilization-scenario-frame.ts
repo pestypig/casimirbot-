@@ -19,6 +19,7 @@ export {
   type CivilizationBoundaryKindV1,
   type CivilizationConstraintProfileV1,
   type CivilizationCoordinationModeV1,
+  type CivilizationCoordinationProfileV1,
   type CivilizationDevelopmentalStageV1,
   type CivilizationScenarioEditorKindV1,
   type CivilizationScenarioEvidenceModeV1,

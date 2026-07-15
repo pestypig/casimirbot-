@@ -145,6 +145,9 @@ const MIN_ZOOM_FLOOR = 0.18;
 const ZOOM_BURST_FACTOR = 1.22;
 const WORDMARK_BASE_FONT_PX = 11;
 const WORDMARK_MAX_FONT_PX = 40;
+const BADGE_POPUP_BASE_WIDTH_PX = 240;
+const BADGE_POPUP_ESTIMATED_HEIGHT_PX = 86;
+const BADGE_POPUP_VIEWPORT_MARGIN_PX = 12;
 
 function labelizeBiomeToken(value: string): string {
   return value
@@ -166,6 +169,11 @@ function chunkWordmarkClipId(chunk: TheoryBiomeChunkV1): string {
 
 function chunkWatermarkFontSize(zoom: number): number {
   return Number(clamp(WORDMARK_BASE_FONT_PX / Math.max(zoom, MIN_ZOOM_FLOOR), WORDMARK_BASE_FONT_PX, WORDMARK_MAX_FONT_PX).toFixed(2));
+}
+
+function badgePopupScreenScale(zoom: number): number {
+  const wordmarkScale = chunkWatermarkFontSize(zoom) / WORDMARK_BASE_FONT_PX;
+  return Number(clamp(1 + (wordmarkScale - 1) * 0.45, 1, 1.8).toFixed(4));
 }
 
 function chunkWatermarkTiles(
@@ -363,7 +371,11 @@ export default function TheoryAchievementMap({
   const suppressNextScrollRef = useRef(false);
   const [zoom, setZoom] = useState(1);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+  const [displayViewport, setDisplayViewport] = useState(viewport);
+  const [hoveredBadgeId, setHoveredBadgeId] = useState<string | null>(null);
+  const [focusedBadgeId, setFocusedBadgeId] = useState<string | null>(null);
   const wordmarkFontSize = chunkWatermarkFontSize(zoom);
+  const popupScreenScale = badgePopupScreenScale(zoom);
   const layout = useMemo(() => layoutTheoryAchievementMap(graph), [graph]);
   const frontierOverlay = useMemo(
     () => (frontierTrace ? buildTheoryFrontierMapOverlay({ trace: frontierTrace, nodes: layout.nodes }) : null),
@@ -377,6 +389,36 @@ export default function TheoryAchievementMap({
     () => new Map<string, TheoryBadgeV1>(graph.badges.map((badge: TheoryBadgeV1) => [badge.id, badge])),
     [graph.badges],
   );
+  const inspectedBadgeId = hoveredBadgeId ?? focusedBadgeId ?? selectedBadgeId;
+  const inspectedNode = inspectedBadgeId ? nodesById.get(inspectedBadgeId) ?? null : null;
+  const inspectedBadge = inspectedBadgeId ? badgesById.get(inspectedBadgeId) ?? null : null;
+  const inspectedExpression = inspectedBadge ? primaryExpression(inspectedBadge) : null;
+  const effectiveViewportWidth = viewportSize.width || 640;
+  const effectiveViewportHeight = viewportSize.height || 480;
+  const maxPopupScaleForViewport = Math.max(
+    0.7,
+    (effectiveViewportWidth - BADGE_POPUP_VIEWPORT_MARGIN_PX * 2) / BADGE_POPUP_BASE_WIDTH_PX,
+  );
+  const renderedPopupScale = Math.min(popupScreenScale, maxPopupScaleForViewport);
+  const inspectedNodeCenterX = inspectedNode
+    ? inspectedNode.x * zoom - displayViewport.scrollLeft + (THEORY_BIOME_LAYOUT_SPACING_CONTRACT_V1.badgeSizePx * zoom) / 2
+    : 0;
+  const inspectedNodeTopY = inspectedNode ? inspectedNode.y * zoom - displayViewport.scrollTop : 0;
+  const popupHalfWidth = (BADGE_POPUP_BASE_WIDTH_PX * renderedPopupScale) / 2;
+  const popupCenterX = clamp(
+    inspectedNodeCenterX,
+    BADGE_POPUP_VIEWPORT_MARGIN_PX + popupHalfWidth,
+    Math.max(
+      BADGE_POPUP_VIEWPORT_MARGIN_PX + popupHalfWidth,
+      effectiveViewportWidth - BADGE_POPUP_VIEWPORT_MARGIN_PX - popupHalfWidth,
+    ),
+  );
+  const popupBelowY = inspectedNodeTopY + THEORY_BIOME_LAYOUT_SPACING_CONTRACT_V1.badgeSizePx * zoom + 10;
+  const popupAbove =
+    popupBelowY + BADGE_POPUP_ESTIMATED_HEIGHT_PX * renderedPopupScale >
+      effectiveViewportHeight - BADGE_POPUP_VIEWPORT_MARGIN_PX &&
+    inspectedNodeTopY > BADGE_POPUP_ESTIMATED_HEIGHT_PX * renderedPopupScale + BADGE_POPUP_VIEWPORT_MARGIN_PX;
+  const popupAnchorY = popupAbove ? inspectedNodeTopY - 10 : popupBelowY;
   const selectedSet = new Set(selectedBadgeIds);
   const traceBadgeSet = new Set(traceBadgeIds);
   const backendOverlaySet = new Set(highlightedBadgeIds);
@@ -409,6 +451,7 @@ export default function TheoryAchievementMap({
     suppressNextScrollRef.current = true;
     element.scrollLeft = Math.max(0, center.x * nextZoom - element.clientWidth / 2);
     element.scrollTop = Math.max(0, center.y * nextZoom - element.clientHeight / 2);
+    setDisplayViewport({ scrollLeft: element.scrollLeft, scrollTop: element.scrollTop });
   }, []);
 
   const graphCenterForViewport = useCallback(() => {
@@ -445,6 +488,7 @@ export default function TheoryAchievementMap({
     if (!element || restoredRef.current) return;
     element.scrollLeft = viewport.scrollLeft;
     element.scrollTop = viewport.scrollTop;
+    setDisplayViewport(viewport);
     restoredRef.current = true;
   }, [layout.height, layout.width, viewport.scrollLeft, viewport.scrollTop]);
 
@@ -503,6 +547,10 @@ export default function TheoryAchievementMap({
         style={{ scrollbarGutter: "stable both-edges" }}
         onScroll={(event: React.UIEvent<HTMLDivElement>) => {
           const element = event.currentTarget;
+          setDisplayViewport({
+            scrollLeft: element.scrollLeft,
+            scrollTop: element.scrollTop,
+          });
           if (suppressNextScrollRef.current) {
             suppressNextScrollRef.current = false;
             return;
@@ -924,7 +972,6 @@ export default function TheoryAchievementMap({
             {layout.nodes.map((node: TheoryAchievementLayoutNode) => {
             const badge = badgesById.get(node.badgeId);
             if (!badge) return null;
-            const expression = primaryExpression(badge);
             const routeLabel = routeBadgeLabels[node.badgeId] ?? null;
             const tooltipId = badgeTooltipId(node.badgeId);
             const badgeBlockId = badgeAtlasBlockId(badge);
@@ -987,6 +1034,10 @@ export default function TheoryAchievementMap({
                 aria-label={tx(badge.title)}
                 aria-describedby={tooltipId}
                 disabled={visualState.unavailable}
+                onMouseEnter={() => setHoveredBadgeId(node.badgeId)}
+                onMouseLeave={() => setHoveredBadgeId((current) => (current === node.badgeId ? null : current))}
+                onFocus={() => setFocusedBadgeId(node.badgeId)}
+                onBlur={() => setFocusedBadgeId((current) => (current === node.badgeId ? null : current))}
                 onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
                   event.stopPropagation();
                   if (visualState.unavailable) return;
@@ -1011,23 +1062,36 @@ export default function TheoryAchievementMap({
                 {visualState.claimBoundary ? (
                   <span className="pointer-events-none absolute -inset-1.5 border-2 border-amber-300/80" />
                 ) : null}
-                <span
-                  id={tooltipId}
-                  role="tooltip"
-                  data-testid="theory-badge-tooltip"
-                  className="pointer-events-none absolute left-1/2 top-[calc(100%+8px)] z-30 grid min-w-48 max-w-72 -translate-x-1/2 gap-1 border border-slate-500 bg-slate-950 px-3 py-2 text-left normal-case text-slate-100 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-                >
-                  <span className="text-xs font-semibold leading-snug text-slate-50">{tx(badge.title)}</span>
-                  {expression ? (
-                    <span className="font-mono text-[11px] font-medium leading-snug text-cyan-100">{expression}</span>
-                  ) : null}
-                </span>
               </button>
             );
             })}
           </div>
         </div>
       </div>
+      {inspectedBadge && inspectedNode ? (
+        <div
+          id={badgeTooltipId(inspectedBadge.id)}
+          role="tooltip"
+          data-testid="theory-badge-tooltip"
+          data-popup-scale={renderedPopupScale.toFixed(4)}
+          data-popup-screen-scale={renderedPopupScale.toFixed(4)}
+          data-popup-placement={popupAbove ? "above" : "below"}
+          className="pointer-events-none absolute z-30 grid w-60 gap-1 border border-slate-500 bg-slate-950 px-3 py-2 text-left normal-case text-slate-100 shadow-xl"
+          style={{
+            left: popupCenterX,
+            top: popupAnchorY,
+            transform: popupAbove
+              ? `translate(-50%, -100%) scale(${renderedPopupScale})`
+              : `translateX(-50%) scale(${renderedPopupScale})`,
+            transformOrigin: popupAbove ? "bottom center" : "top center",
+          }}
+        >
+          <span className="text-xs font-semibold leading-snug text-slate-50">{tx(inspectedBadge.title)}</span>
+          {inspectedExpression ? (
+            <span className="font-mono text-[11px] font-medium leading-snug text-cyan-100">{inspectedExpression}</span>
+          ) : null}
+        </div>
+      ) : null}
       <div
         className="pointer-events-auto absolute bottom-4 right-4 z-20 grid gap-2"
         aria-label={tx("Theory badge graph zoom controls")}

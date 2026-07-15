@@ -218,6 +218,30 @@ describe("askLocal capsule ids", () => {
     vi.unstubAllGlobals();
   });
 
+  it("keeps retained scientific-image comparisons on the Ask turn entrypoint when legacy parity is disabled", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          text: "Retained comparison turn response.",
+          turn_id: "ask:test-retained-comparison-entrypoint",
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await askLocal(undefined, {
+      question: "Using the saved machine-readable page-8 text and the latest retained scientific Image Lens sidecar for https://arxiv.org/pdf/2401.12345, compare equation (47) row by row. Report symbol and subscript agreements and mismatches. Do not render the PDF again, do not run a new Image Lens crop, and do not promote exact evidence unless the two sources agree.",
+    });
+
+    expect(response.text).toBe("Retained comparison turn response.");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/agi/ask/turn");
+  });
+
   it("caps capsule ids to 12 in job payload", async () => {
     const fetchMock = vi
       .fn()

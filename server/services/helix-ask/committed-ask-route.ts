@@ -17,6 +17,7 @@ import type { HelixIntentArbitration } from "./intent-arbitration";
 import { applyCompoundTerminalPolicy } from "./compound-terminal-policy";
 import { explicitCapabilityContractForCapability } from "./explicit-capability-contract";
 import { buildToolUseRestatement } from "./internet-search-intent";
+import { asksForScientificImageTextEvidenceComparison } from "@shared/helix-scientific-image-intent";
 
 type RecordLike = Record<string, unknown>;
 
@@ -421,16 +422,19 @@ export function buildCommittedAskRoute(input: {
   intentArbitration?: HelixIntentArbitration | null;
   secondaryIntentKinds?: string[];
 }): HelixCommittedAskRoute {
+  const affirmativeScientificImageComparison =
+    asksForScientificImageTextEvidenceComparison(input.promptText);
   const existing = readCommittedAskRoute(input.payload);
   if (existing) {
     const explicitCapabilityContract = readExplicitCapabilityContractFromPayload(input.payload);
-    const hardSourceTargetIntent = readRecord(input.payload.source_target_intent);
-    const hardSourceTarget = readString(hardSourceTargetIntent?.target_source);
     const shouldRepairExistingScientificImageComparisonRoute =
-      hardSourceTargetIntent?.strength === "hard" &&
-      hardSourceTargetIntent?.reuse_retained_scientific_image_sidecar === true &&
-      hardSourceTarget === "scientific_image_evidence" &&
-      (existing.route.source_target === "unknown" || existing.route.source_target === "model_only");
+      affirmativeScientificImageComparison &&
+      (
+        existing.route.source_target !== "scientific_image_evidence" ||
+        existing.capability_policy.required_capability_families.includes("visual_analysis") ||
+        existing.terminal_product.evidence_reentry_required !== true ||
+        existing.terminal_product.followup_reasoning_required !== true
+      );
     const shouldRepairExistingCalculatorGatewayRoute =
       isCalculatorGatewayAdmission(input.payload) &&
       (
@@ -439,6 +443,7 @@ export function buildCommittedAskRoute(input: {
         existing.canonical_goal.goal_kind === "agent_provider_gateway_turn"
       );
     const shouldRepairExistingExplicitCapabilityRoute =
+      !shouldRepairExistingScientificImageComparisonRoute &&
       Boolean(explicitCapabilityContract) &&
       explicitCapabilityContract?.required_terminal_kind !== existing.canonical_goal.required_terminal_kind;
     const existingRawGoal = readCanonicalGoal(input.payload);
@@ -579,10 +584,8 @@ export function buildCommittedAskRoute(input: {
                 "visual_analysis",
                 "scholarly_research",
               ]),
-              required_capability_families: unique([
-                ...existing.capability_policy.required_capability_families,
-                "visual_analysis",
-              ]),
+              required_capability_families: existing.capability_policy.required_capability_families
+                .filter((family) => family !== "visual_analysis"),
             }
         : existing.capability_policy,
       terminal_product: {
@@ -602,7 +605,14 @@ export function buildCommittedAskRoute(input: {
 
   const route = readRouteSource(input.payload);
   const explicitCapabilityContract = readExplicitCapabilityContractFromPayload(input.payload);
-  const effectiveRoute = explicitCapabilityContract
+  const effectiveRoute = affirmativeScientificImageComparison
+    ? {
+        sourceTarget: "scientific_image_evidence",
+        targetKind: "scientific_image_evidence_sidecar",
+        strength: "hard" as const,
+        reason: "retained_scientific_image_text_comparison",
+      }
+    : explicitCapabilityContract
     ? {
         sourceTarget: explicitCapabilityContract.source_target,
         targetKind: explicitCapabilityContract.source_target,
@@ -651,7 +661,9 @@ export function buildCommittedAskRoute(input: {
         /^(?:summarize_doc|doc_|docs_|active_doc|repo_code_)/i.test(rawGoal.goalKind)
       )
     );
-  const goal = shouldUseModelOnlyGoal
+  const goal = affirmativeScientificImageComparison
+    ? { goalKind: "scholarly_research_lookup", requiredTerminalKind: "scholarly_research_answer" }
+    : shouldUseModelOnlyGoal
     ? { goalKind: "model_only_concept", requiredTerminalKind: "direct_answer_text" }
     : explicitCapabilityContract
       ? {
@@ -667,6 +679,14 @@ export function buildCommittedAskRoute(input: {
   const rawForbiddenTerminalKinds = readStringArray(routeContract?.forbidden_terminal_artifact_kinds);
   const rawAllowedTerminalKindsWithGoal = unique([
     ...(shouldUseModelOnlyGoal ? [] : rawAllowedTerminalKinds),
+    ...(affirmativeScientificImageComparison
+      ? [
+          "scholarly_research_answer",
+          "agent_provider_terminal_candidate",
+          "model_synthesized_answer",
+          "typed_failure",
+        ]
+      : []),
     ...modelOnlyTerminalAliases,
     goal.requiredTerminalKind !== "unknown" ? goal.requiredTerminalKind : "",
   ]);
@@ -675,7 +695,15 @@ export function buildCommittedAskRoute(input: {
         ...rawForbiddenTerminalKinds.filter((kind) => !MODEL_ONLY_TERMINAL_ALIASES.has(normalizeCommittedRouteTerminalKind(kind))),
         ...MODEL_ONLY_FORBIDDEN_SOURCE_TERMINALS,
       ])
-    : rawForbiddenTerminalKinds;
+    : affirmativeScientificImageComparison
+      ? rawForbiddenTerminalKinds.filter((kind) =>
+          ![
+            "scholarly_research_answer",
+            "agent_provider_terminal_candidate",
+            "model_synthesized_answer",
+          ].includes(normalizeCommittedRouteTerminalKind(kind)),
+        )
+      : rawForbiddenTerminalKinds;
   const compoundPolicy = applyCompoundTerminalPolicy(input.payload, {
     allowed: rawAllowedTerminalKindsWithGoal,
     forbidden: rawForbiddenTerminalKindsWithGoal,
@@ -691,7 +719,16 @@ export function buildCommittedAskRoute(input: {
     ...toolUseRestatement.requiredToolFamilies,
   ])
     .filter((family) => !suppressedFamilies.includes(family));
-  const requiredFamily = familyForSourceTarget(effectiveRoute.sourceTarget);
+  const sourceTargetIntent = readRecord(input.payload.source_target_intent);
+  const reusesRetainedScientificImageSidecar =
+    effectiveRoute.sourceTarget === "scientific_image_evidence" &&
+    (
+      affirmativeScientificImageComparison ||
+      sourceTargetIntent?.reuse_retained_scientific_image_sidecar === true
+    );
+  const requiredFamily = reusesRetainedScientificImageSidecar
+    ? ""
+    : familyForSourceTarget(effectiveRoute.sourceTarget);
   const negativeConstraints = input.promptInterpretation?.negative_constraints ?? [];
   const sourceBacked = sourceBackedTargets.has(effectiveRoute.sourceTarget);
   const requiredTerminalProduct =
@@ -756,8 +793,13 @@ export function buildCommittedAskRoute(input: {
     },
     terminal_product: {
       terminal_authority_required: true,
-      evidence_reentry_required: sourceBacked || readStringArray(routeContract?.required_artifact_refs).length > 0,
-      followup_reasoning_required: sourceBacked && terminalProductRequiresFollowupReasoning(requiredTerminalProduct),
+      evidence_reentry_required:
+        affirmativeScientificImageComparison ||
+        sourceBacked ||
+        readStringArray(routeContract?.required_artifact_refs).length > 0,
+      followup_reasoning_required:
+        affirmativeScientificImageComparison ||
+        (sourceBacked && terminalProductRequiresFollowupReasoning(requiredTerminalProduct)),
       required_terminal_product: requiredTerminalProduct,
     },
     transitions: [],

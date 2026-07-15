@@ -3004,6 +3004,11 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
 }, payload: Record<string, unknown>): string {
   const debug = asRecord(payload.debug);
   const agentLoop = asRecord(payload.agentLoop);
+  const workspaceSnapshot = asRecord(
+    payload.workspace_context_snapshot ??
+      debug?.workspace_context_snapshot ??
+      agentLoop?.workspace_context_snapshot,
+  );
   const ledger = Array.isArray(agentLoop?.current_turn_artifact_ledger)
     ? agentLoop.current_turn_artifact_ledger
     : Array.isArray(debug?.current_turn_artifact_ledger)
@@ -3855,6 +3860,15 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       payload.ask_turn_solver_trace ??
       debug?.ask_turn_solver_trace ??
       agentLoop?.ask_turn_solver_trace ??
+      null,
+    conversational_referent_resolution:
+      payload.conversational_referent_resolution ??
+      debug?.conversational_referent_resolution ??
+      agentLoop?.conversational_referent_resolution ??
+      null,
+    chat_referent_context_source_summary:
+      asRecord(workspaceSnapshot?.chat_referent_context_source_summary) ??
+      asRecord(workspaceSnapshot?.chatReferentContextSourceSummary) ??
       null,
     ask_turn_procedure_trace:
       payload.ask_turn_procedure_trace ??

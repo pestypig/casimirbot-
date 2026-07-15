@@ -1,5 +1,5 @@
-import fs from "node:fs/promises";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import {
   buildTheoryRuntimeRunRequestV1,
   isTheoryRuntimeRunRequestV1,
@@ -8,6 +8,10 @@ import {
   type TheoryRuntimeRunRequestV1,
 } from "../../../shared/contracts/theory-runtime-run-request.v1";
 import { getTheoryRuntimeEntrypoint } from "../../../shared/theory/runtime-entrypoints";
+import {
+  readTheoryRuntimeJsonFile,
+  writeTheoryRuntimeJsonFile,
+} from "./runtime-atomic-json-store";
 
 export type CreateTheoryRuntimeRunRequestManifestInput = {
   runtimeId: string;
@@ -44,13 +48,12 @@ function requestPath(projectRoot: string | undefined, requestId: string): string
 }
 
 function generatedRequestId(runtimeId: string): string {
-  return `theory-runtime-request:${runtimeId}:${Date.now().toString(36)}`;
+  return `theory-runtime-request:${runtimeId}:${randomUUID()}`;
 }
 
 async function writeRequest(projectRoot: string | undefined, request: TheoryRuntimeRunRequestV1): Promise<string> {
   const manifestPath = requestPath(projectRoot, request.requestId);
-  await fs.mkdir(path.dirname(manifestPath), { recursive: true });
-  await fs.writeFile(manifestPath, `${JSON.stringify(request, null, 2)}\n`, "utf8");
+  await writeTheoryRuntimeJsonFile(manifestPath, request);
   return manifestPath;
 }
 
@@ -95,7 +98,7 @@ export async function readTheoryRuntimeRunRequestStatus(input: {
 }): Promise<TheoryRuntimeRunRequestV1 | null> {
   const manifestPath = requestPath(input.projectRoot, input.requestId);
   try {
-    const raw = await fs.readFile(manifestPath, "utf8");
+    const raw = await readTheoryRuntimeJsonFile(manifestPath);
     const parsed = JSON.parse(raw) as unknown;
     if (!isTheoryRuntimeRunRequestV1(parsed)) {
       throw new Error(`Runtime request manifest ${input.requestId} failed validation.`);
@@ -116,6 +119,9 @@ export async function updateTheoryRuntimeRunRequestStatus(
   });
   if (!current) throw new Error(`Runtime request manifest ${input.requestId} was not found.`);
   const updatedAt = input.updatedAt ?? new Date().toISOString();
+  const progressWasProvided = Boolean(
+    input.heartbeat && Object.prototype.hasOwnProperty.call(input.heartbeat, "progress"),
+  );
   const request = buildTheoryRuntimeRunRequestV1({
     ...current,
     generatedAt: current.generatedAt,
@@ -125,7 +131,9 @@ export async function updateTheoryRuntimeRunRequestStatus(
       updatedAt,
       stage: input.heartbeat?.stage ?? current.heartbeat.stage,
       message: input.heartbeat?.message ?? current.heartbeat.message,
-      progress: input.heartbeat?.progress ?? current.heartbeat.progress,
+      progress: progressWasProvided
+        ? input.heartbeat?.progress ?? null
+        : current.heartbeat.progress,
     },
   });
   const manifestPath = await writeRequest(input.projectRoot, request);

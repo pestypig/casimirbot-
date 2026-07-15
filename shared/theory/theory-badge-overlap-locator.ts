@@ -116,6 +116,11 @@ const intersectNormalized = (left: string[], right: string[]) => {
   );
 };
 
+const intersectSymbols = (left: string[], right: string[]) => {
+  const rightSet = new Set(right.map((value) => value.trim()));
+  return unique(left.map((value) => value.trim()).filter((value) => rightSet.has(value)));
+};
+
 const intersectUnitSignatures = (left: string[], right: string[]) =>
   intersectNormalized(left.filter(isSpecificUnitSignature), right.filter(isSpecificUnitSignature));
 
@@ -174,10 +179,20 @@ function unitSignaturesInQuery(query: string, unitSignatures: string[]) {
   });
 }
 
-function symbolMatchesQuery(queryTokens: string[], symbols: string[]) {
+function symbolMatchesQuery(query: string, queryTokens: string[], symbols: string[]) {
   const tokenKeys = new Set(queryTokens.map(normalizeKey));
+  const caseSensitiveTokens = new Set(
+    query
+      .split(/[^a-z0-9_./^-]+/i)
+      .map((token) => token.trim())
+      .filter(Boolean),
+  );
   return symbols.filter((symbol) => {
     const key = normalizeKey(symbol);
+    if (/^[A-Za-z]$/.test(symbol)) {
+      if (symbol === "a" || symbol === "I") return false;
+      return caseSensitiveTokens.has(symbol);
+    }
     if (key.length <= 3) return tokenKeys.has(key);
     return queryTokens.some((token) => normalize(token).includes(normalize(symbol)));
   });
@@ -260,8 +275,8 @@ export function locateTheoryBadges(args: {
       if (atlasLensBadgeIds.has(badge.id)) addScore(10, "inside selected atlas lens");
 
       const matchedSymbols = unique([
-        ...intersectNormalized(requestedSymbols, symbols),
-        ...symbolMatchesQuery(queryTokens, symbols),
+        ...intersectSymbols(requestedSymbols, symbols),
+        ...symbolMatchesQuery(query, queryTokens, symbols),
       ]);
       if (matchedSymbols.length > 0) addScore(35 * matchedSymbols.length, `symbol match: ${matchedSymbols.join(", ")}`);
 
@@ -281,10 +296,24 @@ export function locateTheoryBadges(args: {
         addScore(25 * matchedEquationFamilies.length, `equation family match: ${matchedEquationFamilies.join(", ")}`);
       }
 
+      const meaningfulPayloadTokens = queryTokens.filter((token) => {
+        const key = normalizeKey(token);
+        return key.length >= 4 && /[a-z]/i.test(key);
+      });
+      const normalizedQueryKey = normalizeKey(query);
       const payloadHits = queryTokens.length
-        ? badge.calculatorPayloads.filter((payload) =>
-            queryTokens.some((token) => normalize(`${payload.id} ${payload.expression} ${payload.displayLatex}`).includes(token)),
-          )
+        ? badge.calculatorPayloads.filter((payload) => {
+            const payloadParts = [payload.id, payload.expression, payload.displayLatex];
+            const exactPayloadMatch = payloadParts.some((part) => {
+              const key = normalizeKey(part);
+              return key.length >= 4 && normalizedQueryKey.includes(key);
+            });
+            const normalizedPayloadText = normalize(payloadParts.join(" "));
+            const meaningfulTokenHits = meaningfulPayloadTokens.filter((token) =>
+              normalizedPayloadText.includes(token),
+            );
+            return exactPayloadMatch || meaningfulTokenHits.length >= 2;
+          })
         : [];
       if (payloadHits.length > 0) {
         addScore(25 * payloadHits.length, `calculator payload match: ${payloadHits.map((payload) => payload.id).join(", ")}`);
@@ -386,19 +415,71 @@ function edgeIndexes(edges: TheoryBadgeEdgeV1[]) {
   return { outgoing, incoming };
 }
 
-function ancestorDistances(badgeId: string, incoming: Map<string, TheoryBadgeEdgeV1[]>) {
+const CONTEXTUAL_TRACE_RELATIONS = new Set<TheoryBadgeEdgeV1["relation"]>([
+  "bounds",
+  "shares_units",
+  "diagnostic_checks",
+  "documents",
+  "blocks",
+]);
+
+const MAX_CONTEXTUAL_TRACE_HOPS = 1;
+
+const contextualTraceHop = (edge: TheoryBadgeEdgeV1) =>
+  CONTEXTUAL_TRACE_RELATIONS.has(edge.relation) ? 1 : 0;
+
+const traversalStateKey = (id: string, contextualHops: number) => `${id}\u0000${contextualHops}`;
+
+function boundedTraversalDistances(args: {
+  badgeId: string;
+  adjacency: Map<string, TheoryBadgeEdgeV1[]>;
+  nextId: (edge: TheoryBadgeEdgeV1) => string;
+  direction: "incoming" | "outgoing";
+}) {
   const distances = new Map<string, number>();
-  const queue: Array<{ id: string; distance: number }> = [{ id: badgeId, distance: 0 }];
+  const stateDistances = new Map<string, number>();
+  const queue: Array<{ id: string; distance: number; contextualHops: number }> = [
+    { id: args.badgeId, distance: 0, contextualHops: 0 },
+  ];
   while (queue.length > 0) {
     const current = queue.shift();
     if (!current) break;
-    if (distances.has(current.id) && (distances.get(current.id) ?? 0) <= current.distance) continue;
-    distances.set(current.id, current.distance);
-    for (const edge of incoming.get(current.id) ?? []) {
-      queue.push({ id: edge.from, distance: current.distance + 1 });
+    const stateKey = traversalStateKey(current.id, current.contextualHops);
+    if ((stateDistances.get(stateKey) ?? Number.POSITIVE_INFINITY) <= current.distance) continue;
+    stateDistances.set(stateKey, current.distance);
+    distances.set(current.id, Math.min(distances.get(current.id) ?? Number.POSITIVE_INFINITY, current.distance));
+    if (args.direction === "outgoing" && current.contextualHops > 0) continue;
+    for (const edge of args.adjacency.get(current.id) ?? []) {
+      const contextualHop = contextualTraceHop(edge);
+      if (contextualHop > 0 && args.direction === "incoming" && current.distance > 0) continue;
+      const contextualHops = current.contextualHops + contextualHop;
+      if (contextualHops > MAX_CONTEXTUAL_TRACE_HOPS) continue;
+      queue.push({
+        id: args.nextId(edge),
+        distance: current.distance + 1,
+        contextualHops,
+      });
     }
   }
   return distances;
+}
+
+function ancestorDistances(badgeId: string, incoming: Map<string, TheoryBadgeEdgeV1[]>) {
+  return boundedTraversalDistances({
+    badgeId,
+    adjacency: incoming,
+    nextId: (edge) => edge.from,
+    direction: "incoming",
+  });
+}
+
+function descendantDistances(badgeId: string, outgoing: Map<string, TheoryBadgeEdgeV1[]>) {
+  return boundedTraversalDistances({
+    badgeId,
+    adjacency: outgoing,
+    nextId: (edge) => edge.to,
+    direction: "outgoing",
+  });
 }
 
 function shortestDirectedPath(args: {
@@ -406,22 +487,27 @@ function shortestDirectedPath(args: {
   to: string;
   outgoing: Map<string, TheoryBadgeEdgeV1[]>;
 }) {
-  const queue: Array<{ id: string; badgeIds: string[]; edgeIds: string[] }> = [
-    { id: args.from, badgeIds: [args.from], edgeIds: [] },
+  const queue: Array<{ id: string; badgeIds: string[]; edgeIds: string[]; contextualHops: number }> = [
+    { id: args.from, badgeIds: [args.from], edgeIds: [], contextualHops: 0 },
   ];
   const visited = new Set<string>();
   while (queue.length > 0) {
     const current = queue.shift();
     if (!current) break;
     if (current.id === args.to) return current;
-    if (visited.has(current.id)) continue;
-    visited.add(current.id);
+    const stateKey = traversalStateKey(current.id, current.contextualHops);
+    if (visited.has(stateKey)) continue;
+    visited.add(stateKey);
+    if (current.contextualHops > 0) continue;
     for (const edge of args.outgoing.get(current.id) ?? []) {
-      if (visited.has(edge.to)) continue;
+      const contextualHops = current.contextualHops + contextualTraceHop(edge);
+      if (contextualHops > MAX_CONTEXTUAL_TRACE_HOPS) continue;
+      if (visited.has(traversalStateKey(edge.to, contextualHops))) continue;
       queue.push({
         id: edge.to,
         badgeIds: [...current.badgeIds, edge.to],
         edgeIds: [...current.edgeIds, edge.id],
+        contextualHops,
       });
     }
   }
@@ -463,16 +549,41 @@ export function traceTheoryBadgeConnections(args: {
     const rightDistance = ancestorMaps.reduce((sum, map) => sum + (map.get(right) ?? 0), 0);
     return leftDistance - rightDistance || left.localeCompare(right);
   });
-  const rootAncestor = rankedAncestors[0] ?? selectedBadgeIds[0];
-  const pathSegments = selectedBadgeIds
-    .map((to) => {
-      const path = shortestDirectedPath({ from: rootAncestor, to, outgoing });
+  const descendantMaps = selectedBadgeIds.map((id) => descendantDistances(id, outgoing));
+  const sharedDescendantIds = Array.from(descendantMaps[0].keys()).filter((descendantId) =>
+    descendantMaps.every((map) => map.has(descendantId)),
+  );
+  const rankedJunctions = sharedDescendantIds
+    .filter((id) => badgesById.get(id)?.tags.includes("selection_convergence_junction"))
+    .map((id) => ({
+      id,
+      distances: descendantMaps.map((map) => map.get(id) ?? Number.POSITIVE_INFINITY),
+    }))
+    .filter(({ distances }) => distances.every((distance) => distance <= 4))
+    .filter(({ distances }) => distances.reduce((sum, distance) => sum + distance, 0) <= 6)
+    .sort((left, right) => {
+      const leftTotal = left.distances.reduce((sum, distance) => sum + distance, 0);
+      const rightTotal = right.distances.reduce((sum, distance) => sum + distance, 0);
+      const leftMax = Math.max(...left.distances);
+      const rightMax = Math.max(...right.distances);
+      return leftTotal - rightTotal || leftMax - rightMax || left.id.localeCompare(right.id);
+    });
+  const rootAncestor = rankedAncestors[0] ?? null;
+  const commonJunction = rootAncestor ? null : rankedJunctions[0]?.id ?? null;
+  const pathRequests = rootAncestor
+    ? selectedBadgeIds.map((to) => ({ from: rootAncestor, to }))
+    : commonJunction
+      ? selectedBadgeIds.map((from) => ({ from, to: commonJunction }))
+      : selectedBadgeIds.map((to) => ({ from: selectedBadgeIds[0], to }));
+  const pathSegments = pathRequests
+    .map(({ from, to }) => {
+      const path = shortestDirectedPath({ from, to, outgoing });
       if (!path) {
-        warnings.push(`no directed path from ${rootAncestor} to ${to}`);
+        warnings.push("no directed connection between " + from + " and " + to);
         return null;
       }
       return {
-        from: rootAncestor,
+        from,
         to,
         badgeIds: path.badgeIds,
         edgeIds: path.edgeIds,
@@ -481,11 +592,15 @@ export function traceTheoryBadgeConnections(args: {
     .filter((segment): segment is TheoryBadgeConnectionTrace["pathSegments"][number] => Boolean(segment));
 
   const selectedBadges = selectedBadgeIds.map((id) => badgesById.get(id)).filter((badge): badge is TheoryBadgeV1 => Boolean(badge));
-  const sharedValues = (selector: (badge: TheoryBadgeV1) => string[]) => {
+  const sharedValues = (
+    selector: (badge: TheoryBadgeV1) => string[],
+    equivalent: (left: string, right: string) => boolean = (left, right) =>
+      normalizeKey(left) === normalizeKey(right),
+  ) => {
     if (selectedBadges.length === 0) return [];
     const [first, ...rest] = selectedBadges.map(selector);
     return first.filter((value) =>
-      rest.every((values) => values.some((candidate) => normalizeKey(candidate) === normalizeKey(value))),
+      rest.every((values) => values.some((candidate) => equivalent(candidate, value))),
     );
   };
 
@@ -502,7 +617,7 @@ export function traceTheoryBadgeConnections(args: {
     connectingBadgeIds,
     sharedAncestorIds: rankedAncestors,
     sharedSubjects: unique(sharedValues((badge) => badge.subjects)),
-    sharedSymbols: unique(sharedValues(badgeSymbols)),
+    sharedSymbols: unique(sharedValues(badgeSymbols, (left, right) => left.trim() === right.trim())),
     sharedUnitSignatures: unique(sharedValues(badgeUnitSignatures)),
     pathSegments,
     claimBoundaryNotes,

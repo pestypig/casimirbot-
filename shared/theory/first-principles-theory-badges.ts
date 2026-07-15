@@ -553,28 +553,12 @@ export const FIRST_PRINCIPLES_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     claimBoundaryNote: "Specialization edge is a derivation hint.",
   },
   {
-    id: "quantum_energy_feeds_energy_density",
-    from: "physics.quantum.energy_frequency",
-    to: "physics.energy.energy_density",
-    relation: "requires",
-    label: "Quantum energy expressions can feed scalar energy-density calculations.",
-    claimBoundaryNote: "Energy input does not select a mechanism.",
-  },
-  {
     id: "quantum_momentum_feeds_energy_momentum",
     from: "physics.quantum.momentum_wavelength",
     to: "physics.relativity.energy_momentum_relation",
     relation: "requires",
     label: "Momentum can feed the relativistic energy-momentum relation.",
     claimBoundaryNote: "Momentum relation is a reference bridge.",
-  },
-  {
-    id: "rest_energy_feeds_energy_density",
-    from: "physics.relativity.rest_energy",
-    to: "physics.energy.energy_density",
-    relation: "requires",
-    label: "Rest energy can be treated as an energy input to density calculations.",
-    claimBoundaryNote: "Scalar substitution is contextual.",
   },
   {
     id: "energy_density_feeds_stress_energy_tensor",

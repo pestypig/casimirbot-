@@ -50,6 +50,18 @@ describe("Helix Ask chat referent context", () => {
         terminal_eligible: false,
         raw_content_included: false,
       },
+      recent_assistant_final_answers: [
+        expect.objectContaining({
+          reply_id: "turn-latest",
+          text: "Navigation team is ready for the next burn window.",
+          recency_rank: 0,
+        }),
+        expect.objectContaining({
+          reply_id: "reply-old",
+          text: "Older answer.",
+          recency_rank: 1,
+        }),
+      ],
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
@@ -168,5 +180,112 @@ describe("Helix Ask chat referent context", () => {
         text: "Persisted fallback answer.",
       },
     });
+  });
+
+  it("prefers the current visible answer over a stale persisted fallback", () => {
+    const storage = new Map<string, string>();
+    vi.stubGlobal("window", {
+      localStorage: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          storage.set(key, value);
+        },
+      },
+    });
+    writePersistedHelixAskReferentReply({
+      id: "reply-stale",
+      selected_final_answer: "The blocking failure stopped the answer; the other failure reduced evidence.",
+    });
+
+    const result = buildHelixAskChatReferentContextForSubmit({
+      durableReplies: [{ id: "reply-durable", content: "Durable session answer." }],
+      visibleReplies: [{
+        id: "reply-visible",
+        turn_id: "turn-visible",
+        selected_final_answer:
+          "The continuity classifier misread the negated crop phrase, while the early-return branch bypassed terminal-product admission.",
+      }],
+    });
+
+    expect(result.source_summary).toMatchObject({
+      selected_source_name: "visible_ask_transcript",
+      context_present: true,
+    });
+    expect(result.context).toMatchObject({
+      previous_assistant_final_answer: {
+        reply_id: "turn-visible",
+        text:
+          "The continuity classifier misread the negated crop phrase, while the early-return branch bypassed terminal-product admission.",
+      },
+    });
+  });
+
+  it("retains a bounded, deduplicated recent-answer window for topic-aware follow-ups", () => {
+    const result = buildHelixAskChatReferentContextFromSources([
+      {
+        source_name: "durable_chat_session",
+        replies: [
+          { id: "quantum", content: "Quantum inequalities bound sampled negative energy." },
+          { id: "duplicate", content: "Newest runtime-verification answer." },
+        ],
+      },
+      {
+        source_name: "visible_ask_transcript",
+        replies: [
+          { id: "runtime", content: "Newest runtime-verification answer." },
+        ],
+      },
+    ]);
+
+    expect(result.source_summary).toMatchObject({
+      readable_reply_count: 3,
+      retained_candidate_count: 2,
+      selected_source_name: "visible_ask_transcript",
+    });
+    expect(result.context?.recent_assistant_final_answers).toEqual([
+      expect.objectContaining({
+        reply_id: "runtime",
+        text: "Newest runtime-verification answer.",
+        recency_rank: 0,
+      }),
+      expect.objectContaining({
+        reply_id: "quantum",
+        text: "Quantum inequalities bound sampled negative energy.",
+        recency_rank: 1,
+      }),
+    ]);
+  });
+
+  it("retains an older topic-matching answer beyond the general recent-answer window", () => {
+    const unrelated = Array.from({ length: 10 }, (_, index) => ({
+      id: `runtime-${index}`,
+      content: `Runtime verification answer ${index}.`,
+    }));
+    const result = buildHelixAskChatReferentContextFromSources([
+      {
+        source_name: "durable_chat_session",
+        replies: [
+          {
+            id: "quantum-energy",
+            content: "Quantum inequalities bound sampled negative energy and impose duration-magnitude limits.",
+          },
+          ...unrelated,
+        ],
+      },
+    ], "Find scholarly references supporting the quantum-inequality claims we discussed.");
+
+    expect(result.source_summary).toMatchObject({
+      readable_reply_count: 11,
+      retained_candidate_count: 9,
+      topic_retained_candidate_count: 1,
+      explicit_topic_term_count: 2,
+    });
+    expect(result.context?.recent_assistant_final_answers).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        reply_id: "quantum-energy",
+        text: "Quantum inequalities bound sampled negative energy and impose duration-magnitude limits.",
+        recency_rank: 10,
+      }),
+    ]));
   });
 });

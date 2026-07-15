@@ -484,6 +484,7 @@ export function buildToolCallAdmissionDecision(input: {
       ? sourceTargetToolFamilies(sourceTarget, promptText, input.sourceTargetIntent)
           .filter(isToolCallAdmissionFamily)
       : [];
+  const promptScholarlyResearchRequested = detectScholarlyResearchIntent(promptText).researchRequested;
   const effectiveSourceTarget =
     explicitCapabilityContract
       ? explicitCapabilityContract.source_target
@@ -498,6 +499,8 @@ export function buildToolCallAdmissionDecision(input: {
         sourceTarget === "general_background"
       ) && !unknownSourceArtifactDiscoveryIntent && toolUseRestatement.requiredToolFamilies.includes("docs_viewer")
       ? "docs_viewer"
+      : (sourceTarget === "unknown" || sourceTarget === "") && promptScholarlyResearchRequested
+      ? "scholarly_research"
       : (sourceTarget === "unknown" || sourceTarget === "") && toolUseRestatement.requiredToolFamilies.includes("internet_search")
       ? "internet_search"
       : sourceTarget === "unknown" && (calculatorSolveIntent || mandatoryCalculatorSolve)
@@ -838,7 +841,7 @@ export function buildToolCallAdmissionDecision(input: {
       !contextualToolSuppressionBlocksFamily(contextualSuppression, family)
     );
   const compoundPromptFamilies: HelixToolCallAdmissionFamily[] = [];
-  if (detectScholarlyResearchIntent(promptText).researchRequested && familyAllowed("scholarly_research")) {
+  if (promptScholarlyResearchRequested && familyAllowed("scholarly_research")) {
     compoundPromptFamilies.push("scholarly_research");
   }
   if (

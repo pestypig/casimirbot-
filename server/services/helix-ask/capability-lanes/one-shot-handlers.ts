@@ -476,6 +476,8 @@ const toImageLensRegionInspectionRequest = (
     source_dimensions_px: (
       readRecord(call.source_dimensions_px ?? call.sourceDimensionsPx) as ImageLensRegionInspectionRequestV1["source_dimensions_px"]
     ) ?? null,
+    source_mount_only:
+      call.source_mount_only === true || call.sourceMountOnly === true,
     bbox_px: bbox,
     crop_ref:
       readString(call.crop_ref ?? call.cropRef) || null,

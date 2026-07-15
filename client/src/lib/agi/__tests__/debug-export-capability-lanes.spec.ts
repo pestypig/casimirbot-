@@ -4176,4 +4176,66 @@ describe("Helix Ask debug export capability lanes", () => {
     });
     expect(exported.debug.agent_continuation_state).toEqual(exported.agent_continuation_state);
   });
+
+  it("exports referent resolution and source summary without prior answer text", () => {
+    const text = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "ask:referent-debug",
+        question: "Based on those two causes you just described, compare them.",
+        content: "Specific comparison.",
+      },
+      {
+        turn_id: "ask:referent-debug",
+        selected_final_answer: "Specific comparison.",
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        conversational_referent_resolution: {
+          schema: "helix.ask.conversational_referent_resolution.v1",
+          referent_detected: true,
+          referent_phrase: "deictic_previous_assistant_answer",
+          source_kind: "chat_history",
+          resolved_source_ref: "chat.final_answer.previous:turn-prior",
+          resolved_text_hash: "sha256:prior",
+          resolution_confidence: "high",
+          resolution_block_reason: null,
+          context_role: "evidence_for_followup_reasoning",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+        workspace_context_snapshot: {
+          chat_referent_context_source_summary: {
+            schema: "helix.ask.chat_referent_context_source_summary.v1",
+            source_count: 3,
+            total_reply_count: 4,
+            readable_reply_count: 4,
+            selected_source_name: "visible_ask_transcript",
+            context_present: true,
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          },
+          chat_referent_context: {
+            previous_assistant_final_answer: {
+              text: "Sensitive prior answer text must not be exported.",
+            },
+          },
+        },
+      },
+    );
+
+    const exported = JSON.parse(text) as Record<string, any>;
+    expect(exported.conversational_referent_resolution).toMatchObject({
+      referent_detected: true,
+      resolved_source_ref: "chat.final_answer.previous:turn-prior",
+      resolution_confidence: "high",
+      raw_content_included: false,
+    });
+    expect(exported.chat_referent_context_source_summary).toMatchObject({
+      selected_source_name: "visible_ask_transcript",
+      context_present: true,
+      raw_content_included: false,
+    });
+    expect(text).not.toContain("Sensitive prior answer text must not be exported.");
+  });
 });

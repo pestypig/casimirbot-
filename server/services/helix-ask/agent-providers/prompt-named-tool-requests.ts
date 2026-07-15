@@ -64,6 +64,10 @@ import {
   HELIX_RESEARCH_LIBRARY_READ_CAPABILITY,
   isSavedResearchLibraryEvidencePrompt,
 } from "@shared/helix-research-library";
+import {
+  conversationalReferentTextCannotSupplyRequestedEvidence,
+  resolveHelixAskConversationalReferent,
+} from "../referent-resolution";
 
 export const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -1234,6 +1238,39 @@ const isScientificImageExactRowRetryPrompt = (prompt: string): boolean => {
   );
 };
 
+const isAffirmativeActiveImageLensRegionInspectionPrompt = (
+  body: Record<string, unknown>,
+  prompt: string,
+): boolean => {
+  const workspaceSnapshot = readRecord(body.workspace_context_snapshot ?? body.workspaceContextSnapshot);
+  const activeSource =
+    readRecord(body.active_image_lens_source ?? body.activeImageLensSource) ??
+    readRecord(workspaceSnapshot?.active_image_lens_source ?? workspaceSnapshot?.activeImageLensSource);
+  const activeSourceId = readString(activeSource?.source_id ?? activeSource?.sourceId);
+  const activeSourceRef =
+    readString(activeSource?.source_image_ref ?? activeSource?.sourceImageRef) ??
+    readString(activeSource?.page_image_ref ?? activeSource?.pageImageRef);
+  if (!activeSourceId || !activeSourceRef) return false;
+  const affirmativePrompt = unquotePrompt(prompt.replace(/`([^`]*)`/g, "$1"))
+    .replace(/\b(?:the\s+)?(?:screen|ui|message|reply|chat|log|trace|prompt)\s+(?:says?|shows?|reads?|contains?)\b[^.!?;\n]{0,240}/gi, " ")
+    .replace(/"[^"]*"|'[^']*'/g, " ")
+    .replace(/\b(?:previously|earlier|historically|last\s+time)\b[^.!?;\n]{0,240}/gi, " ")
+    .replace(/\b(?:if|when|later|in\s+the\s+future|eventually|would|could|might)\b[^.!?;\n]{0,240}/gi, " ")
+    .replace(/\b(?:do\s+not|don't|without|exclude|avoid)\b[^.!?;\n]{0,240}/gi, " ");
+  const namedSourceIds = Array.from(affirmativePrompt.matchAll(/\bpdf-page-render:[A-Za-z0-9_-]+\b/gi))
+    .map((match) => match[0]?.toLowerCase())
+    .filter((entry): entry is string => Boolean(entry));
+  const exactSourceNamed = namedSourceIds.includes(activeSourceId.toLowerCase());
+  const activeSourceNamed =
+    /\b(?:current|currently\s+active|active|loaded|visible|existing)\b[\s\S]{0,80}\b(?:image\s+lens|source|pdf\s+page|page)\b/i.test(affirmativePrompt) ||
+    /\b(?:image\s+lens|source|pdf\s+page|page)\b[\s\S]{0,80}\b(?:current|currently\s+active|active|loaded|visible|existing)\b/i.test(affirmativePrompt) ||
+    /\bremain\s+on\s+(?:the\s+)?(?:current|active|existing)\s+source\b/i.test(affirmativePrompt);
+  const inspectionRequested =
+    /\b(?:inspect|crop|extract|capture|ocr|read|execute|use)\b/i.test(affirmativePrompt) &&
+    /\b(?:image\s+lens|visual_analysis\.inspect_image_region|bbox|equation|pdf-page-render:)\b/i.test(affirmativePrompt);
+  return inspectionRequested && (exactSourceNamed || activeSourceNamed);
+};
+
 export const isTheoryFormulaDiscoveryPhasePrompt = (prompt: string): boolean => {
   const unquoted = unquotePrompt(prompt);
   const mentionsTheoryGraph = /\b(?:theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b/i.test(unquoted);
@@ -1354,33 +1391,148 @@ export const buildPromptDerivedScholarlyResearchGatewayCallRequests = (
   if (hasNegatedScholarlyResearchInstruction(prompt)) return [];
   const intent = detectScholarlyResearchIntent(prompt);
   if (!intent.researchRequested) return [];
-  return [{
-    schema: "helix.workstation_gateway.prompt_derived_scholarly_research_call_request.v1",
-    derivation_source: "helix_prompt_derived_scholarly_research",
-    capability_id: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
-    mode: "read",
-    arguments: {
-      query: intent.normalizedQuery,
-      mode: intent.mode,
-      scholarly_intent: intent.scholarlyIntent,
-      planned_scholarly_capability_chain: intent.plannedScholarlyCapabilityChain,
-      source_target_intent: {
-        source: "helix_prompt_derived_scholarly_research",
-        target_source: "scholarly_research",
-        target_kind: "research_paper_search",
-        strength: intent.strength,
-        explicit_cues: intent.explicitCues,
-        reasons: intent.reasons,
-        requested_outputs: intent.requestedOutputs,
-        doi: intent.doi,
-        arxiv_id: intent.arxivId,
-        full_text_requested: intent.fullTextRequested,
-        scholarly_intent: intent.scholarlyIntent,
+  const conversationalReferent = resolveHelixAskConversationalReferent(body);
+  const hasExplicitIdentifierOrSourceTarget = Boolean(
+    intent.doi || intent.arxivId || extractScholarlySourceUrl(prompt),
+  );
+  const explicitTopicFallbackQuery = conversationalReferent.trace.explicit_topic_phrase?.trim() ?? "";
+  const normalizeReferentClaim = (value: string): string =>
+    value
+      .replace(/^\s*(?:[-*+]\s+|\d+[.)]\s+)/, "")
+      .replace(/[*_`#]+/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  const resolvedReferentQueries = (() => {
+    const resolvedText = conversationalReferent.resolvedText?.trim() ?? "";
+    if (!resolvedText) return [];
+    const bulletClaims = resolvedText
+      .split(/\r?\n/)
+      .filter((line) => /^\s*(?:[-*+]\s+|\d+[.)]\s+)/.test(line))
+      .map(normalizeReferentClaim)
+      .filter((claim) =>
+        claim.length >= 20 &&
+        claim.length <= 500 &&
+        !conversationalReferentTextCannotSupplyRequestedEvidence(claim)
+      );
+    const candidates = bulletClaims.length > 0
+      ? bulletClaims
+      : resolvedText
+          .replace(/\r?\n+/g, " ")
+          .split(/(?<=[.!?])\s+/)
+          .map(normalizeReferentClaim)
+          .filter((claim) =>
+            claim.length >= 20 &&
+            claim.length <= 500 &&
+            !conversationalReferentTextCannotSupplyRequestedEvidence(claim)
+          );
+    return [...new Set(candidates)].slice(0, 6);
+  })();
+  const referentDerived = Boolean(
+    conversationalReferent.trace.referent_detected &&
+    !hasExplicitIdentifierOrSourceTarget &&
+    conversationalReferent.trace.resolution_confidence === "high" &&
+    resolvedReferentQueries.length > 0
+  );
+  const explicitTopicFallbackDerived = Boolean(
+    conversationalReferent.trace.referent_detected &&
+    !hasExplicitIdentifierOrSourceTarget &&
+    explicitTopicFallbackQuery &&
+    conversationalReferent.trace.explicit_topic_terms.length > 0
+  );
+  // Never send operator instructions such as "claims we just discussed" to a
+  // paper API. Prefer bounded resolved claims. If the retained conversation no
+  // longer contains a matching answer, an explicit topic named in the current
+  // prompt may seed a topic-only lookup; an unscoped missing antecedent still
+  // fails closed.
+  if (conversationalReferent.trace.referent_detected && !hasExplicitIdentifierOrSourceTarget) {
+    if (!referentDerived && !explicitTopicFallbackDerived) {
+      return [];
+    }
+  }
+  const queries = referentDerived
+    ? resolvedReferentQueries
+    : explicitTopicFallbackDerived
+      ? [explicitTopicFallbackQuery]
+      : [intent.normalizedQuery];
+  const requestedFullTextCount = (() => {
+    const match = prompt.match(
+      /\b(?:best|top|fetch|open|read|parse)\s+(?:the\s+)?(one|two|three|1|2|3)\b[\s\S]{0,50}\b(?:accessible\s+)?(?:sources?|papers?|articles?|pdfs?|full[-\s]?texts?)\b/i,
+    );
+    const token = match?.[1]?.toLowerCase();
+    if (token === "three" || token === "3") return 3;
+    if (token === "two" || token === "2") return 2;
+    return 1;
+  })();
+  return queries.map((query, claimIndex) => {
+    const closesScholarlyLookupSet = Boolean(
+      (referentDerived || explicitTopicFallbackDerived) &&
+      intent.scholarlyIntent.requires_full_text &&
+      claimIndex === queries.length - 1
+    );
+    const derivationSource = referentDerived
+      ? "helix_resolved_referent_scholarly_research"
+      : explicitTopicFallbackDerived
+        ? "helix_explicit_topic_scholarly_research"
+        : "helix_prompt_derived_scholarly_research";
+    const scholarlyIntent = {
+      ...intent.scholarlyIntent,
+      scholarly_query: query,
+      query_normalization_reasons: [
+        ...(intent.scholarlyIntent.query_normalization_reasons ?? []),
+        ...(referentDerived ? ["resolved_conversational_referent_claim"] : []),
+        ...(explicitTopicFallbackDerived ? ["explicit_current_turn_topic_fallback"] : []),
+      ],
+    };
+    return {
+      schema: "helix.workstation_gateway.prompt_derived_scholarly_research_call_request.v1",
+      derivation_source: derivationSource,
+      ...(closesScholarlyLookupSet ? {
+        compound_outcome: "scholarly_research_workflow",
+        subgoal_id: "scholarly_research_workflow:scholarly_evidence",
+        dependent_capability_id: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      } : {}),
+      capability_id: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+      mode: "read",
+      arguments: {
+        query,
+        mode: intent.mode,
+        scholarly_intent: scholarlyIntent,
         planned_scholarly_capability_chain: intent.plannedScholarlyCapabilityChain,
-        terminal_evidence_requirement: intent.scholarlyIntent.terminal_evidence_requirement,
+        ...(closesScholarlyLookupSet ? {
+          allow_scholarly_dependent_chain: true,
+          requested_full_text_count: requestedFullTextCount,
+          ...(referentDerived ? { scholarly_claim_portfolio: true } : {}),
+        } : {}),
+        source_target_intent: {
+          source: derivationSource,
+          target_source: "scholarly_research",
+          target_kind: "research_paper_search",
+          strength: intent.strength,
+          explicit_cues: intent.explicitCues,
+          reasons: intent.reasons,
+          requested_outputs: intent.requestedOutputs,
+          doi: intent.doi,
+          arxiv_id: intent.arxivId,
+          full_text_requested: intent.fullTextRequested,
+          scholarly_intent: scholarlyIntent,
+          planned_scholarly_capability_chain: intent.plannedScholarlyCapabilityChain,
+          terminal_evidence_requirement: intent.scholarlyIntent.terminal_evidence_requirement,
+          ...(referentDerived ? {
+            query_derivation: "resolved_conversational_referent_claim",
+            resolved_referent_ref: conversationalReferent.trace.resolved_source_ref,
+            claim_index: claimIndex,
+            claim_count: queries.length,
+            claim_portfolio_closer: closesScholarlyLookupSet,
+          } : explicitTopicFallbackDerived ? {
+            query_derivation: "explicit_current_turn_topic_fallback",
+            explicit_topic_phrase: conversationalReferent.trace.explicit_topic_phrase,
+            explicit_topic_terms: conversationalReferent.trace.explicit_topic_terms,
+            referent_resolution_block_reason: conversationalReferent.trace.resolution_block_reason,
+          } : {}),
+        },
       },
-    },
-  }];
+    };
+  });
 };
 
 export const buildPromptDerivedResearchLibraryGatewayCallRequests = (
@@ -1388,6 +1540,7 @@ export const buildPromptDerivedResearchLibraryGatewayCallRequests = (
 ): Record<string, unknown>[] => {
   const prompt = readPrompt(body);
   if (!prompt) return [];
+  if (isAffirmativeActiveImageLensRegionInspectionPrompt(body, prompt)) return [];
   if (!isSavedResearchLibraryEvidencePrompt(prompt)) return [];
   const sourceUrl = extractScholarlySourceUrl(prompt);
   const documentId = prompt.match(/\bresearch:[A-Za-z0-9_-]{8,}\b/)?.[0] ?? null;

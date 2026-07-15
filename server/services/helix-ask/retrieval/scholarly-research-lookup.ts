@@ -245,35 +245,133 @@ const makePaper = (input: {
 
 const SCHOLARLY_LOOKUP_STOP_WORDS = new Set([
   "a",
+  "abstract",
+  "access",
+  "accessible",
+  "also",
   "an",
   "and",
+  "any",
+  "arbitrarily",
   "are",
+  "arxiv",
+  "best",
+  "can",
+  "cannot",
+  "citation",
+  "citations",
+  "claim",
+  "claims",
+  "could",
+  "consequently",
+  "decompose",
+  "discussed",
+  "diverse",
+  "do",
+  "does",
+  "evidence",
+  "every",
+  "exact",
+  "fetch",
+  "find",
   "for",
   "from",
+  "full",
+  "generally",
+  "has",
+  "have",
+  "how",
+  "however",
+  "identify",
   "in",
+  "it",
+  "its",
+  "larger",
+  "lookup",
+  "longer",
+  "map",
+  "many",
+  "may",
+  "metadata",
+  "might",
+  "must",
   "of",
   "on",
+  "only",
   "or",
   "paper",
   "papers",
+  "provider",
+  "providers",
+  "proposed",
+  "reference",
+  "references",
   "research",
+  "result",
+  "results",
+  "return",
+  "remain",
+  "review",
+  "roughly",
   "scholarly",
   "search",
+  "separate",
+  "shorter",
+  "should",
+  "source",
+  "sources",
   "study",
+  "support",
+  "supporting",
+  "that",
   "the",
+  "these",
+  "therefore",
+  "they",
+  "this",
+  "those",
+  "text",
   "to",
+  "topic",
+  "topics",
+  "was",
+  "were",
+  "what",
+  "when",
+  "which",
+  "will",
   "with",
+  "would",
 ]);
 
 const SCHOLARLY_LOOKUP_OFF_TARGET = /\b(?:scholarly\s+(?:document|writing|communication|process)|citation\s+count|peer\s+review|large\s+language\s+models?|llm|bert|text\s+classification|document\s+quality|writing\s+and\s+peer\s+review)\b/i;
 
-const scholarlyLookupTokens = (value: string): string[] =>
+const scholarlyLookupSearchTerms = (value: string): string[] =>
   unique(value
     .toLowerCase()
     .replace(/[^a-z0-9\s]+/g, " ")
     .split(/\s+/)
     .map((token) => token.trim())
     .filter((token) => token.length > 1 && !SCHOLARLY_LOOKUP_STOP_WORDS.has(token)));
+
+const normalizeScholarlyLookupToken = (value: string): string => {
+  let token = value;
+  if (token.length > 4 && token.endsWith("ies")) {
+    token = `${token.slice(0, -3)}y`;
+  } else if (token.length > 5 && token.endsWith("ing")) {
+    token = token.slice(0, -3);
+  } else if (token.length > 4 && token.endsWith("ed")) {
+    token = token.slice(0, -2);
+  } else if (token.length > 4 && /(?:ches|shes|ses|xes|zes)$/.test(token)) {
+    token = token.slice(0, -2);
+  } else if (token.length > 3 && token.endsWith("s") && !token.endsWith("ss")) {
+    token = token.slice(0, -1);
+  }
+  return token;
+};
+
+const scholarlyLookupTokens = (value: string): string[] =>
+  unique(scholarlyLookupSearchTerms(value).map(normalizeScholarlyLookupToken));
 
 const paperSearchText = (paper: HelixScholarlyPaperResult): string =>
   [
@@ -318,21 +416,79 @@ const paperSupportsHistoricalOriginalQuery = (
   return hasOriginalYear && hasCasimirAuthor && hasPlateIdentity;
 };
 
-const paperSupportsQuery = (paper: HelixScholarlyPaperResult, query: string, queryTokens: string[]): boolean => {
-  if (queryTokens.length === 0) return true;
-  if (!paperSupportsHistoricalOriginalQuery(paper, query, queryTokens)) return false;
+type ScholarlyPaperRelevanceEvaluation = {
+  supported: boolean;
+  matched_tokens: string[];
+  missing_tokens: string[];
+  anchor_tokens: string[];
+  matched_anchor_tokens: string[];
+  required_match_count: number;
+  reason: string;
+};
+
+const evaluatePaperRelevance = (
+  paper: HelixScholarlyPaperResult,
+  query: string,
+  queryTokens: string[],
+): ScholarlyPaperRelevanceEvaluation => {
+  if (queryTokens.length === 0) {
+    return {
+      supported: true,
+      matched_tokens: [],
+      missing_tokens: [],
+      anchor_tokens: [],
+      matched_anchor_tokens: [],
+      required_match_count: 0,
+      reason: "no_required_topic_terms",
+    };
+  }
+  if (!paperSupportsHistoricalOriginalQuery(paper, query, queryTokens)) {
+    return {
+      supported: false,
+      matched_tokens: [],
+      missing_tokens: queryTokens,
+      anchor_tokens: queryTokens.slice(0, 3),
+      matched_anchor_tokens: [],
+      required_match_count: queryTokens.length,
+      reason: "historical_paper_identity_not_supported",
+    };
+  }
+
   const haystack = paperSearchText(paper);
-  const hits = queryTokens.filter((token) => haystack.includes(token));
-  if (SCHOLARLY_LOOKUP_OFF_TARGET.test(haystack) && hits.length < queryTokens.length) return false;
-  if (queryTokens.length <= 2) return hits.length === queryTokens.length;
-  return hits.length >= Math.max(2, Math.ceil(queryTokens.length * 0.6));
+  const paperTokens = new Set(scholarlyLookupTokens(haystack));
+  const matchedTokens = queryTokens.filter((token) => paperTokens.has(token));
+  const missingTokens = queryTokens.filter((token) => !paperTokens.has(token));
+  const anchorTokens = queryTokens.slice(0, 3);
+  const matchedAnchorTokens = anchorTokens.filter((token) => paperTokens.has(token));
+  const requiredMatchCount = queryTokens.length <= 2
+    ? queryTokens.length
+    : Math.max(2, Math.min(4, Math.ceil(queryTokens.length * 0.4)));
+  const offTarget = SCHOLARLY_LOOKUP_OFF_TARGET.test(haystack) && matchedTokens.length < queryTokens.length;
+  const missingAnchor = queryTokens.length > 2 && matchedAnchorTokens.length === 0;
+  const supported = !offTarget && !missingAnchor && matchedTokens.length >= requiredMatchCount;
+  return {
+    supported,
+    matched_tokens: matchedTokens,
+    missing_tokens: missingTokens,
+    anchor_tokens: anchorTokens,
+    matched_anchor_tokens: matchedAnchorTokens,
+    required_match_count: requiredMatchCount,
+    reason: offTarget
+      ? "off_target_scholarly_process_result"
+      : missingAnchor
+        ? "missing_primary_topic_anchor"
+        : supported
+          ? "bounded_topic_overlap_satisfied"
+          : "insufficient_topic_overlap",
+  };
 };
 
 const buildLookupRecoveryQueries = (query: string, tokens: string[]): string[] => {
   const normalized = query.trim();
-  const tokenText = tokens.join(" ");
-  const base = normalized || tokenText || "scholarly paper";
-  const queries = [base];
+  const tokenText = scholarlyLookupSearchTerms(query).join(" ");
+  const base = tokenText || normalized || "scholarly paper";
+  const queries: string[] = [];
+  if (base.toLowerCase() !== normalized.toLowerCase()) queries.push(base);
   if (tokens.includes("weyl") || /\bweyl\b/i.test(base)) {
     queries.push(
       "Weyl tensor conformal curvature general relativity",
@@ -621,9 +777,13 @@ const lookupArxiv = async (input: {
   evidenceRefs: HelixScholarlyEvidenceRef[];
 }): Promise<HelixScholarlyPaperResult[]> => {
   const exactArxivId = normalizeArxivId(input.arxivId);
+  const topicTerms = scholarlyLookupSearchTerms(input.query).slice(0, 3);
+  const topicQuery = topicTerms.length > 0
+    ? topicTerms.map((term) => `all:${term}`).join(" AND ")
+    : `all:${input.query.trim()}`;
   const search = exactArxivId
     ? `id_list=${encodeURIComponent(exactArxivId)}`
-    : `search_query=all:${encodeURIComponent(input.query)}&start=0&max_results=${input.limit}`;
+    : `search_query=${encodeURIComponent(topicQuery)}&start=0&max_results=${input.limit}`;
   const xml = await fetchText({
     ...input,
     provider: "arxiv",
@@ -799,9 +959,23 @@ export async function runScholarlyResearchLookup(
     ? dedupePapers(papers).filter((paper) => paperMatchesArxivId(paper, arxivId))
     : dedupePapers(papers);
   const queryTokens = scholarlyLookupTokens(query);
+  const relevanceEvaluations = new Map(candidatePapers.map((paper) => [
+    paper.result_id,
+    arxivId
+      ? {
+          supported: true,
+          matched_tokens: queryTokens,
+          missing_tokens: [],
+          anchor_tokens: queryTokens.slice(0, 3),
+          matched_anchor_tokens: queryTokens.slice(0, 3),
+          required_match_count: 0,
+          reason: "exact_identifier_match",
+        }
+      : evaluatePaperRelevance(paper, query, queryTokens),
+  ]));
   const relevantPapers = arxivId
     ? candidatePapers
-    : candidatePapers.filter((paper) => paperSupportsQuery(paper, query, queryTokens));
+    : candidatePapers.filter((paper) => relevanceEvaluations.get(paper.result_id)?.supported);
   const dedupedPapers = relevantPapers.slice(0, limit);
   const rejectedPapers = candidatePapers
     .filter((paper) => !dedupedPapers.some((selected) => selected.result_id === paper.result_id))
@@ -829,6 +1003,18 @@ export async function runScholarlyResearchLookup(
     status: evidenceState === "lookup_usable" ? "satisfied" : "blocked",
     code: evidenceState === "lookup_usable" ? "lookup_result_relevant" : evidenceState,
     required_any: queryTokens,
+    candidate_evaluations: candidatePapers.map((paper) => ({
+      result_id: paper.result_id,
+      ...(relevanceEvaluations.get(paper.result_id) ?? {
+        supported: true,
+        matched_tokens: queryTokens,
+        missing_tokens: [],
+        anchor_tokens: queryTokens.slice(0, 3),
+        matched_anchor_tokens: queryTokens.slice(0, 3),
+        required_match_count: 0,
+        reason: "exact_identifier_match",
+      }),
+    })),
     supporting_any: dedupedPapers.map((paper) => paper.result_id),
     selected_result_ids: dedupedPapers.map((paper) => paper.result_id),
     rejected_result_ids: rejectedPapers.map((paper) => paper.result_id),
@@ -847,7 +1033,12 @@ export async function runScholarlyResearchLookup(
         rejected_results: rejectedPapers.map((paper) => ({
           result_id: paper.result_id,
           title: paper.title,
-          reason: "query_terms_not_supported_by_title_or_abstract",
+          reason: relevanceEvaluations.get(paper.result_id)?.reason ?? "query_terms_not_supported_by_title_or_abstract",
+          matched_tokens: relevanceEvaluations.get(paper.result_id)?.matched_tokens ?? [],
+          missing_tokens: relevanceEvaluations.get(paper.result_id)?.missing_tokens ?? queryTokens,
+          anchor_tokens: relevanceEvaluations.get(paper.result_id)?.anchor_tokens ?? queryTokens.slice(0, 3),
+          matched_anchor_tokens: relevanceEvaluations.get(paper.result_id)?.matched_anchor_tokens ?? [],
+          required_match_count: relevanceEvaluations.get(paper.result_id)?.required_match_count ?? queryTokens.length,
         })),
         recovery_queries: nextAffordances.map((affordance) => affordance.query).filter((entry): entry is string => Boolean(entry)),
         recovery_query_basis: recoveryQueryBasis,

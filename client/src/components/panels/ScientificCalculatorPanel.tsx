@@ -24,6 +24,10 @@ import {
 } from "@/store/useTheoryCompoundRunStore";
 import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
 import { ScientificCalculatorLiveSourceControls } from "./ScientificCalculatorLiveSourceControls";
+import { RuntimeWorkbenchSection } from "./scientific-calculator/RuntimeWorkbenchSection";
+import { DOC_CALCULATOR_LAUNCH_EVENT } from "@/lib/docs/docCalculatorLaunch";
+import type { DocCalculatorLaunchV1 } from "@shared/contracts/doc-calculator-launch.v1";
+import { useTheoryRuntimeJobStore } from "@/store/useTheoryRuntimeJobStore";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
 import { useInterfaceText, type InterfaceTextResolver } from "@/lib/i18n/interfaceText";
@@ -233,6 +237,7 @@ export default function ScientificCalculatorPanel() {
   const rememberDraft = useWorkstationSessionMemoryStore((state) => state.rememberDraft);
   const readDraft = useWorkstationSessionMemoryStore((state) => state.readDraft);
   const clearDraft = useWorkstationSessionMemoryStore((state) => state.clearDraft);
+  const selectedRuntimeSetup = useTheoryRuntimeJobStore((state) => state.selectedSetup);
   const [input, setInput] = useState(() =>
     resolveInitialCalculatorInput(readDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY), currentLatex),
   );
@@ -399,6 +404,19 @@ export default function ScientificCalculatorPanel() {
       window.removeEventListener(SCIENTIFIC_CALCULATOR_MATH_PICKED_EVENT, onPicked as EventListener);
     };
   }, [ingestLatex, promoteWorkbenchSection, rememberDraft]);
+
+  useEffect(() => {
+    const onLaunch = (event: Event) => {
+      const detail = (event as CustomEvent<DocCalculatorLaunchV1>).detail;
+      if (detail?.kind === "runtime") promoteWorkbenchSection("runtime");
+    };
+    window.addEventListener(DOC_CALCULATOR_LAUNCH_EVENT, onLaunch as EventListener);
+    return () => window.removeEventListener(DOC_CALCULATOR_LAUNCH_EVENT, onLaunch as EventListener);
+  }, [promoteWorkbenchSection]);
+
+  useEffect(() => {
+    if (selectedRuntimeSetup) promoteWorkbenchSection("runtime");
+  }, [promoteWorkbenchSection, selectedRuntimeSetup]);
 
   const handlePasteClipboard = async () => {
     if (typeof navigator === "undefined" || !navigator.clipboard?.readText) return;
@@ -659,7 +677,7 @@ export default function ScientificCalculatorPanel() {
     };
   }, [activeTheoryLoadoutItem, input, lastSetup?.subgoal, t]);
   const showTheoryWorkbench = activeSection === "theory" || Boolean(activeTheoryRun || lastTheoryLoadout);
-  const showRuntimeWorkbench = activeSection === "runtime" || Boolean(activeRuntimeTrace || runtimeTheoryRunRows.length > 0);
+  const showRuntimeWorkbench = activeSection === "runtime" || Boolean(selectedRuntimeSetup || activeRuntimeTrace || runtimeTheoryRunRows.length > 0);
 
   return (
     <div className="h-full w-full overflow-auto bg-slate-950/90 p-4 text-slate-100">
@@ -1058,8 +1076,9 @@ export default function ScientificCalculatorPanel() {
               </Badge>
             ) : null}
           </div>
+          <RuntimeWorkbenchSection />
           {activeRuntimeTrace ? (
-            <div className="space-y-2">
+            <div className="mt-3 space-y-2">
               <div className="rounded border border-violet-900/50 bg-slate-950/60 p-2 text-xs">
                 <div className="font-mono text-violet-100">{activeRuntimeTrace.traceId}</div>
                 <div className="mt-1 text-slate-400">{activeRuntimeTrace.request.target}</div>

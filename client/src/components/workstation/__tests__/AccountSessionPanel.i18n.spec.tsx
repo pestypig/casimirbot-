@@ -200,7 +200,7 @@ describe("AccountSessionPanel interface language", () => {
     expect(document.documentElement.dir).toBe("ltr");
   });
 
-  it("hides developer-preview catalogs from public account selection", async () => {
+  it("offers every interface language catalog to public accounts", async () => {
     vi.stubGlobal("fetch", mockFetch());
 
     render(<AccountSessionPanel />);
@@ -211,9 +211,9 @@ describe("AccountSessionPanel interface language", () => {
     expect(screen.getByRole("option", { name: /English/ })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: /German/ })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: /Arabic/ })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: /Hawaiian/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: /Spanish/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: /Wolof/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Hawaiian/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Spanish/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Wolof/ })).toBeInTheDocument();
   });
 
   it("renders known backend states through localized display labels instead of raw enum values", async () => {

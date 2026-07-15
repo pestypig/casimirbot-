@@ -1,7 +1,6 @@
 import { getInterfaceCatalogReviewedCount } from "@/lib/i18n/messages/targetCatalogs";
 import { INTERFACE_MESSAGE_IDS } from "@/lib/i18n/messages/types";
 import {
-  isPublicInterfaceLanguageCode,
   SHARED_INTERFACE_LANGUAGE_CODES,
   type SharedInterfaceLanguageCode,
 } from "@shared/interface-language-codes";
@@ -173,12 +172,9 @@ export function getInterfaceLanguageOption(value: unknown): InterfaceLanguageOpt
 }
 
 export function getInterfaceLanguageOptionsForAccount(
-  accountType: HelixAccountType | null | undefined,
+  _accountType: HelixAccountType | null | undefined,
 ): InterfaceLanguageOption[] {
-  if (accountType === "developer") return INTERFACE_LANGUAGE_OPTIONS;
-  return INTERFACE_LANGUAGE_OPTIONS.filter((option) =>
-    isPublicInterfaceLanguageCode(option.code),
-  );
+  return INTERFACE_LANGUAGE_OPTIONS;
 }
 
 export function getInterfaceLanguageReadiness(option: InterfaceLanguageOption): string {

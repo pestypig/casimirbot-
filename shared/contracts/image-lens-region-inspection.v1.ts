@@ -94,6 +94,8 @@ export type ImageLensRegionInspectionRequestV1 = {
   scholarly_source_pdf_ref?: string | null;
   scholarly_pdf_cache_path?: string | null;
   source_dimensions_px?: { width: number; height: number } | null;
+  /** Mount the rendered source in Image Lens without running OCR or visual analysis. */
+  source_mount_only?: boolean;
   bbox_px: DocumentImageBboxPxV1;
   crop_ref?: string | null;
   current_crop_ref?: string | null;
@@ -133,6 +135,8 @@ export type ImageLensRegionInspectionReceiptV1 = {
   page_image_ref: string | null;
   scholarly_source_pdf_ref?: string | null;
   scholarly_pdf_cache_path?: string | null;
+  source_dimensions_px?: { width: number; height: number } | null;
+  source_mount_only?: boolean;
   bbox_px: DocumentImageBboxPxV1;
   crop_ref?: string | null;
   source_refs: string[];

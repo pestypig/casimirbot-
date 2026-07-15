@@ -44,6 +44,16 @@ export type HelixAskInlineCodeTextSegment =
   | { kind: "text"; text: string }
   | { kind: "inline_code"; text: string; start: number };
 
+export type HelixAskExternalLinkTextSegment =
+  | { kind: "text"; text: string }
+  | {
+      kind: "external_link";
+      text: string;
+      href: string;
+      start: number;
+      syntax: "markdown" | "bare";
+    };
+
 const HELIX_ASK_MATH_DELIMITERS: ReadonlyArray<{
   openDelimiter: string;
   closeDelimiter: string;
@@ -62,6 +72,8 @@ const HELIX_ASK_BARE_EQUATION_SIGNAL_RE =
 const HELIX_ASK_PATH_SEGMENT_RE =
   /(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+\.(?:tsx|ts|jsx|js|md|json|cjs|mjs|py|yml|yaml)/g;
 const HELIX_ASK_INLINE_CODE_SEGMENT_RE = /`([^`\n]+)`/g;
+const HELIX_ASK_EXTERNAL_LINK_SEGMENT_RE =
+  /\[([^\]\n]+)\]\((https?:\/\/[^\s<>"']+)\)|(https?:\/\/[^\s<>"'`]+)/gi;
 
 function coerceText(value: unknown): string {
   if (value === null || value === undefined) return "";
@@ -295,6 +307,66 @@ export function splitHelixAskInlineCodeTextSegments(content: unknown): HelixAskI
     }
     segments.push({ kind: "inline_code", text: body, start });
     cursor = start + full.length;
+  }
+  if (cursor < text.length) {
+    segments.push({ kind: "text", text: text.slice(cursor) });
+  }
+  return segments.length ? segments : [{ kind: "text", text }];
+}
+
+function trimBareExternalLinkCandidate(value: string): string {
+  let candidate = value.replace(/[.,;:!?]+$/g, "");
+  while (candidate.endsWith(")")) {
+    const openCount = (candidate.match(/\(/g) ?? []).length;
+    const closeCount = (candidate.match(/\)/g) ?? []).length;
+    if (closeCount <= openCount) break;
+    candidate = candidate.slice(0, -1);
+  }
+  return candidate;
+}
+
+function normalizeSafeExternalLink(value: string): string | null {
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return null;
+    if (!parsed.hostname) return null;
+    return parsed.href;
+  } catch {
+    return null;
+  }
+}
+
+export function splitHelixAskExternalLinkTextSegments(
+  content: unknown,
+): HelixAskExternalLinkTextSegment[] {
+  const text = coerceText(content);
+  if (!text) return [];
+  const segments: HelixAskExternalLinkTextSegment[] = [];
+  let cursor = 0;
+  HELIX_ASK_EXTERNAL_LINK_SEGMENT_RE.lastIndex = 0;
+  for (const match of text.matchAll(HELIX_ASK_EXTERNAL_LINK_SEGMENT_RE)) {
+    const full = match[0] ?? "";
+    const markdownLabel = match[1] ?? "";
+    const markdownHref = match[2] ?? "";
+    const bareHref = match[3] ?? "";
+    const start = match.index ?? -1;
+    if (!full || start < 0) continue;
+    const syntax = markdownHref ? "markdown" as const : "bare" as const;
+    const rawHref = syntax === "markdown" ? markdownHref : trimBareExternalLinkCandidate(bareHref);
+    const href = normalizeSafeExternalLink(rawHref);
+    if (!href) continue;
+    const consumedText = syntax === "markdown" ? full : rawHref;
+    if (start > cursor) {
+      segments.push({ kind: "text", text: text.slice(cursor, start) });
+    }
+    segments.push({
+      kind: "external_link",
+      text: syntax === "markdown" ? markdownLabel : rawHref,
+      href,
+      start,
+      syntax,
+    });
+    cursor = start + consumedText.length;
   }
   if (cursor < text.length) {
     segments.push({ kind: "text", text: text.slice(cursor) });

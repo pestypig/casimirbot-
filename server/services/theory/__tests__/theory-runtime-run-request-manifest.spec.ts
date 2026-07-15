@@ -70,6 +70,20 @@ describe("theory runtime run request manifests", () => {
     expect(readBack?.status).toBe("queued");
     expect(readBack?.heartbeat.stage).toBe("queued");
     expect(readBack?.heartbeat.progress).toBe(0.1);
+
+    const indeterminate = await updateTheoryRuntimeRunRequestStatus({
+      requestId: "request:status",
+      status: "running",
+      projectRoot: tempRoot,
+      updatedAt: "2026-05-29T00:02:00.000Z",
+      heartbeat: {
+        stage: "runtime_execution",
+        message: "Runtime is active; the command does not expose measurable progress.",
+        progress: null,
+      },
+    });
+
+    expect(indeterminate.request.heartbeat.progress).toBeNull();
   });
 
   it("rejects invalid runtimes", async () => {
@@ -82,6 +96,30 @@ describe("theory runtime run request manifests", () => {
         projectRoot: tempRoot,
       }),
     ).rejects.toThrow(/not registered/i);
+  });
+
+  it("generates collision-resistant request identities even at the same timestamp", async () => {
+    const [first, second] = await Promise.all([
+      createTheoryRuntimeRunRequestManifest({
+        runtimeId: "solar.manifest",
+        graphId: "test.graph",
+        badgeIds: [],
+        requestedScope: "quick",
+        projectRoot: tempRoot,
+        generatedAt: "2026-05-29T00:00:00.000Z",
+      }),
+      createTheoryRuntimeRunRequestManifest({
+        runtimeId: "solar.manifest",
+        graphId: "test.graph",
+        badgeIds: [],
+        requestedScope: "quick",
+        projectRoot: tempRoot,
+        generatedAt: "2026-05-29T00:00:00.000Z",
+      }),
+    ]);
+
+    expect(first.request.requestId).not.toBe(second.request.requestId);
+    expect(first.manifestPath).not.toBe(second.manifestPath);
   });
 
   it("keeps long warp/NHM2 requests manifest-only by default", async () => {

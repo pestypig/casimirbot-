@@ -12,7 +12,10 @@ import type {
 import { buildWorkstationPathRef, normalizeWorkstationDocPath } from "@shared/workstation-view-state";
 import { isTheoryCompoundRunV1, type TheoryCompoundRunV1 } from "@shared/contracts/theory-compound-run.v1";
 import { emitDocEquationContextArtifact } from "@/lib/docs/docEquationContextEvents";
-import { dispatchScientificCalculatorMathPicked } from "@/lib/scientific-calculator/events";
+import {
+  buildDocScalarCalculatorLaunch,
+  dispatchDocCalculatorLaunch,
+} from "@/lib/docs/docCalculatorLaunch";
 import { useTheoryBadgeGraphPanelStore } from "@/store/useTheoryBadgeGraphPanelStore";
 import { useTheoryCompoundRunStore } from "@/store/useTheoryCompoundRunStore";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
@@ -92,6 +95,10 @@ export function getDocEquationTheoryActions(entry: DocEquationActionEntryV1 | nu
   return entry?.actions.filter((action) => action.kind === "artifact_backed_theory_run") ?? [];
 }
 
+export function getDocEquationCalculatorActions(entry: DocEquationActionEntryV1 | null): DocEquationActionV1[] {
+  return entry?.actions.filter((action) => action.kind === "calculator_ingest") ?? [];
+}
+
 export async function executeDocEquationAction(args: ExecuteDocEquationActionArgs): Promise<void> {
   const entry = getDocEquationActionEntryForLatex(args.currentPath, args.latex);
   const action = entry?.actions.find((candidate) => candidate.actionId === args.actionId) ?? null;
@@ -99,11 +106,16 @@ export async function executeDocEquationAction(args: ExecuteDocEquationActionArg
 
   if (action.kind === "calculator_ingest") {
     const openedPanels = action.openPanels ?? ["scientific-calculator"];
-    dispatchScientificCalculatorMathPicked({
+    dispatchDocCalculatorLaunch(buildDocScalarCalculatorLaunch({
       latex: args.latex,
-      sourcePath: args.currentPath ?? null,
+      docPath: args.currentPath ?? null,
       anchor: args.anchor ?? entry.equationId,
-    });
+      label: entry.label,
+      claimBoundaryNotes: [
+        ...entry.claimBoundaryNotes,
+        ...(action.claimBoundaryNote ? [action.claimBoundaryNote] : []),
+      ],
+    }));
     openDocEquationPanels(openedPanels);
     emitActionContext({
       currentPath: args.currentPath,
@@ -117,11 +129,13 @@ export async function executeDocEquationAction(args: ExecuteDocEquationActionArg
   }
 
   if (action.alsoIngestLatex !== false) {
-    dispatchScientificCalculatorMathPicked({
+    dispatchDocCalculatorLaunch(buildDocScalarCalculatorLaunch({
       latex: args.latex,
-      sourcePath: args.currentPath ?? null,
+      docPath: args.currentPath ?? null,
       anchor: args.anchor ?? entry.equationId,
-    });
+      label: entry.label,
+      claimBoundaryNotes: entry.claimBoundaryNotes,
+    }));
   }
 
   const openedPanels = action.openPanels ?? ["theory-badge-graph", "scientific-calculator"];

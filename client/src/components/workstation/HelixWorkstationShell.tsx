@@ -238,6 +238,109 @@ export function HelixWorkstationShell({
     ],
   );
 
+  const sessionHeaderContent = (
+    <>
+      <div className="flex shrink-0 items-center">
+        <button
+          type="button"
+          onClick={() => setSessionListOpen((open) => !open)}
+          aria-label={sessionListOpen ? t("workstation.shell.returnCurrentChat") : t("workstation.shell.openChats")}
+          title={sessionListOpen ? t("workstation.shell.returnCurrentChat") : t("workstation.shell.openChats")}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/5 text-slate-100 hover:bg-white/10"
+        >
+          {sessionListOpen ? <ArrowRight className="h-4 w-4" /> : <ArrowLeft className="h-4 w-4" />}
+        </button>
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold text-white">{activeTitle}</p>
+        <p className="truncate text-[11px] uppercase tracking-[0.16em] text-slate-500">
+          {t("workstation.shell.sessionEyebrow")}
+        </p>
+      </div>
+    </>
+  );
+
+  const sessionSwitcher = sessionListOpen ? (
+    <div className="absolute inset-0 z-30 overflow-hidden bg-slate-950/82 backdrop-blur-md">
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold text-white">{t("workstation.shell.chatsTitle")}</p>
+            <p className="text-xs text-slate-400">{t("workstation.shell.chatsDescription")}</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleCreateSession}
+            className="inline-flex items-center gap-2 rounded border border-cyan-400/40 bg-cyan-500/10 px-3 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/20"
+          >
+            <MessageSquarePlus className="h-4 w-4" />
+            {newChatLabel}
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          <div className="space-y-2">
+            {helixSessions.map((session) => {
+              const selected = session.id === activeSession?.id;
+              const title = titleFromSession(session, newChatLabel);
+              const messageCount = session.messages.length;
+              return (
+                <div
+                  key={session.id}
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${
+                    selected
+                      ? "border-cyan-400/50 bg-cyan-500/15"
+                      : "border-white/10 bg-black/25"
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleSelectSession(session.id)}
+                    className="min-w-0 flex-1 text-left"
+                  >
+                    <p className="truncate text-sm font-medium text-slate-100">{title}</p>
+                    <p className="mt-1 truncate text-[11px] text-slate-500">
+                      {t(
+                        messageCount === 1
+                          ? "workstation.shell.messageCountSingular"
+                          : "workstation.shell.messageCountPlural",
+                        { count: messageCount },
+                      )} - {formatSessionDate(session.updatedAt)}
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectSession(session.id)}
+                    aria-label={t("workstation.shell.openChat", { title })}
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleDeleteSession(session.id);
+                    }}
+                    aria-label={t("workstation.shell.deleteChat", { title })}
+                    title={t("workstation.shell.deleteChatTitle")}
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-rose-300/20 bg-rose-500/10 text-rose-100 hover:border-rose-200/50 hover:bg-rose-500/20"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              );
+            })}
+            {helixSessions.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-white/15 bg-black/20 p-4 text-sm text-slate-400">
+                {t("workstation.shell.noChats")}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   const visibleWidth = chatDock.collapsed ? 56 : resizePreviewWidth ?? chatDock.widthPx;
 
   if (layoutVariant === "mobile") {
@@ -271,7 +374,19 @@ export function HelixWorkstationShell({
             showingWorkstation ? "translate-x-0" : "translate-x-full"
           }`}
         >
-          <WorkstationStage layoutVariant="mobile" />
+          <div
+            className="grid h-full min-h-0 w-full"
+            style={{ gridTemplateRows: "3.5rem minmax(0, 1fr)" }}
+            data-mobile-workstation-session-shell="true"
+          >
+            <div className="flex min-w-0 items-center gap-3 border-b border-white/10 bg-slate-950/72 px-3 backdrop-blur">
+              {sessionHeaderContent}
+            </div>
+            <div className="relative h-full min-h-0 min-w-0">
+              <WorkstationStage layoutVariant="mobile" />
+              {sessionSwitcher}
+            </div>
+          </div>
         </section>
 
         {!showingWorkstation ? (
@@ -308,108 +423,11 @@ export function HelixWorkstationShell({
       }}
     >
       <div className="col-start-1 col-end-3 row-start-1 flex min-w-0 items-center gap-3 border-b border-white/10 bg-slate-950/72 px-3 backdrop-blur">
-        <div className="flex shrink-0 items-center">
-          <button
-            type="button"
-            onClick={() => setSessionListOpen((open) => !open)}
-            aria-label={sessionListOpen ? t("workstation.shell.returnCurrentChat") : t("workstation.shell.openChats")}
-            title={sessionListOpen ? t("workstation.shell.returnCurrentChat") : t("workstation.shell.openChats")}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/5 text-slate-100 hover:bg-white/10"
-          >
-            {sessionListOpen ? <ArrowRight className="h-4 w-4" /> : <ArrowLeft className="h-4 w-4" />}
-          </button>
-        </div>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-white">{activeTitle}</p>
-          <p className="truncate text-[11px] uppercase tracking-[0.16em] text-slate-500">
-            {t("workstation.shell.sessionEyebrow")}
-          </p>
-        </div>
+        {sessionHeaderContent}
       </div>
       <div className="relative col-start-1 row-start-2 h-full min-h-0 min-w-0">
         <WorkstationStage />
-        {sessionListOpen ? (
-          <div className="absolute inset-0 z-30 overflow-hidden bg-slate-950/82 backdrop-blur-md">
-            <div className="flex h-full min-h-0 flex-col">
-              <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
-                <div>
-                  <p className="text-sm font-semibold text-white">{t("workstation.shell.chatsTitle")}</p>
-                  <p className="text-xs text-slate-400">{t("workstation.shell.chatsDescription")}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleCreateSession}
-                  className="inline-flex items-center gap-2 rounded border border-cyan-400/40 bg-cyan-500/10 px-3 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/20"
-                >
-                  <MessageSquarePlus className="h-4 w-4" />
-                  {newChatLabel}
-                </button>
-              </div>
-              <div className="min-h-0 flex-1 overflow-y-auto p-3">
-                <div className="space-y-2">
-                  {helixSessions.map((session) => {
-                    const selected = session.id === activeSession?.id;
-                    const title = titleFromSession(session, newChatLabel);
-                    const messageCount = session.messages.length;
-                    return (
-                      <div
-                        key={session.id}
-                        className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${
-                          selected
-                            ? "border-cyan-400/50 bg-cyan-500/15"
-                            : "border-white/10 bg-black/25"
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => handleSelectSession(session.id)}
-                          className="min-w-0 flex-1 text-left"
-                        >
-                          <p className="truncate text-sm font-medium text-slate-100">
-                            {title}
-                          </p>
-                          <p className="mt-1 truncate text-[11px] text-slate-500">
-                            {t(
-                              messageCount === 1
-                                ? "workstation.shell.messageCountSingular"
-                                : "workstation.shell.messageCountPlural",
-                              { count: messageCount },
-                            )} - {formatSessionDate(session.updatedAt)}
-                          </p>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleSelectSession(session.id)}
-                          aria-label={t("workstation.shell.openChat", { title })}
-                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleDeleteSession(session.id);
-                          }}
-                          aria-label={t("workstation.shell.deleteChat", { title })}
-                          title={t("workstation.shell.deleteChatTitle")}
-                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-rose-300/20 bg-rose-500/10 text-rose-100 hover:border-rose-200/50 hover:bg-rose-500/20"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                  {helixSessions.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-white/15 bg-black/20 p-4 text-sm text-slate-400">
-                      {t("workstation.shell.noChats")}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
+        {sessionSwitcher}
       </div>
       <div className="col-start-2 row-start-2 h-full min-h-0">
         <WorkstationResizeRail

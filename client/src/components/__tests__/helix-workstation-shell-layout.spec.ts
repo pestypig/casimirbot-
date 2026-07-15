@@ -32,4 +32,18 @@ describe("HelixWorkstationShell layout contract", () => {
     expect(resolveMobileSurfaceSwipe({ surface: "ask", deltaX: 40, deltaY: 5 })).toBeNull();
     expect(resolveMobileSurfaceSwipe({ surface: "ask", deltaX: 80, deltaY: 70 })).toBeNull();
   });
+
+  it("renders the shared session header and chat switcher inside the mobile workstation", () => {
+    const source = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/workstation/HelixWorkstationShell.tsx"),
+      "utf8",
+    );
+
+    expect(source).toContain("const sessionHeaderContent = (");
+    expect(source).toContain("const sessionSwitcher = sessionListOpen ? (");
+    expect(source).toContain('data-mobile-workstation-session-shell="true"');
+    expect(source).toContain('<WorkstationStage layoutVariant="mobile" />');
+    expect(source.match(/\{sessionHeaderContent\}/g)).toHaveLength(2);
+    expect(source.match(/\{sessionSwitcher\}/g)).toHaveLength(2);
+  });
 });

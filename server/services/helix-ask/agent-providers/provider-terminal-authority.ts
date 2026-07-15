@@ -137,6 +137,26 @@ const isGatewayObservationReenteredForProviderReasoning = (
       isCalculatorBlockedExpressionObservation(result) ||
       isGatewayRecoveryAffordanceObservation(result);
 
+const scholarlyGatewayAttemptWasSupersededByUsableEvidence = (
+  result: HelixWorkstationGatewayCallResult,
+  gatewayCallResults: HelixWorkstationGatewayCallResult[],
+): boolean => {
+  if (!isScholarlyGatewayCapability(result)) return false;
+  const capability = gatewayCapability(result);
+  return gatewayCallResults.some((candidate) =>
+    gatewayCapability(candidate) === capability &&
+    candidate.ok === true &&
+    isScholarlyEvidenceSelectedForAnswer(candidate)
+  );
+};
+
+const isGatewayObservationCompatibleWithProviderReasoning = (
+  result: HelixWorkstationGatewayCallResult,
+  gatewayCallResults: HelixWorkstationGatewayCallResult[],
+): boolean =>
+  isGatewayObservationReenteredForProviderReasoning(result) ||
+  scholarlyGatewayAttemptWasSupersededByUsableEvidence(result, gatewayCallResults);
+
 const isTextToSpeechReceiptObservation = (packet: HelixAgentStepObservationPacket): boolean => {
   if (packet.capability_key !== "text_to_speech.speak_text") return false;
   const stateDelta = readRecord(packet.state_delta);
@@ -217,7 +237,9 @@ export const buildHelixProviderReasoningReentry = (input: {
   );
   const allGatewayCallsSucceeded =
     input.gatewayCallResults.length === 0 ||
-    input.gatewayCallResults.every(isGatewayObservationReenteredForProviderReasoning);
+    input.gatewayCallResults.every((result) =>
+      isGatewayObservationCompatibleWithProviderReasoning(result, input.gatewayCallResults)
+    );
   const allCapabilityLaneObservationsSucceeded =
     capabilityLaneObservationPackets.length === 0 ||
     successfulCapabilityLaneObservationPackets.length === capabilityLaneObservationPackets.length;

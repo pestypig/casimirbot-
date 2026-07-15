@@ -15,6 +15,13 @@ describe("civilization_scenario_frame/v1", () => {
       substrateKind: "planetary_infrastructure",
       agencyModel: "market_network",
       coordinationMode: "treaty",
+      coordinationProfile: {
+        declaredLabels: ["mixed civic order"],
+        declaredLabelsAreNonAuthoritative: true,
+        allocationChannels: ["market_price", "public_provision"],
+        authorityChannels: ["electoral_authority", "administrative_authority"],
+        accountabilityChannels: ["election", "court_or_appeal", "public_transparency"],
+      },
       constraintProfiles: ["material_limited", "transport_limited", "governance_limited"],
       evidenceMode: "user_hypothesis",
       promptSummary: "Test prompt",
@@ -49,6 +56,10 @@ describe("civilization_scenario_frame/v1", () => {
       boundaryKind: "planetary_civilization",
       developmentalStage: "planetary_coordination",
       evidenceMode: "user_hypothesis",
+      coordinationProfile: {
+        declaredLabelsAreNonAuthoritative: true,
+        allocationChannels: ["market_price", "public_provision"],
+      },
     });
     expect(frame.authority).toMatchObject({
       assistant_answer: false,

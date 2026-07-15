@@ -1150,6 +1150,47 @@ describe("provider-neutral capability lane one-shot runner", () => {
     });
   });
 
+  it("mounts a rendered PDF page source without running OCR or creating a scientific sidecar", async () => {
+    const sourceImageRef = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+    const result = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-render-only-page-mount",
+        capability_lane_call: {
+          capability: "visual_analysis.inspect_image_region",
+          source_id: "pdf-page-render:page-8",
+          source_kind: "pdf_page_render",
+          source_image_ref: sourceImageRef,
+          page_image_ref: sourceImageRef,
+          page_number: 8,
+          page_count: 17,
+          source_dimensions_px: { width: 1224, height: 1584 },
+          source_mount_only: true,
+          bbox_px: { x: 0, y: 0, width: 1224, height: 1584 },
+          question: "Mount page 8 as the active Image Lens source without OCR or crop analysis.",
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+      },
+      env: { OPENAI_API_KEY: "test-openai" } as NodeJS.ProcessEnv,
+    });
+
+    expect(result.call_results[0]).toMatchObject({
+      ok: true,
+      receipt: {
+        source_mount_only: true,
+        source_kind: "pdf_page_render",
+        page_number: 8,
+        source_dimensions_px: { width: 1224, height: 1584 },
+        extraction_status: "not_run",
+        summary: "Rendered scholarly PDF page 8 mounted in Image Lens without OCR or visual analysis.",
+      },
+    });
+    const receipt = (result.call_results[0] as any).receipt;
+    expect(receipt).not.toHaveProperty("scientific_evidence_packet");
+    expect(receipt).not.toHaveProperty("scientific_evidence_sidecar");
+  });
+
   it("propagates exact equation block promotion through the Image Lens receipt and observation", async () => {
     const result = await runHelixCapabilityLaneOneShotRequests({
       provider: buildProvider("codex"),

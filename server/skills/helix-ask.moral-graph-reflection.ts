@@ -9,7 +9,11 @@ import type {
 } from "@shared/ideology-context-reflection";
 import type { MoralBadgeLocatorV1 } from "@shared/moral-badge-locator";
 import type { CivicTrustTraversabilityV1 } from "@shared/civic-trust-traversability";
+import type { CivicOrderParticipationV1 } from "@shared/civic-order-participation";
+import type { CivilizationProvisioningNetworkV1 } from "@shared/civilization-provisioning-network";
 import { buildCivicTrustTraversabilityV1 } from "@shared/moral-graph/build-civic-trust-traversability";
+import { buildCivicOrderParticipationV1 } from "@shared/civic-order/build-civic-order-participation";
+import { buildCivilizationProvisioningNetworkV1 } from "@shared/civilization/build-civilization-provisioning-network";
 import { loadIdeologyGraphFromFile } from "@shared/moral-graph/load-ideology-graph";
 import { reflectIdeologyContext } from "@shared/moral-graph/reflect-ideology-context";
 import { mapIdeologyReflectionToRecommendedActionAdmission } from "@shared/moral-graph/map-ideology-recommendations-to-admission";
@@ -44,6 +48,8 @@ const MoralGraphToolInputSchema = z.object({
       includeFruition: z.boolean().optional(),
       includeProceduralClassification: z.boolean().optional(),
       includeCivicTrustTraversability: z.boolean().optional(),
+      includeCivicOrderParticipation: z.boolean().optional(),
+      includeCivilizationProvisioning: z.boolean().optional(),
     })
     .optional(),
 });
@@ -60,6 +66,8 @@ export type HelixAskMoralGraphReflectionToolInput = {
     includeFruition?: boolean;
     includeProceduralClassification?: boolean;
     includeCivicTrustTraversability?: boolean;
+    includeCivicOrderParticipation?: boolean;
+    includeCivilizationProvisioning?: boolean;
   };
 };
 
@@ -69,6 +77,8 @@ export type HelixAskMoralGraphReflectionToolOutput = {
   locator?: MoralBadgeLocatorV1;
   fruition?: FruitionProcedureExpressionV1;
   civicTrustTraversability?: CivicTrustTraversabilityV1;
+  civicOrderParticipation?: CivicOrderParticipationV1;
+  civilizationProvisioningNetwork?: CivilizationProvisioningNetworkV1;
   admissions: HelixRecommendedActionAdmissionV1[];
 };
 
@@ -140,6 +150,20 @@ export async function runHelixAskMoralGraphReflectionTool(
         refs: input.refs,
         activatedBadgeIds: locatedBadgeIds,
       });
+  const civicOrderParticipation = input.options?.includeCivicOrderParticipation === false
+    ? null
+    : buildCivicOrderParticipationV1({
+        text: input.text,
+        refs: input.refs,
+        activatedBadgeIds: locatedBadgeIds,
+      });
+  const civilizationProvisioningNetwork = input.options?.includeCivilizationProvisioning === false
+    ? null
+    : buildCivilizationProvisioningNetworkV1({
+        text: input.text,
+        refs: input.refs,
+        moralNodeIds: locatedBadgeIds,
+      });
 
   return {
     reflection,
@@ -147,6 +171,8 @@ export async function runHelixAskMoralGraphReflectionTool(
     ...(locator ? { locator } : {}),
     ...(fruition ? { fruition } : {}),
     ...(civicTrustTraversability ? { civicTrustTraversability } : {}),
+    ...(civicOrderParticipation ? { civicOrderParticipation } : {}),
+    ...(civilizationProvisioningNetwork ? { civilizationProvisioningNetwork } : {}),
     admissions,
   };
 }
@@ -170,6 +196,8 @@ export const moralGraphReflectionSpec: ToolSpecShape = {
           includeFruition: { type: "boolean" },
           includeProceduralClassification: { type: "boolean" },
           includeCivicTrustTraversability: { type: "boolean" },
+          includeCivicOrderParticipation: { type: "boolean" },
+          includeCivilizationProvisioning: { type: "boolean" },
         },
       },
     },
@@ -183,6 +211,8 @@ export const moralGraphReflectionSpec: ToolSpecShape = {
       locator: { type: "object" },
       fruition: { type: "object" },
       civicTrustTraversability: { type: "object" },
+      civicOrderParticipation: { type: "object" },
+      civilizationProvisioningNetwork: { type: "object" },
       admissions: { type: "array", items: { type: "object" } },
     },
     required: ["reflection", "admissions"],

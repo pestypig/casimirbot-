@@ -161,6 +161,14 @@ export type CivilizationBoundedActorGrammarV1 = {
   evidenceRefs: string[];
 };
 
+export type CivilizationCoordinationProfileV1 = {
+  declaredLabels: string[];
+  declaredLabelsAreNonAuthoritative: true;
+  allocationChannels: CivicAllocationChannelV1[];
+  authorityChannels: CivicAuthorityChannelV1[];
+  accountabilityChannels: CivicAccountabilityChannelV1[];
+};
+
 export type CivilizationScenarioFrameAuthorityV1 = {
   assistant_answer: false;
   raw_content_included: false;
@@ -187,6 +195,7 @@ export type CivilizationScenarioFrameV1 = {
   substrateKind: CivilizationSubstrateKindV1;
   agencyModel: CivilizationAgencyModelV1;
   coordinationMode: CivilizationCoordinationModeV1;
+  coordinationProfile?: CivilizationCoordinationProfileV1;
   constraintProfiles: CivilizationConstraintProfileV1[];
   evidenceMode: CivilizationScenarioEvidenceModeV1;
   promptSummary: string;
@@ -210,6 +219,7 @@ export type CivilizationScenarioFrameV1 = {
     substrateKind: CivilizationSubstrateKindV1;
     agencyModel: CivilizationAgencyModelV1;
     coordinationMode: CivilizationCoordinationModeV1;
+    coordinationProfile?: CivilizationCoordinationProfileV1;
     constraintProfiles: CivilizationConstraintProfileV1[];
     evidenceMode: CivilizationScenarioEvidenceModeV1;
   };
@@ -274,6 +284,7 @@ export function buildCivilizationScenarioFrameV1(
     substrateKind: input.substrateKind,
     agencyModel: input.agencyModel,
     coordinationMode: input.coordinationMode,
+    ...(input.coordinationProfile ? { coordinationProfile: input.coordinationProfile } : {}),
     constraintProfiles: input.constraintProfiles,
     evidenceMode: input.evidenceMode,
     promptSummary: input.promptSummary,
@@ -289,6 +300,7 @@ export function buildCivilizationScenarioFrameV1(
       substrateKind: input.substrateKind,
       agencyModel: input.agencyModel,
       coordinationMode: input.coordinationMode,
+      ...(input.coordinationProfile ? { coordinationProfile: input.coordinationProfile } : {}),
       constraintProfiles: input.constraintProfiles,
       evidenceMode: input.evidenceMode,
     },
@@ -337,6 +349,19 @@ export function validateCivilizationScenarioFrameV1(value: unknown): string[] {
   if (!includes(CIVILIZATION_SUBSTRATE_KINDS, value.substrateKind)) issues.push("substrateKind is invalid");
   if (!includes(CIVILIZATION_AGENCY_MODELS, value.agencyModel)) issues.push("agencyModel is invalid");
   if (!includes(CIVILIZATION_COORDINATION_MODES, value.coordinationMode)) issues.push("coordinationMode is invalid");
+  if (value.coordinationProfile !== undefined) {
+    if (!isRecord(value.coordinationProfile)) {
+      issues.push("coordinationProfile must be an object when present");
+    } else {
+      validateStringArray("coordinationProfile.declaredLabels", value.coordinationProfile.declaredLabels, issues);
+      if (value.coordinationProfile.declaredLabelsAreNonAuthoritative !== true) {
+        issues.push("coordinationProfile.declaredLabelsAreNonAuthoritative must be true");
+      }
+      validateEnumArray("coordinationProfile.allocationChannels", value.coordinationProfile.allocationChannels, CIVIC_ALLOCATION_CHANNELS, issues);
+      validateEnumArray("coordinationProfile.authorityChannels", value.coordinationProfile.authorityChannels, CIVIC_AUTHORITY_CHANNELS, issues);
+      validateEnumArray("coordinationProfile.accountabilityChannels", value.coordinationProfile.accountabilityChannels, CIVIC_ACCOUNTABILITY_CHANNELS, issues);
+    }
+  }
   validateEnumArray("constraintProfiles", value.constraintProfiles, CIVILIZATION_CONSTRAINT_PROFILES, issues);
   if (!includes(CIVILIZATION_SCENARIO_EVIDENCE_MODES, value.evidenceMode)) issues.push("evidenceMode is invalid");
   validateEnumArray("suggestedEditors", value.suggestedEditors, CIVILIZATION_SCENARIO_EDITOR_KINDS, issues);
@@ -394,6 +419,11 @@ export function validateCivilizationScenarioFrameV1(value: unknown): string[] {
     if (suggestedRoadmapInputs.coordinationMode !== value.coordinationMode) {
       issues.push("suggestedRoadmapInputs.coordinationMode must match frame");
     }
+    if (value.coordinationProfile !== undefined) {
+      if (JSON.stringify(suggestedRoadmapInputs.coordinationProfile) !== JSON.stringify(value.coordinationProfile)) {
+        issues.push("suggestedRoadmapInputs.coordinationProfile must match frame");
+      }
+    }
     if (suggestedRoadmapInputs.evidenceMode !== value.evidenceMode) issues.push("suggestedRoadmapInputs.evidenceMode must match frame");
     validateEnumArray(
       "suggestedRoadmapInputs.constraintProfiles",
@@ -432,3 +462,11 @@ export function isCivilizationScenarioFrameV1(
 ): value is CivilizationScenarioFrameV1 {
   return validateCivilizationScenarioFrameV1(value).length === 0;
 }
+import {
+  CIVIC_ACCOUNTABILITY_CHANNELS,
+  CIVIC_ALLOCATION_CHANNELS,
+  CIVIC_AUTHORITY_CHANNELS,
+  type CivicAccountabilityChannelV1,
+  type CivicAllocationChannelV1,
+  type CivicAuthorityChannelV1,
+} from "./civic-order-participation.v1";

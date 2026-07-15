@@ -196,6 +196,12 @@
     transform: translateY(-0.08rem);
   }
 
+  .doc-runtime-command-inline {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+  }
+
   .doc-equation-action-chip:hover {
     border-color: rgba(125, 211, 252, 0.9);
     background: rgba(14, 116, 144, 0.95);

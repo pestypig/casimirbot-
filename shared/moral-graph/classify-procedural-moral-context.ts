@@ -2,23 +2,12 @@ import {
   buildProceduralMoralClassificationV1,
   type ProceduralMoralClassificationEntryV1,
   type ProceduralMoralClassificationV1,
-  type ProceduralMoralMoveV1,
-  type ProceduralMoralObservedPatternV1,
 } from "../procedural-moral-classification";
 import type { IdeologyContextReflectionV1 } from "../ideology-context-reflection";
 import type { IdeologyGraph } from "./ideology-graph-types";
-
-type ProceduralMoralPatternRule = {
-  id: string;
-  cues: RegExp[];
-  observedPattern: ProceduralMoralObservedPatternV1;
-  moralRootId: string;
-  proceduralMove: ProceduralMoralMoveV1;
-  explanation: string;
-  missingEvidence: string[];
-  warnings?: string[];
-  reasonCodes: string[];
-};
+import { CIVIC_ORDER_PROCEDURAL_RULES } from "./procedural-rules/civic-order-rules";
+import { PROVISIONING_PROCEDURAL_RULES } from "./procedural-rules/provisioning-rules";
+import type { ProceduralMoralPatternRule } from "./procedural-rules/procedural-rule-types";
 
 export type ClassifyProceduralMoralContextInput = {
   graph: IdeologyGraph;
@@ -401,6 +390,8 @@ const PROCEDURAL_MORAL_PATTERN_RULES: readonly ProceduralMoralPatternRule[] = [
     warnings: ["avoid_closing_loop_on_stale_signal"],
     reasonCodes: ["feedback_loop_hygiene", "liveness"],
   },
+  ...CIVIC_ORDER_PROCEDURAL_RULES,
+  ...PROVISIONING_PROCEDURAL_RULES,
 ] as const;
 
 function compactSummary(input: IdeologyContextReflectionV1): string {

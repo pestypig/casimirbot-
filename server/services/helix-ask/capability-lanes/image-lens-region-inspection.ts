@@ -691,7 +691,9 @@ const buildReceipt = (input: {
 }): ImageLensRegionInspectionReceiptV1 => {
   const summary =
     input.request.summary?.trim() ||
-    `Image Lens region inspection crop prepared at ${input.bbox.x},${input.bbox.y},${input.bbox.width},${input.bbox.height}.`;
+    (input.request.source_mount_only
+      ? `Rendered scholarly PDF page ${input.request.page_number ?? "unknown"} mounted in Image Lens without OCR or visual analysis.`
+      : `Image Lens region inspection crop prepared at ${input.bbox.x},${input.bbox.y},${input.bbox.width},${input.bbox.height}.`);
   const sourceKind = sourceKindFor(input.request);
   const sourceImageRef = nonEmpty(input.request.source_image_ref);
   const pageImageRef = nonEmpty(input.request.page_image_ref);
@@ -716,7 +718,7 @@ const buildReceipt = (input: {
     input.request.parent_region_id,
     documentRegionReceipt.visualSource.frameId,
   ]);
-  const scientificEvidencePacket = buildScientificEvidencePacket({
+  const scientificEvidencePacket = input.request.source_mount_only ? null : buildScientificEvidencePacket({
     cropRegionId: input.regionId,
     sourceRefHash: imageHash({ cropImageRef: input.cropImageRef, bbox: input.bbox }),
     sourceImageRefHash,
@@ -734,11 +736,11 @@ const buildReceipt = (input: {
     equationCaptureMode: input.request.equation_capture_mode ?? null,
     visualLayoutCandidate: input.extraction.visual_layout_candidate ?? null,
   });
-  const scientificEvidenceSidecar = buildScientificImageEvidenceSidecar({
+  const scientificEvidenceSidecar = scientificEvidencePacket ? buildScientificImageEvidenceSidecar({
     sidecarId: `${input.evidenceId}:scientific_image_sidecar`,
     sourceRefHash: sourceImageRefHash,
     packets: [scientificEvidencePacket],
-  });
+  }) : null;
   return {
     schema: IMAGE_LENS_REGION_INSPECTION_RECEIPT_SCHEMA,
     capability: IMAGE_LENS_REGION_INSPECTION_CAPABILITY,
@@ -751,6 +753,8 @@ const buildReceipt = (input: {
     page_image_ref: pageImageRef,
     scholarly_source_pdf_ref: input.request.scholarly_source_pdf_ref ?? null,
     scholarly_pdf_cache_path: input.request.scholarly_pdf_cache_path ?? null,
+    source_dimensions_px: input.request.source_dimensions_px ?? null,
+    source_mount_only: input.request.source_mount_only === true,
     bbox_px: input.bbox,
     ...(requestCropRef ? { crop_ref: requestCropRef } : {}),
     source_refs: sourceRefs,
@@ -760,28 +764,30 @@ const buildReceipt = (input: {
     ...(input.extraction.visual_layout_candidate ? { visual_layout_candidate: input.extraction.visual_layout_candidate } : {}),
     extraction_status: input.extraction.extraction_status,
     ...(input.extraction.table_candidate_ref ? { table_candidate_ref: input.extraction.table_candidate_ref } : {}),
-    uncertainty: scientificEvidencePacket.uncertainty,
+    uncertainty: scientificEvidencePacket?.uncertainty ?? input.extraction.uncertainty,
     evidence_id: input.evidenceId,
     requested_question: input.request.question ?? null,
     reason_for_crop: input.request.reason_for_crop ?? null,
     ...(input.request.region_label ? { region_label: input.request.region_label } : {}),
     ...(input.request.requested_equation_label ? { requested_equation_label: input.request.requested_equation_label } : {}),
-    equation_capture_mode: scientificEvidencePacket.equation_capture_mode,
-    observed_equation_labels: scientificEvidencePacket.observed_equation_labels,
-    label_match_status: scientificEvidencePacket.label_match_status,
-    exact_equation_admissibility: scientificEvidencePacket.exact_equation_admissibility,
-    row_quality_diagnostics: scientificEvidencePacket.row_quality_diagnostics,
-    exact_row_promotion: scientificEvidencePacket.exact_row_promotion,
-    exact_block_promotion: scientificEvidencePacket.exact_block_promotion,
-    evidence_role: scientificEvidencePacket.evidence_role,
-    quality_flags: scientificEvidencePacket.quality_flags,
-    quality_rejection_reasons: scientificEvidencePacket.quality_rejection_reasons,
-    retry_debug: scientificEvidencePacket.retry_debug,
+    ...(scientificEvidencePacket ? {
+      equation_capture_mode: scientificEvidencePacket.equation_capture_mode,
+      observed_equation_labels: scientificEvidencePacket.observed_equation_labels,
+      label_match_status: scientificEvidencePacket.label_match_status,
+      exact_equation_admissibility: scientificEvidencePacket.exact_equation_admissibility,
+      row_quality_diagnostics: scientificEvidencePacket.row_quality_diagnostics,
+      exact_row_promotion: scientificEvidencePacket.exact_row_promotion,
+      exact_block_promotion: scientificEvidencePacket.exact_block_promotion,
+      evidence_role: scientificEvidencePacket.evidence_role,
+      quality_flags: scientificEvidencePacket.quality_flags,
+      quality_rejection_reasons: scientificEvidencePacket.quality_rejection_reasons,
+      retry_debug: scientificEvidencePacket.retry_debug,
+    } : {}),
     parent_region_id: input.request.parent_region_id ?? null,
     detail: input.request.detail ?? "auto",
     document_region_receipt: documentRegionReceipt,
-    scientific_evidence_packet: scientificEvidencePacket,
-    scientific_evidence_sidecar: scientificEvidenceSidecar,
+    ...(scientificEvidencePacket ? { scientific_evidence_packet: scientificEvidencePacket } : {}),
+    ...(scientificEvidenceSidecar ? { scientific_evidence_sidecar: scientificEvidenceSidecar } : {}),
     claim_boundary: {
       cropObservationOnly: true,
       ocrCandidateOnly: true,
@@ -1072,12 +1078,18 @@ export const runImageLensRegionInspection = async (input: {
   const evidenceId = `${turnId}:image_lens_region_inspection:${hashShort({ regionId, cropImageRef })}`;
   const generatedAt = new Date().toISOString();
   const normalizedRequest = { ...input.request, source_id: normalizedSourceId };
-  const rawExtraction = await resolveImageLensRegionExtraction({
-    request: normalizedRequest,
-    bbox,
-    cropImageRef,
-    env: input.env,
-  });
+  const rawExtraction: ImageLensRegionExtractionResult = normalizedRequest.source_mount_only
+    ? {
+        extraction_status: "not_run",
+        uncertainty: [],
+        backend_ref: null,
+      }
+    : await resolveImageLensRegionExtraction({
+        request: normalizedRequest,
+        bbox,
+        cropImageRef,
+        env: input.env,
+      });
   const extraction = recoverDisplayedLinesFromBoundedCandidates({
     request: normalizedRequest,
     extraction: rawExtraction,

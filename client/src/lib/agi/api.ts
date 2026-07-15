@@ -62,6 +62,7 @@ import {
 import { ingestPostulateReviewReceiptsFromAskPayload } from "@/lib/agi/proposals";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 import { ingestScientificEvidenceWorkflowStatusFromAskPayload } from "@/store/useScientificEvidenceWorkflowStore";
+import { asksForScientificImageTextEvidenceComparison } from "@shared/helix-scientific-image-intent";
 
 const HELIX_CONTEXT_CAPSULE_MAX_IDS = 12;
 
@@ -2943,6 +2944,18 @@ const isHelixE814LaneParityEnabled = (): boolean =>
     true,
   );
 
+const bodyRequiresAskTurnEntrypoint = (body: Record<string, unknown>): boolean => {
+  const routeMetadata = readAgiRecord(body.route_metadata ?? body.routeMetadata);
+  const sourceTargetIntent =
+    readAgiRecord(body.source_target_intent ?? body.sourceTargetIntent) ??
+    readAgiRecord(routeMetadata?.source_target_intent ?? routeMetadata?.sourceTargetIntent);
+  const question = readAgiString(body.question ?? body.prompt ?? body.transcript);
+  return (
+    sourceTargetIntent?.must_enter_backend_ask === true ||
+    asksForScientificImageTextEvidenceComparison(question)
+  );
+};
+
 const isHelixAskJobUnsupported = (error: unknown): boolean =>
   Boolean(
     error &&
@@ -3114,7 +3127,10 @@ const askLocalDirect = async (
   signal?: AbortSignal,
 ): Promise<LocalAskResponse> => {
   const hasTurnInputItems = Array.isArray(body.turn_input_items) && body.turn_input_items.length > 0;
-  const endpoint = isHelixE814LaneParityEnabled() || hasTurnInputItems ? "/api/agi/ask/turn" : "/api/agi/ask";
+  const endpoint =
+    isHelixE814LaneParityEnabled() || hasTurnInputItems || bodyRequiresAskTurnEntrypoint(body)
+      ? "/api/agi/ask/turn"
+      : "/api/agi/ask";
   const payload = await asJson<unknown>(
     await fetch(endpoint, {
       method: "POST",
@@ -3459,7 +3475,7 @@ export async function askLocal(
   }
   const signal = options?.signal;
   const hasTurnInputItems = Array.isArray(body.turn_input_items) && body.turn_input_items.length > 0;
-  if (hasTurnInputItems) {
+  if (hasTurnInputItems || bodyRequiresAskTurnEntrypoint(body)) {
     if (isNavigatorOffline()) {
       await waitForOnline(signal);
     }

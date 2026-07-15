@@ -6,6 +6,7 @@ import {
   type TheoryRuntimeReceiptV1,
 } from "../../../shared/contracts/theory-runtime-receipt.v1";
 import { getTheoryRuntimeEntrypoint } from "../../../shared/theory/runtime-entrypoints";
+import { THEORY_RUNTIME_LONG_EXECUTION_IDS } from "../../../shared/theory/runtime-execution-policy";
 import {
   readTheoryRuntimeRunRequestStatus,
   updateTheoryRuntimeRunRequestStatus,
@@ -16,8 +17,9 @@ import type {
   TheoryRuntimeExecutionResult,
   TheoryRuntimeSpawnExecutor,
 } from "./runtime-adapters";
+import { appendBoundedTheoryRuntimeOutput } from "./runtime-output-buffer";
 
-export const LONG_RUNTIME_EXECUTION_ALLOWLIST = ["nhm2.shift_lapse.alpha_sweep"] as const;
+export const LONG_RUNTIME_EXECUTION_ALLOWLIST = THEORY_RUNTIME_LONG_EXECUTION_IDS;
 
 export type LongTheoryRuntimeId = (typeof LONG_RUNTIME_EXECUTION_ALLOWLIST)[number];
 
@@ -105,10 +107,10 @@ async function defaultSpawnExecutor(command: TheoryRuntimeCommandV1): Promise<Th
       });
     }, command.timeoutMs);
     child.stdout?.on("data", (chunk) => {
-      stdout += String(chunk);
+      stdout = appendBoundedTheoryRuntimeOutput(stdout, chunk);
     });
     child.stderr?.on("data", (chunk) => {
-      stderr += String(chunk);
+      stderr = appendBoundedTheoryRuntimeOutput(stderr, chunk);
     });
     child.on("error", (error) => {
       if (settled) return;
@@ -201,6 +203,7 @@ export async function executeLongTheoryRuntimeRequest(
   input: ExecuteLongTheoryRuntimeRequestInput,
   options: {
     spawnExecutor?: TheoryRuntimeSpawnExecutor;
+    manageTerminalStatus?: boolean;
   } = {},
 ): Promise<ExecuteLongTheoryRuntimeRequestResult> {
   if (input.execute !== true) throw new Error("Long runtime execution requires explicit execute: true.");
@@ -231,24 +234,26 @@ export async function executeLongTheoryRuntimeRequest(
     heartbeat: {
       stage: "running",
       message: `Running fixed runtime command: npm run ${command.npmScript}`,
-      progress: 0.25,
+      progress: null,
     },
   });
 
   const execution = await (options.spawnExecutor ?? defaultSpawnExecutor)(command);
   if (execution.timedOut || execution.exitCode !== 0) {
     const status = execution.timedOut ? "timeout" : "failed";
-    await updateTheoryRuntimeRunRequestStatus({
-      requestId: input.requestId,
-      projectRoot,
-      status,
-      updatedAt: execution.completedAt ?? input.generatedAt,
-      heartbeat: {
-        stage: status,
-        message: execution.error ?? `Runtime ${status}.`,
-        progress: 1,
-      },
-    });
+    if (options.manageTerminalStatus !== false) {
+      await updateTheoryRuntimeRunRequestStatus({
+        requestId: input.requestId,
+        projectRoot,
+        status,
+        updatedAt: execution.completedAt ?? input.generatedAt,
+        heartbeat: {
+          stage: status,
+          message: execution.error ?? `Runtime ${status}.`,
+          progress: 1,
+        },
+      });
+    }
     return {
       requestId: input.requestId,
       runtimeId: request.runtimeId,
@@ -266,17 +271,19 @@ export async function executeLongTheoryRuntimeRequest(
     };
   }
 
-  await updateTheoryRuntimeRunRequestStatus({
-    requestId: input.requestId,
-    projectRoot,
-    status: "completed",
-    updatedAt: execution.completedAt ?? input.generatedAt,
-    heartbeat: {
-      stage: "completed",
-      message: "Long runtime process completed; reading artifacts with fail-closed adapter.",
-      progress: 1,
-    },
-  });
+  if (options.manageTerminalStatus !== false) {
+    await updateTheoryRuntimeRunRequestStatus({
+      requestId: input.requestId,
+      projectRoot,
+      status: "completed",
+      updatedAt: execution.completedAt ?? input.generatedAt,
+      heartbeat: {
+        stage: "completed",
+        message: "Long runtime process completed; reading artifacts with fail-closed adapter.",
+        progress: 1,
+      },
+    });
+  }
   const receiptV1 = await readWarpNhm2RuntimeArtifacts({
     runtimeId: request.runtimeId,
     graphId: request.graphId,

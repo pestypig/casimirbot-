@@ -51,6 +51,8 @@ import {
 } from "../docs-viewer-intent";
 
 const HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY = "helix_ask.inspect_capability_catalog" as const;
+const SCIENTIFIC_CALCULATOR_THEORY_RUN_CONTEXT_CAPABILITY =
+  "scientific-calculator.read_visible_theory_run_result" as const;
 
 const isCapabilityCatalogSelection = (selectedCapability: string): boolean =>
   /^(?:helix_ask\.inspect_capability_catalog|helix\.ask\.inspect_capability_catalog|inspect_capability_catalog|capability_catalog|runtime_capability_catalog|capability_catalog_runtime)$/i.test(
@@ -412,6 +414,52 @@ export const buildActiveCalculatorContextWorkstationGatewayCallRequests = (
         target_kind: "active_calculator",
         active_panel: activePanel,
         deictic_prompt: true,
+      },
+    },
+  }];
+};
+
+export const buildActiveTheoryRuntimeContextWorkstationGatewayCallRequests = (
+  body: Record<string, unknown>,
+): Record<string, unknown>[] => {
+  const prompt = readPrompt(body);
+  if (!prompt) return [];
+  const unquoted = unquotePrompt(prompt);
+  if (
+    /\b(?:do\s+not|don'?t|without|not\s+asking\s+to)\b[\s\S]{0,100}\b(?:explain|interpret|use|read)\b[\s\S]{0,80}\b(?:runtime|result|receipt)\b/i.test(unquoted) ||
+    /\b(?:future|later|eventually|hypothetically|before|after|if|when)\b[\s\S]{0,140}\b(?:explain|interpret|use|read)\b[\s\S]{0,80}\b(?:runtime|result|receipt)\b/i.test(unquoted) ||
+    /\b(?:previously|earlier|historically|last\s+time)\b[\s\S]{0,120}\b(?:runtime|result|receipt)\b/i.test(unquoted) ||
+    /\b(?:screen|button|label|text|phrase)\b[\s\S]{0,100}\b(?:says|shows|reads|mentions)\b[\s\S]{0,100}\b(?:runtime|result|receipt)\b/i.test(unquoted)
+  ) return [];
+  if (!/\b(?:explain|interpret|summari[sz]e|what\s+does|what\s+is)\b[\s\S]{0,180}\b(?:selected|current|visible|this)\b[\s\S]{0,100}\b(?:runtime\s+)?(?:result|receipt|report)\b/i.test(unquoted)) {
+    return [];
+  }
+  const workspaceSnapshot = readWorkspaceSnapshot(body);
+  const context = readRecord(
+    workspaceSnapshot?.activeTheoryRuntimeContext ?? workspaceSnapshot?.active_theory_runtime_context,
+  );
+  const requestId = readString(context?.requestId ?? context?.request_id);
+  const receiptId = readString(context?.receiptId ?? context?.receipt_id);
+  if (!context || !requestId || !receiptId) return [];
+  return [{
+    schema: "helix.workstation_gateway.active_theory_runtime_context_call_request.v1",
+    derivation_source: "helix_explicit_theory_runtime_result_context",
+    capability_id: SCIENTIFIC_CALCULATOR_THEORY_RUN_CONTEXT_CAPABILITY,
+    mode: "read",
+    arguments: {
+      request_id: requestId,
+      receipt_id: receiptId,
+      theory_runtime_context: context,
+      source_target_intent: {
+        source: "helix_explicit_theory_runtime_result_context",
+        target_source: "scientific_calculator_theory_runtime_result",
+        target_kind: "theory_runtime_receipt",
+        request_id: requestId,
+        receipt_id: receiptId,
+        output_role: "evidence_for_synthesis",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
       },
     },
   }];

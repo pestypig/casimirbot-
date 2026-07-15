@@ -13,10 +13,11 @@ import type { DocumentLiveTranslationProjectionSnapshotSummary } from "@/lib/doc
 let handleDocMathPick: typeof import("@/components/DocViewerPanel").handleDocMathPick;
 let applyDocNarratorSourceIds: typeof import("@/components/DocViewerPanel").applyDocNarratorSourceIds;
 let getDocumentTranslationStatusLabel: typeof import("@/components/DocViewerPanel").getDocumentTranslationStatusLabel;
+let renderDocumentMarkdownToHtml: typeof import("@/components/DocViewerPanel").renderDocumentMarkdownToHtml;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
-  ({ applyDocNarratorSourceIds, getDocumentTranslationStatusLabel, handleDocMathPick } = await import("@/components/DocViewerPanel"));
+  ({ applyDocNarratorSourceIds, getDocumentTranslationStatusLabel, handleDocMathPick, renderDocumentMarkdownToHtml } = await import("@/components/DocViewerPanel"));
 });
 
 describe("doc viewer math interaction", () => {
@@ -209,6 +210,35 @@ describe("doc viewer math interaction", () => {
       sourcePath: "/docs/research/sample.md",
       anchor: "eq-1",
     });
+  });
+
+  it("renders a visible calculator sidecar for equations without a specialized manifest action", () => {
+    const html = renderDocumentMarkdownToHtml("\\[x^2 + y^2 = z^2\\]", "docs/example/generic-equation.md");
+    document.body.innerHTML = html;
+
+    const equation = document.querySelector<HTMLElement>("[data-doc-math-latex]");
+    const sidecar = document.querySelector<HTMLElement>("[data-doc-calculator-ingest='true']");
+    expect(equation?.dataset.docMathLatex).toBe("x^2 + y^2 = z^2");
+    expect(sidecar?.textContent).toBe("C");
+    expect(sidecar?.getAttribute("title")).toMatch(/Scientific Calculator/i);
+  });
+
+  it("renders runtime sidecars for exact executable registry IDs in inline code", () => {
+    const html = renderDocumentMarkdownToHtml(
+      "Use `solar.pipeline`, `casimir.verify`, or `nhm2.shift_lapse.alpha_sweep`. Keep `runtimeId` and `warp.full_solve.campaign` inert.",
+      "docs/theory-runtime-entrypoints.md",
+    );
+    document.body.innerHTML = html;
+
+    const sidecars = Array.from(document.querySelectorAll<HTMLElement>("[data-doc-runtime-command-id]"));
+    expect(sidecars.map((sidecar) => sidecar.dataset.docRuntimeCommandId)).toEqual([
+      "solar.pipeline",
+      "casimir.verify",
+      "nhm2.shift_lapse.alpha_sweep",
+    ]);
+    expect(document.querySelector("[data-doc-runtime-id='casimir.verify']")?.getAttribute("data-doc-runtime-command"))
+      .toBe("npm run casimir:verify");
+    expect(document.querySelector("[data-doc-runtime-id='warp.full_solve.campaign']")).toBeNull();
   });
 
   it("adds stable narrator source ids to rendered document text blocks", () => {

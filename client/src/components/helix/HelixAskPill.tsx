@@ -1328,6 +1328,7 @@ import type { LiveSituationArtifact } from "@shared/helix-live-situation-artifac
 import type { LiveAnswerEnvironment } from "@shared/helix-live-answer-environment";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
+import { useTheoryRuntimeJobStore } from "@/store/useTheoryRuntimeJobStore";
 import { useSituationRoomStore } from "@/store/useSituationRoomStore";
 import {
   selectSituationRoomAskContextSnapshot,
@@ -4384,6 +4385,7 @@ function buildAskTurnWorkspaceContextSnapshot(sessionId: string | null | undefin
   const layoutState = useWorkstationLayoutStore.getState();
   const notesState = useWorkstationNotesStore.getState();
   const calculatorState = useScientificCalculatorStore.getState();
+  const theoryRuntimeContext = useTheoryRuntimeJobStore.getState().activeContext;
   const docContext = resolveAskTurnDocViewerSnapshotPath();
   const activeDocVisibleTranslationContext = readActiveDocVisibleTranslationContext();
   const accountLanguageTranslationProjections = readHelixAccountLanguageTranslationProjectionContext();
@@ -4401,6 +4403,7 @@ function buildAskTurnWorkspaceContextSnapshot(sessionId: string | null | undefin
     layoutState,
     notesState,
     calculatorState,
+    theoryRuntimeContext,
     docContext,
     activeDocVisibleTranslationContext,
     accountLanguageTranslationProjections,
@@ -20856,9 +20859,10 @@ export function HelixAskPill({
               : [];
           const chatReferentContextBuild =
             reasoningContextModeForTurn === "isolated"
-              ? null
-              : buildHelixAskChatReferentContextForSubmit({
-                  durableReplies: durableAskRepliesForReferents,
+                ? null
+                : buildHelixAskChatReferentContextForSubmit({
+                    promptText: trimmed,
+                    durableReplies: durableAskRepliesForReferents,
                   visibleReplies: chronologicalAskRepliesForTranscript,
                 });
           const workspaceContextSnapshot = chatReferentContextBuild?.context
@@ -22486,6 +22490,7 @@ export function HelixAskPill({
       appendSyntheticLiveEvent,
       askBusy,
       bumpVoiceTurnRevision,
+      chronologicalAskRepliesForTranscript,
       conversationGovernor.completion_score.score,
       conversationGovernor.floor_owner,
       createReasoningAttempt,
@@ -22502,6 +22507,7 @@ export function HelixAskPill({
       enqueueReasoningAttempt,
       getHelixAskSessionId,
       getPinnedContextCapsuleCount,
+      helixChatSessions,
       launchAtomicViewer,
       patchHelixTimelineEntry,
       resetReasoningTheaterEventClock,

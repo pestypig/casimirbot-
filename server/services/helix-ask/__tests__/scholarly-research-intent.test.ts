@@ -73,4 +73,14 @@ describe("scholarly research intent", () => {
       "scholarly-research.fetch_full_text",
     ]);
   });
+
+  it("keeps full-text portfolio instructions out of the scholarly search query", () => {
+    const intent = detectScholarlyResearchIntent(
+      "Find research papers about quantum inequality sampling constraints in curved spacetime. Fetch the best three accessible sources and summarize only from full text.",
+    );
+
+    expect(intent.researchRequested).toBe(true);
+    expect(intent.normalizedQuery).toBe("quantum inequality sampling constraints curved spacetime");
+    expect(intent.scholarlyIntent.requested_workflow).toBe("full_text_summary");
+  });
 });

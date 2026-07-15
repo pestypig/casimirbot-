@@ -674,3 +674,127 @@ Focused verification:
 - Casimir verification: not applicable; this changes non-physics Ask routing, evidence capture admission, and debug presentation.
 
 Fresh-server UI validation remains required because the operator's keyed server was not restarted. After restart and refresh, repeat the exact prompt. Expected: `visual_analysis.inspect_image_region` executes once with the exact `120,205,500,120` crop; a retained sidecar reports its source/page/crop/status/promotion fields; and Copy Debug reports `debug_export_source=backend_endpoint` with `backend_debug_response_status=fetched`.
+
+### Retained-sidecar comparison must not require a current image
+
+The post-restart operator turn `ask:1fd347af-c8f1-4990-bbff-0252a087f3d3` confirms that the debug-copy repair worked: the export is now authoritative with `debug_export_source=backend_endpoint` and `backend_debug_response_status=fetched`. It also confirms that the operator reran the row-comparison prompt before a successful fresh capture had reseeded durable evidence. The durable workbench record contains the saved PDF/page-8 text but `scientific_image_record=null`, so no reusable scientific Image Lens sidecar actually exists yet.
+
+Two route defects still made that valid missing-evidence state misleading. The retained-sidecar route declared `requiredToolFamily=visual_analysis`, causing a direct keyed-server probe to fail with “I do not have the image for this turn. Reattach it and resend.” before durable evidence lookup. Separately, the intended canonical goal for retained scientific-image comparison had been inserted as unreachable code inside `resolveAskPostulateAccount`, leaving the committed route vulnerable to a model-only goal projection.
+
+This repair is classified as `source admission`, `evidence re-entry`, and `terminal authority`:
+
+- retained-sidecar comparison remains a hard `scientific_image_evidence` route but no longer requires a fresh `visual_analysis` capability or current image attachment;
+- its committed route requires evidence re-entry while allowing the provider to reuse durable source-keyed sidecar memory;
+- the canonical goal branch now executes in `buildAskTurnCanonicalGoalFrame` and requires a scholarly research answer or typed evidence failure;
+- a missing sidecar must be reported from the actual durable lookup state, while a fresh render/crop remains a separate affirmative operator request.
+
+Verification:
+
+- Scientific-image route metadata plus committed-route capability policy: 1/1 PASS; the route has no required `visual_analysis` family and still requires evidence re-entry.
+- Server bundle: PASS with the same four pre-existing duplicate-key/dead-case warnings.
+- The focused top-level API parity case was attempted with one worker, but the Vitest worker exited during collection after 145 seconds under device memory pressure; it produced no test verdict and is not counted as a product failure or pass.
+- A pre-patch direct probe against the operator-started keyed server reproduced the wrong current-image requirement. Fresh-server validation of the repair remains required after restart.
+- Casimir verification: not applicable; this changes non-physics route admission and retained evidence re-entry.
+
+The correct next sequence is now explicit: restart the keyed server and refresh the UI, run the fresh bounded capture prompt once to create the missing sidecar, then run the row-comparison prompt. Skipping the capture should yield a grounded missing-sidecar typed failure, not a current-image attachment demand and not an invented comparison.
+
+### Metadata-only sidecar capture must not terminalize as a raw receipt dump
+
+The fresh operator turn `ask:476a38fa-5a23-4ff5-8c01-3eb17c936261` successfully executed the requested page-8 Image Lens crop and persisted its scientific sidecar. The durable record contains the sidecar ID, saved-paper source ID/hash, page 8, the exact `120,205,500,120` crop reference, partial extraction status, five detected display rows, and context-only/non-promoted equation state. This closes the earlier materialization failure: the sidecar exists and can be reused after restart.
+
+The terminal product was still wrong. A provider prompt-leak recovery path selected the generic `image_lens_observation_report`, which dumped the full observation receipt, OCR/LaTeX, diagnostics, and leak warning instead of honoring `Report only ...` for the requested sidecar metadata. The persisted evidence was correct; its terminal presentation was not.
+
+This repair is classified as `prompt interpretation`, `terminal authority`, and `presentation`:
+
+- an affirmative metadata-only sidecar request is recognized only when it directly asks to report/return/show/list the sidecar ID, source identity, crop reference, and promotion state;
+- quoted, historical, future, conditional, and negated variants remain non-executing;
+- the observation-authorized terminal report now projects the normalized, persisted sidecar fields rather than raw OCR/LaTeX receipt content;
+- prompt-leak recovery remains receipt-grounded and does not add a private retry or model loop.
+
+Verification:
+
+- Metadata-only sidecar projection and adversarial non-execution: 2/2 PASS.
+- The live operator artifact independently confirms durable sidecar materialization; no reconstruction from UI text was used.
+- Server build, discipline classification, and diff checks are recorded in the final verification pass below.
+- Casimir verification: not applicable; this is non-physics evidence presentation and terminal-product policy.
+
+The operator-started keyed server must be restarted before retesting this presentation repair. The already-persisted sidecar does not need to be recaptured solely for storage; the comparison prompt can reuse it after restart.
+
+### Retained-sidecar comparison must override conflicting read-document metadata
+
+The next authoritative operator trace, turn `ask:e330d62c-0376-4890-92bf-4fa44ae7f05e`, proves that the durable sidecar was not the missing component. The retained record from turn `ask:476a38fa-5a23-4ff5-8c01-3eb17c936261` still identifies the saved-paper source, page 8, crop `120,205,500,120`, five detected display rows, and context-only/non-promoted scientific evidence. The failed comparison turn instead committed `source_target=research_library`, requested `research-library.read_document`, set `evidence_reentry_required=false`, and terminated with `scholarly_evidence_escalation_missing`. No retained-sidecar lookup was attempted.
+
+This repair is classified as `intent arbitration`, `source admission`, `evidence re-entry`, `terminal authority`, and `presentation`:
+
+- an affirmative retained machine-text/Image-Lens comparison overrides stale or conflicting client `research_library` route metadata at both `/ask/turn` and `/ask/turn/stream` boundaries;
+- the explicit workstation-gateway shortcut is suppressed for this exact route, so stale `research-library.read_document` metadata cannot execute before the server-owned route is committed;
+- the active Theory Badge Graph panel cannot claim the turn as a reflection shortcut;
+- missing current-image input is not an integrity failure because the route explicitly reuses durable sidecar evidence;
+- the committed route requires evidence re-entry and follow-up reasoning without requiring `visual_analysis`, a new render, or a new crop;
+- response presentation reasserts the same scientific source target and scholarly terminal goal so later model-only projection cannot contradict committed route authority;
+- quoted, historical, future/conditional, and negated comparison language remains non-executing through the shared classifier tests.
+
+Verification:
+
+- API parity retained-sidecar routes: 3/3 PASS, covering missing client metadata, conflicting `research-library.read_document` metadata, and the UI stream path.
+- Scientific route metadata and committed-route policy: 1/1 PASS; no `visual_analysis` requirement is admitted.
+- Metadata-only sidecar projection and adversarial non-execution: 2/2 PASS.
+- Server bundle: PASS with the same four pre-existing duplicate-key/dead-case warnings.
+- `npm run helix:ask:discipline:quick`: PASS under the declared classifications, with existing advisory shortcut warnings on the cumulatively modified provider/route surfaces.
+- `git diff --check`: PASS; line-ending notices only.
+- The broader provider `sidecar` filter is not a release-pass signal: 12 tests passed and 5 older/state-sensitive graph-reflection and terminal-copy expectations failed. The two newly affected metadata-only cases pass independently.
+- Casimir verification: not applicable; this changes non-physics route admission, retained evidence re-entry, and terminal presentation.
+
+Fresh-server UI validation remains required because the operator's keyed server was not restarted. Re-run the exact row-comparison prompt after restart. Expected: committed `scientific_image_evidence`, no `research-library.read_document`, no render or crop, one retained-sidecar continuation lookup, and either the model-authored row comparison or a typed failure grounded in the actual retained lookup result.
+
+### Fresh-capture prohibitions must not suppress retained-sidecar re-entry
+
+The copied UI export for turn `ask:e330d62c-0376-4890-92bf-4fa44ae7f05e` still projected `scholarly_evidence_escalation_missing`, requesting a `scientific_evidence_packet` and page-image observations even though the prompt explicitly asked to compare the latest retained sidecar and explicitly prohibited a new render or crop. The provider-layer cause was independent of the repaired top-level route: `asksForScientificImageTheoryContinuation` evaluated the broad scientific-context exclusion before the affirmative cross-evidence comparison. As a result, `Do not render the PDF again` and `do not run a new Image Lens crop` incorrectly suppressed the already-retained sidecar, after which generic scholarly follow-up classification treated the word `sidecar` as a request to create a new scientific evidence packet.
+
+This repair is classified as `evidence re-entry` and `follow-up reasoning`:
+
+- an affirmative machine-text/retained-sidecar comparison is evaluated before broad fresh-capture exclusions;
+- a narrow prohibition on rerendering, recropping, or promotion suppresses those operations but does not suppress the explicitly requested retained evidence;
+- an explicit prohibition on using the retained sidecar still keeps that evidence dormant;
+- the provider regression now uses the exact live UI prompt and rejects `scientific_evidence_packet_ref_missing` and `page_image_observation_refs_missing` as terminal output for a successfully retained comparison source.
+- the client transport now sends this hard comparison directly to `/api/agi/ask/turn` even when the legacy E8.14 job/parity flag is disabled, so the visible turn and `/ask/turn/:id/debug-export` share one backend entrypoint.
+
+Verification:
+
+- Focused provider comparison precedence and retained-crop reuse: 2/2 PASS.
+- Focused top-level API parity with conflicting client research-library metadata: 1/1 PASS.
+- Focused client entrypoint regression with legacy parity disabled: 1/1 PASS.
+- Server bundle: PASS with the same four pre-existing duplicate-key/dead-case warnings.
+- `npm run helix:ask:discipline:quick`: PASS with the existing advisory shortcut warnings.
+- The full prompt-solving benchmark was stopped without a verdict after its single worker reached about 1.9 GB and the operator's development server disappeared under device memory pressure. This is recorded as an aborted resource-constrained check, not a product pass or failure.
+- Casimir verification: not applicable; this changes non-physics evidence re-entry and follow-up reasoning policy.
+
+The copied debug export is not authoritative for this turn: `debug_export_source=client_projection_backend_unresolved`, `backend_debug_response_status=fetch_failed`, and the exact-turn debug endpoint returned 404. That observability failure remains separate from the provider precedence repair. The agent did not restart the operator's server. After the operator restarts the keyed server, the same prompt should reuse the durable sidecar without a render/crop and should either return the model-authored comparison or a typed failure naming the actual retained-sidecar lookup state.
+
+### Retained evidence must reach model re-entry and preserve its committed route
+
+The fresh authoritative export for turn `ask:6c87a6db-87ed-42e3-9abc-8eb83e1f6a6f` closes the prior observability question: `debug_export_source=backend_endpoint` and `backend_debug_response_status=fetched`. Both required evidence sources materialized—the saved-paper `research_library_observation` succeeded and the prior `scientific_image_evidence_sidecar` was present—but the turn still reported `route_not_selected` / `reentry_step_not_executed`. The visible “no server terminal artifact” message was therefore a terminal-eligibility failure, not a missing server turn or missing debug record.
+
+Two provider-path defects combined:
+
+- the retained-sidecar continuity summary returned before the model-authored comparison step, turning an evidence inventory into a premature terminal candidate;
+- provider-local route reconstruction set `source_target=scientific_image_evidence` but left a newly constructed canonical goal and terminal allowlist unknown, and the `/ask/turn` provider response projection did not preserve the committed request route for downstream debug/authority consumers.
+
+This repair is classified as `evidence re-entry`, `follow-up reasoning`, and `terminal authority`:
+
+- affirmative machine-text/retained-sidecar comparison bypasses the metadata-only continuity-summary terminal and proceeds through model re-entry;
+- provider-local reconstruction now commits `scholarly_research_lookup` / `scholarly_research_answer`, allows the model-authored provider candidate plus typed failure, and requires both evidence re-entry and follow-up reasoning;
+- non-stream and stream provider projections preserve `committed_ask_route` and `route_evidence_authority` in both the response and debug mirror.
+
+Verification:
+
+- Focused retained-crop model-reentry regression: 1/1 PASS.
+- Provider response committed-route projection: 1/1 PASS.
+- Scientific comparison route reconstruction: 2/2 PASS.
+- Server bundle: PASS with the same four pre-existing duplicate-key/dead-case warnings.
+- `npm run helix:ask:discipline:quick`: PASS with advisory shortcut warnings on the cumulatively changed Ask surfaces.
+- The full provider-response projection file has 7 passing tests and one unrelated pre-existing exact-object expectation failure caused by newer goal-dispatch fields; the new projection case passes independently.
+- The focused API-parity subprocess returned without a Vitest verdict summary and is recorded as inconclusive, not a pass or failure. The earlier exact conflict case remains independently passed before this incremental provider repair.
+- Casimir verification: not applicable; this is non-physics route authority, evidence re-entry, and response projection.
+
+Fresh keyed-server validation is still required because source edits do not change the already-running process. After the operator restarts the keyed server and refreshes the workstation, rerun the same prompt. The expected trace has a committed `scientific_image_evidence` route, successful saved-page and retained-sidecar observations, `provider_reasoning_reentry`, and one authorized model-authored comparison terminal—without rerendering or recropping.

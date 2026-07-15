@@ -15,6 +15,7 @@ type RecordLike = Record<string, unknown>;
 
 export type AskCapabilityContractState =
   | "suppressed_contextual_reference"
+  | "conversational_referent_no_evidence"
   | "explicit_capability_command"
   | "hard_live_source_phase"
   | "classifier_hypothesis"
@@ -366,6 +367,7 @@ export const resolveAskCapabilityContractArbitration = (input: {
   hardLiveSourceMailboxRoute?: boolean;
   requestedCapabilityContract?: ExplicitCapabilityContract | null;
   contextualSuppression?: HelixContextualToolAdmissionSuppression | null;
+  referentEvidenceUnavailable?: boolean;
   fallbackSourceTarget: string;
   fallbackPlanFamily: HelixCapabilityFamily;
   fallbackGoalKind: string;
@@ -398,6 +400,26 @@ export const resolveAskCapabilityContractArbitration = (input: {
       routeProductContract?.required_terminal_artifact_kind,
       routeProductContract?.required_terminal_kind,
     );
+
+  if (input.referentEvidenceUnavailable === true) {
+    return {
+      schema: "helix.ask_capability_contract_arbitration.v1",
+      turn_id: input.turnId,
+      contract_state: "conversational_referent_no_evidence",
+      requested_capability: null,
+      selected_source_target: "model_only",
+      selected_plan_family: "debug_export",
+      canonical_goal_kind: "model_only_concept",
+      required_observation_kinds: [],
+      required_terminal_kind: "direct_answer_text",
+      allow_phase_repair: false,
+      route_metadata_demoted: routeMetadataPresent,
+      demotion_reason: "referent_cannot_supply_requested_evidence",
+      failure_code_if_incompatible: "conversational_referent_has_no_retrievable_claims",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
 
   if (
     suppressionBlocksContract(contextualSuppression, requestedCapabilityContract) ||

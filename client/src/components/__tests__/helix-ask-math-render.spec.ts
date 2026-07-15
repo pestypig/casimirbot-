@@ -4,6 +4,7 @@ import {
   buildHelixAskMathRenderDebugForText,
   hasHelixAskRenderableMath,
   shouldShowHelixAskCalculatorPanel,
+  splitHelixAskExternalLinkTextSegments,
   splitHelixAskInlineCodeTextSegments,
   splitHelixAskTextPathSegments,
   tokenizeHelixAskMathTokens,
@@ -181,6 +182,53 @@ describe("splitHelixAskTextPathSegments", () => {
     expect(splitHelixAskTextPathSegments("No file path was referenced.")).toEqual([
       { kind: "text", text: "No file path was referenced." },
     ]);
+  });
+});
+
+describe("splitHelixAskExternalLinkTextSegments", () => {
+  it("turns Markdown scholarly citations into safe external-link segments", () => {
+    const text =
+      "See [arXiv 2408.08592](https://arxiv.org/abs/2408.08592) and [DOI](https://doi.org/10.29007/slnn).";
+    expect(
+      splitHelixAskExternalLinkTextSegments(text),
+    ).toEqual([
+      { kind: "text", text: "See " },
+      {
+        kind: "external_link",
+        text: "arXiv 2408.08592",
+        href: "https://arxiv.org/abs/2408.08592",
+        start: 4,
+        syntax: "markdown",
+      },
+      { kind: "text", text: " and " },
+      {
+        kind: "external_link",
+        text: "DOI",
+        href: "https://doi.org/10.29007/slnn",
+        start: text.indexOf("[DOI]"),
+        syntax: "markdown",
+      },
+      { kind: "text", text: "." },
+    ]);
+  });
+
+  it("links bare web URLs without swallowing sentence punctuation", () => {
+    expect(splitHelixAskExternalLinkTextSegments("Open https://arxiv.org/abs/2401.12345, then continue.")).toEqual([
+      { kind: "text", text: "Open " },
+      {
+        kind: "external_link",
+        text: "https://arxiv.org/abs/2401.12345",
+        href: "https://arxiv.org/abs/2401.12345",
+        start: 5,
+        syntax: "bare",
+      },
+      { kind: "text", text: ", then continue." },
+    ]);
+  });
+
+  it("does not admit non-web or malformed destinations", () => {
+    const text = "Keep [unsafe](javascript:alert(1)), artifact://local/ref, and https:// as text.";
+    expect(splitHelixAskExternalLinkTextSegments(text)).toEqual([{ kind: "text", text }]);
   });
 });
 

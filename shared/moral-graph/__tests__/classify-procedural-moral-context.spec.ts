@@ -38,6 +38,18 @@ const nodeIds = [
   "trust-medium-translation",
   "domain-bounded-accountability",
   "contestable-reentry-threshold",
+  "participation-consent-separation",
+  "inherited-order-participation",
+  "proximity-norm-reciprocity",
+  "voice-exit-contestability",
+  "adherence-legitimacy-separation",
+  "coordination-pluralism",
+  "need-before-allocation",
+  "efficiency-without-erasure",
+  "mandate-bounded-hierarchy",
+  "legible-rules-bounded-confidentiality",
+  "cooperation-without-assimilation",
+  "specialization-without-caste",
 ] as const;
 
 const graphDocument: IdeologyGraphDocument = {
@@ -320,5 +332,46 @@ describe("procedural Moral context classifier", () => {
       ]),
     );
     expect(classification.authority).toMatchObject({ character_verdict: false, moral_finality: false });
+  });
+
+  it("separates civic participation from consent, legitimacy, and ideology ranking", () => {
+    const classification = classify(
+      [
+        "A tenant pays rent and uses the system without explicit consent because there is no affordable alternative.",
+        "The order was inherited, formal exit exists but feasible exit does not, and compliance is not endorsement.",
+        "Compare capitalism and socialism through allocation channel, authority channel, and accountability channel.",
+      ].join(" "),
+    );
+
+    expect(classification.classifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ moralRootId: "participation-consent-separation" }),
+        expect.objectContaining({ moralRootId: "inherited-order-participation" }),
+        expect.objectContaining({ moralRootId: "voice-exit-contestability" }),
+        expect.objectContaining({ moralRootId: "adherence-legitimacy-separation" }),
+        expect.objectContaining({ moralRootId: "coordination-pluralism" }),
+      ]),
+    );
+    expect(classification.authority).toMatchObject({ terminal_eligible: false, moral_finality: false });
+  });
+
+  it("routes provisioning claims through explicit lenses and blocks biology-to-policy shortcuts", () => {
+    const classification = classify(
+      [
+        "A plant captures energy directly, so should biology dictate a universal tax budget?",
+        "Do not use an overall efficiency score or civilization balance score.",
+        "A shared research project needs cooperation without assimilation and a reviewable delegated authority scope.",
+      ].join(" "),
+    );
+
+    expect(classification.classifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ moralRootId: "need-before-allocation" }),
+        expect.objectContaining({ moralRootId: "efficiency-without-erasure" }),
+        expect.objectContaining({ moralRootId: "mandate-bounded-hierarchy" }),
+        expect.objectContaining({ moralRootId: "cooperation-without-assimilation" }),
+      ]),
+    );
+    expect(JSON.stringify(classification)).not.toMatch(/best ideology|best civilization/i);
   });
 });

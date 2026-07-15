@@ -374,8 +374,25 @@ export function buildTheoryBiomeLayoutV1(graph: TheoryBadgeGraphV1): TheoryBiome
   const seed = `${graph.graphId}:theory-biome:v1`;
   const depths = computeTheoryBiomeDepths(graph);
   const placed: Array<{ x: number; y: number }> = [];
+  const layoutDegree = new Map<string, number>();
+  for (const edge of graph.edges) {
+    if (!LAYOUT_EDGE_RELATIONS.has(edge.relation)) continue;
+    layoutDegree.set(edge.from, (layoutDegree.get(edge.from) ?? 0) + 1);
+    layoutDegree.set(edge.to, (layoutDegree.get(edge.to) ?? 0) + 1);
+  }
+  const placementOrder = graph.badges
+    .map((badge, index) => ({ badge, index }))
+    .sort((a, b) => {
+      const levelDelta = LEVEL_DEPTH[a.badge.level] - LEVEL_DEPTH[b.badge.level];
+      if (levelDelta !== 0) return levelDelta;
+      const aPhysicsCore = a.badge.id.startsWith("physics.") ? 0 : 1;
+      const bPhysicsCore = b.badge.id.startsWith("physics.") ? 0 : 1;
+      if (aPhysicsCore !== bPhysicsCore) return aPhysicsCore - bPhysicsCore;
+      const degreeDelta = (layoutDegree.get(b.badge.id) ?? 0) - (layoutDegree.get(a.badge.id) ?? 0);
+      return degreeDelta || a.index - b.index;
+    });
 
-  const coordinates: TheoryBiomeCoordinateV1[] = graph.badges.map((badge: TheoryBadgeV1) => {
+  const coordinates: TheoryBiomeCoordinateV1[] = placementOrder.map(({ badge }) => {
     const inferred = inferTheoryBiomeCoordinateSeed(badge);
     const depth = depths.get(badge.id) ?? LEVEL_DEPTH[badge.level];
     const baseX = semanticX({ ...inferred, depth, seed, badgeId: badge.id });

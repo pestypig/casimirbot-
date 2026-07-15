@@ -87,11 +87,22 @@ type ScientificCalculatorSnapshotInput = {
   debugEvents?: unknown;
 };
 
+type TheoryRuntimeContextSnapshotInput = Record<string, unknown> & {
+  schema?: unknown;
+  requestId?: unknown;
+  receiptId?: unknown;
+  runtimeId?: unknown;
+  outputRole?: unknown;
+  terminalEligible?: unknown;
+  postToolModelStepRequired?: unknown;
+};
+
 export type AskTurnWorkspaceContextSnapshotInput = {
   sessionId?: string | null;
   layoutState: WorkstationLayoutSnapshotInput;
   notesState: WorkstationNotesSnapshotInput;
   calculatorState: ScientificCalculatorSnapshotInput;
+  theoryRuntimeContext?: TheoryRuntimeContextSnapshotInput | null;
   docContext: {
     path: string | null;
     source: string;
@@ -343,6 +354,23 @@ export function buildAskTurnWorkspaceContextSnapshotFromState(
     step_count: Array.isArray(input.calculatorState.steps) ? input.calculatorState.steps.length : 0,
     recent_debug_events: calculatorRecentDebugEvents,
   };
+  const activeTheoryRuntimeContext = input.theoryRuntimeContext
+    ? {
+      ...input.theoryRuntimeContext,
+      outputRole: "evidence_for_synthesis",
+      output_role: "evidence_for_synthesis",
+      answerAuthority: false,
+      answer_authority: false,
+      terminalEligible: false,
+      terminal_eligible: false,
+      postToolModelStepRequired: true,
+      post_tool_model_step_required: true,
+      assistantAnswer: false,
+      assistant_answer: false,
+      rawContentIncluded: false,
+      raw_content_included: false,
+    }
+    : null;
   const currentPath = input.docContext.path;
   const docContextSource = input.docContext.source;
   const activeDocVisibleTranslationContext =
@@ -400,6 +428,10 @@ export function buildAskTurnWorkspaceContextSnapshotFromState(
     groupCount: Object.keys(groups).length,
     openPanels: [...new Set(openPanelIds)].sort((a, b) => a.localeCompare(b)),
     activeCalculatorContext,
+    activeTheoryRuntimeContext,
+    active_theory_runtime_context: activeTheoryRuntimeContext,
+    hasTheoryRuntimeContext: Boolean(activeTheoryRuntimeContext),
+    has_theory_runtime_context: Boolean(activeTheoryRuntimeContext),
     hasCalculatorContext: activePanel === "scientific-calculator" && (
       Boolean(activeCalculatorContext.current_latex) ||
       Boolean(activeCalculatorContext.last_result_text) ||

@@ -8,6 +8,7 @@ import { buildHelixAgentRuntimeSelectionTrace } from "../agent-providers/runtime
 import {
   applyGatewayFailureAuthorityGuard,
   codexProvider,
+  providerGatewayEvidenceReadyForSolver,
   readCodexArgs,
   resetScholarlyPdfWorkbenchVolatileMemoryForTest,
   resolveCodexBinary,
@@ -963,6 +964,209 @@ describe("Helix Ask agent provider selection", () => {
     )).toBe(true);
   });
 
+  it("derives anaphoric literature lookup from the resolved claim instead of searching operator instructions", () => {
+    const body = {
+      turn_id: "ask:test:scholarly-chat-referent",
+      question: "Find scholarly references supporting the scientific claims in your immediately previous answer. Decompose them into separate claims, search arXiv and the other scholarly providers, return a diverse claim-to-citation map, and fetch the best three accessible sources.",
+      workspace_context_snapshot: {
+        chat_referent_context: {
+          schema: "helix.ask.chat_referent_context.v1",
+          previous_assistant_final_answer: {
+            role: "assistant",
+            reply_id: "reply-science",
+            source_ref: "chat.final_answer.previous:reply-science",
+            text: "Quantum inequalities constrain weighted negative energy averages, while sampling duration changes the bound.",
+          },
+        },
+      },
+    };
+
+    expect(buildPromptDerivedScholarlyResearchGatewayCallRequests(body)).toEqual([
+      expect.objectContaining({
+        derivation_source: "helix_resolved_referent_scholarly_research",
+        capability_id: "scholarly-research.lookup_papers",
+        arguments: expect.objectContaining({
+          query: "Quantum inequalities constrain weighted negative energy averages, while sampling duration changes the bound.",
+          scholarly_intent: expect.objectContaining({
+            scholarly_query: "Quantum inequalities constrain weighted negative energy averages, while sampling duration changes the bound.",
+            query_normalization_reasons: expect.arrayContaining(["resolved_conversational_referent_claim"]),
+          }),
+          source_target_intent: expect.objectContaining({
+            query_derivation: "resolved_conversational_referent_claim",
+            resolved_referent_ref: "chat.final_answer.previous:reply-science",
+            claim_index: 0,
+            claim_count: 1,
+          }),
+        }),
+      }),
+    ]);
+    expect(buildCompoundCapabilityDependencyGatewayCallRequests(body)).toEqual([]);
+  });
+
+  it("creates one bounded scholarly lookup per resolved bullet claim", () => {
+    const body = {
+      turn_id: "ask:test:scholarly-chat-referent-bullets",
+      question: "Use the scientific claims in your immediately previous answer. Search arXiv and other scholarly providers, then fetch the best three accessible full-text sources.",
+      workspace_context_snapshot: {
+        chat_referent_context: {
+          schema: "helix.ask.chat_referent_context.v1",
+          previous_assistant_final_answer: {
+            role: "assistant",
+            reply_id: "reply-science-bullets",
+            source_ref: "chat.final_answer.previous:reply-science-bullets",
+            text: [
+              "- Quantum inequalities bound sampled negative energy along an observer worldline.",
+              "- Longer sampling durations tighten negative-energy magnitude limits.",
+              "- Quantum interest requires compensating positive-energy pulses.",
+              "- Quantum inequalities constrain traversable wormhole and warp-drive geometries.",
+            ].join("\n"),
+          },
+        },
+      },
+    };
+
+    const requests = buildPromptDerivedScholarlyResearchGatewayCallRequests(body);
+
+    expect(requests).toHaveLength(4);
+    expect(requests.map((request: any) => request.arguments.query)).toEqual([
+      "Quantum inequalities bound sampled negative energy along an observer worldline.",
+      "Longer sampling durations tighten negative-energy magnitude limits.",
+      "Quantum interest requires compensating positive-energy pulses.",
+      "Quantum inequalities constrain traversable wormhole and warp-drive geometries.",
+    ]);
+    expect(requests.every((request: any) =>
+      request.arguments.source_target_intent.full_text_requested === true &&
+      request.arguments.source_target_intent.claim_count === 4
+    )).toBe(true);
+    expect(requests.slice(0, -1).every((request: any) => request.compound_outcome === undefined)).toBe(true);
+    expect(requests.at(-1)).toMatchObject({
+      compound_outcome: "scholarly_research_workflow",
+      dependent_capability_id: "scholarly-research.fetch_full_text",
+      arguments: {
+        allow_scholarly_dependent_chain: true,
+        requested_full_text_count: 3,
+        scholarly_claim_portfolio: true,
+        source_target_intent: {
+          claim_index: 3,
+          claim_count: 4,
+          claim_portfolio_closer: true,
+        },
+      },
+    });
+
+    const admittedScholarlyRequests = readWorkstationGatewayCallRequestsForTurn({
+      body,
+      includePlannerDerived: true,
+    }).filter((request) => request.capability_id === "scholarly-research.lookup_papers");
+    expect(admittedScholarlyRequests).toHaveLength(4);
+    expect(admittedScholarlyRequests.map((request: any) => request.arguments.query)).toEqual(
+      requests.map((request: any) => request.arguments.query),
+    );
+    expect(admittedScholarlyRequests.at(-1)).toMatchObject({
+      compound_outcome: "scholarly_research_workflow",
+      arguments: {
+        requested_full_text_count: 3,
+        scholarly_claim_portfolio: true,
+      },
+    });
+  });
+
+  it("does not turn a retained scholarly failure disclaimer into a paper-search claim", () => {
+    const body = {
+      turn_id: "ask:test:scholarly-chat-referent-meta-disclaimer",
+      question: "Find scholarly references supporting the scientific claims in your immediately previous answer. Search arXiv and fetch accessible full text.",
+      workspace_context_snapshot: {
+        chat_referent_context: {
+          schema: "helix.ask.chat_referent_context.v1",
+          previous_assistant_final_answer: {
+            role: "assistant",
+            reply_id: "reply-science-with-disclaimer",
+            source_ref: "chat.final_answer.previous:reply-science-with-disclaimer",
+            text: [
+              "Quantum inequalities bound sampled negative energy along an observer worldline.",
+              "Longer sampling durations tighten negative-energy magnitude limits.",
+              "I therefore cannot honestly present these results as support for the claims you meant.",
+            ].join(" "),
+          },
+        },
+      },
+    };
+
+    const requests = buildPromptDerivedScholarlyResearchGatewayCallRequests(body);
+
+    expect(requests.map((request: any) => request.arguments.query)).toEqual([
+      "Quantum inequalities bound sampled negative energy along an observer worldline.",
+      "Longer sampling durations tighten negative-energy magnitude limits.",
+    ]);
+    expect(requests.map((request: any) => request.arguments.query).join(" "))
+      .not.toContain("cannot honestly present");
+  });
+
+  it("fails closed before prompt-derived scholarly lookup when an anaphoric claim has no retained antecedent", () => {
+    const body = {
+      turn_id: "ask:test:scholarly-chat-referent-missing",
+      question: "Find scholarly references supporting the scientific claims in your immediately previous answer and fetch full text.",
+      workspace_context_snapshot: {},
+    };
+
+    expect(buildPromptDerivedScholarlyResearchGatewayCallRequests(body)).toEqual([]);
+    expect(buildCompoundCapabilityDependencyGatewayCallRequests(body)).toEqual([]);
+  });
+
+  it("uses an explicit current-turn scholarly topic when retained answers do not contain the named claims", () => {
+    const body = {
+      turn_id: "ask:test:scholarly-explicit-topic-fallback",
+      question: "Find scholarly references supporting the quantum-inequality claims we discussed. Decompose them into separate claims, search arXiv and the other scholarly providers, identify accessible full text, and fetch the best three accessible sources.",
+      workspace_context_snapshot: {
+        chat_referent_context: {
+          schema: "helix.ask.chat_referent_context.v1",
+          previous_assistant_final_answer: {
+            role: "assistant",
+            reply_id: "reply-runtime",
+            source_ref: "chat.final_answer.previous:reply-runtime",
+            text: "Runtime verification can switch a neural-network controller to a safe backup.",
+          },
+          recent_assistant_final_answers: [
+            {
+              role: "assistant",
+              reply_id: "reply-runtime",
+              source_ref: "chat.final_answer.recent:reply-runtime",
+              text: "Runtime verification can switch a neural-network controller to a safe backup.",
+            },
+          ],
+        },
+      },
+    };
+
+    const requests = buildPromptDerivedScholarlyResearchGatewayCallRequests(body);
+
+    expect(requests).toEqual([
+      expect.objectContaining({
+        derivation_source: "helix_explicit_topic_scholarly_research",
+        compound_outcome: "scholarly_research_workflow",
+        dependent_capability_id: "scholarly-research.fetch_full_text",
+        capability_id: "scholarly-research.lookup_papers",
+        arguments: expect.objectContaining({
+          query: "quantum-inequality",
+          allow_scholarly_dependent_chain: true,
+          requested_full_text_count: 3,
+          scholarly_intent: expect.objectContaining({
+            scholarly_query: "quantum-inequality",
+            query_normalization_reasons: expect.arrayContaining(["explicit_current_turn_topic_fallback"]),
+          }),
+          source_target_intent: expect.objectContaining({
+            query_derivation: "explicit_current_turn_topic_fallback",
+            explicit_topic_phrase: "quantum-inequality",
+            explicit_topic_terms: ["quantum", "inequality"],
+            referent_resolution_block_reason: "referent_resolution_required:explicit_topic_mismatch",
+          }),
+        }),
+      }),
+    ]);
+    expect((requests[0] as any)?.arguments?.scholarly_claim_portfolio).toBeUndefined();
+    expect(buildCompoundCapabilityDependencyGatewayCallRequests(body)).toEqual([]);
+  });
+
   it("extracts scholarly topic and workflow before lookup planning", () => {
     expect(extractScholarlyIntent(
       'Search scholarly research papers for "weyl curvature" and summarize the paper evidence.',
@@ -1223,6 +1427,36 @@ describe("Helix Ask agent provider selection", () => {
     });
   });
 
+  it("does not let rejected weak scholarly attempts block a later re-entered usable observation", () => {
+    const rejectedWeakAttempt = {
+      ok: false,
+      capability_id: "scholarly-research.lookup_papers",
+      gateway_admission: {
+        requested_capability: "scholarly-research.lookup_papers",
+        admitted: true,
+        blocked_reason: "lookup_weak_match",
+      },
+      observation: {
+        schema: "helix.scholarly_research_observation.v1",
+        evidence_state: "lookup_weak_match",
+        selected_for_answer: false,
+      },
+      artifact_refs: [],
+      observation_packet: {
+        produced_artifact_refs: [],
+      },
+    } as any;
+
+    expect(providerGatewayEvidenceReadyForSolver({
+      gatewayCallResults: [rejectedWeakAttempt],
+      scholarlyRecoveryObservationReentered: false,
+    })).toBe(false);
+    expect(providerGatewayEvidenceReadyForSolver({
+      gatewayCallResults: [rejectedWeakAttempt],
+      scholarlyRecoveryObservationReentered: true,
+    })).toBe(true);
+  });
+
   it("does not promote later Casimir papers to answer-grade evidence for original-paper requests", async () => {
     process.env.CODEX_AGENT_FAKE_STDOUT = "The first Casimir-effect paper lookup was recovered from metadata evidence.";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
@@ -1265,7 +1499,8 @@ describe("Helix Ask agent provider selection", () => {
     expect(result.ok).toBe(true);
     expect((result as any).terminal_artifact_kind).not.toBe("scholarly_metadata_answer");
     expect((result as any).terminal_artifact_kind).toBe("scholarly_recovery_plan");
-    expect(result.text).toContain("asked for full-text evidence");
+    expect(result.text).toContain("no usable topic-relevant paper was selected");
+    expect(result.text).toContain("no full text was fetched");
     expect(result.text).toContain("Evidence state: lookup_weak_match");
     expect((result.debug as any)?.scholarly_response_mode_selection).toMatchObject({
       selected_for_answer: false,
@@ -1277,6 +1512,66 @@ describe("Helix Ask agent provider selection", () => {
     );
     expect(lookupCalls.length).toBeGreaterThanOrEqual(2);
     expect(lookupCalls.length).toBeLessThanOrEqual(3);
+  });
+
+  it("surfaces a bounded scholarly recovery plan when normalized weak-match observations outlive a failed provider follow-up", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "I need retrieval before finalizing this claim. I do not yet have grounded evidence references for it.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "1";
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+        "<entry>",
+        "<id>https://arxiv.org/abs/2607.99999</id>",
+        "<title>Unrelated metadata candidate</title>",
+        "<summary>This record does not support quantum inequality claims.</summary>",
+        "<published>2026-07-01T00:00:00Z</published>",
+        "<author><name>A. Researcher</name></author>",
+        "</entry>",
+        "</feed>",
+      ].join(""),
+    })) as typeof fetch;
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:scholarly-weak-match-provider-followup-failed",
+        agent_runtime: "codex",
+        question: "Use the scientific claims in your immediately previous answer. Decompose them separately, search arXiv and the other scholarly providers, return a diverse claim-to-citation map, identify accessible full text, and fetch the best three accessible sources. Distinguish metadata-only evidence from full-text evidence.",
+        workspace_context_snapshot: {
+          chat_referent_context: {
+            schema: "helix.ask.chat_referent_context.v1",
+            previous_assistant_final_answer: {
+              role: "assistant",
+              reply_id: "reply-quantum-inequality-claims",
+              source_ref: "chat.final_answer.previous:reply-quantum-inequality-claims",
+              text: [
+                "- Quantum inequalities bound sampled negative energy along an observer worldline.",
+                "- Longer sampling durations tighten negative-energy magnitude limits.",
+                "- Quantum inequalities constrain traversable wormhole and warp-drive geometries.",
+              ].join("\n"),
+            },
+          },
+        },
+      },
+      headers: {},
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      response_type: "final_answer",
+      final_answer_source: "scholarly_recovery_plan",
+      terminal_artifact_kind: "scholarly_recovery_plan",
+    });
+    expect(result.text).toContain("Evidence state: lookup_weak_match");
+    expect(result.text).toContain("no usable topic-relevant paper was selected");
+    expect(result.text).not.toContain("I need retrieval before finalizing this claim");
+    expect((result.debug as any)?.scholarly_terminal_materialization_debug).toMatchObject({
+      authority_materialized: true,
+    });
   });
 
   it("re-enters prior scholarly metadata evidence for paper follow-up prompts", async () => {
@@ -6809,6 +7104,124 @@ describe("Helix Ask agent provider selection", () => {
       terminalAnswerAuthority: null,
       terminalPresentation: null,
     });
+  });
+
+  it("authorizes provider synthesis when a weak scholarly attempt is superseded by selected usable evidence", () => {
+    const turnId = "ask:test:codex-provider-recovered-scholarly-candidate";
+    const weakRef = `${turnId}:scholarly-research.lookup_papers:weak`;
+    const usableRef = `${turnId}:scholarly-research.lookup_papers:usable`;
+    const makeResult = (input: {
+      ok: boolean;
+      ref: string;
+      evidenceState: string;
+      selectedForAnswer: boolean;
+    }) => ({
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: "test",
+      ok: input.ok,
+      agent_runtime: "codex",
+      capability_id: "scholarly-research.lookup_papers",
+      mode: "read",
+      gateway_admission: {
+        schema: "helix.workstation_tool_gateway.admission.v1",
+        requested_capability: "scholarly-research.lookup_papers",
+        selected_agent_provider: "codex",
+        permission_profile: "read",
+        admission_status: "admitted",
+        admission_reason: "test",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        schema: "helix.agent_step_observation_packet.v1",
+        turn_id: turnId,
+        iteration: 1,
+        call_id: `${input.ref}:call`,
+        decision_id: `${input.ref}:decision`,
+        capability_key: "scholarly-research.lookup_papers",
+        panel_id: "scholarly-research",
+        action: "lookup_papers",
+        status: input.ok ? "succeeded" : "failed",
+        produced_artifact_refs: [input.ref],
+        observation_summary: "Scholarly lookup observation.",
+        receipts: [],
+        missing_requirements: input.ok ? [] : ["lookup_weak_match"],
+        state_delta: {
+          evidence_state: input.evidenceState,
+          selected_for_answer: input.selectedForAnswer,
+        },
+        suggested_next_steps: [],
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      tool_lifecycle_trace: {} as any,
+      tool_followup_decision: {} as any,
+      observation: {
+        schema: "helix.scholarly_research_observation.v1",
+        evidence_state: input.evidenceState,
+        selected_for_answer: input.selectedForAnswer,
+      },
+      artifact_refs: [input.ref],
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      ...(input.ok ? {} : { error: "lookup_weak_match" }),
+    });
+    const gatewayCallResults = [
+      makeResult({
+        ok: false,
+        ref: weakRef,
+        evidenceState: "lookup_weak_match",
+        selectedForAnswer: false,
+      }),
+      makeResult({
+        ok: true,
+        ref: usableRef,
+        evidenceState: "lookup_usable",
+        selectedForAnswer: true,
+      }),
+    ] as any;
+
+    const trace = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId,
+      threadId: "thread:test",
+      route: "/ask/turn",
+      gatewayCallResults,
+      normalizedObservationPackets: gatewayCallResults.map((result: any) => result.observation_packet),
+      providerText: "The selected scholarly observation supports a bounded synthesis.",
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+    });
+
+    expect(trace).toMatchObject({
+      providerReasoningReentry: {
+        status: "completed",
+        evidence_reentered: true,
+      },
+      terminalAuthorityCandidateReview: {
+        terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+        terminal_authority_granted: true,
+        final_visible_answer_authorized: true,
+        selected_observation_refs: [usableRef],
+      },
+      providerTerminalAuthorityBridge: {
+        all_gateway_calls_succeeded: true,
+        terminal_authority_granted: true,
+        final_visible_answer_authorized: true,
+      },
+      terminalAnswerAuthority: {
+        turn_id: turnId,
+        terminal_kind: "answer",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+      },
+    });
+    expect(trace.terminalAuthorityCandidateReview.selected_observation_refs).not.toContain(weakRef);
   });
 
   it("emits Codex provider transcript progress through the stream callback before terminal answer", async () => {

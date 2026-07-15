@@ -168,6 +168,13 @@ describe("nuclear binding first-principles theory badges", () => {
         "delta_p_min_kg_m_s",
         "hbar_J_s",
       ],
+      mentionedDomains: [
+        "coulomb_barrier",
+        "quantum_tunneling",
+        "strong_force",
+        "nuclear_binding",
+        "electron_cloud",
+      ],
       generatedAt: "2026-06-12T00:00:00.000Z",
       reflectionId: "reflection:nuclear-binding-first-principles",
       limit: 24,

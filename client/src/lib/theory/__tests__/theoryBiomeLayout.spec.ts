@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { THEORY_BIOME_LAYOUT_SPACING_CONTRACT_V1 } from "@shared/contracts/theory-biome-layout.v1";
 import { buildNhm2TheoryBadgeGraphV1 } from "@shared/theory/nhm2-theory-badges";
+import { buildHelixTheoryBadgeGraphV1 } from "@shared/theory/helix-theory-badge-graph";
 import { layoutTheoryBiomeMap } from "../theoryBiomeLayout";
 
 describe("layoutTheoryBiomeMap", () => {
@@ -83,5 +84,33 @@ describe("layoutTheoryBiomeMap", () => {
         expect(Math.abs(a.x - b.x) >= minDx || Math.abs(a.y - b.y) >= minDy).toBe(true);
       }
     }
+  });
+
+  it("keeps the photon junction and atomic state chain local to their physics biomes", () => {
+    const layout = layoutTheoryBiomeMap(buildHelixTheoryBadgeGraphV1());
+    const coords = new Map(layout.biome.coordinates.map((coord) => [coord.badgeId, coord]));
+    const distance = (fromId: string, toId: string) => {
+      const from = coords.get(fromId);
+      const to = coords.get(toId);
+      expect(from).toBeTruthy();
+      expect(to).toBeTruthy();
+      return Math.hypot((from?.x ?? 0) - (to?.x ?? 0), (from?.y ?? 0) - (to?.y ?? 0));
+    };
+
+    expect(coords.get("physics.radiation.massless_photon_kinematics_context")?.domainKey).toBe("quantum");
+    expect(coords.get("physics.atomic.element_identity_context")?.scaleBand).toBe("atomic");
+    expect(coords.get("physics.atomic.spectra.transition_probability_context")?.scaleBand).toBe("atomic");
+    expect(
+      distance("physics.quantum.energy_frequency", "physics.radiation.massless_photon_kinematics_context"),
+    ).toBeLessThan(360);
+    expect(
+      distance("physics.radiation.massless_photon_kinematics_context", "physics.radiation.mode_context"),
+    ).toBeLessThan(360);
+    expect(
+      distance("physics.atomic.ionization_charge_state_context", "physics.atomic.electronic_level_structure_context"),
+    ).toBeLessThan(480);
+    expect(
+      distance("physics.atomic.electronic_level_structure_context", "physics.atomic.transition_gap_frequency_context"),
+    ).toBeLessThan(360);
   });
 });

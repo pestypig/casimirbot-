@@ -1,6 +1,9 @@
-import type { ReactNode } from "react";
+import React, { type ReactNode } from "react";
 
-import { splitHelixAskTextPathSegments } from "@/lib/helix/ask-answer-rendering";
+import {
+  splitHelixAskExternalLinkTextSegments,
+  splitHelixAskTextPathSegments,
+} from "@/lib/helix/ask-answer-rendering";
 
 export type HelixAskPathLinkedTextSurfaceProps = {
   text: string;
@@ -16,26 +19,42 @@ export function HelixAskPathLinkedTextSurface({
   onOpenPanel,
 }: HelixAskPathLinkedTextSurfaceProps) {
   const parts: ReactNode[] = [];
-  for (const segment of splitHelixAskTextPathSegments(text)) {
-    if (segment.kind === "text") {
-      parts.push(segment.text);
+  for (const linkSegment of splitHelixAskExternalLinkTextSegments(text)) {
+    if (linkSegment.kind === "external_link") {
+      parts.push(
+        <a
+          key={`${keyPrefix}-external-${linkSegment.start}`}
+          className="text-sky-300 underline underline-offset-2 hover:text-sky-200"
+          href={linkSegment.href}
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          {linkSegment.text}
+        </a>,
+      );
       continue;
     }
-    const panelId = resolvePanelId(segment.text);
-    if (!panelId) {
-      parts.push(segment.text);
-      continue;
+    for (const segment of splitHelixAskTextPathSegments(linkSegment.text)) {
+      if (segment.kind === "text") {
+        parts.push(segment.text);
+        continue;
+      }
+      const panelId = resolvePanelId(segment.text);
+      if (!panelId) {
+        parts.push(segment.text);
+        continue;
+      }
+      parts.push(
+        <button
+          key={`${keyPrefix}-${segment.text}-${segment.start}`}
+          className="text-sky-300 underline underline-offset-2 hover:text-sky-200"
+          onClick={() => onOpenPanel(panelId)}
+          type="button"
+        >
+          {segment.text}
+        </button>,
+      );
     }
-    parts.push(
-      <button
-        key={`${keyPrefix}-${segment.text}-${segment.start}`}
-        className="text-sky-300 underline underline-offset-2 hover:text-sky-200"
-        onClick={() => onOpenPanel(panelId)}
-        type="button"
-      >
-        {segment.text}
-      </button>,
-    );
   }
   return <>{parts.length ? parts : text}</>;
 }

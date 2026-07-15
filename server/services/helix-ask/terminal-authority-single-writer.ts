@@ -125,6 +125,7 @@ const terminalKindForSelectedArtifact = (selectedArtifactKind: string | null): s
   if (selectedArtifactKind === "typed_failure") return "failure";
   if (selectedArtifactKind === "request_user_input") return "request_user_input";
   if (selectedArtifactKind === "workstation_tool_evaluation") return "tool_evaluation";
+  if (selectedArtifactKind === "image_lens_named_receipt_evaluation") return "answer";
   if (selectedArtifactKind?.includes("receipt")) return "tool_receipt";
   return "answer";
 };
@@ -6631,6 +6632,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
       schema: "helix.terminal_presentation.v1",
       turn_id: input.turnId,
       terminal_artifact_kind: "image_lens_named_receipt_evaluation",
+      final_answer_source: "image_lens_named_receipt_evaluation",
       concise_text: selectedImageLensNamedReceiptEvaluation.text,
       assistant_answer: false,
       raw_content_included: false,

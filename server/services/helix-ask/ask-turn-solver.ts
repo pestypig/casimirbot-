@@ -611,6 +611,37 @@ const providerTerminalPathMaterialized = (input: {
     readString(providerRouteProductMaterialization?.materialized_terminal_artifact_kind);
   const materializedSupportRefs = readStringArray(providerRouteProductMaterialization?.selected_observation_refs);
   const presentationSupportRefs = readStringArray(terminalPresentation?.selected_observation_refs);
+  const canonicalGoal = readRecord(input.payload.canonical_goal_frame);
+  const committedAskRoute = readRecord(input.payload.committed_ask_route);
+  const committedCanonicalGoal = readRecord(committedAskRoute?.canonical_goal);
+  const routeProductContract = readRecord(input.payload.route_product_contract);
+  const sourceTargetIntent = readRecord(input.payload.source_target_intent);
+  const directModelOnlyGoalKind =
+    readString(canonicalGoal?.goal_kind) || readString(committedCanonicalGoal?.goal_kind);
+  const directModelOnlyTerminalAllowed =
+    readString(canonicalGoal?.required_terminal_kind) === input.terminalArtifactKind ||
+    readString(committedCanonicalGoal?.required_terminal_kind) === input.terminalArtifactKind ||
+    readStringArray(committedCanonicalGoal?.allowed_terminal_artifact_kinds).includes(input.terminalArtifactKind) ||
+    readStringArray(routeProductContract?.allowed_terminal_artifact_kinds).includes(input.terminalArtifactKind);
+  const directModelOnlyProviderProduct =
+    terminalUsesProviderCandidate &&
+    presentationSupportRefs.length === 0 &&
+    ["model_only_concept", "conversation", "workspace_help"].includes(directModelOnlyGoalKind) &&
+    readString(sourceTargetIntent?.strength) !== "hard" &&
+    providerBridge?.terminal_authority_granted === true &&
+    providerBridge?.final_visible_answer_authorized === true &&
+    readString(providerReasoningReentry?.status) === "completed" &&
+    providerReasoningReentry?.evidence_reentry_required === false &&
+    providerReasoningReentry?.evidence_reentered === true &&
+    readBoolean(providerReasoningReentry?.solver_completed) === true &&
+    readBoolean(providerReasoningReentry?.goal_satisfaction_compatible) === true &&
+    readBoolean(terminalAuthority?.server_authoritative) === true &&
+    readString(terminalAuthority?.terminal_artifact_kind) === input.terminalArtifactKind &&
+    readString(terminalAuthority?.final_answer_source) === input.finalAnswerSource &&
+    readString(terminalPresentation?.terminal_artifact_kind) === input.terminalArtifactKind &&
+    readString(terminalPresentation?.final_answer_source) === input.finalAnswerSource &&
+    directModelOnlyTerminalAllowed;
+  if (directModelOnlyProviderProduct) return true;
   const terminalUsesMaterializedProviderRouteProduct =
     readString(providerRouteProductMaterialization?.status) === "materialized" &&
     materializedProviderRouteProductKind === input.terminalArtifactKind &&

@@ -132,7 +132,7 @@ describe("AGI workstation tool gateway route", () => {
     );
   });
 
-  it("projects only release-ready interface languages to public accounts", async () => {
+  it("projects every interface language to public accounts", async () => {
     const response = await request(createApp())
       .get("/api/agi/workstation-tool-gateway/capabilities?agent_runtime=codex&mode=act")
       .expect(200);
@@ -140,10 +140,22 @@ describe("AGI workstation tool gateway route", () => {
     const languageCapability = response.body.capabilities.find(
       (entry: { capability_id: string }) => entry.capability_id === SET_INTERFACE_LANGUAGE_CAPABILITY,
     );
-    expect(languageCapability.input_schema.properties.language.enum).toEqual(["en", "de", "ar"]);
+    expect(languageCapability.input_schema.properties.language.enum).toEqual([
+      "en",
+      "haw",
+      "es",
+      "fr",
+      "de",
+      "pt",
+      "ja",
+      "ko",
+      "zh",
+      "ar",
+      "wo",
+    ]);
   });
 
-  it("blocks developer-preview interface languages for public accounts with a typed failure", async () => {
+  it("allows every catalog language for public accounts", async () => {
     const response = await request(createApp())
       .post("/api/agi/workstation-tool-gateway/call")
       .send({
@@ -152,15 +164,14 @@ describe("AGI workstation tool gateway route", () => {
         capability_id: SET_INTERFACE_LANGUAGE_CAPABILITY,
         arguments: { language: "haw" },
       })
-      .expect(400);
+      .expect(200);
 
     expect(response.body).toMatchObject({
-      ok: false,
-      error: "interface_language_preview_locked",
+      ok: true,
       account_policy: { account_type: "user" },
       observation: {
-        status: "blocked",
-        supported_language_codes: ["en", "de", "ar"],
+        language: "haw",
+        status: "succeeded",
       },
     });
   });

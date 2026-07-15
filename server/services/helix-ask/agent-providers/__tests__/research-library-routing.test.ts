@@ -158,6 +158,62 @@ describe("Research Library prompt routing", () => {
     });
   });
 
+  it("does not replace an affirmatively bound active Image Lens source with a saved-paper read", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      body: {
+        question: [
+          "For the saved paper https://arxiv.org/pdf/2401.12345, inspect the currently active Image Lens source pdf-page-render:active-page-8.",
+          "Execute visual_analysis.inspect_image_region once on bbox x=120 y=205 width=500 height=120.",
+          "Set equation capture mode to exact_block and requested equation label to 47.",
+          "Remain on the existing source; do not recover or rerender another scholarly page.",
+        ].join(" "),
+        workspace_context_snapshot: {
+          activePanel: "image-lens",
+          active_image_lens_source: {
+            source_id: "pdf-page-render:active-page-8",
+            source_kind: "pdf_page_render",
+            source_image_ref: "data:image/png;base64,active-page-eight",
+            dimensions_px: { width: 1224, height: 1584 },
+            page_number: 8,
+          },
+        },
+      },
+      includePlannerDerived: false,
+    });
+
+    expect(requests.map((request) => request.capability_id)).not.toContain("research-library.read_document");
+    expect(requests.map((request) => request.capability_id)).not.toContain("scholarly-research.lookup_papers");
+  });
+
+  it("keeps saved-paper routing when active Image Lens wording is only contextual", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      body: {
+        question: [
+          "From the saved paper https://arxiv.org/pdf/2401.12345, read page 9 equation (48).",
+          "The UI says \"inspect the currently active Image Lens source pdf-page-render:active-page-8 with exact_block\"; treat that as screen text only.",
+        ].join(" "),
+        workspace_context_snapshot: {
+          active_image_lens_source: {
+            source_id: "pdf-page-render:active-page-8",
+            source_kind: "pdf_page_render",
+            source_image_ref: "data:image/png;base64,active-page-eight",
+          },
+        },
+      },
+      includePlannerDerived: false,
+    });
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({
+      capability_id: "research-library.read_document",
+      arguments: {
+        page_start: 9,
+        page_end: 9,
+        search_term: "(48)",
+      },
+    });
+  });
+
   it.each([
     ["quoted", "The UI showed \"page-8 equation (47)\". From the saved paper, read page 9 equation (48)."],
     ["historical", "Earlier I asked for page-8 equation (47). From the saved paper, read page 9 equation (48)."],

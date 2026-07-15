@@ -22,6 +22,31 @@ export type HelixAskReferentResolution = {
   resolvedText: string | null;
 };
 
+export type HelixAskConversationalReferentResolutionTrace = {
+  schema: "helix.ask.conversational_referent_resolution.v1";
+  referent_detected: boolean;
+  referent_phrase: string | null;
+  source_kind: "chat_history" | null;
+  resolved_source_ref: string | null;
+  resolved_text_hash: string | null;
+  resolution_confidence: "high" | "medium" | "blocked" | "not_applicable";
+  resolution_block_reason: string | null;
+  explicit_topic_phrase: string | null;
+  explicit_topic_terms: string[];
+  candidate_count: number;
+  matched_candidate_count: number;
+  selection_policy: "latest_answer" | "explicit_topic_match" | "blocked_topic_mismatch" | null;
+  context_role: "evidence_for_followup_reasoning" | null;
+  assistant_answer: false;
+  terminal_eligible: false;
+  raw_content_included: false;
+};
+
+export type HelixAskConversationalReferentResolution = {
+  trace: HelixAskConversationalReferentResolutionTrace;
+  resolvedText: string | null;
+};
+
 const readRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 
@@ -94,6 +119,40 @@ const readPreviousAssistantFinalAnswer = (body: Record<string, unknown>): { text
   };
 };
 
+type ConversationalReferentCandidate = {
+  text: string;
+  ref: string;
+};
+
+const readRecentAssistantFinalAnswers = (
+  body: Record<string, unknown>,
+): ConversationalReferentCandidate[] => {
+  const context = readChatReferentContext(body);
+  const recent = readArray(
+    context?.recent_assistant_final_answers ?? context?.recentAssistantFinalAnswers,
+  )
+    .map(readRecord)
+    .flatMap((answer): ConversationalReferentCandidate[] => {
+      const text = readString(answer?.text);
+      if (!text) return [];
+      return [{
+        text,
+        ref:
+          readString(answer?.source_ref ?? answer?.sourceRef ?? answer?.reply_id ?? answer?.replyId) ??
+          `chat.final_answer.recent:${sha256Short(text)}`,
+      }];
+    });
+  const previous = readPreviousAssistantFinalAnswer(body);
+  const ordered = previous ? [previous, ...recent] : recent;
+  const seenHashes = new Set<string>();
+  return ordered.filter((candidate) => {
+    const hash = sha256Short(candidate.text);
+    if (seenHashes.has(hash)) return false;
+    seenHashes.add(hash);
+    return true;
+  });
+};
+
 const readPreviousChatMessage = (body: Record<string, unknown>): { text: string; ref: string; role: string | null } | null => {
   const context = readChatReferentContext(body);
   const message = readRecord(context?.previous_chat_message ?? context?.previousChatMessage);
@@ -106,6 +165,239 @@ const readPreviousChatMessage = (body: Record<string, unknown>): { text: string;
       readString(message?.source_ref ?? message?.sourceRef ?? message?.message_id ?? message?.messageId) ??
       `chat.message.previous:${sha256Short(text)}`,
   };
+};
+
+const blankConversationalReferentTrace = (
+  overrides: Partial<HelixAskConversationalReferentResolutionTrace> = {},
+): HelixAskConversationalReferentResolutionTrace => ({
+  schema: "helix.ask.conversational_referent_resolution.v1",
+  referent_detected: false,
+  referent_phrase: null,
+  source_kind: null,
+  resolved_source_ref: null,
+  resolved_text_hash: null,
+  resolution_confidence: "not_applicable",
+  resolution_block_reason: null,
+  explicit_topic_phrase: null,
+  explicit_topic_terms: [],
+  candidate_count: 0,
+  matched_candidate_count: 0,
+  selection_policy: null,
+  context_role: null,
+  assistant_answer: false,
+  terminal_eligible: false,
+  raw_content_included: false,
+  ...overrides,
+});
+
+const EXPLICIT_REFERENT_TOPIC_STOP_WORDS = new Set([
+  "claim",
+  "concept",
+  "discussion",
+  "evidence",
+  "finding",
+  "paper",
+  "physic",
+  "physical",
+  "physics",
+  "point",
+  "previous",
+  "prior",
+  "reference",
+  "research",
+  "response",
+  "scholarly",
+  "science",
+  "scientific",
+  "source",
+  "topic",
+]);
+
+const normalizeTopicToken = (token: string): string => {
+  const normalized = token.toLowerCase();
+  if (normalized.endsWith("ies") && normalized.length > 4) return `${normalized.slice(0, -3)}y`;
+  if (normalized.endsWith("s") && normalized.length > 4 && !normalized.endsWith("ss")) {
+    return normalized.slice(0, -1);
+  }
+  return normalized;
+};
+
+const explicitTopicTerms = (value: string): string[] =>
+  [...new Set(
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .split(/\s+/)
+      .map(normalizeTopicToken)
+      .filter((token) => token.length >= 3 && !EXPLICIT_REFERENT_TOPIC_STOP_WORDS.has(token)),
+  )];
+
+const explicitConversationalTopicPhrase = (prompt: string): string | null => {
+  const unquoted = unquotePrompt(prompt).replace(/\s+/g, " ").trim();
+  const patterns = [
+    /\b(?:supporting|for|about|on)\s+(?:the\s+)?([a-z0-9][a-z0-9\s-]{1,100}?)\s+(?:claims?|points?|topics?|concepts?)\s+(?:that\s+)?(?:we|you)\s+(?:just\s+)?(?:discussed|were\s+(?:just\s+)?discussing|have\s+been\s+discussing|talked\s+about|were\s+talking\s+about)\b/i,
+    /\b(?:supporting|for|about|on)\s+(?:the\s+)?([a-z0-9][a-z0-9\s-]{1,100}?)\s+(?:claims?|points?|topics?|concepts?)\s+(?:from|in)\s+(?:(?:the|our|your)\s+)?(?:earlier|previous|prior|last)\s+(?:answer|response|discussion|conversation)\b/i,
+  ];
+  for (const pattern of patterns) {
+    const phrase = readString(unquoted.match(pattern)?.[1]);
+    if (phrase && explicitTopicTerms(phrase).length > 0) return phrase;
+  }
+  return null;
+};
+
+const conversationalCandidateTopicScore = (candidate: string, terms: string[]): number => {
+  const candidateTerms = new Set(explicitTopicTerms(candidate));
+  return terms.reduce((score, term) => score + (candidateTerms.has(term) ? 1 : 0), 0);
+};
+
+export const conversationalReferentTextCannotSupplyRequestedEvidence = (value: string): boolean => {
+  const text = value.trim();
+  return (
+    /^i\s+(?:therefore\s+)?(?:could\s+not|cannot|couldn['’]?t|can['’]?t)\b[\s\S]{0,220}\b(?:complete|answer|produce|provide|create|present|treat|use|cite|map|support|verify)\b/i.test(text) ||
+    /\b(?:could\s+not|cannot|couldn['’]?t|can['’]?t)\s+honestly\s+(?:present|treat|use|cite|map|offer)\b[\s\S]{0,180}\b(?:claims?|evidence|support)\b/i.test(text) ||
+    /^(?:these|those|the)\s+(?:results?|search(?:es)?|papers?|sources?|evidence)\b[\s\S]{0,180}\b(?:do|does|did|can|could|would)\s+not\b[\s\S]{0,100}\b(?:support|match|address|establish|verify)\b/i.test(text) ||
+    /^(?:the\s+)?(?:conversational\s+)?referent\b[\s\S]{0,120}\b(?:incorrectly\s+resolved|resolution\s+failed|was\s+missing)\b/i.test(text) ||
+    /^backend\s+ask\s+was\s+reached\b/i.test(text) ||
+    /^the\s+turn\s+failed\b/i.test(text) ||
+    /^the\s+(?:immediately\s+)?(?:previous|prior|last)\s+(?:answer|response)\s+(?:contained|contains|had|has)\s+no\s+(?:scientific|physics|research)\s+claims?\b/i.test(text) ||
+    /^there\s+(?:are|were)\s+no\s+(?:scientific|physics|research)\s+claims?\b/i.test(text)
+  );
+};
+
+const conversationalReferentPhrase = (prompt: string): string | null => {
+  const unquoted = unquotePrompt(prompt).replace(/\s+/g, " ").trim();
+  if (!unquoted) return null;
+  if (
+    /\b(?:ignore|disregard|avoid|do\s+not\s+use|don't\s+use|dont\s+use)\b[\s\S]{0,100}\b(?:what\s+we\s+(?:just\s+)?(?:discussed|were\s+discussing|talked\s+about)|the\s+(?:previous|last|prior)\s+(?:answer|response|discussion|claims?|points?|topics?))\b/i.test(unquoted) ||
+    /\b(?:do\s+not|don't|dont|without|avoid|ignore|disregard)\s+(?:using|use|relying\s+on|rely\s+on|referencing|reference|considering|consider|carrying\s+over|carry\s+over|restoring|restore)?\s*(?:the\s+|your\s+)?(?:previous|last|prior)\s+(?:assistant\s+)?(?:answer|response|reply|explanation|statement|summary|discussion|claims?|points?|topics?)\b/i.test(unquoted)
+  ) {
+    return null;
+  }
+  if (
+    /^\s*(?:if|when)\b[\s\S]{0,180}\b(?:later|eventually|next\s+time|in\s+the\s+future)\b/i.test(unquoted) &&
+    !/\b(?:now|right\s+now|you\s+just|just\s+(?:said|described|explained|mentioned|listed|identified|outlined))\b/i.test(unquoted)
+  ) {
+    return null;
+  }
+  if (
+    /\b(?:those|these|the)\s+(?:(?:two|three|four|five|\d+)\s+)?(?:(?:failure|evidence|route|tool|scientific|execution|context)\s+)?(?:things?|causes?|reasons?|failures?|issues?|points?|steps?|items?|layers?|problems?|options?|examples?|prompts?|results?|findings?|details?)\s+(?:that\s+)?you\s+(?:just|previously)\s+(?:described|mentioned|explained|listed|identified|gave|said|outlined)\b/i.test(unquoted) ||
+    /\b(?:what|the\s+thing|that)\s+you\s+(?:just|previously)\s+(?:said|described|mentioned|explained|listed|identified|outlined)\b/i.test(unquoted) ||
+    /\b(?:the\s+)?(?:(?:scientific|physics|physical|research)\s+)?(?:claims?|points?|topics?|concepts?|things?)\s+(?:that\s+)?(?:we|you)\s+(?:just\s+)?(?:discussed|were\s+(?:just\s+)?discussing|have\s+been\s+discussing|talked\s+about|were\s+talking\s+about)\b/i.test(unquoted) ||
+    /\b(?:the\s+)?(?:(?:scientific|physics|physical|research)\s+)?(?:claims?|points?|topics?|concepts?|things?)\s+(?:in|from|of)\s+(?:(?:the|your)\s+)?(?:immediately\s+)?(?:previous|last|prior)\s+(?:assistant\s+)?(?:answer|response|reply|explanation|statement|summary)\b/i.test(unquoted) ||
+    /\bwhat\s+(?:we|you)\s+(?:just\s+)?(?:discussed|were\s+(?:just\s+)?discussing|have\s+been\s+discussing|talked\s+about|were\s+talking\s+about)\b/i.test(unquoted)
+  ) {
+    return "deictic_previous_assistant_answer";
+  }
+  if (
+    /\b(?:the|your)\s+(?:immediately\s+)?(?:previous|last|prior)\s+(?:assistant\s+)?(?:answer|response|reply|explanation|statement|summary)\b/i.test(unquoted)
+  ) {
+    return "previous_assistant_final_answer";
+  }
+  if (
+    /\bbased\s+on\s+(?:that|those|this|the\s+(?:previous|last|prior)\s+(?:answer|response|reply|explanation|statement|summary))\b/i.test(unquoted) ||
+    /\b(?:can|could|would)\s+you\s+(?:do|apply|explain|continue|expand\s+on|clarify)\s+that\b/i.test(unquoted)
+  ) {
+    return "deictic_previous_assistant_answer";
+  }
+  return null;
+};
+
+export const resolveHelixAskConversationalReferent = (
+  body: Record<string, unknown>,
+): HelixAskConversationalReferentResolution => {
+  const referentPhrase = conversationalReferentPhrase(readQuestion(body));
+  if (!referentPhrase) {
+    return { trace: blankConversationalReferentTrace(), resolvedText: null };
+  }
+  const candidates = readRecentAssistantFinalAnswers(body);
+  const explicitTopicPhrase = explicitConversationalTopicPhrase(readQuestion(body));
+  const topicTerms = explicitTopicPhrase ? explicitTopicTerms(explicitTopicPhrase) : [];
+  if (candidates.length === 0) {
+    return {
+      resolvedText: null,
+      trace: blankConversationalReferentTrace({
+        referent_detected: true,
+        referent_phrase: referentPhrase,
+        source_kind: "chat_history",
+        resolution_confidence: "blocked",
+        resolution_block_reason: "referent_resolution_required:missing_previous_assistant_final_answer",
+        explicit_topic_phrase: explicitTopicPhrase,
+        explicit_topic_terms: topicTerms,
+        context_role: "evidence_for_followup_reasoning",
+      }),
+    };
+  }
+  const minimumTopicMatches = Math.max(1, Math.ceil(topicTerms.length * 0.6));
+  const matchingCandidates = topicTerms.length > 0
+    ? candidates.filter((candidate) =>
+        !conversationalReferentTextCannotSupplyRequestedEvidence(candidate.text) &&
+        conversationalCandidateTopicScore(candidate.text, topicTerms) >= minimumTopicMatches)
+    : candidates;
+  if (topicTerms.length > 0 && matchingCandidates.length === 0) {
+    return {
+      resolvedText: null,
+      trace: blankConversationalReferentTrace({
+        referent_detected: true,
+        referent_phrase: referentPhrase,
+        source_kind: "chat_history",
+        resolution_confidence: "blocked",
+        resolution_block_reason: "referent_resolution_required:explicit_topic_mismatch",
+        explicit_topic_phrase: explicitTopicPhrase,
+        explicit_topic_terms: topicTerms,
+        candidate_count: candidates.length,
+        matched_candidate_count: 0,
+        selection_policy: "blocked_topic_mismatch",
+        context_role: "evidence_for_followup_reasoning",
+      }),
+    };
+  }
+  const selectedAnswer = matchingCandidates[0] ?? candidates[0]!;
+  return {
+    resolvedText: selectedAnswer.text,
+    trace: blankConversationalReferentTrace({
+      referent_detected: true,
+      referent_phrase: referentPhrase,
+      source_kind: "chat_history",
+      resolved_source_ref: selectedAnswer.ref,
+      resolved_text_hash: sha256Short(selectedAnswer.text),
+      resolution_confidence: "high",
+      explicit_topic_phrase: explicitTopicPhrase,
+      explicit_topic_terms: topicTerms,
+      candidate_count: candidates.length,
+      matched_candidate_count: matchingCandidates.length,
+      selection_policy: topicTerms.length > 0 ? "explicit_topic_match" : "latest_answer",
+      context_role: "evidence_for_followup_reasoning",
+    }),
+  };
+};
+
+export const conversationalReferentCannotSupplyRequestedEvidence = (
+  body: Record<string, unknown>,
+): boolean => {
+  const resolution = resolveHelixAskConversationalReferent(body);
+  const retainedText = resolution.resolvedText?.trim() ?? "";
+  return (
+    resolution.trace.referent_detected === true &&
+    (
+      resolution.trace.resolution_confidence === "blocked" ||
+      (
+        resolution.trace.resolution_confidence === "high" &&
+        conversationalReferentTextCannotSupplyRequestedEvidence(retainedText)
+      )
+    )
+  );
+};
+
+export const conversationalReferentHasExplicitTopicFallback = (
+  body: Record<string, unknown>,
+): boolean => {
+  const resolution = resolveHelixAskConversationalReferent(body);
+  return Boolean(
+    resolution.trace.referent_detected === true &&
+    resolution.trace.resolution_confidence === "blocked" &&
+    resolution.trace.explicit_topic_phrase?.trim() &&
+    resolution.trace.explicit_topic_terms.length > 0
+  );
 };
 
 export const resolveHelixAskReadAloudReferent = (

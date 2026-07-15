@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import {
   buildTheoryRuntimeReceiptV1,
@@ -10,7 +11,10 @@ import {
   findTheoryRuntimeEntrypointsForBadge,
   THEORY_RUNTIME_ENTRYPOINTS,
 } from "../../../shared/theory/runtime-entrypoints";
+import { THEORY_RUNTIME_SMALL_EXECUTION_IDS } from "../../../shared/theory/runtime-execution-policy";
 import { resolveEvidenceArtifacts } from "./evidence-artifact-resolver";
+import { appendBoundedTheoryRuntimeOutput } from "./runtime-output-buffer";
+import { terminateTheoryRuntimeProcessTree } from "./runtime-process-tree";
 
 export type TheoryRuntimeAdapterInput = {
   runtimeId: string;
@@ -66,12 +70,7 @@ export type TheoryRuntimeAdapter = {
   toReceipt: (input: TheoryRuntimeAdapterReceiptInput) => TheoryRuntimeReceiptV1;
 };
 
-export const SMALL_RUNTIME_ADAPTER_IDS = [
-  "solar.pipeline",
-  "solar.manifest",
-  "casimir.verify",
-  "physics.validate",
-] as const;
+export const SMALL_RUNTIME_ADAPTER_IDS = THEORY_RUNTIME_SMALL_EXECUTION_IDS;
 
 export type SmallTheoryRuntimeAdapterId = (typeof SMALL_RUNTIME_ADAPTER_IDS)[number];
 
@@ -81,8 +80,14 @@ function unique(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
 }
 
-function npmCommand(): string {
-  return process.platform === "win32" ? "npm.cmd" : "npm";
+function windowsNpmCliPath(): string | null {
+  const candidates = [
+    process.env.npm_execpath?.trim() ?? "",
+    path.join(path.dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js"),
+  ];
+  return candidates.find((candidate) =>
+    candidate && path.basename(candidate).toLowerCase() === "npm-cli.js" && existsSync(candidate)
+  ) ?? null;
 }
 
 function includesRuntime(scope: TheoryRuntimeAdapterSolveScope): boolean {
@@ -164,47 +169,75 @@ function buildSmallRuntimeCommand(input: TheoryRuntimeAdapterInput): TheoryRunti
   if (!entrypoint || !script) {
     throw new Error(`Runtime ${input.runtimeId} does not have a runnable npm script command.`);
   }
+  if (!/^[A-Za-z0-9:_-]+$/.test(script)) {
+    throw new Error(`Runtime ${input.runtimeId} resolved to an unsafe npm script name.`);
+  }
+  const windows = process.platform === "win32";
+  const npmCliPath = windows ? windowsNpmCliPath() : null;
   return {
-    command: npmCommand(),
-    args: ["run", "-s", script],
+    // Node 24 rejects direct shell:false spawning of .cmd shims on Windows
+    // with EINVAL. Prefer the installed npm CLI through the current Node
+    // executable, with a fixed cmd.exe fallback for non-standard installs.
+    command: npmCliPath ? process.execPath : windows ? (process.env.ComSpec?.trim() || "cmd.exe") : "npm",
+    args: npmCliPath
+      ? [npmCliPath, "run", "-s", script]
+      : windows
+        ? ["/d", "/s", "/c", "npm.cmd", "run", "-s", script]
+        : ["run", "-s", script],
     cwd: path.resolve(input.projectRoot ?? process.cwd()),
     npmScript: script,
     timeoutMs: Math.min(input.timeoutMs ?? entrypoint.timeoutPolicy.smallMs, entrypoint.timeoutPolicy.fullMs),
   };
 }
 
-async function defaultSpawnExecutor(command: TheoryRuntimeCommandV1): Promise<TheoryRuntimeExecutionResult> {
+export async function executeTheoryRuntimeCommand(command: TheoryRuntimeCommandV1): Promise<TheoryRuntimeExecutionResult> {
   const startedAt = new Date().toISOString();
   const started = Date.now();
   return new Promise((resolve) => {
-    const child = spawn(command.command, command.args, {
-      cwd: command.cwd,
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: false,
-      windowsHide: true,
-    });
-    let stdout = "";
-    let stderr = "";
-    let settled = false;
-    const timer = setTimeout(() => {
-      settled = true;
-      child.kill("SIGTERM");
+    let child: ReturnType<typeof spawn>;
+    try {
+      child = spawn(command.command, command.args, {
+        cwd: command.cwd,
+        stdio: ["ignore", "pipe", "pipe"],
+        shell: false,
+        windowsHide: true,
+      });
+    } catch (error) {
       resolve({
         startedAt,
         completedAt: new Date().toISOString(),
         durationMs: Date.now() - started,
         exitCode: null,
-        stdout,
-        stderr,
-        timedOut: true,
-        error: `Runtime command timed out after ${command.timeoutMs}ms.`,
+        stdout: "",
+        stderr: "",
+        timedOut: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+    const timer = setTimeout(() => {
+      settled = true;
+      void terminateTheoryRuntimeProcessTree(child).then(() => {
+        resolve({
+          startedAt,
+          completedAt: new Date().toISOString(),
+          durationMs: Date.now() - started,
+          exitCode: null,
+          stdout,
+          stderr,
+          timedOut: true,
+          error: `Runtime command timed out after ${command.timeoutMs}ms.`,
+        });
       });
     }, command.timeoutMs);
     child.stdout?.on("data", (chunk) => {
-      stdout += String(chunk);
+      stdout = appendBoundedTheoryRuntimeOutput(stdout, chunk);
     });
     child.stderr?.on("data", (chunk) => {
-      stderr += String(chunk);
+      stderr = appendBoundedTheoryRuntimeOutput(stderr, chunk);
     });
     child.on("error", (error) => {
       if (settled) return;
@@ -364,7 +397,7 @@ export async function runTheoryRuntimeAdapter(
     });
   }
 
-  const execution = await (options.spawnExecutor ?? defaultSpawnExecutor)(command);
+  const execution = await (options.spawnExecutor ?? executeTheoryRuntimeCommand)(command);
   const parsedReceipt = await adapter.parseArtifacts({ ...input, execution });
   return adapter.toReceipt({ ...input, execution, parsedReceipt });
 }

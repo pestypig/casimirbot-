@@ -4,8 +4,11 @@ import { buildNhm2TheoryBadgeGraphV1 } from "../../../shared/theory/nhm2-theory-
 import { validateTheoryBadgeGraphV1 } from "../../../shared/contracts/theory-badge-graph.v1";
 import { isTheoryCompoundRunV1 } from "../../../shared/contracts/theory-compound-run.v1";
 import { buildArtifactBackedCompoundTheoryRun } from "../../services/theory/artifact-backed-compound-run";
+import { helixTheoryRuntimeRouter } from "./theory-runtime";
 
 const helixTheoryRouter = Router();
+
+helixTheoryRouter.use("/runtime-jobs", helixTheoryRuntimeRouter);
 
 const setCors = (res: Response) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
