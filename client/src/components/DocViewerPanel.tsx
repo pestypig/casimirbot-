@@ -2,7 +2,7 @@ import React from "react";
 import { marked, type MarkedOptions, type Tokens } from "marked";
 import { renderToString as renderKatexToString } from "katex";
 import "katex/dist/katex.min.css";
-import { ArrowLeft, Folder, Languages, Pause, Play, Search } from "lucide-react";
+import { ArrowLeft, Folder, Languages, LoaderCircle, Pause, Play, Search, Trash2 } from "lucide-react";
 import { HelixAccountLanguageTranslationProjection } from "@/components/helix/HelixAccountLanguageTranslationProjection";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -104,6 +104,7 @@ import type { InterfaceMessageId } from "@/lib/i18n/messages/types";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
 import {
+  deleteResearchLibraryDocument,
   listResearchLibraryDocuments,
   readResearchLibraryDocument,
   researchLibraryDocumentToMarkdown,
@@ -498,6 +499,8 @@ export function DocViewerPanel() {
   const [researchLibraryDocuments, setResearchLibraryDocuments] = React.useState<HelixResearchLibraryDocumentSummary[]>([]);
   const [researchLibraryStatus, setResearchLibraryStatus] = React.useState<"loading" | "ready" | "signed_out" | "error">("loading");
   const [researchLibraryError, setResearchLibraryError] = React.useState<string | null>(null);
+  const [researchLibraryMutationError, setResearchLibraryMutationError] = React.useState<string | null>(null);
+  const [deletingResearchDocumentId, setDeletingResearchDocumentId] = React.useState<string | null>(null);
   const [activeResearchDocument, setActiveResearchDocument] = React.useState<HelixResearchLibraryDocument | null>(null);
   const [docClassFilter, setDocClassFilter] = React.useState<DocTaxonomyFilter>("all");
   const [html, setHtml] = React.useState<string>("");
@@ -614,6 +617,26 @@ export function DocViewerPanel() {
       })
       .catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Research document could not be loaded."))
       .finally(() => setLoading(false));
+  }, []);
+
+  const handleDeleteResearchDocument = React.useCallback((documentId: string, title: string) => {
+    const confirmed = typeof window === "undefined" || typeof window.confirm !== "function"
+      ? true
+      : window.confirm(`Delete “${title}” from My Research Library? This removes the saved extraction from your private library.`);
+    if (!confirmed) return;
+    setDeletingResearchDocumentId(documentId);
+    setResearchLibraryMutationError(null);
+    void deleteResearchLibraryDocument(documentId)
+      .then(() => {
+        setResearchLibraryDocuments((current) => current.filter((entry) => entry.document_id !== documentId));
+        setActiveResearchDocument((current) => current?.document_id === documentId ? null : current);
+      })
+      .catch((deleteError) => {
+        setResearchLibraryMutationError(
+          deleteError instanceof Error ? deleteError.message : "Research document could not be deleted.",
+        );
+      })
+      .finally(() => setDeletingResearchDocumentId((current) => current === documentId ? null : current));
   }, []);
 
   const handleSelectCanonicalDoc = React.useCallback((path: string) => {
@@ -2197,7 +2220,10 @@ export function DocViewerPanel() {
           researchLibraryDocuments={researchLibraryDocuments}
           researchLibraryStatus={researchLibraryStatus}
           researchLibraryError={researchLibraryError}
+          researchLibraryMutationError={researchLibraryMutationError}
+          deletingResearchDocumentId={deletingResearchDocumentId}
           onSelectResearchDocument={handleSelectResearchDocument}
+          onDeleteResearchDocument={handleDeleteResearchDocument}
           variant="full"
           scrollMemoryKey="docs-viewer:directory"
           t={t}
@@ -2307,7 +2333,10 @@ type DirectoryRailProps = {
   researchLibraryDocuments?: HelixResearchLibraryDocumentSummary[];
   researchLibraryStatus?: "loading" | "ready" | "signed_out" | "error";
   researchLibraryError?: string | null;
+  researchLibraryMutationError?: string | null;
+  deletingResearchDocumentId?: string | null;
   onSelectResearchDocument?: (documentId: string) => void;
+  onDeleteResearchDocument?: (documentId: string, title: string) => void;
   variant?: "rail" | "full";
   scrollMemoryKey?: string;
   t: Translate;
@@ -2327,7 +2356,10 @@ export function DirectoryRail({
   researchLibraryDocuments = [],
   researchLibraryStatus = "ready",
   researchLibraryError = null,
+  researchLibraryMutationError = null,
+  deletingResearchDocumentId = null,
   onSelectResearchDocument,
+  onDeleteResearchDocument,
   variant = "rail",
   scrollMemoryKey,
   t,
@@ -2458,23 +2490,44 @@ export function DirectoryRail({
                 : "No saved extraction matches this search."}
             </p>
           ) : (
-            <ul className="space-y-1.5">
-              {visibleResearchLibraryDocuments.map((document) => (
-                <li key={document.document_id}>
-                  <button
-                    type="button"
-                    className="w-full rounded-lg px-2 py-1.5 text-left text-slate-200 transition-colors hover:bg-violet-400/10"
-                    onClick={() => onSelectResearchDocument?.(document.document_id)}
-                  >
-                    <p className="break-words text-sm font-medium leading-tight">{document.title}</p>
-                    <p className="mt-0.5 text-[10px] uppercase tracking-wide text-violet-300/80">
-                      {document.page_count} pages · {document.extraction_status.replaceAll("_", " ")}
-                    </p>
-                    <p className="truncate text-[11px] text-slate-400">{document.source_url ?? document.source_pdf_ref ?? document.document_id}</p>
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <>
+              {researchLibraryMutationError ? (
+                <p className="mb-1.5 rounded border border-rose-400/20 bg-rose-400/5 px-2 py-1 text-[11px] text-rose-300" role="alert">
+                  Could not delete the saved extraction: {researchLibraryMutationError}
+                </p>
+              ) : null}
+              <ul className="space-y-1.5">
+                {visibleResearchLibraryDocuments.map((document) => {
+                  const deleting = deletingResearchDocumentId === document.document_id;
+                  return (
+                    <li key={document.document_id} className="group flex items-start gap-1 rounded-lg transition-colors hover:bg-violet-400/10">
+                      <button
+                        type="button"
+                        className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left text-slate-200 disabled:opacity-50"
+                        onClick={() => onSelectResearchDocument?.(document.document_id)}
+                        disabled={deleting}
+                      >
+                        <p className="break-words text-sm font-medium leading-tight">{document.title}</p>
+                        <p className="mt-0.5 text-[10px] uppercase tracking-wide text-violet-300/80">
+                          {document.page_count} pages · {document.extraction_status.replaceAll("_", " ")}
+                        </p>
+                        <p className="truncate text-[11px] text-slate-400">{document.source_url ?? document.source_pdf_ref ?? document.document_id}</p>
+                      </button>
+                      <button
+                        type="button"
+                        className="mt-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-rose-400/10 hover:text-rose-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-rose-300 disabled:cursor-wait disabled:opacity-60"
+                        aria-label={`Delete ${document.title} from My Research Library`}
+                        title="Delete saved extraction"
+                        disabled={deleting}
+                        onClick={() => onDeleteResearchDocument?.(document.document_id, document.title)}
+                      >
+                        {deleting ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
           )}
         </div>
         {entries.map((group) => (

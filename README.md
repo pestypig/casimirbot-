@@ -54,7 +54,8 @@ Each stage has a different authority boundary:
   back to scholarly lookup memory only when no page-image/scientific evidence
   chain exists.
 
-Useful test prompt sequence:
+Useful example prompt sequence (this topic is documentation-only, not the
+Workflow Demo Lab default):
 
 ```text
 Search scholarly research papers for a PDF-accessible paper about Weyl geometry
@@ -73,6 +74,36 @@ boundary diagnostic-only unless the evidence supports stronger authority.
 Tell me which paper, page, equation, crop ref, and evidence depth you are using
 from the prior steps.
 ```
+
+Developer accounts can run this sequence from **Workflow Demo Lab**. Enabling
+the `Research paper to proposal` demo adds an editable next-prompt quick-time
+event to both the legacy and ReCrowned Ask layouts. The QTE inserts text into
+the composer but never auto-sends it. Each run first binds an operator-confirmed
+workflow objective from the latest bounded research request in the active Helix
+Ask chat, a custom topic, or a blank placeholder. Blank runs do not emit a QTE
+until an objective is bound. The binding is frozen for the run and may be
+rebased only before typed evidence advances the first step.
+
+Demo progress is deterministic: typed scholarly workbench state, scientific
+evidence status, graph-reflection refs, provenance-audit state, and a postulate
+submission receipt advance the steps. Assistant prose does not. The suggestion
+is explicitly non-terminal (`assistantAnswer=false`,
+`terminalEligible=false`, `autoSubmit=false`). The context-bound template makes
+the first prompt relevant without sampling a model. A future goal/runtime
+coaching lane may refine the wording, but it must receive the current unmet step
+from this deterministic reducer and cannot mark a step complete.
+
+While a demo is active, QTE observations and operator actions are retained in
+an append-only `helix.workflow_demo_debug.v1` ledger. Each evidence transition
+records the source client reply, backend turn/trace when available, before/after
+step, typed artifact refs, and any post-final debug amendment. Per-answer
+**Debug Copy** includes the matching ledger events as `workflow_demo_debug` and
+as `workflow_demo` master-clock rows. Edited prompt text is not copied into this
+ledger; only its hash, length, and whether it differs from the template are
+recorded. Context-binding events likewise retain source ids and an objective
+hash, while the run session retains the operator-visible objective needed to
+render later prompts. All workflow debug artifacts remain non-answer,
+non-terminal, and observation-only.
 
 Local deterministic tests cover the server-side workbench path, but keyed live
 validation should use the operator-owned Helix Ask server. Do not start a new

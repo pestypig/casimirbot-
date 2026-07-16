@@ -221,4 +221,27 @@ describe("helix ask prompt launch bridge", () => {
     expect((consumed?.promptId ?? "").length).toBeGreaterThan(0);
     expect(window.localStorage.getItem(HELIX_PENDING_ASK_KEY)).toBeNull();
   });
+
+  it("preserves workflow QTE causal metadata across editable prompt handoff", () => {
+    launchHelixAskPrompt({
+      question: "Find one bounded scholarly paper.",
+      autoSubmit: false,
+      workflowQte: {
+        schema: "helix.workflow_qte_launch.v1",
+        runId: "workflow-demo:test",
+        stepId: "paper_lookup",
+        sourceSessionId: "chat:test",
+      },
+    });
+
+    expect(consumePendingHelixAskPrompt()).toMatchObject({
+      autoSubmit: false,
+      workflowQte: {
+        schema: "helix.workflow_qte_launch.v1",
+        runId: "workflow-demo:test",
+        stepId: "paper_lookup",
+        sourceSessionId: "chat:test",
+      },
+    });
+  });
 });

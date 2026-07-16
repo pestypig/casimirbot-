@@ -67,7 +67,47 @@ describe("theory-badge-locator/v1", () => {
       claimBoundaryNotes: ["nhm2.qei.sampling_window: diagnostic-only badge"],
     });
 
+    expect(artifact.resolution).toBe("matched");
+    expect(artifact.resolutionReason).toBe("matched_graph_evidence");
     expect(validateTheoryBadgeLocatorArtifactV1(artifact)).toEqual([]);
     expect(isTheoryBadgeLocatorArtifactV1(artifact)).toBe(true);
+  });
+
+  it("builds a typed unresolved artifact when no graph evidence matches", () => {
+    const artifact = buildTheoryBadgeLocatorArtifactV1({
+      graphId: "nhm2-theory-badge-graph",
+      input: {
+        query: "Fermat's Last Theorem",
+        expression: null,
+        subjects: [],
+        symbols: [],
+        unitSignatures: [],
+        repoPaths: [],
+        equationFamilies: [],
+        simulationOwners: [],
+        source: "helix_ask",
+      },
+      matches: [],
+      overlay: {
+        centerBadgeIds: [],
+        highlightedBadgeIds: [],
+        highlightedEdgeIds: [],
+        rippleBadgeIds: [],
+        heatByBadgeId: {},
+        suggestedViewport: {
+          centerBadgeId: null,
+          zoom: 1,
+        },
+      },
+      recommendedActions: [],
+      claimBoundaryNotes: [
+        "No canonical theory badge matched the supplied context.",
+        "Locator result is unresolved; no proof or validation claim was made.",
+      ],
+    });
+
+    expect(artifact.resolution).toBe("unresolved");
+    expect(artifact.resolutionReason).toBe("no_supported_graph_match");
+    expect(validateTheoryBadgeLocatorArtifactV1(artifact)).toEqual([]);
   });
 });

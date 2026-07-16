@@ -269,6 +269,38 @@ export const buildRealtimeClientReceiptObservation = (input: {
     source_binding_ref: readString(body.source_binding_ref ?? body.sourceBindingRef),
     failure_code: readString(body.error_code ?? body.errorCode ?? body.failure_code ?? body.failureCode),
     failure_reason: readString(body.blocked_reason ?? body.blockedReason ?? body.failure_reason ?? body.failureReason),
+    selected_model_or_service: readString(
+      body.selected_model_or_service ?? body.selectedModelOrService,
+    ),
+    provider_session_ref: readString(body.provider_session_ref ?? body.providerSessionRef),
+    provider_event_type: readString(body.provider_event_type ?? body.providerEventType),
+    provider_response_ref: readString(body.provider_response_ref ?? body.providerResponseRef),
+    response_status: readString(body.response_status ?? body.responseStatus),
+    vad_state: readString(body.vad_state ?? body.vadState),
+    response_interrupted: body.response_interrupted === true || body.responseInterrupted === true,
+    audio_focus_owner: readString(body.audio_focus_owner ?? body.audioFocusOwner),
+    audio_focus_owner_ref: readString(body.audio_focus_owner_ref ?? body.audioFocusOwnerRef),
+    qualified_user_interruption:
+      body.qualified_user_interruption === true || body.qualifiedUserInterruption === true,
+    speaker_loopback_suppressed:
+      body.speaker_loopback_suppressed === true || body.speakerLoopbackSuppressed === true,
+    terminal_voice_interrupted:
+      body.terminal_voice_interrupted === true || body.terminalVoiceInterrupted === true,
+    barge_in_qualification_basis: readString(
+      body.barge_in_qualification_basis ?? body.bargeInQualificationBasis,
+    ),
+    client_reported_transport_execution_attempted:
+      body.transport_execution_attempted === true || body.transportExecutionAttempted === true,
+    client_reported_openai_network_call_attempted:
+      body.openai_network_call_attempted === true || body.openAiNetworkCallAttempted === true,
+    client_reported_webrtc_started:
+      body.webrtc_started === true || body.webrtcStarted === true,
+    client_reported_media_capture_started:
+      body.media_capture_started === true || body.mediaCaptureStarted === true,
+    client_reported_browser_tracks_created:
+      body.browser_tracks_created === true || body.browserTracksCreated === true,
+    client_reported_data_channels_created:
+      body.data_channels_created === true || body.dataChannelsCreated === true,
     openai_network_call_attempted: false,
     ephemeral_credential_minted: false,
     webrtc_started: false,

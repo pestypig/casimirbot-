@@ -1,0 +1,120 @@
+import express from "express";
+import request from "supertest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { accountSessionRouter } from "../../../../routes/account-session";
+import { realtimeSessionRouter } from "../../../../routes/agi.realtime-session";
+import { resetAccountSessionStore } from "../../../helix-account/account-session-store";
+import { setOpenAiRealtimeContractTransportForTests } from "../adapter";
+import { resetRealtimeSessionRegistryForTests } from "../session-registry";
+import { setOpenAiRealtimeSdpTransportForTests } from "../sdp-transport";
+
+const ENV_KEYS = [
+  "HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED",
+  "HELIX_REALTIME_SESSION_ADAPTER_ENABLED",
+  "HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED",
+  "HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED",
+  "OPENAI_API_KEY",
+] as const;
+
+const priorEnv = new Map<string, string | undefined>();
+
+const createApp = () => {
+  const app = express();
+  app.use(express.json({ limit: "256kb" }));
+  app.use("/api/account", accountSessionRouter);
+  app.use("/api/agi", realtimeSessionRouter);
+  return app;
+};
+
+describe("Realtime SDP route", () => {
+  beforeEach(async () => {
+    await resetAccountSessionStore();
+    resetRealtimeSessionRegistryForTests();
+    for (const key of ENV_KEYS) priorEnv.set(key, process.env[key]);
+    process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED = "1";
+    process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED = "1";
+    process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED = "1";
+    process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED = "1";
+    process.env.OPENAI_API_KEY = "server-key-must-not-leak";
+    setOpenAiRealtimeContractTransportForTests(async () => ({
+      ok: true,
+      providerSessionRef: "provider:admission",
+      ephemeralClientSecret: "internal-only",
+    }));
+  });
+
+  afterEach(() => {
+    setOpenAiRealtimeContractTransportForTests(null);
+    setOpenAiRealtimeSdpTransportForTests(null);
+    resetRealtimeSessionRegistryForTests();
+    for (const key of ENV_KEYS) {
+      const value = priorEnv.get(key);
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    priorEnv.clear();
+    vi.restoreAllMocks();
+  });
+
+  it("exchanges SDP only for the admitted developer session and matching consent", async () => {
+    const sdpTransport = vi.fn(async () => ({
+      ok: true,
+      answerSdp: "v=0\r\nanswer",
+      providerCallRef: "openai-realtime:call:test",
+    }));
+    setOpenAiRealtimeSdpTransportForTests(sdpTransport);
+    const agent = request.agent(createApp());
+    await agent.post("/api/account/session/sign-in")
+      .send({ profile_id: "profile:developer-realtime-sdp" })
+      .expect(200);
+    const admission = await agent.post("/api/agi/realtime/session").send({
+      runtime_agent_mode: "live_voice",
+      runtime_agent_authority: "observe_only",
+      transport: "webrtc",
+      sdp_exchange_mode: "server",
+      selected_model_or_service: "gpt-realtime-2.1",
+      selected_realtime_voice: "marin",
+      visible_user_consent_receipt: "receipt:visible-consent:sdp",
+    }).expect(200);
+
+    const response = await agent
+      .post(`/api/agi/realtime/session/${encodeURIComponent(admission.body.realtime_session_id)}/sdp`)
+      .send({
+        offer_sdp: "v=0\r\noffer",
+        visible_user_consent_receipt: "receipt:visible-consent:sdp",
+      })
+      .expect(200);
+
+    expect(sdpTransport).toHaveBeenCalledWith(expect.objectContaining({
+      apiKey: "server-key-must-not-leak",
+      offerSdp: "v=0\r\noffer",
+      model: "gpt-realtime-2.1",
+      voice: "marin",
+    }));
+    expect(response.body).toMatchObject({
+      schema: "helix.realtime_session.sdp_exchange_response.v1",
+      ok: true,
+      error: null,
+      answer_sdp: "v=0\r\nanswer",
+      provider_call_ref: "openai-realtime:call:test",
+      openai_network_call_attempted: true,
+      webrtc_started: true,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(JSON.stringify(response.body)).not.toContain("server-key-must-not-leak");
+    expect(JSON.stringify(response.body)).not.toContain("internal-only");
+  });
+
+  it("fails closed before OpenAI for absent admission or mismatched consent", async () => {
+    const sdpTransport = vi.fn();
+    setOpenAiRealtimeSdpTransportForTests(sdpTransport);
+    await request(createApp())
+      .post("/api/agi/realtime/session/realtime%3Aunknown/sdp")
+      .send({ offer_sdp: "v=0\r\noffer", visible_user_consent_receipt: "receipt:none" })
+      .expect(403);
+    expect(sdpTransport).not.toHaveBeenCalled();
+  });
+});

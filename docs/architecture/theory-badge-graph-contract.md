@@ -125,6 +125,27 @@ favor reflection, atlas, repo/source, scholarly, or benchmark utilities before
 claim synthesis. A focused mode can admit calculator or compound-run actions
 when the selected badges expose scalar payloads or runtime rows.
 
+### Open-world placement and dynamic derivation
+
+The conditional candidate probabilities do not exhaust theory space. Reflection
+must also emit represented graph mass, an explicit out-of-graph hypothesis, and
+open-world entropy. These values remain locator telemetry rather than truth
+probability. An empty supported candidate set has out-of-graph probability one.
+
+Congruence reflection also compiles a non-terminal `theory_master_problem/v1`
+artifact. The artifact records the normalized operation and target observable,
+selected equations, registered graph bridges, symbol maps, unit and scale-domain
+checks, missing bindings, computability status, allowed result kinds, and a
+separated uncertainty ledger. It may declare a path eligible for the completed
+solver path, but it cannot execute tools, answer, validate a theory, solve a
+physical mechanism, or promote an equation.
+
+The compiler may compose only registered graph relations. When selected badges
+have no registered bridge it emits `missing_bridge_relation`; noncomputable
+references remain representable and non-executable. New agent-proposed relations
+remain conjectures outside the canonical graph until a separate evidence and
+promotion review accepts them.
+
 ## Tool-Call Contract
 
 Helix Ask admits theory graph utilities through the congruence trace. A batch is

@@ -26,6 +26,7 @@ import {
   VISUAL_OBSERVER_QUERY_PROFILES_CAPABILITY,
   VISUAL_OBSERVER_TEST_PROFILE_CAPABILITY,
   THEORY_CONTEXT_REFLECTION_CAPABILITY,
+  THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY,
   VOICE_INTERIM_CALLOUT_CAPABILITY,
   VOICE_NARRATOR_SAY_CAPABILITY,
   WORKSTATION_ACTIVE_CONTEXT_CAPABILITY,
@@ -53,6 +54,7 @@ import {
 } from "./compound-dependency-requests";
 import {
   buildActiveCalculatorContextWorkstationGatewayCallRequests,
+  buildActiveTheoryBadgeGraphContextWorkstationGatewayCallRequests,
   buildActiveTheoryRuntimeContextWorkstationGatewayCallRequests,
   buildActiveDocsContextWorkstationGatewayCallRequests,
   buildActiveWorkstationContextGatewayCallRequests,
@@ -118,6 +120,7 @@ const MORAL_GRAPH_FORBIDDEN_ADJACENT_CAPABILITY_FAMILIES: Record<string, Forbidd
   [VISUAL_OBSERVER_TEST_PROFILE_CAPABILITY]: ["visual_evidence"],
   [VISUAL_OBSERVER_COMPARE_PROFILES_CAPABILITY]: ["visual_evidence"],
   [WORKSTATION_ACTIVE_CONTEXT_CAPABILITY]: ["ambient_context"],
+  [THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY]: ["ambient_context"],
 };
 
 const NEGATED_EVIDENCE_FAMILY_PATTERNS: Record<ForbiddenEvidenceFamily, RegExp> = {
@@ -264,7 +267,10 @@ const contextualSuppressionFamilyForCapability = (
     capability === CALCULATOR_ACTIVE_CONTEXT_CAPABILITY ||
     capability === CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY
   ) return "calculator";
-  if (capability === THEORY_CONTEXT_REFLECTION_CAPABILITY) return "theory_locator";
+  if (
+    capability === THEORY_CONTEXT_REFLECTION_CAPABILITY ||
+    capability === THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY
+  ) return "theory_locator";
   if (
     capability === MORAL_GRAPH_REFLECTION_CAPABILITY ||
     capability === MORAL_SUBSTRATE_PRIMARY_CAPABILITY
@@ -301,6 +307,12 @@ const filterContextuallySuppressedPromptRequests = (
   }
   return requests.filter((request) => {
     const capability = readString(request.capability_id) ?? readString(request.capabilityId);
+    const narrowerSearchSuppressionAllowsFullText =
+      capability === SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY &&
+      /^(?:internet_search\.web_research|scholarly-research\.lookup_papers)$/i.test(
+        suppression.verb_or_cue,
+      );
+    if (narrowerSearchSuppressionAllowsFullText) return true;
     const family = contextualSuppressionFamilyForCapability(capability);
     return !family || !contextualToolSuppressionBlocksFamily(suppression, family);
   });
@@ -513,6 +525,7 @@ export {
 } from "./compound-dependency-requests";
 export {
   buildActiveCalculatorContextWorkstationGatewayCallRequests,
+  buildActiveTheoryBadgeGraphContextWorkstationGatewayCallRequests,
   buildActiveTheoryRuntimeContextWorkstationGatewayCallRequests,
   buildActiveDocsContextWorkstationGatewayCallRequests,
   buildActiveWorkstationContextGatewayCallRequests,
@@ -534,6 +547,125 @@ export {
   buildPromptNamedCapabilityGatewayCallRequests,
 } from "./prompt-named-tool-requests";
 
+const isScholarlyLookupPortfolioCloser = (request: Record<string, unknown>): boolean => {
+  const capability = readString(request.capability_id) ?? readString(request.capabilityId);
+  const args = readRecord(request.arguments ?? request.args);
+  return capability === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY &&
+    args?.allow_scholarly_dependent_chain === true &&
+    args?.scholarly_claim_portfolio === true;
+};
+
+export const selectScholarlyPortfolioDependencySeedResult = (
+  results: HelixWorkstationGatewayCallResult[],
+  fallback: HelixWorkstationGatewayCallResult,
+): HelixWorkstationGatewayCallResult =>
+  [...results].reverse().find((result) =>
+    result.capability_id === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY && result.ok === true
+  ) ?? fallback;
+
+const attachPromptRequiredScholarlyPortfolioChain = (
+  body: Record<string, unknown>,
+  requests: Record<string, unknown>[],
+): Record<string, unknown>[] => {
+  if (requests.some((request) =>
+    (readString(request.capability_id) ?? readString(request.capabilityId)) === SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY
+  )) return requests;
+  const lookupIndexes = requests.flatMap((request, index) =>
+    (readString(request.capability_id) ?? readString(request.capabilityId)) === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY
+      ? [index]
+      : []
+  );
+  if (lookupIndexes.length === 0 || requests.some(isScholarlyLookupPortfolioCloser)) return requests;
+  const chainTemplate = buildPromptDerivedScholarlyResearchGatewayCallRequests(body)
+    .find((request) =>
+      readString(request.compound_outcome) === "scholarly_research_workflow" &&
+      (readString(request.dependent_capability_id) ?? readString(request.dependentCapabilityId)) ===
+        SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY
+    );
+  if (!chainTemplate) return requests;
+  const closerIndex = lookupIndexes.at(-1)!;
+  const closer = requests[closerIndex];
+  const closerArgs = readRecord(closer.arguments ?? closer.args) ?? {};
+  const templateArgs = readRecord(chainTemplate.arguments ?? chainTemplate.args) ?? {};
+  const closerIntent = readRecord(closerArgs.source_target_intent);
+  const templateIntent = readRecord(templateArgs.source_target_intent);
+  const enriched = [...requests];
+  enriched[closerIndex] = {
+    ...closer,
+    compound_outcome: readString(chainTemplate.compound_outcome),
+    subgoal_id: readString(chainTemplate.subgoal_id),
+    dependent_capability_id: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+    arguments: {
+      ...closerArgs,
+      allow_scholarly_dependent_chain: true,
+      requested_full_text_count: templateArgs.requested_full_text_count ?? 1,
+      scholarly_claim_portfolio: true,
+      ...(closerArgs.scholarly_intent === undefined && templateArgs.scholarly_intent !== undefined
+        ? { scholarly_intent: templateArgs.scholarly_intent }
+        : {}),
+      ...(closerArgs.planned_scholarly_capability_chain === undefined &&
+        templateArgs.planned_scholarly_capability_chain !== undefined
+        ? { planned_scholarly_capability_chain: templateArgs.planned_scholarly_capability_chain }
+        : {}),
+      source_target_intent: {
+        ...(templateIntent ?? {}),
+        ...(closerIntent ?? {}),
+        compound_outcome: "scholarly_research_workflow",
+        claim_portfolio_closer: true,
+      },
+    },
+  };
+  return enriched;
+};
+
+const attachRequiredTheoryBadgeGraphContextRequests = (
+  body: Record<string, unknown>,
+  requests: Record<string, unknown>[],
+): Record<string, unknown>[] => {
+  const currentContextRequests = buildActiveTheoryBadgeGraphContextWorkstationGatewayCallRequests(body);
+  if (currentContextRequests.length === 0) return requests;
+  const structuredReflectionRequests = buildStructuredAdmissionWorkstationGatewayCallRequests(body)
+    .filter((request) =>
+      (readString(request.capability_id) ?? readString(request.capabilityId)) === THEORY_CONTEXT_REFLECTION_CAPABILITY
+    );
+  const promptReflectionRequests = buildPromptDerivedTheoryReflectionGatewayCallRequests(body)
+    .filter((request) =>
+      (readString(request.capability_id) ?? readString(request.capabilityId)) === THEORY_CONTEXT_REFLECTION_CAPABILITY
+    );
+  const prompt = readPrompt(body) ?? "";
+  const reflectionRequests = structuredReflectionRequests.length > 0
+    ? structuredReflectionRequests
+    : promptReflectionRequests.length > 0
+      ? promptReflectionRequests
+      : [{
+          schema: "helix.workstation_gateway.theory_badge_graph_context_dependency_call_request.v1",
+          derivation_source: "helix_theory_badge_graph_current_context_dependency",
+          capability_id: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+          mode: "read",
+          arguments: {
+            prompt,
+            conversation_context: prompt,
+            build_explanation_plan: true,
+            source_target_intent: {
+              source: "helix_theory_badge_graph_current_context_dependency",
+              target_source: "theory_badge_graph",
+              target_kind: "theory_context_reflection",
+              depends_on_capability_id: THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY,
+              dependency_binding: "current_selection_to_theory_reflection",
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          },
+        }];
+  const augmented: Record<string, unknown>[] = [];
+  const seen = new Set<string>();
+  appendDedupe(augmented, seen, requests);
+  appendDedupe(augmented, seen, reflectionRequests);
+  appendDedupe(augmented, seen, currentContextRequests);
+  return augmented;
+};
+
 export const readWorkstationGatewayCallRequestsForTurn = (input: {
   body: Record<string, unknown>;
   includePlannerDerived?: boolean;
@@ -542,8 +674,13 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   if (explicit.length > 0) {
     const deduplicated: Record<string, unknown>[] = [];
     appendDedupe(deduplicated, new Set<string>(), explicit);
+    const chainAwareExplicit = attachPromptRequiredScholarlyPortfolioChain(input.body, deduplicated);
+    const dependencyCompleteExplicit = attachRequiredTheoryBadgeGraphContextRequests(
+      input.body,
+      chainAwareExplicit,
+    );
     const prompt = readPrompt(input.body) ?? "";
-    const admittedExplicit = filterRequestsAllowedByCommittedRoute(input.body, deduplicated).filter((request) => {
+    const admittedExplicit = filterRequestsAllowedByCommittedRoute(input.body, dependencyCompleteExplicit).filter((request) => {
       const capability = readString(request.capability_id) ?? readString(request.capabilityId);
       return !gatewayCapabilityNegatedByPrompt(prompt, capability);
     });
@@ -618,6 +755,7 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
     readRecord(input.body.source_target_intent ?? input.body.sourceTargetIntent),
   );
   if (hasPrimaryStructuredAdmission && structured.length > 0) {
+    appendPromptDerivedDedupe(buildActiveTheoryBadgeGraphContextWorkstationGatewayCallRequests(input.body));
     return finalizeRequests(reduceMoralGraphRequestsToPrimary({
       requests,
       prompt,
@@ -667,6 +805,7 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   }
   const activeCalculatorContext = buildActiveCalculatorContextWorkstationGatewayCallRequests(input.body);
   appendPromptDerivedDedupe(activeCalculatorContext);
+  appendPromptDerivedDedupe(buildActiveTheoryBadgeGraphContextWorkstationGatewayCallRequests(input.body));
   appendPromptDerivedDedupe(buildActiveTheoryRuntimeContextWorkstationGatewayCallRequests(input.body));
   const activeWorkstationContext = buildActiveWorkstationContextGatewayCallRequests(input.body);
   appendPromptDerivedDedupe(activeWorkstationContext);
@@ -717,6 +856,7 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
     researchLibraryRequests.length === 0 &&
     !promptNamedCapabilities.has(SCHOLARLY_RESEARCH_SEARCH_CAPABILITY) &&
     !promptNamedCapabilities.has(SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY) &&
+    !compoundDependencyCapabilities.has(SCHOLARLY_RESEARCH_SEARCH_CAPABILITY) &&
     (compoundDependencyCapabilities.size === 0 || allowsCompoundAdjunctCapabilities)
   ) {
     appendPromptDerivedDedupe(buildPromptDerivedScholarlyResearchGatewayCallRequests(input.body));
@@ -754,6 +894,84 @@ export const runExplicitWorkstationGatewayCalls = async (input: {
   const turnId = input.turnId ?? readHelixAgentTurnId(input.body);
   const results: HelixWorkstationGatewayCallResult[] = [];
   const profileId = readString(input.body.research_library_owner_id);
+  const executeDependentChain = async (
+    request: Record<string, unknown>,
+    result: HelixWorkstationGatewayCallResult,
+  ): Promise<void> => {
+    const dependentRequest = buildDependentCompoundCapabilityGatewayCallRequest({
+      request,
+      result,
+      results,
+      turnId,
+    });
+    const dependencyRailStatus = buildCompoundDependencyRailStatus({
+      request,
+      result,
+      results,
+      dependentRequest,
+    });
+    if (dependencyRailStatus) {
+      const observation = readRecord(result.observation);
+      if (observation) {
+        observation.compound_dependency_plan = dependencyRailStatus;
+      }
+      result.observation_packet.state_delta = {
+        ...(readRecord(result.observation_packet.state_delta) ?? {}),
+        compound_dependency_plan: dependencyRailStatus,
+      };
+    }
+    if (dependentRequest && isCodexReasoningDependentRequest(dependentRequest)) {
+      attachDependentRequestAsNextAffordance(result, dependentRequest);
+    }
+    if (!shouldAutoExecuteDependentCompoundRequest(dependentRequest)) return;
+    let nextDependentRequest: Record<string, unknown> | null = dependentRequest;
+    let dependentDepth = 0;
+    while (nextDependentRequest && dependentDepth < 4) {
+      dependentDepth += 1;
+      const dependentResult = await callWorkstationGatewayCapability({
+        agentRuntime: input.agentRuntime,
+        mode: readString(nextDependentRequest.mode),
+        capabilityId: readString(nextDependentRequest.capability_id) ?? "",
+        arguments: readRecord(nextDependentRequest.arguments) ?? {},
+        turnId,
+        iteration: results.length + 1,
+        profileId,
+      });
+      results.push(dependentResult);
+      const followupDependentRequest = buildDependentCompoundCapabilityGatewayCallRequest({
+        request: nextDependentRequest,
+        result: dependentResult,
+        results,
+        turnId,
+      });
+      const followupRailStatus = buildCompoundDependencyRailStatus({
+        request: nextDependentRequest,
+        result: dependentResult,
+        results,
+        dependentRequest: followupDependentRequest,
+      });
+      if (followupRailStatus) {
+        const dependentObservation = readRecord(dependentResult.observation);
+        if (dependentObservation) {
+          dependentObservation.compound_dependency_plan = followupRailStatus;
+        }
+        dependentResult.observation_packet.state_delta = {
+          ...(readRecord(dependentResult.observation_packet.state_delta) ?? {}),
+          compound_dependency_plan: followupRailStatus,
+        };
+      }
+      if (followupDependentRequest && isCodexReasoningDependentRequest(followupDependentRequest)) {
+        attachDependentRequestAsNextAffordance(dependentResult, followupDependentRequest);
+        nextDependentRequest = null;
+      } else {
+        nextDependentRequest = followupDependentRequest;
+      }
+    }
+  };
+  let scholarlyPortfolioCloser: {
+    request: Record<string, unknown>;
+    result: HelixWorkstationGatewayCallResult;
+  } | null = null;
   for (const [index, request] of requests.entries()) {
     const result = await callWorkstationGatewayCapability({
       agentRuntime: input.agentRuntime,
@@ -766,76 +984,17 @@ export const runExplicitWorkstationGatewayCalls = async (input: {
       profileId,
     });
     results.push(result);
-    const dependentVoiceRequest = buildDependentCompoundCapabilityGatewayCallRequest({
-      request,
-      result,
-      results,
-      turnId,
-    });
-    const dependencyRailStatus = buildCompoundDependencyRailStatus({
-      request,
-      result,
-      results,
-      dependentRequest: dependentVoiceRequest,
-    });
-    if (dependencyRailStatus) {
-      const observation = readRecord(result.observation);
-      if (observation) {
-        observation.compound_dependency_plan = dependencyRailStatus;
-      }
-      result.observation_packet.state_delta = {
-        ...(readRecord(result.observation_packet.state_delta) ?? {}),
-        compound_dependency_plan: dependencyRailStatus,
-      };
+    if (isScholarlyLookupPortfolioCloser(request)) {
+      scholarlyPortfolioCloser = { request, result };
+      continue;
     }
-    if (dependentVoiceRequest && isCodexReasoningDependentRequest(dependentVoiceRequest)) {
-      attachDependentRequestAsNextAffordance(result, dependentVoiceRequest);
-    }
-    if (shouldAutoExecuteDependentCompoundRequest(dependentVoiceRequest)) {
-      let nextDependentRequest: Record<string, unknown> | null = dependentVoiceRequest;
-      let dependentDepth = 0;
-      while (nextDependentRequest && dependentDepth < 4) {
-        dependentDepth += 1;
-        const dependentResult = await callWorkstationGatewayCapability({
-        agentRuntime: input.agentRuntime,
-          mode: readString(nextDependentRequest.mode),
-          capabilityId: readString(nextDependentRequest.capability_id) ?? "",
-          arguments: readRecord(nextDependentRequest.arguments) ?? {},
-        turnId,
-        iteration: results.length + 1,
-        profileId,
-        });
-        results.push(dependentResult);
-        const followupDependentRequest = buildDependentCompoundCapabilityGatewayCallRequest({
-          request: nextDependentRequest,
-          result: dependentResult,
-          results,
-          turnId,
-        });
-        const followupRailStatus = buildCompoundDependencyRailStatus({
-          request: nextDependentRequest,
-          result: dependentResult,
-          results,
-          dependentRequest: followupDependentRequest,
-        });
-        if (followupRailStatus) {
-          const dependentObservation = readRecord(dependentResult.observation);
-          if (dependentObservation) {
-            dependentObservation.compound_dependency_plan = followupRailStatus;
-          }
-          dependentResult.observation_packet.state_delta = {
-            ...(readRecord(dependentResult.observation_packet.state_delta) ?? {}),
-            compound_dependency_plan: followupRailStatus,
-          };
-        }
-        if (followupDependentRequest && isCodexReasoningDependentRequest(followupDependentRequest)) {
-          attachDependentRequestAsNextAffordance(dependentResult, followupDependentRequest);
-          nextDependentRequest = null;
-        } else {
-          nextDependentRequest = followupDependentRequest;
-        }
-      }
-    }
+    await executeDependentChain(request, result);
+  }
+  if (scholarlyPortfolioCloser) {
+    await executeDependentChain(
+      scholarlyPortfolioCloser.request,
+      selectScholarlyPortfolioDependencySeedResult(results, scholarlyPortfolioCloser.result),
+    );
   }
   const turnCompoundDependencyPlan = buildTurnCompoundDependencyPlan({
     turnId,

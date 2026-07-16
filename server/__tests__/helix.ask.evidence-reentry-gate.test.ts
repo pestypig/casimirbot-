@@ -1052,6 +1052,55 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
     expect(trace.solver_risk_flags.map(String)).not.toContain("contextual_tool_mention_executed");
   });
 
+  it("does not treat a negated paper search as a ban on an explicit full-text fetch", () => {
+    const trace = buildAskTurnSolverTrace({
+      turnId: "turn:direct-fulltext-no-search",
+      promptText: [
+        "Fetch and parse the full text for arXiv gr-qc/9510071.",
+        "Return one page-numbered passage or equation.",
+        "Do not search for other papers.",
+      ].join(" "),
+      selectedRoute: "/ask",
+      terminalArtifactKind: "scholarly_research_answer",
+      finalAnswerSource: "scholarly_research_answer",
+      payload: {
+        ...authorityPayload({
+          sourceTarget: "scholarly_research",
+          allowed: ["scholarly_research_answer", "typed_failure"],
+        }),
+        tool_call_admission_decision: {
+          admitted_tool_families: ["workstation_tool_gateway"],
+          forbidden_tool_families: [],
+        },
+      },
+      loopParityTrace: {
+        actual_tool_calls: [{
+          tool_id: "scholarly-research.fetch_full_text",
+          family: "scholarly_research",
+          admitted: true,
+          mutating: false,
+          result_ref: "obs:fulltext",
+        }],
+        unexpected_tool_calls: [],
+        observations_created: [{ observation_id: "obs:fulltext", source_kind: "scholarly_full_text_observation" }],
+        evidence_selected_for_answer: ["obs:fulltext"],
+        evidence_rejected_for_answer: [],
+        terminal_selection_ran_after_observations: true,
+        route_authority_ok: true,
+        poison_audit_ok: true,
+        terminal_authority_ok: true,
+      },
+    });
+
+    expect(trace.prompt_interpretation.contextual_tool_mentions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ verb_or_cue: "internet_search.web_research", reason: "negated" }),
+    ]));
+    expect(trace.contextual_tool_audit.blocked_families).toContain("internet_search");
+    expect(trace.contextual_tool_audit.blocked_families).not.toContain("scholarly_research");
+    expect(trace.contextual_tool_audit.executed_blocked_tool_ids).toEqual([]);
+    expect(trace.solver_risk_flags).not.toContain("blocked_contextual_tool_executed");
+  });
+
   it("hard-fails only when a contextual write negation matches an executed blocked family", () => {
     const trace = buildAskTurnSolverTrace({
       turnId: "turn:blocked-contextual-note",

@@ -48,6 +48,41 @@ export type HelixScholarlyTerminalEvidenceRequirement =
   | "numeric_values"
   | "calculation_from_numeric_values";
 
+export type HelixScholarlyEvidenceDepth =
+  | "metadata_lookup"
+  | "abstract_or_snippet"
+  | "full_text"
+  | "page_image_parse"
+  | "scientific_evidence_packet"
+  | "numeric_values"
+  | "calculation_from_numeric_values";
+
+export type HelixScholarlyEvidenceProduct =
+  | "paper_metadata"
+  | "full_text_summary"
+  | "page_grounded_passage"
+  | "exact_equation"
+  | "numeric_parameters"
+  | "calculation";
+
+export type HelixScholarlyEvidenceAlternative = {
+  product: HelixScholarlyEvidenceProduct;
+  minimum_depth: HelixScholarlyEvidenceDepth;
+  exactness: "bounded" | "exact";
+};
+
+export type HelixScholarlyEvidenceDemand = {
+  schema: "helix.scholarly_evidence_demand.v1";
+  satisfaction: "all_of" | "any_of";
+  alternatives: HelixScholarlyEvidenceAlternative[];
+  required_modes: string[];
+  optional_modes: string[];
+  minimum_satisfying_depth: HelixScholarlyEvidenceDepth;
+  derivation_reasons: string[];
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
 export type HelixScholarlyIntent = {
   schema: "helix.scholarly_intent.v1";
   original_prompt: string;
@@ -59,6 +94,7 @@ export type HelixScholarlyIntent = {
   requires_numeric_extraction: boolean;
   requires_calculation: boolean;
   terminal_evidence_requirement: HelixScholarlyTerminalEvidenceRequirement;
+  evidence_demand: HelixScholarlyEvidenceDemand;
   query_normalization_reasons: string[];
   assistant_answer: false;
   raw_content_included: false;
@@ -85,6 +121,13 @@ export type HelixScholarlyEvidenceState =
   | "numeric_evidence_missing"
   | "answer_ready"
   | "answer_blocked";
+
+export const HELIX_SCHOLARLY_TERMINAL_READY_EVIDENCE_STATES = [
+  "lookup_usable",
+  "full_text_usable",
+  "numeric_evidence_usable",
+  "answer_ready",
+] as const satisfies readonly HelixScholarlyEvidenceState[];
 
 export type HelixScholarlyResponseMode =
   | "scholarly_metadata_answer"

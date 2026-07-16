@@ -21,6 +21,7 @@ import {
   REPO_SEARCH_CAPABILITY,
   SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
   THEORY_CONTEXT_REFLECTION_ALIAS_CAPABILITIES,
+  THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY,
   THEORY_CONTEXT_REFLECTION_CAPABILITY,
   THEORY_FRONTIER_CONJECTURE_CAPABILITY,
   VISUAL_OBSERVER_COMPARE_PROFILES_CAPABILITY,
@@ -37,6 +38,7 @@ import {
   readString,
   unquotePrompt,
 } from "./explicit-tool-requests";
+import { isTheoryBadgeGraphCurrentContextPrompt } from "../theory-badge-graph-current-context-intent";
 import { appendDedupe } from "./gateway-request-dedupe";
 import {
   extractCalculatorMathTokenSequence,
@@ -457,6 +459,45 @@ export const buildActiveTheoryRuntimeContextWorkstationGatewayCallRequests = (
         request_id: requestId,
         receipt_id: receiptId,
         output_role: "evidence_for_synthesis",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    },
+  }];
+};
+
+export const buildActiveTheoryBadgeGraphContextWorkstationGatewayCallRequests = (
+  body: Record<string, unknown>,
+): Record<string, unknown>[] => {
+  const prompt = readPrompt(body);
+  if (!prompt || !isTheoryBadgeGraphCurrentContextPrompt(prompt)) return [];
+  const workspaceSnapshot = readWorkspaceSnapshot(body);
+  const activePanel = readWorkspaceActivePanel(workspaceSnapshot);
+  const currentContext = readRecord(
+    workspaceSnapshot?.activeTheoryBadgeGraphContext ??
+      workspaceSnapshot?.active_theory_badge_graph_context,
+  );
+  if (!currentContext) return [];
+  const panelOpen = currentContext.panel_open === true ||
+    readArray(workspaceSnapshot?.openPanels ?? workspaceSnapshot?.open_panels).some(
+      (panelId) => readString(panelId) === "theory-badge-graph",
+    );
+  if (activePanel !== "theory-badge-graph" && !panelOpen) return [];
+
+  return [{
+    schema: "helix.workstation_gateway.active_theory_badge_graph_context_call_request.v1",
+    derivation_source: "helix_active_theory_badge_graph_context",
+    capability_id: THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY,
+    mode: "read",
+    arguments: {
+      current_context: currentContext,
+      source_target_intent: {
+        source: "helix_active_theory_badge_graph_context",
+        target_source: "theory_badge_graph",
+        target_kind: "theory_badge_graph_current_context",
+        focused_panel: activePanel,
+        deictic_prompt: true,
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,

@@ -44,6 +44,7 @@ export const INTERNET_SEARCH_ALIAS_CAPABILITIES = [
 export const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY;
 export const SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY = HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY;
 export const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context" as const;
+export const THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY = "theory-badge-graph.current_context" as const;
 export const THEORY_CONTEXT_REFLECTION_ALIAS_CAPABILITIES = [
   "helix_ask.reflect_theory_context",
 ] as const;

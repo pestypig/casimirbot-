@@ -104,6 +104,13 @@ export type TheoryContextReflectionUncertaintyV1 = {
   informationGainBits: number;
   normalizedMass: number;
   uncertaintyMode: TheoryContextReflectionUncertaintyModeV1;
+  representedProbabilityMass?: number;
+  outOfGraphProbability?: number;
+  openWorldCandidateProbabilityById?: Record<string, number>;
+  openWorldEntropyBits?: number;
+  openWorldPlacementCertainty?: number;
+  coverageBasis?: "closed_world_default" | "caller_calibrated" | "absolute_match_score_heuristic" | "no_candidates";
+  openWorldInterpretation?: "includes_out_of_graph_hypothesis_not_truth_claim";
 };
 
 export type TheoryContextReflectionOverlayV1 = {
@@ -277,6 +284,40 @@ function validateUncertainty(value: unknown, issues: string[]): void {
   }
   if (!["broad", "focused", "ambiguous"].includes(String(value.uncertaintyMode))) {
     issues.push("overlay.uncertainty.uncertaintyMode is invalid");
+  }
+  if (value.openWorldCandidateProbabilityById !== undefined) {
+    validateProbabilityMap(
+      "overlay.uncertainty.openWorldCandidateProbabilityById",
+      value.openWorldCandidateProbabilityById,
+      issues,
+    );
+  }
+  for (const field of [
+    "representedProbabilityMass",
+    "outOfGraphProbability",
+    "openWorldEntropyBits",
+    "openWorldPlacementCertainty",
+  ] as const) {
+    if (value[field] === undefined) continue;
+    if (!isFiniteNumber(value[field])) {
+      issues.push(`overlay.uncertainty.${field} must be a finite number`);
+    } else if (value[field] < 0 || (field !== "openWorldEntropyBits" && value[field] > 1)) {
+      issues.push(`overlay.uncertainty.${field} must be between 0 and 1`);
+    }
+  }
+  if (
+    value.coverageBasis !== undefined &&
+    !["closed_world_default", "caller_calibrated", "absolute_match_score_heuristic", "no_candidates"].includes(
+      String(value.coverageBasis),
+    )
+  ) {
+    issues.push("overlay.uncertainty.coverageBasis is invalid");
+  }
+  if (
+    value.openWorldInterpretation !== undefined &&
+    value.openWorldInterpretation !== "includes_out_of_graph_hypothesis_not_truth_claim"
+  ) {
+    issues.push("overlay.uncertainty.openWorldInterpretation is invalid");
   }
 }
 

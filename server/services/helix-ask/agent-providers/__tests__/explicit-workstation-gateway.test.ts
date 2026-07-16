@@ -9,6 +9,7 @@ import {
   buildPromptDerivedWorkspaceStatusGatewayCallRequests,
   readWorkstationGatewayCallRequestsForTurn,
   runExplicitWorkstationGatewayCalls,
+  selectScholarlyPortfolioDependencySeedResult,
   shouldAutoExecuteDependentCompoundRequest,
 } from "../explicit-workstation-gateway";
 import {
@@ -137,6 +138,215 @@ describe("explicit workstation gateway derived calls", () => {
       "quantum interest positive energy overcompensation",
       "quantum inequalities wormholes warp drives",
     ]);
+  });
+
+  it("carries an affirmative best-three full-text contract onto an explicit scholarly lookup portfolio", () => {
+    const lookupCalls = Array.from({ length: 10 }, (_, index) => ({
+      capability_id: "scholarly-research.lookup_papers",
+      mode: "read",
+      arguments: { query: `quantum inequality claim ${index + 1}`, limit: 3 },
+    }));
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question: [
+          "Find scholarly references supporting the quantum-inequality claims we discussed.",
+          "Search arXiv and the other scholarly providers. Build a claim-to-citation map,",
+          "identify which papers have accessible full text, and fetch the best three accessible sources.",
+          "Clearly distinguish metadata-only evidence from full-text evidence.",
+        ].join(" "),
+        workstation_gateway_calls: lookupCalls,
+      },
+    });
+
+    expect(requests).toHaveLength(10);
+    expect(requests.slice(0, -1).every((request) => request.compound_outcome === undefined)).toBe(true);
+    expect(requests.at(-1)).toMatchObject({
+      capability_id: "scholarly-research.lookup_papers",
+      compound_outcome: "scholarly_research_workflow",
+      dependent_capability_id: "scholarly-research.fetch_full_text",
+      arguments: {
+        query: "quantum inequality claim 10",
+        allow_scholarly_dependent_chain: true,
+        requested_full_text_count: 3,
+        scholarly_claim_portfolio: true,
+        source_target_intent: {
+          compound_outcome: "scholarly_research_workflow",
+          claim_portfolio_closer: true,
+        },
+      },
+    });
+  });
+
+  it("keeps the best-three full-text chain when the prompt also specifies conditional retry behavior", () => {
+    const promptText = [
+      "Find three unique, directly relevant primary papers supporting quantum-inequality constraints on negative energy, traversable wormholes, or warp drives.",
+      "Search the scholarly providers, deduplicate papers across DOI, arXiv, title, and provider records, and fetch full text for three unique sources.",
+      "If a fetch fails or duplicates an existing paper, continue searching.",
+      "Build a claim-to-citation map using page- or equation-level support from fetched text.",
+    ].join(" ");
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question: promptText,
+        workstation_gateway_calls: [{
+          capability_id: "scholarly-research.lookup_papers",
+          mode: "read",
+          arguments: { query: "quantum inequalities wormholes warp drives", limit: 6 },
+        }],
+      },
+    });
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({
+      capability_id: "scholarly-research.lookup_papers",
+      compound_outcome: "scholarly_research_workflow",
+      dependent_capability_id: "scholarly-research.fetch_full_text",
+      arguments: {
+        query: "quantum inequalities wormholes warp drives",
+        allow_scholarly_dependent_chain: true,
+        requested_full_text_count: 3,
+      },
+    });
+  });
+
+  it("keeps citation-level equation support in the automatic scholarly full-text workflow", () => {
+    const promptText = [
+      "Find three unique, directly relevant primary papers supporting quantum-inequality constraints on negative energy, traversable wormholes, or warp drives.",
+      "Search the scholarly providers, deduplicate papers across DOI, arXiv, title, and provider records, and fetch full text for three unique sources.",
+      "If a fetch fails or duplicates an existing paper, continue searching.",
+      "Build a claim-to-citation map using page- or equation-level support from fetched text.",
+      "Clearly distinguish full-text evidence from metadata-only evidence, and do not count duplicate provider records as separate sources.",
+    ].join(" ");
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question: promptText,
+      },
+    });
+
+    expect(requests).toHaveLength(3);
+    expect(requests.map((request) => (request.arguments as any).query)).toEqual([
+      "quantum-inequality constraints on negative energy",
+      "quantum-inequality constraints on traversable wormholes",
+      "quantum-inequality constraints on warp drives",
+    ]);
+    expect(requests.slice(0, -1).every((request) => request.compound_outcome === undefined)).toBe(true);
+    expect(requests.at(-1)).toMatchObject({
+      capability_id: "scholarly-research.lookup_papers",
+      compound_outcome: "scholarly_research_workflow",
+      dependent_capability_id: "scholarly-research.fetch_full_text",
+      arguments: {
+        query: "quantum-inequality constraints on warp drives",
+        allow_scholarly_dependent_chain: true,
+        requested_full_text_count: 3,
+        scholarly_claim_portfolio: true,
+        source_target_intent: {
+          query_derivation: "direct_multi_topic_scholarly_portfolio",
+          claim_index: 2,
+          claim_count: 3,
+          claim_portfolio_closer: true,
+        },
+      },
+    });
+  });
+
+  it("does not infer a full-text chain for negated explicit scholarly lookup calls", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question: "Search scholarly metadata for quantum inequalities, but do not fetch, open, or parse full text.",
+        workstation_gateway_calls: [{
+          capability_id: "scholarly-research.lookup_papers",
+          mode: "read",
+          arguments: { query: "quantum inequalities" },
+        }],
+      },
+    });
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).not.toHaveProperty("compound_outcome");
+    expect(requests[0]).not.toHaveProperty("dependent_capability_id");
+    expect(requests[0].arguments).not.toHaveProperty("allow_scholarly_dependent_chain");
+  });
+
+  it("executes metadata lookup when only downstream full-text work is negated", () => {
+    const promptText = [
+      "LOOKUP_SMOKE_03 — Search arXiv for “Quantum Field Theory Constrains Traversable Wormhole Geometries” by Ford and Roman.",
+      "Use scholarly lookup only and return the title, authors, DOI, and arXiv ID.",
+      "Do not fetch full text or inspect PDF pages.",
+    ].join(" ");
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question: promptText,
+      },
+    });
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({
+      capability_id: "scholarly-research.lookup_papers",
+      mode: "read",
+      arguments: {
+        query: "Quantum Field Theory Constrains Traversable Wormhole Geometries",
+        mode: "paper_search",
+        scholarly_intent: {
+          scholarly_query: "Quantum Field Theory Constrains Traversable Wormhole Geometries",
+          query_normalization_reasons: ["quoted_topic_selected"],
+          requested_workflow: "metadata_search",
+          requires_full_text: false,
+          terminal_evidence_requirement: "metadata",
+        },
+        source_target_intent: {
+          target_source: "scholarly_research",
+          target_kind: "research_paper_search",
+        },
+      },
+    });
+    expect(requests[0]).not.toHaveProperty("compound_outcome");
+    expect(requests[0]).not.toHaveProperty("dependent_capability_id");
+    expect(requests[0].arguments).not.toHaveProperty("allow_scholarly_dependent_chain");
+  });
+
+  it("does not execute lookup from negated, quoted, historical, or future-only scholarly text", () => {
+    const prompts = [
+      "Do not search arXiv for Ford and Roman; answer from general knowledge.",
+      '"Search arXiv for Ford and Roman" was the prior instruction; explain what it means.',
+      "I searched arXiv for Ford and Roman earlier; summarize what that request meant.",
+      "Later, if needed, search arXiv for Ford and Roman; for now answer from general knowledge.",
+    ];
+
+    for (const question of prompts) {
+      expect(readWorkstationGatewayCallRequestsForTurn({
+        includePlannerDerived: true,
+        body: { agent_runtime: "codex", question },
+      })).toEqual([]);
+    }
+  });
+
+  it("seeds a scholarly portfolio fetch from the latest successful lookup when the closer lookup failed", () => {
+    const success = {
+      capability_id: "scholarly-research.lookup_papers",
+      ok: true,
+    } as any;
+    const failedCloser = {
+      capability_id: "scholarly-research.lookup_papers",
+      ok: false,
+    } as any;
+
+    expect(selectScholarlyPortfolioDependencySeedResult(
+      [success, failedCloser],
+      failedCloser,
+    )).toBe(success);
+    expect(selectScholarlyPortfolioDependencySeedResult(
+      [failedCloser],
+      failedCloser,
+    )).toBe(failedCloser);
   });
 
   it("keeps a quoted search identifier out of a calculator-only itinerary", () => {
@@ -1947,11 +2157,35 @@ describe("explicit workstation gateway derived calls", () => {
     expect(namedRequests[0]).toMatchObject({
       derivation_source: "helix_prompt_named_capability",
       arguments: {
-        source_url: "https://arxiv.org/pdf/2401.12345",
+        source_url: "https://arxiv.org/pdf/2401.12345.pdf",
         source_target_intent: {
           target_source: "scholarly_research",
           target_kind: "research_paper_full_text",
           arxiv_id: "2401.12345",
+        },
+      },
+    });
+
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: { agent_runtime: "codex", question: prompt },
+    });
+    expect(capabilities(requests)).toEqual(["scholarly-research.fetch_full_text"]);
+  });
+
+  it("routes a natural-language old-style arXiv fetch despite narrower search negation", () => {
+    const prompt =
+      "FULLTEXT_SMOKE_01 — Fetch and parse the full text for arXiv gr-qc/9510071. Return the title, parsed page count, and one page-numbered equation. Do not search for other papers.";
+
+    const namedRequests = buildPromptNamedCapabilityGatewayCallRequests({ question: prompt });
+    expect(capabilities(namedRequests)).toEqual(["scholarly-research.fetch_full_text"]);
+    expect(namedRequests[0]).toMatchObject({
+      arguments: {
+        source_url: "https://arxiv.org/pdf/gr-qc/9510071.pdf",
+        source_target_intent: {
+          target_source: "scholarly_research",
+          target_kind: "research_paper_full_text",
+          arxiv_id: "gr-qc/9510071",
         },
       },
     });
@@ -2089,6 +2323,98 @@ describe("explicit workstation gateway derived calls", () => {
     })).toBeNull();
   });
 
+  it("does not spend the three-source budget on a cross-provider duplicate paper", () => {
+    const title = "Quantum Field Theory Constrains Traversable Wormhole Geometries";
+    const lookupRequest = {
+      compound_outcome: "scholarly_research_workflow",
+      dependent_capability_id: "scholarly-research.fetch_full_text",
+      capability_id: "scholarly-research.lookup_papers",
+      arguments: {
+        query: "quantum inequality negative energy traversable wormholes",
+        scholarly_claim_portfolio: true,
+        allow_scholarly_dependent_chain: true,
+        requested_full_text_count: 3,
+        scholarly_intent: { requested_workflow: "full_text_summary" },
+      },
+    } as any;
+    const papers = [
+      {
+        result_id: "arxiv:ford-roman",
+        title,
+        abstract: "Quantum inequalities bound sampled negative energy and constrain wormholes.",
+        identifiers: {
+          arxiv_id: "gr-qc/9510071",
+          pdf_url: "https://arxiv.org/pdf/gr-qc/9510071.pdf",
+        },
+      },
+      {
+        result_id: "semantic:ford-roman",
+        title,
+        abstract: "Quantum inequalities bound sampled negative energy and constrain wormholes.",
+        identifiers: {
+          doi: "10.1103/PhysRevD.53.5496",
+          pdf_url: "https://arxiv.org/pdf/gr-qc/9510071",
+        },
+      },
+      {
+        result_id: "arxiv:fewster-roman",
+        title: "Problems with Wormholes Which Involve Arbitrarily Small Amounts of Exotic Matter",
+        abstract: "A null-contracted quantum inequality constrains negative energy in traversable wormholes.",
+        identifiers: {
+          arxiv_id: "gr-qc/0510079",
+          pdf_url: "https://arxiv.org/pdf/gr-qc/0510079.pdf",
+        },
+      },
+    ];
+    const lookupResult = {
+      capability_id: "scholarly-research.lookup_papers",
+      ok: true,
+      gateway_admission: { source_target_intent: {} },
+      observation: {
+        schema: "helix.scholarly_research_observation.v1",
+        query: "quantum inequality negative energy traversable wormholes",
+        papers,
+      },
+      observation_packet: {
+        produced_artifact_refs: ["observation:cross-provider-lookup"],
+        state_delta: {},
+        suggested_next_steps: [],
+      },
+    } as any;
+    const makeFetchResult = (paperResultId: string) => ({
+      capability_id: "scholarly-research.fetch_full_text",
+      ok: true,
+      observation: { evidence_state: "full_text_usable", paper_result_id: paperResultId },
+      observation_packet: { produced_artifact_refs: [`observation:${paperResultId}`], state_delta: {} },
+    } as any);
+
+    const fetchOne = buildDependentCompoundCapabilityGatewayCallRequest({
+      request: lookupRequest,
+      result: lookupResult,
+      results: [lookupResult],
+      turnId: "turn:cross-provider-full-text-dedupe",
+    })!;
+    expect((fetchOne.arguments as any).papers).toHaveLength(2);
+    expect((fetchOne.arguments as any).paper_result_id).toBe("arxiv:ford-roman");
+
+    const fetchOneResult = makeFetchResult("arxiv:ford-roman");
+    const fetchTwo = buildDependentCompoundCapabilityGatewayCallRequest({
+      request: fetchOne,
+      result: fetchOneResult,
+      results: [lookupResult, fetchOneResult],
+      turnId: "turn:cross-provider-full-text-dedupe",
+    })!;
+    expect((fetchTwo.arguments as any).paper_result_id).toBe("arxiv:fewster-roman");
+
+    const fetchTwoResult = makeFetchResult("arxiv:fewster-roman");
+    expect(buildDependentCompoundCapabilityGatewayCallRequest({
+      request: fetchTwo,
+      result: fetchTwoResult,
+      results: [lookupResult, fetchOneResult, fetchTwoResult],
+      turnId: "turn:cross-provider-full-text-dedupe",
+    })).toBeNull();
+  });
+
   it("aggregates resolved claim lookups before choosing three accessible full-text sources", () => {
     const body = {
       agent_runtime: "codex",
@@ -2182,6 +2508,144 @@ describe("explicit workstation gateway derived calls", () => {
       "paper:claim-3",
       "paper:claim-4",
     ]);
+    expect((firstFetch as any).arguments.source_target_intent.source_refs).toEqual([
+      "observation:claim-1",
+      "observation:claim-2",
+      "observation:claim-3",
+      "observation:claim-4",
+    ]);
+  });
+
+  it("ranks claim-relevant accessible papers ahead of generic quantum-information matches", () => {
+    const claimQueries = [
+      "Quantum inequalities bound sampled negative energy along an observer worldline.",
+      "Longer sampling durations tighten negative-energy magnitude limits.",
+      "Quantum interest requires compensating positive-energy pulses.",
+      "Quantum inequalities constrain traversable wormhole and warp-drive geometries.",
+    ];
+    const makePaper = (resultId: string, title: string, abstract: string, arxivId: string) => ({
+      result_id: resultId,
+      title,
+      abstract,
+      provider: "arxiv",
+      identifiers: {
+        arxiv_id: arxivId,
+        pdf_url: `https://arxiv.org/pdf/${arxivId}.pdf`,
+      },
+    });
+    const papersByClaim = [
+      [
+        makePaper(
+          "paper:quantum-noise",
+          "Deviation bounds and concentration inequalities for quantum noises",
+          "Concentration bounds for stochastic quantum information systems.",
+          "2607.20001",
+        ),
+        makePaper(
+          "paper:ford-roman",
+          "Quantum Field Theory Constrains Traversable Wormhole Geometries",
+          "Quantum inequalities bound negative energy sampled on timelike worldlines and restrict traversable wormholes.",
+          "gr-qc/9510071",
+        ),
+      ],
+      [makePaper(
+        "paper:marginal-bounds",
+        "New Quantum Bounds for Inequalities involving Marginal Expectations",
+        "Bounds on marginal expectations in quantum information and Bell scenarios.",
+        "2607.20002",
+      )],
+      [makePaper(
+        "paper:ford-review",
+        "Negative Energy Densities in Quantum Field Theory",
+        "Quantum inequalities limit the magnitude and duration of negative energy and describe quantum interest.",
+        "0911.3597",
+      )],
+      [
+        makePaper(
+          "paper:contextuality",
+          "Characterising and bounding the set of quantum behaviours in contextuality scenarios",
+          "Quantum contextuality bounds and Bell-type inequalities.",
+          "2607.20003",
+        ),
+        makePaper(
+          "paper:fewster-roman",
+          "Problems with wormholes which involve arbitrarily small amounts of exotic matter",
+          "A null-contracted quantum inequality constrains traversable wormholes and negative exotic matter.",
+          "gr-qc/0510079",
+        ),
+      ],
+    ];
+    const lookupResults = claimQueries.map((query, index) => ({
+      capability_id: "scholarly-research.lookup_papers",
+      ok: true,
+      gateway_admission: { source_target_intent: {} },
+      observation: {
+        schema: "helix.scholarly_research_observation.v1",
+        query,
+        papers: papersByClaim[index],
+      },
+      observation_packet: {
+        produced_artifact_refs: [`observation:relevance-${index + 1}`],
+        state_delta: {},
+        suggested_next_steps: [],
+      },
+    })) as any[];
+    const request = {
+      compound_outcome: "scholarly_research_workflow",
+      dependent_capability_id: "scholarly-research.fetch_full_text",
+      capability_id: "scholarly-research.lookup_papers",
+      arguments: {
+        query: claimQueries.at(-1),
+        scholarly_claim_portfolio: true,
+        allow_scholarly_dependent_chain: true,
+        requested_full_text_count: 3,
+        scholarly_intent: { requested_workflow: "full_text_summary" },
+      },
+    };
+
+    const firstFetch = buildDependentCompoundCapabilityGatewayCallRequest({
+      request,
+      result: lookupResults.at(-1),
+      results: lookupResults,
+      turnId: "turn:claim-relevance-ranking",
+    });
+    expect(firstFetch).toMatchObject({
+      capability_id: "scholarly-research.fetch_full_text",
+      arguments: { paper_result_id: "paper:ford-roman" },
+    });
+
+    const fetchedIds = [(firstFetch as any).arguments.paper_result_id];
+    let nextRequest = firstFetch as any;
+    for (let index = 0; index < 2; index += 1) {
+      const fetchedId = nextRequest.arguments.paper_result_id;
+      const fetchResult = {
+        capability_id: "scholarly-research.fetch_full_text",
+        ok: true,
+        observation: { evidence_state: "full_text_usable", paper_result_id: fetchedId },
+        observation_packet: { produced_artifact_refs: [`observation:${fetchedId}`], state_delta: {} },
+      } as any;
+      nextRequest = buildDependentCompoundCapabilityGatewayCallRequest({
+        request: nextRequest,
+        result: fetchResult,
+        results: [...lookupResults, fetchResult],
+        turnId: "turn:claim-relevance-ranking",
+      }) as any;
+      fetchedIds.push(nextRequest.arguments.paper_result_id);
+    }
+    expect(fetchedIds).toEqual([
+      "paper:ford-roman",
+      "paper:ford-review",
+      "paper:fewster-roman",
+    ]);
+    expect(fetchedIds).not.toContain("paper:quantum-noise");
+    expect(fetchedIds).not.toContain("paper:marginal-bounds");
+    expect(fetchedIds).not.toContain("paper:contextuality");
+    expect(nextRequest.arguments.source_target_intent.source_refs).toEqual([
+      "observation:relevance-1",
+      "observation:relevance-2",
+      "observation:relevance-3",
+      "observation:relevance-4",
+    ]);
   });
 
   it("routes explicit arXiv PDF page Image Lens extraction as scholarly full-text workflow, not numeric extraction", () => {
@@ -2198,21 +2662,15 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).toEqual(["scholarly-research.lookup_papers"]);
+    expect(capabilities(requests)).toEqual(["scholarly-research.fetch_full_text"]);
     expect(requests[0]).toMatchObject({
-      derivation_source: "helix_scholarly_workflow_planner",
-      dependent_capability_id: "scholarly-research.fetch_full_text",
+      derivation_source: "helix_prompt_named_capability",
       arguments: {
-        query: "General Relativity and Weyl Frames",
-        scholarly_intent: expect.objectContaining({
-          requested_workflow: "full_text_summary",
-          requires_numeric_extraction: false,
-        }),
-        planned_scholarly_capability_chain: expect.objectContaining({
-          planned_capabilities: [
-            "scholarly-research.lookup_papers",
-            "scholarly-research.fetch_full_text",
-          ],
+        source_url: "https://arxiv.org/pdf/1106.5543v1.pdf",
+        source_target_intent: expect.objectContaining({
+          target_source: "scholarly_research",
+          target_kind: "research_paper_full_text",
+          arxiv_id: "1106.5543v1",
         }),
       },
     });

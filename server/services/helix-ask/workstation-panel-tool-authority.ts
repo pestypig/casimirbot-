@@ -48,6 +48,13 @@ const entry = (
 const EXACT_AUTHORITY_ENTRIES: HelixWorkstationPanelToolAuthorityEntry[] = [
   entry(
     "theory-badge-graph",
+    "current_context",
+    "context_locator",
+    "evidence_only",
+    "Observed the user's current theory badge selection and its graph possibilities.",
+  ),
+  entry(
+    "theory-badge-graph",
     "reflect_discussion_context",
     "context_locator",
     "evidence_only",

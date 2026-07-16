@@ -4,7 +4,38 @@ import {
   applyGatewayFailureAuthorityGuard,
   buildCodexMoralGraphReflectionReceiptAnswer,
   buildMoralGraphObservationFallbackAnswer,
+  providerGatewayEvidenceReadyForSolver,
 } from "../codex-provider";
+
+const buildTheoryGraphGatewayResult = (capability: string, ok: boolean) => ({
+  ok,
+  capability_id: capability,
+  gateway_admission: {
+    requested_capability: capability,
+    admission_reason: "read_only_gateway_capability",
+    blocked_reason: ok ? null : "tavily_requires_TAVILY_API_KEY",
+  },
+  observation_packet: {
+    status: ok ? "succeeded" : "blocked",
+    produced_artifact_refs: ok ? [`ask:theory:${capability}`] : [],
+    observation_summary: ok ? `${capability} observed.` : "Internet search unavailable.",
+    terminal_eligible: false,
+    post_tool_model_step_required: true,
+    assistant_answer: false,
+  },
+  observation: {
+    status: ok ? "succeeded" : "blocked",
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  },
+  artifact_refs: ok ? [`ask:theory:${capability}`] : [],
+  terminal_eligible: false,
+  post_tool_model_step_required: true,
+  assistant_answer: false,
+  raw_content_included: false,
+  error: ok ? null : "tavily_requires_TAVILY_API_KEY",
+});
 
 const buildScholarlyNumericMissingResult = () => ({
   ok: false,
@@ -226,6 +257,47 @@ describe("Codex provider terminal pass-through", () => {
     expect(guarded).toContain(providerText);
     expect(guarded).toContain("External evidence unavailable: internet-search.search_web: tavily_requires_TAVILY_API_KEY.");
     expect(guarded).not.toContain("I cannot claim the requested workstation tool or UI action ran");
+  });
+
+  it("keeps a complete Theory Badge Graph context route answerable when optional web corroboration fails", () => {
+    const gatewayCallResults = [
+      buildTheoryGraphGatewayResult("theory-badge-graph.current_context", true),
+      buildTheoryGraphGatewayResult("theory-badge-graph.reflect_discussion_context", true),
+      buildTheoryGraphGatewayResult("internet-search.search_web", false),
+    ];
+    const providerText =
+      "The selected badges form a compatible diagnostic path, but the arrangement is not proof of a physical state or a measured transition.";
+
+    const guarded = applyGatewayFailureAuthorityGuard({
+      text: providerText,
+      gatewayCallResults: gatewayCallResults as never,
+    });
+
+    expect(providerGatewayEvidenceReadyForSolver({
+      gatewayCallResults: gatewayCallResults as never,
+      scholarlyRecoveryObservationReentered: false,
+    })).toBe(true);
+    expect(guarded).toContain(providerText);
+    expect(guarded).toContain(
+      "External evidence unavailable: internet-search.search_web: tavily_requires_TAVILY_API_KEY.",
+    );
+    expect(guarded).not.toContain("I cannot claim the requested workstation tool or UI action ran");
+  });
+
+  it("does not excuse a failed web search when either required Theory graph observation is missing", () => {
+    const gatewayCallResults = [
+      buildTheoryGraphGatewayResult("theory-badge-graph.current_context", true),
+      buildTheoryGraphGatewayResult("internet-search.search_web", false),
+    ];
+
+    expect(providerGatewayEvidenceReadyForSolver({
+      gatewayCallResults: gatewayCallResults as never,
+      scholarlyRecoveryObservationReentered: false,
+    })).toBe(false);
+    expect(applyGatewayFailureAuthorityGuard({
+      text: "The graph is enough.",
+      gatewayCallResults: gatewayCallResults as never,
+    })).toContain("I cannot claim the requested workstation tool or UI action ran");
   });
 
   it("builds a bounded Moral Graph fallback answer from the reflection observation when provider text is absent", () => {

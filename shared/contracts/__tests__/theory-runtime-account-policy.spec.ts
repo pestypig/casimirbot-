@@ -2,6 +2,13 @@ import { describe, expect, it } from "vitest";
 import { HELIX_DEVELOPER_ACCOUNT_POLICY, HELIX_USER_ACCOUNT_POLICY, resolveHelixWorkstationCapabilityAccess } from "../../helix-account-session";
 
 describe("public theory runtime policy", () => {
+  it("allows developer, user, and no-session access to the read-only current graph context", () => {
+    const capability_id = "theory-badge-graph.current_context";
+    expect(resolveHelixWorkstationCapabilityAccess(HELIX_DEVELOPER_ACCOUNT_POLICY, { capability_id, permission_profile_required: "read" }).state).toBe("available");
+    expect(resolveHelixWorkstationCapabilityAccess(HELIX_USER_ACCOUNT_POLICY, { capability_id, permission_profile_required: "read" }).state).toBe("available");
+    expect(resolveHelixWorkstationCapabilityAccess(null, { capability_id, permission_profile_required: "read" }).state).toBe("available");
+  });
+
   it.each([
     "scientific-calculator.run_theory_runtime",
     "scientific-calculator.read_theory_runtime_result",

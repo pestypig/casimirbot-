@@ -3,7 +3,10 @@ import type {
   TheoryBadgeGraphV1,
   TheoryBadgeV1,
 } from "@shared/contracts/theory-badge-graph.v1";
-import type { TheoryBadgeConnectionTraceResult } from "@/lib/theory/theoryBadgeConnectionTrace";
+import {
+  resolveTheoryBadgeConnectionTrace,
+  type TheoryBadgeConnectionTraceResult,
+} from "@/lib/theory/theoryBadgeConnectionTrace";
 
 export type TheoryBadgeCombinationReaderBadge = {
   id: string;
@@ -213,4 +216,36 @@ export function buildTheoryBadgeCombinationReaderPayload(args: {
     }),
     suggestedNextBadgeIds: availableNextBadges.slice(0, 8).map((badge) => badge.id),
   };
+}
+
+export function buildTheoryBadgeCombinationReaderPayloadForSelection(args: {
+  graph: TheoryBadgeGraphV1;
+  selectedBadgeIds: string[];
+}): TheoryBadgeCombinationReaderPayload {
+  const selectedBadgeIds = Array.from(new Set(args.selectedBadgeIds)).filter((badgeId) =>
+    args.graph.badges.some((badge) => badge.id === badgeId),
+  );
+  const trace = selectedBadgeIds.length >= 2
+    ? resolveTheoryBadgeConnectionTrace({ graph: args.graph, badgeIds: selectedBadgeIds })
+    : null;
+  const selected = new Set(selectedBadgeIds);
+  const availableNextBadgeIds = selectedBadgeIds.length === 0
+    ? []
+    : args.graph.badges
+      .filter((badge) => !selected.has(badge.id))
+      .filter((badge) => {
+        const candidateTrace = resolveTheoryBadgeConnectionTrace({
+          graph: args.graph,
+          badgeIds: [...selectedBadgeIds, badge.id],
+        });
+        return candidateTrace.connectingEdgeIds.length > 0 && candidateTrace.connectingBadgeIds.includes(badge.id);
+      })
+      .map((badge) => badge.id);
+
+  return buildTheoryBadgeCombinationReaderPayload({
+    graph: args.graph,
+    selectedBadgeIds,
+    trace,
+    availableNextBadgeIds,
+  });
 }

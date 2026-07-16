@@ -59,6 +59,7 @@ import { arbitrateAskSourceTarget } from "../ask-source-target-arbitrator";
 import { buildToolCallAdmissionDecision } from "../tool-call-admission";
 import {
   buildActiveCalculatorContextWorkstationGatewayCallRequests,
+  buildActiveTheoryBadgeGraphContextWorkstationGatewayCallRequests,
   buildActiveTheoryRuntimeContextWorkstationGatewayCallRequests,
   buildActiveDocsContextWorkstationGatewayCallRequests,
   buildActiveWorkstationContextGatewayCallRequests,
@@ -95,6 +96,13 @@ import {
 } from "../runtime/agent-continuation-state";
 import type { HelixAgentContinuationState } from "@shared/helix-agent-continuation-state";
 import { HELIX_RESEARCH_LIBRARY_READ_CAPABILITY } from "@shared/helix-research-library";
+import {
+  HELIX_SCHOLARLY_TERMINAL_READY_EVIDENCE_STATES,
+  type HelixScholarlyEvidenceDemand,
+} from "@shared/helix-scholarly-research-observation";
+import {
+  deriveScholarlyEvidenceDemand,
+} from "../scholarly-evidence-demand";
 
 const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context" as const;
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression" as const;
@@ -110,12 +118,14 @@ const RESEARCH_LIBRARY_READ_CAPABILITY = HELIX_RESEARCH_LIBRARY_READ_CAPABILITY;
 const MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY = "moral-graph.reflect_living_substrate_context" as const;
 const MORAL_GRAPH_REFLECTION_CAPABILITY = "moral-graph.reflect_context" as const;
 const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context" as const;
+const THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY = "theory-badge-graph.current_context" as const;
 const WORKSTATION_UI_ACTION_RECEIPT_SCHEMA = "helix.workstation_ui_action_receipt.v1" as const;
 const WORKSTATION_NOTES_CREATE_NOTE_CAPABILITY = "workstation-notes.create_note" as const;
 const COMPOUND_NORMALIZABLE_CAPABILITIES = new Set<string>([
   "docs.search",
   CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
   "theory-badge-graph.reflect_discussion_context",
+  THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY,
   "theory-badge-graph.propose_frontier_conjectures",
   "civilization-bounds.reflect_system_bounds",
   MORAL_GRAPH_REFLECTION_CAPABILITY,
@@ -304,12 +314,9 @@ const SCHOLARLY_GATEWAY_CAPABILITIES = new Set<string>([
   SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
 ]);
 
-const SCHOLARLY_TERMINAL_READY_EVIDENCE_STATES = new Set<string>([
-  "lookup_usable",
-  "full_text_usable",
-  "numeric_evidence_usable",
-  "answer_ready",
-]);
+const SCHOLARLY_TERMINAL_READY_EVIDENCE_STATE_SET = new Set<string>(
+  HELIX_SCHOLARLY_TERMINAL_READY_EVIDENCE_STATES,
+);
 
 type ScholarlyResponseMode =
   | "scholarly_metadata_answer"
@@ -686,7 +693,7 @@ export const asksForFreshScientificImageCapture = (question: string): boolean =>
   if (asksToBuildScientificEvidencePacketFromRetainedSidecar(question)) return false;
   const affirmativeQuestion = affirmativeScientificImageOperatorText(question);
   return (
-    /\b(?:render|inspect|capture|ocr|extract|create|materialize|retain|save)\b/i.test(affirmativeQuestion) &&
+    /\b(?:render|load|mount|open|put|inspect|capture|ocr|extract|create|materialize|retain|save)\b/i.test(affirmativeQuestion) &&
     /\b(?:paper|pdf|page\s*(?:number\s*)?\d{1,3}|image\s+lens|bounded\s+crop|bbox|x\s*=\s*\d+)\b/i.test(affirmativeQuestion)
   );
 };
@@ -873,18 +880,18 @@ type ScholarlyFollowupEvidenceLookup = {
 const scholarlyFollowupEvidenceMemory = new Map<string, ScholarlyFollowupEvidenceMemoryRecord[]>();
 
 const SCHOLARLY_FOLLOWUP_REFERENCE_PATTERN =
-  /\b(?:what\s+you\s+found|you\s+found|found\s+(?:the\s+)?paper|paper\s+you\s+found|papers?\s+you\s+found|that\s+(?:same\s+)?paper|same\s+paper|the\s+paper|this\s+paper|those\s+papers|that\s+(?:same\s+)?pdf|same\s+pdf|the\s+pdf|this\s+pdf|the\s+casimir\s+paper|that\s+result|the\s+result|prior\s+paper\s+record|which\s+prior\s+paper\s+record|which\s+(?:paper|record|result)\s+did\s+you\s+resolve|resolved?\s+(?:that|the)\s+follow-?up|that\s+follow-?up|what\s+(?:did|does)\s+it\s+(?:measure|show|say)|what\s+numbers\s+did\s+it\s+measure|tell\s+me\s+about\s+(?:it|that|the\s+one)|(?:reflect|use|extract|put|inspect|render|parse|ocr|crop)\s+(?:this|that|the|same)\s+(?:paper|pdf)|(?:this|that|the|same)\s+(?:paper|pdf)'?s\s+(?:relevance|equations?|formulas?|formulae?|pages?))\b/i;
+  /\b(?:what\s+you\s+found|you\s+found|found\s+(?:the\s+)?paper|paper\s+you\s+found|papers?\s+you\s+found|that\s+(?:same\s+)?paper|same\s+paper|selected\s+(?:paper|pdf)(?:\s+from\s+the\s+prior\s+step)?|the\s+paper|this\s+paper|those\s+papers|that\s+(?:same\s+)?pdf|same\s+pdf|the\s+pdf|this\s+pdf|the\s+casimir\s+paper|that\s+result|the\s+result|prior\s+paper\s+record|which\s+prior\s+paper\s+record|which\s+(?:paper|record|result)\s+did\s+you\s+resolve|resolved?\s+(?:that|the)\s+follow-?up|that\s+follow-?up|what\s+(?:did|does)\s+it\s+(?:measure|show|say)|what\s+numbers\s+did\s+it\s+measure|tell\s+me\s+about\s+(?:it|that|the\s+one)|(?:reflect|use|extract|put|inspect|render|load|mount|open|materialize|parse|ocr|crop)\s+(?:this|that|the|same|selected)\s+(?:paper|pdf)|(?:this|that|the|same|selected)\s+(?:paper|pdf)'?s\s+(?:relevance|equations?|formulas?|formulae?|pages?))\b/i;
 
 const SCHOLARLY_PAGE_FOLLOWUP_PATTERN =
-  /\b(?:inspect|render|parse|ocr|crop|extract|retry|rerender|continue|scan|scanning|search|find)\b[\s\S]{0,160}\b(?:page\s*(?:number\s*)?\d{1,3}|next\s+pages?|following\s+pages?|subsequent\s+pages?|higher\s+resolution|equation(?:-like)?\s+rows?|displayed\s+equations?|displayed\s+equation\s+rows?)\b/i;
+  /\b(?:inspect|render|load|mount|open|put|materialize|parse|ocr|crop|extract|retry|rerender|continue|scan|scanning|search|find)\b[\s\S]{0,160}\b(?:page\s*(?:number\s*)?\d{1,3}|next\s+pages?|following\s+pages?|subsequent\s+pages?|higher\s+resolution|equation(?:-like)?\s+rows?|displayed\s+equations?|displayed\s+equation\s+rows?)\b/i;
 
-const isScholarlyFollowupReferencePrompt = (question: string): boolean => {
+export const isScholarlyFollowupReferencePrompt = (question: string): boolean => {
   const unquoted = question.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
   const hasExplicitPaperReferent = SCHOLARLY_FOLLOWUP_REFERENCE_PATTERN.test(unquoted);
   const hasPageFollowupCue = SCHOLARLY_PAGE_FOLLOWUP_PATTERN.test(unquoted);
   const scholarlyResearchRequested = detectScholarlyResearchIntent(unquoted).researchRequested;
   const hasPriorPaperReferent =
-    /\b(?:what\s+you\s+found|you\s+found|paper\s+you\s+found|papers?\s+you\s+found|same\s+(?:paper|pdf)|this\s+(?:paper|pdf)|that\s+(?:paper|pdf|result)|those\s+papers|prior\s+(?:paper|record|result)|previous\s+(?:paper|record|result)|earlier\s+(?:paper|record|result)|again|follow-?up|resolved?\s+(?:that|the)\s+follow-?up)\b/i.test(unquoted);
+    /\b(?:what\s+you\s+found|you\s+found|paper\s+you\s+found|papers?\s+you\s+found|same\s+(?:paper|pdf)|selected\s+(?:paper|pdf)(?:\s+from\s+the\s+prior\s+step)?|this\s+(?:paper|pdf)|that\s+(?:paper|pdf|result)|those\s+papers|prior\s+(?:paper|record|result|step)|previous\s+(?:paper|record|result|step)|earlier\s+(?:paper|record|result|step)|again|follow-?up|resolved?\s+(?:that|the)\s+follow-?up)\b/i.test(unquoted);
   if (
     scholarlyResearchRequested &&
     !hasPageFollowupCue &&
@@ -3884,6 +3891,12 @@ const CODEX_PROVIDER_CONTINUATION_HARD_MAX_STEPS = (() => {
     ? Math.min(32, Math.floor(configured))
     : 12;
 })();
+const SCHOLARLY_PDF_PAGE_SCOUT_WINDOW_MAX_PAGES = (() => {
+  const configured = Number(process.env.HELIX_SCHOLARLY_PDF_PAGE_SCOUT_WINDOW_MAX_PAGES);
+  return Number.isFinite(configured) && configured > 0
+    ? Math.min(5, Math.floor(configured))
+    : 3;
+})();
 const LIVE_TRANSLATION_TRANSLATE_TEXT_CAPABILITY = "live_translation.translate_text" as const;
 const TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY = "text_to_speech.speak_text" as const;
 const VISUAL_ANALYSIS_INSPECT_IMAGE_REGION_CAPABILITY = "visual_analysis.inspect_image_region" as const;
@@ -5308,6 +5321,38 @@ const buildCodexCapabilityLaneReentryPrefix = (question: string): string[] => [
   question,
 ];
 
+export const buildScholarlyCapabilityLaneReentryEvidenceLines = (
+  gatewayCallResults: HelixWorkstationGatewayCallResult[],
+): string[] => {
+  const scholarlyEvidenceResults = gatewayCallResults
+    .filter((result) => {
+      const capability = gatewayCapability(result);
+      return (
+        capability === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY ||
+        capability === SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY
+      );
+    })
+    .map((result) => ({
+      capability_id: result.capability_id,
+      requested_capability: result.gateway_admission.requested_capability,
+      ok: result.ok,
+      observation: result.observation,
+      observation_ref: result.observation_packet.observation_ref,
+      artifact_refs: result.artifact_refs,
+      error: result.error ?? null,
+      assistant_answer: false,
+      terminal_eligible: false,
+    }));
+
+  if (scholarlyEvidenceResults.length === 0) return [];
+
+  return [
+    "Admitted scholarly lookup and full-text observations carried forward from this same turn:",
+    JSON.stringify(compactCapabilityLaneModelValue(scholarlyEvidenceResults), null, 2),
+    "Use these observations together with any PDF/Image Lens page observations. Preserve metadata-only versus full-text boundaries. A failed or empty crop limits claims about that crop, but it does not erase separately fetched scholarly text evidence.",
+  ];
+};
+
 const PROVIDER_PROMPT_LEAK_MARKERS = [
   { id: "model_visible_capability_lane_manifest", pattern: /model_visible_capability_lane_manifest/i },
   { id: "workstation_gateway_capabilities_heading", pattern: /Available Helix workstation gateway capabilities:/i },
@@ -5827,10 +5872,10 @@ const renderScholarlyPdfPageImageDataUrl = (input: {
 };
 
 const isScholarlyVisualEscalationQuestion = (question: string): boolean => {
-  const affirmativeQuestion = stripNegatedOperatorClauses(question);
-  return /\b(?:extract|read|use|take|parse|ocr|inspect|render|compare|put|create|continue|scan|scanning|search|find)\b[\s\S]{0,180}\b(?:equations?|equation\s+rows?|formulae?|formulas?|figures?|tables?|page\s*(?:number\s*)?\d{1,3}|next\s+pages?|following\s+pages?|subsequent\s+pages?|page\s+images?|page\s+evidence|pdf\s+pages?|image\s+lens|scientific\s+evidence\s+packet|theory\s+badge\s+graph)\b/i.test(affirmativeQuestion) ||
-    /\b(?:show\s+(?:me\s+)?(?:the\s+)?science|scientific\s+content|main\s+equations?|show\s+(?:me\s+)?(?:the\s+)?equations?|scientific\s+evidence(?:\s+packet)?)\b/i.test(affirmativeQuestion) ||
-    /\b(?:equations?|formulae?|formulas?|figures?|tables?|page\s*(?:number\s*)?\d{1,3}|page\s+images?|page\s+evidence|pdf\s+pages?|image\s+lens)\b[\s\S]{0,160}\b(?:from|in|of|on|into)\s+(?:that|the|this|image\s+lens)\b/i.test(affirmativeQuestion);
+  const affirmativeQuestion = affirmativeScientificImageOperatorText(question);
+  const evidenceDemand = deriveScholarlyEvidenceDemand({ promptText: affirmativeQuestion });
+  return evidenceDemand.required_modes.includes("page_image_parse") ||
+    /\b(?:scientific\s+evidence(?:\s+packet)?|theory\s+badge\s+graph)\b/i.test(affirmativeQuestion);
 };
 
 const isScholarlyLookupCandidate = (
@@ -5853,8 +5898,9 @@ export const synthesizeScholarlyPageImageLaneCandidate = (input: {
 }): Record<string, unknown> | null => {
   if (!input.record || (input.source !== "current" && input.lookup?.status !== "found")) return null;
   if (!isScholarlyVisualEscalationQuestion(input.question)) return null;
+  const affirmativeQuestion = affirmativeScientificImageOperatorText(input.question);
   const firstSourceRef = input.record.page_image_affordance_refs[0] ?? input.record.source_pdf_ref;
-  const requestedPageNumber = input.pageNumberOverride ?? scholarlyRequestedPdfPageNumber(input.question, firstSourceRef);
+  const requestedPageNumber = input.pageNumberOverride ?? scholarlyRequestedPdfPageNumber(affirmativeQuestion, firstSourceRef);
   const sourceRef = requestedPageNumber && input.record.source_pdf_ref
     ? `${input.record.source_pdf_ref}/page/${requestedPageNumber}`
     : firstSourceRef;
@@ -5867,13 +5913,13 @@ export const synthesizeScholarlyPageImageLaneCandidate = (input: {
     pageNumber,
     memoryId: input.record.memory_id,
   });
-  const promptBbox = readImageLensPromptBbox(input.question);
+  const promptBbox = readImageLensPromptBbox(affirmativeQuestion);
   const renderedDimensions = renderedPage?.dimensions ?? null;
   const boundedPromptBbox = promptBbox && imageLensBboxFitsDimensions(promptBbox, renderedDimensions)
     ? promptBbox
     : null;
   const sourceId = `pdf-page-render:${hashScientificImageSourceShort([input.record.memory_id, sourceRef, pageNumber])}`;
-  const wantsEquation = /\b(?:equations?|formulae?|formulas?|derive|derivation|symbolic|latex)\b/i.test(input.question);
+  const wantsEquation = /\b(?:equations?|formulae?|formulas?|derive|derivation|symbolic|latex)\b/i.test(affirmativeQuestion);
   const sourceMountOnly = asksToMountScholarlyPdfPageWithoutInspection(input.question);
   return {
     capability: VISUAL_ANALYSIS_INSPECT_IMAGE_REGION_CAPABILITY,
@@ -5922,7 +5968,7 @@ const isScholarlyPdfPageWindowScoutQuestion = (question: string): boolean =>
   /\b(?:scan|scout|look\s+through|continue\s+scanning|keep\s+(?:looking|scanning)|next\s+pages?|following\s+pages?|subsequent\s+pages?)\b/i.test(question) &&
   /\b(?:pages?|pdf|paper|equations?|formulae?|formulas?|displayed\s+equation|math|science)\b/i.test(question);
 
-const synthesizeScholarlyPageWindowLaneCandidates = (input: {
+export const synthesizeScholarlyPageWindowLaneCandidates = (input: {
   question: string;
   record: ScholarlyFollowupEvidenceMemoryRecord | null;
   lookup: ScholarlyFollowupEvidenceLookup | null;
@@ -5930,7 +5976,8 @@ const synthesizeScholarlyPageWindowLaneCandidates = (input: {
   source?: "prior" | "current";
 }): Record<string, unknown>[] | null => {
   if (!input.record || (input.source !== "current" && input.lookup?.status !== "found")) return null;
-  if (!isScholarlyVisualEscalationQuestion(input.question) || !isScholarlyPdfPageWindowScoutQuestion(input.question)) return null;
+  const affirmativeQuestion = affirmativeScientificImageOperatorText(input.question);
+  if (!isScholarlyVisualEscalationQuestion(input.question) || !isScholarlyPdfPageWindowScoutQuestion(affirmativeQuestion)) return null;
   const pageCount = readScholarlyPdfPageCount(input.record.cache_path);
   const inspectedPages = new Set(
     (input.sidecar?.packets ?? [])
@@ -5938,12 +5985,12 @@ const synthesizeScholarlyPageWindowLaneCandidates = (input: {
       .filter((page): page is number => typeof page === "number" && Number.isFinite(page) && page > 0)
   );
   const firstSourceRef = input.record.page_image_affordance_refs[0] ?? input.record.source_pdf_ref;
-  const requestedPage = scholarlyRequestedPdfPageNumber(input.question, firstSourceRef);
+  const requestedPage = scholarlyRequestedPdfPageNumber(affirmativeQuestion, firstSourceRef);
   const lastInspectedPage = inspectedPages.size > 0 ? Math.max(...Array.from(inspectedPages)) : null;
   const startPage = Math.max(1, requestedPage ?? (lastInspectedPage ? lastInspectedPage + 1 : 1));
-  const maxPage = pageCount ?? startPage + CODEX_PROVIDER_CONTINUATION_HARD_MAX_STEPS - 1;
+  const maxPage = pageCount ?? startPage + SCHOLARLY_PDF_PAGE_SCOUT_WINDOW_MAX_PAGES - 1;
   const pageNumbers: number[] = [];
-  for (let page = startPage; page <= maxPage && pageNumbers.length < CODEX_PROVIDER_CONTINUATION_HARD_MAX_STEPS; page += 1) {
+  for (let page = startPage; page <= maxPage && pageNumbers.length < SCHOLARLY_PDF_PAGE_SCOUT_WINDOW_MAX_PAGES; page += 1) {
     if (!inspectedPages.has(page)) pageNumbers.push(page);
   }
   const candidates = pageNumbers
@@ -6090,6 +6137,9 @@ const typedObservationKindForGatewayCapability = (capabilityId: string): string 
   if (capabilityId === "theory-badge-graph.reflect_discussion_context") {
     return "helix_theory_context_reflection_tool_receipt";
   }
+  if (capabilityId === THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY) {
+    return "theory_badge_graph_current_context";
+  }
   if (capabilityId === "theory-badge-graph.propose_frontier_conjectures") {
     return "theory_frontier_conjecture_observation";
   }
@@ -6123,6 +6173,9 @@ const schemaForTypedObservationKind = (kind: string): string => {
   if (kind === "research_library_observation") return "helix.research_library_observation.v1";
   if (kind === "helix_theory_context_reflection_tool_receipt") {
     return "helix_theory_context_reflection_tool_receipt/v1";
+  }
+  if (kind === "theory_badge_graph_current_context") {
+    return "helix.theory_badge_graph_current_context_observation.v1";
   }
   if (kind === "theory_frontier_conjecture_observation") {
     return "helix.theory_frontier_conjecture_observation.v1";
@@ -6867,7 +6920,7 @@ export const buildCodexMoralGraphReflectionReceiptAnswer = (input: {
   return { answer, authority };
 };
 
-const buildCodexTheoryReflectionReceiptAnswer = (input: {
+export const buildCodexTheoryReflectionReceiptAnswer = (input: {
   turnId: string;
   threadId: string;
   route?: string | null;
@@ -6877,9 +6930,15 @@ const buildCodexTheoryReflectionReceiptAnswer = (input: {
   answer: Record<string, unknown>;
   authority: ReturnType<typeof buildHelixTurnTerminalAuthority>;
 } | null => {
-  if (!/\b(?:reflect|reflection|theory\s+badge\s+graph|calculator\s+template|calculator\s+payload)\b/i.test(input.promptText)) {
+  if (!/\b(?:reflect|reflection|theory\s+badge\s+graph|calculator\s+template|calculator\s+payload|(?:these|selected|current)\s+badges?|badge\s+(?:selection|combination|trace|branch))\b/i.test(input.promptText)) {
     return null;
   }
+  const currentContextArtifacts = input.normalizedArtifacts.filter((artifact) => {
+    const kind = readString(artifact.kind);
+    const capabilityKey = readString(artifact.capability_key);
+    return kind === "theory_badge_graph_current_context" ||
+      capabilityKey === THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY;
+  });
   const theoryArtifacts = input.normalizedArtifacts.filter((artifact) => {
     const kind = readString(artifact.kind);
     const capabilityKey = readString(artifact.capability_key);
@@ -6890,6 +6949,28 @@ const buildCodexTheoryReflectionReceiptAnswer = (input: {
 
   const selected = theoryArtifacts[theoryArtifacts.length - 1];
   const payload = readRecord(selected.payload) ?? selected;
+  const currentContextArtifact = currentContextArtifacts[currentContextArtifacts.length - 1] ?? null;
+  const currentContextPayload = currentContextArtifact
+    ? readRecord(currentContextArtifact.payload) ?? currentContextArtifact
+    : null;
+  const currentCombination = readRecord(currentContextPayload?.combination_reader);
+  const badgeLabels = (value: unknown): string[] => readArray(value)
+    .map(readRecord)
+    .filter((badge): badge is Record<string, unknown> => Boolean(badge))
+    .flatMap((badge) => {
+      const id = readString(badge.id);
+      if (!id) return [];
+      const title = readString(badge.title);
+      return [title ? `${title} (\`${id}\`)` : `\`${id}\``];
+    });
+  const currentSelectedBadges = badgeLabels(currentCombination?.selected_badges);
+  const currentTraceBadges = badgeLabels(currentCombination?.trace_path_badges);
+  const currentIntermediateBadges = badgeLabels(currentCombination?.intermediate_badges);
+  const currentAvailableNextBadges = badgeLabels(currentCombination?.available_next_badges);
+  const currentImplicationSummary = readStringArray(currentCombination?.implication_summary);
+  const currentBoundaryNotes = readStringArray(
+    readRecord(currentCombination?.boundary_context)?.notes,
+  );
   const branchGate = readRecord(payload.scientific_branch_gate);
   const calculatorTemplateAdmissibility = readRecord(payload.calculator_template_admissibility);
   const sourceSidecar = readRecord(payload.scientific_evidence_sidecar);
@@ -6955,6 +7036,25 @@ const buildCodexTheoryReflectionReceiptAnswer = (input: {
   const lines = [
     "Theory Badge Graph reflection completed as diagnostic evidence only.",
     "",
+    currentContextPayload ? "Current user-configured graph state:" : null,
+    currentContextPayload
+      ? currentSelectedBadges.length > 0
+        ? `- Selected badges: ${currentSelectedBadges.slice(0, 12).join(", ")}`
+        : "- Selected badges: none available."
+      : null,
+    currentContextPayload && currentTraceBadges.length > 0
+      ? `- Computed trace: ${currentTraceBadges.slice(0, 16).join(" → ")}`
+      : null,
+    currentContextPayload && currentIntermediateBadges.length > 0
+      ? `- Intermediate bridge badges: ${currentIntermediateBadges.slice(0, 12).join(", ")}`
+      : null,
+    currentContextPayload && currentAvailableNextBadges.length > 0
+      ? `- Available next badges: ${currentAvailableNextBadges.slice(0, 12).join(", ")}`
+      : null,
+    currentContextPayload && currentImplicationSummary.length > 0
+      ? `- Combination implications: ${currentImplicationSummary.slice(0, 4).join(" ")}`
+      : null,
+    currentContextPayload ? "" : null,
     `Summary: ${summary}`,
     "",
     `Scientific branch gate: \`${branchStatus}\``,
@@ -6978,8 +7078,10 @@ const buildCodexTheoryReflectionReceiptAnswer = (input: {
     `- Binding status: \`${bindingStatus}\``,
     rejectedCalculatorIds.length > 0 ? `- Rejected template ids: ${rejectedCalculatorIds.slice(0, 8).map((id) => `\`${id}\``).join(", ")}` : null,
     "",
-    "Claim boundary: this is graph/reflection context from page-grounded Image Lens evidence. It is not proof, physical validation, badge promotion, graph mutation, or calculator solve authority.",
-    claimNotes.length > 0 ? `Boundary notes: ${claimNotes.slice(0, 3).join(" ")}` : null,
+    "Claim boundary: this is graph/reflection context. Manual badge selection records the operator's chosen arrangement; it is not proof, physical validation, badge promotion, graph mutation, or calculator solve authority.",
+    [...currentBoundaryNotes, ...claimNotes].length > 0
+      ? `Boundary notes: ${Array.from(new Set([...currentBoundaryNotes, ...claimNotes])).slice(0, 5).join(" ")}`
+      : null,
   ].filter((line): line is string => typeof line === "string");
   const text = lines.join("\n");
   const answer = {
@@ -6989,10 +7091,10 @@ const buildCodexTheoryReflectionReceiptAnswer = (input: {
     source: "codex_provider_theory_reflection_receipt",
     answer_text: text,
     text,
-    selected_observation_refs: theoryArtifacts
+    selected_observation_refs: [...currentContextArtifacts, ...theoryArtifacts]
       .map((artifact) => readString(artifact.artifact_id))
       .filter((ref): ref is string => Boolean(ref)),
-    support_refs: theoryArtifacts
+    support_refs: [...currentContextArtifacts, ...theoryArtifacts]
       .map((artifact) => readString(artifact.artifact_id))
       .filter((ref): ref is string => Boolean(ref)),
     source_ref: sourceRef,
@@ -7343,7 +7445,7 @@ const isScholarlyGatewayResultSelectedForAnswer = (
   if (!isScholarlyGatewayResult(result)) return true;
   if (!readScholarlyGatewaySelectedForAnswer(result)) return false;
   const evidenceState = readScholarlyGatewayEvidenceState(result);
-  return !evidenceState || SCHOLARLY_TERMINAL_READY_EVIDENCE_STATES.has(evidenceState);
+  return !evidenceState || SCHOLARLY_TERMINAL_READY_EVIDENCE_STATE_SET.has(evidenceState);
 };
 
 const isCalculatorSolveObservation = (result: HelixWorkstationGatewayCallResult): boolean => {
@@ -8668,6 +8770,7 @@ type ScholarlyEvidenceDepth =
 
 type ScholarlyEvidenceEscalationPlan = {
   schema: "helix.scholarly_evidence_escalation_plan.v1";
+  evidence_demand: HelixScholarlyEvidenceDemand;
   requested_modes: string[];
   selected_evidence_depth: ScholarlyEvidenceDepth;
   evidence_depth_reason: string;
@@ -8732,25 +8835,15 @@ const scholarlyVisualEvidenceFromLanePackets = (
 
 export const scholarlyFollowupRequestedModes = (question: string): string[] => {
   const affirmativeQuestion = stripNegatedOperatorClauses(question);
+  const evidenceDemand = deriveScholarlyEvidenceDemand({ promptText: affirmativeQuestion });
   return uniqueStrings([
+  ...evidenceDemand.required_modes,
   /\b(?:theory\s+badge\s+graph|badge\s+graph|theory\s+reflection|reflect(?:ion)?|relevance\s+to\s+(?:the\s+)?theory)\b/i.test(affirmativeQuestion)
     ? "theory_badge_graph_reflection"
-    : "",
-  /\b(?:equations?|formulae?|formulas?|derive|derivation|variables?|parameter\s+binding)\b/i.test(affirmativeQuestion)
-    ? "equation_extraction"
     : "",
   isScholarlyNumericFollowupQuestion(affirmativeQuestion) ? "numeric_extraction" : "",
   /\b(?:scientific\s+evidence\s+packet|evidence\s+packet|sidecar|scientific\s+evidence|proof\s+packet)\b/i.test(affirmativeQuestion)
     ? "scientific_evidence_packet"
-    : "",
-  /\b(?:show\s+(?:me\s+)?(?:the\s+)?science|scientific\s+content|main\s+equations?|show\s+(?:me\s+)?(?:the\s+)?equations?)\b/i.test(affirmativeQuestion)
-    ? "page_image_parse"
-    : "",
-  /\b(?:page\s+images?|screenshots?|render(?:ed)?\s+pages?|pdf\s+pages?|image\s+lens|ocr|figures?|tables?|plots?)\b/i.test(affirmativeQuestion)
-    ? "page_image_parse"
-    : "",
-  /\b(?:full[-\s]?text|fetched\s+text|read\s+(?:the\s+)?(?:paper|pdf|article)|paper\s+content|detailed\s+(?:argument|result|conclusion))\b/i.test(affirmativeQuestion)
-    ? "full_text"
     : "",
   /\b(?:tell\s+me|summari[sz]e|explain|relevance|relevant)\b/i.test(affirmativeQuestion)
     ? "metadata_context"
@@ -8894,6 +8987,9 @@ const buildScholarlyEvidenceEscalationPlan = (input: {
   terminalKind?: string;
   currentTurnVisualEvidence?: CurrentTurnScholarlyVisualEvidence | null;
 }): ScholarlyEvidenceEscalationPlan | null => {
+  const evidenceDemand = deriveScholarlyEvidenceDemand({
+    promptText: stripNegatedOperatorClauses(input.question),
+  });
   const requestedModes = scholarlyFollowupRequestedModes(input.question);
   if (!input.record && requestedModes.length === 0) return null;
   const asksScientificPacket = requestedModes.includes("scientific_evidence_packet");
@@ -8950,6 +9046,7 @@ const buildScholarlyEvidenceEscalationPlan = (input: {
           : "request_asks_to_materialize_scientific_evidence_packet";
   return {
     schema: "helix.scholarly_evidence_escalation_plan.v1",
+    evidence_demand: evidenceDemand,
     requested_modes: requestedModes,
     selected_evidence_depth: selectedDepth,
     evidence_depth_reason: reason,
@@ -9589,6 +9686,20 @@ const isExternalEvidenceGatewayResult = (result: HelixWorkstationGatewayCallResu
 const hasSuccessfulMoralGraphObservation = (gatewayCallResults: HelixWorkstationGatewayCallResult[]): boolean =>
   gatewayCallResults.some(isMoralGraphObservationGatewayResult);
 
+const hasSuccessfulTheoryBadgeGraphContextObservations = (
+  gatewayCallResults: HelixWorkstationGatewayCallResult[],
+): boolean => {
+  const successfulCapabilities = new Set(
+    gatewayCallResults
+      .filter((result) => result.ok === true)
+      .map((result) => result.gateway_admission.requested_capability || result.capability_id),
+  );
+  return (
+    successfulCapabilities.has("theory-badge-graph.current_context") &&
+    successfulCapabilities.has(THEORY_CONTEXT_REFLECTION_CAPABILITY)
+  );
+};
+
 const isMoralGraphAdjacentExternalFailure = (
   gatewayCallResults: HelixWorkstationGatewayCallResult[],
   index: number,
@@ -9596,6 +9707,19 @@ const isMoralGraphAdjacentExternalFailure = (
   const result = gatewayCallResults[index];
   if (!result || result.ok === true) return false;
   return isExternalEvidenceGatewayResult(result) && hasSuccessfulMoralGraphObservation(gatewayCallResults);
+};
+
+const isTheoryBadgeGraphAdjacentInternetFailure = (
+  gatewayCallResults: HelixWorkstationGatewayCallResult[],
+  index: number,
+): boolean => {
+  const result = gatewayCallResults[index];
+  if (!result || result.ok === true) return false;
+  const capability = result.gateway_admission.requested_capability || result.capability_id;
+  return (
+    capability === INTERNET_SEARCH_CAPABILITY &&
+    hasSuccessfulTheoryBadgeGraphContextObservations(gatewayCallResults)
+  );
 };
 
 const isGatewayResultCompatibleWithProviderReentry = (
@@ -9614,7 +9738,8 @@ const isGatewayResultCompatibleWithProviderReentry = (
     isScholarlyNumericFailClosedGatewayResult(result) ||
     isCalculatorBlockedExpressionGatewayResult(result) ||
     isGatewayRecoveryAffordanceResult(result) ||
-    isMoralGraphAdjacentExternalFailure(gatewayCallResults, index)
+    isMoralGraphAdjacentExternalFailure(gatewayCallResults, index) ||
+    isTheoryBadgeGraphAdjacentInternetFailure(gatewayCallResults, index)
   );
 };
 
@@ -9676,13 +9801,20 @@ export const applyGatewayFailureAuthorityGuard = (input: {
   const moralAdjacentExternalFailures = input.gatewayCallResults.filter((result, index) =>
     result.ok !== true && isMoralGraphAdjacentExternalFailure(input.gatewayCallResults, index),
   );
-  if (failed.length === 0 && moralAdjacentExternalFailures.length === 0) return input.text;
+  const theoryAdjacentInternetFailures = input.gatewayCallResults.filter((result, index) =>
+    result.ok !== true && isTheoryBadgeGraphAdjacentInternetFailure(input.gatewayCallResults, index),
+  );
+  const boundedAdjacentExternalFailures = [
+    ...moralAdjacentExternalFailures,
+    ...theoryAdjacentInternetFailures,
+  ];
+  if (failed.length === 0 && boundedAdjacentExternalFailures.length === 0) return input.text;
   if (failed.length > 0 && failed.every(isScholarlyGatewayResult)) return input.text;
   const descriptions = failed
     .slice(0, 3)
     .map(describeGatewayFailure);
-  if (failed.length === 0 && moralAdjacentExternalFailures.length > 0) {
-    const externalDescriptions = moralAdjacentExternalFailures.slice(0, 3).map(describeGatewayFailure);
+  if (failed.length === 0 && boundedAdjacentExternalFailures.length > 0) {
+    const externalDescriptions = boundedAdjacentExternalFailures.slice(0, 3).map(describeGatewayFailure);
     const note = `External evidence unavailable: ${externalDescriptions.join("; ")}.`;
     return input.text.includes(note) ? input.text : [input.text.trim(), note].filter(Boolean).join("\n\n");
   }
@@ -9981,6 +10113,7 @@ export const ensureCodexPreGatewayRouteAuthority = (input: {
   const allPreGatewayDerivedCapabilities = Array.from(new Set([
     ...explicitPreGatewayRequests,
     ...buildActiveCalculatorContextWorkstationGatewayCallRequests(input.body),
+    ...buildActiveTheoryBadgeGraphContextWorkstationGatewayCallRequests(input.body),
     ...buildActiveTheoryRuntimeContextWorkstationGatewayCallRequests(input.body),
     ...buildActiveDocsContextWorkstationGatewayCallRequests(input.body),
     ...buildActiveWorkstationContextGatewayCallRequests(input.body),
@@ -12858,6 +12991,9 @@ export const codexProvider: HelixAgentProvider = {
         capabilityLaneCandidateCapability(firstRuntimeLaneRequestCandidate) === LIVE_TRANSLATION_TRANSLATE_TEXT_CAPABILITY;
       const firstLaneWasImageLens =
         capabilityLaneCandidateCapability(firstRuntimeLaneRequestCandidate) === "visual_analysis.inspect_image_region";
+      const scholarlyLaneReentryEvidenceLines = firstLaneWasImageLens
+        ? buildScholarlyCapabilityLaneReentryEvidenceLines(gatewayCallResults)
+        : [];
       const firstLaneNeedsSpeechFollowup =
         firstLaneWasTranslation && isAffirmativeTranslateAndReadAloudRequest(question);
       providerContinuationState = publishProviderContinuationState("post_attempt");
@@ -12885,10 +13021,10 @@ export const codexProvider: HelixAgentProvider = {
             : firstLaneWasImageLens
               ? scholarlyPdfWorkbenchState
                 ? [
-                    "Use the re-entered Image Lens extraction evidence and the scholarly PDF workbench state to decide the next step.",
+                    "Use the re-entered Image Lens extraction evidence, the carried-forward scholarly lookup/full-text observations, and the scholarly PDF workbench state to decide the next step.",
                     "For Image Lens crops, bbox/crop receipts alone are not text or equation transcription authority.",
                     "Only report exact text or LaTeX candidates that appear in text_candidate or latex_candidate fields.",
-                    "For crops with extraction_status failed/not_run and no candidate fields, either answer with the bounded miss or request another visual_analysis.inspect_image_region lane if the workbench affordances show a useful next PDF page/crop action.",
+                    "For crops with extraction_status failed/not_run and no candidate fields, treat the crop as a bounded miss; do not infer that carried-forward fetched text, paper identities, or passages are absent. Request another visual_analysis.inspect_image_region lane only if the workbench affordances show a useful next PDF page/crop action.",
                     `If another PDF page/crop observation is needed, output only ${CODEX_CAPABILITY_LANE_REQUEST_MARKER} followed by compact JSON for visual_analysis.inspect_image_region.`,
                     "Do not request a fresh scholarly lookup when the workbench already has an active PDF/source chain.",
                   ].join("\n")
@@ -12906,6 +13042,9 @@ export const codexProvider: HelixAgentProvider = {
         "",
         "Capability lane observation block after Helix execution:",
         capabilityLaneContext.reentry_observation_block,
+        ...(scholarlyLaneReentryEvidenceLines.length > 0
+          ? ["", ...scholarlyLaneReentryEvidenceLines]
+          : []),
         "",
         formatHelixAgentContinuationStateForRuntime(providerContinuationState),
         ...(scholarlyPdfWorkbenchState
@@ -13265,10 +13404,10 @@ export const codexProvider: HelixAgentProvider = {
               : "Helix executed the visible target collector and then the runtime-requested translation lane call. The results below are observation/receipt evidence, not final answers by themselves.",
           firstLaneWasImageLens && scholarlyPdfWorkbenchState
             ? [
-                "Use the PDF/Image Lens observations and scholarly workbench state to decide whether the user goal is satisfied.",
+                "Use the carried-forward scholarly lookup/full-text observations, PDF/Image Lens observations, and scholarly workbench state to decide whether the user goal is satisfied.",
                 "If the user goal still needs another page/crop observation and the workbench affordances support it, you may emit another visual_analysis.inspect_image_region lane request.",
                 `If another PDF page/crop observation is needed, output only ${CODEX_CAPABILITY_LANE_REQUEST_MARKER} followed by compact JSON for visual_analysis.inspect_image_region.`,
-                "Otherwise produce the final answer using only the PDF/Image Lens observations and the scholarly workbench state. Report page numbers, candidates, misses, and recovery affordances with claim boundaries.",
+                "Otherwise produce the final answer using the carried-forward scholarly observations together with the PDF/Image Lens observations and scholarly workbench state. Report page numbers, candidates, misses, and recovery affordances with claim boundaries.",
               ].join("\n")
             : firstLaneNeedsSpeechFollowup
               ? "Now produce the final answer using only the translation observation and text-to-speech receipt. Report playback as played only if the receipt proves it; otherwise report the exact pending, blocked, or failed status."
@@ -13279,6 +13418,9 @@ export const codexProvider: HelixAgentProvider = {
           "",
         "Capability lane observation block after Helix execution:",
         capabilityLaneContext.reentry_observation_block,
+          ...(scholarlyLaneReentryEvidenceLines.length > 0
+            ? ["", ...scholarlyLaneReentryEvidenceLines]
+            : []),
           "",
           formatHelixAgentContinuationStateForRuntime(providerContinuationState),
           ...(scholarlyPdfWorkbenchState
@@ -13419,17 +13561,20 @@ export const codexProvider: HelixAgentProvider = {
               "",
               "Helix executed another runtime-requested PDF/Image Lens lane call from the scholarly PDF workbench.",
               "The result below is page/crop observation evidence, not a final answer by itself.",
-              "Use the updated workbench state to decide whether the user goal is satisfied.",
+              "Use the carried-forward scholarly lookup/full-text observations and the updated workbench state to decide whether the user goal is satisfied.",
               chainedLaneCalls.length < CODEX_PROVIDER_CONTINUATION_HARD_MAX_STEPS
                 ? `If another PDF page/crop observation is still needed, output only ${CODEX_CAPABILITY_LANE_REQUEST_MARKER} followed by compact JSON for visual_analysis.inspect_image_region.`
                 : "The PDF exploration step budget is exhausted for this turn; produce the best bounded answer from the observations and recovery affordances.",
-              "Otherwise produce the final answer using only the PDF/Image Lens observations and scholarly workbench state. Preserve claim boundaries.",
+              "Otherwise produce the final answer using the carried-forward scholarly observations together with the PDF/Image Lens observations and scholarly workbench state. Preserve claim boundaries.",
               "",
               "Runtime-requested PDF/Image Lens candidate chain:",
               JSON.stringify(compactCapabilityLaneModelValue(chainedLaneCalls), null, 2),
               "",
               "Capability lane observation block after Helix execution:",
               capabilityLaneContext.reentry_observation_block,
+              ...(scholarlyLaneReentryEvidenceLines.length > 0
+                ? ["", ...scholarlyLaneReentryEvidenceLines]
+                : []),
               "",
               formatHelixAgentContinuationStateForRuntime(providerContinuationState),
               ...(scholarlyPdfWorkbenchState

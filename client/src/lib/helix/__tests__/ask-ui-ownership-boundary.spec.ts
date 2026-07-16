@@ -3559,6 +3559,9 @@ describe("Helix Ask UI ownership boundaries", () => {
     const turnAssemblyController = read(
       "client/src/components/helix/ask-console/HelixAskVoiceTurnAssemblyController.ts",
     );
+    const voiceConfirmationRuntime = read(
+      "client/src/components/helix/ask-console/HelixAskVoiceConfirmationRuntime.tsx",
+    );
     const extractedOwners = [
       confidence,
       confirmation,
@@ -3571,6 +3574,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       scoring,
       voiceCapture,
       turnAssemblyController,
+      voiceConfirmationRuntime,
     ];
 
     expect(map).toContain("Voice capture, STT, confirmation, continuation, and auto-dispatch");
@@ -3584,6 +3588,8 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(map).toContain("transcript confirmation/admission projection");
     expect(map).toContain("auto-dispatch rate-window/governance projection");
     expect(map).toContain("pending-confirmation merge/update projection");
+    expect(map).toContain("HelixAskVoiceConfirmationRuntime");
+    expect(map).toContain("shared three-second confirmation timer lifecycle");
     expect(map).toContain("silence/dead-air seal evaluation");
     expect(map).toContain("transcript-confirm policy resolution");
     expect(map).toContain("ask-voice-auto-dispatch-governance.ts");
@@ -3607,13 +3613,19 @@ describe("Helix Ask UI ownership boundaries", () => {
     ]) {
       expect(turnAssemblyController).toContain(controllerPolicySymbol);
     }
-    for (const controllerSymbol of [
-      "buildHelixAskVoicePendingConfirmationPolicyProjection",
+    expect(turnAssemblyController).toContain("buildHelixAskVoicePendingConfirmationPolicyProjection");
+    expect(pill).toContain("buildHelixAskVoicePendingConfirmationPolicyProjection");
+    expect(turnAssemblyController).toContain("buildHelixAskVoiceTranscriptConfirmAutoPolicyProjection");
+    expect(voiceConfirmationRuntime).toContain(
       "buildHelixAskVoiceTranscriptConfirmAutoPolicyProjection",
-    ]) {
-      expect(turnAssemblyController).toContain(controllerSymbol);
-      expect(pill).toContain(controllerSymbol);
-    }
+    );
+    expect(pill).not.toContain("buildHelixAskVoiceTranscriptConfirmAutoPolicyProjection");
+    expect(voiceConfirmationRuntime).toContain("useHelixAskVoiceConfirmationRuntime");
+    expect(voiceConfirmationRuntime).toContain("window.setInterval");
+    expect(voiceConfirmationRuntime).toContain("window.clearInterval");
+    expect(pill).toContain("useHelixAskVoiceConfirmationRuntime({");
+    expect(pill).not.toContain("commandConfirmAutoTimerRef");
+    expect(pill).not.toContain("transcriptConfirmAutoTimerRef");
     for (const directPolicyCall of [
       "deriveTranscriptConfidence({",
       "resolveTranscriptConfirmPolicy({",
@@ -3740,6 +3752,17 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(map).toContain("pending-confirmation merge predicates live in `ask-voice-held-transcript-policy.ts`");
     expect(map).toContain("confirmation state mutation");
     expect(map).toContain("low-pivot translation blocking");
+    for (const forbiddenRuntimeOwner of [
+      "dispatchConfirmedVoiceTranscript",
+      "executeVoiceCommandLaneAction",
+      "voiceTranscribeQueueRef",
+      "setCommandConfirmState",
+      "setTranscriptConfirmState",
+      "fetch(",
+      "@/store/",
+    ]) {
+      expect(voiceConfirmationRuntime).not.toContain(forbiddenRuntimeOwner);
+    }
     for (const localAnchor of [
       "voiceTranscribeQueueRef",
       "voiceConfirmedTurnQueueRef",

@@ -14,6 +14,13 @@ import { evaluateFinalAnswerDraftQualityGate } from "../services/helix-ask/final
 import { materializeFinalAnswerDraftTerminal } from "../services/helix-ask/final-answer-draft-terminal-materializer";
 import { buildRouteProductContract } from "../services/helix-ask/route-product-contract";
 import { buildToolCallAdmissionDecision } from "../services/helix-ask/tool-call-admission";
+import {
+  contextualToolSuppressionBlocksFamily,
+  detectContextualToolAdmissionSuppression,
+} from "../services/helix-ask/contextual-tool-admission";
+import { buildHelixCapabilityItinerary } from "../services/helix-ask/capability-itinerary";
+import { detectScholarlyResearchIntent } from "../services/helix-ask/scholarly-research-intent";
+import { buildToolUseRestatement } from "../services/helix-ask/internet-search-intent";
 import { buildHelixCapabilityItineraryExecutionState } from "../services/helix-ask/capability-itinerary-execution";
 import {
   __testHelixAgentStepDecisionHints,
@@ -1782,6 +1789,161 @@ describe("Helix scholarly research tool admission", () => {
     }
   });
 
+  it("preserves an affirmative full-text workflow when conditional retry language follows", () => {
+    const promptText = [
+      "Find three unique, directly relevant primary papers supporting quantum-inequality constraints on negative energy, traversable wormholes, or warp drives.",
+      "Search the scholarly providers, deduplicate papers across DOI, arXiv, title, and provider records, and fetch full text for three unique sources.",
+      "A duplicate provider record must not count as another source.",
+      "If a fetch fails or duplicates an existing paper, continue searching.",
+      "Build a claim-to-citation map using page- or equation-level support from fetched text, and clearly separate full-text evidence from metadata-only evidence.",
+      "Do not describe unfetched papers as full-text support.",
+    ].join(" ");
+
+    const suppression = detectContextualToolAdmissionSuppression(promptText);
+    expect(contextualToolSuppressionBlocksFamily(suppression, "scholarly_research")).toBe(false);
+    expect(buildToolUseRestatement(promptText).requiredToolFamilies).not.toContain("docs_viewer");
+
+    const intent = detectScholarlyResearchIntent(promptText);
+    expect(intent).toMatchObject({
+      researchRequested: true,
+      fullTextRequested: true,
+      normalizedQuery: "quantum-inequality constraints on negative energy, traversable wormholes, or warp drives",
+      scholarlyIntent: {
+        requested_workflow: "full_text_summary",
+        terminal_evidence_requirement: "full_text",
+      },
+    });
+    expect(intent.plannedScholarlyCapabilityChain.planned_capabilities).toEqual([
+      HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+      HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+    ]);
+
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:scholarly-conditional-retry",
+      promptText,
+      availableCapabilities: [],
+    });
+    expect(itinerary.relevant_tool_families).toContain("scholarly_research");
+    expect(itinerary.relevant_tool_families).not.toContain("docs_viewer");
+    expect(itinerary.terminal_success_criteria.required_observation_families).toContain("scholarly_research");
+  });
+
+  it("keeps metadata lookup admitted when only downstream full-text work is negated", () => {
+    const promptText = [
+      "LOOKUP_SMOKE_02 — Search arXiv for Quantum Field Theory Constrains Traversable Wormhole Geometries by Ford and Roman.",
+      "Use scholarly lookup only and return title, authors, DOI, and arXiv ID.",
+      "Do not fetch full text or inspect PDF pages.",
+    ].join(" ");
+
+    expect(detectContextualToolAdmissionSuppression(promptText)).toBeNull();
+
+    const intent = detectScholarlyResearchIntent(promptText);
+    expect(intent).toMatchObject({
+      researchRequested: true,
+      fullTextRequested: false,
+      scholarlyIntent: {
+        requested_workflow: "metadata_search",
+        terminal_evidence_requirement: "metadata",
+      },
+    });
+    expect(intent.plannedScholarlyCapabilityChain.planned_capabilities).toEqual([
+      HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+    ]);
+
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId: "ask:scholarly-lookup-only",
+      threadId: "helix-ask:test",
+      promptText,
+    });
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "scholarly_research",
+      target_kind: "scholarly_research",
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+    });
+
+    const admission = buildToolCallAdmissionDecision({
+      turnId: "ask:scholarly-lookup-only",
+      sourceTargetIntent,
+      routeProductContract: buildRouteProductContract({
+        turnId: "ask:scholarly-lookup-only",
+        threadId: "helix-ask:test",
+        sourceTargetIntent,
+        promptText,
+      }),
+      promptText,
+    });
+    expect(admission).toMatchObject({
+      source_target: "scholarly_research",
+      required: true,
+    });
+    expect(admission.admitted_tool_families).toContain("scholarly_research");
+  });
+
+  it("keeps an affirmative direct full-text fetch on the scholarly route when broader search is negated", () => {
+    const promptText =
+      "FULLTEXT_SMOKE_01 — Fetch and parse the full text for arXiv gr-qc/9510071. Return the title, parsed page count, and one page-numbered equation. Do not search for other papers.";
+
+    const suppression = detectContextualToolAdmissionSuppression(promptText);
+    expect(suppression?.verb_or_cue).toMatch(/^(?:internet_search\.web_research|scholarly-research\.lookup_papers)$/);
+
+    const intent = detectScholarlyResearchIntent(promptText);
+    expect(intent).toMatchObject({
+      researchRequested: true,
+      arxivId: "gr-qc/9510071",
+      fullTextRequested: true,
+    });
+
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId: "ask:scholarly-direct-full-text-with-search-negation",
+      threadId: "helix-ask:test",
+      promptText,
+    });
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "scholarly_research",
+      target_kind: "scholarly_research",
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+    });
+
+    const admission = buildToolCallAdmissionDecision({
+      turnId: "ask:scholarly-direct-full-text-with-search-negation",
+      sourceTargetIntent,
+      routeProductContract: buildRouteProductContract({
+        turnId: "ask:scholarly-direct-full-text-with-search-negation",
+        threadId: "helix-ask:test",
+        sourceTargetIntent,
+        promptText,
+      }),
+      promptText,
+    });
+    expect(admission).toMatchObject({
+      source_target: "scholarly_research",
+      required: true,
+    });
+    expect(admission.admitted_tool_families).toContain("scholarly_research");
+  });
+
+  it("keeps contextual scholarly references suppressed when no current lookup is requested", () => {
+    const prompts = [
+      "Do not search arXiv for Ford and Roman. Do not fetch full text; answer from general knowledge.",
+      '"Search arXiv for Ford and Roman" was the prior instruction. Do not fetch full text; explain the instruction.',
+      "I searched arXiv for Ford and Roman earlier. Do not fetch full text; summarize what the request means.",
+      "Later, if needed, search arXiv for Ford and Roman. Do not fetch full text; for now answer from general knowledge.",
+    ];
+
+    for (const promptText of prompts) {
+      const suppression = detectContextualToolAdmissionSuppression(promptText);
+      expect(suppression).not.toBeNull();
+      const sourceTargetIntent = arbitrateAskSourceTarget({
+        turnId: "ask:scholarly-contextual-lookup-only",
+        threadId: "helix-ask:test",
+        promptText,
+      });
+      expect(sourceTargetIntent.target_source).toBe("model_only");
+    }
+  });
+
   it("plans the explicit full-text capability for PDF and paper text requests", () => {
     const promptText = "Do research: fetch the PDF/full text for arXiv:2401.00001 and extract the methods section.";
     const sourceTargetIntent = arbitrateAskSourceTarget({
@@ -2352,6 +2514,69 @@ describe("Helix scholarly research tool admission", () => {
       source_providers: expect.arrayContaining(["openalex", "crossref"]),
     });
     expect(observation.evidence_refs.map((ref) => ref.provider)).toEqual(["openalex", "crossref"]);
+  });
+
+  it("deduplicates DOI and arXiv provider records for the same paper identity", async () => {
+    const title = "Quantum Field Theory Constrains Traversable Wormhole Geometries";
+    const fetchImpl: ScholarlyFetch = async (url) => {
+      if (url.includes("api.semanticscholar.org")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: [{
+              paperId: "semantic-ford-roman",
+              title,
+              authors: [{ name: "L. H. Ford" }, { name: "Thomas A. Roman" }],
+              year: 1996,
+              abstract: "Quantum inequalities constrain negative energy and traversable wormholes.",
+              externalIds: { DOI: "10.1103/PhysRevD.53.5496" },
+              isOpenAccess: true,
+              openAccessPdf: { url: "https://arxiv.org/pdf/gr-qc/9510071" },
+            }],
+          }),
+        };
+      }
+      if (url.includes("export.arxiv.org")) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => [
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+            "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+            "<entry>",
+            "<id>https://arxiv.org/abs/gr-qc/9510071</id>",
+            `<title>${title}</title>`,
+            "<summary>Quantum inequalities constrain negative energy and traversable wormholes.</summary>",
+            "<published>1995-10-31T00:00:00Z</published>",
+            "<author><name>L. H. Ford</name></author>",
+            "<author><name>Thomas A. Roman</name></author>",
+            "</entry>",
+            "</feed>",
+          ].join(""),
+        };
+      }
+      return { ok: false, status: 404, json: async () => ({}) };
+    };
+
+    const observation = await runScholarlyResearchLookup({
+      turnId: "ask:scholarly-cross-provider-identity",
+      callId: "call:scholarly-cross-provider-identity",
+      query: `${title} negative energy quantum inequalities`,
+      providers: ["semantic_scholar", "arxiv"],
+      limit: 5,
+      fetchImpl,
+    });
+
+    expect(observation.papers).toHaveLength(1);
+    expect(observation.papers[0]).toMatchObject({
+      title,
+      identifiers: {
+        doi: "10.1103/physrevd.53.5496",
+        arxiv_id: "gr-qc/9510071",
+      },
+      source_providers: expect.arrayContaining(["semantic_scholar", "arxiv"]),
+    });
   });
 
   it("pins explicit arXiv identifiers to exact arXiv-capable results", async () => {

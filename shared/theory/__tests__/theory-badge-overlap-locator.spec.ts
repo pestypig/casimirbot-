@@ -77,6 +77,46 @@ describe("theory badge overlap locator", () => {
     expect(massOnlyMatches).toEqual([]);
   });
 
+  it("abstains on named mathematics theorems outside current graph coverage", () => {
+    const graph = buildNhm2TheoryBadgeGraphV1();
+    const queries = [
+      "Godel's incompleteness theorem",
+      "Gödel's incompleteness theorem",
+      "Fermat's Last Theorem",
+      "x^n + y^n = z^n has no positive integer solutions for n greater than 2",
+    ];
+
+    for (const query of queries) {
+      expect(
+        locateTheoryBadges({
+          graph,
+          input: { query, limit: 8 },
+        }),
+        query,
+      ).toEqual([]);
+    }
+  });
+
+  it("does not match short element tags as substrings but preserves explicit lookup", () => {
+    const graph = buildNhm2TheoryBadgeGraphV1();
+    const theoremMatches = locateTheoryBadges({
+      graph,
+      input: { query: "Fermat's Last Theorem", limit: 20 },
+    });
+    const explicitElementMatches = locateTheoryBadges({
+      graph,
+      input: { subjects: ["as"], limit: 20 },
+    });
+    const namedElementMatches = locateTheoryBadges({
+      graph,
+      input: { query: "arsenic element origin", limit: 20 },
+    });
+
+    expect(theoremMatches).toEqual([]);
+    expect(explicitElementMatches.map((match) => match.badgeId)).toContain("element.as.origin");
+    expect(namedElementMatches.map((match) => match.badgeId)).toContain("element.as.origin");
+  });
+
   it("traces connections across selected badges", () => {
     const graph = buildNhm2TheoryBadgeGraphV1();
     const trace = traceTheoryBadgeConnections({

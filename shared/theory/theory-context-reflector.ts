@@ -45,6 +45,15 @@ export type BuildTheoryContextReflectionInput = {
 };
 
 const STRONG_MATCH_SCORE = 70;
+
+function estimateGraphCoverageProbability(matches: TheoryBadgeLookupMatch[]): number {
+  if (matches.length === 0) return 0;
+  const topScore = Math.max(0, ...matches.map((match) => match.score));
+  // Locator scores are evidence-strength telemetry rather than a scientific
+  // posterior. This saturating map preserves explicit out-of-graph mass until
+  // the prompt has strong absolute graph evidence.
+  return Number(Math.min(0.99, 1 - Math.exp(-topScore / 30)).toFixed(6));
+}
 const RESOLUTION_ROLES: TheoryContextReflectionResolutionRole[] = [
   "prompt_center",
   "first_principles_path",
@@ -1081,11 +1090,24 @@ export function buildTheoryContextReflection(
   const softRegionBadgeIds = unique([...exactBadgeIds, ...likelyBadgeIds, ...connectedBadgeIds]);
   const biomeLayout = buildTheoryBiomeLayoutV1(args.graph);
   const biomeCoordinateByBadgeId = new Map(biomeLayout.coordinates.map((coordinate) => [coordinate.badgeId, coordinate]));
-  const biomeFocusCoordinates = unique([...centerBadgeIds, ...exactBadgeIds, ...likelyBadgeIds, ...connectedBadgeIds])
+  const graphBadgesById = badgeById(args.graph);
+  const nearestClaimBoundaryBadgeId = sortedLookupMatches.find((match) => {
+    const badge = graphBadgesById.get(match.badgeId);
+    return Boolean(badge && hasClaimBoundaryShape(badge));
+  })?.badgeId;
+  const biomeFocusCoordinates = unique([
+    ...centerBadgeIds,
+    ...exactBadgeIds,
+    ...likelyBadgeIds,
+    ...connectedBadgeIds,
+    ...(nearestClaimBoundaryBadgeId ? [nearestClaimBoundaryBadgeId] : []),
+  ])
     .map((badgeId) => biomeCoordinateByBadgeId.get(badgeId))
     .filter((coordinate): coordinate is NonNullable<typeof coordinate> => Boolean(coordinate));
   const probabilityTerrain = buildProbabilityTerrainV1({
     graphKind: "theory_badge_graph",
+    coverageProbability: estimateGraphCoverageProbability(locatedMatches),
+    coverageBasis: "absolute_match_score_heuristic",
     candidates: locatedMatches.map((match) => {
       const coordinate = biomeCoordinateByBadgeId.get(match.badgeId);
       return {
@@ -1105,6 +1127,13 @@ export function buildTheoryContextReflection(
     informationGainBits: probabilityTerrain.informationGainBits,
     normalizedMass: probabilityTerrain.normalizedMass,
     uncertaintyMode: probabilityTerrain.uncertaintyMode,
+    representedProbabilityMass: probabilityTerrain.representedProbabilityMass,
+    outOfGraphProbability: probabilityTerrain.outOfGraphProbability,
+    openWorldCandidateProbabilityById: probabilityTerrain.openWorldCandidateProbabilityById,
+    openWorldEntropyBits: probabilityTerrain.openWorldEntropyBits,
+    openWorldPlacementCertainty: probabilityTerrain.openWorldPlacementCertainty,
+    coverageBasis: probabilityTerrain.coverageBasis,
+    openWorldInterpretation: probabilityTerrain.openWorldInterpretation,
   };
   const suggestedBiomeChunkIds = unique(
     biomeFocusCoordinates.map((coordinate) => coordinate.renderChunkId),

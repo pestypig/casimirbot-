@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { isHelixTheoryContextReflectionToolReceiptV1 } from "../../shared/contracts/helix-theory-context-reflection-tool-receipt.v1";
 import { isTheoryCongruenceTraceV1 } from "../../shared/helix-theory-congruence-trace";
+import { isTheoryMasterProblemV1 } from "../../shared/contracts/theory-master-problem.v1";
 import { runAskLevelTheoryContextReflectionTool } from "../services/helix-ask/theory-context-reflection-tool";
 import { buildScholarlyPaperSources } from "../services/helix-ask/theory-congruence/scholarly-observation";
 
@@ -35,6 +36,10 @@ describe("Helix Ask theory congruence trace", () => {
     )).toBe(true);
     expect(trace?.forbidden_claim_scan.status).toBe("pass");
     expect(trace?.calculator_payloads.some((payload) => payload.status === "loadable")).toBe(true);
+    expect(isTheoryMasterProblemV1(trace?.master_problem)).toBe(true);
+    expect(trace?.master_problem.claimBoundary.terminalEligible).toBe(false);
+    expect(trace?.master_problem.claimBoundary.completedSolverPathRequired).toBe(true);
+    expect(trace?.master_problem.uncertaintyLedger.outOfGraphProbability).toBeGreaterThanOrEqual(0);
   });
 
   it("represents exact arXiv direct-PDF fallback when metadata fails", () => {
@@ -67,5 +72,35 @@ describe("Helix Ask theory congruence trace", () => {
         pdf_url: "https://arxiv.org/pdf/1706.03762.pdf",
       }),
     ]);
+  });
+
+  it("carries an explicitly normalized request into the non-terminal master problem", () => {
+    const receipt = runAskLevelTheoryContextReflectionTool({
+      turnId: "turn:explicit-master-problem",
+      prompt: "Compare solar nanoflare power predictions at the same observable scale.",
+      mentionedSymbols: ["P_nano", "E_nano", "tau_nano"],
+      mentionedDomains: ["solar_surface_spectrum"],
+      derivationRequest: {
+        operation: "compare",
+        target: "solar nanoflare power",
+        targetObservable: "P_nano",
+        scaleLog10M: { min: 5, max: 7 },
+        coordinateFrame: "solar_surface_local",
+        initialBoundaryConditions: ["same cadence and event-selection window"],
+        formalSystem: null,
+        requestedPrecision: "report interval overlap",
+        evidenceMaturityCeiling: "diagnostic",
+        normalizationStatus: "explicit",
+      },
+    });
+
+    expect(receipt.theoryCongruenceTraceV1?.master_problem.request).toMatchObject({
+      operation: "compare",
+      targetObservable: "P_nano",
+      coordinateFrame: "solar_surface_local",
+      normalizationStatus: "explicit",
+    });
+    expect(receipt.theoryCongruenceTraceV1?.master_problem.compile.allowedResultKinds).toContain("equivalence_class");
+    expect(receipt.theoryCongruenceTraceV1?.master_problem.claimBoundary.assistantAnswer).toBe(false);
   });
 });

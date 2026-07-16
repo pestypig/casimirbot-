@@ -9,6 +9,7 @@ import type {
   HelixScholarlyResearchIntentMode,
   HelixScholarlyTerminalEvidenceRequirement,
 } from "@shared/helix-scholarly-research-observation";
+import { deriveScholarlyEvidenceDemand } from "./scholarly-evidence-demand";
 
 export type HelixScholarlyResearchIntent = {
   researchRequested: boolean;
@@ -25,8 +26,26 @@ export type HelixScholarlyResearchIntent = {
   plannedScholarlyCapabilityChain: HelixScholarlyCapabilityChainPlan;
 };
 
+export const deriveDirectScholarlyPortfolioQueries = (
+  query: string,
+  requestedFullTextCount: number,
+): string[] => {
+  const normalized = query.replace(/\s+/g, " ").trim();
+  if (requestedFullTextCount <= 1) return [normalized];
+  const threeTopicList = normalized.match(
+    /^(.{3,180}?\b(?:about|for|involving|on)\s+)([^,]{3,120}),\s*([^,]{3,120}),\s*(?:and|or)\s+([^,]{3,120})[.?!]?$/i,
+  );
+  if (!threeTopicList) return [normalized];
+  const prefix = threeTopicList[1].trim();
+  const topics = threeTopicList.slice(2, 5)
+    .map((topic) => topic.replace(/[.?!]+$/g, "").trim())
+    .filter(Boolean);
+  if (topics.length !== 3) return [normalized];
+  return Array.from(new Set(topics.map((topic) => `${prefix} ${topic}`))).slice(0, 3);
+};
+
 const DOI_PATTERN = /\b10\.\d{4,9}\/[-._;()/:A-Z0-9]+\b/i;
-const ARXIV_PATTERN = /\b(?:arxiv:\s*|arxiv\.org\/(?:abs|pdf)\/)([A-Za-z-]+\/\d{7}|\d{4}\.\d{4,5})(?:v\d+)?\b/i;
+const ARXIV_PATTERN = /\b(?:arxiv(?:\s*:\s*|\s+)|arxiv\.org\/(?:abs|pdf)\/)([A-Za-z-]+\/\d{7}|\d{4}\.\d{4,5})(?:v\d+)?\b/i;
 const BARE_ARXIV_PATTERN = /\b\d{4}\.\d{4,5}(?:v\d+)?\b/i;
 
 const trimIdentifier = (value: string): string =>
@@ -35,7 +54,7 @@ const trimIdentifier = (value: string): string =>
 // Tool names and examples are frequently quoted in prompts that explicitly say not to run them.
 // Intent cues must be read from the operator text, not from those literal examples.
 const stripQuotedPromptSegments = (promptText: string): string =>
-  promptText.replace(/"[^"\n]*"|'[^'\n]*'|`[^`\n]*`/g, " ");
+  promptText.replace(/"[^"\n]*"|'[^'\n]*'|“[^”\n]*”|‘[^’\n]*’|`[^`\n]*`/g, " ");
 
 export const extractScholarlyDoi = (promptText: string): string | null => {
   const match = promptText.match(DOI_PATTERN)?.[0];
@@ -55,11 +74,29 @@ export const extractScholarlySourceUrl = (promptText: string): string | null => 
   return match ? trimIdentifier(match) : null;
 };
 
+export const normalizeScholarlyFullTextSourceUrl = (
+  sourceUrl: string | null | undefined,
+): string | null => {
+  const normalized = sourceUrl?.trim();
+  if (!normalized) return null;
+  const arxivMatch = normalized.match(
+    /^https?:\/\/(?:www\.)?arxiv\.org\/(?:abs|pdf)\/([^?#]+?)(?:[?#].*)?$/i,
+  );
+  if (!arxivMatch) return normalized;
+  const arxivId = arxivMatch[1].replace(/\.pdf$/i, "");
+  return `https://arxiv.org/pdf/${arxivId}.pdf`;
+};
+
 export const hasDirectScholarlyFullTextSourceIntent = (promptText: string): boolean => {
   const sourceUrl = extractScholarlySourceUrl(promptText);
   const hasIdentifier = Boolean(sourceUrl || extractScholarlyDoi(promptText) || extractScholarlyArxivId(promptText));
-  if (!hasIdentifier || !/\bscholarly-research\.fetch_full_text\b/i.test(promptText)) return false;
-  const directFetch = /\bscholarly-research\.fetch_full_text\b[^.!?;\n]{0,120}\b(?:directly|from|on)\b/i.test(promptText);
+  const fullTextActionNegated =
+    /\b(?:do\s+not|don't|dont|without|avoid|not\s+asking\s+to)\b[\s\S]{0,100}\b(?:fetch|retrieve|read|open|parse|extract)\b[\s\S]{0,80}\b(?:pdf|full[-\s]?text|paper\s+text|article\s+text|paper|article)\b/i.test(promptText);
+  if (!hasIdentifier || fullTextActionNegated) return false;
+  const directFetch =
+    /\bscholarly-research\.fetch_full_text\b[^.!?;\n]{0,120}\b(?:directly|from|on)\b/i.test(promptText) ||
+    /\b(?:fetch|retrieve|get|pull|read|parse)\b[\s\S]{0,120}\b(?:pdf|full[-\s]?text|paper\s+text|article\s+text)\b/i.test(promptText) ||
+    /\b(?:pdf|full[-\s]?text|paper\s+text|article\s+text)\b[\s\S]{0,120}\b(?:fetch|retrieve|get|pull|read|parse)\b/i.test(promptText);
   const lookupNegated = /\b(?:do\s+not|don't|dont|without|avoid)\b[^.!?;\n]{0,120}\bscholarly-research\.lookup_papers\b/i.test(promptText);
   const lookupAbsent = !/\bscholarly-research\.lookup_papers\b/i.test(promptText);
   return directFetch && (lookupNegated || lookupAbsent);
@@ -112,7 +149,13 @@ const uniqueStrings = (values: string[]): string[] =>
   Array.from(new Set(values.map((entry) => entry.trim()).filter(Boolean)));
 
 const firstQuotedTopic = (promptText: string): string | null => {
-  for (const pattern of [/"([^"\n]{3,180})"/g, /'([^'\n]{3,180})'/g, /`([^`\n]{3,180})`/g]) {
+  for (const pattern of [
+    /"([^"\n]{3,180})"/g,
+    /'([^'\n]{3,180})'/g,
+    /“([^”\n]{3,180})”/g,
+    /‘([^’\n]{3,180})’/g,
+    /`([^`\n]{3,180})`/g,
+  ]) {
     for (const match of promptText.matchAll(pattern)) {
       const candidate = match[1]?.replace(/\s+/g, " ").trim();
       if (!candidate) continue;
@@ -129,6 +172,18 @@ const explicitLookupTopic = (promptText: string): string | null => {
   if (!match) return null;
   const cleaned = match
     .replace(/\b(?:then|use)\b[\s\S]*$/i, "")
+    .replace(/\s+/g, " ")
+    .replace(/^[\s:;,.!?-]+|[\s:;,.!?-]+$/g, "")
+    .trim();
+  return cleaned && /[A-Za-z]/.test(cleaned) ? cleaned : null;
+};
+
+const explicitPrimaryPaperTopic = (promptText: string): string | null => {
+  const match = promptText.match(
+    /\b(?:find|search|locate|retrieve|collect|get)\b[^.;\n]{0,120}\b(?:primary\s+)?(?:research\s+)?papers?\b\s+(?:supporting|that\s+support|about|on|for)\s+([^.;\n]{3,220})/i,
+  )?.[1];
+  if (!match) return null;
+  const cleaned = match
     .replace(/\s+/g, " ")
     .replace(/^[\s:;,.!?-]+|[\s:;,.!?-]+$/g, "")
     .trim();
@@ -171,6 +226,10 @@ const stripInstructionText = (promptText: string): { query: string; reasons: str
   const explicitTopic = explicitLookupTopic(query);
   if (explicitTopic) {
     return { query: explicitTopic, reasons: ["explicit_lookup_topic_selected"] };
+  }
+  const primaryPaperTopic = explicitPrimaryPaperTopic(query);
+  if (primaryPaperTopic) {
+    return { query: primaryPaperTopic, reasons: ["explicit_primary_paper_topic_selected"] };
   }
   const historicalTopic = historicalOriginalPaperTopic(query);
   if (historicalTopic) {
@@ -288,6 +347,10 @@ export const extractScholarlyIntent = (promptText: string): HelixScholarlyIntent
     requiresCalculation ? "calculation" : "",
     workflow === "bibliography_repair" ? "bibliography" : "",
   ]);
+  const evidenceDemand = deriveScholarlyEvidenceDemand({
+    promptText: originalPrompt,
+    workflow,
+  });
   return {
     schema: "helix.scholarly_intent.v1",
     original_prompt: originalPrompt,
@@ -299,6 +362,7 @@ export const extractScholarlyIntent = (promptText: string): HelixScholarlyIntent
     requires_numeric_extraction: requiresNumericExtraction,
     requires_calculation: requiresCalculation,
     terminal_evidence_requirement: terminalRequirementForWorkflow(workflow),
+    evidence_demand: evidenceDemand,
     query_normalization_reasons: normalized.reasons,
     assistant_answer: false,
     raw_content_included: false,

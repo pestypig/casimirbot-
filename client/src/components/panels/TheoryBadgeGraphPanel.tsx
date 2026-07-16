@@ -38,7 +38,7 @@ import TheoryAtlasRail, { type TheoryAtlasLensId } from "@/components/panels/The
 import TokamakPlasmaLens from "@/components/panels/TokamakPlasmaLens";
 import WarpGrNhm2Lens from "@/components/panels/WarpGrNhm2Lens";
 import { dispatchScientificCalculatorMathPicked } from "@/lib/scientific-calculator/events";
-import { buildTheoryBadgeCombinationReaderPayload } from "@/lib/theory/theoryBadgeCombinationReader";
+import { buildTheoryBadgeCombinationReaderPayloadForSelection } from "@/lib/theory/theoryBadgeCombinationReader";
 import { resolveTheoryBadgeConnectionTrace } from "@/lib/theory/theoryBadgeConnectionTrace";
 import { formatTheoryBadgePlaybackMarkdown } from "@/lib/theory/theoryBadgePlaybackRunner";
 import { buildTheoryBadgeLocatorArtifact } from "@/lib/theory/theoryMapOverlay";
@@ -5786,26 +5786,14 @@ export default function TheoryBadgeGraphPanel() {
     if (multiTrace) return multiTrace.connectingEdgeIds;
     return [];
   }, [graph, multiTrace]);
-  const connectableBadgeIds = useMemo(() => {
-    if (!graph || selectedBadgeIds.length === 0) return [];
-    const selected = new Set(selectedBadgeIds);
-    return graph.badges
-      .filter((badge: TheoryBadgeV1) => !selected.has(badge.id))
-      .filter((badge: TheoryBadgeV1) => {
-        const trace = resolveTheoryBadgeConnectionTrace({ graph, badgeIds: [...selectedBadgeIds, badge.id] });
-        return trace.connectingEdgeIds.length > 0 && trace.connectingBadgeIds.includes(badge.id);
-      })
-      .map((badge: TheoryBadgeV1) => badge.id);
-  }, [graph, selectedBadgeIds]);
   const combinationReaderPayload = useMemo(() => {
     if (!graph) return null;
-    return buildTheoryBadgeCombinationReaderPayload({
+    return buildTheoryBadgeCombinationReaderPayloadForSelection({
       graph,
       selectedBadgeIds,
-      trace: multiTrace,
-      availableNextBadgeIds: connectableBadgeIds,
     });
-  }, [connectableBadgeIds, graph, multiTrace, selectedBadgeIds]);
+  }, [graph, selectedBadgeIds]);
+  const connectableBadgeIds = combinationReaderPayload?.availableNextBadges.map((badge) => badge.id) ?? [];
 
   const routeEligibility = useMemo(() => {
     if (!graph) return null;

@@ -1,11 +1,17 @@
 import { isWorkspaceOsStatusPrompt, workspaceOsStatusReasonCodes } from "../workspace-os-status-intent";
 import { detectInternetSearchIntent } from "../internet-search-intent";
 import {
+  contextualToolSuppressionBlocksFamily,
+  detectContextualToolAdmissionSuppression,
+} from "../contextual-tool-admission";
+import {
+  deriveDirectScholarlyPortfolioQueries,
   detectScholarlyResearchIntent,
   extractScholarlyArxivId,
   extractScholarlyDoi,
   extractScholarlySourceUrl,
   hasDirectScholarlyFullTextSourceIntent,
+  normalizeScholarlyFullTextSourceUrl,
 } from "../scholarly-research-intent";
 import { moralGraphPolicyAllowsProceduralBadgeReflection } from "../../../../shared/moral-graph/moral-graph-agent-invocation-policy";
 import {
@@ -617,9 +623,9 @@ export const buildPromptNamedCapabilityGatewayCallRequests = (
     const sourceUrl = extractScholarlySourceUrl(prompt);
     const arxivId = extractScholarlyArxivId(prompt);
     const doi = extractScholarlyDoi(prompt);
-    const resolvedSourceUrl = sourceUrl ??
+    const resolvedSourceUrl = normalizeScholarlyFullTextSourceUrl(sourceUrl ??
       (arxivId ? `https://arxiv.org/abs/${arxivId}` : null) ??
-      (doi ? `https://doi.org/${doi}` : null);
+      (doi ? `https://doi.org/${doi}` : null));
     if (resolvedSourceUrl) {
       addNamedRequest(SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY, "read", {
         source_url: resolvedSourceUrl,
@@ -1388,7 +1394,10 @@ export const buildPromptDerivedScholarlyResearchGatewayCallRequests = (
   const prompt = readPrompt(body);
   if (!prompt) return [];
   if (isScientificImageEvidenceRefRevisionPrompt(prompt)) return [];
-  if (hasNegatedScholarlyResearchInstruction(prompt)) return [];
+  if (contextualToolSuppressionBlocksFamily(
+    detectContextualToolAdmissionSuppression(prompt),
+    "scholarly_research",
+  )) return [];
   const intent = detectScholarlyResearchIntent(prompt);
   if (!intent.researchRequested) return [];
   const conversationalReferent = resolveHelixAskConversationalReferent(body);
@@ -1439,33 +1448,48 @@ export const buildPromptDerivedScholarlyResearchGatewayCallRequests = (
     explicitTopicFallbackQuery &&
     conversationalReferent.trace.explicit_topic_terms.length > 0
   );
+  const affirmativeCurrentTurnResearchAction = Boolean(
+    isPaperBackedNumericBindingPhasePrompt(prompt) ||
+    hasAffirmativeResearchRetryIntent(prompt)
+  );
   // Never send operator instructions such as "claims we just discussed" to a
   // paper API. Prefer bounded resolved claims. If the retained conversation no
   // longer contains a matching answer, an explicit topic named in the current
   // prompt may seed a topic-only lookup; an unscoped missing antecedent still
   // fails closed.
   if (conversationalReferent.trace.referent_detected && !hasExplicitIdentifierOrSourceTarget) {
-    if (!referentDerived && !explicitTopicFallbackDerived) {
+    if (!referentDerived && !explicitTopicFallbackDerived && !affirmativeCurrentTurnResearchAction) {
       return [];
     }
   }
-  const queries = referentDerived
-    ? resolvedReferentQueries
-    : explicitTopicFallbackDerived
-      ? [explicitTopicFallbackQuery]
-      : [intent.normalizedQuery];
   const requestedFullTextCount = (() => {
     const match = prompt.match(
-      /\b(?:best|top|fetch|open|read|parse)\s+(?:the\s+)?(one|two|three|1|2|3)\b[\s\S]{0,50}\b(?:accessible\s+)?(?:sources?|papers?|articles?|pdfs?|full[-\s]?texts?)\b/i,
+      /\b(?:best|top|fetch|open|read|parse)\b[^.!?;\n]{0,100}\b(one|two|three|1|2|3)\b[^.!?;\n]{0,50}\b(?:unique\s+)?(?:accessible\s+)?(?:sources?|papers?|articles?|pdfs?|full[-\s]?texts?)\b/i,
+    ) ?? prompt.match(
+      /\b(one|two|three|1|2|3)\b[^.!?;\n]{0,40}\b(?:unique\s+)?(?:accessible\s+)?(?:full[-\s]?text\s+)?(?:sources?|papers?|articles?|pdfs?)\b[^.!?;\n]{0,80}\b(?:fetch|open|read|parse|full[-\s]?text)\b/i,
     );
     const token = match?.[1]?.toLowerCase();
     if (token === "three" || token === "3") return 3;
     if (token === "two" || token === "2") return 2;
     return 1;
   })();
+  const directPortfolioQueries = deriveDirectScholarlyPortfolioQueries(
+    intent.normalizedQuery,
+    requestedFullTextCount,
+  );
+  const queries = referentDerived
+    ? resolvedReferentQueries
+    : explicitTopicFallbackDerived
+      ? [explicitTopicFallbackQuery]
+      : directPortfolioQueries;
+  const directPortfolioDerived = Boolean(
+    !referentDerived &&
+    !explicitTopicFallbackDerived &&
+    !hasExplicitIdentifierOrSourceTarget &&
+    directPortfolioQueries.length > 1
+  );
   return queries.map((query, claimIndex) => {
     const closesScholarlyLookupSet = Boolean(
-      (referentDerived || explicitTopicFallbackDerived) &&
       intent.scholarlyIntent.requires_full_text &&
       claimIndex === queries.length - 1
     );
@@ -1501,7 +1525,7 @@ export const buildPromptDerivedScholarlyResearchGatewayCallRequests = (
         ...(closesScholarlyLookupSet ? {
           allow_scholarly_dependent_chain: true,
           requested_full_text_count: requestedFullTextCount,
-          ...(referentDerived ? { scholarly_claim_portfolio: true } : {}),
+          ...(referentDerived || directPortfolioDerived ? { scholarly_claim_portfolio: true } : {}),
         } : {}),
         source_target_intent: {
           source: derivationSource,
@@ -1520,6 +1544,11 @@ export const buildPromptDerivedScholarlyResearchGatewayCallRequests = (
           ...(referentDerived ? {
             query_derivation: "resolved_conversational_referent_claim",
             resolved_referent_ref: conversationalReferent.trace.resolved_source_ref,
+            claim_index: claimIndex,
+            claim_count: queries.length,
+            claim_portfolio_closer: closesScholarlyLookupSet,
+          } : directPortfolioDerived ? {
+            query_derivation: "direct_multi_topic_scholarly_portfolio",
             claim_index: claimIndex,
             claim_count: queries.length,
             claim_portfolio_closer: closesScholarlyLookupSet,

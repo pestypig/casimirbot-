@@ -115,6 +115,11 @@ describe("Helix Ask debug export capability lanes", () => {
             client_secret: "must-not-export",
             ephemeral_secret: "must-not-export",
             sdp: "v=0 must-not-export",
+            answer_sdp: "v=0 answer-must-not-export",
+            ice_candidate: "candidate:ice-must-not-export",
+            Authorization: "Bearer auth-must-not-export",
+            openai_api_key: "key-must-not-export",
+            raw_provider_response: { secret: "provider-must-not-export" },
             audio_payload: "must-not-export",
             raw_audio: "must-not-export",
             openai_network_call_attempted: true,
@@ -240,6 +245,11 @@ describe("Helix Ask debug export capability lanes", () => {
     expect(text).not.toContain("must_not_execute");
     expect(text).not.toContain("workstation_action_args");
     expect(text).not.toContain("prompt_text");
+    expect(text).not.toContain("ice-must-not-export");
+    expect(text).not.toContain("auth-must-not-export");
+    expect(text).not.toContain("key-must-not-export");
+    expect(text).not.toContain("provider-must-not-export");
+    expect(text).not.toContain("answer-must-not-export");
   });
 
   it("preserves client note persistence receipts for workstation note creation", () => {

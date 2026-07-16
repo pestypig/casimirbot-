@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from "react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentGoalSessionV1 } from "@shared/contracts/workstation-goal-context.v1";
 import { WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS } from "@shared/contracts/workstation-goal-context.v1";
@@ -31,6 +31,7 @@ afterEach(() => {
   cleanup();
   useAgiChatStore.setState({ sessions: {}, activeId: undefined });
   window.localStorage.removeItem(HELIX_ASK_LANGUAGE_MODEL_PROFILE_STORAGE_KEY);
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -715,5 +716,47 @@ describe("HelixAskMinimalRuntimeShell", () => {
     expect(screen.getByTestId<HTMLTextAreaElement>("helix-debug-export-json").value).toContain(
       '"turn_id": "ask:runtime-shell-turn"',
     );
+  });
+
+  it("runs the recrowned voice confirmation countdown without the legacy bridge", () => {
+    vi.useFakeTimers();
+    const onCommandAutoConfirm = vi.fn();
+
+    render(
+      <HelixAskMinimalRuntimeShell
+        contextId="ctx"
+        visibleSurface={{
+          voiceConfirmationRuntime: {
+            micEnabled: true,
+            commandCandidate: {
+              id: "minimal-command:send",
+              action: "send",
+              transcript: "send it",
+            },
+            transcriptCandidate: null,
+            confirmV2Active: true,
+            lowQualitySpeechProbability: 0.45,
+            lowQualitySnrDb: 6,
+            readTranscriptActivity: () => ({ speechActive: false, queuedSegmentCount: 0 }),
+            onCommandAutoConfirm,
+            onCommandPreempted: vi.fn(),
+            onTranscriptAutoConfirm: vi.fn(),
+            clipText: (text, limit) => text.slice(0, limit),
+            describeCommandAction: (action) => action,
+            onCommandAccept: vi.fn(),
+            onCommandCancel: vi.fn(),
+            onTranscriptAccept: vi.fn(),
+            onTranscriptRetry: vi.fn(),
+            countdownMs: 3_000,
+            tickMs: 1_000,
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Auto-confirming in 3s. Say \"cancel\" to stop.")).toBeTruthy();
+    act(() => vi.advanceTimersByTime(3_000));
+    expect(onCommandAutoConfirm).toHaveBeenCalledWith("minimal-command:send");
+    expect(screen.queryByTestId("helix-ask-pill")).toBeNull();
   });
 });

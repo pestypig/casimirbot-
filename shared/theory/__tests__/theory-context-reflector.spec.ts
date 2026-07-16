@@ -422,4 +422,20 @@ describe("theory context reflector", () => {
       reflection.overlay.uncertainty?.posteriorEntropyBits ?? 0,
     );
   });
+
+  it("keeps unsupported formal-theorem requests in the open-world null hypothesis", () => {
+    const reflection = buildTheoryContextReflection({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      prompt: "Compare Godel's incompleteness theorem with Fermat's Last Theorem.",
+      generatedAt: "2026-07-15T00:00:00.000Z",
+      reflectionId: "reflection:formal-theorems-out-of-graph",
+    });
+
+    expect(reflection.exactMatches).toEqual([]);
+    expect(reflection.likelyMatches).toEqual([]);
+    expect(reflection.overlay.uncertainty?.representedProbabilityMass).toBe(0);
+    expect(reflection.overlay.uncertainty?.outOfGraphProbability).toBe(1);
+    expect(reflection.overlay.uncertainty?.openWorldCandidateProbabilityById).toEqual({});
+    expect(reflection.overlay.uncertainty?.coverageBasis).toBe("no_candidates");
+  });
 });

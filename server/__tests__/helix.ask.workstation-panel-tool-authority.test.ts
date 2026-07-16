@@ -15,6 +15,14 @@ describe("workstation panel tool authority registry", () => {
     expect(entry.authority).toBe("evidence_only");
   });
 
+  it("classifies the current graph selection as evidence-only context", () => {
+    expect(getWorkstationPanelToolAuthority("theory-badge-graph", "current_context")).toMatchObject({
+      tool: "theory-badge-graph.current_context",
+      role: "context_locator",
+      authority: "evidence_only",
+    });
+  });
+
   it("classifies calculator solves as numeric observations", () => {
     const entry = getWorkstationPanelToolAuthority("scientific-calculator", "solve_expression");
 
@@ -74,6 +82,7 @@ describe("workstation panel tool authority registry", () => {
     const tools = listWorkstationPanelToolAuthorityEntries().map((entry) => entry.tool);
 
     expect(tools).toContain("theory-badge-graph.reflect_discussion_context");
+    expect(tools).toContain("theory-badge-graph.current_context");
     expect(new Set(tools).size).toBe(tools.length);
     expect(buildWorkstationToolKey("a", "b")).toBe("a.b");
   });

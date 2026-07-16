@@ -95,6 +95,21 @@ const scholarlyVerbOrCue = (text: string): string =>
     ? "scholarly-research.fetch_full_text"
     : "scholarly-research.lookup_papers";
 
+const hasAffirmativeScholarlyActionClause = (promptText: string): boolean => {
+  const unquoted = promptText.replace(/"[^"\n]*"|'[^'\n]*'|`[^`\n]*`/g, " ");
+  return unquoted.split(/[.!?;\n]+/).some((rawClause) => {
+    const clause = rawClause.trim();
+    if (!clause || !SCHOLARLY_ACTION_WITH_CUE_RE.test(clause)) return false;
+    const actionIndex = clause.search(SCHOLARLY_ACTION_RE);
+    const prefix = actionIndex >= 0 ? clause.slice(0, actionIndex) : clause;
+    if (/\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to)\b/i.test(prefix)) return false;
+    if (/\b(?:if|when|before|after|would|could|might|hypothetically|later|next\s+time|in\s+the\s+future)\b/i.test(prefix)) return false;
+    if (/\b(?:earlier|previously|last\s+turn|historically|already)\b/i.test(prefix)) return false;
+    if (SCHOLARLY_EXPLANATION_RE.test(clause)) return false;
+    return true;
+  });
+};
+
 const isNegatedEvidenceFamilySuppression = (
   suppression: HelixContextualToolAdmissionSuppression,
 ): boolean =>
@@ -135,6 +150,12 @@ export function contextualToolSuppressionBlocksFamily(
   if (!suppression) return false;
   const cue = suppression.verb_or_cue;
   if (/all[_-]?tools/i.test(cue)) return true;
+  // Capability-qualified negations are narrower than their shared provider
+  // family. In particular, `internet_search.web_research` contains the word
+  // "research", but it must not suppress an independently requested
+  // `scholarly-research.fetch_full_text` call.
+  if (/^internet[_-]search\./i.test(cue)) return family === "internet_search";
+  if (/^scholarly[_-]research\./i.test(cue)) return family === "scholarly_research";
   if (negatedEvidenceFamilyBlocks(suppression, family)) return true;
   if (family === "docs_viewer") return /docs_viewer|docs-viewer/i.test(cue) || DOCS_MD_PATH_CUE_RE.test(suppression.text);
   if (family === "scientific_calculator" || family === "calculator") return /scientific[_-]calculator|calculator/i.test(cue);
@@ -487,12 +508,18 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
   const promptForExternalNegation = stripWriteOnlyNegationsForExternalToolMatching(prompt);
   const negatedScholarly = promptForExternalNegation.match(/\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to)\b[\s\S]{0,120}(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|query|get|resolve|collect|cite|read)\b[\s\S]{0,160}(?:doi|arxiv|crossref|openalex|semantic\s+scholar|citations?|references?|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?|10\.\d{4,9}\/[-._;()/:A-Z0-9]+)\b/i)?.[0];
   if (negatedScholarly) {
-    return {
-      tool_admission_suppressed: true,
-      suppression_reason: "negated_tool_instruction",
-      verb_or_cue: scholarlyVerbOrCue(negatedScholarly),
-      text: negatedScholarly,
-    };
+    const negatedCapability = scholarlyVerbOrCue(negatedScholarly);
+    const preservesAffirmativeMetadataLookup =
+      negatedCapability !== "scholarly-research.lookup_papers" &&
+      hasAffirmativeScholarlyActionClause(prompt);
+    if (!preservesAffirmativeMetadataLookup) {
+      return {
+        tool_admission_suppressed: true,
+        suppression_reason: "negated_tool_instruction",
+        verb_or_cue: negatedCapability,
+        text: negatedScholarly,
+      };
+    }
   }
   const negatedInternet = promptForExternalNegation.match(/\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no)\b[\s\S]{0,120}(?:browse|browsing|search(?:ing)?|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|verify\s+online)\b/i)?.[0];
   if (negatedInternet || REWRITE_ONLY_CURRENT_TEXT_RE.test(promptForExternalNegation)) {
@@ -522,7 +549,7 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
     };
   }
   const hypotheticalScholarly = prompt.match(/\b(?:if|when|before|after|would|could|might|hypothetically)\b[\s\S]{0,120}(?:do\s+research|research|find|search|searched|look\s*up|looked\s+up|lookup|retrieve|retrieved|fetch|fetched|query|queried|get|resolve|collect|cite|read)\b[\s\S]{0,160}(?:doi|arxiv|crossref|openalex|semantic\s+scholar|citations?|references?|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?)\b/i)?.[0];
-  if (hypotheticalScholarly) {
+  if (hypotheticalScholarly && !hasAffirmativeScholarlyActionClause(prompt)) {
     return {
       tool_admission_suppressed: true,
       suppression_reason: "hypothetical_tool_reference",

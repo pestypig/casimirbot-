@@ -157,6 +157,7 @@ describe("DocViewerPanel taxonomy UI", () => {
 
   it("renders and opens profile-private research extractions separately from canonical docs", () => {
     const onSelectResearchDocument = vi.fn();
+    const onDeleteResearchDocument = vi.fn();
     const { __testDocViewerTaxonomy, DirectoryRail } = DocViewerPanelModule;
     render(
       <DirectoryRail
@@ -192,6 +193,7 @@ describe("DocViewerPanel taxonomy UI", () => {
           raw_content_included: false,
         }]}
         onSelectResearchDocument={onSelectResearchDocument}
+        onDeleteResearchDocument={onDeleteResearchDocument}
         variant="full"
         t={t}
       />,
@@ -199,9 +201,66 @@ describe("DocViewerPanel taxonomy UI", () => {
 
     expect(screen.getByTestId("research-library-section")).toBeTruthy();
     expect(screen.getByText("Private")).toBeTruthy();
-    const paper = screen.getByRole("button", { name: /Distributionally Robust Receive Combining/i });
-    fireEvent.click(paper);
+    const paper = screen.getByText("Distributionally Robust Receive Combining").closest("button");
+    expect(paper).toBeTruthy();
+    fireEvent.click(paper!);
     expect(onSelectResearchDocument).toHaveBeenCalledWith("research:test-paper");
+
+    const deleteButton = screen.getByRole("button", {
+      name: "Delete Distributionally Robust Receive Combining from My Research Library",
+    });
+    fireEvent.click(deleteButton);
+    expect(onDeleteResearchDocument).toHaveBeenCalledWith(
+      "research:test-paper",
+      "Distributionally Robust Receive Combining",
+    );
+  });
+
+  it("disables a research-library row while its deletion is pending", () => {
+    const { __testDocViewerTaxonomy, DirectoryRail } = DocViewerPanelModule;
+    render(
+      <DirectoryRail
+        entries={[]}
+        total={0}
+        filteredCount={0}
+        query=""
+        docClassFilter="all"
+        taxonomyCounts={__testDocViewerTaxonomy.buildDocTaxonomyCounts([])}
+        onQueryChange={vi.fn()}
+        onDocClassFilterChange={vi.fn()}
+        onSelect={vi.fn()}
+        researchLibraryStatus="ready"
+        researchLibraryDocuments={[{
+          schema: "helix.research_library_document.v1",
+          document_id: "research:deleting",
+          profile_id: "profile:test",
+          title: "Deleting Paper",
+          source_url: null,
+          source_kind: "pdf",
+          source_pdf_ref: "artifact://scholarly-pdf/deleting.pdf",
+          source_integrity_hash: "delete123",
+          paper_result_id: null,
+          query: null,
+          page_count: 4,
+          text_char_count: 8000,
+          extraction_status: "full_text_usable",
+          language: null,
+          sidecar_refs: [],
+          created_at: "2026-07-12T00:00:00.000Z",
+          updated_at: "2026-07-12T00:00:00.000Z",
+          private: true,
+          raw_content_included: false,
+        }]}
+        deletingResearchDocumentId="research:deleting"
+        onSelectResearchDocument={vi.fn()}
+        onDeleteResearchDocument={vi.fn()}
+        variant="full"
+        t={t}
+      />,
+    );
+
+    expect(screen.getByText("Deleting Paper").closest("button")).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Delete Deleting Paper/i })).toBeDisabled();
   });
 
   it("matches entries by selected taxonomy filter", () => {

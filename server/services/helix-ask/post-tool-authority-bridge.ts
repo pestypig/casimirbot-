@@ -514,7 +514,7 @@ const inferRouteFamily = (payload: RecordLike, capability: string): HelixPostToo
   if (/workspace_diagnostic|workspace_os\.status|workspace_os_status|workspace[- ]status/i.test(haystack)) return "workspace_diagnostic";
   if (/scholarly_research|scholarly-research|doi|arxiv|citation|journal/i.test(haystack)) return "scholarly_research";
   if (/internet_search|internet-search|search_web|google_custom_search|web_search/i.test(haystack)) return "internet_search";
-  if (/theory_locator|reflect_theory_context|theory_context_reflection|frontierVectorFieldTrace|theory_frontier_vector_field/i.test(haystack)) return "theory_locator";
+  if (/theory_locator|reflect_theory_context|theory_context_reflection|theory_badge_graph_current_context|theory-badge-graph\.current_context|frontierVectorFieldTrace|theory_frontier_vector_field/i.test(haystack)) return "theory_locator";
   if (/context_reflection|reflect_context_attachments|reflect_live_synthetic_data|bounded_context_reference/i.test(haystack)) return "context_reflection";
   if (/moral_graph_reflection|ideology_context_reflection|procedural_moral_classification|bridge_theory_ideology_context|theory_ideology_bridge/i.test(haystack)) return "moral_graph_reflection";
   if (/civilization_bounds|civilization_scenario_frame|civilization_bounds_roadmap/i.test(haystack)) return "civilization_bounds";

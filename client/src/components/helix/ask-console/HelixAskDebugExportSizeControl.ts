@@ -104,6 +104,7 @@ export function copyHelixRailCriticalDebugFieldsForUi(
     "runtime_goal_session",
     "runtime_goal_debug_export",
     "runtime_goal_debug_summary",
+    "workflow_demo_debug",
     "debug_export_ref",
     "backend_debug_response_ref",
   ].forEach((key) => assign(key, source[key] ?? debug?.[key]));
@@ -192,6 +193,7 @@ export function boundHelixDebugExportTextForUi(payload: string): string {
       "runtime_goal_session",
       "runtime_goal_debug_export",
       "runtime_goal_debug_summary",
+      "workflow_demo_debug",
       "typed_failure",
       "debug_export_anti_determinism_audit",
       "backend_debug_response_ref",

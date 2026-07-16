@@ -4,6 +4,7 @@ import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
 import type { HelixAgentStepObservationPacket } from "@shared/helix-agent-step-observation-packet";
 import type { HelixWorkstationGatewayCallResult } from "../workstation-tool-gateway/types";
 import { buildHelixTurnTerminalAuthority } from "../turn-terminal-authority";
+import { HELIX_SCHOLARLY_TERMINAL_READY_EVIDENCE_STATES } from "@shared/helix-scholarly-research-observation";
 
 const sha256 = (value: string): string =>
   crypto.createHash("sha256").update(value).digest("hex");
@@ -26,12 +27,9 @@ const SCHOLARLY_GATEWAY_CAPABILITIES = new Set([
   "scholarly-research.extract_numeric_parameters",
 ]);
 
-const SCHOLARLY_TERMINAL_READY_EVIDENCE_STATES = new Set([
-  "lookup_usable",
-  "full_text_usable",
-  "numeric_evidence_usable",
-  "answer_ready",
-]);
+const SCHOLARLY_TERMINAL_READY_EVIDENCE_STATE_SET = new Set<string>(
+  HELIX_SCHOLARLY_TERMINAL_READY_EVIDENCE_STATES,
+);
 
 const gatewayCapability = (result: HelixWorkstationGatewayCallResult): string =>
   result.gateway_admission.requested_capability || result.capability_id;
@@ -62,7 +60,7 @@ const isScholarlyEvidenceSelectedForAnswer = (
     false;
   if (!selectedForAnswer) return false;
   const evidenceState = scholarlyEvidenceState(result);
-  return !evidenceState || SCHOLARLY_TERMINAL_READY_EVIDENCE_STATES.has(evidenceState);
+  return !evidenceState || SCHOLARLY_TERMINAL_READY_EVIDENCE_STATE_SET.has(evidenceState);
 };
 
 const hasRecoveryAffordanceEvidence = (value: unknown): boolean => {

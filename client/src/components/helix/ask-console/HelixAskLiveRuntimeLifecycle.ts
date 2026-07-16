@@ -17,6 +17,8 @@ export const HELIX_ASK_LIVE_RUNTIME_LIFECYCLE_STATES = [
   "requesting",
   "active",
   "listening",
+  "speaking",
+  "muted",
   "paused",
   "transcript_received",
   "stopping",
@@ -49,6 +51,9 @@ export const HELIX_ASK_LIVE_RUNTIME_TRANSPORT_CONTROLLER_STATES = [
   "idle",
   "awaiting_consent",
   "awaiting_server_session",
+  "ready",
+  "connecting",
+  "active",
   "ready_blocked",
   "starting_blocked",
   "stopping",
@@ -131,23 +136,24 @@ export type HelixAskLiveRuntimeTransportHandoffPlan = {
   status:
     | "waiting_for_visible_consent"
     | "waiting_for_server_session_response"
+    | "ready_for_browser_transport"
     | "blocked_live_transport_disabled";
   visible_user_consent_receipt: string | null;
   server_session_response_observed: boolean;
   server_session_response_ok: boolean;
   transport_plan: HelixRealtimeSessionTransportPlan | null;
-  provider_session_ref: null;
+  provider_session_ref: string | null;
   requires_visible_user_gesture: true;
   requires_server_session_response: true;
   requires_client_consent_receipt: true;
-  client_secret_issued: false;
-  sdp_exchange_allowed: false;
+  client_secret_issued: boolean;
+  sdp_exchange_allowed: boolean;
   server_sideband_allowed: false;
-  can_start_browser_transport: false;
+  can_start_browser_transport: boolean;
   media_capture_started: false;
   browser_media_api_referenced: boolean;
   webrtc_started: false;
-  openai_network_call_attempted: false;
+  openai_network_call_attempted: boolean;
   blocked_reason: string;
   reentry_required: true;
   answer_authority: false;
@@ -169,11 +175,11 @@ export type HelixAskLiveRuntimeTransportLifecycleReceiptPayload = {
   observed_at_ms: number;
   blocked_reason: string | null;
   latest_lifecycle_receipt_refs: string[];
-  transport_execution_attempted: false;
+  transport_execution_attempted: boolean;
   media_capture_started: boolean;
-  browser_media_api_referenced: false;
+  browser_media_api_referenced: boolean;
   webrtc_started: boolean;
-  openai_network_call_attempted: false;
+  openai_network_call_attempted: boolean;
   browser_tracks_created: boolean;
   data_channels_created: boolean;
   reentry_required: true;
@@ -191,11 +197,11 @@ export type HelixAskLiveRuntimeTransportControllerModel = {
   latest_lifecycle_receipt_refs: string[];
   blocked_reason: string | null;
   events: HelixAskLiveRuntimeTransportControllerEvent[];
-  transport_execution_attempted: false;
+  transport_execution_attempted: boolean;
   media_capture_started: false;
-  browser_media_api_referenced: false;
+  browser_media_api_referenced: boolean;
   webrtc_started: false;
-  openai_network_call_attempted: false;
+  openai_network_call_attempted: boolean;
   reentry_required: true;
   answer_authority: false;
   assistant_answer: false;
@@ -211,9 +217,9 @@ export type HelixAskLiveRuntimeTransportBoundaryResult = {
   receipt: HelixAskLiveRuntimeTransportLifecycleReceiptPayload;
   transport_execution_attempted: boolean;
   media_capture_started: boolean;
-  browser_media_api_referenced: false;
+  browser_media_api_referenced: boolean;
   webrtc_started: boolean;
-  openai_network_call_attempted: false;
+  openai_network_call_attempted: boolean;
   browser_tracks_created: boolean;
   data_channels_created: boolean;
   blocked_reason: string;
@@ -356,6 +362,10 @@ export const labelForHelixAskLiveRuntimeLifecycleState = (
       return "Active";
     case "listening":
       return "Listening";
+    case "speaking":
+      return "Speaking";
+    case "muted":
+      return "Muted";
     case "paused":
       return "Paused";
     case "transcript_received":
@@ -379,6 +389,12 @@ export const labelForHelixAskLiveRuntimeTransportControllerState = (
       return "Needs Consent";
     case "awaiting_server_session":
       return "Needs Session";
+    case "ready":
+      return "Ready";
+    case "connecting":
+      return "Connecting";
+    case "active":
+      return "Live";
     case "ready_blocked":
       return "Ready Blocked";
     case "starting_blocked":
@@ -526,16 +542,27 @@ export function buildHelixAskLiveRuntimeTransportHandoffPlan(args: {
       : null;
   const serverResponseObserved = Boolean(args.serverResponse);
   const transportPlan = readRealtimeTransportPlan(args.serverResponse);
+  const transportReady = Boolean(
+    consentRef &&
+      args.serverResponse?.ok === true &&
+      args.serverResponse.realtime_session_id &&
+      transportPlan?.live_transport_enabled === true &&
+      args.serverResponse.sdp_exchange_requested === true,
+  );
   const status = !consentRef
     ? "waiting_for_visible_consent"
     : !serverResponseObserved
       ? "waiting_for_server_session_response"
-      : "blocked_live_transport_disabled";
+      : transportReady
+        ? "ready_for_browser_transport"
+        : "blocked_live_transport_disabled";
   const blockedReason = !consentRef
     ? "visible_user_consent_required"
     : !serverResponseObserved
       ? "server_session_response_required"
-      : transportPlan?.live_execution_disabled_reason ?? "live_transport_not_enabled";
+      : transportReady
+        ? "transport_contract_admitted"
+        : transportPlan?.live_execution_disabled_reason ?? "live_transport_not_enabled";
 
   return {
     schema: "helix.ask.live_runtime.transport_handoff_plan.v1",
@@ -544,18 +571,18 @@ export function buildHelixAskLiveRuntimeTransportHandoffPlan(args: {
     server_session_response_observed: serverResponseObserved,
     server_session_response_ok: args.serverResponse?.ok === true,
     transport_plan: transportPlan,
-    provider_session_ref: null,
+    provider_session_ref: args.serverResponse?.provider_session_ref ?? null,
     requires_visible_user_gesture: true,
     requires_server_session_response: true,
     requires_client_consent_receipt: true,
-    client_secret_issued: false,
-    sdp_exchange_allowed: false,
+    client_secret_issued: args.serverResponse?.client_secret_issued === true,
+    sdp_exchange_allowed: transportReady,
     server_sideband_allowed: false,
-    can_start_browser_transport: false,
+    can_start_browser_transport: transportReady,
     media_capture_started: false,
     browser_media_api_referenced: false,
     webrtc_started: false,
-    openai_network_call_attempted: false,
+    openai_network_call_attempted: args.serverResponse?.openai_network_call_attempted === true,
     blocked_reason: blockedReason,
     reentry_required: true,
     answer_authority: false,
@@ -619,6 +646,7 @@ export function buildHelixAskLiveRuntimeTransportLifecycleReceiptPayload(args: {
   browserTracksCreated?: boolean;
   dataChannelsCreated?: boolean;
   browserMediaApiReferenced?: boolean;
+  openAiNetworkCallAttempted?: boolean;
 }): HelixAskLiveRuntimeTransportLifecycleReceiptPayload {
   const realtimeSessionId = args.realtimeSessionId ?? null;
   const controllerState = controllerStateForTransportReceiptKind(
@@ -651,7 +679,7 @@ export function buildHelixAskLiveRuntimeTransportLifecycleReceiptPayload(args: {
     media_capture_started: args.mediaCaptureStarted === true,
     browser_media_api_referenced: args.browserMediaApiReferenced === true,
     webrtc_started: args.webrtcStarted === true,
-    openai_network_call_attempted: false,
+    openai_network_call_attempted: args.openAiNetworkCallAttempted === true,
     browser_tracks_created: args.browserTracksCreated === true,
     data_channels_created: args.dataChannelsCreated === true,
     reentry_required: true,
@@ -677,13 +705,13 @@ export function buildHelixAskLiveRuntimeTransportReceiptRouteRequest(
       handoff_status: payload.handoff_status,
       blocked_reason: payload.blocked_reason,
       latest_lifecycle_receipt_refs: payload.latest_lifecycle_receipt_refs,
-      transport_execution_attempted: false,
-      media_capture_started: false,
-      browser_media_api_referenced: false,
-      webrtc_started: false,
-      openai_network_call_attempted: false,
-      browser_tracks_created: false,
-      data_channels_created: false,
+      transport_execution_attempted: payload.transport_execution_attempted,
+      media_capture_started: payload.media_capture_started,
+      browser_media_api_referenced: payload.browser_media_api_referenced,
+      webrtc_started: payload.webrtc_started,
+      openai_network_call_attempted: payload.openai_network_call_attempted,
+      browser_tracks_created: payload.browser_tracks_created,
+      data_channels_created: payload.data_channels_created,
       assistant_answer: false,
       terminal_eligible: false,
       answer_authority: false,
@@ -701,6 +729,8 @@ const controllerStateForHandoff = (
       return "awaiting_consent";
     case "waiting_for_server_session_response":
       return "awaiting_server_session";
+    case "ready_for_browser_transport":
+      return "ready";
     case "blocked_live_transport_disabled":
       return handoffPlan.server_session_response_observed ? "ready_blocked" : "starting_blocked";
   }

@@ -92,10 +92,66 @@ describe("scholarly research lookup relevance", () => {
           title: "Runtime Safety Verification of Neural Network Controlled Systems",
           reason: "missing_primary_topic_anchor",
           matched_tokens: expect.arrayContaining(["time", "energy", "field", "state", "duration"]),
-          matched_anchor_tokens: [],
+          matched_anchor_tokens: ["duration"],
         }),
       ],
     });
+  });
+
+  it("rejects generic quantum-inequality constraint matches without the negative-energy anchor", async () => {
+    const fetchImpl: ScholarlyFetch = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: [
+          {
+            paperId: "qubo-inequalities",
+            title: "Encoding Inequality Constraints for Quantum Optimization",
+            abstract: "We transform inequality constraints into QUBO penalty functions for quantum annealing.",
+            authors: [{ name: "A. Optimizer" }],
+            year: 2022,
+            externalIds: { ArXiv: "2211.13914" },
+            isOpenAccess: true,
+            openAccessPdf: { url: "https://arxiv.org/pdf/2211.13914.pdf" },
+          },
+          {
+            paperId: "negative-energy-qei",
+            title: "Quantum Inequalities and Negative Energy",
+            abstract: "Timelike sampling bounds constrain the magnitude and duration of negative energy density.",
+            authors: [{ name: "B. Relativist" }],
+            year: 1999,
+            externalIds: { ArXiv: "gr-qc/9900001" },
+            isOpenAccess: true,
+            openAccessPdf: { url: "https://arxiv.org/pdf/gr-qc/9900001.pdf" },
+          },
+        ],
+      }),
+    });
+
+    const observation = await runScholarlyResearchLookup({
+      turnId: "ask:negative-energy-domain-anchor",
+      callId: "call:negative-energy-domain-anchor",
+      query: "quantum-inequality constraints on negative energy",
+      providers: ["semantic_scholar"],
+      limit: 5,
+      fetchImpl,
+    });
+
+    expect(observation.evidence_state).toBe("lookup_usable");
+    expect(observation.papers.map((paper) => paper.title)).toEqual([
+      "Quantum Inequalities and Negative Energy",
+    ]);
+    expect(observation.lookup_relevance_gate?.candidate_evaluations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          result_id: expect.stringContaining("semantic_scholar:"),
+          supported: false,
+          reason: "missing_primary_topic_anchor",
+          anchor_tokens: ["negative"],
+          matched_anchor_tokens: [],
+        }),
+      ]),
+    );
   });
 
   it("builds an arXiv field query from bounded topic terms instead of one encoded prose value", async () => {
@@ -120,7 +176,7 @@ describe("scholarly research lookup relevance", () => {
     });
 
     expect(observedSearchQuery).toBe(
-      "all:worldline AND all:quantum AND all:inequalities",
+      "all:worldline AND all:negative AND all:duration AND all:quantum AND all:inequalities",
     );
   });
 });

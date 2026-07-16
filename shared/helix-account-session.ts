@@ -73,6 +73,7 @@ export const HELIX_LOCKED_WORKSTATION_PANEL_IDS = [
   "situation-room-pipelines",
   "stage-play-badge-graph",
   "workstation-workflow-timeline",
+  "workflow-demo-lab",
 ] as const;
 
 export const HELIX_DEVELOPER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
@@ -118,6 +119,7 @@ export const HELIX_USER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
   allowed_workstation_capabilities: [
     "workspace_os.status",
     "workstation.active_context",
+    "theory-badge-graph.current_context",
     "workstation-notes.list_notes",
     "scientific-calculator.solve_expression",
     "scientific-calculator.solve_scalar_expression",

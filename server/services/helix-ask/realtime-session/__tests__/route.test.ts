@@ -5,6 +5,7 @@ import { accountSessionRouter } from "../../../../routes/account-session";
 import { realtimeSessionRouter } from "../../../../routes/agi.realtime-session";
 import { resetAccountSessionStore } from "../../../helix-account/account-session-store";
 import { setOpenAiRealtimeContractTransportForTests } from "../adapter";
+import { buildRealtimeClientReceiptObservation } from "../route-boundary";
 
 const createApp = (): express.Express => {
   const app = express();
@@ -91,6 +92,59 @@ const expectNonTerminalRealtimeEnvelope = (body: Record<string, unknown>, ok = f
 };
 
 describe("AGI Realtime session route boundary", () => {
+  it("normalizes safe client-reported Realtime lifecycle metadata without authority", () => {
+    const observation = buildRealtimeClientReceiptObservation({
+      realtimeSessionId: "realtime:safe-metadata",
+      body: {
+        client_receipt_ref: "receipt:response:completed",
+        receipt_kind: "response_completed",
+        observed_at_ms: 1783549299000,
+        selected_model_or_service: "gpt-realtime-2.1-mini",
+        provider_session_ref: "provider:session:safe",
+        provider_event_type: "response.done",
+        provider_response_ref: "response:safe-ref",
+        response_status: "completed",
+        vad_state: "speech_stopped",
+        audio_focus_owner: "helix_realtime",
+        qualified_user_interruption: true,
+        terminal_voice_interrupted: true,
+        barge_in_qualification_basis:
+          "browser_echo_cancellation_plus_persistent_provider_vad",
+        transport_execution_attempted: true,
+        openai_network_call_attempted: true,
+        webrtc_started: true,
+        media_capture_started: true,
+        browser_tracks_created: true,
+        data_channels_created: true,
+      },
+    });
+
+    expect(observation).toMatchObject({
+      realtime_session_id: "realtime:safe-metadata",
+      selected_model_or_service: "gpt-realtime-2.1-mini",
+      provider_session_ref: "provider:session:safe",
+      provider_event_type: "response.done",
+      provider_response_ref: "response:safe-ref",
+      response_status: "completed",
+      vad_state: "speech_stopped",
+      audio_focus_owner: "helix_realtime",
+      qualified_user_interruption: true,
+      terminal_voice_interrupted: true,
+      client_reported_transport_execution_attempted: true,
+      client_reported_openai_network_call_attempted: true,
+      client_reported_webrtc_started: true,
+      client_reported_media_capture_started: true,
+      client_reported_browser_tracks_created: true,
+      client_reported_data_channels_created: true,
+      openai_network_call_attempted: false,
+      webrtc_started: false,
+      media_capture_started: false,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+  });
   beforeEach(async () => {
     await resetAccountSessionStore();
   });

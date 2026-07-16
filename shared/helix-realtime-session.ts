@@ -19,6 +19,9 @@ export const HELIX_REALTIME_SESSION_EVENT_RESPONSE_SCHEMA =
 export const HELIX_REALTIME_SESSION_CLIENT_RECEIPT_RESPONSE_SCHEMA =
   "helix.realtime_session.client_receipt_response.v1" as const;
 
+export const HELIX_REALTIME_SDP_EXCHANGE_RESPONSE_SCHEMA =
+  "helix.realtime_session.sdp_exchange_response.v1" as const;
+
 export type HelixRealtimeSessionAction =
   | "start"
   | "stop"
@@ -71,6 +74,34 @@ export type HelixRealtimeSessionEventRequest = {
   event_ref?: string | null;
   client_receipt_ref?: string | null;
   observed_at_ms?: number | null;
+};
+
+export type HelixRealtimeSdpExchangeRequest = {
+  offer_sdp?: string | null;
+  visible_user_consent_receipt?: string | null;
+};
+
+export type HelixRealtimeSdpExchangeResponse = {
+  schema: typeof HELIX_REALTIME_SDP_EXCHANGE_RESPONSE_SCHEMA;
+  ok: boolean;
+  error:
+    | "realtime_runtime_agent_locked_by_account_policy"
+    | "realtime_session_not_found"
+    | "realtime_sdp_exchange_disabled"
+    | "realtime_sdp_offer_invalid"
+    | "realtime_openai_contract_failed"
+    | null;
+  blocked_reason: string | null;
+  realtime_session_id: string | null;
+  provider_call_ref: string | null;
+  answer_sdp: string | null;
+  openai_network_call_attempted: boolean;
+  webrtc_started: boolean;
+  reentry_required: true;
+  answer_authority: false;
+  assistant_answer: false;
+  terminal_eligible: false;
+  raw_content_included: false;
 };
 
 export type HelixRealtimeSessionPolicyGate = {

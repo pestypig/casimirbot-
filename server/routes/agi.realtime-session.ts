@@ -11,11 +11,26 @@ import {
   resolveRealtimeSessionPolicyGate,
 } from "../services/helix-ask/realtime-session/route-boundary";
 import { selectRealtimeSessionAdapter } from "../services/helix-ask/realtime-session/adapter";
+import { readRealtimeSessionFeatureGate } from "../services/helix-ask/realtime-session/config";
+import {
+  admitRealtimeSession,
+  buildRealtimeRequesterRef,
+  readAdmittedRealtimeSession,
+  removeAdmittedRealtimeSession,
+} from "../services/helix-ask/realtime-session/session-registry";
+import {
+  exchangeOpenAiRealtimeSdp,
+  isValidRealtimeOfferSdp,
+} from "../services/helix-ask/realtime-session/sdp-transport";
 import {
   isHelixRealtimeToolSuggestionEventType,
   isHelixRealtimeTranscriptEventType,
 } from "@shared/helix-realtime-observation";
-import type { HelixRealtimeSessionAction } from "@shared/helix-realtime-session";
+import {
+  HELIX_REALTIME_SDP_EXCHANGE_RESPONSE_SCHEMA,
+  type HelixRealtimeSdpExchangeResponse,
+  type HelixRealtimeSessionAction,
+} from "@shared/helix-realtime-session";
 
 export const realtimeSessionRouter = Router();
 
@@ -26,6 +41,32 @@ const readRecord = (value: unknown): Record<string, unknown> =>
 
 const accountPolicyForRequest = async (req: Request) =>
   getAccountCapabilityPolicy(readHelixSessionCookie(req.headers.cookie));
+
+const readString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim() ? value.trim() : null;
+
+const requesterRefForRequest = (req: Request): string =>
+  buildRealtimeRequesterRef(readHelixSessionCookie(req.headers.cookie));
+
+const buildSdpExchangeResponse = (
+  patch: Partial<HelixRealtimeSdpExchangeResponse> &
+    Pick<HelixRealtimeSdpExchangeResponse, "ok" | "error" | "blocked_reason">,
+): HelixRealtimeSdpExchangeResponse => ({
+  schema: HELIX_REALTIME_SDP_EXCHANGE_RESPONSE_SCHEMA,
+  ok: patch.ok,
+  error: patch.error,
+  blocked_reason: patch.blocked_reason,
+  realtime_session_id: patch.realtime_session_id ?? null,
+  provider_call_ref: patch.provider_call_ref ?? null,
+  answer_sdp: patch.answer_sdp ?? null,
+  openai_network_call_attempted: patch.openai_network_call_attempted === true,
+  webrtc_started: patch.webrtc_started === true,
+  reentry_required: true,
+  answer_authority: false,
+  assistant_answer: false,
+  terminal_eligible: false,
+  raw_content_included: false,
+});
 
 const respondRealtimeBoundary = async (input: {
   req: Request;
@@ -67,12 +108,27 @@ const respondRealtimeBoundary = async (input: {
     adapterResult.ok === true &&
     adapterResult.blocked_reason === "openai_realtime_contract_ready"
   ) {
-    return input.res.status(200).json(buildRealtimeSessionAdmissionResponse({
+    const response = buildRealtimeSessionAdmissionResponse({
       accountPolicy,
       body,
       realtimeSessionId: input.realtimeSessionId ?? null,
       adapterResult,
-    }));
+    });
+    const consentReceipt = readString(
+      body.visible_user_consent_receipt ?? body.visibleUserConsentReceipt,
+    );
+    if (response.realtime_session_id && consentReceipt) {
+      admitRealtimeSession({
+        realtimeSessionId: response.realtime_session_id,
+        requesterRef: requesterRefForRequest(input.req),
+        visibleUserConsentReceipt: consentReceipt,
+        model:
+          readString(body.selected_model_or_service ?? body.selectedModelOrService) ??
+          "gpt-realtime-2.1",
+        voice: readString(body.selected_realtime_voice ?? body.selectedRealtimeVoice ?? body.voice),
+      });
+    }
+    return input.res.status(200).json(response);
   }
 
   if (
@@ -96,6 +152,13 @@ const respondRealtimeBoundary = async (input: {
       realtimeSessionId: input.realtimeSessionId ?? null,
       adapterResult,
     }));
+  }
+
+  if (input.action === "stop" && input.realtimeSessionId) {
+    removeAdmittedRealtimeSession({
+      realtimeSessionId: input.realtimeSessionId,
+      requesterRef: requesterRefForRequest(input.req),
+    });
   }
 
   if (input.action === "record_event" && isHelixRealtimeTranscriptEventType(body.event_type)) {
@@ -123,6 +186,8 @@ const respondRealtimeBoundary = async (input: {
     realtimeSessionId: input.realtimeSessionId ?? null,
     blockedReason: adapterResult.blocked_reason === "realtime_adapter_disabled_by_env"
       ? "capability_lane_disabled_by_policy"
+      : adapterResult.blocked_reason === "openai_realtime_contract_ready"
+        ? "openai_realtime_contract_failed"
       : adapterResult.blocked_reason,
     adapterResult,
   }));
@@ -162,3 +227,101 @@ realtimeSessionRouter.post("/realtime/session/:id/event", async (req: Request, r
     realtimeSessionId: req.params.id,
   }),
 );
+
+realtimeSessionRouter.post("/realtime/session/:id/sdp", async (req: Request, res: Response) => {
+  const accountPolicy = await accountPolicyForRequest(req);
+  if (
+    accountPolicy.account_type !== "developer" ||
+    accountPolicy.locked_features.includes("runtime_agent_controls")
+  ) {
+    return res.status(403).json(buildSdpExchangeResponse({
+      ok: false,
+      error: "realtime_runtime_agent_locked_by_account_policy",
+      blocked_reason: "developer_runtime_agent_controls_required",
+      realtime_session_id: req.params.id,
+    }));
+  }
+
+  const gate = readRealtimeSessionFeatureGate(process.env);
+  if (
+    !gate.descriptor_enabled ||
+    !gate.adapter_enabled ||
+    !gate.live_transport_enabled ||
+    !gate.openai_contract_enabled
+  ) {
+    return res.status(409).json(buildSdpExchangeResponse({
+      ok: false,
+      error: "realtime_sdp_exchange_disabled",
+      blocked_reason: "realtime_sdp_exchange_disabled_by_env",
+      realtime_session_id: req.params.id,
+    }));
+  }
+
+  const session = readAdmittedRealtimeSession({
+    realtimeSessionId: req.params.id,
+    requesterRef: requesterRefForRequest(req),
+  });
+  if (!session) {
+    return res.status(404).json(buildSdpExchangeResponse({
+      ok: false,
+      error: "realtime_session_not_found",
+      blocked_reason: "realtime_session_not_found",
+      realtime_session_id: req.params.id,
+    }));
+  }
+
+  const body = readRecord(req.body);
+  const offerSdp = body.offer_sdp ?? body.offerSdp;
+  const consentReceipt = readString(
+    body.visible_user_consent_receipt ?? body.visibleUserConsentReceipt,
+  );
+  if (!isValidRealtimeOfferSdp(offerSdp) || consentReceipt !== session.visibleUserConsentReceipt) {
+    return res.status(400).json(buildSdpExchangeResponse({
+      ok: false,
+      error: "realtime_sdp_offer_invalid",
+      blocked_reason:
+        consentReceipt !== session.visibleUserConsentReceipt
+          ? "visible_user_consent_receipt_mismatch"
+          : "realtime_sdp_offer_invalid",
+      realtime_session_id: req.params.id,
+    }));
+  }
+
+  const apiKey = readString(process.env.OPENAI_API_KEY);
+  if (!apiKey) {
+    return res.status(409).json(buildSdpExchangeResponse({
+      ok: false,
+      error: "realtime_sdp_exchange_disabled",
+      blocked_reason: "missing_openai_key",
+      realtime_session_id: req.params.id,
+    }));
+  }
+
+  const result = await exchangeOpenAiRealtimeSdp({
+    apiKey,
+    offerSdp,
+    model: session.model,
+    voice: session.voice,
+    safetyIdentifier: session.requesterRef,
+  });
+  if (!result.ok || !result.answerSdp) {
+    return res.status(502).json(buildSdpExchangeResponse({
+      ok: false,
+      error: "realtime_openai_contract_failed",
+      blocked_reason: readString(result.failureReason) ?? "openai_realtime_contract_failed",
+      realtime_session_id: req.params.id,
+      openai_network_call_attempted: true,
+    }));
+  }
+
+  return res.status(200).json(buildSdpExchangeResponse({
+    ok: true,
+    error: null,
+    blocked_reason: null,
+    realtime_session_id: req.params.id,
+    provider_call_ref: readString(result.providerCallRef),
+    answer_sdp: result.answerSdp,
+    openai_network_call_attempted: true,
+    webrtc_started: true,
+  }));
+});

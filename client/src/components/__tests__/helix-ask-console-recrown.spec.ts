@@ -1364,6 +1364,8 @@ describe("Helix Ask Console recrown boundary", () => {
       "debug_drawer",
       "copy_debug_read_aloud_controls",
       "voice_read_aloud_affordances",
+      "voice_confirmation_qte",
+      "workflow_next_prompt_qte",
       "visible_stream_progress_status_rows",
       "final_answer_metadata",
       "workstation_trace_rows",
@@ -1386,6 +1388,8 @@ describe("Helix Ask Console recrown boundary", () => {
       "workstation_trace_rows",
       "visible_stream_progress_status_rows",
       "voice_read_aloud_affordances",
+      "voice_confirmation_qte",
+      "workflow_next_prompt_qte",
       "long_answer_unclipped",
     ]);
     expect(HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_OPEN_ITEMS).toEqual([
@@ -1745,7 +1749,7 @@ describe("Helix Ask Console recrown boundary", () => {
       bridgeReplacementReady: false,
       liveDayToDaySliceCount: 1,
       pureDisplayRecrownedSliceCount: 86,
-      behaviorSensitiveRecrownedWithParitySliceCount: 64,
+      behaviorSensitiveRecrownedWithParitySliceCount: 66,
       behaviorSensitiveQuarantinedSliceCount: 5,
       unknownTrapDoorSliceCount: 1,
     });
@@ -3807,6 +3811,15 @@ describe("Helix Ask Console recrown boundary", () => {
           endpoint,
           turn_id: backendTurnId,
         },
+        channels: {
+          workflowDemo: {
+            schema: "helix.workflow_demo_debug.v1",
+            current_turn_event_count: 3,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        },
       }));
       const parsed = JSON.parse(resolved) as Record<string, unknown>;
 
@@ -3818,6 +3831,13 @@ describe("Helix Ask Console recrown boundary", () => {
         debug_export_source: "backend_endpoint",
         backend_debug_response_status: "fetched",
         ask_turn_solver_trace: { completed: true },
+        workflow_demo_debug: {
+          schema: "helix.workflow_demo_debug.v1",
+          current_turn_event_count: 3,
+          answer_authority: false,
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
       });
       expect(debugPayloadMatchesHelixAskLegacyRenderedReply(
         { id: clientTurnId, question: prompt, content: "Page-grounded answer." },
@@ -5112,7 +5132,7 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(actionToolbarSurface).toContain("<HelixAskLiveRuntimeControls");
     expect(liveRuntimeControls).toContain("developer_runtime_agent_controls_required");
     expect(liveRuntimeControls).toContain("data-transport-controller-state");
-    expect(liveRuntimeControls).toContain('data-transport-execution-attempted="false"');
+    expect(liveRuntimeControls).toContain("data-transport-execution-attempted={");
     expect(liveRuntimeControls).not.toContain("fetch(");
     expect(liveRuntimeControls).not.toContain("navigator.mediaDevices");
     expect(liveRuntimeControls).not.toContain("RTCPeerConnection");
@@ -5126,6 +5146,8 @@ describe("Helix Ask Console recrown boundary", () => {
       "requesting",
       "active",
       "listening",
+      "speaking",
+      "muted",
       "paused",
       "transcript_received",
       "stopping",
@@ -5368,6 +5390,9 @@ describe("Helix Ask Console recrown boundary", () => {
       "idle",
       "awaiting_consent",
       "awaiting_server_session",
+      "ready",
+      "connecting",
+      "active",
       "ready_blocked",
       "starting_blocked",
       "stopping",
@@ -5758,11 +5783,39 @@ describe("Helix Ask Console recrown boundary", () => {
     } as const;
     const serverReturnedSessionContract = {
       ok: true,
+      realtime_session_id: "realtime:browser",
       client_secret_issued: true,
       sdp_exchange_requested: true,
       openai_network_call_attempted: false,
       ephemeral_credential_minted: false,
     } as never;
+    const permissionError = new Error("Permission denied by browser");
+    permissionError.name = "NotAllowedError";
+    const permissionDeniedController = createHelixAskLiveRuntimeBrowserTransportController({
+      nowMs: () => 1783375252775,
+      requestMicrophone: vi.fn(async () => {
+        throw permissionError;
+      }),
+    });
+    const permissionDenied = await permissionDeniedController.startTransport({
+      handoffPlan: allowedHandoff,
+      serverResponse: serverReturnedSessionContract,
+      observedAtMs: 1783375252775,
+    });
+    expect(permissionDenied).toMatchObject({
+      ok: false,
+      controller_state: "error",
+      blocked_reason: "microphone_permission_denied",
+      transport_execution_attempted: true,
+      browser_media_api_referenced: true,
+      media_capture_started: false,
+      openai_network_call_attempted: false,
+      receipt: expect.objectContaining({
+        receipt_kind: "transport_error",
+        blocked_reason: "microphone_permission_denied",
+        terminal_eligible: false,
+      }),
+    });
     const allowedController = createHelixAskLiveRuntimeBrowserTransportController({
       nowMs: () => 1783375252800,
       requestMicrophone: vi.fn(async () => ({
@@ -5770,8 +5823,23 @@ describe("Helix Ask Console recrown boundary", () => {
       })),
       createPeerConnection: () => ({
         createDataChannel: () => ({ close: dataChannelClose }),
+        addTrack: vi.fn(),
+        createOffer: vi.fn(async () => ({ type: "offer" as const, sdp: "v=0\r\nmock-offer" })),
+        setLocalDescription: vi.fn(async () => undefined),
+        setRemoteDescription: vi.fn(async () => undefined),
         close: peerConnectionClose,
       }),
+      createRemoteAudio: () => ({
+        autoplay: true,
+        muted: false,
+        srcObject: null,
+        play: vi.fn(async () => undefined),
+        pause: vi.fn(),
+      }),
+      exchangeSdp: vi.fn(async () => ({
+        answerSdp: "v=0\r\nmock-answer",
+        providerCallRef: "openai-realtime:call:test",
+      })),
     });
     const started = await allowedController.startTransport({
       handoffPlan: allowedHandoff,
@@ -5786,7 +5854,7 @@ describe("Helix Ask Console recrown boundary", () => {
       webrtc_started: true,
       browser_tracks_created: true,
       data_channels_created: true,
-      openai_network_call_attempted: false,
+      openai_network_call_attempted: true,
       receipt: expect.objectContaining({
         receipt_kind: "transport_start_requested",
         transport_execution_attempted: true,
@@ -5820,6 +5888,19 @@ describe("Helix Ask Console recrown boundary", () => {
         raw_content_included: false,
         reentry_required: true,
       }),
+    });
+    const stoppedAgain = await allowedController.stopTransport({
+      realtimeSessionId: "realtime:browser",
+      observedAtMs: 1783375252950,
+    });
+    expect(trackStop).toHaveBeenCalledTimes(1);
+    expect(dataChannelClose).toHaveBeenCalledTimes(1);
+    expect(peerConnectionClose).toHaveBeenCalledTimes(1);
+    expect(stoppedAgain).toMatchObject({
+      controller_state: "stopped",
+      blocked_reason: "transport_stop_recorded_without_browser_resources",
+      browser_tracks_created: false,
+      data_channels_created: false,
     });
 
     const controllerSource = read("client/src/components/helix/ask-console/HelixAskLiveRuntimeTransportController.ts");
@@ -10273,7 +10354,7 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(legacyPill).toContain("visible: Boolean(transcriptConfirmState)");
     expect(legacyPill).toContain("countdownSec: transcriptConfirmAutoCountdownSec");
     expect(legacyPill).toContain("onAccept: handleTranscriptConfirmationAccept");
-    expect(legacyPill).toContain("onRetry: handleTranscriptConfirmationRetry");
+    expect(legacyPill).toContain("onRetry: handleTranscriptConfirmationRetryFromPanel");
     expect(legacyPill).toContain("setTranscriptConfirmState");
     expect(legacyPill).not.toContain("<HelixAskTranscriptConfirmationPanel");
     expect(legacyPill).not.toContain("Confirm transcript</p>");
@@ -10290,6 +10371,36 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(voiceConfirmationState).not.toContain("setTranscriptConfirmState");
     expect(supplementSurface).toContain("<HelixAskTranscriptConfirmationPanel");
     expect(supplementSurface).toContain("visible={transcriptConfirmation.visible}");
+  });
+
+  it("owns voice confirmation countdown behavior in the shared recrowned runtime", () => {
+    const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const runtime = read(
+      "client/src/components/helix/ask-console/HelixAskVoiceConfirmationRuntime.tsx",
+    );
+    const minimalRuntime = read(
+      "client/src/components/helix/ask-console/HelixAskMinimalRuntimeShell.tsx",
+    );
+
+    expect(runtime).toContain("export function useHelixAskVoiceConfirmationRuntime");
+    expect(runtime).toContain("export function HelixAskVoiceConfirmationRuntimeSurface");
+    expect(runtime).toContain("HELIX_ASK_VOICE_CONFIRMATION_COUNTDOWN_MS = 3_000");
+    expect(runtime).toContain("command_countdown_fired");
+    expect(runtime).toContain("transcript_countdown_fired");
+    expect(runtime).toContain("buildHelixAskVoiceTranscriptConfirmAutoPolicyProjection");
+    expect(runtime).toContain("window.setInterval");
+    expect(runtime).toContain("window.clearInterval");
+    expect(legacyPill).toContain("useHelixAskVoiceConfirmationRuntime({");
+    expect(legacyPill).toContain("onCommandAutoConfirm: acceptCommandConfirmationCandidate");
+    expect(legacyPill).toContain("acceptTranscriptConfirmationCandidate(candidateId, \"auto\")");
+    expect(legacyPill).not.toContain("commandConfirmAutoTimerRef");
+    expect(legacyPill).not.toContain("transcriptConfirmAutoTimerRef");
+    expect(minimalRuntime).toContain("voiceConfirmationRuntime?: HelixAskVoiceConfirmationRuntimeSurfaceProps");
+    expect(minimalRuntime).toContain("<HelixAskVoiceConfirmationRuntimeSurface");
+    expect(runtime).not.toContain("dispatchConfirmedVoiceTranscript");
+    expect(runtime).not.toContain("executeVoiceCommandLaneAction");
+    expect(runtime).not.toContain("fetch(");
+    expect(runtime).not.toContain("@/store/");
   });
 
   it("bounds debug exports without preserving stale client projection when backend Ask was required", () => {

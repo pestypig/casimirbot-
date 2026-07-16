@@ -44,6 +44,7 @@ import {
 } from "@/lib/agi/debugExport";
 import { buildHelixAskClientBypassAudit, buildWorkspaceActionClientAckSnapshot } from "@/lib/agi/workspaceActionAck";
 import { useAgiChatStore, type ChatSession } from "@/store/useAgiChatStore";
+import { useHelixWorkflowDemoStore } from "@/store/useHelixWorkflowDemoStore";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
 import { useInterfaceText } from "@/lib/i18n/interfaceText";
@@ -95,6 +96,7 @@ import {
   buildHelixAskWorkspaceContextSnapshotBinding,
   buildHelixAskWorkstationLayoutDebugSnapshotBinding,
 } from "@/components/helix/ask-console/HelixAskWorkspaceContextBinding";
+import { readTheoryBadgeGraphAskContextSnapshot } from "@/lib/theory/theoryBadgeGraphAskContext";
 import {
   copyHelixAskContextCapsuleToClipboard,
   copyHelixAskPlainTextToClipboard as copyRecrownedHelixAskPlainTextToClipboard,
@@ -216,6 +218,13 @@ import {
   buildHelixAskTranscriptConfirmationState,
   buildHelixAskVoiceCommandConfirmationState,
 } from "@/components/helix/ask-console/HelixAskVoiceConfirmationState";
+import {
+  useHelixAskVoiceConfirmationRuntime,
+  type HelixAskVoiceConfirmationRuntimeEvent,
+} from "@/components/helix/ask-console/HelixAskVoiceConfirmationRuntime";
+import { HelixAskWorkflowSuggestionRuntime } from "@/components/helix/ask-console/HelixAskWorkflowSuggestionRuntime";
+import { buildHelixWorkflowDemoDebugExport } from "@/lib/helix/workflow-demos/workflow-demo-debug";
+import type { HelixWorkflowDemoDebugExportV1 } from "@shared/contracts/helix-workflow-demo.v1";
 import {
   buildHelixAskVoiceCaptureHealthState,
   type HelixAskVoiceCaptureHealthSnapshot,
@@ -1163,7 +1172,6 @@ import {
   buildHelixAskVoiceHeldTranscriptRecoveryScoringProjection,
   buildHelixAskVoicePendingConfirmationMergeProjection,
   buildHelixAskVoicePendingConfirmationPolicyProjection,
-  buildHelixAskVoiceTranscriptConfirmAutoPolicyProjection,
   buildHelixAskVoiceTranscriptConfirmationProjection,
   buildHelixAskVoiceTranscriptScoringProjection,
   buildHelixAskVoiceTurnDraftUpdate,
@@ -2483,7 +2491,6 @@ const VOICE_TURN_COMPLETE_MEDIUM_HOLD_MS = 420;
 const VOICE_TURN_COMPLETE_LOW_HOLD_MS = 680;
 const VOICE_PREEMPT_BOUNDARY_TIMEOUT_MS = 1200;
 const VOICE_PREEMPT_BOUNDARY_TIMEOUT_REGEN_MS = 3000;
-const VOICE_TRANSCRIPT_AUTO_CONFIRM_DELAY_MS = 3000;
 const VOICE_SESSION_SPEAKER_MAX_PROFILES = 3;
 const HELIX_CONTEXT_CAPSULE_AUTO_APPLY_IDS_VOICE = HELIX_CONTEXT_CAPSULE_MAX_IDS;
 const HELIX_CONTEXT_CAPSULE_AUTO_APPLY_IDS_MANUAL = HELIX_CONTEXT_CAPSULE_MAX_IDS;
@@ -4298,7 +4305,7 @@ const CONTEXT_CAPSULE_SIM_TICK_MS = 50;
 
 type UnifiedDebugEventRow = {
   index: number;
-  channel: "ask_live" | "voice_timeline" | "voice_call" | "voice_playback_receipt" | "observer_lane";
+  channel: "ask_live" | "voice_timeline" | "voice_call" | "voice_playback_receipt" | "observer_lane" | "workflow_demo";
   id: string;
   tsMs: number | null;
   tool: string | null;
@@ -4398,19 +4405,21 @@ function buildAskTurnWorkspaceContextSnapshot(sessionId: string | null | undefin
     situationRoomJobState.last_attached_job_id,
   );
   const situationCaptureContext = buildSituationRoomCaptureContext(situationRoomState);
+  const lastUpdatedAtMs = Date.now();
   return buildHelixAskWorkspaceContextSnapshotBinding({
     sessionId,
     layoutState,
     notesState,
     calculatorState,
     theoryRuntimeContext,
+    theoryBadgeGraphContext: readTheoryBadgeGraphAskContextSnapshot(lastUpdatedAtMs),
     docContext,
     activeDocVisibleTranslationContext,
     accountLanguageTranslationProjections,
     visibleTranslationProjections,
     situationRoomContext,
     situationCaptureContext,
-    lastUpdatedAtMs: Date.now(),
+    lastUpdatedAtMs,
   });
 }
 
@@ -4422,6 +4431,7 @@ function buildReplyMasterEventClockExport(args: {
   docViewerState: Record<string, unknown>;
   workstationLayoutState: Record<string, unknown>;
   consoleAssemblyDebug?: Record<string, unknown> | null;
+  workflowDemoDebug?: HelixWorkflowDemoDebugExportV1 | null;
 }): string {
   const traceIds = new Set<string>();
   const turnKeys = new Set<string>();
@@ -4571,6 +4581,38 @@ function buildReplyMasterEventClockExport(args: {
         };
       })
     : [];
+  const workflowDemoRows: UnifiedDebugEventRow[] = Array.isArray(args.workflowDemoDebug?.current_turn_events)
+    ? args.workflowDemoDebug.current_turn_events.slice(-120).map((event, idx) => {
+        if (event.source_trace_id) traceIds.add(event.source_trace_id);
+        if (event.source_turn_id) turnKeys.add(event.source_turn_id);
+        const parsedAtMs = Date.parse(event.at);
+        return {
+          index: idx + 1,
+          channel: "workflow_demo" as const,
+          id: event.event_id,
+          tsMs: Number.isFinite(parsedAtMs) ? parsedAtMs : null,
+          tool: "helix.workflow_demo",
+          traceId: event.source_trace_id,
+          turnKey: event.source_turn_id,
+          attemptId: null,
+          stage: event.event_kind,
+          detail: [
+            event.reason,
+            event.before_step_id || event.after_step_id
+              ? `step:${event.before_step_id ?? "none"}->${event.after_step_id ?? "none"}`
+              : null,
+            event.new_artifact_refs.length > 0 ? `new_refs:${event.new_artifact_refs.length}` : null,
+            event.amends_debug_for_turn_id ? `amends:${event.amends_debug_for_turn_id}` : null,
+          ].filter(Boolean).join(" | ") || null,
+          text: summarizeVoiceDebugText(
+            event.qte_step_id
+              ? `workflow QTE ${event.event_kind}: ${event.qte_step_id}`
+              : `workflow demo ${event.event_kind}`,
+            280,
+          ),
+        };
+      })
+    : [];
   const observerRows: UnifiedDebugEventRow[] = askRows
     .map((row): UnifiedDebugEventRow | null => {
       const commentary = buildObserverCommentaryForRow(row, {
@@ -4599,6 +4641,7 @@ function buildReplyMasterEventClockExport(args: {
     ...voiceRows,
     ...voiceCallRows,
     ...voicePlaybackReceiptRows,
+    ...workflowDemoRows,
   ]
     .sort((left, right) => {
       const leftTs = left.tsMs ?? Number.MAX_SAFE_INTEGER;
@@ -4686,7 +4729,11 @@ function buildReplyMasterEventClockExport(args: {
     };
   });
   const currentTurnEventLog = [
-    ...unifiedTimeline.filter((row) => rowBelongsToCurrentTurn(row) || rowBelongsToRelatedWorkstationAction(row)),
+    ...unifiedTimeline.filter((row) =>
+      row.channel === "workflow_demo" ||
+      rowBelongsToCurrentTurn(row) ||
+      rowBelongsToRelatedWorkstationAction(row)
+    ),
     ...transcriptRows,
   ].map((row, index) => ({
     ...row,
@@ -4933,6 +4980,7 @@ function buildReplyMasterEventClockExport(args: {
       observerRows: observerRows.length,
       voiceTimelineRows: voiceRows.length,
       voiceCallRows: voiceCallRows.length,
+      workflowDemoRows: workflowDemoRows.length,
       traceIds: selectedTraceIds.size,
       sessionTraceIds: traceIds.size,
       turnKeys: selectedTurnKeys.size,
@@ -5135,6 +5183,7 @@ function buildReplyMasterEventClockExport(args: {
       },
       docViewer: args.docViewerState,
       workstationLayout: args.workstationLayoutState,
+      workflowDemo: args.workflowDemoDebug ?? null,
     },
     timeline: currentTimeline,
     eventLog: currentTurnEventLog,
@@ -6386,6 +6435,8 @@ export function HelixAskPill({
   const { ensureContextSession, addMessage, setActive } = useAgiChatStore();
   const helixChatSessions = useAgiChatStore((state) => state.sessions);
   const helixChatStoreHydrated = useAgiChatStore((state) => state.hydrated);
+  const workflowDemoSession = useHelixWorkflowDemoStore((state) => state.session);
+  const workflowDemoDebugEvents = useHelixWorkflowDemoStore((state) => state.debugEvents);
   const helixAskSessionRef = useRef<string | null>(null);
   const helixAskSessionContextRef = useRef<string | null>(null);
   const askInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -7122,9 +7173,7 @@ export function HelixAskPill({
   const [voiceInputState, setVoiceInputState] = useState<MicRuntimeState>("listening");
   const [voiceInputError, setVoiceInputError] = useState<string | null>(null);
   const [transcriptConfirmState, setTranscriptConfirmState] = useState<TranscriptConfirmState | null>(null);
-  const [transcriptConfirmAutoCountdownSec, setTranscriptConfirmAutoCountdownSec] = useState<number | null>(null);
   const [commandConfirmState, setCommandConfirmState] = useState<VoiceCommandConfirmState | null>(null);
-  const [commandConfirmAutoCountdownSec, setCommandConfirmAutoCountdownSec] = useState<number | null>(null);
   const [voiceMonitorMaxHeightPx, setVoiceMonitorMaxHeightPx] = useState(320);
   const [voiceMonitorLevel, setVoiceMonitorLevel] = useState(0);
   const [voiceMonitorThreshold, setVoiceMonitorThreshold] = useState(MIC_LEVEL_MIN_THRESHOLD);
@@ -7290,11 +7339,7 @@ export function HelixAskPill({
   const voiceTranscribeBackoffUntilMsRef = useRef<number | null>(null);
   const voiceTranscribeBackoffTimerRef = useRef<number | null>(null);
   const transcriptConfirmStateRef = useRef<TranscriptConfirmState | null>(null);
-  const transcriptConfirmAutoTimerRef = useRef<number | null>(null);
-  const transcriptConfirmAutoDeadlineMsRef = useRef<number | null>(null);
   const commandConfirmStateRef = useRef<VoiceCommandConfirmState | null>(null);
-  const commandConfirmAutoTimerRef = useRef<number | null>(null);
-  const commandConfirmAutoDeadlineMsRef = useRef<number | null>(null);
   const voiceTranscribeBusyRef = useRef(false);
   const voiceSealPollTimerRef = useRef<number | null>(null);
   const voiceSegmentFlushTimerRef = useRef<number | null>(null);
@@ -7407,6 +7452,7 @@ export function HelixAskPill({
   const reasoningTimelineEntryByAttemptIdRef = useRef<Record<string, string>>({});
   const reasoningStreamEntryByAttemptIdRef = useRef<Record<string, string>>({});
   const pendingExternalAskPromptRef = useRef<PendingHelixAskPrompt | null>(null);
+  const pendingWorkflowQteRef = useRef<PendingHelixAskPrompt["workflowQte"] | null>(null);
 
   useEffect(() => {
     reasoningAttemptsRef.current = reasoningAttempts;
@@ -11104,6 +11150,7 @@ export function HelixAskPill({
     clearHeldTranscriptState();
     clearRetainedVoiceTranscriptionRetry();
     setTranscriptConfirmState(null);
+    setCommandConfirmState(null);
     voiceDivergenceEventsRef.current = [];
     voiceBargeResumeNotBeforeMsRef.current = null;
     voiceBargeTrafficQuietUntilMsRef.current = null;
@@ -15251,7 +15298,6 @@ export function HelixAskPill({
       setVoiceTrackMuted(false);
       setTranscriptConfirmState(null);
       setCommandConfirmState(null);
-      setCommandConfirmAutoCountdownSec(null);
       voiceTrackMutedRef.current = false;
       setConversationGovernor((prev) => ({
         ...prev,
@@ -17814,13 +17860,15 @@ export function HelixAskPill({
     void processTranscriptionQueue();
   }, [markVoiceCheckpoint, patchVoiceSegmentAttempt, processTranscriptionQueue]);
 
-  const handleTranscriptConfirmationAccept = useCallback(() => {
+  const acceptTranscriptConfirmationCandidate = useCallback((candidateId: string, source: "manual" | "auto") => {
     const pending = transcriptConfirmStateRef.current;
-    if (!pending || micArmStateRef.current !== "on") return;
+    if (!pending || pending.id !== candidateId || micArmStateRef.current !== "on") return;
     stopReadAloud("barge_in");
     setTranscriptConfirmState(null);
     clearHeldTranscriptState();
-    markVoiceCheckpoint("confirm_auto_cancelled", "ok", "Confirm resolved by manual accept.");
+    if (source === "manual") {
+      markVoiceCheckpoint("confirm_auto_cancelled", "ok", "Confirm resolved by manual accept.");
+    }
     const confirmedTurn: VoiceConfirmedTurn = {
       id: pending.id,
       traceId: pending.traceId,
@@ -17912,142 +17960,6 @@ export function HelixAskPill({
       cooling_down: false,
     }));
   }, [clearHeldTranscriptState, markVoiceCheckpoint, patchVoiceSegmentAttempt]);
-
-  const clearTranscriptConfirmAutoTimer = useCallback(() => {
-    if (typeof window !== "undefined" && transcriptConfirmAutoTimerRef.current !== null) {
-      window.clearInterval(transcriptConfirmAutoTimerRef.current);
-      transcriptConfirmAutoTimerRef.current = null;
-    }
-    transcriptConfirmAutoDeadlineMsRef.current = null;
-    setTranscriptConfirmAutoCountdownSec(null);
-  }, []);
-
-  useEffect(() => {
-    clearTranscriptConfirmAutoTimer();
-    if (typeof window === "undefined") return;
-    if (micArmState !== "on") return;
-    if (!transcriptConfirmState) return;
-    const autoConfirmPolicyProjection = buildHelixAskVoiceTranscriptConfirmAutoPolicyProjection({
-      dispatchState: transcriptConfirmState.dispatchState,
-      confidence: transcriptConfirmState.confidence,
-      languageConfidence: transcriptConfirmState.languageConfidence,
-      pivotConfidence: transcriptConfirmState.pivotConfidence,
-      translationUncertain: transcriptConfirmState.translationUncertain,
-      sourceLanguage: transcriptConfirmState.sourceLanguage ?? null,
-      sourceText: transcriptConfirmState.sourceText ?? null,
-      translated: transcriptConfirmState.translated,
-      speechProbability: transcriptConfirmState.speechProbability,
-      snrDb: transcriptConfirmState.snrDb,
-      lowQualitySpeechProbability: voiceNoiseProfile.localGateLowQualitySpeechProbability,
-      lowQualitySnrDb: voiceNoiseProfile.localGateLowQualitySnrDb,
-      speechActive: voiceSpeechActiveRef.current,
-      queuedSegmentCount: voiceTranscribeQueueRef.current.length,
-      confirmV2Active: voiceConfirmV2Active,
-    });
-    const confirmPolicy = autoConfirmPolicyProjection.confirmPolicy;
-    const shouldAutoConfirm = autoConfirmPolicyProjection.shouldAutoConfirm;
-    if (voiceConfirmV2Active && confirmPolicy.confirmBlockReason) {
-      markVoiceCheckpoint(
-        "confirm_blocked_reason",
-        "warn",
-        `Confirm auto blocked: ${confirmPolicy.confirmBlockReason}.`,
-      );
-    }
-    if (!shouldAutoConfirm) return;
-
-    transcriptConfirmAutoDeadlineMsRef.current = Date.now() + VOICE_TRANSCRIPT_AUTO_CONFIRM_DELAY_MS;
-    setTranscriptConfirmAutoCountdownSec(Math.ceil(VOICE_TRANSCRIPT_AUTO_CONFIRM_DELAY_MS / 1000));
-    markVoiceCheckpoint(
-      "confirm_auto_started",
-      "ok",
-      "Confirm auto timer started.",
-    );
-    let waitingForInactivity = false;
-    transcriptConfirmAutoTimerRef.current = window.setInterval(() => {
-      const pending = transcriptConfirmStateRef.current;
-      if (!pending || pending.id !== transcriptConfirmState.id) {
-        markVoiceCheckpoint("confirm_auto_cancelled", "ok", "Confirm auto timer cancelled.");
-        clearTranscriptConfirmAutoTimer();
-        return;
-      }
-      if (voiceConfirmV2Active) {
-        const policyProjection = buildHelixAskVoiceTranscriptConfirmAutoPolicyProjection({
-          dispatchState: pending.dispatchState,
-          confidence: pending.confidence,
-          languageConfidence: pending.languageConfidence,
-          pivotConfidence: pending.pivotConfidence,
-          translationUncertain: pending.translationUncertain,
-          sourceLanguage: pending.sourceLanguage ?? null,
-          sourceText: pending.sourceText ?? null,
-          translated: pending.translated,
-          speechProbability: pending.speechProbability,
-          snrDb: pending.snrDb,
-          lowQualitySpeechProbability: voiceNoiseProfile.localGateLowQualitySpeechProbability,
-          lowQualitySnrDb: voiceNoiseProfile.localGateLowQualitySnrDb,
-          speechActive: voiceSpeechActiveRef.current,
-          queuedSegmentCount: voiceTranscribeQueueRef.current.length,
-          confirmV2Active: true,
-        });
-        const policy = policyProjection.confirmPolicy;
-        const policyWithoutActivity = policyProjection.confirmPolicyWithoutLiveActivity;
-        if (policy.confirmBlockReason) {
-          markVoiceCheckpoint(
-            "confirm_blocked_reason",
-            "warn",
-            `Confirm auto blocked: ${policy.confirmBlockReason}.`,
-          );
-          clearTranscriptConfirmAutoTimer();
-          return;
-        }
-        if (!policyWithoutActivity.confirmAutoEligible) {
-          clearTranscriptConfirmAutoTimer();
-          return;
-        }
-        if (policy.reason === "live_activity") {
-          transcriptConfirmAutoDeadlineMsRef.current = Date.now() + VOICE_TRANSCRIPT_AUTO_CONFIRM_DELAY_MS;
-          setTranscriptConfirmAutoCountdownSec(Math.ceil(VOICE_TRANSCRIPT_AUTO_CONFIRM_DELAY_MS / 1000));
-          if (!waitingForInactivity) {
-            waitingForInactivity = true;
-            markVoiceCheckpoint(
-              "confirm_auto_cancelled",
-              "ok",
-              "Confirm auto waiting for speech/queue inactivity.",
-            );
-          }
-          return;
-        }
-        waitingForInactivity = false;
-      }
-      const deadlineMs = transcriptConfirmAutoDeadlineMsRef.current;
-      if (deadlineMs === null) {
-        clearTranscriptConfirmAutoTimer();
-        return;
-      }
-      const remainingMs = Math.max(0, deadlineMs - Date.now());
-      const nextCountdownSec = Math.ceil(remainingMs / 1000);
-      setTranscriptConfirmAutoCountdownSec((current) =>
-        current === nextCountdownSec ? current : nextCountdownSec,
-      );
-      if (remainingMs > 0) return;
-      clearTranscriptConfirmAutoTimer();
-      markVoiceCheckpoint("confirm_auto_fired", "ok", "Confirm auto fired after inactivity window.");
-      markVoiceCheckpoint("stt_response_error", "ok", "Transcript auto-confirmed after inactivity window.");
-      handleTranscriptConfirmationAccept();
-    }, 120);
-
-    return () => {
-      clearTranscriptConfirmAutoTimer();
-    };
-  }, [
-    clearTranscriptConfirmAutoTimer,
-    handleTranscriptConfirmationAccept,
-    markVoiceCheckpoint,
-    micArmState,
-    transcriptConfirmState,
-    voiceConfirmV2Active,
-    voiceNoiseProfile.localGateLowQualitySnrDb,
-    voiceNoiseProfile.localGateLowQualitySpeechProbability,
-  ]);
 
   const buildVoiceSteeringReservation = useCallback((): VoiceSteeringReservation | null => {
     const activeTurnId = activeAskTurnIdRef.current;
@@ -20099,6 +20011,23 @@ export function HelixAskPill({
       });
       const runAskTurnId = pendingWorkstationUserInputRef.current?.turn_id ?? `ask:${crypto.randomUUID()}`;
       const sessionIdForTurn = getHelixAskSessionId();
+      const pendingWorkflowQte = runAskInputSource === "manual"
+        ? pendingWorkflowQteRef.current
+        : null;
+      pendingWorkflowQteRef.current = null;
+      if (
+        pendingWorkflowQte &&
+        sessionIdForTurn &&
+        pendingWorkflowQte.sourceSessionId === sessionIdForTurn
+      ) {
+        useHelixWorkflowDemoStore.getState().markPromptSubmitted({
+          runId: pendingWorkflowQte.runId,
+          stepId: pendingWorkflowQte.stepId,
+          sourceSessionId: sessionIdForTurn,
+          turnId: runAskTurnId,
+          prompt: trimmed,
+        });
+      }
       const backendEntrypointRoutePlan = buildHelixAskSubmitBackendEntrypointRoutePlan({
         question: trimmed,
         baseRunOptions: options,
@@ -22644,6 +22573,7 @@ export function HelixAskPill({
       }
       pendingExternalAskPromptRef.current = null;
       if (pending?.autoSubmit === false) {
+        pendingWorkflowQteRef.current = pending.workflowQte ?? null;
         if (askInputRef.current) {
           askInputRef.current.value = question;
           resizeTextarea();
@@ -22714,15 +22644,6 @@ export function HelixAskPill({
       skipContextChooser: true,
     });
   }, [askBusy, askQueue, contextCompactionPausePending, runAsk, setContextCompactionPausePendingState]);
-
-  const clearCommandConfirmAutoTimer = useCallback(() => {
-    if (typeof window !== "undefined" && commandConfirmAutoTimerRef.current !== null) {
-      window.clearInterval(commandConfirmAutoTimerRef.current);
-      commandConfirmAutoTimerRef.current = null;
-    }
-    commandConfirmAutoDeadlineMsRef.current = null;
-    setCommandConfirmAutoCountdownSec(null);
-  }, []);
 
   const executeVoiceCommandLaneAction = useCallback(
     (action: "send" | "cancel" | "retry"): boolean => {
@@ -22801,81 +22722,122 @@ export function HelixAskPill({
     ],
   );
 
-  const handleCommandConfirmationAccept = useCallback(() => {
+  const acceptCommandConfirmationCandidate = useCallback((candidateId: string) => {
     const pending = commandConfirmStateRef.current;
-    if (!pending || micArmStateRef.current !== "on") return;
-    clearCommandConfirmAutoTimer();
+    if (!pending || pending.id !== candidateId || micArmStateRef.current !== "on") return;
     setCommandConfirmState(null);
     executeVoiceCommandLaneAction(pending.action);
-  }, [clearCommandConfirmAutoTimer, executeVoiceCommandLaneAction]);
+  }, [executeVoiceCommandLaneAction]);
+
+  const handleVoiceConfirmationRuntimeEvent = useCallback(
+    (event: HelixAskVoiceConfirmationRuntimeEvent) => {
+      switch (event.type) {
+        case "command_countdown_started":
+          markVoiceCheckpoint(
+            "command_confirm_started",
+            "ok",
+            `Command ${event.action} awaiting confirmation.`,
+          );
+          return;
+        case "command_countdown_fired":
+          markVoiceCheckpoint(
+            "command_confirm_fired",
+            "ok",
+            `Command ${event.action} auto-confirmed.`,
+          );
+          return;
+        case "command_preempted":
+          markVoiceCheckpoint(
+            "command_cancelled",
+            "ok",
+            "Voice command cancelled by transcript-confirm precedence.",
+          );
+          return;
+        case "transcript_countdown_started":
+          markVoiceCheckpoint("confirm_auto_started", "ok", "Confirm auto timer started.");
+          return;
+        case "transcript_countdown_fired":
+          markVoiceCheckpoint("confirm_auto_fired", "ok", "Confirm auto fired after inactivity window.");
+          markVoiceCheckpoint(
+            "stt_response_error",
+            "ok",
+            "Transcript auto-confirmed after inactivity window.",
+          );
+          return;
+        case "transcript_countdown_cancelled":
+          markVoiceCheckpoint("confirm_auto_cancelled", "ok", "Confirm auto timer cancelled.");
+          return;
+        case "transcript_waiting_for_inactivity":
+          markVoiceCheckpoint(
+            "confirm_auto_cancelled",
+            "ok",
+            "Confirm auto waiting for speech/queue inactivity.",
+          );
+          return;
+        case "transcript_countdown_blocked":
+          markVoiceCheckpoint(
+            "confirm_blocked_reason",
+            "warn",
+            `Confirm auto blocked: ${event.reason}.`,
+          );
+      }
+    },
+    [markVoiceCheckpoint],
+  );
+
+  const {
+    commandCountdownSec: commandConfirmAutoCountdownSec,
+    transcriptCountdownSec: transcriptConfirmAutoCountdownSec,
+    clearCommandCountdown,
+    clearTranscriptCountdown,
+  } = useHelixAskVoiceConfirmationRuntime({
+    micEnabled: micArmState === "on",
+    commandCandidate: commandConfirmState,
+    transcriptCandidate: transcriptConfirmState,
+    confirmV2Active: voiceConfirmV2Active,
+    lowQualitySpeechProbability: voiceNoiseProfile.localGateLowQualitySpeechProbability,
+    lowQualitySnrDb: voiceNoiseProfile.localGateLowQualitySnrDb,
+    readTranscriptActivity: () => ({
+      speechActive: voiceSpeechActiveRef.current,
+      queuedSegmentCount: voiceTranscribeQueueRef.current.length,
+    }),
+    onCommandAutoConfirm: acceptCommandConfirmationCandidate,
+    onCommandPreempted: (candidateId) => {
+      if (commandConfirmStateRef.current?.id === candidateId) {
+        setCommandConfirmState(null);
+      }
+    },
+    onTranscriptAutoConfirm: (candidateId) => {
+      acceptTranscriptConfirmationCandidate(candidateId, "auto");
+    },
+    onEvent: handleVoiceConfirmationRuntimeEvent,
+  });
+
+  const handleTranscriptConfirmationAccept = useCallback(() => {
+    const candidateId = transcriptConfirmStateRef.current?.id;
+    if (!candidateId) return;
+    clearTranscriptCountdown();
+    acceptTranscriptConfirmationCandidate(candidateId, "manual");
+  }, [acceptTranscriptConfirmationCandidate, clearTranscriptCountdown]);
+
+  const handleTranscriptConfirmationRetryFromPanel = useCallback(() => {
+    clearTranscriptCountdown();
+    handleTranscriptConfirmationRetry();
+  }, [clearTranscriptCountdown, handleTranscriptConfirmationRetry]);
+
+  const handleCommandConfirmationAccept = useCallback(() => {
+    const candidateId = commandConfirmStateRef.current?.id;
+    if (!candidateId) return;
+    clearCommandCountdown();
+    acceptCommandConfirmationCandidate(candidateId);
+  }, [acceptCommandConfirmationCandidate, clearCommandCountdown]);
 
   const handleCommandConfirmationCancel = useCallback(() => {
     if (!commandConfirmStateRef.current) return;
-    clearCommandConfirmAutoTimer();
+    clearCommandCountdown();
     setCommandConfirmState(null);
     markVoiceCheckpoint("command_cancelled", "ok", "Voice command confirmation cancelled.");
-  }, [clearCommandConfirmAutoTimer, markVoiceCheckpoint]);
-
-  useEffect(() => {
-    if (!transcriptConfirmState || !commandConfirmStateRef.current) return;
-    clearCommandConfirmAutoTimer();
-    setCommandConfirmState(null);
-    markVoiceCheckpoint("command_cancelled", "ok", "Voice command cancelled by transcript-confirm precedence.");
-  }, [clearCommandConfirmAutoTimer, markVoiceCheckpoint, transcriptConfirmState]);
-
-  useEffect(() => {
-    clearCommandConfirmAutoTimer();
-    if (typeof window === "undefined") return;
-    if (micArmState !== "on") return;
-    if (!commandConfirmState) return;
-    if (transcriptConfirmState) return;
-    commandConfirmAutoDeadlineMsRef.current = Date.now() + VOICE_TRANSCRIPT_AUTO_CONFIRM_DELAY_MS;
-    setCommandConfirmAutoCountdownSec(Math.ceil(VOICE_TRANSCRIPT_AUTO_CONFIRM_DELAY_MS / 1000));
-    markVoiceCheckpoint("command_confirm_started", "ok", `Command ${commandConfirmState.action} awaiting confirmation.`);
-
-    commandConfirmAutoTimerRef.current = window.setInterval(() => {
-      const pending = commandConfirmStateRef.current;
-      if (!pending || pending.id !== commandConfirmState.id) {
-        clearCommandConfirmAutoTimer();
-        return;
-      }
-      if (transcriptConfirmStateRef.current) {
-        clearCommandConfirmAutoTimer();
-        setCommandConfirmState(null);
-        markVoiceCheckpoint(
-          "command_cancelled",
-          "ok",
-          "Voice command cancelled because transcript confirm became active.",
-        );
-        return;
-      }
-      const deadlineMs = commandConfirmAutoDeadlineMsRef.current;
-      if (deadlineMs === null) {
-        clearCommandConfirmAutoTimer();
-        return;
-      }
-      const remainingMs = Math.max(0, deadlineMs - Date.now());
-      const nextCountdownSec = Math.ceil(remainingMs / 1000);
-      setCommandConfirmAutoCountdownSec((current) =>
-        current === nextCountdownSec ? current : nextCountdownSec,
-      );
-      if (remainingMs > 0) return;
-      clearCommandConfirmAutoTimer();
-      markVoiceCheckpoint("command_confirm_fired", "ok", `Command ${pending.action} auto-confirmed.`);
-      handleCommandConfirmationAccept();
-    }, 120);
-
-    return () => {
-      clearCommandConfirmAutoTimer();
-    };
-  }, [
-    clearCommandConfirmAutoTimer,
-    commandConfirmState,
-    handleCommandConfirmationAccept,
-    markVoiceCheckpoint,
-    micArmState,
-    transcriptConfirmState,
-  ]);
+  }, [clearCommandCountdown, markVoiceCheckpoint]);
 
   const handleStop = useCallback(() => {
     if (askAbortRef.current) {
@@ -23436,7 +23398,7 @@ export function HelixAskPill({
     translationUncertain: transcriptConfirmState?.translationUncertain,
     countdownSec: transcriptConfirmAutoCountdownSec,
     onAccept: handleTranscriptConfirmationAccept,
-    onRetry: handleTranscriptConfirmationRetry,
+    onRetry: handleTranscriptConfirmationRetryFromPanel,
   });
   const contextChooserState = buildHelixAskContextChooserState({
     visible: Boolean(askContextChooser),
@@ -23521,7 +23483,7 @@ export function HelixAskPill({
     runtimePickerModel: agentRuntimePickerModel,
     runtimeMenuOpen: agentRuntimeMenuOpen,
     onRuntimePrimaryClick: handleAgentRuntimeButtonClick,
-    onRuntimeSelect: handleAgentRuntimeSelect,
+    onRuntimeSelect: handleAgentRuntimeSelect, accountPolicy: accountCapabilityPolicy,
     submitViewModel: composerViewModel,
     onSubmitIntent: () => triggerAskActionHaptic(),
     onStop: () => {
@@ -24039,6 +24001,7 @@ export function HelixAskPill({
   return (
     <HelixAskLegacyConsoleView
       {...legacyConsoleViewState}
+      workflowSuggestion={<HelixAskWorkflowSuggestionRuntime latestPayload={latestAskReply} />}
       turnListRef={askReplyListRef}
       turnListContent={
         <>
@@ -24052,6 +24015,25 @@ export function HelixAskPill({
               reply.debug,
               resolveHelixAskLegacyReplyFailContext(reply.debug),
             );
+            const replyDebugRecord = readAgentLoopAuditRecord(reply.debug);
+            const workflowDemoDebug = buildHelixWorkflowDemoDebugExport({
+              session: workflowDemoSession,
+              events: workflowDemoDebugEvents,
+              target: {
+                client_reply_id: reply.id || null,
+                turn_id: resolveHelixAskReplyDebugTurnId(reply),
+                trace_id:
+                  typeof replyDebugRecord?.trace_id === "string" && replyDebugRecord.trace_id.trim()
+                    ? replyDebugRecord.trace_id.trim()
+                    : typeof replyDebugRecord?.traceId === "string" && replyDebugRecord.traceId.trim()
+                      ? replyDebugRecord.traceId.trim()
+                      : null,
+                reply_created_at_ms:
+                  typeof reply.createdAtMs === "number" && Number.isFinite(reply.createdAtMs)
+                    ? reply.createdAtMs
+                    : null,
+              },
+            });
             const replyMasterEventClockPayload = buildReplyMasterEventClockExport({
               reply,
               events: replyEventsChronological,
@@ -24060,8 +24042,8 @@ export function HelixAskPill({
               docViewerState: docViewerDebugSnapshot,
               workstationLayoutState: workstationLayoutDebugSnapshot,
               consoleAssemblyDebug: helixAskConsoleDebugSnapshot,
+              workflowDemoDebug,
             });
-            const replyDebugRecord = readAgentLoopAuditRecord(reply.debug);
             const runtimeGoalDebugSummary = mergeHelixAskRuntimeGoalDebugFields(
               replyDebugRecord,
               reply as unknown as Record<string, unknown>,

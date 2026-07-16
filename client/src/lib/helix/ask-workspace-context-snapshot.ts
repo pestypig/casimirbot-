@@ -103,6 +103,7 @@ export type AskTurnWorkspaceContextSnapshotInput = {
   notesState: WorkstationNotesSnapshotInput;
   calculatorState: ScientificCalculatorSnapshotInput;
   theoryRuntimeContext?: TheoryRuntimeContextSnapshotInput | null;
+  theoryBadgeGraphContext?: Record<string, unknown> | null;
   docContext: {
     path: string | null;
     source: string;
@@ -371,6 +372,28 @@ export function buildAskTurnWorkspaceContextSnapshotFromState(
       raw_content_included: false,
     }
     : null;
+  const theoryBadgeGraphContext = input.theoryBadgeGraphContext &&
+    typeof input.theoryBadgeGraphContext === "object" &&
+    !Array.isArray(input.theoryBadgeGraphContext)
+    ? input.theoryBadgeGraphContext
+    : null;
+  const theoryBadgeGraphPanelOpen = openPanelIds.includes("theory-badge-graph");
+  const activeTheoryBadgeGraphContext = theoryBadgeGraphContext
+    ? {
+      ...theoryBadgeGraphContext,
+      panel_id: "theory-badge-graph",
+      active_panel: activePanel === "theory-badge-graph",
+      panel_open: theoryBadgeGraphPanelOpen,
+      context_role: "ambient_context",
+      output_role: "ambient_context",
+      observation_required: true,
+      answer_authority: false,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    }
+    : null;
   const currentPath = input.docContext.path;
   const docContextSource = input.docContext.source;
   const activeDocVisibleTranslationContext =
@@ -432,6 +455,10 @@ export function buildAskTurnWorkspaceContextSnapshotFromState(
     active_theory_runtime_context: activeTheoryRuntimeContext,
     hasTheoryRuntimeContext: Boolean(activeTheoryRuntimeContext),
     has_theory_runtime_context: Boolean(activeTheoryRuntimeContext),
+    activeTheoryBadgeGraphContext,
+    active_theory_badge_graph_context: activeTheoryBadgeGraphContext,
+    hasTheoryBadgeGraphContext: Boolean(activeTheoryBadgeGraphContext),
+    has_theory_badge_graph_context: Boolean(activeTheoryBadgeGraphContext),
     hasCalculatorContext: activePanel === "scientific-calculator" && (
       Boolean(activeCalculatorContext.current_latex) ||
       Boolean(activeCalculatorContext.last_result_text) ||

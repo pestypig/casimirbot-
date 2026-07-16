@@ -52,6 +52,7 @@ import {
   isExplicitDocsPathLocateSynthesisPrompt,
   isExplicitDocsPathSummaryPrompt as isExplicitDocsMarkdownPathSummaryPrompt,
 } from "./docs-viewer-intent";
+import { isTheoryBadgeGraphCurrentContextPrompt } from "./theory-badge-graph-current-context-intent";
 
 export {
   isStagePlayCheckpointRequestPrompt,
@@ -83,10 +84,22 @@ const isExplicitModelOnlyPrompt = (prompt: string): boolean => {
   const affirmativeDocsRequirement =
     isAffirmativeDocsSourceRequirementPrompt(prompt) &&
     !contextualToolSuppressionBlocksFamily(contextualSuppression, "docs_viewer");
+  const scholarlyIntent = detectScholarlyResearchIntent(prompt);
+  const narrowerSearchSuppression = /^(?:internet_search\.web_research|scholarly-research\.lookup_papers)$/i.test(
+    contextualSuppression?.verb_or_cue ?? "",
+  );
+  const affirmativeScholarlyFullTextRequirement =
+    scholarlyIntent.researchRequested &&
+    scholarlyIntent.fullTextRequested &&
+    (
+      !contextualToolSuppressionBlocksFamily(contextualSuppression, "scholarly_research") ||
+      narrowerSearchSuppression
+    );
   return (
     Boolean(contextualSuppression) &&
     !(mutatingWriteOnlySuppression && isExplicitEvidenceSourceRequest(prompt)) &&
-    !affirmativeDocsRequirement
+    !affirmativeDocsRequirement &&
+    !affirmativeScholarlyFullTextRequirement
   ) ||
     /\bwithout\s+(?:using|checking|looking\s+at|searching|consulting)\s+(?:the\s+)?(?:workspace|docs?|documents?|papers?|screen|visual|sources?)\b/i.test(prompt) ||
     /\b(?:do\s+not|don'?t)\s+(?:use|look\s+at|check|search|consult)\s+(?:the\s+)?(?:workspace|docs?|documents?|papers?|screen|visual|sources?)\b/i.test(prompt) ||
@@ -1016,6 +1029,31 @@ export function arbitrateAskSourceTarget(input: {
       suppressedRoutes: ["active_doc_identity", "active_doc_summary", "doc_open_best", "live_pipeline_control", "model_only_concept", "no_tool_direct"],
       precedenceReason: "explicit_live_capture_content_source_target",
       confidence: 0.96,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  if (isTheoryBadgeGraphCurrentContextPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "theory_locator",
+      targetKind: "theory_locator",
+      strength: "hard",
+      explicitCues: ["current_theory_badge_graph_selection"],
+      reasons: [
+        "theory_badge_graph_current_context_source_target",
+        "deictic_badge_selection_requires_bounded_workstation_observation",
+      ],
+      requestedOutputs: ["theory_context_reflection", "tool_call_eligibility", "typed_failure"],
+      suppressedRoutes: [
+        "model_only_concept",
+        "no_tool_direct",
+        "client_projection",
+        "panel_generated_answer",
+      ],
+      precedenceReason: "theory_badge_graph_current_context_source_target",
+      confidence: 0.98,
       allowClientShortcut: false,
       allowNoToolDirect: false,
     });

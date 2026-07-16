@@ -107,6 +107,26 @@ export const HELIX_ASK_OPERATOR_SURFACE_PARITY_CHECKLIST = [
     evidence: "voice playback controller/runtime modules are recrowned; live playback remains browser-validated",
   },
   {
+    key: "voice_confirmation_qte",
+    label: "Voice confirmation three-second QTE",
+    status: "proven",
+    bridgeReference: "HelixAskPill.tsx",
+    recrownedOwner: "HelixAskVoiceConfirmationRuntime",
+    validationKind: "behavior_sensitive_browser",
+    evidence:
+      "shared command/transcript timer behavior, cleanup, policy rechecks, and the minimal-shell seam have fake-timer parity coverage; live provider voice interaction remains browser-validated",
+  },
+  {
+    key: "workflow_next_prompt_qte",
+    label: "Workflow next-prompt QTE",
+    status: "proven",
+    bridgeReference: "HelixAskPill.tsx",
+    recrownedOwner: "HelixAskWorkflowSuggestionRuntime",
+    validationKind: "unit_and_browser",
+    evidence:
+      "legacy and minimal runtimes share the same layout slot; typed-only deterministic progress and editable autoSubmit-false insertion have focused unit coverage",
+  },
+  {
     key: "visible_stream_progress_status_rows",
     label: "Visible stream progress/status rows",
     status: "proven",

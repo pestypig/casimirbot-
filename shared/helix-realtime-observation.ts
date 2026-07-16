@@ -25,6 +25,14 @@ export type HelixRealtimeClientReceiptKind =
   | "playback_started"
   | "playback_ended"
   | "playback_failed"
+  | "vad_speech_started"
+  | "vad_speech_stopped"
+  | "response_interrupted"
+  | "speaker_loopback_suppressed"
+  | "qualified_barge_in"
+  | "response_started"
+  | "response_completed"
+  | "response_failed"
   | "transport_start_blocked"
   | "transport_stop_requested"
   | "transport_stopped"
@@ -103,6 +111,25 @@ export type HelixRealtimeClientReceiptObservation = {
   source_binding_ref: string | null;
   failure_code: string | null;
   failure_reason: string | null;
+  selected_model_or_service: string | null;
+  provider_session_ref: string | null;
+  provider_event_type: string | null;
+  provider_response_ref: string | null;
+  response_status: string | null;
+  vad_state: string | null;
+  response_interrupted: boolean;
+  audio_focus_owner: string | null;
+  audio_focus_owner_ref: string | null;
+  qualified_user_interruption: boolean;
+  speaker_loopback_suppressed: boolean;
+  terminal_voice_interrupted: boolean;
+  barge_in_qualification_basis: string | null;
+  client_reported_transport_execution_attempted: boolean;
+  client_reported_openai_network_call_attempted: boolean;
+  client_reported_webrtc_started: boolean;
+  client_reported_media_capture_started: boolean;
+  client_reported_browser_tracks_created: boolean;
+  client_reported_data_channels_created: boolean;
   openai_network_call_attempted: false;
   ephemeral_credential_minted: false;
   webrtc_started: false;

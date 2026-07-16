@@ -64,6 +64,7 @@ export function HelixAskLegacyConsoleView({
   turnListContent,
   turnListRef,
   turnListState,
+  workflowSuggestion,
   ...props
 }: HelixAskLegacyConsoleViewProps) {
   return (
@@ -79,6 +80,7 @@ export function HelixAskLegacyConsoleView({
           surfaceContent ?? (surfaceContentState ? <HelixAskLegacySurfaceContent {...surfaceContentState} /> : null)
         ))
       }
+      workflowSuggestion={workflowSuggestion}
       debugDrawer={
         debugDrawer ??
         <HelixAskDebugDrawerSurface

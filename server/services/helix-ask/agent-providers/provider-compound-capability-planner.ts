@@ -1,10 +1,12 @@
 import type { HelixWorkstationGatewayCallResult } from "../workstation-tool-gateway/types";
 import {
+  deriveDirectScholarlyPortfolioQueries,
   detectScholarlyResearchIntent,
   hasDirectScholarlyFullTextSourceIntent,
 } from "../scholarly-research-intent";
 import { isExistingTranslationSurfaceReadPrompt } from "./active-context-tool-requests";
 import { resolveHelixAskConversationalReferent } from "../referent-resolution";
+import { scholarlyPaperIdentityKeys } from "../retrieval/scholarly-paper-identity";
 
 export const READ_ALOUD_SURFACE_OUTCOME = "read_aloud_surface" as const;
 export const READ_ALOUD_DOC_EXCERPT_OUTCOME = READ_ALOUD_SURFACE_OUTCOME;
@@ -60,28 +62,109 @@ const scholarlyFullTextFetchabilityScore = (paper: Record<string, unknown>): num
   return score;
 };
 
+const SCHOLARLY_RELEVANCE_STOP_WORDS = new Set([
+  "about", "after", "along", "also", "among", "another", "before", "being", "best", "between",
+  "citation", "citations", "claim", "claims", "evidence", "fetch", "full", "identify", "into",
+  "metadata", "other", "paper", "papers", "reference", "references", "research", "scholarly", "search",
+  "source", "sources", "support", "supporting", "text", "their", "these", "three", "through", "using",
+  "which", "with", "would",
+]);
+
+const normalizeScholarlyRelevanceToken = (token: string): string => {
+  const lower = token.toLowerCase();
+  if (lower.length > 5 && lower.endsWith("ies")) return `${lower.slice(0, -3)}y`;
+  if (lower.length > 5 && lower.endsWith("ing")) return lower.slice(0, -3);
+  if (lower.length > 4 && lower.endsWith("ed")) return lower.slice(0, -2);
+  if (lower.length > 4 && lower.endsWith("s") && !lower.endsWith("ss")) return lower.slice(0, -1);
+  return lower;
+};
+
+const scholarlyRelevanceTokens = (value: unknown): string[] => {
+  const text = readString(value)?.toLowerCase() ?? "";
+  return uniqueStrings(
+    (text.match(/[a-z0-9]+/g) ?? [])
+      .filter((token) => token.length >= 4 && !SCHOLARLY_RELEVANCE_STOP_WORDS.has(token))
+      .map(normalizeScholarlyRelevanceToken)
+      .filter((token) => token.length >= 3 && !SCHOLARLY_RELEVANCE_STOP_WORDS.has(token)),
+  );
+};
+
+const scholarlyPaperTopicalRelevanceScore = (
+  paper: Record<string, unknown>,
+  queries: string[],
+  corpusTermWeights: Map<string, number>,
+): number => {
+  const queryTokenSets = queries
+    .map((query) => new Set(scholarlyRelevanceTokens(query)))
+    .filter((tokens) => tokens.size > 0);
+  if (queryTokenSets.length === 0) return 0;
+  const titleTokens = new Set(scholarlyRelevanceTokens(paper.title));
+  const supportingTokens = new Set(scholarlyRelevanceTokens([
+    readString(paper.abstract),
+    readString(paper.summary),
+    readString(paper.venue),
+  ].filter(Boolean).join(" ")));
+  let score = 0;
+  for (const queryTokens of queryTokenSets) {
+    let titleOverlap = 0;
+    let supportingOverlap = 0;
+    for (const token of queryTokens) {
+      const weight = corpusTermWeights.get(token) ?? 1;
+      if (titleTokens.has(token)) titleOverlap += weight;
+      else if (supportingTokens.has(token)) supportingOverlap += weight;
+    }
+    score += titleOverlap * 24 + supportingOverlap * 6;
+    if (titleOverlap + supportingOverlap >= 2) score += 18;
+  }
+  return score;
+};
+
 const rankScholarlyPapersForFullTextFetch = (
   papers: Record<string, unknown>[],
-): Record<string, unknown>[] =>
-  papers
+  queries: string[] = [],
+): Record<string, unknown>[] => {
+  const documentFrequency = new Map<string, number>();
+  for (const paper of papers) {
+    const tokens = new Set(scholarlyRelevanceTokens([
+      readString(paper.title),
+      readString(paper.abstract),
+      readString(paper.summary),
+      readString(paper.venue),
+    ].filter(Boolean).join(" ")));
+    for (const token of tokens) documentFrequency.set(token, (documentFrequency.get(token) ?? 0) + 1);
+  }
+  const corpusTermWeights = new Map(Array.from(documentFrequency.entries()).map(([token, frequency]) => [
+    token,
+    1 + Math.log((papers.length + 1) / (frequency + 1)) * 2,
+  ]));
+  return papers
     .map((paper, index) => ({
       paper,
       index,
-      score: scholarlyFullTextFetchabilityScore(paper),
+      fetchabilityScore: scholarlyFullTextFetchabilityScore(paper),
+      relevanceScore: scholarlyPaperTopicalRelevanceScore(paper, queries, corpusTermWeights),
     }))
-    .sort((left, right) => right.score - left.score || left.index - right.index)
-    .filter((entry) => entry.score > 0)
+    .sort((left, right) =>
+      right.relevanceScore - left.relevanceScore ||
+      right.fetchabilityScore - left.fetchabilityScore ||
+      left.index - right.index
+    )
+    .filter((entry) => entry.fetchabilityScore > 0)
     .map((entry) => entry.paper);
+};
 
 const selectScholarlyPaperForFullTextFetch = (
   papers: Record<string, unknown>[],
   fallbackPaper: Record<string, unknown> | undefined,
+  queries: string[] = [],
 ): Record<string, unknown> | null =>
-  rankScholarlyPapersForFullTextFetch(papers)[0] ?? fallbackPaper ?? null;
+  rankScholarlyPapersForFullTextFetch(papers, queries)[0] ?? fallbackPaper ?? null;
 
 const requestedScholarlyFullTextFetchCount = (prompt: string): number => {
   const match = prompt.match(
-    /\b(?:best|top|fetch|open|read|parse)\s+(?:the\s+)?(one|two|three|1|2|3)\b[\s\S]{0,50}\b(?:accessible\s+)?(?:sources?|papers?|articles?|pdfs?|full[-\s]?texts?)\b/i,
+    /\b(?:best|top|fetch|open|read|parse)\b[^.!?;\n]{0,100}\b(one|two|three|1|2|3)\b[^.!?;\n]{0,50}\b(?:unique\s+)?(?:accessible\s+)?(?:sources?|papers?|articles?|pdfs?|full[-\s]?texts?)\b/i,
+  ) ?? prompt.match(
+    /\b(one|two|three|1|2|3)\b[^.!?;\n]{0,40}\b(?:unique\s+)?(?:accessible\s+)?(?:full[-\s]?text\s+)?(?:sources?|papers?|articles?|pdfs?)\b[^.!?;\n]{0,80}\b(?:fetch|open|read|parse|full[-\s]?text)\b/i,
   );
   const token = match?.[1]?.toLowerCase();
   if (token === "three" || token === "3") return 3;
@@ -477,6 +560,11 @@ const isScientificImageExactRowRetryPrompt = (prompt: string): boolean => {
   );
 };
 
+const hasCitationLevelEquationSupportCue = (prompt: string): boolean =>
+  /\b(?:page|section|line|paragraph|equation)(?:[-\s]+(?:or|and)[-\s]+(?:page|section|line|paragraph|equation))?[-\s]+level\s+(?:support|evidence|citations?|references?|grounding)\b/i.test(
+    unquotePrompt(prompt),
+  );
+
 const isResearchQuantifyReflectPrompt = (prompt: string, body: Record<string, unknown>): boolean => {
   if (isScientificImageEvidenceRefRevisionPrompt(prompt)) return false;
   if (isScientificImageExactRowRetryPrompt(prompt)) return false;
@@ -497,7 +585,10 @@ const isResearchQuantifyReflectPrompt = (prompt: string, body: Record<string, un
     return false;
   }
   const wantsResearch = /\b(?:research[-\s]+papers?|research[-\s]+paper\s+evidence|paper[-\s]+backed|papers?|arxiv|scholarly|internet|web|sources?|corroborat(?:e|ion)|retrieve\s+evidence|look\s+up|cite|cited|source[-\s]?bound|source[-\s]?backed)\b/i.test(unquoted);
-  const wantsQuantify = /\b(?:calculate|compute|estimate|solve|solve_expression|calculator|quantif(?:y|ication)|numeric\s+parameters?|numeric\s+values?|numerical\s+values?|numeric\s+binding|formula\s+binding|bind\s+(?:the\s+)?(?:formula\s+)?variables?|scalar|equation|expression|plug\s+into)\b/i.test(unquoted);
+  const wantsExplicitQuantification = /\b(?:calculate|compute|estimate|solve|solve_expression|calculator|quantif(?:y|ication)|numeric\s+parameters?|numeric\s+values?|numerical\s+values?|numeric\s+binding|formula\s+binding|bind\s+(?:the\s+)?(?:formula\s+)?variables?|scalar|plug\s+into)\b/i.test(unquoted);
+  const wantsEquationWork = /\b(?:equations?|expressions?)\b/i.test(unquoted) &&
+    !hasCitationLevelEquationSupportCue(prompt);
+  const wantsQuantify = wantsExplicitQuantification || wantsEquationWork;
   const wantsReflection = /\b(?:reflect|theory\s+badge\s+graph|theory\s+graph|civilization\s+bounds?|claim\s+boundary|conditions\s+of\s+the\s+civilization|social|energy|material)\b/i.test(unquoted);
   const wantsFullTextNumericChain = hasScholarlyFullTextNumericChainIntent(prompt);
   if (wantsFullTextNumericChain && !wantsReflection && !hasPriorTheoryEquationAnaphora(prompt, body)) return false;
@@ -1326,27 +1417,46 @@ const buildScholarlyResearchWorkflowRequests = (body: Record<string, unknown>): 
   const chainPlan = intent.plannedScholarlyCapabilityChain;
   const requestedVariables = requestedFormulaVariablesFromPrompt(prompt);
   const requestedFullTextCount = requestedScholarlyFullTextFetchCount(prompt);
+  const queries = deriveDirectScholarlyPortfolioQueries(
+    intent.normalizedQuery,
+    requestedFullTextCount,
+  );
+  const directPortfolioDerived = queries.length > 1;
   const edges = [
     { from: `${SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME}:scholarly_evidence`, to: `${SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME}:scholarly_full_text`, binding: "selected_paper_to_full_text" },
     { from: `${SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME}:scholarly_full_text`, to: `${SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME}:numeric_parameters`, binding: "full_text_to_numeric_values" },
     { from: `${SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME}:numeric_parameters`, to: `${SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME}:calculator`, binding: "numeric_values_to_calculation" },
   ];
-  return [{
+  return queries.map((query, queryIndex) => {
+    const closesScholarlyLookupSet = queryIndex === queries.length - 1;
+    return {
     schema: "helix.workstation_gateway.compound_dependency_call_request.v1",
     derivation_source: "helix_scholarly_workflow_planner",
-    compound_outcome: SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME,
-    subgoal_id: `${SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME}:scholarly_evidence`,
+    ...(closesScholarlyLookupSet ? {
+      compound_outcome: SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME,
+      subgoal_id: `${SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME}:scholarly_evidence`,
+    } : {}),
     capability_id: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
-    dependent_capability_id: intent.scholarlyIntent.requires_full_text ? SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY : undefined,
+    dependent_capability_id: closesScholarlyLookupSet && intent.scholarlyIntent.requires_full_text
+      ? SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY
+      : undefined,
     mode: "read",
     arguments: {
-      query: intent.normalizedQuery,
+      query,
       mode: intent.mode,
-      scholarly_intent: intent.scholarlyIntent,
+      scholarly_intent: {
+        ...intent.scholarlyIntent,
+        scholarly_query: query,
+        query_normalization_reasons: [
+          ...(intent.scholarlyIntent.query_normalization_reasons ?? []),
+          ...(directPortfolioDerived ? ["direct_multi_topic_scholarly_portfolio"] : []),
+        ],
+      },
       planned_scholarly_capability_chain: chainPlan,
       ...(requestedVariables.length > 0 ? { requested_variables: requestedVariables } : {}),
-      allow_scholarly_dependent_chain: intent.scholarlyIntent.requires_full_text,
-      requested_full_text_count: requestedFullTextCount,
+      allow_scholarly_dependent_chain: closesScholarlyLookupSet && intent.scholarlyIntent.requires_full_text,
+      requested_full_text_count: closesScholarlyLookupSet ? requestedFullTextCount : 1,
+      ...(closesScholarlyLookupSet && directPortfolioDerived ? { scholarly_claim_portfolio: true } : {}),
       source_target_intent: {
         ...buildCompoundSourceTargetIntent({
           outcome: SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME,
@@ -1356,15 +1466,25 @@ const buildScholarlyResearchWorkflowRequests = (body: Record<string, unknown>): 
           requiredObservationKind: "helix.scholarly_research_observation.v1",
           activePanel,
           activeDocPath,
-          ordinal: 1,
+          ordinal: queryIndex + 1,
           dependencyEdges: edges,
         }),
-        scholarly_intent: intent.scholarlyIntent,
+        scholarly_intent: {
+          ...intent.scholarlyIntent,
+          scholarly_query: query,
+        },
         planned_scholarly_capability_chain: chainPlan,
         terminal_evidence_requirement: intent.scholarlyIntent.terminal_evidence_requirement,
+        ...(directPortfolioDerived ? {
+          query_derivation: "direct_multi_topic_scholarly_portfolio",
+          claim_index: queryIndex,
+          claim_count: queries.length,
+          claim_portfolio_closer: closesScholarlyLookupSet,
+        } : {}),
       },
     },
-  }];
+    };
+  });
 };
 
 const buildReadAloudSurfaceRequests = (body: Record<string, unknown>): Record<string, unknown>[] => {
@@ -2446,22 +2566,19 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
     const requestArgs = readRecord(input.request.arguments);
     const observation = readRecord(input.result.observation);
     const currentPapers = readArray(observation?.papers).map(readRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry));
+    const successfulLookupResults = (input.results?.length ? input.results : [input.result])
+      .filter((result) => result.capability_id === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY && result.ok === true);
     const portfolioPapers = outcome === SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME && requestArgs?.scholarly_claim_portfolio === true
-      ? (input.results?.length ? input.results : [input.result])
-          .filter((result) => result.capability_id === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY && result.ok === true)
+      ? successfulLookupResults
           .flatMap((result) => readArray(readRecord(result.observation)?.papers))
           .map(readRecord)
           .filter((entry): entry is Record<string, unknown> => Boolean(entry))
       : currentPapers;
     const seenPaperKeys = new Set<string>();
     const papers = portfolioPapers.filter((paper) => {
-      const key =
-        readString(paper.result_id) ??
-        readString(readRecord(paper.identifiers)?.doi) ??
-        readString(readRecord(paper.identifiers)?.arxiv_id) ??
-        readString(paper.title);
-      if (!key || seenPaperKeys.has(key)) return false;
-      seenPaperKeys.add(key);
+      const keys = scholarlyPaperIdentityKeys(paper);
+      if (keys.length === 0 || keys.some((key) => seenPaperKeys.has(key))) return false;
+      keys.forEach((key) => seenPaperKeys.add(key));
       return true;
     });
     const firstPaper = papers[0];
@@ -2472,6 +2589,12 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
     const requestedWorkflow = readString(scholarlyIntent?.requested_workflow);
     if (requestArgs?.allow_scholarly_dependent_chain !== true) return null;
     const query = readString(observation?.query) ?? readString(requestArgs?.query) ?? "paper full text";
+    const relevanceQueries = uniqueStrings([
+      ...successfulLookupResults
+        .map((result) => readString(readRecord(result.observation)?.query))
+        .filter((entry): entry is string => Boolean(entry)),
+      query,
+    ]);
     const relevanceGate = attachScholarlyLookupRelevanceGate({
       result: input.result,
       papers,
@@ -2483,10 +2606,11 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
       readString(paper.result_id) === readString(relevanceGate.selected_result_id)
     );
     const selectedPaper = outcome === SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME
-      ? selectScholarlyPaperForFullTextFetch(papers, firstPaper)
+      ? selectScholarlyPaperForFullTextFetch(papers, firstPaper, relevanceQueries)
       : selectScholarlyPaperForFullTextFetch(
           relevanceSelectedPaper ? [relevanceSelectedPaper, ...papers.filter((paper) => paper !== relevanceSelectedPaper)] : papers,
           relevanceSelectedPaper ?? firstPaper,
+          relevanceQueries,
         );
     if (!selectedPaper) return null;
     if (!firstPaper) return null;
@@ -2512,6 +2636,7 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
         requested_full_text_count: Math.max(1, Math.min(Number(requestArgs?.requested_full_text_count) || 1, 3)),
         full_text_fetch_index: 1,
         selected_full_text_paper_ids: selectedPaperId ? [selectedPaperId] : [],
+        scholarly_relevance_queries: relevanceQueries,
         ...(scholarlyIntent ? { scholarly_intent: scholarlyIntent } : {}),
         ...(requestedWorkflow ? { requested_workflow: requestedWorkflow } : {}),
         requested_variables: readArray(requestArgs?.requested_variables)
@@ -2533,7 +2658,9 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
           required_observation_kind: "helix.scholarly_full_text_observation.v1",
           required_affordance_kinds: ["source_ref", "citation_evidence"],
           produced_affordance_kind: "text_evidence",
-          source_refs: input.result.observation_packet.produced_artifact_refs,
+          source_refs: uniqueStrings(successfulLookupResults.flatMap((result) =>
+            result.observation_packet.produced_artifact_refs
+          )),
           ...(scholarlyIntent ? { scholarly_intent: scholarlyIntent } : {}),
           ...(requestedWorkflow ? { requested_workflow: requestedWorkflow } : {}),
           ...(variableSourcePlan ? { variable_source_plan: variableSourcePlan } : {}),
@@ -2561,13 +2688,19 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
       const papers = readArray(requestArgs?.papers)
         .map(readRecord)
         .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+      const relevanceQueries = readArray(requestArgs?.scholarly_relevance_queries)
+        .map(readString)
+        .filter((entry): entry is string => Boolean(entry));
+      const lookupSourceRefs = readArray(readRecord(requestArgs?.source_target_intent)?.source_refs)
+        .map(readString)
+        .filter((entry): entry is string => Boolean(entry));
       const selectedIds = new Set(
         readArray(requestArgs?.selected_full_text_paper_ids)
           .map(readString)
           .filter((entry): entry is string => Boolean(entry)),
       );
       const nextPaper = fetchIndex < requestedCount
-        ? rankScholarlyPapersForFullTextFetch(papers).find((paper) => {
+        ? rankScholarlyPapersForFullTextFetch(papers, relevanceQueries).find((paper) => {
             const id = readString(paper.result_id);
             return Boolean(id && !selectedIds.has(id));
           }) ?? null
@@ -2590,6 +2723,7 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
           requested_full_text_count: requestedCount,
           full_text_fetch_index: fetchIndex + 1,
           selected_full_text_paper_ids: Array.from(selectedIds),
+          scholarly_relevance_queries: relevanceQueries,
           ...(scholarlyIntent ? { scholarly_intent: scholarlyIntent } : {}),
           ...(requestedWorkflow ? { requested_workflow: requestedWorkflow } : {}),
           source: "helix_compound_capability_dependency_planner",
@@ -2605,6 +2739,7 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
             required_observation_kind: "helix.scholarly_full_text_observation.v1",
             required_affordance_kinds: ["source_ref", "citation_evidence"],
             produced_affordance_kind: "text_evidence",
+            source_refs: lookupSourceRefs,
             terminal_eligible: false,
             assistant_answer: false,
             raw_content_included: false,

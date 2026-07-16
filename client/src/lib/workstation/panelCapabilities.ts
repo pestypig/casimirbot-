@@ -357,6 +357,15 @@ export const WORKSTATION_V1_PANEL_CAPABILITIES: Record<string, WorkstationPanelC
         aliases: ["open theory badge graph", "show theory badges", "open theory graph"],
       },
       {
+        id: "current_context",
+        title: "Read Current Theory Graph Context",
+        description:
+          "Read the user's current badge selection, connection trace, branch possibilities, boundaries, and semantic lens/object context. Returns observation evidence only.",
+        risk: "low",
+        aliases: ["current theory badge context", "these badges", "selected badge combination"],
+        returns_artifact: true,
+      },
+      {
         id: "locate_context",
         title: "Locate Theory Context",
         description: "Locate prompt, expression, symbols, unit signatures, or source refs on the theory achievement map without solving.",

@@ -8,6 +8,7 @@ import type {
   TheoryContextExplanationPlanV1,
 } from "../../../../shared/contracts/theory-context-explanation-plan.v1";
 import type { TheoryContextReflectionV1 } from "../../../../shared/contracts/theory-context-reflection.v1";
+import type { TheoryMasterProblemRequestV1 } from "../../../../shared/contracts/theory-master-problem.v1";
 import type {
   HelixScholarlyFullTextObservation,
   HelixScholarlyResearchObservation,
@@ -33,6 +34,7 @@ import {
 } from "./scholarly-observation";
 import { selectTheoryDepth } from "./depth-policy";
 import { buildTheoryToolAdmissionPlan } from "./tool-admission";
+import { compileTheoryMasterProblem } from "../../../../shared/theory/theory-master-problem-compiler";
 
 export type TheoryCongruenceTraceFeatureFlagMode = "off" | "shadow" | "on";
 
@@ -54,6 +56,7 @@ export type BuildTheoryCongruenceTraceInput = {
   scholarlyResearchObservation?: HelixScholarlyResearchObservation | null;
   scholarlyFullTextObservation?: HelixScholarlyFullTextObservation | null;
   scholarlyMetadataFailed?: boolean;
+  derivationRequest?: TheoryMasterProblemRequestV1;
 };
 
 const CURRENT_INFO_CUE = /\b(today|latest|current|currently|recent|newest|as of now|live)\b/i;
@@ -145,6 +148,25 @@ function isAdmitted(
   return decisions.some((decision) => decision.tool === tool && decision.status === "admitted");
 }
 
+function defaultDerivationRequest(prompt: string, depth: HelixAskDepth): TheoryMasterProblemRequestV1 {
+  return {
+    operation: "explain",
+    target: prompt.trim() || "theory graph reflection",
+    targetObservable: null,
+    scaleLog10M: null,
+    coordinateFrame: null,
+    initialBoundaryConditions: [],
+    formalSystem: null,
+    requestedPrecision: null,
+    evidenceMaturityCeiling: depth === "direct"
+      ? "exploratory"
+      : depth === "source_grounded"
+        ? "reduced_order"
+        : "diagnostic",
+    normalizationStatus: "provisional",
+  };
+}
+
 export function buildTheoryCongruenceTrace(
   input: BuildTheoryCongruenceTraceInput,
 ): TheoryCongruenceTraceV1 {
@@ -219,9 +241,22 @@ export function buildTheoryCongruenceTrace(
     fullTextObservation: input.scholarlyFullTextObservation,
     metadataFailed: input.scholarlyMetadataFailed,
   });
+  const masterProblem = compileTheoryMasterProblem({
+    graph: input.graph,
+    badgeIds: ids,
+    request: input.derivationRequest ?? defaultDerivationRequest(input.prompt, depthSelection.depth),
+    uncertainty: {
+      placementEntropyBits: input.reflection.overlay.uncertainty?.posteriorEntropyBits ?? 0,
+      openWorldEntropyBits: input.reflection.overlay.uncertainty?.openWorldEntropyBits ?? 0,
+      outOfGraphProbability: input.reflection.overlay.uncertainty?.outOfGraphProbability ?? 0,
+    },
+  });
+  const masterProblemMissingEvidence = masterProblem.compile.status === "executable"
+    ? []
+    : masterProblem.compile.unresolvedReasons;
   const status = forbiddenScan.status === "fail"
     ? "unsatisfied"
-    : missingEvidence.length > 0 || requiredBlocked.length > 0
+    : missingEvidence.length > 0 || requiredBlocked.length > 0 || masterProblemMissingEvidence.length > 0
       ? "partial"
       : "satisfied";
 
@@ -298,6 +333,7 @@ export function buildTheoryCongruenceTrace(
           support_level: "badge_edge" as const,
           caveat: edge.claimBoundaryNote,
         }))),
+    master_problem: masterProblem,
     claim_boundaries: unique([
       ...input.reflection.evidenceForAsk.claimBoundaries,
       ...(input.explanationPlan?.claimBoundaryNotes ?? []),
@@ -315,6 +351,7 @@ export function buildTheoryCongruenceTrace(
       status,
       missing_evidence: unique([
         ...missingEvidence,
+        ...masterProblemMissingEvidence,
         ...requiredBlocked.map((decision) => decision.blocked_reason ?? decision.reason),
       ]),
       ...(requiredBlocked[0] ? { next_best_tool: requiredBlocked[0].tool } : {}),

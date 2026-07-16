@@ -3,6 +3,7 @@ import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
 import type { HelixLanguageModelProfileId } from "@shared/helix-language-model-policy";
 import { DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS } from "@/lib/helix/ask-agent-runtime-display";
 import { useAgiChatStore } from "@/store/useAgiChatStore";
+import { useHelixWorkflowDemoStore } from "@/store/useHelixWorkflowDemoStore";
 
 import {
   buildHelixAskComposerViewModel,
@@ -68,12 +69,18 @@ import {
   type HelixAskSurfaceSupplementStackProps,
 } from "./HelixAskSurfaceSupplementStack";
 import { HelixAskSurfaceFrameSurface } from "./HelixAskSurfaceFrameSurface";
+import {
+  HelixAskVoiceConfirmationRuntimeSurface,
+  type HelixAskVoiceConfirmationRuntimeSurfaceProps,
+} from "./HelixAskVoiceConfirmationRuntime";
+import { HelixAskWorkflowSuggestionRuntime } from "./HelixAskWorkflowSuggestionRuntime";
 
 export type HelixAskMinimalRuntimeVisibleSurfaceSlots = {
   voiceLevelMonitor?: ReactNode;
   goalPill?: ReactNode;
   steeringQueue?: ReactNode;
   supplementStack?: HelixAskSurfaceSupplementStackProps;
+  voiceConfirmationRuntime?: HelixAskVoiceConfirmationRuntimeSurfaceProps;
 };
 
 export type HelixAskMinimalRuntimeShellProps = HelixAskConsoleProps & {
@@ -124,6 +131,7 @@ export function HelixAskMinimalRuntimeShell({
   const runtimeGoalWakeLastSubmittedKeyRef = useRef<string | null>(null);
   const hydratedChatSessionRef = useRef<string | null>(null);
   const pendingExternalPromptRef = useRef<PendingHelixAskPrompt | null>(null);
+  const pendingWorkflowQteRef = useRef<PendingHelixAskPrompt["workflowQte"] | null>(null);
   const askInputRef = useRef<HTMLTextAreaElement | null>(null);
   const toolbarCarouselRef = useRef<HTMLDivElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
@@ -253,17 +261,21 @@ export function HelixAskMinimalRuntimeShell({
   const submitMinimalRuntimeQuestion = useCallback((questionText: string, pendingPrompt: PendingHelixAskPrompt | null = null) => {
     const draftText = questionText.trim();
     if (!draftText) return false;
+    const workflowQte = pendingPrompt?.workflowQte ?? pendingWorkflowQteRef.current;
     if (runtimeState.askBusy) {
+      pendingWorkflowQteRef.current = null;
       pendingExternalPromptRef.current = pendingPrompt
-        ? { ...pendingPrompt, question: draftText }
+        ? { ...pendingPrompt, question: draftText, workflowQte }
         : {
             promptId: `queued:${Date.now()}`,
             question: draftText,
             autoSubmit: true,
+            workflowQte,
             createdAt: Date.now(),
           };
       return true;
     }
+    pendingWorkflowQteRef.current = null;
     const submitPlan = buildHelixAskMinimalRuntimeSubmitPlan({
       draft: draftText,
       selectedRuntime,
@@ -280,6 +292,15 @@ export function HelixAskMinimalRuntimeShell({
       if (sessionId) {
         setChatSessionId(sessionId);
         setActiveChatSession(sessionId);
+        if (workflowQte?.sourceSessionId === sessionId) {
+          useHelixWorkflowDemoStore.getState().markPromptSubmitted({
+            runId: workflowQte.runId,
+            stepId: workflowQte.stepId,
+            sourceSessionId: sessionId,
+            turnId,
+            prompt: submitPlan.envelope.question,
+          });
+        }
         addChatMessage(sessionId, {
           role: "user",
           content: submitPlan.envelope.question,
@@ -396,9 +417,11 @@ export function HelixAskMinimalRuntimeShell({
     if (!claimExternalPromptSingleFlight(claimId)) return;
     clearPendingHelixAskPrompt();
     if (pending?.autoSubmit === false) {
+      pendingWorkflowQteRef.current = pending.workflowQte ?? null;
       setDraft(question);
       return;
     }
+    pendingWorkflowQteRef.current = null;
     submitMinimalRuntimeQuestion(question, pending);
   }, [submitMinimalRuntimeQuestion]);
 
@@ -578,6 +601,9 @@ export function HelixAskMinimalRuntimeShell({
           {visibleSurface?.supplementStack ? (
             <HelixAskSurfaceSupplementStack {...visibleSurface.supplementStack} />
           ) : null}
+          {visibleSurface?.voiceConfirmationRuntime ? (
+            <HelixAskVoiceConfirmationRuntimeSurface {...visibleSurface.voiceConfirmationRuntime} />
+          ) : null}
           <HelixAskRuntimeStatusLine text={runtimeState.askStatus} />
           <HelixAskMinimalRuntimeTurnList
             replies={runtimeState.replies}
@@ -585,6 +611,11 @@ export function HelixAskMinimalRuntimeShell({
             controlActions={shellControlActions}
           />
         </div>
+      }
+      workflowSuggestion={
+        <HelixAskWorkflowSuggestionRuntime
+          latestPayload={runtimeState.replies[runtimeState.replies.length - 1] ?? null}
+        />
       }
       goalPill={visibleSurface?.goalPill}
       steeringQueue={visibleSurface?.steeringQueue}

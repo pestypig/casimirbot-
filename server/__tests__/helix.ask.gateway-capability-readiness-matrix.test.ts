@@ -12,6 +12,7 @@ import {
 
 const gatewayOnlyOrSpecializedAliases = new Set([
   "workstation.active_context",
+  "theory-badge-graph.current_context",
   "workstation-notes.list_notes",
   "scientific-calculator.solve_scalar_expression",
   "scientific-calculator.classify_expression",

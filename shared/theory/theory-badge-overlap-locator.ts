@@ -166,9 +166,18 @@ function claimBoundaryWarnings(badge: TheoryBadgeV1) {
   return warnings;
 }
 
-function textIncludesAny(haystack: string, needles: string[]) {
-  const normalizedHaystack = normalize(haystack);
-  return needles.filter((needle) => normalizedHaystack.includes(normalize(needle)));
+function textIncludesAny(
+  haystack: string,
+  needles: string[],
+  options: { minimumKeyLength?: number } = {},
+) {
+  const normalizedHaystack = `_${normalizeKey(haystack)}_`;
+  const minimumKeyLength = options.minimumKeyLength ?? 1;
+  return needles.filter((needle) => {
+    const key = normalizeKey(needle);
+    if (!key || key.length < minimumKeyLength) return false;
+    return normalizedHaystack.includes(`_${key}_`);
+  });
 }
 
 function unitSignaturesInQuery(query: string, unitSignatures: string[]) {
@@ -262,23 +271,40 @@ export function locateTheoryBadges(args: {
       ].join(" ");
 
       let score = 0;
+      let hasAdmissionSignal = false;
       const reasons: string[] = [];
       const addScore = (points: number, reason: string) => {
         score += points;
         reasons.push(reason);
       };
 
-      if (queryKey && normalizeKey(badge.id) === queryKey) addScore(100, "direct badge id match");
-      if (queryKey && normalizeKey(badge.title) === queryKey) addScore(60, "direct badge title match");
+      if (queryKey && normalizeKey(badge.id) === queryKey) {
+        addScore(100, "direct badge id match");
+        hasAdmissionSignal = true;
+      }
+      if (queryKey && normalizeKey(badge.title) === queryKey) {
+        addScore(60, "direct badge title match");
+        hasAdmissionSignal = true;
+      }
 
-      if (atlasPrimaryBadgeIds.has(badge.id)) addScore(40, "direct atlas primary badge");
-      if (atlasLensBadgeIds.has(badge.id)) addScore(10, "inside selected atlas lens");
+      if (atlasPrimaryBadgeIds.has(badge.id)) {
+        addScore(40, "direct atlas primary badge");
+        hasAdmissionSignal = true;
+      }
+      if (atlasLensBadgeIds.has(badge.id)) {
+        addScore(10, "inside selected atlas lens");
+        hasAdmissionSignal = true;
+      }
 
-      const matchedSymbols = unique([
-        ...intersectSymbols(requestedSymbols, symbols),
-        ...symbolMatchesQuery(query, queryTokens, symbols),
-      ]);
-      if (matchedSymbols.length > 0) addScore(35 * matchedSymbols.length, `symbol match: ${matchedSymbols.join(", ")}`);
+      const requestedSymbolMatches = intersectSymbols(requestedSymbols, symbols);
+      const querySymbolMatches = symbolMatchesQuery(query, queryTokens, symbols);
+      const matchedSymbols = unique([...requestedSymbolMatches, ...querySymbolMatches]);
+      if (matchedSymbols.length > 0) {
+        addScore(35 * matchedSymbols.length, `symbol match: ${matchedSymbols.join(", ")}`);
+        hasAdmissionSignal ||=
+          requestedSymbolMatches.length > 0 ||
+          querySymbolMatches.some((symbol) => normalizeKey(symbol).length >= 4);
+      }
 
       const matchedUnitSignatures = unique([
         ...intersectUnitSignatures(requestedUnitSignatures, unitSignatures),
@@ -286,6 +312,7 @@ export function locateTheoryBadges(args: {
       ]);
       if (matchedUnitSignatures.length > 0) {
         addScore(30 * matchedUnitSignatures.length, `unit signature match: ${matchedUnitSignatures.join(", ")}`);
+        hasAdmissionSignal = true;
       }
 
       const matchedEquationFamilies = unique([
@@ -294,6 +321,7 @@ export function locateTheoryBadges(args: {
       ]);
       if (matchedEquationFamilies.length > 0) {
         addScore(25 * matchedEquationFamilies.length, `equation family match: ${matchedEquationFamilies.join(", ")}`);
+        hasAdmissionSignal = true;
       }
 
       const meaningfulPayloadTokens = queryTokens.filter((token) => {
@@ -317,42 +345,55 @@ export function locateTheoryBadges(args: {
         : [];
       if (payloadHits.length > 0) {
         addScore(25 * payloadHits.length, `calculator payload match: ${payloadHits.map((payload) => payload.id).join(", ")}`);
+        hasAdmissionSignal = true;
       }
 
-      const matchedSubjects = unique([
-        ...intersectNormalized(requestedSubjects, subjects),
-        ...textIncludesAny(query, subjects),
-      ]);
-      if (matchedSubjects.length > 0) addScore(20 * matchedSubjects.length, `subject/tag match: ${matchedSubjects.join(", ")}`);
+      const requestedSubjectMatches = intersectNormalized(requestedSubjects, subjects);
+      const querySubjectMatches = textIncludesAny(query, subjects, { minimumKeyLength: 3 });
+      const matchedSubjects = unique([...requestedSubjectMatches, ...querySubjectMatches]);
+      if (matchedSubjects.length > 0) {
+        addScore(20 * matchedSubjects.length, `subject/tag match: ${matchedSubjects.join(", ")}`);
+        hasAdmissionSignal = true;
+      }
 
       const matchedRepoPaths = unique([
         ...intersectNormalized(requestedRepoPaths, repoPaths),
         ...repoPaths.filter((path) => requestedRepoPaths.some((requested) => normalize(path).includes(normalize(requested)))),
         ...repoPaths.filter((path) => query && normalize(query).includes(normalize(path))),
       ]);
-      if (matchedRepoPaths.length > 0) addScore(20 * matchedRepoPaths.length, `repo path match: ${matchedRepoPaths.join(", ")}`);
+      if (matchedRepoPaths.length > 0) {
+        addScore(20 * matchedRepoPaths.length, `repo path match: ${matchedRepoPaths.join(", ")}`);
+        hasAdmissionSignal = true;
+      }
 
       const matchedOwners = intersectNormalized(requestedSimulationOwners, simulationOwners);
-      if (matchedOwners.length > 0) addScore(20 * matchedOwners.length, `simulation owner match: ${matchedOwners.join(", ")}`);
+      if (matchedOwners.length > 0) {
+        addScore(20 * matchedOwners.length, `simulation owner match: ${matchedOwners.join(", ")}`);
+        hasAdmissionSignal = true;
+      }
 
       const atlasSubjectMatches = intersectNormalized(atlasSubjectPriors, subjects);
       if (atlasSubjectMatches.length > 0) {
         addScore(20 * atlasSubjectMatches.length, `subject match via atlas block: ${atlasSubjectMatches.join(", ")}`);
+        hasAdmissionSignal = true;
       }
 
       const atlasOwnerMatches = intersectNormalized(atlasSimulationOwnerPriors, simulationOwners);
       if (atlasOwnerMatches.length > 0) {
         addScore(20 * atlasOwnerMatches.length, `simulation owner match via atlas block: ${atlasOwnerMatches.join(", ")}`);
+        hasAdmissionSignal = true;
       }
 
       const atlasEquationFamilyMatches = intersectNormalized(atlasEquationFamilyPriors, equationFamilies);
       if (atlasEquationFamilyMatches.length > 0) {
         addScore(18 * atlasEquationFamilyMatches.length, `equation family via atlas block: ${atlasEquationFamilyMatches.join(", ")}`);
+        hasAdmissionSignal = true;
       }
 
       const atlasUnitMatches = intersectUnitSignatures(atlasUnitSignaturePriors, unitSignatures);
       if (atlasUnitMatches.length > 0) {
         addScore(18 * atlasUnitMatches.length, `unit signature via atlas block: ${atlasUnitMatches.join(", ")}`);
+        hasAdmissionSignal = true;
       }
 
       const atlasRepoMatches = unique([
@@ -361,6 +402,7 @@ export function locateTheoryBadges(args: {
       ]);
       if (atlasRepoMatches.length > 0) {
         addScore(15 * atlasRepoMatches.length, `source path hint via atlas block: ${atlasRepoMatches.join(", ")}`);
+        hasAdmissionSignal = true;
       }
 
       const atlasCalculatorExampleHits = atlasCalculatorExamples.filter((example) => {
@@ -378,12 +420,17 @@ export function locateTheoryBadges(args: {
           15 * atlasCalculatorExampleHits.length,
           `calculator example expression/symbol match: ${atlasCalculatorExampleHits.map((example) => example.label).join(", ")}`,
         );
+        hasAdmissionSignal = true;
       }
 
       const textTokenHits = queryTokens.filter((token) => normalize(badgeText).includes(token));
-      if (textTokenHits.length > 0) addScore(Math.min(30, 10 * textTokenHits.length), `text match: ${textTokenHits.join(", ")}`);
+      if (textTokenHits.length > 0) {
+        addScore(Math.min(30, 10 * textTokenHits.length), `text match: ${textTokenHits.join(", ")}`);
+        const textCoverage = textTokenHits.length / Math.max(1, queryTokens.length);
+        hasAdmissionSignal ||= textTokenHits.length >= 2 && textCoverage >= 0.5;
+      }
 
-      if (score <= 0) return null;
+      if (score <= 0 || !hasAdmissionSignal) return null;
       return {
         badgeId: badge.id,
         badgeTitle: badge.title,

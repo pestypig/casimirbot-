@@ -390,6 +390,7 @@ export const TOOL_FAMILY_DEFAULT_CONTRACTS: Record<ToolFamily, ToolFamilyContrac
       "frontier_vector_field_trace",
       "theory-badge-graph.propose_frontier_conjectures",
       "theory-badge-graph.reflect_discussion_context",
+      "theory-badge-graph.current_context",
       "propose_frontier_conjectures",
       "frontier_conjecture_workbench",
     ],

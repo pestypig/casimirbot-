@@ -318,6 +318,11 @@ describe("capability lane debug export fields", () => {
           client_secret: "must-not-export",
           ephemeral_secret: "must-not-export",
           sdp: "v=0 must-not-export",
+          answer_sdp: "v=0 answer-must-not-export",
+          ice_candidate: "candidate:ice-must-not-export",
+          Authorization: "Bearer auth-must-not-export",
+          openai_api_key: "key-must-not-export",
+          raw_provider_response: { secret: "provider-must-not-export" },
           audio_payload: "must-not-export",
           raw_audio: "must-not-export",
           openai_network_call_attempted: true,
@@ -382,6 +387,11 @@ describe("capability lane debug export fields", () => {
     expect(serialized).not.toContain("audio_payload");
     expect(serialized).not.toContain("ephemeral_secret");
     expect(serialized).not.toContain("v=0");
+    expect(serialized).not.toContain("ice-must-not-export");
+    expect(serialized).not.toContain("auth-must-not-export");
+    expect(serialized).not.toContain("key-must-not-export");
+    expect(serialized).not.toContain("provider-must-not-export");
+    expect(serialized).not.toContain("answer-must-not-export");
   });
 
   it("projects lane lifecycle and runtime request fields from payload", () => {

@@ -339,6 +339,14 @@ const BASE_PANELS: PanelDefinition[] = [
     defaultPosition: { x: 300, y: 200 },
   },
   {
+    id: "workflow-demo-lab",
+    title: "Workflow Demo Lab",
+    loader: load(() => import("@/components/workstation/WorkflowDemoLabPanel")),
+    defaultSize: { w: 980, h: 720 },
+    defaultPosition: { x: 320, y: 180 },
+    keywords: ["workflow", "demo", "quick time event", "qte", "research", "proposal", "developer"],
+  },
+  {
     id: "workstation-process-graph",
     title: "Process Graph",
     loader: load(() => import("@/components/workstation/WorkstationProcessGraphPanel")),

@@ -22,10 +22,10 @@ export const HELIX_ASK_LEGACY_CONSOLE_ACTIVE_PATH = [
 
 export const HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT = {
   file: "client/src/components/helix/HelixAskPill.tsx",
-  lineCountAtInventory: 24230,
-  exportedComponentStartsAtLine: 6364,
-  liveRenderSliceStartsAtLine: 24034,
-  liveLegacyConsoleViewStartsAtLine: 24034,
+  lineCountAtInventory: 24133,
+  exportedComponentStartsAtLine: 6373,
+  liveRenderSliceStartsAtLine: 23938,
+  liveLegacyConsoleViewStartsAtLine: 23938,
   inventoryReason:
     "The normal Ask path remains on the legacy-looking bridge until the recrowned minimal runtime shell reaches live visual parity. Extracted ask-console display owners should continue to grow in the recrowned directory, not inside HelixAskPill.",
 } as const;
@@ -519,7 +519,21 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     classification: "pure_display_already_recrowned",
     source: "ask-console",
     evidence:
-      "The voice command and transcript confirmation panel props now run through buildHelixAskVoiceCommandConfirmationState and buildHelixAskTranscriptConfirmationState, which package already-derived visible text/countdown/callback props while command policy, transcript confirmation policy, countdown lifecycle, voice execution, retry execution, and state mutation remain in the bridge.",
+      "The voice command and transcript confirmation panel props now run through buildHelixAskVoiceCommandConfirmationState and buildHelixAskTranscriptConfirmationState, which package already-derived visible text/countdown/callback props while command policy, transcript confirmation policy, candidate state mutation, voice execution, and retry execution remain injected by the active runtime.",
+  },
+  {
+    key: "voice_confirmation_countdown_runtime",
+    classification: "behavior_sensitive_recrowned_with_parity",
+    source: "ask-console",
+    evidence:
+      "HelixAskVoiceConfirmationRuntime owns the shared three-second command/transcript countdown lifecycle, candidate identity guards, transcript-over-command precedence, live-activity reset, transcript policy rechecks, cleanup, typed events, and an independent minimal-shell surface. Fake-timer lifecycle tests cover exact-once auto-confirm, manual cancellation, preemption, reset, fail-closed policy, mic disable, unmount cleanup, and minimal-shell use without HelixAskPill; execution and candidate mutation remain injected.",
+  },
+  {
+    key: "workflow_next_prompt_qte_runtime",
+    classification: "behavior_sensitive_recrowned_with_parity",
+    source: "ask-console",
+    evidence:
+      "HelixAskWorkflowSuggestionRuntime owns the shared legacy/ReCrowned next-prompt surface. It observes only typed workflow/workbench objects, projects a non-terminal editable QTE, and inserts through launchHelixAskPrompt with autoSubmit false. Deterministic progress reduction and persisted demo-session state live outside HelixAskPill; model sampling, tool execution, route authority, terminal authority, and automatic submission are forbidden here.",
   },
   {
     key: "context_chooser_state_projection",

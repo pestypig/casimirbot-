@@ -1,3 +1,8 @@
+import {
+  validateTheoryMasterProblemV1,
+  type TheoryMasterProblemV1,
+} from "./contracts/theory-master-problem.v1";
+
 export const HELIX_THEORY_CONGRUENCE_TRACE_SCHEMA =
   "helix.theory_congruence_trace.v1" as const;
 
@@ -114,6 +119,7 @@ export type TheoryCongruenceTraceV1 = {
     support_level: "direct_source" | "calculator_supported" | "badge_edge" | "inferred";
     caveat?: string;
   }>;
+  master_problem: TheoryMasterProblemV1;
   claim_boundaries: Array<{
     boundary_id: string;
     text: string;
@@ -224,6 +230,9 @@ export function validateTheoryCongruenceTraceV1(value: unknown): string[] {
     "claim_boundaries",
   ] as const) {
     if (!Array.isArray(value[field])) issues.push(`${field} must be an array`);
+  }
+  for (const issue of validateTheoryMasterProblemV1(value.master_problem)) {
+    issues.push(`master_problem.${issue}`);
   }
   if (!isRecord(value.forbidden_claim_scan)) {
     issues.push("forbidden_claim_scan must be an object");

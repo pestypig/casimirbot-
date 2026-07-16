@@ -7,6 +7,7 @@ export type HelixAskConsoleRuntimeLayoutProps = {
   className?: string;
   layoutVariant: "hero" | "dock";
   surface: ReactNode;
+  workflowSuggestion?: ReactNode;
   goalPill?: ReactNode;
   steeringQueue?: ReactNode;
   errorLine?: ReactNode;
@@ -18,6 +19,7 @@ export function HelixAskConsoleRuntimeLayout({
   className,
   layoutVariant,
   surface,
+  workflowSuggestion = null,
   goalPill = null,
   steeringQueue = null,
   errorLine = null,
@@ -28,6 +30,7 @@ export function HelixAskConsoleRuntimeLayout({
     <HelixAskErrorBoundary>
       <HelixAskConsoleStack className={className} layoutVariant={layoutVariant}>
         {surface}
+        {workflowSuggestion}
         {goalPill}
         {errorLine}
         {turnList}

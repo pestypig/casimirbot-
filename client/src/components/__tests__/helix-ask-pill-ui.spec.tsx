@@ -1329,6 +1329,19 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(debugExportSource).toContain("provider_terminal_authority_bridge: providerTerminalAuthorityBridge");
   });
 
+  it("attaches turn-correlated workflow QTE events to the master debug export", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    const debugExportSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/lib/agi/debugExport.ts"),
+      "utf8",
+    );
+    expect(source).toContain('channel: "workflow_demo" as const');
+    expect(source).toContain("workflowDemo: args.workflowDemoDebug ?? null");
+    expect(source).toContain("const workflowDemoDebug = buildHelixWorkflowDemoDebugExport");
+    expect(debugExportSource).toContain("workflow_demo_debug:");
+    expect(debugExportSource).toContain("asRecord(asRecord(payload.channels)?.workflowDemo)");
+  });
+
   it("includes active scientific calculator context in backend Ask turn snapshots", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     const workspaceContextSource = fs.readFileSync(workspaceContextSnapshotPath, "utf8");
@@ -1881,6 +1894,13 @@ describe("HelixAskPill mic-first surface contract", () => {
       path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskVoiceConfirmationState.ts"),
       "utf8",
     );
+    const voiceConfirmationRuntime = fs.readFileSync(
+      path.resolve(
+        process.cwd(),
+        "client/src/components/helix/ask-console/HelixAskVoiceConfirmationRuntime.tsx",
+      ),
+      "utf8",
+    );
     expect(source).toContain("const voiceCommandConfirmationState = buildHelixAskVoiceCommandConfirmationState({");
     expect(source).toContain("voiceCommandConfirmation: voiceCommandConfirmationState");
     expect(source).toContain("countdownSec: commandConfirmAutoCountdownSec");
@@ -1890,6 +1910,13 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(supplementSurface).toContain("countdownSec={voiceCommandConfirmation.countdownSec}");
     expect(voiceConfirmation).toContain("Voice command");
     expect(voiceConfirmation).toContain("Auto-confirming in {countdownSec}s.");
+    expect(voiceConfirmationRuntime).toContain("export function useHelixAskVoiceConfirmationRuntime");
+    expect(voiceConfirmationRuntime).toContain("HELIX_ASK_VOICE_CONFIRMATION_COUNTDOWN_MS = 3_000");
+    expect(voiceConfirmationRuntime).toContain("command_countdown_fired");
+    expect(voiceConfirmationRuntime).toContain("window.clearInterval");
+    expect(source).toContain("useHelixAskVoiceConfirmationRuntime({");
+    expect(source).not.toContain("commandConfirmAutoTimerRef");
+    expect(source).not.toContain("transcriptConfirmAutoTimerRef");
     expect(source).toContain("command_detected");
     expect(source).toContain("command_confirm_started");
     expect(source).toContain("command_confirm_fired");

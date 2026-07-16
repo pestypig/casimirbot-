@@ -232,6 +232,9 @@ export async function resolveHelixAskAuthoritativeDebugExportPayload(localPayloa
       readAgentLoopAuditRecord(parsed.console_assembly_debug) ??
       readAgentLoopAuditRecord(readAgentLoopAuditRecord(parsed.debug)?.console_assembly_debug) ??
       readAgentLoopAuditRecord(readAgentLoopAuditRecord(parsed.reply)?.console_assembly_debug);
+    const clientWorkflowDemoDebug =
+      readAgentLoopAuditRecord(parsed.workflow_demo_debug) ??
+      readAgentLoopAuditRecord(readAgentLoopAuditRecord(parsed.channels)?.workflowDemo);
     const mergedPayload = {
       ...authoritativePayload,
       ...mergeHelixAskRuntimeGoalDebugFields(authoritativePayload, parsed),
@@ -249,6 +252,7 @@ export async function resolveHelixAskAuthoritativeDebugExportPayload(localPayloa
       client_voice_playback_output: clientProjection.voice_playback_output,
       client_voice_playback_metrics: clientProjection.voice_playback_metrics,
       client_voice_calls: clientProjection.voice_calls,
+      workflow_demo_debug: clientWorkflowDemoDebug,
     };
     return boundHelixDebugExportTextForUi(JSON.stringify({
       ...mergedPayload,

@@ -11,6 +11,7 @@ import {
   type HelixScholarlyResearchObservation,
   type HelixScholarlyResearchProvider,
 } from "@shared/helix-scholarly-research-observation";
+import { scholarlyPapersShareIdentity } from "./scholarly-paper-identity";
 import {
   detectScholarlyResearchIntent,
   extractScholarlyArxivId,
@@ -162,37 +163,37 @@ const openAlexAbstract = (invertedIndex: unknown): string | undefined => {
     .trim() || undefined;
 };
 
-const paperKey = (paper: HelixScholarlyPaperResult): string =>
-  paper.identifiers.doi ??
-  arxivComparisonKey(paper.identifiers.arxiv_id) ??
-  paper.identifiers.openalex_id ??
-  paper.identifiers.semantic_scholar_id ??
-  paper.title.toLowerCase();
-
 const dedupePapers = (papers: HelixScholarlyPaperResult[]): HelixScholarlyPaperResult[] => {
-  const byKey = new Map<string, HelixScholarlyPaperResult>();
+  const deduped: HelixScholarlyPaperResult[] = [];
   for (const paper of papers) {
-    const key = paperKey(paper);
-    const existing = byKey.get(key);
-    if (!existing) {
-      byKey.set(key, paper);
+    const matchingIndexes = deduped
+      .map((candidate, index) => scholarlyPapersShareIdentity(candidate, paper) ? index : -1)
+      .filter((index) => index >= 0);
+    if (matchingIndexes.length === 0) {
+      deduped.push(paper);
       continue;
     }
-    byKey.set(key, {
+    const primaryIndex = matchingIndexes[0];
+    const matches = matchingIndexes.map((index) => deduped[index]);
+    const existing = matches[0];
+    deduped[primaryIndex] = {
       ...existing,
       authors: existing.authors.length ? existing.authors : paper.authors,
-      abstract: existing.abstract ?? paper.abstract,
-      venue: existing.venue ?? paper.venue,
+      abstract: existing.abstract ?? paper.abstract ?? matches.find((candidate) => candidate.abstract)?.abstract,
+      venue: existing.venue ?? paper.venue ?? matches.find((candidate) => candidate.venue)?.venue,
       citation_count: existing.citation_count ?? paper.citation_count,
       reference_count: existing.reference_count ?? paper.reference_count,
       is_open_access: existing.is_open_access ?? paper.is_open_access,
-      identifiers: { ...paper.identifiers, ...existing.identifiers },
-      evidence_refs: unique([...existing.evidence_refs, ...paper.evidence_refs]),
-      source_providers: unique([...existing.source_providers, ...paper.source_providers]),
-      confidence: existing.confidence === "high" || paper.confidence === "high" ? "high" : "medium",
-    });
+      identifiers: Object.assign({}, ...matches.map((candidate) => candidate.identifiers), paper.identifiers),
+      evidence_refs: unique([...matches.flatMap((candidate) => candidate.evidence_refs), ...paper.evidence_refs]),
+      source_providers: unique([...matches.flatMap((candidate) => candidate.source_providers), ...paper.source_providers]),
+      confidence: [...matches, paper].some((candidate) => candidate.confidence === "high") ? "high" : "medium",
+    };
+    for (const duplicateIndex of matchingIndexes.slice(1).sort((left, right) => right - left)) {
+      deduped.splice(duplicateIndex, 1);
+    }
   }
-  return Array.from(byKey.values());
+  return deduped;
 };
 
 const makePaper = (input: {
@@ -264,6 +265,8 @@ const SCHOLARLY_LOOKUP_STOP_WORDS = new Set([
   "claims",
   "could",
   "consequently",
+  "constraint",
+  "constraints",
   "decompose",
   "discussed",
   "diverse",
@@ -373,6 +376,31 @@ const normalizeScholarlyLookupToken = (value: string): string => {
 const scholarlyLookupTokens = (value: string): string[] =>
   unique(scholarlyLookupSearchTerms(value).map(normalizeScholarlyLookupToken));
 
+const SCHOLARLY_LOOKUP_GENERIC_TOPIC_TOKENS = new Set([
+  "bound",
+  "constraint",
+  "energy",
+  "inequality",
+  "quantum",
+]);
+
+const scholarlyLookupAnchorTokens = (tokens: string[]): string[] => {
+  const domainTokens = tokens.filter((token) => !SCHOLARLY_LOOKUP_GENERIC_TOPIC_TOKENS.has(token));
+  return (domainTokens.length > 0 ? domainTokens : tokens).slice(0, 3);
+};
+
+const boundedArxivTopicTerms = (query: string): string[] => {
+  const rawTerms = scholarlyLookupSearchTerms(query);
+  const domainTerms: string[] = [];
+  const genericTerms: string[] = [];
+  for (const term of rawTerms) {
+    const normalized = normalizeScholarlyLookupToken(term);
+    if (SCHOLARLY_LOOKUP_GENERIC_TOPIC_TOKENS.has(normalized)) genericTerms.push(term);
+    else domainTerms.push(term);
+  }
+  return unique([...domainTerms, ...genericTerms]).slice(0, 5);
+};
+
 const paperSearchText = (paper: HelixScholarlyPaperResult): string =>
   [
     paper.title,
@@ -458,13 +486,14 @@ const evaluatePaperRelevance = (
   const paperTokens = new Set(scholarlyLookupTokens(haystack));
   const matchedTokens = queryTokens.filter((token) => paperTokens.has(token));
   const missingTokens = queryTokens.filter((token) => !paperTokens.has(token));
-  const anchorTokens = queryTokens.slice(0, 3);
+  const anchorTokens = scholarlyLookupAnchorTokens(queryTokens);
   const matchedAnchorTokens = anchorTokens.filter((token) => paperTokens.has(token));
+  const requiredAnchorMatchCount = Math.min(2, anchorTokens.length);
   const requiredMatchCount = queryTokens.length <= 2
     ? queryTokens.length
     : Math.max(2, Math.min(4, Math.ceil(queryTokens.length * 0.4)));
   const offTarget = SCHOLARLY_LOOKUP_OFF_TARGET.test(haystack) && matchedTokens.length < queryTokens.length;
-  const missingAnchor = queryTokens.length > 2 && matchedAnchorTokens.length === 0;
+  const missingAnchor = queryTokens.length > 2 && matchedAnchorTokens.length < requiredAnchorMatchCount;
   const supported = !offTarget && !missingAnchor && matchedTokens.length >= requiredMatchCount;
   return {
     supported,
@@ -777,7 +806,7 @@ const lookupArxiv = async (input: {
   evidenceRefs: HelixScholarlyEvidenceRef[];
 }): Promise<HelixScholarlyPaperResult[]> => {
   const exactArxivId = normalizeArxivId(input.arxivId);
-  const topicTerms = scholarlyLookupSearchTerms(input.query).slice(0, 3);
+  const topicTerms = boundedArxivTopicTerms(input.query);
   const topicQuery = topicTerms.length > 0
     ? topicTerms.map((term) => `all:${term}`).join(" AND ")
     : `all:${input.query.trim()}`;

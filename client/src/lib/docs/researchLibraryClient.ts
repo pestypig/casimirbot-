@@ -34,6 +34,18 @@ export async function readResearchLibraryDocument(
   return body.document;
 }
 
+export async function deleteResearchLibraryDocument(
+  documentId: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  const response = await fetch(`/api/research-library/${encodeURIComponent(documentId)}`, {
+    method: "DELETE",
+    credentials: "same-origin",
+    signal,
+  });
+  if (!response.ok) throw new Error(await readError(response));
+}
+
 export function researchLibraryDocumentToMarkdown(document: HelixResearchLibraryDocument): string {
   const provenance = [
     `# ${document.title}`,
@@ -51,4 +63,3 @@ export function researchLibraryDocumentToMarkdown(document: HelixResearchLibrary
   ]);
   return [...provenance, ...pages].join("\n");
 }
-

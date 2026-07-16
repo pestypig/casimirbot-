@@ -122,6 +122,8 @@ export type { HelixAskLegacyComposerStateOptions } from "./HelixAskLegacyCompose
 export { HelixAskLegacySurfaceContent } from "./HelixAskLegacySurfaceContent";
 export { buildHelixAskLegacySurfaceContentState } from "./HelixAskLegacySurfaceContentState";
 export { HelixAskMinimalRuntimeShell } from "./HelixAskMinimalRuntimeShell";
+export { HelixAskWorkflowSuggestionRuntime } from "./HelixAskWorkflowSuggestionRuntime";
+export type { HelixAskWorkflowSuggestionRuntimeProps } from "./HelixAskWorkflowSuggestionRuntime";
 export {
   buildHelixAskMinimalRuntimeTurnViews,
   HelixAskMinimalRuntimeTurnList,
@@ -265,6 +267,10 @@ export {
 export {
   createHelixAskLiveRuntimeBrowserTransportController,
 } from "./HelixAskLiveRuntimeTransportController";
+export {
+  createHelixAskRealtimeProviderEventHandler,
+} from "./HelixAskRealtimeProviderEventHandler";
+export { useHelixAskLiveRuntimeSession } from "./useHelixAskLiveRuntimeSession";
 export { HelixAskLanguageModelPicker } from "./HelixAskLanguageModelPicker";
 export { buildHelixAskLanguageModelPickerModel } from "./HelixAskLanguageModelPicker";
 export {
@@ -283,6 +289,21 @@ export {
   buildHelixAskTranscriptConfirmationState,
   buildHelixAskVoiceCommandConfirmationState,
 } from "./HelixAskVoiceConfirmationState";
+export {
+  HELIX_ASK_VOICE_CONFIRMATION_COUNTDOWN_MS,
+  HELIX_ASK_VOICE_CONFIRMATION_TICK_MS,
+  HelixAskVoiceConfirmationRuntimeSurface,
+  useHelixAskVoiceConfirmationRuntime,
+} from "./HelixAskVoiceConfirmationRuntime";
+export type {
+  HelixAskVoiceCommandConfirmationCandidate,
+  HelixAskVoiceConfirmationActivity,
+  HelixAskVoiceConfirmationRuntimeEvent,
+  HelixAskVoiceConfirmationRuntimeOptions,
+  HelixAskVoiceConfirmationRuntimeState,
+  HelixAskVoiceConfirmationRuntimeSurfaceProps,
+  HelixAskVoiceTranscriptConfirmationCandidate,
+} from "./HelixAskVoiceConfirmationRuntime";
 export { buildHelixAskVoiceCaptureHealthState } from "./HelixAskVoiceCaptureHealthState";
 export type {
   HelixAskVoiceCaptureHealthSnapshot,
@@ -834,8 +855,15 @@ export type {
   HelixAskLiveRuntimeDataChannelLike,
   HelixAskLiveRuntimeMediaStreamLike,
   HelixAskLiveRuntimePeerConnectionLike,
+  HelixAskLiveRuntimeRemoteAudioLike,
+  HelixAskLiveRuntimeSdpExchange,
+  HelixAskLiveRuntimeSessionDescriptionLike,
   HelixAskLiveRuntimeTrackLike,
 } from "./HelixAskLiveRuntimeTransportController";
+export type {
+  HelixAskRealtimeProviderEventHandler,
+  HelixAskRealtimeProviderEventProjection,
+} from "./HelixAskRealtimeProviderEventHandler";
 export type {
   HelixAskSituationRoomSourceDerivedStateOptions,
   HelixAskSituationRoomSourceStateOptions,

@@ -772,6 +772,8 @@ export function buildRouteProductContract(input: {
       ],
       precedenceReason: "theory_locator_source_target_requires_reflection_evidence_before_terminal_synthesis",
       sideArtifactKindsAllowed: [
+        "theory_badge_graph_current_context",
+        "theory_badge_graph_current_context_observation",
         "helix_theory_context_reflection_tool_receipt",
         "theory_context_reflection",
         "helix_theory_frontier_vector_field_tool_receipt",

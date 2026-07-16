@@ -109,6 +109,7 @@ The current provider-shared workstation gateway exposes these capabilities:
 ```txt
 workspace_os.status
 workstation.active_context
+theory-badge-graph.current_context
 workstation-notes.list_notes
 scientific-calculator.solve_expression
 scientific-calculator.solve_scalar_expression
@@ -287,6 +288,7 @@ capability uses:
 | --- | --- |
 | `helix.workspace_os_status_observation.v1` | Workspace/runtime status observations. |
 | `helix.workstation_active_context_observation.v1` | Active workstation focus/context observations. |
+| `helix.theory_badge_graph_current_context_observation.v1` | Bounded current Theory Badge Graph selection, trace, branch possibilities, boundary, and semantic lens observations. |
 | `helix.workstation_notes_list_observation.v1` | Body-redacted Workstation Notes index observations. |
 | `helix.calculator_solve_observation.v1` | Calculator solve observations. |
 | `helix.calculator_scalar_solve_observation.v1` | Scalar calculator solve observations. |
@@ -328,6 +330,7 @@ capabilities with non-empty `input_schema.required`:
 | `workstation.focus_panel` | `panel_id` |
 | `account_session.set_interface_language` | `language` |
 | `docs-viewer.open_doc` | `path` |
+| `theory-badge-graph.current_context` | `current_context` |
 | `moral-graph.reflect_living_substrate_context` | `prompt` |
 | `repo.search` | `query` |
 | `docs.search` | `query` |

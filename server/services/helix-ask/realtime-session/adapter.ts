@@ -374,6 +374,11 @@ const readSelectedRealtimeVoice = (body: unknown): string | null => {
   );
 };
 
+const requestsServerSdpExchange = (body: unknown): boolean => {
+  const record = readRecord(body);
+  return readString(record.sdp_exchange_mode ?? record.sdpExchangeMode) === "server";
+};
+
 export const createOpenAiRealtimeSessionAdapter = (
   transport: HelixRealtimeOpenAiContractTransport = defaultOpenAiContractTransport,
 ): HelixRealtimeSessionAdapter => ({
@@ -418,6 +423,32 @@ export const createOpenAiRealtimeSessionAdapter = (
         transportPlanPatch: {
           adapter_state: "missing_key",
           live_execution_disabled_reason: "missing_openai_key",
+        },
+      });
+    }
+    if (requestsServerSdpExchange(args.body)) {
+      const model = readSelectedRealtimeModel(args.body);
+      const clientReceiptRefs = readClientReceiptRefs(args.body);
+      const providerSessionRef = `openai-realtime:sdp-admission:${crypto
+        .createHash("sha256")
+        .update([model, ...clientReceiptRefs].join(":"))
+        .digest("hex")
+        .slice(0, 16)}`;
+      return buildAdapterResult({
+        action: "start",
+        body: args.body,
+        env: args.env,
+        ok: true,
+        blockedReason: "openai_realtime_contract_ready",
+        providerSessionRef,
+        transportPlanPatch: {
+          planned_transport: "webrtc",
+          adapter_state: "contract_ready",
+          live_execution_disabled_reason: "openai_realtime_server_sdp_ready",
+          client_secret_requested: false,
+          client_secret_issued: false,
+          sdp_exchange_requested: true,
+          provider_session_ref: providerSessionRef,
         },
       });
     }

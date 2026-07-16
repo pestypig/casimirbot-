@@ -27,6 +27,7 @@ import {
   type VoicePlaybackLifecycleDiagnostic,
 } from "@/lib/helix/voice-playback-diagnostics";
 import type { VoicePlaybackLifecycleReceiptStatus } from "@/lib/helix/voice-capture-diagnostics";
+import { releaseAudioFocus, requestAudioFocus } from "@/lib/audio-focus";
 
 export const VOICE_PLAYBACK_DIRECT_RETRY_DELAY_MS = 120;
 export const VOICE_PLAYBACK_GRAPH_FAILURE_STREAK_FOR_BYPASS = 2;
@@ -236,6 +237,18 @@ export async function playHelixAskVoiceAudioBlob(
     audio.load();
     input.playbackAudioRef.current = audio;
     input.voicePlaybackTransportPausedRef.current = false;
+    const audioFocusId = `helix-terminal-voice:${replyId ?? Date.now()}`;
+    let audioFocusStopReason: "barge_in" | null = null;
+    requestAudioFocus({
+      id: audioFocusId,
+      kind: "helix_terminal_voice",
+      priority: 100,
+      stop: (reason) => {
+        if (reason === "interrupted") audioFocusStopReason = "barge_in";
+        audio.pause();
+        input.voiceAutoSpeakPendingPlaybackResolverRef.current?.();
+      },
+    });
     let lifecycleDiagnostic = createVoicePlaybackLifecycleDiagnostic({
       stage: "audio_response",
       mimeType: input.blob.type || "application/octet-stream",
@@ -268,6 +281,7 @@ export async function playHelixAskVoiceAudioBlob(
           }
         };
         const clearRuntimePlaybackRefs = () => {
+          releaseAudioFocus(audioFocusId);
           if (input.playbackUrlRef.current === url) {
             URL.revokeObjectURL(url);
             input.playbackUrlRef.current = null;
@@ -344,7 +358,11 @@ export async function playHelixAskVoiceAudioBlob(
                 event === "ended" ? "completed" : event === "stopped" ? "cancelled" : "failed",
               replyId,
               cancelReason:
-                event === "stopped" ? "user_stop" : event === "error" ? "error" : null,
+                event === "stopped"
+                  ? audioFocusStopReason ?? "user_stop"
+                  : event === "error"
+                    ? "error"
+                    : null,
               error: event === "error" ? "voice_audio_playback_error" : null,
               positionMs: Number.isFinite(audio.currentTime)
                 ? Math.max(0, Math.round(audio.currentTime * 1000))

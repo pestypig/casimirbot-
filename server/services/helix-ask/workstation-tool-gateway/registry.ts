@@ -184,6 +184,9 @@ const CIVILIZATION_BOUNDS_REFLECTION_OBSERVATION_SCHEMA =
   "helix.civilization_bounds_reflection_observation.v1" as const;
 const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context" as const;
 const THEORY_CONTEXT_REFLECTION_OBSERVATION_SCHEMA = "helix.theory_context_reflection_observation.v1" as const;
+const THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY = "theory-badge-graph.current_context" as const;
+const THEORY_BADGE_GRAPH_CURRENT_CONTEXT_OBSERVATION_SCHEMA =
+  "helix.theory_badge_graph_current_context_observation.v1" as const;
 const THEORY_FRONTIER_CONJECTURE_CAPABILITY = "theory-badge-graph.propose_frontier_conjectures" as const;
 const THEORY_FRONTIER_CONJECTURE_OBSERVATION_SCHEMA =
   "helix.theory_frontier_conjecture_observation.v1" as const;
@@ -381,6 +384,9 @@ const manifestProducesAffordances = (capabilityId: string): HelixWorkstationType
   }
   if (capabilityId === THEORY_CONTEXT_REFLECTION_CAPABILITY) {
     return ["theory_context", "scientific_evidence", "calculator_expression_template", "claim_boundary", "source_ref"];
+  }
+  if (capabilityId === THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY) {
+    return ["theory_context", "claim_boundary", "source_ref"];
   }
   if (capabilityId === THEORY_FRONTIER_CONJECTURE_CAPABILITY) {
     return ["theory_context", "frontier_candidate", "claim_boundary", "source_ref"];
@@ -865,6 +871,119 @@ const readBoundedWorkspaceActiveContext = (value: unknown): {
   };
 };
 
+const readBoundedTheoryBadgeGraphCurrentContext = (value: unknown): Record<string, unknown> => {
+  const record = readRecord(value) ?? {};
+  const combination = readRecord(record.combination_reader ?? record.combinationReader) ?? {};
+  const boundedText = (entry: unknown, max = 320): string | null => {
+    const text = cleanString(entry);
+    return text ? text.slice(0, max) : null;
+  };
+  const boundedBadges = (entry: unknown, limit = 64): Array<Record<string, unknown>> =>
+    readRecordArray(entry).slice(0, limit).flatMap((badge) => {
+      const id = boundedText(badge.id, 200);
+      if (!id) return [];
+      return [{
+        id,
+        title: boundedText(badge.title, 240),
+        level: boundedText(badge.level, 80),
+        status: boundedText(badge.status, 80),
+      }];
+    });
+  const selectedBadges = boundedBadges(combination.selectedBadges ?? combination.selected_badges, 32);
+  const selectedBadgeIds = readStringArray(record.selected_badge_ids ?? record.selectedBadgeIds);
+  const normalizedSelectedBadgeIds = selectedBadgeIds.length > 0
+    ? selectedBadgeIds
+    : selectedBadges.map((badge) => cleanString(badge.id)).filter(Boolean);
+  const tracePathBadges = boundedBadges(combination.tracePathBadges ?? combination.trace_path_badges, 96);
+  const intermediateBadges = boundedBadges(combination.intermediateBadges ?? combination.intermediate_badges, 64);
+  const availableNextBadges = boundedBadges(combination.availableNextBadges ?? combination.available_next_badges, 96);
+  const disconnectedSelectedBadges = boundedBadges(
+    combination.disconnectedSelectedBadges ?? combination.disconnected_selected_badges,
+    32,
+  );
+  const boundary = readRecord(combination.boundaryContext ?? combination.boundary_context) ?? {};
+  const traceEdges = readRecordArray(combination.traceEdges ?? combination.trace_edges).slice(0, 128).flatMap((edge) => {
+    const id = boundedText(edge.id, 200);
+    const from = boundedText(edge.from, 200);
+    const to = boundedText(edge.to, 200);
+    if (!id || !from || !to) return [];
+    return [{
+      id,
+      from,
+      to,
+      relation: boundedText(edge.relation, 80),
+      line_style: boundedText(edge.lineStyle ?? edge.line_style, 32),
+      implication: boundedText(edge.implication, 320),
+    }];
+  });
+  const semanticSelections = readRecordArray(
+    record.semantic_selections ?? record.semanticSelections,
+  ).slice(0, 16).flatMap((selection) => {
+    const domain = boundedText(selection.domain, 120);
+    if (!domain) return [];
+    return [{
+      domain,
+      selection_kind: boundedText(selection.selection_kind ?? selection.selectionKind, 120),
+      selection_id: boundedText(selection.selection_id ?? selection.selectionId, 200),
+      object_binding_id: boundedText(selection.object_binding_id ?? selection.objectBindingId, 240),
+    }];
+  });
+  const capturedAt = readFiniteNumber(record.captured_at_ms ?? record.capturedAtMs);
+  const graphId = boundedText(record.graph_id ?? record.graphId, 240);
+  const contextRef = `theory_badge_graph_context:${hashShort({
+    graphId,
+    selectedBadgeIds: normalizedSelectedBadgeIds,
+    activeAtlasLensId: record.active_atlas_lens_id ?? record.activeAtlasLensId,
+    capturedAt,
+  })}`;
+
+  return {
+    source_context_schema: boundedText(record.schema, 160),
+    context_ref: contextRef,
+    panel_id: "theory-badge-graph",
+    graph_id: graphId,
+    active_badge_id: boundedText(record.active_badge_id ?? record.activeBadgeId, 200),
+    selected_badge_ids: normalizedSelectedBadgeIds,
+    active_atlas_lens_id: boundedText(record.active_atlas_lens_id ?? record.activeAtlasLensId, 160),
+    semantic_selections: semanticSelections,
+    combination_reader: {
+      schema: boundedText(combination.schema, 160),
+      selected_badges: selectedBadges,
+      trace_path_badges: tracePathBadges,
+      intermediate_badges: intermediateBadges,
+      available_next_badges: availableNextBadges,
+      disconnected_selected_badges: disconnectedSelectedBadges,
+      unavailable_badge_count: Math.max(0, Math.min(10_000, Math.floor(readFiniteNumber(
+        combination.unavailableBadgeCount ?? combination.unavailable_badge_count,
+      ) ?? 0))),
+      boundary_context: {
+        badges: boundedBadges(boundary.badges, 32),
+        notes: readStringArray(boundary.notes).map((note) => note.slice(0, 500)),
+      },
+      trace_edges: traceEdges,
+      shared_subjects: readStringArray(combination.sharedSubjects ?? combination.shared_subjects),
+      shared_symbols: readStringArray(combination.sharedSymbols ?? combination.shared_symbols),
+      shared_unit_signatures: readStringArray(
+        combination.sharedUnitSignatures ?? combination.shared_unit_signatures,
+      ),
+      calculator_payload_ids: readStringArray(
+        combination.calculatorPayloadIds ?? combination.calculator_payload_ids,
+      ),
+      warnings: readStringArray(combination.warnings).map((warning) => warning.slice(0, 500)),
+      implication_summary: readStringArray(
+        combination.implicationSummary ?? combination.implication_summary,
+      ).map((summary) => summary.slice(0, 500)),
+      suggested_next_badge_ids: readStringArray(
+        combination.suggestedNextBadgeIds ?? combination.suggested_next_badge_ids,
+      ),
+    },
+    captured_at_ms: capturedAt,
+    active_panel: record.active_panel === true,
+    panel_open: record.panel_open === true,
+    has_selection: normalizedSelectedBadgeIds.length > 0,
+  };
+};
+
 const normalizeNumberText = (value: number): string => {
   if (!Number.isFinite(value)) return String(value);
   if (value !== 0 && (Math.abs(value) >= 1e6 || Math.abs(value) < 1e-3)) {
@@ -1213,6 +1332,36 @@ const buildGatewayProducedAffordances = (input: {
   const status = cleanString(input.observation.status);
   const available = status !== "blocked" && status !== "failed" && status !== "missing_input";
   const baseStatus: HelixWorkstationTypedAffordance["status"] = available ? "available" : "blocked";
+  if (input.capabilityId === THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY) {
+    const combination = readRecord(input.observation.combination_reader);
+    const boundary = readRecord(combination?.boundary_context);
+    const selectedBadgeIds = readStringArray(input.observation.selected_badge_ids).slice(0, 32);
+    const traceBadgeIds = readRecordArray(combination?.trace_path_badges)
+      .map((badge) => cleanString(badge.id))
+      .filter(Boolean)
+      .slice(0, 64);
+    const boundaryNotes = readStringArray(boundary?.notes);
+    return [
+      typedAffordance({
+        kind: "theory_context",
+        role: "producer",
+        capabilityId: input.capabilityId,
+        status: baseStatus,
+        sourceRefs: Array.from(new Set([...selectedBadgeIds, ...traceBadgeIds])),
+        claimBoundary: boundaryNotes[0] ?? "Manual graph selection is operator-declared context, not proof or physical validation.",
+      }),
+      ...(boundaryNotes.length > 0
+        ? [typedAffordance({
+          kind: "claim_boundary",
+          role: "producer",
+          capabilityId: input.capabilityId,
+          status: baseStatus,
+          sourceRefs: selectedBadgeIds,
+          claimBoundary: boundaryNotes.join(" ").slice(0, 1200),
+        })]
+        : []),
+    ];
+  }
   if (input.capabilityId === THEORY_CONTEXT_REFLECTION_CAPABILITY) {
     const payloads = readRecordArray(input.observation.calculator_payloads).slice(0, 12);
     const branchGate = readRecord(input.observation.scientific_branch_gate);
@@ -2509,6 +2658,46 @@ const workstationActiveContextManifest: HelixWorkstationCapabilityManifest = {
   output_observation_schema: WORKSTATION_ACTIVE_CONTEXT_OBSERVATION_SCHEMA,
   observation_schema: WORKSTATION_ACTIVE_CONTEXT_OBSERVATION_SCHEMA,
   safety_tags: ["read_or_observe", "workstation_context", "active_context", "non_terminal", "no_shell", "no_code_mutation"],
+  assistant_answer: false,
+  raw_content_included: false,
+};
+
+const theoryBadgeGraphCurrentContextManifest: HelixWorkstationCapabilityManifest = {
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY,
+  label: "Theory Badge Graph current context",
+  description:
+    "Reads the bounded semantic Theory Badge Graph selection supplied by the Ask turn workspace snapshot, including its trace, intermediate badges, available next badges, boundaries, and active lens. It is observation-only and cannot mutate or answer.",
+  panel_id: "theory-badge-graph",
+  action_id: "current_context",
+  mode: "read",
+  mutating: false,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: true,
+  terminal_eligible: false,
+  permission_profile_required: "read",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["current_context"],
+    properties: {
+      current_context: { type: "object" },
+      source_target_intent: { type: "object" },
+    },
+  },
+  output_observation_schema: THEORY_BADGE_GRAPH_CURRENT_CONTEXT_OBSERVATION_SCHEMA,
+  observation_schema: THEORY_BADGE_GRAPH_CURRENT_CONTEXT_OBSERVATION_SCHEMA,
+  safety_tags: [
+    "read_or_observe",
+    "theory_badge_graph",
+    "active_context",
+    "non_terminal",
+    "no_shell",
+    "no_code_mutation",
+  ],
   assistant_answer: false,
   raw_content_included: false,
 };
@@ -4125,6 +4314,7 @@ const visualObserverReadManifests = [
 const rawCapabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   [workspaceOsStatusManifest.capability_id, workspaceOsStatusManifest],
   [workstationActiveContextManifest.capability_id, workstationActiveContextManifest],
+  [theoryBadgeGraphCurrentContextManifest.capability_id, theoryBadgeGraphCurrentContextManifest],
   [workstationNotesListManifest.capability_id, workstationNotesListManifest],
   [calculatorSolveExpressionManifest.capability_id, calculatorSolveExpressionManifest],
   [calculatorSolveScalarExpressionManifest.capability_id, calculatorSolveScalarExpressionManifest],
@@ -4487,6 +4677,106 @@ export const callWorkstationGatewayCapability = async (
       assistant_answer: false,
       raw_content_included: false,
       error: hasContext ? undefined : "workstation_active_context_missing",
+    };
+  }
+
+  if (manifest.capability_id === THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY) {
+    const args = readArguments(input.arguments);
+    const sourceContext = readRecord(args.current_context ?? args.currentContext);
+    const currentContext = readBoundedTheoryBadgeGraphCurrentContext(sourceContext);
+    const selectedBadgeIds = readStringArray(currentContext.selected_badge_ids);
+    const hasContext = Boolean(sourceContext && cleanString(currentContext.graph_id));
+    const hasSelection = selectedBadgeIds.length > 0;
+    const ok = hasContext && hasSelection;
+    const error = !hasContext
+      ? "theory_badge_graph_current_context_missing"
+      : !hasSelection
+        ? "theory_badge_graph_selection_missing"
+        : undefined;
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: ok ? "admitted" : "blocked",
+      reason: ok ? "read_only_gateway_capability" : error ?? "theory_badge_graph_current_context_missing",
+      blockedReason: error,
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const combination = readRecord(currentContext.combination_reader) ?? {};
+    const traceCount = readRecordArray(combination.trace_path_badges).length;
+    const availableCount = readRecordArray(combination.available_next_badges).length;
+    const summary = ok
+      ? `Observed ${selectedBadgeIds.length} user-selected Theory Badge Graph badge(s), a ${traceCount}-badge trace, and ${availableCount} available next badge(s).`
+      : error === "theory_badge_graph_selection_missing"
+        ? "The Theory Badge Graph context was present, but no current badge selection was available."
+        : "The Theory Badge Graph current context was not supplied by the Ask turn workspace snapshot.";
+    const observation = {
+      schema: THEORY_BADGE_GRAPH_CURRENT_CONTEXT_OBSERVATION_SCHEMA,
+      capability_key: manifest.capability_id,
+      status: ok ? "succeeded" : "blocked",
+      blocked_reason: error ?? null,
+      summary,
+      ...currentContext,
+      context_role: "tool_evidence",
+      observation_role: "evidence_not_assistant_answer",
+      answer_authority: false,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const producedAffordances = buildGatewayProducedAffordances({
+      capabilityId: manifest.capability_id,
+      observation,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "theory-badge-graph",
+      action: "current_context",
+      status: ok ? "succeeded" : "blocked",
+      summary,
+      observation,
+      missingRequirements: ok ? [] : [{
+        code: error ?? "theory_badge_graph_current_context_missing",
+        message: error === "theory_badge_graph_selection_missing"
+          ? "Select one or more Theory Badge Graph badges before referring to the current combination."
+          : "Attach a current Theory Badge Graph workspace context before referring to its selected badges.",
+        repair_action: "ask_user",
+      }],
+      producedAffordances,
+      producedAffordanceKinds: manifest.produces_affordances,
+      requiredAffordanceKinds: manifest.consumes_affordances,
+      missingAffordanceKinds: ok ? [] : manifest.consumes_affordances,
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      produced_affordances: producedAffordances,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      ...(error ? { error } : {}),
     };
   }
 

@@ -964,6 +964,60 @@ describe("Helix Ask agent provider selection", () => {
     )).toBe(true);
   });
 
+  it("executes a metadata-only scholarly lookup when downstream PDF work is forbidden", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "The requested scholarly metadata was verified from the lookup observation.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<feed xmlns=\"http://www.w3.org/2005/Atom\" xmlns:arxiv=\"http://arxiv.org/schemas/atom\">",
+        "<entry>",
+        "<id>https://arxiv.org/abs/gr-qc/9510071</id>",
+        "<title>Quantum Field Theory Constrains Traversable Wormhole Geometries</title>",
+        "<summary>Quantum inequalities constrain negative energy in traversable wormhole geometries.</summary>",
+        "<published>1995-10-10T00:00:00Z</published>",
+        "<author><name>L. H. Ford</name></author>",
+        "<author><name>Thomas A. Roman</name></author>",
+        "<arxiv:doi>10.1103/PhysRevD.53.5496</arxiv:doi>",
+        "</entry>",
+        "</feed>",
+      ].join(""),
+    })) as typeof fetch;
+
+    const body = {
+      turn_id: "ask:test:codex-scholarly-metadata-only-downstream-negation",
+      agent_runtime: "codex",
+      question: [
+        "LOOKUP_SMOKE_03 — Search arXiv for “Quantum Field Theory Constrains Traversable Wormhole Geometries” by Ford and Roman.",
+        "Use scholarly lookup only and return the title, authors, DOI, and arXiv ID.",
+        "Do not fetch full text or inspect PDF pages.",
+      ].join(" "),
+    };
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body,
+      headers: {},
+    });
+
+    expect((result.debug as any)?.workstation_gateway_call_results?.map((entry: any) => entry.capability_id))
+      .toEqual(["scholarly-research.lookup_papers"]);
+    expect((result.debug as any)?.workstation_gateway_call_results?.[0]).toMatchObject({
+      ok: true,
+      capability_id: "scholarly-research.lookup_papers",
+    });
+    expect((result.debug as any)?.workstation_gateway_call_results?.map((entry: any) => entry.capability_id))
+      .not.toContain("scholarly-research.fetch_full_text");
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "tool_observation" &&
+      event.capability_id === "scholarly-research.lookup_papers" &&
+      /Scholarly research lookup returned 1 paper/i.test(String(event.text)),
+    )).toBe(true);
+  });
+
   it("derives anaphoric literature lookup from the resolved claim instead of searching operator instructions", () => {
     const body = {
       turn_id: "ask:test:scholarly-chat-referent",

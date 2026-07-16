@@ -41,6 +41,7 @@ export type ToolUseRestatementV1 = {
 
 const hasLocalWorkspaceScopeCue = (promptText: string): boolean =>
   /\b(?:docs?\s+viewer|documents?\s+viewer|current\s+(?:doc|document)|active\s+(?:doc|document)|repo|repository|codebase|working\s+tree|workspace|local\s+files?|our\s+docs?|from\s+(?:our|local|the\s+)?docs?)\b/i.test(promptText) ||
+  /\b(?:theory\s+badge\s+graph|current\s+badge\s+graph|selected\s+badges?|badge\s+(?:selection|combination|trace|branch))\b/i.test(promptText) ||
   /\b(?:current\s+)?(?:NHM[-\s]?2\s+)?(?:white\s*paper|whitepaper|doc(?:ument)?|paper)\b[\s\S]{0,120}\b(?:document\s+)?evidence\b/i.test(promptText) ||
   /\b(?:use|consult|check|read|inspect|apply|ground|base)\b[\s\S]{0,120}\b(?:NHM[-\s]?2\s+)?(?:white\s*paper|whitepaper|doc(?:ument)?|paper)\b/i.test(promptText) ||
   /\b(?:summari[sz]e|summary|overview|takeaways?|explain|describe|gist)\b[\s\S]{0,80}\bdocs?\s+about\b/i.test(promptText) ||
@@ -59,6 +60,7 @@ const hasSearchActionCue = (promptText: string): boolean =>
 export const hasAffirmativeDocsViewerSearchCue = (promptText: string): boolean => {
   const prompt = promptText.trim();
   if (!prompt) return false;
+  if (hasScholarlyScopeCue(prompt) && !hasLocalWorkspaceScopeCue(prompt)) return false;
   const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
   if (contextualToolSuppressionBlocksFamily(contextualSuppression, "docs_viewer")) return false;
   if (

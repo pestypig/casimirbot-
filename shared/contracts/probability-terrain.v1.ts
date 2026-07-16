@@ -12,8 +12,16 @@ export const PROBABILITY_TERRAIN_UNCERTAINTY_MODES = [
   "ambiguous",
 ] as const;
 
+export const PROBABILITY_TERRAIN_COVERAGE_BASES = [
+  "closed_world_default",
+  "caller_calibrated",
+  "absolute_match_score_heuristic",
+  "no_candidates",
+] as const;
+
 export type ProbabilityTerrainGraphKindV1 = (typeof PROBABILITY_TERRAIN_GRAPH_KINDS)[number];
 export type ProbabilityTerrainUncertaintyModeV1 = (typeof PROBABILITY_TERRAIN_UNCERTAINTY_MODES)[number];
+export type ProbabilityTerrainCoverageBasisV1 = (typeof PROBABILITY_TERRAIN_COVERAGE_BASES)[number];
 
 export type ProbabilityTerrainCandidateV1 = {
   id: string;
@@ -38,6 +46,18 @@ export type ProbabilityTerrainV1 = {
   dominantRenderChunkId: string | null;
   dominantSemanticChunkId: string | null;
   interpretation: "placement_probability_not_truth_claim";
+  /**
+   * Open-world fields are additive v1 extensions. The legacy probability maps
+   * remain conditional on the returned candidate set; these fields preserve
+   * explicit probability mass for "none of the represented graph".
+   */
+  representedProbabilityMass?: number;
+  outOfGraphProbability?: number;
+  openWorldCandidateProbabilityById?: Record<string, number>;
+  openWorldEntropyBits?: number;
+  openWorldPlacementCertainty?: number;
+  coverageBasis?: ProbabilityTerrainCoverageBasisV1;
+  openWorldInterpretation?: "includes_out_of_graph_hypothesis_not_truth_claim";
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -99,6 +119,56 @@ export function validateProbabilityTerrainV1(value: unknown): string[] {
   }
   if (value.interpretation !== "placement_probability_not_truth_claim") {
     issues.push("interpretation must be placement_probability_not_truth_claim");
+  }
+
+  const hasOpenWorldFields = [
+    "representedProbabilityMass",
+    "outOfGraphProbability",
+    "openWorldCandidateProbabilityById",
+    "openWorldEntropyBits",
+    "openWorldPlacementCertainty",
+    "coverageBasis",
+    "openWorldInterpretation",
+  ].some((field) => value[field] !== undefined);
+
+  if (hasOpenWorldFields) {
+    validateProbabilityMap(
+      "openWorldCandidateProbabilityById",
+      value.openWorldCandidateProbabilityById,
+      issues,
+    );
+    for (const field of [
+      "representedProbabilityMass",
+      "outOfGraphProbability",
+      "openWorldEntropyBits",
+      "openWorldPlacementCertainty",
+    ] as const) {
+      if (!isFiniteNumber(value[field])) {
+        issues.push(`${field} must be a finite number`);
+      } else if (value[field] < 0 || ((field !== "openWorldEntropyBits") && value[field] > 1)) {
+        issues.push(`${field} must be between 0 and 1`);
+      }
+    }
+    if (!PROBABILITY_TERRAIN_COVERAGE_BASES.includes(value.coverageBasis as ProbabilityTerrainCoverageBasisV1)) {
+      issues.push("coverageBasis is invalid");
+    }
+    if (value.openWorldInterpretation !== "includes_out_of_graph_hypothesis_not_truth_claim") {
+      issues.push("openWorldInterpretation must be includes_out_of_graph_hypothesis_not_truth_claim");
+    }
+
+    if (isFiniteNumber(value.representedProbabilityMass) && isFiniteNumber(value.outOfGraphProbability)) {
+      if (Math.abs(value.representedProbabilityMass + value.outOfGraphProbability - 1) > 0.00001) {
+        issues.push("representedProbabilityMass plus outOfGraphProbability must equal 1");
+      }
+    }
+    if (isRecord(value.openWorldCandidateProbabilityById) && isFiniteNumber(value.representedProbabilityMass)) {
+      const representedSum = Object.values(value.openWorldCandidateProbabilityById)
+        .filter(isFiniteNumber)
+        .reduce((total, probability) => total + probability, 0);
+      if (Math.abs(representedSum - value.representedProbabilityMass) > 0.00005) {
+        issues.push("openWorldCandidateProbabilityById mass must equal representedProbabilityMass");
+      }
+    }
   }
 
   return issues;

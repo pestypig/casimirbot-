@@ -12,6 +12,7 @@ import {
 import { SHARED_INTERFACE_LANGUAGE_CODES } from "@shared/interface-language-codes";
 
 const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context";
+const THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY = "theory-badge-graph.current_context";
 const WORKSTATION_NOTES_LIST_NOTES_CAPABILITY = "workstation-notes.list_notes";
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression";
 const CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY = "scientific-calculator.solve_scalar_expression";
@@ -953,6 +954,127 @@ describe("Helix workstation tool gateway", () => {
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
+      },
+    });
+  });
+
+  it("reads the bounded current Theory Badge Graph selection as non-terminal evidence", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY,
+      arguments: {
+        current_context: {
+          schema: "helix.theory_badge_graph_current_context.v1",
+          graph_id: "helix-theory-badge-graph/v1",
+          active_badge_id: "physics.quantum.energy_frequency",
+          selected_badge_ids: ["element.h.origin", "physics.quantum.energy_frequency"],
+          active_atlas_lens_id: "atomic_radiation_state",
+          semantic_selections: [{
+            domain: "solar_surface_spectrum",
+            selection_kind: "observation_group",
+            selection_id: "hydrogen_lines",
+            object_binding_id: "solar-spectrum:hydrogen-lines",
+          }],
+          combination_reader: {
+            schema: "theory_badge_graph_combination_reader/v1",
+            selectedBadges: [
+              { id: "element.h.origin", title: "Hydrogen" },
+              { id: "physics.quantum.energy_frequency", title: "Quantum Energy-Frequency Relation" },
+            ],
+            tracePathBadges: [
+              { id: "element.h.origin", title: "Hydrogen" },
+              { id: "physics.atomic.transition_gap_frequency_context", title: "Transition Gap" },
+              { id: "physics.quantum.energy_frequency", title: "Quantum Energy-Frequency Relation" },
+            ],
+            intermediateBadges: [
+              { id: "physics.atomic.transition_gap_frequency_context", title: "Transition Gap" },
+            ],
+            availableNextBadges: [
+              { id: "physics.radiation.mode_context", title: "Radiation Mode" },
+            ],
+            boundaryContext: { notes: ["A graph path is compatibility context, not proof of a transition."] },
+          },
+          captured_at_ms: 1_750_000_000_000,
+          active_panel: true,
+          panel_open: true,
+        },
+      },
+      turnId: "ask:test:theory-badge-current-context",
+      iteration: 2,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY,
+      gateway_admission: { admission_status: "admitted" },
+      observation_packet: {
+        status: "succeeded",
+        panel_id: "theory-badge-graph",
+        action: "current_context",
+        terminal_eligible: false,
+        assistant_answer: false,
+      },
+      observation: {
+        schema: "helix.theory_badge_graph_current_context_observation.v1",
+        selected_badge_ids: ["element.h.origin", "physics.quantum.energy_frequency"],
+        active_atlas_lens_id: "atomic_radiation_state",
+        context_role: "tool_evidence",
+        answer_authority: false,
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        combination_reader: {
+          intermediate_badges: [
+            expect.objectContaining({ id: "physics.atomic.transition_gap_frequency_context" }),
+          ],
+          available_next_badges: [
+            expect.objectContaining({ id: "physics.radiation.mode_context" }),
+          ],
+        },
+      },
+      tool_followup_decision: {
+        next_action: "continue_reasoning",
+        evidence_reentered: false,
+      },
+    });
+  });
+
+  it("blocks a current Theory Badge Graph observation when no badge is selected", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY,
+      arguments: {
+        current_context: {
+          schema: "helix.theory_badge_graph_current_context.v1",
+          graph_id: "helix-theory-badge-graph/v1",
+          selected_badge_ids: [],
+          combination_reader: { selectedBadges: [] },
+        },
+      },
+      turnId: "ask:test:theory-badge-current-context-empty",
+      iteration: 1,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY,
+      error: "theory_badge_graph_selection_missing",
+      gateway_admission: { admission_status: "blocked" },
+      observation_packet: {
+        status: "blocked",
+        missing_requirements: [
+          expect.objectContaining({
+            code: "theory_badge_graph_selection_missing",
+            repair_action: "ask_user",
+          }),
+        ],
+      },
+      observation: {
+        status: "blocked",
+        terminal_eligible: false,
+        assistant_answer: false,
       },
     });
   });

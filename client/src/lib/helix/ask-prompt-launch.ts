@@ -1,4 +1,5 @@
 import { navigate } from "wouter/use-browser-location";
+import type { ResearchPaperToProposalStepId } from "@shared/contracts/helix-workflow-demo.v1";
 
 export const HELIX_PENDING_ASK_KEY = "helix:pending-ask";
 export const HELIX_ASK_PROMPT_EVENT = "helix-ask:prompt";
@@ -101,6 +102,12 @@ export type PendingHelixAskPrompt = {
   answerContract?: HelixAskAnswerContract;
   routeMetadata?: HelixAskRouteMetadata;
   route_metadata?: HelixAskRouteMetadata;
+  workflowQte?: {
+    schema: "helix.workflow_qte_launch.v1";
+    runId: string;
+    stepId: ResearchPaperToProposalStepId;
+    sourceSessionId: string;
+  };
   createdAt: number;
 };
 
@@ -212,6 +219,14 @@ export function consumePendingHelixAskPrompt(): PendingHelixAskPrompt | null {
           : undefined,
       routeMetadata,
       route_metadata: routeMetadata,
+      workflowQte:
+        parsed.workflowQte &&
+        parsed.workflowQte.schema === "helix.workflow_qte_launch.v1" &&
+        typeof parsed.workflowQte.runId === "string" &&
+        typeof parsed.workflowQte.stepId === "string" &&
+        typeof parsed.workflowQte.sourceSessionId === "string"
+          ? parsed.workflowQte
+          : undefined,
       createdAt:
         typeof parsed.createdAt === "number" && Number.isFinite(parsed.createdAt)
           ? parsed.createdAt
@@ -236,6 +251,7 @@ export function launchHelixAskPrompt(args: {
   answerContract?: HelixAskAnswerContract;
   routeMetadata?: HelixAskRouteMetadata;
   route_metadata?: HelixAskRouteMetadata;
+  workflowQte?: PendingHelixAskPrompt["workflowQte"];
 }) {
   if (typeof window === "undefined") return;
   const question = args.question.trim();
@@ -260,6 +276,7 @@ export function launchHelixAskPrompt(args: {
     answerContract: args.answerContract,
     routeMetadata,
     route_metadata: routeMetadata,
+    workflowQte: args.workflowQte,
     createdAt: Date.now(),
   };
 

@@ -15,6 +15,7 @@ import {
 } from "@/lib/scientific-calculator/debugLog";
 import { runScientificSolve, type ScientificSolveResult } from "@/lib/scientific-calculator/solver";
 import { runTheoryBadgePlaybackNow } from "@/lib/theory/theoryBadgePlaybackRunner";
+import { readTheoryBadgeGraphAskContextSnapshot } from "@/lib/theory/theoryBadgeGraphAskContext";
 import { runTheoryCompoundRunNow, type TheoryCompoundRunSolveScope } from "@/lib/theory/runTheoryCompoundRunNow";
 import { solveTheoryCalculatorLoadoutNow } from "@/lib/theory/theoryCalculatorLoadoutRunner";
 import { runImageLensFocusRun } from "@/lib/helix/imageLensFocusRun";
@@ -5524,6 +5525,33 @@ export function executeHelixPanelAction(
           graph_id: graph.graphId,
           badge_count: graph.badges.length,
           edge_count: graph.edges.length,
+        },
+      };
+    }
+
+    if (actionId === "current_context") {
+      const currentContext = readTheoryBadgeGraphAskContextSnapshot(Date.now());
+      if (currentContext.selected_badge_ids.length === 0) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "No theory badges are currently selected.",
+        };
+      }
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "theory_badge_graph_current_context",
+          schemaVersion: currentContext.schema,
+          artifact_v1: currentContext,
+          graph_id: currentContext.graph_id,
+          selected_badge_ids: currentContext.selected_badge_ids,
+          observation_required: true,
+          answer_authority: false,
+          terminal_eligible: false,
         },
       };
     }

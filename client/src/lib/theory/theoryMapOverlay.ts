@@ -103,7 +103,13 @@ export function buildTheoryBadgeLocatorArtifact(args: {
 
   const primaryMatch = locatorMatches[0];
   const primaryPayloadIds = primaryMatch?.calculatorPayloads.map((payload) => payload.payloadId) ?? [];
-  const claimBoundaryNotes = unique(matchedBadges.flatMap(claimBoundaryNotesForBadge));
+  const claimBoundaryNotes =
+    matchedBadges.length > 0
+      ? unique(matchedBadges.flatMap(claimBoundaryNotesForBadge))
+      : [
+          "No canonical theory badge matched the supplied context.",
+          "Locator result is unresolved; no proof or validation claim was made.",
+        ];
 
   return buildTheoryBadgeLocatorArtifactV1({
     graphId: graph.graphId,

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { helixRuntimeGoalSessionStore } from "../goal-runtime-session";
 
 const translationCall = {
@@ -11,6 +11,8 @@ const translationCall = {
   source_hash: "fnv1a32:title",
 };
 
+const originalExternalTranslationBackends = process.env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED;
+
 beforeEach(() => {
   helixRuntimeGoalSessionStore.clear();
   process.env.ENABLE_CODEX_AGENT = "1";
@@ -18,6 +20,15 @@ beforeEach(() => {
   process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
   delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
   delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+  process.env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED = "0";
+});
+
+afterEach(() => {
+  if (originalExternalTranslationBackends === undefined) {
+    delete process.env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED;
+  } else {
+    process.env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED = originalExternalTranslationBackends;
+  }
 });
 
 describe("runtime goal session controller", () => {

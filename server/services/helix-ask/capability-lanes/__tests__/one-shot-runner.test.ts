@@ -1172,11 +1172,23 @@ describe("provider-neutral capability lane one-shot runner", () => {
           terminal_eligible: false,
         },
       },
-      env: { OPENAI_API_KEY: "test-openai" } as NodeJS.ProcessEnv,
+      env: {} as NodeJS.ProcessEnv,
     });
 
     expect(result.call_results[0]).toMatchObject({
       ok: true,
+      lane_resolve_trace: {
+        admission_status: "admitted_shadow_only",
+        lane_status: "dry_run",
+        selected_backend_provider: "visual_analysis.local_pdf_page_mount",
+        selection_reason: "source_mount_only_local_pdf_renderer_selected_without_external_visual_backend",
+        permission_status: "admitted",
+        privacy_class: "local_only",
+        resolved_backend_provider: "none",
+        resolved_model_or_service: "local_pdf_page_mount",
+        blocked_reason: null,
+        execution_status: "executed_observation_only",
+      },
       receipt: {
         source_mount_only: true,
         source_kind: "pdf_page_render",
@@ -1189,6 +1201,82 @@ describe("provider-neutral capability lane one-shot runner", () => {
     const receipt = (result.call_results[0] as any).receipt;
     expect(receipt).not.toHaveProperty("scientific_evidence_packet");
     expect(receipt).not.toHaveProperty("scientific_evidence_sidecar");
+  });
+
+  it("does not bypass an unconfigured visual backend for OCR or inspection", async () => {
+    const sourceImageRef = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+    const result = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-unconfigured-page-inspection",
+        capability_lane_call: {
+          capability: "visual_analysis.inspect_image_region",
+          source_id: "pdf-page-render:page-8",
+          source_kind: "pdf_page_render",
+          source_image_ref: sourceImageRef,
+          page_image_ref: sourceImageRef,
+          page_number: 8,
+          source_mount_only: false,
+          bbox_px: { x: 0, y: 0, width: 1, height: 1 },
+          question: "Inspect and OCR PDF page 8 in Image Lens.",
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+      },
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(result.call_results[0]).toMatchObject({
+      ok: false,
+      lane_resolve_trace: {
+        admission_status: "blocked",
+        lane_status: "unconfigured",
+        blocked_reason: "backend_provider_key_or_endpoint_not_configured",
+        execution_status: "not_executed_shadow_only",
+      },
+      receipt: null,
+      error: "backend_provider_key_or_endpoint_not_configured",
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+  });
+
+  it("does not bypass an explicitly disabled visual lane for a local page mount", async () => {
+    const sourceImageRef = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+    const result = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-disabled-page-mount",
+        capability_lane_call: {
+          capability: "visual_analysis.inspect_image_region",
+          source_id: "pdf-page-render:page-8",
+          source_kind: "pdf_page_render",
+          source_image_ref: sourceImageRef,
+          page_image_ref: sourceImageRef,
+          page_number: 8,
+          source_mount_only: true,
+          bbox_px: { x: 0, y: 0, width: 1, height: 1 },
+          question: "Mount PDF page 8 in Image Lens as a source only.",
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+      },
+      env: { HELIX_CAPABILITY_LANE_VISUAL_ANALYSIS_ENABLED: "0" } as NodeJS.ProcessEnv,
+    });
+
+    expect(result.call_results[0]).toMatchObject({
+      ok: false,
+      lane_resolve_trace: {
+        admission_status: "blocked",
+        lane_status: "disabled",
+        blocked_reason: "capability_lane_disabled_by_policy",
+        execution_status: "not_executed_shadow_only",
+      },
+      receipt: null,
+      error: "capability_lane_disabled_by_policy",
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
   });
 
   it("propagates exact equation block promotion through the Image Lens receipt and observation", async () => {

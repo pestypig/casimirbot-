@@ -6,6 +6,61 @@ import {
 } from "../ask-workspace-context-snapshot";
 
 describe("ask workspace context snapshot helpers", () => {
+  it("attaches current Theory Badge Graph state as ambient, non-terminal context", () => {
+    const theoryContext = {
+      schema: "helix.theory_badge_graph_current_context.v1",
+      graph_id: "helix-theory-badge-graph/v1",
+      selected_badge_ids: ["element.h.origin", "physics.quantum.energy_frequency"],
+      combination_reader: {
+        intermediateBadges: [{ id: "physics.atomic.transition_gap_frequency_context" }],
+        availableNextBadges: [{ id: "physics.radiation.mode_context" }],
+      },
+    };
+    const snapshot = buildAskTurnWorkspaceContextSnapshotFromState({
+      layoutState: {
+        activeGroupId: "main",
+        groups: {
+          main: {
+            activePanelId: "theory-badge-graph",
+            panelIds: ["theory-badge-graph", "scientific-calculator"],
+          },
+        },
+      },
+      notesState: {},
+      calculatorState: {},
+      theoryBadgeGraphContext: theoryContext,
+      docContext: { path: null, source: "none" },
+      lastUpdatedAtMs: 123,
+    });
+
+    expect(snapshot).toMatchObject({
+      activePanel: "theory-badge-graph",
+      hasTheoryBadgeGraphContext: true,
+      has_theory_badge_graph_context: true,
+      activeTheoryBadgeGraphContext: {
+        ...theoryContext,
+        panel_id: "theory-badge-graph",
+        active_panel: true,
+        panel_open: true,
+        context_role: "ambient_context",
+        output_role: "ambient_context",
+        observation_required: true,
+        answer_authority: false,
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      active_theory_badge_graph_context: expect.objectContaining({
+        selected_badge_ids: ["element.h.origin", "physics.quantum.energy_frequency"],
+        active_panel: true,
+        panel_open: true,
+        answer_authority: false,
+        terminal_eligible: false,
+      }),
+    });
+  });
+
   it("builds a deterministic workstation layout debug snapshot from supplied state", () => {
     expect(buildWorkstationLayoutDebugSnapshotFromState({
       mode: "desktop",

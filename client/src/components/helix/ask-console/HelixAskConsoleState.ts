@@ -47,6 +47,8 @@ export const HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_ITEMS = [
   "debug_drawer",
   "copy_debug_read_aloud_controls",
   "voice_read_aloud_affordances",
+  "voice_confirmation_qte",
+  "workflow_next_prompt_qte",
   "visible_stream_progress_status_rows",
   "final_answer_metadata",
   "workstation_trace_rows",
@@ -72,6 +74,8 @@ export const HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_PROVEN_ITEMS = [
   "workstation_trace_rows",
   "visible_stream_progress_status_rows",
   "voice_read_aloud_affordances",
+  "voice_confirmation_qte",
+  "workflow_next_prompt_qte",
   "long_answer_unclipped",
 ] as const satisfies readonly HelixAskConsoleOperatorSurfaceParityItem[];
 

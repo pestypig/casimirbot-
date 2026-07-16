@@ -231,6 +231,7 @@ Each capability contract should define:
 | --- | --- | --- |
 | `workspace_os.status` | [workspace_os.status.md](workspace_os.status.md) | `draft` |
 | `workstation.active_context` | [workstation.active_context.md](workstation.active_context.md) | `draft` |
+| `theory-badge-graph.current_context` | [theory-badge-graph.current_context.md](theory-badge-graph.current_context.md) | `draft` |
 | `workstation-notes.list_notes` | [workstation-notes.list_notes.md](workstation-notes.list_notes.md) | `draft` |
 | `scientific-calculator.solve_expression` | [scientific-calculator.solve_expression.md](scientific-calculator.solve_expression.md) | `candidate` |
 | `scientific-calculator.solve_scalar_expression` | [scientific-calculator.solve_expression.md](scientific-calculator.solve_expression.md) | `candidate` |

@@ -8,7 +8,16 @@ export const THEORY_BADGE_LOCATOR_SOURCES = [
   "playback",
 ] as const;
 
+export const THEORY_BADGE_LOCATOR_RESOLUTIONS = ["matched", "unresolved"] as const;
+export const THEORY_BADGE_LOCATOR_RESOLUTION_REASONS = [
+  "matched_graph_evidence",
+  "no_supported_graph_match",
+] as const;
+
 export type TheoryBadgeLocatorSource = (typeof THEORY_BADGE_LOCATOR_SOURCES)[number];
+export type TheoryBadgeLocatorResolution = (typeof THEORY_BADGE_LOCATOR_RESOLUTIONS)[number];
+export type TheoryBadgeLocatorResolutionReason =
+  (typeof THEORY_BADGE_LOCATOR_RESOLUTION_REASONS)[number];
 
 export type TheoryBadgeLocatorMatchV1 = {
   badgeId: string;
@@ -58,6 +67,8 @@ export type TheoryBadgeLocatorArtifactV1 = {
     simulationOwners: string[];
     source: TheoryBadgeLocatorSource;
   };
+  resolution: TheoryBadgeLocatorResolution;
+  resolutionReason: TheoryBadgeLocatorResolutionReason;
   matches: TheoryBadgeLocatorMatchV1[];
   overlay: TheoryBadgeLocatorOverlayV1;
   recommendedActions: Array<{
@@ -90,16 +101,23 @@ function validateOverlay(value: unknown, prefix: string): string[] {
 }
 
 export function buildTheoryBadgeLocatorArtifactV1(
-  args: Omit<TheoryBadgeLocatorArtifactV1, "artifactId" | "schemaVersion" | "generatedAt"> & {
+  args: Omit<
+    TheoryBadgeLocatorArtifactV1,
+    "artifactId" | "schemaVersion" | "generatedAt" | "resolution" | "resolutionReason"
+  > & {
     generatedAt?: string;
   },
 ): TheoryBadgeLocatorArtifactV1 {
+  const resolution = args.matches.length > 0 ? "matched" : "unresolved";
   return {
     artifactId: THEORY_BADGE_LOCATOR_ARTIFACT_ID,
     schemaVersion: THEORY_BADGE_LOCATOR_SCHEMA_VERSION,
     generatedAt: args.generatedAt ?? new Date().toISOString(),
     graphId: args.graphId,
     input: args.input,
+    resolution,
+    resolutionReason:
+      resolution === "matched" ? "matched_graph_evidence" : "no_supported_graph_match",
     matches: args.matches,
     overlay: args.overlay,
     recommendedActions: args.recommendedActions,
@@ -118,6 +136,30 @@ export function validateTheoryBadgeLocatorArtifactV1(value: unknown): string[] {
   if (typeof value.graphId !== "string" || !value.graphId) issues.push("graphId must be a non-empty string");
   if (!isRecord(value.input)) issues.push("input must be an object");
   if (!Array.isArray(value.matches)) issues.push("matches must be an array");
+  if (!THEORY_BADGE_LOCATOR_RESOLUTIONS.includes(value.resolution as TheoryBadgeLocatorResolution)) {
+    issues.push("resolution is invalid");
+  }
+  if (
+    !THEORY_BADGE_LOCATOR_RESOLUTION_REASONS.includes(
+      value.resolutionReason as TheoryBadgeLocatorResolutionReason,
+    )
+  ) {
+    issues.push("resolutionReason is invalid");
+  }
+  if (Array.isArray(value.matches)) {
+    if (value.resolution === "matched" && value.matches.length === 0) {
+      issues.push("matched resolution requires at least one match");
+    }
+    if (value.resolution === "unresolved" && value.matches.length > 0) {
+      issues.push("unresolved resolution requires no matches");
+    }
+    if (value.resolution === "matched" && value.resolutionReason !== "matched_graph_evidence") {
+      issues.push("matched resolution requires matched_graph_evidence reason");
+    }
+    if (value.resolution === "unresolved" && value.resolutionReason !== "no_supported_graph_match") {
+      issues.push("unresolved resolution requires no_supported_graph_match reason");
+    }
+  }
   if (value.overlay) issues.push(...validateOverlay(value.overlay, "overlay"));
   else issues.push("overlay must be present");
   if (!Array.isArray(value.recommendedActions)) issues.push("recommendedActions must be an array");

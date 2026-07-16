@@ -38,11 +38,53 @@ import { getVisionProvider, getVisionProviderHealth } from "../../vision/provide
 import { resolveHelixCapabilityLaneRequest } from "./registry";
 
 const LANE_ID = "visual_analysis" as const;
+const LOCAL_PDF_PAGE_MOUNT_BACKEND = "visual_analysis.local_pdf_page_mount";
+const LOCAL_PDF_PAGE_MOUNT_SELECTION_REASON =
+  "source_mount_only_local_pdf_renderer_selected_without_external_visual_backend";
 
 const hashHex = (value: unknown): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex");
 
 const hashShort = (value: unknown): string => hashHex(value).slice(0, 16);
+
+const admitLocalPdfPageMount = (input: {
+  request: ImageLensRegionInspectionRequestV1;
+  trace: HelixCapabilityLaneResolveTrace;
+}): HelixCapabilityLaneResolveTrace => {
+  const localMountRequested =
+    input.request.source_mount_only === true &&
+    input.request.source_kind === "pdf_page_render" &&
+    Boolean(input.request.page_number);
+  const externalBackendOnlyBlock =
+    input.trace.lane_status === "unconfigured" &&
+    input.trace.blocked_reason === "backend_provider_key_or_endpoint_not_configured";
+  if (!localMountRequested || !externalBackendOnlyBlock) return input.trace;
+
+  return {
+    ...input.trace,
+    admission_status: "admitted_shadow_only",
+    lane_status: "dry_run",
+    selected_backend_provider: LOCAL_PDF_PAGE_MOUNT_BACKEND,
+    backend_selection_decision: {
+      ...input.trace.backend_selection_decision,
+      outcome: "fallback_selected",
+      reason: LOCAL_PDF_PAGE_MOUNT_SELECTION_REASON,
+      selected_backend_provider: LOCAL_PDF_PAGE_MOUNT_BACKEND,
+      fallback_backend_provider: LOCAL_PDF_PAGE_MOUNT_BACKEND,
+      live_backend_execution_enabled: false,
+    },
+    selection_reason: LOCAL_PDF_PAGE_MOUNT_SELECTION_REASON,
+    availability_status: "dry_run",
+    permission_status: "admitted",
+    cost_class: "free_local",
+    latency_class: "local",
+    privacy_class: "local_only",
+    fallback_backend_provider: LOCAL_PDF_PAGE_MOUNT_BACKEND,
+    resolved_backend_provider: "none",
+    resolved_model_or_service: "local_pdf_page_mount",
+    blocked_reason: null,
+  };
+};
 
 const clampNumber = (value: number, min: number, max: number): number => {
   if (!Number.isFinite(value)) return min;
@@ -980,11 +1022,14 @@ export const runImageLensRegionInspection = async (input: {
   const iteration = typeof input.iteration === "number" && Number.isFinite(input.iteration)
     ? Math.max(0, Math.trunc(input.iteration))
     : 0;
-  const trace = resolveHelixCapabilityLaneRequest({
-    provider: input.provider,
-    requestedLane: LANE_ID,
-    requestedBackendProvider: input.request.requested_backend_provider ?? null,
-    env: input.env,
+  const trace = admitLocalPdfPageMount({
+    request: input.request,
+    trace: resolveHelixCapabilityLaneRequest({
+      provider: input.provider,
+      requestedLane: LANE_ID,
+      requestedBackendProvider: input.request.requested_backend_provider ?? null,
+      env: input.env,
+    }),
   });
   const normalizedSourceId = input.request.source_id.trim();
   const bbox = await resolveEffectiveBbox(input.request);

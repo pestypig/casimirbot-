@@ -5,6 +5,7 @@ import type {
 import type {
   TheoryContextReflectionConfidenceMode,
 } from "../../../shared/contracts/theory-context-reflection.v1";
+import type { TheoryMasterProblemRequestV1 } from "../../../shared/contracts/theory-master-problem.v1";
 import type {
   HelixScholarlyFullTextObservation,
   HelixScholarlyResearchObservation,
@@ -32,6 +33,7 @@ export type RunAskLevelTheoryContextReflectionToolInput = {
   panelOverlayMode?: HelixTheoryContextReflectionPanelSyncOverlayMode;
   scholarlyResearchObservation?: HelixScholarlyResearchObservation | null;
   scholarlyFullTextObservation?: HelixScholarlyFullTextObservation | null;
+  derivationRequest?: TheoryMasterProblemRequestV1;
 };
 
 function theoryCongruenceTraceMode(): TheoryCongruenceTraceFeatureFlagMode {
@@ -77,6 +79,7 @@ export function runAskLevelTheoryContextReflectionTool(
       reflection: receipt.reflectionV1,
       explanationPlan: receipt.explanationPlanV1,
       featureFlagMode: mode,
+      derivationRequest: input.derivationRequest,
     }),
   };
 }

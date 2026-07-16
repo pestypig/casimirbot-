@@ -57,6 +57,40 @@ describe("panelActionAdapters physics context plan", () => {
     expect(useTheoryMapOverlayStore.getState().highlightedBadgeIds.length).toBeGreaterThan(0);
   });
 
+  it("returns the live manual badge combination through the read-only current_context action", () => {
+    useTheoryBadgeGraphPanelStore.getState().setSelectedBadgeIds([
+      "element.h.origin",
+      "physics.quantum.energy_frequency",
+    ]);
+    useTheoryBadgeGraphPanelStore.getState().setSelectedBadgeId("physics.quantum.energy_frequency");
+
+    const result = executeHelixPanelAction(
+      {
+        panel_id: "theory-badge-graph",
+        action_id: "current_context",
+      },
+      actionContext(),
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      panel_id: "theory-badge-graph",
+      action_id: "current_context",
+      artifact: {
+        kind: "theory_badge_graph_current_context",
+        selected_badge_ids: ["element.h.origin", "physics.quantum.energy_frequency"],
+        observation_required: true,
+        answer_authority: false,
+        terminal_eligible: false,
+        artifact_v1: {
+          selected_badge_ids: ["element.h.origin", "physics.quantum.energy_frequency"],
+          answer_authority: false,
+          terminal_eligible: false,
+        },
+      },
+    });
+  });
+
   it("plans a solar scalar workflow with solve as an explicit next action", () => {
     const result = executeHelixPanelAction(
       {

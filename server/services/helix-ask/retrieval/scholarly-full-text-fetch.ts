@@ -15,6 +15,7 @@ import {
 } from "@shared/helix-scholarly-research-observation";
 import { runScholarlyResearchLookup } from "./scholarly-research-lookup";
 import { saveResearchLibraryExtraction } from "../../helix-account/research-library-store";
+import { normalizeScholarlyFullTextSourceUrl } from "../scholarly-research-intent";
 
 type RecordLike = Record<string, unknown>;
 
@@ -709,7 +710,9 @@ export async function runScholarlyFullTextFetch(
 
   const query = input.query.trim();
   const paper = selectPaper(input);
-  const sourceUrl = input.sourceUrl?.trim() || resolveScholarlyFullTextUrl(paper);
+  const sourceUrl = normalizeScholarlyFullTextSourceUrl(
+    input.sourceUrl?.trim() || resolveScholarlyFullTextUrl(paper),
+  );
   const maxPages = Math.max(1, Math.min(Number(input.maxPages) || DEFAULT_MAX_PAGES, MAX_PAGES));
   const maxChunks = Math.max(1, Math.min(Number(input.maxChunks) || DEFAULT_MAX_CHUNKS, MAX_CHUNKS));
   const missingRequirements: string[] = [];

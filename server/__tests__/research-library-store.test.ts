@@ -81,6 +81,26 @@ describe("profile research library", () => {
     expect((await readResearchLibraryDocument("profile:research-b", saved.document_id))).toBeNull();
   });
 
+  it("deletes a saved extraction only for its signed-in owner", async () => {
+    const app = createApp();
+    const profileA = request.agent(app);
+    const profileB = request.agent(app);
+    await profileA.post("/api/account/session/sign-in").send({ profile_id: "profile:research-a", display_name: "Research A" }).expect(200);
+    await profileB.post("/api/account/session/sign-in").send({ profile_id: "profile:research-b", display_name: "Research B" }).expect(200);
+    const saved = await sampleExtraction("profile:research-a");
+    const path = `/api/research-library/${encodeURIComponent(saved.document_id)}`;
+
+    await profileB.delete(path).expect(404);
+    const deleted = await profileA.delete(path).expect(200);
+    expect(deleted.body).toEqual(expect.objectContaining({
+      ok: true,
+      document_id: saved.document_id,
+    }));
+    expect((await listResearchLibraryDocuments("profile:research-a")).documents).toHaveLength(0);
+    expect(await readResearchLibraryDocument("profile:research-a", saved.document_id)).toBeNull();
+    await profileA.delete(path).expect(404);
+  });
+
   it("persists all extracted pages while keeping the scholarly observation compact", async () => {
     const agent = request.agent(createApp());
     await agent.post("/api/account/session/sign-in").send({ profile_id: "profile:research-a", display_name: "Research A" }).expect(200);

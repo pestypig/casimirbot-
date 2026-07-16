@@ -1,6 +1,7 @@
 import {
   PROBABILITY_TERRAIN_SCHEMA_VERSION,
   type ProbabilityTerrainCandidateV1,
+  type ProbabilityTerrainCoverageBasisV1,
   type ProbabilityTerrainGraphKindV1,
   type ProbabilityTerrainUncertaintyModeV1,
   type ProbabilityTerrainV1,
@@ -9,6 +10,8 @@ import {
 export type BuildProbabilityTerrainInputV1 = {
   graphKind: ProbabilityTerrainGraphKindV1;
   candidates: ProbabilityTerrainCandidateV1[];
+  coverageProbability?: number;
+  coverageBasis?: ProbabilityTerrainCoverageBasisV1;
 };
 
 function roundProbability(value: number): number {
@@ -101,6 +104,28 @@ export function buildProbabilityTerrainV1(input: BuildProbabilityTerrainInputV1)
   const priorEntropyBits = candidates.length > 0 ? Number(Math.log2(candidates.length).toFixed(6)) : 0;
   const posteriorEntropyBits = entropyBits(Object.values(probabilities));
   const informationGainBits = Number(Math.max(0, priorEntropyBits - posteriorEntropyBits).toFixed(6));
+  const representedProbabilityMass = candidates.length === 0
+    ? 0
+    : roundProbability(clamp01(input.coverageProbability ?? 1));
+  const outOfGraphProbability = roundProbability(1 - representedProbabilityMass);
+  const openWorldCandidateProbabilityById = Object.fromEntries(
+    Object.entries(probabilities).map(([candidateId, probability]) => [
+      candidateId,
+      roundProbability(probability * representedProbabilityMass),
+    ]),
+  );
+  const openWorldEntropyBits = entropyBits([
+    ...Object.values(openWorldCandidateProbabilityById),
+    outOfGraphProbability,
+  ]);
+  const openWorldOutcomeCount = candidates.length + 1;
+  const openWorldMaxEntropyBits = openWorldOutcomeCount > 1 ? Math.log2(openWorldOutcomeCount) : 0;
+  const openWorldPlacementCertainty = candidates.length === 0 || openWorldMaxEntropyBits === 0
+    ? 0
+    : roundProbability(clamp01(1 - openWorldEntropyBits / openWorldMaxEntropyBits));
+  const coverageBasis: ProbabilityTerrainCoverageBasisV1 = candidates.length === 0
+    ? "no_candidates"
+    : input.coverageBasis ?? (input.coverageProbability === undefined ? "closed_world_default" : "caller_calibrated");
 
   return {
     schemaVersion: PROBABILITY_TERRAIN_SCHEMA_VERSION,
@@ -123,6 +148,13 @@ export function buildProbabilityTerrainV1(input: BuildProbabilityTerrainInputV1)
     dominantRenderChunkId: dominantId(renderChunkProbabilityById),
     dominantSemanticChunkId: dominantId(semanticChunkProbabilityById),
     interpretation: "placement_probability_not_truth_claim",
+    representedProbabilityMass,
+    outOfGraphProbability,
+    openWorldCandidateProbabilityById,
+    openWorldEntropyBits,
+    openWorldPlacementCertainty,
+    coverageBasis,
+    openWorldInterpretation: "includes_out_of_graph_hypothesis_not_truth_claim",
   };
 }
 

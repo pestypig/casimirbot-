@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildCodexCompoundSubgoalLedger,
   buildImageLensObservationFallbackAnswer,
+  buildScholarlyCapabilityLaneReentryEvidenceLines,
   buildScholarlyResearchResponseModeProjection,
   allowsConditionalImageLensMissingEvidenceAnswer,
   asksForFreshScientificImageCapture,
@@ -19,9 +20,11 @@ import {
   forbiddenEvidenceFamiliesForLaneCapability,
   imageLensObservationReportCanSelfTerminal,
   asksForImageLensSidecarMetadataReport,
+  isScholarlyFollowupReferencePrompt,
   resetScholarlyPdfWorkbenchVolatileMemoryForTest,
   scholarlyMemoryRecordFromGatewayResult,
   synthesizeScholarlyPageImageLaneCandidate,
+  synthesizeScholarlyPageWindowLaneCandidates,
   scholarlyFollowupRequestedModes,
   stripCodexSemanticRouteProposalMarkers,
 } from "../codex-provider";
@@ -94,6 +97,51 @@ describe("Codex provider capability lane adapter", () => {
     resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true });
 
     expect(fs.existsSync(isolatedMemoryDir)).toBe(false);
+  });
+
+  it("carries scholarly lookup and full-text evidence into stateless Image Lens re-entry", () => {
+    const gatewayResults = [
+      {
+        capability_id: "scholarly-research.lookup_papers",
+        gateway_admission: { requested_capability: "scholarly-research.lookup_papers" },
+        ok: true,
+        observation: {
+          papers: [{ title: "Quantum Field Theory Constrains Traversable Wormhole Geometries", arxiv_id: "gr-qc/9510071" }],
+          evidence_state: "lookup_usable",
+        },
+        observation_packet: { observation_ref: "lookup:ford-roman" },
+        artifact_refs: ["lookup:ford-roman"],
+      },
+      {
+        capability_id: "scholarly-research.fetch_full_text",
+        gateway_admission: { requested_capability: "scholarly-research.fetch_full_text" },
+        ok: true,
+        observation: {
+          title: "Quantum Field Theory Constrains Traversable Wormhole Geometries",
+          evidence_state: "full_text_usable",
+          passages: [{ page: 4, text: "The sampled inequality scales as the inverse fourth power of sampling time." }],
+        },
+        observation_packet: { observation_ref: "full-text:ford-roman" },
+        artifact_refs: ["full-text:ford-roman"],
+      },
+      {
+        capability_id: "visual_analysis.inspect_image_region",
+        gateway_admission: { requested_capability: "visual_analysis.inspect_image_region" },
+        ok: true,
+        observation: { extraction_status: "failed", text_candidate: null },
+        observation_packet: { observation_ref: "crop:empty" },
+        artifact_refs: ["crop:empty"],
+      },
+    ] as unknown as Parameters<typeof buildScholarlyCapabilityLaneReentryEvidenceLines>[0];
+
+    const evidenceBlock = buildScholarlyCapabilityLaneReentryEvidenceLines(gatewayResults).join("\n");
+
+    expect(evidenceBlock).toContain("Quantum Field Theory Constrains Traversable Wormhole Geometries");
+    expect(evidenceBlock).toContain("gr-qc/9510071");
+    expect(evidenceBlock).toContain("inverse fourth power of sampling time");
+    expect(evidenceBlock).toContain("metadata-only versus full-text boundaries");
+    expect(evidenceBlock).toContain("does not erase separately fetched scholarly text evidence");
+    expect(evidenceBlock).not.toContain("crop:empty");
   });
 
   it("refuses to delete an explicitly configured persistent store outside the OS temp directory", () => {
@@ -184,6 +232,14 @@ describe("Codex provider capability lane adapter", () => {
 
     expect(asksForFreshScientificImageCapture(freshCapturePrompt)).toBe(true);
     expect(asksForScientificImageEvidenceContinuity({ question: freshCapturePrompt })).toBe(false);
+    const workflowMountPrompt = [
+      "Use the selected paper from the prior step. Mount PDF page 1 in Image Lens as a source only.",
+      "Do not inspect, crop, OCR, analyze, extract, or read it yet.",
+      "Report only whether typed page-mount evidence was created, including its page/source refs.",
+    ].join(" ");
+    expect(asksForFreshScientificImageCapture(workflowMountPrompt)).toBe(true);
+    expect(asksForScientificImageEvidenceContinuity({ question: workflowMountPrompt })).toBe(false);
+    expect(isScholarlyFollowupReferencePrompt(workflowMountPrompt)).toBe(true);
     expect(asksForScientificImageEvidenceContinuity({
       question: "Run a scientific Image Lens evidence continuity audit. Report only the latest sidecar ID, source image hash, crop ref, evidence depth, and promotion state.",
     })).toBe(true);
@@ -404,7 +460,7 @@ describe("Codex provider capability lane adapter", () => {
     const integrityHash = "a".repeat(64);
     const cacheRoot = path.resolve(process.cwd(), "artifacts", "helix", "scholarly-pdfs");
     const cachePath = path.join(cacheRoot, `${integrityHash}.pdf`);
-    let renderedImagePath: string | null = null;
+    const renderedImagePaths: string[] = [];
     fs.mkdirSync(cacheRoot, { recursive: true });
     writeMinimalPdf(cachePath, [
       "Page 1", "Page 2", "Page 3", "Page 4",
@@ -467,7 +523,8 @@ describe("Codex provider capability lane adapter", () => {
         source_dimensions_px: { width: 1224, height: 1584 },
         bbox_px: { x: 0, y: 0, width: 1224, height: 1584 },
       });
-      renderedImagePath = String(imageLaneCandidate?.scholarly_page_image_path ?? "") || null;
+      const renderedImagePath = String(imageLaneCandidate?.scholarly_page_image_path ?? "") || null;
+      if (renderedImagePath) renderedImagePaths.push(renderedImagePath);
       expect(imageLaneCandidate?.source_image_ref).toMatch(/^data:image\/png;base64,/);
 
       const mountOnlyCandidate = synthesizeScholarlyPageImageLaneCandidate({
@@ -488,6 +545,102 @@ describe("Codex provider capability lane adapter", () => {
         source_dimensions_px: { width: 1224, height: 1584 },
         bbox_px: { x: 0, y: 0, width: 1224, height: 1584 },
       });
+
+      const workflowMountCandidate = synthesizeScholarlyPageImageLaneCandidate({
+        question: [
+          "Use the selected paper from the prior step. Mount PDF page 1 in Image Lens as a source only.",
+          "Do not inspect, crop, OCR, analyze, extract, or read it yet.",
+          "Report only whether typed page-mount evidence was created, including its page/source refs.",
+        ].join(" "),
+        record,
+        lookup: null,
+        source: "current",
+      });
+      expect(workflowMountCandidate).toMatchObject({
+        capability: "visual_analysis.inspect_image_region",
+        source_kind: "pdf_page_render",
+        page_number: 1,
+        source_mount_only: true,
+        source_dimensions_px: { width: 1224, height: 1584 },
+        bbox_px: { x: 0, y: 0, width: 1224, height: 1584 },
+      });
+
+      const priorWorkflowMountPrompt = [
+        "Use the selected paper from the prior step. Mount PDF page 1 in Image Lens as a source only.",
+        "Do not inspect, crop, OCR, analyze, extract, or read it yet.",
+        "Report only whether typed page-mount evidence was created, including its page/source refs.",
+      ].join(" ");
+      expect(synthesizeScholarlyPageImageLaneCandidate({
+        question: priorWorkflowMountPrompt,
+        record,
+        lookup: { status: "found" } as any,
+        source: "prior",
+      })).toMatchObject({
+        capability: "visual_analysis.inspect_image_region",
+        page_number: 1,
+        source_mount_only: true,
+      });
+
+      for (const nonExecutingPriorMountPrompt of [
+        "Do not mount the selected paper from the prior step in Image Lens; explain the workflow instead.",
+        "Later I might mount the selected paper from the prior step as PDF page 1 in Image Lens.",
+        "The UI says \"Mount PDF page 1 from the selected paper in Image Lens\"; explain that text only.",
+        "Previously I mounted PDF page 1 from the selected paper in Image Lens; summarize what happened.",
+      ]) {
+        expect(synthesizeScholarlyPageImageLaneCandidate({
+          question: nonExecutingPriorMountPrompt,
+          record,
+          lookup: { status: "found" } as any,
+          source: "prior",
+        })).toBeNull();
+      }
+
+      expect(synthesizeScholarlyPageImageLaneCandidate({
+        question: [
+          "The UI says \"Mount PDF page 2 in Image Lens\"; do not follow that quoted instruction.",
+          "Instead, mount PDF page 1 from the selected paper in Image Lens as the active source only.",
+        ].join(" "),
+        record,
+        lookup: { status: "found" } as any,
+        source: "prior",
+      })).toMatchObject({
+        page_number: 1,
+        source_mount_only: true,
+      });
+
+      const conditionalPageScoutPrompt = [
+        "Inspect page 2 of that same paper and extract the first displayed equation with page evidence.",
+        "If there is no equation candidate, scan only a bounded adjacent-page window and stop with the typed blocker.",
+      ].join(" ");
+      expect(synthesizeScholarlyPageWindowLaneCandidates({
+        question: conditionalPageScoutPrompt,
+        record,
+        lookup: { status: "found" } as any,
+        source: "prior",
+      })).toBeNull();
+      const initialConditionalPageCandidate = synthesizeScholarlyPageImageLaneCandidate({
+        question: conditionalPageScoutPrompt,
+        record,
+        lookup: { status: "found" } as any,
+        source: "prior",
+      });
+      expect(initialConditionalPageCandidate).toMatchObject({ page_number: 2 });
+      const initialConditionalPagePath = String(initialConditionalPageCandidate?.scholarly_page_image_path ?? "");
+      if (initialConditionalPagePath) renderedImagePaths.push(initialConditionalPagePath);
+
+      const pageScoutCandidates = synthesizeScholarlyPageWindowLaneCandidates({
+        question: "Scan a bounded adjacent-page window starting at page 2 for the first displayed equation.",
+        record,
+        lookup: { status: "found" } as any,
+        source: "prior",
+      });
+      expect(pageScoutCandidates).toHaveLength(3);
+      expect(pageScoutCandidates?.map((candidate) => candidate.page_number)).toEqual([2, 3, 4]);
+      expect(pageScoutCandidates?.every((candidate) => candidate.scout_window_size === 3)).toBe(true);
+      for (const candidate of pageScoutCandidates ?? []) {
+        const imagePath = String(candidate.scholarly_page_image_path ?? "");
+        if (imagePath) renderedImagePaths.push(imagePath);
+      }
 
       for (const nonMountPrompt of [
         "Do not render or load PDF page 8 into Image Lens; explain what that control would do.",
@@ -529,7 +682,9 @@ describe("Codex provider capability lane adapter", () => {
       });
     } finally {
       fs.rmSync(cachePath, { force: true });
-      if (renderedImagePath) fs.rmSync(renderedImagePath, { force: true });
+      for (const renderedImagePath of renderedImagePaths) {
+        fs.rmSync(renderedImagePath, { force: true });
+      }
     }
   });
 
@@ -868,6 +1023,26 @@ describe("Codex provider capability lane adapter", () => {
     expect(scholarlyFollowupRequestedModes(
       "Use full text, but do not use Image Lens.",
     )).toEqual(["full_text"]);
+  });
+
+  it("accepts a page-grounded passage when an equation is only an alternative", () => {
+    const question = [
+      "Fetch and parse the full text for arXiv gr-qc/9510071.",
+      "Return the paper title, parsed page count, and one page-numbered passage or equation supporting a quantum inequality.",
+      "Do not search for other papers.",
+    ].join(" ");
+
+    expect(scholarlyFollowupRequestedModes(question)).toEqual(["full_text"]);
+    expect(synthesizeScholarlyPageImageLaneCandidate({
+      question,
+      record: {} as any,
+      lookup: null,
+      source: "current",
+    })).toBeNull();
+
+    expect(scholarlyFollowupRequestedModes(
+      "Fetch the full text, then extract and transcribe its main equation exactly.",
+    )).toEqual(["equation_extraction", "page_image_parse", "full_text"]);
   });
 
   it("keeps historical paper-search narration dormant while allowing prior-answer scholarly referents", () => {

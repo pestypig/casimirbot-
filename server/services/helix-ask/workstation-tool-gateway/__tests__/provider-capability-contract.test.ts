@@ -100,6 +100,7 @@ const readLiveEnvironmentToolNames = (): string[] => {
 const reviewedSharedProviderGatewayCapabilityIds = [
   "workspace_os.status",
   "workstation.active_context",
+  "theory-badge-graph.current_context",
   "workstation-notes.list_notes",
   "scientific-calculator.solve_expression",
   "scientific-calculator.solve_scalar_expression",
