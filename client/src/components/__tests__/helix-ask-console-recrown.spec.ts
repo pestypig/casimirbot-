@@ -167,6 +167,7 @@ import {
   copyHelixAskDebugPayloadToClipboard,
   resolveHelixAskAuthoritativeDebugExportPayload,
 } from "@/components/helix/ask-console/HelixAskDebugCopyProjection";
+import { mergeHelixAskClientWorkflowDemoDebugIntoExport } from "@/components/helix/ask-console/HelixAskWorkflowDebugProjection";
 import { selectHelixAskVisibleFinalAnswer } from "@/components/helix/ask-console/HelixAskVisibleFinalAnswerSelection";
 import {
   buildHelixAskRuntimeGoalDebugFields,
@@ -3849,6 +3850,38 @@ describe("Helix Ask Console recrown boundary", () => {
         value: originalFetch,
       });
     }
+  });
+
+  it("attaches client workflow demo debug at the final debug-copy boundary", () => {
+    const merged = mergeHelixAskClientWorkflowDemoDebugIntoExport(
+      JSON.stringify({
+        schema: "helix.ask.debug_export.v1",
+        active_turn_id: "ask:qte-debug",
+        workflow_demo_debug: null,
+      }),
+      {
+        schema: "helix.workflow_demo_debug.v1",
+        current_turn_event_count: 3,
+        run_event_count: 8,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+    );
+
+    expect(JSON.parse(merged)).toMatchObject({
+      active_turn_id: "ask:qte-debug",
+      workflow_demo_debug: {
+        schema: "helix.workflow_demo_debug.v1",
+        current_turn_event_count: 3,
+        run_event_count: 8,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+    });
   });
 
   it("resolves debug-copy backend-entrypoint misses as typed failure before stale sidecar text can answer", async () => {

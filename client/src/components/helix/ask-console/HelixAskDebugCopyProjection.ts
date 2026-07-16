@@ -27,6 +27,7 @@ import {
   resolveHelixAskLegacyDebugExportClientTurnId,
 } from "./HelixAskLegacyTurnControls";
 import { mergeHelixAskRuntimeGoalDebugFields } from "./HelixAskRuntimeGoalDebugContext";
+import { mergeHelixAskClientWorkflowDemoDebugIntoExport } from "./HelixAskWorkflowDebugProjection";
 
 export type HelixAskDebugPayloadClipboardCopyResult = RecrownedHelixAskDebugClipboardCopyResult;
 

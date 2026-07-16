@@ -3,7 +3,6 @@ import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
 import type { HelixLanguageModelProfileId } from "@shared/helix-language-model-policy";
 import { DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS } from "@/lib/helix/ask-agent-runtime-display";
 import { useAgiChatStore } from "@/store/useAgiChatStore";
-import { useHelixWorkflowDemoStore } from "@/store/useHelixWorkflowDemoStore";
 
 import {
   buildHelixAskComposerViewModel,
@@ -74,6 +73,7 @@ import {
   type HelixAskVoiceConfirmationRuntimeSurfaceProps,
 } from "./HelixAskVoiceConfirmationRuntime";
 import { HelixAskWorkflowSuggestionRuntime } from "./HelixAskWorkflowSuggestionRuntime";
+import { useHelixAskWorkflowQteBridge } from "./HelixAskWorkflowQteBridge";
 
 export type HelixAskMinimalRuntimeVisibleSurfaceSlots = {
   voiceLevelMonitor?: ReactNode;
@@ -131,7 +131,7 @@ export function HelixAskMinimalRuntimeShell({
   const runtimeGoalWakeLastSubmittedKeyRef = useRef<string | null>(null);
   const hydratedChatSessionRef = useRef<string | null>(null);
   const pendingExternalPromptRef = useRef<PendingHelixAskPrompt | null>(null);
-  const pendingWorkflowQteRef = useRef<PendingHelixAskPrompt["workflowQte"] | null>(null);
+  const workflowQteBridge = useHelixAskWorkflowQteBridge();
   const askInputRef = useRef<HTMLTextAreaElement | null>(null);
   const toolbarCarouselRef = useRef<HTMLDivElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
@@ -261,9 +261,9 @@ export function HelixAskMinimalRuntimeShell({
   const submitMinimalRuntimeQuestion = useCallback((questionText: string, pendingPrompt: PendingHelixAskPrompt | null = null) => {
     const draftText = questionText.trim();
     if (!draftText) return false;
-    const workflowQte = pendingPrompt?.workflowQte ?? pendingWorkflowQteRef.current;
+    const workflowQte = workflowQteBridge.resolvePending(pendingPrompt);
     if (runtimeState.askBusy) {
-      pendingWorkflowQteRef.current = null;
+      workflowQteBridge.clearPending();
       pendingExternalPromptRef.current = pendingPrompt
         ? { ...pendingPrompt, question: draftText, workflowQte }
         : {
@@ -275,7 +275,7 @@ export function HelixAskMinimalRuntimeShell({
           };
       return true;
     }
-    pendingWorkflowQteRef.current = null;
+    workflowQteBridge.clearPending();
     const submitPlan = buildHelixAskMinimalRuntimeSubmitPlan({
       draft: draftText,
       selectedRuntime,
@@ -292,15 +292,12 @@ export function HelixAskMinimalRuntimeShell({
       if (sessionId) {
         setChatSessionId(sessionId);
         setActiveChatSession(sessionId);
-        if (workflowQte?.sourceSessionId === sessionId) {
-          useHelixWorkflowDemoStore.getState().markPromptSubmitted({
-            runId: workflowQte.runId,
-            stepId: workflowQte.stepId,
-            sourceSessionId: sessionId,
-            turnId,
-            prompt: submitPlan.envelope.question,
-          });
-        }
+        workflowQteBridge.recordSubmitted({
+          workflowQte,
+          sourceSessionId: sessionId,
+          turnId,
+          prompt: submitPlan.envelope.question,
+        });
         addChatMessage(sessionId, {
           role: "user",
           content: submitPlan.envelope.question,
@@ -408,6 +405,7 @@ export function HelixAskMinimalRuntimeShell({
     selectedRuntime,
     setActiveChatSession,
     turnRunner,
+    workflowQteBridge,
   ]);
 
   const executePendingPrompt = useCallback((pending: PendingHelixAskPrompt | null | undefined) => {
@@ -417,13 +415,13 @@ export function HelixAskMinimalRuntimeShell({
     if (!claimExternalPromptSingleFlight(claimId)) return;
     clearPendingHelixAskPrompt();
     if (pending?.autoSubmit === false) {
-      pendingWorkflowQteRef.current = pending.workflowQte ?? null;
+      workflowQteBridge.replacePending(pending.workflowQte);
       setDraft(question);
       return;
     }
-    pendingWorkflowQteRef.current = null;
+    workflowQteBridge.clearPending();
     submitMinimalRuntimeQuestion(question, pending);
-  }, [submitMinimalRuntimeQuestion]);
+  }, [submitMinimalRuntimeQuestion, workflowQteBridge]);
 
   useEffect(() => {
     if (runtimeState.askBusy) return;

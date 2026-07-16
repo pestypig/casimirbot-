@@ -44,7 +44,6 @@ import {
 } from "@/lib/agi/debugExport";
 import { buildHelixAskClientBypassAudit, buildWorkspaceActionClientAckSnapshot } from "@/lib/agi/workspaceActionAck";
 import { useAgiChatStore, type ChatSession } from "@/store/useAgiChatStore";
-import { useHelixWorkflowDemoStore } from "@/store/useHelixWorkflowDemoStore";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
 import { useInterfaceText } from "@/lib/i18n/interfaceText";
@@ -140,7 +139,6 @@ import {
   selectHelixAskLegacyDebugCopyLocalPayload,
   selectHelixAskLegacyReplyScopedDebugExportPayload,
 } from "@/components/helix/ask-console/HelixAskLegacyTurnControls";
-import { boundHelixDebugExportTextForUi } from "@/components/helix/ask-console/HelixAskDebugExportSizeControl";
 import {
   copyHelixAskDebugPayloadToClipboard,
   resolveHelixAskAuthoritativeDebugExportPayload,
@@ -156,7 +154,6 @@ import {
   hasSuccessfulWorkstationTerminalTranscriptRows,
   resolveHelixAskConsoleFinalAnswerSourceLabel,
 } from "@/components/helix/ask-console/HelixAskFinalProjection";
-import { mergeRenderedLanguageModelPolicySummaryIntoDebugExport } from "@/components/helix/ask-console/HelixAskDebugExportModelPolicyProjection";
 import { buildHelixAskAttachmentStripState } from "@/components/helix/ask-console/HelixAskAttachmentStripState";
 import {
   type StagePlayGoalSessionAction,
@@ -223,8 +220,14 @@ import {
   type HelixAskVoiceConfirmationRuntimeEvent,
 } from "@/components/helix/ask-console/HelixAskVoiceConfirmationRuntime";
 import { HelixAskWorkflowSuggestionRuntime } from "@/components/helix/ask-console/HelixAskWorkflowSuggestionRuntime";
-import { buildHelixWorkflowDemoDebugExport } from "@/lib/helix/workflow-demos/workflow-demo-debug";
-import type { HelixWorkflowDemoDebugExportV1 } from "@shared/contracts/helix-workflow-demo.v1";
+import {
+  buildHelixAskWorkflowDemoDebugRows,
+  buildHelixAskWorkflowDemoReplyDebug,
+  finalizeHelixAskWorkflowDebugCopyExport,
+  useHelixAskWorkflowDemoDebugState,
+  type HelixWorkflowDemoDebugExportV1,
+} from "@/components/helix/ask-console/HelixAskWorkflowDebugProjection";
+import { useHelixAskWorkflowQteBridge } from "@/components/helix/ask-console/HelixAskWorkflowQteBridge";
 import {
   buildHelixAskVoiceCaptureHealthState,
   type HelixAskVoiceCaptureHealthSnapshot,
@@ -4581,38 +4584,13 @@ function buildReplyMasterEventClockExport(args: {
         };
       })
     : [];
-  const workflowDemoRows: UnifiedDebugEventRow[] = Array.isArray(args.workflowDemoDebug?.current_turn_events)
-    ? args.workflowDemoDebug.current_turn_events.slice(-120).map((event, idx) => {
-        if (event.source_trace_id) traceIds.add(event.source_trace_id);
-        if (event.source_turn_id) turnKeys.add(event.source_turn_id);
-        const parsedAtMs = Date.parse(event.at);
-        return {
-          index: idx + 1,
-          channel: "workflow_demo" as const,
-          id: event.event_id,
-          tsMs: Number.isFinite(parsedAtMs) ? parsedAtMs : null,
-          tool: "helix.workflow_demo",
-          traceId: event.source_trace_id,
-          turnKey: event.source_turn_id,
-          attemptId: null,
-          stage: event.event_kind,
-          detail: [
-            event.reason,
-            event.before_step_id || event.after_step_id
-              ? `step:${event.before_step_id ?? "none"}->${event.after_step_id ?? "none"}`
-              : null,
-            event.new_artifact_refs.length > 0 ? `new_refs:${event.new_artifact_refs.length}` : null,
-            event.amends_debug_for_turn_id ? `amends:${event.amends_debug_for_turn_id}` : null,
-          ].filter(Boolean).join(" | ") || null,
-          text: summarizeVoiceDebugText(
-            event.qte_step_id
-              ? `workflow QTE ${event.event_kind}: ${event.qte_step_id}`
-              : `workflow demo ${event.event_kind}`,
-            280,
-          ),
-        };
-      })
-    : [];
+  const workflowDemoProjection = buildHelixAskWorkflowDemoDebugRows({
+    debug: args.workflowDemoDebug,
+    summarizeText: summarizeVoiceDebugText,
+  });
+  workflowDemoProjection.traceIds.forEach((traceId) => traceIds.add(traceId));
+  workflowDemoProjection.turnKeys.forEach((turnKey) => turnKeys.add(turnKey));
+  const workflowDemoRows: UnifiedDebugEventRow[] = workflowDemoProjection.rows;
   const observerRows: UnifiedDebugEventRow[] = askRows
     .map((row): UnifiedDebugEventRow | null => {
       const commentary = buildObserverCommentaryForRow(row, {
@@ -6435,8 +6413,8 @@ export function HelixAskPill({
   const { ensureContextSession, addMessage, setActive } = useAgiChatStore();
   const helixChatSessions = useAgiChatStore((state) => state.sessions);
   const helixChatStoreHydrated = useAgiChatStore((state) => state.hydrated);
-  const workflowDemoSession = useHelixWorkflowDemoStore((state) => state.session);
-  const workflowDemoDebugEvents = useHelixWorkflowDemoStore((state) => state.debugEvents);
+  const workflowDemoDebugState = useHelixAskWorkflowDemoDebugState();
+  const workflowQteBridge = useHelixAskWorkflowQteBridge();
   const helixAskSessionRef = useRef<string | null>(null);
   const helixAskSessionContextRef = useRef<string | null>(null);
   const askInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -7452,7 +7430,6 @@ export function HelixAskPill({
   const reasoningTimelineEntryByAttemptIdRef = useRef<Record<string, string>>({});
   const reasoningStreamEntryByAttemptIdRef = useRef<Record<string, string>>({});
   const pendingExternalAskPromptRef = useRef<PendingHelixAskPrompt | null>(null);
-  const pendingWorkflowQteRef = useRef<PendingHelixAskPrompt["workflowQte"] | null>(null);
 
   useEffect(() => {
     reasoningAttemptsRef.current = reasoningAttempts;
@@ -9057,7 +9034,12 @@ export function HelixAskPill({
   );
 
   const handleCopyReplyMasterDebug = useCallback(
-    async (reply: HelixAskReply, payload: string | null | undefined, sourceElement?: HTMLElement | null) => {
+    async (
+      reply: HelixAskReply,
+      payload: string | null | undefined,
+      sourceElement?: HTMLElement | null,
+      workflowDemoDebug?: HelixWorkflowDemoDebugExportV1 | null,
+    ) => {
       if (debugCopyInFlightRef.current) return;
       debugCopyInFlightRef.current = true;
       setDebugExportDrawer(null);
@@ -9100,9 +9082,11 @@ export function HelixAskPill({
             clickedButtonScopedPayload: renderedButtonScopedPayload,
             sourceElement,
           });
-        const exportPayload = boundHelixDebugExportTextForUi(
-          mergeRenderedLanguageModelPolicySummaryIntoDebugExport(matchedExportPayload, clickedTurnScope),
-        );
+        const exportPayload = finalizeHelixAskWorkflowDebugCopyExport({
+          payload: matchedExportPayload,
+          clickedTurnScope,
+          workflowDemoDebug,
+        });
         if (typeof window !== "undefined") {
           (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY__?: string }).__HELIX_LAST_UNIFIED_DEBUG_COPY__ = exportPayload;
         }
@@ -20011,23 +19995,13 @@ export function HelixAskPill({
       });
       const runAskTurnId = pendingWorkstationUserInputRef.current?.turn_id ?? `ask:${crypto.randomUUID()}`;
       const sessionIdForTurn = getHelixAskSessionId();
-      const pendingWorkflowQte = runAskInputSource === "manual"
-        ? pendingWorkflowQteRef.current
-        : null;
-      pendingWorkflowQteRef.current = null;
-      if (
-        pendingWorkflowQte &&
-        sessionIdForTurn &&
-        pendingWorkflowQte.sourceSessionId === sessionIdForTurn
-      ) {
-        useHelixWorkflowDemoStore.getState().markPromptSubmitted({
-          runId: pendingWorkflowQte.runId,
-          stepId: pendingWorkflowQte.stepId,
-          sourceSessionId: sessionIdForTurn,
-          turnId: runAskTurnId,
-          prompt: trimmed,
-        });
-      }
+      const pendingWorkflowQte = workflowQteBridge.takePending(runAskInputSource === "manual");
+      workflowQteBridge.recordSubmitted({
+        workflowQte: pendingWorkflowQte,
+        sourceSessionId: sessionIdForTurn,
+        turnId: runAskTurnId,
+        prompt: trimmed,
+      });
       const backendEntrypointRoutePlan = buildHelixAskSubmitBackendEntrypointRoutePlan({
         question: trimmed,
         baseRunOptions: options,
@@ -22465,6 +22439,7 @@ export function HelixAskPill({
       visualSituationEvidenceForTurn,
       visualSituationSourceLabel,
       visualSituationSourceStatus,
+      workflowQteBridge,
     ],
   );
   runAskRef.current = runAsk;
@@ -22573,7 +22548,7 @@ export function HelixAskPill({
       }
       pendingExternalAskPromptRef.current = null;
       if (pending?.autoSubmit === false) {
-        pendingWorkflowQteRef.current = pending.workflowQte ?? null;
+        workflowQteBridge.replacePending(pending.workflowQte);
         if (askInputRef.current) {
           askInputRef.current.value = question;
           resizeTextarea();
@@ -22603,6 +22578,7 @@ export function HelixAskPill({
       cancelPendingWorkstationRequestForTurnTransition,
       resizeTextarea,
       runAsk,
+      workflowQteBridge,
     ],
   );
 
@@ -24016,9 +23992,8 @@ export function HelixAskPill({
               resolveHelixAskLegacyReplyFailContext(reply.debug),
             );
             const replyDebugRecord = readAgentLoopAuditRecord(reply.debug);
-            const workflowDemoDebug = buildHelixWorkflowDemoDebugExport({
-              session: workflowDemoSession,
-              events: workflowDemoDebugEvents,
+            const workflowDemoDebug = buildHelixAskWorkflowDemoReplyDebug({
+              state: workflowDemoDebugState,
               target: {
                 client_reply_id: reply.id || null,
                 turn_id: resolveHelixAskReplyDebugTurnId(reply),
@@ -24168,6 +24143,7 @@ export function HelixAskPill({
                   reply,
                   replyMasterEventClockPayload,
                   event.currentTarget,
+                  workflowDemoDebug,
                 ),
               onReadAloud: () => void handleReadAloud(reply, latestTurnBinding.controlTarget.finalAnswerText),
               showDebugCopy: turnControlViewModel.showDebugCopy,

@@ -630,6 +630,27 @@ export type {
   HelixAskDebugPayloadClipboardCopyResult,
 } from "./HelixAskDebugCopyProjection";
 export {
+  buildHelixAskWorkflowDemoDebugRows,
+  buildHelixAskWorkflowDemoReplyDebug,
+  finalizeHelixAskWorkflowDebugCopyExport,
+  mergeHelixAskClientWorkflowDemoDebugIntoExport,
+  useHelixAskWorkflowDemoDebugState,
+} from "./HelixAskWorkflowDebugProjection";
+export type {
+  HelixAskWorkflowDemoDebugRow,
+  HelixAskWorkflowDemoDebugState,
+  HelixWorkflowDemoDebugExportV1,
+} from "./HelixAskWorkflowDebugProjection";
+export {
+  createHelixAskWorkflowQteBridge,
+  useHelixAskWorkflowQteBridge,
+} from "./HelixAskWorkflowQteBridge";
+export type {
+  HelixAskWorkflowQteBridge,
+  HelixAskWorkflowQteLaunch,
+  HelixAskWorkflowQteSubmission,
+} from "./HelixAskWorkflowQteBridge";
+export {
   normalizeHelixAskReplyMasterDebugPayload,
 } from "./HelixAskDebugCopyLocalPayload";
 export type {

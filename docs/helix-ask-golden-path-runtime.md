@@ -22,6 +22,11 @@ The runtime is enabled by default. Operators can explicitly opt out with:
 - `HELIX_ASK_GOLDEN_PATH_RUNTIME=disabled`
 - `HELIX_ASK_GOLDEN_PATH_RUNTIME=off`
 
+The repository's README-supported development commands (`npm run dev`,
+`npm run dev:agi`, `npm run dev:agi:5050`, and `npm run dev:agi:5173`)
+explicitly opt out so normal keyed development reaches the live model/tool
+route. `npm run dev:golden-path` is the explicit local scaffold command.
+
 When enabled, a request enters golden path if an ordered capability or compound
 module matches the prompt/body. Unmatched prompts fall through to the legacy
 route unless the request explicitly opts into the contract-only scaffold with a
@@ -189,7 +194,7 @@ import `server/routes/agi.plan.ts`.
 
 Activation should remain staged:
 
-1. Keep the golden path disabled by default.
+1. Keep normal README development entrypoints explicitly opted out.
 2. Validate deterministic contract tests.
 3. Run keyed localhost probes only after user-started server confirmation.
 4. Expand explicit capability coverage behind the same gate.

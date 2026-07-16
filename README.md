@@ -177,6 +177,10 @@ Do not start a separate Vite server for normal development; the dev scripts
 already wire the API and UI together. Use `npm run dev` for the default port or
 `npm run dev:agi:5050` for the AGI-enabled 5050 workflow.
 
+The normal development commands keep the contract-only Helix Ask golden-path
+scaffold disabled so keyed model and tool routes can run. Use
+`npm run dev:golden-path` only when deliberately testing that scaffold.
+
 ### Runtime Commands
 
 Use these commands from the repository root during setup and deployment:

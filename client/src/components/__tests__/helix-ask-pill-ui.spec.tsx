@@ -1331,13 +1331,21 @@ describe("HelixAskPill mic-first surface contract", () => {
 
   it("attaches turn-correlated workflow QTE events to the master debug export", () => {
     const source = fs.readFileSync(pillPath, "utf8");
+    const workflowDebugProjectionSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskWorkflowDebugProjection.ts"),
+      "utf8",
+    );
     const debugExportSource = fs.readFileSync(
       path.resolve(process.cwd(), "client/src/lib/agi/debugExport.ts"),
       "utf8",
     );
-    expect(source).toContain('channel: "workflow_demo" as const');
+    expect(source).toContain("buildHelixAskWorkflowDemoDebugRows({");
     expect(source).toContain("workflowDemo: args.workflowDemoDebug ?? null");
-    expect(source).toContain("const workflowDemoDebug = buildHelixWorkflowDemoDebugExport");
+    expect(source).toContain("const workflowDemoDebug = buildHelixAskWorkflowDemoReplyDebug");
+    expect(source).not.toContain('channel: "workflow_demo" as const');
+    expect(workflowDebugProjectionSource).toContain('channel: "workflow_demo"');
+    expect(workflowDebugProjectionSource).toContain("buildHelixWorkflowDemoDebugExport({");
+    expect(workflowDebugProjectionSource).toContain("finalizeHelixAskWorkflowDebugCopyExport");
     expect(debugExportSource).toContain("workflow_demo_debug:");
     expect(debugExportSource).toContain("asRecord(asRecord(payload.channels)?.workflowDemo)");
   });
