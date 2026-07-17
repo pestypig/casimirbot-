@@ -109,7 +109,12 @@ export type TheoryContextReflectionUncertaintyV1 = {
   openWorldCandidateProbabilityById?: Record<string, number>;
   openWorldEntropyBits?: number;
   openWorldPlacementCertainty?: number;
-  coverageBasis?: "closed_world_default" | "caller_calibrated" | "absolute_match_score_heuristic" | "no_candidates";
+  coverageBasis?:
+    | "closed_world_default"
+    | "caller_calibrated"
+    | "absolute_match_score_heuristic"
+    | "semantic_coverage_heuristic"
+    | "no_candidates";
   openWorldInterpretation?: "includes_out_of_graph_hypothesis_not_truth_claim";
 };
 
@@ -307,7 +312,13 @@ function validateUncertainty(value: unknown, issues: string[]): void {
   }
   if (
     value.coverageBasis !== undefined &&
-    !["closed_world_default", "caller_calibrated", "absolute_match_score_heuristic", "no_candidates"].includes(
+    ![
+      "closed_world_default",
+      "caller_calibrated",
+      "absolute_match_score_heuristic",
+      "semantic_coverage_heuristic",
+      "no_candidates",
+    ].includes(
       String(value.coverageBasis),
     )
   ) {

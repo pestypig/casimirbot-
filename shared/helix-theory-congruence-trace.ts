@@ -2,6 +2,10 @@ import {
   validateTheoryMasterProblemV1,
   type TheoryMasterProblemV1,
 } from "./contracts/theory-master-problem.v1";
+import {
+  validateTheoryDerivationProgramV1,
+  type TheoryDerivationProgramV1,
+} from "./contracts/theory-derivation-program.v1";
 
 export const HELIX_THEORY_CONGRUENCE_TRACE_SCHEMA =
   "helix.theory_congruence_trace.v1" as const;
@@ -120,6 +124,7 @@ export type TheoryCongruenceTraceV1 = {
     caveat?: string;
   }>;
   master_problem: TheoryMasterProblemV1;
+  derivation_program: TheoryDerivationProgramV1;
   claim_boundaries: Array<{
     boundary_id: string;
     text: string;
@@ -233,6 +238,9 @@ export function validateTheoryCongruenceTraceV1(value: unknown): string[] {
   }
   for (const issue of validateTheoryMasterProblemV1(value.master_problem)) {
     issues.push(`master_problem.${issue}`);
+  }
+  for (const issue of validateTheoryDerivationProgramV1(value.derivation_program)) {
+    issues.push(`derivation_program.${issue}`);
   }
   if (!isRecord(value.forbidden_claim_scan)) {
     issues.push("forbidden_claim_scan must be an object");

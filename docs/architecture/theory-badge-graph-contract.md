@@ -146,6 +146,58 @@ references remain representable and non-executable. New agent-proposed relations
 remain conjectures outside the canonical graph until a separate evidence and
 promotion review accepts them.
 
+For `compare` operations, graph reachability and matching units are not enough.
+Every participating badge must expose a source-backed `observables[]` binding
+with a canonical observable id, mathematical object type, units/dimensions,
+frame, operational-definition ref, and optional response-model ref. The Master
+Problem records the selected bindings and pairwise identity checks under
+`observableResolution`.
+
+Two sources are directly comparable only when those bindings share canonical
+identity, mathematical type, dimensions, units, frame, and response semantics.
+Different observables require an edge-level `observableBridge` with registered
+authority, provenance refs, assumptions, validity domain, and error contract.
+Approximation, coarse-graining, and calibrated-response bridges must carry a
+bounded or statistical error expression. Missing identity is `unidentifiable`;
+different identities without a bridge are `missing_bridge_relation`; frame or
+bridge-domain failures are `domain_mismatch`; and mathematical/dimensional
+incompatibility fails closed as `dimensionally_incompatible`.
+
+Prompt text, shared subject words, symbol spelling, and unit compatibility may
+help retrieval, but they cannot create an observable binding or promote an
+agent-proposed bridge into the canonical graph during the same turn.
+
+An admitted Master Problem is compiled once more into a temporary,
+non-terminal `theory_derivation_program/v1` artifact. This is the auditable
+derivation DAG for the current question, not a new runtime. It records:
+
+- dependency-ordered relation, observable, bridge, uncertainty, comparison,
+  runtime-request, gate, and solver-input steps;
+- preflight, execution, and post-execution obligations for bindings,
+  dimensions, scale/frame domains, bridge error, runtime receipts, gate
+  receipts, and formal systems;
+- a proposed solver family and whether that route is admitted, conditional,
+  reference-only, or blocked;
+- typed failure receipts for unidentifiable targets, missing bridges,
+  incompatibility, noncomputability, insufficient evidence, and cyclic graph
+  cuts; and
+- the bridge error expressions that the completed solver path must propagate.
+
+The Master Problem may retain a broad locator neighborhood for audit context,
+but the derivation program compiles the smallest registered upstream cut that
+reaches the requested target or comparison participants. Ambient/likely badges
+outside that cut do not create solver steps or missing-input obligations. Hard
+evidence, observable, dimension, or domain failures take precedence over
+downstream equation failures so the receipt reports the next repairable cause
+instead of flooding the turn with unreachable requirements.
+
+Every derivation step is emitted with `executionStatus = not_started`.
+`executorOwner = agent_runtime`; the program cannot call a tool, sample a
+model, become an assistant answer, or acquire terminal authority. Codex (or a
+future compatible agent runtime) chooses and executes admitted capabilities,
+then re-enters their observations. Helix Ask validates evidence identity,
+obligations, route eligibility, and the final route-product contract.
+
 ## Tool-Call Contract
 
 Helix Ask admits theory graph utilities through the congruence trace. A batch is

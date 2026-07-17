@@ -7,6 +7,7 @@ import {
 } from "../../contracts/theory-master-problem.v1";
 import {
   buildTheoryBadgeGraphV1,
+  validateTheoryBadgeGraphV1,
   type TheoryBadgeEdgeV1,
   type TheoryBadgeV1,
 } from "../../contracts/theory-badge-graph.v1";
@@ -31,8 +32,16 @@ function badge(args: {
   outputSymbols?: string[];
   dimensionSignature?: string;
   noncomputable?: boolean;
+  observable?: {
+    canonicalObservableId: string;
+    quantity?: string;
+    unit?: string;
+    coordinateFrame?: string | null;
+    responseModelRef?: string | null;
+  };
 }): TheoryBadgeV1 {
   const outputSymbol = args.outputSymbols?.[0] ?? args.inputSymbols?.[0] ?? "x";
+  const sourcePath = `tests/${args.id}.spec.ts`;
   return {
     id: args.id,
     title: args.id,
@@ -60,13 +69,27 @@ function badge(args: {
     })),
     assumptions: [],
     calculatorPayloads: [],
-    sourceRefs: [{ kind: "test", path: `tests/${args.id}.spec.ts` }],
+    sourceRefs: [{ kind: "test", path: sourcePath }],
+    ...(args.observable ? {
+      observables: [{
+        id: `${args.id}.observable`,
+        canonicalObservableId: args.observable.canonicalObservableId,
+        symbol: outputSymbol,
+        quantity: args.observable.quantity ?? outputSymbol,
+        mathematicalType: "scalar",
+        unit: args.observable.unit ?? "arb",
+        dimensionSignature: args.dimensionSignature ?? "Q",
+        coordinateFrame: args.observable.coordinateFrame ?? "laboratory",
+        operationalDefinitionRef: sourcePath,
+        responseModelRef: args.observable.responseModelRef ?? null,
+      }],
+    } : {}),
     scaleEnvelope: {
       characteristicLog10M: 0,
       minLog10M: -1,
       maxLog10M: 1,
       basis: "derived",
-      sourceRefs: [{ kind: "test", path: `tests/${args.id}.spec.ts` }],
+      sourceRefs: [{ kind: "test", path: sourcePath }],
     },
     hintKeys: {
       subjects: [],
@@ -186,5 +209,233 @@ describe("theory master problem compiler", () => {
 
     expect(result.compile.status).toBe("insufficient_evidence");
     expect(result.compile.runtimeAdmission).toBe("blocked");
+  });
+
+  it("admits comparison only when source-backed bindings share canonical observable identity", () => {
+    const left = badge({
+      id: "left-model",
+      outputSymbols: ["y_left"],
+      observable: { canonicalObservableId: "observable.shared_y", quantity: "shared_y" },
+    });
+    const right = badge({
+      id: "right-model",
+      outputSymbols: ["y_right"],
+      observable: { canonicalObservableId: "observable.shared_y", quantity: "shared_y" },
+    });
+    const comparisonGraph = graph([left, right]);
+    const result = compileTheoryMasterProblem({
+      graph: comparisonGraph,
+      badgeIds: [left.id, right.id],
+      comparisonBadgeIds: [left.id, right.id],
+      request: {
+        ...request,
+        operation: "compare",
+        target: "compare the two model predictions",
+        targetObservable: null,
+      },
+    });
+
+    expect(validateTheoryBadgeGraphV1(comparisonGraph)).toEqual([]);
+    expect(result.observableResolution).toMatchObject({
+      targetObservableId: "observable.shared_y",
+      status: "resolved",
+      participantBadgeIds: [left.id, right.id],
+      pairChecks: [{ status: "same_canonical_observable" }],
+    });
+    expect(result.request.targetObservable).toBe("observable.shared_y");
+    expect(result.compile.status).toBe("executable");
+  });
+
+  it("does not treat shared symbols or units as canonical observable identity", () => {
+    const left = badge({ id: "left-unbound", outputSymbols: ["pressure"] });
+    const right = badge({ id: "right-unbound", outputSymbols: ["pressure"] });
+    const result = compileTheoryMasterProblem({
+      graph: graph([left, right]),
+      badgeIds: [left.id, right.id],
+      comparisonBadgeIds: [left.id, right.id],
+      request: {
+        ...request,
+        operation: "compare",
+        target: "compare pressure",
+        targetObservable: "pressure",
+      },
+    });
+
+    expect(result.observableResolution.status).toBe("blocked");
+    expect(result.observableResolution.unresolvedReasons).toContain("target observable is not registered: pressure");
+    expect(result.compile.status).toBe("unidentifiable");
+    expect(result.compile.runtimeAdmission).toBe("blocked");
+  });
+
+  it("returns missing_bridge_relation when canonical observable identities differ", () => {
+    const left = badge({
+      id: "sphere-plane",
+      outputSymbols: ["force_gradient"],
+      observable: { canonicalObservableId: "casimir.sphere_plane.force_gradient" },
+    });
+    const right = badge({
+      id: "parallel-plate",
+      outputSymbols: ["pressure"],
+      observable: { canonicalObservableId: "casimir.parallel_plate.pressure" },
+    });
+    const result = compileTheoryMasterProblem({
+      graph: graph([left, right]),
+      badgeIds: [left.id, right.id],
+      comparisonBadgeIds: [left.id, right.id],
+      request: {
+        ...request,
+        operation: "compare",
+        target: "compare Casimir observables",
+        targetObservable: null,
+      },
+    });
+
+    expect(result.observableResolution.pairChecks[0]).toMatchObject({
+      status: "observable_identity_mismatch",
+      bridgeEdgeId: null,
+    });
+    expect(result.compile.status).toBe("missing_bridge_relation");
+    expect(result.compile.allowedResultKinds).toEqual(["unresolved"]);
+  });
+
+  it("admits a different-observable comparison through a registered bounded bridge", () => {
+    const model = badge({
+      id: "force-model",
+      outputSymbols: ["force"],
+      observable: { canonicalObservableId: "model.force", quantity: "force", unit: "N" },
+    });
+    const detector = badge({
+      id: "detector-model",
+      inputSymbols: ["force"],
+      outputSymbols: ["counts"],
+      observable: {
+        canonicalObservableId: "instrument.count_rate",
+        quantity: "detector_count_rate",
+        unit: "count/s",
+        responseModelRef: "tests/detector-model.spec.ts",
+      },
+    });
+    const bridge: TheoryBadgeEdgeV1 = {
+      ...derives(model.id, detector.id),
+      observableBridge: {
+        fromObservableId: "model.force",
+        toObservableId: "instrument.count_rate",
+        kind: "calibrated_response",
+        authority: "registered",
+        reversible: false,
+        assumptions: ["calibration:v1 applies"],
+        sourceRefs: ["tests/detector-model.spec.ts"],
+        validityDomain: {
+          scaleLog10M: { min: -3, max: 1 },
+          coordinateFrames: ["laboratory"],
+          conditions: ["detector response is unsaturated"],
+        },
+        errorContract: { kind: "bounded", expression: "abs(delta_counts) <= 2" },
+      },
+    };
+    const comparisonGraph = graph([model, detector], [bridge]);
+    const result = compileTheoryMasterProblem({
+      graph: comparisonGraph,
+      badgeIds: [model.id, detector.id],
+      comparisonBadgeIds: [model.id, detector.id],
+      request: {
+        ...request,
+        operation: "compare",
+        target: "compare model force with detector counts",
+        targetObservable: "instrument.count_rate",
+        coordinateFrame: "laboratory",
+        scaleLog10M: { min: -2, max: 0 },
+      },
+    });
+
+    expect(validateTheoryBadgeGraphV1(comparisonGraph)).toEqual([]);
+    expect(result.observableResolution.pairChecks[0]).toMatchObject({
+      status: "approved_bridge",
+      bridgeEdgeId: bridge.id,
+      bridgeKind: "calibrated_response",
+      errorKind: "bounded",
+      errorExpression: "abs(delta_counts) <= 2",
+    });
+    expect(result.compile.status).toBe("executable");
+  });
+
+  it("fails a registered bridge closed outside its frame domain", () => {
+    const model = badge({
+      id: "frame-model",
+      outputSymbols: ["x"],
+      observable: { canonicalObservableId: "observable.frame_x" },
+    });
+    const detector = badge({
+      id: "frame-detector",
+      inputSymbols: ["x"],
+      outputSymbols: ["x_observed"],
+      observable: { canonicalObservableId: "observable.frame_x_observed" },
+    });
+    const bridge: TheoryBadgeEdgeV1 = {
+      ...derives(model.id, detector.id),
+      observableBridge: {
+        fromObservableId: "observable.frame_x",
+        toObservableId: "observable.frame_x_observed",
+        kind: "calibrated_response",
+        authority: "registered",
+        reversible: false,
+        assumptions: [],
+        sourceRefs: ["tests/frame-detector.spec.ts"],
+        validityDomain: {
+          scaleLog10M: null,
+          coordinateFrames: ["laboratory"],
+          conditions: [],
+        },
+        errorContract: { kind: "statistical", expression: "sigma_x <= 0.1" },
+      },
+    };
+    const result = compileTheoryMasterProblem({
+      graph: graph([model, detector], [bridge]),
+      badgeIds: [model.id, detector.id],
+      comparisonBadgeIds: [model.id, detector.id],
+      request: {
+        ...request,
+        operation: "compare",
+        target: "compare outside the calibration frame",
+        targetObservable: "observable.frame_x_observed",
+        coordinateFrame: "cosmological",
+      },
+    });
+
+    expect(result.observableResolution.pairChecks[0].status).toBe("bridge_domain_mismatch");
+    expect(result.compile.status).toBe("domain_mismatch");
+    expect(result.compile.runtimeAdmission).toBe("blocked");
+  });
+
+  it("rejects approximation bridges without an explicit error contract", () => {
+    const source = badge({
+      id: "approx-source",
+      outputSymbols: ["fine"],
+      observable: { canonicalObservableId: "observable.fine" },
+    });
+    const target = badge({
+      id: "approx-target",
+      inputSymbols: ["fine"],
+      outputSymbols: ["coarse"],
+      observable: { canonicalObservableId: "observable.coarse" },
+    });
+    const invalidGraph = graph([source, target], [{
+      ...derives(source.id, target.id),
+      observableBridge: {
+        fromObservableId: "observable.fine",
+        toObservableId: "observable.coarse",
+        kind: "approximation",
+        authority: "registered",
+        reversible: false,
+        assumptions: [],
+        sourceRefs: ["tests/approx-target.spec.ts"],
+        validityDomain: { scaleLog10M: null, coordinateFrames: [], conditions: [] },
+        errorContract: { kind: "exact", expression: null },
+      },
+    }]);
+
+    expect(validateTheoryBadgeGraphV1(invalidGraph)).toContain(
+      "edges[0].observableBridge.approximation requires a bounded/statistical error expression",
+    );
   });
 });

@@ -74,6 +74,31 @@ export const THEORY_BADGE_SCALE_ENVELOPE_BASES = [
   "heuristic",
 ] as const;
 
+export const THEORY_BADGE_OBSERVABLE_MATHEMATICAL_TYPES = [
+  "scalar",
+  "vector",
+  "tensor",
+  "distribution",
+  "count",
+  "event",
+  "relation",
+] as const;
+
+export const THEORY_BADGE_OBSERVABLE_BRIDGE_KINDS = [
+  "identity",
+  "unit_conversion",
+  "coordinate_transform",
+  "calibrated_response",
+  "coarse_graining",
+  "approximation",
+] as const;
+
+export const THEORY_BADGE_OBSERVABLE_ERROR_KINDS = [
+  "exact",
+  "bounded",
+  "statistical",
+] as const;
+
 const THEORY_BADGE_CALCULATOR_ACTIONS = [
   "ingest_latex",
   "solve_expression",
@@ -144,6 +169,53 @@ export type TheoryBadgeSourceRefV1 = {
 
 export type TheoryBadgeScaleEnvelopeBasisV1 = (typeof THEORY_BADGE_SCALE_ENVELOPE_BASES)[number];
 
+export type TheoryBadgeObservableMathematicalTypeV1 =
+  (typeof THEORY_BADGE_OBSERVABLE_MATHEMATICAL_TYPES)[number];
+export type TheoryBadgeObservableBridgeKindV1 =
+  (typeof THEORY_BADGE_OBSERVABLE_BRIDGE_KINDS)[number];
+export type TheoryBadgeObservableErrorKindV1 =
+  (typeof THEORY_BADGE_OBSERVABLE_ERROR_KINDS)[number];
+
+/**
+ * Stable, source-backed binding from a badge-local quantity to a canonical
+ * observable identity. A shared word, symbol, or unit is not such a binding.
+ */
+export type TheoryBadgeObservableV1 = {
+  id: string;
+  canonicalObservableId: string;
+  symbol: string;
+  quantity: string;
+  mathematicalType: TheoryBadgeObservableMathematicalTypeV1;
+  unit: string | null;
+  dimensionSignature: string | null;
+  coordinateFrame: string | null;
+  operationalDefinitionRef: string;
+  responseModelRef: string | null;
+};
+
+/**
+ * A governed cross-observable transformation stored on a canonical graph edge.
+ * Agent-proposed relations cannot create this record during a reasoning turn.
+ */
+export type TheoryBadgeObservableBridgeV1 = {
+  fromObservableId: string;
+  toObservableId: string;
+  kind: TheoryBadgeObservableBridgeKindV1;
+  authority: "registered";
+  reversible: boolean;
+  assumptions: string[];
+  sourceRefs: string[];
+  validityDomain: {
+    scaleLog10M: { min: number | null; max: number | null } | null;
+    coordinateFrames: string[];
+    conditions: string[];
+  };
+  errorContract: {
+    kind: TheoryBadgeObservableErrorKindV1;
+    expression: string | null;
+  };
+};
+
 export type TheoryBadgeScaleEnvelopeV1 = {
   characteristicLog10M: number | null;
   minLog10M: number | null;
@@ -190,6 +262,7 @@ export type TheoryBadgeV1 = {
   calculatorPayloads: TheoryBadgeCalculatorPayloadV1[];
   sourceRefs: TheoryBadgeSourceRefV1[];
   scaleEnvelope?: TheoryBadgeScaleEnvelopeV1 | null;
+  observables?: TheoryBadgeObservableV1[];
 
   hintKeys: {
     subjects: string[];
@@ -210,6 +283,7 @@ export type TheoryBadgeEdgeV1 = {
   relation: TheoryBadgeEdgeRelation;
   label: string;
   claimBoundaryNote: string;
+  observableBridge?: TheoryBadgeObservableBridgeV1 | null;
 };
 
 export type TheoryBadgeGraphV1 = {
@@ -308,6 +382,8 @@ export function validateTheoryBadgeGraphV1(value: unknown): string[] {
   const edges: unknown[] = Array.isArray(value.edges) ? value.edges : [];
   const badgeIds = new Set<string>();
   const edgeIds = new Set<string>();
+  const observablesByBadgeId = new Map<string, TheoryBadgeObservableV1[]>();
+  const sourceRefIdsByBadgeId = new Map<string, Set<string>>();
 
   for (const [index, rawBadge] of badges.entries()) {
     const prefix = `badges[${index}]`;
@@ -401,6 +477,76 @@ export function validateTheoryBadgeGraphV1(value: unknown): string[] {
     };
 
     validateSourceRefs(rawBadge.sourceRefs, `${prefix}.sourceRefs`);
+
+    const rawObservables = rawBadge.observables;
+    if (rawObservables !== undefined && !Array.isArray(rawObservables)) {
+      issues.push(`${prefix}.observables must be an array when present`);
+    }
+    const observableIds = new Set<string>();
+    const typedObservables: TheoryBadgeObservableV1[] = [];
+    const badgeSourceRefIds = new Set(
+      (Array.isArray(rawBadge.sourceRefs) ? rawBadge.sourceRefs : [])
+        .filter(isRecord)
+        .flatMap((ref) => [ref.path, ref.id])
+        .filter(isNonEmptyString),
+    );
+    if (isNonEmptyString(badgeId)) sourceRefIdsByBadgeId.set(badgeId, badgeSourceRefIds);
+    for (const [observableIndex, rawObservable] of (
+      Array.isArray(rawObservables) ? rawObservables : []
+    ).entries()) {
+      const observablePrefix = `${prefix}.observables[${observableIndex}]`;
+      if (!isRecord(rawObservable)) {
+        issues.push(`${observablePrefix} must be an object`);
+        continue;
+      }
+      if (!isNonEmptyString(rawObservable.id)) {
+        issues.push(`${observablePrefix}.id must be a non-empty string`);
+      } else if (observableIds.has(rawObservable.id)) {
+        issues.push(`${observablePrefix}.id must be unique within the badge`);
+      } else {
+        observableIds.add(rawObservable.id);
+      }
+      for (const field of [
+        "canonicalObservableId",
+        "symbol",
+        "quantity",
+        "operationalDefinitionRef",
+      ] as const) {
+        if (!isNonEmptyString(rawObservable[field])) {
+          issues.push(`${observablePrefix}.${field} must be a non-empty string`);
+        }
+      }
+      if (!includes(THEORY_BADGE_OBSERVABLE_MATHEMATICAL_TYPES, rawObservable.mathematicalType)) {
+        issues.push(`${observablePrefix}.mathematicalType is invalid`);
+      }
+      for (const field of ["unit", "dimensionSignature", "coordinateFrame", "responseModelRef"] as const) {
+        if (rawObservable[field] !== null && typeof rawObservable[field] !== "string") {
+          issues.push(`${observablePrefix}.${field} must be a string or null`);
+        }
+      }
+      if (
+        isNonEmptyString(rawObservable.operationalDefinitionRef) &&
+        !badgeSourceRefIds.has(rawObservable.operationalDefinitionRef)
+      ) {
+        issues.push(`${observablePrefix}.operationalDefinitionRef must identify a badge sourceRef`);
+      }
+      if (
+        isNonEmptyString(rawObservable.responseModelRef) &&
+        !badgeSourceRefIds.has(rawObservable.responseModelRef)
+      ) {
+        issues.push(`${observablePrefix}.responseModelRef must identify a badge sourceRef`);
+      }
+      if (
+        isNonEmptyString(rawObservable.id) &&
+        isNonEmptyString(rawObservable.canonicalObservableId) &&
+        isNonEmptyString(rawObservable.symbol) &&
+        isNonEmptyString(rawObservable.quantity) &&
+        includes(THEORY_BADGE_OBSERVABLE_MATHEMATICAL_TYPES, rawObservable.mathematicalType)
+      ) {
+        typedObservables.push(rawObservable as TheoryBadgeObservableV1);
+      }
+    }
+    if (isNonEmptyString(badgeId)) observablesByBadgeId.set(badgeId, typedObservables);
 
     if (rawBadge.scaleEnvelope != null) {
       const envelopePrefix = `${prefix}.scaleEnvelope`;
@@ -516,6 +662,108 @@ export function validateTheoryBadgeGraphV1(value: unknown): string[] {
     if (!isNonEmptyString(rawEdge.label)) issues.push(`${prefix}.label must be a non-empty string`);
     if (!isNonEmptyString(rawEdge.claimBoundaryNote)) {
       issues.push(`${prefix}.claimBoundaryNote must be a non-empty string`);
+    }
+    if (rawEdge.observableBridge != null) {
+      const bridgePrefix = `${prefix}.observableBridge`;
+      if (!isRecord(rawEdge.observableBridge)) {
+        issues.push(`${bridgePrefix} must be an object or null`);
+      } else {
+        const bridge = rawEdge.observableBridge;
+        for (const field of ["fromObservableId", "toObservableId"] as const) {
+          if (!isNonEmptyString(bridge[field])) issues.push(`${bridgePrefix}.${field} must be a non-empty string`);
+        }
+        if (!includes(THEORY_BADGE_OBSERVABLE_BRIDGE_KINDS, bridge.kind)) {
+          issues.push(`${bridgePrefix}.kind is invalid`);
+        }
+        if (bridge.authority !== "registered") issues.push(`${bridgePrefix}.authority must be registered`);
+        if (typeof bridge.reversible !== "boolean") issues.push(`${bridgePrefix}.reversible must be boolean`);
+        if (!isStringArray(bridge.assumptions)) issues.push(`${bridgePrefix}.assumptions must be strings`);
+        if (!isStringArray(bridge.sourceRefs) || bridge.sourceRefs.length === 0) {
+          issues.push(`${bridgePrefix}.sourceRefs must be a non-empty string array`);
+        } else {
+          const admittedSourceRefs = new Set([
+            ...(isNonEmptyString(rawEdge.from) ? sourceRefIdsByBadgeId.get(rawEdge.from) ?? [] : []),
+            ...(isNonEmptyString(rawEdge.to) ? sourceRefIdsByBadgeId.get(rawEdge.to) ?? [] : []),
+          ]);
+          for (const sourceRef of bridge.sourceRefs) {
+            if (!admittedSourceRefs.has(sourceRef)) {
+              issues.push(`${bridgePrefix}.sourceRefs must identify a sourceRef on an endpoint badge`);
+              break;
+            }
+          }
+        }
+        const fromObservables = isNonEmptyString(rawEdge.from)
+          ? observablesByBadgeId.get(rawEdge.from) ?? []
+          : [];
+        const toObservables = isNonEmptyString(rawEdge.to)
+          ? observablesByBadgeId.get(rawEdge.to) ?? []
+          : [];
+        const fromObservable = fromObservables.find(
+          (observable) => observable.canonicalObservableId === bridge.fromObservableId,
+        );
+        const toObservable = toObservables.find(
+          (observable) => observable.canonicalObservableId === bridge.toObservableId,
+        );
+        if (!fromObservable) {
+          issues.push(`${bridgePrefix}.fromObservableId must be registered on the from badge`);
+        }
+        if (!toObservable) {
+          issues.push(`${bridgePrefix}.toObservableId must be registered on the to badge`);
+        }
+        if (bridge.kind === "identity" && bridge.fromObservableId !== bridge.toObservableId) {
+          issues.push(`${bridgePrefix}.identity bridge requires the same canonical observable id`);
+        }
+        if (
+          (bridge.kind === "identity" || bridge.kind === "unit_conversion" || bridge.kind === "coordinate_transform") &&
+          fromObservable?.dimensionSignature &&
+          toObservable?.dimensionSignature &&
+          fromObservable.dimensionSignature !== toObservable.dimensionSignature
+        ) {
+          issues.push(`${bridgePrefix}.${String(bridge.kind)} requires matching dimensions`);
+        }
+        if (!isRecord(bridge.validityDomain)) {
+          issues.push(`${bridgePrefix}.validityDomain must be an object`);
+        } else {
+          if (!isStringArray(bridge.validityDomain.coordinateFrames)) {
+            issues.push(`${bridgePrefix}.validityDomain.coordinateFrames must be strings`);
+          }
+          if (!isStringArray(bridge.validityDomain.conditions)) {
+            issues.push(`${bridgePrefix}.validityDomain.conditions must be strings`);
+          }
+          const scale = bridge.validityDomain.scaleLog10M;
+          if (scale !== null) {
+            if (!isRecord(scale)) {
+              issues.push(`${bridgePrefix}.validityDomain.scaleLog10M must be an object or null`);
+            } else {
+              if (!isFiniteNumberOrNull(scale.min)) {
+                issues.push(`${bridgePrefix}.validityDomain.scaleLog10M.min must be finite or null`);
+              }
+              if (!isFiniteNumberOrNull(scale.max)) {
+                issues.push(`${bridgePrefix}.validityDomain.scaleLog10M.max must be finite or null`);
+              }
+              if (typeof scale.min === "number" && typeof scale.max === "number" && scale.min > scale.max) {
+                issues.push(`${bridgePrefix}.validityDomain.scaleLog10M.min must be <= max`);
+              }
+            }
+          }
+        }
+        if (!isRecord(bridge.errorContract)) {
+          issues.push(`${bridgePrefix}.errorContract must be an object`);
+        } else {
+          if (!includes(THEORY_BADGE_OBSERVABLE_ERROR_KINDS, bridge.errorContract.kind)) {
+            issues.push(`${bridgePrefix}.errorContract.kind is invalid`);
+          }
+          if (bridge.errorContract.expression !== null && typeof bridge.errorContract.expression !== "string") {
+            issues.push(`${bridgePrefix}.errorContract.expression must be a string or null`);
+          }
+          if (
+            ["coarse_graining", "approximation", "calibrated_response"].includes(String(bridge.kind)) &&
+            (bridge.errorContract.kind === "exact" || !isNonEmptyString(bridge.errorContract.expression))
+          ) {
+            issues.push(`${bridgePrefix}.${String(bridge.kind)} requires a bounded/statistical error expression`);
+          }
+        }
+      }
     }
   }
 

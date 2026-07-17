@@ -105,6 +105,7 @@ export function copyHelixRailCriticalDebugFieldsForUi(
     "runtime_goal_debug_export",
     "runtime_goal_debug_summary",
     "workflow_demo_debug",
+    "realtime_live_client_debug",
     "debug_export_ref",
     "backend_debug_response_ref",
   ].forEach((key) => assign(key, source[key] ?? debug?.[key]));

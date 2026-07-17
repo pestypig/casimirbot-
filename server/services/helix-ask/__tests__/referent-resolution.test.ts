@@ -285,6 +285,112 @@ describe("Helix Ask conversational referent resolution", () => {
     });
   });
 
+  it.each([
+    "Reflect this with the Theory Badge Graph.",
+    "Okay, please reflect that using the theory badge graph.",
+    "Use the Theory Badge Graph to reflect this.",
+  ])("resolves an affirmative theory-graph imperative to the previous assistant answer: %s", (question) => {
+    const resolution = resolveHelixAskConversationalReferent(bodyWithPreviousAnswer(question));
+
+    expect(resolution.resolvedText).toBe("Navigation team is ready for the next burn window.");
+    expect(resolution.trace).toMatchObject({
+      referent_detected: true,
+      referent_phrase: "deictic_previous_assistant_answer",
+      source_kind: "chat_history",
+      resolved_source_ref: "chat.final_answer.previous:reply-1",
+      resolution_confidence: "high",
+      selection_policy: "latest_answer",
+      context_role: "evidence_for_followup_reasoning",
+    });
+  });
+
+  it("fails closed for an affirmative theory-graph imperative when the previous answer is missing", () => {
+    const resolution = resolveHelixAskConversationalReferent({
+      turn_id: "ask:test:theory-referent-missing",
+      question: "Reflect this with the Theory Badge Graph.",
+      workspace_context_snapshot: {},
+    });
+
+    expect(resolution.resolvedText).toBeNull();
+    expect(resolution.trace).toMatchObject({
+      referent_detected: true,
+      referent_phrase: "deictic_previous_assistant_answer",
+      source_kind: "chat_history",
+      resolution_confidence: "blocked",
+      resolution_block_reason: "referent_resolution_required:missing_previous_assistant_final_answer",
+    });
+  });
+
+  it("skips a failed theory-reflection answer and selects the earlier substantive answer on retry", () => {
+    const resolution = resolveHelixAskConversationalReferent(
+      bodyWithRecentAnswers(
+        "Reflect this with the Theory Badge Graph.",
+        [
+          {
+            id: "failed-theory-reflection",
+            text: [
+              "The Theory Badge Graph could not resolve ‘this’ to the preceding discussion.",
+              "It found no exact or likely badge matches, so no supported graph path was produced.",
+            ].join(" "),
+          },
+          {
+            id: "substantive-determinism",
+            text: "Deterministic microscopic laws can produce probabilistic macroscopic observations through coarse-graining, hidden detail, and chaotic sensitivity.",
+          },
+        ],
+      ),
+    );
+
+    expect(resolution.resolvedText).toContain("Deterministic microscopic laws");
+    expect(resolution.trace).toMatchObject({
+      resolved_source_ref: "chat.final_answer.recent:substantive-determinism",
+      candidate_count: 2,
+      matched_candidate_count: 1,
+      selection_policy: "latest_substantive_answer",
+      resolution_confidence: "high",
+    });
+  });
+
+  it("fails closed when a theory-reflection retry has only non-substantive failure history", () => {
+    const resolution = resolveHelixAskConversationalReferent(
+      bodyWithRecentAnswers(
+        "Reflect this with the Theory Badge Graph.",
+        [
+          {
+            id: "failed-theory-reflection",
+            text: "The Theory Badge Graph could not resolve this and found no exact or likely badge matches.",
+          },
+        ],
+      ),
+    );
+
+    expect(resolution.resolvedText).toBeNull();
+    expect(resolution.trace).toMatchObject({
+      resolution_confidence: "blocked",
+      resolution_block_reason: "referent_resolution_required:no_substantive_previous_assistant_final_answer",
+      candidate_count: 1,
+      matched_candidate_count: 0,
+      selection_policy: "blocked_non_substantive_history",
+    });
+  });
+
+  it.each([
+    "Do not reflect this with the Theory Badge Graph.",
+    "If we need it later, reflect this with the Theory Badge Graph.",
+    "Would you reflect this with the Theory Badge Graph?",
+    "The documentation says to reflect this with the Theory Badge Graph.",
+    'The screen displays "Reflect this with the Theory Badge Graph." Explain that example.',
+    "I previously asked you to reflect this with the Theory Badge Graph.",
+  ])("does not admit non-affirmative theory-graph referent text: %s", (question) => {
+    const resolution = resolveHelixAskConversationalReferent(bodyWithPreviousAnswer(question));
+
+    expect(resolution.resolvedText).toBeNull();
+    expect(resolution.trace).toMatchObject({
+      referent_detected: false,
+      resolution_confidence: "not_applicable",
+    });
+  });
+
   it("resolves scientific claims just discussed for scholarly follow-up reasoning", () => {
     const resolution = resolveHelixAskConversationalReferent(
       bodyWithPreviousAnswer(

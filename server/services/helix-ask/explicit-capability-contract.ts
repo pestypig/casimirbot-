@@ -7,6 +7,7 @@ import {
 } from "@shared/helix-scholarly-research-observation";
 import type { HelixToolCallAdmissionFamily } from "@shared/helix-tool-call-admission";
 import { HELIX_RESEARCH_LIBRARY_READ_CAPABILITY } from "@shared/helix-research-library";
+import { HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY } from "@shared/helix-paper-evidence-enrichment";
 import {
   askCapabilityCatalogPromptMatchIndex,
   isAskCapabilityCatalogPrompt,
@@ -196,6 +197,8 @@ const requiredArgsForCapability = (capability: string): string[] => {
       return ["paper_result_or_source"];
     case HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY:
       return ["text_evidence"];
+    case HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY:
+      return ["document_id", "proposal"];
     case "live_env.draft_micro_reasoner_preset":
       return ["scenario_text"];
     case "live_env.route_micro_reasoner_prompt":
@@ -266,6 +269,8 @@ const optionalArgsForCapability = (capability: string): string[] => {
       return ["paper_result_id", "paper_id", "result_id", "doi", "arxiv_id", "arxivId", "source_url", "pdf_url", "full_text_url", "url"];
     case HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY:
       return ["source_ref", "full_text_observation", "requested_variables", "variables"];
+    case HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY:
+      return ["source_target_intent"];
     case "live_env.query_micro_reasoner_presets":
       return ["query", "include_presets", "limit", "source_id", "source_ids", "preset_id"];
     case "live_env.draft_micro_reasoner_preset":
@@ -782,6 +787,27 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
       HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
       HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
       "internet_search.web_research",
+      "model.direct_answer",
+    ],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY,
+    aliases: [
+      "research_library.apply_evidence_enrichment",
+      "apply paper evidence enrichment",
+      "persist paper evidence enrichment",
+    ],
+    capability_family: "scholarly_research",
+    plan_family: "scholarly_research",
+    source_target: "research_library",
+    admission_families: ["scholarly_research"],
+    required_observation_kinds: ["paper_evidence_enrichment_observation"],
+    required_terminal_kind: "model_synthesized_answer",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: [
+      "scientific-calculator.solve_expression",
+      "theory-badge-graph.reflect_discussion_context",
       "model.direct_answer",
     ],
   },
@@ -1762,6 +1788,24 @@ const negatedCommandMentionsCapabilityAt = (prompt: string, matchIndex: number):
   ).test(clausePrefix);
 };
 
+const capabilityMentionIsQuotedAt = (prompt: string, matchIndex: number): boolean => {
+  const before = prompt.slice(0, Math.max(0, matchIndex));
+  const straightQuotes = (before.match(/(?<!\\)"/g) ?? []).length;
+  const openCurlyQuotes = (before.match(/[“]/g) ?? []).length;
+  const closeCurlyQuotes = (before.match(/[”]/g) ?? []).length;
+  return straightQuotes % 2 === 1 || openCurlyQuotes > closeCurlyQuotes;
+};
+
+const capabilityMentionIsDeferredAt = (prompt: string, matchIndex: number): boolean => {
+  const before = prompt.slice(Math.max(0, matchIndex - 160), matchIndex);
+  const clausePrefix = before.split(/[.!?;\n]/).pop() ?? before;
+  return /\b(?:later|eventually|someday|in\s+the\s+future|if|when|unless)\b[\s\S]{0,120}$/i.test(clausePrefix) ||
+    /\b(?:may|might|could|would|plan\s+to|intend\s+to)\s+(?:then\s+)?(?:call|use|run|invoke|execute)\b[\s\S]{0,80}$/i.test(clausePrefix);
+};
+
+const capabilityMentionIsNonExecutableContextAt = (prompt: string, matchIndex: number): boolean =>
+  capabilityMentionIsQuotedAt(prompt, matchIndex) || capabilityMentionIsDeferredAt(prompt, matchIndex);
+
 const capabilityMentionIsExplanatoryQuestionAt = (prompt: string, matchIndex: number): boolean => {
   const boundaryIndex = Math.max(
     prompt.lastIndexOf(".", matchIndex - 1),
@@ -1825,6 +1869,7 @@ const commandMentionsContract = (prompt: string, contract: ExplicitCapabilityCon
     for (const match of prompt.matchAll(matcher)) {
       const matchIndex = typeof match.index === "number" ? match.index : -1;
       if (matchIndex < 0) continue;
+      if (capabilityMentionIsNonExecutableContextAt(prompt, matchIndex)) continue;
       if (negatedCommandMentionsCapabilityAt(prompt, matchIndex)) continue;
       if (commandMentionsCapabilityAt(prompt, name, matchIndex)) return true;
     }
@@ -1916,6 +1961,7 @@ export const extractExplicitCapabilityContracts = (
       for (const match of prompt.matchAll(matcher)) {
         const matchIndex = typeof match.index === "number" ? match.index : -1;
         if (matchIndex < 0) continue;
+        if (capabilityMentionIsNonExecutableContextAt(prompt, matchIndex)) continue;
         if (
           contract.capability !== "helix_ask.inspect_capability_catalog" &&
           capabilityMentionIsExplanatoryQuestionAt(prompt, matchIndex)

@@ -40,7 +40,10 @@ import {
   type ImageLensRegionInspectionResultV1,
 } from "@shared/contracts/image-lens-region-inspection.v1";
 import type { DocumentImageBboxPxV1 } from "@shared/contracts/document-image-region-receipt.v1";
+import { HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY } from "@shared/helix-paper-evidence-enrichment";
 import type { HelixAgentProvider } from "../agent-providers/types";
+import { callWorkstationGatewayCapability } from "../workstation-tool-gateway/registry";
+import type { HelixWorkstationGatewayCallResult } from "../workstation-tool-gateway/types";
 import { runImageLensRegionInspection } from "./image-lens-region-inspection";
 import { runLiveTranslationTranslateText } from "./live-translation";
 import { resolveHelixCapabilityLaneRequest } from "./registry";
@@ -50,6 +53,8 @@ import { runUtilityTextNormalizeText } from "./utility-text";
 import {
   runWorkstationToolReferenceCollectVisibleTranslationTargets,
   runWorkstationToolReferenceListCapabilities,
+  runWorkstationToolReferenceTheoryContextReflection,
+  type HelixWorkstationTheoryContextReflectionBridgeResult,
 } from "./workstation-tool-reference";
 
 type RecordLike = Record<string, unknown>;
@@ -71,6 +76,30 @@ export type HelixCapabilityLaneShadowOneShotResult = {
   raw_content_included: false;
 };
 
+export type HelixWorkstationPaperEvidenceEnrichmentBridgeResult = {
+  schema: "helix.workstation_tool_reference.gateway_bridge_result.v1";
+  ok: boolean;
+  lane_id: "workstation_tool_reference";
+  capability: typeof HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY;
+  delegated_capability_id: typeof HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY;
+  delegation_status: "gateway_executed";
+  selected_runtime_agent_provider: HelixAgentProvider["id"];
+  lane_resolve_trace: HelixCapabilityLaneResolveTrace;
+  delegated_gateway_call_result: HelixWorkstationGatewayCallResult;
+  gateway_admission: HelixWorkstationGatewayCallResult["gateway_admission"];
+  tool_lifecycle_trace: HelixWorkstationGatewayCallResult["tool_lifecycle_trace"];
+  tool_followup_decision: HelixWorkstationGatewayCallResult["tool_followup_decision"];
+  observation: unknown;
+  observation_packet: HelixAgentStepObservationPacket;
+  artifact_refs: string[];
+  error?: string;
+  reentry_required: true;
+  answer_authority: false;
+  terminal_eligible: false;
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
 export type HelixCapabilityLaneOneShotCallResult =
   | HelixLiveTranslationOneShotResult
   | HelixSpeechToTextOneShotResult
@@ -78,6 +107,8 @@ export type HelixCapabilityLaneOneShotCallResult =
   | HelixUtilityTextNormalizeResult
   | HelixWorkstationToolReferenceListResult
   | HelixWorkstationToolReferenceVisibleTranslationTargetsResult
+  | HelixWorkstationTheoryContextReflectionBridgeResult
+  | HelixWorkstationPaperEvidenceEnrichmentBridgeResult
   | ImageLensRegionInspectionResultV1
   | HelixCapabilityLaneShadowOneShotResult;
 
@@ -811,6 +842,104 @@ const workstationToolReferenceHandler: HelixCapabilityLaneOneShotHandler = {
   },
 };
 
+const theoryContextReflectionGatewayBridgeHandler: HelixCapabilityLaneOneShotHandler = {
+  capabilityPrefix: "helix_ask.reflect_theory_context",
+  laneId: "workstation_tool_reference",
+  run(input) {
+    return runWorkstationToolReferenceTheoryContextReflection({
+      provider: input.provider,
+      call: input.call,
+      turnId: input.turnId,
+      iteration: input.iteration,
+      env: input.env,
+    });
+  },
+};
+
+const paperEvidenceEnrichmentGatewayBridgeHandler: HelixCapabilityLaneOneShotHandler = {
+  capabilityPrefix: HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY,
+  laneId: "workstation_tool_reference",
+  async run(input) {
+    const requestedBackendProvider = readString(
+      input.call.requested_backend_provider ?? input.call.requestedBackendProvider,
+    ) || null;
+    const trace = resolveHelixCapabilityLaneRequest({
+      provider: input.provider,
+      requestedLane: "workstation_tool_reference",
+      requestedBackendProvider,
+      env: input.env,
+    });
+    if (trace.admission_status !== "admitted_shadow_only") {
+      return buildShadowResult({
+        provider: input.provider,
+        laneId: "workstation_tool_reference",
+        capability: HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY,
+        requestedBackendProvider,
+        turnId: input.turnId,
+        iteration: input.iteration,
+        env: input.env,
+      });
+    }
+    const turnId = input.turnId || readString(input.call.turn_id ?? input.call.turnId) ||
+      "ask:lane:paper_evidence_enrichment";
+    const iteration = typeof input.iteration === "number" && Number.isFinite(input.iteration)
+      ? Math.max(0, Math.trunc(input.iteration))
+      : 0;
+    const profileId = readString(input.call.profile_id ?? input.call.profileId);
+    const documentId = readString(input.call.document_id ?? input.call.documentId);
+    const proposal = readRecord(input.call.proposal);
+    const sourceTargetIntent = readRecord(input.call.source_target_intent ?? input.call.sourceTargetIntent);
+    const gatewayResult = await callWorkstationGatewayCapability({
+      agentRuntime: input.provider.id,
+      mode: "act",
+      capabilityId: HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY,
+      arguments: {
+        ...(documentId ? { document_id: documentId } : {}),
+        ...(proposal ? { proposal } : {}),
+        ...(sourceTargetIntent ? { source_target_intent: sourceTargetIntent } : {}),
+      },
+      profileId: profileId || null,
+      turnId,
+      iteration,
+    });
+    const observationRef = gatewayResult.artifact_refs[0] ??
+      `${turnId}:capability_lane:${HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY}:${hashShort({
+        ok: gatewayResult.ok,
+        documentId,
+      })}`;
+    return {
+      schema: "helix.workstation_tool_reference.gateway_bridge_result.v1",
+      ok: gatewayResult.ok,
+      lane_id: "workstation_tool_reference",
+      capability: HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY,
+      delegated_capability_id: HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY,
+      delegation_status: "gateway_executed",
+      selected_runtime_agent_provider: input.provider.id,
+      lane_resolve_trace: {
+        ...trace,
+        execution_status: "executed_observation_only",
+        result_ref: observationRef,
+        observation_ref: observationRef,
+        receipt_ref: null,
+        blocked_reason: gatewayResult.error ?? trace.blocked_reason,
+      },
+      delegated_gateway_call_result: gatewayResult,
+      gateway_admission: gatewayResult.gateway_admission,
+      tool_lifecycle_trace: gatewayResult.tool_lifecycle_trace,
+      tool_followup_decision: gatewayResult.tool_followup_decision,
+      observation: gatewayResult.observation,
+      observation_packet: gatewayResult.observation_packet,
+      artifact_refs: gatewayResult.artifact_refs,
+      ...(gatewayResult.error ? { error: gatewayResult.error } : {}),
+      reentry_required: true,
+      answer_authority: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  },
+};
+
 const workstationVisibleTextHandler: HelixCapabilityLaneOneShotHandler = {
   capabilityPrefix: "workstation.visible_text.",
   laneId: "workstation_tool_reference",
@@ -892,6 +1021,8 @@ export const HELIX_CAPABILITY_LANE_ONE_SHOT_HANDLERS: HelixCapabilityLaneOneShot
   speechToTextHandler,
   textToSpeechHandler,
   visualAnalysisHandler,
+  theoryContextReflectionGatewayBridgeHandler,
+  paperEvidenceEnrichmentGatewayBridgeHandler,
   workstationVisibleTextHandler,
   workstationToolReferenceHandler,
 ];

@@ -54,9 +54,14 @@ import {
 } from "../referent-resolution";
 import {
   detectScholarlyResearchIntent,
+  extractScholarlySourceUrl,
 } from "../scholarly-research-intent";
 import { arbitrateAskSourceTarget } from "../ask-source-target-arbitrator";
 import { buildToolCallAdmissionDecision } from "../tool-call-admission";
+import {
+  HELIX_THEORY_CONTEXT_REFLECTION_CAPABILITY,
+  HELIX_THEORY_CONTEXT_REFLECTION_LEGACY_ALIASES,
+} from "../theory-congruence/capability-contract";
 import {
   buildActiveCalculatorContextWorkstationGatewayCallRequests,
   buildActiveTheoryBadgeGraphContextWorkstationGatewayCallRequests,
@@ -69,6 +74,7 @@ import {
   buildPromptDerivedCivilizationBoundsGatewayCallRequests,
   buildPromptDerivedRepoSearchGatewayCallRequests,
   buildPromptDerivedResearchLibraryGatewayCallRequests,
+  buildPromptDerivedTheoryReflectionGatewayCallRequests,
   buildPromptDerivedWorkspaceStatusGatewayCallRequests,
   buildPromptNamedCapabilityGatewayCallRequests,
 } from "./prompt-named-tool-requests";
@@ -97,6 +103,10 @@ import {
 import type { HelixAgentContinuationState } from "@shared/helix-agent-continuation-state";
 import { HELIX_RESEARCH_LIBRARY_READ_CAPABILITY } from "@shared/helix-research-library";
 import {
+  HELIX_PAPER_EVIDENCE_ENRICHMENT_OBSERVATION_SCHEMA,
+  HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY,
+} from "@shared/helix-paper-evidence-enrichment";
+import {
   HELIX_SCHOLARLY_TERMINAL_READY_EVIDENCE_STATES,
   type HelixScholarlyEvidenceDemand,
 } from "@shared/helix-scholarly-research-observation";
@@ -115,16 +125,19 @@ const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = "scholarly-research.lookup_papers" 
 const SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY = "scholarly-research.fetch_full_text" as const;
 const SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY = "scholarly-research.extract_numeric_parameters" as const;
 const RESEARCH_LIBRARY_READ_CAPABILITY = HELIX_RESEARCH_LIBRARY_READ_CAPABILITY;
+const RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY =
+  HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY;
 const MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY = "moral-graph.reflect_living_substrate_context" as const;
 const MORAL_GRAPH_REFLECTION_CAPABILITY = "moral-graph.reflect_context" as const;
-const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context" as const;
+const THEORY_CONTEXT_REFLECTION_CAPABILITY = HELIX_THEORY_CONTEXT_REFLECTION_CAPABILITY;
 const THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY = "theory-badge-graph.current_context" as const;
 const WORKSTATION_UI_ACTION_RECEIPT_SCHEMA = "helix.workstation_ui_action_receipt.v1" as const;
 const WORKSTATION_NOTES_CREATE_NOTE_CAPABILITY = "workstation-notes.create_note" as const;
 const COMPOUND_NORMALIZABLE_CAPABILITIES = new Set<string>([
   "docs.search",
   CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
-  "theory-badge-graph.reflect_discussion_context",
+  THEORY_CONTEXT_REFLECTION_CAPABILITY,
+  ...HELIX_THEORY_CONTEXT_REFLECTION_LEGACY_ALIASES,
   THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY,
   "theory-badge-graph.propose_frontier_conjectures",
   "civilization-bounds.reflect_system_bounds",
@@ -134,6 +147,7 @@ const COMPOUND_NORMALIZABLE_CAPABILITIES = new Set<string>([
   SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
   SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
   RESEARCH_LIBRARY_READ_CAPABILITY,
+  RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY,
 ]);
 
 const readBooleanEnv = (value: string | undefined, defaultValue: boolean): boolean => {
@@ -173,6 +187,12 @@ const DEFAULT_CODEX_ARGS = [
   "--skip-git-repo-check",
   "--color",
   "never",
+] as const;
+
+export const CODEX_FINAL_ANSWER_PRESENTATION_POLICY_LINES = [
+  "Final-answer presentation contract: return readable GitHub-flavored Markdown as the visible terminal candidate; do not wrap the whole answer in JSON or a generic code fence.",
+  "Write inline mathematics as \\( ... \\) and display mathematics as \\[ ... \\] using valid LaTeX. For multiline display mathematics, prefer a fenced latex block; never substitute standalone bare [ and ] lines for LaTeX delimiters. Do not leave intended mathematical notation as bare pseudo-LaTeX or plaintext identifiers.",
+  "When a diagram materially clarifies the answer, use a fenced mermaid block containing valid Mermaid syntax. Do not imitate a renderable diagram with ASCII arrows, box-drawing characters, or raw graph indicators.",
 ] as const;
 
 export const readCodexArgs = (): string[] => {
@@ -2022,36 +2042,38 @@ const latestScholarlyPdfPageFromSidecar = (
   return pages.length > 0 ? Math.max(...pages) : null;
 };
 
-const scholarlyPdfSelectedAffordanceFromRuntimeLoop = (
+export const scholarlyPdfSelectedAffordanceFromRuntimeLoop = (
   question: string,
   runtimeLaneRequestLoop?: Record<string, unknown> | null,
 ): string | null => {
   const reason = readString(runtimeLaneRequestLoop?.synthesis_reason) ?? "";
-  const normalized = question.toLowerCase();
+  const affirmativeQuestion = affirmativeScientificImageOperatorText(question);
+  const normalized = affirmativeQuestion.toLowerCase();
   const chainStepCount = readNumber(runtimeLaneRequestLoop?.chain_step_count) ?? 0;
   const candidateChain = readArray(runtimeLaneRequestLoop?.candidate_chain);
   const scannedMultiplePages = chainStepCount > 1 || candidateChain.length > 1;
-  if (/\b(?:audit|provenance|evidence\s+depth|crop\s+ref|source\s+refs?|which\s+paper|which\s+page)\b/i.test(normalized)) {
-    return "audit_provenance";
-  }
   if (/\b(?:theory\s+badge\s+graph|reflect|reflection)\b/i.test(normalized)) {
     return "reflect_to_theory_badge_graph";
   }
   if (/\b(?:scientific\s+evidence\s+packet|build\s+(?:the\s+)?packet)\b/i.test(normalized)) {
     return "build_scientific_evidence_packet";
   }
-  if (/\b(?:higher\s+resolution|rerender|retry)\b/i.test(normalized)) {
+  if (/\b(?:higher\s+resolution|rerender)\b/i.test(normalized)) {
     return "rerender_page_higher_resolution";
   }
-  if (/\b(?:crop|promote|use)\b[\s\S]{0,120}\b(?:exact\s+(?:equation\s+)?row|row\s+crop|exact\s+equation\s+admissibility)\b/i.test(question)) {
+  if (/\b(?:crop|promote|use)\b[\s\S]{0,120}\b(?:exact\s+(?:equation\s+)?row|row\s+crop|exact\s+equation\s+admissibility)\b/i.test(affirmativeQuestion)) {
     return "crop_exact_equation_row";
   }
   if (scannedMultiplePages || /page_scout|scan_next_pages/i.test(reason)) {
     return "scan_next_pages";
   }
-  if (/\b(?:find|show|extract|inspect|search)\b[\s\S]{0,160}\b(?:first\s+displayed\s+equation|displayed\s+equation|equation\s+candidate|equations?|formulae?|formulas?)\b/i.test(question)) {
+  if (/\b(?:find|show|extract|inspect|search)\b[\s\S]{0,160}\b(?:first\s+displayed\s+equation|displayed\s+equation|equation\s+candidate|equations?|formulae?|formulas?)\b/i.test(affirmativeQuestion)) {
     return "find_first_displayed_equation";
   }
+  const explicitlyRequestsAudit =
+    /\b(?:audit|trace|verify|review)\b[\s\S]{0,160}\b(?:provenance|evidence\s+depth|crop\s+refs?|source\s+refs?|paper|page|evidence\s+chain)\b/i.test(normalized) ||
+    /\b(?:which\s+paper|which\s+page)\b/i.test(normalized);
+  if (explicitlyRequestsAudit) return "audit_provenance";
   if (/image_lens_parse|pdf_page_affordance|inspect_page/i.test(reason)) {
     return "inspect_page";
   }
@@ -3933,13 +3955,23 @@ const readCapabilityLaneRequestCandidatesFromParsed = (value: unknown): Record<s
   if (Array.isArray(candidate)) {
     return candidate
       .map(readRecord)
-      .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+      .filter((entry): entry is Record<string, unknown> =>
+        Boolean(entry) && Boolean(readString(entry?.capability ?? entry?.capability_id ?? entry?.capabilityId)),
+      );
   }
   const candidateRecord = readRecord(candidate);
-  return candidateRecord ? [candidateRecord] : [];
+  if (!candidateRecord) return [];
+  const capability = readString(
+    candidateRecord.capability ?? candidateRecord.capability_id ?? candidateRecord.capabilityId,
+  );
+  // A model may answer a structured request with bare JSON. That JSON is not a
+  // capability-lane call unless it names a capability explicitly. Without this
+  // guard, Master Problem/result JSON is reclassified as
+  // unknown_capability_lane.unknown after valid gateway evidence re-entry.
+  return capability ? [candidateRecord] : [];
 };
 
-const extractCodexCapabilityLaneRequestCandidates = (text: string): Record<string, unknown>[] => {
+export const extractCodexCapabilityLaneRequestCandidates = (text: string): Record<string, unknown>[] => {
   const markerIndex = text.indexOf(CODEX_CAPABILITY_LANE_REQUEST_MARKER);
   if (markerIndex >= 0) {
     const afterMarker = text.slice(markerIndex + CODEX_CAPABILITY_LANE_REQUEST_MARKER.length);
@@ -3962,7 +3994,7 @@ const extractCodexCapabilityLaneRequestCandidates = (text: string): Record<strin
   return readCapabilityLaneRequestCandidatesFromParsed(parseJsonValue(text));
 };
 
-const extractCodexCapabilityLaneRequestCandidate = (text: string): Record<string, unknown> | null => {
+export const extractCodexCapabilityLaneRequestCandidate = (text: string): Record<string, unknown> | null => {
   return extractCodexCapabilityLaneRequestCandidates(text)[0] ?? null;
 };
 
@@ -4056,6 +4088,12 @@ const buildCodexCapabilityLaneRequestBody = (
 const capabilityLaneCandidateCapability = (candidate: Record<string, unknown> | null): string | null =>
   readString(candidate?.capability ?? candidate?.capability_id ?? candidate?.capabilityId);
 
+const capabilityLaneCandidateIncludesCapability = (
+  candidate: Record<string, unknown> | Record<string, unknown>[] | null,
+  capabilityId: string,
+): boolean => (Array.isArray(candidate) ? candidate : candidate ? [candidate] : [])
+  .some((entry) => capabilityLaneCandidateCapability(entry) === capabilityId);
+
 type NegativeEvidenceCapabilityLaneSuppression = {
   schema: "helix.negative_evidence_capability_lane_suppression.v1";
   status: "suppressed" | "not_applicable";
@@ -4102,7 +4140,7 @@ export const forbiddenEvidenceFamiliesForLaneCapability = (question: string, cap
   const visualNegated = promptNegatesCapabilityLaneEvidenceFamily(
     visualEvidenceConstraintQuestion,
     /\b(?:images?|image\s+lens|image-lens|visual|crop|bbox|screenshot|attached\s+image|visible\s+image)\b(?:\s+(?:evidence|sidecar|observation))?/i,
-    /\b(?:use|run|call|request|read|open|load|render|materialize|inspect|extract|crop|capture|analy[sz]e)\b/i,
+    /\b(?:use|run|call|request|require|read|open|load|render|materialize|inspect|extract|crop|capture|analy[sz]e)\b/i,
   );
   const calculatorNegated = promptNegatesCapabilityLaneEvidenceFamily(
     question,
@@ -4799,22 +4837,66 @@ export const augmentImageLensRegionCandidatesForQuestion = (
   ];
 };
 
-const enrichCapabilityLaneCandidatesFromBody = (
+export const enrichCapabilityLaneCandidatesFromBody = (
   body: Record<string, unknown>,
   candidate: Record<string, unknown> | Record<string, unknown>[],
-): Record<string, unknown> | Record<string, unknown>[] => (
-  Array.isArray(candidate)
-    ? candidate.map((entry) =>
-        enrichTextToSpeechCandidateWithResolvedReferent(
-          body,
-          enrichImageLensRegionCandidateFromBody(body, enrichVisibleTranslationCollectorCandidateFromBody(body, entry)),
-        )
-      )
-    : enrichTextToSpeechCandidateWithResolvedReferent(
-        body,
-        enrichImageLensRegionCandidateFromBody(body, enrichVisibleTranslationCollectorCandidateFromBody(body, candidate)),
-      )
-);
+): Record<string, unknown> | Record<string, unknown>[] => {
+  const enrichCandidate = (entry: Record<string, unknown>): Record<string, unknown> => {
+    const visibleAndImageEnriched = enrichTextToSpeechCandidateWithResolvedReferent(
+      body,
+      enrichImageLensRegionCandidateFromBody(body, enrichVisibleTranslationCollectorCandidateFromBody(body, entry)),
+    );
+    if (capabilityLaneCandidateCapability(visibleAndImageEnriched) === THEORY_CONTEXT_REFLECTION_CAPABILITY) {
+      const currentUserPrompt = readQuestion(body);
+      if (!currentUserPrompt) return visibleAndImageEnriched;
+      const boundedCandidate = {
+        ...visibleAndImageEnriched,
+        user_semantic_prompt: currentUserPrompt,
+        user_semantic_prompt_hash: `sha256:${hashScientificImageSourceShort(currentUserPrompt)}`,
+        semantic_prompt_source:
+          readString(
+            visibleAndImageEnriched.semantic_prompt_source ?? visibleAndImageEnriched.semanticPromptSource,
+          ) ??
+          (readString(
+            visibleAndImageEnriched.resolved_referent_text ?? visibleAndImageEnriched.resolvedReferentText,
+          )
+            ? "runtime_resolved_referent"
+            : "current_user_request"),
+      };
+      // Runtime-authored structure may guide the derivation procedure, but it
+      // cannot introduce evidence-bearing symbols, domains, or equations that
+      // were absent from the user-owned subject (or a provenance-bound
+      // resolved referent). The graph infers bounded hints from that source.
+      for (const field of [
+        "mentioned_domains",
+        "mentionedDomains",
+        "mentioned_equations",
+        "mentionedEquations",
+        "mentioned_symbols",
+        "mentionedSymbols",
+      ]) {
+        delete boundedCandidate[field];
+      }
+      return boundedCandidate;
+    }
+    if (
+      capabilityLaneCandidateCapability(visibleAndImageEnriched) !==
+      RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY
+    ) {
+      return visibleAndImageEnriched;
+    }
+    const candidateWithoutProfile = { ...visibleAndImageEnriched };
+    delete candidateWithoutProfile.profile_id;
+    delete candidateWithoutProfile.profileId;
+    const trustedProfileId = readString(body.research_library_owner_id);
+    return trustedProfileId
+      ? { ...candidateWithoutProfile, profile_id: trustedProfileId }
+      : candidateWithoutProfile;
+  };
+  return Array.isArray(candidate)
+    ? candidate.map(enrichCandidate)
+    : enrichCandidate(candidate);
+};
 
 const enrichCapabilityLaneCallsInBody = (body: Record<string, unknown>): Record<string, unknown> => {
   const candidate = body.capability_lane_call ?? body.capabilityLaneCall;
@@ -5105,6 +5187,82 @@ const buildScholarlyChatReferentRecoveryBody = (input: {
   };
 };
 
+export const buildScholarlyCurrentPromptIdentifierRecoveryBody = (input: {
+  body: Record<string, unknown>;
+  question: string;
+}): {
+  body: Record<string, unknown>;
+  query: string;
+  source: string;
+  identifier_kind: "doi" | "arxiv" | "canonical_url";
+} | null => {
+  if (!asksForFreshScientificImageCapture(input.question)) return null;
+  const affirmativeQuestion = affirmativeScientificImageOperatorText(input.question);
+  const requestsExactRematerialization =
+    /\b(?:re[-\s]?materialize|fetch|retrieve|reload|reopen|render|mount|load)\b/i.test(affirmativeQuestion) &&
+    /\b(?:directly|exact|canonical|identifier|doi|arxiv|url|paper|pdf|page)\b/i.test(affirmativeQuestion);
+  if (!requestsExactRematerialization) return null;
+
+  const intent = detectScholarlyResearchIntent(input.question);
+  const canonicalUrl = extractScholarlySourceUrl(input.question);
+  const identifierKind = intent.doi
+    ? "doi"
+    : intent.arxivId
+      ? "arxiv"
+      : canonicalUrl
+        ? "canonical_url"
+        : null;
+  const query = intent.doi
+    ?? (intent.arxivId ? `arXiv:${intent.arxivId}` : canonicalUrl);
+  if (!identifierKind || !query) return null;
+
+  const requestedPage = affirmativeQuestion.match(/\bpage\s*(?:number\s*)?(\d{1,3})\b/i)?.[1] ?? null;
+  const recoveryPrompt = [
+    `Fetch and parse the full text directly for the exact scholarly source ${query}.`,
+    "Restrict retrieval to this exact identifier or canonical URL.",
+    requestedPage
+      ? `Materialize PDF page ${requestedPage} so it can be supplied to Image Lens as current-turn page-image evidence.`
+      : "Materialize the requested PDF page so it can be supplied to Image Lens as current-turn page-image evidence.",
+  ].join(" ");
+  return {
+    body: {
+      ...input.body,
+      question: recoveryPrompt,
+      prompt: recoveryPrompt,
+      raw_user_prompt: recoveryPrompt,
+      workstation_gateway_call: undefined,
+      workstationGatewayCall: undefined,
+      workstation_gateway_calls: undefined,
+      workstationGatewayCalls: undefined,
+      committed_ask_route: undefined,
+      committedAskRoute: undefined,
+      route_evidence_authority: undefined,
+      routeEvidenceAuthority: undefined,
+      source_target_intent: undefined,
+      sourceTargetIntent: undefined,
+      route_product_contract: undefined,
+      routeProductContract: undefined,
+      tool_call_admission_decision: undefined,
+      toolCallAdmissionDecision: undefined,
+      ask_turn_solver_trace: undefined,
+      capability_itinerary: undefined,
+      compound_capability_contract: undefined,
+      capability_itinerary_execution_state: undefined,
+      compound_capability_synthesis_readiness: undefined,
+    },
+    query,
+    source: "current_prompt_exact_scholarly_identifier",
+    identifier_kind: identifierKind,
+  };
+};
+
+export const shouldAttemptScholarlyPromptRecovery = (input: {
+  currentPromptRecoveryPresent: boolean;
+  priorRecordPresent: boolean;
+  lookupStatus: string | null;
+}): boolean => input.currentPromptRecoveryPresent ||
+  (!input.priorRecordPresent && input.lookupStatus === "missing");
+
 const visibleTranslationTargetsFromCapabilityLaneDebug = (
   debugProjection: { capability_lane_call_results?: unknown[] } | null | undefined,
 ): Record<string, unknown>[] => {
@@ -5264,6 +5422,27 @@ const isCodexMissingTranslationInputClarification = (providerText: string): bool
   return mentionsTranslation && (asksForText || asksForLanguage);
 };
 
+const isTheoryContextReflectionCapabilityLanePrompt = (question: string): boolean => {
+  const body = { question, prompt: question };
+  return [
+    ...buildPromptNamedCapabilityGatewayCallRequests(body),
+    ...buildPromptDerivedTheoryReflectionGatewayCallRequests(body),
+  ].some((request) =>
+    readString(request.capability_id ?? request.capabilityId) === THEORY_CONTEXT_REFLECTION_CAPABILITY
+  );
+};
+
+const isCodexMissingTheoryReferentClarification = (providerText: string): boolean => {
+  const text = providerText.trim().toLowerCase();
+  if (!text || !text.includes("?")) return false;
+  const asksForAntecedent =
+    /\b(?:what|which|please provide|please restate|clarify|missing|need)\b/.test(text) &&
+    /\b(?:this|that|referent|antecedent|preceding|previous|prior|discussion|idea|concept|subject)\b/.test(text);
+  const mentionsReflection =
+    /\b(?:reflect|reflection|theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b/.test(text);
+  return asksForAntecedent && mentionsReflection;
+};
+
 const shouldRetryCodexCapabilityLaneRequest = (input: {
   question: string;
   providerText: string;
@@ -5272,11 +5451,13 @@ const shouldRetryCodexCapabilityLaneRequest = (input: {
   if (input.existingObservationPacketCount > 0) return false;
   if (extractCodexCapabilityLaneRequestCandidate(input.providerText)) return false;
   if (isCodexMissingTranslationInputClarification(input.providerText)) return false;
+  if (isCodexMissingTheoryReferentClarification(input.providerText)) return false;
   const question = input.question.trim().toLowerCase();
   if (!question) return false;
   return (
     question.startsWith("translate ") ||
     /\btranslate\b.+\b(to|into)\b/.test(question) ||
+    isTheoryContextReflectionCapabilityLanePrompt(input.question) ||
     /\b(?:image\s+lens|image-lens|attached\s+image|image\s+attachment|visible\s+image|current\s+image|visual_analysis\.inspect_image_region)\b/.test(question) &&
       /\b(?:crop|bbox|bounding\s+box|region|area|look\s+closely|inspect|read|ocr|latex|equation|figure)\b/.test(question)
   );
@@ -5297,6 +5478,15 @@ const isImageLensCapabilityLanePrompt = (question: string): boolean => {
 };
 
 const buildCodexCapabilityLaneRetryInstruction = (question: string): string => {
+  if (isTheoryContextReflectionCapabilityLanePrompt(question)) {
+    return [
+      `Output only ${CODEX_CAPABILITY_LANE_REQUEST_MARKER} followed by compact JSON for ${THEORY_CONTEXT_REFLECTION_CAPABILITY}.`,
+      "Required fields: capability and prompt. The prompt must contain the resolved semantic subject, not a bare deictic token such as this, that, or it.",
+      "When Helix supplied a resolved conversational referent, copy that bounded prior-answer text into prompt and preserve its resolved_source_ref and resolved_text_hash when available.",
+      "Use conversation_context only as non-authoritative provenance/context; it is not badge-matching evidence.",
+      "If the antecedent is unavailable, ask for clarification instead of requesting the lane.",
+    ].join("\n");
+  }
   if (isImageLensCapabilityLanePrompt(question)) {
     return [
       `Output only ${CODEX_CAPABILITY_LANE_REQUEST_MARKER} followed by compact JSON for ${VISUAL_ANALYSIS_INSPECT_IMAGE_REGION_CAPABILITY}.`,
@@ -5316,6 +5506,7 @@ const buildCodexCapabilityLaneReentryPrefix = (question: string): string[] => [
   "The blocks below are internal evidence and control context. Use them for reasoning, but do not quote, restate, or expose their headings or instructions.",
   "Capability observations are not answers. Return either the next explicitly allowed capability-lane request or a concise answer grounded in the re-entered evidence.",
   "Do not repeat the initial capability manifest, gateway instructions, request-context JSON, or any model-visible policy scaffold.",
+  ...CODEX_FINAL_ANSWER_PRESENTATION_POLICY_LINES,
   "",
   "Original user request:",
   question,
@@ -6134,7 +6325,10 @@ const buildCurrentTurnArtifactLedgerFromGatewayPackets = (input: {
 const typedObservationKindForGatewayCapability = (capabilityId: string): string | null => {
   if (capabilityId === "docs.search") return "doc_location_matches";
   if (capabilityId === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) return "calculator_receipt";
-  if (capabilityId === "theory-badge-graph.reflect_discussion_context") {
+  if (
+    capabilityId === THEORY_CONTEXT_REFLECTION_CAPABILITY ||
+    (HELIX_THEORY_CONTEXT_REFLECTION_LEGACY_ALIASES as readonly string[]).includes(capabilityId)
+  ) {
     return "helix_theory_context_reflection_tool_receipt";
   }
   if (capabilityId === THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY) {
@@ -6155,6 +6349,9 @@ const typedObservationKindForGatewayCapability = (capabilityId: string): string 
   if (capabilityId === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY) return "scholarly_research_observation";
   if (capabilityId === SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY) return "scholarly_full_text_observation";
   if (capabilityId === RESEARCH_LIBRARY_READ_CAPABILITY) return "research_library_observation";
+  if (capabilityId === RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY) {
+    return "paper_evidence_enrichment_observation";
+  }
   if (capabilityId === SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY) {
     return "scholarly_numeric_parameter_observation";
   }
@@ -6171,6 +6368,9 @@ const schemaForTypedObservationKind = (kind: string): string => {
   if (kind === "retrieval_context") return "helix.retrieval_context.v1";
   if (kind === "calculator_receipt") return "helix.calculator_receipt.v1";
   if (kind === "research_library_observation") return "helix.research_library_observation.v1";
+  if (kind === "paper_evidence_enrichment_observation") {
+    return HELIX_PAPER_EVIDENCE_ENRICHMENT_OBSERVATION_SCHEMA;
+  }
   if (kind === "helix_theory_context_reflection_tool_receipt") {
     return "helix_theory_context_reflection_tool_receipt/v1";
   }
@@ -6415,7 +6615,7 @@ const normalizeGatewayActionReceiptForHelix = (input: {
   };
 };
 
-const buildCodexNormalizedObservationArtifacts = (input: {
+export const buildCodexNormalizedObservationArtifacts = (input: {
   turnId: string;
   gatewayCallResults: HelixWorkstationGatewayCallResult[];
 }): {
@@ -6459,6 +6659,44 @@ const buildCodexNormalizedObservationArtifacts = (input: {
     }
   });
   return { artifacts, missingNormalizationFailures };
+};
+
+const delegatedGatewayCallResultsFromCapabilityLaneContext = (
+  context: Awaited<ReturnType<typeof buildHelixCapabilityLaneProviderAdapterContext>>,
+): HelixWorkstationGatewayCallResult[] =>
+  context.one_shot.call_results.flatMap((laneResult) => {
+    const laneRecord = readRecord(laneResult);
+    const gatewayResult = readRecord(laneRecord?.delegated_gateway_call_result);
+    if (
+      readString(gatewayResult?.schema) !== "helix.workstation_tool_gateway.call_result.v1" ||
+      !readString(gatewayResult?.capability_id) ||
+      !readRecord(gatewayResult?.gateway_admission) ||
+      !readRecord(gatewayResult?.observation_packet) ||
+      !readRecord(gatewayResult?.tool_lifecycle_trace) ||
+      !readRecord(gatewayResult?.tool_followup_decision)
+    ) {
+      return [];
+    }
+    return [gatewayResult as unknown as HelixWorkstationGatewayCallResult];
+  });
+
+const mergeUniqueGatewayCallResults = (
+  existing: HelixWorkstationGatewayCallResult[],
+  additional: HelixWorkstationGatewayCallResult[],
+): HelixWorkstationGatewayCallResult[] => {
+  const seenCallIds = new Set(
+    existing
+      .map((result) => readString(result.observation_packet?.call_id))
+      .filter((callId): callId is string => Boolean(callId)),
+  );
+  const merged = [...existing];
+  for (const result of additional) {
+    const callId = readString(result.observation_packet?.call_id);
+    if (callId && seenCallIds.has(callId)) continue;
+    if (callId) seenCallIds.add(callId);
+    merged.push(result);
+  }
+  return merged;
 };
 
 const buildNormalizedObservationPacketsFromArtifacts = (input: {
@@ -6925,6 +7163,7 @@ export const buildCodexTheoryReflectionReceiptAnswer = (input: {
   threadId: string;
   route?: string | null;
   promptText: string;
+  providerText?: string | null;
   normalizedArtifacts: Array<Record<string, unknown>>;
 }): {
   answer: Record<string, unknown>;
@@ -7083,12 +7322,18 @@ export const buildCodexTheoryReflectionReceiptAnswer = (input: {
       ? `Boundary notes: ${Array.from(new Set([...currentBoundaryNotes, ...claimNotes])).slice(0, 5).join(" ")}`
       : null,
   ].filter((line): line is string => typeof line === "string");
-  const text = lines.join("\n");
+  const receiptBoundaryText = lines.join("\n");
+  const providerSynthesisText = readString(input.providerText);
+  const text = providerSynthesisText ?? receiptBoundaryText;
   const answer = {
     schema: "helix.theory_reflection_receipt_answer.v1",
     answer_id: `${input.turnId}:codex_theory_reflection_receipt_answer`,
     turn_id: input.turnId,
     source: "codex_provider_theory_reflection_receipt",
+    synthesis_source: providerSynthesisText
+      ? "runtime_provider_after_theory_observation_reentry"
+      : "deterministic_theory_reflection_receipt_projection",
+    receipt_boundary_text: providerSynthesisText ? receiptBoundaryText : null,
     answer_text: text,
     text,
     selected_observation_refs: [...currentContextArtifacts, ...theoryArtifacts]
@@ -7111,7 +7356,9 @@ export const buildCodexTheoryReflectionReceiptAnswer = (input: {
     terminal_text: text,
     terminal_item_id: readString(answer.answer_id) ?? `${input.turnId}:codex_theory_reflection_receipt_answer`,
     terminal_kind: "answer",
-    authority_origin: "codex_provider_theory_reflection_receipt",
+    authority_origin: providerSynthesisText
+      ? "codex_provider_theory_reflection_runtime_synthesis"
+      : "codex_provider_theory_reflection_receipt",
     server_authoritative: true,
     terminal_eligible: true,
     assistant_answer: false,
@@ -8713,6 +8960,12 @@ const buildMissingActiveImageLensSourceProjection = (input: {
   providerText?: string;
 }): { text: string; projection: Record<string, unknown> } | null => {
   if (!isImageLensCapabilityLanePrompt(input.question)) return null;
+  if (
+    forbiddenEvidenceFamiliesForLaneCapability(
+      input.question,
+      VISUAL_ANALYSIS_INSPECT_IMAGE_REGION_CAPABILITY,
+    ).length > 0
+  ) return null;
   if (input.observationPacketCount > 0) return null;
   if (bodyHasActiveImageLensSource(input.body) || firstImageTurnInputItemFromBody(input.body)) return null;
   if (allowsConditionalImageLensMissingEvidenceAnswer({
@@ -11191,14 +11444,25 @@ export const codexProvider: HelixAgentProvider = {
           record: scholarlyFollowup.record,
         });
       }
-      if (!scholarlyFollowup.record && scholarlyFollowup.lookup.status === "missing") {
-        const chatRecovery = buildScholarlyChatReferentRecoveryBody({
-          body: request.body,
-          question,
-        });
-        if (chatRecovery) {
+      const currentPromptRecovery = buildScholarlyCurrentPromptIdentifierRecoveryBody({
+        body: request.body,
+        question,
+      });
+      if (shouldAttemptScholarlyPromptRecovery({
+        currentPromptRecoveryPresent: Boolean(currentPromptRecovery),
+        priorRecordPresent: Boolean(scholarlyFollowup.record),
+        lookupStatus: scholarlyFollowup.lookup.status,
+      })) {
+        const chatRecovery = currentPromptRecovery
+          ? null
+          : buildScholarlyChatReferentRecoveryBody({
+              body: request.body,
+              question,
+            });
+        const recovery = currentPromptRecovery ?? chatRecovery;
+        if (recovery) {
           const recoveredGatewayResults = await runExplicitCodexWorkstationGatewayCalls({
-            body: chatRecovery.body,
+            body: recovery.body,
             turnId,
           });
           evidenceGatewayCallResults = [
@@ -11223,15 +11487,19 @@ export const codexProvider: HelixAgentProvider = {
             candidate_count: currentTurnScholarlyDeepEvidenceMemoryRecord ? 1 : 0,
             selected_memory_id: currentTurnScholarlyDeepEvidenceMemoryRecord?.memory_id ?? null,
             selected_prior_turn_id: currentTurnScholarlyDeepEvidenceMemoryRecord?.turn_id ?? null,
-            resolution_reason: currentTurnScholarlyDeepEvidenceMemoryRecord
-              ? "recovered_scholarly_referent_from_previous_chat_answer"
-              : "chat_referent_recovery_lookup_did_not_materialize_scholarly_evidence",
+            resolution_reason: currentPromptRecovery
+              ? currentTurnScholarlyDeepEvidenceMemoryRecord
+                ? "recovered_exact_scholarly_identifier_from_current_prompt"
+                : "current_prompt_exact_identifier_did_not_materialize_scholarly_evidence"
+              : currentTurnScholarlyDeepEvidenceMemoryRecord
+                ? "recovered_scholarly_referent_from_previous_chat_answer"
+                : "chat_referent_recovery_lookup_did_not_materialize_scholarly_evidence",
             resolution_confidence: currentTurnScholarlyDeepEvidenceMemoryRecord ? "medium" : "blocked",
             candidate_summaries: currentTurnScholarlyDeepEvidenceMemoryRecord
               ? [{
                   memory_id: currentTurnScholarlyDeepEvidenceMemoryRecord.memory_id,
                   prior_turn_id: currentTurnScholarlyDeepEvidenceMemoryRecord.turn_id,
-                  query: currentTurnScholarlyDeepEvidenceMemoryRecord.query ?? chatRecovery.query,
+                  query: currentTurnScholarlyDeepEvidenceMemoryRecord.query ?? recovery.query,
                   evidence_state: currentTurnScholarlyDeepEvidenceMemoryRecord.evidence_state,
                   evidence_grade: currentTurnScholarlyDeepEvidenceMemoryRecord.evidence_grade,
                   terminal_artifact_kind: currentTurnScholarlyDeepEvidenceMemoryRecord.terminal_artifact_kind,
@@ -11239,16 +11507,32 @@ export const codexProvider: HelixAgentProvider = {
                   selected: true,
                 }]
               : [],
-            chat_referent_recovery: {
-              schema: "helix.scholarly_chat_referent_recovery.v1",
-              status: currentTurnScholarlyDeepEvidenceMemoryRecord ? "materialized" : "no_evidence_materialized",
-              query: chatRecovery.query,
-              source: chatRecovery.source,
-              recovered_gateway_result_count: recoveredGatewayResults.length,
-              assistant_answer: false,
-              terminal_eligible: false,
-              raw_content_included: false,
-            },
+            ...(chatRecovery ? {
+              chat_referent_recovery: {
+                schema: "helix.scholarly_chat_referent_recovery.v1",
+                status: currentTurnScholarlyDeepEvidenceMemoryRecord ? "materialized" : "no_evidence_materialized",
+                query: chatRecovery.query,
+                source: chatRecovery.source,
+                recovered_gateway_result_count: recoveredGatewayResults.length,
+                assistant_answer: false,
+                terminal_eligible: false,
+                raw_content_included: false,
+              },
+            } : {}),
+            ...(currentPromptRecovery ? {
+              current_prompt_identifier_recovery: {
+                schema: "helix.scholarly_current_prompt_identifier_recovery.v1",
+                status: currentTurnScholarlyDeepEvidenceMemoryRecord ? "materialized" : "no_evidence_materialized",
+                query: currentPromptRecovery.query,
+                identifier_kind: currentPromptRecovery.identifier_kind,
+                exact_source_only: true,
+                broad_lookup_allowed: false,
+                recovered_gateway_result_count: recoveredGatewayResults.length,
+                assistant_answer: false,
+                terminal_eligible: false,
+                raw_content_included: false,
+              },
+            } : {}),
           } as ScholarlyFollowupEvidenceLookup;
         }
       }
@@ -12460,6 +12744,7 @@ export const codexProvider: HelixAgentProvider = {
           "Do not describe helix_agent_provider_edge as the runtime agent provider; it is the adapter boundary.",
           "This turn is admitted as model-only/direct answer. Do not call tools, request retrieval, or require evidence unless the user explicitly asks for external/source-backed evidence.",
           "Answer the user request directly and concisely.",
+          ...CODEX_FINAL_ANSWER_PRESENTATION_POLICY_LINES,
           "",
           ...conversationalReferentPromptLines,
           formatHelixAgentContinuationStateForRuntime(providerContinuationState),
@@ -12472,8 +12757,9 @@ export const codexProvider: HelixAgentProvider = {
           "When asked what runtime agent provider you are using, answer: codex / Codex Workstation Mode.",
           "When asked what adapter boundary you are using, answer separately: helix_agent_provider_edge.",
           "Do not describe helix_agent_provider_edge as the runtime agent provider; it is the adapter boundary.",
+          ...CODEX_FINAL_ANSWER_PRESENTATION_POLICY_LINES,
           ...adapterContract.prompt_policy_lines,
-          "The current Helix workstation gateway gives Codex read/observe evidence only. Helix may separately project non-mutating UI action receipts from those observations.",
+          "The current Helix workstation gateway exposes only the manifest-scoped read/observe/act capabilities admitted by the provider permission profile. Gateway outputs are observations, never answers. Mutating calls require an affirmative user request and a model-authored structured capability request.",
           `Provider permission profile: ${JSON.stringify(codexProvider.permissionProfile)}`,
           "Answer the user request using the provided context.",
       "",
@@ -12545,6 +12831,8 @@ export const codexProvider: HelixAgentProvider = {
       "If a scholarly observation includes scholarly_lookup_recovery_affordance, scholarly_full_text_recovery_affordance, scholarly_numeric_recovery_affordance, or recovery_affordances, treat that as non-terminal evidence about a failed or weak retrieval/fetch/extraction. Use it to explain the mismatch, propose a narrower re-query, ask the user, or fail closed; do not claim full-text, numeric extraction, or calculator results from it.",
       `Optionally, before a final answer or capability lane request, you may output one line starting with ${CODEX_SEMANTIC_ROUTE_PROPOSAL_MARKER} followed by compact JSON describing your route interpretation. This proposal is not an answer, does not execute a tool, and cannot authorize terminal output. Continue normally after the proposal line.`,
       `Before giving a final answer, decide whether the user request needs a one-shot capability lane. If it does and required inputs are present, output ${CODEX_CAPABILITY_LANE_REQUEST_MARKER} followed by compact JSON for the lane call, with no prose around that lane request except the optional semantic route proposal line described above. Use {"capability_lane_call":[...]} only when the user explicitly asks for multiple Image Lens regions or multiple visible translation chunks.`,
+      `For an affirmative request to classify and persist extracted paper equations, request ${RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY} with document_id and a complete helix.paper_evidence_enrichment_proposal.v1 object. Resolve symbols, values, units, assumptions, source refs, confidence, and Calculator prefill by reasoning from the bounded Research Library sidecar. Label agent inferences explicitly. Set calculator.auto_run_allowed:false and exact_equation_authority_requested:false. Do not request Theory Graph mutation or calculate the expression. Helix binds the trusted profile owner; never supply or choose profile_id.`,
+      `For an affirmative Theory Badge Graph reflection request, request ${THEORY_CONTEXT_REFLECTION_CAPABILITY} before answering. Set prompt to a concise, faithful statement of the central semantic subject; exclude illustrative examples, prior failure/status language, tool instructions, and presentation text that are not part of that subject. Never pass only "this", "that", or "it". When Helix conversational referent resolution is present, bind its full bounded prior_assistant_answer as resolved_referent_text, preserve resolved_source_ref and resolved_text_hash, and derive prompt from that answer without inventing new claims. conversation_context is provenance/context only and must not be treated as badge-matching evidence. If no antecedent is available, ask the user to restate it instead of calling the capability.`,
       "For translation requests over text/content, you must request live_translation.translate_text instead of answering from memory. Required fields are text and target_language. A direct translation answer before the lane observation is non-compliant.",
       "For Image Lens, attached-image, or visible-image requests that ask to crop, inspect a region, read an equation, OCR, or report bbox coordinates, request visual_analysis.inspect_image_region before answering. Required fields are source_id when known, bbox_px, question, reason_for_crop, assistant_answer:false, and terminal_eligible:false. For explicit separate/multiple region requests, request one visual_analysis.inspect_image_region call per region.",
       "If workspace_context_snapshot.active_doc_visible_translation_context is present and the user asks to translate the visible/current document, first request workstation.visible_text.collect_translation_targets and pass active_doc_visible_translation_context: workspace_context_snapshot.active_doc_visible_translation_context when available. The legacy equivalent is workstation_tool_reference.collect_visible_translation_targets. If the user names a target language, include that requested target_language on the collector request even when the visible context has a different default target_language. After Helix returns that collector observation, request live_translation.translate_text for admitted collected chunks; preserve doc_path, source_id, panel_id, region_id, bbox, source_hash, source_text_hash, source_text_char_count, source_event_id, source_event_ms, chunk_id, chunk_index, dedupe_key, projection_target, account_locale, existing_observation_ref, existing_receipt_ref, existing_projection_status, existing_freshness_status, existing_terminal_authority_status, existing_source_event_ms, and existing_observed_at_ms when available. If the collected target has observed_at_ms, pass it as now_ms on live_translation.translate_text so projection receipts keep the collector observation time. Preserve target_language from the collected target unless the user explicitly requested a different target language; in that case use the user-requested target_language.",
@@ -12797,6 +13085,44 @@ export const codexProvider: HelixAgentProvider = {
         assistant_answer: false,
         raw_content_included: false,
       };
+      const suppressedLaneRecoveryPrompt = [
+        prompt,
+        "",
+        "Helix policy suppressed the runtime-requested capability lane because the user explicitly excluded that evidence family.",
+        JSON.stringify(runtimeLaneRequestSuppression, null, 2),
+        "",
+        "This suppression is a tool-admission decision, not a terminal answer.",
+        "Continue reasoning from the scholarly observations already present in this prompt and produce the requested answer when those observations are sufficient.",
+        "Do not request the suppressed capability again. Preserve the user's distinction between a page-numbered passage and exact equation transcription.",
+      ].join("\n");
+      const suppressedLaneRecoveryResult = await runCodexProcess({
+        prompt: suppressedLaneRecoveryPrompt,
+        signal: request.signal,
+        turnId,
+        onNativeEvent: emitCodexNativeRuntimeEvent,
+      });
+      const suppressedLaneRecoveryText =
+        suppressedLaneRecoveryResult.stdout.trim() ||
+        suppressedLaneRecoveryResult.stderr.trim() ||
+        "";
+      runtimeSemanticRouteProposal =
+        runtimeSemanticRouteProposal ??
+        extractCodexSemanticRouteProposalCandidate(suppressedLaneRecoveryText, {
+          turnId,
+          question,
+        });
+      result = suppressedLaneRecoveryResult;
+      runtimeLaneRequestLoop = {
+        ...runtimeLaneRequestLoop,
+        suppressed_lane_recovery_attempted: true,
+        suppressed_lane_recovery_status:
+          suppressedLaneRecoveryText &&
+          suppressedLaneRecoveryResult.exitCode === 0 &&
+          !suppressedLaneRecoveryResult.timedOut
+            ? "provider_answer_candidate_returned"
+            : "provider_answer_candidate_missing",
+        suppressed_lane_recovery_preview: safeProviderPreview(suppressedLaneRecoveryText),
+      };
     }
     if (runtimeLaneRequestCandidate) {
       const laneRequestBody = buildCodexCapabilityLaneRequestBody(request.body, runtimeLaneRequestCandidate);
@@ -12908,6 +13234,8 @@ export const codexProvider: HelixAgentProvider = {
         bridge: postLaneScientificImageBridge.bridge,
       });
       const postLaneScientificImageGatewayResults = postLaneScientificImageBridge.gatewayResults;
+      const runtimeLaneDelegatedGatewayResults =
+        delegatedGatewayCallResultsFromCapabilityLaneContext(capabilityLaneContext);
       if (postLaneScientificImageBridge.bridge) {
         runtimeLaneRequestLoop = {
           ...runtimeLaneRequestLoop,
@@ -12937,15 +13265,19 @@ export const codexProvider: HelixAgentProvider = {
           state: scholarlyPdfWorkbenchState,
         });
       }
-      if (postLaneScientificImageGatewayResults.length > 0) {
-        evidenceGatewayCallResults = [
-          ...evidenceGatewayCallResults,
-          ...postLaneScientificImageGatewayResults,
-        ];
-        gatewayCallResults = [
-          ...gatewayCallResults,
-          ...postLaneScientificImageGatewayResults,
-        ];
+      const postRuntimeLaneGatewayResults = mergeUniqueGatewayCallResults(
+        runtimeLaneDelegatedGatewayResults,
+        postLaneScientificImageGatewayResults,
+      );
+      if (postRuntimeLaneGatewayResults.length > 0) {
+        evidenceGatewayCallResults = mergeUniqueGatewayCallResults(
+          evidenceGatewayCallResults,
+          postRuntimeLaneGatewayResults,
+        );
+        gatewayCallResults = mergeUniqueGatewayCallResults(
+          gatewayCallResults,
+          postRuntimeLaneGatewayResults,
+        );
         gatewayObservationPackets = gatewayCallResults.map((result) => result.observation_packet);
         normalizedObservationResult = buildCodexNormalizedObservationArtifacts({
           turnId,
@@ -12989,6 +13321,8 @@ export const codexProvider: HelixAgentProvider = {
         isVisibleTranslationTargetCollectorCandidate(firstRuntimeLaneRequestCandidate);
       const firstLaneWasTranslation =
         capabilityLaneCandidateCapability(firstRuntimeLaneRequestCandidate) === LIVE_TRANSLATION_TRANSLATE_TEXT_CAPABILITY;
+      const firstLaneWasTheoryReflection =
+        capabilityLaneCandidateCapability(firstRuntimeLaneRequestCandidate) === THEORY_CONTEXT_REFLECTION_CAPABILITY;
       const firstLaneWasImageLens =
         capabilityLaneCandidateCapability(firstRuntimeLaneRequestCandidate) === "visual_analysis.inspect_image_region";
       const scholarlyLaneReentryEvidenceLines = firstLaneWasImageLens
@@ -13018,6 +13352,13 @@ export const codexProvider: HelixAgentProvider = {
                 "Use text equal to the translated_text from the translation observation and include source_observation_ref when available.",
                 "If no translated_text is usable, answer with a typed failure. Do not claim playback before a text_to_speech receipt re-enters.",
               ].join("\n")
+            : firstLaneWasTheoryReflection
+              ? [
+                  "Now produce the final reflection from the re-entered Theory Badge Graph observation and the user's requested comparison.",
+                  "Distinguish exact, likely, rejected, represented, and out-of-graph results using the observation's own confidence and claim boundaries.",
+                  "Do not treat the prior conversational answer, conversation_context, badge names, or calculator templates as independent proof.",
+                  "Do not emit another lane request. Preserve uncertainty and state what additional evidence would be required for stronger claims.",
+                ].join("\n")
             : firstLaneWasImageLens
               ? scholarlyPdfWorkbenchState
                 ? [
@@ -13804,7 +14145,19 @@ export const codexProvider: HelixAgentProvider = {
       text: workstationGuardedText,
       gatewayCallResults,
     });
+    const missingTheoryReferentGuardActive = Boolean(
+      isTheoryContextReflectionCapabilityLanePrompt(question) &&
+      conversationalReferentResolutionTrace?.resolution_block_reason?.startsWith(
+        "referent_resolution_required:",
+      ),
+    );
+    const theoryReferentGuardedText = missingTheoryReferentGuardActive
+      ? isCodexMissingTheoryReferentClarification(gatewayGuardedText)
+        ? gatewayGuardedText
+        : "I cannot resolve what “this” refers to from the available conversation context. Please restate the idea you want reflected with the Theory Badge Graph."
+      : gatewayGuardedText;
     const boundedMissingSourceGuardActive =
+      missingTheoryReferentGuardActive ||
       (isDeicticDocumentContentQuestion(question) && !hasDocsContentObservation(gatewayCallResults)) ||
       (isRepoContentQuestion(question) && !hasRepoSearchObservation(gatewayCallResults)) ||
       (isInternetSearchContentQuestion(question) && !hasInternetSearchObservation(gatewayCallResults)) ||
@@ -13836,7 +14189,7 @@ export const codexProvider: HelixAgentProvider = {
       scientificImageBlockedReflectionText ??
         scientificImageRetryTerminalText ??
         moralGraphObservationFallbackText ??
-        gatewayGuardedText,
+        theoryReferentGuardedText,
     );
     const imageLensObservationReportText =
       imageLensObservationFallbackAnswer && isImageLensCapabilityLanePrompt(question)
@@ -14022,6 +14375,14 @@ export const codexProvider: HelixAgentProvider = {
         : null;
     const moralGraphReflectionReceiptTerminalAuthority = moralGraphReflectionReceiptProjection?.authority ?? null;
     const moralGraphReflectionReceiptTerminalAuthorized = Boolean(moralGraphReflectionReceiptTerminalAuthority);
+    const runtimeTheoryReflectionObservationReentered =
+      capabilityLaneCandidateIncludesCapability(
+        runtimeLaneRequestCandidate,
+        THEORY_CONTEXT_REFLECTION_CAPABILITY,
+      ) &&
+      capabilityLaneContext.observation_packets.some((packet) =>
+        packet.capability_key === THEORY_CONTEXT_REFLECTION_CAPABILITY && packet.status === "succeeded"
+      );
     const theoryReflectionReceiptProjection =
       !compoundTerminalAuthorized &&
       !scholarlyExploratoryTerminalAuthority &&
@@ -14032,6 +14393,9 @@ export const codexProvider: HelixAgentProvider = {
             threadId,
             route: request.route,
             promptText: question,
+            providerText: runtimeTheoryReflectionObservationReentered && providerProcessOk
+              ? authorityGuardedText
+              : null,
             normalizedArtifacts: normalizedObservationArtifacts,
           })
         : null;
@@ -14816,6 +15180,10 @@ export const codexProvider: HelixAgentProvider = {
           normalizationFailures[0] ??
           codexProcessFailure?.error_code ??
           result.failReason ??
+          (missingTheoryReferentGuardActive
+            ? conversationalReferentResolutionTrace?.resolution_block_reason ??
+              "referent_resolution_required:missing_previous_assistant_final_answer"
+            : null) ??
           (ok
             ? null
             : compoundTerminalAuthorized ||
@@ -14926,19 +15294,22 @@ export const codexProvider: HelixAgentProvider = {
       },
     };
     if (boundedMissingSourceGuardActive) {
+      const boundedSourceErrorCode = missingTheoryReferentGuardActive
+        ? "referent_resolution_required"
+        : "required_source_observation_missing";
       responsePayload.ok = false;
       responsePayload.response_type = "final_failure";
       responsePayload.final_status = "final_failure";
       responsePayload.terminal_artifact_kind = "typed_failure";
       responsePayload.final_answer_source = "typed_failure";
-      responsePayload.terminal_error_code = "required_source_observation_missing";
+      responsePayload.terminal_error_code = boundedSourceErrorCode;
       responsePayload.terminal_failure_text = authorityGuardedText;
       responsePayload.text = authorityGuardedText;
       responsePayload.answer = authorityGuardedText;
       responsePayload.selected_final_answer = authorityGuardedText;
       (responsePayload as Record<string, unknown>).typed_failure = {
         schema: "helix.typed_failure.v1",
-        error_code: "required_source_observation_missing",
+        error_code: boundedSourceErrorCode,
         message: authorityGuardedText,
         text: authorityGuardedText,
         answer_text: authorityGuardedText,

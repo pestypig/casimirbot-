@@ -117,7 +117,7 @@ export function buildHelixAskMinimalRuntimeTurnPayload(args: {
   if (!requiresBackendAskEntrypoint) return payload;
   const fingerprint = {
     schema: "helix.ask.backend_entrypoint_runtime_fingerprint.v1",
-    client_entrypoint_guard_version: "minimal-runtime:E79",
+    client_entrypoint_guard_version: "minimal-runtime:E81",
     submit_handler_source: "HelixAskMinimalRuntimeShell.submitMinimalRuntimeQuestion",
     runAsk_entered: true,
     hard_backend_entrypoint_required: true,

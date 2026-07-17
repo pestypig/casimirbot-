@@ -4,6 +4,9 @@ import {
   type TheoryMasterProblemCompileStatusV1,
   type TheoryMasterProblemEdgeV1,
   type TheoryMasterProblemNodeV1,
+  type TheoryMasterProblemObservableBindingV1,
+  type TheoryMasterProblemObservablePairCheckV1,
+  type TheoryMasterProblemObservableResolutionV1,
   type TheoryMasterProblemRequestV1,
   type TheoryMasterProblemResultKindV1,
   type TheoryMasterProblemV1,
@@ -12,6 +15,8 @@ import type {
   TheoryBadgeEdgeRelation,
   TheoryBadgeEquationV1,
   TheoryBadgeGraphV1,
+  TheoryBadgeObservableBridgeV1,
+  TheoryBadgeObservableV1,
   TheoryBadgeSourceRefV1,
   TheoryBadgeV1,
 } from "../contracts/theory-badge-graph.v1";
@@ -25,6 +30,7 @@ export type CompileTheoryMasterProblemInput = {
     openWorldEntropyBits?: number;
     outOfGraphProbability?: number;
   };
+  comparisonBadgeIds?: string[];
   generatedAt?: string;
   planId?: string;
 };
@@ -148,6 +154,424 @@ function scaleDomainStatus(from: TheoryBadgeV1, to: TheoryBadgeV1): TheoryMaster
     : "compatible";
 }
 
+function normalizeObservableKey(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function observableBinding(
+  badgeId: string,
+  observable: TheoryBadgeObservableV1,
+): TheoryMasterProblemObservableBindingV1 {
+  return {
+    badgeId,
+    observableId: observable.id,
+    canonicalObservableId: observable.canonicalObservableId,
+    symbol: observable.symbol,
+    quantity: observable.quantity,
+    mathematicalType: observable.mathematicalType,
+    unit: observable.unit,
+    dimensionSignature: observable.dimensionSignature,
+    coordinateFrame: observable.coordinateFrame,
+    operationalDefinitionRef: observable.operationalDefinitionRef,
+    responseModelRef: observable.responseModelRef,
+  };
+}
+
+function observableMatchesTarget(
+  binding: TheoryMasterProblemObservableBindingV1,
+  targetObservable: string,
+): boolean {
+  const target = normalizeObservableKey(targetObservable);
+  return [
+    binding.observableId,
+    binding.canonicalObservableId,
+    binding.symbol,
+    binding.quantity,
+  ].some((value) => normalizeObservableKey(value) === target);
+}
+
+function bridgeForPair(args: {
+  graph: TheoryBadgeGraphV1;
+  fromBadgeId: string;
+  toBadgeId: string;
+  fromObservable: TheoryMasterProblemObservableBindingV1;
+  toObservable: TheoryMasterProblemObservableBindingV1;
+}): { edgeId: string; bridge: TheoryBadgeObservableBridgeV1 } | null {
+  for (const edge of args.graph.edges) {
+    const bridge = edge.observableBridge;
+    if (!bridge) continue;
+    if (
+      edge.from === args.fromBadgeId &&
+      edge.to === args.toBadgeId &&
+      bridge.fromObservableId === args.fromObservable.canonicalObservableId &&
+      bridge.toObservableId === args.toObservable.canonicalObservableId
+    ) {
+      return { edgeId: edge.id, bridge };
+    }
+    if (
+      bridge.reversible &&
+      edge.from === args.toBadgeId &&
+      edge.to === args.fromBadgeId &&
+      bridge.fromObservableId === args.toObservable.canonicalObservableId &&
+      bridge.toObservableId === args.fromObservable.canonicalObservableId
+    ) {
+      return { edgeId: edge.id, bridge };
+    }
+  }
+  return null;
+}
+
+function bridgeDomainMismatch(
+  bridge: TheoryBadgeObservableBridgeV1,
+  request: TheoryMasterProblemRequestV1,
+): string | null {
+  if (
+    request.coordinateFrame &&
+    bridge.validityDomain.coordinateFrames.length > 0 &&
+    !bridge.validityDomain.coordinateFrames.includes(request.coordinateFrame)
+  ) {
+    return `requested coordinate frame ${request.coordinateFrame} is outside the registered bridge domain`;
+  }
+  const requestedScale = request.scaleLog10M;
+  const bridgeScale = bridge.validityDomain.scaleLog10M;
+  if (requestedScale && bridgeScale) {
+    if (
+      typeof requestedScale.min === "number" &&
+      typeof bridgeScale.min === "number" &&
+      requestedScale.min < bridgeScale.min
+    ) {
+      return "requested minimum scale is outside the registered bridge domain";
+    }
+    if (
+      typeof requestedScale.max === "number" &&
+      typeof bridgeScale.max === "number" &&
+      requestedScale.max > bridgeScale.max
+    ) {
+      return "requested maximum scale is outside the registered bridge domain";
+    }
+  }
+  return null;
+}
+
+function bridgeErrorContractMissing(bridge: TheoryBadgeObservableBridgeV1): boolean {
+  return ["calibrated_response", "coarse_graining", "approximation"].includes(bridge.kind) &&
+    (bridge.errorContract.kind === "exact" || !bridge.errorContract.expression?.trim());
+}
+
+function pairCheckForBindings(args: {
+  graph: TheoryBadgeGraphV1;
+  request: TheoryMasterProblemRequestV1;
+  fromBadgeId: string;
+  toBadgeId: string;
+  fromObservable: TheoryMasterProblemObservableBindingV1;
+  toObservable: TheoryMasterProblemObservableBindingV1;
+}): TheoryMasterProblemObservablePairCheckV1 {
+  const base = {
+    fromBadgeId: args.fromBadgeId,
+    toBadgeId: args.toBadgeId,
+    fromObservableId: args.fromObservable.observableId,
+    toObservableId: args.toObservable.observableId,
+    fromCanonicalObservableId: args.fromObservable.canonicalObservableId,
+    toCanonicalObservableId: args.toObservable.canonicalObservableId,
+  };
+  const bridgeRecord = bridgeForPair(args);
+  if (bridgeRecord) {
+    const { bridge, edgeId } = bridgeRecord;
+    if (
+      ["identity", "unit_conversion", "coordinate_transform"].includes(bridge.kind) &&
+      args.fromObservable.dimensionSignature &&
+      args.toObservable.dimensionSignature &&
+      args.fromObservable.dimensionSignature !== args.toObservable.dimensionSignature
+    ) {
+      return {
+        ...base,
+        status: "dimensional_mismatch",
+        bridgeEdgeId: edgeId,
+        bridgeKind: bridge.kind,
+        errorKind: bridge.errorContract.kind,
+        errorExpression: bridge.errorContract.expression,
+        sourceRefs: bridge.sourceRefs,
+        reason: "registered identity/unit/frame bridge has incompatible dimensions",
+      };
+    }
+    if (bridgeErrorContractMissing(bridge)) {
+      return {
+        ...base,
+        status: "bridge_error_contract_missing",
+        bridgeEdgeId: edgeId,
+        bridgeKind: bridge.kind,
+        errorKind: bridge.errorContract.kind,
+        errorExpression: bridge.errorContract.expression,
+        sourceRefs: bridge.sourceRefs,
+        reason: `${bridge.kind} bridge lacks a bounded or statistical error expression`,
+      };
+    }
+    const domainMismatch = bridgeDomainMismatch(bridge, args.request);
+    if (domainMismatch) {
+      return {
+        ...base,
+        status: "bridge_domain_mismatch",
+        bridgeEdgeId: edgeId,
+        bridgeKind: bridge.kind,
+        errorKind: bridge.errorContract.kind,
+        errorExpression: bridge.errorContract.expression,
+        sourceRefs: bridge.sourceRefs,
+        reason: domainMismatch,
+      };
+    }
+    return {
+      ...base,
+      status: "approved_bridge",
+      bridgeEdgeId: edgeId,
+      bridgeKind: bridge.kind,
+      errorKind: bridge.errorContract.kind,
+      errorExpression: bridge.errorContract.expression,
+      sourceRefs: bridge.sourceRefs,
+      reason: `registered ${bridge.kind} bridge admits the observable comparison`,
+    };
+  }
+
+  if (args.fromObservable.canonicalObservableId !== args.toObservable.canonicalObservableId) {
+    return {
+      ...base,
+      status: "observable_identity_mismatch",
+      bridgeEdgeId: null,
+      bridgeKind: null,
+      errorKind: null,
+      errorExpression: null,
+      sourceRefs: [],
+      reason: "canonical observable identities differ and no registered bridge connects them",
+    };
+  }
+  if (args.fromObservable.mathematicalType !== args.toObservable.mathematicalType) {
+    return {
+      ...base,
+      status: "mathematical_type_mismatch",
+      bridgeEdgeId: null,
+      bridgeKind: null,
+      errorKind: null,
+      errorExpression: null,
+      sourceRefs: [],
+      reason: "canonical observable identity is shared but mathematical object types differ",
+    };
+  }
+  if (
+    args.fromObservable.dimensionSignature &&
+    args.toObservable.dimensionSignature &&
+    args.fromObservable.dimensionSignature !== args.toObservable.dimensionSignature
+  ) {
+    return {
+      ...base,
+      status: "dimensional_mismatch",
+      bridgeEdgeId: null,
+      bridgeKind: null,
+      errorKind: null,
+      errorExpression: null,
+      sourceRefs: [],
+      reason: "canonical observable identity is shared but dimension signatures differ",
+    };
+  }
+  if (
+    args.fromObservable.unit &&
+    args.toObservable.unit &&
+    args.fromObservable.unit !== args.toObservable.unit
+  ) {
+    return {
+      ...base,
+      status: "observable_identity_mismatch",
+      bridgeEdgeId: null,
+      bridgeKind: null,
+      errorKind: null,
+      errorExpression: null,
+      sourceRefs: [],
+      reason: "same observable is reported in different units without a registered unit-conversion bridge",
+    };
+  }
+  if (
+    args.fromObservable.coordinateFrame &&
+    args.toObservable.coordinateFrame &&
+    args.fromObservable.coordinateFrame !== args.toObservable.coordinateFrame
+  ) {
+    return {
+      ...base,
+      status: "coordinate_frame_mismatch",
+      bridgeEdgeId: null,
+      bridgeKind: null,
+      errorKind: null,
+      errorExpression: null,
+      sourceRefs: [],
+      reason: "same observable is bound to different frames without a registered coordinate transform",
+    };
+  }
+  if (
+    args.fromObservable.responseModelRef &&
+    args.toObservable.responseModelRef &&
+    args.fromObservable.responseModelRef !== args.toObservable.responseModelRef
+  ) {
+    return {
+      ...base,
+      status: "observable_identity_mismatch",
+      bridgeEdgeId: null,
+      bridgeKind: null,
+      errorKind: null,
+      errorExpression: null,
+      sourceRefs: [],
+      reason: "instrument/response models differ without a registered calibrated-response bridge",
+    };
+  }
+  return {
+    ...base,
+    status: "same_canonical_observable",
+    bridgeEdgeId: null,
+    bridgeKind: null,
+    errorKind: "exact",
+    errorExpression: null,
+    sourceRefs: unique([
+      args.fromObservable.operationalDefinitionRef,
+      args.toObservable.operationalDefinitionRef,
+    ]),
+    reason: "source-backed bindings share canonical observable identity, type, dimension, unit, and frame",
+  };
+}
+
+const PAIR_CHECK_RANK: Record<TheoryMasterProblemObservablePairCheckV1["status"], number> = {
+  same_canonical_observable: 100,
+  approved_bridge: 90,
+  bridge_domain_mismatch: 40,
+  bridge_error_contract_missing: 35,
+  coordinate_frame_mismatch: 30,
+  mathematical_type_mismatch: 25,
+  dimensional_mismatch: 20,
+  observable_identity_mismatch: 10,
+  missing_observable_binding: 0,
+};
+
+function buildObservableResolution(args: {
+  graph: TheoryBadgeGraphV1;
+  badgesById: Map<string, TheoryBadgeV1>;
+  selectedBadgeIds: string[];
+  comparisonBadgeIds?: string[];
+  request: TheoryMasterProblemRequestV1;
+}): TheoryMasterProblemObservableResolutionV1 {
+  const allBindings = args.selectedBadgeIds.flatMap((badgeId) =>
+    (args.badgesById.get(badgeId)?.observables ?? []).map((observable) => observableBinding(badgeId, observable)),
+  );
+  if (args.request.operation !== "compare") {
+    return {
+      targetObservableId: args.request.targetObservable,
+      status: "not_required",
+      participantBadgeIds: [],
+      bindings: allBindings,
+      pairChecks: [],
+      unresolvedReasons: [],
+    };
+  }
+
+  const explicitParticipants = unique(args.comparisonBadgeIds ?? [])
+    .filter((badgeId) => args.selectedBadgeIds.includes(badgeId));
+  const participantBadgeIds = explicitParticipants.length > 0
+    ? explicitParticipants
+    : args.selectedBadgeIds.filter((badgeId) =>
+        (args.badgesById.get(badgeId)?.observables?.length ?? 0) > 0,
+      );
+  const directTargetBindings = args.request.targetObservable
+    ? allBindings.filter((binding) => observableMatchesTarget(binding, args.request.targetObservable as string))
+    : [];
+  const candidateBindings = directTargetBindings.length > 0
+    ? allBindings.filter((binding) =>
+        directTargetBindings.some((target) =>
+          target.badgeId === binding.badgeId ||
+          target.canonicalObservableId === binding.canonicalObservableId ||
+          bridgeForPair({
+            graph: args.graph,
+            fromBadgeId: target.badgeId,
+            toBadgeId: binding.badgeId,
+            fromObservable: target,
+            toObservable: binding,
+          }) !== null ||
+          bridgeForPair({
+            graph: args.graph,
+            fromBadgeId: binding.badgeId,
+            toBadgeId: target.badgeId,
+            fromObservable: binding,
+            toObservable: target,
+          }) !== null,
+        ),
+      )
+    : allBindings;
+
+  const pairChecks: TheoryMasterProblemObservablePairCheckV1[] = [];
+  for (let leftIndex = 0; leftIndex < participantBadgeIds.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < participantBadgeIds.length; rightIndex += 1) {
+      const fromBadgeId = participantBadgeIds[leftIndex];
+      const toBadgeId = participantBadgeIds[rightIndex];
+      const fromBindings = candidateBindings.filter((binding) => binding.badgeId === fromBadgeId);
+      const toBindings = candidateBindings.filter((binding) => binding.badgeId === toBadgeId);
+      if (fromBindings.length === 0 || toBindings.length === 0) {
+        pairChecks.push({
+          fromBadgeId,
+          toBadgeId,
+          fromObservableId: fromBindings[0]?.observableId ?? null,
+          toObservableId: toBindings[0]?.observableId ?? null,
+          fromCanonicalObservableId: fromBindings[0]?.canonicalObservableId ?? null,
+          toCanonicalObservableId: toBindings[0]?.canonicalObservableId ?? null,
+          status: "missing_observable_binding",
+          bridgeEdgeId: null,
+          bridgeKind: null,
+          errorKind: null,
+          errorExpression: null,
+          sourceRefs: [],
+          reason: "comparison participant lacks a source-backed observable binding for the requested target",
+        });
+        continue;
+      }
+      const ranked = fromBindings.flatMap((fromObservable) =>
+        toBindings.map((toObservable) => pairCheckForBindings({
+          graph: args.graph,
+          request: args.request,
+          fromBadgeId,
+          toBadgeId,
+          fromObservable,
+          toObservable,
+        })),
+      ).sort((left, right) => PAIR_CHECK_RANK[right.status] - PAIR_CHECK_RANK[left.status]);
+      pairChecks.push(ranked[0]);
+    }
+  }
+
+  const unresolvedReasons = unique([
+    ...(participantBadgeIds.length < 2
+      ? ["observable comparison requires at least two source-backed participant badges"]
+      : []),
+    ...(args.request.targetObservable && directTargetBindings.length === 0
+      ? [`target observable is not registered: ${args.request.targetObservable}`]
+      : []),
+    ...pairChecks
+      .filter((check) => check.status !== "same_canonical_observable" && check.status !== "approved_bridge")
+      .map((check) => `${check.fromBadgeId} -> ${check.toBadgeId}: ${check.reason}`),
+  ]);
+  const directlySharedCanonicalIds = unique(
+    pairChecks
+      .filter((check) => check.status === "same_canonical_observable")
+      .map((check) => check.fromCanonicalObservableId ?? ""),
+  );
+  const inferredTargetObservable =
+    !args.request.targetObservable &&
+    pairChecks.length > 0 &&
+    pairChecks.every((check) => check.status === "same_canonical_observable") &&
+    directlySharedCanonicalIds.length === 1
+      ? directlySharedCanonicalIds[0]
+      : null;
+  return {
+    targetObservableId: args.request.targetObservable ?? inferredTargetObservable,
+    status: unresolvedReasons.length === 0 && pairChecks.length > 0 ? "resolved" : "blocked",
+    participantBadgeIds,
+    bindings: allBindings,
+    pairChecks,
+    unresolvedReasons,
+  };
+}
+
 function buildEdges(args: {
   graph: TheoryBadgeGraphV1;
   badgesById: Map<string, TheoryBadgeV1>;
@@ -232,7 +656,17 @@ export function compileTheoryMasterProblem(input: CompileTheoryMasterProblemInpu
   const edges = buildEdges({ graph: input.graph, badgesById, nodesByBadge, selectedBadgeIds: selectedSet });
   const outputSymbols = unique(nodes.flatMap((node) => node.outputSymbols));
   const inferredObservable = input.request.targetObservable ?? (outputSymbols.length === 1 ? outputSymbols[0] : null);
-  const request: TheoryMasterProblemRequestV1 = { ...input.request, targetObservable: inferredObservable };
+  let request: TheoryMasterProblemRequestV1 = { ...input.request, targetObservable: inferredObservable };
+  const observableResolution = buildObservableResolution({
+    graph: input.graph,
+    badgesById,
+    selectedBadgeIds,
+    comparisonBadgeIds: input.comparisonBadgeIds,
+    request,
+  });
+  if (!request.targetObservable && observableResolution.targetObservableId) {
+    request = { ...request, targetObservable: observableResolution.targetObservableId };
+  }
   const producedSymbolKeys = new Set(outputSymbols.map(normalizeSymbol));
   const missingBindings = unique(
     nodes.flatMap((node) => node.inputSymbols).filter((symbol) => !producedSymbolKeys.has(normalizeSymbol(symbol))),
@@ -240,12 +674,23 @@ export function compileTheoryMasterProblem(input: CompileTheoryMasterProblemInpu
   const hardFailures = unique([
     ...edges.filter((edge) => edge.dimensionalStatus === "incompatible").map((edge) => `${edge.sourceEdgeId}: dimensional incompatibility`),
     ...edges.filter((edge) => edge.domainStatus === "incompatible").map((edge) => `${edge.sourceEdgeId}: scale-domain mismatch`),
+    ...observableResolution.pairChecks
+      .filter((check) => check.status === "dimensional_mismatch" || check.status === "mathematical_type_mismatch")
+      .map((check) => `${check.fromBadgeId} -> ${check.toBadgeId}: ${check.reason}`),
+    ...observableResolution.pairChecks
+      .filter((check) => check.status === "coordinate_frame_mismatch" || check.status === "bridge_domain_mismatch")
+      .map((check) => `${check.fromBadgeId} -> ${check.toBadgeId}: ${check.reason}`),
   ]);
   const unresolvedReasons = unique([
     ...(selectedBadgeIds.length === 0 ? ["no supported graph badge was selected"] : []),
-    ...(selectedBadgeIds.length > 1 && edges.length === 0 ? ["missing_bridge_relation"] : []),
+    ...(selectedBadgeIds.length > 1 &&
+      edges.length === 0 &&
+      !(request.operation === "compare" && observableResolution.status === "resolved")
+      ? ["missing_bridge_relation"]
+      : []),
     ...(missingBindings.length > 0 ? missingBindings.map((symbol) => `unbound input symbol: ${symbol}`) : []),
     ...(request.operation !== "explain" && !request.targetObservable ? ["target observable is not bound"] : []),
+    ...observableResolution.unresolvedReasons,
     ...edges.flatMap((edge) => edge.verificationRequirements.map((requirement) => `${edge.sourceEdgeId}: ${requirement}`)),
   ]);
   const allReferenceOnly = nodes.length > 0 && nodes.every((node) =>
@@ -254,14 +699,30 @@ export function compileTheoryMasterProblem(input: CompileTheoryMasterProblemInpu
   const hasExecutableNode = nodes.some((node) =>
     node.computabilityStatus === "closed_form" || node.computabilityStatus === "runtime_required"
   );
+  const observableStatuses = new Set(observableResolution.pairChecks.map((check) => check.status));
+  const observableCompileFailure: TheoryMasterProblemCompileStatusV1 | null = observableResolution.status !== "blocked"
+    ? null
+    : observableStatuses.has("dimensional_mismatch") || observableStatuses.has("mathematical_type_mismatch")
+      ? "dimensionally_incompatible"
+      : observableStatuses.has("coordinate_frame_mismatch") || observableStatuses.has("bridge_domain_mismatch")
+        ? "domain_mismatch"
+        : observableStatuses.has("missing_observable_binding") || observableResolution.pairChecks.length === 0
+          ? "unidentifiable"
+          : "missing_bridge_relation";
   let status: TheoryMasterProblemCompileStatusV1;
   if (selectedBadgeIds.length === 0 || (input.uncertainty?.outOfGraphProbability ?? 0) >= 0.75) {
     status = "insufficient_evidence";
+  } else if (observableCompileFailure) {
+    status = observableCompileFailure;
   } else if (edges.some((edge) => edge.dimensionalStatus === "incompatible")) {
     status = "dimensionally_incompatible";
   } else if (edges.some((edge) => edge.domainStatus === "incompatible")) {
     status = "domain_mismatch";
-  } else if (selectedBadgeIds.length > 1 && edges.length === 0) {
+  } else if (
+    selectedBadgeIds.length > 1 &&
+    edges.length === 0 &&
+    !(request.operation === "compare" && observableResolution.status === "resolved")
+  ) {
     status = "missing_bridge_relation";
   } else if (allReferenceOnly) {
     status = "noncomputable";
@@ -292,6 +753,7 @@ export function compileTheoryMasterProblem(input: CompileTheoryMasterProblemInpu
     selectedBadgeIds,
     nodes,
     edges,
+    observableResolution,
     compile: {
       status,
       allowedResultKinds: allowedResultKinds(request.operation, status),

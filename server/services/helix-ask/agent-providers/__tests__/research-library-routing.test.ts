@@ -3,11 +3,47 @@ import { readWorkstationGatewayCallRequestsForTurn } from "../explicit-workstati
 import { ensureCodexPreGatewayRouteAuthority } from "../codex-provider";
 import { compactScholarlyFullTextArtifactForModel } from "../../model-context-economy";
 import { isHelixAskGoldenPathScholarlyResearchRequested } from "../../golden-path/capabilities/scholarly-research";
+import { extractExplicitCapabilityContracts } from "../../explicit-capability-contract";
 
 const prompt =
   "Using the existing full-text evidence for https://arxiv.org/pdf/2401.12345, report the paper title, authors, and abstract. Include page-grounded evidence references. Do not refetch the PDF, run lookup_papers, or use Image Lens.";
 
 describe("Research Library prompt routing", () => {
+  it("does not turn a natural saved-paper read into an automatic enrichment mutation", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      body: {
+        question:
+          "Read the saved paper and resolve symbols, units, and assumptions where the evidence supports them. Prepare a Calculator prefill, but do not run it or update the Theory Graph.",
+      },
+      includePlannerDerived: true,
+    });
+
+    expect(requests.map((request) => request.capability_id)).not.toContain(
+      "research-library.apply_evidence_enrichment",
+    );
+  });
+
+  it("admits only an affirmative explicit enrichment adapter command", () => {
+    const affirmative = extractExplicitCapabilityContracts(
+      "Call research-library.apply_evidence_enrichment with the supplied document_id and proposal.",
+    );
+    expect(affirmative.map((match) => match.capability)).toContain(
+      "research-library.apply_evidence_enrichment",
+    );
+  });
+
+  it.each([
+    ["negated", "Do not call research-library.apply_evidence_enrichment."],
+    ["quoted", "The screen says \"call research-library.apply_evidence_enrichment\"."],
+    ["historical", "Earlier I called research-library.apply_evidence_enrichment."],
+    ["future", "Later we may call research-library.apply_evidence_enrichment."],
+    ["explanatory", "Can research-library.apply_evidence_enrichment update the saved sidecar?"],
+  ])("does not admit a %s enrichment mention", (_label, question) => {
+    expect(extractExplicitCapabilityContracts(question).map((match) => match.capability)).not.toContain(
+      "research-library.apply_evidence_enrichment",
+    );
+  });
+
   it("routes exact saved-evidence prompts to the private library without network or Image Lens tools", () => {
     const requests = readWorkstationGatewayCallRequestsForTurn({
       body: { question: prompt, agent_runtime: "codex" },

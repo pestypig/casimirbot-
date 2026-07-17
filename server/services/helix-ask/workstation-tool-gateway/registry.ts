@@ -48,6 +48,12 @@ import {
   HELIX_RESEARCH_LIBRARY_READ_CAPABILITY,
 } from "@shared/helix-research-library";
 import {
+  HELIX_PAPER_EVIDENCE_ENRICHMENT_OBSERVATION_SCHEMA,
+  HELIX_PAPER_EVIDENCE_ENRICHMENT_PROPOSAL_JSON_SCHEMA,
+  HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY,
+} from "@shared/helix-paper-evidence-enrichment";
+import {
+  applyResearchLibraryEvidenceEnrichment,
   findResearchLibraryDocument,
   listResearchLibraryDocuments,
 } from "../../helix-account/research-library-store";
@@ -97,6 +103,16 @@ import {
   theoryFrontierConjectureForbiddenClaimNotes,
 } from "@shared/theory/theory-frontier-conjecture-workbench";
 import { runHelixTheoryContextReflectionTool } from "@shared/theory/theory-context-reflection-tool";
+import { runAskLevelTheoryContextReflectionTool } from "../theory-context-reflection-tool";
+import {
+  HELIX_THEORY_CONTEXT_REFLECTION_CAPABILITY,
+  HELIX_THEORY_CONTEXT_REFLECTION_LEGACY_ALIASES,
+  canonicalizeHelixTheoryContextReflectionCapability,
+} from "../theory-congruence/capability-contract";
+import {
+  THEORY_DERIVATION_REQUEST_INPUT_PROPERTIES,
+  parseTheoryDerivationRequestArgs,
+} from "../theory-congruence/derivation-request";
 import {
   buildScientificBranchGate,
   buildScientificEvidenceGraphReflection,
@@ -175,6 +191,10 @@ const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAP
 const SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA = HELIX_SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA;
 const RESEARCH_LIBRARY_READ_CAPABILITY = HELIX_RESEARCH_LIBRARY_READ_CAPABILITY;
 const RESEARCH_LIBRARY_OBSERVATION_SCHEMA = HELIX_RESEARCH_LIBRARY_OBSERVATION_SCHEMA;
+const RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY =
+  HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY;
+const PAPER_EVIDENCE_ENRICHMENT_OBSERVATION_SCHEMA =
+  HELIX_PAPER_EVIDENCE_ENRICHMENT_OBSERVATION_SCHEMA;
 const SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY = HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY;
 const SCHOLARLY_FULL_TEXT_OBSERVATION_SCHEMA = HELIX_SCHOLARLY_FULL_TEXT_OBSERVATION_SCHEMA;
 const SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY = HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY;
@@ -182,7 +202,7 @@ const SCHOLARLY_NUMERIC_PARAMETER_OBSERVATION_SCHEMA = HELIX_SCHOLARLY_NUMERIC_P
 const CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY = "civilization-bounds.reflect_system_bounds" as const;
 const CIVILIZATION_BOUNDS_REFLECTION_OBSERVATION_SCHEMA =
   "helix.civilization_bounds_reflection_observation.v1" as const;
-const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context" as const;
+const THEORY_CONTEXT_REFLECTION_CAPABILITY = HELIX_THEORY_CONTEXT_REFLECTION_CAPABILITY;
 const THEORY_CONTEXT_REFLECTION_OBSERVATION_SCHEMA = "helix.theory_context_reflection_observation.v1" as const;
 const THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY = "theory-badge-graph.current_context" as const;
 const THEORY_BADGE_GRAPH_CURRENT_CONTEXT_OBSERVATION_SCHEMA =
@@ -555,6 +575,8 @@ const modeAllowsManifest = (
 ): boolean => gatewayModeRank[mode] >= permissionProfileRank[manifest.permission_profile_required];
 
 const normalizeGatewayCapabilityId = (value: string): string => {
+  const theoryCapability = canonicalizeHelixTheoryContextReflectionCapability(value);
+  if (theoryCapability !== value) return theoryCapability;
   if (value === "internet.search" || value === "web.search" || value === "internet_search.web_research") {
     return INTERNET_SEARCH_CAPABILITY;
   }
@@ -3422,6 +3444,52 @@ const researchLibraryReadManifest: HelixWorkstationCapabilityManifest = {
   raw_content_included: false,
 };
 
+const researchLibraryApplyEvidenceEnrichmentManifest: HelixWorkstationCapabilityManifest = {
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY,
+  label: "Apply paper evidence enrichment",
+  description:
+    "Validates and persists an agent-authored equation enrichment proposal to one profile-scoped Research Library sidecar. It cannot choose bindings, run the Calculator, promote Theory Graph evidence, or answer by itself.",
+  panel_id: "docs-viewer",
+  action_id: "apply_paper_evidence_enrichment",
+  mode: "act",
+  mutating: true,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: true,
+  terminal_eligible: false,
+  permission_profile_required: "act",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["document_id", "proposal"],
+    properties: {
+      document_id: { type: "string" },
+      proposal: HELIX_PAPER_EVIDENCE_ENRICHMENT_PROPOSAL_JSON_SCHEMA,
+      source_target_intent: { type: "object" },
+    },
+  },
+  output_observation_schema: PAPER_EVIDENCE_ENRICHMENT_OBSERVATION_SCHEMA,
+  observation_schema: PAPER_EVIDENCE_ENRICHMENT_OBSERVATION_SCHEMA,
+  safety_tags: [
+    "mutating",
+    "profile_scoped",
+    "saved_research",
+    "agent_authored_proposal_required",
+    "optimistic_revision",
+    "non_terminal",
+    "no_calculator_auto_run",
+    "no_theory_graph_mutation",
+    "no_network",
+    "no_shell",
+    "no_code_mutation",
+  ],
+  assistant_answer: false,
+  raw_content_included: false,
+};
+
 const scholarlyResearchSearchManifest: HelixWorkstationCapabilityManifest = {
   schema: "helix.workstation_tool_gateway.capability.v1",
   capability_id: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
@@ -3582,9 +3650,9 @@ const civilizationBoundsReflectionManifest: HelixWorkstationCapabilityManifest =
 const theoryContextReflectionManifest: HelixWorkstationCapabilityManifest = {
   schema: "helix.workstation_tool_gateway.capability.v1",
   capability_id: THEORY_CONTEXT_REFLECTION_CAPABILITY,
-  label: "Theory Badge Graph reflect discussion context",
+  label: "Helix Ask reflect theory context",
   description:
-    "Reflects the prompt against the existing Theory Badge Graph as bounded, evidence-only context. It does not solve, mutate files, run shell commands, or become a final answer.",
+    "Builds bounded, open-world Theory Badge Graph context plus a non-terminal congruence trace and Master Problem. It does not solve, mutate files, run shell commands, or become a final answer.",
   panel_id: "theory-badge-graph",
   action_id: "reflect_discussion_context",
   mode: "read",
@@ -3608,6 +3676,7 @@ const theoryContextReflectionManifest: HelixWorkstationCapabilityManifest = {
       mentioned_domains: { type: "array", items: { type: "string" } },
       build_explanation_plan: { type: "boolean" },
       limit: { type: "number" },
+      ...THEORY_DERIVATION_REQUEST_INPUT_PROPERTIES,
     },
   },
   output_observation_schema: THEORY_CONTEXT_REFLECTION_OBSERVATION_SCHEMA,
@@ -4338,6 +4407,7 @@ const rawCapabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   [docsSearchManifest.capability_id, docsSearchManifest],
   [internetSearchManifest.capability_id, internetSearchManifest],
   [researchLibraryReadManifest.capability_id, researchLibraryReadManifest],
+  [researchLibraryApplyEvidenceEnrichmentManifest.capability_id, researchLibraryApplyEvidenceEnrichmentManifest],
   [scholarlyResearchSearchManifest.capability_id, scholarlyResearchSearchManifest],
   [scholarlyFullTextFetchManifest.capability_id, scholarlyFullTextFetchManifest],
   [scholarlyNumericParameterExtractManifest.capability_id, scholarlyNumericParameterExtractManifest],
@@ -7498,6 +7568,124 @@ export const callWorkstationGatewayCapability = async (
     };
   }
 
+  if (manifest.capability_id === RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY) {
+    const args = readArguments(input.arguments);
+    const profileId = cleanString(input.profileId);
+    const documentId = optionalString(args.document_id ?? args.documentId);
+    const proposal = args.proposal;
+    let result: Awaited<ReturnType<typeof applyResearchLibraryEvidenceEnrichment>> | null = null;
+    let error: string | undefined;
+    if (!profileId) {
+      error = "profile_session_required";
+    } else if (!documentId) {
+      error = "research_library_document_id_required";
+    } else if (!proposal || typeof proposal !== "object") {
+      error = "paper_evidence_enrichment_proposal_invalid";
+    } else {
+      try {
+        result = await applyResearchLibraryEvidenceEnrichment({
+          profile_id: profileId,
+          document_id: documentId,
+          proposal,
+        });
+        if (!result.ok) error = result.failure_code;
+      } catch (caught) {
+        error = caught instanceof Error ? caught.message : "paper_evidence_enrichment_persist_failed";
+      }
+    }
+    const succeeded = Boolean(result?.ok);
+    const status = succeeded ? "succeeded" as const : "blocked" as const;
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: succeeded ? "admitted" : "blocked",
+      reason: succeeded
+        ? "profile_scoped_agent_enrichment_proposal_applied"
+        : "paper_evidence_enrichment_blocked",
+      blockedReason: error,
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const missingRequirements = result && !result.ok
+      ? result.missing_requirements
+      : error ? [error] : [];
+    const observation = {
+      schema: PAPER_EVIDENCE_ENRICHMENT_OBSERVATION_SCHEMA,
+      artifact_id: `${turnId}:paper_evidence_enrichment_observation:${iteration}`,
+      turn_id: turnId,
+      capability: RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY,
+      status: succeeded ? result?.status : "blocked",
+      requested_document_id: documentId,
+      document_id: result?.ok ? result.document_id : null,
+      sidecar_id: result?.ok ? result.sidecar_id : null,
+      proposal_id: result?.ok ? result.proposal_id : null,
+      from_revision: result?.ok ? result.from_revision : null,
+      to_revision: result?.ok ? result.to_revision : null,
+      updated_equation_ids: result?.ok ? result.updated_equation_ids : [],
+      idempotent: result?.ok ? result.status === "idempotent" : false,
+      evidence_state: result?.ok ? "enrichment_persisted" : "enrichment_blocked",
+      missing_requirements: missingRequirements,
+      authority: {
+        validates_paper_claims: false,
+        exact_equation_authority: false,
+        calculator_auto_run_allowed: false,
+        theory_graph_promotion_allowed: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "docs-viewer",
+      action: "apply_paper_evidence_enrichment",
+      status,
+      summary: succeeded
+        ? result?.status === "idempotent"
+          ? "The previously applied paper-evidence proposal was recognized without creating another revision."
+          : `Persisted agent enrichment for ${result?.updated_equation_ids.length ?? 0} equation candidate(s).`
+        : "The paper-evidence enrichment proposal was rejected by the profile, identity, revision, or evidence-authority boundary.",
+      observation,
+      missingRequirements: missingRequirements.map((code) => ({
+        code,
+        message: code === "profile_session_required"
+          ? "Sign in before updating private Research Library evidence."
+          : `Paper-evidence enrichment requires repair: ${code}.`,
+        repair_action: code === "profile_session_required" ? "ask_user" as const : "repair" as const,
+      })),
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: succeeded,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      ...(error ? { error } : {}),
+    };
+  }
+
   if (manifest.capability_id === RESEARCH_LIBRARY_READ_CAPABILITY) {
     const args = readArguments(input.arguments);
     const profileId = cleanString(input.profileId);
@@ -7639,13 +7827,58 @@ export const callWorkstationGatewayCapability = async (
       });
     const completedSearch = Boolean(document && !blockedReason && searchTerm);
     const selectedForAnswer = Boolean(document && (selectedPages.length > 0 || completedSearch));
+    const selectedEvidencePageSet = new Set(selectedPages.map((page) => page.page));
+    const boundedPaperEvidenceSidecars = (document?.paper_evidence_sidecars ?? [])
+      .slice(0, 4)
+      .map((sidecar) => ({
+        schema: sidecar.schema,
+        sidecar_id: sidecar.sidecar_id,
+        sidecar_kind: sidecar.sidecar_kind,
+        document_id: sidecar.document_id,
+        source_integrity_hash: sidecar.source_integrity_hash,
+        revision: sidecar.revision ?? 1,
+        parent_revision: sidecar.parent_revision ?? null,
+        status: sidecar.status,
+        evidence_level: sidecar.evidence_level,
+        enrichment_status: sidecar.enrichment.agent_enrichment_status,
+        last_proposal_id: sidecar.enrichment.last_proposal_id ?? null,
+        equation_candidates: sidecar.equation_candidates
+          .filter((candidate) => selectedEvidencePageSet.size === 0 || selectedEvidencePageSet.has(candidate.page))
+          .slice(0, 40)
+          .map((candidate) => ({
+            equation_id: candidate.equation_id,
+            page: candidate.page,
+            source_text_ref: candidate.source_text_ref,
+            raw_text_excerpt: candidate.raw_text.slice(0, 1200),
+            latex_candidate: candidate.latex_candidate,
+            extraction_method: candidate.extraction_method,
+            confidence: candidate.confidence,
+            symbols: candidate.symbols.slice(0, 24),
+            unit_candidates: candidate.unit_candidates.slice(0, 12),
+            calculator: candidate.calculator,
+            evidence: candidate.evidence,
+            agent_enrichment: candidate.agent_enrichment,
+          })),
+        authority: {
+          assistant_answer: false,
+          terminal_eligible: false,
+          validates_paper_claims: false,
+          exact_equation_authority: false,
+          theory_graph_promotion_allowed: false,
+        },
+        raw_content_included: false,
+      }));
     const observation = {
       schema: RESEARCH_LIBRARY_OBSERVATION_SCHEMA,
       artifact_id: `${turnId}:research_library_observation:${iteration}`,
       turn_id: turnId,
       capability: RESEARCH_LIBRARY_READ_CAPABILITY,
-      ...(document ? { document: (() => { const { pages: _pages, ...summary } = document; return { ...summary, raw_content_included: false }; })() } : {}),
+      ...(document ? { document: (() => {
+        const { pages: _pages, paper_evidence_sidecars: _sidecars, ...summary } = document;
+        return { ...summary, raw_content_included: false };
+      })() } : {}),
       selected_pages: selectedPages,
+      paper_evidence_sidecars: boundedPaperEvidenceSidecars,
       requested_source_url: sourceUrl,
       requested_document_id: documentId,
       resolved_document_id: resolvedDocumentId,
@@ -7747,6 +7980,13 @@ export const callWorkstationGatewayCapability = async (
         ...(plannedScholarlyCapabilityChain ? { planned_scholarly_capability_chain: plannedScholarlyCapabilityChain } : {}),
         providers_considered: providers,
         providers_called: [],
+        provider_record_count: 0,
+        unique_paper_count: 0,
+        deduplication: {
+          provider_record_count: 0,
+          unique_paper_count: 0,
+          duplicate_record_count: 0,
+        },
         evidence_refs: [],
         papers: [],
         evidence_state: "lookup_blocked",
@@ -8435,7 +8675,12 @@ export const callWorkstationGatewayCapability = async (
     const scientificEvidencePacket = scientificEvidenceInput.packet;
     const scientificEvidenceSidecar = scientificEvidenceInput.sidecar;
     const requestedMentionedDomains = readStringArray(args.mentioned_domains ?? args.mentionedDomains);
-    const gatedMentionedDomains = scientificEvidencePacket
+    const hasObservedScientificDomain =
+      scientificEvidenceInput.source === "sidecar" ||
+      scientificEvidenceInput.source === "explicit_packet";
+    // Prompt-context classification is a branch hypothesis, not observed
+    // evidence. It must not broaden badge admission or manufacture exact hits.
+    const gatedMentionedDomains = scientificEvidencePacket && hasObservedScientificDomain
       ? Array.from(new Set([
           ...requestedMentionedDomains,
           ...scientificEvidencePacket.admissibility.allowed_branch_hints.slice(0, 8),
@@ -8508,8 +8753,7 @@ export const callWorkstationGatewayCapability = async (
       };
     }
 
-    const receipt = runHelixTheoryContextReflectionTool({
-      graph: buildNhm2TheoryBadgeGraphV1(),
+    const receipt = runAskLevelTheoryContextReflectionTool({
       turnId,
       threadId: optionalString(args.thread_id ?? args.threadId),
       prompt,
@@ -8519,12 +8763,10 @@ export const callWorkstationGatewayCapability = async (
       mentionedDomains: gatedMentionedDomains,
       limit,
       buildExplanationPlan: args.build_explanation_plan === true || args.buildExplanationPlan === true,
-      panelSync: {
-        requested: false,
-        applied: false,
-        openPanel: false,
-        overlayMode: "none",
-      },
+      syncPanel: false,
+      openPanel: false,
+      panelOverlayMode: "none",
+      derivationRequest: parseTheoryDerivationRequestArgs(args, prompt),
     });
     const reflection = receipt.reflectionV1;
     const rawCalculatorPayloads = reflection.evidenceForAsk.calculatorPayloads.slice(0, 12).map((payload) => ({
@@ -8662,6 +8904,29 @@ export const callWorkstationGatewayCapability = async (
       receipt_schema: receipt.schemaVersion,
       reflection_terminal_eligible: reflection.terminal_eligible,
       authority: receipt.authority,
+      open_world_uncertainty: reflection.overlay.uncertainty ?? null,
+      probability_semantics: {
+        badge_probability_by_id:
+          "conditional_distribution_within_represented_candidates_not_scientific_truth",
+        open_world_candidate_probability_by_id:
+          "joint_placement_mass_including_out_of_graph_hypothesis_not_scientific_truth",
+        represented_probability_mass:
+          "semantic_graph_coverage_heuristic_not_validation_probability",
+        out_of_graph_probability:
+          "unrepresented_semantic_placement_mass_not_evidence_against_the_claim",
+        entropy:
+          "uncertainty_of_locator_placement_distribution_not_physical_system_entropy",
+      },
+      match_authority_semantics: {
+        exact_and_likely: "semantic_locator_status_not_scientific_validation",
+        rejected: "scientific_authority_gate_status_not_semantic_mismatch",
+        axes_are_independent: true,
+      },
+      theory_congruence_trace_v1: receipt.theoryCongruenceTraceV1 ?? null,
+      master_problem_v1: receipt.theoryCongruenceTraceV1?.master_problem ?? null,
+      derivation_program_v1: receipt.theoryCongruenceTraceV1?.derivation_program ?? null,
+      canonical_capability_id: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+      legacy_alias_capability_ids: [...HELIX_THEORY_CONTEXT_REFLECTION_LEGACY_ALIASES],
       terminal_eligible: false,
       post_tool_model_step_required: true,
       assistant_answer: false,

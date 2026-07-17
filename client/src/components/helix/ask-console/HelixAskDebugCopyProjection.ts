@@ -163,6 +163,12 @@ export async function resolveHelixAskAuthoritativeDebugExportPayload(localPayloa
   } catch {
     return localPayload;
   }
+  if (
+    coerceDebugCopyText(parsed.debug_export_source).trim() === "backend_endpoint" &&
+    coerceDebugCopyText(parsed.backend_debug_response_status).trim() === "fetched"
+  ) {
+    return localPayload;
+  }
 
   const backendTarget = resolveHelixAskLegacyDebugExportBackendTarget(parsed);
   const activeTurnId = backendTarget.activeTurnId;
@@ -279,6 +285,7 @@ export async function resolveHelixAskAuthoritativeDebugExportPayload(localPayloa
 export async function copyHelixAskDebugPayloadToClipboard(
   payload: string,
 ): Promise<HelixAskDebugPayloadClipboardCopyResult> {
-  const json = boundHelixDebugExportTextForUi(typeof payload === "string" ? payload : "");
+  const localJson = boundHelixDebugExportTextForUi(typeof payload === "string" ? payload : "");
+  const json = await resolveHelixAskAuthoritativeDebugExportPayload(localJson);
   return copyHelixAskDebugJsonToClipboard(json);
 }

@@ -438,4 +438,303 @@ describe("theory context reflector", () => {
     expect(reflection.overlay.uncertainty?.openWorldCandidateProbabilityById).toEqual({});
     expect(reflection.overlay.uncertainty?.coverageBasis).toBe("no_candidates");
   });
+
+  it("keeps long-form examples from displacing the cross-scale subject", () => {
+    const reflection = buildTheoryContextReflection({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      prompt: [
+        "Deterministic microscopic laws can yield probabilistic macroscopic observations when fine-grained information is inaccessible or discarded under coarse-graining.",
+        "Hidden detail, chaotic sensitivity, and emergence can make effective descriptions probabilistic.",
+        "Statistical mechanics is the classic example: particles may follow deterministic equations while temperature and pressure are described statistically.",
+        "The distinction is whether probability is epistemic or unavoidable at the effective scale; quantum mechanics makes that contentious.",
+      ].join(" "),
+      generatedAt: "2026-07-16T00:00:00.000Z",
+      reflectionId: "reflection:determinism-probability-cross-scale",
+    });
+    const likelyBadgeIds = reflection.likelyMatches.map((match) => match.badgeId);
+
+    expect(reflection.exactMatches).toEqual([]);
+    expect(likelyBadgeIds).toEqual(expect.arrayContaining([
+      "scale.eft.effective_degrees_of_freedom_context",
+      "scale.eft.rg_relevance_context",
+    ]));
+    expect(likelyBadgeIds).not.toEqual(expect.arrayContaining([
+      "low_temp.temperature.thermal_energy_not_pressure",
+      "tokamak.plasma.thermal_pressure_proxy",
+      "starsim.observable.surface_temperature_proxy",
+    ]));
+    expect(reflection.inferredDomains.map((domain) => domain.atlasBlockId)).not.toContain(
+      "tokamak_plasma",
+    );
+    expect(reflection.overlay.uncertainty).toMatchObject({
+      representedProbabilityMass: 0.55,
+      outOfGraphProbability: 0.45,
+      coverageBasis: "semantic_coverage_heuristic",
+    });
+  });
+
+  it("anchors on the first scientific sentence and excludes a quantum caveat from placement mass", () => {
+    const reflection = buildTheoryContextReflection({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      prompt: [
+        "Exactly.",
+        "Deterministic microscopic evolution does not guarantee predictable macroscopic observations.",
+        "Probability can emerge when coarse-graining maps many distinct microstates to the same macrostate.",
+        "Because microscopic details are discarded, uncertainty in the hidden microstate induces probabilistic macrodynamics.",
+        "So the probability may reflect the scale-dependent description rather than randomness in the underlying laws—though that alone does not establish that every apparently fundamental probability, such as quantum measurement, has this origin.",
+      ].join(" "),
+      generatedAt: "2026-07-16T00:00:00.000Z",
+      reflectionId: "reflection:deictic-long-form-caveat-boundary",
+    });
+    const likelyBadgeIds = reflection.likelyMatches.map((match) => match.badgeId);
+
+    expect(reflection.exactMatches).toEqual([]);
+    expect(likelyBadgeIds).toEqual(expect.arrayContaining([
+      "scale.eft.effective_degrees_of_freedom_context",
+      "scale.eft.rg_relevance_context",
+    ]));
+    expect(likelyBadgeIds).toHaveLength(2);
+    expect(likelyBadgeIds).not.toContain("physics.atomic.electron_cloud_uncertainty_floor");
+    expect(reflection.overlay.uncertainty?.openWorldCandidateProbabilityById).not.toHaveProperty(
+      "physics.atomic.electron_cloud_uncertainty_floor",
+    );
+    expect(reflection.overlay.uncertainty).toMatchObject({
+      representedProbabilityMass: 0.55,
+      outOfGraphProbability: 0.45,
+      coverageBasis: "semantic_coverage_heuristic",
+    });
+  });
+
+  it("keeps embedded examples in the keyed level-two answer out of placement mass", () => {
+    const reflection = buildTheoryContextReflection({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      prompt: [
+        "Exactly. Deterministic microscopic dynamics can yield probabilistic macroscopic observations because changing scale usually discards information.",
+        "Once we track coarse variables—temperature, pressure, density—instead of every microscopic degree of freedom, many distinct microstates become observationally indistinguishable.",
+        "Probability then describes our uncertainty over those hidden microstates, even if each evolves deterministically.",
+        "Chaos strengthens this effect: tiny unresolved differences can grow rapidly, making long-term outcomes practically unpredictable.",
+        "Statistical mechanics formalizes the idea through distributions over microstates, while renormalization explains how microscopic details can become irrelevant at larger scales.",
+        "So the probabilities need not be fundamental.",
+        "They can emerge from coarse-graining, incomplete initial information, chaotic amplification, environmental coupling, and collective behavior in systems with many degrees of freedom.",
+        "The key distinction is between ontic probability—indeterminism in reality itself—and epistemic or emergent probability—uncertainty introduced by limited resolution and scale-dependent description.",
+        "Deterministic laws are fully compatible with the latter.",
+      ].join(" "),
+      generatedAt: "2026-07-16T00:00:00.000Z",
+      reflectionId: "reflection:keyed-level-two-cross-scale-answer",
+    });
+    const likelyBadgeIds = reflection.likelyMatches.map((match) => match.badgeId);
+
+    expect(reflection.exactMatches).toEqual([]);
+    expect(likelyBadgeIds).toEqual([
+      "scale.eft.effective_degrees_of_freedom_context",
+      "scale.eft.rg_relevance_context",
+    ]);
+    expect(reflection.overlay.highlightedEdgeIds).toContain(
+      "rg_relevance_bounds_effective_degrees_of_freedom",
+    );
+    expect(reflection.overlay.uncertainty).toMatchObject({
+      representedProbabilityMass: 0.55,
+      outOfGraphProbability: 0.45,
+      coverageBasis: "semantic_coverage_heuristic",
+    });
+    expect(reflection.overlay.uncertainty?.openWorldCandidateProbabilityById).toEqual({
+      "scale.eft.effective_degrees_of_freedom_context": expect.any(Number),
+      "scale.eft.rg_relevance_context": expect.any(Number),
+    });
+  });
+
+  it("retains an affirmative long-form thermodynamic comparison with two coherent signals", () => {
+    const reflection = buildTheoryContextReflection({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      prompt:
+        "Compare temperature and pressure as explicit thermodynamic observables in a plasma model, " +
+        "including the assumptions needed to relate both measured quantities to a common state.",
+      generatedAt: "2026-07-16T00:00:00.000Z",
+      reflectionId: "reflection:affirmative-thermodynamic-comparison",
+    });
+    const matchedBadgeIds = [
+      ...reflection.exactMatches.map((match) => match.badgeId),
+      ...reflection.likelyMatches.map((match) => match.badgeId),
+    ];
+
+    expect(matchedBadgeIds).toContain("tokamak.plasma.thermal_pressure_proxy");
+  });
+
+  it("assigns no represented mass when the only graph concept appears in a claim-boundary caveat", () => {
+    const reflection = buildTheoryContextReflection({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      prompt:
+        "Exactly. This does not establish that electron-cloud quantum uncertainty is the mechanism.",
+      generatedAt: "2026-07-16T00:00:00.000Z",
+      reflectionId: "reflection:caveat-only-candidate",
+    });
+
+    expect(reflection.exactMatches).toEqual([]);
+    expect(reflection.likelyMatches).toEqual([]);
+    expect(reflection.overlay.uncertainty).toMatchObject({
+      representedProbabilityMass: 0,
+      outOfGraphProbability: 1,
+      coverageBasis: "no_candidates",
+    });
+  });
+
+  it("still admits electron-cloud uncertainty when it is an affirmative comparison subject", () => {
+    const reflection = buildTheoryContextReflection({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      prompt:
+        "Compare electron-cloud position-momentum uncertainty with uncertainty induced by coarse-graining deterministic microscopic states into macroscopic observations.",
+      generatedAt: "2026-07-16T00:00:00.000Z",
+      reflectionId: "reflection:explicit-electron-cloud-comparison",
+    });
+    const matchedBadgeIds = [
+      ...reflection.exactMatches.map((match) => match.badgeId),
+      ...reflection.likelyMatches.map((match) => match.badgeId),
+    ];
+
+    expect(matchedBadgeIds).toContain("physics.atomic.electron_cloud_uncertainty_floor");
+    expect(matchedBadgeIds).toContain("scale.eft.effective_degrees_of_freedom_context");
+  });
+
+  it.each([
+    ["contextual", "For context only, electron-cloud quantum uncertainty is a separate mechanism."],
+    ["negated", "Do not map electron-cloud quantum uncertainty into this mechanism."],
+    ["future conditional", "If a later request asks about electron-cloud quantum uncertainty, compare it then."],
+    ["historical", "Previously, we mentioned electron-cloud quantum uncertainty."],
+    ["quoted", '"Electron-cloud quantum uncertainty" is only quoted text from the prior answer.'],
+    ["screen-visible", "The screen shows the words electron-cloud quantum uncertainty."],
+  ])("keeps %s candidate language contextual in a mixed scientific reflection", (_label, contextualSentence) => {
+    const reflection = buildTheoryContextReflection({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      prompt: [
+        "Deterministic microscopic states become probabilistic macroscopic descriptions after coarse-graining.",
+        contextualSentence,
+      ].join(" "),
+      generatedAt: "2026-07-16T00:00:00.000Z",
+      reflectionId: `reflection:contextual-candidate-${_label}`,
+    });
+    const likelyBadgeIds = reflection.likelyMatches.map((match) => match.badgeId);
+
+    expect(likelyBadgeIds).toContain("scale.eft.effective_degrees_of_freedom_context");
+    expect(likelyBadgeIds).not.toContain("physics.atomic.electron_cloud_uncertainty_floor");
+  });
+
+  it("keeps ontology comparisons diagnostic when the graph only contains scale-context bridges", () => {
+    const reflection = buildTheoryContextReflection({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      prompt:
+        "Now compare two interpretations with the Theory Badge Graph: first, that macroscopic " +
+        "probability is epistemic because coarse-graining hides deterministic microstates; second, " +
+        "that probability is fundamental rather than caused by missing information. Show where the " +
+        "graph supports or fails to represent each interpretation.",
+      generatedAt: "2026-07-16T00:00:00.000Z",
+      reflectionId: "reflection:epistemic-versus-fundamental-probability",
+    });
+    const likelyBadgeIds = reflection.likelyMatches.map((match) => match.badgeId);
+
+    expect(reflection.exactMatches).toEqual([]);
+    expect(likelyBadgeIds).toEqual(expect.arrayContaining([
+      "scale.eft.effective_degrees_of_freedom_context",
+      "scale.eft.rg_relevance_context",
+    ]));
+    expect(likelyBadgeIds).not.toEqual(expect.arrayContaining([
+      "biology.evolution.selection_fitness_context",
+      "prebiotic.photochemistry.radiation_processing_context",
+      "collapse.objective.dp_hazard_probability",
+    ]));
+    expect(reflection.overlay.highlightedEdgeIds).toContain(
+      "rg_relevance_bounds_effective_degrees_of_freedom",
+    );
+    expect(reflection.overlay.uncertainty).toMatchObject({
+      representedProbabilityMass: 0.55,
+      outOfGraphProbability: 0.45,
+      coverageBasis: "semantic_coverage_heuristic",
+    });
+  });
+
+  it("does not promote a calculator payload coincidence to exact semantic identity", () => {
+    const reflection = buildTheoryContextReflection({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      prompt:
+        "Epistemic probability from hidden deterministic microstates versus fundamental objective probability.",
+      generatedAt: "2026-07-16T00:00:00.000Z",
+      reflectionId: "reflection:objective-probability-payload-coincidence",
+    });
+
+    expect(reflection.exactMatches).toEqual([]);
+    expect(reflection.likelyMatches.map((match) => match.badgeId)).toContain(
+      "collapse.objective.dp_hazard_probability",
+    );
+    expect(reflection.overlay.highlightedEdgeIds).toEqual([]);
+    expect(reflection.overlay.uncertainty).toMatchObject({
+      representedProbabilityMass: 0.35,
+      outOfGraphProbability: 0.65,
+      coverageBasis: "semantic_coverage_heuristic",
+    });
+  });
+
+  it("keeps live reflection control and output fields outside semantic coverage", () => {
+    const reflection = buildTheoryContextReflection({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      prompt:
+        "LIVE_DERIVATION_PROGRAM_GODEL_07 Use helix_ask.reflect_theory_context exactly once " +
+        "to compare Gödel incompleteness theorem with Fermat Last Theorem. " +
+        "Report exact_badge_ids, likely_badge_ids, representedProbabilityMass, " +
+        "outOfGraphProbability, master_problem_v1, derivation_program_v1, and failureReceipts.",
+      generatedAt: "2026-07-16T00:00:00.000Z",
+      reflectionId: "reflection:live-meta-formal-theorems-out-of-graph",
+    });
+
+    expect(reflection.exactMatches).toEqual([]);
+    expect(reflection.likelyMatches).toEqual([]);
+    expect(reflection.overlay.uncertainty).toMatchObject({
+      representedProbabilityMass: 0,
+      outOfGraphProbability: 1,
+      coverageBasis: "no_candidates",
+    });
+  });
+
+  it("does not let retained conversation context manufacture semantic graph coverage", () => {
+    const reflection = buildTheoryContextReflection({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      prompt: "Compare Godel incompleteness theorem with Fermat Last Theorem.",
+      conversationContext:
+        "Retained paper and workstation context mentions Einstein field equations, stellar spectral abundance, photon energy, nucleosynthesis, nuclear structure, and surface gravity.",
+      generatedAt: "2026-07-16T00:00:00.000Z",
+      reflectionId: "reflection:ambient-context-does-not-admit-badges",
+    });
+
+    expect(reflection.input.conversationContext).toContain("Einstein field equations");
+    expect(reflection.exactMatches).toEqual([]);
+    expect(reflection.likelyMatches).toEqual([]);
+    expect(reflection.overlay.uncertainty).toMatchObject({
+      representedProbabilityMass: 0,
+      outOfGraphProbability: 1,
+      coverageBasis: "no_candidates",
+    });
+  });
+
+  it("uses semantic identity evidence for exact matches and graph coverage", () => {
+    const reflection = buildTheoryContextReflection({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      prompt: "Compare the Einstein field equation with stress-energy conservation at the same observable scale.",
+      generatedAt: "2026-07-16T00:00:00.000Z",
+      reflectionId: "reflection:semantic-coverage",
+    });
+    const exactBadgeIds = reflection.exactMatches.map((match) => match.badgeId);
+
+    expect(exactBadgeIds).toEqual(expect.arrayContaining([
+      "physics.gr.einstein_field_equation",
+      "physics.gr.stress_energy_conservation",
+    ]));
+    expect(exactBadgeIds).toHaveLength(2);
+    expect(exactBadgeIds).not.toContain("physics.symmetry.energy_momentum_conservation");
+    expect(reflection.likelyMatches.map((match) => match.badgeId)).toContain(
+      "physics.symmetry.energy_momentum_conservation",
+    );
+    expect(reflection.overlay.uncertainty).toMatchObject({
+      coverageBasis: "semantic_coverage_heuristic",
+    });
+    expect(reflection.overlay.uncertainty?.representedProbabilityMass).toBeGreaterThan(0.9);
+    expect(reflection.overlay.uncertainty?.outOfGraphProbability).toBeLessThan(0.1);
+  });
 });

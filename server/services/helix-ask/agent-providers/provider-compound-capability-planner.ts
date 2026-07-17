@@ -7,6 +7,7 @@ import {
 import { isExistingTranslationSurfaceReadPrompt } from "./active-context-tool-requests";
 import { resolveHelixAskConversationalReferent } from "../referent-resolution";
 import { scholarlyPaperIdentityKeys } from "../retrieval/scholarly-paper-identity";
+import { HELIX_THEORY_CONTEXT_REFLECTION_CAPABILITY } from "../theory-congruence/capability-contract";
 
 export const READ_ALOUD_SURFACE_OUTCOME = "read_aloud_surface" as const;
 export const READ_ALOUD_DOC_EXCERPT_OUTCOME = READ_ALOUD_SURFACE_OUTCOME;
@@ -22,7 +23,7 @@ const DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY = "docs-viewer.read_active_transla
 const REPO_SEARCH_CAPABILITY = "repo.search" as const;
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression" as const;
 const CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY = "scientific-calculator.read_visible_result" as const;
-const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context" as const;
+const THEORY_CONTEXT_REFLECTION_CAPABILITY = HELIX_THEORY_CONTEXT_REFLECTION_CAPABILITY;
 const CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY = "civilization-bounds.reflect_system_bounds" as const;
 const INTERNET_SEARCH_CAPABILITY = "internet-search.search_web" as const;
 const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = "scholarly-research.lookup_papers" as const;
@@ -291,7 +292,7 @@ const hasExplicitDocsOrRepoCapabilityMention = (prompt: string): boolean =>
   );
 
 const hasExplicitCompoundPlannerCapabilityMention = (prompt: string): boolean =>
-  /\b(?:docs\.search|repo\.search|scientific-calculator\.solve_expression|theory-badge-graph\.reflect_discussion_context|civilization-bounds\.reflect_system_bounds|internet-search\.search_web|scholarly-research\.(?:lookup_papers|fetch_full_text|extract_numeric_parameters))\b/i.test(
+  /\b(?:docs\.search|repo\.search|scientific-calculator\.solve_expression|helix_ask\.reflect_theory_context|theory-badge-graph\.reflect_discussion_context|civilization-bounds\.reflect_system_bounds|internet-search\.search_web|scholarly-research\.(?:lookup_papers|fetch_full_text|extract_numeric_parameters))\b/i.test(
     unquotePrompt(prompt),
   );
 

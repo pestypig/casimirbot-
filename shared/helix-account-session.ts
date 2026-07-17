@@ -55,6 +55,7 @@ export const HELIX_USER_WORKSTATION_PANEL_IDS = [
   "workstation-task-manager",
   "moral-graph",
   "postulate-board",
+  "workflow-demo-lab",
 ] as const;
 
 export const HELIX_LOCKED_WORKSTATION_PANEL_IDS = [
@@ -73,7 +74,6 @@ export const HELIX_LOCKED_WORKSTATION_PANEL_IDS = [
   "situation-room-pipelines",
   "stage-play-badge-graph",
   "workstation-workflow-timeline",
-  "workflow-demo-lab",
 ] as const;
 
 export const HELIX_DEVELOPER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {

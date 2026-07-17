@@ -2296,6 +2296,14 @@ describe("Helix terminal authority single writer", () => {
       tool_call_admission_decision: {
         tool_admission_suppressed: true,
       },
+      codex_parity_agent_spine_rail_table: {
+        schema: "helix.codex_parity_agent_spine_rail_table.v1",
+        requested_capability: "model_only",
+        selected_capability: "model_only",
+        admitted_capability: "model_only",
+        reentry_status: "no_observation",
+        reentry_proven: false,
+      },
       goal_satisfaction_evaluation: {
         satisfaction: "satisfied",
         next_decision: "allow_terminal",
@@ -2324,7 +2332,7 @@ describe("Helix terminal authority single writer", () => {
     expect(payload.ask_turn_procedure_trace).toMatchObject({
       schema: "helix.ask_turn_procedure_trace.v1",
       intent_class: "model_only_concept",
-      evidence_reentry_status: "reentered",
+      evidence_reentry_status: "no_observation",
       allowed_terminal_products: expect.arrayContaining(["direct_answer_text"]),
       selected_terminal_product: expect.objectContaining({
         kind: "direct_answer_text",

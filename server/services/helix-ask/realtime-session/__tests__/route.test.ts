@@ -7,6 +7,16 @@ import { resetAccountSessionStore } from "../../../helix-account/account-session
 import { setOpenAiRealtimeContractTransportForTests } from "../adapter";
 import { buildRealtimeClientReceiptObservation } from "../route-boundary";
 
+const REALTIME_TEST_ENV_KEYS = [
+  "HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED",
+  "HELIX_REALTIME_SESSION_ADAPTER_ENABLED",
+  "HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED",
+  "HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED",
+  "OPENAI_REALTIME_API_KEY",
+  "OPENAI_API_KEY",
+] as const;
+const priorRealtimeTestEnv = new Map<string, string | undefined>();
+
 const createApp = (): express.Express => {
   const app = express();
   app.use(express.json({ limit: "256kb" }));
@@ -147,10 +157,20 @@ describe("AGI Realtime session route boundary", () => {
   });
   beforeEach(async () => {
     await resetAccountSessionStore();
+    for (const key of REALTIME_TEST_ENV_KEYS) {
+      priorRealtimeTestEnv.set(key, process.env[key]);
+      delete process.env[key];
+    }
   });
 
   afterEach(() => {
     setOpenAiRealtimeContractTransportForTests(null);
+    for (const key of REALTIME_TEST_ENV_KEYS) {
+      const value = priorRealtimeTestEnv.get(key);
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    priorRealtimeTestEnv.clear();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -248,12 +268,14 @@ describe("AGI Realtime session route boundary", () => {
     expect(JSON.stringify(response.body)).not.toContain("OPENAI_API_KEY");
   });
 
-  it("keeps the provider stub non-networked even when adapter and transport flags are enabled", async () => {
+  it("keeps the explicitly selected provider stub non-networked", async () => {
     const previousAdapter = process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED;
     const previousTransport = process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED;
+    const previousContract = process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED;
     const previousKey = process.env.OPENAI_API_KEY;
     process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED = "1";
     process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED = "1";
+    process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED = "0";
     process.env.OPENAI_API_KEY = "route-secret-must-not-leak";
     try {
       const agent = await createDeveloperAgent();
@@ -264,11 +286,12 @@ describe("AGI Realtime session route boundary", () => {
           runtime_agent_authority: "suggest_actions",
           visible_user_consent_receipt: "receipt:visible-consent:stub",
         })
-        .expect(409);
+        .expect(200);
 
       expect(response.body).toMatchObject({
-        error: "realtime_session_disabled",
-        blocked_reason: "openai_realtime_adapter_stub_no_live_call",
+        ok: true,
+        error: null,
+        blocked_reason: null,
         transport_plan: expect.objectContaining({
           adapter_id: "openai_realtime_stub",
           adapter_state: "stubbed",
@@ -282,6 +305,7 @@ describe("AGI Realtime session route boundary", () => {
           provider_session_ref: null,
         }),
         realtime_runtime_session_summary: expect.objectContaining({
+          live_session_admission_status: "admitted_stub",
           adapter_id: "openai_realtime_stub",
           adapter_state: "stubbed",
           provider_session_ref: null,
@@ -293,6 +317,7 @@ describe("AGI Realtime session route boundary", () => {
         webrtc_started: false,
         sideband_started: false,
       });
+      expectNonTerminalRealtimeEnvelope(response.body, true);
       expect(JSON.stringify(response.body)).not.toContain("route-secret-must-not-leak");
     } finally {
       if (previousAdapter === undefined) {
@@ -304,6 +329,11 @@ describe("AGI Realtime session route boundary", () => {
         delete process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED;
       } else {
         process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED = previousTransport;
+      }
+      if (previousContract === undefined) {
+        delete process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED;
+      } else {
+        process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED = previousContract;
       }
       if (previousKey === undefined) {
         delete process.env.OPENAI_API_KEY;
@@ -317,10 +347,12 @@ describe("AGI Realtime session route boundary", () => {
     const previousDescriptor = process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED;
     const previousAdapter = process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED;
     const previousTransport = process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED;
+    const previousContract = process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED;
     const previousKey = process.env.OPENAI_API_KEY;
     process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED = "1";
     process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED = "1";
     process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED = "0";
+    process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED = "0";
     process.env.OPENAI_API_KEY = "admitted-secret-must-not-leak";
     try {
       const agent = await createDeveloperAgent();
@@ -427,6 +459,11 @@ describe("AGI Realtime session route boundary", () => {
         delete process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED;
       } else {
         process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED = previousTransport;
+      }
+      if (previousContract === undefined) {
+        delete process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED;
+      } else {
+        process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED = previousContract;
       }
       if (previousKey === undefined) {
         delete process.env.OPENAI_API_KEY;

@@ -22,6 +22,92 @@ const stringArg = (value: unknown, fallback = ""): string =>
 const nullableStringArg = (value: unknown): string | null =>
   typeof value === "string" ? value : null;
 
+const THEORY_DERIVATION_ASSIGNMENT_KEYS = [
+  "operation",
+  "target",
+  "target_observable",
+  "scale_min_log10_m",
+  "scale_max_log10_m",
+  "coordinate_frame",
+  "initial_boundary_conditions",
+  "formal_system",
+  "requested_precision",
+  "evidence_maturity_ceiling",
+] as const;
+
+const trimExplicitAssignmentValue = (value: string): string => {
+  const trimmed = value
+    .replace(/^[\s,;]+/, "")
+    .replace(/\s+(?:and\s+)?(?:report|return|include|show)\b[\s\S]*$/i, "")
+    .replace(/[\s,;.]+$/, "")
+    .trim();
+  if (
+    trimmed.length >= 2 &&
+    ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      (trimmed.startsWith("'") && trimmed.endsWith("'")))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+};
+
+const parseBoundaryConditions = (value: string): string[] => {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
+    }
+  } catch {
+    // A compact comma/pipe list is also an explicit assignment form.
+  }
+  return value
+    .replace(/^\[|\]$/g, "")
+    .split(/[|,]/)
+    .map((entry) => entry.trim().replace(/^['"]|['"]$/g, ""))
+    .filter(Boolean);
+};
+
+/**
+ * Preserves machine-readable fields written inside an affirmative prompt-named
+ * capability request. This is transport, not intent inference: only canonical
+ * field names followed by `=` or `:` are accepted.
+ */
+export function extractExplicitTheoryDerivationRequestAssignments(
+  text: string,
+): Record<string, unknown> {
+  const keyPattern = THEORY_DERIVATION_ASSIGNMENT_KEYS.join("|");
+  const assignmentPattern = new RegExp(`\\b(${keyPattern})\\s*[:=]\\s*`, "gi");
+  const matches = Array.from(text.matchAll(assignmentPattern));
+  const assignments: Record<string, unknown> = {};
+
+  matches.forEach((match, index) => {
+    const key = match[1]?.toLowerCase();
+    if (!key || !THEORY_DERIVATION_ASSIGNMENT_KEYS.includes(
+      key as (typeof THEORY_DERIVATION_ASSIGNMENT_KEYS)[number],
+    )) return;
+    const start = (match.index ?? 0) + match[0].length;
+    const nextStart = matches[index + 1]?.index ?? text.length;
+    const bounded = text.slice(start, nextStart).split(/[;\n]/, 1)[0] ?? "";
+    const value = trimExplicitAssignmentValue(bounded);
+    if (!value) return;
+
+    if (key === "scale_min_log10_m" || key === "scale_max_log10_m") {
+      const number = Number(value);
+      if (Number.isFinite(number)) assignments[key] = number;
+      return;
+    }
+    if (key === "initial_boundary_conditions") {
+      const conditions = parseBoundaryConditions(value);
+      if (conditions.length > 0) assignments[key] = conditions;
+      return;
+    }
+    assignments[key] = value;
+  });
+
+  return assignments;
+}
+
 /**
  * Normalizes explicit tool arguments into the theory-congruence request contract.
  * It intentionally does not infer an operation from prompt text: lexical cues are

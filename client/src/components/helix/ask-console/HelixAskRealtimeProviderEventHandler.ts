@@ -1,8 +1,16 @@
-import { launchHelixAskPrompt } from "@/lib/helix/ask-prompt-launch";
+import {
+  launchHelixAskPrompt,
+  type HelixAskRouteMetadata,
+} from "@/lib/helix/ask-prompt-launch";
+import type {
+  HelixRealtimeStagePlayAskHandoffV1,
+  HelixRealtimeStagePlayContextSyncV1,
+} from "@shared/contracts/helix-realtime-stage-play.v1";
 import {
   getAudioFocusSnapshot,
   interruptAudioFocusByKind,
 } from "@/lib/audio-focus";
+import { recordHelixAskLiveRuntimeStagePlayHandoff } from "./HelixAskLiveRuntimeDebugState";
 
 export const HELIX_REALTIME_BARGE_MIN_SPEECH_MS = 700;
 
@@ -28,6 +36,10 @@ export type HelixAskRealtimeProviderEventProjection = {
   speaker_loopback_suppressed: boolean;
   reentry_status: "not_required" | "pending_observation_receipt" | "reentered" | "blocked";
   blocked_reason: string | null;
+  handoff_id: string | null;
+  stage_play_event_ref: string | null;
+  context_pack_id: string | null;
+  context_sync_status: string | null;
   tool_execution_attempted: false;
   workstation_action_executed: false;
   reentry_required: boolean;
@@ -79,7 +91,9 @@ const classifyEvent = (
   }
   if (
     type.startsWith("response.output_audio.") ||
-    type.startsWith("response.audio.")
+    type.startsWith("response.audio.") ||
+    type === "output_audio_buffer.started" ||
+    type === "output_audio_buffer.stopped"
   ) {
     return "playback";
   }
@@ -99,6 +113,10 @@ const buildProjection = (input: {
   providerResponseRef?: string | null;
   qualifiedUserInterruption?: boolean;
   speakerLoopbackSuppressed?: boolean;
+  handoffId?: string | null;
+  stagePlayEventRef?: string | null;
+  contextPackId?: string | null;
+  contextSyncStatus?: string | null;
 }): HelixAskRealtimeProviderEventProjection => ({
   schema: "helix.ask.realtime.provider_event_projection.v1",
   event_ref: input.eventRef,
@@ -114,6 +132,10 @@ const buildProjection = (input: {
   speaker_loopback_suppressed: input.speakerLoopbackSuppressed === true,
   reentry_status: input.reentryStatus ?? "not_required",
   blocked_reason: input.blockedReason ?? null,
+  handoff_id: input.handoffId ?? null,
+  stage_play_event_ref: input.stagePlayEventRef ?? null,
+  context_pack_id: input.contextPackId ?? null,
+  context_sync_status: input.contextSyncStatus ?? null,
   tool_execution_attempted: false,
   workstation_action_executed: false,
   reentry_required: input.kind === "input_transcript_final",
@@ -133,6 +155,7 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
     vadState?: string | null;
     interruptionCount?: number;
     audioFocusOwner?: string | null;
+    sourceBinding?: Record<string, unknown> | null;
   };
   postEvent?: (path: string, body: Record<string, unknown>) => Promise<unknown>;
   launchPrompt?: typeof launchHelixAskPrompt;
@@ -240,7 +263,7 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
       }
       if (kind === "playback") {
         const responseRef = readString(event.response_id ?? event.responseId) ?? eventRef;
-        const ended = type.endsWith(".done");
+        const ended = type.endsWith(".done") || type === "output_audio_buffer.stopped";
         const receiptKind = ended ? "playback_ended" : "playback_started";
         const receiptKey = `${responseRef}:${receiptKind}`;
         let blockedReason: string | null = null;
@@ -421,6 +444,7 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
       }
       const path = `/api/agi/realtime/session/${encodeURIComponent(input.realtimeSessionId)}/event`;
       try {
+        const runtimeContext = input.getRuntimeContext?.() ?? {};
         const response = readRecord(await postEvent(path, {
           event_type: "transcript.final",
           event_ref: eventRef,
@@ -431,10 +455,15 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
             source_id: `realtime-mic:${input.realtimeSessionId}`,
             source_kind: "realtime_microphone",
           },
+          workstation_source_binding: runtimeContext.sourceBinding ?? null,
           observed_at_ms: observedAtMs,
           qualified_user_interruption: qualifiedUserInterruption,
           terminal_voice_interrupted: terminalVoiceInterrupted,
           speaker_loopback_suppressed: false,
+          realtime_transport_receipt_ref: runtimeContext.transportReceiptRef ?? null,
+          realtime_vad_state: runtimeContext.vadState ?? null,
+          realtime_interruption_count: runtimeContext.interruptionCount ?? 0,
+          realtime_audio_focus_owner: runtimeContext.audioFocusOwner ?? null,
         }));
         const observation = readRecord(
           Array.isArray(response.realtime_transcript_observations)
@@ -445,7 +474,44 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
         if (response.ok !== true || !observationRef) {
           throw new Error("realtime_transcript_observation_receipt_missing");
         }
-        const runtimeContext = input.getRuntimeContext?.() ?? {};
+        const handoff = readRecord(response.realtime_stage_play_ask_handoff);
+        const routeMetadata = readRecord(handoff.route_metadata);
+        const sourceTargetIntent = readRecord(routeMetadata.source_target_intent);
+        const forbiddenCapabilities = Array.isArray(routeMetadata.forbiddenCapabilities)
+          ? routeMetadata.forbiddenCapabilities.filter((value): value is string =>
+              typeof value === "string")
+          : [];
+        const contextSync = readRecord(response.realtime_stage_play_context_sync);
+        const handoffId = readString(handoff.handoff_id);
+        const stagePlayEventRef = readString(handoff.stage_play_event_ref);
+        const contextPackId = readString(handoff.context_pack_id);
+        if (
+          handoff.schema !== "helix.realtime_stage_play.ask_handoff.v1" ||
+          handoff.transcript_observation_ref !== observationRef ||
+          handoff.realtime_session_id !== input.realtimeSessionId ||
+          handoff.read_only !== true ||
+          handoff.transcript_is_user_intent_after_admission !== true ||
+          handoff.reentry_required !== true ||
+          handoff.answer_authority !== false ||
+          handoff.assistant_answer !== false ||
+          handoff.terminal_eligible !== false ||
+          handoff.raw_content_included !== false ||
+          !handoffId ||
+          !stagePlayEventRef ||
+          !contextPackId ||
+          routeMetadata.source !== "realtime_stage_play" ||
+          routeMetadata.invocationKind !== "stage_play_realtime_transcript_handoff" ||
+          sourceTargetIntent.must_enter_backend_ask !== true ||
+          sourceTargetIntent.allow_client_shortcut !== false ||
+          sourceTargetIntent.admitted_readonly_handoff !== true ||
+          sourceTargetIntent.assistant_answer !== false ||
+          sourceTargetIntent.raw_content_included !== false ||
+          !forbiddenCapabilities.includes("workstation_mutation") ||
+          !forbiddenCapabilities.includes("workstation_action_execution") ||
+          !forbiddenCapabilities.includes("realtime_provider_tool_execution")
+        ) {
+          throw new Error("realtime_stage_play_ask_handoff_missing");
+        }
         launchPrompt({
           question: transcript,
           autoSubmit: true,
@@ -453,36 +519,15 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
           forceReasoningDispatch: true,
           requiresBackendAskEntrypoint: true,
           suppressWorkstationPayloadActions: true,
-          routeMetadata: {
-            schema: "helix.ask.route_metadata.v1",
-            source: "realtime_session",
-            invocationKind: "realtime_transcript_readonly_reentry",
-            sourceTarget: "realtime_transcript",
-            allowedCapabilities: [],
-            forbiddenCapabilities: ["workstation_mutation", "workstation_action_execution"],
-            evidenceRefs: [observationRef],
-            source_target_intent: {
-              must_enter_backend_ask: true,
-              realtime_session_id: input.realtimeSessionId,
-              realtime_observation_ref: observationRef,
-              realtime_transport: "webrtc",
-              selected_realtime_model: input.selectedRealtimeModel ?? null,
-              provider_session_ref: input.providerSessionRef ?? null,
-              realtime_transport_receipt_ref: runtimeContext.transportReceiptRef ?? null,
-              realtime_vad_state: runtimeContext.vadState ?? null,
-              realtime_interruption_count: runtimeContext.interruptionCount ?? 0,
-              realtime_audio_focus_owner: runtimeContext.audioFocusOwner ?? null,
-              qualified_user_interruption: qualifiedUserInterruption,
-              terminal_voice_interrupted: terminalVoiceInterrupted,
-              speaker_loopback_suppressed: false,
-              barge_in_qualification_basis: qualifiedUserInterruption
-                ? "browser_echo_cancellation_plus_persistent_provider_vad"
-                : null,
-              realtime_reentry_status: "observation_receipt_reentered_readonly",
-              admitted_readonly_handoff: true,
-              transcript_is_user_intent_after_admission: true,
-            },
-          },
+          routeMetadata: routeMetadata as HelixAskRouteMetadata,
+        });
+        consumedEventRefs.add(eventRef);
+        recordHelixAskLiveRuntimeStagePlayHandoff({
+          handoff: handoff as unknown as HelixRealtimeStagePlayAskHandoffV1,
+          contextSync: Object.keys(contextSync).length > 0
+            ? contextSync as unknown as HelixRealtimeStagePlayContextSyncV1
+            : null,
+          observedAtMs,
         });
         const projection = buildProjection({
           eventRef,
@@ -491,10 +536,15 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
           transcriptCharCount: transcript.length,
           reentryStatus: "reentered",
           qualifiedUserInterruption,
+          handoffId,
+          stagePlayEventRef,
+          contextPackId,
+          contextSyncStatus: readString(contextSync.status),
         });
         input.onProjection?.(projection);
         return projection;
       } catch (error) {
+        consumedEventRefs.delete(eventRef);
         const projection = buildProjection({
           eventRef,
           type,

@@ -666,6 +666,29 @@ const attachRequiredTheoryBadgeGraphContextRequests = (
   return augmented;
 };
 
+const isTheoryContextReflectionRequest = (request: Record<string, unknown>): boolean =>
+  (readString(request.capability_id) ?? readString(request.capabilityId)) ===
+    THEORY_CONTEXT_REFLECTION_CAPABILITY;
+
+/**
+ * Natural-language theory reflection is runtime-owned step selection. Keep an
+ * explicitly supplied gateway call, which is already a fully authored tool
+ * request, but do not let prompt/planner/structured-admission fallbacks execute
+ * the reflection before the runtime can resolve conversational context and
+ * author the semantic arguments.
+ */
+const deferRuntimeTheoryReflectionRequests = (
+  requests: Record<string, unknown>[],
+  explicitRequests: Record<string, unknown>[] = [],
+): Record<string, unknown>[] => {
+  const explicitRequestRefs = new Set(
+    explicitRequests.filter(isTheoryContextReflectionRequest),
+  );
+  return requests.filter((request) =>
+    !isTheoryContextReflectionRequest(request) || explicitRequestRefs.has(request)
+  );
+};
+
 export const readWorkstationGatewayCallRequestsForTurn = (input: {
   body: Record<string, unknown>;
   includePlannerDerived?: boolean;
@@ -679,8 +702,12 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
       input.body,
       chainAwareExplicit,
     );
+    const runtimeDeferredExplicit = deferRuntimeTheoryReflectionRequests(
+      dependencyCompleteExplicit,
+      explicit,
+    );
     const prompt = readPrompt(input.body) ?? "";
-    const admittedExplicit = filterRequestsAllowedByCommittedRoute(input.body, dependencyCompleteExplicit).filter((request) => {
+    const admittedExplicit = filterRequestsAllowedByCommittedRoute(input.body, runtimeDeferredExplicit).filter((request) => {
       const capability = readString(request.capability_id) ?? readString(request.capabilityId);
       return !gatewayCapabilityNegatedByPrompt(prompt, capability);
     });
@@ -706,7 +733,9 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   const seen = new Set<string>();
   const prompt = readPrompt(input.body) ?? "";
   const finalizeRequests = (candidates: Record<string, unknown>[]): Record<string, unknown>[] =>
-    filterRequestsAllowedByCommittedRoute(input.body, candidates)
+    deferRuntimeTheoryReflectionRequests(
+      filterRequestsAllowedByCommittedRoute(input.body, candidates),
+    )
       .filter((request) => {
         const capability = readString(request.capability_id) ?? readString(request.capabilityId);
         return !gatewayCapabilityNegatedByPrompt(prompt, capability);

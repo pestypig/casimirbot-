@@ -203,6 +203,9 @@ const artifactKindMatchesCapability = (
   if (capability === "scholarly-research.lookup_papers") return /scholarly_research_observation|helix\.scholarly_research_observation\.v1|scholarly_research/i.test(joined);
   if (capability === "scholarly-research.fetch_full_text") return /scholarly_full_text_observation|helix\.scholarly_full_text_observation\.v1|scholarly_research/i.test(joined);
   if (capability === "research-library.read_document") return /research_library_observation|helix\.research_library_observation\.v1|profile_research_library/i.test(joined);
+  if (capability === "research-library.apply_evidence_enrichment") {
+    return /paper_evidence_enrichment_observation|helix\.paper_evidence_enrichment_observation\.v1|apply_evidence_enrichment/i.test(joined);
+  }
   if (capability === "internet_search.web_research" || capability === "internet-search.search_web") {
     return /internet_search_observation|web_research_observation|helix\.internet_search_observation\.v1|internet_search|web_research/i.test(joined);
   }
@@ -370,6 +373,9 @@ const capabilityFamilyForArtifact = (artifact: Record<string, unknown> | null): 
   if (/research_library_observation|helix\.research_library_observation\.v1|profile_research_library/i.test(joined)) {
     return "research-library.read_document";
   }
+  if (/paper_evidence_enrichment_observation|helix\.paper_evidence_enrichment_observation\.v1|apply_evidence_enrichment/i.test(joined)) {
+    return "research-library.apply_evidence_enrichment";
+  }
   if (/scholarly_research_observation|helix\.scholarly_research_observation\.v1|scholarly_research/i.test(joined)) {
     return "scholarly-research.lookup_papers";
   }
@@ -472,6 +478,7 @@ const selectedRepoEvidenceCapabilityHasCurrentTurnObservation = (
     capability !== "scholarly-research.lookup_papers" &&
     capability !== "scholarly-research.fetch_full_text" &&
     capability !== "research-library.read_document" &&
+    capability !== "research-library.apply_evidence_enrichment" &&
     capability !== "internet_search.web_research" &&
     capability !== "internet-search.search_web"
   ) return false;

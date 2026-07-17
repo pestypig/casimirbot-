@@ -21,6 +21,7 @@ describe("WorkstationPanelHost account policy", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     testState.interfaceLanguage = "en";
   });
 
@@ -38,6 +39,23 @@ describe("WorkstationPanelHost account policy", () => {
 
     expect(screen.getByText("Code Admin is locked")).toBeTruthy();
     expect(screen.getByText(/reserved for developer mode/i)).toBeTruthy();
+  });
+
+  it("renders the workflow demo lab for public user-policy deep links", async () => {
+    vi.stubGlobal("React", React);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ account_policy: HELIX_USER_ACCOUNT_POLICY }),
+      })),
+    );
+    await fetchAccountCapabilityPolicy();
+
+    render(<WorkstationPanelHost panelId="workflow-demo-lab" />);
+
+    expect(await screen.findByTestId("workflow-demo-lab-panel")).toBeTruthy();
+    expect(screen.queryByText(/reserved for developer mode/i)).toBeNull();
   });
 
   it("renders locked panel chrome through the selected interface language", async () => {

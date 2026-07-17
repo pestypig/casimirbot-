@@ -9,6 +9,10 @@ import type {
   HelixRealtimeToolSuggestionObservation,
   HelixRealtimeTranscriptObservation,
 } from "./helix-realtime-observation";
+import type {
+  HelixRealtimeStagePlayAskHandoffV1,
+  HelixRealtimeStagePlayContextSyncV1,
+} from "./contracts/helix-realtime-stage-play.v1";
 
 export const HELIX_REALTIME_SESSION_RESPONSE_SCHEMA =
   "helix.realtime_session.response.v1" as const;
@@ -97,6 +101,8 @@ export type HelixRealtimeSdpExchangeResponse = {
   answer_sdp: string | null;
   openai_network_call_attempted: boolean;
   webrtc_started: boolean;
+  sideband_started: boolean;
+  realtime_stage_play_context_sync: HelixRealtimeStagePlayContextSyncV1 | null;
   reentry_required: true;
   answer_authority: false;
   assistant_answer: false;
@@ -129,7 +135,7 @@ export type HelixRealtimeSessionDebugSummary = HelixLiveRuntimeAgentControlState
   media_capture_started: false;
   openai_network_call_attempted: boolean;
   webrtc_started: false;
-  sideband_started: false;
+  sideband_started: boolean;
   adapter_id: HelixRealtimeSessionTransportPlan["adapter_id"];
   adapter_state: HelixRealtimeSessionTransportPlan["adapter_state"];
   transport_plan: HelixRealtimeSessionTransportPlan;
@@ -172,12 +178,12 @@ export type HelixRealtimeSessionResponse = {
   client_secret_requested: boolean;
   client_secret_issued: boolean;
   sdp_exchange_requested: boolean;
-  server_sideband_requested: false;
+  server_sideband_requested: boolean;
   provider_session_ref: string | null;
   openai_network_call_attempted: boolean;
   ephemeral_credential_minted: boolean;
   webrtc_started: false;
-  sideband_started: false;
+  sideband_started: boolean;
   account_policy: HelixAccountCapabilityPolicy;
   policy_gate: HelixRealtimeSessionPolicyGate;
   realtime_runtime_session_summary: HelixRealtimeSessionDebugSummary;
@@ -186,6 +192,8 @@ export type HelixRealtimeSessionResponse = {
   realtime_tool_suggestion_observations: HelixRealtimeToolSuggestionObservation[];
   realtime_client_receipt_observations: HelixRealtimeClientReceiptObservation[];
   realtime_reentry_status: "observation_packet_required_for_provider_reentry" | null;
+  realtime_stage_play_ask_handoff?: HelixRealtimeStagePlayAskHandoffV1 | null;
+  realtime_stage_play_context_sync?: HelixRealtimeStagePlayContextSyncV1 | null;
   reentry_required: true;
   answer_authority: false;
   assistant_answer: false;

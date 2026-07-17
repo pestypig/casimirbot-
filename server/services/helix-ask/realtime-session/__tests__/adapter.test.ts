@@ -22,10 +22,10 @@ describe("Realtime session adapter boundary", () => {
     vi.restoreAllMocks();
   });
 
-  it("keeps every feature gate disabled by default", () => {
-    const gate = readRealtimeSessionFeatureGate({} as NodeJS.ProcessEnv);
+  it("derives the default feature gate from the normal OpenAI startup key", () => {
+    const disabledGate = readRealtimeSessionFeatureGate({} as NodeJS.ProcessEnv);
 
-    expect(gate).toEqual({
+    expect(disabledGate).toEqual({
       schema: "helix.realtime_session.feature_gate.v1",
       descriptor_enabled: false,
       adapter_enabled: false,
@@ -37,6 +37,26 @@ describe("Realtime session adapter boundary", () => {
       openai_contract_flag: HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED_ENV,
     });
     expect(selectRealtimeSessionAdapter({} as NodeJS.ProcessEnv)).toBe(disabledRealtimeSessionAdapter);
+
+    const keyedEnv = { OPENAI_API_KEY: "normal-startup-key" } as NodeJS.ProcessEnv;
+    expect(readRealtimeSessionFeatureGate(keyedEnv)).toMatchObject({
+      descriptor_enabled: true,
+      adapter_enabled: true,
+      live_transport_enabled: true,
+      openai_contract_enabled: true,
+    });
+    expect(selectRealtimeSessionAdapter(keyedEnv).id).toBe("openai_realtime");
+
+    const killedEnv = {
+      OPENAI_API_KEY: "normal-startup-key",
+      HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED: "0",
+    } as NodeJS.ProcessEnv;
+    expect(readRealtimeSessionFeatureGate(killedEnv)).toMatchObject({
+      descriptor_enabled: true,
+      adapter_enabled: true,
+      live_transport_enabled: false,
+      openai_contract_enabled: true,
+    });
   });
 
   it("returns deterministic non-networked envelopes from the disabled adapter", async () => {
@@ -76,6 +96,7 @@ describe("Realtime session adapter boundary", () => {
     const env = {
       HELIX_REALTIME_SESSION_ADAPTER_ENABLED: "1",
       HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED: "1",
+      HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED: "0",
       OPENAI_API_KEY: "must-not-leak",
     } as NodeJS.ProcessEnv;
     const adapter = selectRealtimeSessionAdapter(env);
@@ -106,12 +127,13 @@ describe("Realtime session adapter boundary", () => {
     expect(JSON.stringify(result)).not.toContain("must-not-leak");
   });
 
-  it("does not call the injected OpenAI transport unless the explicit contract flag is enabled", async () => {
+  it("does not call the injected OpenAI transport when the contract kill switch is disabled", async () => {
     const transport = vi.fn(async () => ({ ok: true, providerSessionRef: "provider:should-not-run" }));
     setOpenAiRealtimeContractTransportForTests(transport);
     const env = {
       HELIX_REALTIME_SESSION_ADAPTER_ENABLED: "1",
       HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED: "1",
+      HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED: "0",
       OPENAI_API_KEY: "must-not-leak",
     } as NodeJS.ProcessEnv;
 

@@ -44,6 +44,13 @@ describe("launchPanelPolicy", () => {
     expect(isLockedLaunchPanel("postulate-board")).toBe(false);
   });
 
+  it("includes the workflow demo lab in public launch panels", () => {
+    expect(isUserLaunchPanel("workflow-demo-lab")).toBe(true);
+    expect(isUnfinishedPanel("workflow-demo-lab")).toBe(false);
+    expect(isLockedLaunchPanel("workflow-demo-lab")).toBe(false);
+    expect(isDiscoverableLaunchPanel("workflow-demo-lab")).toBe(true);
+  });
+
   it("includes the Moral Badge Graph but not the Fruition Calculator in public launch panels", () => {
     expect(isUserLaunchPanel("moral-graph")).toBe(true);
     expect(isUserLaunchPanel("fruition-calculator")).toBe(false);

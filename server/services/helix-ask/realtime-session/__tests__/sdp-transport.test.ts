@@ -14,7 +14,7 @@ describe("OpenAI Realtime SDP transport", () => {
       status: 200,
       text: async () => "v=0\r\nanswer",
       headers: {
-        get: (name: string) => name.toLowerCase() === "location" ? "/v1/realtime/calls/call_123" : null,
+        get: (name: string) => name.toLowerCase() === "location" ? "/v1/realtime/calls/rtc_test_123" : null,
       },
     }));
     const result = await createDefaultOpenAiRealtimeSdpTransport(fetchMock)({
@@ -56,6 +56,7 @@ describe("OpenAI Realtime SDP transport", () => {
       ok: true,
       answerSdp: "v=0\r\nanswer",
       providerCallRef: expect.stringMatching(/^openai-realtime:call:/),
+      providerCallId: "rtc_test_123",
     });
     expect(JSON.stringify(result)).not.toContain("server-key-must-not-leak");
   });
@@ -76,10 +77,6 @@ describe("OpenAI Realtime SDP transport", () => {
     const clientSecretTransport = vi.fn();
     const result = await createOpenAiRealtimeSessionAdapter(clientSecretTransport).createSession({
       env: {
-        HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED: "1",
-        HELIX_REALTIME_SESSION_ADAPTER_ENABLED: "1",
-        HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED: "1",
-        HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED: "1",
         OPENAI_API_KEY: "server-key-must-not-leak",
       } as NodeJS.ProcessEnv,
       body: {

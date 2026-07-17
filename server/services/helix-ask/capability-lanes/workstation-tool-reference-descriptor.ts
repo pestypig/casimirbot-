@@ -1,4 +1,9 @@
 import type { HelixCapabilityLaneTemplate } from "./lane-template";
+import { HELIX_THEORY_CONTEXT_REFLECTION_CAPABILITY } from "../theory-congruence/capability-contract";
+import {
+  HELIX_PAPER_EVIDENCE_ENRICHMENT_PROPOSAL_SCHEMA,
+  HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY,
+} from "@shared/helix-paper-evidence-enrichment";
 
 export const workstationToolReferenceLaneTemplate: HelixCapabilityLaneTemplate = {
   lane_id: "workstation_tool_reference",
@@ -16,6 +21,88 @@ export const workstationToolReferenceLaneTemplate: HelixCapabilityLaneTemplate =
   session_supported: false,
   goal_binding_supported: false,
   capabilities: [
+    {
+      capability_id: HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY,
+      label: "Apply paper evidence enrichment",
+      one_shot_status: "executable",
+      session_status: "not_supported",
+      backend_provider_required: false,
+      model_visible_hint: {
+        required_input_fields: ["document_id", "proposal"],
+        optional_input_fields: ["source_target_intent", "requested_backend_provider"],
+        when_to_use:
+          "Use only after an affirmative user request to classify and persist extracted paper evidence, and only after a bounded Research Library sidecar observation supplies the document id, sidecar id, source integrity hash, current revision, equation ids, and source refs. The selected model must author the complete proposal, label agent inferences, preserve unresolved variables, and produce Calculator prefill with auto-run disabled.",
+        when_not_to_use:
+          "Do not use from contextual, negated, future, historical, quoted, or screen-visible mentions. Do not choose a profile id, invent sidecar identity or revision data, run a calculation, request exact-equation authority, or mutate the Theory Badge Graph. Its typed result is persistence evidence only and must re-enter the selected model before any answer.",
+        request_shape_hint: {
+          capability_lane_call: {
+            capability: HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY,
+            document_id: "<from bounded Research Library sidecar observation>",
+            proposal: {
+              schema: HELIX_PAPER_EVIDENCE_ENRICHMENT_PROPOSAL_SCHEMA,
+              proposal_id: "<model-authored stable id>",
+              document_id: "<same bounded document id>",
+              sidecar_id: "<bounded sidecar id>",
+              source_integrity_hash: "<bounded source integrity hash>",
+              expected_revision: "<bounded current revision>",
+              agent_authored: true,
+              equation_updates: "<one or more evidence-bounded updates>",
+              assistant_answer: false,
+              terminal_eligible: false,
+              raw_content_included: false,
+            },
+          },
+        },
+      },
+    },
+    {
+      capability_id: HELIX_THEORY_CONTEXT_REFLECTION_CAPABILITY,
+      label: "Reflect theory context through the workstation gateway",
+      one_shot_status: "executable",
+      session_status: "not_supported",
+      backend_provider_required: false,
+      model_visible_hint: {
+        required_input_fields: ["prompt"],
+        optional_input_fields: [
+          "conversation_context",
+          "mentioned_equations",
+          "mentioned_symbols",
+          "mentioned_domains",
+          "build_explanation_plan",
+          "limit",
+          "operation",
+          "target",
+          "target_observable",
+          "scale_min_log10_m",
+          "scale_max_log10_m",
+          "coordinate_frame",
+          "initial_boundary_conditions",
+          "formal_system",
+          "requested_precision",
+          "evidence_maturity_ceiling",
+          "resolved_referent_text",
+          "resolved_source_ref",
+          "resolved_text_hash",
+          "semantic_prompt_source",
+          "requested_backend_provider",
+        ],
+        when_to_use:
+          "Use when the user affirmatively asks to reflect, compare, or map a semantic topic with the Theory Badge Graph. The prompt must be a concise, faithful central subject, not a bare deictic or a copy of incidental examples and prior failure/status prose. When a prior turn supplies the resolved subject, bind the full source answer separately as resolved_referent_text and include resolved_source_ref plus resolved_text_hash so the bridge can preserve provenance.",
+        when_not_to_use:
+          "Do not use from contextual, negated, future, historical, quoted, or screen-visible mentions of the graph. Do not treat conversation_context as graph evidence or send a bare this/that/it prompt without a provenance-bound resolved referent. The result is observation-only and must re-enter the selected runtime before any answer.",
+        request_shape_hint: {
+          capability_lane_call: {
+            capability: HELIX_THEORY_CONTEXT_REFLECTION_CAPABILITY,
+            prompt: "<concise central semantic theory topic derived from the resolved source>",
+            conversation_context: "<optional bounded discussion context>",
+            build_explanation_plan: true,
+            resolved_referent_text: "<full resolved prior answer when the prompt came from a deictic referent>",
+            resolved_source_ref: "<chat or prompt source ref when resolving a referent>",
+            resolved_text_hash: "<resolved source text hash>",
+          },
+        },
+      },
+    },
     {
       capability_id: "workstation_tool_reference.list_capabilities",
       label: "List workstation gateway capabilities",

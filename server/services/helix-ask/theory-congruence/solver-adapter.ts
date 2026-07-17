@@ -35,6 +35,7 @@ import {
 import { selectTheoryDepth } from "./depth-policy";
 import { buildTheoryToolAdmissionPlan } from "./tool-admission";
 import { compileTheoryMasterProblem } from "../../../../shared/theory/theory-master-problem-compiler";
+import { compileTheoryDerivationProgram } from "../../../../shared/theory/theory-derivation-program-compiler";
 
 export type TheoryCongruenceTraceFeatureFlagMode = "off" | "shadow" | "on";
 
@@ -89,6 +90,16 @@ function selectedBadgeIds(args: {
     ...args.reflection.overlay.centerBadgeIds,
     ...args.reflection.overlay.highlightedBadgeIds,
   ]);
+}
+
+function compilationBadgeIds(reflection: TheoryContextReflectionV1): string[] {
+  const exactBadgeIds = unique(reflection.exactMatches.map((match) => match.badgeId));
+  if (exactBadgeIds.length > 0) return exactBadgeIds;
+  // Likely matches remain usable for explicitly conditional, open-world
+  // compilation when no direct identity exists. Once an exact identity cut is
+  // available, graph-neighborhood and explanation badges remain context only
+  // and must not add unrelated equations or missing inputs to the program.
+  return unique(reflection.likelyMatches.map((match) => match.badgeId));
 }
 
 function hasRepoSourceRefs(badges: TheoryBadgeV1[], plan: TheoryContextExplanationPlanV1 | null): boolean {
@@ -241,22 +252,36 @@ export function buildTheoryCongruenceTrace(
     fullTextObservation: input.scholarlyFullTextObservation,
     metadataFailed: input.scholarlyMetadataFailed,
   });
+  const derivationRequest = input.derivationRequest ?? defaultDerivationRequest(input.prompt, depthSelection.depth);
+  const masterBadgeIds = compilationBadgeIds(input.reflection);
   const masterProblem = compileTheoryMasterProblem({
     graph: input.graph,
-    badgeIds: ids,
-    request: input.derivationRequest ?? defaultDerivationRequest(input.prompt, depthSelection.depth),
+    badgeIds: masterBadgeIds,
+    request: derivationRequest,
+    comparisonBadgeIds: derivationRequest.operation === "compare"
+      ? input.reflection.exactMatches.map((match) => match.badgeId)
+      : undefined,
     uncertainty: {
       placementEntropyBits: input.reflection.overlay.uncertainty?.posteriorEntropyBits ?? 0,
       openWorldEntropyBits: input.reflection.overlay.uncertainty?.openWorldEntropyBits ?? 0,
       outOfGraphProbability: input.reflection.overlay.uncertainty?.outOfGraphProbability ?? 0,
     },
   });
-  const masterProblemMissingEvidence = masterProblem.compile.status === "executable"
+  const derivationProgram = compileTheoryDerivationProgram({ masterProblem });
+  const derivationProgramMissingEvidence = derivationProgram.status === "ready"
     ? []
-    : masterProblem.compile.unresolvedReasons;
+    : unique([
+        ...derivationProgram.failureReceipts.map((receipt) => receipt.message),
+        ...derivationProgram.obligations
+          .filter((obligation) =>
+            obligation.phase === "preflight" &&
+            (obligation.status === "required" || obligation.status === "blocked")
+          )
+          .map((obligation) => obligation.description),
+      ]);
   const status = forbiddenScan.status === "fail"
     ? "unsatisfied"
-    : missingEvidence.length > 0 || requiredBlocked.length > 0 || masterProblemMissingEvidence.length > 0
+    : missingEvidence.length > 0 || requiredBlocked.length > 0 || derivationProgramMissingEvidence.length > 0
       ? "partial"
       : "satisfied";
 
@@ -334,6 +359,7 @@ export function buildTheoryCongruenceTrace(
           caveat: edge.claimBoundaryNote,
         }))),
     master_problem: masterProblem,
+    derivation_program: derivationProgram,
     claim_boundaries: unique([
       ...input.reflection.evidenceForAsk.claimBoundaries,
       ...(input.explanationPlan?.claimBoundaryNotes ?? []),
@@ -351,7 +377,7 @@ export function buildTheoryCongruenceTrace(
       status,
       missing_evidence: unique([
         ...missingEvidence,
-        ...masterProblemMissingEvidence,
+        ...derivationProgramMissingEvidence,
         ...requiredBlocked.map((decision) => decision.blocked_reason ?? decision.reason),
       ]),
       ...(requiredBlocked[0] ? { next_best_tool: requiredBlocked[0].tool } : {}),

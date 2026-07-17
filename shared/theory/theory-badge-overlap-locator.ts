@@ -22,11 +22,33 @@ export type TheoryBadgeLookupInput = {
   limit?: number;
 };
 
+export type TheoryBadgeLookupMatchKind =
+  | "direct_badge_id"
+  | "direct_badge_title"
+  | "atlas_primary_prior"
+  | "atlas_lens_prior"
+  | "requested_symbol"
+  | "query_symbol"
+  | "unit_signature"
+  | "equation_family"
+  | "calculator_payload"
+  | "subject"
+  | "repo_path"
+  | "simulation_owner"
+  | "atlas_subject_prior"
+  | "atlas_simulation_owner_prior"
+  | "atlas_equation_family_prior"
+  | "atlas_unit_signature_prior"
+  | "atlas_repo_path_prior"
+  | "atlas_calculator_example_prior"
+  | "text";
+
 export type TheoryBadgeLookupMatch = {
   badgeId: string;
   badgeTitle: string;
   score: number;
   reasons: string[];
+  matchKinds: TheoryBadgeLookupMatchKind[];
   matchedSubjects: string[];
   matchedSymbols: string[];
   matchedUnitSignatures: string[];
@@ -95,7 +117,12 @@ const TOKEN_STOP_WORDS = new Set([
   "with",
 ]);
 
-const normalize = (value: string) => value.trim().toLowerCase();
+const normalize = (value: string) =>
+  value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
 
 const normalizeKey = (value: string) =>
   normalize(value)
@@ -103,9 +130,24 @@ const normalizeKey = (value: string) =>
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
 
-const unique = (values: string[]) => Array.from(new Set(values.filter(Boolean)));
+const unique = <T extends string>(values: T[]): T[] => Array.from(new Set(values.filter(Boolean)));
 
-const isSpecificUnitSignature = (value: string) => normalize(value).length >= 3;
+const SPECIFIC_SI_UNIT_SIGNATURES = new Set([
+  "j/m^3",
+  "kg",
+  "m^2",
+  "n/m",
+  "pa",
+]);
+
+const isSpecificUnitSignature = (value: string) => {
+  const normalized = normalize(value).replace(/\s+/g, " ");
+  if (SPECIFIC_SI_UNIT_SIGNATURES.has(normalized)) return true;
+  if (!/[\s^/]/.test(normalized)) return false;
+  return /^(?:(?:m|l|t|i|theta|n|j)(?:\^-?\d+)?)(?:\s+(?:m|l|t|i|theta|n|j)(?:\^-?\d+)?)*$/i.test(
+    normalized,
+  );
+};
 
 const intersectNormalized = (left: string[], right: string[]) => {
   const rightByKey = new Map(right.map((value) => [normalizeKey(value), value]));
@@ -181,29 +223,59 @@ function textIncludesAny(
 }
 
 function unitSignaturesInQuery(query: string, unitSignatures: string[]) {
-  const normalizedQuery = normalize(query);
+  const normalizedQuery = `_${normalizeKey(query)}_`;
   return unitSignatures.filter((signature) => {
-    const normalizedSignature = normalize(signature);
-    return isSpecificUnitSignature(signature) && normalizedQuery.includes(normalizedSignature);
+    const normalizedSignature = normalizeKey(signature);
+    return (
+      isSpecificUnitSignature(signature) &&
+      Boolean(normalizedSignature) &&
+      normalizedQuery.includes(`_${normalizedSignature}_`)
+    );
   });
 }
 
-function symbolMatchesQuery(query: string, queryTokens: string[], symbols: string[]) {
-  const tokenKeys = new Set(queryTokens.map(normalizeKey));
-  const caseSensitiveTokens = new Set(
-    query
-      .split(/[^a-z0-9_./^-]+/i)
-      .map((token) => token.trim())
-      .filter(Boolean),
+const QUERY_GREEK_SYMBOL_NAMES = new Set([
+  "alpha",
+  "beta",
+  "gamma",
+  "delta",
+  "eta",
+  "lambda",
+  "mu",
+  "nu",
+  "omega",
+  "phi",
+  "pi",
+  "psi",
+  "rho",
+  "sigma",
+  "tau",
+  "theta",
+]);
+
+const normalizeQuerySymbol = (value: string) =>
+  normalize(value)
+    .replace(/[{}\s]/g, "")
+    .replace(/\\_/g, "_");
+
+const isSpecificQuerySymbol = (symbol: string): boolean => {
+  const normalized = normalizeQuerySymbol(symbol);
+  if (!normalized || /^[a-z]$/.test(normalized)) return false;
+  return (
+    /[_\\^()[\]/]/.test(symbol) ||
+    /^[A-Z][A-Z0-9]{1,3}$/.test(symbol) ||
+    QUERY_GREEK_SYMBOL_NAMES.has(normalized)
   );
+};
+
+function symbolMatchesQuery(queryTokens: string[], symbols: string[]) {
+  const tokenKeys = new Set(queryTokens.map(normalizeQuerySymbol));
   return symbols.filter((symbol) => {
-    const key = normalizeKey(symbol);
-    if (/^[A-Za-z]$/.test(symbol)) {
-      if (symbol === "a" || symbol === "I") return false;
-      return caseSensitiveTokens.has(symbol);
-    }
-    if (key.length <= 3) return tokenKeys.has(key);
-    return queryTokens.some((token) => normalize(token).includes(normalize(symbol)));
+    const key = normalizeQuerySymbol(symbol);
+    // Single-letter and prose-shaped symbols are too polysemous to infer from
+    // prose. They may still be supplied through the explicit `symbols` input.
+    if (!key || !isSpecificQuerySymbol(symbol)) return false;
+    return tokenKeys.has(key);
   });
 }
 
@@ -273,37 +345,49 @@ export function locateTheoryBadges(args: {
       let score = 0;
       let hasAdmissionSignal = false;
       const reasons: string[] = [];
-      const addScore = (points: number, reason: string) => {
+      const matchKinds: TheoryBadgeLookupMatchKind[] = [];
+      const addScore = (points: number, reason: string, kind: TheoryBadgeLookupMatchKind) => {
         score += points;
         reasons.push(reason);
+        matchKinds.push(kind);
       };
 
       if (queryKey && normalizeKey(badge.id) === queryKey) {
-        addScore(100, "direct badge id match");
+        addScore(100, "direct badge id match", "direct_badge_id");
         hasAdmissionSignal = true;
       }
       if (queryKey && normalizeKey(badge.title) === queryKey) {
-        addScore(60, "direct badge title match");
+        addScore(60, "direct badge title match", "direct_badge_title");
         hasAdmissionSignal = true;
       }
 
       if (atlasPrimaryBadgeIds.has(badge.id)) {
-        addScore(40, "direct atlas primary badge");
+        addScore(40, "direct atlas primary badge", "atlas_primary_prior");
         hasAdmissionSignal = true;
       }
       if (atlasLensBadgeIds.has(badge.id)) {
-        addScore(10, "inside selected atlas lens");
+        addScore(10, "inside selected atlas lens", "atlas_lens_prior");
         hasAdmissionSignal = true;
       }
 
       const requestedSymbolMatches = intersectSymbols(requestedSymbols, symbols);
-      const querySymbolMatches = symbolMatchesQuery(query, queryTokens, symbols);
+      const querySymbolMatches = symbolMatchesQuery(queryTokens, symbols);
       const matchedSymbols = unique([...requestedSymbolMatches, ...querySymbolMatches]);
-      if (matchedSymbols.length > 0) {
-        addScore(35 * matchedSymbols.length, `symbol match: ${matchedSymbols.join(", ")}`);
-        hasAdmissionSignal ||=
-          requestedSymbolMatches.length > 0 ||
-          querySymbolMatches.some((symbol) => normalizeKey(symbol).length >= 4);
+      if (requestedSymbolMatches.length > 0) {
+        addScore(
+          35 * requestedSymbolMatches.length,
+          `explicit symbol match: ${requestedSymbolMatches.join(", ")}`,
+          "requested_symbol",
+        );
+        hasAdmissionSignal = true;
+      }
+      if (querySymbolMatches.length > 0) {
+        addScore(
+          35 * querySymbolMatches.length,
+          `query symbol match: ${querySymbolMatches.join(", ")}`,
+          "query_symbol",
+        );
+        hasAdmissionSignal ||= querySymbolMatches.some((symbol) => normalizeKey(symbol).length >= 2);
       }
 
       const matchedUnitSignatures = unique([
@@ -311,7 +395,11 @@ export function locateTheoryBadges(args: {
         ...unitSignaturesInQuery(query, unitSignatures),
       ]);
       if (matchedUnitSignatures.length > 0) {
-        addScore(30 * matchedUnitSignatures.length, `unit signature match: ${matchedUnitSignatures.join(", ")}`);
+        addScore(
+          30 * matchedUnitSignatures.length,
+          `unit signature match: ${matchedUnitSignatures.join(", ")}`,
+          "unit_signature",
+        );
         hasAdmissionSignal = true;
       }
 
@@ -320,7 +408,11 @@ export function locateTheoryBadges(args: {
         ...textIncludesAny(query, equationFamilies),
       ]);
       if (matchedEquationFamilies.length > 0) {
-        addScore(25 * matchedEquationFamilies.length, `equation family match: ${matchedEquationFamilies.join(", ")}`);
+        addScore(
+          25 * matchedEquationFamilies.length,
+          `equation family match: ${matchedEquationFamilies.join(", ")}`,
+          "equation_family",
+        );
         hasAdmissionSignal = true;
       }
 
@@ -344,15 +436,23 @@ export function locateTheoryBadges(args: {
           })
         : [];
       if (payloadHits.length > 0) {
-        addScore(25 * payloadHits.length, `calculator payload match: ${payloadHits.map((payload) => payload.id).join(", ")}`);
+        addScore(
+          25 * payloadHits.length,
+          `calculator payload match: ${payloadHits.map((payload) => payload.id).join(", ")}`,
+          "calculator_payload",
+        );
         hasAdmissionSignal = true;
       }
 
       const requestedSubjectMatches = intersectNormalized(requestedSubjects, subjects);
-      const querySubjectMatches = textIncludesAny(query, subjects, { minimumKeyLength: 3 });
+      const querySubjectMatches = textIncludesAny(
+        query,
+        subjects.filter((subject) => !TOKEN_STOP_WORDS.has(normalizeKey(subject))),
+        { minimumKeyLength: 3 },
+      );
       const matchedSubjects = unique([...requestedSubjectMatches, ...querySubjectMatches]);
       if (matchedSubjects.length > 0) {
-        addScore(20 * matchedSubjects.length, `subject/tag match: ${matchedSubjects.join(", ")}`);
+        addScore(20 * matchedSubjects.length, `subject/tag match: ${matchedSubjects.join(", ")}`, "subject");
         hasAdmissionSignal = true;
       }
 
@@ -362,37 +462,57 @@ export function locateTheoryBadges(args: {
         ...repoPaths.filter((path) => query && normalize(query).includes(normalize(path))),
       ]);
       if (matchedRepoPaths.length > 0) {
-        addScore(20 * matchedRepoPaths.length, `repo path match: ${matchedRepoPaths.join(", ")}`);
+        addScore(20 * matchedRepoPaths.length, `repo path match: ${matchedRepoPaths.join(", ")}`, "repo_path");
         hasAdmissionSignal = true;
       }
 
       const matchedOwners = intersectNormalized(requestedSimulationOwners, simulationOwners);
       if (matchedOwners.length > 0) {
-        addScore(20 * matchedOwners.length, `simulation owner match: ${matchedOwners.join(", ")}`);
+        addScore(
+          20 * matchedOwners.length,
+          `simulation owner match: ${matchedOwners.join(", ")}`,
+          "simulation_owner",
+        );
         hasAdmissionSignal = true;
       }
 
       const atlasSubjectMatches = intersectNormalized(atlasSubjectPriors, subjects);
       if (atlasSubjectMatches.length > 0) {
-        addScore(20 * atlasSubjectMatches.length, `subject match via atlas block: ${atlasSubjectMatches.join(", ")}`);
+        addScore(
+          20 * atlasSubjectMatches.length,
+          `subject match via atlas block: ${atlasSubjectMatches.join(", ")}`,
+          "atlas_subject_prior",
+        );
         hasAdmissionSignal = true;
       }
 
       const atlasOwnerMatches = intersectNormalized(atlasSimulationOwnerPriors, simulationOwners);
       if (atlasOwnerMatches.length > 0) {
-        addScore(20 * atlasOwnerMatches.length, `simulation owner match via atlas block: ${atlasOwnerMatches.join(", ")}`);
+        addScore(
+          20 * atlasOwnerMatches.length,
+          `simulation owner match via atlas block: ${atlasOwnerMatches.join(", ")}`,
+          "atlas_simulation_owner_prior",
+        );
         hasAdmissionSignal = true;
       }
 
       const atlasEquationFamilyMatches = intersectNormalized(atlasEquationFamilyPriors, equationFamilies);
       if (atlasEquationFamilyMatches.length > 0) {
-        addScore(18 * atlasEquationFamilyMatches.length, `equation family via atlas block: ${atlasEquationFamilyMatches.join(", ")}`);
+        addScore(
+          18 * atlasEquationFamilyMatches.length,
+          `equation family via atlas block: ${atlasEquationFamilyMatches.join(", ")}`,
+          "atlas_equation_family_prior",
+        );
         hasAdmissionSignal = true;
       }
 
       const atlasUnitMatches = intersectUnitSignatures(atlasUnitSignaturePriors, unitSignatures);
       if (atlasUnitMatches.length > 0) {
-        addScore(18 * atlasUnitMatches.length, `unit signature via atlas block: ${atlasUnitMatches.join(", ")}`);
+        addScore(
+          18 * atlasUnitMatches.length,
+          `unit signature via atlas block: ${atlasUnitMatches.join(", ")}`,
+          "atlas_unit_signature_prior",
+        );
         hasAdmissionSignal = true;
       }
 
@@ -401,7 +521,11 @@ export function locateTheoryBadges(args: {
         ...repoPaths.filter((path) => atlasRepoPathPriors.some((prior) => normalize(path).includes(normalize(prior)))),
       ]);
       if (atlasRepoMatches.length > 0) {
-        addScore(15 * atlasRepoMatches.length, `source path hint via atlas block: ${atlasRepoMatches.join(", ")}`);
+        addScore(
+          15 * atlasRepoMatches.length,
+          `source path hint via atlas block: ${atlasRepoMatches.join(", ")}`,
+          "atlas_repo_path_prior",
+        );
         hasAdmissionSignal = true;
       }
 
@@ -419,13 +543,18 @@ export function locateTheoryBadges(args: {
         addScore(
           15 * atlasCalculatorExampleHits.length,
           `calculator example expression/symbol match: ${atlasCalculatorExampleHits.map((example) => example.label).join(", ")}`,
+          "atlas_calculator_example_prior",
         );
         hasAdmissionSignal = true;
       }
 
       const textTokenHits = queryTokens.filter((token) => normalize(badgeText).includes(token));
       if (textTokenHits.length > 0) {
-        addScore(Math.min(30, 10 * textTokenHits.length), `text match: ${textTokenHits.join(", ")}`);
+        addScore(
+          Math.min(30, 10 * textTokenHits.length),
+          `text match: ${textTokenHits.join(", ")}`,
+          "text",
+        );
         const textCoverage = textTokenHits.length / Math.max(1, queryTokens.length);
         hasAdmissionSignal ||= textTokenHits.length >= 2 && textCoverage >= 0.5;
       }
@@ -436,6 +565,7 @@ export function locateTheoryBadges(args: {
         badgeTitle: badge.title,
         score,
         reasons: unique(reasons),
+        matchKinds: unique(matchKinds),
         matchedSubjects,
         matchedSymbols,
         matchedUnitSignatures,

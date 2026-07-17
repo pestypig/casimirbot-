@@ -1,11 +1,60 @@
 import { describe, expect, it, vi } from "vitest";
 import { createHelixAskRealtimeProviderEventHandler } from "@/components/helix/ask-console/HelixAskRealtimeProviderEventHandler";
 
+const buildServerHandoff = (observationRef: string, suffix = "test") => ({
+  schema: "helix.realtime_stage_play.ask_handoff.v1",
+  handoff_id: `realtime-stage-play-handoff:${suffix}`,
+  realtime_session_id: "realtime:test",
+  thread_id: "helix-ask:desktop",
+  provider_event_ref: `event:transcript:${suffix}`,
+  transcript_observation_ref: observationRef,
+  stage_play_event_ref: `stage-play-event:${suffix}`,
+  context_pack_id: `context-pack:${suffix}`,
+  context_hash: `sha256:${suffix}`,
+  transcript_text_hash: `sha256:transcript-${suffix}`,
+  transcript_text_char_count: 37,
+  created_at_ms: 100,
+  route_metadata: {
+    schema: "helix.ask.route_metadata.v1",
+    source: "realtime_stage_play",
+    invocationKind: "stage_play_realtime_transcript_handoff",
+    sourceTarget: "operator_text",
+    handoffId: `realtime-stage-play-handoff:${suffix}`,
+    forbiddenCapabilities: [
+      "workstation_mutation",
+      "workstation_action_execution",
+      "realtime_provider_tool_execution",
+    ],
+    evidenceRefs: [observationRef, `stage-play-event:${suffix}`],
+    source_target_intent: {
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      admitted_readonly_handoff: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      server_fixture_marker: suffix,
+    },
+  },
+  read_only: true,
+  transcript_is_user_intent_after_admission: true,
+  reentry_required: true,
+  answer_authority: false,
+  assistant_answer: false,
+  terminal_eligible: false,
+  raw_content_included: false,
+});
+
 describe("Helix Ask Realtime provider event handler", () => {
   it("requires a transcript observation receipt before read-only Ask re-entry", async () => {
+    const serverHandoff = buildServerHandoff("obs:realtime:transcript:test");
     const postEvent = vi.fn(async () => ({
       ok: true,
       realtime_transcript_observations: [{ observation_ref: "obs:realtime:transcript:test" }],
+      realtime_stage_play_ask_handoff: serverHandoff,
+      realtime_stage_play_context_sync: {
+        schema: "helix.realtime_stage_play.context_sync.v1",
+        status: "sent",
+      },
     }));
     const launchPrompt = vi.fn();
     const handler = createHelixAskRealtimeProviderEventHandler({
@@ -18,6 +67,12 @@ describe("Helix Ask Realtime provider event handler", () => {
         vadState: "speech_stopped",
         interruptionCount: 1,
         audioFocusOwner: "helix_realtime",
+        sourceBinding: {
+          thread_id: "helix-ask:desktop",
+          source_id: "helix-ask:desktop",
+          source_kind: "helix_ask_workstation",
+          focus_panel_id: "scientific-calculator",
+        },
       }),
     });
 
@@ -33,6 +88,14 @@ describe("Helix Ask Realtime provider event handler", () => {
         event_type: "transcript.final",
         transcript_text: "Check the current workstation status.",
         runtime_agent_authority: "observe_only",
+        realtime_transport_receipt_ref: "receipt:transport:test",
+        realtime_vad_state: "speech_stopped",
+        realtime_interruption_count: 1,
+        realtime_audio_focus_owner: "helix_realtime",
+        workstation_source_binding: expect.objectContaining({
+          focus_panel_id: "scientific-calculator",
+          source_kind: "helix_ask_workstation",
+        }),
       }),
     );
     expect(launchPrompt).toHaveBeenCalledWith(expect.objectContaining({
@@ -43,14 +106,11 @@ describe("Helix Ask Realtime provider event handler", () => {
       requiresBackendAskEntrypoint: true,
       suppressWorkstationPayloadActions: true,
       routeMetadata: expect.objectContaining({
-        source: "realtime_session",
-        invocationKind: "realtime_transcript_readonly_reentry",
-        evidenceRefs: ["obs:realtime:transcript:test"],
+        source: "realtime_stage_play",
+        invocationKind: "stage_play_realtime_transcript_handoff",
+        evidenceRefs: expect.arrayContaining(["obs:realtime:transcript:test"]),
         source_target_intent: expect.objectContaining({
-          realtime_transport_receipt_ref: "receipt:transport:test",
-          realtime_vad_state: "speech_stopped",
-          realtime_interruption_count: 1,
-          realtime_audio_focus_owner: "helix_realtime",
+          server_fixture_marker: "test",
         }),
       }),
     }));
@@ -63,6 +123,10 @@ describe("Helix Ask Realtime provider event handler", () => {
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
+      handoff_id: "realtime-stage-play-handoff:test",
+      stage_play_event_ref: "stage-play-event:test",
+      context_pack_id: "context-pack:test",
+      context_sync_status: "sent",
     });
     expect(result).not.toHaveProperty("transcript_text");
   });
@@ -118,6 +182,38 @@ describe("Helix Ask Realtime provider event handler", () => {
       "/api/agi/realtime/session/realtime%3Atest/client-receipt",
       expect.objectContaining({ receipt_kind: "playback_ended", terminal_eligible: false }),
     );
+  });
+
+  it("recognizes WebRTC output buffer lifecycle as non-terminal playback", async () => {
+    const postEvent = vi.fn(async () => ({ ok: true }));
+    const handler = createHelixAskRealtimeProviderEventHandler({
+      realtimeSessionId: "realtime:webrtc-buffer",
+      runtimeAgentAuthority: "observe_only",
+      postEvent,
+      launchPrompt: vi.fn(),
+    });
+
+    const started = await handler.handle({
+      type: "output_audio_buffer.started",
+      event_id: "event:buffer:started",
+      response_id: "response:buffer",
+    });
+    const stopped = await handler.handle({
+      type: "output_audio_buffer.stopped",
+      event_id: "event:buffer:stopped",
+      response_id: "response:buffer",
+    });
+
+    expect(started).toMatchObject({
+      event_kind: "playback",
+      answer_authority: false,
+      terminal_eligible: false,
+    });
+    expect(stopped).toMatchObject({
+      event_kind: "playback",
+      answer_authority: false,
+      terminal_eligible: false,
+    });
   });
 
   it("normalizes VAD and interruption events into safe non-terminal receipts", async () => {
@@ -283,6 +379,10 @@ describe("Helix Ask Realtime provider event handler", () => {
             realtime_transcript_observations: [
               { observation_ref: "obs:realtime:qualified-barge" },
             ],
+            realtime_stage_play_ask_handoff: buildServerHandoff(
+              "obs:realtime:qualified-barge",
+              "qualified-barge",
+            ),
           }
         : { ok: true });
     const launchPrompt = vi.fn();
@@ -336,9 +436,7 @@ describe("Helix Ask Realtime provider event handler", () => {
       question: "Stop and check the workstation status.",
       routeMetadata: expect.objectContaining({
         source_target_intent: expect.objectContaining({
-          qualified_user_interruption: true,
-          terminal_voice_interrupted: true,
-          speaker_loopback_suppressed: false,
+          server_fixture_marker: "qualified-barge",
         }),
       }),
     }));
@@ -362,5 +460,88 @@ describe("Helix Ask Realtime provider event handler", () => {
       blocked_reason: "realtime_transcript_observation_receipt_missing",
     });
     expect(launchPrompt).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when the server observation has no canonical Stage Play handoff", async () => {
+    const launchPrompt = vi.fn();
+    const handler = createHelixAskRealtimeProviderEventHandler({
+      realtimeSessionId: "realtime:test",
+      runtimeAgentAuthority: "observe_only",
+      postEvent: vi.fn(async () => ({
+        ok: true,
+        realtime_transcript_observations: [{ observation_ref: "obs:realtime:no-handoff" }],
+      })),
+      launchPrompt,
+    });
+    const result = await handler.handle({
+      type: "conversation.item.input_audio_transcription.completed",
+      event_id: "event:transcript:no-handoff",
+      transcript: "What changed?",
+    });
+    expect(result).toMatchObject({
+      reentry_status: "blocked",
+      blocked_reason: "realtime_stage_play_ask_handoff_missing",
+    });
+    expect(launchPrompt).not.toHaveBeenCalled();
+  });
+
+  it("rejects a handoff whose route metadata can bypass the read-only Ask boundary", async () => {
+    const launchPrompt = vi.fn();
+    const unsafeHandoff = buildServerHandoff("obs:realtime:unsafe-route", "unsafe-route");
+    unsafeHandoff.route_metadata.source_target_intent.allow_client_shortcut = true;
+    const handler = createHelixAskRealtimeProviderEventHandler({
+      realtimeSessionId: "realtime:test",
+      runtimeAgentAuthority: "observe_only",
+      postEvent: vi.fn(async () => ({
+        ok: true,
+        realtime_transcript_observations: [{ observation_ref: "obs:realtime:unsafe-route" }],
+        realtime_stage_play_ask_handoff: unsafeHandoff,
+      })),
+      launchPrompt,
+    });
+
+    const result = await handler.handle({
+      type: "conversation.item.input_audio_transcription.completed",
+      event_id: "event:transcript:unsafe-route",
+      transcript: "What changed?",
+    });
+
+    expect(result).toMatchObject({
+      reentry_status: "blocked",
+      blocked_reason: "realtime_stage_play_ask_handoff_missing",
+    });
+    expect(launchPrompt).not.toHaveBeenCalled();
+  });
+
+  it("allows a failed server handoff request to retry without duplicate Ask launch", async () => {
+    const observationRef = "obs:realtime:retry";
+    const postEvent = vi.fn()
+      .mockResolvedValueOnce({ ok: true, realtime_transcript_observations: [] })
+      .mockResolvedValueOnce({
+        ok: true,
+        realtime_transcript_observations: [{ observation_ref: observationRef }],
+        realtime_stage_play_ask_handoff: buildServerHandoff(observationRef, "retry"),
+      });
+    const launchPrompt = vi.fn();
+    const handler = createHelixAskRealtimeProviderEventHandler({
+      realtimeSessionId: "realtime:test",
+      runtimeAgentAuthority: "observe_only",
+      postEvent,
+      launchPrompt,
+    });
+    const event = {
+      type: "conversation.item.input_audio_transcription.completed",
+      event_id: "event:transcript:retry",
+      transcript: "Retry this admitted transcript.",
+    };
+
+    expect(await handler.handle(event)).toMatchObject({ reentry_status: "blocked" });
+    expect(await handler.handle(event)).toMatchObject({ reentry_status: "reentered" });
+    expect(await handler.handle(event)).toMatchObject({
+      reentry_status: "blocked",
+      blocked_reason: "duplicate_realtime_transcript_event",
+    });
+    expect(postEvent).toHaveBeenCalledTimes(2);
+    expect(launchPrompt).toHaveBeenCalledTimes(1);
   });
 });

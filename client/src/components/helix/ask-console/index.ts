@@ -478,6 +478,8 @@ export { HelixAskInlineCodeSurface } from "./HelixAskInlineCodeSurface";
 export type { HelixAskInlineCodeSurfaceProps } from "./HelixAskInlineCodeSurface";
 export { HelixAskMathHtmlSurface } from "./HelixAskMathHtmlSurface";
 export type { HelixAskMathHtmlSurfaceProps } from "./HelixAskMathHtmlSurface";
+export { HelixAskMermaidBlock } from "./HelixAskMermaidBlock";
+export type { HelixAskMermaidBlockProps } from "./HelixAskMermaidBlock";
 export { useHelixAskLegacyContentRenderers } from "./HelixAskLegacyContentRenderers";
 export type {
   HelixAskLegacyContentRenderers,
@@ -489,7 +491,10 @@ export { HelixAskPlainAnswerSurface } from "./HelixAskPlainAnswerSurface";
 export type { HelixAskPlainAnswerSurfaceProps } from "./HelixAskPlainAnswerSurface";
 export { HelixAskRenderedContentSurface } from "./HelixAskRenderedContentSurface";
 export type { HelixAskRenderedContentSurfaceProps } from "./HelixAskRenderedContentSurface";
-export { buildHelixAskFinalAnswerBlocks } from "./HelixAskFinalAnswer";
+export {
+  buildHelixAskFinalAnswerBlocks,
+  isHelixAskMermaidCodeBlockLanguage,
+} from "./HelixAskFinalAnswer";
 export {
   HelixAskLiveBridgePillStrip,
   HelixAskJobReadyLinkStrip,

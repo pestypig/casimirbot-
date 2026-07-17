@@ -228,6 +228,15 @@ export type HelixScholarlyResearchObservation = {
   intent: HelixScholarlyResearchIntentMode;
   providers_considered: HelixScholarlyResearchProvider[];
   providers_called: HelixScholarlyResearchProvider[];
+  /** Provider result rows observed before cross-provider identity deduplication. */
+  provider_record_count?: number;
+  /** Unique paper identities remaining after DOI/arXiv/title identity deduplication. */
+  unique_paper_count?: number;
+  deduplication?: {
+    provider_record_count: number;
+    unique_paper_count: number;
+    duplicate_record_count: number;
+  };
   evidence_refs: HelixScholarlyEvidenceRef[];
   papers: HelixScholarlyPaperResult[];
   evidence_state: HelixScholarlyEvidenceState;

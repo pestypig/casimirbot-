@@ -9,11 +9,13 @@ import {
   type HelixWorkflowDemoDebugEventV1,
   type HelixWorkflowDemoEvidenceV1,
   type HelixWorkflowDemoSessionV1,
+  type HelixWorkflowDemoStepRetryV1,
   type HelixWorkflowQteDispatchV1,
   type ResearchPaperToProposalStepId,
 } from "@shared/contracts/helix-workflow-demo.v1";
 import {
   extractHelixWorkflowDemoEvidenceFromPayload,
+  extractHelixWorkflowDemoRetrySignalFromPayload,
   isHelixWorkflowDemoTypedFailurePayload,
   mergeHelixWorkflowDemoEvidence,
   projectResearchPaperToProposalSession,
@@ -46,7 +48,7 @@ export type HelixWorkflowDemoState = {
   observePayload: (payload: unknown, sourceSessionId?: string | null) => void;
   dismissSuggestion: (stepId: ResearchPaperToProposalStepId) => void;
   restoreSuggestion: () => void;
-  recordSuggestionShown: (stepId: ResearchPaperToProposalStepId) => void;
+  recordSuggestionShown: (stepId: ResearchPaperToProposalStepId, prompt: string, reason: string) => void;
   recordPromptInserted: (input: {
     stepId: ResearchPaperToProposalStepId;
     prompt: string;
@@ -148,6 +150,38 @@ const admitEvidenceForCurrentStep = (
       break;
   }
   return admitted;
+};
+
+const uniqueRetryRefs = (...groups: Array<readonly (string | null | undefined)[]>): string[] =>
+  Array.from(new Set(groups.flatMap((group) => group)
+    .map((value) => typeof value === "string" ? value.trim() : "")
+    .filter(Boolean))).slice(0, 48);
+
+const mergeStepRetry = (args: {
+  current: HelixWorkflowDemoStepRetryV1 | null | undefined;
+  signal: ReturnType<typeof extractHelixWorkflowDemoRetrySignalFromPayload>;
+  sourceTurnId: string | null;
+  observedAt: string;
+}): HelixWorkflowDemoStepRetryV1 | null => {
+  if (!args.signal) return args.current ?? null;
+  const current = args.current?.stepId === args.signal.stepId ? args.current : null;
+  const sameTurn = Boolean(args.sourceTurnId && current?.sourceTurnId === args.sourceTurnId);
+  return {
+    schema: "helix.workflow_demo_step_retry.v1",
+    stepId: "ocr_math_candidate",
+    reason: args.signal.reason,
+    attemptCount: Math.max(1, (current?.attemptCount ?? 0) + (sameTurn ? 0 : 1)),
+    triedPageNumbers: Array.from(new Set([
+      ...(current?.triedPageNumbers ?? []),
+      ...(args.signal.pageNumber ? [args.signal.pageNumber] : []),
+    ])).sort((left, right) => left - right).slice(0, 8),
+    latestPageNumber: args.signal.pageNumber,
+    pageCount: args.signal.pageCount ?? current?.pageCount ?? null,
+    sourceId: args.signal.sourceId ?? current?.sourceId ?? null,
+    artifactRefs: uniqueRetryRefs(current?.artifactRefs ?? [], args.signal.artifactRefs),
+    sourceTurnId: args.sourceTurnId ?? current?.sourceTurnId ?? null,
+    observedAt: args.observedAt,
+  };
 };
 
 const debugSourceFromContextBinding = (binding: HelixWorkflowDemoContextBindingV1 | null) => {
@@ -414,10 +448,17 @@ export const useHelixWorkflowDemoStore = create<HelixWorkflowDemoState>()(
         );
         const evidence = mergeHelixWorkflowDemoEvidence(session.evidence, incoming);
         const typedFailure = isHelixWorkflowDemoTypedFailurePayload(payload);
-        const observedRefs = flattenHelixWorkflowDemoEvidenceRefs(incoming);
+        const retrySignal = beforeProjection.currentStepId === "ocr_math_candidate"
+          ? extractHelixWorkflowDemoRetrySignalFromPayload(payload)
+          : null;
+        const observedRefs = uniqueRetryRefs(
+          flattenHelixWorkflowDemoEvidenceRefs(incoming),
+          retrySignal?.artifactRefs ?? [],
+        );
         const observationFingerprint = hashHelixWorkflowDemoDebugText(JSON.stringify({
           typedFailure,
           observedRefs,
+          retrySignal,
         }));
         const observationKey = `${source.source_observation_key ?? "anonymous"}:${observationFingerprint}`;
         if (debugEvents.some((event) =>
@@ -427,15 +468,28 @@ export const useHelixWorkflowDemoStore = create<HelixWorkflowDemoState>()(
             event.event_kind === "workflow_step_advanced" ||
             event.event_kind === "workflow_completed")
         )) return;
+        const observedAt = nowIso();
+        const stepRetry = typedFailure
+          ? session.stepRetry ?? null
+          : mergeStepRetry({
+              current: session.stepRetry,
+              signal: retrySignal,
+              sourceTurnId: source.source_turn_id ?? source.source_trace_id,
+              observedAt,
+            });
         const nextSession: HelixWorkflowDemoSessionV1 = {
           ...session,
           evidence,
-          dismissedStepId: observedRefs.length > 0 ? null : session.dismissedStepId,
+          stepRetry,
+          dismissedStepId: observedRefs.length > 0 || retrySignal ? null : session.dismissedStepId,
           pendingQteDispatch: typedFailure ? null : session.pendingQteDispatch,
-          updatedAt: nowIso(),
+          updatedAt: observedAt,
         };
         const afterProjection = projectResearchPaperToProposalSession(nextSession);
-        const newArtifactRefs = diffHelixWorkflowDemoEvidenceRefs(session.evidence, evidence);
+        const newArtifactRefs = uniqueRetryRefs(
+          diffHelixWorkflowDemoEvidenceRefs(session.evidence, evidence),
+          retrySignal?.artifactRefs.filter((ref) => !(session.stepRetry?.artifactRefs ?? []).includes(ref)) ?? [],
+        );
         const eventKind = afterProjection.completed && !beforeProjection.completed
           ? "workflow_completed"
           : afterProjection.currentStepId !== beforeProjection.currentStepId
@@ -443,6 +497,8 @@ export const useHelixWorkflowDemoStore = create<HelixWorkflowDemoState>()(
             : "workflow_evidence_observed";
         const reason = typedFailure
           ? "typed_failure_not_admitted_as_workflow_evidence"
+          : retrySignal && afterProjection.currentStepId === beforeProjection.currentStepId
+            ? "typed_partial_observation_selected_bounded_step_retry"
           : newArtifactRefs.length === 0
             ? "no_new_typed_workflow_evidence"
             : eventKind === "workflow_completed"
@@ -461,13 +517,14 @@ export const useHelixWorkflowDemoStore = create<HelixWorkflowDemoState>()(
           observedArtifactRefs: observedRefs,
           newArtifactRefs,
           qteStepId: afterProjection.qte?.stepId ?? null,
+          prompt: afterProjection.qte?.prompt ?? null,
           reason,
         });
         set({
           session: afterProjection.completed
-            ? { ...nextSession, status: "completed", pendingQteDispatch: null }
+            ? { ...nextSession, status: "completed", pendingQteDispatch: null, stepRetry: null }
             : afterProjection.currentStepId !== beforeProjection.currentStepId
-              ? { ...nextSession, pendingQteDispatch: null }
+              ? { ...nextSession, pendingQteDispatch: null, stepRetry: null }
               : nextSession,
           debugEvents: appendHelixWorkflowDemoDebugEvent(debugEvents, event),
         });
@@ -507,12 +564,14 @@ export const useHelixWorkflowDemoStore = create<HelixWorkflowDemoState>()(
           ),
         };
       }),
-      recordSuggestionShown: (stepId: ResearchPaperToProposalStepId) => set((state: HelixWorkflowDemoState) => {
+      recordSuggestionShown: (stepId: ResearchPaperToProposalStepId, prompt: string, reason: string) => set((state: HelixWorkflowDemoState) => {
         if (!state.session) return state;
+        const promptHash = hashHelixWorkflowDemoDebugText(prompt);
         const alreadyRecorded = state.debugEvents.some((event) =>
           event.run_id === state.session?.runId &&
           event.event_kind === "qte_suggested" &&
-          event.qte_step_id === stepId
+          event.qte_step_id === stepId &&
+          event.prompt_hash === promptHash
         );
         if (alreadyRecorded) return state;
         const source = findLatestHelixWorkflowDemoDebugSource(state.debugEvents, state.session.runId);
@@ -524,7 +583,8 @@ export const useHelixWorkflowDemoStore = create<HelixWorkflowDemoState>()(
               session: state.session,
               source,
               qteStepId: stepId,
-              reason: "deterministic_projection_selected_next_unmet_step",
+              prompt,
+              reason: reason || "deterministic_projection_selected_next_unmet_step",
             }),
           ),
         };

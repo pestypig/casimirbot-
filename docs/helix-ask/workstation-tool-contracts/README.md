@@ -253,6 +253,7 @@ Each capability contract should define:
 | `docs.search` | [docs.search.md](docs.search.md) | `draft` |
 | `repo.search` | [repo.search.md](repo.search.md) | `draft` |
 | `research-library.read_document` | [research-library.read_document.md](research-library.read_document.md) | `draft` |
+| `research-library.apply_evidence_enrichment` | [research-library.apply_evidence_enrichment.md](research-library.apply_evidence_enrichment.md) | `draft` |
 | `theory-badge-graph.reflect_discussion_context` | [theory-badge-graph.reflect_discussion_context.md](theory-badge-graph.reflect_discussion_context.md) | `candidate` |
 | `theory-badge-graph.propose_frontier_conjectures` | [theory-badge-graph.propose_frontier_conjectures.md](theory-badge-graph.propose_frontier_conjectures.md) | `draft` |
 | `moral-graph.reflect_context` | [moral-graph.reflect_context.md](moral-graph.reflect_context.md) | `draft` |

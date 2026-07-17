@@ -175,4 +175,26 @@ export const createHelixWorkflowDemoCustomBinding = (
 export const renderHelixWorkflowDemoPromptTemplate = (
   template: string,
   binding: HelixWorkflowDemoContextBindingV1,
-): string => template.replaceAll("{{research_topic}}", binding.objective);
+  evidenceRefs: {
+    paperRef?: string | null;
+    renderedPageRef?: string | null;
+    ocrMathCandidateRef?: string | null;
+    promotedEquationRef?: string | null;
+    graphReflectionRef?: string | null;
+    provenanceAuditRef?: string | null;
+  } = {},
+): string => {
+  const replacements: Record<string, string> = {
+    research_topic: binding.objective,
+    paper_ref: evidenceRefs.paperRef ?? "unavailable",
+    rendered_page_ref: evidenceRefs.renderedPageRef ?? "unavailable",
+    ocr_math_candidate_ref: evidenceRefs.ocrMathCandidateRef ?? "unavailable",
+    promoted_equation_ref: evidenceRefs.promotedEquationRef ?? "unavailable",
+    graph_reflection_ref: evidenceRefs.graphReflectionRef ?? "unavailable",
+    provenance_audit_ref: evidenceRefs.provenanceAuditRef ?? "unavailable",
+  };
+  return Object.entries(replacements).reduce(
+    (rendered, [key, value]) => rendered.replaceAll(`{{${key}}}`, value),
+    template,
+  );
+};

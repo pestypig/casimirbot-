@@ -3,6 +3,7 @@ import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
 import type { HelixLanguageModelProfileId } from "@shared/helix-language-model-policy";
 import { DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS } from "@/lib/helix/ask-agent-runtime-display";
 import { useAgiChatStore } from "@/store/useAgiChatStore";
+import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 
 import {
   buildHelixAskComposerViewModel,
@@ -74,6 +75,7 @@ import {
 } from "./HelixAskVoiceConfirmationRuntime";
 import { HelixAskWorkflowSuggestionRuntime } from "./HelixAskWorkflowSuggestionRuntime";
 import { useHelixAskWorkflowQteBridge } from "./HelixAskWorkflowQteBridge";
+import { buildHelixAskMinimalRuntimeWorkspaceContext } from "./HelixAskMinimalRuntimeWorkspaceContext";
 
 export type HelixAskMinimalRuntimeVisibleSurfaceSlots = {
   voiceLevelMonitor?: ReactNode;
@@ -171,29 +173,11 @@ export function HelixAskMinimalRuntimeShell({
 
   const buildMinimalWorkspaceContextSnapshot = useCallback((sessionId: string | null): RecordLike => {
     const href = typeof window === "undefined" ? "" : window.location.href;
-    const url = (() => {
-      try {
-        return href ? new URL(href) : null;
-      } catch {
-        return null;
-      }
-    })();
-    const docPath = url?.searchParams.get("doc")?.trim() || null;
-    const focus = url?.searchParams.get("focus")?.trim() || null;
-    const panels = url?.searchParams.get("panels")?.split(",").map((entry) => entry.trim()).filter(Boolean) ?? [];
-    return {
-      schema: "helix.ask.minimal_runtime_workspace_context_snapshot.v1",
-      session_id: sessionId,
-      desktop_url: href,
-      active_panel_id: focus || (panels.includes("docs-viewer") ? "docs-viewer" : null),
-      activePanelId: focus || (panels.includes("docs-viewer") ? "docs-viewer" : null),
-      open_panel_ids: panels,
-      openPanelIds: panels,
-      active_doc_path: docPath,
-      activeDocPath: docPath,
-      doc_context_path: docPath,
-      docContextPath: docPath,
-    };
+    return buildHelixAskMinimalRuntimeWorkspaceContext({
+      sessionId,
+      desktopUrl: href,
+      layoutState: useWorkstationLayoutStore.getState(),
+    });
   }, []);
 
   const appendMinimalRuntimeWakeReply = useCallback((reply: RecordLike) => {
@@ -276,11 +260,13 @@ export function HelixAskMinimalRuntimeShell({
       return true;
     }
     workflowQteBridge.clearPending();
+    const desktopUrl = typeof window === "undefined" ? "" : window.location.href;
     const submitPlan = buildHelixAskMinimalRuntimeSubmitPlan({
       draft: draftText,
       selectedRuntime,
       selectedLanguageModelProfile,
-      desktopUrl: typeof window === "undefined" ? "" : window.location.href,
+      desktopUrl,
+      workspaceContextSnapshot: buildMinimalWorkspaceContextSnapshot(chatSessionId),
       pendingPrompt,
       durableReplies: chatSession ? buildHelixAskMinimalRuntimeRepliesFromChatSession(chatSession) : [],
       visibleReplies: runtimeState.replies,
@@ -396,6 +382,7 @@ export function HelixAskMinimalRuntimeShell({
     return false;
   }, [
     addChatMessage,
+    buildMinimalWorkspaceContextSnapshot,
     chatSessionId,
     ensureContextSession,
     onSubmitPlan,

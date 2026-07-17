@@ -1687,14 +1687,21 @@ const buildAskTurnProcedureTrace = (input: {
     selectedTerminalKind !== "typed_failure" &&
     allowedTerminalProducts.includes(selectedTerminalKind);
   const failureRail = terminalProcedureFailureRail(payload, selectedTerminalKind);
+  const authoritativeReentryStatus = readString(
+    readRecord(payload.codex_parity_agent_spine_rail_table)?.reentry_status,
+  );
   const evidenceReentryStatus =
-    selectedTerminalKind && selectedTerminalKind !== "typed_failure"
-      ? "reentered"
-      : failureRail === "evidence_not_reentered"
-        ? "not_reentered"
-        : observedArtifacts.length > 0
-          ? "observed_without_terminal"
-          : "not_required_or_not_observed";
+    authoritativeReentryStatus === "reentered" ||
+    authoritativeReentryStatus === "not_reentered" ||
+    authoritativeReentryStatus === "no_observation"
+      ? authoritativeReentryStatus
+      : selectedTerminalKind && selectedTerminalKind !== "typed_failure"
+        ? "reentered"
+        : failureRail === "evidence_not_reentered"
+          ? "not_reentered"
+          : observedArtifacts.length > 0
+            ? "observed_without_terminal"
+            : "not_required_or_not_observed";
 
   return {
     schema: "helix.ask_turn_procedure_trace.v1",

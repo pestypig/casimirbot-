@@ -106,8 +106,8 @@ export default function WorkflowDemoLabPanel() {
             <div className="flex items-center gap-2">
               <FlaskConical className="h-4 w-4 text-cyan-200" />
               <h1 className="text-sm font-semibold">Workflow Demo Lab</h1>
-              <span className="rounded border border-amber-300/25 bg-amber-400/10 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] text-amber-100">
-                developer
+              <span className="rounded border border-cyan-300/25 bg-cyan-400/10 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] text-cyan-100">
+                public demo
               </span>
             </div>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-400">

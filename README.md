@@ -243,6 +243,13 @@ $env:ELEVENLABS_API_KEY=""
 npm run dev
 ```
 
+When `OPENAI_API_KEY` is configured, the same startup command also makes the
+developer-only GPT Realtime session path available. Realtime still requires a
+visible user start action and microphone consent, and user accounts remain
+blocked by server policy. The `HELIX_REALTIME_SESSION_*_ENABLED` variables are
+optional emergency overrides; set an individual flag to `0` only when that
+Realtime layer must be disabled.
+
 `GOOGLE_CLIENT_ID` and `VITE_GOOGLE_CLIENT_ID` should use the same Google OAuth
 Web application client ID. `VITE_GOOGLE_CLIENT_ID` is intentionally exposed to
 the browser; the other key and token values should remain private.

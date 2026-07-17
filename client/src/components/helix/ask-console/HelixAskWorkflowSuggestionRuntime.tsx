@@ -39,8 +39,8 @@ export function HelixAskWorkflowSuggestionRuntime({
   }, [qte?.runId, qte?.stepId, qte?.prompt]);
 
   useEffect(() => {
-    if (qte?.stepId && activeChatOwnsRun) recordSuggestionShown(qte.stepId);
-  }, [activeChatOwnsRun, qte?.runId, qte?.stepId, recordSuggestionShown]);
+    if (qte?.stepId && activeChatOwnsRun) recordSuggestionShown(qte.stepId, qte.prompt, qte.reason);
+  }, [activeChatOwnsRun, qte?.prompt, qte?.reason, qte?.runId, qte?.stepId, recordSuggestionShown]);
 
   if (!qte || !activeChatId) return null;
   if (!activeChatOwnsRun) {

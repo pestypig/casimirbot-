@@ -72,7 +72,12 @@ describe("account session panel API", () => {
       session: null,
       account_policy: {
         account_type: "user",
-        allowed_panels: expect.arrayContaining(["account-session", "docs-viewer", "scientific-calculator"]),
+        allowed_panels: expect.arrayContaining([
+          "account-session",
+          "docs-viewer",
+          "scientific-calculator",
+          "workflow-demo-lab",
+        ]),
         locked_panels: expect.arrayContaining(["live-answer-environment", "stage-play-badge-graph"]),
       },
     });
@@ -132,6 +137,7 @@ describe("account session panel API", () => {
           "workstation-storage-map",
           "workstation-task-manager",
           "moral-graph",
+          "workflow-demo-lab",
         ]),
         locked_panels: expect.arrayContaining([
           "code-admin",

@@ -67,6 +67,9 @@ describe("Helix Ask backend entrypoint policy", () => {
       "Describe `repo.search` as a capability name. Do not run it.",
       "What is Image Lens as a tool? Explain only; do not inspect an image.",
       "Define the scholarly-research.lookup_papers capability. Do not call it.",
+      "Define the research-library.apply_evidence_enrichment capability. Do not call it.",
+      "Define helix_ask.reflect_theory_context as a capability. Do not call it.",
+      "What is the Theory Badge Graph? Explain conceptually. Do not reflect anything.",
     ]) {
       expect(requiresHelixAskBackendEntrypoint(question)).toBe(false);
       expect(resolveHelixAskBackendEntrypointFamily(question)).toBeNull();
@@ -98,6 +101,7 @@ describe("Helix Ask backend entrypoint policy", () => {
     "Does the live-source tool read mail before recording a decision?",
     "Can the narrator tool return a receipt without speaking automatically?",
     "Does the Postulate Board workflow create a review before submission?",
+    "Can the Theory Badge Graph compare interpretations without changing badges?",
   ])("keeps cross-family capability behavior wording non-executing: %s", (question) => {
     expect(requiresHelixAskBackendEntrypoint(question)).toBe(false);
     expect(resolveHelixAskBackendEntrypointFamily(question)).toBeNull();
@@ -135,6 +139,140 @@ describe("Helix Ask backend entrypoint policy", () => {
         selectedCapability: example.selectedCapability,
       });
     }
+  });
+
+  it("routes bounded Research Library enrichment through a read-first compound Ask path", () => {
+    const question =
+      "Using the saved Research Library document for https://arxiv.org/pdf/gr-qc/9510071.pdf, read only PDF page 4 and its current paper-evidence sidecar. Create a Calculator-ready prefill, but do not run the Calculator. Persist the enrichment using research-library.apply_evidence_enrichment. Do not mutate the Theory Badge Graph.";
+
+    expect(requiresHelixAskBackendEntrypoint(question)).toBe(true);
+    expect(resolveHelixAskBackendEntrypointFamily(question)).toMatchObject({
+      family: "research_library",
+      sourceTarget: "research_library",
+      targetKind: "saved_paper_evidence_enrichment",
+      requiredToolFamily: "research_library",
+      selectedCapability: "research-library.read_document",
+      explicitCue: "research_library_read_then_enrich",
+      requestedOutputs: expect.arrayContaining([
+        "research_library_observation",
+        "paper_evidence_enrichment_observation",
+        "calculator_prefill",
+        "model_authored_synthesis",
+      ]),
+    });
+
+    expect(buildHelixAskHardBackendEntrypointRouteMetadata({
+      question,
+      turnId: "turn-research-library-enrich",
+      threadId: "thread-research-library-enrich",
+    })).toMatchObject({
+      source: "hard_tool_backend_entrypoint",
+      sourceTarget: "research_library",
+      requiredToolFamily: "research_library",
+      mandatory_next_tool: {
+        tool_name: "research-library.read_document",
+        selected_capability: "research-library.read_document",
+        terminal_forbidden: true,
+      },
+      source_target_intent: {
+        target_source: "research_library",
+        target_kind: "saved_paper_evidence_enrichment",
+        must_enter_backend_ask: true,
+        allow_client_shortcut: false,
+        requested_outputs: expect.arrayContaining([
+          "research_library_observation",
+          "paper_evidence_enrichment_observation",
+        ]),
+      },
+    });
+  });
+
+  it("routes the exact Theory Badge Graph interpretation comparison through backend Ask", () => {
+    const question =
+      "Now compare two interpretations with the Theory Badge Graph: first, that macroscopic probability is epistemic because coarse-graining hides deterministic microstates; second, that probability is fundamental rather than caused by missing information. Show where the graph supports or fails to represent each interpretation.";
+
+    expect(requiresHelixAskBackendEntrypoint(question)).toBe(true);
+    expect(resolveHelixAskBackendEntrypointFamily(question)).toMatchObject({
+      family: "theory_badge_graph",
+      sourceTarget: "theory_locator",
+      targetKind: "theory_locator",
+      requiredToolFamily: "theory_locator",
+      selectedCapability: "helix_ask.reflect_theory_context",
+      explicitCue: "affirmative_theory_badge_graph_reflection",
+      requestedOutputs: expect.arrayContaining([
+        "theory_context_reflection_observation",
+        "model_authored_synthesis",
+      ]),
+    });
+
+    expect(buildHelixAskHardBackendEntrypointRouteMetadata({
+      question,
+      turnId: "turn-theory-interpretations",
+      threadId: "thread-theory-interpretations",
+    })).toMatchObject({
+      source: "hard_tool_backend_entrypoint",
+      sourceTarget: "theory_locator",
+      requiredToolFamily: "theory_locator",
+      mandatory_next_tool: {
+        tool_name: "helix_ask.reflect_theory_context",
+        required_tool_family: "theory_locator",
+        terminal_forbidden: true,
+      },
+      source_target_intent: {
+        target_source: "theory_locator",
+        target_kind: "theory_locator",
+        must_enter_backend_ask: true,
+        allow_client_shortcut: false,
+        allow_no_tool_direct: false,
+      },
+    });
+  });
+
+  it("routes current Theory Badge Graph selection questions through a bounded context read", () => {
+    const question = "What do these selected badges imply, and which branches are possible next?";
+
+    expect(resolveHelixAskBackendEntrypointFamily(question)).toMatchObject({
+      family: "theory_badge_graph",
+      sourceTarget: "theory_locator",
+      targetKind: "theory_badge_graph_current_context",
+      selectedCapability: "theory-badge-graph.current_context",
+      explicitCue: "current_theory_badge_graph_selection",
+    });
+  });
+
+  it.each([
+    "Do not reflect deterministic laws with the Theory Badge Graph.",
+    "Now do not compare deterministic laws with the Theory Badge Graph.",
+    "Next time, compare deterministic laws with the Theory Badge Graph.",
+    "If we continue, then compare deterministic laws with the Theory Badge Graph.",
+    "Previously I asked you to reflect deterministic laws with the Theory Badge Graph.",
+    'The phrase "Reflect deterministic laws with the Theory Badge Graph" is only an example.',
+    "The button says Now compare deterministic laws with the Theory Badge Graph.",
+    "Previously I asked you to call helix_ask.reflect_theory_context.",
+  ])("does not backend-route a contextual Theory Badge Graph mention: %s", (question) => {
+    expect(requiresHelixAskBackendEntrypoint(question)).toBe(false);
+    expect(resolveHelixAskBackendEntrypointFamily(question)).toBeNull();
+  });
+
+  it("keeps Theory Graph negation subordinate to the affirmative Research Library enrichment", () => {
+    const question =
+      "Using the saved Research Library document, read its sidecar and persist the enrichment using research-library.apply_evidence_enrichment. Do not mutate or reflect anything to the Theory Badge Graph.";
+
+    expect(resolveHelixAskBackendEntrypointFamily(question)).toMatchObject({
+      family: "research_library",
+      selectedCapability: "research-library.read_document",
+      explicitCue: "research_library_read_then_enrich",
+    });
+  });
+
+  it("routes a direct enrichment command to the mutating Research Library capability", () => {
+    const question =
+      "Run research-library.apply_evidence_enrichment for document research:abcdefgh using the supplied revision-bound proposal.";
+
+    expect(resolveHelixAskBackendEntrypointFamily(question)).toMatchObject({
+      family: "research_library",
+      selectedCapability: "research-library.apply_evidence_enrichment",
+    });
   });
 
   it("builds a recrowned minimal-runtime backend payload for note creation", () => {

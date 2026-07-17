@@ -34,13 +34,57 @@ import {
 } from "@shared/helix-live-translation-lane";
 import type { HelixLiveTranslationProjectionTarget } from "@shared/helix-live-translation-projection-target";
 import type { HelixAgentProvider } from "../agent-providers/types";
-import { listWorkstationGatewayCapabilities } from "../workstation-tool-gateway/registry";
-import type { HelixWorkstationGatewayMode } from "../workstation-tool-gateway/types";
+import {
+  callWorkstationGatewayCapability,
+  listWorkstationGatewayCapabilities,
+} from "../workstation-tool-gateway/registry";
+import type {
+  HelixWorkstationGatewayCallResult,
+  HelixWorkstationGatewayMode,
+} from "../workstation-tool-gateway/types";
+import { HELIX_THEORY_CONTEXT_REFLECTION_CAPABILITY } from "../theory-congruence/capability-contract";
 import { resolveHelixCapabilityLaneRequest } from "./registry";
 
 const CAPABILITY_ID = "workstation_tool_reference.list_capabilities" as const;
 const COLLECT_VISIBLE_TRANSLATION_TARGETS_CAPABILITY_ID =
   HELIX_WORKSTATION_TOOL_REFERENCE_VISIBLE_TRANSLATION_TARGETS_CAPABILITY;
+const THEORY_CONTEXT_REFLECTION_CAPABILITY_ID =
+  HELIX_THEORY_CONTEXT_REFLECTION_CAPABILITY;
+
+export type HelixWorkstationTheoryContextReflectionBridgeResult = {
+  schema: "helix.workstation_tool_reference.gateway_bridge_result.v1";
+  ok: boolean;
+  lane_id: "workstation_tool_reference";
+  capability: typeof THEORY_CONTEXT_REFLECTION_CAPABILITY_ID;
+  delegated_capability_id: typeof THEORY_CONTEXT_REFLECTION_CAPABILITY_ID;
+  delegation_status: "gateway_executed" | "blocked_before_gateway";
+  selected_runtime_agent_provider: HelixAgentProvider["id"];
+  lane_resolve_trace: HelixCapabilityLaneResolveTrace;
+  delegated_gateway_call_result: HelixWorkstationGatewayCallResult | null;
+  gateway_admission: HelixWorkstationGatewayCallResult["gateway_admission"] | null;
+  tool_lifecycle_trace: HelixWorkstationGatewayCallResult["tool_lifecycle_trace"] | null;
+  tool_followup_decision: HelixWorkstationGatewayCallResult["tool_followup_decision"] | null;
+  observation: unknown;
+  observation_packet: HelixAgentStepObservationPacket;
+  artifact_refs: string[];
+  resolved_source_ref: string | null;
+  resolved_text_hash: string | null;
+  semantic_prompt_source: string | null;
+  semantic_prompt_argument_source:
+    | "current_user_request"
+    | "runtime_semantic_prompt"
+    | "runtime_resolved_referent"
+    | null;
+  semantic_prompt_text_hash: string | null;
+  runtime_requested_prompt_hash: string | null;
+  runtime_prompt_differed_from_bound_semantic_prompt: boolean;
+  error?: string;
+  reentry_required: true;
+  answer_authority: false;
+  terminal_eligible: false;
+  assistant_answer: false;
+  raw_content_included: false;
+};
 
 const hashShort = (value: unknown): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 16);
@@ -498,6 +542,326 @@ const withExecutionTrace = (input: {
   receipt_ref: null,
   blocked_reason: input.blockedReason ?? input.trace.blocked_reason,
 });
+
+const readStringList = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.map(readText).filter(Boolean)
+    : [];
+
+const isUnresolvedTheoryDeicticPrompt = (value: string): boolean =>
+  /^(?:this|that|it)[\s.!?,;:]*$/i.test(value.trim());
+
+const buildTheoryBridgeGatewayArguments = (input: {
+  call: Record<string, unknown>;
+  prompt: string;
+}): Record<string, unknown> => {
+  const call = input.call;
+  const args: Record<string, unknown> = { prompt: input.prompt };
+  const stringFields = [
+    "conversation_context",
+    "operation",
+    "target",
+    "target_observable",
+    "coordinate_frame",
+    "formal_system",
+    "requested_precision",
+    "evidence_maturity_ceiling",
+  ] as const;
+  for (const field of stringFields) {
+    const value = readText(call[field]);
+    if (value) args[field] = value;
+  }
+  const mentionedEquations = readStringList(call.mentioned_equations ?? call.mentionedEquations);
+  const mentionedSymbols = readStringList(call.mentioned_symbols ?? call.mentionedSymbols);
+  const mentionedDomains = readStringList(call.mentioned_domains ?? call.mentionedDomains);
+  const initialBoundaryConditions = readStringList(
+    call.initial_boundary_conditions ?? call.initialBoundaryConditions,
+  );
+  if (mentionedEquations.length > 0) args.mentioned_equations = mentionedEquations;
+  if (mentionedSymbols.length > 0) args.mentioned_symbols = mentionedSymbols;
+  if (mentionedDomains.length > 0) args.mentioned_domains = mentionedDomains;
+  if (initialBoundaryConditions.length > 0) {
+    args.initial_boundary_conditions = initialBoundaryConditions;
+  }
+  if (typeof call.build_explanation_plan === "boolean") {
+    args.build_explanation_plan = call.build_explanation_plan;
+  } else if (typeof call.buildExplanationPlan === "boolean") {
+    args.build_explanation_plan = call.buildExplanationPlan;
+  }
+  const numberFields = ["limit", "scale_min_log10_m", "scale_max_log10_m"] as const;
+  for (const field of numberFields) {
+    const value = readNumber(call[field]);
+    if (value !== null) args[field] = value;
+  }
+  return args;
+};
+
+const buildTheoryBridgeBlockedResult = (input: {
+  provider: HelixAgentProvider;
+  turnId: string;
+  iteration: number;
+  trace: HelixCapabilityLaneResolveTrace;
+  reason: string;
+  summary: string;
+  prompt: string;
+  resolvedSourceRef: string | null;
+  resolvedTextHash: string | null;
+  semanticPromptSource: string | null;
+}): HelixWorkstationTheoryContextReflectionBridgeResult => {
+  const observationRef = `${input.turnId}:capability_lane:${THEORY_CONTEXT_REFLECTION_CAPABILITY_ID}:${hashShort({
+    reason: input.reason,
+    prompt: input.prompt,
+    resolved_source_ref: input.resolvedSourceRef,
+    resolved_text_hash: input.resolvedTextHash,
+  })}`;
+  const observation = {
+    schema: "helix.workstation_tool_reference.theory_reflection_bridge_observation.v1",
+    capability_key: THEORY_CONTEXT_REFLECTION_CAPABILITY_ID,
+    status: "blocked",
+    blocked_reason: input.reason,
+    requested_prompt: input.prompt,
+    resolved_source_ref: input.resolvedSourceRef,
+    resolved_text_hash: input.resolvedTextHash,
+    semantic_prompt_source: input.semanticPromptSource,
+    answer_authority: false,
+    terminal_eligible: false,
+    post_tool_model_step_required: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  } as const;
+  const packet: HelixAgentStepObservationPacket = {
+    schema: HELIX_AGENT_STEP_OBSERVATION_PACKET_SCHEMA,
+    turn_id: input.turnId,
+    iteration: input.iteration,
+    call_id: `${input.turnId}:capability_lane:${THEORY_CONTEXT_REFLECTION_CAPABILITY_ID}:call`,
+    decision_id: `${input.turnId}:capability_lane:${THEORY_CONTEXT_REFLECTION_CAPABILITY_ID}:decision`,
+    capability_key: THEORY_CONTEXT_REFLECTION_CAPABILITY_ID,
+    panel_id: "capability_lane",
+    action: "reflect_theory_context",
+    status: "blocked",
+    produced_artifact_refs: [observationRef],
+    observation_summary: input.summary,
+    receipts: [],
+    missing_requirements: [{
+      code: input.reason,
+      message: input.summary,
+      repair_action: input.reason === "referent_resolution_required"
+        ? "supply_resolved_semantic_prompt_and_source_provenance"
+        : "use_configured_lane_backend_or_supported_capability",
+    }],
+    backend_selection_decision: input.trace.backend_selection_decision,
+    state_delta: {
+      workstation_tool_reference: {
+        gateway_mode: "read",
+        observation_ref: observationRef,
+        answer_authority: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    },
+    suggested_next_steps: input.reason === "referent_resolution_required"
+      ? ["repair", "ask_user"]
+      : ["repair", "fail_closed"],
+    produced_affordances: [],
+    consumed_affordances: [],
+    typed_handoff_contract: {
+      schema: "helix.workstation_typed_handoff_contract.v1",
+      producer_capability: THEORY_CONTEXT_REFLECTION_CAPABILITY_ID,
+      consumer_capability: null,
+      required_affordance_kinds: [],
+      produced_affordance_kinds: [],
+      missing_affordance_kinds: [],
+      answer_authority: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    answer_authority: false,
+    terminal_eligible: false,
+    post_tool_model_step_required: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  return {
+    schema: "helix.workstation_tool_reference.gateway_bridge_result.v1",
+    ok: false,
+    lane_id: "workstation_tool_reference",
+    capability: THEORY_CONTEXT_REFLECTION_CAPABILITY_ID,
+    delegated_capability_id: THEORY_CONTEXT_REFLECTION_CAPABILITY_ID,
+    delegation_status: "blocked_before_gateway",
+    selected_runtime_agent_provider: input.provider.id,
+    lane_resolve_trace: withExecutionTrace({
+      trace: input.trace,
+      observationRef,
+      status: "not_executed_shadow_only",
+      blockedReason: input.reason,
+    }),
+    delegated_gateway_call_result: null,
+    gateway_admission: null,
+    tool_lifecycle_trace: null,
+    tool_followup_decision: null,
+    observation,
+    observation_packet: packet,
+    artifact_refs: packet.produced_artifact_refs,
+    resolved_source_ref: input.resolvedSourceRef,
+    resolved_text_hash: input.resolvedTextHash,
+    semantic_prompt_source: input.semanticPromptSource,
+    semantic_prompt_argument_source: null,
+    semantic_prompt_text_hash: input.prompt ? `sha256:${hashShort(input.prompt)}` : null,
+    runtime_requested_prompt_hash: input.prompt ? `sha256:${hashShort(input.prompt)}` : null,
+    runtime_prompt_differed_from_bound_semantic_prompt: false,
+    error: input.reason,
+    reentry_required: true,
+    answer_authority: false,
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+/**
+ * Thin runtime-callable adapter for the canonical theory reflection gateway.
+ * It performs lane admission and referent safety checks, then delegates to the
+ * existing workstation gateway instead of reproducing graph/reflection logic.
+ */
+export const runWorkstationToolReferenceTheoryContextReflection = async (input: {
+  provider: HelixAgentProvider;
+  call: Record<string, unknown>;
+  turnId?: string | null;
+  iteration?: number | null;
+  env?: NodeJS.ProcessEnv;
+}): Promise<HelixWorkstationTheoryContextReflectionBridgeResult> => {
+  const turnId = input.turnId?.trim() || readText(input.call.turn_id ?? input.call.turnId) ||
+    "ask:lane:theory_context_reflection";
+  const iteration = typeof input.iteration === "number" && Number.isFinite(input.iteration)
+    ? Math.max(0, Math.trunc(input.iteration))
+    : 0;
+  const requestedBackendProvider = readText(
+    input.call.requested_backend_provider ?? input.call.requestedBackendProvider,
+  ) || null;
+  const trace = resolveHelixCapabilityLaneRequest({
+    provider: input.provider,
+    requestedLane: "workstation_tool_reference",
+    requestedBackendProvider,
+    env: input.env,
+  });
+  const requestedPrompt = readText(input.call.prompt);
+  const userSemanticPrompt = readText(
+    input.call.user_semantic_prompt ?? input.call.userSemanticPrompt,
+  );
+  const resolvedReferentText = readText(
+    input.call.resolved_referent_text ?? input.call.resolvedReferentText,
+  );
+  const resolvedSourceRef = readText(
+    input.call.resolved_source_ref ?? input.call.resolvedSourceRef,
+  ) || null;
+  const resolvedTextHash = readText(
+    input.call.resolved_text_hash ?? input.call.resolvedTextHash,
+  ) || null;
+  const semanticPromptSource = readText(
+    input.call.semantic_prompt_source ?? input.call.semanticPromptSource,
+  ) || null;
+
+  if (trace.admission_status !== "admitted_shadow_only") {
+    const reason = trace.blocked_reason ?? "workstation_tool_reference_lane_blocked";
+    return buildTheoryBridgeBlockedResult({
+      provider: input.provider,
+      turnId,
+      iteration,
+      trace,
+      reason,
+      summary: `Theory reflection gateway bridge blocked: ${reason}.`,
+      prompt: requestedPrompt,
+      resolvedSourceRef,
+      resolvedTextHash,
+      semanticPromptSource,
+    });
+  }
+
+  const promptIsUnresolvedDeictic = isUnresolvedTheoryDeicticPrompt(requestedPrompt);
+  const hasBoundResolvedReferent = Boolean(
+    resolvedReferentText &&
+    !isUnresolvedTheoryDeicticPrompt(resolvedReferentText) &&
+    resolvedSourceRef &&
+    resolvedTextHash,
+  );
+  if (promptIsUnresolvedDeictic && !hasBoundResolvedReferent) {
+    return buildTheoryBridgeBlockedResult({
+      provider: input.provider,
+      turnId,
+      iteration,
+      trace,
+      reason: "referent_resolution_required",
+      summary:
+        "Theory reflection requires a resolved semantic prompt plus resolved_source_ref and resolved_text_hash; a bare this/that/it prompt cannot be sent to the graph.",
+      prompt: requestedPrompt,
+      resolvedSourceRef,
+      resolvedTextHash,
+      semanticPromptSource,
+    });
+  }
+
+  const semanticPrompt = hasBoundResolvedReferent
+    ? resolvedReferentText
+    : userSemanticPrompt || requestedPrompt;
+  const semanticPromptArgumentSource = hasBoundResolvedReferent
+    ? "runtime_resolved_referent" as const
+    : userSemanticPrompt
+      ? "current_user_request" as const
+      : "runtime_semantic_prompt" as const;
+  const gatewayResult = await callWorkstationGatewayCapability({
+    agentRuntime: input.provider.id,
+    mode: "read",
+    capabilityId: THEORY_CONTEXT_REFLECTION_CAPABILITY_ID,
+    arguments: buildTheoryBridgeGatewayArguments({
+      call: input.call,
+      prompt: semanticPrompt,
+    }),
+    turnId,
+    iteration,
+  });
+  const observationRef = gatewayResult.artifact_refs[0] ?? `${turnId}:capability_lane:${THEORY_CONTEXT_REFLECTION_CAPABILITY_ID}:${hashShort({
+    ok: gatewayResult.ok,
+    prompt: semanticPrompt,
+  })}`;
+  return {
+    schema: "helix.workstation_tool_reference.gateway_bridge_result.v1",
+    ok: gatewayResult.ok,
+    lane_id: "workstation_tool_reference",
+    capability: THEORY_CONTEXT_REFLECTION_CAPABILITY_ID,
+    delegated_capability_id: THEORY_CONTEXT_REFLECTION_CAPABILITY_ID,
+    delegation_status: "gateway_executed",
+    selected_runtime_agent_provider: input.provider.id,
+    lane_resolve_trace: withExecutionTrace({
+      trace,
+      observationRef,
+      status: "executed_observation_only",
+      blockedReason: gatewayResult.error ?? null,
+    }),
+    delegated_gateway_call_result: gatewayResult,
+    gateway_admission: gatewayResult.gateway_admission,
+    tool_lifecycle_trace: gatewayResult.tool_lifecycle_trace,
+    tool_followup_decision: gatewayResult.tool_followup_decision,
+    observation: gatewayResult.observation,
+    observation_packet: gatewayResult.observation_packet,
+    artifact_refs: gatewayResult.artifact_refs,
+    resolved_source_ref: resolvedSourceRef,
+    resolved_text_hash: resolvedTextHash,
+    semantic_prompt_source: semanticPromptSource,
+    semantic_prompt_argument_source: semanticPromptArgumentSource,
+    semantic_prompt_text_hash: semanticPrompt ? `sha256:${hashShort(semanticPrompt)}` : null,
+    runtime_requested_prompt_hash: requestedPrompt ? `sha256:${hashShort(requestedPrompt)}` : null,
+    runtime_prompt_differed_from_bound_semantic_prompt:
+      Boolean(requestedPrompt && semanticPrompt && requestedPrompt !== semanticPrompt),
+    ...(gatewayResult.error ? { error: gatewayResult.error } : {}),
+    reentry_required: true,
+    answer_authority: false,
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
 
 const summarizeCapabilities = (
   capabilities: ReturnType<typeof listWorkstationGatewayCapabilities>["capabilities"],

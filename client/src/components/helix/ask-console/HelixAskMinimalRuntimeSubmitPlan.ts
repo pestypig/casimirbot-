@@ -31,6 +31,7 @@ export function buildHelixAskMinimalRuntimeSubmitPlan(args: {
   selectedRuntime: HelixAgentRuntimeId;
   selectedLanguageModelProfile?: HelixLanguageModelProfileId;
   desktopUrl?: string | null;
+  workspaceContextSnapshot?: Record<string, unknown> | null;
   pendingPrompt?: PendingHelixAskPrompt | null;
   durableReplies?: readonly HelixAskChatReferentReplyLike[];
   visibleReplies?: readonly HelixAskChatReferentReplyLike[];
@@ -43,7 +44,10 @@ export function buildHelixAskMinimalRuntimeSubmitPlan(args: {
     attachmentKinds: [],
     allEntriesArePastedTextResumeRecallPrompt: false,
   });
-  const baseContext = buildHelixAskContextBridgeSnapshot(args.desktopUrl ?? "");
+  const baseContext = {
+    ...buildHelixAskContextBridgeSnapshot(args.desktopUrl ?? ""),
+    ...(args.workspaceContextSnapshot ?? {}),
+  };
   const chatReferentContextBuild = buildHelixAskChatReferentContextForSubmit({
     promptText: admission.firstEntry ?? args.draft,
     durableReplies: args.durableReplies ?? [],

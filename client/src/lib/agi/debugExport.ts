@@ -3434,8 +3434,33 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
         : [];
   const coverageArtifacts = collectCoverageArtifacts(ledger);
   const calculatorPanelState = asRecord(payload.calculator_panel_state ?? debug?.calculator_panel_state ?? agentLoop?.calculator_panel_state);
+  const debugExportRebuildReason = readString(payload.debug_export_rebuild_reason)?.trim() ?? "";
+  const debugExportSource = readString(payload.debug_export_source)?.trim() ?? "";
+  const isReplyScopedDebugProjection =
+    debugExportSource === "rendered_reply_dom" ||
+    debugExportRebuildReason === "rendered_button_scope" ||
+    debugExportRebuildReason === "rendered_reply" ||
+    debugExportRebuildReason === "payload_reply_mismatch" ||
+    debugExportRebuildReason === "empty_payload" ||
+    debugExportRebuildReason === "invalid_json_payload";
+  const replyScopedSelectedTurnId = isReplyScopedDebugProjection
+    ? readString(payload.active_turn_id)
+    : null;
+  const normalizedReplyScopedSelectedTurnId =
+    normalizeBackendDebugExportTurnId(replyScopedSelectedTurnId) ?? replyScopedSelectedTurnId;
+  const terminalAuthorityTurnId = readString(terminalAuthority?.turn_id);
+  const normalizedTerminalAuthorityTurnId =
+    normalizeBackendDebugExportTurnId(terminalAuthorityTurnId) ?? terminalAuthorityTurnId;
+  const terminalAuthorityMatchesSelectedTurn = Boolean(
+    !normalizedReplyScopedSelectedTurnId ||
+    !normalizedTerminalAuthorityTurnId ||
+    normalizedReplyScopedSelectedTurnId === normalizedTerminalAuthorityTurnId,
+  );
   const terminalAuthorityText = readString(terminalAuthority?.terminal_text_preview);
-  const terminalAuthorityVerified = readBoolean(terminalAuthority?.server_authoritative) === true && Boolean(terminalAuthorityText);
+  const terminalAuthorityVerified =
+    readBoolean(terminalAuthority?.server_authoritative) === true &&
+    Boolean(terminalAuthorityText) &&
+    terminalAuthorityMatchesSelectedTurn;
   const terminalArtifactKind = imageLensPromptLeakRecovered
     ? readString(terminalPresentation?.terminal_artifact_kind) ??
       readString(terminalAuthority?.terminal_artifact_kind) ??
@@ -3486,15 +3511,6 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
   );
   const routeTerminalProductBlocked =
     !routeEvidenceAuthorityAllowsTerminalKind(routeEvidenceAuthority, terminalArtifactKind);
-  const debugExportRebuildReason = readString(payload.debug_export_rebuild_reason)?.trim() ?? "";
-  const debugExportSource = readString(payload.debug_export_source)?.trim() ?? "";
-  const isReplyScopedDebugProjection =
-    debugExportSource === "rendered_reply_dom" ||
-    debugExportRebuildReason === "rendered_button_scope" ||
-    debugExportRebuildReason === "rendered_reply" ||
-    debugExportRebuildReason === "payload_reply_mismatch" ||
-    debugExportRebuildReason === "empty_payload" ||
-    debugExportRebuildReason === "invalid_json_payload";
   const promptRequiresBackendEntrypoint = requiresBackendEntrypointForDebugExport(
     readString(reply.question) ?? readString(payload.selectedDebugQuestion) ?? "",
   );
@@ -3712,12 +3728,16 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
         readString(payload.finalAnswer);
   const canonicalGoalFrame = asRecord(debug?.canonical_goal_frame ?? agentLoop?.canonical_goal_frame);
   const activeTurnId =
+    replyScopedSelectedTurnId ??
     readString(debug?.turn_id) ??
     readString(canonicalGoalFrame?.turn_id) ??
     readString(asRecord(payload.turnTruthTable)?.turn_id) ??
     readString(reply.id) ??
     "unknown-turn";
-  const canonicalActiveTurnId = readString(terminalAuthority?.turn_id) ?? activeTurnId;
+  const canonicalActiveTurnId =
+    replyScopedSelectedTurnId ??
+    (terminalAuthorityVerified ? terminalAuthorityTurnId : null) ??
+    activeTurnId;
   const projectedBackendDebugRef =
     existingBackendDebugRef ??
     buildBackendDebugExportRef(canonicalActiveTurnId) ??

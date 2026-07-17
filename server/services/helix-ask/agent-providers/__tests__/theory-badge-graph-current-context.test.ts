@@ -6,6 +6,8 @@ import {
 } from "../explicit-workstation-gateway";
 import { arbitrateAskSourceTarget } from "../../ask-source-target-arbitrator";
 import { buildCodexTheoryReflectionReceiptAnswer } from "../codex-provider";
+import { isAffirmativeTheoryBadgeGraphReflectionPrompt } from "../../theory-badge-graph-current-context-intent";
+import { buildPromptDerivedTheoryReflectionGatewayCallRequests } from "../prompt-named-tool-requests";
 
 const currentContext = {
   schema: "helix.theory_badge_graph_current_context.v1",
@@ -39,6 +41,93 @@ const bodyFor = (question: string): Record<string, unknown> => ({
 });
 
 describe("Theory Badge Graph current-context admission", () => {
+  const levelOnePrompt =
+    "Reflect the idea that deterministic microscopic laws can produce probabilistic macroscopic observations when information is lost through coarse-graining with the Theory Badge Graph.";
+  const levelThreePrompt =
+    "Now compare two interpretations with the Theory Badge Graph: first, that macroscopic probability is epistemic because coarse-graining hides deterministic microstates; second, that probability is fundamental rather than caused by missing information. Show where the graph supports or fails to represent each interpretation.";
+
+  it("routes a long direct semantic subject through the Theory locator instead of model-only synthesis", () => {
+    expect(isAffirmativeTheoryBadgeGraphReflectionPrompt(levelOnePrompt)).toBe(true);
+
+    const intent = arbitrateAskSourceTarget({
+      turnId: "ask:test:theory-level-one",
+      threadId: "thread:test",
+      promptText: levelOnePrompt,
+    });
+
+    expect(intent).toMatchObject({
+      target_source: "theory_locator",
+      target_kind: "theory_locator",
+      strength: "hard",
+      precedence_reason: "affirmative_theory_badge_graph_reflection_source_target",
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+    });
+    expect(intent.explicit_cues).toContain("affirmative_theory_badge_graph_reflection");
+
+    const [request] = buildPromptDerivedTheoryReflectionGatewayCallRequests({ question: levelOnePrompt });
+    expect(request).toMatchObject({
+      capability_id: "helix_ask.reflect_theory_context",
+      arguments: {
+        prompt: expect.stringContaining("deterministic microscopic laws"),
+        conversation_context: levelOnePrompt,
+      },
+    });
+  });
+
+  it("routes the exact Level 3 discourse-prefixed comparison through the Theory capability lane", () => {
+    expect(isAffirmativeTheoryBadgeGraphReflectionPrompt(levelThreePrompt)).toBe(true);
+
+    const intent = arbitrateAskSourceTarget({
+      turnId: "ask:test:theory-level-three",
+      threadId: "thread:test",
+      promptText: levelThreePrompt,
+    });
+
+    expect(intent).toMatchObject({
+      target_source: "theory_locator",
+      target_kind: "theory_locator",
+      strength: "hard",
+      precedence_reason: "affirmative_theory_badge_graph_reflection_source_target",
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+    });
+
+    const [request] = buildPromptDerivedTheoryReflectionGatewayCallRequests({ question: levelThreePrompt });
+    expect(request).toMatchObject({
+      capability_id: "helix_ask.reflect_theory_context",
+      arguments: {
+        prompt: expect.stringContaining("compare two interpretations"),
+        conversation_context: levelThreePrompt,
+      },
+    });
+  });
+
+  it.each([
+    "Now compare determinism and probability with the Theory Badge Graph.",
+    "Next, compare determinism and probability with the Theory Badge Graph.",
+    "Then reflect this interpretation with the Theory Badge Graph.",
+  ])("admits an affirmative discourse-prefixed Theory command: %s", (question) => {
+    expect(isAffirmativeTheoryBadgeGraphReflectionPrompt(question)).toBe(true);
+    expect(buildPromptDerivedTheoryReflectionGatewayCallRequests({ question })).toHaveLength(1);
+  });
+
+  it.each([
+    'The phrase "Reflect deterministic laws with the Theory Badge Graph" is only an example.',
+    "Do not reflect deterministic laws with the Theory Badge Graph.",
+    "Now do not compare deterministic laws with the Theory Badge Graph.",
+    "Next time, compare deterministic laws with the Theory Badge Graph.",
+    "If we continue, then compare deterministic laws with the Theory Badge Graph.",
+    "If we later reflect deterministic laws with the Theory Badge Graph, what might happen?",
+    "Previously I asked you to reflect deterministic laws with the Theory Badge Graph.",
+    'Previously I said "Now compare deterministic laws with the Theory Badge Graph."',
+    "The UI label says Reflect deterministic laws with the Theory Badge Graph.",
+    "The button says Now compare deterministic laws with the Theory Badge Graph.",
+  ])("does not execute a contextual direct-reflection mention: %s", (question) => {
+    expect(isAffirmativeTheoryBadgeGraphReflectionPrompt(question)).toBe(false);
+    expect(buildPromptDerivedTheoryReflectionGatewayCallRequests({ question })).toEqual([]);
+  });
+
   it("admits a bounded read for a deictic current-selection question", () => {
     const requests = buildActiveTheoryBadgeGraphContextWorkstationGatewayCallRequests(
       bodyFor("What do these selected badges imply, and which branches are possible next?"),
@@ -110,7 +199,7 @@ describe("Theory Badge Graph current-context admission", () => {
     expect(buildActiveTheoryBadgeGraphContextWorkstationGatewayCallRequests(bodyFor(question))).toEqual([]);
   });
 
-  it("keeps the exact current selection beside the required Theory reflection on a structured route", () => {
+  it("keeps the exact current selection while deferring the authored Theory reflection to the runtime", () => {
     const body = {
       ...bodyFor("What do these selected badges imply, and which branches are possible next?"),
       source_target_intent: {
@@ -125,8 +214,8 @@ describe("Theory Badge Graph current-context admission", () => {
     });
     const capabilities = requests.map((request) => request.capability_id);
 
-    expect(capabilities).toContain("theory-badge-graph.reflect_discussion_context");
     expect(capabilities).toContain("theory-badge-graph.current_context");
+    expect(capabilities).not.toContain("theory-badge-graph.reflect_discussion_context");
   });
 
   it("does not add a web-search edge for the live current-graph prompt", () => {
@@ -147,11 +236,11 @@ describe("Theory Badge Graph current-context admission", () => {
     const capabilities = requests.map((request) => request.capability_id);
 
     expect(capabilities).toContain("theory-badge-graph.current_context");
-    expect(capabilities).toContain("theory-badge-graph.reflect_discussion_context");
+    expect(capabilities).not.toContain("theory-badge-graph.reflect_discussion_context");
     expect(capabilities).not.toContain("internet-search.search_web");
   });
 
-  it("keeps the required Theory reflection when the runtime explicitly requests only current graph context", () => {
+  it("does not invent a Theory reflection call when the runtime requests only current graph context", () => {
     const question = [
       "Looking at the current Theory Badge Graph arrangement I set up, what do these selected badges imply together?",
       "Identify the selected badges, their connection trace and intermediate badges, and the possibilities currently available next.",
@@ -173,7 +262,6 @@ describe("Theory Badge Graph current-context admission", () => {
 
     expect(requests.map((request) => request.capability_id)).toEqual([
       "theory-badge-graph.current_context",
-      "theory-badge-graph.reflect_discussion_context",
     ]);
   });
 

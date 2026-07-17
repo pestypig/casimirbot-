@@ -1219,6 +1219,16 @@ const modelVisibleRequiredArgSchemaCoverage = [
     ],
   },
   {
+    capability: "research-library.apply_evidence_enrichment",
+    requiredArgs: ["document_id", "proposal"],
+    routeSnippets: [
+      "case HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY:",
+      'return schema(["document_id", "proposal"], {',
+      "Profile-scoped Research Library document id from a prior bounded sidecar observation.",
+      "proposal: HELIX_PAPER_EVIDENCE_ENRICHMENT_PROPOSAL_JSON_SCHEMA",
+    ],
+  },
+  {
     capability: "theory-badge-graph.propose_frontier_conjectures",
     requiredArgs: ["prompt"],
     routeSnippets: [

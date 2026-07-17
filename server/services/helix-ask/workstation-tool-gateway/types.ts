@@ -67,6 +67,7 @@ export type HelixWorkstationGatewayCallInput = {
   turnId?: string | null;
   iteration?: number | null;
   accountType?: HelixAccountType | null;
+  profileId?: string | null;
 };
 
 export type HelixWorkstationGatewayAdmissionRecord = {

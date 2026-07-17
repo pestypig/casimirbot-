@@ -1,4 +1,5 @@
 import { releaseAudioFocus, requestAudioFocus } from "@/lib/audio-focus";
+import { isLikelyLoopbackDeviceLabel } from "@/lib/helix/ask-voice-capture-display";
 import type {
   HelixRealtimeSdpExchangeResponse,
   HelixRealtimeSessionResponse,
@@ -10,7 +11,15 @@ import {
   type HelixAskLiveRuntimeTransportHandoffPlan,
 } from "./HelixAskLiveRuntimeLifecycle";
 
-export type HelixAskLiveRuntimeTrackLike = { stop(): void };
+export type HelixAskLiveRuntimeTrackLike = {
+  stop(): void;
+  kind?: string;
+  enabled?: boolean;
+  muted?: boolean;
+  readyState?: string;
+  label?: string;
+  getSettings?(): { deviceId?: string };
+};
 
 export type HelixAskLiveRuntimeMediaStreamLike = {
   getTracks(): HelixAskLiveRuntimeTrackLike[];
@@ -18,6 +27,11 @@ export type HelixAskLiveRuntimeMediaStreamLike = {
 
 export type HelixAskLiveRuntimeDataChannelLike = {
   close(): void;
+  send?(data: string): void;
+  readyState?: string;
+  onopen?: (() => void) | null;
+  onclose?: (() => void) | null;
+  onerror?: (() => void) | null;
   onmessage?: ((event: { data: unknown }) => void) | null;
 };
 
@@ -32,7 +46,10 @@ export type HelixAskLiveRuntimePeerConnectionLike = {
   createOffer?(): Promise<HelixAskLiveRuntimeSessionDescriptionLike>;
   setLocalDescription?(description: HelixAskLiveRuntimeSessionDescriptionLike): Promise<void>;
   setRemoteDescription?(description: HelixAskLiveRuntimeSessionDescriptionLike): Promise<void>;
-  ontrack?: ((event: { streams?: HelixAskLiveRuntimeMediaStreamLike[] }) => void) | null;
+  ontrack?: ((event: {
+    streams?: HelixAskLiveRuntimeMediaStreamLike[];
+    track?: HelixAskLiveRuntimeTrackLike;
+  }) => void) | null;
   close(): void;
 };
 
@@ -65,15 +82,43 @@ export type HelixAskLiveRuntimeBrowserTransportDeps = {
   requestMicrophone?: () => Promise<HelixAskLiveRuntimeMediaStreamLike>;
   createPeerConnection?: () => HelixAskLiveRuntimePeerConnectionLike;
   createRemoteAudio?: () => HelixAskLiveRuntimeRemoteAudioLike;
+  createRemoteMediaStream?: (
+    track: HelixAskLiveRuntimeTrackLike | undefined,
+  ) => HelixAskLiveRuntimeMediaStreamLike | null;
   exchangeSdp?: HelixAskLiveRuntimeSdpExchange;
   onProviderEvent?: (event: unknown) => void;
   onAudioState?: (state: "listening" | "speaking" | "muted") => void;
+  onMicrophoneState?: (outcome: {
+    trackCount: number;
+    liveTrackCount: number;
+    enabledTrackCount: number;
+    mutedTrackCount: number;
+    deviceLabel: string | null;
+    loopbackSource: boolean;
+  }) => void;
+  onDataChannelState?: (outcome: {
+    state: "open" | "closed" | "error";
+    initialAudioProbe: "not_attempted" | "requested" | "failed";
+    errorCode: string | null;
+  }) => void;
+  onRemoteAudioTrack?: (outcome: {
+    source: "stream" | "track_fallback";
+    muted: boolean;
+    focusGranted: boolean;
+  }) => void;
+  onRemoteAudioPlayback?: (outcome: {
+    status: "started" | "failed";
+    errorCode: string | null;
+    muted: boolean;
+  }) => void;
   nowMs?: () => number;
 };
 
 export type HelixAskLiveRuntimeBrowserTransportController =
   HelixAskLiveRuntimeTransportExecutionBoundary & {
     getResources(): HelixAskLiveRuntimeBrowserResources;
+    setMicrophoneEnabled(enabled: boolean): boolean;
+    getMicrophoneEnabled(): boolean;
   };
 
 const defaultNowMs = (): number => Date.now();
@@ -81,13 +126,35 @@ const defaultNowMs = (): number => Date.now();
 const defaultRequestMicrophone = async (): Promise<HelixAskLiveRuntimeMediaStreamLike> => {
   const mediaDevices = globalThis.navigator?.mediaDevices;
   if (!mediaDevices?.getUserMedia) throw new Error("browser_media_api_unavailable");
-  return mediaDevices.getUserMedia({
-    audio: {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
-    },
-  });
+  const constraints: MediaTrackConstraints = {
+    echoCancellation: { ideal: true },
+    noiseSuppression: { ideal: true },
+    autoGainControl: { ideal: true },
+    channelCount: { ideal: 1 },
+  };
+  let stream = await mediaDevices.getUserMedia({ audio: constraints });
+  const initialTrack = stream.getAudioTracks()[0];
+  const initialLabel = initialTrack?.label?.trim() ?? "";
+  if (initialTrack && isLikelyLoopbackDeviceLabel(initialLabel) && mediaDevices.enumerateDevices) {
+    try {
+      const currentDeviceId = initialTrack.getSettings().deviceId;
+      const fallback = (await mediaDevices.enumerateDevices()).find((device) =>
+        device.kind === "audioinput" &&
+        Boolean(device.deviceId) &&
+        device.deviceId !== currentDeviceId &&
+        !isLikelyLoopbackDeviceLabel(device.label ?? ""));
+      if (fallback?.deviceId) {
+        const fallbackStream = await mediaDevices.getUserMedia({
+          audio: { ...constraints, deviceId: { exact: fallback.deviceId } },
+        });
+        stream.getTracks().forEach((track) => track.stop());
+        stream = fallbackStream;
+      }
+    } catch {
+      // Preserve the granted stream; debug state reports whether it still looks like loopback.
+    }
+  }
+  return stream;
 };
 
 const defaultCreatePeerConnection = (): HelixAskLiveRuntimePeerConnectionLike => {
@@ -102,7 +169,23 @@ const defaultCreateRemoteAudio = (): HelixAskLiveRuntimeRemoteAudioLike => {
   const audio = document.createElement("audio");
   audio.autoplay = true;
   audio.setAttribute("playsinline", "true");
+  audio.setAttribute("aria-hidden", "true");
+  audio.hidden = true;
+  document.body.appendChild(audio);
   return audio;
+};
+
+const defaultCreateRemoteMediaStream = (
+  track: HelixAskLiveRuntimeTrackLike | undefined,
+): HelixAskLiveRuntimeMediaStreamLike | null => {
+  if (!track || typeof globalThis.MediaStream !== "function") return null;
+  try {
+    return new globalThis.MediaStream([
+      track as MediaStreamTrack,
+    ]) as HelixAskLiveRuntimeMediaStreamLike;
+  } catch {
+    return null;
+  }
 };
 
 const defaultExchangeSdp: HelixAskLiveRuntimeSdpExchange = async (input) => {
@@ -137,6 +220,26 @@ const normalizeBrowserTransportFailure = (error: unknown): string => {
   if (/^[a-z0-9_:-]{1,160}$/i.test(message)) return message;
   return "realtime_browser_transport_failed";
 };
+
+const normalizeRemoteAudioPlaybackFailure = (error: unknown): string => {
+  const name = error instanceof Error ? error.name : "";
+  if (name === "NotAllowedError") return "remote_audio_playback_blocked";
+  if (name === "NotSupportedError") return "remote_audio_format_unsupported";
+  return "remote_audio_playback_failed";
+};
+
+const buildInitialAudioProbeEvent = (): string => JSON.stringify({
+  type: "response.create",
+  response: {
+    conversation: "none",
+    output_modalities: ["audio"],
+    instructions: "Say exactly: Live voice connected. I'm listening.",
+    metadata: {
+      helix_purpose: "connection_audio_probe",
+      answer_authority: "none",
+    },
+  },
+});
 
 const hasServerReturnedRealtimeSessionContract = (
   response: HelixRealtimeSessionResponse | null | undefined,
@@ -216,11 +319,55 @@ export const createHelixAskLiveRuntimeBrowserTransportController = (
   let dataChannel: HelixAskLiveRuntimeDataChannelLike | null = null;
   let remoteAudio: HelixAskLiveRuntimeRemoteAudioLike | null = null;
   let audioFocusId: string | null = null;
+  let microphoneEnabled = false;
   const nowMs = deps.nowMs ?? defaultNowMs;
   const requestMicrophone = deps.requestMicrophone ?? defaultRequestMicrophone;
   const createPeerConnection = deps.createPeerConnection ?? defaultCreatePeerConnection;
   const createRemoteAudio = deps.createRemoteAudio ?? defaultCreateRemoteAudio;
+  const createRemoteMediaStream = deps.createRemoteMediaStream ?? defaultCreateRemoteMediaStream;
   const exchangeSdp = deps.exchangeSdp ?? defaultExchangeSdp;
+
+  const reportMicrophoneState = () => {
+    const tracks = mediaStream?.getTracks() ?? [];
+    const audioTrack = tracks.find((track) => track.kind === "audio") ?? tracks[0];
+    const deviceLabel = audioTrack?.label?.trim() || null;
+    deps.onMicrophoneState?.({
+      trackCount: tracks.length,
+      liveTrackCount: tracks.filter((track) => track.readyState !== "ended").length,
+      enabledTrackCount: tracks.filter((track) => track.enabled !== false).length,
+      mutedTrackCount: tracks.filter((track) => track.muted === true).length,
+      deviceLabel,
+      loopbackSource: isLikelyLoopbackDeviceLabel(deviceLabel ?? ""),
+    });
+  };
+
+  const setMicrophoneEnabled = (enabled: boolean): boolean => {
+    const tracks = mediaStream?.getTracks() ?? [];
+    if (tracks.length === 0) return false;
+    microphoneEnabled = enabled;
+    tracks.forEach((track) => {
+      track.enabled = enabled;
+    });
+    reportMicrophoneState();
+    return true;
+  };
+
+  const playRemoteAudio = () => {
+    const audio = remoteAudio;
+    if (!audio) return;
+    void audio.play().then(
+      () => deps.onRemoteAudioPlayback?.({
+        status: "started",
+        errorCode: null,
+        muted: audio.muted,
+      }),
+      (error) => deps.onRemoteAudioPlayback?.({
+        status: "failed",
+        errorCode: normalizeRemoteAudioPlaybackFailure(error),
+        muted: audio.muted,
+      }),
+    );
+  };
 
   const closeResources = () => {
     const tracks = mediaStream?.getTracks() ?? [];
@@ -240,11 +387,14 @@ export const createHelixAskLiveRuntimeBrowserTransportController = (
     dataChannel = null;
     remoteAudio = null;
     audioFocusId = null;
+    microphoneEnabled = false;
     return closed;
   };
 
   return {
     getResources: () => ({ mediaStream, peerConnection, dataChannel, remoteAudio }),
+    setMicrophoneEnabled,
+    getMicrophoneEnabled: () => microphoneEnabled,
     prepareTransport: async ({ handoffPlan, observedAtMs }) =>
       buildResult({
         ok: canStartBrowserTransport(handoffPlan),
@@ -275,6 +425,7 @@ export const createHelixAskLiveRuntimeBrowserTransportController = (
       let openAiNetworkCallAttempted = false;
       try {
         mediaStream = await requestMicrophone();
+        setMicrophoneEnabled(false);
         peerConnection = createPeerConnection();
         if (
           !peerConnection.addTrack ||
@@ -287,7 +438,8 @@ export const createHelixAskLiveRuntimeBrowserTransportController = (
         remoteAudio = createRemoteAudio();
         audioFocusId = `helix-realtime:${serverResponse.realtime_session_id}`;
         peerConnection.ontrack = (event) => {
-          const stream = event.streams?.[0];
+          const streamFromEvent = event.streams?.[0] ?? null;
+          const stream = streamFromEvent ?? createRemoteMediaStream(event.track);
           if (!remoteAudio || !stream || !audioFocusId) return;
           remoteAudio.srcObject = stream;
           const focusGranted = requestAudioFocus({
@@ -303,18 +455,55 @@ export const createHelixAskLiveRuntimeBrowserTransportController = (
               if (!remoteAudio) return;
               remoteAudio.muted = false;
               deps.onAudioState?.("speaking");
-              void remoteAudio.play().catch(() => undefined);
+              playRemoteAudio();
             },
           });
           remoteAudio.muted = !focusGranted;
+          deps.onRemoteAudioTrack?.({
+            source: streamFromEvent ? "stream" : "track_fallback",
+            muted: remoteAudio.muted,
+            focusGranted,
+          });
           deps.onAudioState?.(focusGranted ? "listening" : "muted");
-          void remoteAudio.play().catch(() => undefined);
+          playRemoteAudio();
         };
         for (const track of mediaStream.getTracks()) {
           peerConnection.addTrack(track, mediaStream);
         }
         dataChannel = peerConnection.createDataChannel?.("oai-events") ?? null;
         if (dataChannel) {
+          dataChannel.onopen = () => {
+            deps.onDataChannelState?.({
+              state: "open",
+              initialAudioProbe: "not_attempted",
+              errorCode: null,
+            });
+            try {
+              if (!dataChannel?.send) throw new Error("realtime_data_channel_send_unavailable");
+              dataChannel.send(buildInitialAudioProbeEvent());
+              deps.onDataChannelState?.({
+                state: "open",
+                initialAudioProbe: "requested",
+                errorCode: null,
+              });
+            } catch {
+              deps.onDataChannelState?.({
+                state: "open",
+                initialAudioProbe: "failed",
+                errorCode: "initial_audio_probe_send_failed",
+              });
+            }
+          };
+          dataChannel.onclose = () => deps.onDataChannelState?.({
+            state: "closed",
+            initialAudioProbe: "not_attempted",
+            errorCode: null,
+          });
+          dataChannel.onerror = () => deps.onDataChannelState?.({
+            state: "error",
+            initialAudioProbe: "not_attempted",
+            errorCode: "realtime_data_channel_error",
+          });
           dataChannel.onmessage = (event) => {
             try {
               deps.onProviderEvent?.(

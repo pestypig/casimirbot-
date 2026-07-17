@@ -78,6 +78,20 @@ export type HelixWorkflowQteDispatchV1 = {
   submittedAt: string | null;
 };
 
+export type HelixWorkflowDemoStepRetryV1 = {
+  schema: "helix.workflow_demo_step_retry.v1";
+  stepId: "ocr_math_candidate";
+  reason: "no_ocr_or_latex_candidate";
+  attemptCount: number;
+  triedPageNumbers: number[];
+  latestPageNumber: number | null;
+  pageCount: number | null;
+  sourceId: string | null;
+  artifactRefs: string[];
+  sourceTurnId: string | null;
+  observedAt: string;
+};
+
 export type HelixWorkflowDemoSessionV1 = {
   schema: typeof HELIX_WORKFLOW_DEMO_SESSION_SCHEMA;
   runId: string;
@@ -93,6 +107,8 @@ export type HelixWorkflowDemoSessionV1 = {
   originSessionId?: string | null;
   /** The editable QTE prompt currently awaiting a causally linked Ask turn. */
   pendingQteDispatch?: HelixWorkflowQteDispatchV1 | null;
+  /** Retryable typed observations are not completion evidence and stay isolated here. */
+  stepRetry?: HelixWorkflowDemoStepRetryV1 | null;
 };
 
 export type HelixWorkflowQteV1 = {

@@ -272,6 +272,20 @@ describe("DocViewerPanel taxonomy UI", () => {
     expect(__testDocViewerTaxonomy.docMatchesTaxonomyFilter(makeEntry({ docClass: null }), "uncategorized")).toBe(true);
   });
 
+  it("renders a Research Library Calculator prefill with a generic launch action and no solve action", () => {
+    const { __testDocViewerTaxonomy } = DocViewerPanelModule;
+    const rendered = __testDocViewerTaxonomy.renderMathMarkdown(
+      "#### Calculator-ready prefill\n\n\\[\nE = m*(299792458)^2\n\\]\n",
+      "research-library:research:calculator-paper",
+    );
+
+    expect(rendered).toContain('data-doc-calculator-ingest="true"');
+    expect(rendered).toContain('title="Open in Scientific Calculator"');
+    expect(rendered).toContain('data-doc-math-latex="E = m*(299792458)^2"');
+    expect(rendered).not.toContain("solve_expression");
+    expect(rendered).not.toContain("theory-badge-graph");
+  });
+
   it("builds pending inline translation state with source payload identity", () => {
     const { __testDocViewerTaxonomy } = DocViewerPanelModule;
 

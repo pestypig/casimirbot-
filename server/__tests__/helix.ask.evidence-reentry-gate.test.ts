@@ -1239,6 +1239,57 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
     expect(trace.evidence_reentry_gate.violation_codes).toContain("source_observation_terminal_without_selection");
   });
 
+  it("selects a typed paper-enrichment observation for the post-tool model answer", () => {
+    const turnId = "turn:paper-evidence-enrichment";
+    const observationRef = `${turnId}:codex_normalized:paper_evidence_enrichment_observation:1`;
+    const gate = buildEvidenceReentryGate({
+      turnId,
+      payload: {
+        current_turn_artifact_ledger: [{
+          artifact_id: observationRef,
+          kind: "paper_evidence_enrichment_observation",
+          payload: {
+            schema: "helix.paper_evidence_enrichment_observation.v1",
+            status: "applied",
+            selected_for_answer: true,
+            exact_equation_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          },
+        }],
+      },
+      loopTrace: {
+        actual_tool_calls: [{
+          tool_id: "research-library.apply_evidence_enrichment",
+          family: "scholarly_research",
+          admitted: true,
+          mutating: true,
+          result_ref: observationRef,
+        }],
+        observations_created: [{
+          observation_id: observationRef,
+          source_kind: "paper_evidence_enrichment_observation",
+        }],
+        evidence_selected_for_answer: [],
+        evidence_rejected_for_answer: [],
+      },
+      primaryIntent: "control_command",
+      terminalArtifactKind: "model_synthesized_answer",
+      finalAnswerSource: "final_answer_draft",
+      finalArbitrationRan: true,
+      sourceEvidenceRequired: true,
+      allowedTerminalProducts: ["model_synthesized_answer", "typed_failure"],
+    });
+
+    expect(gate).toMatchObject({
+      required: true,
+      completed: true,
+      selected_evidence_refs: [observationRef],
+      violation_codes: [],
+    });
+  });
+
   it("requires explanatory follow-up when evidence was selected for a content answer", () => {
     const gate = buildFollowupReasoningGate({
       turnId: "turn:followup",

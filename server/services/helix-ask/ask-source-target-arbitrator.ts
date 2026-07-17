@@ -52,7 +52,10 @@ import {
   isExplicitDocsPathLocateSynthesisPrompt,
   isExplicitDocsPathSummaryPrompt as isExplicitDocsMarkdownPathSummaryPrompt,
 } from "./docs-viewer-intent";
-import { isTheoryBadgeGraphCurrentContextPrompt } from "./theory-badge-graph-current-context-intent";
+import {
+  isAffirmativeTheoryBadgeGraphReflectionPrompt,
+  isTheoryBadgeGraphCurrentContextPrompt,
+} from "./theory-badge-graph-current-context-intent";
 
 export {
   isStagePlayCheckpointRequestPrompt,
@@ -1033,17 +1036,24 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
-  if (isTheoryBadgeGraphCurrentContextPrompt(prompt)) {
+  const affirmativeTheoryReflection = isAffirmativeTheoryBadgeGraphReflectionPrompt(prompt);
+  if (affirmativeTheoryReflection || isTheoryBadgeGraphCurrentContextPrompt(prompt)) {
     return toSourceTargetIntent({
       turnId: input.turnId,
       threadId: input.threadId,
       target: "theory_locator",
       targetKind: "theory_locator",
       strength: "hard",
-      explicitCues: ["current_theory_badge_graph_selection"],
+      explicitCues: affirmativeTheoryReflection
+        ? ["affirmative_theory_badge_graph_reflection"]
+        : ["current_theory_badge_graph_selection"],
       reasons: [
-        "theory_badge_graph_current_context_source_target",
-        "deictic_badge_selection_requires_bounded_workstation_observation",
+        affirmativeTheoryReflection
+          ? "affirmative_theory_badge_graph_reflection_source_target"
+          : "theory_badge_graph_current_context_source_target",
+        affirmativeTheoryReflection
+          ? "theory_reflection_requires_bounded_graph_observation"
+          : "deictic_badge_selection_requires_bounded_workstation_observation",
       ],
       requestedOutputs: ["theory_context_reflection", "tool_call_eligibility", "typed_failure"],
       suppressedRoutes: [
@@ -1052,7 +1062,9 @@ export function arbitrateAskSourceTarget(input: {
         "client_projection",
         "panel_generated_answer",
       ],
-      precedenceReason: "theory_badge_graph_current_context_source_target",
+      precedenceReason: affirmativeTheoryReflection
+        ? "affirmative_theory_badge_graph_reflection_source_target"
+        : "theory_badge_graph_current_context_source_target",
       confidence: 0.98,
       allowClientShortcut: false,
       allowNoToolDirect: false,

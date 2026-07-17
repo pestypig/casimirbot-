@@ -1,4 +1,5 @@
 import React, { Suspense } from "react";
+import { HelixLoadingMark } from "@/components/common/HelixLoadingMark";
 import {
   HelixAskMinimalRuntimeShell,
   type HelixAskMinimalRuntimeShellProps,
@@ -31,7 +32,7 @@ export function HelixAskConsoleRuntimeShell({
   }
 
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<HelixLoadingMark title="Loading Helix Ask" compact />}>
       <HelixAskLegacyRuntimeBridge {...buildHelixAskConsoleRuntimeBridgeProps(props)} />
     </Suspense>
   );

@@ -974,6 +974,13 @@ export async function runScholarlyResearchLookup(
     }
   }
 
+  // Preserve the provider-level audit before adding any synthetic arXiv fallback
+  // record. The returned `papers` collection is identity-deduplicated, so these
+  // explicit counts are required when a model is asked to report both raw
+  // provider records and unique papers without inferring either value.
+  const providerRecordCount = papers.length;
+  const uniqueProviderPaperCount = dedupePapers(papers).length;
+
   const exactArxivPapers = arxivId
     ? dedupePapers(papers).filter((paper) => paperMatchesArxivId(paper, arxivId))
     : [];
@@ -1088,6 +1095,13 @@ export async function runScholarlyResearchLookup(
     intent: input.mode ?? intent.mode,
     providers_considered: providers,
     providers_called: unique(providersCalled),
+    provider_record_count: providerRecordCount,
+    unique_paper_count: uniqueProviderPaperCount,
+    deduplication: {
+      provider_record_count: providerRecordCount,
+      unique_paper_count: uniqueProviderPaperCount,
+      duplicate_record_count: Math.max(0, providerRecordCount - uniqueProviderPaperCount),
+    },
     evidence_refs: evidenceRefs,
     papers: dedupedPapers.length > 0 ? dedupedPapers : candidatePapers.slice(0, limit),
     evidence_state: evidenceState,

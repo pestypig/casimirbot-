@@ -74,6 +74,8 @@ import {
   conversationalReferentTextCannotSupplyRequestedEvidence,
   resolveHelixAskConversationalReferent,
 } from "../referent-resolution";
+import { extractExplicitTheoryDerivationRequestAssignments } from "../theory-congruence/derivation-request";
+import { isAffirmativeTheoryBadgeGraphReflectionPrompt } from "../theory-badge-graph-current-context-intent";
 
 export const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -87,7 +89,7 @@ export const isContextualPromptNamedCapabilityMention = (prompt: string, capabil
   const affirmativeOperatorMention =
     capabilityTokenMention && /^\s*(?:please\s+)?(?:use|run|call|execute|query|read|check)\b/i.test(unquoted);
   const contextualMarker =
-    /\b(?:text|sentence|phrase|quote|screen|page|button|label|ui|future|later|eventually|hypothetically|would|could|might|do\s+not|don't|dont|without|not\s+asking\s+to)\b/i.test(
+    /\b(?:text|sentence|phrase|quote|screen|page|button|label|ui|future|later|eventually|hypothetically|would|could|might|earlier|previously|historically|already|do\s+not|don't|dont|without|not\s+asking\s+to)\b/i.test(
       unquoted,
     );
   if (affirmativeOperatorMention && !contextualMarker) return false;
@@ -96,6 +98,7 @@ export const isContextualPromptNamedCapabilityMention = (prompt: string, capabil
     new RegExp(`${capability}[\\s\\S]{0,120}\\b(?:as\\s+text|text\\s+only|phrase\\s+only|do\\s+not\\s+run|don't\\s+run|without\\s+running)\\b`, "i"),
     new RegExp(`\\b(?:explain|describe|what\\s+does|what\\s+is|what\\s+are)\\b[\\s\\S]{0,120}${capability}[\\s\\S]{0,120}\\b(?:mean|means|do|does|is|are|would)\\b`, "i"),
     new RegExp(`\\b(?:future|later|eventually|hypothetically|if|when|would|could|might)\\b[\\s\\S]{0,140}${capability}`, "i"),
+    new RegExp(`\\b(?:earlier|previously|last\\s+turn|historically|already)\\b[\\s\\S]{0,140}${capability}`, "i"),
   ];
   return contextualPatterns.some((pattern) => pattern.test(unquoted));
 };
@@ -284,6 +287,50 @@ export const extractNamedCapabilityQuery = (segment: string | null, fallback: st
   return cleanNamedCapabilityArgumentText(segment.replace(/\bdocs[\\/][^\s;,)]+/gi, " ")) ?? cleanFallback;
 };
 
+const buildPromptNamedTheoryReflectionArguments = (
+  prompt: string,
+  capabilityId: string,
+): Record<string, unknown> => {
+  const segment = readPromptNamedCapabilitySegment(prompt, capabilityId);
+  const explicitAssignments = extractExplicitTheoryDerivationRequestAssignments(prompt);
+  const explicitTarget = readString(explicitAssignments.target);
+  return {
+    prompt: explicitTarget ?? extractNamedCapabilityQuery(segment, prompt),
+    conversation_context: prompt,
+    build_explanation_plan: true,
+    ...explicitAssignments,
+  };
+};
+
+export const hasExplicitScholarlyProviderRecordAuditIntent = (prompt: string): boolean => {
+  const unquoted = unquotePrompt(prompt).replace(/"[^"\n]*"|'[^'\n]*'|`[^`\n]*`/g, " ");
+  const providerCue = /\b(?:scholarly\s+providers?|provider(?:[-\s]+records?|s))\b/i;
+  if (!providerCue.test(unquoted)) return false;
+  return unquoted.split(/[.!?;\n]+/).some((rawClause) => {
+    const clause = rawClause.trim();
+    if (!clause || !providerCue.test(clause)) return false;
+    const actionPatterns = [
+      /\b(?:search|look\s*up|lookup|query|retrieve|collect)\b[^\n]{0,120}\b(?:scholarly\s+providers?|provider(?:[-\s]+records?|s))\b/i,
+      /\b(?:scholarly\s+providers?|provider(?:[-\s]+records?|s))\b[^\n]{0,120}\b(?:search|look\s*up|lookup|query|retrieve|collect)\b/i,
+      /\b(?:report|return|include|give|show)\b[^\n]{0,160}\b(?:provider[-\s]+record\s+count|provider\s+records?\s+(?:retrieved|returned|found)|unique[-\s]+paper\s+count|matched\s+identities)\b/i,
+      /\b(?:deduplicate|dedup)\b[^\n]{0,180}\b(?:provider(?:[-\s]+records?)?|doi|arxiv|normalized\s+title)\b/i,
+      /\b(?:provider(?:[-\s]+records?)?|doi|arxiv|normalized\s+title)\b[^\n]{0,180}\b(?:deduplicate|dedup)\b/i,
+      /\bdeduplication\b[^\n]{0,80}\b(?:must|should|shall|needs?\s+to)\b[^\n]{0,160}\b(?:provider(?:[-\s]+records?)?|doi|arxiv|normalized\s+title)\b/i,
+    ];
+    const actionMatch = actionPatterns
+      .map((pattern) => pattern.exec(clause))
+      .filter((match): match is RegExpExecArray => Boolean(match))
+      .sort((left, right) => left.index - right.index)[0];
+    if (!actionMatch) return false;
+    const prefix = clause.slice(0, actionMatch.index);
+    if (/\b(?:do\s+not|don't|dont|never|avoid|without|not\s+asking\s+to|no\s+need\s+to)\b/i.test(prefix)) return false;
+    if (/\b(?:if|when|before|after|would|could|might|hypothetically|eventually|later|next\s+time|in\s+the\s+future)\b/i.test(prefix)) return false;
+    if (/\b(?:earlier|previously|last\s+turn|historically|already)\b/i.test(prefix)) return false;
+    if (/\b(?:screen|visible|button|label|phrase|text|debug)\b[^\n]{0,100}\b(?:says|shows|reads|contains|mentions|listed|reported)\b/i.test(prefix)) return false;
+    return true;
+  });
+};
+
 
 export const buildPromptNamedCapabilityGatewayCallRequests = (
   body: Record<string, unknown>,
@@ -455,13 +502,10 @@ export const buildPromptNamedCapabilityGatewayCallRequests = (
 
   if (
     hasPromptNamedCapability(prompt, THEORY_CONTEXT_REFLECTION_CAPABILITY) &&
-    !hasNegatedToolInstruction(prompt, /\btheory-badge-graph\.reflect_discussion_context\b/i)
+    !hasNegatedToolInstruction(prompt, promptNamedCapabilityPattern(THEORY_CONTEXT_REFLECTION_CAPABILITY))
   ) {
-    const segment = readPromptNamedCapabilitySegment(prompt, THEORY_CONTEXT_REFLECTION_CAPABILITY);
     addNamedRequest(THEORY_CONTEXT_REFLECTION_CAPABILITY, "read", {
-      prompt: extractNamedCapabilityQuery(segment, prompt),
-      conversation_context: prompt,
-      build_explanation_plan: true,
+      ...buildPromptNamedTheoryReflectionArguments(prompt, THEORY_CONTEXT_REFLECTION_CAPABILITY),
       source_target_intent: {
         target_source: "theory_badge_graph",
         target_kind: "theory_context_reflection",
@@ -474,11 +518,8 @@ export const buildPromptNamedCapabilityGatewayCallRequests = (
     !hasNegatedToolInstruction(prompt, promptNamedCapabilityPattern(capabilityId)),
   );
   if (promptNamedTheoryReflectionAlias) {
-    const segment = readPromptNamedCapabilitySegment(prompt, promptNamedTheoryReflectionAlias);
     addNamedRequest(THEORY_CONTEXT_REFLECTION_CAPABILITY, "read", {
-      prompt: extractNamedCapabilityQuery(segment, prompt),
-      conversation_context: prompt,
-      build_explanation_plan: true,
+      ...buildPromptNamedTheoryReflectionArguments(prompt, promptNamedTheoryReflectionAlias),
       source_target_intent: {
         target_source: "theory_badge_graph",
         target_kind: "theory_context_reflection",
@@ -618,6 +659,7 @@ export const buildPromptNamedCapabilityGatewayCallRequests = (
 
   if (
     hasDirectScholarlyFullTextSourceIntent(prompt) &&
+    !hasExplicitScholarlyProviderRecordAuditIntent(prompt) &&
     !hasNegatedToolInstruction(prompt, /\bscholarly-research\.fetch_full_text\b/i)
   ) {
     const sourceUrl = extractScholarlySourceUrl(prompt);
@@ -1015,8 +1057,7 @@ export const buildPromptDerivedTheoryReflectionGatewayCallRequests = (
   }
   const unquoted = unquotePrompt(prompt);
   const wantsTheoryReflection =
-    /\breflect\b[\s\S]{0,120}\b(?:theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b/i.test(unquoted) ||
-    /\b(?:theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b[\s\S]{0,120}\breflect(?:ion)?\b/i.test(unquoted) ||
+    isAffirmativeTheoryBadgeGraphReflectionPrompt(prompt) ||
     /\b(?:find|return|give|identify|select|choose|surface)\b[\s\S]{0,140}\b(?:formulas?|equations?|templates?)\b[\s\S]{0,140}\b(?:from|in|within|via|through)\s+(?:the\s+)?(?:theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b/i.test(unquoted) ||
     /\b(?:from|in|within|via|through)\s+(?:the\s+)?(?:theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b[\s\S]{0,140}\b(?:find|return|give|identify|select|choose|surface)\b[\s\S]{0,140}\b(?:formulas?|equations?|templates?)\b/i.test(unquoted) ||
     /\b(?:fetch|get|read|show|use|run|call|execute)\b[\s\S]{0,80}\b(?:the\s+)?theory\s+(?:context\s+)?reflection\b/i.test(unquoted) ||
@@ -1024,22 +1065,25 @@ export const buildPromptDerivedTheoryReflectionGatewayCallRequests = (
   if (!wantsTheoryReflection) return [];
   const focusedPrompt =
     cleanNamedCapabilityArgumentText(
-      unquoted.match(/\breflect\s+(.{3,160}?)\s+(?:against|through|via|with)\s+(?:the\s+)?(?:theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b/i)?.[1] ??
+      unquoted.match(/\breflect\s+([\s\S]{3,4000}?)\s+(?:against|through|via|with)\s+(?:the\s+)?(?:theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b/i)?.[1] ??
         unquoted.match(/\b(?:fetch|get|read|show|use|run|call|execute)\b[\s\S]{0,80}\b(?:the\s+)?theory\s+(?:context\s+)?reflection\s+(?:for|about|on)\s+([^.;\n]+)/i)?.[1] ??
         unquoted.match(/\b(?:theory\s+(?:context\s+)?reflection)\s+(?:for|about|on)\s+([^.;\n]+)/i)?.[1] ??
         unquoted.match(/\b(?:reflect|reflection)\b[\s\S]{0,120}\b(?:for|about|on)\s+([^.;\n]+)/i)?.[1] ??
         unquoted.match(/\b(?:for|about|on)\s+([^.;\n]+)\b[\s\S]{0,80}\b(?:theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b/i)?.[1] ??
         null,
     ) ?? prompt;
+  const explicitAssignments = extractExplicitTheoryDerivationRequestAssignments(prompt);
+  const explicitTarget = readString(explicitAssignments.target);
   return [{
     schema: "helix.workstation_gateway.prompt_derived_theory_reflection_call_request.v1",
     derivation_source: "helix_prompt_derived_theory_reflection",
     capability_id: THEORY_CONTEXT_REFLECTION_CAPABILITY,
     mode: "read",
     arguments: {
-      prompt: focusedPrompt,
+      prompt: explicitTarget ?? focusedPrompt,
       conversation_context: prompt,
       build_explanation_plan: true,
+      ...explicitAssignments,
       source_target_intent: {
         source: "helix_prompt_derived_theory_reflection",
         target_source: "theory_badge_graph",

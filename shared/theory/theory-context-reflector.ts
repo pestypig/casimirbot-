@@ -27,6 +27,7 @@ import {
   locateTheoryBadges,
   traceTheoryBadgeConnections,
   type TheoryBadgeLookupMatch,
+  type TheoryBadgeLookupMatchKind,
 } from "./theory-badge-overlap-locator";
 
 export type BuildTheoryContextReflectionInput = {
@@ -45,14 +46,238 @@ export type BuildTheoryContextReflectionInput = {
 };
 
 const STRONG_MATCH_SCORE = 70;
+const LONG_FORM_QUERY_TOKEN_FLOOR = 18;
 
-function estimateGraphCoverageProbability(matches: TheoryBadgeLookupMatch[]): number {
+type TheoryReflectionSemanticDiscourse = {
+  assertedClauses: string[];
+  caveatText: string;
+};
+
+const CONVERSATIONAL_ACKNOWLEDGEMENT_RE =
+  /^(?:yes|exactly|right|correct|indeed|absolutely|agreed|okay|ok|sure|certainly)[.!]*$/i;
+const CONTEXTUAL_ONLY_SENTENCE_PATTERNS = [
+  /^(?:though|although|however|nevertheless|nonetheless|for\s+context(?:\s+only)?)\b/i,
+  /^(?:this|that|it)\b[\s\S]{0,40}\b(?:does|do|is|are|should|must|can)\s+not\b[\s\S]{0,50}\b(?:establish|prove|imply|validate|confirm|demonstrate|show|treat)/i,
+  /^nothing\b[\s\S]{0,80}\b(?:establishes|proves|validates|confirms)/i,
+  /^(?:do\s+not|don't|without)\b/i,
+  /^(?:earlier|previously|historically|in\s+the\s+prior\s+answer)\b/i,
+  /^(?:if|when)\b[\s\S]{0,120}\b(?:later|future|next\s+request)\b/i,
+  /^(?:the\s+)?(?:screen|prior\s+answer|quoted\s+text|quote)\b[\s\S]{0,80}\b(?:said|says|showed|shows|contained|contains|mentioned|mentions)\b/i,
+  /\b(?:was|is)\s+(?:only\s+)?quoted\s+text\b/i,
+  /\bshould\s+not\s+be\s+treated\b/i,
+  /^.{0,120}\bmakes?\s+(?:that|this)\s+(?:contentious|uncertain|controversial)\b/i,
+] as const;
+const INLINE_CAVEAT_RE =
+  /(?:[\u2014\u2013;]|,\s*)\s*(?:though|although|however|nevertheless|nonetheless)\b/i;
+const CONTEXTUAL_EXAMPLE_SENTENCE_RE =
+  /\b(?:(?:classic|canonical|illustrative)\s+example|for\s+example|for\s+instance|as\s+an\s+example)\b/i;
+
+function isContextualOnlySentence(value: string): boolean {
+  return CONTEXTUAL_ONLY_SENTENCE_PATTERNS.some((pattern) => pattern.test(value));
+}
+
+function splitEmbeddedContextualAsides(value: string): {
+  assertedText: string;
+  contextualText: string;
+} {
+  const contextual: string[] = [];
+  const assertedText = value
+    .replace(/[\u2014\u2013]([^\u2014\u2013]{1,240})[\u2014\u2013]/g, (_match, aside: string) => {
+      const normalizedAside = aside.trim();
+      if (normalizedAside) contextual.push(normalizedAside);
+      return " ";
+    })
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return {
+    assertedText,
+    contextualText: contextual.join(" "),
+  };
+}
+
+function buildTheoryReflectionSemanticDiscourse(value: string): TheoryReflectionSemanticDiscourse {
+  const sentences = value
+    .replace(/([.!?])\s+(?=[A-Z0-9])/g, "$1\n")
+    .split(/\n+|;\s*/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+  const asserted: string[] = [];
+  const caveats: string[] = [];
+
+  for (const sentence of sentences) {
+    if (CONVERSATIONAL_ACKNOWLEDGEMENT_RE.test(sentence)) continue;
+    if (isContextualOnlySentence(sentence) || CONTEXTUAL_EXAMPLE_SENTENCE_RE.test(sentence)) {
+      caveats.push(sentence);
+      continue;
+    }
+    // Paired dashes commonly embed examples or definitions inside the main
+    // assertion. Preserve those spans for explanatory context, but do not let
+    // their terms independently acquire graph-placement mass.
+    const embeddedAside = splitEmbeddedContextualAsides(sentence);
+    if (embeddedAside.contextualText) caveats.push(embeddedAside.contextualText);
+    const assertionCandidate = embeddedAside.assertedText;
+    const inlineCaveatIndex = assertionCandidate.search(INLINE_CAVEAT_RE);
+    if (inlineCaveatIndex >= 0) {
+      const assertion = assertionCandidate.slice(0, inlineCaveatIndex).trim();
+      const caveat = assertionCandidate.slice(inlineCaveatIndex).trim();
+      if (assertion) asserted.push(assertion);
+      if (caveat) caveats.push(caveat);
+      continue;
+    }
+    if (assertionCandidate) asserted.push(assertionCandidate);
+  }
+
+  return {
+    assertedClauses: asserted,
+    caveatText: caveats.join(" "),
+  };
+}
+
+function semanticTextIncludes(value: string, signal: string): boolean {
+  const valueKey = normalizeKey(value);
+  const signalKey = normalizeKey(signal);
+  return Boolean(valueKey && signalKey && (`_${valueKey}_`).includes(`_${signalKey}_`));
+}
+
+function hasSemanticEvidenceInText(args: {
+  match: TheoryBadgeLookupMatch;
+  text: string;
+  allowGenericSubjects: boolean;
+}): boolean {
+  if (!args.text) return false;
+  const { match, text, allowGenericSubjects } = args;
+  if (
+    semanticTextIncludes(text, match.badgeId) ||
+    semanticTextIncludes(text, match.badgeTitle)
+  ) {
+    return true;
+  }
+  if (
+    match.matchedSubjects.some((subject) =>
+      (allowGenericSubjects || isSpecificSemanticSubject(subject)) && semanticTextIncludes(text, subject),
+    )
+  ) {
+    return true;
+  }
+  if (match.matchedEquationFamilies.some((family) => semanticTextIncludes(text, family))) return true;
+  if (match.matchedRepoPaths.some((path) => normalize(text).includes(normalize(path)))) return true;
+  if (
+    match.matchedSymbols.some((symbol) =>
+      normalizeKey(symbol).length >= 2 && semanticTextIncludes(text, symbol),
+    )
+  ) {
+    return true;
+  }
+  return match.matchedUnitSignatures.some((signature) => normalize(text).includes(normalize(signature)));
+}
+
+function isDistinctiveCompoundSemanticSubject(value: string): boolean {
+  if (!isSpecificSemanticSubject(value)) return false;
+  return normalizeKey(value)
+    .split("_")
+    .filter((token) => token.length >= 3 && !GENERIC_SEMANTIC_SUBJECT_KEYS.has(token))
+    .length >= 2;
+}
+
+function hasAffirmativeCandidateEvidence(
+  match: TheoryBadgeLookupMatch,
+  assertedClauses: string[],
+): boolean {
+  return assertedClauses.some((clause) => {
+    if (semanticTextIncludes(clause, match.badgeId) || semanticTextIncludes(clause, match.badgeTitle)) {
+      return true;
+    }
+    if (match.matchedEquationFamilies.some((family) => semanticTextIncludes(clause, family))) return true;
+    if (match.matchedRepoPaths.some((path) => normalize(clause).includes(normalize(path)))) return true;
+    if (
+      match.matchedSymbols.some((symbol) =>
+        normalizeKey(symbol).length >= 2 && semanticTextIncludes(clause, symbol),
+      )
+    ) {
+      return true;
+    }
+    if (match.matchedUnitSignatures.some((signature) => normalize(clause).includes(normalize(signature)))) {
+      return true;
+    }
+
+    const specificSubjectMatches = unique(
+      match.matchedSubjects.filter(
+        (subject) => isSpecificSemanticSubject(subject) && semanticTextIncludes(clause, subject),
+      ),
+    );
+    return (
+      specificSubjectMatches.some(isDistinctiveCompoundSemanticSubject) ||
+      specificSubjectMatches.length >= 2
+    );
+  });
+}
+
+function admitSemanticReflectionCandidate(
+  match: TheoryBadgeLookupMatch,
+  queryTokenCount: number,
+  discourse: TheoryReflectionSemanticDiscourse,
+): boolean {
+  const positiveEvidence = hasAffirmativeCandidateEvidence(match, discourse.assertedClauses);
+  const caveatEvidence = hasSemanticEvidenceInText({
+    match,
+    text: discourse.caveatText,
+    allowGenericSubjects: true,
+  });
+
+  // Caveats, negations, and claim-boundary examples remain available to the
+  // model as context, but a candidate named only there cannot receive graph
+  // placement mass. This is semantic admission, not scientific authority.
+  if (caveatEvidence && !positiveEvidence) return false;
+  if (isExactMatch(match)) return positiveEvidence || queryTokenCount < LONG_FORM_QUERY_TOKEN_FLOOR;
+  if (queryTokenCount < LONG_FORM_QUERY_TOKEN_FLOOR) return true;
+
+  // Long explanatory answers often name examples or boundary cases that are
+  // not the subject being reflected. A candidate therefore needs an explicit
+  // compound subject, two coherent subject signals in the same asserted
+  // clause, or structured identity/equation evidence. Score, generic tags, and
+  // calculator-payload overlap cannot substitute for that evidence.
+  return positiveEvidence;
+}
+
+function estimateGraphCoverageProbability(args: {
+  matches: TheoryBadgeLookupMatch[];
+  query: string;
+  connectedEdgeCount: number;
+}): number {
+  const matches = args.matches;
   if (matches.length === 0) return 0;
-  const topScore = Math.max(0, ...matches.map((match) => match.score));
-  // Locator scores are evidence-strength telemetry rather than a scientific
-  // posterior. This saturating map preserves explicit out-of-graph mass until
-  // the prompt has strong absolute graph evidence.
-  return Number(Math.min(0.99, 1 - Math.exp(-topScore / 30)).toFixed(6));
+  const confidenceFor = (match: TheoryBadgeLookupMatch): number => {
+    const kinds = new Set(match.matchKinds);
+    if (kinds.has("direct_badge_id") || kinds.has("direct_badge_title")) return 0.99;
+    if (isExactEquationFamilyMatch(match)) return 0.92;
+    // A matching formula, symbol, unit, or source path locates a component of
+    // a badge. It is not by itself coverage of the requested scientific
+    // subject and must not collapse the open-world alternative.
+    if (kinds.has("repo_path")) return 0.7;
+    if (kinds.has("requested_symbol")) return 0.65;
+    if (kinds.has("unit_signature")) return 0.6;
+    if (kinds.has("subject")) return 0.55;
+    if (kinds.has("query_symbol")) return 0.5;
+    if (kinds.has("equation_family")) return 0.45;
+    if (kinds.has("calculator_payload")) return 0.35;
+    if (kinds.has("text")) return 0.32;
+    // Atlas lenses, graph neighborhoods, and source-path priors are useful for
+    // navigation, but do not establish that the requested subject is in-graph.
+    return 0.1;
+  };
+  const strongestSemanticCoverage = Math.max(...matches.map(confidenceFor));
+  const independentIdentityMatches = matches.filter(isExactMatch).length;
+  const corroborationBonus = Math.min(0.06, Math.max(0, independentIdentityMatches - 1) * 0.03);
+  let coverage = Math.min(0.99, strongestSemanticCoverage + corroborationBonus);
+  const relationshipRequested =
+    /\b(?:compare|comparison|versus|vs\.?|between|relationship|relation|connect|bridge)\b/i.test(args.query) ||
+    /\bfirst\b[\s\S]{0,500}\bsecond\b/i.test(args.query);
+  if (relationshipRequested) {
+    if (matches.length < 2) coverage = Math.min(coverage, 0.4);
+    else if (args.connectedEdgeCount === 0) coverage = Math.min(coverage, 0.55);
+  }
+  return Number(coverage.toFixed(6));
 }
 const RESOLUTION_ROLES: TheoryContextReflectionResolutionRole[] = [
   "prompt_center",
@@ -92,18 +317,66 @@ const TOKEN_STOP_WORDS = new Set([
   "with",
 ]);
 
-const DIRECT_MATCH_REASON_PATTERNS = [
-  /direct badge id match/i,
-  /direct badge title match/i,
-  /calculator payload match/i,
-  /symbol match/i,
-  /equation family match/i,
-  /repo path match/i,
-  /source path hint/i,
-] as const;
+const EXACT_IDENTITY_MATCH_KINDS = new Set<TheoryBadgeLookupMatchKind>([
+  "direct_badge_id",
+  "direct_badge_title",
+]);
+
+const GENERIC_SEMANTIC_SUBJECT_KEYS = new Set([
+  "amplification",
+  "context",
+  "evolution",
+  "information",
+  "measurement",
+  "model",
+  "observation",
+  "physics",
+  "probability",
+  "resolution",
+  "scale",
+  "state",
+  "system",
+  "theory",
+  "uncertainty",
+]);
+
+function isSpecificSemanticSubject(value: string): boolean {
+  const key = normalizeKey(value);
+  return key.length >= 5 && !GENERIC_SEMANTIC_SUBJECT_KEYS.has(key);
+}
+
+function isExactEquationFamilyMatch(match: TheoryBadgeLookupMatch): boolean {
+  if (!match.matchKinds.includes("equation_family")) return false;
+  return match.matchedEquationFamilies.some((family) => {
+    const key = normalizeKey(family);
+    return key.length >= 8 && key.split("_").filter(Boolean).length >= 2;
+  });
+}
+
+const GENERIC_ATLAS_QUERY_SIGNALS = new Set([
+  "claim",
+  "claims",
+  "context",
+  "contextual",
+  "evidence",
+  "experimental",
+  "measurement",
+  "observation",
+  "parameter",
+  "parameters",
+  "physics",
+  "theory",
+]);
+
+const THEORY_REFLECTION_OUTPUT_FIELD_RE =
+  /\b(?:exact_badge_ids|likely_badge_ids|rejected_badge_ids|representedProbabilityMass|outOfGraphProbability|open_world_uncertainty|master_problem_v1|derivation_program_v1|failureReceipts|failure_receipts|solverRoute|solver_route|input_binding_missing|assistant_answer|terminal_eligible)\b/gi;
 
 function normalize(value: string): string {
-  return value.trim().toLowerCase();
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
 }
 
 function normalizeKey(value: string): string {
@@ -119,18 +392,38 @@ function unique(values: string[]): string[] {
 
 function tokenizeResolutionQuery(value: string): string[] {
   return unique(
-    value
-      .toLowerCase()
+    normalize(value)
       .split(/[^a-z0-9_./^-]+/i)
       .map((token) => token.trim())
       .filter((token) => token.length >= 2 && !TOKEN_STOP_WORDS.has(token)),
   );
 }
 
+export function normalizeTheoryReflectionSemanticQuery(value: string): string {
+  return value
+    .replace(/\bLIVE_[A-Z0-9_]+\b/gi, " ")
+    .replace(
+      /\b(?:use|run|call|execute)\s+helix_ask\.reflect_theory_context\b(?:\s+(?:exactly\s+)?once)?/gi,
+      " ",
+    )
+    .replace(
+      /\b(?:and\s+)?(?:report|return|include|show)\b[^.;\n]*(?:exact_badge_ids|likely_badge_ids|representedProbabilityMass|outOfGraphProbability|master_problem_v1|derivation_program_v1|failureReceipts|failure_receipts)[^.;\n]*/gi,
+      " ",
+    )
+    .replace(/\bhelix_ask\.reflect_theory_context\b/gi, " ")
+    .replace(THEORY_REFLECTION_OUTPUT_FIELD_RE, " ")
+    .replace(/\b(?:operation|target|target_observable|coordinate_frame|formal_system|requested_precision|evidence_maturity_ceiling)\s*[:=]\s*/gi, " ")
+    .replace(/[{}\[\]"]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function queryText(args: BuildTheoryContextReflectionInput): string {
+  // Conversation/workstation context is retained in the reflection artifact,
+  // but it is ambient evidence. Only the current request and explicit equation
+  // inputs may establish semantic graph coverage.
   return unique([
-    args.prompt,
-    args.conversationContext ?? "",
+    normalizeTheoryReflectionSemanticQuery(args.prompt),
     ...(args.mentionedEquations ?? []),
   ]).join("\n");
 }
@@ -186,13 +479,23 @@ function inferAtlasBlockIds(args: {
       if (requestedKeys.has(normalizeKey(block.id))) return true;
       if (requestedKeys.has(normalizeKey(block.title)) || requestedKeys.has(normalizeKey(block.shortTitle))) return true;
       if (block.subjects.some((subject) => requestedKeys.has(normalizeKey(subject)))) return true;
-      return (
-        textIncludes(query, block.title) ||
-        textIncludes(query, block.shortTitle) ||
-        block.subjects.some((subject) => textIncludes(query, subject)) ||
-        block.equationFamilies.some((family) => textIncludes(query, family)) ||
-        block.simulationOwners.some((owner) => textIncludes(query, owner))
-      );
+      if (textIncludes(query, block.title) || textIncludes(query, block.shortTitle)) return true;
+      const querySignals = unique([
+        ...block.subjects,
+        ...block.equationFamilies,
+        ...block.simulationOwners,
+      ].filter((signal) => {
+        const key = normalizeKey(signal);
+        return (
+          key.length >= 5 &&
+          !GENERIC_ATLAS_QUERY_SIGNALS.has(key) &&
+          textIncludes(query, signal)
+        );
+      }));
+      // Atlas blocks are broad navigation priors. Two independent,
+      // domain-specific query signals are required before they may widen the
+      // locator candidate set.
+      return querySignals.length >= 2;
     })
     .map((block) => block.id);
 }
@@ -217,15 +520,13 @@ function inferSimulationOwners(graph: TheoryBadgeGraphV1, query: string, domains
 
 function isExactMatch(match: TheoryBadgeLookupMatch): boolean {
   return (
-    match.score >= STRONG_MATCH_SCORE ||
-    match.reasons.some((reason) => DIRECT_MATCH_REASON_PATTERNS.some((pattern) => pattern.test(reason)))
+    match.matchKinds.some((kind) => EXACT_IDENTITY_MATCH_KINDS.has(kind)) ||
+    isExactEquationFamilyMatch(match)
   );
 }
 
 function hasDirectMatchReason(match: TheoryBadgeLookupMatch): boolean {
-  return match.reasons.some((reason) =>
-    DIRECT_MATCH_REASON_PATTERNS.some((pattern) => pattern.test(reason)),
-  );
+  return isExactMatch(match);
 }
 
 function toReflectionMatch(match: TheoryBadgeLookupMatch): TheoryContextReflectionMatchV1 {
@@ -944,7 +1245,7 @@ function resolutionSortWeight(args: {
     ? -500
     : 0;
   const roleWeight = hasClaimBoundaryShape(args.badge) && hasSpecificEvidence
-    ? 9000
+    ? 10000
     : hasSpecificEvidence
       ? 10000
       : hasObservableShape(args.badge)
@@ -1036,12 +1337,18 @@ export function buildTheoryContextReflection(
     query,
     matches: mergedLookupMatches,
   });
+  const semanticQueryTokenCount = tokenizeResolutionQuery(query).length;
+  const semanticDiscourse = buildTheoryReflectionSemanticDiscourse(query);
+  const semanticallyAdmittedMatches = bridgeRankedMatches.filter((match) =>
+    admitSemanticReflectionCandidate(match, semanticQueryTokenCount, semanticDiscourse) ||
+    (bridgePrompt && bridgeFocusScore(match, bridgeFocusGroups) > 0),
+  );
   const sortedLookupMatches = bridgePrompt
-    ? bridgeRankedMatches
+    ? semanticallyAdmittedMatches
     : prioritizeResolutionAwareMatches({
         graph: args.graph,
         query,
-        matches: bridgeRankedMatches,
+        matches: semanticallyAdmittedMatches,
       });
   const locatedMatches = sortedLookupMatches.slice(0, limit);
 
@@ -1052,11 +1359,18 @@ export function buildTheoryContextReflection(
       : locatedMatches.filter((match) => !isExactMatch(match));
   const exactMatches = exactLookupMatches.map(toReflectionMatch);
   const likelyMatches = likelyLookupMatches.map(toReflectionMatch);
-  const traceTargetIds = unique([...exactLookupMatches, ...likelyLookupMatches].slice(0, 8).map((match) => match.badgeId));
+  const traceTargetIds = unique([...exactLookupMatches, ...likelyLookupMatches].slice(0, 12).map((match) => match.badgeId));
   const trace = traceTheoryBadgeConnections({ graph: args.graph, badgeIds: traceTargetIds });
   const connectedBadgeIds = trace.connectingBadgeIds;
   const highlightedBadgeIds = unique([...traceTargetIds, ...connectedBadgeIds]);
-  const highlightedEdgeIds = unique(trace.pathSegments.flatMap((segment) => segment.edgeIds));
+  const traceTargetIdSet = new Set(traceTargetIds);
+  const directSelectedEdgeIds = args.graph.edges
+    .filter((edge) => traceTargetIdSet.has(edge.from) && traceTargetIdSet.has(edge.to))
+    .map((edge) => edge.id);
+  const highlightedEdgeIds = unique([
+    ...trace.pathSegments.flatMap((segment) => segment.edgeIds),
+    ...directSelectedEdgeIds,
+  ]);
   const resolution = buildResolution({
     graph: args.graph,
     matches: locatedMatches,
@@ -1080,7 +1394,12 @@ export function buildTheoryContextReflection(
         reasons: blockScore.reasons,
       };
     })
-    .filter((domain) => domain.score > 0)
+    .filter((domain) =>
+      domain.score > 0 &&
+      domain.reasons.some((reason) =>
+        /primary badge matches|root badge matches|mentioned domain matched atlas block/i.test(reason),
+      ),
+    )
     .sort((left, right) => right.score - left.score || left.atlasBlockId.localeCompare(right.atlasBlockId))
     .slice(0, 5);
 
@@ -1090,11 +1409,24 @@ export function buildTheoryContextReflection(
   const softRegionBadgeIds = unique([...exactBadgeIds, ...likelyBadgeIds, ...connectedBadgeIds]);
   const biomeLayout = buildTheoryBiomeLayoutV1(args.graph);
   const biomeCoordinateByBadgeId = new Map(biomeLayout.coordinates.map((coordinate) => [coordinate.badgeId, coordinate]));
-  const graphBadgesById = badgeById(args.graph);
-  const nearestClaimBoundaryBadgeId = sortedLookupMatches.find((match) => {
-    const badge = graphBadgesById.get(match.badgeId);
-    return Boolean(badge && hasClaimBoundaryShape(badge));
-  })?.badgeId;
+  const isClaimBoundaryBiome = (badgeId: string) =>
+    biomeCoordinateByBadgeId.get(badgeId)?.scaleBand === "claim_boundary";
+  const directlyLocatedClaimBoundaryBadgeId = sortedLookupMatches.find((match) =>
+    isClaimBoundaryBiome(match.badgeId),
+  )?.badgeId;
+  const adjacentClaimBoundaryBadgeId = softRegionBadgeIds
+    .flatMap((badgeId) =>
+      args.graph.edges.flatMap((edge) => {
+        if (edge.from === badgeId) return [edge.to];
+        if (edge.to === badgeId) return [edge.from];
+        return [];
+      }),
+    )
+    .find(isClaimBoundaryBiome);
+  // A neighboring claim boundary is navigation context only. It helps the
+  // overlay show where the current inference must stop without turning that
+  // boundary into an exact match or adding it to semantic coverage.
+  const nearestClaimBoundaryBadgeId = directlyLocatedClaimBoundaryBadgeId ?? adjacentClaimBoundaryBadgeId;
   const biomeFocusCoordinates = unique([
     ...centerBadgeIds,
     ...exactBadgeIds,
@@ -1106,8 +1438,12 @@ export function buildTheoryContextReflection(
     .filter((coordinate): coordinate is NonNullable<typeof coordinate> => Boolean(coordinate));
   const probabilityTerrain = buildProbabilityTerrainV1({
     graphKind: "theory_badge_graph",
-    coverageProbability: estimateGraphCoverageProbability(locatedMatches),
-    coverageBasis: "absolute_match_score_heuristic",
+    coverageProbability: estimateGraphCoverageProbability({
+      matches: locatedMatches,
+      query,
+      connectedEdgeCount: highlightedEdgeIds.length,
+    }),
+    coverageBasis: "semantic_coverage_heuristic",
     candidates: locatedMatches.map((match) => {
       const coordinate = biomeCoordinateByBadgeId.get(match.badgeId);
       return {

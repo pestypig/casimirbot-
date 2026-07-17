@@ -272,7 +272,7 @@ describe("Helix Ask backend entrypoint projection guard", () => {
 
     expect(fingerprint).toMatchObject({
       schema: "helix.backend_ask_entrypoint_runtime_fingerprint.v1",
-      client_entrypoint_guard_version: "E79",
+      client_entrypoint_guard_version: "E81",
       submit_handler_source: "HelixAskPill.runAsk",
       runAsk_entered: true,
       hard_backend_entrypoint_required: true,

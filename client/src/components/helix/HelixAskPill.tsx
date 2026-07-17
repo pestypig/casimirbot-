@@ -24141,7 +24141,7 @@ export function HelixAskPill({
               onDebugCopy: (event) =>
                 void handleCopyReplyMasterDebug(
                   reply,
-                  replyMasterEventClockPayload,
+                  null,
                   event.currentTarget,
                   workflowDemoDebug,
                 ),

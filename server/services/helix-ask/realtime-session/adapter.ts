@@ -214,7 +214,7 @@ export const openAiRealtimeSessionAdapterStub: HelixRealtimeSessionAdapter = {
 };
 
 const readOpenAiApiKey = (env?: NodeJS.ProcessEnv): string | null =>
-  readString(env?.OPENAI_API_KEY);
+  readString(env?.OPENAI_REALTIME_API_KEY) ?? readString(env?.OPENAI_API_KEY);
 
 const isSafeOpenAiSafetyIdentifier = (value: string | null): value is string =>
   Boolean(value && /^[A-Za-z0-9._:-]{8,128}$/.test(value));

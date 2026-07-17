@@ -469,6 +469,61 @@ describe("Helix capability lane registry", () => {
       ],
       capabilities: [
         expect.objectContaining({
+          capability_id: "research-library.apply_evidence_enrichment",
+          one_shot_status: "executable",
+          session_status: "not_supported",
+          backend_provider_required: false,
+          result_authority: "observation_or_receipt_only",
+          reentry_required: true,
+          terminal_eligible: false,
+          assistant_answer: false,
+          model_visible_hint: expect.objectContaining({
+            required_input_fields: ["document_id", "proposal"],
+            optional_input_fields: expect.arrayContaining([
+              "source_target_intent",
+              "requested_backend_provider",
+            ]),
+            when_to_use: expect.stringContaining("bounded Research Library sidecar observation"),
+            when_not_to_use: expect.stringContaining("Do not choose a profile id"),
+            request_shape_hint: {
+              capability_lane_call: expect.objectContaining({
+                capability: "research-library.apply_evidence_enrichment",
+                document_id: "<from bounded Research Library sidecar observation>",
+                proposal: expect.objectContaining({
+                  schema: "helix.paper_evidence_enrichment_proposal.v1",
+                  agent_authored: true,
+                  assistant_answer: false,
+                  terminal_eligible: false,
+                }),
+              }),
+            },
+          }),
+        }),
+        expect.objectContaining({
+          capability_id: "helix_ask.reflect_theory_context",
+          one_shot_status: "executable",
+          backend_provider_required: false,
+          result_authority: "observation_or_receipt_only",
+          reentry_required: true,
+          terminal_eligible: false,
+          assistant_answer: false,
+          model_visible_hint: expect.objectContaining({
+            required_input_fields: ["prompt"],
+            optional_input_fields: expect.arrayContaining([
+              "conversation_context",
+              "build_explanation_plan",
+              "operation",
+              "target_observable",
+              "resolved_referent_text",
+              "resolved_source_ref",
+              "resolved_text_hash",
+              "requested_backend_provider",
+            ]),
+            when_to_use: expect.stringContaining("resolved subject"),
+            when_not_to_use: expect.stringContaining("observation-only"),
+          }),
+        }),
+        expect.objectContaining({
           capability_id: "workstation_tool_reference.list_capabilities",
           one_shot_status: "executable",
           backend_provider_required: false,
@@ -996,10 +1051,10 @@ describe("Helix capability lane registry", () => {
     expect(blocked.lanes.find((lane) => lane.lane_id === "workstation_tool_reference")?.status).toBe("permission_blocked");
   });
 
-  it("keeps the Realtime session lane disabled by default and non-terminal", () => {
+  it("keeps the Realtime session lane disabled without a configured key and non-terminal", () => {
     const manifest = listHelixCapabilityLanes({
       provider: buildProvider({ id: "codex" }),
-      env: { OPENAI_API_KEY: "test-key" } as NodeJS.ProcessEnv,
+      env: {} as NodeJS.ProcessEnv,
     });
     const lane = manifest.lanes.find((entry) => entry.lane_id === "realtime_session");
     const provider = lane?.backend_providers.find(
@@ -1009,7 +1064,7 @@ describe("Helix capability lane registry", () => {
       provider: buildProvider({ id: "codex" }),
       requestedLane: "realtime_session",
       requestedBackendProvider: "realtime_session.openai_realtime",
-      env: { OPENAI_API_KEY: "test-key" } as NodeJS.ProcessEnv,
+      env: {} as NodeJS.ProcessEnv,
     });
 
     expect(lane).toMatchObject({
@@ -1017,7 +1072,7 @@ describe("Helix capability lane registry", () => {
       status: "disabled",
       status_reason: "capability_lane_disabled_by_policy",
       backend_family: "openai_realtime",
-      model_or_service_ref: "gpt_realtime_session_placeholder",
+      model_or_service_ref: "gpt-realtime-2.1",
       default_backend_provider: "realtime_session.openai_realtime",
       requestable_by_runtime_provider: false,
       one_shot_call_contract: expect.objectContaining({
@@ -1043,8 +1098,8 @@ describe("Helix capability lane registry", () => {
       assistant_answer: false,
       raw_content_included: false,
       safety_tags: expect.arrayContaining([
-        "disabled_by_default",
-        "no_network_phase1",
+        "developer_only",
+        "visible_user_start",
         "requires_visible_consent",
       ]),
     });
@@ -1056,7 +1111,7 @@ describe("Helix capability lane registry", () => {
     expect(provider).toMatchObject({
       configuration_status: "disabled",
       required_env_vars: ["OPENAI_REALTIME_API_KEY", "OPENAI_API_KEY"],
-      configured_env_vars: ["OPENAI_API_KEY"],
+      configured_env_vars: [],
       availability_status: "disabled",
       permission_status: "policy_disabled",
       raw_secret_exposed: false,
@@ -1083,13 +1138,12 @@ describe("Helix capability lane registry", () => {
     });
   });
 
-  it("admits the Realtime session lane as dry-run only when explicitly enabled", () => {
+  it("admits the Realtime descriptor from the README OpenAI key without extra startup flags", () => {
     const trace = resolveHelixCapabilityLaneRequest({
       provider: buildProvider({ id: "codex" }),
       requestedLane: "realtime_session",
       env: {
-        HELIX_CAPABILITY_LANE_REALTIME_SESSION_ENABLED: "1",
-        OPENAI_REALTIME_API_KEY: "test-realtime-key",
+        OPENAI_API_KEY: "test-realtime-key",
       } as NodeJS.ProcessEnv,
     });
 
@@ -1098,7 +1152,7 @@ describe("Helix capability lane registry", () => {
       lane_status: "dry_run",
       selected_backend_provider: "realtime_session.openai_realtime",
       resolved_backend_provider: "openai_realtime",
-      resolved_model_or_service: "gpt_realtime_session_placeholder",
+      resolved_model_or_service: "gpt-realtime-2.1",
       execution_status: "not_executed_shadow_only",
       terminal_eligible: false,
       assistant_answer: false,
@@ -1126,7 +1180,7 @@ describe("Helix capability lane registry", () => {
       lane_status: "dry_run",
       selected_backend_provider: "realtime_session.openai_realtime",
       resolved_backend_provider: "openai_realtime",
-      resolved_model_or_service: "gpt_realtime_session_placeholder",
+      resolved_model_or_service: "gpt-realtime-2.1",
       execution_status: "not_executed_shadow_only",
       terminal_eligible: false,
       assistant_answer: false,
@@ -1139,12 +1193,13 @@ describe("Helix capability lane registry", () => {
     });
   });
 
-  it("does not make Realtime executable from adapter or live transport flags alone", () => {
+  it("honors the explicit Realtime descriptor kill switch even when a key is configured", () => {
     const trace = resolveHelixCapabilityLaneRequest({
       provider: buildProvider({ id: "codex" }),
       requestedLane: "realtime_session",
       requestedBackendProvider: "realtime_session.openai_realtime",
       env: {
+        HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED: "0",
         HELIX_REALTIME_SESSION_ADAPTER_ENABLED: "1",
         HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED: "1",
         OPENAI_REALTIME_API_KEY: "test-realtime-key",

@@ -24,7 +24,10 @@ import { interactiveTextLaneTemplate } from "./interactive-text";
 import type { HelixCapabilityLaneTemplate } from "./lane-template";
 import { liveTranslationLaneTemplate } from "./live-translation-descriptor";
 import { realtimeSessionLaneTemplate } from "./realtime-session-descriptor";
-import { HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED_ENV } from "../realtime-session/config";
+import {
+  HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED_ENV,
+  readRealtimeSessionFeatureGate,
+} from "../realtime-session/config";
 import { speechToTextLaneTemplate } from "./speech-to-text-descriptor";
 import { textToSpeechLaneTemplate } from "./text-to-speech-descriptor";
 import { utilityTextLaneTemplate } from "./utility-text-descriptor";
@@ -84,11 +87,12 @@ const laneEnabled = (
   env: NodeJS.ProcessEnv,
 ): boolean => {
   if (laneId === "realtime_session") {
+    const featureGate = readRealtimeSessionFeatureGate(env);
     return readBooleanEnv(env.HELIX_CAPABILITY_LANES_ENABLED, true) &&
       readBooleanEnv(
         env[HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED_ENV] ??
           env.HELIX_CAPABILITY_LANE_REALTIME_SESSION_ENABLED,
-        false,
+        featureGate.descriptor_enabled,
       );
   }
   const defaultEnabled = laneId !== "realtime_session";

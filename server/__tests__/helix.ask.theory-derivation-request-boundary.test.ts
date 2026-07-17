@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import {
+  extractExplicitTheoryDerivationRequestAssignments,
   parseTheoryDerivationRequestArgs,
   THEORY_DERIVATION_REQUEST_INPUT_PROPERTIES,
 } from "../services/helix-ask/theory-congruence/derivation-request";
@@ -39,6 +40,37 @@ describe("theory derivation request extraction boundary", () => {
       target: "derive this equation",
       target_observable: "x",
     }, "derive this equation")).toBeUndefined();
+  });
+
+  it("preserves canonical key-value assignments without inferring from prose", () => {
+    const assignments = extractExplicitTheoryDerivationRequestAssignments(
+      "Use the reflection capability. operation=compare; " +
+      "target=Einstein field equation and stress-energy conservation; " +
+      "target_observable=nabla_mu_T_mu_nu; coordinate_frame=local_orthonormal; " +
+      "evidence_maturity_ceiling=diagnostic. Report the result.",
+    );
+
+    expect(assignments).toEqual({
+      operation: "compare",
+      target: "Einstein field equation and stress-energy conservation",
+      target_observable: "nabla_mu_T_mu_nu",
+      coordinate_frame: "local_orthonormal",
+      evidence_maturity_ceiling: "diagnostic",
+    });
+    expect(parseTheoryDerivationRequestArgs(assignments, "fallback")).toMatchObject({
+      operation: "compare",
+      target: "Einstein field equation and stress-energy conservation",
+      targetObservable: "nabla_mu_T_mu_nu",
+      coordinateFrame: "local_orthonormal",
+      evidenceMaturityCeiling: "diagnostic",
+      normalizationStatus: "explicit",
+    });
+  });
+
+  it("does not convert ordinary derivation prose into structured authority", () => {
+    expect(extractExplicitTheoryDerivationRequestAssignments(
+      "Compare these equations, derive c, and use diagnostic evidence.",
+    )).toEqual({});
   });
 
   it("owns the capability schema fragment outside the retiring route", () => {

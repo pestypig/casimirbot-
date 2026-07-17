@@ -10,6 +10,7 @@ import type {
 } from "@shared/contracts/helix-workflow-demo.v1";
 import { boundHelixDebugExportTextForUi } from "./HelixAskDebugExportSizeControl";
 import { mergeRenderedLanguageModelPolicySummaryIntoDebugExport } from "./HelixAskDebugExportModelPolicyProjection";
+import { mergeHelixAskLiveRuntimeClientDebugIntoExport } from "./HelixAskLiveRuntimeDebugState";
 
 export type HelixAskWorkflowDemoDebugState = {
   session: HelixWorkflowDemoSessionV1 | null;
@@ -122,9 +123,11 @@ export function finalizeHelixAskWorkflowDebugCopyExport(args: {
   workflowDemoDebug: HelixWorkflowDemoDebugExportV1 | null | undefined;
 }): string {
   return boundHelixDebugExportTextForUi(
-    mergeRenderedLanguageModelPolicySummaryIntoDebugExport(
-      mergeHelixAskClientWorkflowDemoDebugIntoExport(args.payload, args.workflowDemoDebug),
-      args.clickedTurnScope,
+    mergeHelixAskLiveRuntimeClientDebugIntoExport(
+      mergeRenderedLanguageModelPolicySummaryIntoDebugExport(
+        mergeHelixAskClientWorkflowDemoDebugIntoExport(args.payload, args.workflowDemoDebug),
+        args.clickedTurnScope,
+      ),
     ),
   );
 }

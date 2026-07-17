@@ -4,6 +4,10 @@ import {
   type ExtractedExplicitCapabilityContract,
 } from "./explicit-capability-contract";
 import type { HelixWorkstationTypedAffordanceKind } from "../../../shared/helix-agent-step-observation-packet";
+import {
+  HELIX_PAPER_EVIDENCE_ENRICHMENT_PROPOSAL_SCHEMA,
+  HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY,
+} from "@shared/helix-paper-evidence-enrichment";
 
 type RecordLike = Record<string, unknown>;
 
@@ -406,6 +410,18 @@ const argsHintForSubgoal = (input: {
     return {
       text_evidence: boundedPromptArg(),
       requested_variables: [],
+    };
+  }
+  if (capability === HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY) {
+    // Planning hints expose the binding shape without inventing a valid mutation.
+    // The selected model must replace these sentinels after the bounded sidecar
+    // observation re-enters; the gateway then validates the complete proposal.
+    return {
+      document_id: "<bind from bounded Research Library sidecar observation>",
+      proposal: {
+        schema: HELIX_PAPER_EVIDENCE_ENRICHMENT_PROPOSAL_SCHEMA,
+        proposal_status: "<model authoring required after sidecar evidence re-entry>",
+      },
     };
   }
   if (capability === "workstation-notes.create" || capability === "workstation-notes.create_note") {

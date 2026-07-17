@@ -1,3 +1,12 @@
+import {
+  THEORY_BADGE_OBSERVABLE_BRIDGE_KINDS,
+  THEORY_BADGE_OBSERVABLE_ERROR_KINDS,
+  THEORY_BADGE_OBSERVABLE_MATHEMATICAL_TYPES,
+  type TheoryBadgeObservableBridgeKindV1,
+  type TheoryBadgeObservableErrorKindV1,
+  type TheoryBadgeObservableMathematicalTypeV1,
+} from "./theory-badge-graph.v1";
+
 export const THEORY_MASTER_PROBLEM_ARTIFACT_ID = "theory_master_problem" as const;
 export const THEORY_MASTER_PROBLEM_SCHEMA_VERSION = "theory_master_problem/v1" as const;
 
@@ -106,6 +115,54 @@ export type TheoryMasterProblemEdgeV1 = {
   claimBoundaryNote: string;
 };
 
+export type TheoryMasterProblemObservableBindingV1 = {
+  badgeId: string;
+  observableId: string;
+  canonicalObservableId: string;
+  symbol: string;
+  quantity: string;
+  mathematicalType: TheoryBadgeObservableMathematicalTypeV1;
+  unit: string | null;
+  dimensionSignature: string | null;
+  coordinateFrame: string | null;
+  operationalDefinitionRef: string;
+  responseModelRef: string | null;
+};
+
+export type TheoryMasterProblemObservablePairCheckV1 = {
+  fromBadgeId: string;
+  toBadgeId: string;
+  fromObservableId: string | null;
+  toObservableId: string | null;
+  fromCanonicalObservableId: string | null;
+  toCanonicalObservableId: string | null;
+  status:
+    | "same_canonical_observable"
+    | "approved_bridge"
+    | "missing_observable_binding"
+    | "observable_identity_mismatch"
+    | "mathematical_type_mismatch"
+    | "dimensional_mismatch"
+    | "coordinate_frame_mismatch"
+    | "bridge_domain_mismatch"
+    | "bridge_error_contract_missing";
+  bridgeEdgeId: string | null;
+  bridgeKind: TheoryBadgeObservableBridgeKindV1 | null;
+  errorKind: TheoryBadgeObservableErrorKindV1 | null;
+  errorExpression: string | null;
+  sourceRefs: string[];
+  reason: string;
+};
+
+export type TheoryMasterProblemObservableResolutionV1 = {
+  targetObservableId: string | null;
+  status: "not_required" | "resolved" | "blocked";
+  participantBadgeIds: string[];
+  bindings: TheoryMasterProblemObservableBindingV1[];
+  pairChecks: TheoryMasterProblemObservablePairCheckV1[];
+  unresolvedReasons: string[];
+};
+
 export type TheoryMasterProblemV1 = {
   artifactId: typeof THEORY_MASTER_PROBLEM_ARTIFACT_ID;
   schemaVersion: typeof THEORY_MASTER_PROBLEM_SCHEMA_VERSION;
@@ -116,6 +173,7 @@ export type TheoryMasterProblemV1 = {
   selectedBadgeIds: string[];
   nodes: TheoryMasterProblemNodeV1[];
   edges: TheoryMasterProblemEdgeV1[];
+  observableResolution: TheoryMasterProblemObservableResolutionV1;
   compile: {
     status: TheoryMasterProblemCompileStatusV1;
     allowedResultKinds: TheoryMasterProblemResultKindV1[];
@@ -160,6 +218,7 @@ export function buildTheoryMasterProblemV1(input: BuildTheoryMasterProblemV1Inpu
     selectedBadgeIds: input.selectedBadgeIds,
     nodes: input.nodes,
     edges: input.edges,
+    observableResolution: input.observableResolution,
     compile: input.compile,
     uncertaintyLedger: input.uncertaintyLedger,
     claimBoundary: input.claimBoundary,
@@ -270,6 +329,98 @@ export function validateTheoryMasterProblemV1(value: unknown): string[] {
       if (!isStringArray(edge.verificationRequirements)) issues.push(`${prefix}.verificationRequirements must be strings`);
       if (!isNonEmptyString(edge.claimBoundaryNote)) issues.push(`${prefix}.claimBoundaryNote must be a non-empty string`);
     });
+  }
+  if (!isRecord(value.observableResolution)) {
+    issues.push("observableResolution must be an object");
+  } else {
+    const resolution = value.observableResolution;
+    if (resolution.targetObservableId !== null && typeof resolution.targetObservableId !== "string") {
+      issues.push("observableResolution.targetObservableId must be a string or null");
+    }
+    if (!["not_required", "resolved", "blocked"].includes(String(resolution.status))) {
+      issues.push("observableResolution.status is invalid");
+    }
+    if (!isStringArray(resolution.participantBadgeIds)) {
+      issues.push("observableResolution.participantBadgeIds must be strings");
+    }
+    if (!isStringArray(resolution.unresolvedReasons)) {
+      issues.push("observableResolution.unresolvedReasons must be strings");
+    }
+    if (!Array.isArray(resolution.bindings)) {
+      issues.push("observableResolution.bindings must be an array");
+    } else {
+      resolution.bindings.forEach((binding, index) => {
+        const prefix = `observableResolution.bindings[${index}]`;
+        if (!isRecord(binding)) {
+          issues.push(`${prefix} must be an object`);
+          return;
+        }
+        for (const field of [
+          "badgeId",
+          "observableId",
+          "canonicalObservableId",
+          "symbol",
+          "quantity",
+          "operationalDefinitionRef",
+        ] as const) {
+          if (!isNonEmptyString(binding[field])) issues.push(`${prefix}.${field} must be a non-empty string`);
+        }
+        if (!includes(THEORY_BADGE_OBSERVABLE_MATHEMATICAL_TYPES, binding.mathematicalType)) {
+          issues.push(`${prefix}.mathematicalType is invalid`);
+        }
+        for (const field of ["unit", "dimensionSignature", "coordinateFrame", "responseModelRef"] as const) {
+          if (binding[field] !== null && typeof binding[field] !== "string") {
+            issues.push(`${prefix}.${field} must be a string or null`);
+          }
+        }
+      });
+    }
+    if (!Array.isArray(resolution.pairChecks)) {
+      issues.push("observableResolution.pairChecks must be an array");
+    } else {
+      resolution.pairChecks.forEach((pair, index) => {
+        const prefix = `observableResolution.pairChecks[${index}]`;
+        if (!isRecord(pair)) {
+          issues.push(`${prefix} must be an object`);
+          return;
+        }
+        for (const field of ["fromBadgeId", "toBadgeId", "reason"] as const) {
+          if (!isNonEmptyString(pair[field])) issues.push(`${prefix}.${field} must be a non-empty string`);
+        }
+        for (const field of [
+          "fromObservableId",
+          "toObservableId",
+          "fromCanonicalObservableId",
+          "toCanonicalObservableId",
+          "bridgeEdgeId",
+          "errorExpression",
+        ] as const) {
+          if (pair[field] !== null && typeof pair[field] !== "string") {
+            issues.push(`${prefix}.${field} must be a string or null`);
+          }
+        }
+        if (![
+          "same_canonical_observable",
+          "approved_bridge",
+          "missing_observable_binding",
+          "observable_identity_mismatch",
+          "mathematical_type_mismatch",
+          "dimensional_mismatch",
+          "coordinate_frame_mismatch",
+          "bridge_domain_mismatch",
+          "bridge_error_contract_missing",
+        ].includes(String(pair.status))) {
+          issues.push(`${prefix}.status is invalid`);
+        }
+        if (pair.bridgeKind !== null && !includes(THEORY_BADGE_OBSERVABLE_BRIDGE_KINDS, pair.bridgeKind)) {
+          issues.push(`${prefix}.bridgeKind is invalid`);
+        }
+        if (pair.errorKind !== null && !includes(THEORY_BADGE_OBSERVABLE_ERROR_KINDS, pair.errorKind)) {
+          issues.push(`${prefix}.errorKind is invalid`);
+        }
+        if (!isStringArray(pair.sourceRefs)) issues.push(`${prefix}.sourceRefs must be strings`);
+      });
+    }
   }
   if (!isRecord(value.compile)) {
     issues.push("compile must be an object");

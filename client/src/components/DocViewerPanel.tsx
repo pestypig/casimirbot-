@@ -2181,9 +2181,10 @@ export function DocViewerPanel() {
       event.stopPropagation();
       const actionSource = target.closest("[data-doc-equation-action-id]") as HTMLElement | null;
       const actionId = actionSource?.dataset.docEquationActionId?.trim();
+      const activeDocPath = displayEntry?.relativePath ?? currentPath;
       if (actionId) {
         void executeDocEquationAction({
-          currentPath,
+          currentPath: activeDocPath,
           anchor,
           actionId,
           latex,
@@ -2192,7 +2193,7 @@ export function DocViewerPanel() {
       }
       handleDocMathPick({
         latex,
-        currentPath,
+        currentPath: activeDocPath,
         anchor,
         clipboardWrite:
           typeof navigator !== "undefined" && navigator.clipboard?.writeText
@@ -2200,7 +2201,7 @@ export function DocViewerPanel() {
             : null,
       });
     },
-    [anchor, currentPath],
+    [anchor, currentPath, displayEntry?.relativePath],
   );
 
   return (
@@ -3514,6 +3515,7 @@ export const __testDocViewerTaxonomy = {
   buildDocTaxonomyCounts,
   docMatchesTaxonomyFilter,
   getDocBadges,
+  renderMathMarkdown,
 };
 
 function shouldAutoEnableInlineTranslationProjection(

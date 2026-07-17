@@ -17,11 +17,19 @@ import {
   buildRealtimeRequesterRef,
   readAdmittedRealtimeSession,
   removeAdmittedRealtimeSession,
+  updateAdmittedRealtimeSession,
 } from "../services/helix-ask/realtime-session/session-registry";
 import {
   exchangeOpenAiRealtimeSdp,
   isValidRealtimeOfferSdp,
 } from "../services/helix-ask/realtime-session/sdp-transport";
+import { bridgeRealtimeTranscriptToStagePlay } from "../services/helix-ask/live-source/realtime-stage-play-handoff";
+import {
+  recordRealtimeStagePlayActivity,
+  startRealtimeStagePlaySideband,
+} from "../services/helix-ask/realtime-session/sideband-context-sync";
+import { buildRealtimeStagePlayDebugProvenance } from "../services/helix-ask/realtime-session/debug-provenance";
+import { createRealtimeGroundedAnswerFeedbackMiddleware } from "../services/helix-ask/realtime-session/grounded-answer-feedback";
 import {
   isHelixRealtimeToolSuggestionEventType,
   isHelixRealtimeTranscriptEventType,
@@ -31,6 +39,10 @@ import {
   type HelixRealtimeSdpExchangeResponse,
   type HelixRealtimeSessionAction,
 } from "@shared/helix-realtime-session";
+import {
+  mergeRealtimeWorkstationSourceBinding,
+  readSafeRealtimeSourceBinding,
+} from "../services/helix-ask/realtime-session/source-binding";
 
 export const realtimeSessionRouter = Router();
 
@@ -44,6 +56,13 @@ const accountPolicyForRequest = async (req: Request) =>
 
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
+
+const readThreadId = (body: Record<string, unknown>, sourceBinding: Record<string, unknown> | null): string =>
+  /^helix-ask:[A-Za-z0-9._:-]{1,160}$/.test(
+    readString(sourceBinding?.thread_id ?? body.thread_id ?? body.threadId) ?? "",
+  )
+    ? readString(sourceBinding?.thread_id ?? body.thread_id ?? body.threadId)!
+    : "helix-ask:desktop";
 
 const requesterRefForRequest = (req: Request): string =>
   buildRealtimeRequesterRef(readHelixSessionCookie(req.headers.cookie));
@@ -61,6 +80,8 @@ const buildSdpExchangeResponse = (
   answer_sdp: patch.answer_sdp ?? null,
   openai_network_call_attempted: patch.openai_network_call_attempted === true,
   webrtc_started: patch.webrtc_started === true,
+  sideband_started: patch.sideband_started === true,
+  realtime_stage_play_context_sync: patch.realtime_stage_play_context_sync ?? null,
   reentry_required: true,
   answer_authority: false,
   assistant_answer: false,
@@ -118,6 +139,7 @@ const respondRealtimeBoundary = async (input: {
       body.visible_user_consent_receipt ?? body.visibleUserConsentReceipt,
     );
     if (response.realtime_session_id && consentReceipt) {
+      const sourceBinding = readSafeRealtimeSourceBinding(body.source_binding ?? body.sourceBinding);
       admitRealtimeSession({
         realtimeSessionId: response.realtime_session_id,
         requesterRef: requesterRefForRequest(input.req),
@@ -126,6 +148,8 @@ const respondRealtimeBoundary = async (input: {
           readString(body.selected_model_or_service ?? body.selectedModelOrService) ??
           "gpt-realtime-2.1",
         voice: readString(body.selected_realtime_voice ?? body.selectedRealtimeVoice ?? body.voice),
+        threadId: readThreadId(body, sourceBinding),
+        sourceBinding,
       });
     }
     return input.res.status(200).json(response);
@@ -146,12 +170,56 @@ const respondRealtimeBoundary = async (input: {
   }
 
   if (input.action === "record_client_receipt") {
-    return input.res.status(200).json(buildRealtimeClientReceiptResponse({
+    const session = input.realtimeSessionId
+      ? readAdmittedRealtimeSession({
+          realtimeSessionId: input.realtimeSessionId,
+          requesterRef: requesterRefForRequest(input.req),
+        })
+      : null;
+    const receiptKind = readString(body.receipt_kind ?? body.receiptKind);
+    if (session && receiptKind) {
+      const activities = new Set([
+        "vad_speech_started",
+        "vad_speech_stopped",
+        "response_started",
+        "response_completed",
+        "response_failed",
+        "response_interrupted",
+        "playback_started",
+        "playback_ended",
+        "playback_failed",
+      ]);
+      if (activities.has(receiptKind)) {
+        recordRealtimeStagePlayActivity({
+          realtimeSessionId: session.realtimeSessionId,
+          activity: receiptKind as Parameters<typeof recordRealtimeStagePlayActivity>[0]["activity"],
+        });
+      }
+    }
+    const response = buildRealtimeClientReceiptResponse({
       accountPolicy,
       body,
       realtimeSessionId: input.realtimeSessionId ?? null,
       adapterResult,
-    }));
+    });
+    const refreshed = session
+      ? readAdmittedRealtimeSession({
+          realtimeSessionId: session.realtimeSessionId,
+          requesterRef: session.requesterRef,
+        })
+      : null;
+    return input.res.status(200).json(refreshed
+      ? {
+          ...response,
+          server_sideband_requested: Boolean(refreshed.providerCallId),
+          sideband_started: refreshed.sidebandState === "open",
+          realtime_stage_play_context_sync: refreshed.latestContextSync,
+          realtime_runtime_session_summary: {
+            ...response.realtime_runtime_session_summary,
+            sideband_started: refreshed.sidebandState === "open",
+          },
+        }
+      : response);
   }
 
   if (input.action === "stop" && input.realtimeSessionId) {
@@ -162,12 +230,86 @@ const respondRealtimeBoundary = async (input: {
   }
 
   if (input.action === "record_event" && isHelixRealtimeTranscriptEventType(body.event_type)) {
-    return input.res.status(200).json(buildRealtimeTranscriptEventResponse({
+    const response = buildRealtimeTranscriptEventResponse({
       accountPolicy,
       body,
       realtimeSessionId: input.realtimeSessionId ?? null,
       adapterResult,
-    }));
+    });
+    const session = input.realtimeSessionId
+      ? readAdmittedRealtimeSession({
+          realtimeSessionId: input.realtimeSessionId,
+          requesterRef: requesterRefForRequest(input.req),
+        })
+      : null;
+    const currentWorkstationSourceBinding = readSafeRealtimeSourceBinding(
+      body.workstation_source_binding ?? body.workstationSourceBinding,
+    );
+    const contextualSession = session && currentWorkstationSourceBinding
+      ? updateAdmittedRealtimeSession({
+          realtimeSessionId: session.realtimeSessionId,
+          requesterRef: session.requesterRef,
+          patch: {
+            sourceBinding: mergeRealtimeWorkstationSourceBinding({
+              base: session.sourceBinding,
+              current: currentWorkstationSourceBinding,
+            }),
+          },
+        }) ?? session
+      : session;
+    const observation = response.realtime_transcript_observations[0] ?? null;
+    const transcriptText = readString(body.transcript_text ?? body.transcriptText ?? body.text);
+    const providerEventRef = readString(body.event_ref ?? body.eventRef) ?? observation?.observation_ref ?? null;
+    const handoff = contextualSession && observation && transcriptText && providerEventRef && body.event_type === "transcript.final"
+      ? bridgeRealtimeTranscriptToStagePlay({
+          realtimeSessionId: contextualSession.realtimeSessionId,
+          threadId: contextualSession.threadId,
+          providerEventRef,
+          transcriptText,
+          observation,
+          sourceBinding: contextualSession.sourceBinding,
+          providerCallRef: contextualSession.providerCallRef,
+          transportReceiptRef: readString(
+            body.realtime_transport_receipt_ref ?? body.transport_receipt_ref,
+          ),
+          vadState: readString(body.realtime_vad_state ?? body.vad_state),
+          interruptionCount:
+            typeof body.realtime_interruption_count === "number"
+              ? body.realtime_interruption_count
+              : null,
+          audioFocusOwner: readString(body.realtime_audio_focus_owner ?? body.audio_focus_owner),
+          qualifiedUserInterruption: body.qualified_user_interruption === true,
+          terminalVoiceInterrupted: body.terminal_voice_interrupted === true,
+        })
+      : null;
+    const refreshed = contextualSession
+      ? readAdmittedRealtimeSession({
+          realtimeSessionId: contextualSession.realtimeSessionId,
+          requesterRef: contextualSession.requesterRef,
+        })
+      : null;
+    return input.res.status(200).json({
+      ...response,
+      ...(handoff ? { realtime_stage_play_ask_handoff: handoff } : {}),
+      ...(refreshed
+        ? {
+            server_sideband_requested: Boolean(refreshed.providerCallId),
+            sideband_started: refreshed.sidebandState === "open",
+            realtime_stage_play_context_sync: refreshed.latestContextSync,
+            realtime_runtime_session_summary: {
+              ...response.realtime_runtime_session_summary,
+              sideband_started: refreshed.sidebandState === "open",
+              session_lifecycle: handoff
+                ? [
+                    ...response.realtime_runtime_session_summary.session_lifecycle,
+                    "stage_play_conversation_event_recorded",
+                    "server_readonly_ask_handoff_issued",
+                  ]
+                : response.realtime_runtime_session_summary.session_lifecycle,
+            },
+          }
+        : {}),
+    });
   }
 
   if (input.action === "record_event" && isHelixRealtimeToolSuggestionEventType(body.event_type)) {
@@ -314,14 +456,70 @@ realtimeSessionRouter.post("/realtime/session/:id/sdp", async (req: Request, res
     }));
   }
 
+  const providerCallRef = readString(result.providerCallRef);
+  updateAdmittedRealtimeSession({
+    realtimeSessionId: session.realtimeSessionId,
+    requesterRef: session.requesterRef,
+    patch: {
+      providerCallId: readString(result.providerCallId),
+      providerCallRef,
+    },
+  });
+  const contextSync = result.providerCallId && providerCallRef
+    ? startRealtimeStagePlaySideband({
+        realtimeSessionId: session.realtimeSessionId,
+        requesterRef: session.requesterRef,
+        providerCallId: result.providerCallId,
+        providerCallRef,
+        apiKey,
+      })
+    : null;
+  const refreshed = readAdmittedRealtimeSession({
+    realtimeSessionId: session.realtimeSessionId,
+    requesterRef: session.requesterRef,
+  });
+
   return res.status(200).json(buildSdpExchangeResponse({
     ok: true,
     error: null,
     blocked_reason: null,
     realtime_session_id: req.params.id,
-    provider_call_ref: readString(result.providerCallRef),
+    provider_call_ref: providerCallRef,
     answer_sdp: result.answerSdp,
     openai_network_call_attempted: true,
     webrtc_started: true,
+    sideband_started: refreshed?.sidebandState === "open",
+    realtime_stage_play_context_sync: refreshed?.latestContextSync ?? contextSync,
   }));
 });
+
+realtimeSessionRouter.get("/realtime/session/:id/debug", async (req: Request, res: Response) => {
+  const accountPolicy = await accountPolicyForRequest(req);
+  if (
+    accountPolicy.account_type !== "developer" ||
+    accountPolicy.locked_features.includes("runtime_agent_controls")
+  ) {
+    return res.status(403).json({
+      ok: false,
+      error: "realtime_runtime_agent_locked_by_account_policy",
+      raw_content_included: false,
+    });
+  }
+  const session = readAdmittedRealtimeSession({
+    realtimeSessionId: req.params.id,
+    requesterRef: requesterRefForRequest(req),
+  });
+  if (!session) {
+    return res.status(404).json({
+      ok: false,
+      error: "realtime_session_not_found",
+      raw_content_included: false,
+    });
+  }
+  return res.status(200).json(buildRealtimeStagePlayDebugProvenance(session));
+});
+
+// This extracted middleware observes only server-final Ask responses carrying a
+// previously issued Realtime handoff. It does not sample, execute tools, or write
+// terminal answers.
+realtimeSessionRouter.use(createRealtimeGroundedAnswerFeedbackMiddleware());

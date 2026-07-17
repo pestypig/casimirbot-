@@ -16,6 +16,7 @@ export const PROBABILITY_TERRAIN_COVERAGE_BASES = [
   "closed_world_default",
   "caller_calibrated",
   "absolute_match_score_heuristic",
+  "semantic_coverage_heuristic",
   "no_candidates",
 ] as const;
 

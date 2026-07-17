@@ -1,3 +1,5 @@
+import type { HelixPaperEvidenceSidecarV1 } from "./helix-paper-evidence-sidecar";
+
 export const HELIX_RESEARCH_LIBRARY_DOCUMENT_SCHEMA =
   "helix.research_library_document.v1" as const;
 
@@ -53,8 +55,12 @@ export type HelixResearchLibraryDocumentSummary = {
   raw_content_included: false;
 };
 
-export type HelixResearchLibraryDocument = HelixResearchLibraryDocumentSummary & {
+export type HelixResearchLibraryDocument = Omit<
+  HelixResearchLibraryDocumentSummary,
+  "raw_content_included"
+> & {
   pages: HelixResearchLibraryPage[];
+  paper_evidence_sidecars: HelixPaperEvidenceSidecarV1[];
   raw_content_included: true;
 };
 

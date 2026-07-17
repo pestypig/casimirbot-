@@ -387,6 +387,32 @@ const collectScholarlyResearchEvidenceRefs = (input: {
     .filter(Boolean);
 };
 
+const collectPaperEvidenceEnrichmentRefs = (input: {
+  payload: RecordLike;
+  terminalArtifactKind: string;
+  finalAnswerSource: string;
+}): string[] => {
+  const terminalReportsModelSynthesis =
+    /model_synthesized_answer|final_answer_draft|agent_provider_terminal_candidate/i.test(input.terminalArtifactKind) ||
+    /model_synthesized_answer|final_answer_draft|agent_provider_terminal_candidate/i.test(input.finalAnswerSource);
+  if (!terminalReportsModelSynthesis) return [];
+  const ledger = Array.isArray(input.payload.current_turn_artifact_ledger)
+    ? input.payload.current_turn_artifact_ledger
+    : [];
+  return ledger
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is RecordLike => Boolean(entry))
+    .filter((entry) => {
+      const payloadRecord = readRecord(entry.payload);
+      return (
+        readString(entry.kind) === "paper_evidence_enrichment_observation" ||
+        readString(payloadRecord?.schema) === "helix.paper_evidence_enrichment_observation.v1"
+      );
+    })
+    .map((entry) => readString(entry.artifact_id))
+    .filter(Boolean);
+};
+
 const collectInternetSearchEvidenceRefs = (input: {
   payload: RecordLike;
   terminalArtifactKind: string;
@@ -603,7 +629,7 @@ const capabilityItineraryEvidencePatterns: Array<{ family: string; pattern: RegE
   },
   {
     family: "scholarly_research",
-    pattern: /scholarly_research_observation|scholarly_full_text_observation|research_library_observation|lookup_papers|fetch_full_text|research-library\.read_document/i,
+    pattern: /scholarly_research_observation|scholarly_full_text_observation|research_library_observation|paper_evidence_enrichment_observation|lookup_papers|fetch_full_text|research-library\.(?:read_document|apply_evidence_enrichment)/i,
   },
   {
     family: "theory_locator",
@@ -847,6 +873,11 @@ export function buildEvidenceReentryGate(input: {
       finalAnswerSource: input.finalAnswerSource,
     }),
     ...collectScholarlyResearchEvidenceRefs({
+      payload: input.payload,
+      terminalArtifactKind: input.terminalArtifactKind,
+      finalAnswerSource: input.finalAnswerSource,
+    }),
+    ...collectPaperEvidenceEnrichmentRefs({
       payload: input.payload,
       terminalArtifactKind: input.terminalArtifactKind,
       finalAnswerSource: input.finalAnswerSource,

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HELIX_WORKSPACE_OS_STATUS_CAPABILITY } from "../../workspace-os-status-intent";
+import { HELIX_THEORY_CONTEXT_REFLECTION_CAPABILITY } from "../../theory-congruence/capability-contract";
 import {
   callWorkstationGatewayCapability,
   listWorkstationGatewayCapabilities,
@@ -37,7 +38,7 @@ const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = "scholarly-research.lookup_papers";
 const SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY = "scholarly-research.fetch_full_text";
 const SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY = "scholarly-research.extract_numeric_parameters";
 const CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY = "civilization-bounds.reflect_system_bounds";
-const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context";
+const THEORY_CONTEXT_REFLECTION_CAPABILITY = HELIX_THEORY_CONTEXT_REFLECTION_CAPABILITY;
 const MORAL_GRAPH_REFLECTION_CAPABILITY = "moral-graph.reflect_context";
 const MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY = "moral-graph.reflect_living_substrate_context";
 const THEORY_FRONTIER_CONJECTURE_CAPABILITY = "theory-badge-graph.propose_frontier_conjectures";
@@ -4168,7 +4169,7 @@ describe("Helix workstation tool gateway", () => {
       mode: "read",
       capabilityId: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
       arguments: {
-        query: "quantum inequalities warp drive",
+        query: "quantum inequalities warp constraints",
         providers: ["arxiv"],
         limit: 1,
       },
@@ -4199,10 +4200,17 @@ describe("Helix workstation tool gateway", () => {
       observation: {
         schema: "helix.scholarly_research_observation.v1",
         capability_key: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
-        query: "quantum inequalities warp drive",
+        query: "quantum inequalities warp constraints",
         providers_considered: ["arxiv"],
         providers_called: ["arxiv"],
-        evidence_state: "lookup_usable",
+        provider_record_count: 1,
+        unique_paper_count: 1,
+        deduplication: {
+          provider_record_count: 1,
+          unique_paper_count: 1,
+          duplicate_record_count: 0,
+        },
+         evidence_state: "lookup_usable",
         next_affordances: [],
         selected_for_answer: true,
         status: "succeeded",

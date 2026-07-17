@@ -1,16 +1,28 @@
 import React, { type ReactNode } from "react";
 import { renderToString as renderKatexToString } from "katex";
 import "katex/dist/katex.min.css";
+import { Lexer, type Token, type Tokens } from "marked";
 
-import { parseHelixAskFinalAnswerBulletLine } from "@/lib/helix/ask-answer-rendering";
+import {
+  parseHelixAskFinalAnswerBulletLine,
+  splitHelixAskInlineCodeTextSegments,
+  tokenizeHelixAskMathTokens,
+} from "@/lib/helix/ask-answer-rendering";
 import type {
   ReadAloudRegionTrafficRegion,
   ReadAloudRegionTrafficState,
 } from "@/lib/helix/ask-read-aloud-display";
 
 import { HelixAskMathHtmlSurface } from "./HelixAskMathHtmlSurface";
+import { HelixAskMermaidBlock } from "./HelixAskMermaidBlock";
+import { HelixAskRenderedContentSurface } from "./HelixAskRenderedContentSurface";
 
 export type HelixAskFinalAnswerTextSegment = {
+  key: string;
+  text: string;
+};
+
+export type HelixAskFinalAnswerTableCell = {
   key: string;
   text: string;
 };
@@ -31,6 +43,20 @@ export type HelixAskFinalAnswerBlock =
       key: string;
       text: string;
       segments: HelixAskFinalAnswerTextSegment[];
+    }
+  | {
+      kind: "heading";
+      key: string;
+      level: number;
+      text: string;
+      segments: HelixAskFinalAnswerTextSegment[];
+    }
+  | {
+      kind: "table";
+      key: string;
+      align: Array<"left" | "center" | "right" | null>;
+      header: HelixAskFinalAnswerTableCell[];
+      rows: HelixAskFinalAnswerTableCell[][];
     }
   | {
       kind: "line";
@@ -82,6 +108,84 @@ function parseHelixAskFinalAnswerCodeFence(line: string): string | null {
   return language || "";
 }
 
+function parseHelixAskMarkdownTableCells(line: string): string[] | null {
+  const trimmed = line.trim();
+  if (!trimmed.includes("|")) return null;
+  const content = trimmed.replace(/^\|/, "").replace(/\|$/, "");
+  const cells: string[] = [];
+  let cell = "";
+  let escaped = false;
+  for (const character of content) {
+    if (character === "|" && !escaped) {
+      cells.push(cell.trim());
+      cell = "";
+      continue;
+    }
+    cell += character;
+    escaped = character === "\\" && !escaped;
+    if (character !== "\\") escaped = false;
+  }
+  cells.push(cell.trim());
+  return cells.length >= 2 ? cells : null;
+}
+
+function parseHelixAskMarkdownTableAlignment(
+  cells: readonly string[],
+): Array<"left" | "center" | "right" | null> | null {
+  if (cells.length < 2) return null;
+  const align: Array<"left" | "center" | "right" | null> = [];
+  for (const cell of cells) {
+    const compact = cell.replace(/\s+/g, "");
+    if (!/^:?-{3,}:?$/.test(compact)) return null;
+    align.push(
+      compact.startsWith(":") && compact.endsWith(":")
+        ? "center"
+        : compact.endsWith(":")
+          ? "right"
+          : compact.startsWith(":")
+            ? "left"
+            : null,
+    );
+  }
+  return align;
+}
+
+function buildHelixAskFinalAnswerTableCells(
+  keyPrefix: string,
+  cells: readonly string[],
+  width: number,
+): HelixAskFinalAnswerTableCell[] {
+  return Array.from({ length: width }, (_, index) => ({
+    key: `${keyPrefix}-cell-${index}`,
+    text: cells[index] ?? "",
+  }));
+}
+
+function parseHelixAskDisplayMathFence(line: string): {
+  closingMarkers: readonly string[];
+  requiresMathHeuristic: boolean;
+} | null {
+  const trimmed = line.trim();
+  if (trimmed === "$$") {
+    return { closingMarkers: ["$$"], requiresMathHeuristic: false };
+  }
+  if (trimmed === "\\[") {
+    return { closingMarkers: ["\\]", "]"], requiresMathHeuristic: false };
+  }
+  if (trimmed === "[") {
+    return { closingMarkers: ["]", "\\]"], requiresMathHeuristic: true };
+  }
+  return null;
+}
+
+function isLikelyHelixAskStandaloneBracketMath(body: string): boolean {
+  const compact = body.trim();
+  if (!compact || compact.length > 20_000) return false;
+  const hasRelation = /(?:^|\s)(?:=|<|>|≤|≥|≈|≃|∝)(?:\s|$)/m.test(compact);
+  const hasLatexOrIndexedNotation = /\\[A-Za-z]+|[_^]\s*\{|[∑∫√]/.test(compact);
+  return hasRelation && hasLatexOrIndexedNotation;
+}
+
 export function buildHelixAskFinalAnswerBlocks(content: unknown): HelixAskFinalAnswerBlock[] {
   const text = coerceText(content);
   if (!text) return [];
@@ -119,7 +223,80 @@ export function buildHelixAskFinalAnswerBlocks(content: unknown): HelixAskFinalA
       });
       continue;
     }
-    const bulletText = parseHelixAskFinalAnswerBulletLine(trimmed);
+    const displayMathFence = parseHelixAskDisplayMathFence(line);
+    if (displayMathFence) {
+      const mathLines: string[] = [];
+      let closingIndex = -1;
+      const maxClosingIndex = Math.min(lines.length - 1, index + 80);
+      for (let mathIndex = index + 1; mathIndex <= maxClosingIndex; mathIndex += 1) {
+        const mathLine = lines[mathIndex] ?? "";
+        if (displayMathFence.closingMarkers.includes(mathLine.trim())) {
+          closingIndex = mathIndex;
+          break;
+        }
+        mathLines.push(mathLine);
+      }
+      const mathBody = mathLines.join("\n").trim();
+      if (
+        closingIndex > index &&
+        mathBody &&
+        (!displayMathFence.requiresMathHeuristic || isLikelyHelixAskStandaloneBracketMath(mathBody))
+      ) {
+        blocks.push({
+          kind: "code",
+          key: `final-answer-display-math-${index}`,
+          language: "math",
+          text: mathBody,
+        });
+        index = closingIndex;
+        continue;
+      }
+    }
+    const tableHeaderCells = parseHelixAskMarkdownTableCells(line);
+    const tableDelimiterCells = parseHelixAskMarkdownTableCells(lines[index + 1] ?? "");
+    const tableAlignment = tableDelimiterCells
+      ? parseHelixAskMarkdownTableAlignment(tableDelimiterCells)
+      : null;
+    if (
+      tableHeaderCells &&
+      tableAlignment &&
+      tableHeaderCells.length === tableAlignment.length
+    ) {
+      const key = `final-answer-table-${index}`;
+      const rows: HelixAskFinalAnswerTableCell[][] = [];
+      let lastTableIndex = index + 1;
+      for (let rowIndex = index + 2; rowIndex < lines.length; rowIndex += 1) {
+        const rowCells = parseHelixAskMarkdownTableCells(lines[rowIndex] ?? "");
+        if (!rowCells) break;
+        rows.push(buildHelixAskFinalAnswerTableCells(`${key}-row-${rows.length}`, rowCells, tableHeaderCells.length));
+        lastTableIndex = rowIndex;
+      }
+      blocks.push({
+        kind: "table",
+        key,
+        align: tableAlignment,
+        header: buildHelixAskFinalAnswerTableCells(`${key}-header`, tableHeaderCells, tableHeaderCells.length),
+        rows,
+      });
+      index = lastTableIndex;
+      continue;
+    }
+    const headingMatch = trimmed.match(/^(#{1,6})\s+(.+?)(?:\s+#+)?$/);
+    if (headingMatch?.[1] && headingMatch[2]) {
+      const key = `final-answer-heading-${index}`;
+      const headingText = headingMatch[2].trim();
+      blocks.push({
+        kind: "heading",
+        key,
+        level: headingMatch[1].length,
+        text: headingText,
+        segments: buildHelixAskFinalAnswerTextSegments(key, headingText),
+      });
+      continue;
+    }
+    const bulletText = /^[-*]\s+/.test(trimmed)
+      ? parseHelixAskFinalAnswerBulletLine(trimmed)
+      : null;
     if (bulletText) {
       const key = `final-answer-bullet-${index}`;
       blocks.push({
@@ -159,7 +336,7 @@ function collectHelixAskFinalAnswerReadAloudTargets(blocks: readonly HelixAskFin
     isSegment: boolean;
   }> = [];
   for (const block of blocks) {
-    if (block.kind !== "line" && block.kind !== "bullet") continue;
+    if (block.kind !== "line" && block.kind !== "bullet" && block.kind !== "heading") continue;
     for (const segment of block.segments) {
       const normalizedText = normalizeReadAloudMatchText(segment.text);
       if (normalizedText) {
@@ -229,30 +406,126 @@ export function resolveHelixAskFinalAnswerReadAloudBlockKeys(
   return [];
 }
 
+function renderHelixAskMarkedInlineTokens(
+  tokens: readonly Token[],
+  renderText: (value: string) => ReactNode,
+  keyPrefix: string,
+): ReactNode[] {
+  return tokens.map((token, index) => {
+    const key = `${keyPrefix}-${token.type}-${index}`;
+    if (token.type === "codespan") {
+      return (
+        <code
+          key={key}
+          className="rounded border border-cyan-300/20 bg-slate-950/75 px-1 py-0.5 font-mono text-[0.92em] text-cyan-100"
+        >
+          {(token as Tokens.Codespan).text}
+        </code>
+      );
+    }
+    if (token.type === "strong") {
+      return (
+        <strong key={key} className="font-semibold text-slate-50">
+          {renderHelixAskMarkedInlineTokens((token as Tokens.Strong).tokens, renderText, key)}
+        </strong>
+      );
+    }
+    if (token.type === "em") {
+      return (
+        <em key={key} className="italic text-slate-100">
+          {renderHelixAskMarkedInlineTokens((token as Tokens.Em).tokens, renderText, key)}
+        </em>
+      );
+    }
+    if (token.type === "del") {
+      return (
+        <del key={key} className="text-slate-300/80">
+          {renderHelixAskMarkedInlineTokens((token as Tokens.Del).tokens, renderText, key)}
+        </del>
+      );
+    }
+    if (token.type === "br") return <br key={key} />;
+    if (token.type === "link") {
+      const link = token as Tokens.Link;
+      const children = renderHelixAskMarkedInlineTokens(link.tokens, renderText, key);
+      const safeHref = /^(?:https?:|mailto:)/i.test(link.href.trim()) ? link.href : null;
+      return safeHref ? (
+        <a
+          key={key}
+          href={safeHref}
+          target={/^https?:/i.test(safeHref) ? "_blank" : undefined}
+          rel={/^https?:/i.test(safeHref) ? "noreferrer noopener" : undefined}
+          className="text-cyan-200 underline decoration-cyan-300/45 underline-offset-2 hover:text-cyan-100"
+        >
+          {children}
+        </a>
+      ) : (
+        <React.Fragment key={key}>{children}</React.Fragment>
+      );
+    }
+    if (token.type === "text" || token.type === "escape") {
+      return (
+        <React.Fragment key={key}>
+          {renderText((token as Tokens.Text | Tokens.Escape).text)}
+        </React.Fragment>
+      );
+    }
+    const nestedTokens = "tokens" in token && Array.isArray(token.tokens)
+      ? token.tokens as Token[]
+      : null;
+    if (nestedTokens?.length) {
+      return (
+        <React.Fragment key={key}>
+          {renderHelixAskMarkedInlineTokens(nestedTokens, renderText, key)}
+        </React.Fragment>
+      );
+    }
+    return <React.Fragment key={key}>{renderText(token.raw)}</React.Fragment>;
+  });
+}
+
 function renderHelixAskInlineMarkdownText(
   text: string,
   renderText: (value: string) => ReactNode,
 ): ReactNode {
-  const parts = text.split(/(`[^`]+`)/g).filter(Boolean);
-  if (parts.length === 0) return renderText(text);
-  return parts.map((part, index) => {
-    if (/^`[^`]+`$/.test(part)) {
-      const inlineCode = part.replace(/^`/, "").replace(/`$/, "");
+  const inlineCodeSegments = splitHelixAskInlineCodeTextSegments(text);
+  return inlineCodeSegments.map((segment, segmentIndex) => {
+    if (segment.kind === "inline_code") {
       return (
         <code
-          key={`inline-code-${index}`}
+          key={`inline-code-${segment.start}`}
           className="rounded border border-cyan-300/20 bg-slate-950/75 px-1 py-0.5 font-mono text-[0.92em] text-cyan-100"
         >
-          {inlineCode}
+          {segment.text}
         </code>
       );
     }
-    return <React.Fragment key={`inline-text-${index}`}>{renderText(part)}</React.Fragment>;
+    const mathTokens = tokenizeHelixAskMathTokens(segment.text);
+    return mathTokens.map((mathToken, mathIndex) => {
+      const key = `inline-segment-${segmentIndex}-math-${mathIndex}`;
+      if (mathToken.kind === "math") {
+        return (
+          <React.Fragment key={key}>
+            {renderText(`${mathToken.openDelimiter}${mathToken.text}${mathToken.closeDelimiter}`)}
+          </React.Fragment>
+        );
+      }
+      const markedTokens = Lexer.lexInline(mathToken.text, { gfm: true, breaks: true });
+      return (
+        <React.Fragment key={key}>
+          {renderHelixAskMarkedInlineTokens(markedTokens, renderText, key)}
+        </React.Fragment>
+      );
+    });
   });
 }
 
 function isHelixAskLatexCodeBlockLanguage(language: string | null): boolean {
   return /^(?:latex|tex|math)$/i.test(language?.trim() ?? "");
+}
+
+export function isHelixAskMermaidCodeBlockLanguage(language: string | null): boolean {
+  return /^mermaid$/i.test(language?.trim() ?? "");
 }
 
 function renderHelixAskFinalAnswerCodeBlock(block: Extract<HelixAskFinalAnswerBlock, { kind: "code" }>) {
@@ -283,6 +556,9 @@ function renderHelixAskFinalAnswerCodeBlock(block: Extract<HelixAskFinalAnswerBl
       // Fall back to the raw code surface below; the final answer remains readable.
     }
   }
+  if (isHelixAskMermaidCodeBlockLanguage(block.language)) {
+    return <HelixAskMermaidBlock key={block.key} source={block.text} />;
+  }
   return (
     <div
       key={block.key}
@@ -301,6 +577,19 @@ function renderHelixAskFinalAnswerCodeBlock(block: Extract<HelixAskFinalAnswerBl
       </pre>
     </div>
   );
+}
+
+function helixAskHeadingClass(level: number): string {
+  if (level === 1) return "break-words pb-1 pt-3 text-xl font-semibold tracking-tight text-cyan-50 [overflow-wrap:anywhere]";
+  if (level === 2) return "break-words pb-0.5 pt-2.5 text-lg font-semibold tracking-tight text-cyan-50 [overflow-wrap:anywhere]";
+  if (level === 3) return "break-words pt-2 text-base font-semibold text-cyan-100 [overflow-wrap:anywhere]";
+  return "break-words pt-1 text-sm font-semibold text-cyan-100 [overflow-wrap:anywhere]";
+}
+
+function helixAskTableAlignClass(align: "left" | "center" | "right" | null): string {
+  if (align === "center") return "text-center";
+  if (align === "right") return "text-right";
+  return "text-left";
 }
 
 function HelixAskReadAloudBlockReticle({
@@ -368,7 +657,12 @@ function HelixAskReadAloudInlineReticle({
 
 export function HelixAskFinalAnswer({ text, meta, renderContent, readAloudTraffic }: HelixAskFinalAnswerProps) {
   const blocks = buildHelixAskFinalAnswerBlocks(text);
-  const renderText = renderContent ?? ((value: string) => value);
+  const renderText = renderContent ?? ((value: string) => (
+    <HelixAskRenderedContentSurface
+      content={value}
+      renderTextWithPathLinks={(plainText) => plainText}
+    />
+  ));
   const readAloudRegions = readAloudTraffic?.regions?.length
     ? readAloudTraffic.regions
     : readAloudTraffic?.active
@@ -435,6 +729,59 @@ export function HelixAskFinalAnswer({ text, meta, renderContent, readAloudTraffi
         }
         if (block.kind === "code") {
           return renderHelixAskFinalAnswerCodeBlock(block);
+        }
+        if (block.kind === "table") {
+          return renderBlockWithReticle(block.key, (
+            <div
+              key={block.key}
+              className="my-2 overflow-x-auto rounded-md border border-cyan-300/20 bg-slate-950/50"
+              data-testid="helix-ask-final-answer-table"
+            >
+              <table className="w-full min-w-[36rem] border-collapse text-left text-xs leading-relaxed text-slate-100">
+                <thead className="bg-cyan-950/45 text-cyan-50">
+                  <tr>
+                    {block.header.map((cell, columnIndex) => (
+                      <th
+                        key={cell.key}
+                        scope="col"
+                        className={`border-b border-r border-cyan-300/15 px-3 py-2 font-semibold last:border-r-0 ${helixAskTableAlignClass(block.align[columnIndex] ?? null)}`}
+                      >
+                        {renderHelixAskInlineMarkdownText(cell.text, renderText)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {block.rows.map((row, rowIndex) => (
+                    <tr key={`${block.key}-visible-row-${rowIndex}`} className="border-b border-white/10 last:border-b-0">
+                      {row.map((cell, columnIndex) => (
+                        <td
+                          key={cell.key}
+                          className={`border-r border-white/10 px-3 py-2 align-top last:border-r-0 ${helixAskTableAlignClass(block.align[columnIndex] ?? null)}`}
+                        >
+                          {renderHelixAskInlineMarkdownText(cell.text, renderText)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ));
+        }
+        if (block.kind === "heading") {
+          const headingTag = `h${Math.min(6, Math.max(1, block.level))}` as keyof React.JSX.IntrinsicElements;
+          return renderBlockWithReticle(block.key, React.createElement(
+            headingTag,
+            {
+              key: block.key,
+              className: helixAskHeadingClass(block.level),
+              "data-testid": "helix-ask-final-answer-heading",
+              "data-heading-level": block.level,
+              "data-narrator-source-id": `helix-${block.key}`,
+            },
+            renderTextSegments(block.segments),
+          ));
         }
         if (block.kind === "bullet") {
           return renderBlockWithReticle(block.key, (

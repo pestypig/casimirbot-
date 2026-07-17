@@ -14,6 +14,9 @@ export type HelixAskActionToolbarProps = {
   hasReadyAttachment?: boolean;
   hasAnyAttachment?: boolean;
   micEnabled: boolean;
+  showMicButton?: boolean;
+  micInputMode?: "voice_lane" | "live_runtime";
+  micDisabled?: boolean;
   voiceTranscribing?: boolean;
   onToggleMic: () => void;
   showRetryVoiceSample?: boolean;
@@ -85,6 +88,9 @@ export function HelixAskActionToolbar({
   hasReadyAttachment = false,
   hasAnyAttachment = false,
   micEnabled,
+  showMicButton = true,
+  micInputMode = "voice_lane",
+  micDisabled = false,
   voiceTranscribing = false,
   onToggleMic,
   showRetryVoiceSample = false,
@@ -101,7 +107,9 @@ export function HelixAskActionToolbar({
   liveRuntimeControls = null,
   submitButton,
 }: HelixAskActionToolbarProps) {
-  const micTitle = micEnabled ? "Disable microphone" : "Enable microphone";
+  const micTitle = micInputMode === "live_runtime"
+    ? micEnabled ? "Disable Live Voice microphone" : "Enable Live Voice microphone"
+    : micEnabled ? "Disable microphone" : "Enable microphone";
   const visualAudioTitle = visualSituationIncludeAudio
     ? "Disable tab audio for visual capture"
     : "Enable tab audio for visual capture";
@@ -129,8 +137,8 @@ export function HelixAskActionToolbar({
           className="hidden"
           onChange={onImageSelect}
         />
-        {runtimePicker}
         {liveRuntimeControls}
+        {runtimePicker}
         <button
           type="button"
           data-helix-ask-action-item="true"
@@ -145,20 +153,24 @@ export function HelixAskActionToolbar({
         >
           <Plus className="h-4 w-4" />
         </button>
-        <button
-          type="button"
-          data-helix-ask-action-item="true"
-          aria-label={micTitle}
-          aria-pressed={micEnabled}
-          title={micTitle}
-          className={`${actionButtonBaseClassName} ${readMicButtonClassName({
-            micEnabled,
-            voiceTranscribing,
-          })}`}
-          onClick={onToggleMic}
-        >
-          <Mic className={`h-4 w-4 ${micEnabled || voiceTranscribing ? "animate-pulse" : ""}`} />
-        </button>
+        {showMicButton ? (
+          <button
+            type="button"
+            data-helix-ask-action-item="true"
+            aria-label={micTitle}
+            aria-pressed={micEnabled}
+            title={micTitle}
+            data-microphone-owner={micInputMode}
+            className={`${actionButtonBaseClassName} ${readMicButtonClassName({
+              micEnabled,
+              voiceTranscribing,
+            })}`}
+            onClick={onToggleMic}
+            disabled={micDisabled}
+          >
+            <Mic className={`h-4 w-4 ${micEnabled || voiceTranscribing ? "animate-pulse" : ""}`} />
+          </button>
+        ) : null}
         {showRetryVoiceSample ? (
           <button
             type="button"

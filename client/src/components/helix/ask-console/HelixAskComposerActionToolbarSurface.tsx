@@ -1,4 +1,11 @@
-import React, { type ChangeEventHandler, type Ref } from "react";
+import React, {
+  type ChangeEventHandler,
+  type Ref,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
 
 import { HelixAskActionToolbar } from "./HelixAskActionToolbar";
@@ -13,6 +20,7 @@ import {
 import {
   HelixAskLiveRuntimeControls,
   type HelixAskLiveRuntimeControlsModel,
+  type HelixAskLiveRuntimeToolbarBridge,
 } from "./HelixAskLiveRuntimeControls";
 
 export type HelixAskComposerActionToolbarSurfaceProps = {
@@ -84,6 +92,36 @@ export function HelixAskComposerActionToolbarSurface({
   onSubmitIntent,
   onStop,
 }: HelixAskComposerActionToolbarSurfaceProps) {
+  const [liveRuntimeBridge, setLiveRuntimeBridge] =
+    useState<HelixAskLiveRuntimeToolbarBridge | null>(null);
+  const legacyMicDisableRequestedRef = useRef(false);
+  const handleLiveRuntimeBridgeChange = useCallback(
+    (bridge: HelixAskLiveRuntimeToolbarBridge | null) => {
+      setLiveRuntimeBridge(bridge);
+    },
+    [],
+  );
+  const liveOwnsMicrophone = liveRuntimeBridge?.engaged === true;
+
+  useEffect(() => {
+    if (!liveOwnsMicrophone) {
+      legacyMicDisableRequestedRef.current = false;
+      return;
+    }
+    if (micEnabled && !legacyMicDisableRequestedRef.current) {
+      legacyMicDisableRequestedRef.current = true;
+      onToggleMic();
+    }
+  }, [liveOwnsMicrophone, micEnabled, onToggleMic]);
+
+  const effectiveMicEnabled = liveOwnsMicrophone
+    ? liveRuntimeBridge?.microphoneEnabled === true
+    : micEnabled;
+  const effectiveVoiceTranscribing = liveOwnsMicrophone ? false : voiceTranscribing;
+  const effectiveToggleMic = liveOwnsMicrophone
+    ? () => liveRuntimeBridge?.toggleMicrophone()
+    : onToggleMic;
+
   return (
     <HelixAskActionToolbar
       carouselRef={carouselRef}
@@ -97,9 +135,12 @@ export function HelixAskComposerActionToolbarSurface({
       attachDisabled={attachDisabled}
       hasReadyAttachment={hasReadyAttachment}
       hasAnyAttachment={hasAnyAttachment}
-      micEnabled={micEnabled}
-      voiceTranscribing={voiceTranscribing}
-      onToggleMic={onToggleMic}
+      micEnabled={effectiveMicEnabled}
+      showMicButton={!liveOwnsMicrophone}
+      micInputMode={liveOwnsMicrophone ? "live_runtime" : "voice_lane"}
+      micDisabled={liveOwnsMicrophone && liveRuntimeBridge?.microphoneToggleDisabled !== false}
+      voiceTranscribing={effectiveVoiceTranscribing}
+      onToggleMic={effectiveToggleMic}
       showRetryVoiceSample={showRetryVoiceSample}
       retryVoiceSampleDisabled={retryVoiceSampleDisabled}
       onRetryVoiceSample={onRetryVoiceSample}
@@ -110,6 +151,14 @@ export function HelixAskComposerActionToolbarSurface({
       displayAudioStatus={displayAudioStatus}
       visualAudioToggleDisabled={visualAudioToggleDisabled}
       onToggleVisualAudio={onToggleVisualAudio}
+      liveRuntimeControls={
+        liveRuntimeControlsModel?.visible ? (
+          <HelixAskLiveRuntimeControls
+            model={liveRuntimeControlsModel}
+            onToolbarBridgeChange={handleLiveRuntimeBridgeChange}
+          />
+        ) : null
+      }
       runtimePicker={
         <HelixAskRuntimePicker
           model={runtimePickerModel}
@@ -117,9 +166,6 @@ export function HelixAskComposerActionToolbarSurface({
           onPrimaryClick={onRuntimePrimaryClick}
           onSelect={onRuntimeSelect}
         />
-      }
-      liveRuntimeControls={
-        liveRuntimeControlsModel ? <HelixAskLiveRuntimeControls model={liveRuntimeControlsModel} /> : null
       }
       submitButton={
         <HelixAskComposerSubmitButton

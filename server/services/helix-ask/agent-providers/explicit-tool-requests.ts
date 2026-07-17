@@ -14,6 +14,10 @@ import {
   HELIX_DOCS_SEARCH_ALIAS_CAPABILITIES,
   HELIX_DOCS_SEARCH_CAPABILITY,
 } from "../docs-capability-contract";
+import {
+  HELIX_THEORY_CONTEXT_REFLECTION_CAPABILITY,
+  HELIX_THEORY_CONTEXT_REFLECTION_LEGACY_ALIASES,
+} from "../theory-congruence/capability-contract";
 
 export { WORKSTATION_CONTEXT_FEED_QUERY_CAPABILITIES } from "../workstation-context-feed-query-tool-contracts";
 
@@ -43,11 +47,10 @@ export const INTERNET_SEARCH_ALIAS_CAPABILITIES = [
 ] as const;
 export const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY;
 export const SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY = HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY;
-export const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context" as const;
+export const THEORY_CONTEXT_REFLECTION_CAPABILITY = HELIX_THEORY_CONTEXT_REFLECTION_CAPABILITY;
 export const THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY = "theory-badge-graph.current_context" as const;
-export const THEORY_CONTEXT_REFLECTION_ALIAS_CAPABILITIES = [
-  "helix_ask.reflect_theory_context",
-] as const;
+export const THEORY_CONTEXT_REFLECTION_ALIAS_CAPABILITIES =
+  HELIX_THEORY_CONTEXT_REFLECTION_LEGACY_ALIASES;
 export const THEORY_FRONTIER_CONJECTURE_CAPABILITY = "theory-badge-graph.propose_frontier_conjectures" as const;
 export const THEORY_FRONTIER_CONJECTURE_ALIAS_CAPABILITIES = [
   "propose_frontier_conjectures",

@@ -33,6 +33,31 @@ const sessionsById = new Map<string, AgentGoalSessionV1>();
 const MAX_UPDATES_PER_THREAD = 240;
 const MAX_SESSIONS_PER_THREAD = 80;
 
+type StagePlayGoalContextChange =
+  | { kind: "context_update"; threadId: string | null; update: WorkstationGoalContextUpdateV1 }
+  | { kind: "goal_session"; threadId: string; session: AgentGoalSessionV1 };
+
+type StagePlayGoalContextListener = (change: StagePlayGoalContextChange) => void;
+
+const goalContextListeners = new Set<StagePlayGoalContextListener>();
+
+const notifyGoalContextListeners = (change: StagePlayGoalContextChange): void => {
+  for (const listener of goalContextListeners) {
+    try {
+      listener(change);
+    } catch {
+      // Context observers are side effects and cannot invalidate the stored update.
+    }
+  }
+};
+
+export function subscribeStagePlayGoalContextChanges(
+  listener: StagePlayGoalContextListener,
+): () => void {
+  goalContextListeners.add(listener);
+  return () => goalContextListeners.delete(listener);
+}
+
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
 
@@ -370,7 +395,11 @@ export function recordStagePlayGoalContextUpdate(
     throw new Error(`Invalid Stage Play goal-context update: ${issues.join("; ")}`);
   }
   updatesById.set(normalizedUpdate.updateId, normalizedUpdate);
-  trimThreadUpdates(normalizedUpdate.loopRefs.find((ref) => ref.startsWith("thread:"))?.slice("thread:".length) ?? "");
+  const threadId = normalizedUpdate.loopRefs
+    .find((ref) => ref.startsWith("thread:"))
+    ?.slice("thread:".length) ?? null;
+  trimThreadUpdates(threadId ?? "");
+  notifyGoalContextListeners({ kind: "context_update", threadId, update: normalizedUpdate });
   return normalizedUpdate;
 }
 
@@ -411,6 +440,7 @@ export function upsertStagePlayAgentGoalSession(session: AgentGoalSessionV1): Ag
   }
   sessionsById.set(session.goalId, session);
   trimThreadSessions(session.threadId);
+  notifyGoalContextListeners({ kind: "goal_session", threadId: session.threadId, session });
   return session;
 }
 
@@ -637,7 +667,7 @@ export function syncStagePlayGoalContextFromMailbox(input: {
         ? {
             goalId: mail.objective.objectiveId,
             relevance: 0.6,
-            reason: mail.objective.text,
+            reason: mail.objective.text ?? "Mail matched the active objective.",
           }
         : null,
       suggestedDispatch: dispatchActionsForMail(mail),

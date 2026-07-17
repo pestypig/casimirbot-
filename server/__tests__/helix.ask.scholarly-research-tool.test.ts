@@ -2501,11 +2501,27 @@ describe("Helix scholarly research tool admission", () => {
       capability: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
       intent: "citation_lookup",
       providers_called: ["openalex", "crossref"],
+      provider_record_count: 2,
+      unique_paper_count: 1,
+      deduplication: {
+        provider_record_count: 2,
+        unique_paper_count: 1,
+        duplicate_record_count: 1,
+      },
       selected_for_answer: true,
       assistant_answer: false,
       raw_content_included: false,
     });
     expect(observation.papers).toHaveLength(1);
+    expect(observation).toMatchObject({
+      provider_record_count: 2,
+      unique_paper_count: 1,
+      deduplication: {
+        provider_record_count: 2,
+        unique_paper_count: 1,
+        duplicate_record_count: 1,
+      },
+    });
     expect(observation.papers[0]).toMatchObject({
       title: "Warp Field Mechanics 101",
       identifiers: { doi: "10.1103/physrevd.84.024020" },

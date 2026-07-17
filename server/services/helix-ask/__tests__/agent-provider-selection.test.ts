@@ -5834,6 +5834,15 @@ describe("Helix Ask agent provider selection", () => {
         }),
       }),
     ]);
+    expect(buildActiveWorkstationContextGatewayCallRequests({
+      ...body,
+      question: "Okay, using only what humans actually know, tell me which workstation panel you are currently looking at.",
+    })).toEqual([
+      expect.objectContaining({
+        capability_id: "workstation.active_context",
+        mode: "read",
+      }),
+    ]);
 
     const result = await codexProvider.runTurn({
       runtime: "codex",
@@ -5896,9 +5905,12 @@ describe("Helix Ask agent provider selection", () => {
     };
     const prompts = [
       "I am not asking about the current open panels; explain what a panel means in general.",
+      "I am not asking which workstation panel you are currently looking at; explain the phrase instead.",
       "Before I open a panel, explain what evidence would be needed.",
+      "If we later ask which workstation panel you are currently looking at, explain what evidence would be needed.",
       "The previous answer mentioned which panel was active; explain why that was insufficient.",
       "The screen shows text that says \"what panels are open\"; explain the wording.",
+      "The screen text says which workstation panel you are currently looking at; explain that wording.",
       "If we later switch panels, tell me what observation would be needed.",
     ];
 
@@ -5908,6 +5920,10 @@ describe("Helix Ask agent provider selection", () => {
         question,
       })).toEqual([]);
     });
+    expect(buildActiveWorkstationContextGatewayCallRequests({
+      ...baseBody,
+      question: "If we ask later which workstation panel you are currently looking at, wait; right now tell me which workstation panel you are currently looking at.",
+    })).toHaveLength(1);
   });
 
   it("does not answer current workstation panel state when no workstation observation exists", async () => {

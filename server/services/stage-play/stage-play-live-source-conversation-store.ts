@@ -12,6 +12,12 @@ import {
 const conversationEventsById = new Map<string, StagePlayLiveSourceConversationEventV1>();
 const MAX_EVENTS_PER_THREAD = 250;
 
+type StagePlayConversationListener = (
+  event: StagePlayLiveSourceConversationEventV1,
+) => void;
+
+const conversationListeners = new Set<StagePlayConversationListener>();
+
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
 
@@ -134,7 +140,21 @@ export function recordStagePlayLiveSourceConversationEvent(input: {
   };
   conversationEventsById.set(event.eventId, event);
   trimThreadEvents(input.threadId);
+  for (const listener of conversationListeners) {
+    try {
+      listener(event);
+    } catch {
+      // Observers cannot roll back or block the canonical conversation write.
+    }
+  }
   return event;
+}
+
+export function subscribeStagePlayLiveSourceConversationEvents(
+  listener: StagePlayConversationListener,
+): () => void {
+  conversationListeners.add(listener);
+  return () => conversationListeners.delete(listener);
 }
 
 export function listStagePlayLiveSourceConversationEvents(input: {

@@ -40,6 +40,7 @@ Image Lens actions remain blocked independently and must not be substituted.
 
 - Schema: `helix.research_library_observation.v1`.
 - Contains document metadata, bounded `selected_pages`, exact source-text refs, optional match count/page locations, and evidence state.
+- May include up to four bounded paper-evidence sidecar summaries and up to 40 equation candidates per sidecar for the selected pages. These expose revision identity and proposal inputs, not the complete encrypted sidecar.
 - Full encrypted page content remains in profile storage; only bounded excerpts enter model context.
 - `assistant_answer=false`, `terminal_eligible=false`, and a post-tool model step is required.
 - `raw_content_included=false`
@@ -59,8 +60,9 @@ The observation is scholarly evidence, not an answer. It must re-enter the selec
 ## Host Projection
 
 Allowed projection fields are the document summary, bounded `selected_pages`,
-exact source-text refs, match counts, match page locations, and typed failure
-codes. Complete decrypted page arrays are not projected.
+exact source-text refs, match counts, match page locations, bounded equation
+candidate/revision summaries, and typed failure codes. Complete decrypted page
+arrays, context-candidate arrays, and complete sidecars are not projected.
 
 ## Visible Trace
 

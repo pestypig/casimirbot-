@@ -1,4 +1,7 @@
-import { readBooleanEnv } from "../capability-lanes/backend-provider-config";
+import {
+  hasAnyConfiguredEnvVar,
+  readBooleanEnv,
+} from "../capability-lanes/backend-provider-config";
 import type {
   HelixRealtimeSessionTransport,
   HelixRealtimeSessionTransportPlan,
@@ -25,19 +28,26 @@ export type HelixRealtimeSessionFeatureGate = {
   openai_contract_flag: typeof HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED_ENV;
 };
 
+export const realtimeSessionOpenAiKeyConfigured = (
+  env: NodeJS.ProcessEnv = process.env,
+): boolean => hasAnyConfiguredEnvVar(env, ["OPENAI_REALTIME_API_KEY", "OPENAI_API_KEY"]);
+
 export const readRealtimeSessionFeatureGate = (
   env: NodeJS.ProcessEnv = process.env,
-): HelixRealtimeSessionFeatureGate => ({
-  schema: "helix.realtime_session.feature_gate.v1",
-  descriptor_enabled: readBooleanEnv(env[HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED_ENV], false),
-  adapter_enabled: readBooleanEnv(env[HELIX_REALTIME_SESSION_ADAPTER_ENABLED_ENV], false),
-  live_transport_enabled: readBooleanEnv(env[HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED_ENV], false),
-  openai_contract_enabled: readBooleanEnv(env[HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED_ENV], false),
-  descriptor_flag: HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED_ENV,
-  adapter_flag: HELIX_REALTIME_SESSION_ADAPTER_ENABLED_ENV,
-  live_transport_flag: HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED_ENV,
-  openai_contract_flag: HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED_ENV,
-});
+): HelixRealtimeSessionFeatureGate => {
+  const keyConfigured = realtimeSessionOpenAiKeyConfigured(env);
+  return {
+    schema: "helix.realtime_session.feature_gate.v1",
+    descriptor_enabled: readBooleanEnv(env[HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED_ENV], keyConfigured),
+    adapter_enabled: readBooleanEnv(env[HELIX_REALTIME_SESSION_ADAPTER_ENABLED_ENV], keyConfigured),
+    live_transport_enabled: readBooleanEnv(env[HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED_ENV], keyConfigured),
+    openai_contract_enabled: readBooleanEnv(env[HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED_ENV], keyConfigured),
+    descriptor_flag: HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED_ENV,
+    adapter_flag: HELIX_REALTIME_SESSION_ADAPTER_ENABLED_ENV,
+    live_transport_flag: HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED_ENV,
+    openai_contract_flag: HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED_ENV,
+  };
+};
 
 export const buildRealtimeSessionTransportPlan = (args?: {
   requestedTransport?: HelixRealtimeSessionTransport | null;

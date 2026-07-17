@@ -58,7 +58,7 @@ describe("Helix Ask E63 debug copy atomicity", () => {
     expect(source).not.toContain("onPointerDown={() => void handleCopyReplyMasterDebug");
   });
 
-  it("binds scoped debug copy to the rendered reply event-clock payload", () => {
+  it("binds scoped debug copy to the clicked rendered reply instead of the global event-clock payload", () => {
     const source = fs.readFileSync(
       path.resolve(process.cwd(), "client/src/components/helix/HelixAskPill.tsx"),
       "utf8",
@@ -73,7 +73,8 @@ describe("Helix Ask E63 debug copy atomicity", () => {
     );
 
     expect(source).toContain("replyMasterEventClockPayload = buildReplyMasterEventClockExport");
-    expect(source).toMatch(/handleCopyReplyMasterDebug\(\s*reply,\s*replyMasterEventClockPayload/);
+    expect(source).toMatch(/handleCopyReplyMasterDebug\(\s*reply,\s*null,\s*event\.currentTarget/);
+    expect(source).not.toMatch(/handleCopyReplyMasterDebug\(\s*reply,\s*replyMasterEventClockPayload/);
     expect(source).toContain("const hasProvidedPayload = typeof payload === \"string\" && payload.trim().length > 0");
     expect(source).toContain("const providedPayloadMatchesRenderedTurn =");
     expect(source).toContain("selectHelixAskLegacyDebugCopyLocalPayload({");
@@ -96,7 +97,7 @@ describe("Helix Ask E63 debug copy atomicity", () => {
     expect(source).not.toContain("export function debugPayloadMatchesRenderedTurnPayload");
     expect(controlsSource).toContain("const renderedActiveTurnId = coerceControlText(rendered.activeTurnId).trim()");
     expect(controlsSource).toContain("const renderedClientTurnId = coerceControlText(rendered.clientTurnId).trim()");
-    expect(controlsSource).toContain("!turnCandidates.some((candidate) => candidate === renderedActiveTurnId)");
+    expect(controlsSource).toContain("!turnCandidates.some((candidate) =>");
     expect(controlsSource).toContain("!clientTurnCandidates.some((candidate) => candidate === renderedClientTurnId)");
     expect(controlsSource).toContain("export function enforceHelixAskLegacyDebugExportMatchesClickedButton");
     expect(turnControlsSource).toContain("{...turnScopeAttributes}");

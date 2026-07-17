@@ -35,7 +35,13 @@ export type HelixAskConversationalReferentResolutionTrace = {
   explicit_topic_terms: string[];
   candidate_count: number;
   matched_candidate_count: number;
-  selection_policy: "latest_answer" | "explicit_topic_match" | "blocked_topic_mismatch" | null;
+  selection_policy:
+    | "latest_answer"
+    | "latest_substantive_answer"
+    | "explicit_topic_match"
+    | "blocked_topic_mismatch"
+    | "blocked_non_substantive_history"
+    | null;
   context_role: "evidence_for_followup_reasoning" | null;
   assistant_answer: false;
   terminal_eligible: false;
@@ -257,10 +263,30 @@ export const conversationalReferentTextCannotSupplyRequestedEvidence = (value: s
     /\b(?:could\s+not|cannot|couldn['’]?t|can['’]?t)\s+honestly\s+(?:present|treat|use|cite|map|offer)\b[\s\S]{0,180}\b(?:claims?|evidence|support)\b/i.test(text) ||
     /^(?:these|those|the)\s+(?:results?|search(?:es)?|papers?|sources?|evidence)\b[\s\S]{0,180}\b(?:do|does|did|can|could|would)\s+not\b[\s\S]{0,100}\b(?:support|match|address|establish|verify)\b/i.test(text) ||
     /^(?:the\s+)?(?:conversational\s+)?referent\b[\s\S]{0,120}\b(?:incorrectly\s+resolved|resolution\s+failed|was\s+missing)\b/i.test(text) ||
+    /^the\s+theory\s+badge\s+graph\s+(?:could\s+not|cannot|couldn['â€™]?t|can['â€™]?t)\b[\s\S]{0,180}\b(?:resolve|find|locate|match|produce)\b/i.test(text) ||
+    /^the\s+theory\s+badge\s+graph\b[\s\S]{0,220}\bfound\s+no\s+(?:exact|likely|supported)\b/i.test(text) ||
     /^backend\s+ask\s+was\s+reached\b/i.test(text) ||
     /^the\s+turn\s+failed\b/i.test(text) ||
     /^the\s+(?:immediately\s+)?(?:previous|prior|last)\s+(?:answer|response)\s+(?:contained|contains|had|has)\s+no\s+(?:scientific|physics|research)\s+claims?\b/i.test(text) ||
     /^there\s+(?:are|were)\s+no\s+(?:scientific|physics|research)\s+claims?\b/i.test(text)
+  );
+};
+
+const isAffirmativeTheoryBadgeGraphReferentPrompt = (prompt: string): boolean => {
+  const unquoted = unquotePrompt(prompt).replace(/\s+/g, " ").trim();
+  if (!unquoted) return false;
+  const politeLead = String.raw`(?:(?:ok(?:ay)?|please|now|then)\b[\s,;:]*)*`;
+  const graphName = String.raw`(?:the\s+)?theory\s+badge\s+graph`;
+  const deictic = String.raw`(?:this|that)`;
+  return (
+    new RegExp(
+      String.raw`^${politeLead}reflect\s+${deictic}\s+(?:with|using)\s+${graphName}(?:\s+(?:now|please))?\s*[.!?]*$`,
+      "i",
+    ).test(unquoted) ||
+    new RegExp(
+      String.raw`^${politeLead}use\s+${graphName}\s+to\s+reflect\s+${deictic}(?:\s+(?:now|please))?\s*[.!?]*$`,
+      "i",
+    ).test(unquoted)
   );
 };
 
@@ -278,6 +304,9 @@ const conversationalReferentPhrase = (prompt: string): string | null => {
     !/\b(?:now|right\s+now|you\s+just|just\s+(?:said|described|explained|mentioned|listed|identified|outlined))\b/i.test(unquoted)
   ) {
     return null;
+  }
+  if (isAffirmativeTheoryBadgeGraphReferentPrompt(prompt)) {
+    return "deictic_previous_assistant_answer";
   }
   if (
     /\b(?:those|these|the)\s+(?:(?:two|three|four|five|\d+)\s+)?(?:(?:failure|evidence|route|tool|scientific|execution|context)\s+)?(?:things?|causes?|reasons?|failures?|issues?|points?|steps?|items?|layers?|problems?|options?|examples?|prompts?|results?|findings?|details?)\s+(?:that\s+)?you\s+(?:just|previously)\s+(?:described|mentioned|explained|listed|identified|gave|said|outlined)\b/i.test(unquoted) ||
@@ -328,11 +357,16 @@ export const resolveHelixAskConversationalReferent = (
     };
   }
   const minimumTopicMatches = Math.max(1, Math.ceil(topicTerms.length * 0.6));
-  const matchingCandidates = topicTerms.length > 0
+  const theoryGraphReferentPrompt = isAffirmativeTheoryBadgeGraphReferentPrompt(readQuestion(body));
+  const substantiveCandidates = theoryGraphReferentPrompt
     ? candidates.filter((candidate) =>
+        !conversationalReferentTextCannotSupplyRequestedEvidence(candidate.text))
+    : candidates;
+  const matchingCandidates = topicTerms.length > 0
+    ? substantiveCandidates.filter((candidate) =>
         !conversationalReferentTextCannotSupplyRequestedEvidence(candidate.text) &&
         conversationalCandidateTopicScore(candidate.text, topicTerms) >= minimumTopicMatches)
-    : candidates;
+    : substantiveCandidates;
   if (topicTerms.length > 0 && matchingCandidates.length === 0) {
     return {
       resolvedText: null,
@@ -351,7 +385,30 @@ export const resolveHelixAskConversationalReferent = (
       }),
     };
   }
+  if (theoryGraphReferentPrompt && matchingCandidates.length === 0) {
+    return {
+      resolvedText: null,
+      trace: blankConversationalReferentTrace({
+        referent_detected: true,
+        referent_phrase: referentPhrase,
+        source_kind: "chat_history",
+        resolution_confidence: "blocked",
+        resolution_block_reason: "referent_resolution_required:no_substantive_previous_assistant_final_answer",
+        explicit_topic_phrase: explicitTopicPhrase,
+        explicit_topic_terms: topicTerms,
+        candidate_count: candidates.length,
+        matched_candidate_count: 0,
+        selection_policy: "blocked_non_substantive_history",
+        context_role: "evidence_for_followup_reasoning",
+      }),
+    };
+  }
   const selectedAnswer = matchingCandidates[0] ?? candidates[0]!;
+  const skippedNonSubstantiveLatest = Boolean(
+    theoryGraphReferentPrompt &&
+    candidates[0] &&
+    selectedAnswer.ref !== candidates[0].ref,
+  );
   return {
     resolvedText: selectedAnswer.text,
     trace: blankConversationalReferentTrace({
@@ -365,7 +422,11 @@ export const resolveHelixAskConversationalReferent = (
       explicit_topic_terms: topicTerms,
       candidate_count: candidates.length,
       matched_candidate_count: matchingCandidates.length,
-      selection_policy: topicTerms.length > 0 ? "explicit_topic_match" : "latest_answer",
+      selection_policy: topicTerms.length > 0
+        ? "explicit_topic_match"
+        : skippedNonSubstantiveLatest
+          ? "latest_substantive_answer"
+          : "latest_answer",
       context_role: "evidence_for_followup_reasoning",
     }),
   };

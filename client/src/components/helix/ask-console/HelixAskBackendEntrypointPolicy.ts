@@ -1,10 +1,14 @@
 import type { HelixAskRouteMetadata } from "@/lib/helix/ask-prompt-launch";
 import { asksForScientificImageTextEvidenceComparison } from "@shared/helix-scientific-image-intent";
+import {
+  isAffirmativeTheoryBadgeGraphReflectionPrompt,
+  isTheoryBadgeGraphCurrentContextPrompt,
+} from "@shared/helix-theory-badge-graph-intent";
 
 export const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE = "backend_ask_entry_required";
 export const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT =
   "This prompt requires the backend Ask solver path before a final answer can be shown.";
-export const HELIX_ASK_ENTRYPOINT_GUARD_VERSION = "E79";
+export const HELIX_ASK_ENTRYPOINT_GUARD_VERSION = "E81";
 
 type HelixAskBackendEntrypointFamily =
   | "calculator"
@@ -13,9 +17,11 @@ type HelixAskBackendEntrypointFamily =
   | "workstation_notes"
   | "repo_code"
   | "moral_graph"
+  | "theory_badge_graph"
   | "workspace_diagnostic"
   | "internet_search"
   | "scholarly_research"
+  | "research_library"
   | "live_pipeline"
   | "helix_ask"
   | "visual_capture"
@@ -42,7 +48,7 @@ const HELIX_EVIDENCE_GATE_TRANSFORM_TASK_RE =
 const HELIX_ASK_COMPARE_TRIGGER_RE = /\b(?:compare|contrast|difference|diff|what changed|changed since)\b/i;
 
 const HELIX_ASK_CAPABILITY_BEHAVIOR_TOOL_LABEL =
-  "(?:research[-\\s]+papers?|scholarly(?:[-\\s]+research)?|scientific[-\\s]+calculator|calculator|docs?(?:[-\\s]+viewer)?|repo(?:[-\\s]+search)?|internet[-\\s]+search|moral[-\\s]+graph|image[-\\s]+lens|visual[-\\s]+capture|workstation[-\\s]+notes?|notes?|workspace(?:[-\\s]+diagnostic)?|live[-\\s]+source|live[-\\s]+environment|narrator|voice|postulate(?:[-\\s]+board)?|helix[-\\s]+ask)";
+  "(?:research[-\\s]+library|research[-\\s]+papers?|scholarly(?:[-\\s]+research)?|scientific[-\\s]+calculator|calculator|docs?(?:[-\\s]+viewer)?|repo(?:[-\\s]+search)?|internet[-\\s]+search|moral[-\\s]+graph|theory[-\\s]+badge[-\\s]+graph|theory[-\\s]+graph|badge[-\\s]+graph|image[-\\s]+lens|visual[-\\s]+capture|workstation[-\\s]+notes?|notes?|workspace(?:[-\\s]+diagnostic)?|live[-\\s]+source|live[-\\s]+environment|narrator|voice|postulate(?:[-\\s]+board)?|helix[-\\s]+ask)";
 
 const HELIX_ASK_CAPABILITY_BEHAVIOR_SUBJECT =
   `(?:(?:(?:the|this)\\s+)?${HELIX_ASK_CAPABILITY_BEHAVIOR_TOOL_LABEL}|(?:your|the|this)\\s+(?:${HELIX_ASK_CAPABILITY_BEHAVIOR_TOOL_LABEL}\\s+)?(?:tool|capability|workflow))`;
@@ -53,7 +59,7 @@ const HELIX_ASK_CAPABILITY_BEHAVIOR_QUESTION_RE = new RegExp(
 );
 
 const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE =
-  /(?:^|\s)\/postulate\b|\b(?:postulate\.submit_proposal|scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\.search|docs\s+viewer|docs\s+search|narrator\.[a-z0-9_.-]+|panel[_\s-]?id\s*(?:=|:)\s*narrator|workstation-notes\.create_note|workstation-notes\.create|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|repo\.search|repo\s+search|moral-graph\.[a-z0-9_.-]+|(?:use|with|through|via)\s+(?:only\s+)?(?:the\s+)?moral\s+graph\b[\s\S]{0,120}\b(?:reflect|reflection|case|situation|dependency|repair|boundary|agency|badge|lens)|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|scholarly-research\.[a-z0-9_.-]+|scholarly_research\.[a-z0-9_.-]+|scholarly\s+research\s+tool|lookup_papers|fetch_full_text|extract_numeric_parameters|live_env\.[a-z0-9_.-]+|helix_ask\.[a-z0-9_.-]+|image[_\s-]?lens|visual_analysis\.inspect_image_region|visual_capture|scientific\s+(?:document|image|page)|document\s+image|attached\s+image.*(?:equation|latex|theory\s+graph))\b/i;
+  /(?:^|\s)\/postulate\b|\b(?:postulate\.submit_proposal|scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\.search|docs\s+viewer|docs\s+search|narrator\.[a-z0-9_.-]+|panel[_\s-]?id\s*(?:=|:)\s*narrator|workstation-notes\.create_note|workstation-notes\.create|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|repo\.search|repo\s+search|moral-graph\.[a-z0-9_.-]+|(?:use|with|through|via)\s+(?:only\s+)?(?:the\s+)?moral\s+graph\b[\s\S]{0,120}\b(?:reflect|reflection|case|situation|dependency|repair|boundary|agency|badge|lens)|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|scholarly-research\.[a-z0-9_.-]+|scholarly_research\.[a-z0-9_.-]+|scholarly\s+research\s+tool|lookup_papers|fetch_full_text|extract_numeric_parameters|research-library\.[a-z0-9_.-]+|research_library\.[a-z0-9_.-]+|live_env\.[a-z0-9_.-]+|helix_ask\.(?!reflect_theory_context\b)[a-z0-9_.-]+|image[_\s-]?lens|visual_analysis\.inspect_image_region|visual_capture|scientific\s+(?:document|image|page)|document\s+image|attached\s+image.*(?:equation|latex|theory\s+graph))\b/i;
 
 const HELIX_ASK_NOTE_CREATE_NEGATED_OR_CONTEXTUAL_RE =
   /\b(?:don't|do\s+not|dont|never|no\s+need\s+to|without|avoid|stop|cancel|should\s+i|would\s+it|could\s+it|when\s+i|when\s+you|if\s+i|if\s+you|before\s+i|after\s+i|last\s+time|previously|earlier|failed|failure|debug|quote|quoted|says?|said|screen\s+shows?)\b[\s\S]{0,120}\b(?:write|make|create|save|take|add)\s+(?:me\s+)?(?:a\s+|the\s+|new\s+)?note\b/i;
@@ -99,12 +105,12 @@ export const isConceptualToolExplanationWithoutExecution = (question: string): b
   const asksForConcept =
     /\b(?:what\s+is|what\s+does|explain|describe|define|meaning\s+of|looks?\s+like)\b/i.test(normalized);
   const referencesToolOrCapability =
-    /\b(?:tool|capability|identifier|namespace|function|action|moral\s+graph\s+reflection|moral\s+graph\s+tool|internet[-_.\s]?search|scientific\s+calculator|image\s+lens|docs\s+viewer|repo\.search|scholarly[-_.\s]?research)\b/i.test(normalized);
+    /\b(?:tool|capability|identifier|namespace|function|action|moral\s+graph\s+reflection|moral\s+graph\s+tool|theory\s+badge\s+graph|theory\s+graph|badge\s+graph|helix_ask\.reflect_theory_context|theory-badge-graph\.reflect_discussion_context|internet[-_.\s]?search|scientific\s+calculator|image\s+lens|docs\s+viewer|repo\.search|scholarly[-_.\s]?research|research[-_.\s]?library)\b/i.test(normalized);
   const suppressesExecution =
     /\b(?:do\s+not|don't|dont|without|not\s+to|no\s+need\s+to)\b[\s\S]{0,80}\b(?:run|execute|call|use|browse|search|open|inspect|reflect)\b/i.test(normalized) ||
     /\b(?:conceptually|plain\s+english|just\s+explain|only\s+explain)\b/i.test(normalized);
   const affirmativeExecution =
-    /\b(?:use|run|execute|call|open|search|browse|inspect|reflect\s+on|reflect\s+with|through|via)\s+(?:only\s+)?(?:the\s+)?(?:moral\s+graph|scientific\s+calculator|image\s+lens|docs\s+viewer|repo\.search|internet\s+search|scholarly\s+research)\b/i.test(normalized);
+    /\b(?:use|run|execute|call|open|search|browse|inspect|reflect\s+on|reflect\s+with|through|via)\s+(?:only\s+)?(?:the\s+)?(?:moral\s+graph|theory\s+badge\s+graph|theory\s+graph|badge\s+graph|helix_ask\.reflect_theory_context|theory-badge-graph\.reflect_discussion_context|scientific\s+calculator|image\s+lens|docs\s+viewer|repo\.search|internet\s+search|scholarly\s+research|research\s+library)\b/i.test(normalized);
   return asksForConcept && referencesToolOrCapability && suppressesExecution && !affirmativeExecution;
 };
 
@@ -270,6 +276,64 @@ export function resolveHelixAskBackendEntrypointFamily(
       requestedOutputs: ["tool_call_eligibility", "scholarly_paper_evidence", "full_text_observation", "numeric_parameter_observation", "typed_failure"],
     };
   }
+  if (/\b(?:research-library|research_library)\.[a-z0-9_.-]+\b/i.test(normalized)) {
+    const explicitCapability = normalized
+      .match(/\b(?:research-library|research_library)\.[a-z0-9_.-]+\b/i)?.[0]
+      ?.replace(/^research_library\./i, "research-library.") ?? null;
+    const requestsEnrichment = explicitCapability === "research-library.apply_evidence_enrichment";
+    const requestsBoundedReadFirst = requestsEnrichment &&
+      /\b(?:read|inspect|using|use|from)\b[\s\S]{0,180}\b(?:saved\s+)?research\s+library\s+(?:document|paper|pdf|sidecar|evidence)\b/i.test(normalized);
+    const selectedCapability = requestsBoundedReadFirst
+      ? "research-library.read_document"
+      : explicitCapability;
+    return {
+      family: "research_library",
+      sourceTarget: "research_library",
+      targetKind: requestsEnrichment ? "saved_paper_evidence_enrichment" : "saved_scholarly_full_text",
+      requiredToolFamily: "research_library",
+      selectedCapability,
+      explicitCue: requestsBoundedReadFirst
+        ? "research_library_read_then_enrich"
+        : "research_library_tool_family",
+      requestedOutputs: requestsEnrichment
+        ? [
+            "tool_call_eligibility",
+            "research_library_observation",
+            "paper_evidence_enrichment_observation",
+            "calculator_prefill",
+            "model_authored_synthesis",
+            "typed_failure",
+          ]
+        : ["tool_call_eligibility", "research_library_observation", "model_authored_synthesis", "typed_failure"],
+    };
+  }
+  const requestsCurrentTheoryBadgeGraphContext = isTheoryBadgeGraphCurrentContextPrompt(normalized);
+  const requestsTheoryBadgeGraphReflection = isAffirmativeTheoryBadgeGraphReflectionPrompt(normalized);
+  if (requestsCurrentTheoryBadgeGraphContext || requestsTheoryBadgeGraphReflection) {
+    const selectedCapability = requestsCurrentTheoryBadgeGraphContext
+      ? "theory-badge-graph.current_context"
+      : "helix_ask.reflect_theory_context";
+    return {
+      family: "theory_badge_graph",
+      sourceTarget: "theory_locator",
+      targetKind: requestsCurrentTheoryBadgeGraphContext
+        ? "theory_badge_graph_current_context"
+        : "theory_locator",
+      requiredToolFamily: "theory_locator",
+      selectedCapability,
+      explicitCue: requestsCurrentTheoryBadgeGraphContext
+        ? "current_theory_badge_graph_selection"
+        : "affirmative_theory_badge_graph_reflection",
+      requestedOutputs: [
+        "tool_call_eligibility",
+        ...(requestsCurrentTheoryBadgeGraphContext
+          ? ["theory_badge_graph_current_context_observation"]
+          : ["theory_context_reflection_observation"]),
+        "model_authored_synthesis",
+        "typed_failure",
+      ],
+    };
+  }
   if (/\blive_env\.[a-z0-9_.-]+\b/i.test(normalized)) {
     const capability = normalized.match(/\blive_env\.[a-z0-9_.-]+\b/i)?.[0] ?? null;
     return {
@@ -282,7 +346,7 @@ export function resolveHelixAskBackendEntrypointFamily(
       requestedOutputs: ["tool_call_eligibility", "live_source_observation", "typed_failure"],
     };
   }
-  if (/\bhelix_ask\.[a-z0-9_.-]+\b/i.test(normalized)) {
+  if (/\bhelix_ask\.(?!reflect_theory_context\b)[a-z0-9_.-]+\b/i.test(normalized)) {
     const capability = normalized.match(/\bhelix_ask\.[a-z0-9_.-]+\b/i)?.[0] ?? null;
     return {
       family: "helix_ask",

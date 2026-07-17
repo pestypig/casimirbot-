@@ -250,9 +250,10 @@ describe("HelixAskWorkflowSuggestionRuntime", () => {
     expect(screen.getByText("Find a bounded paper")).toBeInTheDocument();
   });
 
-  it("enables the developer demo from the lab panel", () => {
+  it("enables the public demo from the lab panel", () => {
     render(<WorkflowDemoLabPanel />);
     expect(screen.getByTestId("workflow-demo-lab-panel")).toBeInTheDocument();
+    expect(screen.getByText("public demo")).toBeInTheDocument();
     expect(screen.queryByTestId("helix-ask-workflow-qte")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Custom topic" }));

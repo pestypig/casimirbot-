@@ -1000,6 +1000,7 @@ describe("Helix Ask Console recrown boundary", () => {
       "HelixAskFinalAnswerSurface.tsx",
       "HelixAskInlineCodeSurface.tsx",
       "HelixAskMathHtmlSurface.tsx",
+      "HelixAskMermaidBlock.tsx",
       "HelixAskRenderedContentSurface.tsx",
       "HelixAskPathLinkedTextSurface.tsx",
       "HelixAskLegacyContentRenderers.tsx",
@@ -3530,7 +3531,12 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(legacyPill).not.toContain("function collectHelixReplyTerminalTranscriptTexts");
     expect(legacyPill).toContain("debugPayloadMatchesHelixAskLegacyRenderedReply as debugPayloadMatchesRenderedReply");
     expect(legacyPill).not.toContain("function debugPayloadMatchesRenderedReply");
-    expect(legacyPill).toContain("boundHelixDebugExportTextForUi");
+    expect(legacyPill).toContain("finalizeHelixAskWorkflowDebugCopyExport");
+    expect(legacyPill).not.toContain("boundHelixDebugExportTextForUi");
+    const workflowDebugProjectionSource = read(
+      "client/src/components/helix/ask-console/HelixAskWorkflowDebugProjection.ts",
+    );
+    expect(workflowDebugProjectionSource).toContain("boundHelixDebugExportTextForUi");
     expect(legacyPill).toContain("buildHelixAskRuntimeGoalDebugFields(localResponseRecord)");
     const debugCopyProjectionSource = read("client/src/components/helix/ask-console/HelixAskDebugCopyProjection.ts");
     expect(legacyPill).toContain("resolveHelixAskAuthoritativeDebugExportPayload(localPayload)");
@@ -3852,6 +3858,62 @@ describe("Helix Ask Console recrown boundary", () => {
     }
   });
 
+  it("hydrates an advertised backend debug ref at the shared clipboard boundary", async () => {
+    const originalFetch = globalThis.fetch;
+    const originalNavigator = globalThis.navigator;
+    const backendTurnId = "ask:research-library-debug-copy";
+    const clientTurnId = `helix-chat-turn:client:${backendTurnId}`;
+    const endpoint = `/api/agi/ask/turn/${encodeURIComponent(backendTurnId)}/debug-export`;
+    const writes: string[] = [];
+    Object.defineProperty(globalThis, "fetch", {
+      configurable: true,
+      value: vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: vi.fn(async () => ({
+          payload: {
+            schema: "helix.ask.debug_export.v1",
+            active_turn_id: backendTurnId,
+            active_prompt: "Read the saved Research Library document.",
+            ask_turn_solver_trace: { completed_solver_path: true },
+          },
+        })),
+      }) as unknown as Response),
+    });
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: {
+        clipboard: {
+          writeText: vi.fn(async (text: string) => writes.push(text)),
+        },
+      },
+    });
+
+    try {
+      const result = await copyHelixAskDebugPayloadToClipboard(JSON.stringify({
+        schema: "helix.ask.debug_export.v1",
+        active_turn_id: clientTurnId,
+        active_prompt: "Read the saved Research Library document.",
+        debug_export_source: "rendered_reply_dom",
+        backend_debug_response_status: "ref_advertised",
+        backend_debug_response_ref: { endpoint, turn_id: backendTurnId },
+      }));
+
+      expect(result).toMatchObject({ ok: true, method: "navigator.clipboard" });
+      expect(writes).toHaveLength(1);
+      expect(JSON.parse(writes[0])).toMatchObject({
+        active_turn_id: backendTurnId,
+        client_active_turn_id: clientTurnId,
+        debug_export_source: "backend_endpoint",
+        backend_debug_response_status: "fetched",
+        ask_turn_solver_trace: { completed_solver_path: true },
+      });
+    } finally {
+      Object.defineProperty(globalThis, "fetch", { configurable: true, value: originalFetch });
+      Object.defineProperty(globalThis, "navigator", { configurable: true, value: originalNavigator });
+    }
+  });
+
   it("attaches client workflow demo debug at the final debug-copy boundary", () => {
     const merged = mergeHelixAskClientWorkflowDemoDebugIntoExport(
       JSON.stringify({
@@ -3968,6 +4030,56 @@ describe("Helix Ask Console recrown boundary", () => {
       visible_final_answer: visibleFailure,
       selected_final_answer: visibleFailure,
       ui_answer_equals_selected_final_answer: true,
+    });
+  });
+
+  it("keeps clicked rendered-turn identity above a stale nested terminal authority", () => {
+    const selectedTurnId = "ask:dynamic-reflection";
+    const selectedClientTurnId = "helix-chat-turn:client:ask:dynamic-reflection";
+    const selectedQuestion = "Compile the dynamic theory reflection request.";
+    const selectedFailure =
+      "I could not complete this turn because a tool observation required a follow-up model answer step, but no later terminal answer artifact was available.";
+    const staleScholarlyAnswer = "Old scholarly-paper answer from another turn.";
+    const exported = JSON.parse(buildHelixDebugExportEnvelopeFromMasterPayload({
+      id: selectedClientTurnId,
+      question: selectedQuestion,
+      content: selectedFailure,
+    }, {
+      debug_export_source: "rendered_reply_dom",
+      debug_export_rebuild_reason: "rendered_button_scope",
+      active_turn_id: selectedTurnId,
+      client_active_turn_id: selectedClientTurnId,
+      selectedDebugQuestion: selectedQuestion,
+      selectedDebugFinalAnswer: selectedFailure,
+      selected_final_answer: selectedFailure,
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "post_tool_model_step_missing",
+      debug: {
+        turn_id: selectedTurnId,
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+        terminal_error_code: "post_tool_model_step_missing",
+        terminal_answer_authority: {
+          turn_id: "ask:old-scholarly-paper",
+          server_authoritative: true,
+          terminal_artifact_kind: "scholarly_research_answer",
+          final_answer_source: "scholarly_research_answer",
+          terminal_text_preview: staleScholarlyAnswer,
+        },
+      },
+    }));
+
+    expect(exported.active_turn_id).toBe(selectedTurnId);
+    expect(exported.backend_turn_id).toBe(selectedTurnId);
+    expect(exported.client_active_turn_id).toBe(selectedClientTurnId);
+    expect(exported.active_prompt).toBe(selectedQuestion);
+    expect(exported.selected_final_answer).toBe(selectedFailure);
+    expect(exported.selected_final_answer).not.toBe(staleScholarlyAnswer);
+    expect(exported.resolved_turn_summary).toMatchObject({
+      turn_id: selectedTurnId,
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: "post_tool_model_step_missing",
     });
   });
 
@@ -5124,7 +5236,7 @@ describe("Helix Ask Console recrown boundary", () => {
       }),
     });
     expect(userModel).toMatchObject({
-      visible: true,
+      visible: false,
       locked: true,
       lockReason: "developer_runtime_agent_controls_required",
       modeLabel: "Live Voice",
@@ -5135,6 +5247,14 @@ describe("Helix Ask Console recrown boundary", () => {
         terminal_eligible: false,
         assistant_answer: false,
       }),
+    });
+    const noSessionModel = buildHelixAskLiveRuntimeControlsModel({
+      accountPolicy: null,
+      mode: "live_voice",
+    });
+    expect(noSessionModel).toMatchObject({
+      visible: false,
+      locked: true,
     });
     expect(isHelixAgentRuntimeId("realtime_session")).toBe(false);
     expect(normalizeHelixAgentProvidersResponse({
@@ -5152,6 +5272,9 @@ describe("Helix Ask Console recrown boundary", () => {
     const markup = renderToStaticMarkup(
       React.createElement(HelixAskLiveRuntimeControls, { model: developerModel }),
     );
+    const userMarkup = renderToStaticMarkup(
+      React.createElement(HelixAskLiveRuntimeControls, { model: userModel }),
+    );
     const toolbar = read("client/src/components/helix/ask-console/HelixAskActionToolbar.tsx");
     const actionToolbarSurface = read("client/src/components/helix/ask-console/HelixAskComposerActionToolbarSurface.tsx");
     const liveRuntimeControls = read("client/src/components/helix/ask-console/HelixAskLiveRuntimeControls.tsx");
@@ -5160,12 +5283,18 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(markup).toContain("Live Off");
     expect(markup).toContain("Observe");
     expect(markup).toContain("Listening");
-    expect(markup).toContain("Ready Blocked");
+    expect(markup).not.toContain("Ready Blocked");
+    expect(userMarkup).toBe("");
     expect(toolbar).toContain("{liveRuntimeControls}");
+    expect(toolbar.indexOf("{liveRuntimeControls}")).toBeLessThan(
+      toolbar.indexOf("{runtimePicker}"),
+    );
     expect(actionToolbarSurface).toContain("<HelixAskLiveRuntimeControls");
+    expect(actionToolbarSurface).toContain("liveRuntimeControlsModel?.visible");
     expect(liveRuntimeControls).toContain("developer_runtime_agent_controls_required");
-    expect(liveRuntimeControls).toContain("data-transport-controller-state");
-    expect(liveRuntimeControls).toContain("data-transport-execution-attempted={");
+    expect(liveRuntimeControls).toContain("data-live-microphone-enabled");
+    expect(liveRuntimeControls).toContain("runtime.setMicrophoneEnabled(!runtime.microphoneEnabled)");
+    expect(actionToolbarSurface).toContain("showMicButton={!liveOwnsMicrophone}");
     expect(liveRuntimeControls).not.toContain("fetch(");
     expect(liveRuntimeControls).not.toContain("navigator.mediaDevices");
     expect(liveRuntimeControls).not.toContain("RTCPeerConnection");
@@ -5787,7 +5916,56 @@ describe("Helix Ask Console recrown boundary", () => {
 
     const trackStop = vi.fn();
     const dataChannelClose = vi.fn();
+    const dataChannelSend = vi.fn();
+    const dataChannelState = vi.fn();
+    const microphoneState = vi.fn();
+    const localMicrophoneTrack = {
+      stop: trackStop,
+      kind: "audio",
+      enabled: true,
+      muted: false,
+      readyState: "live",
+      label: "USB Microphone",
+    };
+    let onDataChannelOpen: (() => void) | null = null;
+    const dataChannel = {
+      close: dataChannelClose,
+      send: dataChannelSend,
+      get onopen() {
+        return onDataChannelOpen;
+      },
+      set onopen(handler: (() => void) | null) {
+        onDataChannelOpen = handler;
+      },
+      onclose: null as (() => void) | null,
+      onerror: null as (() => void) | null,
+      onmessage: null as ((event: { data: unknown }) => void) | null,
+    };
     const peerConnectionClose = vi.fn();
+    const remoteAudioPlay = vi.fn(async () => undefined);
+    const remoteAudioPause = vi.fn();
+    const remoteAudioPlayback = vi.fn();
+    const remoteAudioTrack = vi.fn();
+    const remoteTrackStream = { getTracks: () => [] };
+    const createRemoteMediaStream = vi.fn(() => remoteTrackStream);
+    let onRemoteTrack: ((event: {
+      streams?: Array<{ getTracks(): Array<{ stop(): void }> }>;
+      track?: { stop(): void };
+    }) => void) | null = null;
+    const dispatchRemoteTrack = (event: {
+      streams?: Array<{ getTracks(): Array<{ stop(): void }> }>;
+      track?: { stop(): void };
+    }) => {
+      if (!onRemoteTrack) throw new Error("remote_track_handler_not_registered");
+      onRemoteTrack(event);
+    };
+    const remoteAudio = {
+      autoplay: true,
+      muted: false,
+      srcObject: null as unknown,
+      play: remoteAudioPlay,
+      pause: remoteAudioPause,
+    };
     const allowedHandoff = {
       schema: "helix.ask.live_runtime.transport_handoff_plan.v1",
       status: "blocked_live_transport_disabled",
@@ -5852,23 +6030,28 @@ describe("Helix Ask Console recrown boundary", () => {
     const allowedController = createHelixAskLiveRuntimeBrowserTransportController({
       nowMs: () => 1783375252800,
       requestMicrophone: vi.fn(async () => ({
-        getTracks: () => [{ stop: trackStop }],
+        getTracks: () => [localMicrophoneTrack],
       })),
       createPeerConnection: () => ({
-        createDataChannel: () => ({ close: dataChannelClose }),
+        get ontrack() {
+          return onRemoteTrack;
+        },
+        set ontrack(handler) {
+          onRemoteTrack = handler ?? null;
+        },
+        createDataChannel: () => dataChannel,
         addTrack: vi.fn(),
         createOffer: vi.fn(async () => ({ type: "offer" as const, sdp: "v=0\r\nmock-offer" })),
         setLocalDescription: vi.fn(async () => undefined),
         setRemoteDescription: vi.fn(async () => undefined),
         close: peerConnectionClose,
       }),
-      createRemoteAudio: () => ({
-        autoplay: true,
-        muted: false,
-        srcObject: null,
-        play: vi.fn(async () => undefined),
-        pause: vi.fn(),
-      }),
+      createRemoteAudio: () => remoteAudio,
+      createRemoteMediaStream,
+      onRemoteAudioTrack: remoteAudioTrack,
+      onRemoteAudioPlayback: remoteAudioPlayback,
+      onMicrophoneState: microphoneState,
+      onDataChannelState: dataChannelState,
       exchangeSdp: vi.fn(async () => ({
         answerSdp: "v=0\r\nmock-answer",
         providerCallRef: "openai-realtime:call:test",
@@ -5900,11 +6083,89 @@ describe("Helix Ask Console recrown boundary", () => {
         terminal_eligible: false,
       }),
     });
+    expect(microphoneState).toHaveBeenCalledWith({
+      trackCount: 1,
+      liveTrackCount: 1,
+      enabledTrackCount: 0,
+      mutedTrackCount: 0,
+      deviceLabel: "USB Microphone",
+      loopbackSource: false,
+    });
+    expect(allowedController.getMicrophoneEnabled()).toBe(false);
+    expect(localMicrophoneTrack.enabled).toBe(false);
+    expect(allowedController.setMicrophoneEnabled(true)).toBe(true);
+    expect(allowedController.getMicrophoneEnabled()).toBe(true);
+    expect(localMicrophoneTrack.enabled).toBe(true);
+    expect(microphoneState).toHaveBeenLastCalledWith({
+      trackCount: 1,
+      liveTrackCount: 1,
+      enabledTrackCount: 1,
+      mutedTrackCount: 0,
+      deviceLabel: "USB Microphone",
+      loopbackSource: false,
+    });
+    if (!onDataChannelOpen) throw new Error("data_channel_open_handler_not_registered");
+    onDataChannelOpen();
+    expect(dataChannelState).toHaveBeenNthCalledWith(1, {
+      state: "open",
+      initialAudioProbe: "not_attempted",
+      errorCode: null,
+    });
+    expect(dataChannelState).toHaveBeenNthCalledWith(2, {
+      state: "open",
+      initialAudioProbe: "requested",
+      errorCode: null,
+    });
+    expect(dataChannelSend).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(dataChannelSend.mock.calls[0][0])).toMatchObject({
+      type: "response.create",
+      response: {
+        conversation: "none",
+        output_modalities: ["audio"],
+        metadata: {
+          helix_purpose: "connection_audio_probe",
+          answer_authority: "none",
+        },
+      },
+    });
+    const streamBackedRemoteAudio = { getTracks: () => [] };
+    dispatchRemoteTrack({ streams: [streamBackedRemoteAudio] });
+    await vi.waitFor(() => expect(remoteAudioPlayback).toHaveBeenLastCalledWith({
+      status: "started",
+      errorCode: null,
+      muted: false,
+    }));
+    expect(remoteAudioPlay).toHaveBeenCalledTimes(1);
+    expect(remoteAudio.srcObject).toBe(streamBackedRemoteAudio);
+    expect(remoteAudioTrack).toHaveBeenLastCalledWith({
+      source: "stream",
+      muted: false,
+      focusGranted: true,
+    });
+
+    const playbackBlocked = new Error("play() requires a user gesture");
+    playbackBlocked.name = "NotAllowedError";
+    remoteAudioPlay.mockRejectedValueOnce(playbackBlocked);
+    const trackOnlyRemoteAudio = { stop: vi.fn() };
+    dispatchRemoteTrack({ streams: [], track: trackOnlyRemoteAudio });
+    await vi.waitFor(() => expect(remoteAudioPlayback).toHaveBeenLastCalledWith({
+      status: "failed",
+      errorCode: "remote_audio_playback_blocked",
+      muted: false,
+    }));
+    expect(createRemoteMediaStream).toHaveBeenCalledWith(trackOnlyRemoteAudio);
+    expect(remoteAudio.srcObject).toBe(remoteTrackStream);
+    expect(remoteAudioTrack).toHaveBeenLastCalledWith({
+      source: "track_fallback",
+      muted: false,
+      focusGranted: true,
+    });
     const stopped = await allowedController.stopTransport({
       realtimeSessionId: "realtime:browser",
       observedAtMs: 1783375252900,
     });
     expect(trackStop).toHaveBeenCalledTimes(1);
+    expect(remoteAudioPause).toHaveBeenCalledTimes(1);
     expect(dataChannelClose).toHaveBeenCalledTimes(1);
     expect(peerConnectionClose).toHaveBeenCalledTimes(1);
     expect(stopped).toMatchObject({
@@ -5941,6 +6202,9 @@ describe("Helix Ask Console recrown boundary", () => {
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     expect(controllerSource).toContain("navigator?.mediaDevices");
     expect(controllerSource).toContain("RTCPeerConnection");
+    expect(controllerSource).toContain("document.body.appendChild(audio)");
+    expect(controllerSource).toContain("isLikelyLoopbackDeviceLabel");
+    expect(controllerSource).toContain("setMicrophoneEnabled(false)");
     expect(controllerSource).not.toContain("OPENAI_API_KEY");
     expect(controllerSource).not.toContain("client_secrets");
     expect(controllerSource).not.toContain("/v1/realtime");
@@ -6081,7 +6345,8 @@ describe("Helix Ask Console recrown boundary", () => {
 
     expect(toolbar).toContain("export function HelixAskActionToolbar");
     expect(toolbar).toContain('title="Attach image"');
-    expect(toolbar).toContain('const micTitle = micEnabled ? "Disable microphone" : "Enable microphone"');
+    expect(toolbar).toContain('const micTitle = micInputMode === "live_runtime"');
+    expect(toolbar).toContain('data-microphone-owner={micInputMode}');
     expect(toolbar).toContain('title="Capture visual source"');
     expect(toolbar).toContain("const visualAudioTitle = visualSituationIncludeAudio");
     expect(toolbar).toContain("<Plus className=");

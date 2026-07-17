@@ -97,6 +97,23 @@ describe("theory badge overlap locator", () => {
     }
   });
 
+  it("does not treat reflection packet vocabulary as scientific identity", () => {
+    const graph = buildNhm2TheoryBadgeGraphV1();
+    const matches = locateTheoryBadges({
+      graph,
+      input: {
+        query:
+          "LIVE_DERIVATION_PROGRAM_GODEL_07 Use helix_ask.reflect_theory_context exactly once " +
+          "to compare Gödel incompleteness theorem with Fermat Last Theorem. " +
+          "Report exact_badge_ids, likely_badge_ids, representedProbabilityMass, " +
+          "outOfGraphProbability, master_problem_v1, derivation_program_v1, and failureReceipts.",
+        limit: 20,
+      },
+    });
+
+    expect(matches).toEqual([]);
+  });
+
   it("does not match short element tags as substrings but preserves explicit lookup", () => {
     const graph = buildNhm2TheoryBadgeGraphV1();
     const theoremMatches = locateTheoryBadges({

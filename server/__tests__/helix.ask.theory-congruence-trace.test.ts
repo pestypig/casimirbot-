@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { isHelixTheoryContextReflectionToolReceiptV1 } from "../../shared/contracts/helix-theory-context-reflection-tool-receipt.v1";
 import { isTheoryCongruenceTraceV1 } from "../../shared/helix-theory-congruence-trace";
 import { isTheoryMasterProblemV1 } from "../../shared/contracts/theory-master-problem.v1";
+import { isTheoryDerivationProgramV1 } from "../../shared/contracts/theory-derivation-program.v1";
 import { runAskLevelTheoryContextReflectionTool } from "../services/helix-ask/theory-context-reflection-tool";
 import { buildScholarlyPaperSources } from "../services/helix-ask/theory-congruence/scholarly-observation";
 
@@ -40,6 +41,16 @@ describe("Helix Ask theory congruence trace", () => {
     expect(trace?.master_problem.claimBoundary.terminalEligible).toBe(false);
     expect(trace?.master_problem.claimBoundary.completedSolverPathRequired).toBe(true);
     expect(trace?.master_problem.uncertaintyLedger.outOfGraphProbability).toBeGreaterThanOrEqual(0);
+    expect(isTheoryDerivationProgramV1(trace?.derivation_program)).toBe(true);
+    expect(trace?.derivation_program.claimBoundary).toMatchObject({
+      temporaryProgram: true,
+      executesTools: false,
+      assistantAnswer: false,
+      terminalEligible: false,
+      completedSolverPathRequired: true,
+    });
+    expect(trace?.derivation_program.solverRoute.executorOwner).toBe("agent_runtime");
+    expect(trace?.derivation_program.steps.every((step) => step.executionStatus === "not_started")).toBe(true);
   });
 
   it("represents exact arXiv direct-PDF fallback when metadata fails", () => {
@@ -100,7 +111,28 @@ describe("Helix Ask theory congruence trace", () => {
       coordinateFrame: "solar_surface_local",
       normalizationStatus: "explicit",
     });
-    expect(receipt.theoryCongruenceTraceV1?.master_problem.compile.allowedResultKinds).toContain("equivalence_class");
+    expect(receipt.theoryCongruenceTraceV1?.master_problem.observableResolution).toMatchObject({
+      targetObservableId: "P_nano",
+      status: "blocked",
+    });
+    expect(receipt.theoryCongruenceTraceV1?.master_problem.compile).toMatchObject({
+      status: "unidentifiable",
+      allowedResultKinds: ["unresolved"],
+      runtimeAdmission: "blocked",
+    });
     expect(receipt.theoryCongruenceTraceV1?.master_problem.claimBoundary.assistantAnswer).toBe(false);
+    expect(receipt.theoryCongruenceTraceV1?.derivation_program).toMatchObject({
+      artifactId: "theory_derivation_program",
+      status: "blocked",
+      solverRoute: { family: "none", admission: "blocked" },
+    });
+    expect(receipt.theoryCongruenceTraceV1?.derivation_program.failureReceipts).toEqual(
+      expect.arrayContaining([expect.objectContaining({
+          code: "observable_unidentifiable",
+          assistantAnswer: false,
+          terminalEligible: false,
+        })]),
+    );
+    expect(receipt.theoryCongruenceTraceV1?.derivation_program.failureReceipts).toHaveLength(1);
   });
 });

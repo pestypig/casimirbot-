@@ -454,6 +454,10 @@ describe("Codex provider capability lane adapter", () => {
       "Do not crop the image or use Image Lens; answer from saved text only.",
       visualCapability,
     )).toEqual(["visual_evidence"]);
+    expect(forbiddenEvidenceFamiliesForLaneCapability(
+      "A passage is sufficient; do not require exact equation transcription or Image Lens.",
+      visualCapability,
+    )).toEqual(["visual_evidence"]);
   });
 
   it("bridges a private Research Library PDF observation into renderable scholarly workbench memory", () => {
@@ -1214,6 +1218,87 @@ describe("Codex provider capability lane adapter", () => {
       globalThis.fetch = previousFetch;
       if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
       else process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      if (previousExitCode === undefined) delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      else process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+    }
+  });
+
+  it("resamples an answer after a negated Image Lens lane request is suppressed", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    const previousFetch = globalThis.fetch;
+    const modelAnswer = [
+      "Title: Test Scholarly Paper.",
+      "Source kind: html; parsed pages: 1.",
+      "Page 1 passage: The sampled negative energy density is bounded in magnitude and duration.",
+    ].join("\n");
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        'HELIX_CAPABILITY_LANE_REQUEST_JSON: {"capability":"visual_analysis.inspect_image_region","bbox_px":{"x":0,"y":0,"width":1,"height":1},"question":"Inspect the rendered scholarly PDF page for equations.","reason_for_crop":"Scholarly PDF page image evidence extraction.","assistant_answer":false,"terminal_eligible":false}',
+        modelAnswer,
+      ],
+    });
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    const htmlBytes = new TextEncoder().encode(
+      `<html><body><article>${"The sampled negative energy density is bounded in magnitude and duration. ".repeat(80)}</article></body></html>`,
+    );
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: () => "text/html; charset=utf-8" },
+      arrayBuffer: async () => htmlBytes.buffer.slice(
+        htmlBytes.byteOffset,
+        htmlBytes.byteOffset + htmlBytes.byteLength,
+      ),
+    })) as typeof fetch;
+
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "ask:test:suppressed-image-lens-answer-reentry",
+          thread_id: "thread:test:suppressed-image-lens-answer-reentry",
+          agent_runtime: "codex",
+          question: [
+            "Fetch and parse the full text from https://example.test/paper.",
+            "Return one page-numbered passage supporting a quantum inequality.",
+            "A passage is sufficient; do not require exact equation transcription or Image Lens.",
+            "Do not search for other papers.",
+          ].join(" "),
+        },
+        headers: {},
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.text).toBe(modelAnswer);
+      expect((result as any).terminal_artifact_kind).toBe("scholarly_research_answer");
+      expect((result.debug as any)?.runtime_lane_request_loop).toMatchObject({
+        status: "lane_request_suppressed_by_negative_evidence_constraint",
+        suppressed_lane_recovery_attempted: true,
+        suppressed_lane_recovery_status: "provider_answer_candidate_returned",
+        negative_evidence_capability_lane_suppression: {
+          forbidden_families: ["visual_evidence"],
+        },
+      });
+      expect((result.debug as any)?.capability_lane_call_results ?? []).toEqual([]);
+      expect((result.debug as any)?.provider_gateway_debug_summary).toMatchObject({
+        evidence_reentry_status: "completed",
+        terminal_authority_granted: true,
+        terminal_artifact_kind: "scholarly_research_answer",
+      });
+    } finally {
+      globalThis.fetch = previousFetch;
+      if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      else process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      if (previousStdoutSequence === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      else process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      if (previousCallIndex === undefined) delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      else process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
       if (previousExitCode === undefined) delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
       else process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
     }
@@ -3534,7 +3619,7 @@ describe("Codex provider capability lane adapter", () => {
       const debug = result.debug as Record<string, any>;
       const gatewayResults = debug.workstation_gateway_call_results as Array<Record<string, any>>;
       const theoryResult = gatewayResults.find((entry) =>
-        entry.capability_id === "theory-badge-graph.reflect_discussion_context"
+        entry.capability_id === "helix_ask.reflect_theory_context"
       );
 
       expect(result).toMatchObject({
@@ -3542,8 +3627,17 @@ describe("Codex provider capability lane adapter", () => {
         final_answer_source: "theory_context_reflection_answer",
         terminal_artifact_kind: "theory_context_reflection_answer",
       });
-      expect(result.answer).toContain("Theory Badge Graph reflection completed as diagnostic evidence only");
-      expect(result.answer).toContain("Calculator template admissibility");
+      expect(result.answer).toBe(
+        "The scientific image sidecar was reflected through the Theory Badge Graph observation.",
+      );
+      expect(debug.theory_reflection_receipt_answer?.answer_text).toContain(
+        "Theory Badge Graph reflection completed as diagnostic evidence only",
+      );
+      expect(debug.theory_reflection_receipt_answer?.answer_text).toContain("Calculator template admissibility");
+      expect((result as any).theory_context_reflection_answer).toMatchObject({
+        answer_text: result.answer,
+        provider_terminal_candidate_kind: "agent_provider_terminal_candidate",
+      });
       expect(result.answer).not.toContain("tool observation required a follow-up model answer step");
       expect(theoryResult).toBeTruthy();
       expect(theoryResult?.observation).toMatchObject({
@@ -3578,7 +3672,7 @@ describe("Codex provider capability lane adapter", () => {
       expect(debug.runtime_lane_request_loop).toMatchObject({
         scientific_image_sidecar_gateway_bridge: {
           status: "completed",
-          capability_id: "theory-badge-graph.reflect_discussion_context",
+          capability_id: "helix_ask.reflect_theory_context",
           result_count: 1,
         },
       });

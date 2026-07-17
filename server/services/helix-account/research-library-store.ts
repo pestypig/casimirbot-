@@ -7,6 +7,14 @@ import {
   type HelixResearchLibraryList,
   type HelixResearchLibraryPage,
 } from "@shared/helix-research-library";
+import {
+  buildHelixPaperEvidenceSidecarV1,
+  type HelixPaperEvidenceSidecarV1,
+} from "@shared/helix-paper-evidence-sidecar";
+import {
+  applyHelixPaperEvidenceEnrichmentV1,
+  type ApplyHelixPaperEvidenceEnrichmentResultV1,
+} from "@shared/helix-paper-evidence-enrichment";
 import { ensureDatabase, getPool } from "../../db/client";
 
 const ENCRYPTION_ALGORITHM = "aes-256-gcm";
@@ -71,11 +79,17 @@ const encryptionKey = (): { key: Buffer; keyId: string } => {
   };
 };
 
-const encryptPages = (pages: HelixResearchLibraryPage[]) => {
+type EncryptedResearchLibraryContentV2 = {
+  schema: "helix.research_library_encrypted_content.v2";
+  pages: HelixResearchLibraryPage[];
+  paper_evidence_sidecars: HelixPaperEvidenceSidecarV1[];
+};
+
+const encryptContent = (content: EncryptedResearchLibraryContentV2) => {
   const { key, keyId } = encryptionKey();
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, key, iv);
-  const plaintext = Buffer.from(JSON.stringify(pages), "utf8");
+  const plaintext = Buffer.from(JSON.stringify(content), "utf8");
   const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
   return {
     encryptedContent: [
@@ -89,7 +103,7 @@ const encryptPages = (pages: HelixResearchLibraryPage[]) => {
   };
 };
 
-const decryptPages = (value: string): HelixResearchLibraryPage[] => {
+const decryptContent = (value: string): EncryptedResearchLibraryContentV2 => {
   const parts = value.split(":");
   if (parts.length !== 4 || parts[0] !== ENCRYPTED_CONTENT_PREFIX) throw new Error("research_library_content_invalid");
   const { key } = encryptionKey();
@@ -100,7 +114,28 @@ const decryptPages = (value: string): HelixResearchLibraryPage[] => {
     decipher.final(),
   ]).toString("utf8");
   const parsed = JSON.parse(plaintext);
-  return Array.isArray(parsed) ? parsed as HelixResearchLibraryPage[] : [];
+  if (Array.isArray(parsed)) {
+    return {
+      schema: "helix.research_library_encrypted_content.v2",
+      pages: parsed as HelixResearchLibraryPage[],
+      paper_evidence_sidecars: [],
+    };
+  }
+  if (parsed && typeof parsed === "object") {
+    const record = parsed as Partial<EncryptedResearchLibraryContentV2>;
+    return {
+      schema: "helix.research_library_encrypted_content.v2",
+      pages: Array.isArray(record.pages) ? record.pages : [],
+      paper_evidence_sidecars: Array.isArray(record.paper_evidence_sidecars)
+        ? record.paper_evidence_sidecars
+        : [],
+    };
+  }
+  return {
+    schema: "helix.research_library_encrypted_content.v2",
+    pages: [],
+    paper_evidence_sidecars: [],
+  };
 };
 
 const parseMetadata = (row: ResearchLibraryRow): HelixResearchLibraryDocumentSummary => {
@@ -128,9 +163,45 @@ export async function saveResearchLibraryExtraction(
   const pages = input.pages
     .filter((page) => Number.isInteger(page.page) && page.page > 0)
     .sort((left, right) => left.page - right.page);
-  const encrypted = encryptPages(pages);
-  if (encrypted.contentBytes > MAX_DOCUMENT_BYTES) throw new Error("research_library_document_too_large");
+  const documentId = `research:${crypto.createHash("sha256").update(`${profileId}:${integrityHash}`).digest("base64url").slice(0, 24)}`;
+  const now = new Date().toISOString();
+  const freshPaperEvidenceSidecar = buildHelixPaperEvidenceSidecarV1({
+    document_id: documentId,
+    source_integrity_hash: integrityHash,
+    paper_result_id: clean(input.paper_result_id) || null,
+    extraction_status: input.extraction_status,
+    pages,
+    generated_at: now,
+  });
   await ensureDatabase();
+  const { rows: existingRows } = await getPool().query<ResearchLibraryRow>(
+    `SELECT * FROM helix_research_library_documents
+     WHERE profile_id = $1 AND source_integrity_hash = $2 AND deleted_at IS NULL LIMIT 1`,
+    [profileId, integrityHash],
+  );
+  const existingContent = existingRows[0]
+    ? decryptContent(existingRows[0].encrypted_content)
+    : null;
+  const preserveEnrichedContent = Boolean(existingContent?.paper_evidence_sidecars.some((sidecar) =>
+    (sidecar.revision ?? 1) > 1 || (sidecar.enrichment?.history?.length ?? 0) > 0,
+  ));
+  const contentToPersist: EncryptedResearchLibraryContentV2 = preserveEnrichedContent && existingContent
+    ? existingContent
+    : {
+        schema: "helix.research_library_encrypted_content.v2",
+        pages,
+        paper_evidence_sidecars: [freshPaperEvidenceSidecar],
+      };
+  const persistedPages = contentToPersist.pages;
+  const paperEvidenceSidecar = contentToPersist.paper_evidence_sidecars[0] ?? freshPaperEvidenceSidecar;
+  const encrypted = encryptContent({
+    schema: "helix.research_library_encrypted_content.v2",
+    pages: persistedPages,
+    paper_evidence_sidecars: contentToPersist.paper_evidence_sidecars.length > 0
+      ? contentToPersist.paper_evidence_sidecars
+      : [paperEvidenceSidecar],
+  });
+  if (encrypted.contentBytes > MAX_DOCUMENT_BYTES) throw new Error("research_library_document_too_large");
   const { rows: usageRows } = await getPool().query<{ total_bytes: string | number }>(
     `SELECT COALESCE(SUM(content_bytes), 0) AS total_bytes
      FROM helix_research_library_documents
@@ -141,8 +212,6 @@ export async function saveResearchLibraryExtraction(
   if (currentBytes + encrypted.contentBytes > DEFAULT_PROFILE_QUOTA_BYTES) {
     throw new Error("research_library_profile_quota_exceeded");
   }
-  const documentId = `research:${crypto.createHash("sha256").update(`${profileId}:${integrityHash}`).digest("base64url").slice(0, 24)}`;
-  const now = new Date().toISOString();
   const metadata: HelixResearchLibraryDocumentSummary = {
     schema: HELIX_RESEARCH_LIBRARY_DOCUMENT_SCHEMA,
     document_id: documentId,
@@ -154,11 +223,18 @@ export async function saveResearchLibraryExtraction(
     source_integrity_hash: integrityHash,
     paper_result_id: clean(input.paper_result_id) || null,
     query: clean(input.query) || null,
-    page_count: pages.length,
-    text_char_count: pages.reduce((sum, page) => sum + page.text.length, 0),
+    page_count: persistedPages.length,
+    text_char_count: persistedPages.reduce((sum, page) => sum + page.text.length, 0),
     extraction_status: input.extraction_status,
     language: null,
-    sidecar_refs: [],
+    sidecar_refs: [{
+      sidecar_id: paperEvidenceSidecar.sidecar_id,
+      kind: paperEvidenceSidecar.sidecar_kind,
+      artifact_ref: paperEvidenceSidecar.sidecar_id,
+      ...(persistedPages[0]?.page ? { page_start: persistedPages[0].page } : {}),
+      ...(persistedPages.at(-1)?.page ? { page_end: persistedPages.at(-1)?.page } : {}),
+      created_at: paperEvidenceSidecar.generated_at,
+    }],
     created_at: now,
     updated_at: now,
     private: true,
@@ -213,7 +289,13 @@ export async function readResearchLibraryDocument(
   );
   const row = rows[0];
   if (!row) return null;
-  return { ...parseMetadata(row), pages: decryptPages(row.encrypted_content), raw_content_included: true };
+  const content = decryptContent(row.encrypted_content);
+  return {
+    ...parseMetadata(row),
+    pages: content.pages,
+    paper_evidence_sidecars: content.paper_evidence_sidecars,
+    raw_content_included: true,
+  };
 }
 
 export async function findResearchLibraryDocument(input: {
@@ -244,7 +326,144 @@ export async function findResearchLibraryDocument(input: {
     );
   });
   if (!row) return null;
-  return { ...parseMetadata(row), pages: decryptPages(row.encrypted_content), raw_content_included: true };
+  const content = decryptContent(row.encrypted_content);
+  return {
+    ...parseMetadata(row),
+    pages: content.pages,
+    paper_evidence_sidecars: content.paper_evidence_sidecars,
+    raw_content_included: true,
+  };
+}
+
+export type ApplyResearchLibraryEvidenceEnrichmentResult =
+  | (Extract<ApplyHelixPaperEvidenceEnrichmentResultV1, { ok: true }> & {
+      document_id: string;
+      sidecar_id: string;
+      updated_at: string;
+    })
+  | Extract<ApplyHelixPaperEvidenceEnrichmentResultV1, { ok: false }>;
+
+export async function applyResearchLibraryEvidenceEnrichment(input: {
+  profile_id: string;
+  document_id: string;
+  proposal: unknown;
+}): Promise<ApplyResearchLibraryEvidenceEnrichmentResult> {
+  const profileId = clean(input.profile_id);
+  const documentId = clean(input.document_id);
+  if (!profileId) throw new Error("profile_session_required");
+  if (!documentId) throw new Error("research_library_document_id_required");
+  await ensureDatabase();
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    const { rows } = await client.query<ResearchLibraryRow>(
+      `SELECT * FROM helix_research_library_documents
+       WHERE profile_id = $1 AND document_id = $2 AND deleted_at IS NULL
+       LIMIT 1 FOR UPDATE`,
+      [profileId, documentId],
+    );
+    const row = rows[0];
+    if (!row) {
+      await client.query("ROLLBACK");
+      throw new Error("research_library_document_not_found");
+    }
+    const content = decryptContent(row.encrypted_content);
+    const proposalRecord = input.proposal && typeof input.proposal === "object"
+      ? input.proposal as Record<string, unknown>
+      : null;
+    const requestedSidecarId = clean(proposalRecord?.sidecar_id);
+    const sidecarIndex = content.paper_evidence_sidecars.findIndex((sidecar) =>
+      sidecar.sidecar_id === requestedSidecarId,
+    );
+    if (sidecarIndex < 0) {
+      await client.query("ROLLBACK");
+      return {
+        ok: false,
+        status: "blocked",
+        failure_code: "paper_evidence_enrichment_identity_mismatch",
+        missing_requirements: ["saved_paper_evidence_sidecar_required"],
+      };
+    }
+    const appliedAt = new Date().toISOString();
+    const result = applyHelixPaperEvidenceEnrichmentV1({
+      sidecar: content.paper_evidence_sidecars[sidecarIndex],
+      pages: content.pages,
+      proposal: input.proposal,
+      applied_at: appliedAt,
+    });
+    if (!result.ok) {
+      await client.query("ROLLBACK");
+      return result;
+    }
+    if (result.status === "idempotent") {
+      await client.query("ROLLBACK");
+      return {
+        ...result,
+        document_id: documentId,
+        sidecar_id: result.sidecar.sidecar_id,
+        updated_at: result.sidecar.updated_at ?? iso(row.updated_at),
+      };
+    }
+    const paperEvidenceSidecars = [...content.paper_evidence_sidecars];
+    paperEvidenceSidecars[sidecarIndex] = result.sidecar;
+    const encrypted = encryptContent({
+      schema: "helix.research_library_encrypted_content.v2",
+      pages: content.pages,
+      paper_evidence_sidecars: paperEvidenceSidecars,
+    });
+    if (encrypted.contentBytes > MAX_DOCUMENT_BYTES) {
+      await client.query("ROLLBACK");
+      throw new Error("research_library_document_too_large");
+    }
+    const { rows: usageRows } = await client.query<{ total_bytes: string | number }>(
+      `SELECT COALESCE(SUM(content_bytes), 0) AS total_bytes
+       FROM helix_research_library_documents
+       WHERE profile_id = $1 AND document_id <> $2 AND deleted_at IS NULL`,
+      [profileId, documentId],
+    );
+    if (Number(usageRows[0]?.total_bytes ?? 0) + encrypted.contentBytes > DEFAULT_PROFILE_QUOTA_BYTES) {
+      await client.query("ROLLBACK");
+      throw new Error("research_library_profile_quota_exceeded");
+    }
+    const metadata = parseMetadata(row);
+    metadata.updated_at = appliedAt;
+    await client.query(
+      `UPDATE helix_research_library_documents SET
+         metadata = $3::jsonb,
+         encrypted_content = $4,
+         encryption_key_id = $5,
+         encryption_algorithm = $6,
+         content_bytes = $7,
+         updated_at = $8
+       WHERE profile_id = $1 AND document_id = $2 AND deleted_at IS NULL`,
+      [
+        profileId,
+        documentId,
+        JSON.stringify(metadata),
+        encrypted.encryptedContent,
+        encrypted.keyId,
+        ENCRYPTION_ALGORITHM,
+        encrypted.contentBytes,
+        appliedAt,
+      ],
+    );
+    await client.query("COMMIT");
+    return {
+      ...result,
+      document_id: documentId,
+      sidecar_id: result.sidecar.sidecar_id,
+      updated_at: appliedAt,
+    };
+  } catch (error) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      // Preserve the original failure.
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function deleteResearchLibraryDocument(profileId: string, documentId: string): Promise<boolean> {
