@@ -3,6 +3,12 @@ import type { RequestHandler } from "express";
 import type { HelixRealtimeStagePlayGroundedAnswerV1 } from "@shared/contracts/helix-realtime-stage-play.v1";
 import { readRealtimeStagePlayAskHandoff } from "../live-source/realtime-stage-play-handoff";
 import { recordStagePlayLiveSourceConversationEvent } from "../../stage-play/stage-play-live-source-conversation-store";
+import {
+  enqueueRealtimeGroundedAnswerRelay,
+  resetRealtimeGroundedAnswerRelaysForTests,
+  suppressRealtimeGroundedAnswerRelay,
+} from "./grounded-answer-relay";
+import { resolveRealtimeFinalWorkerAdmission } from "./worker-admission";
 
 const MAX_CAPTURE_BYTES = 1_250_000;
 const groundedAnswersByHandoffId = new Map<string, HelixRealtimeStagePlayGroundedAnswerV1>();
@@ -22,6 +28,11 @@ const readStringArray = (value: unknown): string[] =>
 
 const unique = (values: Array<string | null | undefined>, limit = 48): string[] =>
   Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean))).slice(0, limit);
+
+const readRecordArray = (value: unknown): RecordLike[] =>
+  Array.isArray(value)
+    ? value.map(readRecord).filter((entry): entry is RecordLike => Boolean(entry))
+    : [];
 
 const hashText = (value: string): string =>
   `sha256:${crypto.createHash("sha256").update(value).digest("hex")}`;
@@ -81,6 +92,54 @@ const readHandoffId = (body: unknown): string | null => {
   );
 };
 
+const collectGatewayResults = (payload: RecordLike, debug: RecordLike | null): RecordLike[] => [
+  ...readRecordArray(payload.workstation_gateway_call_results),
+  ...readRecordArray(debug?.workstation_gateway_call_results),
+];
+
+const gatewayResultEvidenceRefs = (result: RecordLike): string[] => {
+  const observationPacket = readRecord(result.observation_packet);
+  return unique([
+    ...readStringArray(result.artifact_refs),
+    ...readStringArray(observationPacket?.produced_artifact_refs),
+    readString(observationPacket?.call_id),
+  ]);
+};
+
+const requiredGroundingSatisfied = (input: {
+  requiredCapabilityIds: string[];
+  payload: RecordLike;
+  debug: RecordLike | null;
+  solverTrace: RecordLike | null;
+}): { satisfied: boolean; evidenceRefs: string[] } => {
+  if (input.requiredCapabilityIds.length === 0) return { satisfied: true, evidenceRefs: [] };
+  const evidenceReentry = readRecord(input.solverTrace?.evidence_reentry);
+  const followupReasoning = readRecord(input.solverTrace?.followup_reasoning);
+  if (
+    evidenceReentry?.required !== true ||
+    evidenceReentry.completed !== true ||
+    followupReasoning?.required !== true ||
+    followupReasoning.completed !== true
+  ) {
+    return { satisfied: false, evidenceRefs: [] };
+  }
+  const gatewayResults = collectGatewayResults(input.payload, input.debug);
+  const selectedResults = input.requiredCapabilityIds.map((capabilityId) =>
+    gatewayResults.find((result) => {
+      const observationPacket = readRecord(result.observation_packet);
+      return (
+        readString(result.capability_id ?? result.capabilityId) === capabilityId &&
+        result.ok === true &&
+        observationPacket?.status === "succeeded"
+      );
+    }) ?? null);
+  if (selectedResults.some((result) => !result)) return { satisfied: false, evidenceRefs: [] };
+  return {
+    satisfied: true,
+    evidenceRefs: unique(selectedResults.flatMap((result) => gatewayResultEvidenceRefs(result!))),
+  };
+};
+
 export const recordRealtimeGroundedAnswerFromPayload = (input: {
   handoffId: string;
   payload: RecordLike;
@@ -109,19 +168,40 @@ export const recordRealtimeGroundedAnswerFromPayload = (input: {
     readString(input.payload.content) ??
     readString(input.payload.answer) ??
     readString(input.payload.text);
-  if (
-    !completedSolverPath ||
-    !serverAuthoritative ||
-    !answerText ||
-    !terminalArtifactKind ||
-    !finalAnswerSource ||
-    terminalArtifactKind === "typed_failure" ||
-    terminalArtifactKind === "request_user_input" ||
-    terminalArtifactKind === "tool_receipt" ||
-    finalAnswerSource === "typed_failure"
-  ) {
+  const grounding = requiredGroundingSatisfied({
+    requiredCapabilityIds: handoff.required_grounding_capability_ids,
+    payload: input.payload,
+    debug,
+    solverTrace,
+  });
+  const nowMs = input.nowMs ?? Date.now();
+  const rejectionReason = !completedSolverPath
+    ? "solver_path_not_completed"
+    : !serverAuthoritative
+      ? "terminal_answer_not_server_authoritative"
+      : !answerText || !terminalArtifactKind || !finalAnswerSource
+        ? "terminal_answer_contract_incomplete"
+        : terminalArtifactKind === "typed_failure" || finalAnswerSource === "typed_failure"
+          ? "typed_failure_not_spoken"
+          : terminalArtifactKind === "request_user_input"
+            ? "request_user_input_not_spoken"
+            : terminalArtifactKind === "tool_receipt"
+              ? "tool_receipt_not_answer_authority"
+              : !grounding.satisfied
+                ? "required_grounding_evidence_missing"
+                : null;
+  if (rejectionReason) {
+    suppressRealtimeGroundedAnswerRelay({
+      handoffId: handoff.handoff_id,
+      reason: rejectionReason,
+      failureCode: rejectionReason,
+      nowMs,
+    });
     return null;
   }
+  const acceptedAnswerText = answerText as string;
+  const acceptedFinalAnswerSource = finalAnswerSource as string;
+  const acceptedTerminalArtifactKind = terminalArtifactKind as string;
 
   const askTurnId =
     readString(input.askTurnId) ??
@@ -132,14 +212,16 @@ export const recordRealtimeGroundedAnswerFromPayload = (input: {
     handoff.transcript_observation_ref,
     handoff.stage_play_event_ref,
     handoff.context_pack_id,
+    handoff.goal_id,
+    handoff.runtime_goal_session_ref,
+    ...grounding.evidenceRefs,
     ...readStringArray(input.payload.selected_terminal_support_refs),
     ...readStringArray(input.payload.terminal_synthesis_support_refs),
     ...readStringArray(terminalAuthority?.support_refs),
   ]);
-  const nowMs = input.nowMs ?? Date.now();
   const stagePlayEvent = recordStagePlayLiveSourceConversationEvent({
     threadId: handoff.thread_id,
-    text: answerText,
+    text: acceptedAnswerText,
     source: "assistant_answer",
     turnId: askTurnId,
     evidenceRefs,
@@ -148,19 +230,22 @@ export const recordRealtimeGroundedAnswerFromPayload = (input: {
   const feedback: HelixRealtimeStagePlayGroundedAnswerV1 = {
     feedback_id: `realtime-grounded-answer:${crypto
       .createHash("sha256")
-      .update(`${handoff.handoff_id}:${askTurnId ?? "unknown"}:${hashText(answerText)}`)
+      .update(`${handoff.handoff_id}:${askTurnId ?? "unknown"}:${hashText(acceptedAnswerText)}`)
       .digest("hex")
       .slice(0, 20)}`,
     handoff_id: handoff.handoff_id,
     realtime_session_id: handoff.realtime_session_id,
     thread_id: handoff.thread_id,
+    goal_id: handoff.goal_id,
     ask_turn_id: askTurnId,
     stage_play_event_ref: stagePlayEvent.eventId,
-    answer_text_hash: hashText(answerText),
-    answer_text_char_count: answerText.length,
-    final_answer_source: finalAnswerSource,
-    terminal_artifact_kind: terminalArtifactKind,
+    answer_text_hash: hashText(acceptedAnswerText),
+    answer_text_char_count: acceptedAnswerText.length,
+    final_answer_source: acceptedFinalAnswerSource,
+    terminal_artifact_kind: acceptedTerminalArtifactKind,
     evidence_refs: evidenceRefs,
+    required_grounding_capability_ids: handoff.required_grounding_capability_ids,
+    grounding_evidence_satisfied: true,
     recorded_at_ms: nowMs,
     completed_solver_path: true,
     server_authoritative: true,
@@ -168,6 +253,21 @@ export const recordRealtimeGroundedAnswerFromPayload = (input: {
     raw_content_included: false,
   };
   groundedAnswersByHandoffId.set(handoff.handoff_id, feedback);
+  const workerAdmission = resolveRealtimeFinalWorkerAdmission({
+    preliminary: handoff.worker_admission,
+    payload: input.payload,
+    debug,
+    solverTrace,
+    evidenceRefs,
+    nowMs,
+  });
+  enqueueRealtimeGroundedAnswerRelay({
+    handoff,
+    feedback,
+    workerAdmission,
+    answerText: acceptedAnswerText,
+    nowMs,
+  });
   return feedback;
 };
 
@@ -239,4 +339,5 @@ export const readRealtimeGroundedAnswer = (
 
 export const resetRealtimeGroundedAnswerFeedbackForTests = (): void => {
   groundedAnswersByHandoffId.clear();
+  resetRealtimeGroundedAnswerRelaysForTests();
 };

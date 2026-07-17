@@ -30,6 +30,7 @@ import {
 } from "../services/helix-ask/realtime-session/sideband-context-sync";
 import { buildRealtimeStagePlayDebugProvenance } from "../services/helix-ask/realtime-session/debug-provenance";
 import { createRealtimeGroundedAnswerFeedbackMiddleware } from "../services/helix-ask/realtime-session/grounded-answer-feedback";
+import { recordRealtimeGroundedRelayClientReceipt } from "../services/helix-ask/realtime-session/grounded-answer-relay";
 import {
   isHelixRealtimeToolSuggestionEventType,
   isHelixRealtimeTranscriptEventType,
@@ -178,6 +179,13 @@ const respondRealtimeBoundary = async (input: {
       : null;
     const receiptKind = readString(body.receipt_kind ?? body.receiptKind);
     if (session && receiptKind) {
+      recordRealtimeGroundedRelayClientReceipt({
+        realtimeSessionId: session.realtimeSessionId,
+        receiptKind,
+        clientReceiptRef: readString(body.client_receipt_ref ?? body.clientReceiptRef),
+        providerResponseRef: readString(body.provider_response_ref ?? body.providerResponseRef),
+        nowMs: typeof body.observed_at_ms === "number" ? body.observed_at_ms : undefined,
+      });
       const activities = new Set([
         "vad_speech_started",
         "vad_speech_stopped",

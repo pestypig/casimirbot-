@@ -19,6 +19,7 @@ export type HelixLiveSourceSurface =
   | "screen"
   | "window"
   | "browser_tab"
+  | "camera"
   | "document"
   | "game"
   | "app"
@@ -30,6 +31,7 @@ export type HelixLiveSourceSurface =
 
 export type HelixLiveSourceOrigin =
   | "browser_getDisplayMedia"
+  | "browser_getUserMedia"
   | "manual_upload"
   | "discord_bridge"
   | "minehut_plugin"

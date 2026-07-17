@@ -7,6 +7,7 @@ import type {
   HelixRealtimeStagePlayContextSyncV1,
   HelixRealtimeStagePlayDebugV1,
 } from "@shared/contracts/helix-realtime-stage-play.v1";
+import type { HelixAskLiveRuntimeVisualFrameReceipt } from "./HelixAskLiveRuntimeTransportController";
 
 const MAX_EVENTS = 80;
 
@@ -19,6 +20,11 @@ export type HelixAskLiveRuntimeClientDebugEvent = {
     | "microphone_tracks_observed"
     | "microphone_enabled"
     | "microphone_disabled"
+    | "visual_input_enabled"
+    | "visual_input_disabled"
+    | "visual_frame_sent"
+    | "visual_frame_blocked"
+    | "visual_frame_error"
     | "data_channel_opened"
     | "data_channel_closed"
     | "data_channel_error"
@@ -69,6 +75,14 @@ export type HelixAskLiveRuntimeClientDebugSnapshot = {
   microphone_device_label: string | null;
   microphone_loopback_source: boolean;
   microphone_input_enabled: boolean;
+  visual_input_enabled: boolean;
+  visual_frame_attempt_count: number;
+  visual_frame_sent_count: number;
+  visual_frame_blocked_count: number;
+  visual_frame_error_count: number;
+  latest_visual_frame_receipt: Omit<HelixAskLiveRuntimeVisualFrameReceipt, "raw_content_included"> & {
+    raw_content_included: false;
+  } | null;
   data_channel_state: "not_created" | "connecting" | "open" | "closed" | "error";
   initial_audio_probe_requested: boolean;
   initial_audio_probe_error: string | null;
@@ -156,6 +170,12 @@ export const beginHelixAskLiveRuntimeClientDebugAttempt = (input: {
     microphone_device_label: null,
     microphone_loopback_source: false,
     microphone_input_enabled: false,
+    visual_input_enabled: false,
+    visual_frame_attempt_count: 0,
+    visual_frame_sent_count: 0,
+    visual_frame_blocked_count: 0,
+    visual_frame_error_count: 0,
+    latest_visual_frame_receipt: null,
     data_channel_state: "not_created",
     initial_audio_probe_requested: false,
     initial_audio_probe_error: null,
@@ -338,6 +358,12 @@ export const recordHelixAskLiveRuntimeClientDebugEvent = (input: {
         : input.eventKind === "microphone_disabled"
           ? false
           : snapshot.microphone_input_enabled,
+    visual_input_enabled:
+      input.eventKind === "visual_input_enabled"
+        ? true
+        : input.eventKind === "visual_input_disabled"
+          ? false
+          : snapshot.visual_input_enabled,
     data_channel_state:
       input.eventKind === "data_channel_opened"
         ? "open"
@@ -384,6 +410,34 @@ export const recordHelixAskLiveRuntimeClientDebugEvent = (input: {
   };
   next.speaker_trigger_evidence = resolveSpeakerTriggerEvidence(next);
   snapshot = next;
+};
+
+export const recordHelixAskLiveRuntimeVisualFrameReceipt = (
+  receipt: HelixAskLiveRuntimeVisualFrameReceipt,
+): void => {
+  if (!snapshot) return;
+  recordHelixAskLiveRuntimeClientDebugEvent({
+    eventKind: receipt.ok
+      ? "visual_frame_sent"
+      : receipt.status === "blocked"
+        ? "visual_frame_blocked"
+        : "visual_frame_error",
+    observedAtMs: receipt.observed_at_ms,
+    detailCode: receipt.code,
+  });
+  if (!snapshot) return;
+  snapshot = {
+    ...snapshot,
+    visual_frame_attempt_count: snapshot.visual_frame_attempt_count + 1,
+    visual_frame_sent_count: snapshot.visual_frame_sent_count + (receipt.ok ? 1 : 0),
+    visual_frame_blocked_count: snapshot.visual_frame_blocked_count + (receipt.status === "blocked" ? 1 : 0),
+    visual_frame_error_count: snapshot.visual_frame_error_count + (receipt.status === "error" ? 1 : 0),
+    latest_visual_frame_receipt: {
+      ...receipt,
+      raw_content_included: false,
+    },
+    updated_at_ms: receipt.observed_at_ms,
+  };
 };
 
 export const readHelixAskLiveRuntimeClientDebugSnapshot = ():

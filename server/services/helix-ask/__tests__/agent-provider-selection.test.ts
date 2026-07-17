@@ -5806,7 +5806,7 @@ describe("Helix Ask agent provider selection", () => {
     const body = {
       turn_id: "ask:test:codex-active-workstation-context",
       agent_runtime: "codex",
-      question: "What panels are open and which panel is active?",
+      question: "What panel is active right now?",
       workspace_context_snapshot: {
         activePanel: "docs-viewer",
         activeGroupId: "main",
@@ -5843,6 +5843,16 @@ describe("Helix Ask agent provider selection", () => {
         mode: "read",
       }),
     ]);
+    expect(buildActiveWorkstationContextGatewayCallRequests({
+      ...body,
+      question: "What panel do you see?",
+    })).toEqual([
+      expect.objectContaining({
+        capability_id: "workstation.active_context",
+        mode: "read",
+      }),
+    ]);
+    expect(buildPromptDerivedInternetSearchGatewayCallRequests(body)).toEqual([]);
 
     const result = await codexProvider.runTurn({
       runtime: "codex",
@@ -5858,6 +5868,45 @@ describe("Helix Ask agent provider selection", () => {
       event.source_event_type === "tool_observation" &&
       /workstation\.active_context materialized active workstation context with active panel docs-viewer and 2 open panel/i.test(String(event.text)),
     )).toBe(true);
+
+    const realtimeHandoffResult = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        ...body,
+        turn_id: "ask:test:codex-active-workstation-context-realtime-handoff",
+        question: "What panel do you see?",
+        route_metadata: {
+          source: "realtime_stage_play",
+          invocationKind: "stage_play_realtime_transcript_handoff",
+          forbiddenCapabilities: [
+            "workstation_mutation",
+            "workstation_action_execution",
+            "realtime_provider_tool_execution",
+          ],
+          source_target_intent: {
+            source: "stage_play_realtime_handoff",
+            target_source: "operator_text",
+            target_kind: "realtime_transcript",
+            strength: "hard",
+            must_enter_backend_ask: true,
+            allow_client_shortcut: false,
+            allow_no_tool_direct: false,
+            admitted_readonly_handoff: true,
+            required_grounding_capability_ids: ["workstation.active_context"],
+          },
+        },
+      },
+      headers: {},
+    });
+    expect((realtimeHandoffResult.debug as any)?.workstation_gateway_call_results)
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          ok: true,
+          capability_id: "workstation.active_context",
+          observation_packet: expect.objectContaining({ status: "succeeded" }),
+        }),
+      ]));
   });
 
   it("does not derive active workstation context when the prompt explicitly forbids tools", async () => {

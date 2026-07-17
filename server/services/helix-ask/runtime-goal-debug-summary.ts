@@ -6,6 +6,7 @@ import type {
 export type HelixRuntimeGoalDebugSummary = {
   schema: "helix.runtime_goal.debug_copy_summary.v1";
   goal_id: string;
+  thread_id: string;
   job_title: string;
   runtime_agent_provider: string;
   runtime_session_id: string;
@@ -33,6 +34,10 @@ export type HelixRuntimeGoalDebugSummary = {
   provider_terminal_candidate_ref: string | null;
   final_answer_source: string | null;
   terminal_answer_server_authoritative: boolean | null;
+  stage_play_projection_status: "projected" | "failed" | null;
+  stage_play_goal_session_ref: string | null;
+  stage_play_context_update_ref: string | null;
+  stage_play_projection_failure_code: string | null;
   answer_authority: false;
   assistant_answer: false;
   terminal_eligible: false;
@@ -59,6 +64,7 @@ export const buildRuntimeGoalDebugSummary = (
   return {
     schema: "helix.runtime_goal.debug_copy_summary.v1",
     goal_id: session.goal_id,
+    thread_id: session.thread_id,
     job_title:
       session.job_brief.user_goal_text ||
       session.objective ||
@@ -96,6 +102,13 @@ export const buildRuntimeGoalDebugSummary = (
       null,
     final_answer_source: session.latest_final_answer_source,
     terminal_answer_server_authoritative: terminalAnswerServerAuthoritative,
+    stage_play_projection_status: debugExport.runtime_goal_stage_play_projection?.status ?? null,
+    stage_play_goal_session_ref:
+      debugExport.runtime_goal_stage_play_projection?.stage_play_goal_session_ref ?? null,
+    stage_play_context_update_ref:
+      debugExport.runtime_goal_stage_play_projection?.context_update_ref ?? null,
+    stage_play_projection_failure_code:
+      debugExport.runtime_goal_stage_play_projection?.failure_code ?? null,
     answer_authority: false,
     assistant_answer: false,
     terminal_eligible: false,

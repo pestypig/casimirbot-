@@ -70,6 +70,30 @@ describe("visual snapshot source routes", () => {
     });
   }, 15000);
 
+  it("preserves a device camera source as non-answer visual context", () => {
+    const receipt = startVisualSnapshotSource({
+      thread_id: threadId,
+      source_id: "source:visual:device-camera",
+      source_family: "visual_snapshot",
+      source_surface: "device_camera",
+      capture_mode: "interval",
+      raw_image_storage_policy: "ephemeral",
+    });
+
+    expect(receipt).toMatchObject({
+      ok: true,
+      assistant_answer: false,
+      raw_image_included: false,
+      context_policy: "compact_context_pack_only",
+      source: {
+        source_id: "source:visual:device-camera",
+        source_surface: "device_camera",
+        assistant_answer: false,
+        raw_image_included: false,
+      },
+    });
+  });
+
   it("records frame metadata without exposing raw image bytes in public context", async () => {
     const app = await createApp();
     await request(app)

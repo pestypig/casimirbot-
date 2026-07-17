@@ -276,15 +276,16 @@ const isAffirmativeTheoryBadgeGraphReferentPrompt = (prompt: string): boolean =>
   const unquoted = unquotePrompt(prompt).replace(/\s+/g, " ").trim();
   if (!unquoted) return false;
   const politeLead = String.raw`(?:(?:ok(?:ay)?|please|now|then)\b[\s,;:]*)*`;
+  const affirmativeLead = String.raw`${politeLead}(?:(?:can\s+you)\s+)?(?:please\s+)?`;
   const graphName = String.raw`(?:the\s+)?theory\s+badge\s+graph`;
   const deictic = String.raw`(?:this|that)`;
   return (
     new RegExp(
-      String.raw`^${politeLead}reflect\s+${deictic}\s+(?:with|using)\s+${graphName}(?:\s+(?:now|please))?\s*[.!?]*$`,
+      String.raw`^${affirmativeLead}reflect\s+${deictic}\s+(?:in(?:to)?|onto|through|against|with|using)\s+${graphName}(?:\s+(?:now|please))?\s*[.!?]*$`,
       "i",
     ).test(unquoted) ||
     new RegExp(
-      String.raw`^${politeLead}use\s+${graphName}\s+to\s+reflect\s+${deictic}(?:\s+(?:now|please))?\s*[.!?]*$`,
+      String.raw`^${affirmativeLead}use\s+${graphName}\s+to\s+reflect\s+${deictic}(?:\s+(?:now|please))?\s*[.!?]*$`,
       "i",
     ).test(unquoted)
   );

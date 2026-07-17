@@ -184,6 +184,7 @@ export {
 } from "./HelixAskSlashCommandMenu";
 export {
   HELIX_ASK_IMAGE_ATTACHMENT_MAX_BYTES,
+  buildHelixAskImageAttachmentFromDataUrl,
   buildHelixAskImageAttachmentFromFile,
   buildHelixAskImageAttachmentsFromFiles,
   selectHelixAskClipboardImageFiles,
@@ -235,6 +236,11 @@ export {
   syncHelixAskVisualCaptureRoutePreference,
 } from "./HelixAskVisualCapturePreference";
 export {
+  HELIX_ASK_DISPLAY_AUDIO_CHUNK_MS,
+  HELIX_ASK_LIVE_VISUAL_CAPTURE_CADENCE_MS,
+  useHelixAskVisualSourceCaptureRuntime,
+} from "./useHelixAskVisualSourceCaptureRuntime";
+export {
   HELIX_ASK_CONTEXT_RESUME_FRAME_SCHEMA,
   HELIX_ASK_CONTEXT_RESUME_FRAME_STORAGE_KEY,
   extractHelixAskContextCompactionResumeFrame,
@@ -266,11 +272,20 @@ export {
 } from "./HelixAskLiveRuntimeLifecycle";
 export {
   createHelixAskLiveRuntimeBrowserTransportController,
+  HELIX_ASK_LIVE_RUNTIME_MAX_RETAINED_VISUAL_FRAMES,
+  HELIX_ASK_LIVE_RUNTIME_MAX_VISUAL_FRAME_BYTES,
 } from "./HelixAskLiveRuntimeTransportController";
 export {
   createHelixAskRealtimeProviderEventHandler,
 } from "./HelixAskRealtimeProviderEventHandler";
 export { useHelixAskLiveRuntimeSession } from "./useHelixAskLiveRuntimeSession";
+export { useHelixAskVisualFrameAttachmentIngress } from "./useHelixAskVisualFrameAttachmentIngress";
+export {
+  registerHelixAskVisualFrameAttachmentPromotionHandler,
+  registerHelixAskVisualFrameLivePromotionHandler,
+  requestHelixAskVisualFrameAttachmentPromotion,
+  requestHelixAskVisualFrameLivePromotion,
+} from "./HelixAskVisualFramePromotion";
 export { HelixAskLanguageModelPicker } from "./HelixAskLanguageModelPicker";
 export { buildHelixAskLanguageModelPickerModel } from "./HelixAskLanguageModelPicker";
 export {
@@ -853,13 +868,22 @@ export type {
   HelixAskVisualCapturePreferenceTarget,
   HelixAskVisualCaptureRoute,
 } from "./HelixAskVisualCapturePreference";
+export type {
+  HelixAskDisplayAudioStatus,
+  HelixAskVisualSituationSourceStatus,
+  HelixAskVisualSourceCaptureRuntime,
+  HelixAskVisualSourceCaptureRuntimeOptions,
+} from "./useHelixAskVisualSourceCaptureRuntime";
 export type { HelixAskContextCompactionResumeFrameStorage } from "./HelixAskContextCompactionResumeFrameStorage";
 export type {
   HelixAskRuntimePickerItem,
   HelixAskRuntimePickerModel,
   HelixAskRuntimePickerProps,
 } from "./HelixAskRuntimePicker";
-export type { HelixAskLiveRuntimeControlsModel } from "./HelixAskLiveRuntimeControls";
+export type {
+  HelixAskLiveRuntimeControlsModel,
+  HelixAskLiveRuntimeToolbarBridge,
+} from "./HelixAskLiveRuntimeControls";
 export type {
   HelixAskLiveRuntimeClientReceiptKind,
   HelixAskLiveRuntimeClientReceiptPayload,
@@ -885,6 +909,11 @@ export type {
   HelixAskLiveRuntimeSdpExchange,
   HelixAskLiveRuntimeSessionDescriptionLike,
   HelixAskLiveRuntimeTrackLike,
+  HelixAskLiveRuntimeVisualFrameDetail,
+  HelixAskLiveRuntimeVisualFrameInput,
+  HelixAskLiveRuntimeVisualFrameReceipt,
+  HelixAskLiveRuntimeVisualFrameResultCode,
+  HelixAskLiveRuntimeVisualFrameSourceKind,
 } from "./HelixAskLiveRuntimeTransportController";
 export type {
   HelixAskRealtimeProviderEventHandler,
@@ -901,7 +930,10 @@ export type {
 export type { HelixAskBusyReasoningPanelProps } from "./HelixAskBusyReasoningPanel";
 export type { HelixAskMoodAvatarProps } from "./HelixAskMoodAvatar";
 export type { HelixAskMoodAvatarSurfaceProps } from "./HelixAskMoodAvatarSurface";
-export type { HelixAskActionToolbarProps } from "./HelixAskActionToolbar";
+export type {
+  HelixAskActionToolbarProps,
+  HelixAskVisualSourceKind,
+} from "./HelixAskActionToolbar";
 export type { HelixAskComposerActionToolbarSurfaceProps } from "./HelixAskComposerActionToolbarSurface";
 export type {
   HelixAskGoalPillProps,

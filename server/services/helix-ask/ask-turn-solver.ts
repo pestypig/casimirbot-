@@ -55,6 +55,7 @@ import {
 import { applyCompoundTerminalPolicy } from "./compound-terminal-policy";
 import { appendHelixRuntimeIntentPacketToPayload, type HelixTurnArtifact } from "./runtime/runtime-intent-packet";
 import { resolvePublishedWorkstationToolTerminal } from "./terminal-identity-precedence";
+import { providerPostObservationCompletionMaterialized } from "./provider-terminal-completion";
 
 type RecordLike = Record<string, unknown>;
 
@@ -586,6 +587,7 @@ const compoundSynthesisTerminalPathMaterialized = (input: {
 
 const providerTerminalPathMaterialized = (input: {
   payload: RecordLike;
+  turnId: string;
   terminalArtifactKind: string;
   finalAnswerSource: string;
 }): boolean => {
@@ -666,7 +668,27 @@ const providerTerminalPathMaterialized = (input: {
   if (terminalUsesMaterializedProviderRouteProduct) {
     return terminalMatchesCanonicalGoalContract(input.payload, input.terminalArtifactKind);
   }
-  if (!terminalMatchesCanonicalGoalContract(input.payload, "model_synthesized_answer")) return false;
+  const canonicalProviderTerminal = terminalMatchesCanonicalGoalContract(
+    input.payload,
+    input.terminalArtifactKind,
+  );
+  if (
+    !canonicalProviderTerminal &&
+    !terminalMatchesCanonicalGoalContract(input.payload, "model_synthesized_answer")
+  ) {
+    return false;
+  }
+  if (
+    canonicalProviderTerminal &&
+    !providerPostObservationCompletionMaterialized({
+      payload: input.payload,
+      turnId: input.turnId,
+      terminalArtifactKind: input.terminalArtifactKind,
+      finalAnswerSource: input.finalAnswerSource,
+    })
+  ) {
+    return false;
+  }
   return (
     readBoolean(terminalAuthority?.server_authoritative) &&
     (
@@ -1617,6 +1639,7 @@ export function buildAskTurnSolverTrace(input: {
   });
   const providerFinalArbitrationMaterialized = providerTerminalPathMaterialized({
     payload: input.payload,
+    turnId: input.turnId,
     terminalArtifactKind,
     finalAnswerSource,
   });

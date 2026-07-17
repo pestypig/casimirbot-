@@ -1,5 +1,7 @@
 import crypto from "node:crypto";
 
+import { providerPostObservationCompletionMaterialized } from "./provider-terminal-completion";
+
 type RecordLike = Record<string, unknown>;
 
 export type HelixLoopParityTrace = {
@@ -453,7 +455,16 @@ export function buildLoopParityTrace(input: {
     productAuthorityGuard?.allowed !== false &&
     !forbiddenTerminalKinds.includes(terminalArtifactKind) &&
     (allowedTerminalKinds.length === 0 || allowedTerminalKinds.includes(terminalArtifactKind));
-  const routeAuthorityOk = routeAuthorityAudit?.route_authority_ok === true || calculatorContractAuthorityOk;
+  const providerCompletionMaterialized = providerPostObservationCompletionMaterialized({
+    payload,
+    turnId: input.turnId,
+    terminalArtifactKind,
+    finalAnswerSource,
+  });
+  const routeAuthorityOk =
+    routeAuthorityAudit?.route_authority_ok === true ||
+    calculatorContractAuthorityOk ||
+    providerCompletionMaterialized;
   const terminalAuthorityOk = terminalAuthority?.server_authoritative === true;
   const poisonViolations = Array.isArray(poisonAudit?.violations)
     ? poisonAudit.violations
@@ -466,7 +477,12 @@ export function buildLoopParityTrace(input: {
   const poisonAuditOk =
     poisonAudit?.ok === true ||
     (routeAuthorityOk && terminalAuthorityOk && onlyStaleContractPoison);
-  const terminalSelectionRan = Boolean(readRecord(payload.terminal_artifact_selection_guard) || readRecord(payload.product_authority_guard) || routeAuthorityAudit);
+  const terminalSelectionRan = Boolean(
+    readRecord(payload.terminal_artifact_selection_guard) ||
+    readRecord(payload.product_authority_guard) ||
+    routeAuthorityAudit ||
+    providerCompletionMaterialized
+  );
   const postObservationFinalizerRan = Boolean(readRecord(payload.terminal_presentation) || terminalSelectionRan);
   const modelOnlySourceTarget =
     sourceTargetIntent?.target_source === "model_only" ||
@@ -487,7 +503,9 @@ export function buildLoopParityTrace(input: {
       ? "hard_source_target_allowed_no_tool_direct"
       : "",
     routeContractMissing ? "route_contract_missing" : "",
-    !routeAuthorityAudit && !calculatorContractAuthorityOk ? "route_authority_missing" : "",
+    !routeAuthorityAudit && !calculatorContractAuthorityOk && !providerCompletionMaterialized
+      ? "route_authority_missing"
+      : "",
     poisonAuditOk && routeAuthorityAudit && !routeAuthorityOk ? "poison_clean_but_authority_failed" : "",
     observationsCreated.length > 0 && !postObservationFinalizerRan ? "observations_created_but_not_reentered" : "",
     terminalArtifactKind !== "unknown" && !terminalSelectionRan ? "terminal_selected_before_observation_finalizer" : "",
@@ -512,7 +530,10 @@ export function buildLoopParityTrace(input: {
     evidence_rejected_for_answer: evidenceRejectedForAnswer,
     tool_results_returned_to_turn: toolResultsReturnedToTurn(payload, actualToolCalls, observationsCreated),
     post_observation_finalizer_ran: postObservationFinalizerRan,
-    followup_reasoning_ran: Array.isArray(payload.current_turn_artifact_ledger) && payload.current_turn_artifact_ledger.some((artifact) => readRecord(artifact)?.kind === "reasoning_context")
+    followup_reasoning_ran: providerCompletionMaterialized || (
+      Array.isArray(payload.current_turn_artifact_ledger) &&
+      payload.current_turn_artifact_ledger.some((artifact) => readRecord(artifact)?.kind === "reasoning_context")
+    )
       ? true
       : "not_applicable",
     terminal_selection_ran_after_observations: terminalSelectionRan,

@@ -222,7 +222,7 @@ describe("Codex provider runtime theory referent lane", () => {
           resolved_source_ref: resolvedSourceRef,
           resolved_text_hash: resolvedTextHash,
           semantic_prompt_source: "chat_history",
-          semantic_prompt_argument_source: "runtime_resolved_referent",
+          semantic_prompt_argument_source: "helix_resolved_referent",
           runtime_prompt_differed_from_bound_semantic_prompt: true,
           reentry_required: true,
           terminal_eligible: false,
@@ -294,6 +294,84 @@ describe("Codex provider runtime theory referent lane", () => {
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
+  }, 20_000);
+
+  it("uses the Helix-bound superconductivity referent when the runtime omits referent fields", async () => {
+    const priorAnswer = [
+      "Electron-phonon attraction supports Cooper pairing, a BCS gap, collective phase coherence, zero DC resistance, and the Meissner response.",
+      "Temperature, current density, and magnetic field impose superconducting critical-surface limits through Tc, Jc, and Bc.",
+    ].join(" ");
+    const resolvedSourceRef = "chat.final_answer.previous:reply-superconductivity";
+    const resolvedTextHash = crypto.createHash("sha256").update(priorAnswer).digest("hex").slice(0, 16);
+    const finalReflection =
+      "The re-entered graph observation locates the superconducting critical surface while keeping the microscopic mechanism claim bounded.";
+
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        `HELIX_CAPABILITY_LANE_REQUEST_JSON: ${JSON.stringify({
+          capability: CAPABILITY,
+          prompt: "A generic superconductivity reflection supplied by the runtime.",
+          conversation_context: "can you reflect this in theory badge graph?",
+          build_explanation_plan: true,
+        })}`,
+        finalReflection,
+      ],
+    });
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "turn-codex-theory-helix-bound-superconductivity",
+        question: "can you reflect this in theory badge graph?",
+        workspace_context_snapshot: {
+          chat_referent_context: {
+            schema: "helix.ask.chat_referent_context.v1",
+            previous_assistant_final_answer: {
+              role: "assistant",
+              reply_id: "reply-superconductivity",
+              source_ref: resolvedSourceRef,
+              text: priorAnswer,
+              text_hash: resolvedTextHash,
+            },
+          },
+        },
+      },
+    });
+    const debug = result.debug as Record<string, any>;
+
+    expect(result).toMatchObject({
+      ok: true,
+      answer: finalReflection,
+      final_answer_source: "theory_context_reflection_answer",
+      terminal_artifact_kind: "theory_context_reflection_answer",
+    });
+    expect(debug.conversational_referent_resolution).toMatchObject({
+      referent_detected: true,
+      resolved_source_ref: resolvedSourceRef,
+      resolved_text_hash: resolvedTextHash,
+      resolution_confidence: "high",
+    });
+    expect(debug.capability_lane_call_results).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        ok: true,
+        capability: CAPABILITY,
+        resolved_source_ref: resolvedSourceRef,
+        resolved_text_hash: resolvedTextHash,
+        semantic_prompt_source: "chat_history",
+        semantic_prompt_argument_source: "helix_resolved_referent",
+        runtime_prompt_differed_from_bound_semantic_prompt: true,
+        observation: expect.objectContaining({
+          prompt: priorAnswer,
+          exact_badge_ids: expect.arrayContaining([
+            "low_temp.superconductivity.zero_dc_resistance_bounds",
+          ]),
+        }),
+      }),
+    ]));
   }, 20_000);
 
   it("asks for the missing theory referent without fabricating a graph call", async () => {

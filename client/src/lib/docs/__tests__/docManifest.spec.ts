@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  buildProductionDocModules,
   DOC_MANIFEST,
   compareDocCatalogEntries,
   filterDocManifestEntries,
@@ -187,5 +188,25 @@ describe("filterDocManifestEntries", () => {
     expect(counts["current-development"]).toBeGreaterThan(100);
     expect(counts["legacy-development"]).toBeGreaterThan(10);
     expect(counts.uncategorized ?? 0).toBeLessThan(250);
+  });
+
+  it("loads production Markdown from the server instead of bundling every document", async () => {
+    const fetchDocument = vi.fn(async () =>
+      new Response("# Helix Ask Flow (Grounded)\n", {
+        status: 200,
+        headers: { "Content-Type": "text/markdown" },
+      }),
+    );
+    const modules = buildProductionDocModules(fetchDocument as typeof fetch);
+    const loader = modules["../../../../docs/helix-ask-flow.md"];
+
+    expect(loader).toBeTypeOf("function");
+    await expect(loader()).resolves.toContain("Helix Ask Flow");
+    expect(fetchDocument).toHaveBeenCalledWith(
+      "/docs/helix-ask-flow.md",
+      expect.objectContaining({
+        headers: { Accept: "text/markdown, text/plain;q=0.9, */*;q=0.1" },
+      }),
+    );
   });
 });

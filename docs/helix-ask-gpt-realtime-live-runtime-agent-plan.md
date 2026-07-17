@@ -1,6 +1,34 @@
 # GPT Realtime Live Runtime Agent Plan
 
-Status: planning/audit artifact. No runtime implementation is included here.
+Status: active implementation record. Phases 1 and 2 are complete; the Phase 3
+read-only live companion and worker-grounded spoken relay are implemented and
+awaiting keyed operator proof. Phases 4 and 5 remain governed future work.
+
+Implementation checkpoint (2026-07-17):
+
+- Final Realtime transcripts enter the normal Helix Ask solver path through a
+  server-issued, read-only Stage Play handoff.
+- An extracted worker-admission contract classifies conversation-local,
+  read-only worker-grounded, durable-goal-bound, and action-candidate turns.
+- Codex or the selected runtime provider remains the worker. GPT Realtime has
+  no workstation tools, mutation authority, or terminal answer authority.
+- Completed server-authoritative worker answers can be projected through the
+  existing OpenAI sideband connection as bounded, redacted, correlated
+  out-of-band audio. The full canonical answer remains in Helix Ask chat.
+- Conversation-local answers, typed failures, incomplete solver paths, missing
+  required observations, stale results, and action candidates are not relayed.
+- Relay lifecycle covers worker running, result ready, busy queueing, provider
+  response, playback receipt, supersession, interruption, closure, and failure.
+- Debug export correlates transcript handoff, admission reason, worker
+  provider/model, capabilities/evidence, terminal authority, relay decision,
+  provider response, and playback receipt without raw answer/provider payloads.
+- The recrowned Ask UI adds only passive worker status text. It adds no new
+  control and does not change the runtime-agent picker.
+- The README startup contract is unchanged: the existing `OPENAI_API_KEY`
+  startup path enables the live transport without additional required flags.
+- Implementation lives under extracted Realtime/Stage Play/recrowned Ask
+  modules and does not depend on or add code to deprecated `agi.plan.ts` or
+  `HelixAskPill.tsx`.
 
 ## Objective
 
@@ -496,6 +524,8 @@ These receipts are not answers.
 
 ### Phase 1: Static Plan And Disabled Descriptors
 
+Implementation status: complete.
+
 Add shared types, a disabled/experimental Realtime descriptor, account-policy
 visibility, debug shape tests, and UI placeholders. No OpenAI network call.
 
@@ -507,6 +537,8 @@ Acceptance:
 - No Ask language-model picker changes.
 
 ### Phase 2: Transcription-Only Session
+
+Implementation status: complete.
 
 Use existing voice STT lane or Realtime transcription mode to prove visible
 session lifecycle, source binding, transcript observation packets, and debug
@@ -520,6 +552,8 @@ Acceptance:
 
 ### Phase 3: Readonly Live Voice Companion
 
+Implementation status: implemented; keyed grounded-relay playback proof pending.
+
 Add live voice Q&A over current Ask/workstation context with no mutating tools.
 Realtime responses can speak, but final Ask answers still come from the solver
 path when terminal authority is required.
@@ -532,6 +566,9 @@ Acceptance:
 
 ### Phase 4: Safe Action Suggestions
 
+Implementation status: partial policy scaffold only. Action candidates are
+auditable but suppressed from Realtime execution and delayed spoken relay.
+
 Allow Realtime to suggest safe/read-only actions. The suggestion becomes a
 candidate, then gateway admission decides whether it may run.
 
@@ -543,6 +580,8 @@ Acceptance:
 
 ### Phase 5: Confirmed Mutating Actions
 
+Implementation status: intentionally not implemented by the read-only relay.
+
 Allow admitted mutating workstation actions only under
 `execute_confirmed_actions` with explicit user confirmation and receipt.
 
@@ -553,6 +592,8 @@ Acceptance:
 - Runtime cannot claim completion without observation/receipt evidence.
 
 ### Phase 6: Keyed Live Proof And Rollout
+
+Implementation status: pending operator-owned keyed proof.
 
 Run keyed operator-owned localhost proof only after the user starts the normal
 keyed server. Do not use a self-started unkeyed server as proof.

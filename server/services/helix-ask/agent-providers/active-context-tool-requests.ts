@@ -39,6 +39,7 @@ import {
   unquotePrompt,
 } from "./explicit-tool-requests";
 import { isTheoryBadgeGraphCurrentContextPrompt } from "../theory-badge-graph-current-context-intent";
+import { isActiveWorkstationContextPrompt } from "../workstation-active-context-intent";
 import { appendDedupe } from "./gateway-request-dedupe";
 import {
   extractCalculatorMathTokenSequence,
@@ -504,45 +505,6 @@ export const buildActiveTheoryBadgeGraphContextWorkstationGatewayCallRequests = 
       },
     },
   }];
-};
-
-const CURRENT_PANEL_VIEWING_CUE_PATTERN =
-  /\b(?:which|what)\s+(?:workstation\s+)?panel\b[\s\S]{0,100}?\b(?:currently|right\s+now|now)\b[\s\S]{0,80}?\b(?:look(?:ing)?\s+at|view(?:ing)?|focus(?:ed)?|active|visible|open)\b/gi;
-
-const hasAffirmativeCurrentPanelViewingCue = (prompt: string): boolean => {
-  for (const match of prompt.matchAll(CURRENT_PANEL_VIEWING_CUE_PATTERN)) {
-    const prefix = prompt.slice(Math.max(0, (match.index ?? 0) - 180), match.index ?? 0);
-    const clausePrefix = prefix.split(/[.!?;\n]|\b(?:but|however|instead)\b/i).at(-1) ?? "";
-    if (
-      /\b(?:not|don'?t|do\s+not|without|avoid)\b[\s\S]{0,100}\b(?:ask|asking|answer|identify|inspect|tell)\b/i.test(clausePrefix) ||
-      /\b(?:before|after|if|when|later|future|eventually|hypothetically|would|could|might|previously|earlier|historically)\b/i.test(clausePrefix) ||
-      /\b(?:screen|page|button|label|ui|text|sentence|phrase)\b[\s\S]{0,120}\b(?:says|shows|reads|contains|mentions)\b/i.test(clausePrefix)
-    ) {
-      continue;
-    }
-    return true;
-  }
-  return false;
-};
-
-export const isActiveWorkstationContextPrompt = (prompt: string): boolean => {
-  if (/\bbackground\s+only\b/i.test(prompt)) return false;
-  const unquotedPrompt = prompt.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
-  if (
-    /\b(?:do\s+not|don'?t|no)\b.{0,80}\b(?:run|call|use|execute)\s+(?:any\s+)?(?:tools?|workstation\s+tools?|gateway\s+calls?)\b/i.test(unquotedPrompt)
-  ) {
-    return false;
-  }
-  if (/\b(?:not|don'?t|do\s+not)\s+(?:asking\s+about|ask|answer|use|read|explain|inspect)\b.{0,80}\b(?:current|active|open|visible)\s+(?:panel|panels|workspace|workstation|layout)\b/i.test(unquotedPrompt)) return false;
-  if (/\b(?:before|after|if|when)\b.{0,80}\b(?:open|focus|switch|show)\b.{0,40}\b(?:panel|workspace|workstation)\b/i.test(unquotedPrompt)) return false;
-  if (/\b(?:previous|last|earlier|historical)\b.{0,80}\b(?:panel|panels|workspace|workstation|layout)\b/i.test(unquotedPrompt)) return false;
-  const mentionsPanelContext =
-    /\b(?:current|active|open|visible)\s+(?:panel|panels|workspace|workstation|layout)\b/i.test(unquotedPrompt) ||
-    /\b(?:panel|panels)\s+(?:open|active|visible|on\s+screen|in\s+(?:the\s+)?workspace)\b/i.test(unquotedPrompt) ||
-    /\bwhat\s+(?:panel|panels)\s+(?:is|are)\s+(?:open|active|visible)\b/i.test(unquotedPrompt) ||
-    hasAffirmativeCurrentPanelViewingCue(unquotedPrompt);
-  const asksForContext = /\b(?:what|which|where|list|show|tell\s+me|identify|inspect|read)\b/i.test(unquotedPrompt);
-  return mentionsPanelContext && asksForContext;
 };
 
 export const buildActiveWorkstationContextGatewayCallRequests = (

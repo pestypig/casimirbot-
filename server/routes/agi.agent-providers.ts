@@ -211,6 +211,7 @@ agentProvidersRouter.post("/goal/runtime-session", async (req: Request, res: Res
     objective: readString(body.objective ?? body.goal ?? body.prompt),
     runtimeAgentProvider,
     goalId: readString(body.goal_id ?? body.goalId) || null,
+    threadId: readString(body.thread_id ?? body.threadId) || "helix-ask:desktop",
     runtimeSessionId: readString(body.runtime_session_id ?? body.runtimeSessionId) || null,
     allowedLanes: readStringArray(body.allowed_lanes ?? body.allowedLanes),
     allowedWorkstationTools: readStringArray(body.allowed_workstation_tools ?? body.allowedWorkstationTools),

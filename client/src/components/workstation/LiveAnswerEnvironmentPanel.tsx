@@ -73,6 +73,11 @@ import {
   type VisualSourceCaptureState,
 } from "@/store/useVisualSourceCaptureStore";
 import { useImageLensLiveSourceStore } from "@/store/useImageLensLiveSourceStore";
+import { useDocumentImageRegionStore } from "@/store/useDocumentImageRegionStore";
+import {
+  requestHelixAskVisualFrameAttachmentPromotion,
+  requestHelixAskVisualFrameLivePromotion,
+} from "@/components/helix/ask-console/HelixAskVisualFramePromotion";
 import {
   startDisplayAudioSituationSession,
   type DisplayAudioSituationSession,
@@ -2642,6 +2647,64 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     window.dispatchEvent(new CustomEvent("open-helix-panel", { detail: { id: "image-lens" } }));
   };
 
+  const sendSelectedVisualFrameToGptLive = (): void => {
+    if (!selectedVisualFrameHistory) {
+      setLastActionStatus("Select a captured frame before sending it to GPT Live.");
+      return;
+    }
+    const outcome = requestHelixAskVisualFrameLivePromotion({
+      imageDataUrl: selectedVisualFrameHistory.preview_data_url,
+      sourceKind: "screen",
+      sourceLabel: selectedVisualFrameHistory.crop_only ? "Selected Image Lens crop" : "Selected visual frame",
+      detail: selectedVisualFrameHistory.crop_only ? "high" : "auto",
+    });
+    setLastActionStatus(outcome.ok
+      ? `Selected frame sent to GPT Live (${outcome.receipt?.item_id ?? "accepted"}).`
+      : outcome.code === "visual_input_consent_required"
+        ? "Turn Vision On in GPT Live before sending a selected frame."
+        : outcome.code === "live_runtime_unavailable"
+          ? "Start GPT Live before sending a selected frame."
+          : `GPT Live frame send blocked: ${outcome.code}.`);
+  };
+
+  const attachSelectedVisualFrameToNextAsk = (): void => {
+    if (!selectedVisualFrameHistory) {
+      setLastActionStatus("Select a captured frame before attaching it to the next Ask turn.");
+      return;
+    }
+    const frameRef = selectedVisualFrameHistory.frame_id ?? selectedVisualFrameHistory.history_id;
+    const outcome = requestHelixAskVisualFrameAttachmentPromotion({
+      imageDataUrl: selectedVisualFrameHistory.preview_data_url,
+      fileName: `visual-frame-${frameRef.replace(/[^a-z0-9._-]+/gi, "-")}.jpg`,
+      evidenceRef: selectedVisualFrameHistory.evidence_id,
+    });
+    setLastActionStatus(outcome.ok
+      ? "Selected frame added to the next Helix Ask turn. Review the attachment strip before sending."
+      : outcome.detail ?? `Selected frame attachment blocked: ${outcome.code}.`);
+  };
+
+  const openSelectedVisualFrameInImageLens = (): void => {
+    if (!selectedVisualFrameHistory) {
+      setLastActionStatus("Select a captured frame before opening Image Lens.");
+      return;
+    }
+    clearImageLensLiveSource();
+    useDocumentImageRegionStore.getState().setSourceImage({
+      sourceImageUrl: selectedVisualFrameHistory.preview_data_url,
+      sourceAttachmentId: `visual-frame:${selectedVisualFrameHistory.frame_id ?? selectedVisualFrameHistory.history_id}`,
+      sourceKind: "image_attachment",
+      pageNumber: null,
+      sourceId: selectedVisualFrameHistory.source_id,
+      evidenceId: selectedVisualFrameHistory.evidence_id,
+      sourceRefHash: selectedVisualFrameHistory.preview_hash,
+      mountedAt: new Date().toISOString(),
+      viewMode: "fit_to_panel",
+      coordinateSpace: "natural_image_px",
+    });
+    openImageLensPanel();
+    setLastActionStatus("Selected frozen frame opened in Image Lens. Draw a crop and explicitly send it when ready.");
+  };
+
   const ensureVisualSourceRegistered = async (): Promise<VisualSourceRead> => {
     const existing = visualLatest?.active_source ?? visualLatest?.source ?? null;
     if (existing) return existing;
@@ -4009,6 +4072,29 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                     <span className="uppercase text-slate-500">Expires</span>{" "}
                     <span className="font-mono text-slate-300">{formatTime(selectedVisualFrameHistory.expires_at)}</span>
                   </div>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5" data-testid="visual-frame-explicit-promotion-actions">
+                  <button
+                    type="button"
+                    onClick={sendSelectedVisualFrameToGptLive}
+                    className="rounded border border-emerald-300/30 bg-emerald-400/10 px-2 py-1 text-[10px] font-semibold text-emerald-100 hover:bg-emerald-400/20"
+                  >
+                    Send now to GPT Live
+                  </button>
+                  <button
+                    type="button"
+                    onClick={attachSelectedVisualFrameToNextAsk}
+                    className="rounded border border-sky-300/30 bg-sky-400/10 px-2 py-1 text-[10px] font-semibold text-sky-100 hover:bg-sky-400/20"
+                  >
+                    Use in next Ask
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openSelectedVisualFrameInImageLens}
+                    className="rounded border border-cyan-300/30 bg-cyan-400/10 px-2 py-1 text-[10px] font-semibold text-cyan-100 hover:bg-cyan-400/20"
+                  >
+                    Open frozen frame in Image Lens
+                  </button>
                 </div>
               </div>
             </div>

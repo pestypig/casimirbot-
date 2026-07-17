@@ -49,6 +49,9 @@ const safeRef = (value: unknown, limit = 260): string | null => {
 const unique = (values: Array<string | null | undefined>, limit = Number.MAX_SAFE_INTEGER): string[] =>
   Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean))).slice(0, limit);
 
+const readPrefixedRef = (refs: string[], prefix: string): string | null =>
+  refs.map((ref) => safeRef(ref)).find((ref): ref is string => Boolean(ref?.startsWith(prefix))) ?? null;
+
 const toMs = (value: unknown): number | null => {
   if (typeof value === "number" && Number.isFinite(value)) return Math.trunc(value);
   if (typeof value !== "string") return null;
@@ -200,8 +203,17 @@ export const buildHelixRealtimeStagePlayContextPack = (input: {
     );
 
   const activeGoalSessions = goalSessions
-    .filter((session) => session.status === "active" || session.status === "paused" || session.status === "draft")
+    .filter((session) =>
+      session.status === "active" ||
+      session.status === "paused" ||
+      session.status === "draft" ||
+      session.status === "blocked")
     .slice(0, MAX_GOAL_SUMMARIES);
+  const activeRuntimeGoalSession = activeGoalSessions.find((session) =>
+    session.constructRefs.includes("runtime-goal-stage-play-projection")) ?? null;
+  const activeGoalSession = activeRuntimeGoalSession ??
+    activeGoalSessions[0] ??
+    null;
   const workstationGoalSummaries = activeGoalSessions.map((session) => {
     const checkpoint = session.checkpoints.at(-1);
     return boundedItem({
@@ -256,6 +268,29 @@ export const buildHelixRealtimeStagePlayContextPack = (input: {
     }));
   workstationGoalSummaries.push(...goalUpdateSummaries);
 
+  const activeGoalCheckpoint = activeGoalSession?.checkpoints.at(-1) ?? null;
+  const runtimeSessionRef = activeGoalSession
+    ? readPrefixedRef(activeGoalSession.constructRefs, "runtime-session:")
+    : null;
+  const runtimeProviderRef = activeGoalSession
+    ? readPrefixedRef(activeGoalSession.constructRefs, "runtime-provider:")
+    : null;
+  const activeGoalBinding = activeGoalSession
+    ? {
+        goal_id: activeGoalSession.goalId,
+        status: activeGoalSession.status,
+        runtime_session_ref: runtimeSessionRef,
+        runtime_agent_provider: runtimeProviderRef?.slice("runtime-provider:".length) || null,
+        source_refs: unique(activeGoalSession.sourceRefs.map((ref) => safeRef(ref)), 12),
+        evidence_refs: unique([
+          ...(activeGoalCheckpoint?.evidenceRefs ?? []),
+          ...activeGoalSession.sourceRefs,
+        ].map((ref) => safeRef(ref)), 16),
+        answer_authority: false as const,
+        terminal_eligible: false as const,
+      }
+    : null;
+
   const selectedRefs = unique([
     ...recentQuestions.map((entry) => entry.ref),
     ...groundedAnswers.map((entry) => entry.ref),
@@ -283,14 +318,20 @@ export const buildHelixRealtimeStagePlayContextPack = (input: {
   ].map((entry) => safeRef(entry)), MAX_EVIDENCE_REFS);
 
   const objective = clip(
-    activeGoalSessions[0]?.objective ??
+    activeGoalSession?.objective ??
       situation?.objective ??
       conversation.lastAgreedObjective?.textPreview ??
       "",
   ) || null;
-  const currentGoal = clip(situation?.current_goal ?? activeGoalSessions[0]?.userVisibleSummary ?? "") || null;
+  const currentGoal = clip(
+    activeRuntimeGoalSession?.userVisibleSummary ??
+      situation?.current_goal ??
+      activeGoalSession?.userVisibleSummary ??
+      "",
+  ) || null;
   const semanticContent = {
     thread_id: input.threadId,
+    active_goal_binding: activeGoalBinding,
     objective,
     current_goal: currentGoal,
     active_constraints: activeConstraints,
@@ -310,6 +351,7 @@ export const buildHelixRealtimeStagePlayContextPack = (input: {
   const hasContent = Boolean(
     objective ||
     currentGoal ||
+    activeGoalBinding ||
     selectedRefs.length > 0 ||
     semanticContent.known_risks.length > 0 ||
     semanticContent.known_unknowns.length > 0,

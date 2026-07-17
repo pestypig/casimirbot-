@@ -1726,9 +1726,9 @@ describe("Helix Ask Console recrown boundary", () => {
       liveLegacyConsoleViewStartsAtLine: legacyConsoleViewLine,
     });
     expect(Math.abs(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.lineCountAtInventory - legacyPillLines.length)).toBeLessThanOrEqual(5);
-    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.lineCountAtInventory).toBeGreaterThan(24000);
+    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.lineCountAtInventory).toBeGreaterThan(23000);
     expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.exportedComponentStartsAtLine).toBeGreaterThan(6300);
-    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.liveRenderSliceStartsAtLine).toBeGreaterThan(23900);
+    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.liveRenderSliceStartsAtLine).toBeGreaterThan(23000);
     const sliceClassifications = HELIX_ASK_LEGACY_CONSOLE_SLICES.map((slice) => slice.classification);
     expect(sliceClassifications[0]).toBe("live_day_to_day_must_move");
     expect(new Set(sliceClassifications)).toEqual(
@@ -1751,7 +1751,7 @@ describe("Helix Ask Console recrown boundary", () => {
       bridgeReplacementReady: false,
       liveDayToDaySliceCount: 1,
       pureDisplayRecrownedSliceCount: 86,
-      behaviorSensitiveRecrownedWithParitySliceCount: 66,
+      behaviorSensitiveRecrownedWithParitySliceCount: 67,
       behaviorSensitiveQuarantinedSliceCount: 5,
       unknownTrapDoorSliceCount: 1,
     });
@@ -5278,6 +5278,8 @@ describe("Helix Ask Console recrown boundary", () => {
     const toolbar = read("client/src/components/helix/ask-console/HelixAskActionToolbar.tsx");
     const actionToolbarSurface = read("client/src/components/helix/ask-console/HelixAskComposerActionToolbarSurface.tsx");
     const liveRuntimeControls = read("client/src/components/helix/ask-console/HelixAskLiveRuntimeControls.tsx");
+    const liveRuntimeSession = read("client/src/components/helix/ask-console/useHelixAskLiveRuntimeSession.ts");
+    const visualFrameProducer = read("client/src/lib/helix/visualFrameProducer.ts");
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
 
     expect(markup).toContain("Live Off");
@@ -5294,6 +5296,12 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(liveRuntimeControls).toContain("developer_runtime_agent_controls_required");
     expect(liveRuntimeControls).toContain("data-live-microphone-enabled");
     expect(liveRuntimeControls).toContain("runtime.setMicrophoneEnabled(!runtime.microphoneEnabled)");
+    expect(liveRuntimeControls).toContain("data-live-visual-input-enabled");
+    expect(liveRuntimeControls).toContain("runtime.setVisualInputEnabled(!runtime.visualInputEnabled)");
+    expect(liveRuntimeSession).toContain("subscribeVisualFrameProducerFrames(routeFrame)");
+    expect(liveRuntimeSession).toContain("!frame.liveRuntimeEligible");
+    expect(liveRuntimeSession).toContain("controllerRef.current?.sendVisualFrame({");
+    expect(visualFrameProducer).toContain("liveRuntimeEligible: input.liveRuntimeEligible === true");
     expect(actionToolbarSurface).toContain("showMicButton={!liveOwnsMicrophone}");
     expect(liveRuntimeControls).not.toContain("fetch(");
     expect(liveRuntimeControls).not.toContain("navigator.mediaDevices");
@@ -6347,7 +6355,8 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(toolbar).toContain('title="Attach image"');
     expect(toolbar).toContain('const micTitle = micInputMode === "live_runtime"');
     expect(toolbar).toContain('data-microphone-owner={micInputMode}');
-    expect(toolbar).toContain('title="Capture visual source"');
+    expect(toolbar).toContain("const visualCaptureTitle = visualSituationSourceStatus");
+    expect(toolbar).toContain("title={visualCaptureTitle}");
     expect(toolbar).toContain("const visualAudioTitle = visualSituationIncludeAudio");
     expect(toolbar).toContain("<Plus className=");
     expect(toolbar).toContain("<Mic className=");
@@ -9126,13 +9135,17 @@ describe("Helix Ask Console recrown boundary", () => {
 
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     const visualPreference = read("client/src/components/helix/ask-console/HelixAskVisualCapturePreference.ts");
-    expect(legacyPill).toContain("readHelixAskVisualCaptureAudioPreference()");
-    expect(legacyPill).toContain("syncHelixAskVisualCaptureRoutePreference(");
+    const visualRuntime = read("client/src/components/helix/ask-console/useHelixAskVisualSourceCaptureRuntime.ts");
+    expect(legacyPill).toContain("useHelixAskVisualSourceCaptureRuntime({");
     expect(legacyPill).toContain("visualSituationIncludeAudio");
-    expect(legacyPill).toContain("attachDisplayAudioSource(");
-    expect(legacyPill).not.toContain("function readHelixAskVisualCaptureAudioPreference");
-    expect(legacyPill).not.toContain("function syncHelixAskVisualCaptureRoutePreference");
-    expect(legacyPill).not.toContain("const HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_STORAGE_KEY");
+    expect(legacyPill).not.toContain("readHelixAskVisualCaptureAudioPreference()");
+    expect(legacyPill).not.toContain("syncHelixAskVisualCaptureRoutePreference(");
+    expect(legacyPill).not.toContain("attachDisplayAudioSource(");
+    expect(legacyPill).not.toContain("postHelixAskAudioTranscriptChunk");
+    expect(visualRuntime).toContain("readHelixAskVisualCaptureAudioPreference()");
+    expect(visualRuntime).toContain("syncHelixAskVisualCaptureRoutePreference(");
+    expect(visualRuntime).toContain("attachDisplayAudioSource(");
+    expect(visualRuntime).toContain("postHelixAskAudioTranscriptChunk");
     expect(visualPreference).toContain("export function readHelixAskVisualCaptureAudioPreference");
     expect(visualPreference).toContain("export function syncHelixAskVisualCaptureRoutePreference");
     expect(visualPreference).toContain("HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_SYNC_EVENT");

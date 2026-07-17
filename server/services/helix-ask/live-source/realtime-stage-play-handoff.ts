@@ -6,6 +6,8 @@ import {
 import type { HelixRealtimeTranscriptObservation } from "@shared/helix-realtime-observation";
 import { recordStagePlayLiveSourceConversationEvent } from "../../stage-play/stage-play-live-source-conversation-store";
 import { buildHelixRealtimeStagePlayContextPack } from "../realtime-session/context-pack";
+import { startRealtimeGroundedRelayForHandoff } from "../realtime-session/grounded-answer-relay";
+import { buildRealtimeTranscriptWorkerAdmission } from "../realtime-session/worker-admission";
 
 const handoffsById = new Map<string, HelixRealtimeStagePlayAskHandoffV1>();
 const handoffIdByProviderEventKey = new Map<string, string>();
@@ -87,6 +89,7 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
     sourceBinding: input.sourceBinding,
     nowMs,
   });
+  const activeGoalBinding = contextPack.active_goal_binding;
   const handoffId = `realtime-stage-play-handoff:${hash([
     input.realtimeSessionId,
     input.providerEventRef,
@@ -100,6 +103,19 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
     contextPack.context_pack_id,
     ...contextPack.evidence_refs,
   ]).slice(0, 40);
+  const workerAdmission = buildRealtimeTranscriptWorkerAdmission({
+    handoffId,
+    realtimeSessionId: input.realtimeSessionId,
+    threadId: input.threadId,
+    transcriptText,
+    sourceBinding: input.sourceBinding,
+    activeGoalBinding,
+    evidenceRefs,
+    nowMs,
+  });
+  const requiredGroundingCapabilityIds = workerAdmission.spoken_relay_eligible
+    ? workerAdmission.candidate_readonly_capability_ids
+    : [];
   const routeMetadata: Record<string, unknown> = {
     schema: "helix.ask.route_metadata.v1",
     source: "realtime_stage_play",
@@ -108,6 +124,11 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
     mailboxThreadId: input.threadId,
     handoffId,
     realtimeSessionId: input.realtimeSessionId,
+    goalId: activeGoalBinding?.goal_id ?? null,
+    runtimeGoalSessionRef: activeGoalBinding?.runtime_session_ref ?? null,
+    boundRuntimeAgentProvider: activeGoalBinding?.runtime_agent_provider ?? null,
+    requiredGroundingCapabilityIds,
+    realtimeWorkerAdmission: workerAdmission,
     forbiddenCapabilities: [
       "workstation_mutation",
       "workstation_action_execution",
@@ -131,8 +152,14 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
       precedence_reason: "server_admitted_realtime_transcript_handoff",
       must_enter_backend_ask: true,
       allow_client_shortcut: false,
-      allow_no_tool_direct: true,
+      allow_no_tool_direct: requiredGroundingCapabilityIds.length === 0,
       admitted_readonly_handoff: true,
+      grounded_feedback_requires_observation: requiredGroundingCapabilityIds.length > 0,
+      required_grounding_capability_ids: requiredGroundingCapabilityIds,
+      goal_id: activeGoalBinding?.goal_id ?? null,
+      runtime_goal_session_ref: activeGoalBinding?.runtime_session_ref ?? null,
+      runtime_agent_provider: activeGoalBinding?.runtime_agent_provider ?? null,
+      realtime_worker_admission: workerAdmission,
       transcript_is_user_intent_after_admission: true,
       handoff_id: handoffId,
       realtime_session_id: input.realtimeSessionId,
@@ -168,6 +195,11 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
     context_hash: contextPack.context_hash,
     transcript_text_hash: transcriptTextHash,
     transcript_text_char_count: transcriptText.length,
+    goal_id: activeGoalBinding?.goal_id ?? null,
+    runtime_goal_session_ref: activeGoalBinding?.runtime_session_ref ?? null,
+    runtime_agent_provider: activeGoalBinding?.runtime_agent_provider ?? null,
+    required_grounding_capability_ids: requiredGroundingCapabilityIds,
+    worker_admission: workerAdmission,
     created_at_ms: nowMs,
     route_metadata: routeMetadata,
     read_only: true,
@@ -180,6 +212,11 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
   };
   handoffsById.set(handoffId, handoff);
   handoffIdByProviderEventKey.set(providerEventKey, handoffId);
+  startRealtimeGroundedRelayForHandoff({
+    handoff,
+    workerAdmission,
+    nowMs,
+  });
   trimHandoffs();
   return handoff;
 };

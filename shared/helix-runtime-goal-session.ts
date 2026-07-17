@@ -141,6 +141,7 @@ export type HelixRuntimeGoalSourceBinding = {
 export type HelixRuntimeGoalJobBrief = {
   schema: "helix.runtime_goal.job_brief.v1";
   goal_id: string;
+  thread_id: string;
   user_goal_text: string;
   selected_runtime_agent_provider: HelixAgentRuntimeId;
   created_at: string;
@@ -189,6 +190,22 @@ export type HelixRuntimeGoalProgressSummary = {
   current_summary: string;
   next_wake_behavior: string;
   terminal_authority_status: HelixRuntimeGoalTerminalAuthorityStatus;
+  answer_authority: false;
+  assistant_answer: false;
+  terminal_eligible: false;
+  raw_content_included: false;
+};
+
+export type HelixRuntimeGoalStagePlayProjection = {
+  schema: "helix.runtime_goal.stage_play_projection.v1";
+  status: "projected" | "failed";
+  goal_id: string;
+  thread_id: string;
+  runtime_session_id: string;
+  stage_play_goal_session_ref: string | null;
+  context_update_ref: string | null;
+  projected_evidence_refs: string[];
+  failure_code: string | null;
   answer_authority: false;
   assistant_answer: false;
   terminal_eligible: false;
@@ -253,6 +270,7 @@ export type HelixRuntimeGoalDebugEvent = {
 export type HelixRuntimeGoalSession = {
   schema: "helix.runtime_goal.session.v1";
   goal_id: string;
+  thread_id: string;
   objective: string;
   runtime_agent_provider: HelixAgentRuntimeId;
   runtime_session_id: string;
@@ -300,6 +318,7 @@ export type HelixRuntimeGoalDebugExport = {
   runtime_goal_progress_summary: HelixRuntimeGoalProgressSummary | null;
   runtime_goal_source_binding: HelixRuntimeGoalSourceBinding | null;
   runtime_goal_observation_refs: string[];
+  runtime_goal_stage_play_projection: HelixRuntimeGoalStagePlayProjection | null;
   runtime_goal_terminal_authority_status: HelixRuntimeGoalTerminalAuthorityStatus;
   latest_observation_refs: string[];
   latest_receipt_refs: string[];

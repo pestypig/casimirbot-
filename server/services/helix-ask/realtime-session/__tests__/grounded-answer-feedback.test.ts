@@ -16,6 +16,12 @@ import {
   recordRealtimeGroundedAnswerFromPayload,
   resetRealtimeGroundedAnswerFeedbackForTests,
 } from "../grounded-answer-feedback";
+import { readRealtimeGroundedAnswerRelay } from "../grounded-answer-relay";
+import { buildRealtimeStagePlayDebugProvenance } from "../debug-provenance";
+import {
+  admitRealtimeSession,
+  resetRealtimeSessionRegistryForTests,
+} from "../session-registry";
 
 const terminalPayload = (answer: string) => ({
   schema: "helix.ask.turn.response.v1",
@@ -50,11 +56,31 @@ const createHandoff = (suffix: string) => {
   });
 };
 
+const createDeicticHandoff = (suffix = "deictic") => {
+  const transcriptText = "What panel do you see?";
+  const observation = buildRealtimeTranscriptObservation({
+    realtimeSessionId: "realtime:test",
+    body: {
+      event_type: "transcript.final",
+      event_ref: `provider-event:${suffix}`,
+      transcript_text: transcriptText,
+    },
+  })!;
+  return bridgeRealtimeTranscriptToStagePlay({
+    realtimeSessionId: "realtime:test",
+    threadId: "helix-ask:desktop",
+    providerEventRef: `provider-event:${suffix}`,
+    transcriptText,
+    observation,
+  });
+};
+
 describe("Realtime grounded answer feedback", () => {
   beforeEach(() => {
     resetStagePlayLiveSourceConversationStoreForTest();
     resetRealtimeStagePlayAskHandoffsForTests();
     resetRealtimeGroundedAnswerFeedbackForTests();
+    resetRealtimeSessionRegistryForTests();
   });
 
   it("records a server-authoritative completed Ask answer and ignores incomplete candidates", () => {
@@ -92,6 +118,158 @@ describe("Realtime grounded answer feedback", () => {
     })).toEqual([
       expect.objectContaining({ textPreview: "The grounded answer." }),
     ]);
+  });
+
+  it("rejects deictic answers until active-context evidence was re-entered and followed by reasoning", () => {
+    const handoff = createDeicticHandoff();
+    expect(handoff.required_grounding_capability_ids).toEqual(["workstation.active_context"]);
+
+    const missingObservation = {
+      ...terminalPayload("The account panel is visible."),
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        evidence_reentry: { required: true, completed: true },
+        followup_reasoning: { required: true, completed: true },
+      },
+    };
+    expect(recordRealtimeGroundedAnswerFromPayload({
+      handoffId: handoff.handoff_id,
+      payload: missingObservation,
+    })).toBeNull();
+    expect(readRealtimeGroundedAnswerRelay(handoff.handoff_id)).toMatchObject({
+      status: "suppressed",
+      status_reason: "required_grounding_evidence_missing",
+    });
+
+    const activeContextRef = "observation:workstation.active_context:1";
+    const feedback = recordRealtimeGroundedAnswerFromPayload({
+      handoffId: handoff.handoff_id,
+      payload: {
+        ...missingObservation,
+        selected_terminal_support_refs: [activeContextRef],
+        workstation_gateway_call_results: [{
+          ok: true,
+          capability_id: "workstation.active_context",
+          artifact_refs: [activeContextRef],
+          observation_packet: {
+            status: "succeeded",
+            call_id: "call:workstation.active_context:1",
+            produced_artifact_refs: [activeContextRef],
+          },
+        }],
+      },
+    });
+
+    expect(feedback).toMatchObject({
+      required_grounding_capability_ids: ["workstation.active_context"],
+      grounding_evidence_satisfied: true,
+      completed_solver_path: true,
+      server_authoritative: true,
+    });
+    expect(feedback?.evidence_refs).toContain(activeContextRef);
+  });
+
+  it("suppresses typed failures and exports the complete authority-safe relay chain", () => {
+    const nowMs = Date.now();
+    const session = admitRealtimeSession({
+      realtimeSessionId: "realtime:test",
+      requesterRef: "requester:test",
+      visibleUserConsentReceipt: "receipt:consent:test",
+      model: "gpt-realtime",
+      threadId: "helix-ask:desktop",
+      nowMs,
+    });
+    const failedHandoff = createHandoff("typed-failure");
+    expect(recordRealtimeGroundedAnswerFromPayload({
+      handoffId: failedHandoff.handoff_id,
+      payload: {
+        ...terminalPayload("The worker could not complete this turn."),
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+      },
+      nowMs: nowMs + 10,
+    })).toBeNull();
+    expect(readRealtimeGroundedAnswerRelay(failedHandoff.handoff_id)).toMatchObject({
+      status: "suppressed",
+      status_reason: "typed_failure_not_spoken",
+      response_created: false,
+    });
+
+    const deicticFailure = createDeicticHandoff("deictic-typed-failure");
+    expect(recordRealtimeGroundedAnswerFromPayload({
+      handoffId: deicticFailure.handoff_id,
+      payload: {
+        ...terminalPayload("The worker could not observe the active panel."),
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+      },
+      nowMs: nowMs + 11,
+    })).toBeNull();
+    expect(readRealtimeGroundedAnswerRelay(deicticFailure.handoff_id)).toMatchObject({
+      status: "suppressed",
+      status_reason: "typed_failure_not_spoken",
+    });
+
+    const groundedHandoff = createDeicticHandoff();
+    const activeContextRef = "observation:workstation.active_context:debug";
+    const answerText = "The active panel is Account & Sessions.";
+    expect(recordRealtimeGroundedAnswerFromPayload({
+      handoffId: groundedHandoff.handoff_id,
+      payload: {
+        ...terminalPayload(answerText),
+        selected_agent_provider: "codex",
+        language_model_policy: { resolved_model: "gpt-5.4" },
+        ask_turn_solver_trace: {
+          completed_solver_path: true,
+          evidence_reentry: { required: true, completed: true },
+          followup_reasoning: { required: true, completed: true },
+        },
+        workstation_gateway_call_results: [{
+          ok: true,
+          capability_id: "workstation.active_context",
+          artifact_refs: [activeContextRef],
+          observation_packet: {
+            status: "succeeded",
+            call_id: "call:workstation.active_context:debug",
+            produced_artifact_refs: [activeContextRef],
+          },
+        }],
+      },
+      nowMs: nowMs + 20,
+    })).not.toBeNull();
+
+    const debug = buildRealtimeStagePlayDebugProvenance(session);
+    const groundedDebug = debug.handoffs.find((entry) =>
+      entry.handoff_id === groundedHandoff.handoff_id);
+    expect(groundedDebug).toMatchObject({
+      worker_admission: {
+        decision_phase: "transcript_handoff",
+        worker_turn_dispatched: true,
+        workstation_action_execution_allowed: false,
+      },
+      grounded_answer: {
+        completed_solver_path: true,
+        server_authoritative: true,
+      },
+      grounded_relay: {
+        status: "relay_queued_busy",
+        worker_admission: {
+          decision_phase: "solver_final",
+          outcome: "worker_grounded",
+          selected_runtime_agent_provider: "codex",
+          selected_model: "gpt-5.4",
+          observed_readonly_capability_ids: ["workstation.active_context"],
+        },
+        response_created: false,
+        answer_authority: false,
+      },
+    });
+    expect(debug.latest_grounded_relay?.handoff_id).toBe(groundedHandoff.handoff_id);
+    expect(debug.authority).toMatchObject({
+      spoken_relay_requires_server_authoritative_grounded_answer: true,
+      realtime_relay_answer_authority: false,
+    });
+    expect(JSON.stringify(debug)).not.toContain(answerText);
   });
 
   it("observes JSON and streaming turn-final responses without changing their payload", async () => {

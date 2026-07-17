@@ -1,3 +1,8 @@
+import type {
+  HelixRealtimeGroundedRelayV1,
+  HelixRealtimeWorkerAdmissionV1,
+} from "./helix-realtime-worker-relay.v1";
+
 export const HELIX_REALTIME_STAGE_PLAY_CONTEXT_PACK_SCHEMA =
   "helix.realtime_stage_play.context_pack.v1" as const;
 
@@ -25,6 +30,17 @@ export type HelixRealtimeStagePlaySourceIdentityV1 = {
   evidence_refs: string[];
 };
 
+export type HelixRealtimeStagePlayGoalBindingV1 = {
+  goal_id: string;
+  status: "draft" | "active" | "paused" | "blocked" | "satisfied" | "stopped" | "failed";
+  runtime_session_ref: string | null;
+  runtime_agent_provider: string | null;
+  source_refs: string[];
+  evidence_refs: string[];
+  answer_authority: false;
+  terminal_eligible: false;
+};
+
 export type HelixRealtimeStagePlayRejectedRefV1 = {
   ref: string;
   reason:
@@ -45,6 +61,7 @@ export type HelixRealtimeStagePlayContextPackV1 = {
   generated_at_ms: number;
   fresh_until_ms: number;
   freshness_status: "fresh" | "empty";
+  active_goal_binding: HelixRealtimeStagePlayGoalBindingV1 | null;
   objective: string | null;
   current_goal: string | null;
   active_constraints: HelixRealtimeStagePlayContextItemV1[];
@@ -91,6 +108,11 @@ export type HelixRealtimeStagePlayAskHandoffV1 = {
   context_hash: string;
   transcript_text_hash: string;
   transcript_text_char_count: number;
+  goal_id: string | null;
+  runtime_goal_session_ref: string | null;
+  runtime_agent_provider: string | null;
+  required_grounding_capability_ids: string[];
+  worker_admission: HelixRealtimeWorkerAdmissionV1;
   created_at_ms: number;
   route_metadata: Record<string, unknown>;
   read_only: true;
@@ -143,6 +165,7 @@ export type HelixRealtimeStagePlayGroundedAnswerV1 = {
   handoff_id: string;
   realtime_session_id: string;
   thread_id: string;
+  goal_id: string | null;
   ask_turn_id: string | null;
   stage_play_event_ref: string;
   answer_text_hash: string;
@@ -150,6 +173,8 @@ export type HelixRealtimeStagePlayGroundedAnswerV1 = {
   final_answer_source: string;
   terminal_artifact_kind: string;
   evidence_refs: string[];
+  required_grounding_capability_ids: string[];
+  grounding_evidence_satisfied: true;
   recorded_at_ms: number;
   completed_solver_path: true;
   server_authoritative: true;
@@ -161,6 +186,9 @@ export type HelixRealtimeStagePlayDebugV1 = {
   schema: typeof HELIX_REALTIME_STAGE_PLAY_DEBUG_SCHEMA;
   realtime_session_id: string;
   thread_id: string;
+  bound_goal_id: string | null;
+  bound_runtime_session_ref: string | null;
+  bound_runtime_agent_provider: string | null;
   provider_call_ref: string | null;
   handoffs: Array<{
     handoff_id: string;
@@ -169,15 +197,25 @@ export type HelixRealtimeStagePlayDebugV1 = {
     stage_play_event_ref: string;
     context_pack_id: string;
     context_hash: string;
+    goal_id: string | null;
+    runtime_goal_session_ref: string | null;
+    runtime_agent_provider: string | null;
+    required_grounding_capability_ids: string[];
+    worker_admission: HelixRealtimeWorkerAdmissionV1;
     created_at_ms: number;
     grounded_answer: HelixRealtimeStagePlayGroundedAnswerV1 | null;
+    grounded_relay: HelixRealtimeGroundedRelayV1 | null;
   }>;
   latest_context_sync: HelixRealtimeStagePlayContextSyncV1 | null;
+  latest_grounded_relay: HelixRealtimeGroundedRelayV1 | null;
   authority: {
     realtime_answer_authority: false;
     workstation_action_authority: false;
     terminal_answer_authority: false;
     grounded_answer_requires_completed_solver_path: true;
+    grounded_answer_requires_route_evidence: true;
+    spoken_relay_requires_server_authoritative_grounded_answer: true;
+    realtime_relay_answer_authority: false;
   };
   provider_call_id_included: false;
   provider_payload_included: false;

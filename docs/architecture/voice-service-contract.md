@@ -229,6 +229,29 @@ Behavioral binding:
 - Missing evidence for repo-attributed mission claims should suppress or downgrade certainty.
 - Suppression responses should carry stable deterministic reason labels.
 
+## GPT Realtime grounded worker relay (additive)
+
+- GPT Realtime conversation audio remains separate from `/api/voice/speak` and
+  the ElevenLabs/local read-aloud queue. A worker-grounded result is presented
+  through the existing OpenAI Realtime sideband call as a correlated
+  out-of-band `response.create` audio response.
+- Only a completed, server-authoritative Helix Ask terminal answer with required
+  read-only observations may enter this relay. Tool receipts, typed failures,
+  requests for input, action candidates, and client projections are ineligible.
+- The projection is bounded and credential-redacted. Raw documents, tool
+  output, debug exports, provider payloads, and the full answer are not sent;
+  the canonical full answer remains in Helix Ask chat and Stage Play.
+- GPT Realtime receives no workstation tools and gains no mutation or terminal
+  answer authority. It presents the worker's result without adding claims or
+  implying that it executed the worker's tools.
+- User speech, provider response activity, and browser playback hold the relay
+  queue busy. Newer transcripts supersede older pending results; qualified
+  barge-in cancels active relay speech; session closure cancels remaining work.
+- Delivery is complete only after the correlated browser playback receipt.
+  Debug records transcript/handoff, worker admission, provider/model,
+  capabilities/evidence, relay lifecycle, provider response ID, and playback
+  receipt without raw answer content.
+
 ## Integration points
 - Input signals from Helix Ask live events and final envelopes.
 - Optional integration with Mission Go Board event stream.

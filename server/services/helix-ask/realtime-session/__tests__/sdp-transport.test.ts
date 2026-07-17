@@ -42,9 +42,15 @@ describe("OpenAI Realtime SDP transport", () => {
       tools: [],
       audio: {
         input: {
-          transcription: { model: "gpt-4o-mini-transcribe" },
+          noise_reduction: { type: "far_field" },
+          transcription: {
+            model: "gpt-4o-transcribe",
+            language: "en",
+            prompt: expect.stringContaining("workstation, panel, active panel"),
+          },
           turn_detection: {
             type: "semantic_vad",
+            eagerness: "low",
             create_response: true,
             interrupt_response: true,
           },

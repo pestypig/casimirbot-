@@ -15,6 +15,7 @@ export type HelixVisualSourceSurface =
   | "browser_tab"
   | "desktop_window"
   | "screen_share_window"
+  | "device_camera"
   | "minecraft_client_window"
   | "manual_upload";
 

@@ -91,6 +91,25 @@ const webTreeSitterNodeShim = (): Plugin => ({
   },
 });
 
+const productionRawContentModuleStub = (): Plugin => ({
+  name: "production-raw-content-module-stub",
+  enforce: "pre",
+  load(id: string) {
+    if (process.env.NODE_ENV !== "production") return null;
+    const posixId = toPosix(id).split("?", 1)[0];
+    if (process.env.REPLIT_BUILD_DIAGNOSTICS === "1" && posixId.includes("source-list")) {
+      console.log(`[vite] production source-list candidate: ${posixId}`);
+    }
+    if (posixId.endsWith("/client/src/lib/code-index/source-list.ts")) {
+      return "export const SOURCE_PATTERNS = Object.freeze([]); export const SOURCE_LOADERS = Object.freeze({});";
+    }
+    if (posixId.endsWith("/client/src/lib/docs/docModules.ts")) {
+      return "export const DOC_MODULES = Object.freeze({});";
+    }
+    return null;
+  },
+});
+
 export default defineConfig({
   envPrefix: ["VITE_", "ENABLE_", "KNOWLEDGE_"],
   define: {
@@ -103,12 +122,13 @@ export default defineConfig({
     react(),
     runtimeErrorOverlay(),
     viteStaticCopy({
-      targets: treeSitterSources.map((source) => ({
+      targets: treeSitterSources.map((source: string) => ({
         src: toClientRelative(source),
         dest: "treesitter",
       })),
     }),
     webTreeSitterNodeShim(),
+    productionRawContentModuleStub(),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [

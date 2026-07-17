@@ -244,6 +244,13 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain("Review previous visual frame");
     expect(source).toContain("Review next visual frame");
     expect(source).toContain("Recent visual frame thumbnails");
+    expect(source).toContain('data-testid="visual-frame-explicit-promotion-actions"');
+    expect(source).toContain("Send now to GPT Live");
+    expect(source).toContain("Use in next Ask");
+    expect(source).toContain("Open frozen frame in Image Lens");
+    expect(source).toContain("requestHelixAskVisualFrameLivePromotion");
+    expect(source).toContain("requestHelixAskVisualFrameAttachmentPromotion");
+    expect(source).toContain("useDocumentImageRegionStore.getState().setSourceImage");
     expect(producer).toContain("const visualFrameHistoryLimit = 20");
     expect(producer).toContain("const visualFrameHistoryTtlMs = 10 * 60 * 1000");
     expect(producer).toContain("frame_history: pruneVisualFrameHistory");

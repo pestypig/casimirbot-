@@ -970,21 +970,42 @@ describe("HelixAskPill mic-first surface contract", () => {
       path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskVisualCapturePreference.ts"),
       "utf8",
     );
+    const visualRuntimeSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/useHelixAskVisualSourceCaptureRuntime.ts"),
+      "utf8",
+    );
 
-    expect(source).toContain("readHelixAskVisualCaptureAudioPreference");
-    expect(source).toContain("syncHelixAskVisualCaptureRoutePreference");
+    expect(source).toContain("useHelixAskVisualSourceCaptureRuntime({");
+    expect(source).not.toContain("readHelixAskVisualCaptureAudioPreference");
+    expect(source).not.toContain("syncHelixAskVisualCaptureRoutePreference");
+    expect(visualRuntimeSource).toContain("readHelixAskVisualCaptureAudioPreference");
+    expect(visualRuntimeSource).toContain("syncHelixAskVisualCaptureRoutePreference");
     expect(visualPreferenceSource).toContain(
       'HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_SYNC_EVENT =\n  "helix:live-answer:visual-capture-routes"',
     );
-    expect(source).toContain('HELIX_ASK_AUDIO_TRANSCRIPT_SOURCE_ID = `audio_transcript:${HELIX_ASK_THREAD_ID}`');
-    expect(source).toContain("HELIX_ASK_DISPLAY_AUDIO_CHUNK_MS = 10_000");
-    expect(source).toContain("postHelixAskAudioTranscriptChunk");
-    expect(source).toContain('postSituationJson("/api/agi/situation/audio-source/transcript-chunk"');
-    expect(source).toContain("source_id: HELIX_ASK_AUDIO_TRANSCRIPT_SOURCE_ID");
+    expect(visualRuntimeSource).toContain('HELIX_ASK_AUDIO_TRANSCRIPT_SOURCE_ID = `audio_transcript:${HELIX_ASK_THREAD_ID}`');
+    expect(visualRuntimeSource).toContain("HELIX_ASK_DISPLAY_AUDIO_CHUNK_MS = 10_000");
+    expect(visualRuntimeSource).toContain("postHelixAskAudioTranscriptChunk");
+    expect(visualRuntimeSource).toContain('postSituationJson("/api/agi/situation/audio-source/transcript-chunk"');
+    expect(visualRuntimeSource).toContain("source_id: sourceId");
+    expect(visualRuntimeSource).toContain("displayAudioTranscriptSourceIdRef");
+    expect(visualRuntimeSource).toContain(
+      "`${HELIX_ASK_AUDIO_TRANSCRIPT_SOURCE_ID}:${crypto.randomUUID()}`",
+    );
     expect(source).toContain("visualSituationIncludeAudio");
-    expect(source).toContain("audio: input.includeAudio ? HELIX_ASK_DISPLAY_AUDIO_CONSTRAINTS : false");
-    expect(source).toContain("attachDisplayAudioSource(");
-    expect(source).toContain("onTranscriptChunk: postHelixAskAudioTranscriptChunk");
+    expect(visualRuntimeSource).toContain("requestVisualSourceMediaStream({");
+    expect(visualRuntimeSource).toContain("includeDisplayAudio,");
+    expect(visualRuntimeSource).toContain('kind: visualSituationSourceKind');
+    expect(visualRuntimeSource).toContain('source_surface: kind === "camera" ? "device_camera" : "screen_share_window"');
+    expect(visualRuntimeSource).toContain("startVisualFrameProducerInterval({");
+    expect(visualRuntimeSource).toContain("liveRuntimeEligible: true");
+    expect(visualRuntimeSource).toContain("canUseCaptureControls ||");
+    expect(visualRuntimeSource).toContain("releaseVisualSituationCapture(visualSituationSourceKind)");
+    expect(visualRuntimeSource).toContain('stream?.getAudioTracks().some((track) => track.readyState !== "ended")');
+    expect(visualRuntimeSource).toContain("visualSituationStreamRef.current?.getAudioTracks()");
+    expect(visualRuntimeSource).toContain("attachDisplayAudioSource(");
+    expect(visualRuntimeSource).toContain("onTranscriptChunk: (chunk) => postHelixAskAudioTranscriptChunk(");
+    expect(visualRuntimeSource).toContain("sourceId: audioTranscriptSourceId");
     expect(source).toContain("visualSituationIncludeAudio,");
     expect(source).toContain("onToggleVisualAudio: () =>");
     expect(legacyComposerSurfaceSource).toContain("<HelixAskComposerActionToolbarSurface {...actionToolbar}");
@@ -1030,7 +1051,8 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(actionToolbarSurfaceSource).toContain("<HelixAskActionToolbar");
     expect(toolbarSource).toContain('title="Attach image"');
     expect(toolbarSource).toContain('title={micTitle}');
-    expect(toolbarSource).toContain('title="Capture visual source"');
+    expect(toolbarSource).toContain("const visualCaptureTitle = visualSituationSourceStatus");
+    expect(toolbarSource).toContain("title={visualCaptureTitle}");
     expect(toolbarSource).toContain('title={visualAudioTitle}');
     expect(actionToolbarSurfaceSource).toContain("<HelixAskComposerSubmitButton");
     expect(composerSource).toContain("title={viewModel.submitTitle}");

@@ -1,5 +1,15 @@
 import React, { type ChangeEventHandler, type ReactNode, type Ref } from "react";
-import { Headphones, Image as ImageIcon, Mic, Plus, RotateCcw } from "lucide-react";
+import {
+  Camera,
+  Headphones,
+  Image as ImageIcon,
+  Mic,
+  MonitorUp,
+  Plus,
+  RotateCcw,
+} from "lucide-react";
+
+export type HelixAskVisualSourceKind = "screen" | "camera";
 
 export type HelixAskActionToolbarProps = {
   carouselRef?: Ref<HTMLDivElement>;
@@ -23,6 +33,9 @@ export type HelixAskActionToolbarProps = {
   retryVoiceSampleDisabled?: boolean;
   onRetryVoiceSample: () => void;
   showVisualCaptureControls?: boolean;
+  visualSourceKind?: HelixAskVisualSourceKind;
+  visualSourceSelectionDisabled?: boolean;
+  onToggleVisualSourceKind?: () => void;
   visualSituationSourceStatus: "idle" | "active" | "requesting" | "error" | string;
   onCaptureVisualSource: () => void;
   visualSituationIncludeAudio: boolean;
@@ -97,6 +110,9 @@ export function HelixAskActionToolbar({
   retryVoiceSampleDisabled = false,
   onRetryVoiceSample,
   showVisualCaptureControls = true,
+  visualSourceKind = "screen",
+  visualSourceSelectionDisabled = false,
+  onToggleVisualSourceKind,
   visualSituationSourceStatus,
   onCaptureVisualSource,
   visualSituationIncludeAudio,
@@ -113,6 +129,15 @@ export function HelixAskActionToolbar({
   const visualAudioTitle = visualSituationIncludeAudio
     ? "Disable tab audio for visual capture"
     : "Enable tab audio for visual capture";
+  const visualSourceLabel = visualSourceKind === "camera" ? "Camera" : "Screen";
+  const nextVisualSourceLabel = visualSourceKind === "camera" ? "screen" : "camera";
+  const visualCaptureTitle = visualSituationSourceStatus === "requesting"
+    ? `Cancel ${visualSourceLabel.toLowerCase()} sharing request`
+    : visualSituationSourceStatus === "active"
+      ? `Stop ${visualSourceLabel.toLowerCase()} sharing`
+      : visualSituationSourceStatus === "error"
+        ? `Retry ${visualSourceLabel.toLowerCase()} sharing`
+        : `Start ${visualSourceLabel.toLowerCase()} sharing`;
 
   return (
     <div className="relative min-w-0 flex-1">
@@ -189,33 +214,57 @@ export function HelixAskActionToolbar({
             <button
               type="button"
               data-helix-ask-action-item="true"
-              aria-label="Capture visual source for Situation Room"
+              data-visual-source-kind={visualSourceKind}
+              aria-label={`Visual source: ${visualSourceLabel}. Switch to ${nextVisualSourceLabel}`}
+              title={`Visual source: ${visualSourceLabel}. Switch to ${nextVisualSourceLabel}`}
+              className="inline-flex h-10 shrink-0 snap-center items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 text-sm font-medium text-slate-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60"
+              onClick={onToggleVisualSourceKind}
+              disabled={
+                visualSourceSelectionDisabled ||
+                visualSituationSourceStatus === "active" ||
+                visualSituationSourceStatus === "requesting" ||
+                !onToggleVisualSourceKind
+              }
+            >
+              {visualSourceKind === "camera" ? (
+                <Camera className="h-4 w-4" />
+              ) : (
+                <MonitorUp className="h-4 w-4" />
+              )}
+              <span>{visualSourceLabel}</span>
+            </button>
+            <button
+              type="button"
+              data-helix-ask-action-item="true"
+              aria-label={visualCaptureTitle}
               aria-pressed={visualSituationSourceStatus === "active"}
-              title="Capture visual source"
+              title={visualCaptureTitle}
               className={`${actionButtonBaseClassName} ${readVisualSourceButtonClassName(visualSituationSourceStatus)}`}
               onClick={onCaptureVisualSource}
             >
               <ImageIcon className={`h-4 w-4 ${visualSituationSourceStatus === "active" ? "animate-pulse" : ""}`} />
             </button>
-            <button
-              type="button"
-              data-helix-ask-action-item="true"
-              aria-label={visualAudioTitle}
-              aria-pressed={visualSituationIncludeAudio}
-              title={visualAudioTitle}
-              className={`${actionButtonBaseClassName} ${readVisualAudioButtonClassName({
-                visualSituationIncludeAudio,
-                displayAudioStatus,
-              })}`}
-              onClick={onToggleVisualAudio}
-              disabled={visualAudioToggleDisabled}
-            >
-              <Headphones
-                className={`h-4 w-4 ${
-                  visualSituationIncludeAudio && displayAudioStatus !== "error" ? "animate-pulse" : ""
-                }`}
-              />
-            </button>
+            {visualSourceKind === "screen" ? (
+              <button
+                type="button"
+                data-helix-ask-action-item="true"
+                aria-label={visualAudioTitle}
+                aria-pressed={visualSituationIncludeAudio}
+                title={visualAudioTitle}
+                className={`${actionButtonBaseClassName} ${readVisualAudioButtonClassName({
+                  visualSituationIncludeAudio,
+                  displayAudioStatus,
+                })}`}
+                onClick={onToggleVisualAudio}
+                disabled={visualAudioToggleDisabled}
+              >
+                <Headphones
+                  className={`h-4 w-4 ${
+                    visualSituationIncludeAudio && displayAudioStatus !== "error" ? "animate-pulse" : ""
+                  }`}
+                />
+              </button>
+            ) : null}
           </>
         ) : null}
         {submitButton}

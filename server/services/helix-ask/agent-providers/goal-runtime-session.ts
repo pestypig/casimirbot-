@@ -32,6 +32,7 @@ import {
   runExplicitWorkstationGatewayCalls,
 } from "./explicit-workstation-gateway";
 import type { HelixWorkstationGatewayCallResult } from "../workstation-tool-gateway/types";
+import { projectRuntimeGoalSessionToStagePlay } from "../runtime-goals/runtime-goal-stage-play-projection";
 
 type RecordLike = Record<string, unknown>;
 
@@ -47,6 +48,7 @@ export type StartGoalRuntimeSessionInput = {
   objective: string;
   runtimeAgentProvider: HelixAgentRuntimeId;
   goalId?: string | null;
+  threadId?: string | null;
   runtimeSessionId?: string | null;
   sourceBinding?: HelixRuntimeGoalSourceBinding | null;
   allowedLanes?: string[];
@@ -75,6 +77,7 @@ export type GoalRuntimeSessionResult = {
   session: HelixRuntimeGoalSession;
   wake_event?: HelixRuntimeGoalWakeEvent;
   debug_export: HelixRuntimeGoalDebugExport;
+  stage_play_projection: HelixRuntimeGoalDebugExport["runtime_goal_stage_play_projection"];
   blocked_reason?: string | null;
 };
 
@@ -84,6 +87,9 @@ const nowIso = (): string => new Date().toISOString();
 
 const readString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
+
+const normalizeThreadId = (value: unknown): string =>
+  readString(value) || "helix-ask:desktop";
 
 const readFiniteNumber = (value: unknown): number | null => {
   const numberValue = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
@@ -266,6 +272,7 @@ const buildHelixNativeGoalResumeResult = (input: {
 
 const buildGoalJobBrief = (input: {
   goalId: string;
+  threadId: string;
   objective: string;
   runtimeAgentProvider: HelixAgentRuntimeId;
   createdAt: string;
@@ -279,6 +286,7 @@ const buildGoalJobBrief = (input: {
   return {
     schema: "helix.runtime_goal.job_brief.v1",
     goal_id: input.goalId,
+    thread_id: input.threadId,
     user_goal_text: input.objective,
     selected_runtime_agent_provider: input.runtimeAgentProvider,
     created_at: input.createdAt,
@@ -499,6 +507,7 @@ export class HelixRuntimeGoalSessionStore {
     const reportPolicy = input.reportPolicy ?? "report_only_failure";
     const timestamp = nowIso();
     const goalId = readString(input.goalId) || `goal:${crypto.randomUUID()}`;
+    const threadId = normalizeThreadId(input.threadId);
     const objective = readString(input.objective);
     const allowedLanes = input.allowedLanes?.length ? [...input.allowedLanes] : [...adapterContract.capability_lane_ids];
     const allowedWorkstationTools = input.allowedWorkstationTools?.length
@@ -508,6 +517,7 @@ export class HelixRuntimeGoalSessionStore {
     const sourceBinding = input.sourceBinding ?? null;
     const jobBrief = buildGoalJobBrief({
       goalId,
+      threadId,
       objective,
       runtimeAgentProvider: provider.id,
       createdAt: timestamp,
@@ -520,6 +530,7 @@ export class HelixRuntimeGoalSessionStore {
     const session: HelixRuntimeGoalSession = {
       schema: "helix.runtime_goal.session.v1",
       goal_id: goalId,
+      thread_id: threadId,
       objective,
       runtime_agent_provider: provider.id,
       runtime_session_id: readString(input.runtimeSessionId) || `runtime:${provider.id}:${crypto.randomUUID()}`,
@@ -1009,11 +1020,13 @@ export class HelixRuntimeGoalSessionStore {
     const reportPolicy = input.input.reportPolicy ?? "report_only_failure";
     const timestamp = nowIso();
     const goalId = readString(input.input.goalId) || `goal:${crypto.randomUUID()}`;
+    const threadId = normalizeThreadId(input.input.threadId);
     const objective = readString(input.input.objective);
     const allowedLanes = input.input.allowedLanes ?? [];
     const allowedWorkstationTools = input.input.allowedWorkstationTools ?? [];
     const jobBrief = buildGoalJobBrief({
       goalId,
+      threadId,
       objective,
       runtimeAgentProvider: input.runtimeId,
       createdAt: timestamp,
@@ -1025,6 +1038,7 @@ export class HelixRuntimeGoalSessionStore {
     return {
       schema: "helix.runtime_goal.session.v1",
       goal_id: goalId,
+      thread_id: threadId,
       objective,
       runtime_agent_provider: input.runtimeId,
       runtime_session_id: readString(input.input.runtimeSessionId) || `runtime:${input.runtimeId}:${crypto.randomUUID()}`,
@@ -1225,6 +1239,7 @@ export class HelixRuntimeGoalSessionStore {
       runtime_goal_progress_summary: session.latest_progress_summary,
       runtime_goal_source_binding: session.latest_source_binding,
       runtime_goal_observation_refs: session.latest_observation_refs,
+      runtime_goal_stage_play_projection: null,
       runtime_goal_terminal_authority_status: session.terminal_authority_status,
       latest_observation_refs: session.latest_observation_refs,
       latest_receipt_refs: session.latest_receipt_refs,
@@ -1248,11 +1263,16 @@ export class HelixRuntimeGoalSessionStore {
     blockedReason: string | null = null,
     wakeEvent?: HelixRuntimeGoalWakeEvent,
   ): GoalRuntimeSessionResult {
+    const stagePlayProjection = projectRuntimeGoalSessionToStagePlay(session);
     return {
       ok,
       session,
       ...(wakeEvent ? { wake_event: wakeEvent } : {}),
-      debug_export: this.debugExportFor(session),
+      debug_export: {
+        ...this.debugExportFor(session),
+        runtime_goal_stage_play_projection: stagePlayProjection,
+      },
+      stage_play_projection: stagePlayProjection,
       blocked_reason: blockedReason,
     };
   }

@@ -1,5 +1,9 @@
 # Helix Ask API Parity Matrix
 
+For local/Replit build identity, runtime fingerprints, the deterministic Theory
+Badge Graph referent fixture, and cross-environment replay, see
+[`replit-parity-contract.md`](./replit-parity-contract.md).
+
 The API parity harness tests Helix Ask through the same top-level API surface used by the UI. It is not an answer route, not a private agent loop, and not a replacement for Codex-owned sampling, tool execution, approval, sandboxing, or terminal completion.
 
 ## Goal

@@ -312,6 +312,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     const { memoryRouter } = await import("./routes/agi.memory");
     const { planRouter } = await import("./routes/agi.plan");
     const { agentProvidersRouter } = await import("./routes/agi.agent-providers");
+    const { runtimeParityRouter } = await import("./routes/agi.runtime-parity");
     const { workstationToolGatewayRouter } = await import("./routes/agi.workstation-tool-gateway");
     const { realtimeSessionRouter } = await import("./routes/agi.realtime-session");
     const { runtimeGoalsRouter } = await import("./routes/agi.runtime-goals");
@@ -340,6 +341,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     app.use("/api/agi/environment", environmentSourceRouter);
     app.use("/api/agi/adapter", adapterRouter);
     app.use("/api/agi", agentProvidersRouter);
+    app.use("/api/agi", runtimeParityRouter);
     app.use("/api/agi", workstationToolGatewayRouter);
     app.use("/api/agi", realtimeSessionRouter);
     app.use("/api/agi", runtimeGoalsRouter);

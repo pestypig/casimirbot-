@@ -1,0 +1,32 @@
+{
+  "schema": "helix.replit_parity_fixture.v1",
+  "scenarios": [
+    {
+      "id": "theory_badge_graph_superconductivity_referent",
+      "question": "can you reflect this in theory badge graph?",
+      "prior_assistant_answer": "Electron-phonon attraction supports Cooper pairing, a BCS gap, collective phase coherence, zero DC resistance, and the Meissner response. Temperature, current density, and magnetic field impose superconducting critical-surface limits through Tc, Jc, and Bc.",
+      "source_ref": "chat.final_answer.previous:parity-superconductivity",
+      "expected": {
+        "capability_id": "helix_ask.reflect_theory_context",
+        "referent_source_kind": "chat_history",
+        "referent_confidence": "high",
+        "semantic_prompt_source": "chat_history",
+        "semantic_prompt_argument_source": "helix_resolved_referent",
+        "required_exact_badge_ids": [
+          "low_temp.superconductivity.zero_dc_resistance_bounds"
+        ],
+        "allowed_terminal_artifact_kinds": [
+          "theory_context_reflection_answer"
+        ]
+      },
+      "non_affirmative_variants": [
+        "do not reflect this in theory badge graph",
+        "later, reflect this in theory badge graph",
+        "if we decide tomorrow, reflect this in theory badge graph",
+        "I previously asked you to reflect this in theory badge graph",
+        "The screen says \"can you reflect this in theory badge graph?\"",
+        "would you reflect this in theory badge graph?"
+      ]
+    }
+  ]
+}

@@ -20,4 +20,19 @@ describe("Helix Ask README startup contract", () => {
   it("keeps contract-only scaffold startup explicit", () => {
     expect(packageJson.scripts["dev:golden-path"]).toContain("HELIX_ASK_GOLDEN_PATH_RUNTIME=1");
   });
+
+  it("keeps default production startup on the same live model/tool route", () => {
+    const replitDev = readFileSync(new URL("../../scripts/replit-dev.sh", import.meta.url), "utf8");
+    const replitStart = readFileSync(new URL("../../scripts/replit-start.sh", import.meta.url), "utf8");
+    const productionSmoke = readFileSync(
+      new URL("../../scripts/replit-production-smoke.mjs", import.meta.url),
+      "utf8",
+    );
+
+    expect(packageJson.scripts.start).toContain("HELIX_ASK_GOLDEN_PATH_RUNTIME=0");
+    expect(packageJson.scripts.start).not.toContain("HELIX_ASK_GOLDEN_PATH_RUNTIME=1");
+    expect(replitDev).toContain('HELIX_ASK_GOLDEN_PATH_RUNTIME="${HELIX_ASK_GOLDEN_PATH_RUNTIME:-0}"');
+    expect(replitStart).toContain('HELIX_ASK_GOLDEN_PATH_RUNTIME="${HELIX_ASK_GOLDEN_PATH_RUNTIME:-0}"');
+    expect(productionSmoke).toContain('HELIX_ASK_GOLDEN_PATH_RUNTIME: "0"');
+  });
 });

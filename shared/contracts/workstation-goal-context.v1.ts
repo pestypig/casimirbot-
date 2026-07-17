@@ -46,6 +46,7 @@ export type GoalContextProducerKindV1 =
   | "source_health"
   | "trace_memory"
   | "route_watch"
+  | "runtime_goal"
   | "narrator"
   | "automation";
 
@@ -60,6 +61,7 @@ export const WORKSTATION_GOAL_CONTEXT_PRODUCER_KINDS: readonly GoalContextProduc
   "source_health",
   "trace_memory",
   "route_watch",
+  "runtime_goal",
   "narrator",
   "automation",
 ];
@@ -74,6 +76,7 @@ export type GoalContextUpdateKindV1 =
   | "source_status"
   | "preset_state"
   | "automation_status"
+  | "runtime_goal_progress"
   | "reflection"
   | "error"
   | "suggested_action";
@@ -88,6 +91,7 @@ export const WORKSTATION_GOAL_CONTEXT_UPDATE_KINDS: readonly GoalContextUpdateKi
   "source_status",
   "preset_state",
   "automation_status",
+  "runtime_goal_progress",
   "reflection",
   "error",
   "suggested_action",

@@ -7,6 +7,7 @@ import {
   contextualToolSuppressionBlocksFamily,
   detectContextualToolAdmissionSuppression,
 } from "./contextual-tool-admission";
+import { hasWorkstationPanelScopeCue } from "./workstation-active-context-intent";
 
 export type HelixInternetSearchIntent = {
   searchRequested: boolean;
@@ -218,7 +219,10 @@ export const buildToolUseRestatement = (promptText: string): ToolUseRestatementV
   const suppressed = compactLiveSourceMailboxHandoff || negativeConstraints.length > 0 || isSuppliedTextOnlyTask(prompt);
   const requiresDocsViewer = !suppressed && hasAffirmativeDocsViewerSearchCue(prompt);
   const requiresVoiceDelivery = !suppressed && hasAffirmativeVoiceReadAloudCue(prompt);
-  const localSourceScope = hasLocalWorkspaceScopeCue(prompt) || hasLocalObservationScopeCue(prompt);
+  const localSourceScope =
+    hasWorkstationPanelScopeCue(prompt) ||
+    hasLocalWorkspaceScopeCue(prompt) ||
+    hasLocalObservationScopeCue(prompt);
   const localSourceWithoutExplicitWeb = localSourceScope && !explicitProviderCue;
   const freshnessRequired = !suppressed && !localSourceWithoutExplicitWeb && (explicitProviderCue || currentWebCue || timeSensitiveCue || currentAffairsCue);
   const currentAffairsRequired = !suppressed && !localSourceWithoutExplicitWeb && currentAffairsCue;
@@ -265,7 +269,7 @@ export const detectInternetSearchIntent = (promptText: string): HelixInternetSea
   const explicitProviderCue = hasExplicitWebProviderCue(prompt);
   const searchAction = hasSearchActionCue(prompt);
   const currentWebCue = hasCurrentWebCue(prompt);
-  const localScope = hasLocalWorkspaceScopeCue(prompt);
+  const localScope = hasWorkstationPanelScopeCue(prompt) || hasLocalWorkspaceScopeCue(prompt);
   const scholarlyScope = hasScholarlyScopeCue(prompt);
   const domains = extractDomains(prompt);
   const recencyDays = extractRecencyDays(prompt);

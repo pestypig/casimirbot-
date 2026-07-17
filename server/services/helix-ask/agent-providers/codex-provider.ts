@@ -4849,11 +4849,56 @@ export const enrichCapabilityLaneCandidatesFromBody = (
     if (capabilityLaneCandidateCapability(visibleAndImageEnriched) === THEORY_CONTEXT_REFLECTION_CAPABILITY) {
       const currentUserPrompt = readQuestion(body);
       if (!currentUserPrompt) return visibleAndImageEnriched;
+      const helixReferentResolution = resolveHelixAskConversationalReferent(body);
+      const helixReferentTrace = helixReferentResolution.trace;
+      const helixReferentDetected = helixReferentTrace.referent_detected;
+      const helixResolvedReferentText = readString(helixReferentResolution.resolvedText);
+      const helixResolvedSourceRef = readString(helixReferentTrace.resolved_source_ref);
+      const helixResolvedTextHash = readString(helixReferentTrace.resolved_text_hash);
+      const helixReferentBound = Boolean(
+        helixResolvedReferentText &&
+        helixResolvedSourceRef &&
+        helixResolvedTextHash &&
+        helixReferentTrace.resolution_confidence === "high",
+      );
+      const runtimeReferentMatchesHelix = Boolean(
+        helixReferentBound &&
+        readString(
+          visibleAndImageEnriched.resolved_referent_text ??
+          visibleAndImageEnriched.resolvedReferentText,
+        ) === helixResolvedReferentText &&
+        readString(
+          visibleAndImageEnriched.resolved_source_ref ??
+          visibleAndImageEnriched.resolvedSourceRef,
+        ) === helixResolvedSourceRef &&
+        readString(
+          visibleAndImageEnriched.resolved_text_hash ??
+          visibleAndImageEnriched.resolvedTextHash,
+        ) === helixResolvedTextHash,
+      );
       const boundedCandidate = {
         ...visibleAndImageEnriched,
+        ...(helixReferentDetected && !helixReferentBound
+          ? {
+              prompt: "this",
+              referent_resolution_block_reason:
+                helixReferentTrace.resolution_block_reason ?? "referent_resolution_required",
+            }
+          : {}),
+        ...(helixReferentBound
+          ? {
+              resolved_referent_text: helixResolvedReferentText,
+              resolved_source_ref: helixResolvedSourceRef,
+              resolved_text_hash: helixResolvedTextHash,
+              resolved_referent_authority: "helix_policy",
+              runtime_resolved_referent_matched_helix_policy: runtimeReferentMatchesHelix,
+              semantic_prompt_source: "chat_history",
+            }
+          : {}),
         user_semantic_prompt: currentUserPrompt,
         user_semantic_prompt_hash: `sha256:${hashScientificImageSourceShort(currentUserPrompt)}`,
         semantic_prompt_source:
+          (helixReferentBound ? "chat_history" : null) ??
           readString(
             visibleAndImageEnriched.semantic_prompt_source ?? visibleAndImageEnriched.semanticPromptSource,
           ) ??
@@ -4863,6 +4908,18 @@ export const enrichCapabilityLaneCandidatesFromBody = (
             ? "runtime_resolved_referent"
             : "current_user_request"),
       };
+      if (helixReferentDetected && !helixReferentBound) {
+        for (const field of [
+          "resolved_referent_text",
+          "resolvedReferentText",
+          "resolved_source_ref",
+          "resolvedSourceRef",
+          "resolved_text_hash",
+          "resolvedTextHash",
+        ]) {
+          delete boundedCandidate[field];
+        }
+      }
       // Runtime-authored structure may guide the derivation procedure, but it
       // cannot introduce evidence-bearing symbols, domains, or equations that
       // were absent from the user-owned subject (or a provenance-bound

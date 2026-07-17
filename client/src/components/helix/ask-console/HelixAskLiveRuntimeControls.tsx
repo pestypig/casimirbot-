@@ -1,6 +1,17 @@
 import React, { useEffect, useState } from "react";
-import { Activity, Mic, Radio, ShieldCheck } from "lucide-react";
+import {
+  Activity,
+  CircleCheck,
+  Eye,
+  EyeOff,
+  LoaderCircle,
+  Mic,
+  Radio,
+  ShieldCheck,
+  Volume2,
+} from "lucide-react";
 import type { HelixAccountCapabilityPolicy } from "@shared/helix-account-session";
+import type { HelixRealtimeGroundedRelayStatusV1 } from "@shared/contracts/helix-realtime-worker-relay.v1";
 import {
   buildInactiveHelixLiveRuntimeAgentControlState,
   resolveHelixLiveRuntimeAuthority,
@@ -37,6 +48,9 @@ export type HelixAskLiveRuntimeToolbarBridge = {
   microphoneEnabled: boolean;
   microphoneToggleDisabled: boolean;
   toggleMicrophone: () => void;
+  visualInputEnabled: boolean;
+  visualInputToggleDisabled: boolean;
+  toggleVisualInput: () => void;
 };
 
 const labelForMode = (mode: HelixLiveRuntimeAgentMode): string => {
@@ -65,6 +79,25 @@ const labelForAuthority = (authority: HelixLiveRuntimeAgentAuthority): string =>
     case "observe_only":
       return "Observe";
   }
+};
+
+export const describeHelixAskWorkerRelayStatus = (
+  status: HelixRealtimeGroundedRelayStatusV1 | null,
+): { label: string; icon: "checking" | "ready" | "speaking" } | null => {
+  if (status === "worker_running") {
+    return { label: "Checking workspace", icon: "checking" };
+  }
+  if (
+    status === "result_ready" ||
+    status === "relay_queued_busy" ||
+    status === "response_requested"
+  ) {
+    return { label: "Result ready", icon: "ready" };
+  }
+  if (status === "speaking") {
+    return { label: "Speaking result", icon: "speaking" };
+  }
+  return null;
 };
 
 export function buildHelixAskLiveRuntimeControlsModel(args: {
@@ -157,6 +190,7 @@ function HelixAskVisibleLiveRuntimeControls({
     runtime.lifecycleState === "stopping" ||
     runtime.transportState === "connecting" ||
     runtime.transportState === "active";
+  const workerRelayIndicator = describeHelixAskWorkerRelayStatus(runtime.workerRelayStatus);
   useEffect(() => {
     if (!onToolbarBridgeChange) return;
     onToolbarBridgeChange({
@@ -167,6 +201,11 @@ function HelixAskVisibleLiveRuntimeControls({
       toggleMicrophone: () => {
         runtime.setMicrophoneEnabled(!runtime.microphoneEnabled);
       },
+      visualInputEnabled: runtime.visualInputEnabled,
+      visualInputToggleDisabled: !runtime.active,
+      toggleVisualInput: () => {
+        runtime.setVisualInputEnabled(!runtime.visualInputEnabled);
+      },
     });
     return () => onToolbarBridgeChange(null);
   }, [
@@ -175,6 +214,8 @@ function HelixAskVisibleLiveRuntimeControls({
     runtime.active,
     runtime.microphoneEnabled,
     runtime.setMicrophoneEnabled,
+    runtime.setVisualInputEnabled,
+    runtime.visualInputEnabled,
   ]);
   const cycleMode = () => {
     const index = modeOptions.indexOf(mode);
@@ -224,27 +265,71 @@ function HelixAskVisibleLiveRuntimeControls({
         <span>{labelForHelixAskLiveRuntimeLifecycleState(runtime.lifecycleState)}</span>
       </button>
       {runtime.active ? (
-        <button
-          type="button"
-          data-helix-ask-action-item="true"
-          aria-label={runtime.microphoneEnabled
-            ? "Disable Live Voice microphone"
-            : "Enable Live Voice microphone"}
-          aria-pressed={runtime.microphoneEnabled}
-          title={runtime.microphoneEnabled
-            ? "Disable Live Voice microphone"
-            : "Enable Live Voice microphone"}
-          className={`inline-flex h-10 shrink-0 snap-center items-center gap-2 rounded-full border px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200/70 ${
-            runtime.microphoneEnabled
-              ? "border-emerald-300/55 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/20"
-              : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
-          }`}
-          data-live-microphone-enabled={runtime.microphoneEnabled ? "true" : "false"}
-          onClick={() => runtime.setMicrophoneEnabled(!runtime.microphoneEnabled)}
+        <>
+          <button
+            type="button"
+            data-helix-ask-action-item="true"
+            aria-label={runtime.microphoneEnabled
+              ? "Disable Live Voice microphone"
+              : "Enable Live Voice microphone"}
+            aria-pressed={runtime.microphoneEnabled}
+            title={runtime.microphoneEnabled
+              ? "Disable Live Voice microphone"
+              : "Enable Live Voice microphone"}
+            className={`inline-flex h-10 shrink-0 snap-center items-center gap-2 rounded-full border px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200/70 ${
+              runtime.microphoneEnabled
+                ? "border-emerald-300/55 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/20"
+                : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
+            }`}
+            data-live-microphone-enabled={runtime.microphoneEnabled ? "true" : "false"}
+            onClick={() => runtime.setMicrophoneEnabled(!runtime.microphoneEnabled)}
+          >
+            <Mic className={`h-4 w-4 ${runtime.microphoneEnabled ? "animate-pulse" : ""}`} />
+            <span>{runtime.microphoneEnabled ? "Mic On" : "Mic Off"}</span>
+          </button>
+          <button
+            type="button"
+            data-helix-ask-action-item="true"
+            data-live-visual-input-enabled={runtime.visualInputEnabled ? "true" : "false"}
+            aria-label={runtime.visualInputEnabled
+              ? "Stop sharing visual frames with GPT Live"
+              : "Share visual frames with GPT Live"}
+            aria-pressed={runtime.visualInputEnabled}
+            title={runtime.visualInputError ?? (runtime.visualInputEnabled
+              ? `GPT Live receives frames from the active Screen or Camera source (${runtime.visualInputFrameCount} sent)`
+              : "Route the active Screen or Camera source to GPT Live")}
+            className={`inline-flex h-10 shrink-0 snap-center items-center gap-2 rounded-full border px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/70 ${
+              runtime.visualInputEnabled
+                ? "border-cyan-300/55 bg-cyan-500/15 text-cyan-100 hover:bg-cyan-500/20"
+                : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
+            }`}
+            onClick={() => runtime.setVisualInputEnabled(!runtime.visualInputEnabled)}
+          >
+            {runtime.visualInputEnabled ? (
+              <Eye className="h-4 w-4 animate-pulse" />
+            ) : (
+              <EyeOff className="h-4 w-4" />
+            )}
+            <span>{runtime.visualInputEnabled ? "Vision On" : "Vision Off"}</span>
+          </button>
+        </>
+      ) : null}
+      {workerRelayIndicator ? (
+        <span
+          role="status"
+          aria-live="polite"
+          data-helix-ask-worker-relay-status={runtime.workerRelayStatus}
+          className="inline-flex h-10 shrink-0 snap-center items-center gap-2 border-l border-white/15 px-3 text-sm font-medium text-slate-100"
         >
-          <Mic className={`h-4 w-4 ${runtime.microphoneEnabled ? "animate-pulse" : ""}`} />
-          <span>{runtime.microphoneEnabled ? "Mic On" : "Mic Off"}</span>
-        </button>
+          {workerRelayIndicator.icon === "checking" ? (
+            <LoaderCircle className="h-4 w-4 animate-spin text-cyan-200" />
+          ) : workerRelayIndicator.icon === "speaking" ? (
+            <Volume2 className="h-4 w-4 text-emerald-200" />
+          ) : (
+            <CircleCheck className="h-4 w-4 text-amber-200" />
+          )}
+          <span>{workerRelayIndicator.label}</span>
+        </span>
       ) : null}
     </>
   );

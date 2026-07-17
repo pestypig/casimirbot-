@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import type { IncomingHttpHeaders } from "node:http";
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
 import type {
+  HelixRuntimeGoalDebugExport,
   HelixRuntimeGoalProgressSummary,
   HelixRuntimeGoalSession,
   HelixRuntimeGoalSourceBinding,
@@ -70,6 +71,19 @@ const latestGoalSession = (): HelixRuntimeGoalSession | null =>
 
 const readWorkspaceSnapshot = (body: RecordLike): RecordLike =>
   readRecord(body.workspace_context_snapshot ?? body.workspaceContextSnapshot) ?? {};
+
+const readRuntimeGoalThreadId = (body: RecordLike): string => {
+  const routeMetadata = readRecord(body.route_metadata ?? body.routeMetadata);
+  const sourceTargetIntent = readRecord(
+    routeMetadata?.source_target_intent ?? body.source_target_intent,
+  );
+  return (
+    readString(body.thread_id ?? body.threadId) ||
+    readString(routeMetadata?.mailboxThreadId ?? routeMetadata?.mailbox_thread_id) ||
+    readString(sourceTargetIntent?.thread_id ?? sourceTargetIntent?.threadId) ||
+    "helix-ask:desktop"
+  );
+};
 
 export const readRuntimeGoalVisibleDocContext = (body: RecordLike): {
   docPath: string | null;
@@ -321,6 +335,7 @@ export const buildHelixRuntimeGoalCommandPayload = (input: {
     runtime_goal_source_binding: session.latest_source_binding,
     runtime_goal_observation_refs: session.latest_observation_refs,
     runtime_goal_terminal_authority_status: session.terminal_authority_status,
+    runtime_goal_stage_play_projection: input.result.stage_play_projection,
     runtime_goal_debug_export: debugExport,
     runtime_goal_debug_summary: runtimeGoalDebugSummary,
     debug_export: {
@@ -343,6 +358,7 @@ export const buildHelixRuntimeGoalCommandPayload = (input: {
       runtime_goal_source_binding: session.latest_source_binding,
       runtime_goal_observation_refs: session.latest_observation_refs,
       runtime_goal_terminal_authority_status: session.terminal_authority_status,
+      runtime_goal_stage_play_projection: input.result.stage_play_projection,
       runtime_goal_debug_export: debugExport,
       runtime_goal_debug_summary: runtimeGoalDebugSummary,
       selected_observation_refs: session.latest_observation_refs,
@@ -362,6 +378,7 @@ export const buildHelixRuntimeGoalCommandPayload = (input: {
       runtime_goal_source_binding: session.latest_source_binding,
       runtime_goal_observation_refs: session.latest_observation_refs,
       runtime_goal_terminal_authority_status: session.terminal_authority_status,
+      runtime_goal_stage_play_projection: input.result.stage_play_projection,
       runtime_goal_debug_export: debugExport,
       runtime_goal_debug_summary: runtimeGoalDebugSummary,
       selected_observation_refs: session.latest_observation_refs,
@@ -490,6 +507,7 @@ export const routeHelixRuntimeGoalCommand = async (input: {
       objective: command.objective ?? question,
       runtimeAgentProvider,
       goalId: readString(input.body.goal_id) || readString(input.body.goalId) || null,
+      threadId: readRuntimeGoalThreadId(input.body),
       runtimeSessionId:
         readString(input.body.runtime_session_id) ||
         readString(input.body.runtimeSessionId) ||
@@ -506,6 +524,7 @@ export const routeHelixRuntimeGoalCommand = async (input: {
         objective: "No active runtime goal session.",
         runtimeAgentProvider,
         goalId: `goal:missing:${crypto.randomUUID()}`,
+        threadId: readRuntimeGoalThreadId(input.body),
         reportPolicy: "report_only_failure",
       });
       result = helixRuntimeGoalSessionStore.blockGoalRuntimeSession({

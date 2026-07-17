@@ -287,6 +287,9 @@ describe("Helix Ask conversational referent resolution", () => {
 
   it.each([
     "Reflect this with the Theory Badge Graph.",
+    "reflect this in theory badge graph?",
+    "can you reflect this in theory badge graph?",
+    "Can you please reflect that through the Theory Badge Graph?",
     "Okay, please reflect that using the theory badge graph.",
     "Use the Theory Badge Graph to reflect this.",
   ])("resolves an affirmative theory-graph imperative to the previous assistant answer: %s", (question) => {
@@ -376,10 +379,14 @@ describe("Helix Ask conversational referent resolution", () => {
 
   it.each([
     "Do not reflect this with the Theory Badge Graph.",
+    "Do not reflect this in the Theory Badge Graph.",
     "If we need it later, reflect this with the Theory Badge Graph.",
+    "If we need it later, can you reflect this in the Theory Badge Graph?",
     "Would you reflect this with the Theory Badge Graph?",
     "The documentation says to reflect this with the Theory Badge Graph.",
+    "I previously asked whether you can reflect this in the Theory Badge Graph.",
     'The screen displays "Reflect this with the Theory Badge Graph." Explain that example.',
+    'The screen displays "can you reflect this in theory badge graph?" Explain that example.',
     "I previously asked you to reflect this with the Theory Badge Graph.",
   ])("does not admit non-affirmative theory-graph referent text: %s", (question) => {
     const resolution = resolveHelixAskConversationalReferent(bodyWithPreviousAnswer(question));

@@ -310,9 +310,10 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(map).toContain("pending-input request reading");
   });
 
-  it("recrowns visual/audio capture preference syncing while capture runtime stays local", () => {
+  it("recrowns visual/audio capture preference and runtime ownership", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const visualPreference = read("client/src/components/helix/ask-console/HelixAskVisualCapturePreference.ts");
+    const visualRuntime = read("client/src/components/helix/ask-console/useHelixAskVisualSourceCaptureRuntime.ts");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const displayOwners = {
       activeTurnStream: read("client/src/lib/helix/ask-active-turn-stream.ts"),
@@ -322,16 +323,22 @@ describe("Helix Ask UI ownership boundaries", () => {
       valueNormalization: read("client/src/lib/helix/ask-value-normalization.ts"),
     };
 
-    expect(map).toContain("Visual/audio capture preferences");
-    expect(map).toContain("Preference storage/sync is recrowned in `ask-console/`");
-    expect(map).toContain("capture route controller and media/audio transcript runtime stay local");
-    expect(pill).toContain('from "@/components/helix/ask-console/HelixAskVisualCapturePreference"');
-    expect(pill).toContain("readHelixAskVisualCaptureAudioPreference()");
-    expect(pill).toContain("syncHelixAskVisualCaptureRoutePreference(");
-    expect(pill).toContain("attachDisplayAudioSource(");
-    expect(pill).not.toContain("function readHelixAskVisualCaptureAudioPreference");
-    expect(pill).not.toContain("function syncHelixAskVisualCaptureRoutePreference");
-    expect(pill).not.toContain("const HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_STORAGE_KEY");
+    expect(map).toContain("Visual/audio capture preferences and runtime");
+    expect(map).toContain("legacy pill only injects product wiring and consumes observation state");
+    expect(pill).toContain('from "@/components/helix/ask-console/useHelixAskVisualSourceCaptureRuntime"');
+    expect(pill).toContain("useHelixAskVisualSourceCaptureRuntime({");
+    expect(pill).not.toContain("readHelixAskVisualCaptureAudioPreference()");
+    expect(pill).not.toContain("syncHelixAskVisualCaptureRoutePreference(");
+    expect(pill).not.toContain("attachDisplayAudioSource(");
+    expect(pill).not.toContain("postHelixAskAudioTranscriptChunk");
+    expect(pill).not.toContain("requestVisualSourceMediaStream(");
+    expect(pill).not.toContain("startVisualFrameProducerInterval(");
+    expect(visualRuntime).toContain("readHelixAskVisualCaptureAudioPreference()");
+    expect(visualRuntime).toContain("syncHelixAskVisualCaptureRoutePreference(");
+    expect(visualRuntime).toContain("attachDisplayAudioSource(");
+    expect(visualRuntime).toContain("postHelixAskAudioTranscriptChunk");
+    expect(visualRuntime).toContain("requestVisualSourceMediaStream({");
+    expect(visualRuntime).toContain("startVisualFrameProducerInterval({");
     expect(visualPreference).toContain("export function readHelixAskVisualCaptureAudioPreference");
     expect(visualPreference).toContain("export function syncHelixAskVisualCaptureRoutePreference");
     expect(visualPreference).toContain("HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_STORAGE_KEY");
@@ -348,6 +355,32 @@ describe("Helix Ask UI ownership boundaries", () => {
       expect(owner).not.toContain("helix.liveAnswer.visualCaptureRoutes.v1");
       expect(owner).not.toContain("helix:live-answer:visual-capture-routes");
     }
+  });
+
+  it("keeps explicit selected-frame promotion in recrowned owners", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const promotion = read("client/src/components/helix/ask-console/HelixAskVisualFramePromotion.ts");
+    const ingress = read("client/src/components/helix/ask-console/useHelixAskVisualFrameAttachmentIngress.ts");
+    const liveRuntime = read("client/src/components/helix/ask-console/useHelixAskLiveRuntimeSession.ts");
+    const liveAnswerPanel = read("client/src/components/workstation/LiveAnswerEnvironmentPanel.tsx");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+
+    expect(map).toContain("HelixAskVisualFramePromotion.ts");
+    expect(map).toContain("Promotion receipts are observations");
+    expect(pill).toContain("useHelixAskVisualFrameAttachmentIngress({");
+    expect(pill).not.toContain("registerHelixAskVisualFrameAttachmentPromotionHandler");
+    expect(pill).not.toContain("buildHelixAskImageAttachmentFromDataUrl");
+    expect(promotion).toContain("requestHelixAskVisualFrameLivePromotion");
+    expect(promotion).toContain("requestHelixAskVisualFrameAttachmentPromotion");
+    expect(promotion).toContain("answer_authority: false");
+    expect(promotion).toContain("terminal_eligible: false");
+    expect(ingress).toContain("buildHelixAskImageAttachmentFromDataUrl");
+    expect(ingress).toContain("attachment_limit_reached");
+    expect(liveRuntime).toContain("registerHelixAskVisualFrameLivePromotionHandler");
+    expect(liveRuntime).toContain("visual_input_consent_required");
+    expect(liveAnswerPanel).toContain("requestHelixAskVisualFrameLivePromotion");
+    expect(liveAnswerPanel).toContain("requestHelixAskVisualFrameAttachmentPromotion");
+    expect(liveAnswerPanel).toContain("openSelectedVisualFrameInImageLens");
   });
 
   it("recrowns per-session microphone default authority while capture runtime stays local", () => {

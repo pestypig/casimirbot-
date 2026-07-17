@@ -10,6 +10,7 @@ export type HelixLiveSourceSurface =
 
 export type HelixLiveSourceOrigin =
   | "browser_getDisplayMedia"
+  | "browser_getUserMedia"
   | "client_upload"
   | "server_event"
   | "manual"

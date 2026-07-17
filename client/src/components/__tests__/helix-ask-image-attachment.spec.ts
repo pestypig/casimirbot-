@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   HELIX_ASK_IMAGE_ATTACHMENT_MAX_BYTES,
+  buildHelixAskImageAttachmentFromDataUrl,
   buildHelixAskImageAttachmentFromFile,
   selectHelixAskClipboardImageFiles,
 } from "@/components/helix/ask-console/HelixAskImageAttachment";
@@ -70,5 +71,26 @@ describe("Helix Ask image attachment materialization", () => {
         fileLike({ name: "large.png", type: "image/png", size: HELIX_ASK_IMAGE_ATTACHMENT_MAX_BYTES + 1 }),
       ),
     ).rejects.toThrow("Image attachments are limited to 8 MB for this Helix Ask path.");
+  });
+
+  it("materializes a selected carousel data URL as turn-input-only image evidence", () => {
+    expect(buildHelixAskImageAttachmentFromDataUrl("data:image/jpeg;base64,AQID", {
+      fileName: "selected-frame.jpg",
+      evidenceRef: "visual-evidence:1",
+      now: () => new Date("2026-07-17T12:00:00.000Z"),
+      randomUUID: () => "selected-frame-attachment",
+    })).toEqual({
+      kind: "image",
+      id: "selected-frame-attachment",
+      fileName: "selected-frame.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: 3,
+      imageBase64: "AQID",
+      imageRef: null,
+      evidenceRef: "visual-evidence:1",
+      previewUrl: "data:image/jpeg;base64,AQID",
+      status: "ready",
+      error: null,
+    });
   });
 });

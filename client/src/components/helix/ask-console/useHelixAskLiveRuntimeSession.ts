@@ -4,6 +4,7 @@ import type {
   HelixLiveRuntimeAgentMode,
 } from "@shared/helix-live-runtime-agent";
 import type { HelixRealtimeSessionResponse } from "@shared/helix-realtime-session";
+import type { HelixRealtimeGroundedRelayStatusV1 } from "@shared/contracts/helix-realtime-worker-relay.v1";
 import {
   buildHelixAskLiveRuntimeClientReceiptPayload,
   buildHelixAskLiveRuntimeRouteRequest,
@@ -15,13 +16,21 @@ import {
   createHelixAskLiveRuntimeBrowserTransportController,
   type HelixAskLiveRuntimeBrowserTransportController,
 } from "./HelixAskLiveRuntimeTransportController";
+import {
+  getLatestVisualFrameProducerFrame,
+  isVisualFrameProducerSourceActive,
+  subscribeVisualFrameProducerFrames,
+  type VisualFrameProducerClientFrame,
+} from "@/lib/helix/visualFrameProducer";
 import { createHelixAskRealtimeProviderEventHandler } from "./HelixAskRealtimeProviderEventHandler";
 import { getAudioFocusSnapshot } from "@/lib/audio-focus";
 import {
   beginHelixAskLiveRuntimeClientDebugAttempt,
   recordHelixAskLiveRuntimeClientDebugEvent,
   recordHelixAskLiveRuntimeServerStagePlayDebug,
+  recordHelixAskLiveRuntimeVisualFrameReceipt,
 } from "./HelixAskLiveRuntimeDebugState";
+import { registerHelixAskVisualFrameLivePromotionHandler } from "./HelixAskVisualFramePromotion";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import { buildHelixAskLiveRuntimeSourceBinding } from "./HelixAskMinimalRuntimeWorkspaceContext";
 
@@ -31,7 +40,11 @@ type LiveRuntimeSessionState = {
   realtimeSessionId: string | null;
   error: string | null;
   active: boolean;
+  workerRelayStatus: HelixRealtimeGroundedRelayStatusV1 | null;
   microphoneEnabled: boolean;
+  visualInputEnabled: boolean;
+  visualInputFrameCount: number;
+  visualInputError: string | null;
 };
 
 const INITIAL_STATE: LiveRuntimeSessionState = {
@@ -40,7 +53,11 @@ const INITIAL_STATE: LiveRuntimeSessionState = {
   realtimeSessionId: null,
   error: null,
   active: false,
+  workerRelayStatus: null,
   microphoneEnabled: false,
+  visualInputEnabled: false,
+  visualInputFrameCount: 0,
+  visualInputError: null,
 };
 
 type LiveRuntimeSafeContext = {
@@ -48,6 +65,27 @@ type LiveRuntimeSafeContext = {
   vadState: string | null;
   interruptionCount: number;
 };
+
+const REALTIME_GROUNDED_RELAY_STATUSES = new Set<HelixRealtimeGroundedRelayStatusV1>([
+  "worker_running",
+  "result_ready",
+  "relay_queued_busy",
+  "response_requested",
+  "speaking",
+  "delivered",
+  "suppressed",
+  "superseded",
+  "stale",
+  "interrupted",
+  "cancelled",
+  "failed",
+]);
+
+const readWorkerRelayStatus = (value: unknown): HelixRealtimeGroundedRelayStatusV1 | null =>
+  typeof value === "string" &&
+  REALTIME_GROUNDED_RELAY_STATUSES.has(value as HelixRealtimeGroundedRelayStatusV1)
+    ? value as HelixRealtimeGroundedRelayStatusV1
+    : null;
 
 const postJson = async <T,>(path: string, body: Record<string, unknown>): Promise<T> => {
   const response = await fetch(path, {
@@ -80,9 +118,11 @@ export const useHelixAskLiveRuntimeSession = (input: {
     lifecycleState: input.initialLifecycleState ?? INITIAL_STATE.lifecycleState,
     transportState: input.initialTransportState ?? INITIAL_STATE.transportState,
   }));
+  const [visualTransportRevision, setVisualTransportRevision] = useState(0);
   const controllerRef = useRef<HelixAskLiveRuntimeBrowserTransportController | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const microphoneEnabledRef = useRef(false);
+  const visualInputEnabledRef = useRef(false);
   const runtimeContextRef = useRef<LiveRuntimeSafeContext>({
     transportReceiptRef: null,
     vadState: null,
@@ -90,6 +130,8 @@ export const useHelixAskLiveRuntimeSession = (input: {
   });
 
   const stop = useCallback(async () => {
+    // Consent revocation must take effect before React can commit the next render.
+    visualInputEnabledRef.current = false;
     const sessionId = sessionIdRef.current ?? state.realtimeSessionId;
     recordHelixAskLiveRuntimeClientDebugEvent({
       eventKind: "session_stop_requested",
@@ -122,7 +164,11 @@ export const useHelixAskLiveRuntimeSession = (input: {
       realtimeSessionId: null,
       error: null,
       active: false,
+      workerRelayStatus: null,
       microphoneEnabled: false,
+      visualInputEnabled: false,
+      visualInputFrameCount: 0,
+      visualInputError: null,
     });
     microphoneEnabledRef.current = false;
     recordHelixAskLiveRuntimeClientDebugEvent({
@@ -135,6 +181,7 @@ export const useHelixAskLiveRuntimeSession = (input: {
 
   const start = useCallback(async () => {
     if (!input.enabled || state.active || state.lifecycleState === "requesting") return;
+    visualInputEnabledRef.current = false;
     const mode = input.mode === "off" ? "live_voice" : input.mode;
     const observedAtMs = Date.now();
     const consentReceipt = buildHelixAskLiveRuntimeClientReceiptPayload({
@@ -156,7 +203,11 @@ export const useHelixAskLiveRuntimeSession = (input: {
       realtimeSessionId: null,
       error: null,
       active: false,
+      workerRelayStatus: null,
       microphoneEnabled: false,
+      visualInputEnabled: false,
+      visualInputFrameCount: 0,
+      visualInputError: null,
     });
     try {
       const startReceipt = buildHelixAskLiveRuntimeClientReceiptPayload({
@@ -283,6 +334,9 @@ export const useHelixAskLiveRuntimeSession = (input: {
             realtimeSessionId: response.realtime_session_id,
             detailCode: outcome.errorCode,
           });
+          if (outcome.state === "open") {
+            setVisualTransportRevision((current) => current + 1);
+          }
         },
         onAudioState: (audioState) => {
           const projectedAudioState = audioState === "listening" && !microphoneEnabledRef.current
@@ -399,9 +453,14 @@ export const useHelixAskLiveRuntimeSession = (input: {
         realtimeSessionId: response.realtime_session_id,
         error: remoteAudioPlaybackFailure,
         active: true,
+        workerRelayStatus: null,
         microphoneEnabled: false,
+        visualInputEnabled: false,
+        visualInputFrameCount: 0,
+        visualInputError: null,
       });
     } catch (error) {
+      visualInputEnabledRef.current = false;
       const failureCode = error instanceof Error ? error.message : "realtime_session_start_failed";
       recordHelixAskLiveRuntimeClientDebugEvent({
         eventKind: "transport_failed",
@@ -433,7 +492,11 @@ export const useHelixAskLiveRuntimeSession = (input: {
         realtimeSessionId: null,
         error: error instanceof Error ? error.message : "realtime_session_start_failed",
         active: false,
+        workerRelayStatus: null,
         microphoneEnabled: false,
+        visualInputEnabled: false,
+        visualInputFrameCount: 0,
+        visualInputError: null,
       });
       microphoneEnabledRef.current = false;
     }
@@ -458,6 +521,127 @@ export const useHelixAskLiveRuntimeSession = (input: {
     return true;
   }, []);
 
+  const setVisualInputEnabled = useCallback((enabled: boolean): boolean => {
+    if (enabled && (!controllerRef.current || !sessionIdRef.current)) return false;
+    // Keep an imperative consent gate in sync so Vision Off closes the route in
+    // the same turn, without waiting for the subscription effect to clean up.
+    visualInputEnabledRef.current = enabled;
+    recordHelixAskLiveRuntimeClientDebugEvent({
+      eventKind: enabled ? "visual_input_enabled" : "visual_input_disabled",
+      realtimeSessionId: sessionIdRef.current,
+      detailCode: enabled ? "live_visual_input_enabled" : "live_visual_input_disabled",
+    });
+    setState((current) => ({
+      ...current,
+      visualInputEnabled: enabled,
+      visualInputError: null,
+    }));
+    return true;
+  }, []);
+
+  const applyVisualFrameReceipt = useCallback((
+    sessionId: string,
+    receipt: ReturnType<HelixAskLiveRuntimeBrowserTransportController["sendVisualFrame"]>,
+  ): void => {
+    recordHelixAskLiveRuntimeVisualFrameReceipt(receipt);
+    setState((current) => current.realtimeSessionId !== sessionId
+      ? current
+      : receipt.ok
+        ? {
+            ...current,
+            visualInputFrameCount: current.visualInputFrameCount + 1,
+            visualInputError: null,
+          }
+        : {
+            ...current,
+            visualInputError: receipt.code,
+          });
+  }, []);
+
+  useEffect(() => registerHelixAskVisualFrameLivePromotionHandler((frame) => {
+    const sessionId = sessionIdRef.current;
+    const controller = controllerRef.current;
+    if (!state.active || !sessionId || !controller) {
+      return {
+        ok: false,
+        code: "live_runtime_unavailable",
+        receipt: null,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+      };
+    }
+    if (!visualInputEnabledRef.current) {
+      recordHelixAskLiveRuntimeClientDebugEvent({
+        eventKind: "visual_frame_blocked",
+        realtimeSessionId: sessionId,
+        detailCode: "visual_input_consent_required",
+      });
+      return {
+        ok: false,
+        code: "visual_input_consent_required",
+        receipt: null,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+      };
+    }
+    const receipt = controller.sendVisualFrame(frame);
+    applyVisualFrameReceipt(sessionId, receipt);
+    return {
+      ok: receipt.ok,
+      code: receipt.code,
+      receipt,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+    };
+  }), [applyVisualFrameReceipt, state.active, state.realtimeSessionId]);
+
+  useEffect(() => {
+    const sessionId = state.realtimeSessionId;
+    if (!state.active || !state.visualInputEnabled || !sessionId) return;
+    let lastClientFrameId: string | null = null;
+    const routeFrame = (frame: VisualFrameProducerClientFrame): void => {
+      if (
+        !visualInputEnabledRef.current ||
+        !frame.liveRuntimeEligible ||
+        frame.threadId !== "helix-ask:desktop" ||
+        !isVisualFrameProducerSourceActive(frame.sourceId) ||
+        frame.clientFrameId === lastClientFrameId
+      ) {
+        return;
+      }
+      const receipt = controllerRef.current?.sendVisualFrame({
+        imageDataUrl: frame.dataUrl,
+        sourceKind:
+          frame.sourceSurface === "camera" || frame.sourceOrigin === "browser_getUserMedia"
+            ? "camera"
+            : "screen",
+        sourceLabel:
+          frame.sourceSurface === "camera" || frame.sourceOrigin === "browser_getUserMedia"
+            ? "Device camera"
+            : "Shared screen",
+        detail:
+          frame.sourceSurface === "camera" || frame.sourceOrigin === "browser_getUserMedia"
+            ? "low"
+            : "auto",
+      });
+      if (!receipt) return;
+      if (receipt.ok) lastClientFrameId = frame.clientFrameId;
+      applyVisualFrameReceipt(sessionId, receipt);
+    };
+    const unsubscribe = subscribeVisualFrameProducerFrames(routeFrame);
+    const latestFrame = getLatestVisualFrameProducerFrame();
+    if (
+      latestFrame &&
+      Date.now() - Date.parse(latestFrame.capturedAt) <= 30_000
+    ) {
+      routeFrame(latestFrame);
+    }
+    return unsubscribe;
+  }, [applyVisualFrameReceipt, state.active, state.realtimeSessionId, state.visualInputEnabled, visualTransportRevision]);
+
   useEffect(() => {
     const sessionId = state.realtimeSessionId;
     if (!state.active || !sessionId) return;
@@ -468,8 +652,20 @@ export const useHelixAskLiveRuntimeSession = (input: {
           `/api/agi/realtime/session/${encodeURIComponent(sessionId)}/debug`,
         );
         if (!response.ok || disposed) return;
-        const payload = await response.json();
-        if (!disposed) recordHelixAskLiveRuntimeServerStagePlayDebug(payload);
+        const payload = await response.json() as {
+          latest_grounded_relay?: { status?: unknown } | null;
+        };
+        if (!disposed) {
+          recordHelixAskLiveRuntimeServerStagePlayDebug(payload);
+          const workerRelayStatus = readWorkerRelayStatus(
+            payload.latest_grounded_relay?.status,
+          );
+          setState((current) =>
+            current.realtimeSessionId !== sessionId ||
+            current.workerRelayStatus === workerRelayStatus
+              ? current
+              : { ...current, workerRelayStatus });
+        }
       } catch {
         // Debug refresh is observational and must not affect the live transport.
       }
@@ -483,6 +679,7 @@ export const useHelixAskLiveRuntimeSession = (input: {
   }, [state.active, state.realtimeSessionId]);
 
   useEffect(() => () => {
+    visualInputEnabledRef.current = false;
     const controller = controllerRef.current;
     const sessionId = sessionIdRef.current;
     controllerRef.current = null;
@@ -502,5 +699,11 @@ export const useHelixAskLiveRuntimeSession = (input: {
     }
   }, []);
 
-  return { ...state, start, stop, setMicrophoneEnabled };
+  return {
+    ...state,
+    start,
+    stop,
+    setMicrophoneEnabled,
+    setVisualInputEnabled,
+  };
 };

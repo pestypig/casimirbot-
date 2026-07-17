@@ -48,6 +48,7 @@ const normalizeModality = (value: unknown): HelixLiveSourceDescriptorModality =>
 
 const normalizeOrigin = (value: unknown): HelixLiveSourceOrigin => {
   if (
+    value === "browser_getUserMedia" ||
     value === "manual_upload" ||
     value === "discord_bridge" ||
     value === "minehut_plugin" ||
@@ -74,6 +75,7 @@ const normalizeSurface = (value: unknown): HelixLiveSourceSurface | null => {
     value === "screen" ||
     value === "window" ||
     value === "browser_tab" ||
+    value === "camera" ||
     value === "document" ||
     value === "game" ||
     value === "app" ||
@@ -106,6 +108,7 @@ export function inferLiveSourceSurface(input: {
   ].filter(Boolean).join("\n"));
   const modality = normalizeModality(input.modality);
   if (origin === "minehut_plugin") return "game";
+  if (origin === "browser_getUserMedia") return "camera";
   if (modality === "calculator_stream") return "calculator";
   if (modality === "simulation_stream") return "simulation";
   if (modality === "environment_state" || modality === "environment_affordance" || modality === "procedure_graph") return "app";

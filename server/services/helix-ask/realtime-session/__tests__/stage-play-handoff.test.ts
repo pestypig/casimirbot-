@@ -68,4 +68,62 @@ describe("Realtime transcript Stage Play handoff", () => {
     expect(JSON.stringify(first)).not.toContain(transcriptText);
     expect(JSON.stringify(first)).not.toContain("realtime_transcript_readonly_reentry");
   });
+
+  it("requires an active-context observation for a deictic workstation question", () => {
+    const transcriptText = "What panel do you see?";
+    const observation = buildRealtimeTranscriptObservation({
+      realtimeSessionId: "realtime:deictic",
+      nowMs: 300,
+      body: {
+        event_type: "transcript.final",
+        event_ref: "provider-event:deictic",
+        transcript_text: transcriptText,
+      },
+    })!;
+    const handoff = bridgeRealtimeTranscriptToStagePlay({
+      realtimeSessionId: "realtime:deictic",
+      threadId: "helix-ask:desktop",
+      providerEventRef: "provider-event:deictic",
+      transcriptText,
+      observation,
+      nowMs: 300,
+    });
+
+    expect(handoff.required_grounding_capability_ids).toEqual(["workstation.active_context"]);
+    expect(handoff.route_metadata).toMatchObject({
+      requiredGroundingCapabilityIds: ["workstation.active_context"],
+      source_target_intent: {
+        allow_no_tool_direct: false,
+        grounded_feedback_requires_observation: true,
+        required_grounding_capability_ids: ["workstation.active_context"],
+      },
+    });
+  });
+
+  it.each([
+    "The button says \"What panel do you see?\"",
+    "Later, ask what panel do you see.",
+    "Do not answer what panel is currently visible.",
+  ])("does not turn contextual panel wording into an observation requirement: %s", (transcriptText) => {
+    const suffix = transcriptText.length.toString(16);
+    const observation = buildRealtimeTranscriptObservation({
+      realtimeSessionId: `realtime:contextual:${suffix}`,
+      body: {
+        event_type: "transcript.final",
+        event_ref: `provider-event:contextual:${suffix}`,
+        transcript_text: transcriptText,
+      },
+    })!;
+    const handoff = bridgeRealtimeTranscriptToStagePlay({
+      realtimeSessionId: `realtime:contextual:${suffix}`,
+      threadId: "helix-ask:desktop",
+      providerEventRef: `provider-event:contextual:${suffix}`,
+      transcriptText,
+      observation,
+    });
+
+    expect(handoff.required_grounding_capability_ids).toEqual([]);
+    expect((handoff.route_metadata.source_target_intent as Record<string, unknown>).allow_no_tool_direct)
+      .toBe(true);
+  });
 });

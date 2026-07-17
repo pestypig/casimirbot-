@@ -1,9 +1,38 @@
 import { describe, expect, it, vi } from "vitest";
 import { createHelixAskRealtimeProviderEventHandler } from "@/components/helix/ask-console/HelixAskRealtimeProviderEventHandler";
 
-const buildServerHandoff = (observationRef: string, suffix = "test") => ({
+const buildServerHandoff = (observationRef: string, suffix = "test") => {
+  const handoffId = `realtime-stage-play-handoff:${suffix}`;
+  const workerAdmission = {
+    schema: "helix.realtime_worker_admission.v1",
+    admission_id: `realtime-worker-admission:${suffix}`,
+    handoff_id: handoffId,
+    realtime_session_id: "realtime:test",
+    thread_id: "helix-ask:desktop",
+    decision_phase: "transcript_handoff",
+    outcome: "conversation_local",
+    reason_codes: ["intent_general_reasoning"],
+    selected_primary_intent: "general_reasoning",
+    selected_route: null,
+    selected_runtime_agent_provider: null,
+    selected_model: null,
+    candidate_readonly_capability_ids: [],
+    observed_readonly_capability_ids: [],
+    action_candidate_capability_ids: [],
+    worker_turn_dispatched: true,
+    spoken_relay_eligible: false,
+    workstation_action_execution_allowed: false,
+    realtime_provider_tool_execution_allowed: false,
+    evidence_refs: [observationRef],
+    decided_at_ms: 100,
+    answer_authority: false,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+  return {
   schema: "helix.realtime_stage_play.ask_handoff.v1",
-  handoff_id: `realtime-stage-play-handoff:${suffix}`,
+  handoff_id: handoffId,
   realtime_session_id: "realtime:test",
   thread_id: "helix-ask:desktop",
   provider_event_ref: `event:transcript:${suffix}`,
@@ -13,13 +42,18 @@ const buildServerHandoff = (observationRef: string, suffix = "test") => ({
   context_hash: `sha256:${suffix}`,
   transcript_text_hash: `sha256:transcript-${suffix}`,
   transcript_text_char_count: 37,
+  goal_id: null,
+  runtime_goal_session_ref: null,
+  runtime_agent_provider: null,
+  required_grounding_capability_ids: [],
+  worker_admission: workerAdmission,
   created_at_ms: 100,
   route_metadata: {
     schema: "helix.ask.route_metadata.v1",
     source: "realtime_stage_play",
     invocationKind: "stage_play_realtime_transcript_handoff",
     sourceTarget: "operator_text",
-    handoffId: `realtime-stage-play-handoff:${suffix}`,
+    handoffId,
     forbiddenCapabilities: [
       "workstation_mutation",
       "workstation_action_execution",
@@ -32,6 +66,7 @@ const buildServerHandoff = (observationRef: string, suffix = "test") => ({
       admitted_readonly_handoff: true,
       assistant_answer: false,
       raw_content_included: false,
+      realtime_worker_admission: workerAdmission,
       server_fixture_marker: suffix,
     },
   },
@@ -42,7 +77,8 @@ const buildServerHandoff = (observationRef: string, suffix = "test") => ({
   assistant_answer: false,
   terminal_eligible: false,
   raw_content_included: false,
-});
+  };
+};
 
 describe("Helix Ask Realtime provider event handler", () => {
   it("requires a transcript observation receipt before read-only Ask re-entry", async () => {

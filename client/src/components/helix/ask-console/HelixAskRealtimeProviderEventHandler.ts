@@ -278,6 +278,8 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
                 status: ended ? "received" : "requested",
                 observed_at_ms: Date.now(),
                 lifecycle_state: ended ? "listening" : "active",
+                provider_event_type: type,
+                provider_response_ref: responseRef,
                 answer_authority: false,
                 assistant_answer: false,
                 terminal_eligible: false,
@@ -477,6 +479,8 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
         const handoff = readRecord(response.realtime_stage_play_ask_handoff);
         const routeMetadata = readRecord(handoff.route_metadata);
         const sourceTargetIntent = readRecord(routeMetadata.source_target_intent);
+        const workerAdmission = readRecord(handoff.worker_admission);
+        const routedWorkerAdmission = readRecord(sourceTargetIntent.realtime_worker_admission);
         const forbiddenCapabilities = Array.isArray(routeMetadata.forbiddenCapabilities)
           ? routeMetadata.forbiddenCapabilities.filter((value): value is string =>
               typeof value === "string")
@@ -496,6 +500,18 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
           handoff.assistant_answer !== false ||
           handoff.terminal_eligible !== false ||
           handoff.raw_content_included !== false ||
+          workerAdmission.schema !== "helix.realtime_worker_admission.v1" ||
+          workerAdmission.handoff_id !== handoffId ||
+          workerAdmission.realtime_session_id !== input.realtimeSessionId ||
+          workerAdmission.decision_phase !== "transcript_handoff" ||
+          workerAdmission.worker_turn_dispatched !== true ||
+          workerAdmission.workstation_action_execution_allowed !== false ||
+          workerAdmission.realtime_provider_tool_execution_allowed !== false ||
+          workerAdmission.answer_authority !== false ||
+          workerAdmission.assistant_answer !== false ||
+          workerAdmission.terminal_eligible !== false ||
+          workerAdmission.raw_content_included !== false ||
+          routedWorkerAdmission.admission_id !== workerAdmission.admission_id ||
           !handoffId ||
           !stagePlayEventRef ||
           !contextPackId ||

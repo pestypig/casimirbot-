@@ -74,6 +74,7 @@ export type HelixWorkstationTheoryContextReflectionBridgeResult = {
     | "current_user_request"
     | "runtime_semantic_prompt"
     | "runtime_resolved_referent"
+    | "helix_resolved_referent"
     | null;
   semantic_prompt_text_hash: string | null;
   runtime_requested_prompt_hash: string | null;
@@ -762,6 +763,9 @@ export const runWorkstationToolReferenceTheoryContextReflection = async (input: 
   const semanticPromptSource = readText(
     input.call.semantic_prompt_source ?? input.call.semanticPromptSource,
   ) || null;
+  const resolvedReferentAuthority = readText(
+    input.call.resolved_referent_authority ?? input.call.resolvedReferentAuthority,
+  ) || null;
 
   if (trace.admission_status !== "admitted_shadow_only") {
     const reason = trace.blocked_reason ?? "workstation_tool_reference_lane_blocked";
@@ -806,7 +810,9 @@ export const runWorkstationToolReferenceTheoryContextReflection = async (input: 
     ? resolvedReferentText
     : userSemanticPrompt || requestedPrompt;
   const semanticPromptArgumentSource = hasBoundResolvedReferent
-    ? "runtime_resolved_referent" as const
+    ? resolvedReferentAuthority === "helix_policy"
+      ? "helix_resolved_referent" as const
+      : "runtime_resolved_referent" as const
     : userSemanticPrompt
       ? "current_user_request" as const
       : "runtime_semantic_prompt" as const;

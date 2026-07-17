@@ -8,7 +8,10 @@ import React, {
 } from "react";
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
 
-import { HelixAskActionToolbar } from "./HelixAskActionToolbar";
+import {
+  HelixAskActionToolbar,
+  type HelixAskVisualSourceKind,
+} from "./HelixAskActionToolbar";
 import {
   HelixAskComposerSubmitButton,
   type HelixAskComposerViewModel,
@@ -42,6 +45,9 @@ export type HelixAskComposerActionToolbarSurfaceProps = {
   retryVoiceSampleDisabled?: boolean;
   onRetryVoiceSample: () => void;
   showVisualCaptureControls?: boolean;
+  visualSourceKind?: HelixAskVisualSourceKind;
+  visualSourceSelectionDisabled?: boolean;
+  onToggleVisualSourceKind?: () => void;
   visualSituationSourceStatus: string;
   onCaptureVisualSource: () => void;
   visualSituationIncludeAudio: boolean;
@@ -77,6 +83,9 @@ export function HelixAskComposerActionToolbarSurface({
   retryVoiceSampleDisabled = false,
   onRetryVoiceSample,
   showVisualCaptureControls = true,
+  visualSourceKind = "screen",
+  visualSourceSelectionDisabled = false,
+  onToggleVisualSourceKind,
   visualSituationSourceStatus,
   onCaptureVisualSource,
   visualSituationIncludeAudio,
@@ -145,6 +154,9 @@ export function HelixAskComposerActionToolbarSurface({
       retryVoiceSampleDisabled={retryVoiceSampleDisabled}
       onRetryVoiceSample={onRetryVoiceSample}
       showVisualCaptureControls={showVisualCaptureControls}
+      visualSourceKind={visualSourceKind}
+      visualSourceSelectionDisabled={visualSourceSelectionDisabled}
+      onToggleVisualSourceKind={onToggleVisualSourceKind}
       visualSituationSourceStatus={visualSituationSourceStatus}
       onCaptureVisualSource={onCaptureVisualSource}
       visualSituationIncludeAudio={visualSituationIncludeAudio}

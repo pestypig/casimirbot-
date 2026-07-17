@@ -1,4 +1,5 @@
 import { DOC_FILE_METADATA } from "@/lib/docs/docMetadata.generated";
+import { DOC_MODULES } from "@/lib/docs/docModules";
 import docTaxonomy from "../../../../docs/doc-taxonomy.v1.json";
 
 type DocModuleLoader = () => Promise<string>;
@@ -106,10 +107,32 @@ const DOC_SEARCH_STOP_WORDS = new Set([
   "whitepaper",
 ]);
 
-const docModules = import.meta.glob("../../../../docs/**/*.md", {
-  query: "?raw",
-  import: "default",
-}) as Record<string, () => Promise<string>>;
+const encodeDocPath = (relativePath: string): string =>
+  relativePath.split("/").map(encodeURIComponent).join("/");
+
+export const buildProductionDocModules = (
+  fetchDocument: typeof fetch = fetch,
+): Record<string, DocModuleLoader> =>
+  Object.fromEntries(
+    Object.keys(DOC_FILE_METADATA)
+      .filter((relativePath) => /^docs\/.*\.md$/i.test(relativePath))
+      .map((relativePath) => [
+        `../../../../${relativePath}`,
+        async () => {
+          const response = await fetchDocument(`/${encodeDocPath(relativePath)}`, {
+            headers: { Accept: "text/markdown, text/plain;q=0.9, */*;q=0.1" },
+          });
+          if (!response.ok) {
+            throw new Error(`Unable to load ${relativePath}: HTTP ${response.status}`);
+          }
+          return response.text();
+        },
+      ]),
+  );
+
+const docModules: Record<string, DocModuleLoader> = import.meta.env.DEV
+  ? DOC_MODULES
+  : buildProductionDocModules();
 
 const DOC_PATH_PATTERN = /docs[\\/]/i;
 

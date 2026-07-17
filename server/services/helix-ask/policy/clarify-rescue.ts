@@ -19,10 +19,10 @@ export type HelixAskClarifyRescueDecision = {
 const HELIX_ASK_CLARIFY_RESCUE_GREETING_RE =
   /^(?:hi|hello|hey|yo|sup|what(?:'s| is)\s+up|how\s+are\s+you|good\s+(?:morning|afternoon|evening)|thanks|thank\s+you|ok|okay)\b/i;
 const HELIX_ASK_CLARIFY_RESCUE_GREETING_ONLY_RE =
-  /^(?:hi|hello|hey|yo|sup|what(?:'s| is)\s+up|how\s+are\s+you|good\s+(?:morning|afternoon|evening)|thanks|thank\s+you|ok|okay)(?:\s+there)?[!?.\s]*$/i;
+  /^(?:hi|hello|hey|yo|sup|what(?:'s| is)\s+up|how\s+are\s+you(?:\s+today)?|good\s+(?:morning|afternoon|evening)|thanks|thank\s+you|ok|okay)(?:\s+there)?[!?.\s]*$/i;
 const HELIX_ASK_CLARIFY_RESCUE_THANKS_ONLY_RE =
   /^(?:thanks|thank\s+you)(?:\s+(?:so\s+much|a\s+lot))?[!?.\s]*$/i;
-const HELIX_ASK_CLARIFY_RESCUE_HOW_ARE_YOU_ONLY_RE = /^how\s+are\s+you[!?.\s]*$/i;
+const HELIX_ASK_CLARIFY_RESCUE_HOW_ARE_YOU_ONLY_RE = /^how\s+are\s+you(?:\s+today)?[!?.\s]*$/i;
 
 export const isHelixAskClarifyRescueCandidateQuestion = (question: string): boolean => {
   const trimmed = question.trim();

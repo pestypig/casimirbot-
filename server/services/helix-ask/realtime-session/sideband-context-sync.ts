@@ -17,6 +17,12 @@ import {
   type HelixRealtimeAdmittedSession,
 } from "./session-registry";
 import { HELIX_REALTIME_PROVISIONAL_POLICY } from "./sdp-transport";
+import {
+  publishRealtimeSidebandActivity,
+  publishRealtimeSidebandProviderEvent,
+  publishRealtimeSidebandSessionClosed,
+  registerRealtimeSidebandControlSender,
+} from "./sideband-control-channel";
 
 const OPENAI_REALTIME_SIDEBAND_URL = "wss://api.openai.com/v1/realtime";
 const SOCKET_OPEN = 1;
@@ -257,10 +263,18 @@ export const requestRealtimeStagePlayContextSync = (input: {
     sourceBinding: session.sourceBinding,
     nowMs: input.nowMs,
   });
-  const connection = connections.get(session.realtimeSessionId);
-  if (!session.providerCallId || !connection) {
-    return writeLatestSync(session, buildSync({
-      session,
+  const boundSession = updateAdmittedRealtimeSession({
+    realtimeSessionId: session.realtimeSessionId,
+    patch: {
+      boundGoalId: pack.active_goal_binding?.goal_id ?? null,
+      boundRuntimeSessionRef: pack.active_goal_binding?.runtime_session_ref ?? null,
+      boundRuntimeAgentProvider: pack.active_goal_binding?.runtime_agent_provider ?? null,
+    },
+  }) ?? session;
+  const connection = connections.get(boundSession.realtimeSessionId);
+  if (!boundSession.providerCallId || !connection) {
+    return writeLatestSync(boundSession, buildSync({
+      session: boundSession,
       reason: input.reason,
       status: "not_connected",
       pack,
@@ -268,7 +282,7 @@ export const requestRealtimeStagePlayContextSync = (input: {
       nowMs: input.nowMs,
     }));
   }
-  return sendPack({ session, connection, reason: input.reason, pack });
+  return sendPack({ session: boundSession, connection, reason: input.reason, pack });
 };
 
 const applyProviderActivityEvent = (realtimeSessionId: string, eventType: string): void => {
@@ -359,8 +373,12 @@ export const startRealtimeStagePlaySideband = (input: {
   });
   socket.on("message", (data) => {
     try {
-      const parsed = JSON.parse(data.toString()) as { type?: unknown };
+      const parsed = JSON.parse(data.toString()) as Record<string, unknown>;
       if (typeof parsed.type === "string") {
+        publishRealtimeSidebandProviderEvent({
+          realtimeSessionId: input.realtimeSessionId,
+          event: parsed,
+        });
         applyProviderActivityEvent(input.realtimeSessionId, parsed.type);
       }
     } catch {
@@ -372,6 +390,10 @@ export const startRealtimeStagePlaySideband = (input: {
     updateAdmittedRealtimeSession({
       realtimeSessionId: input.realtimeSessionId,
       patch: { sidebandState: "closed" },
+    });
+    publishRealtimeSidebandSessionClosed({
+      realtimeSessionId: input.realtimeSessionId,
+      reason: "realtime_sideband_closed",
     });
   });
   socket.on("error", () => {
@@ -440,11 +462,19 @@ export const recordRealtimeStagePlayActivity = (input: {
     patch,
   });
   if (updated && !isBusy(updated)) flushPendingIfIdle(updated);
+  publishRealtimeSidebandActivity({
+    realtimeSessionId: input.realtimeSessionId,
+    activity: input.activity,
+  });
 };
 
 export const stopRealtimeStagePlaySideband = (realtimeSessionId: string): void => {
   const connection = connections.get(realtimeSessionId);
   connections.delete(realtimeSessionId);
+  publishRealtimeSidebandSessionClosed({
+    realtimeSessionId,
+    reason: "realtime_sideband_stopped",
+  });
   if (!connection) return;
   try {
     connection.socket.close();
@@ -463,6 +493,20 @@ export const resetRealtimeStagePlaySidebandForTests = (): void => {
   for (const sessionId of Array.from(connections.keys())) stopRealtimeStagePlaySideband(sessionId);
   connector = defaultConnector;
 };
+
+registerRealtimeSidebandControlSender(({ realtimeSessionId, event, onComplete }) => {
+  const connection = connections.get(realtimeSessionId);
+  if (!connection || connection.socket.readyState !== SOCKET_OPEN) return false;
+  try {
+    connection.socket.send(safeJson(event), (error) => {
+      onComplete?.(error ? "realtime_sideband_control_send_failed" : null);
+    });
+    return true;
+  } catch {
+    onComplete?.("realtime_sideband_control_send_failed");
+    return false;
+  }
+});
 
 subscribeStagePlayLiveSourceConversationEvents((event) => {
   const reason = event.source === "assistant_answer" ? "grounded_answer" : "stage_play_update";

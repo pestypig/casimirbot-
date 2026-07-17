@@ -957,6 +957,120 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
     expect(trace.solver_risk_flags).not.toContain("tool_result_terminal_without_reasoning");
   });
 
+  it("completes provider final arbitration when the canonical goal requires a provider terminal", () => {
+    const turnId = "turn:provider-active-context-terminal";
+    const observationRef = `${turnId}:workstation_gateway:workstation.active_context:1`;
+    const normalizedRef = `${turnId}:codex_normalized:workstation_active_context_observation:1`;
+    const candidateRef = `${turnId}:agent_provider_terminal_candidate:codex:answer`;
+    const payload = {
+      source_target_intent: {
+        target_source: "operator_text",
+        target_kind: "realtime_transcript",
+        strength: "hard",
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "agent_provider_gateway_turn",
+        requested_capability: "workstation.active_context",
+        required_terminal_kind: "agent_provider_terminal_candidate",
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        allowed_terminal_artifact_kinds: ["agent_provider_terminal_candidate", "typed_failure"],
+        forbidden_terminal_artifact_kinds: [],
+      },
+      poison_audit: { ok: true },
+      provider_reasoning_reentry: {
+        schema: "helix.provider_reasoning_reentry.v1",
+        turn_id: turnId,
+        status: "completed",
+        provider_terminal_candidate_ref: candidateRef,
+        evidence_reentered: true,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+      },
+      provider_terminal_authority_bridge: {
+        schema: "helix.provider_terminal_authority_bridge.v1",
+        turn_id: turnId,
+        provider_terminal_candidate_ref: candidateRef,
+        all_observations_succeeded: true,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+        terminal_authority_granted: true,
+        final_visible_answer_authorized: true,
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        turn_id: turnId,
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_artifact_ref: candidateRef,
+        server_authoritative: true,
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        turn_id: turnId,
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        final_answer_source: "agent_provider_terminal_candidate",
+        selected_observation_refs: [observationRef, normalizedRef],
+      },
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        turn_id: turnId,
+        selected_terminal_artifact_kind: "agent_provider_terminal_candidate",
+        selected_terminal_artifact_ref: candidateRef,
+        selected_terminal_support_refs: [observationRef, normalizedRef],
+        integrity: {
+          single_writer_applied: true,
+          post_tool_model_step_satisfied: true,
+        },
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: observationRef,
+          kind: "provider_gateway_observation_packet",
+          payload: { turn_id: turnId, observation_ref: observationRef },
+        },
+        {
+          artifact_id: normalizedRef,
+          kind: "workstation_active_context_observation",
+          payload: { turn_id: turnId, artifact_id: normalizedRef },
+        },
+      ],
+    };
+
+    const trace = buildAskTurnSolverTrace({
+      turnId,
+      promptText: "So, what workstation panel is active right now?",
+      selectedRoute: "/ask/turn/stream",
+      terminalArtifactKind: "agent_provider_terminal_candidate",
+      finalAnswerSource: "agent_provider_terminal_candidate",
+      payload,
+      loopParityTrace: {
+        actual_tool_calls: [{
+          tool_id: "workstation.active_context",
+          family: "workstation_action",
+          admitted: true,
+          mutating: false,
+          result_ref: observationRef,
+        }],
+        observations_created: [{ observation_id: observationRef, source_kind: "workstation_active_context" }],
+        evidence_selected_for_answer: [observationRef, normalizedRef],
+        evidence_rejected_for_answer: [],
+        terminal_selection_ran_after_observations: false,
+        route_authority_ok: false,
+        poison_audit_ok: true,
+        terminal_authority_ok: true,
+      },
+    });
+
+    expect(trace.evidence_reentry_gate).toMatchObject({ completed: true, violation_codes: [] });
+    expect(trace.followup_reasoning_gate).toMatchObject({ completed: true });
+    expect(trace.completed_solver_path).toBe(true);
+    expect(trace.solver_risk_flags).not.toContain("tool_result_terminal_without_reasoning");
+    expect(trace.solver_risk_flags).not.toContain("missing_followup_reasoning");
+  });
+
   it("keeps the original negated cadence prompt on content intent without receipt terminal authority", () => {
     const trace = buildAskTurnSolverTrace({
       turnId: "turn:negated-cadence",

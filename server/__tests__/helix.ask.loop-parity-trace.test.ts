@@ -2,6 +2,125 @@ import { describe, expect, it } from "vitest";
 import { buildLoopParityTrace } from "../services/helix-ask/loop-parity-trace";
 
 describe("Helix Ask loop parity trace", () => {
+  it("recognizes a current-turn provider completion after workstation observation re-entry", () => {
+    const turnId = "ask:test:provider-active-context";
+    const observationRef = `${turnId}:workstation_gateway:workstation.active_context:1`;
+    const normalizedRef = `${turnId}:codex_normalized:workstation_active_context_observation:1`;
+    const candidateRef = `${turnId}:agent_provider_terminal_candidate:codex:answer`;
+    const payload = {
+      source_target_intent: {
+        target_source: "operator_text",
+        target_kind: "realtime_transcript",
+        strength: "hard",
+      },
+      poison_audit: { ok: true, violations: [] },
+      terminal_answer_authority: {
+        turn_id: turnId,
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_artifact_ref: candidateRef,
+        server_authoritative: true,
+      },
+      terminal_presentation: {
+        turn_id: turnId,
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        final_answer_source: "agent_provider_terminal_candidate",
+        selected_observation_refs: [observationRef, normalizedRef],
+      },
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        turn_id: turnId,
+        selected_terminal_artifact_kind: "agent_provider_terminal_candidate",
+        selected_terminal_artifact_ref: candidateRef,
+        selected_terminal_support_refs: [observationRef, normalizedRef],
+        integrity: {
+          single_writer_applied: true,
+          post_tool_model_step_satisfied: true,
+        },
+      },
+      provider_terminal_authority_bridge: {
+        schema: "helix.provider_terminal_authority_bridge.v1",
+        turn_id: turnId,
+        provider_terminal_candidate_ref: candidateRef,
+        all_observations_succeeded: true,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+        terminal_authority_granted: true,
+        final_visible_answer_authorized: true,
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: observationRef,
+          kind: "provider_gateway_observation_packet",
+          payload: { turn_id: turnId, observation_ref: observationRef },
+        },
+        {
+          artifact_id: normalizedRef,
+          kind: "workstation_active_context_observation",
+          payload: { turn_id: turnId, artifact_id: normalizedRef },
+        },
+      ],
+    };
+
+    const trace = buildLoopParityTrace({
+      turnId,
+      promptText: "So, what workstation panel is active right now?",
+      selectedRoute: "/ask/turn/stream",
+      terminalArtifactKind: "agent_provider_terminal_candidate",
+      finalAnswerSource: "agent_provider_terminal_candidate",
+      payload,
+    });
+
+    expect(trace).toMatchObject({
+      post_observation_finalizer_ran: true,
+      followup_reasoning_ran: true,
+      terminal_selection_ran_after_observations: true,
+      route_authority_ok: true,
+      terminal_authority_ok: true,
+    });
+    expect(trace.short_circuit_risk_flags).not.toContain("terminal_selected_before_observation_finalizer");
+    expect(trace.short_circuit_risk_flags).not.toContain("route_authority_missing");
+
+    const missingModelStepTrace = buildLoopParityTrace({
+      turnId,
+      promptText: "So, what workstation panel is active right now?",
+      selectedRoute: "/ask/turn/stream",
+      terminalArtifactKind: "agent_provider_terminal_candidate",
+      finalAnswerSource: "agent_provider_terminal_candidate",
+      payload: {
+        ...payload,
+        terminal_authority_single_writer: {
+          ...payload.terminal_authority_single_writer,
+          integrity: {
+            single_writer_applied: true,
+            post_tool_model_step_satisfied: false,
+          },
+        },
+      },
+    });
+    expect(missingModelStepTrace.terminal_selection_ran_after_observations).toBe(false);
+    expect(missingModelStepTrace.short_circuit_risk_flags).toContain(
+      "terminal_selected_before_observation_finalizer",
+    );
+
+    const staleSupportTrace = buildLoopParityTrace({
+      turnId,
+      promptText: "So, what workstation panel is active right now?",
+      selectedRoute: "/ask/turn/stream",
+      terminalArtifactKind: "agent_provider_terminal_candidate",
+      finalAnswerSource: "agent_provider_terminal_candidate",
+      payload: {
+        ...payload,
+        terminal_presentation: {
+          ...payload.terminal_presentation,
+          selected_observation_refs: ["ask:prior-turn:workstation.active_context:1"],
+        },
+      },
+    });
+    expect(staleSupportTrace.terminal_selection_ran_after_observations).toBe(false);
+    expect(staleSupportTrace.route_authority_ok).toBe(false);
+  });
+
   it("canonicalizes calculator panel action aliases to the admitted calculator capability", () => {
     const turnId = "ask:test:calculator-alias";
     const trace = buildLoopParityTrace({

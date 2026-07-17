@@ -9,7 +9,8 @@ type DescriptorInput = {
   currentState?: "active" | "active_interval" | "permission_required" | "stale" | "paused" | "stopped" | "error";
   cadenceMs?: number | null;
   stream?: MediaStream | null;
-  surface?: "screen" | "window" | "browser_tab" | "document" | "game" | "app" | "terminal" | "file_manager" | "calculator" | "simulation" | "unknown";
+  surface?: "screen" | "window" | "browser_tab" | "camera" | "document" | "game" | "app" | "terminal" | "file_manager" | "calculator" | "simulation" | "unknown";
+  sourceOrigin?: "browser_getDisplayMedia" | "browser_getUserMedia";
   latestObservationRefs?: string[];
 };
 
@@ -21,16 +22,17 @@ const trackLabel = (stream?: MediaStream | null): string | null => {
 
 export async function postVisualLiveSourceDescriptor(input: DescriptorInput): Promise<void> {
   const label = trackLabel(input.stream);
+  const sourceOrigin = input.sourceOrigin ?? "browser_getDisplayMedia";
   await input.postJson("/api/agi/situation/live-source/descriptor", {
     source_id: input.sourceId,
     thread_id: input.threadId,
     environment_id: input.environmentId ?? null,
     pipeline_id: input.pipelineId ?? null,
     modality: "visual_frame",
-    user_label: label ?? "Browser visual capture",
+    user_label: label ?? (sourceOrigin === "browser_getUserMedia" ? "Device camera capture" : "Browser visual capture"),
     serving_context: {
-      surface: input.surface ?? "screen",
-      source_origin: "browser_getDisplayMedia",
+      surface: input.surface ?? (sourceOrigin === "browser_getUserMedia" ? "camera" : "screen"),
+      source_origin: sourceOrigin,
       app_hint: null,
       window_title_hint: label,
       participant_id: null,
@@ -46,16 +48,21 @@ export async function postVisualLiveSourceDescriptor(input: DescriptorInput): Pr
 
 export async function postAudioTranscriptLiveSourceDescriptor(input: DescriptorInput): Promise<void> {
   const label = trackLabel(input.stream);
+  const sourceOrigin = input.sourceOrigin ?? "browser_getDisplayMedia";
   await input.postJson("/api/agi/situation/live-source/descriptor", {
     source_id: input.sourceId,
     thread_id: input.threadId,
     environment_id: input.environmentId ?? null,
     pipeline_id: input.pipelineId ?? null,
     modality: "audio_transcript",
-    user_label: label ? `${label} audio transcript` : "Browser audio transcript",
+    user_label: label
+      ? `${label} audio transcript`
+      : sourceOrigin === "browser_getUserMedia"
+        ? "Device camera audio transcript"
+        : "Browser audio transcript",
     serving_context: {
-      surface: input.surface ?? "screen",
-      source_origin: "browser_getDisplayMedia",
+      surface: input.surface ?? (sourceOrigin === "browser_getUserMedia" ? "camera" : "screen"),
+      source_origin: sourceOrigin,
       app_hint: null,
       window_title_hint: label,
       participant_id: null,

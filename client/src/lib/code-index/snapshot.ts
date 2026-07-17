@@ -70,8 +70,10 @@ function registerSources(record: Record<string, SourceLoader>) {
 async function registerDevGlobSources() {
   if (sourceListLoadAttempted || !import.meta.env.DEV) return;
   sourceListLoadAttempted = true;
-  const sourceListUrl = new URL("./source-list.ts", import.meta.url).href;
-  const sourceList = await import(/* @vite-ignore */ sourceListUrl);
+  const sourceListUrl = "/src/lib/code-index/source-list.ts";
+  const sourceList = await import(/* @vite-ignore */ sourceListUrl) as {
+    SOURCE_LOADERS: Record<string, SourceLoader>;
+  };
   registerSources(sourceList.SOURCE_LOADERS);
 }
 

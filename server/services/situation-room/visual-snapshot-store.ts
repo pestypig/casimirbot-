@@ -70,6 +70,7 @@ const normalizeSourceSurface = (value: unknown): HelixVisualSourceSurface =>
   value === "browser_tab" ||
   value === "desktop_window" ||
   value === "screen_share_window" ||
+  value === "device_camera" ||
   value === "minecraft_client_window" ||
   value === "manual_upload"
     ? value

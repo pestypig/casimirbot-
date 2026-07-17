@@ -22,10 +22,10 @@ export const HELIX_ASK_LEGACY_CONSOLE_ACTIVE_PATH = [
 
 export const HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT = {
   file: "client/src/components/helix/HelixAskPill.tsx",
-  lineCountAtInventory: 24194,
-  exportedComponentStartsAtLine: 6394,
-  liveRenderSliceStartsAtLine: 23978,
-  liveLegacyConsoleViewStartsAtLine: 23978,
+  lineCountAtInventory: 23802,
+  exportedComponentStartsAtLine: 6374,
+  liveRenderSliceStartsAtLine: 23586,
+  liveLegacyConsoleViewStartsAtLine: 23586,
   inventoryReason:
     "The normal Ask path remains on the legacy-looking bridge until the recrowned minimal runtime shell reaches live visual parity. Extracted ask-console display owners should continue to grow in the recrowned directory, not inside HelixAskPill.",
 } as const;
@@ -498,21 +498,21 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     classification: "pure_display_already_recrowned",
     source: "ask-console",
     evidence:
-      "The visible supplement state object now runs through buildHelixAskConsoleSupplementState, which packages already-derived attachment, context capsule, voice status, Situation Room source, confirmation, context chooser, observer lane, and context-memory props while attachment removal, voice command execution, transcript confirmation, context chooser execution, observer event selection, source capture, audio stop behavior, and context-memory derivation remain in the bridge.",
+      "The visible supplement state object now runs through buildHelixAskConsoleSupplementState, which packages already-derived attachment, context capsule, voice status, Situation Room source, confirmation, context chooser, observer lane, and context-memory props while attachment removal, voice command execution, transcript confirmation, context chooser execution, observer event selection, and context-memory derivation remain in the bridge; visual/audio source capture is supplied by the recrowned runtime hook.",
   },
   {
     key: "situation_room_source_state_projection",
     classification: "pure_display_already_recrowned",
     source: "ask-console",
     evidence:
-      "The Situation Room source panel props now run through buildHelixAskSituationRoomSourceState, which packages already-derived visible label/status/error/transcript/audio props while source selection, visual capture, display-audio lifecycle, and stop-audio execution remain in the bridge.",
+      "The Situation Room source panel props now run through buildHelixAskSituationRoomSourceState, which packages already-derived visible label/status/error/transcript/audio props supplied by the recrowned visual-source capture runtime; the bridge only wires the resulting state into the legacy view.",
   },
   {
     key: "situation_room_source_display_derivation",
     classification: "pure_display_already_recrowned",
     source: "ask-console",
     evidence:
-      "The Situation Room source visible label/status/count/transcript/audio-active derivation now runs through buildHelixAskSituationRoomSourceDerivedState from supplied snapshots while source lookup refs, source selection, visual capture, display-audio lifecycle, and stop-audio execution remain in the bridge.",
+      "The Situation Room source visible label/status/count/transcript/audio-active derivation now runs through buildHelixAskSituationRoomSourceDerivedState from snapshots owned by the recrowned visual-source capture runtime; source refs, media capture, display-audio lifecycle, and stop-audio execution no longer live in the bridge.",
   },
   {
     key: "voice_confirmation_state_projection",
@@ -687,7 +687,14 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     classification: "behavior_sensitive_recrowned_with_parity",
     source: "ask-console",
     evidence:
-      "Visual capture audio route preference moved to HelixAskVisualCapturePreference with tests preserving stored route reads, route writes, sync-event detail, and keeping media capture/transcript runtime in the bridge.",
+      "Visual capture audio route preference lives in HelixAskVisualCapturePreference, and the browser screen/camera, frame-producer, descriptor/heartbeat, optional shared-tab-audio transcript, cancellation, source-snapshot, and cleanup lifecycle moved to useHelixAskVisualSourceCaptureRuntime with the pill reduced to injected availability/panel/event/error wiring and observation-state consumption.",
+  },
+  {
+    key: "visual_frame_explicit_promotion_ingress",
+    classification: "behavior_sensitive_recrowned_with_parity",
+    source: "ask-console",
+    evidence:
+      "Explicit selected-frame promotion is owned by HelixAskVisualFramePromotion, while useHelixAskVisualFrameAttachmentIngress owns data-URL validation, attachment-limit admission, and composer mutation. The legacy pill only supplies its existing attachment read/commit/error seams; GPT Live consent and transport remain in useHelixAskLiveRuntimeSession.",
   },
   {
     key: "context_compaction_resume_frame_storage",

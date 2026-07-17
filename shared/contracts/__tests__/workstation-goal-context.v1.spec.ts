@@ -37,6 +37,7 @@ describe("workstation goal context contract", () => {
     source_health: "source_status",
     trace_memory: "route_evidence",
     route_watch: "route_evidence",
+    runtime_goal: "runtime_goal_progress",
     narrator: "suggested_action",
     automation: "automation_status",
   };

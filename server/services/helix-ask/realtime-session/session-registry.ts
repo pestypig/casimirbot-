@@ -10,6 +10,9 @@ export type HelixRealtimeAdmittedSession = {
   model: string;
   voice: string | null;
   threadId: string;
+  boundGoalId: string | null;
+  boundRuntimeSessionRef: string | null;
+  boundRuntimeAgentProvider: string | null;
   sourceBinding: Record<string, unknown> | null;
   providerCallId: string | null;
   providerCallRef: string | null;
@@ -66,6 +69,9 @@ export const admitRealtimeSession = (input: {
     model: input.model,
     voice: input.voice?.trim() || null,
     threadId: input.threadId?.trim() || "helix-ask:desktop",
+    boundGoalId: null,
+    boundRuntimeSessionRef: null,
+    boundRuntimeAgentProvider: null,
     sourceBinding: input.sourceBinding ?? null,
     providerCallId: null,
     providerCallRef: null,
@@ -94,6 +100,9 @@ export const updateAdmittedRealtimeSession = (input: {
     | "playbackActive"
     | "latestContextSync"
     | "sourceBinding"
+    | "boundGoalId"
+    | "boundRuntimeSessionRef"
+    | "boundRuntimeAgentProvider"
   >>;
 }): HelixRealtimeAdmittedSession | null => {
   const session = sessions.get(input.realtimeSessionId);

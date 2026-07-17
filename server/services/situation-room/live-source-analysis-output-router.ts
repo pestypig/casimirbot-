@@ -14,7 +14,10 @@ import { getLiveSourceProducer } from "./live-source-chunk-buffer";
 import { recordLiveSourceProducerLifecycleEvent } from "./live-source-producer-lifecycle-store";
 import { promoteLiveSourceAnalysisOutput } from "./live-cognition-promotion-router";
 import { reasonLiveCardLinesForEnvironment } from "./live-card-line-reasoner";
-import { upsertLiveSourceDescriptor } from "./live-source-descriptor-builder";
+import {
+  getLatestLiveSourceDescriptorForSource,
+  upsertLiveSourceDescriptor,
+} from "./live-source-descriptor-builder";
 import {
   liveSchemaSelectionToLineDefinitions,
   selectLiveSchemaForEnvironment,
@@ -141,6 +144,18 @@ export function routeLiveSourceAnalysisOutput(input: LiveSourceAnalysisRouterInp
       })
     : null;
   const sourceEpoch = Math.max(1, Math.trunc(input.chunk.source_epoch ?? input.chunk.sequence_index ?? 1));
+  const priorVisualDescriptor = input.chunk.modality === "visual_frame"
+    ? getLatestLiveSourceDescriptorForSource(input.chunk.source_id)
+    : null;
+  const priorVisualIdentitySurface = priorVisualDescriptor && [
+    "screen",
+    "window",
+    "browser_tab",
+    "camera",
+    "unknown",
+  ].includes(priorVisualDescriptor.serving_context.surface)
+    ? priorVisualDescriptor.serving_context.surface as "screen" | "window" | "browser_tab" | "camera" | "unknown"
+    : undefined;
   const sourceIdentity = upsertLiveSourceIdentityFromChunk({
     chunk: {
       ...input.chunk,
@@ -148,6 +163,8 @@ export function routeLiveSourceAnalysisOutput(input: LiveSourceAnalysisRouterInp
       source_epoch: sourceEpoch,
     },
     sourceBindingId,
+    sourceSurface: priorVisualIdentitySurface,
+    sourceOrigin: priorVisualDescriptor?.serving_context.source_origin,
     bindingStatus: sourceIsBound ? "bound" : "observed_unbound",
     latestEvidenceRefs: input.outputRefs,
   });
@@ -207,6 +224,8 @@ export function routeLiveSourceAnalysisOutput(input: LiveSourceAnalysisRouterInp
       source_epoch: sourceEpoch,
     },
     sourceBindingId,
+    sourceSurface: priorVisualIdentitySurface,
+    sourceOrigin: priorVisualDescriptor?.serving_context.source_origin,
     bindingStatus: sourceIsBound ? "bound" : "observed_unbound",
     latestObservationId: liveCognitionPromotion.observation?.observation_id ?? null,
     latestEvidenceRefs: [syntheticEvidence.evidence_id, interpretedEvent.event_id, ...input.outputRefs],
@@ -217,8 +236,8 @@ export function routeLiveSourceAnalysisOutput(input: LiveSourceAnalysisRouterInp
       thread_id: input.chunk.thread_id,
       environment_id: input.chunk.environment_id ?? null,
       modality: "visual_frame",
-      source_origin: "browser_getDisplayMedia",
-      surface: "screen",
+      source_origin: priorVisualDescriptor?.serving_context.source_origin ?? "browser_getDisplayMedia",
+      surface: priorVisualDescriptor?.serving_context.surface ?? "screen",
       app_hint: input.summary,
       window_title_hint: input.summary,
       current_state: "active",

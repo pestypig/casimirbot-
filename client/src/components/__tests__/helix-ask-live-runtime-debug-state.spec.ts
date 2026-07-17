@@ -6,6 +6,7 @@ import {
   recordHelixAskLiveRuntimeClientDebugEvent,
   recordHelixAskLiveRuntimeServerStagePlayDebug,
   recordHelixAskLiveRuntimeStagePlayHandoff,
+  recordHelixAskLiveRuntimeVisualFrameReceipt,
   resetHelixAskLiveRuntimeClientDebugStateForTests,
 } from "@/components/helix/ask-console/HelixAskLiveRuntimeDebugState";
 import {
@@ -137,6 +138,64 @@ describe("Helix Ask live runtime client debug state", () => {
     expect(mergeHelixAskLiveRuntimeClientDebugIntoExport(payload)).toBe(payload);
   });
 
+  it("attaches sanitized visual-frame transport evidence without raw pixels or answer authority", () => {
+    beginHelixAskLiveRuntimeClientDebugAttempt({
+      attemptRef: "receipt:live-runtime:visual:test",
+      runtimeAgentMode: "live_voice",
+      runtimeAgentAuthority: "observe_only",
+      observedAtMs: 100,
+    });
+    recordHelixAskLiveRuntimeClientDebugEvent({
+      eventKind: "visual_input_enabled",
+      realtimeSessionId: "realtime:visual:test",
+      observedAtMs: 105,
+    });
+    recordHelixAskLiveRuntimeVisualFrameReceipt({
+      schema: "helix.ask.live_runtime.visual_frame_receipt.v1",
+      ok: true,
+      status: "sent",
+      code: "visual_frame_sent",
+      observed_at_ms: 110,
+      source_kind: "screen",
+      source_label: "Selected visual frame",
+      detail: "auto",
+      media_type: "image/jpeg",
+      frame_size_bytes: 3,
+      event_id: "visual-frame-event:test",
+      item_id: "visual-frame-item:test",
+      pruned_item_id: null,
+      retained_item_count: 1,
+      conversation_item_create_sent: true,
+      conversation_item_delete_sent: false,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      reentry_required: true,
+    });
+
+    const exportedText = mergeHelixAskLiveRuntimeClientDebugIntoExport(JSON.stringify({
+      active_turn_id: "ask:selected-answer",
+    }));
+    const debug = JSON.parse(exportedText).realtime_live_client_debug;
+    expect(debug).toMatchObject({
+      visual_input_enabled: true,
+      visual_frame_attempt_count: 1,
+      visual_frame_sent_count: 1,
+      visual_frame_blocked_count: 0,
+      visual_frame_error_count: 0,
+      latest_visual_frame_receipt: {
+        code: "visual_frame_sent",
+        frame_size_bytes: 3,
+        item_id: "visual-frame-item:test",
+        raw_content_included: false,
+        answer_authority: false,
+        terminal_eligible: false,
+      },
+    });
+    expect(exportedText).not.toContain("data:image/");
+  });
+
   it("binds a server-issued handoff and grounded feedback to the selected answer", () => {
     beginHelixAskLiveRuntimeClientDebugAttempt({
       attemptRef: "receipt:live-runtime:consent:binding",
@@ -162,6 +221,10 @@ describe("Helix Ask live runtime client debug state", () => {
         context_hash: "sha256:binding",
         transcript_text_hash: "sha256:transcript",
         transcript_text_char_count: 20,
+        goal_id: null,
+        runtime_goal_session_ref: null,
+        runtime_agent_provider: null,
+        required_grounding_capability_ids: [],
         created_at_ms: 120,
         route_metadata: {},
         read_only: true,
@@ -178,6 +241,9 @@ describe("Helix Ask live runtime client debug state", () => {
       schema: "helix.realtime_stage_play.debug.v1",
       realtime_session_id: "realtime:binding",
       thread_id: "helix-ask:desktop",
+      bound_goal_id: null,
+      bound_runtime_session_ref: null,
+      bound_runtime_agent_provider: null,
       provider_call_ref: "openai-realtime:call:hash",
       handoffs: [{
         handoff_id: "handoff:binding",
@@ -186,12 +252,17 @@ describe("Helix Ask live runtime client debug state", () => {
         stage_play_event_ref: "stage-event:binding",
         context_pack_id: "context-pack:binding",
         context_hash: "sha256:binding",
+        goal_id: null,
+        runtime_goal_session_ref: null,
+        runtime_agent_provider: null,
+        required_grounding_capability_ids: [],
         created_at_ms: 120,
         grounded_answer: {
           feedback_id: "feedback:binding",
           handoff_id: "handoff:binding",
           realtime_session_id: "realtime:binding",
           thread_id: "helix-ask:desktop",
+          goal_id: null,
           ask_turn_id: "ask:selected-answer",
           stage_play_event_ref: "stage-event:answer",
           answer_text_hash: "sha256:answer",
@@ -199,6 +270,8 @@ describe("Helix Ask live runtime client debug state", () => {
           final_answer_source: "final_answer_draft",
           terminal_artifact_kind: "model_synthesized_answer",
           evidence_refs: ["evidence:1"],
+          required_grounding_capability_ids: [],
+          grounding_evidence_satisfied: true,
           recorded_at_ms: 130,
           completed_solver_path: true,
           server_authoritative: true,
@@ -212,6 +285,7 @@ describe("Helix Ask live runtime client debug state", () => {
         workstation_action_authority: false,
         terminal_answer_authority: false,
         grounded_answer_requires_completed_solver_path: true,
+        grounded_answer_requires_route_evidence: true,
       },
       provider_call_id_included: false,
       provider_payload_included: false,

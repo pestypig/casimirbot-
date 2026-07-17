@@ -264,10 +264,7 @@ import {
 import { resolveInitialMicArmState } from "@/components/helix/ask-console/HelixAskMicrophoneSessionState";
 export { resolveInitialMicArmState };
 import { readActiveDocVisibleTranslationContext } from "@/lib/docs/visibleTranslationContext";
-import {
-  readHelixAskVisualCaptureAudioPreference,
-  syncHelixAskVisualCaptureRoutePreference,
-} from "@/components/helix/ask-console/HelixAskVisualCapturePreference";
+import { useHelixAskVisualSourceCaptureRuntime } from "@/components/helix/ask-console/useHelixAskVisualSourceCaptureRuntime";
 import {
   extractHelixAskContextCompactionResumeFrame,
   extractLatestHelixAskContextCompactionResumeFrameFromReplies,
@@ -342,6 +339,7 @@ import {
   buildHelixAskImageAttachmentsFromFiles,
   selectHelixAskClipboardImageFiles,
 } from "@/components/helix/ask-console/HelixAskImageAttachment";
+import { useHelixAskVisualFrameAttachmentIngress } from "@/components/helix/ask-console/useHelixAskVisualFrameAttachmentIngress";
 import {
   buildHelixAskPromptHistoryEntries,
   resolveHelixAskPromptHistoryNavigation,
@@ -1090,16 +1088,7 @@ export type {
   VoiceReasoningResponseAuthorityDecision,
 } from "@/lib/helix/voice/voice-turn-authority";
 import {
-  adoptServerVisualProducerPolicies,
-  getActiveVisualFrameStream,
-  getLatestActiveVisualFrameStream,
-  runVisualFrameProducerOnce,
-} from "@/lib/helix/visualFrameProducer";
-import type { DisplayAudioTranscriptChunk } from "@/lib/helix/display-audio-capture";
-import { postAudioTranscriptLiveSourceDescriptor } from "@/lib/helix/liveSourceDescriptorClient";
-import {
   createSituationRoomState,
-  sourceLabelForSituationSource,
   type SituationRoomState,
 } from "@/lib/helix/situation-room";
 import { buildSituationRoomCaptureContext } from "@/lib/helix/situation-capture-context";
@@ -1348,15 +1337,6 @@ import {
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 import { useWorkstationActionExecutionStore } from "@/store/useWorkstationActionExecutionStore";
-
-const HELIX_ASK_THREAD_ID = "helix-ask:desktop";
-const HELIX_ASK_AUDIO_TRANSCRIPT_SOURCE_ID = `audio_transcript:${HELIX_ASK_THREAD_ID}`;
-const HELIX_ASK_DISPLAY_AUDIO_CONSTRAINTS: MediaTrackConstraints = {
-  echoCancellation: false,
-  noiseSuppression: false,
-  autoGainControl: false,
-};
-const HELIX_ASK_DISPLAY_AUDIO_CHUNK_MS = 10_000;
 
 const HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT = 80;
 
@@ -6716,21 +6696,6 @@ export function HelixAskPill({
     createSituationRoomState(situationRoomId),
   );
   const askAttachmentsRef = useRef<HelixAskAttachment[]>([]);
-  const [displayAudioStatus, setDisplayAudioStatus] = useState<
-    "idle" | "requesting" | "active" | "transcribing" | "error"
-  >("idle");
-  const [displayAudioError, setDisplayAudioError] = useState<string | null>(null);
-  const [displayAudioCaptureLabel, setDisplayAudioCaptureLabel] = useState<string | null>(null);
-  const displayAudioSourceIdRef = useRef<string | null>(null);
-  const [visualSituationSourceStatus, setVisualSituationSourceStatus] = useState<
-    "idle" | "requesting" | "active" | "error"
-  >("idle");
-  const [visualSituationSourceError, setVisualSituationSourceError] = useState<string | null>(null);
-  const [visualSituationSourceLabel, setVisualSituationSourceLabel] = useState<string | null>(null);
-  const [visualSituationEvidenceForTurn, setVisualSituationEvidenceForTurn] = useState<Record<string, unknown> | null>(null);
-  const [visualSituationIncludeAudio, setVisualSituationIncludeAudio] = useState<boolean>(() => readHelixAskVisualCaptureAudioPreference());
-  const visualSituationSourceIdRef = useRef<string | null>(null);
-  const situationRoomSourcesById = useSituationRoomStore((state) => state.sources);
   useEffect(() => {
     setSituationRoomState((prev) =>
       prev.room_id === situationRoomId ? prev : createSituationRoomState(situationRoomId),
@@ -6889,6 +6854,12 @@ export function HelixAskPill({
   useEffect(() => {
     askAttachmentsRef.current = askAttachments;
   }, [askAttachments]);
+  useHelixAskVisualFrameAttachmentIngress({
+    maxAttachments: HELIX_ASK_MAX_ATTACHMENTS,
+    attachmentsRef: askAttachmentsRef,
+    setAttachments: setAskAttachments,
+    setError: setAskError,
+  });
   const latestPastedTextAttachmentRef = useRef<HelixAskTextAttachment | null>(null);
   const clearAskAttachments = useCallback(() => {
     setAskAttachments((current) => {
@@ -12157,403 +12128,34 @@ export function HelixAskPill({
     [appendSyntheticLiveEvent, normalizeTerminalAnswerText, updateHelixAskConsoleStreamIngressDebug],
   );
 
-  const stopDisplayAudioCapture = useCallback(() => {
-    const sourceId = displayAudioSourceIdRef.current;
-    if (sourceId) {
-      useSituationRoomStore.getState().stopSource(sourceId);
-    }
-    displayAudioSourceIdRef.current = null;
-    setDisplayAudioStatus("idle");
-    setDisplayAudioCaptureLabel(null);
+  const handleVisualCaptureUserError = useCallback((message: string) => {
+    setAskError(message);
+    setAskStatus(null);
   }, []);
 
-  const handleDisplayAudioCaptureToggle = useCallback(() => {
-    if (displayAudioSourceIdRef.current) {
-      stopDisplayAudioCapture();
-      return;
-    }
-    useWorkstationLayoutStore.getState().openPanelInActiveGroup("situation-room-sources");
-    setDisplayAudioStatus("requesting");
-    setDisplayAudioError(null);
-    const situationStore = useSituationRoomStore.getState();
-    const existingRoomId =
-      situationStore.active_room_id && situationStore.rooms[situationStore.active_room_id]
-        ? situationStore.active_room_id
-        : null;
-    const room = existingRoomId
-      ? situationStore.rooms[existingRoomId]
-      : situationStore.createRoom("Helix Ask Sources");
-    if (room?.room_id) {
-      situationStore.setActiveRoom(room.room_id);
-    }
-    void useSituationRoomStore
-      .getState()
-      .attachDisplayAudioSource(room?.room_id ?? situationRoomId, "Helix Ask display audio", {
-        chunkMs: HELIX_ASK_DISPLAY_AUDIO_CHUNK_MS,
-      })
-      .then((source) => {
-        if (!source || source.status === "error") {
-          const message = source?.last_error ?? "Display audio capture failed.";
-          setDisplayAudioStatus("error");
-          setDisplayAudioError(message);
-          appendSyntheticLiveEvent({
-            id: `situation:error:${Date.now()}:${Math.random().toString(36).slice(2)}`,
-            tool: "situation_room",
-            ts: new Date().toISOString(),
-            text: `Display audio capture failed: ${clipText(message, 180)}`,
-            meta: {
-              room_id: room?.room_id ?? situationRoomId,
-              source: "display_screen_audio",
-              event_type: "capture_error",
-            },
-          });
-          return;
-        }
-        displayAudioSourceIdRef.current = source.source_id;
-        setDisplayAudioStatus("active");
-        setDisplayAudioCaptureLabel(source.label || sourceLabelForSituationSource(source.capture_source));
-      })
-      .catch((error) => {
-        setDisplayAudioStatus("error");
-        setDisplayAudioError(error instanceof Error ? error.message : String(error));
-      });
-  }, [
-    appendSyntheticLiveEvent,
-    situationRoomId,
+  const {
+    displayAudioStatus,
+    displayAudioError,
+    displayAudioCaptureLabel,
+    displayAudioSourceSnapshot,
+    visualSituationSourceId,
+    visualSituationSourceStatus,
+    visualSituationSourceError,
+    visualSituationSourceLabel,
+    visualSituationEvidenceForTurn,
+    visualSituationSourceKind,
+    visualSituationIncludeAudio,
     stopDisplayAudioCapture,
-  ]);
-
-  const postSituationJson = useCallback(async (path: string, body?: Record<string, unknown>) => {
-    const response = await fetch(path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      throw new Error(text || `${path} failed with ${response.status}`);
-    }
-    return response.json().catch(() => null);
-  }, []);
-
-  const registerHelixAskAudioTranscriptSource = useCallback(async (input: {
-    roomId?: string | null;
-    stream?: MediaStream | null;
-  } = {}) => {
-    await postSituationJson("/api/agi/situation/audio-source/permission-granted", {
-      source_id: HELIX_ASK_AUDIO_TRANSCRIPT_SOURCE_ID,
-      thread_id: HELIX_ASK_THREAD_ID,
-      room_id: input.roomId ?? null,
-      ts: new Date().toISOString(),
-    });
-    await postAudioTranscriptLiveSourceDescriptor({
-      postJson: postSituationJson,
-      sourceId: HELIX_ASK_AUDIO_TRANSCRIPT_SOURCE_ID,
-      threadId: HELIX_ASK_THREAD_ID,
-      currentState: "active_interval",
-      cadenceMs: HELIX_ASK_DISPLAY_AUDIO_CHUNK_MS,
-      stream: input.stream ?? null,
-    });
-  }, [postSituationJson]);
-
-  const postHelixAskAudioTranscriptChunk = useCallback(async (chunk: DisplayAudioTranscriptChunk) => {
-    const transcript = chunk.event.text?.trim() ?? "";
-    if (!transcript) return;
-    const response = await postSituationJson("/api/agi/situation/audio-source/transcript-chunk", {
-      source_id: HELIX_ASK_AUDIO_TRANSCRIPT_SOURCE_ID,
-      thread_id: HELIX_ASK_THREAD_ID,
-      room_id: chunk.event.room_id ?? null,
-      environment_id: chunk.environmentId ?? null,
-      transcript,
-      transcript_is_final: true,
-      direct_address_classification: "unclassified",
-      evidence_refs: chunk.event.evidence_refs,
-      chunk_index: chunk.chunkIndex,
-      capture_session_id: chunk.captureSessionId,
-      capture_source: chunk.source,
-      duration_ms: chunk.durationMs,
-      from_ts: chunk.fromTs,
-      to_ts: chunk.toTs,
-      ts: chunk.toTs,
-    });
-    const latestObservationRefs = [
-      response?.live_source_event?.event_id,
-      response?.live_source_chunk?.chunk_id,
-      response?.live_source_analysis_job?.job_id,
-    ].filter((ref): ref is string => typeof ref === "string" && ref.trim().length > 0);
-    await postAudioTranscriptLiveSourceDescriptor({
-      postJson: postSituationJson,
-      sourceId: HELIX_ASK_AUDIO_TRANSCRIPT_SOURCE_ID,
-      threadId: HELIX_ASK_THREAD_ID,
-      environmentId: chunk.environmentId ?? null,
-      currentState: "active_interval",
-      cadenceMs: HELIX_ASK_DISPLAY_AUDIO_CHUNK_MS,
-      latestObservationRefs,
-    });
-  }, [postSituationJson]);
-
-  const ensureHelixAskVisualSource = useCallback(async (): Promise<string> => {
-    if (visualSituationSourceIdRef.current) return visualSituationSourceIdRef.current;
-    const response = await postSituationJson("/api/agi/situation/visual-source/start", {
-      thread_id: HELIX_ASK_THREAD_ID,
-      room_id: null,
-      capture_mode: "manual",
-      source_surface: "minecraft_client_window",
-      status: "permission_required",
-      raw_image_storage_policy: "ephemeral",
-    });
-    const sourceId =
-      typeof response?.source?.source_id === "string"
-        ? response.source.source_id
-        : typeof response?.receipt?.source?.source_id === "string"
-          ? response.receipt.source.source_id
-          : null;
-    if (!sourceId) throw new Error("visual_source_registration_failed");
-    visualSituationSourceIdRef.current = sourceId;
-    setVisualSituationSourceLabel("Visual screen capture");
-    return sourceId;
-  }, [postSituationJson, situationRoomId]);
-
-  const requestHelixAskVisualFrame = useCallback(async (input: { includeAudio?: boolean } = {}): Promise<{ summary: string; visualEvidence: Record<string, unknown> | null }> => {
-    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
-      throw new Error("screen_capture_not_available_in_this_browser");
-    }
-    let stream: MediaStream | null = null;
-    try {
-      const sourceId = await ensureHelixAskVisualSource();
-      stream = getActiveVisualFrameStream(sourceId) ?? getLatestActiveVisualFrameStream(HELIX_ASK_THREAD_ID)?.stream ?? null;
-      const existingStreamNeedsAudioUpgrade = Boolean(stream && input.includeAudio && stream.getAudioTracks().length === 0);
-      if (!stream || existingStreamNeedsAudioUpgrade) {
-        const supersededStream = stream;
-        stream = await navigator.mediaDevices.getDisplayMedia({
-          video: true,
-          audio: input.includeAudio ? HELIX_ASK_DISPLAY_AUDIO_CONSTRAINTS : false,
-        });
-        if (existingStreamNeedsAudioUpgrade) {
-          supersededStream?.getTracks().forEach((track) => track.stop());
-        }
-      }
-      const result = await runVisualFrameProducerOnce({
-        sourceId,
-        threadId: HELIX_ASK_THREAD_ID,
-        roomId: null,
-        stream,
-        postJson: postSituationJson,
-      });
-      if (input.includeAudio) {
-        if (stream.getAudioTracks().length > 0) {
-          const situationStore = useSituationRoomStore.getState();
-          const existingRoomId =
-            situationStore.active_room_id && situationStore.rooms[situationStore.active_room_id]
-              ? situationStore.active_room_id
-              : null;
-          const room = existingRoomId
-            ? situationStore.rooms[existingRoomId]
-            : situationStore.createRoom("Helix Ask Sources");
-          if (room?.room_id) {
-            situationStore.setActiveRoom(room.room_id);
-          }
-          if (displayAudioSourceIdRef.current) {
-            situationStore.stopSource(displayAudioSourceIdRef.current);
-            displayAudioSourceIdRef.current = null;
-          }
-          setDisplayAudioStatus("requesting");
-          setDisplayAudioError(null);
-          await registerHelixAskAudioTranscriptSource({
-            roomId: room?.room_id ?? situationRoomId,
-            stream,
-          });
-          const audioSource = await situationStore.attachDisplayAudioSource(
-            room?.room_id ?? situationRoomId,
-            "Helix Ask shared tab audio",
-            {
-              stream,
-              stopStreamOnStop: false,
-              chunkMs: HELIX_ASK_DISPLAY_AUDIO_CHUNK_MS,
-              onTranscriptChunk: postHelixAskAudioTranscriptChunk,
-            },
-          );
-          if (!audioSource || audioSource.status === "error") {
-            const message = audioSource?.last_error ?? "Display audio capture failed.";
-            setDisplayAudioStatus("error");
-            setDisplayAudioError(message);
-          } else {
-            displayAudioSourceIdRef.current = audioSource.source_id;
-            setDisplayAudioStatus("active");
-            setDisplayAudioCaptureLabel(audioSource.label || sourceLabelForSituationSource(audioSource.capture_source));
-          }
-        } else {
-          setDisplayAudioStatus("error");
-          setDisplayAudioError("Selected visual share did not include tab audio. Share a Chrome tab and enable tab audio.");
-        }
-      }
-      stream = null;
-      return {
-        summary: result.summary,
-        visualEvidence: result.evidence
-          ? {
-              evidence: result.evidence,
-              source: {
-                source_id: sourceId,
-                source_family: "visual_snapshot",
-                raw_image_included: false,
-                assistant_answer: false,
-                context_policy: "compact_context_pack_only",
-              },
-            }
-          : null,
-      };
-    } finally {
-      stream?.getTracks().forEach((track) => track.stop());
-    }
-  }, [
-    ensureHelixAskVisualSource,
-    postHelixAskAudioTranscriptChunk,
-    postSituationJson,
-    registerHelixAskAudioTranscriptSource,
+    handleVisualSituationSourceCapture,
+    handleVisualSituationSourceKindToggle,
+    handleVisualSituationAudioPreferenceToggle,
+  } = useHelixAskVisualSourceCaptureRuntime({
     situationRoomId,
-  ]);
-
-  const handleVisualSituationSourceCapture = useCallback(() => {
-    if (!canUseLiveAnswerVisualCaptureControls) {
-      setAskError("Visual capture is not available for this account.");
-      setAskStatus(null);
-      return;
-    }
-    if (visualSituationSourceStatus === "requesting") return;
-    if (visualSituationSourceStatus === "active" || visualSituationSourceStatus === "error") {
-      setVisualSituationSourceStatus("idle");
-      setVisualSituationSourceError(null);
-      setVisualSituationSourceLabel(null);
-      setVisualSituationEvidenceForTurn(null);
-      visualSituationSourceIdRef.current = null;
-      appendSyntheticLiveEvent({
-        id: `situation:visual:disabled:${Date.now()}:${Math.random().toString(36).slice(2)}`,
-        tool: "situation_room",
-        ts: new Date().toISOString(),
-        text: "Visual screen capture detached from Helix Ask context.",
-        meta: {
-          room_id: situationRoomId,
-          source: "visual_screen_capture",
-          event_type: "visual_source_detached",
-          assistant_answer: false,
-          raw_content_included: false,
-        },
-      });
-      return;
-    }
-    syncHelixAskVisualCaptureRoutePreference(visualSituationIncludeAudio);
-    onOpenPanel?.("live-answer-environment");
-    setDisplayAudioError(null);
-    setDisplayAudioStatus((current) => (current === "error" ? "idle" : current));
-    setVisualSituationSourceStatus("requesting");
-    setVisualSituationSourceError(null);
-    setVisualSituationSourceLabel("Visual screen capture");
-    void requestHelixAskVisualFrame({ includeAudio: visualSituationIncludeAudio })
-      .then(({ summary, visualEvidence }) => {
-        setVisualSituationEvidenceForTurn(visualEvidence);
-        setVisualSituationSourceStatus("active");
-        appendSyntheticLiveEvent({
-          id: `situation:visual:${Date.now()}:${Math.random().toString(36).slice(2)}`,
-          tool: "situation_room",
-          ts: new Date().toISOString(),
-          text: summary,
-          meta: {
-            room_id: situationRoomId,
-            source: "visual_screen_capture",
-            event_type: "visual_frame_captured",
-            raw_image_included: false,
-            assistant_answer: false,
-          },
-        });
-      })
-      .catch((error) => {
-        setVisualSituationSourceStatus("error");
-        setVisualSituationSourceError(error instanceof Error ? error.message : String(error));
-      });
-  }, [
+    canUseCaptureControls: canUseLiveAnswerVisualCaptureControls,
     appendSyntheticLiveEvent,
-    canUseLiveAnswerVisualCaptureControls,
     onOpenPanel,
-    requestHelixAskVisualFrame,
-    situationRoomId,
-    visualSituationIncludeAudio,
-    visualSituationSourceStatus,
-  ]);
-
-  const handleVisualSituationAudioPreferenceToggle = useCallback(() => {
-    if (!canUseLiveAnswerVisualCaptureControls) {
-      setAskError("Tab audio for visual capture is not available for this account.");
-      setAskStatus(null);
-      return;
-    }
-    const next = !visualSituationIncludeAudio;
-    setVisualSituationIncludeAudio(next);
-    syncHelixAskVisualCaptureRoutePreference(next);
-    if (!next) {
-      stopDisplayAudioCapture();
-      return;
-    }
-    if (visualSituationSourceStatus !== "active") return;
-    setDisplayAudioError(null);
-    setDisplayAudioStatus((current) => (current === "error" ? "idle" : current));
-    setVisualSituationSourceStatus("requesting");
-    setVisualSituationSourceError(null);
-    void requestHelixAskVisualFrame({ includeAudio: true })
-      .then(({ summary, visualEvidence }) => {
-        setVisualSituationEvidenceForTurn(visualEvidence);
-        setVisualSituationSourceStatus("active");
-        appendSyntheticLiveEvent({
-          id: `situation:visual-audio:${Date.now()}:${Math.random().toString(36).slice(2)}`,
-          tool: "situation_room",
-          ts: new Date().toISOString(),
-          text: summary,
-          meta: {
-            room_id: situationRoomId,
-            source: "visual_screen_capture",
-            event_type: "visual_frame_captured_with_audio_preference",
-            raw_image_included: false,
-            assistant_answer: false,
-          },
-        });
-      })
-      .catch((error) => {
-        setVisualSituationSourceStatus("error");
-        setVisualSituationSourceError(error instanceof Error ? error.message : String(error));
-      });
-  }, [
-    appendSyntheticLiveEvent,
-    canUseLiveAnswerVisualCaptureControls,
-    requestHelixAskVisualFrame,
-    situationRoomId,
-    stopDisplayAudioCapture,
-    visualSituationIncludeAudio,
-    visualSituationSourceStatus,
-  ]);
-
-  useEffect(() => {
-    if (visualSituationSourceStatus !== "active") return;
-    let cancelled = false;
-    const adopt = async () => {
-      try {
-        await adoptServerVisualProducerPolicies({
-          threadId: "helix-ask:desktop",
-          roomId: null,
-          postJson: postSituationJson,
-        });
-      } catch {
-        if (cancelled) return;
-      }
-    };
-    void adopt();
-    const interval = window.setInterval(() => void adopt(), 5000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [postSituationJson, visualSituationSourceStatus]);
-
-  useEffect(() => stopDisplayAudioCapture, [stopDisplayAudioCapture]);
+    onUserError: handleVisualCaptureUserError,
+  });
 
   const dispatchWorkstationActionSequence = useCallback(
     (input: {
@@ -20790,10 +20392,10 @@ export function HelixAskPill({
               : null;
           const ambientVisualCapability =
             visualCapabilityForTurn ??
-            (visualSituationSourceStatus !== "idle" || visualSituationSourceIdRef.current || visualSituationEvidenceForTurn
+            (visualSituationSourceStatus !== "idle" || visualSituationSourceId || visualSituationEvidenceForTurn
               ? {
                   schema: "helix.visual_context_capability.v1",
-                  source_id: visualSituationSourceIdRef.current,
+                  source_id: visualSituationSourceId,
                   label: visualSituationSourceLabel ?? "Visual screen capture",
                   status: visualSituationSourceStatus,
                   evidence_available: Boolean(
@@ -22437,6 +22039,7 @@ export function HelixAskPill({
       selectedAgentRuntime,
       userSettings.showHelixAskDebug,
       visualSituationEvidenceForTurn,
+      visualSituationSourceId,
       visualSituationSourceLabel,
       visualSituationSourceStatus,
       workflowQteBridge,
@@ -23164,6 +22767,7 @@ export function HelixAskPill({
     hasReadyAskAttachment,
     updateAskActionCarouselEdges,
     visualSituationIncludeAudio,
+    visualSituationSourceKind,
     visualSituationSourceStatus,
     voiceRetainedTranscriptionRetry,
   ]);
@@ -23216,9 +22820,6 @@ export function HelixAskPill({
   });
   const transcriptLatestAskReplyId = chronologicalAskReplies.at(-1)?.id ?? latestAskReplyId;
   const currentPlaceholder = composerViewModel.currentPlaceholder;
-  const displayAudioSourceSnapshot = displayAudioSourceIdRef.current
-    ? situationRoomSourcesById[displayAudioSourceIdRef.current]
-    : undefined;
   const [voiceCallDiagnostics, setVoiceCallDiagnostics] = useState<VoiceCallDiagnosticSnapshot[]>(() =>
     getVoiceCallDiagnosticsSnapshot(),
   );
@@ -23444,6 +23045,13 @@ export function HelixAskPill({
       handleRetainedVoiceTranscriptionRetry();
     },
     showVisualCaptureControls: canUseLiveAnswerVisualCaptureControls,
+    visualSourceKind: visualSituationSourceKind,
+    visualSourceSelectionDisabled:
+      visualSituationSourceStatus === "active" || visualSituationSourceStatus === "requesting",
+    onToggleVisualSourceKind: () => {
+      triggerAskActionHaptic();
+      handleVisualSituationSourceKindToggle();
+    },
     visualSituationSourceStatus,
     onCaptureVisualSource: () => {
       triggerAskActionHaptic();
