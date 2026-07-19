@@ -12,6 +12,28 @@ export const HELIX_RESEARCH_LIBRARY_READ_CAPABILITY =
 export const HELIX_RESEARCH_LIBRARY_OBSERVATION_SCHEMA =
   "helix.research_library_observation.v1" as const;
 
+export const HELIX_RESEARCH_LIBRARY_DOC_VIEWER_PATH_PREFIX =
+  "research-library/" as const;
+
+export const HELIX_RESEARCH_LIBRARY_PRIVATE_MAILBOX_THREAD_PREFIX =
+  "helix-ask:private-research:" as const;
+
+export const researchLibraryDocViewerPath = (documentRef: string): string =>
+  `${HELIX_RESEARCH_LIBRARY_DOC_VIEWER_PATH_PREFIX}${encodeURIComponent(documentRef.trim())}`;
+
+export const researchLibraryDocumentRefFromDocViewerPath = (value: unknown): string | null => {
+  const path = typeof value === "string" ? value.trim() : "";
+  if (!path.startsWith(HELIX_RESEARCH_LIBRARY_DOC_VIEWER_PATH_PREFIX)) return null;
+  const encodedDocumentRef = path.slice(HELIX_RESEARCH_LIBRARY_DOC_VIEWER_PATH_PREFIX.length);
+  if (!encodedDocumentRef || encodedDocumentRef.includes("/")) return null;
+  try {
+    const documentRef = decodeURIComponent(encodedDocumentRef).trim();
+    return documentRef && researchLibraryDocViewerPath(documentRef) === path ? documentRef : null;
+  } catch {
+    return null;
+  }
+};
+
 export const isSavedResearchLibraryEvidencePrompt = (prompt: string): boolean =>
   /\b(?:existing|saved|previously\s+(?:saved|extracted)|already\s+extracted|research\s+library|private\s+library)\b[\s\S]{0,120}\b(?:full[-\s]?text|paper|pdf|evidence|extraction|document)\b/i.test(prompt) ||
   /\b(?:use|read|search|from)\b[\s\S]{0,80}\b(?:research\s+library|saved\s+(?:paper|extraction|document))\b/i.test(prompt);
@@ -36,6 +58,12 @@ export type HelixResearchLibrarySidecarRef = {
 export type HelixResearchLibraryDocumentSummary = {
   schema: typeof HELIX_RESEARCH_LIBRARY_DOCUMENT_SCHEMA;
   document_id: string;
+  viewer_ref: string;
+  private_translation_scope: {
+    doc_path: string;
+    source_id: string;
+    mailbox_thread_id: string;
+  };
   profile_id: string;
   title: string;
   source_url: string | null;

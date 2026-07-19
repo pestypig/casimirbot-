@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { helixRuntimeGoalSessionStore } from "../services/helix-ask/agent-providers/goal-runtime-session";
-import { routeHelixRuntimeGoalCommand } from "../services/helix-ask/runtime-goal-command-router";
+import {
+  buildRuntimeGoalReadableSurfaceGatewayCall,
+  readRuntimeGoalVisibleDocContext,
+  routeHelixRuntimeGoalCommand,
+} from "../services/helix-ask/runtime-goal-command-router";
 
 const originalEnableCodexAgent = process.env.ENABLE_CODEX_AGENT;
 const originalCodexFakeStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
@@ -26,6 +30,135 @@ afterEach(() => {
 });
 
 describe("Helix Ask runtime /goal command routing", () => {
+  it.each([
+    {
+      label: "research-library provenance",
+      snapshotDocPath: "docs/snapshot-canonical-fallback.md",
+      context: {
+        doc_path: "docs/canonical-decoy.md",
+        document_source_kind: "research_library",
+        chunks: [{ visible_text: "PRIVATE RESEARCH TEXT" }],
+      },
+    },
+    {
+      label: "private-source flag",
+      snapshotDocPath: "docs/snapshot-canonical-fallback.md",
+      context: {
+        doc_path: "docs/canonical-decoy.md",
+        private_source: true,
+        chunks: [{ visible_text: "PRIVATE RESEARCH TEXT" }],
+      },
+    },
+    {
+      label: "opaque research viewer path",
+      snapshotDocPath: "docs/snapshot-canonical-fallback.md",
+      context: {
+        doc_path: "research-library/private-research%3Aaccount-token%3Adocument-token",
+        chunks: [{ visible_text: "PRIVATE RESEARCH TEXT" }],
+      },
+    },
+    {
+      label: "nested private target provenance",
+      snapshotDocPath: "docs/snapshot-canonical-fallback.md",
+      context: {
+        doc_path: "docs/canonical-decoy.md",
+        chunks: [{
+          private_source: true,
+          visible_text: "PRIVATE RESEARCH TEXT",
+        }],
+      },
+    },
+    {
+      label: "research viewer path hidden behind a canonical body path",
+      snapshotDocPath: "research-library/private-research%3Aaccount-token%3Adocument-token",
+      context: {
+        doc_path: "docs/canonical-decoy.md",
+        chunks: [{ visible_text: "PRIVATE RESEARCH TEXT" }],
+      },
+    },
+  ])("fails closed before reading $label into a runtime goal", ({ context, snapshotDocPath }) => {
+    const body = {
+      doc_path: "docs/body-canonical-fallback.md",
+      source_freshness_ms: 7,
+      workspace_context_snapshot: {
+        active_panel_id: "docs-viewer",
+        active_doc_path: snapshotDocPath,
+        active_doc_visible_translation_context: context,
+      },
+    };
+
+    expect(readRuntimeGoalVisibleDocContext(body)).toEqual({
+      docPath: null,
+      visibleText: null,
+      sourceHash: null,
+      sourceId: null,
+      sourceFreshnessMs: null,
+      unavailableReason: "private_research_runtime_goal_source_not_admitted",
+    });
+    const gatewayCall = buildRuntimeGoalReadableSurfaceGatewayCall(body);
+    expect(gatewayCall).toMatchObject({
+      arguments: {
+        path: null,
+        source_doc_path: null,
+        text: null,
+        visible_text: null,
+        source_id: null,
+        source_hash: null,
+        source_refs: [],
+      },
+    });
+    expect(JSON.stringify(gatewayCall)).not.toContain("PRIVATE RESEARCH TEXT");
+    expect(JSON.stringify(gatewayCall)).not.toContain("docs/body-canonical-fallback.md");
+  });
+
+  it("blocks a manual runtime-goal wake before private research text reaches the provider", async () => {
+    process.env.ENABLE_CODEX_AGENT = "1";
+    process.env.CODEX_AGENT_FAKE_STDOUT = "PRIVATE PROVIDER OUTPUT MUST NOT RUN";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    const start = await routeHelixRuntimeGoalCommand({
+      body: {
+        agent_runtime: "codex",
+        turn_id: "ask:test:private-research-goal-start",
+        question: "/goal Track the visible document.",
+      },
+    });
+    expect(start.statusCode).toBe(200);
+
+    const wake = await routeHelixRuntimeGoalCommand({
+      body: {
+        agent_runtime: "codex",
+        turn_id: "ask:test:private-research-goal-wake",
+        question: "/goal wake",
+        workspace_context_snapshot: {
+          active_panel_id: "docs-viewer",
+          active_doc_path:
+            "research-library/private-research%3Aaccount-token%3Adocument-token",
+          active_doc_visible_translation_context: {
+            schema: "helix.ask.active_doc_visible_translation_context.v1",
+            document_source_kind: "research_library",
+            document_ref: "private-research:account-token:document-token",
+            private_source: true,
+            doc_path:
+              "research-library/private-research%3Aaccount-token%3Adocument-token",
+            chunks: [{ visible_text: "PRIVATE RESEARCH TEXT" }],
+          },
+        },
+      },
+    });
+
+    expect(wake.statusCode).toBe(409);
+    expect(wake.payload).toMatchObject({
+      ok: false,
+      blocked_reason: "private_research_runtime_goal_source_not_admitted",
+      runtime_goal_command: {
+        command: "wake",
+        blocked_reason: "private_research_runtime_goal_source_not_admitted",
+      },
+    });
+    expect(JSON.stringify(wake.payload)).not.toContain("PRIVATE RESEARCH TEXT");
+    expect(JSON.stringify(wake.payload)).not.toContain("PRIVATE PROVIDER OUTPUT MUST NOT RUN");
+  });
+
   it("routes /goal start through the runtime goal-session controller instead of Codex plain prompt text", async () => {
     process.env.ENABLE_CODEX_AGENT = "1";
     process.env.CODEX_AGENT_FAKE_STDOUT = "This should not be used by goal start.";

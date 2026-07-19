@@ -332,6 +332,10 @@ const toLiveTranslationRequest = (
     region_id: readString(call.region_id ?? call.regionId) || null,
     bbox: readRecord(call.bbox ?? call.bbox_px ?? call.bboxPx),
     doc_path: readString(call.doc_path ?? call.docPath) || null,
+    document_source_kind:
+      readString(call.document_source_kind ?? call.documentSourceKind) as HelixLiveTranslationOneShotRequest["document_source_kind"] || null,
+    document_ref: readString(call.document_ref ?? call.documentRef) || null,
+    private_source: call.private_source === true || call.privateSource === true,
     source_hash: readString(call.source_hash ?? call.sourceHash) || null,
     source_kind: readString(call.source_kind ?? call.sourceKind) || null,
     source_text_hash: readString(call.source_text_hash ?? call.sourceTextHash) || null,

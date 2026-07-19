@@ -22,7 +22,10 @@ type FixtureScenario = {
     referent_confidence: string;
     semantic_prompt_source: string;
     semantic_prompt_argument_source: string;
-    required_exact_badge_ids: string[];
+    required_exact_badge_ids?: string[];
+    required_likely_badge_ids?: string[];
+    forbidden_exact_badge_ids?: string[];
+    minimum_represented_probability_mass?: number;
     allowed_terminal_artifact_kinds: string[];
   };
 };
@@ -253,10 +256,33 @@ const runScenario = async (target: Target, scenario: FixtureScenario, runId: str
   }
 
   const exactBadgeIds = stringArray(observation.exact_badge_ids);
-  for (const badgeId of scenario.expected.required_exact_badge_ids) {
+  const likelyBadgeIds = stringArray(observation.likely_badge_ids);
+  const uncertainty = asRecord(observation.open_world_uncertainty);
+  const representedProbabilityMass =
+    typeof uncertainty?.representedProbabilityMass === "number"
+      ? uncertainty.representedProbabilityMass
+      : null;
+  for (const badgeId of scenario.expected.required_exact_badge_ids ?? []) {
     if (!exactBadgeIds.includes(badgeId)) {
       throw new Error(`${target.name}/${scenario.id}: required exact badge is missing: ${badgeId}`);
     }
+  }
+  for (const badgeId of scenario.expected.required_likely_badge_ids ?? []) {
+    if (!likelyBadgeIds.includes(badgeId)) {
+      throw new Error(`${target.name}/${scenario.id}: required likely badge is missing: ${badgeId}`);
+    }
+  }
+  for (const badgeId of scenario.expected.forbidden_exact_badge_ids ?? []) {
+    if (exactBadgeIds.includes(badgeId)) {
+      throw new Error(`${target.name}/${scenario.id}: contextual badge was incorrectly promoted to exact: ${badgeId}`);
+    }
+  }
+  if (
+    scenario.expected.minimum_represented_probability_mass !== undefined &&
+    (representedProbabilityMass === null ||
+      representedProbabilityMass < scenario.expected.minimum_represented_probability_mass)
+  ) {
+    throw new Error(`${target.name}/${scenario.id}: represented probability mass is below the fixture minimum`);
   }
   const terminalArtifactKind = firstString(records, ["terminal_artifact_kind", "selected_terminal_artifact_kind"]);
   if (!terminalArtifactKind || !scenario.expected.allowed_terminal_artifact_kinds.includes(terminalArtifactKind)) {
@@ -268,7 +294,6 @@ const runScenario = async (target: Target, scenario: FixtureScenario, runId: str
   if (runtimeWorktree?.dirty === true) {
     throw new Error(`${target.name}: runtime source checkout is dirty; parity cannot be certified`);
   }
-  const uncertainty = asRecord(observation.open_world_uncertainty);
   const finalAnswer = firstString(records, ["selected_final_answer", "final_answer", "answer", "text"]);
   const providerId = firstString(records, [
     "selected_agent_provider",
@@ -319,8 +344,8 @@ const runScenario = async (target: Target, scenario: FixtureScenario, runId: str
       semantic_prompt_argument_source: semanticPromptArgumentSource,
       semantic_prompt_text_hash: capabilityResult.semantic_prompt_text_hash ?? null,
       exact_badge_ids: exactBadgeIds,
-      likely_badge_ids: stringArray(observation.likely_badge_ids),
-      represented_probability_mass: uncertainty?.representedProbabilityMass ?? null,
+      likely_badge_ids: likelyBadgeIds,
+      represented_probability_mass: representedProbabilityMass,
       out_of_graph_probability: uncertainty?.outOfGraphProbability ?? null,
       final_status: firstString(records, ["final_status", "status"]),
       final_answer_source: firstString(records, ["final_answer_source"]),

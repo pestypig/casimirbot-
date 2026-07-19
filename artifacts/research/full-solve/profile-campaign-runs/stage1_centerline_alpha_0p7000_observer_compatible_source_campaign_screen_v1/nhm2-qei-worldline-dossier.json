@@ -1,0 +1,113 @@
+{
+  "contractVersion": "nhm2_qei_worldline_dossier/v1",
+  "generatedAt": "2026-06-19T19:03:10.647Z",
+  "laneId": "nhm2_shift_lapse",
+  "selectedProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "atlasRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-support-function-atlas.json",
+  "atlasHash": "41bdbf8140bce18f971b417014779f76eb8113c03ec5a79abfcc13d05bff9bb2",
+  "worldlines": [
+    {
+      "worldlineId": "qei:wall:atlas",
+      "regionId": "wall",
+      "chartId": "comoving_cartesian",
+      "samplingFunction": {
+        "kind": "lorentzian",
+        "tauSeconds": 1e-10,
+        "normalized": true
+      },
+      "sampledRho": {
+        "valueSI": 0.05,
+        "provenanceRef": "nhm2_tile_effective_full_tensor_source:wall:T00",
+        "status": "computed"
+      },
+      "bound": {
+        "valueSI": 0,
+        "provenanceRef": "ford_roman_1996_quantum_inequality",
+        "status": "literature_bound"
+      },
+      "margin": {
+        "valueSI": 0.05,
+        "pass": true
+      },
+      "consistency": {
+        "tauVsDuty": "pass",
+        "tauVsLightCrossing": "pass",
+        "tauVsModulation": "pass"
+      },
+      "blockers": []
+    },
+    {
+      "worldlineId": "qei:hull_wall_transition:atlas",
+      "regionId": "hull_wall_transition",
+      "chartId": "comoving_cartesian",
+      "samplingFunction": {
+        "kind": "lorentzian",
+        "tauSeconds": 1e-10,
+        "normalized": true
+      },
+      "sampledRho": {
+        "valueSI": 0.017499999999999998,
+        "provenanceRef": "nhm2_tile_effective_full_tensor_source:hull_wall_transition:transition_kernel_source_tensor:T00",
+        "status": "computed"
+      },
+      "bound": {
+        "valueSI": 0,
+        "provenanceRef": "ford_roman_1996_quantum_inequality",
+        "status": "literature_bound"
+      },
+      "margin": {
+        "valueSI": 0.017499999999999998,
+        "pass": true
+      },
+      "consistency": {
+        "tauVsDuty": "pass",
+        "tauVsLightCrossing": "pass",
+        "tauVsModulation": "pass"
+      },
+      "blockers": []
+    },
+    {
+      "worldlineId": "qei:wall_exterior_transition:atlas",
+      "regionId": "wall_exterior_transition",
+      "chartId": "comoving_cartesian",
+      "samplingFunction": {
+        "kind": "lorentzian",
+        "tauSeconds": 1e-10,
+        "normalized": true
+      },
+      "sampledRho": {
+        "valueSI": 0.05,
+        "provenanceRef": "nhm2_tile_effective_full_tensor_source:wall_exterior_transition:transition_kernel_source_tensor:T00",
+        "status": "computed"
+      },
+      "bound": {
+        "valueSI": 0,
+        "provenanceRef": "ford_roman_1996_quantum_inequality",
+        "status": "literature_bound"
+      },
+      "margin": {
+        "valueSI": 0.05,
+        "pass": true
+      },
+      "consistency": {
+        "tauVsDuty": "pass",
+        "tauVsLightCrossing": "pass",
+        "tauVsModulation": "pass"
+      },
+      "blockers": []
+    }
+  ],
+  "summary": {
+    "hasWallWorldline": true,
+    "allMarginsPass": true,
+    "anyProxy": false,
+    "dossierComplete": true
+  },
+  "literatureRefs": [
+    "ford_roman_1996_quantum_inequality"
+  ],
+  "claimBoundary": {
+    "diagnosticOnly": true,
+    "scalarMarginCannotSubstituteForDossier": true
+  }
+}

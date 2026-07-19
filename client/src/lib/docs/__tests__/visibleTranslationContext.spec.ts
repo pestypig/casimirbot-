@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { hashDocumentSource, segmentMarkdownForTranslation } from "@shared/document-translation";
+import { researchLibraryDocViewerPath } from "@shared/helix-research-library";
 import {
   HELIX_ACTIVE_DOC_VISIBLE_TRANSLATION_CONTEXT_CHANGED_EVENT,
   buildActiveDocVisibleTranslationContext,
@@ -592,5 +593,57 @@ describe("visible translation context", () => {
     });
     expect(context?.ui_text_regions[1]?.source_text_hash).toBe(hashDocumentSource("Translate"));
     expect(context?.ui_text_regions[1]?.dedupe_key).toContain("account_language");
+  });
+
+  it("carries opaque private Research Library provenance through every visible target", () => {
+    const documentRef = "private-research:account-token:document-token";
+    const docPath = researchLibraryDocViewerPath(documentRef);
+    const rawMarkdown = "# Private paper\n\nVisible extracted paragraph.";
+    const context = buildActiveDocVisibleTranslationContext({
+      docPath,
+      title: "Private paper",
+      documentSourceKind: "research_library",
+      documentRef,
+      privateSource: true,
+      rawMarkdown,
+      rawMarkdownSourceHash: hashDocumentSource(rawMarkdown),
+      units: segmentMarkdownForTranslation(rawMarkdown),
+      accountLocale: "en",
+      targetLanguage: "es",
+      uiTextRegions: [{
+        sourceText: "Translate",
+        sourceId: "workstation-shell#docs-viewer:translate-button",
+        regionId: "docs-viewer:translate-button",
+        sourceKind: "button_label",
+      }],
+    });
+
+    expect(context).toMatchObject({
+      doc_path: docPath,
+      source_id: `document_markdown:${docPath}`,
+      document_source_kind: "research_library",
+      document_ref: documentRef,
+      private_source: true,
+    });
+    expect(context?.chunks).not.toHaveLength(0);
+    for (const target of [...(context?.chunks ?? []), ...(context?.ui_text_regions ?? [])]) {
+      expect(target).toMatchObject({
+        doc_path: docPath,
+        document_source_kind: "research_library",
+        document_ref: documentRef,
+        private_source: true,
+      });
+    }
+
+    expect(buildActiveDocVisibleTranslationContext({
+      docPath,
+      documentSourceKind: "research_library",
+      privateSource: true,
+      rawMarkdown,
+      rawMarkdownSourceHash: hashDocumentSource(rawMarkdown),
+      units: segmentMarkdownForTranslation(rawMarkdown),
+      accountLocale: "en",
+      targetLanguage: "es",
+    })).toBeNull();
   });
 });

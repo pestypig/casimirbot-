@@ -1,0 +1,698 @@
+{
+  "contractVersion": "nhm2_source_component_authority_ledger/v1",
+  "generatedAt": "2026-06-19T19:03:10.656Z",
+  "laneId": "nhm2_shift_lapse",
+  "selectedProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "runId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "counterpartArtifactRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json",
+  "sourceTensorArtifactRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-tile-effective-full-tensor-source.json",
+  "atlasRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-support-function-atlas.json",
+  "atlasHash": "41bdbf8140bce18f971b417014779f76eb8113c03ec5a79abfcc13d05bff9bb2",
+  "regions": [
+    {
+      "regionId": "global",
+      "status": "pass",
+      "comparisonRole": "tile_effective_counterpart",
+      "tensorAuthorityMode": "symmetric_full_tensor",
+      "chartRef": "comoving_cartesian",
+      "unitsRef": "J/m^3",
+      "regionMaskRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.mask.global",
+      "aggregationMode": "mean",
+      "normalizationBasis": "sample_count",
+      "sampleCount": 1728,
+      "components": [
+        {
+          "componentId": "T00",
+          "valueSI": 0.03,
+          "authority": "source_model",
+          "componentGroup": "energy_density",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#global",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T01",
+          "valueSI": 3e-12,
+          "authority": "source_model",
+          "componentGroup": "momentum_density",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#global",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T02",
+          "valueSI": 2.1e-12,
+          "authority": "source_model",
+          "componentGroup": "momentum_density",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#global",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T03",
+          "valueSI": 1.2000000000000001e-12,
+          "authority": "source_model",
+          "componentGroup": "momentum_density",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#global",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T11",
+          "valueSI": 0.005399999999999999,
+          "authority": "source_model",
+          "componentGroup": "spatial_stress_diagonal",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#global",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T12",
+          "valueSI": 0.0000027,
+          "authority": "source_model",
+          "componentGroup": "spatial_stress_off_diagonal",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#global",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T13",
+          "valueSI": 0.0000016199999999999997,
+          "authority": "source_model",
+          "componentGroup": "spatial_stress_off_diagonal",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#global",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T22",
+          "valueSI": 0.0045899999999999995,
+          "authority": "source_model",
+          "componentGroup": "spatial_stress_diagonal",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#global",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T23",
+          "valueSI": 0.0000010799999999999998,
+          "authority": "source_model",
+          "componentGroup": "spatial_stress_off_diagonal",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#global",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T33",
+          "valueSI": 0.0037799999999999995,
+          "authority": "source_model",
+          "componentGroup": "spatial_stress_diagonal",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#global",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        }
+      ],
+      "blockers": []
+    },
+    {
+      "regionId": "hull",
+      "status": "pass",
+      "comparisonRole": "tile_effective_counterpart",
+      "tensorAuthorityMode": "symmetric_full_tensor",
+      "chartRef": "comoving_cartesian",
+      "unitsRef": "J/m^3",
+      "regionMaskRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.mask.hull",
+      "aggregationMode": "mean",
+      "normalizationBasis": "sample_count",
+      "sampleCount": 8,
+      "components": [
+        {
+          "componentId": "T00",
+          "valueSI": 0.017499999999999998,
+          "authority": "source_model",
+          "componentGroup": "energy_density",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#hull",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T01",
+          "valueSI": 1.7499999999999998e-12,
+          "authority": "source_model",
+          "componentGroup": "momentum_density",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#hull",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T02",
+          "valueSI": 1.2249999999999997e-12,
+          "authority": "source_model",
+          "componentGroup": "momentum_density",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#hull",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T03",
+          "valueSI": 6.999999999999999e-13,
+          "authority": "source_model",
+          "componentGroup": "momentum_density",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#hull",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T11",
+          "valueSI": 0.0031499999999999996,
+          "authority": "source_model",
+          "componentGroup": "spatial_stress_diagonal",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#hull",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T12",
+          "valueSI": 0.0000015749999999999997,
+          "authority": "source_model",
+          "componentGroup": "spatial_stress_off_diagonal",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#hull",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T13",
+          "valueSI": 9.45e-7,
+          "authority": "source_model",
+          "componentGroup": "spatial_stress_off_diagonal",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#hull",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T22",
+          "valueSI": 0.0026774999999999998,
+          "authority": "source_model",
+          "componentGroup": "spatial_stress_diagonal",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#hull",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T23",
+          "valueSI": 6.299999999999999e-7,
+          "authority": "source_model",
+          "componentGroup": "spatial_stress_off_diagonal",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#hull",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T33",
+          "valueSI": 0.0022049999999999995,
+          "authority": "source_model",
+          "componentGroup": "spatial_stress_diagonal",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#hull",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        }
+      ],
+      "blockers": []
+    },
+    {
+      "regionId": "wall",
+      "status": "pass",
+      "comparisonRole": "tile_effective_counterpart",
+      "tensorAuthorityMode": "symmetric_full_tensor",
+      "chartRef": "comoving_cartesian",
+      "unitsRef": "J/m^3",
+      "regionMaskRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.mask.wall",
+      "aggregationMode": "mean",
+      "normalizationBasis": "sample_count",
+      "sampleCount": 128,
+      "components": [
+        {
+          "componentId": "T00",
+          "valueSI": 0.05,
+          "authority": "source_model",
+          "componentGroup": "energy_density",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#wall",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T01",
+          "valueSI": 5.0000000000000005e-12,
+          "authority": "source_model",
+          "componentGroup": "momentum_density",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#wall",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T02",
+          "valueSI": 3.5e-12,
+          "authority": "source_model",
+          "componentGroup": "momentum_density",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#wall",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T03",
+          "valueSI": 2.0000000000000004e-12,
+          "authority": "source_model",
+          "componentGroup": "momentum_density",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#wall",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T11",
+          "valueSI": 0.009,
+          "authority": "source_model",
+          "componentGroup": "spatial_stress_diagonal",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#wall",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T12",
+          "valueSI": 0.0000045,
+          "authority": "source_model",
+          "componentGroup": "spatial_stress_off_diagonal",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#wall",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T13",
+          "valueSI": 0.0000027,
+          "authority": "source_model",
+          "componentGroup": "spatial_stress_off_diagonal",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#wall",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T22",
+          "valueSI": 0.007649999999999999,
+          "authority": "source_model",
+          "componentGroup": "spatial_stress_diagonal",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#wall",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T23",
+          "valueSI": 0.0000018000000000000001,
+          "authority": "source_model",
+          "componentGroup": "spatial_stress_off_diagonal",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#wall",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T33",
+          "valueSI": 0.006299999999999999,
+          "authority": "source_model",
+          "componentGroup": "spatial_stress_diagonal",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#wall",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        }
+      ],
+      "blockers": []
+    },
+    {
+      "regionId": "exterior_shell",
+      "status": "pass",
+      "comparisonRole": "tile_effective_counterpart",
+      "tensorAuthorityMode": "symmetric_full_tensor",
+      "chartRef": "comoving_cartesian",
+      "unitsRef": "J/m^3",
+      "regionMaskRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.mask.exterior_shell",
+      "aggregationMode": "mean",
+      "normalizationBasis": "sample_count",
+      "sampleCount": 344,
+      "components": [
+        {
+          "componentId": "T00",
+          "valueSI": 0.010000000000000002,
+          "authority": "source_model",
+          "componentGroup": "energy_density",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#exterior_shell",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T01",
+          "valueSI": 1.0000000000000002e-12,
+          "authority": "source_model",
+          "componentGroup": "momentum_density",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#exterior_shell",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T02",
+          "valueSI": 7e-13,
+          "authority": "source_model",
+          "componentGroup": "momentum_density",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#exterior_shell",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T03",
+          "valueSI": 4.000000000000001e-13,
+          "authority": "source_model",
+          "componentGroup": "momentum_density",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#exterior_shell",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T11",
+          "valueSI": 0.0018000000000000004,
+          "authority": "source_model",
+          "componentGroup": "spatial_stress_diagonal",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#exterior_shell",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T12",
+          "valueSI": 9.000000000000003e-7,
+          "authority": "source_model",
+          "componentGroup": "spatial_stress_off_diagonal",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#exterior_shell",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T13",
+          "valueSI": 5.400000000000002e-7,
+          "authority": "source_model",
+          "componentGroup": "spatial_stress_off_diagonal",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#exterior_shell",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T22",
+          "valueSI": 0.0015300000000000003,
+          "authority": "source_model",
+          "componentGroup": "spatial_stress_diagonal",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#exterior_shell",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T23",
+          "valueSI": 3.600000000000001e-7,
+          "authority": "source_model",
+          "componentGroup": "spatial_stress_off_diagonal",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#exterior_shell",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        },
+        {
+          "componentId": "T33",
+          "valueSI": 0.0012600000000000003,
+          "authority": "source_model",
+          "componentGroup": "spatial_stress_diagonal",
+          "receiptRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+          "provenance": {
+            "counterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#exterior_shell",
+            "derivationMode": "tile_model_direct_full_tensor",
+            "sourceModelId": "candidate_declared_tile_effective_tensor_lever_model",
+            "sourceModelVersion": "v1",
+            "notDerivedFromMetricRequiredTensor": true
+          },
+          "blockers": []
+        }
+      ],
+      "blockers": []
+    }
+  ],
+  "summary": {
+    "allRequiredRegionsPresent": true,
+    "allRequiredComponentsPresent": true,
+    "allRequiredComponentsAuthoritative": true,
+    "allRequiredComponentsAdmissible": true,
+    "sourceSideComponentAuthorityComplete": true,
+    "hasWallFullTensorAuthority": true,
+    "anyMetricEcho": false,
+    "anyScalarProxy": false,
+    "anyMissing": false,
+    "anyReducedOrder": false,
+    "missingComponentRefs": [],
+    "proxyComponentRefs": [],
+    "metricEchoComponentRefs": [],
+    "reducedOrderComponentRefs": [],
+    "firstBlocker": null,
+    "blockerCount": 0
+  },
+  "claimBoundary": {
+    "diagnosticOnly": true,
+    "componentAuthorityDoesNotValidateMaterialSource": true,
+    "metricEchoForbidden": true,
+    "scalarProxyCannotProvideFullTensorAuthority": true,
+    "missingComponentsCannotBeZeroFilled": true
+  }
+}

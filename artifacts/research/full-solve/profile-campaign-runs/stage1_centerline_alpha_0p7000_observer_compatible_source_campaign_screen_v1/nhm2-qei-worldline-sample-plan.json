@@ -1,0 +1,86 @@
+{
+  "contractVersion": "nhm2_qei_worldline_sample_plan/v1",
+  "generatedAt": "2026-06-19T19:03:10.639Z",
+  "laneId": "nhm2_shift_lapse",
+  "selectedProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "atlasRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-support-function-atlas.json",
+  "atlasHash": "41bdbf8140bce18f971b417014779f76eb8113c03ec5a79abfcc13d05bff9bb2",
+  "tensorRef": "nhm2_tile_effective_full_tensor_source",
+  "transitionKernelRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-source-transition-kernel.json",
+  "transitionKernelAtlasHash": "41bdbf8140bce18f971b417014779f76eb8113c03ec5a79abfcc13d05bff9bb2",
+  "worldlines": [
+    {
+      "worldlineId": "qei:wall:atlas",
+      "regionId": "wall",
+      "supportFunctionRef": "compact_bump",
+      "sampleLocationsRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-campaign-grid.json:wall:worldline_samples",
+      "sampleCount": 128,
+      "sampleMethod": "atlas_support_source_tensor",
+      "sourceTensorRef": "nhm2_tile_effective_full_tensor_source:wall",
+      "transitionKernelRef": null,
+      "transitionInterfaceId": null,
+      "blockers": [],
+      "warnings": [
+        "wall worldline plan uses atlas support and region source tensor aggregation; it is not a QEI pass proof"
+      ]
+    },
+    {
+      "worldlineId": "qei:hull_wall_transition:atlas",
+      "regionId": "hull_wall_transition",
+      "supportFunctionRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.W.hull_wall_transition",
+      "sampleLocationsRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-campaign-grid.json:hull_wall_transition:worldline_samples",
+      "sampleCount": 16,
+      "sampleMethod": "missing_pointwise_tensor",
+      "sourceTensorRef": "nhm2_tile_effective_full_tensor_source",
+      "transitionKernelRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-source-transition-kernel.json:hull_wall",
+      "transitionInterfaceId": "hull_wall",
+      "blockers": [
+        "transition_worldline_source_sample_missing",
+        "transition_samples_must_not_use_adjacent_region_averages",
+        "pointwise_transition_source_tensor_missing"
+      ],
+      "warnings": [
+        "transition support is planned from atlas/kernel metadata, but no pointwise transition source tensor sample is available"
+      ]
+    },
+    {
+      "worldlineId": "qei:wall_exterior_transition:atlas",
+      "regionId": "wall_exterior_transition",
+      "supportFunctionRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.W.wall_exterior_transition",
+      "sampleLocationsRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-campaign-grid.json:wall_exterior_transition:worldline_samples",
+      "sampleCount": 16,
+      "sampleMethod": "missing_pointwise_tensor",
+      "sourceTensorRef": "nhm2_tile_effective_full_tensor_source",
+      "transitionKernelRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-source-transition-kernel.json:wall_exterior_shell",
+      "transitionInterfaceId": "wall_exterior_shell",
+      "blockers": [
+        "transition_worldline_source_sample_missing",
+        "transition_samples_must_not_use_adjacent_region_averages",
+        "pointwise_transition_source_tensor_missing"
+      ],
+      "warnings": [
+        "transition support is planned from atlas/kernel metadata, but no pointwise transition source tensor sample is available"
+      ]
+    }
+  ],
+  "blockers": [
+    "qei:hull_wall_transition:atlas:transition_worldline_source_sample_missing",
+    "qei:hull_wall_transition:atlas:transition_samples_must_not_use_adjacent_region_averages",
+    "qei:hull_wall_transition:atlas:pointwise_transition_source_tensor_missing",
+    "qei:wall_exterior_transition:atlas:transition_worldline_source_sample_missing",
+    "qei:wall_exterior_transition:atlas:transition_samples_must_not_use_adjacent_region_averages",
+    "qei:wall_exterior_transition:atlas:pointwise_transition_source_tensor_missing"
+  ],
+  "summary": {
+    "hasWallPlan": true,
+    "hasTransitionPlans": true,
+    "pointwiseTensorRequired": true,
+    "planComplete": false
+  },
+  "status": "review",
+  "claimBoundary": {
+    "diagnosticOnly": true,
+    "samplePlanDoesNotProveQeiPass": true,
+    "samplePlanDoesNotProvidePointwiseStressTensor": true
+  }
+}

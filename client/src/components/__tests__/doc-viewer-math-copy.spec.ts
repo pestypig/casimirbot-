@@ -485,7 +485,7 @@ describe("doc viewer math interaction", () => {
     const eventIngestionInstall = panelSource.match(
       /installDocumentLiveTranslationProjectionEventIngestion\(\{[\s\S]*?\n    \}\);/,
     )?.[0] ?? "";
-    expect(panelSource).toContain("if (!currentEntry || !liveTranslationProjectionEligible) return;");
+    expect(panelSource).toContain("if (!activeDocument || !liveTranslationProjectionEligible) return;");
     expect(panelSource).not.toContain("if (!currentEntry || !translationEligible || translationUnits.length === 0) return;");
     expect(eventIngestionInstall).toContain("sourceHash: rawMarkdownSourceHash");
     expect(eventIngestionInstall).not.toContain("sourceTextHash: rawMarkdownSourceHash");
@@ -851,7 +851,7 @@ describe("doc viewer math interaction", () => {
     expect(panelSource).toContain("type DocumentInlineTranslationRenderState");
     expect(panelSource).toContain("type InlineTranslationState = DocumentInlineTranslationRenderState");
     expect(panelSource).toContain("documentMarkdownTranslationEntryToInlineRenderState(entry)");
-    expect(panelSource).toContain("documentMarkdownSourceId(currentEntry.relativePath)");
+    expect(panelSource).toContain("const sourceId = activeDocument.sourceId");
     expect(panelSource).toContain("DOC_TRANSLATION_MAX_UNITS_PER_CHUNK = 1");
     expect(panelSource).toContain("DOC_TRANSLATION_MAX_CHARS_PER_CHUNK = 2200");
     expect(panelSource).toContain("documentTranslationChunkInFlightRef");

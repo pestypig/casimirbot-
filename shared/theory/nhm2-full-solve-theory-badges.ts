@@ -3,6 +3,7 @@ import {
   type TheoryBadgeEdgeV1,
   type TheoryBadgeV1,
 } from "../contracts/theory-badge-graph.v1";
+import { HELIX_CALCULATOR_SETUP_CONTEXT_SCHEMA } from "../helix-calculator-setup-context";
 
 const NHM2_FULL_SOLVE_WHITEPAPER =
   "docs/research/nhm2-current-status-whitepaper.md";
@@ -84,6 +85,8 @@ const NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_PROFILE_ID =
   "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1";
 const NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT =
   `artifacts/research/full-solve/profile-campaign-runs/${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_PROFILE_ID}`;
+const NHM2_0P7000_HISTORICAL_IMPORT_MANIFEST =
+  `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/theory-runtime-output-manifest-alpha-0p7000-historical-import.v1.json`;
 const NHM2_LEAN_CAMPAIGN_CERTIFICATE =
   `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-lean-campaign-certificate.json`;
 const NHM2_LEAN_GENERATED_CAMPAIGN_CERTIFICATE =
@@ -181,6 +184,75 @@ const NHM2_RESEARCH_ROUGHNESS_MEMS_ACTUATION =
 const NHM2_RESEARCH_SURFACE_POTENTIAL_NANOMEMBRANE = "https://arxiv.org/abs/1207.4429";
 const NHM2_RESEARCH_CASIMIR_PULL_IN_FRAMEWORK =
   "https://royalsocietypublishing.org/doi/10.1098/rspa.2020.0311";
+const NHM2_RESEARCH_RF_MEMS_REAL_MATERIAL_ROUGHNESS =
+  "https://arxiv.org/abs/2606.28195";
+const NHM2_RESEARCH_STEERING_BONDI_FLUX =
+  "https://arxiv.org/abs/2606.22531v3";
+
+const NHM2_SUPPORT_RETENTION_F_SUPPORT_MIN = 0.185065881969;
+const NHM2_SUPPORT_RETENTION_F_SUPPORT_MAX = 0.0849673202614;
+const NHM2_SUPPORT_RETENTION_OVERLAP_MARGIN = 0.459119311228;
+
+export type Nhm2SteeringBondiPremiseState = boolean | "unknown" | null | undefined;
+export type Nhm2SteeringBondiFluxGateStatus =
+  | "not_applicable"
+  | "not_ready"
+  | "blocked"
+  | "diagnostic_pass";
+
+export type Nhm2SteeringBondiFluxGateResult = {
+  status: Nhm2SteeringBondiFluxGateStatus;
+  applicable: boolean | null;
+  radiativeBudgetRequired: boolean;
+  claimLocks: {
+    physicalViabilityClaimAllowed: false;
+    transportClaimAllowed: false;
+    routeEtaClaimAllowed: false;
+    propulsionClaimAllowed: false;
+    certifiedWarpSpeedClaimAllowed: false;
+  };
+};
+
+export function evaluateNhm2SteeringBondiFluxGate(input: {
+  asymptoticFlatness: Nhm2SteeringBondiPremiseState;
+  confinedMatter: Nhm2SteeringBondiPremiseState;
+  dominantEnergyCondition: Nhm2SteeringBondiPremiseState;
+  bondiSachsAsymptotics: Nhm2SteeringBondiPremiseState;
+  radiativeFluxBudgetReceipt: Nhm2SteeringBondiPremiseState;
+}): Nhm2SteeringBondiFluxGateResult {
+  const premises = [
+    input.asymptoticFlatness,
+    input.confinedMatter,
+    input.dominantEnergyCondition,
+    input.bondiSachsAsymptotics,
+  ];
+  const premiseFalse = premises.includes(false);
+  const premiseUnknown = premises.some(
+    (value) => value == null || value === "unknown",
+  );
+  const status: Nhm2SteeringBondiFluxGateStatus = premiseFalse
+    ? "not_applicable"
+    : premiseUnknown
+      ? "not_ready"
+      : input.radiativeFluxBudgetReceipt === true
+        ? "diagnostic_pass"
+        : input.radiativeFluxBudgetReceipt === false
+          ? "blocked"
+          : "not_ready";
+
+  return {
+    status,
+    applicable: premiseFalse ? false : premiseUnknown ? null : true,
+    radiativeBudgetRequired: !premiseFalse,
+    claimLocks: {
+      physicalViabilityClaimAllowed: false,
+      transportClaimAllowed: false,
+      routeEtaClaimAllowed: false,
+      propulsionClaimAllowed: false,
+      certifiedWarpSpeedClaimAllowed: false,
+    },
+  };
+}
 
 const NHM2_FULL_SOLVE_BOUNDARY: TheoryBadgeClaimBoundaryV1 = {
   diagnosticOnly: true,
@@ -1743,7 +1815,14 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         outputSymbols: ["tau_candidate"],
       },
     ],
-    units: [{ symbol: "tau_candidate", si: "s", dimension: "time" }],
+    units: [
+      {
+        symbol: "tau_candidate",
+        unit: "s",
+        quantity: "candidate_proper_time",
+        dimensionSignature: "T",
+      },
+    ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
       "The candidate spec is an admission precondition for a fresh ADM/Einstein metric-required tensor route.",
@@ -2073,6 +2152,7 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ...COMMON_ASSUMPTIONS,
       "Lean checks the emitted certificate facts and does not rerun the floating-point GR solver.",
       "The certificate is runtime/reference evidence and has no scalar calculator payload.",
+      "The governed historical-import manifest classifies all 39 package artifacts as preexisting and boundToExecution=false; it is not a fresh runtime receipt.",
       `The formal check command is ${NHM2_LEAN_CERTIFICATE_CHECK_COMMAND}.`,
     ],
     calculatorPayloads: [],
@@ -2081,6 +2161,11 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_LEAN_CAMPAIGN_CERTIFICATE,
         "nhm2-lean-campaign-certificate-json",
         "Generated JSON certificate with artifact hashes, rational bounds, observer/QEI/stability receipts, and closed claim locks.",
+      ),
+      artifactRef(
+        NHM2_0P7000_HISTORICAL_IMPORT_MANIFEST,
+        "theory_runtime_output_manifest/v1",
+        "Governed historical package inventory: 39 hashed preexisting JSON artifacts, no execution interval, and boundToExecution=false.",
       ),
       artifactRef(
         NHM2_LEAN_GENERATED_CAMPAIGN_CERTIFICATE,
@@ -2109,6 +2194,7 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       unitSignatures: [],
       repoPaths: [
         NHM2_LEAN_CAMPAIGN_CERTIFICATE,
+        NHM2_0P7000_HISTORICAL_IMPORT_MANIFEST,
         NHM2_LEAN_GENERATED_CAMPAIGN_CERTIFICATE,
         NHM2_LEAN_CERTIFICATE_EXPORTER,
         NHM2_LEAN_CERTIFICATE_CONTRACT,
@@ -2148,6 +2234,7 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ...COMMON_ASSUMPTIONS,
       "Diagnostic campaign admissibility is a policy theorem over certificate facts.",
       "The theorem does not establish material-source credibility, transport, route result, propulsion, or speed authority.",
+      "The current certificate package is a governed historical import with preexisting freshness and no execution binding.",
     ],
     calculatorPayloads: [],
     sourceRefs: [
@@ -2166,6 +2253,11 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         "diagnosticCampaignAdmissible=true",
         "Certificate JSON records the runtime-facing admissibility bit and failed-field list.",
       ),
+      artifactRef(
+        NHM2_0P7000_HISTORICAL_IMPORT_MANIFEST,
+        "boundToExecution=false",
+        "Historical import boundary kept separate from the formal diagnostic admissibility result.",
+      ),
     ],
     hintKeys: {
       subjects: ["nhm2", "lean", "diagnostic_campaign", "admissibility", "proof_policy"],
@@ -2175,6 +2267,7 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_LEAN_GENERATED_CAMPAIGN_CERTIFICATE,
         NHM2_LEAN_CERTIFICATE_MODULE,
         NHM2_LEAN_CAMPAIGN_CERTIFICATE,
+        NHM2_0P7000_HISTORICAL_IMPORT_MANIFEST,
       ],
       equationFamilies: ["lean_campaign_certificate", "diagnostic_admissibility"],
       simulationOwners: ["NHM2", "formal_methods"],
@@ -2210,6 +2303,7 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ...COMMON_ASSUMPTIONS,
       "Claim locks are part of the Lean certificate conclusion, not UI copy convention.",
       "Closed locks forbid physical viability, transport, route result, propulsion, and speed promotion from this certificate.",
+      "The historical package manifest remains unbound to execution, independently of the closed-lock theorem.",
     ],
     calculatorPayloads: [],
     sourceRefs: [
@@ -2228,6 +2322,11 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         "claimLocks",
         "JSON certificate field with all claim locks false.",
       ),
+      artifactRef(
+        NHM2_0P7000_HISTORICAL_IMPORT_MANIFEST,
+        "preexisting-claim-locked-package",
+        "Governed preexisting package inventory; this manifest supplies no fresh physical or transport evidence.",
+      ),
     ],
     hintKeys: {
       subjects: ["nhm2", "lean", "claim_boundary", "claim_locks", "diagnostic_campaign"],
@@ -2237,6 +2336,7 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_LEAN_CERTIFICATE_MODULE,
         NHM2_LEAN_CLAIM_BOUNDARY_MODULE,
         NHM2_LEAN_CAMPAIGN_CERTIFICATE,
+        NHM2_0P7000_HISTORICAL_IMPORT_MANIFEST,
       ],
       equationFamilies: ["claim_boundary", "lean_campaign_certificate"],
       simulationOwners: ["NHM2", "formal_methods"],
@@ -2325,6 +2425,7 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ...COMMON_ASSUMPTIONS,
       "Hash pinning is provenance discipline and does not make the runtime artifacts physically complete.",
       "The certificate is scoped to the current 0p7000 diagnostic campaign profile.",
+      "The package-level import manifest independently locks the exact 39-artifact inventory, byte sizes, SHA-256 values, and preexisting freshness without claiming execution binding.",
     ],
     calculatorPayloads: [],
     sourceRefs: [
@@ -2332,6 +2433,11 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_LEAN_CAMPAIGN_CERTIFICATE,
         "artifactHashes",
         "Certificate JSON artifact-hash table.",
+      ),
+      artifactRef(
+        NHM2_0P7000_HISTORICAL_IMPORT_MANIFEST,
+        "exact-historical-package-inventory",
+        "Deterministic package-level inventory and hashes; boundToExecution=false and every entry is preexisting.",
       ),
       artifactRef(
         `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-time-dependent-source-campaign.json`,
@@ -2360,6 +2466,7 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       unitSignatures: [],
       repoPaths: [
         NHM2_LEAN_CAMPAIGN_CERTIFICATE,
+        NHM2_0P7000_HISTORICAL_IMPORT_MANIFEST,
         `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-time-dependent-source-campaign.json`,
         `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-regional-full-tensor-residual.json`,
         `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-observer-robust-energy-conditions.json`,
@@ -2411,16 +2518,6 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_EXPERIMENT_FACING_THEORY_ROADMAP_CONTRACT,
         "nhm2_experiment_facing_theory_roadmap/v1",
         "Pre-hardware theory solve roadmap consumed by this campaign.",
-      ),
-      artifactRef(
-        NHM2_PHYSICAL_VIABILITY_CAMPAIGN,
-        "physical-viability-campaign-target",
-        "Expected runtime artifact target for the physical evidence ladder.",
-      ),
-      artifactRef(
-        NHM2_EXPERIMENT_FACING_THEORY_ROADMAP,
-        "experiment-facing-theory-roadmap-target",
-        "Expected roadmap artifact target for planning observables and falsifiers.",
       ),
       artifactRef(
         `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-time-dependent-source-campaign.json`,
@@ -2492,11 +2589,6 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_EXPERIMENT_FACING_THEORY_ROADMAP_CONTRACT,
         "nhm2_experiment_facing_theory_roadmap/v1",
         "Typed roadmap for experiment-facing theoretical solves.",
-      ),
-      artifactRef(
-        NHM2_EXPERIMENT_FACING_THEORY_ROADMAP,
-        "experiment-facing-theory-roadmap-target",
-        "Expected roadmap artifact target; missing receipts remain blockers.",
       ),
       repoRef(
         NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT,
@@ -2639,11 +2731,6 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         "nhm2_experiment_parameter_targets/v1",
         "Typed parameter-target layer for the experiment-facing roadmap.",
       ),
-      artifactRef(
-        NHM2_EXPERIMENT_PARAMETER_TARGETS,
-        "experiment-parameter-targets-target",
-        "Expected runtime artifact target for parameter/comparator/receipt/blocker rows.",
-      ),
       repoRef(
         NHM2_EXPERIMENT_FACING_THEORY_ROADMAP_CONTRACT,
         "nhm2_experiment_facing_theory_roadmap/v1",
@@ -2785,11 +2872,6 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         "nhm2_experiment_research_gap_ledger/v1",
         "Typed research-gap/value-of-information ledger keyed to experiment parameter targets.",
       ),
-      artifactRef(
-        NHM2_EXPERIMENT_RESEARCH_GAP_LEDGER,
-        "experiment-research-gap-ledger-target",
-        "Expected runtime artifact target for research gaps, search receipts, falsifiers, and claim impacts.",
-      ),
       repoRef(
         NHM2_EXPERIMENT_PARAMETER_TARGETS_CONTRACT,
         "nhm2_experiment_parameter_targets/v1",
@@ -2892,6 +2974,7 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "The ideal pressure and force are perfect-conductor scalar diagnostics until real-material force-gap and mechanical receipts exist.",
       "Linear multiplication by 447 layers remains blocked until nonadditivity, support fraction, cross-coupling, thermal load, and active-control energy are receipted.",
       "Mechanical survivability cannot substitute for same-basis full tensor source authority.",
+      "The current 0p7000 package does not publish a layer-stack mechanical receipt artifact; the graph cites its contract and executable test without presenting an expected path as evidence.",
     ],
     calculatorPayloads: [],
     sourceRefs: [
@@ -2899,11 +2982,6 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_LAYER_STACK_MECHANICAL_RECEIPT_CONTRACT,
         "nhm2_layer_stack_mechanical_receipt/v1",
         "Typed diagnostic mechanical receipt for the 447-layer scalar candidate.",
-      ),
-      artifactRef(
-        NHM2_LAYER_STACK_MECHANICAL_RECEIPT,
-        "layer-stack-mechanical-receipt-target",
-        "Expected runtime artifact target for stack load, stress, and mechanical receipt blockers.",
       ),
       repoRef(
         NHM2_EXPERIMENT_PARAMETER_TARGETS_CONTRACT,
@@ -2961,6 +3039,169 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   nhm2FullSolveBadge({
+    id: "nhm2.mechanical.support_retention_overlap",
+    title: "Support-Retention Overlap Margin",
+    plainMeaning:
+      "Computes whether the load-bearing support fraction can overlap the retained-source requirement for the frozen 447-layer scalar candidate; the current margin is 0.459119311228, so the window is blocked.",
+    whyItMatters:
+      "The current maximum support fraction allowed by source retention is smaller than the minimum required by the stress comparator, making the no-overlap condition a visible mechanical gate instead of a buried receipt field.",
+    subjects: [
+      "nhm2",
+      "casimir",
+      "mechanical",
+      "support_fraction",
+      "source_retention",
+      "overlap_margin",
+    ],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "casimir"],
+    equationFamilies: [
+      "support_retention_overlap",
+      "layer_stack_mechanical_receipt",
+      "layer_stack_support_fraction_sweep",
+    ],
+    tags: [
+      "mechanical_gate",
+      "calculator_loadable",
+      "support_retention_overlap_window_missing",
+      "blocked",
+      "claim_boundary",
+    ],
+    equations: [
+      {
+        id: "support_retention_overlap_margin",
+        role: "calculator_demo",
+        displayLatex:
+          "M_{overlap}=\\frac{f_{support,max}}{f_{support,min}}",
+        computableExpression:
+          "M_overlap = f_support_max/f_support_min",
+        operatorKind: "scalar_expression",
+        inputSymbols: ["f_support_max", "f_support_min"],
+        outputSymbols: ["M_overlap"],
+      },
+    ],
+    units: [
+      {
+        symbol: "f_support_min",
+        unit: null,
+        quantity: "minimum support fraction required by the stress comparator",
+        dimensionSignature: "1",
+      },
+      {
+        symbol: "f_support_max",
+        unit: null,
+        quantity: "maximum support fraction allowed by source retention",
+        dimensionSignature: "1",
+      },
+      {
+        symbol: "M_overlap",
+        unit: null,
+        quantity: "support-retention overlap margin",
+        dimensionSignature: "1",
+      },
+    ],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "The current frozen scalar replay uses f_support_min=0.185065881969 and f_support_max=0.0849673202614.",
+      "M_overlap below one means no simultaneous support/retention window exists; the current computed state is blocked.",
+      "The allowable-stress value is a literature comparator, not a measured material coupon receipt.",
+      "This scalar overlap gate cannot supply support/drive tensor terms or unlock physical viability, transport, route ETA, propulsion, or speed authority.",
+    ],
+    calculatorPayloads: [
+      {
+        id: "support_retention_overlap_payload",
+        expression: "M_overlap = f_support_max/f_support_min",
+        displayLatex:
+          "M_{overlap}=\\frac{f_{support,max}}{f_{support,min}}",
+        preferredAction: "solve_with_steps",
+        targetVariable: "M_overlap",
+        setupContext: {
+          schema: HELIX_CALCULATOR_SETUP_CONTEXT_SCHEMA,
+          expression: "M_overlap = f_support_max/f_support_min",
+          display_latex:
+            "M_{overlap}=\\frac{f_{support,max}}{f_{support,min}}",
+          subgoal: "Replay the frozen scalar support-retention overlap margin.",
+          domain: "generic",
+          equation: "M_overlap = f_support_max/f_support_min",
+          variables: [
+            {
+              symbol: "f_support_max",
+              value: String(NHM2_SUPPORT_RETENTION_F_SUPPORT_MAX),
+              unit: "1",
+              meaning: "maximum support fraction compatible with retained-source threshold",
+              dimension_signature: "1",
+            },
+            {
+              symbol: "f_support_min",
+              value: String(NHM2_SUPPORT_RETENTION_F_SUPPORT_MIN),
+              unit: "1",
+              meaning: "minimum support fraction required by the stress comparator",
+              dimension_signature: "1",
+            },
+          ],
+          unit_system: "SI",
+          result_unit: "1",
+          result_quantity: "support-retention overlap margin",
+          result_dimension_signature: "1",
+          assumptions: [
+            `Frozen diagnostic result: M_overlap=${NHM2_SUPPORT_RETENTION_OVERLAP_MARGIN}.`,
+            "A result below one is a blocked overlap window, not physical source evidence.",
+          ],
+          unit_options: [],
+          interpretation_prompt:
+            "Report the scalar overlap margin and retain the mechanical, tensor, and physical-claim locks.",
+        },
+      },
+    ],
+    sourceRefs: [
+      repoRef(
+        NHM2_LAYER_STACK_MECHANICAL_RECEIPT_CONTRACT,
+        "supportWindow",
+        "Deterministic support-window calculation and fail-closed claim boundary.",
+      ),
+      repoRef(
+        "tests/nhm2-layer-stack-mechanical-receipt.spec.ts",
+        "support-window-overlap-expectations",
+        "Executable expectations for the current deterministic overlap value and fail-closed locks; no layer-stack mechanical receipt is published in the current 0p7000 package.",
+      ),
+      repoRef(
+        NHM2_LAYER_STACK_SUPPORT_FRACTION_SWEEP_CONTRACT,
+        "nhm2_layer_stack_support_fraction_sweep/v1",
+        "Discrete go/no-go sweep that consumes the same support and retention quantities.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_RF_MEMS_REAL_MATERIAL_ROUGHNESS,
+        "arxiv_2606_28195_rf_mems_real_material_roughness",
+        "Primary RF-MEMS analysis connecting real material response and roughness to restoring stiffness, stable cycling, and pull-in avoidance.",
+      ),
+    ],
+    hintKeys: {
+      subjects: [
+        "nhm2",
+        "casimir",
+        "mechanical",
+        "support_fraction",
+        "source_retention",
+        "overlap_margin",
+      ],
+      symbols: ["f_support_min", "f_support_max", "M_overlap"],
+      unitSignatures: ["1"],
+      repoPaths: [
+        NHM2_LAYER_STACK_MECHANICAL_RECEIPT_CONTRACT,
+        "tests/nhm2-layer-stack-mechanical-receipt.spec.ts",
+        NHM2_LAYER_STACK_SUPPORT_FRACTION_SWEEP_CONTRACT,
+        NHM2_RESEARCH_RF_MEMS_REAL_MATERIAL_ROUGHNESS,
+      ],
+      equationFamilies: [
+        "support_retention_overlap",
+        "layer_stack_mechanical_receipt",
+        "layer_stack_support_fraction_sweep",
+      ],
+      simulationOwners: ["NHM2", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
     id: "nhm2.experimental.layer_stack_support_fraction_sweep",
     title: "Layer Stack Support Fraction Sweep",
     plainMeaning:
@@ -3011,11 +3252,6 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_LAYER_STACK_SUPPORT_FRACTION_SWEEP_CONTRACT,
         "nhm2_layer_stack_support_fraction_sweep/v1",
         "Typed support-fraction go/no-go sweep for the 447-layer scalar candidate.",
-      ),
-      artifactRef(
-        NHM2_LAYER_STACK_SUPPORT_FRACTION_SWEEP,
-        "layer-stack-support-fraction-sweep-target",
-        "Expected runtime artifact target for support stress, active-area retention, and go/no-go rows.",
       ),
       repoRef(
         NHM2_LAYER_STACK_MECHANICAL_RECEIPT_CONTRACT,
@@ -3133,11 +3369,6 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_LAYER_STACK_ENGINEERING_ARCHITECTURE_LOOP_CONTRACT,
         "nhm2_layer_stack_engineering_architecture_loop/v1",
         "Typed engineering architecture loop for load-path and active-area decoupling candidates.",
-      ),
-      artifactRef(
-        NHM2_LAYER_STACK_ENGINEERING_ARCHITECTURE_LOOP,
-        "layer-stack-engineering-architecture-loop-target",
-        "Expected runtime artifact target for architecture rows, pull-in margins, research gaps, and tensor blockers.",
       ),
       repoRef(
         NHM2_LAYER_STACK_SUPPORT_FRACTION_SWEEP_CONTRACT,
@@ -3262,11 +3493,6 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_LAYER_STACK_FULL_APPARATUS_RECEIPT_LOOP_CONTRACT,
         "nhm2_layer_stack_full_apparatus_receipt_loop/v1",
         "Typed receipt loop for material, pull-in, metrology, control, fatigue, layer scaling, and full apparatus tensor evidence.",
-      ),
-      artifactRef(
-        NHM2_LAYER_STACK_FULL_APPARATUS_RECEIPT_LOOP,
-        "layer-stack-full-apparatus-receipt-loop-target",
-        "Expected runtime artifact target for receipted engineering candidate rows and blockers.",
       ),
       repoRef(
         NHM2_LAYER_STACK_ENGINEERING_ARCHITECTURE_LOOP_CONTRACT,
@@ -3400,20 +3626,10 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         "nhm2_tile_source_physical_validation_plan/v1",
         "Typed validation plan freezing the 447-layer candidate and enumerating receipts, tensor authority, downstream gates, and falsification blockers.",
       ),
-      artifactRef(
-        NHM2_TILE_SOURCE_PHYSICAL_VALIDATION_PLAN,
-        "tile-source-physical-validation-plan-target",
-        "Expected runtime artifact target for the physical tile-source validation plan.",
-      ),
       repoRef(
         NHM2_LAYER_STACK_FULL_APPARATUS_RECEIPT_LOOP_CONTRACT,
         "nhm2_layer_stack_full_apparatus_receipt_loop/v1",
         "Upstream receipt loop consumed by the physical source validation plan.",
-      ),
-      artifactRef(
-        NHM2_LAYER_STACK_FULL_APPARATUS_RECEIPT_LOOP,
-        "layer-stack-full-apparatus-receipt-loop-target",
-        "Upstream 447-layer full-apparatus receipt loop artifact target.",
       ),
       docRef(
         NHM2_FULL_SOLVE_WHITEPAPER,
@@ -3901,6 +4117,120 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       repoPaths: [NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT],
       equationFamilies: ["independent_replication", "physical_viability_campaign"],
       simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.transport.steering_bondi_flux_budget",
+    title: "Premise-Aware Steering Bondi-Flux Budget",
+    plainMeaning:
+      "Requires a radiative-flux budget before a steering or acceleration claim only when the candidate is asymptotically flat, matter-confined, dominant-energy compliant, and equipped with the required Bondi-Sachs asymptotics.",
+    whyItMatters:
+      "It turns a conditional conservation result into an explicit applicability gate while preventing that result from being applied universally or represented as an NHM2 transport mechanism.",
+    subjects: [
+      "nhm2",
+      "transport",
+      "steering",
+      "bondi_sachs",
+      "radiative_flux",
+      "premise_gate",
+    ],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "general_relativity"],
+    equationFamilies: [
+      "bondi_sachs_balance",
+      "steering_flux_budget",
+      "transport_claim_boundary",
+    ],
+    tags: [
+      "premise_aware",
+      "asymptotic_flatness",
+      "confined_matter",
+      "dominant_energy_condition",
+      "null_infinity",
+      "receipt_required",
+      "nonuniversal",
+      "blocked",
+    ],
+    equations: [
+      {
+        id: "steering_bondi_flux_budget_gate",
+        role: "gate",
+        displayLatex:
+          "A_{flat}\\land C_{matter}\\land DEC\\land B_{asym}\\Rightarrow \\Delta P^{\\mu}_{Bondi}=-\\Phi^{\\mu}_{\\mathscr{I}^{+}}",
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: [
+          "asymptotic_flatness_receipt",
+          "confined_matter_receipt",
+          "dec_receipt",
+          "bondi_asymptotics_receipt",
+          "null_infinity_flux_receipt",
+        ],
+        outputSymbols: ["bondi_flux_budget_gate_status"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Applicability requires affirmative receipts for asymptotic flatness, confined matter, the dominant energy condition, and the required Bondi-Sachs asymptotics.",
+      "A false premise yields not_applicable; a missing or unknown premise yields not_ready. Neither state is a pass or a universal no-go result.",
+      "When all premises apply, a steering or acceleration claim still requires a run-specific radiative flux and energy-budget receipt at null infinity.",
+      "The cited construction uses a photon-rocket exterior around a flat cavity and is not an NHM2 field, propulsion implementation, route result, or speed authority.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      repoRef(
+        "shared/theory/nhm2-full-solve-theory-badges.ts",
+        "evaluateNhm2SteeringBondiFluxGate",
+        "Executable premise evaluator: false applicability premises map to not_applicable, unknown premises map to not_ready, and every outcome keeps claim locks closed.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_STEERING_BONDI_FLUX,
+        "arxiv_2606_22531v3_steering_bondi_flux",
+        "Primary source for the conditional Bondi-Sachs balance argument under asymptotic-flatness, confined-matter, DEC, and asymptotic premises.",
+      ),
+      repoRef(
+        NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT,
+        "transportClaimAllowed=false",
+        "Current transport claim lock that remains closed independently of this conditional gate.",
+      ),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "claim-boundary",
+        "NHM2 diagnostic/transport claim boundary.",
+      ),
+    ],
+    hintKeys: {
+      subjects: [
+        "nhm2",
+        "transport",
+        "steering",
+        "bondi_sachs",
+        "radiative_flux",
+        "premise_gate",
+      ],
+      symbols: [
+        "A_flat",
+        "C_matter",
+        "DEC",
+        "B_asym",
+        "Delta_P_Bondi",
+        "Phi_null_infinity",
+      ],
+      unitSignatures: [],
+      repoPaths: [
+        "shared/theory/nhm2-full-solve-theory-badges.ts",
+        NHM2_RESEARCH_STEERING_BONDI_FLUX,
+        NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT,
+        NHM2_FULL_SOLVE_WHITEPAPER,
+      ],
+      equationFamilies: [
+        "bondi_sachs_balance",
+        "steering_flux_budget",
+        "transport_claim_boundary",
+      ],
+      simulationOwners: ["NHM2", "general_relativity"],
     },
   }),
   nhm2FullSolveBadge({
@@ -5699,6 +6029,14 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     claimBoundaryNote: "A support-fraction sweep is a go/no-go planning map, not material evidence.",
   },
   {
+    id: "research_gap_ledger_documents_support_retention_overlap",
+    from: "nhm2.experimental.research_gap_ledger",
+    to: "nhm2.mechanical.support_retention_overlap",
+    relation: "documents",
+    label: "The research-gap ledger exposes the support-versus-retained-source conflict as a first-class scalar gate.",
+    claimBoundaryNote: "A scalar overlap margin is engineering diagnostic context, not material or tensor evidence.",
+  },
+  {
     id: "research_gap_ledger_prioritizes_metric_upper_bound",
     from: "nhm2.experimental.research_gap_ledger",
     to: "nhm2.experimental.metric_upper_bound",
@@ -5827,6 +6165,22 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     claimBoundaryNote: "The consumed load remains ideal scalar context until material receipts exist.",
   },
   {
+    id: "layer_stack_mechanical_receipt_derives_support_retention_overlap",
+    from: "nhm2.experimental.layer_stack_mechanical_receipt",
+    to: "nhm2.mechanical.support_retention_overlap",
+    relation: "derives",
+    label: "The mechanical receipt deterministically derives the support-retention overlap margin from its frozen stress and retention bounds.",
+    claimBoundaryNote: "The derived margin inherits the receipt's ideal-scalar and literature-comparator limitations.",
+  },
+  {
+    id: "support_retention_overlap_feeds_support_fraction_sweep",
+    from: "nhm2.mechanical.support_retention_overlap",
+    to: "nhm2.experimental.layer_stack_support_fraction_sweep",
+    relation: "documents",
+    label: "The continuous overlap margin documents why the discrete support-fraction sweep has no simultaneous stress/retention window.",
+    claimBoundaryNote: "The scalar replay cannot replace measured support or full-apparatus tensor receipts.",
+  },
+  {
     id: "support_fraction_sweep_feeds_array_scaling",
     from: "nhm2.experimental.layer_stack_support_fraction_sweep",
     to: "nhm2.experimental.array_scaling",
@@ -5841,6 +6195,14 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "documents",
     label: "The no-overlap support-fraction blocker motivates architectures that decouple load bearing from active area loss.",
     claimBoundaryNote: "Architecture search prioritizes engineering receipts; it is not material-source evidence.",
+  },
+  {
+    id: "support_retention_overlap_motivates_architecture_loop",
+    from: "nhm2.mechanical.support_retention_overlap",
+    to: "nhm2.experimental.layer_stack_architecture_loop",
+    relation: "documents",
+    label: "The blocked 0.459119311228 overlap margin motivates architectures that decouple load support from active-area retention.",
+    claimBoundaryNote: "Architecture exploration cannot unlock physical, transport, route, propulsion, or speed claims.",
   },
   {
     id: "architecture_loop_feeds_array_scaling",
@@ -5947,6 +6309,14 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     claimBoundaryNote: "Go/no-go planning cannot unlock physical viability or transport claims.",
   },
   {
+    id: "support_retention_overlap_blocks_physical_lock",
+    from: "nhm2.mechanical.support_retention_overlap",
+    to: "nhm2.claim_boundary.physical_viability_locked",
+    relation: "blocks",
+    label: "The missing support-retention overlap keeps the frozen 447-layer scalar route blocked before physical review.",
+    claimBoundaryNote: "A future overlap window would remain subject to material, pull-in, fatigue, control-energy, tensor, and replication receipts.",
+  },
+  {
     id: "layer_stack_mechanical_receipt_blocks_physical_lock",
     from: "nhm2.experimental.layer_stack_mechanical_receipt",
     to: "nhm2.claim_boundary.physical_viability_locked",
@@ -6017,6 +6387,14 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "blocks",
     label: "Transport remains locked until neutral test-worldline response is measured and replicated.",
     claimBoundaryNote: "Geodesic response is a transport precursor, not route ETA or speed authority.",
+  },
+  {
+    id: "steering_bondi_flux_budget_blocks_transport_lock",
+    from: "nhm2.transport.steering_bondi_flux_budget",
+    to: "nhm2.claim_boundary.transport_locked",
+    relation: "blocks",
+    label: "An applicable steering claim remains blocked until the conditional Bondi-flux premises and radiative budget are receipted.",
+    claimBoundaryNote: "False premises mean not applicable and unknown premises mean not ready; this conditional gate is never universal transport authority.",
   },
   {
     id: "natario_invariants_document_observer_authority",

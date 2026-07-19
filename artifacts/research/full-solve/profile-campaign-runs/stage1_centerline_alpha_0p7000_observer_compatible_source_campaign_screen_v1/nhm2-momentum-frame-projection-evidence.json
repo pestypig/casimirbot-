@@ -1,0 +1,105 @@
+{
+  "contractVersion": "nhm2_momentum_frame_projection_evidence/v1",
+  "generatedAt": "2026-06-19T19:03:10.669Z",
+  "laneId": "nhm2_shift_lapse",
+  "selectedProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "runId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1:candidate_regional_source_closure:candidate_projection_evidence",
+  "regionalSupportFunctionAtlasRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-support-function-atlas.json",
+  "atlasHash": "41bdbf8140bce18f971b417014779f76eb8113c03ec5a79abfcc13d05bff9bb2",
+  "frame": {
+    "frameId": "declared-reduced-order-campaign-local-orthonormal-frame",
+    "requestedFrame": "local_orthonormal",
+    "sourceTensorBasis": "local_orthonormal_to_chart",
+    "tetradRef": "declared://nhm2/reduced-order/campaign-profile-local-orthonormal-frame",
+    "projectionMethod": "declared_reduced_order_local_orthonormal",
+    "ratioPolicy": "use_audit_same_chart_ratios_as_local_frame_reduced_order",
+    "projectionStatus": "pass",
+    "assumptions": [
+      "candidate metric momentum remediation targets provide projected metric momentum-to-energy ratios",
+      "when remediation targets lack a projected metric ratio, the source momentum-density audit same-chart metric ratio is used as a declared reduced-order local-frame proxy",
+      "source momentum ratios are read from the source momentum-density audit",
+      "reduced-order frame evidence does not replace a full ADM tetrad projection"
+    ],
+    "blockers": []
+  },
+  "components": [
+    {
+      "regionId": "global",
+      "componentId": "T01",
+      "projectedMetricRequiredMomentumToEnergyRatio": 0,
+      "projectedSourceMomentumToEnergyRatio": 1e-10
+    },
+    {
+      "regionId": "global",
+      "componentId": "T02",
+      "projectedMetricRequiredMomentumToEnergyRatio": 0,
+      "projectedSourceMomentumToEnergyRatio": 7e-11
+    },
+    {
+      "regionId": "global",
+      "componentId": "T03",
+      "projectedMetricRequiredMomentumToEnergyRatio": 0,
+      "projectedSourceMomentumToEnergyRatio": 4.0000000000000004e-11
+    },
+    {
+      "regionId": "hull",
+      "componentId": "T01",
+      "projectedMetricRequiredMomentumToEnergyRatio": 0,
+      "projectedSourceMomentumToEnergyRatio": 1e-10
+    },
+    {
+      "regionId": "hull",
+      "componentId": "T02",
+      "projectedMetricRequiredMomentumToEnergyRatio": 0,
+      "projectedSourceMomentumToEnergyRatio": 6.999999999999999e-11
+    },
+    {
+      "regionId": "hull",
+      "componentId": "T03",
+      "projectedMetricRequiredMomentumToEnergyRatio": 0,
+      "projectedSourceMomentumToEnergyRatio": 4.0000000000000004e-11
+    },
+    {
+      "regionId": "wall",
+      "componentId": "T01",
+      "projectedMetricRequiredMomentumToEnergyRatio": 0,
+      "projectedSourceMomentumToEnergyRatio": 1e-10
+    },
+    {
+      "regionId": "wall",
+      "componentId": "T02",
+      "projectedMetricRequiredMomentumToEnergyRatio": 0,
+      "projectedSourceMomentumToEnergyRatio": 6.999999999999999e-11
+    },
+    {
+      "regionId": "wall",
+      "componentId": "T03",
+      "projectedMetricRequiredMomentumToEnergyRatio": 0,
+      "projectedSourceMomentumToEnergyRatio": 4.0000000000000004e-11
+    },
+    {
+      "regionId": "exterior_shell",
+      "componentId": "T01",
+      "projectedMetricRequiredMomentumToEnergyRatio": 0,
+      "projectedSourceMomentumToEnergyRatio": 1e-10
+    },
+    {
+      "regionId": "exterior_shell",
+      "componentId": "T02",
+      "projectedMetricRequiredMomentumToEnergyRatio": 0,
+      "projectedSourceMomentumToEnergyRatio": 6.999999999999999e-11
+    },
+    {
+      "regionId": "exterior_shell",
+      "componentId": "T03",
+      "projectedMetricRequiredMomentumToEnergyRatio": 0,
+      "projectedSourceMomentumToEnergyRatio": 4.0000000000000004e-11
+    }
+  ],
+  "claimBoundary": {
+    "diagnosticOnly": true,
+    "projectionEvidenceDoesNotValidatePhysicalSource": true,
+    "reducedOrderFrameDoesNotReplaceFullAdmTetrad": true,
+    "causalBoundConclusionRequiresProjectionStatusPass": true
+  }
+}

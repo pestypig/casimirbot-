@@ -1,0 +1,50 @@
+{
+  "contractVersion": "nhm2_switching_covariant_conservation_evidence/v1",
+  "generatedAt": "2026-06-19T19:03:10.675Z",
+  "staticCovariantConservationRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-full-tensor-residual.json",
+  "scheduleRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json#campaignReadiness",
+  "sectorBoundaryRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-campaign-grid.json#regionSamples",
+  "switchingFunctionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-support-function-atlas.json#transitionKernels",
+  "includesRegionalSupportDerivatives": true,
+  "includesSectorBoundaryTerms": true,
+  "includesTimeDerivativeTerms": true,
+  "includesTransitionKernelTerms": true,
+  "toleranceLInf": 0.1,
+  "overallResidualLInf": 0.05,
+  "terms": [
+    {
+      "termId": "regional_support_derivative",
+      "included": true,
+      "residualLInf": 0.05,
+      "toleranceLInf": 0.1,
+      "pass": true,
+      "blockers": []
+    },
+    {
+      "termId": "sector_boundary",
+      "included": true,
+      "residualLInf": 0.05,
+      "toleranceLInf": 0.1,
+      "pass": true,
+      "blockers": []
+    },
+    {
+      "termId": "time_derivative",
+      "included": true,
+      "residualLInf": 0.05,
+      "toleranceLInf": 0.1,
+      "pass": true,
+      "blockers": []
+    },
+    {
+      "termId": "transition_kernel",
+      "included": true,
+      "residualLInf": 0.05,
+      "toleranceLInf": 0.1,
+      "pass": true,
+      "blockers": []
+    }
+  ],
+  "conservationStatus": "pass",
+  "blockers": []
+}

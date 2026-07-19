@@ -522,13 +522,19 @@ describe("ScientificCalculatorPanel theory run workbench", () => {
     render(<ScientificCalculatorPanel />);
 
     const theorySection = await screen.findByTestId("scientific-calculator-theory-run-section");
+    expect(within(theorySection).getByTestId("theory-run-aggregate-status")).toHaveTextContent(/Aggregate theory run\s*loaded/i);
     expect(within(theorySection).getAllByText("Evidence refs").length).toBeGreaterThan(0);
     expect(within(theorySection).getByText("Runtime receipt")).toBeInTheDocument();
-    expect(within(theorySection).getByText("Artifact backed")).toBeInTheDocument();
+    expect(within(theorySection).getByText("Artifact referenced")).toBeInTheDocument();
     expect(within(theorySection).getByText("Blocked by missing evidence")).toBeInTheDocument();
     expect(within(theorySection).getByText("warp.full_solve.campaign")).toBeInTheDocument();
     expect(within(theorySection).getByText(/artifact: artifacts\/research\/full-solve\/run\.json/)).toBeInTheDocument();
     expect(within(theorySection).getByText(/fail-closed/)).toBeInTheDocument();
+    expect(within(theorySection).getByTestId("runtime-status-lamp-aggregate")).toHaveAttribute("data-status", "blocked");
+    expect(within(theorySection).getByTestId("runtime-status-lamp-evidence")).toHaveAttribute("data-status", "unknown");
+    expect(within(theorySection).getByTestId("runtime-status-lamp-provenance")).toHaveAttribute("data-status", "unbound");
+    expect(within(theorySection).getByTestId("runtime-status-lamp-certificate")).toHaveAttribute("data-status", "not_ready");
+    expect(within(theorySection).getByText("certificate_integrity: not_ready")).toBeInTheDocument();
   });
 
   it("renders sweep summaries inside the Theory Run section", async () => {

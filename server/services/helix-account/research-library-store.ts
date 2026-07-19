@@ -2,6 +2,8 @@ import crypto from "node:crypto";
 import {
   HELIX_RESEARCH_LIBRARY_DOCUMENT_SCHEMA,
   HELIX_RESEARCH_LIBRARY_LIST_SCHEMA,
+  HELIX_RESEARCH_LIBRARY_PRIVATE_MAILBOX_THREAD_PREFIX,
+  researchLibraryDocViewerPath,
   type HelixResearchLibraryDocument,
   type HelixResearchLibraryDocumentSummary,
   type HelixResearchLibraryList,
@@ -21,6 +23,8 @@ const ENCRYPTION_ALGORITHM = "aes-256-gcm";
 const ENCRYPTED_CONTENT_PREFIX = "v1";
 const DEFAULT_PROFILE_QUOTA_BYTES = 100 * 1024 * 1024;
 const MAX_DOCUMENT_BYTES = 16 * 1024 * 1024;
+export const RESEARCH_LIBRARY_PRIVATE_MAILBOX_THREAD_PREFIX =
+  HELIX_RESEARCH_LIBRARY_PRIVATE_MAILBOX_THREAD_PREFIX;
 
 type ResearchLibraryRow = {
   document_id: string;
@@ -77,6 +81,29 @@ const encryptionKey = (): { key: Buffer; keyId: string } => {
     key: crypto.createHash("sha256").update("casimirbot-local-profile-storage-dev-key").digest(),
     keyId: "dev-local",
   };
+};
+
+export const researchLibraryPrivateAccountToken = (profileId: string): string => {
+  const { key } = encryptionKey();
+  return crypto
+    .createHmac("sha256", key)
+    .update(`research-library-private-account\n${clean(profileId)}`)
+    .digest("base64url")
+    .slice(0, 24);
+};
+
+export const researchLibraryDocumentViewerRef = (profileId: string, documentId: string): string => {
+  const { key } = encryptionKey();
+  const documentToken = crypto
+    .createHmac("sha256", key)
+    .update(`research-library-private-document\n${clean(profileId)}\n${clean(documentId)}`)
+    .digest("base64url")
+    .slice(0, 24);
+  return `private-research:${researchLibraryPrivateAccountToken(profileId)}:${documentToken}`;
+};
+
+export const researchLibraryPrivateMailboxThreadId = (profileId: string): string => {
+  return `${RESEARCH_LIBRARY_PRIVATE_MAILBOX_THREAD_PREFIX}${researchLibraryPrivateAccountToken(profileId)}`;
 };
 
 type EncryptedResearchLibraryContentV2 = {
@@ -140,10 +167,18 @@ const decryptContent = (value: string): EncryptedResearchLibraryContentV2 => {
 
 const parseMetadata = (row: ResearchLibraryRow): HelixResearchLibraryDocumentSummary => {
   const metadata = typeof row.metadata === "string" ? JSON.parse(row.metadata) : row.metadata;
+  const viewerRef = researchLibraryDocumentViewerRef(row.profile_id, row.document_id);
+  const docPath = researchLibraryDocViewerPath(viewerRef);
   return {
     ...metadata,
     schema: HELIX_RESEARCH_LIBRARY_DOCUMENT_SCHEMA,
     document_id: row.document_id,
+    viewer_ref: viewerRef,
+    private_translation_scope: {
+      doc_path: docPath,
+      source_id: `document_markdown:${docPath}`,
+      mailbox_thread_id: researchLibraryPrivateMailboxThreadId(row.profile_id),
+    },
     profile_id: row.profile_id,
     source_integrity_hash: row.source_integrity_hash,
     created_at: iso(row.created_at),
@@ -215,6 +250,12 @@ export async function saveResearchLibraryExtraction(
   const metadata: HelixResearchLibraryDocumentSummary = {
     schema: HELIX_RESEARCH_LIBRARY_DOCUMENT_SCHEMA,
     document_id: documentId,
+    viewer_ref: researchLibraryDocumentViewerRef(profileId, documentId),
+    private_translation_scope: {
+      doc_path: researchLibraryDocViewerPath(researchLibraryDocumentViewerRef(profileId, documentId)),
+      source_id: `document_markdown:${researchLibraryDocViewerPath(researchLibraryDocumentViewerRef(profileId, documentId))}`,
+      mailbox_thread_id: researchLibraryPrivateMailboxThreadId(profileId),
+    },
     profile_id: profileId,
     title: clean(input.title) || clean(input.source_url) || "Extracted research paper",
     source_url: clean(input.source_url) || null,

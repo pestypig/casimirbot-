@@ -560,6 +560,52 @@ describe("theory context reflector", () => {
     expect(matchedBadgeIds).toContain("tokamak.plasma.thermal_pressure_proxy");
   });
 
+  it("places a natural Cooper-pair explanation near superconducting bounds without promoting it to exact", () => {
+    const reflection = buildTheoryContextReflection({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      prompt: [
+        "Cooper pairs are pairs of electrons that become weakly bound inside certain materials at very low temperatures.",
+        "A lattice distortion can produce an effective attraction that overcomes electron repulsion under the right conditions.",
+        "Many pairs can occupy a coherent quantum state that moves without ordinary electrical resistance, creating superconductivity.",
+        "Cooper pairing is central to conventional BCS superconductivity.",
+      ].join(" "),
+      generatedAt: "2026-07-18T00:00:00.000Z",
+      reflectionId: "reflection:natural-cooper-pair-context",
+    });
+    const badgeId = "low_temp.superconductivity.zero_dc_resistance_bounds";
+
+    expect(reflection.exactMatches.map((match) => match.badgeId)).not.toContain(badgeId);
+    expect(reflection.likelyMatches.map((match) => match.badgeId)).toContain(badgeId);
+    expect(reflection.overlay.uncertainty).toMatchObject({
+      representedProbabilityMass: 0.55,
+      outOfGraphProbability: 0.45,
+      coverageBasis: "semantic_coverage_heuristic",
+    });
+  });
+
+  it.each([
+    ["contextual", "For context only, Cooper pairing and BCS superconductivity are a separate mechanism."],
+    ["negated", "Do not map Cooper pairing or BCS superconductivity into this graph."],
+    ["future conditional", "If a later request asks about BCS superconductivity, compare Cooper pairing then."],
+    ["historical", "Previously, we mentioned Cooper pairing in BCS superconductivity."],
+    ["quoted", '"Cooper pairing in BCS superconductivity" is only quoted text from the prior answer.'],
+    ["screen-visible", "The screen shows the words Cooper pairing and BCS superconductivity."],
+  ])("keeps %s superconductivity aliases contextual", (_label, contextualSentence) => {
+    const reflection = buildTheoryContextReflection({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      prompt: [
+        "Deterministic microscopic states become probabilistic macroscopic descriptions after coarse-graining.",
+        contextualSentence,
+      ].join(" "),
+      generatedAt: "2026-07-18T00:00:00.000Z",
+      reflectionId: `reflection:contextual-superconductivity-${_label}`,
+    });
+
+    expect(reflection.likelyMatches.map((match) => match.badgeId)).not.toContain(
+      "low_temp.superconductivity.zero_dc_resistance_bounds",
+    );
+  });
+
   it("assigns no represented mass when the only graph concept appears in a claim-boundary caveat", () => {
     const reflection = buildTheoryContextReflection({
       graph: buildNhm2TheoryBadgeGraphV1(),

@@ -1,0 +1,209 @@
+{
+  "artifactType": "nhm2_regional_support_function_atlas/v1",
+  "schemaVersion": "1.0.0",
+  "runIdentity": {
+    "runId": "candidate-campaign:stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+    "profileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+    "chartId": "comoving_cartesian",
+    "metricRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-metric-required-full-regional-tensor.json",
+    "sourceModelRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-tile-effective-full-tensor-source.json",
+    "gridRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-campaign-grid.json",
+    "samplePlanRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-campaign-grid.json",
+    "createdAt": "2026-06-19T19:03:10.506Z"
+  },
+  "basisAndUnits": {
+    "tensorBasis": "chart",
+    "coordinateSystem": "comoving_cartesian",
+    "lengthUnit": "m",
+    "energyDensityUnit": "J/m^3",
+    "stressEnergyConvention": "T_mu_nu_same_chart",
+    "signatureConvention": "(-,+,+,+)"
+  },
+  "regions": {
+    "global": {
+      "regionId": "global",
+      "semanticRole": "global_region",
+      "maskRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.mask.global",
+      "supportFunctionRef": "compact_bump",
+      "sampleCount": 1728,
+      "supportStats": {
+        "minWeight": 0,
+        "maxWeight": 1,
+        "meanWeight": 1,
+        "nonzeroFraction": 1
+      },
+      "aggregationPolicy": {
+        "weighting": "global_weighted",
+        "normalization": "sample_count",
+        "includeTransitionSamples": true
+      }
+    },
+    "hull": {
+      "regionId": "hull",
+      "semanticRole": "closure_region",
+      "maskRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.mask.hull",
+      "supportFunctionRef": "compact_bump",
+      "sampleCount": 8,
+      "supportStats": {
+        "minWeight": 0,
+        "maxWeight": 1,
+        "meanWeight": 1,
+        "nonzeroFraction": 1
+      },
+      "aggregationPolicy": {
+        "weighting": "support_weighted",
+        "normalization": "sample_count",
+        "includeTransitionSamples": true
+      }
+    },
+    "wall": {
+      "regionId": "wall",
+      "semanticRole": "closure_region",
+      "maskRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.mask.wall",
+      "supportFunctionRef": "compact_bump",
+      "sampleCount": 128,
+      "supportStats": {
+        "minWeight": 0,
+        "maxWeight": 1,
+        "meanWeight": 1,
+        "nonzeroFraction": 1
+      },
+      "aggregationPolicy": {
+        "weighting": "support_weighted",
+        "normalization": "sample_count",
+        "includeTransitionSamples": true
+      }
+    },
+    "exterior_shell": {
+      "regionId": "exterior_shell",
+      "semanticRole": "closure_region",
+      "maskRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.mask.exterior_shell",
+      "supportFunctionRef": "compact_bump",
+      "sampleCount": 344,
+      "supportStats": {
+        "minWeight": 0,
+        "maxWeight": 1,
+        "meanWeight": 1,
+        "nonzeroFraction": 1
+      },
+      "aggregationPolicy": {
+        "weighting": "support_weighted",
+        "normalization": "sample_count",
+        "includeTransitionSamples": true
+      }
+    },
+    "hull_wall_transition": {
+      "regionId": "hull_wall_transition",
+      "semanticRole": "transition_region",
+      "maskRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.mask.hull_wall_transition",
+      "supportFunctionRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.W.hull_wall_transition",
+      "sampleCount": 16,
+      "supportStats": {
+        "minWeight": 0,
+        "maxWeight": 1,
+        "meanWeight": 0.5,
+        "nonzeroFraction": 1
+      },
+      "aggregationPolicy": {
+        "weighting": "support_weighted",
+        "normalization": "sum_weights",
+        "includeTransitionSamples": false
+      }
+    },
+    "wall_exterior_transition": {
+      "regionId": "wall_exterior_transition",
+      "semanticRole": "transition_region",
+      "maskRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.mask.wall_exterior_transition",
+      "supportFunctionRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.W.wall_exterior_transition",
+      "sampleCount": 16,
+      "supportStats": {
+        "minWeight": 0,
+        "maxWeight": 1,
+        "meanWeight": 0.5,
+        "nonzeroFraction": 1
+      },
+      "aggregationPolicy": {
+        "weighting": "support_weighted",
+        "normalization": "sum_weights",
+        "includeTransitionSamples": false
+      }
+    }
+  },
+  "transitionKernels": [
+    {
+      "kernelId": "kernel:hull_wall:smootherstep_c2",
+      "fromRegion": "hull",
+      "toRegion": "wall",
+      "supportRegion": "hull_wall_transition",
+      "kernelKind": "smootherstep_c2",
+      "smoothnessClass": "C2",
+      "widthMeters": 1,
+      "derivativeTermsAvailable": false
+    },
+    {
+      "kernelId": "kernel:wall_exterior:smootherstep_c2",
+      "fromRegion": "wall",
+      "toRegion": "exterior_shell",
+      "supportRegion": "wall_exterior_transition",
+      "kernelKind": "smootherstep_c2",
+      "smoothnessClass": "C2",
+      "widthMeters": 1,
+      "derivativeTermsAvailable": false
+    }
+  ],
+  "partitionOfUnity": {
+    "appliesTo": [
+      "global",
+      "hull",
+      "wall",
+      "exterior_shell"
+    ],
+    "sumWeightsMean": 1,
+    "sumWeightsMaxAbsError": 0,
+    "negativeWeightMin": 0,
+    "overlapPolicy": "partition_of_unity",
+    "status": "pass"
+  },
+  "derivativeSupport": {
+    "partialMuWAvailable": false,
+    "covariantDerivativeSupportAvailable": false,
+    "derivativeBasis": "chart",
+    "transitionDerivativeTermsRequired": true
+  },
+  "provenance": {
+    "generatedFrom": [
+      "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+      "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-campaign-grid.json",
+      "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-tile-effective-full-tensor-source.json"
+    ],
+    "inputHashes": {
+      "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json": "e8d9e213930e6b722cd25f64d95745b89d892221d5758e7c4db44ec64d056c46",
+      "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-campaign-grid.json": "64da1f33d39cb35cfb20fdcccfdf77ba53a6a43c8b945839edd3953c090694d8",
+      "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-tile-effective-full-tensor-source.json": "17c3b56d06092d160e22ca5f6a58414ed3f40450e5091f41880747e4fb94d8bc"
+    },
+    "atlasHash": "41bdbf8140bce18f971b417014779f76eb8113c03ec5a79abfcc13d05bff9bb2",
+    "targetEchoForbidden": true,
+    "targetDerivedFieldsUsed": false
+  },
+  "eligibility": {
+    "atlasAvailable": true,
+    "sameRunIdentityAvailable": true,
+    "sameBasisMetadataAvailable": true,
+    "downstreamConsumersRequired": [
+      "regional_source_closure_evidence",
+      "regional_source_transition_kernel",
+      "tile_counterpart_conservation",
+      "qei_worldline_dossier",
+      "observer_robust_energy_conditions",
+      "coupled_closure_pass_candidate",
+      "regional_tensor_pass_path_harness"
+    ],
+    "atlasEligibleForClosureHarness": true
+  },
+  "claimBoundary": {
+    "diagnosticOnly": true,
+    "atlasDoesNotFitPhysicsNumbers": true,
+    "atlasDoesNotValidateMaterialSource": true,
+    "physicalTransportClaimAllowed": false
+  }
+}

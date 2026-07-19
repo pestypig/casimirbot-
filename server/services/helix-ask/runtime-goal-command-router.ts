@@ -7,6 +7,7 @@ import type {
   HelixRuntimeGoalSession,
   HelixRuntimeGoalSourceBinding,
 } from "@shared/helix-runtime-goal-session";
+import { HELIX_RESEARCH_LIBRARY_DOC_VIEWER_PATH_PREFIX } from "@shared/helix-research-library";
 import { selectHelixAgentRuntime } from "./agent-providers/runtime-select";
 import {
   helixRuntimeGoalSessionStore,
@@ -72,6 +73,75 @@ const latestGoalSession = (): HelixRuntimeGoalSession | null =>
 const readWorkspaceSnapshot = (body: RecordLike): RecordLike =>
   readRecord(body.workspace_context_snapshot ?? body.workspaceContextSnapshot) ?? {};
 
+const PRIVATE_RESEARCH_RUNTIME_GOAL_SOURCE_UNAVAILABLE_REASON =
+  "private_research_runtime_goal_source_not_admitted";
+
+const recordClaimsPrivateResearchDocument = (record: RecordLike | null): boolean => {
+  if (!record) return false;
+  const documentSourceKind = readString(
+    record.document_source_kind ?? record.documentSourceKind,
+  ).toLowerCase();
+  const privateSource = record.private_source ?? record.privateSource;
+  const docPaths = [
+    record.doc_path,
+    record.docPath,
+    record.active_doc_path,
+    record.activeDocPath,
+    record.doc_context_path,
+    record.docContextPath,
+  ].map(readString).filter(Boolean);
+  const documentRefs = [
+    record.document_ref,
+    record.documentRef,
+    record.active_doc_ref,
+    record.activeDocRef,
+  ].map(readString).filter(Boolean);
+  const sourceIds = [
+    record.source_id,
+    record.sourceId,
+    record.active_doc_source_id,
+    record.activeDocSourceId,
+  ].map(readString).filter(Boolean);
+  return (
+    documentSourceKind === "research_library" ||
+    privateSource === true ||
+    readString(privateSource).toLowerCase() === "true" ||
+    docPaths.some((value) => value.startsWith(HELIX_RESEARCH_LIBRARY_DOC_VIEWER_PATH_PREFIX)) ||
+    documentRefs.some((value) => value.startsWith("private-research:")) ||
+    sourceIds.some((value) => value.startsWith(
+      `document_markdown:${HELIX_RESEARCH_LIBRARY_DOC_VIEWER_PATH_PREFIX}`,
+    ))
+  );
+};
+
+const bodyClaimsPrivateResearchVisibleDocument = (
+  body: RecordLike,
+  snapshot: RecordLike,
+  visibleContext: RecordLike | null,
+): boolean => {
+  if (
+    recordClaimsPrivateResearchDocument(body) ||
+    recordClaimsPrivateResearchDocument(snapshot) ||
+    recordClaimsPrivateResearchDocument(visibleContext)
+  ) {
+    return true;
+  }
+  const visibleTargets = [
+    ...(Array.isArray(visibleContext?.chunks) ? visibleContext.chunks : []),
+    ...(Array.isArray(visibleContext?.ui_text_regions) ? visibleContext.ui_text_regions : []),
+    ...(Array.isArray(visibleContext?.uiTextRegions) ? visibleContext.uiTextRegions : []),
+    ...(Array.isArray(visibleContext?.panel_text_regions) ? visibleContext.panel_text_regions : []),
+    ...(Array.isArray(visibleContext?.panelTextRegions) ? visibleContext.panelTextRegions : []),
+    ...(Array.isArray(visibleContext?.visible_ui_text_regions)
+      ? visibleContext.visible_ui_text_regions
+      : []),
+    ...(Array.isArray(visibleContext?.visibleUiTextRegions)
+      ? visibleContext.visibleUiTextRegions
+      : []),
+  ];
+  return visibleTargets.some((target) => recordClaimsPrivateResearchDocument(readRecord(target)));
+};
+
 const readRuntimeGoalThreadId = (body: RecordLike): string => {
   const routeMetadata = readRecord(body.route_metadata ?? body.routeMetadata);
   const sourceTargetIntent = readRecord(
@@ -98,6 +168,16 @@ export const readRuntimeGoalVisibleDocContext = (body: RecordLike): {
     snapshot.active_doc_visible_translation_context ??
       snapshot.activeDocVisibleTranslationContext,
   );
+  if (bodyClaimsPrivateResearchVisibleDocument(body, snapshot, visibleContext)) {
+    return {
+      docPath: null,
+      visibleText: null,
+      sourceHash: null,
+      sourceId: null,
+      sourceFreshnessMs: null,
+      unavailableReason: PRIVATE_RESEARCH_RUNTIME_GOAL_SOURCE_UNAVAILABLE_REASON,
+    };
+  }
   const chunks = Array.isArray(visibleContext?.chunks) ? visibleContext.chunks : [];
   const visibleText = chunks
     .map((chunk) => readString(readRecord(chunk)?.visible_text ?? readRecord(chunk)?.visibleText))

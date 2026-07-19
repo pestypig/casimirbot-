@@ -3487,7 +3487,7 @@ export const DOC_FILE_METADATA: Record<string, DocFileMetadata> = {
   "docs/renderer/scientific-toolchain-doctor.md": {"mtimeMs":1774402609194,"mtimeIso":"2026-03-25T01:36:49.194Z","sizeBytes":804},
   "docs/renderplan-training.md": {"mtimeMs":1767727811580,"mtimeIso":"2026-01-06T19:30:11.580Z","sizeBytes":2022},
   "docs/replit-build-alignment.md": {"mtimeMs":1769407204285,"mtimeIso":"2026-01-26T06:00:04.285Z","sizeBytes":2503},
-  "docs/replit-parity-contract.md": {"mtimeMs":1784314956071,"mtimeIso":"2026-07-17T19:02:36.071Z","sizeBytes":7437},
+  "docs/replit-parity-contract.md": {"mtimeMs":1784360038419,"mtimeIso":"2026-07-18T07:33:58.419Z","sizeBytes":7637},
   "docs/replit-runtime-constraints.md": {"mtimeMs":1770333327402,"mtimeIso":"2026-02-05T23:15:27.402Z","sizeBytes":2306},
   "docs/replit-runtime.md": {"mtimeMs":1770339561126,"mtimeIso":"2026-02-06T00:59:21.126Z","sizeBytes":6993},
   "docs/research/agibot-codex-cloud-runner-templates-2026-02-20.md": {"mtimeMs":1771623458002,"mtimeIso":"2026-02-20T21:37:38.002Z","sizeBytes":2513},

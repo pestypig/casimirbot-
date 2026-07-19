@@ -263,6 +263,39 @@ describe("canonical open-world theory reflection gateway", () => {
     expect(observation.derivation_program_v1.steps).toHaveLength(2);
   });
 
+  it("locates a natural Cooper-pair referent as likely context without granting exact authority", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: HELIX_THEORY_CONTEXT_REFLECTION_CAPABILITY,
+      turnId: "turn:gateway:natural-cooper-pair-context",
+      arguments: {
+        prompt: [
+          "Cooper pairs are pairs of electrons that become weakly bound together inside certain materials at very low temperatures.",
+          "A crystal-lattice distortion can produce an effective attraction that overcomes electron repulsion under the right conditions.",
+          "Many Cooper pairs can occupy a coherent quantum state that moves without ordinary electrical resistance, creating superconductivity.",
+          "Cooper pairing is central to conventional BCS superconductivity.",
+        ].join(" "),
+        conversation_context: "can you reflect this in theory badge graph?",
+      },
+    });
+    const observation = readObservation(result.observation);
+    const badgeId = "low_temp.superconductivity.zero_dc_resistance_bounds";
+
+    expect(result.ok).toBe(true);
+    expect(observation.exact_badge_ids).not.toContain(badgeId);
+    expect(observation.likely_badge_ids).toContain(badgeId);
+    expect(observation.open_world_uncertainty).toMatchObject({
+      representedProbabilityMass: 0.55,
+      outOfGraphProbability: 0.45,
+      coverageBasis: "semantic_coverage_heuristic",
+    });
+    expect(observation.match_authority_semantics).toMatchObject({
+      exact_and_likely: "semantic_locator_status_not_scientific_validation",
+      axes_are_independent: true,
+    });
+  });
+
   it.each([
     ["contextual", "Explain what helix_ask.reflect_theory_context would do with operation=compare; do not execute it."],
     ["negated", "Do not run helix_ask.reflect_theory_context; operation=compare; target=GR."],

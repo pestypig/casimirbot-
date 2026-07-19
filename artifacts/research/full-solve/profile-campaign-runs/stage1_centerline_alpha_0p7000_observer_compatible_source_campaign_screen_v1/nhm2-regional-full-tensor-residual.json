@@ -1,0 +1,1158 @@
+{
+  "contractVersion": "nhm2_regional_full_tensor_residual/v1",
+  "generatedAt": "2026-06-19T19:03:10.634Z",
+  "laneId": "nhm2_shift_lapse",
+  "selectedProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "runId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1:candidate_regional_source_closure",
+  "atlasRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-support-function-atlas.json",
+  "expectedAtlasHash": "41bdbf8140bce18f971b417014779f76eb8113c03ec5a79abfcc13d05bff9bb2",
+  "regionalSourceClosureEvidenceRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-source-closure-evidence.json",
+  "requiredComponents": [
+    "T00",
+    "T01",
+    "T02",
+    "T03",
+    "T11",
+    "T12",
+    "T13",
+    "T22",
+    "T23",
+    "T33"
+  ],
+  "requiredRegions": [
+    "global",
+    "hull",
+    "wall",
+    "exterior_shell"
+  ],
+  "regions": [
+    {
+      "regionId": "global",
+      "status": "pass",
+      "metricTensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-metric-required-full-regional-tensor.json#metric-required-full-tensor/global/sameChartFullTensor",
+      "tileTensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-tile-effective-full-tensor-source.json#global",
+      "metricTensorAuthorityMode": "symmetric_full_tensor",
+      "tileTensorAuthorityMode": "symmetric_full_tensor",
+      "missingMetricComponentIds": [],
+      "missingTileComponentIds": [],
+      "componentResiduals": [
+        {
+          "componentId": "T00",
+          "family": "t00",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.03,
+          "absResidual": 0.03,
+          "relResidual": 0.03,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T01",
+          "family": "momentum_t0i",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 3e-12,
+          "absResidual": 3e-12,
+          "relResidual": 3e-12,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T02",
+          "family": "momentum_t0i",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 2.1e-12,
+          "absResidual": 2.1e-12,
+          "relResidual": 2.1e-12,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T03",
+          "family": "momentum_t0i",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 1.2000000000000001e-12,
+          "absResidual": 1.2000000000000001e-12,
+          "relResidual": 1.2000000000000001e-12,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T11",
+          "family": "diagonal_tij",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.005399999999999999,
+          "absResidual": 0.005399999999999999,
+          "relResidual": 0.005399999999999999,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T12",
+          "family": "off_diagonal_tij",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.0000027,
+          "absResidual": 0.0000027,
+          "relResidual": 0.0000027,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T13",
+          "family": "off_diagonal_tij",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.0000016199999999999997,
+          "absResidual": 0.0000016199999999999997,
+          "relResidual": 0.0000016199999999999997,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T22",
+          "family": "diagonal_tij",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.0045899999999999995,
+          "absResidual": 0.0045899999999999995,
+          "relResidual": 0.0045899999999999995,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T23",
+          "family": "off_diagonal_tij",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.0000010799999999999998,
+          "absResidual": 0.0000010799999999999998,
+          "relResidual": 0.0000010799999999999998,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T33",
+          "family": "diagonal_tij",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.0037799999999999995,
+          "absResidual": 0.0037799999999999995,
+          "relResidual": 0.0037799999999999995,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        }
+      ],
+      "familyResiduals": [
+        {
+          "family": "t00",
+          "status": "pass",
+          "worstComponentId": "T00",
+          "worstRelResidual": 0.03,
+          "maxCurrentToAllowedMagnitudeRatio": null,
+          "failingComponentIds": [],
+          "missingComponentIds": []
+        },
+        {
+          "family": "momentum_t0i",
+          "status": "pass",
+          "worstComponentId": "T01",
+          "worstRelResidual": 3e-12,
+          "maxCurrentToAllowedMagnitudeRatio": null,
+          "failingComponentIds": [],
+          "missingComponentIds": []
+        },
+        {
+          "family": "diagonal_tij",
+          "status": "pass",
+          "worstComponentId": "T11",
+          "worstRelResidual": 0.005399999999999999,
+          "maxCurrentToAllowedMagnitudeRatio": null,
+          "failingComponentIds": [],
+          "missingComponentIds": []
+        },
+        {
+          "family": "off_diagonal_tij",
+          "status": "pass",
+          "worstComponentId": "T12",
+          "worstRelResidual": 0.0000027,
+          "maxCurrentToAllowedMagnitudeRatio": null,
+          "failingComponentIds": [],
+          "missingComponentIds": []
+        }
+      ],
+      "t00RelResidual": 0.03,
+      "fullRelLInf": 0.03,
+      "fullAbsLInf": 0.03,
+      "toleranceRelLInf": 0.1,
+      "worstComponentId": "T00",
+      "worstComponentRelResidual": 0.03,
+      "blockers": []
+    },
+    {
+      "regionId": "hull",
+      "status": "pass",
+      "metricTensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-metric-required-full-regional-tensor.json#metric-required-full-tensor/hull/sameChartFullTensor",
+      "tileTensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-tile-effective-full-tensor-source.json#hull",
+      "metricTensorAuthorityMode": "symmetric_full_tensor",
+      "tileTensorAuthorityMode": "symmetric_full_tensor",
+      "missingMetricComponentIds": [],
+      "missingTileComponentIds": [],
+      "componentResiduals": [
+        {
+          "componentId": "T00",
+          "family": "t00",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.017499999999999998,
+          "absResidual": 0.017499999999999998,
+          "relResidual": 0.017499999999999998,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T01",
+          "family": "momentum_t0i",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 1.7499999999999998e-12,
+          "absResidual": 1.7499999999999998e-12,
+          "relResidual": 1.7499999999999998e-12,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T02",
+          "family": "momentum_t0i",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 1.2249999999999997e-12,
+          "absResidual": 1.2249999999999997e-12,
+          "relResidual": 1.2249999999999997e-12,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T03",
+          "family": "momentum_t0i",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 6.999999999999999e-13,
+          "absResidual": 6.999999999999999e-13,
+          "relResidual": 6.999999999999999e-13,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T11",
+          "family": "diagonal_tij",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.0031499999999999996,
+          "absResidual": 0.0031499999999999996,
+          "relResidual": 0.0031499999999999996,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T12",
+          "family": "off_diagonal_tij",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.0000015749999999999997,
+          "absResidual": 0.0000015749999999999997,
+          "relResidual": 0.0000015749999999999997,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T13",
+          "family": "off_diagonal_tij",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 9.45e-7,
+          "absResidual": 9.45e-7,
+          "relResidual": 9.45e-7,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T22",
+          "family": "diagonal_tij",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.0026774999999999998,
+          "absResidual": 0.0026774999999999998,
+          "relResidual": 0.0026774999999999998,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T23",
+          "family": "off_diagonal_tij",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 6.299999999999999e-7,
+          "absResidual": 6.299999999999999e-7,
+          "relResidual": 6.299999999999999e-7,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T33",
+          "family": "diagonal_tij",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.0022049999999999995,
+          "absResidual": 0.0022049999999999995,
+          "relResidual": 0.0022049999999999995,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        }
+      ],
+      "familyResiduals": [
+        {
+          "family": "t00",
+          "status": "pass",
+          "worstComponentId": "T00",
+          "worstRelResidual": 0.017499999999999998,
+          "maxCurrentToAllowedMagnitudeRatio": null,
+          "failingComponentIds": [],
+          "missingComponentIds": []
+        },
+        {
+          "family": "momentum_t0i",
+          "status": "pass",
+          "worstComponentId": "T01",
+          "worstRelResidual": 1.7499999999999998e-12,
+          "maxCurrentToAllowedMagnitudeRatio": null,
+          "failingComponentIds": [],
+          "missingComponentIds": []
+        },
+        {
+          "family": "diagonal_tij",
+          "status": "pass",
+          "worstComponentId": "T11",
+          "worstRelResidual": 0.0031499999999999996,
+          "maxCurrentToAllowedMagnitudeRatio": null,
+          "failingComponentIds": [],
+          "missingComponentIds": []
+        },
+        {
+          "family": "off_diagonal_tij",
+          "status": "pass",
+          "worstComponentId": "T12",
+          "worstRelResidual": 0.0000015749999999999997,
+          "maxCurrentToAllowedMagnitudeRatio": null,
+          "failingComponentIds": [],
+          "missingComponentIds": []
+        }
+      ],
+      "t00RelResidual": 0.017499999999999998,
+      "fullRelLInf": 0.017499999999999998,
+      "fullAbsLInf": 0.017499999999999998,
+      "toleranceRelLInf": 0.1,
+      "worstComponentId": "T00",
+      "worstComponentRelResidual": 0.017499999999999998,
+      "blockers": []
+    },
+    {
+      "regionId": "wall",
+      "status": "pass",
+      "metricTensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-metric-required-full-regional-tensor.json#metric-required-full-tensor/wall/sameChartFullTensor",
+      "tileTensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-tile-effective-full-tensor-source.json#wall",
+      "metricTensorAuthorityMode": "symmetric_full_tensor",
+      "tileTensorAuthorityMode": "symmetric_full_tensor",
+      "missingMetricComponentIds": [],
+      "missingTileComponentIds": [],
+      "componentResiduals": [
+        {
+          "componentId": "T00",
+          "family": "t00",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.05,
+          "absResidual": 0.05,
+          "relResidual": 0.05,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T01",
+          "family": "momentum_t0i",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 5.0000000000000005e-12,
+          "absResidual": 5.0000000000000005e-12,
+          "relResidual": 5.0000000000000005e-12,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T02",
+          "family": "momentum_t0i",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 3.5e-12,
+          "absResidual": 3.5e-12,
+          "relResidual": 3.5e-12,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T03",
+          "family": "momentum_t0i",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 2.0000000000000004e-12,
+          "absResidual": 2.0000000000000004e-12,
+          "relResidual": 2.0000000000000004e-12,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T11",
+          "family": "diagonal_tij",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.009,
+          "absResidual": 0.009,
+          "relResidual": 0.009,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T12",
+          "family": "off_diagonal_tij",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.0000045,
+          "absResidual": 0.0000045,
+          "relResidual": 0.0000045,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T13",
+          "family": "off_diagonal_tij",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.0000027,
+          "absResidual": 0.0000027,
+          "relResidual": 0.0000027,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T22",
+          "family": "diagonal_tij",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.007649999999999999,
+          "absResidual": 0.007649999999999999,
+          "relResidual": 0.007649999999999999,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T23",
+          "family": "off_diagonal_tij",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.0000018000000000000001,
+          "absResidual": 0.0000018000000000000001,
+          "relResidual": 0.0000018000000000000001,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T33",
+          "family": "diagonal_tij",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.006299999999999999,
+          "absResidual": 0.006299999999999999,
+          "relResidual": 0.006299999999999999,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        }
+      ],
+      "familyResiduals": [
+        {
+          "family": "t00",
+          "status": "pass",
+          "worstComponentId": "T00",
+          "worstRelResidual": 0.05,
+          "maxCurrentToAllowedMagnitudeRatio": null,
+          "failingComponentIds": [],
+          "missingComponentIds": []
+        },
+        {
+          "family": "momentum_t0i",
+          "status": "pass",
+          "worstComponentId": "T01",
+          "worstRelResidual": 5.0000000000000005e-12,
+          "maxCurrentToAllowedMagnitudeRatio": null,
+          "failingComponentIds": [],
+          "missingComponentIds": []
+        },
+        {
+          "family": "diagonal_tij",
+          "status": "pass",
+          "worstComponentId": "T11",
+          "worstRelResidual": 0.009,
+          "maxCurrentToAllowedMagnitudeRatio": null,
+          "failingComponentIds": [],
+          "missingComponentIds": []
+        },
+        {
+          "family": "off_diagonal_tij",
+          "status": "pass",
+          "worstComponentId": "T12",
+          "worstRelResidual": 0.0000045,
+          "maxCurrentToAllowedMagnitudeRatio": null,
+          "failingComponentIds": [],
+          "missingComponentIds": []
+        }
+      ],
+      "t00RelResidual": 0.05,
+      "fullRelLInf": 0.05,
+      "fullAbsLInf": 0.05,
+      "toleranceRelLInf": 0.1,
+      "worstComponentId": "T00",
+      "worstComponentRelResidual": 0.05,
+      "blockers": []
+    },
+    {
+      "regionId": "exterior_shell",
+      "status": "pass",
+      "metricTensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-metric-required-full-regional-tensor.json#metric-required-full-tensor/exterior_shell/sameChartFullTensor",
+      "tileTensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-tile-effective-full-tensor-source.json#exterior_shell",
+      "metricTensorAuthorityMode": "symmetric_full_tensor",
+      "tileTensorAuthorityMode": "symmetric_full_tensor",
+      "missingMetricComponentIds": [],
+      "missingTileComponentIds": [],
+      "componentResiduals": [
+        {
+          "componentId": "T00",
+          "family": "t00",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.010000000000000002,
+          "absResidual": 0.010000000000000002,
+          "relResidual": 0.010000000000000002,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T01",
+          "family": "momentum_t0i",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 1.0000000000000002e-12,
+          "absResidual": 1.0000000000000002e-12,
+          "relResidual": 1.0000000000000002e-12,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T02",
+          "family": "momentum_t0i",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 7e-13,
+          "absResidual": 7e-13,
+          "relResidual": 7e-13,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T03",
+          "family": "momentum_t0i",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 4.000000000000001e-13,
+          "absResidual": 4.000000000000001e-13,
+          "relResidual": 4.000000000000001e-13,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T11",
+          "family": "diagonal_tij",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.0018000000000000004,
+          "absResidual": 0.0018000000000000004,
+          "relResidual": 0.0018000000000000004,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T12",
+          "family": "off_diagonal_tij",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 9.000000000000003e-7,
+          "absResidual": 9.000000000000003e-7,
+          "relResidual": 9.000000000000003e-7,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T13",
+          "family": "off_diagonal_tij",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 5.400000000000002e-7,
+          "absResidual": 5.400000000000002e-7,
+          "relResidual": 5.400000000000002e-7,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T22",
+          "family": "diagonal_tij",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.0015300000000000003,
+          "absResidual": 0.0015300000000000003,
+          "relResidual": 0.0015300000000000003,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T23",
+          "family": "off_diagonal_tij",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 3.600000000000001e-7,
+          "absResidual": 3.600000000000001e-7,
+          "relResidual": 3.600000000000001e-7,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T33",
+          "family": "diagonal_tij",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.0012600000000000003,
+          "absResidual": 0.0012600000000000003,
+          "relResidual": 0.0012600000000000003,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "correctionHint": {
+            "status": "already_within_tolerance",
+            "signedDeltaToNearestPassSI": 0,
+            "currentToAllowedMagnitudeRatio": null
+          },
+          "status": "pass",
+          "blockers": []
+        }
+      ],
+      "familyResiduals": [
+        {
+          "family": "t00",
+          "status": "pass",
+          "worstComponentId": "T00",
+          "worstRelResidual": 0.010000000000000002,
+          "maxCurrentToAllowedMagnitudeRatio": null,
+          "failingComponentIds": [],
+          "missingComponentIds": []
+        },
+        {
+          "family": "momentum_t0i",
+          "status": "pass",
+          "worstComponentId": "T01",
+          "worstRelResidual": 1.0000000000000002e-12,
+          "maxCurrentToAllowedMagnitudeRatio": null,
+          "failingComponentIds": [],
+          "missingComponentIds": []
+        },
+        {
+          "family": "diagonal_tij",
+          "status": "pass",
+          "worstComponentId": "T11",
+          "worstRelResidual": 0.0018000000000000004,
+          "maxCurrentToAllowedMagnitudeRatio": null,
+          "failingComponentIds": [],
+          "missingComponentIds": []
+        },
+        {
+          "family": "off_diagonal_tij",
+          "status": "pass",
+          "worstComponentId": "T12",
+          "worstRelResidual": 9.000000000000003e-7,
+          "maxCurrentToAllowedMagnitudeRatio": null,
+          "failingComponentIds": [],
+          "missingComponentIds": []
+        }
+      ],
+      "t00RelResidual": 0.010000000000000002,
+      "fullRelLInf": 0.010000000000000002,
+      "fullAbsLInf": 0.010000000000000002,
+      "toleranceRelLInf": 0.1,
+      "worstComponentId": "T00",
+      "worstComponentRelResidual": 0.010000000000000002,
+      "blockers": []
+    }
+  ],
+  "summary": {
+    "allRequiredRegionsPresent": true,
+    "allRequiredComponentsPresent": true,
+    "t00ResidualsPass": true,
+    "fullTensorResidualsPass": true,
+    "anyAtlasMismatch": false,
+    "worstRegionId": "wall",
+    "worstComponentId": "T00",
+    "worstResidualFamily": "t00",
+    "worstRelResidual": 0.05,
+    "firstBlocker": null,
+    "firstBlockerFamily": null,
+    "blockerCount": 0
+  },
+  "claimBoundary": {
+    "diagnosticOnly": true,
+    "fullTensorResidualDoesNotValidatePhysicalSource": true,
+    "missingComponentsCannotBeZeroFilled": true,
+    "globalResidualCannotMaskRegionalFailure": true
+  }
+}

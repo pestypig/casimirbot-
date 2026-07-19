@@ -5,6 +5,11 @@ import { describe, expect, it } from "vitest";
 import { isTheoryRuntimeMathTraceV1 } from "../../../../../shared/contracts/theory-runtime-math-trace.v1";
 import { isTheoryRuntimeReceiptV1 } from "../../../../../shared/contracts/theory-runtime-receipt.v1";
 import {
+  NHM2_ALPHA07_EXPECTED_PACKAGE_ARTIFACTS,
+  NHM2_ALPHA07_IMPORT_MANIFEST_PATH,
+  NHM2_ALPHA07_SOURCE_COMMIT,
+} from "../../../../../shared/theory/nhm2-alpha07-historical-import-governance";
+import {
   GR_NHM2_ARTIFACT_ROOTS,
   grNhm2RuntimeAdapter,
   readGrNhm2RuntimeArtifacts,
@@ -19,8 +24,13 @@ async function withTempRoot<T>(fn: (tempRoot: string) => Promise<T>): Promise<T>
   }
 }
 
-async function writeArtifact(tempRoot: string, name: string, content: unknown): Promise<void> {
-  const root = path.join(tempRoot, GR_NHM2_ARTIFACT_ROOTS[0]);
+async function writeArtifact(
+  tempRoot: string,
+  name: string,
+  content: unknown,
+  rootIndex = 0,
+): Promise<void> {
+  const root = path.join(tempRoot, GR_NHM2_ARTIFACT_ROOTS[rootIndex]);
   await fs.mkdir(root, { recursive: true });
   const raw = typeof content === "string" ? content : JSON.stringify(content, null, 2);
   await fs.writeFile(path.join(root, name), raw, "utf8");
@@ -72,6 +82,7 @@ describe("GR/NHM2 runtime adapter", () => {
       expect(isTheoryRuntimeReceiptV1(receipt)).toBe(true);
       expect(receipt.status).toBe("not_run");
       expect(receipt.outputs.artifacts).toEqual([]);
+      expect(receipt.outputs.gates.runtime_artifact_freshness).toBe("not_ready");
       expect(receipt.claimBoundary.promotionAllowed).toBe(false);
     });
   });
@@ -129,8 +140,9 @@ describe("GR/NHM2 runtime adapter", () => {
 
       const receipt = await readGrNhm2RuntimeArtifacts({ projectRoot: tempRoot });
 
-      expect(receipt.status).toBe("completed");
+      expect(receipt.status).toBe("blocked");
       expect(receipt.outputs.gates.hard_constraints).toBe("fail");
+      expect(receipt.outputs.missingSignals).toContain("runtime_artifact_freshness_unbound");
       expect(receipt.claimBoundary.promotionAllowed).toBe(false);
       expect(receipt.claimBoundary.promotionBlockedBy).toContain("hard_constraints_failed");
     });
@@ -165,7 +177,7 @@ describe("GR/NHM2 runtime adapter", () => {
         graphId: "nhm2-theory-badge-graph",
       });
 
-      expect(receipt?.status).toBe("completed");
+      expect(receipt?.status).toBe("blocked");
       expect(receipt?.outputs.scalars.curvatureRatio).toBe(0.2);
       expect(receipt?.outputs.scalars.wallT00RelLInf).toBe(14.95);
       expect(receipt?.outputs.scalars.weylScalar).toBe(0.03);
@@ -183,8 +195,218 @@ describe("GR/NHM2 runtime adapter", () => {
         "nhm2.natario.curvature_invariants",
         "nhm2.natario.invariant_audit",
         "nhm2.energy_condition.observer_robust_gate",
+        "nhm2.formal.lean_certificate",
+        "nhm2.formal.certificate_hashes_pinned",
+        "nhm2.formal.diagnostic_campaign_admissible",
+        "nhm2.formal.claim_locks_closed",
+        "nhm2.formal.negative_fixtures_fail_closed",
+        "nhm2.mechanical.support_retention_overlap",
       ]),
     );
+  });
+
+  it("reads the governed 0p7000 certificate root for formal badge requests", async () => {
+    await withTempRoot(async (tempRoot) => {
+      await writeArtifact(
+        tempRoot,
+        "nhm2-lean-campaign-certificate.json",
+        {
+          contractVersion: "nhm2_lean_campaign_certificate/v1",
+          certificate: { diagnosticCampaignAdmissible: true },
+          certificateIntegrity: "pass",
+          claimLocks: {
+            physicalViabilityClaimAllowed: false,
+            transportClaimAllowed: false,
+            routeEtaClaimAllowed: false,
+            propulsionClaimAllowed: false,
+            certifiedWarpSpeedClaimAllowed: false,
+          },
+        },
+        1,
+      );
+
+      const receipt = await readGrNhm2RuntimeArtifacts({ projectRoot: tempRoot });
+
+      expect(GR_NHM2_ARTIFACT_ROOTS[1]).toContain("profile-campaign-runs");
+      expect(receipt.badgeIds).toEqual(
+        expect.arrayContaining([
+          "nhm2.formal.lean_certificate",
+          "nhm2.formal.certificate_hashes_pinned",
+          "nhm2.formal.diagnostic_campaign_admissible",
+          "nhm2.formal.claim_locks_closed",
+          "nhm2.formal.negative_fixtures_fail_closed",
+        ]),
+      );
+      expect(receipt.outputs.artifacts).toContain(
+        `${GR_NHM2_ARTIFACT_ROOTS[1]}/nhm2-lean-campaign-certificate.json`,
+      );
+      expect(receipt.outputs.gates.certificate_issued).toBe("pass");
+      expect(receipt.outputs.gates.certificate_integrity).toBe("pass");
+      expect(receipt.outputs.gates.runtime_artifact_freshness).toBe("not_ready");
+      expect(receipt.claimBoundary).toMatchObject({
+        maximumTier: "reduced_order",
+        promotionAllowed: false,
+      });
+      expect(
+        grNhm2RuntimeAdapter.canHandle({ badgeIds: ["nhm2.formal.lean_certificate"] }),
+      ).toBe(true);
+    });
+  });
+
+  it("validates the real governed alpha=0.7 manifest in the production formal-badge read path", async () => {
+    const receipt = await readGrNhm2RuntimeArtifacts({
+      projectRoot: process.cwd(),
+      badgeIds: [
+        "nhm2.formal.lean_certificate",
+        "nhm2.formal.certificate_hashes_pinned",
+        "nhm2.formal.diagnostic_campaign_admissible",
+        "nhm2.formal.claim_locks_closed",
+      ],
+      generatedAt: "2026-07-19T12:00:00.000Z",
+    });
+
+    expect(isTheoryRuntimeReceiptV1(receipt)).toBe(true);
+    expect(receipt.status).toBe("blocked");
+    expect(receipt.outputs.artifactManifest).toMatchObject({
+      manifestPath: NHM2_ALPHA07_IMPORT_MANIFEST_PATH,
+      gitSha: NHM2_ALPHA07_SOURCE_COMMIT,
+      boundToExecution: false,
+      requestId: null,
+      startedAt: null,
+      completedAt: null,
+    });
+    expect(receipt.outputs.artifactManifest?.entries).toHaveLength(
+      NHM2_ALPHA07_EXPECTED_PACKAGE_ARTIFACTS.length,
+    );
+    expect(receipt.outputs.artifactManifest?.entries.every(
+      (entry) => entry.freshness === "preexisting" && /^[a-f0-9]{64}$/.test(entry.sha256),
+    )).toBe(true);
+    expect(receipt.outputs.artifactEvidence).toHaveLength(
+      NHM2_ALPHA07_EXPECTED_PACKAGE_ARTIFACTS.length,
+    );
+    expect(receipt.outputs.artifactEvidence?.every(
+      (entry) => entry.freshness === "preexisting" && /^[a-f0-9]{64}$/.test(entry.sha256),
+    )).toBe(true);
+    expect(receipt.outputs.gates).toMatchObject({
+      source_closure_aggregate: "pass",
+      source_closure_artifact: "pass",
+      certificate_issued: "pass",
+      certificate_integrity: "pass",
+      formal_certificate_hashes_pinned: "pass",
+      formal_claim_locks_closed: "pass",
+      runtime_execution_provenance: "not_ready",
+      runtime_artifact_freshness: "not_ready",
+    });
+    expect(receipt.outputs.missingSignals).toEqual(expect.arrayContaining([
+      "runtime_execution_provenance_unbound",
+      "runtime_artifact_freshness_unbound",
+    ]));
+    expect(receipt.provenance).toEqual({
+      gitSha: NHM2_ALPHA07_SOURCE_COMMIT,
+      startedAt: null,
+      completedAt: null,
+      durationMs: null,
+    });
+    expect(receipt.claimBoundary).toMatchObject({
+      maximumTier: "reduced_order",
+      promotionAllowed: false,
+    });
+  });
+
+  it("does not infer required gate passes from artifact names or descriptive text", async () => {
+    await withTempRoot(async (tempRoot) => {
+      await writeArtifact(
+        tempRoot,
+        "source-closure-certificate-observer-audit.json",
+        { description: "source closure certificate observer audit evidence package" },
+        1,
+      );
+
+      const receipt = await readGrNhm2RuntimeArtifacts({ projectRoot: tempRoot });
+
+      expect(receipt.outputs.gates.source_closure).not.toBe("pass");
+      expect(receipt.outputs.gates.certificate_issued).not.toBe("pass");
+      expect(receipt.outputs.gates.certificate_integrity).not.toBe("pass");
+      expect(receipt.outputs.gates.observer_audit).not.toBe("pass");
+      expect(receipt.outputs.missingSignals).toEqual(
+        expect.arrayContaining([
+          "source_closure_missing",
+          "certificate_issued_missing",
+          "certificate_integrity_missing",
+          "observer_audit_missing",
+        ]),
+      );
+    });
+  });
+
+  it("preserves an explicit failure when another artifact reports a pass", async () => {
+    await withTempRoot(async (tempRoot) => {
+      await writeArtifact(tempRoot, "hard-fail.json", {
+        gateStatus: { hardConstraints: "fail" },
+      });
+      await writeArtifact(tempRoot, "hard-pass.json", {
+        gateStatus: { hardConstraints: "pass" },
+      }, 1);
+
+      const receipt = await readGrNhm2RuntimeArtifacts({ projectRoot: tempRoot });
+
+      expect(receipt.outputs.gates.hard_constraints).toBe("fail");
+      expect(receipt.claimBoundary.promotionAllowed).toBe(false);
+    });
+  });
+
+  it("preserves artifact review when an aggregate artifact reports pass", async () => {
+    await withTempRoot(async (tempRoot) => {
+      await writeArtifact(tempRoot, "aggregate-pass.json", {
+        gateStatus: {
+          sourceClosure: "pass",
+          observerAudit: "pass",
+        },
+      });
+      await writeArtifact(tempRoot, "artifact-review.json", {
+        sections: {
+          source_closure: {
+            artifactRefs: [{ status: "audit_review" }],
+          },
+          observer_audit: {
+            artifactRefs: [{ status: "review" }],
+          },
+        },
+      }, 1);
+
+      const receipt = await readGrNhm2RuntimeArtifacts({ projectRoot: tempRoot });
+
+      expect(receipt.outputs.gates.source_closure).toBe("review");
+      expect(receipt.outputs.gates.observer_audit).toBe("review");
+      expect(receipt.outputs.gates.source_closure_aggregate).toBe("pass");
+      expect(receipt.outputs.gates.source_closure_artifact).toBe("review");
+      expect(receipt.outputs.gates.observer_audit_aggregate).toBe("pass");
+      expect(receipt.outputs.gates.observer_audit_artifact).toBe("review");
+      expect(receipt.outputs.missingSignals).toEqual(
+        expect.arrayContaining(["source_closure_review", "observer_audit_review"]),
+      );
+      expect(receipt.claimBoundary.promotionBlockedBy).toEqual(
+        expect.arrayContaining(["source_closure", "observer_audit"]),
+      );
+      expect(receipt.claimBoundary.promotionAllowed).toBe(false);
+    });
+  });
+
+  it("preserves explicit unknown when another artifact reports pass", async () => {
+    await withTempRoot(async (tempRoot) => {
+      await writeArtifact(tempRoot, "qei-pass.json", {
+        gateStatus: { qeiApplicability: "pass" },
+      });
+      await writeArtifact(tempRoot, "qei-unknown.json", {
+        gateStatus: { qeiApplicability: "unknown" },
+      }, 1);
+
+      const receipt = await readGrNhm2RuntimeArtifacts({ projectRoot: tempRoot });
+
+      expect(receipt.outputs.gates.qei_applicability).toBe("unknown");
+      expect(receipt.outputs.missingSignals).toContain("qei_applicability_missing");
+      expect(receipt.claimBoundary.promotionAllowed).toBe(false);
+    });
   });
 
   it("keeps the static GR reference trace available", () => {

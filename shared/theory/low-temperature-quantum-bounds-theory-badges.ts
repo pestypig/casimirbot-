@@ -549,7 +549,15 @@ export const LOW_TEMPERATURE_QUANTUM_BOUNDS_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["low_temperature", "superconductivity", "dc_resistance", "critical_surface", "meissner_effect"],
+      subjects: [
+        "low_temperature",
+        "superconductivity",
+        "dc_resistance",
+        "critical_surface",
+        "meissner_effect",
+        "cooper_pairing",
+        "bcs_superconductivity",
+      ],
       symbols: ["T_c", "T", "T_margin", "J_c", "J", "J_margin", "B_c", "B", "B_margin", "Z_omega"],
       unitSignatures: ["Theta", "I L^-2", "M T^-2 I^-1"],
       repoPaths: ["shared/theory/low-temperature-quantum-bounds-theory-badges.ts"],

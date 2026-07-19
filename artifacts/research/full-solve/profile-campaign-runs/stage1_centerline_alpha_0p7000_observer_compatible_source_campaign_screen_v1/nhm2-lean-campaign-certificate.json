@@ -1,0 +1,221 @@
+{
+  "contractVersion": "nhm2_lean_campaign_certificate/v1",
+  "generatedAt": "2026-06-20T13:58:51.890Z",
+  "laneId": "nhm2_shift_lapse",
+  "selectedProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "runId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "chartId": "comoving_cartesian",
+  "artifactHashes": [
+    {
+      "artifactId": "profileFrontier",
+      "path": "artifacts/research/full-solve/profile-search/nhm2-profile-campaign-frontier-latest.json",
+      "sha256": "43903d50ad8173a1f54f6297b298d203da056ed2ec9d41cc8b504282d4a919bc"
+    },
+    {
+      "artifactId": "timeDependentSourceCampaign",
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-time-dependent-source-campaign.json",
+      "sha256": "daec9e3f7f7f43d0c248dab5b80ef39e92947269b2a3abf2d9cb90a8d3cbd283"
+    },
+    {
+      "artifactId": "candidateMetricProfileSpec",
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+      "sha256": "e8d9e213930e6b722cd25f64d95745b89d892221d5758e7c4db44ec64d056c46"
+    },
+    {
+      "artifactId": "observerRobustEnergyConditions",
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-observer-robust-energy-conditions.json",
+      "sha256": "ff8473725f4cc440cfbf9eed992ea3fb5f210a76369bbb4a8c8d56952c334dc0"
+    },
+    {
+      "artifactId": "qeiWorldlineDossier",
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-qei-worldline-dossier.json",
+      "sha256": "f37ba3c7cce0b2faedc69eeb71e14a9fea647cd5a757c35cd9bd144bc2f1aeed"
+    },
+    {
+      "artifactId": "regionalFullTensorResidual",
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-full-tensor-residual.json",
+      "sha256": "4eefca5324e2de0edbad5b1b3b2a4b65682655495519ffbc40dd9c33b7cc190f"
+    },
+    {
+      "artifactId": "frequencyConvergenceEvidence",
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-frequency-convergence-evidence.json",
+      "sha256": "3c2c3b6b1b2cebb3c1531b2bf6bba24e74e0d3c564b5d1aef8e85e398d995718"
+    },
+    {
+      "artifactId": "dynamicEffectiveGeometryEvidence",
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-dynamic-effective-geometry-evidence.json",
+      "sha256": "d87f9fe7a87233651942357c57e3543a8cdfcd50a3e240884c4185346a14bb65"
+    },
+    {
+      "artifactId": "switchingCovariantConservationEvidence",
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-switching-covariant-conservation-evidence.json",
+      "sha256": "89ac70e3c28b9b50b06745c6fc0c4ad7820e5cd3db0d3c296b99880d35235276"
+    },
+    {
+      "artifactId": "campaignStabilityEvidence",
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-campaign-stability-evidence.json",
+      "sha256": "d9c331dca5667efa0278e89a94fe6ba25877925129f8d5dbaea321cddf8ce775"
+    }
+  ],
+  "identity": {
+    "expectedProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+    "profileMatchesExpected": true,
+    "chartMatchesCampaign": true,
+    "artifactHashesPresent": true,
+    "atlasHashMatches": true
+  },
+  "tensor": {
+    "hasT00": true,
+    "hasT0i": true,
+    "hasDiagonalTij": true,
+    "hasOffDiagonalTij": true,
+    "missingComponentIds": [],
+    "fullTensorClosurePass": true,
+    "maxRegionalResidual": {
+      "text": "0.05",
+      "numerator": "1",
+      "denominator": "20",
+      "lean": "(1 : Rat) / (20 : Rat)"
+    },
+    "regionalResidualTolerance": {
+      "text": "0.1",
+      "numerator": "1",
+      "denominator": "10",
+      "lean": "(1 : Rat) / (10 : Rat)"
+    }
+  },
+  "sourceIndependence": {
+    "independentlyDerivedTileMaterialTensor": true,
+    "copiedFromMetricRequiredTensor": false,
+    "fittedToMetricResidual": false,
+    "targetEchoDetected": false,
+    "sourceIndependencePass": true
+  },
+  "conservation": {
+    "switchingConservationPass": true,
+    "covariantConservationPass": true,
+    "overallResidualLInf": {
+      "text": "0.05",
+      "numerator": "1",
+      "denominator": "20",
+      "lean": "(1 : Rat) / (20 : Rat)"
+    },
+    "toleranceLInf": {
+      "text": "0.1",
+      "numerator": "1",
+      "denominator": "10",
+      "lean": "(1 : Rat) / (10 : Rat)"
+    }
+  },
+  "frequency": {
+    "frequencyConvergencePass": true,
+    "fixedCycleAverageSource": true,
+    "maxResidualLInf": {
+      "text": "0",
+      "numerator": "0",
+      "denominator": "1",
+      "lean": "(0 : Rat) / (1 : Rat)"
+    },
+    "toleranceLInf": {
+      "text": "0.1",
+      "numerator": "1",
+      "denominator": "10",
+      "lean": "(1 : Rat) / (10 : Rat)"
+    }
+  },
+  "dynamicGeometry": {
+    "dynamicGeometryAgreementPass": true,
+    "cycleAverageSourceFixed": true,
+    "residualLInf": {
+      "text": "0",
+      "numerator": "0",
+      "denominator": "1",
+      "lean": "(0 : Rat) / (1 : Rat)"
+    },
+    "residualBoundLInf": {
+      "text": "0",
+      "numerator": "0",
+      "denominator": "1",
+      "lean": "(0 : Rat) / (1 : Rat)"
+    }
+  },
+  "observer": {
+    "observerFamilyPass": true,
+    "eulerianOnly": false,
+    "robustCheckComplete": true,
+    "anyViolation": false,
+    "hasNonEulerianFamilyPass": true,
+    "continuousOptimizerImplemented": false,
+    "wecReceipt": true,
+    "necReceipt": true,
+    "decReceipt": true,
+    "secReceipt": true
+  },
+  "qei": {
+    "qeiReceiptsPass": true,
+    "hasWallWorldline": true,
+    "dossierComplete": true,
+    "allMarginsPass": true,
+    "anyProxy": false,
+    "minMarginSI": {
+      "text": "0.017499999999999998",
+      "numerator": "8749999999999999",
+      "denominator": "500000000000000000",
+      "lean": "(8749999999999999 : Rat) / (500000000000000000 : Rat)"
+    },
+    "marginBoundSI": {
+      "text": "0",
+      "numerator": "0",
+      "denominator": "1",
+      "lean": "(0 : Rat) / (1 : Rat)"
+    }
+  },
+  "stability": {
+    "stabilityPass": true,
+    "horizonStatus": "pass",
+    "blueshiftStatus": "pass",
+    "particleAccumulationStatus": "pass",
+    "perturbativeStabilityStatus": "pass"
+  },
+  "clocking": {
+    "alphaCenterline": {
+      "text": "0.7",
+      "numerator": "7",
+      "denominator": "10",
+      "lean": "(7 : Rat) / (10 : Rat)"
+    },
+    "coordinateTimeSeconds": {
+      "text": "137755965.917",
+      "numerator": "137755965917",
+      "denominator": "1000",
+      "lean": "(137755965917 : Rat) / (1000 : Rat)"
+    },
+    "shipProperTimeSeconds": {
+      "text": "96429176.14189999",
+      "numerator": "9642917614189999",
+      "denominator": "100000000",
+      "lean": "(9642917614189999 : Rat) / (100000000 : Rat)"
+    },
+    "routeEtaCertified": false
+  },
+  "claimLocks": {
+    "physicalViabilityClaimAllowed": false,
+    "transportClaimAllowed": false,
+    "routeEtaClaimAllowed": false,
+    "propulsionClaimAllowed": false,
+    "certifiedWarpSpeedClaimAllowed": false
+  },
+  "certificate": {
+    "diagnosticCampaignAdmissible": true,
+    "missingOrFailedFields": [],
+    "leanModulePath": "formal/lean/NHM2Formal/Generated/CurrentCampaignCertificate.lean",
+    "jsonArtifactPath": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-lean-campaign-certificate.json"
+  },
+  "claimBoundary": {
+    "diagnosticOnly": true,
+    "leanCertificateDoesNotValidateNumericalSolver": true,
+    "leanCertificateDoesNotProvePhysicalViability": true,
+    "leanCertificateDoesNotCertifyRouteEta": true,
+    "leanCertificateDoesNotCertifySpeed": true
+  }
+}

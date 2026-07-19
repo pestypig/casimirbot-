@@ -4,7 +4,7 @@ import {
   type TheoryRuntimeSourceRefV1,
 } from "../contracts/theory-runtime-entrypoint.v1";
 
-const GENERATED_AT = "2026-05-29T00:00:00.000Z";
+const GENERATED_AT = "2026-07-18T00:00:00.000Z";
 
 const sourceRef = (
   kind: TheoryRuntimeSourceRefV1["kind"],
@@ -123,6 +123,7 @@ export const THEORY_RUNTIME_ENTRYPOINTS: TheoryRuntimeEntrypointV1[] = [
       "casimir.material_receipts",
       "casimir.material.lifshitz_receipt",
       "casimir.geometry.beyond_pfa_validity",
+      "casimir.geometry.finite_temperature_maxwell_stress",
       "casimir.claim_boundary.diagnostic_source_context",
     ],
     sourceRefs: [
@@ -138,6 +139,7 @@ export const THEORY_RUNTIME_ENTRYPOINTS: TheoryRuntimeEntrypointV1[] = [
     claimBoundary: diagnosticBoundary([
       "material model receipt",
       "finite-temperature context",
+      "finite-temperature Maxwell-stress receipt when finite shaped geometry is invoked",
       "measurement/audit receipt",
     ]),
   }),
@@ -221,6 +223,8 @@ export const THEORY_RUNTIME_ENTRYPOINTS: TheoryRuntimeEntrypointV1[] = [
     outputArtifactGlobs: [
       "artifacts/research/full-solve/**/*.json",
       "artifacts/research/full-solve/**/*.md",
+      "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/**/*.json",
+      "formal/lean/NHM2Formal/Generated/**/*.lean",
       "docs/audits/**/*.json",
     ],
     expectedReceiptKind: "theory_runtime_receipt/v1",
@@ -239,6 +243,14 @@ export const THEORY_RUNTIME_ENTRYPOINTS: TheoryRuntimeEntrypointV1[] = [
       "nhm2.source.same_basis_tensor_authority",
       "nhm2.closure.coupled_pass_candidate",
       "nhm2.closure.regional_tensor_pass_path_harness",
+      "nhm2.formal.lean_certificate",
+      "nhm2.formal.certificate_hashes_pinned",
+      "nhm2.formal.diagnostic_campaign_admissible",
+      "nhm2.formal.claim_locks_closed",
+      "nhm2.formal.negative_fixtures_fail_closed",
+      "nhm2.mechanical.support_retention_overlap",
+      "casimir.geometry.finite_temperature_maxwell_stress",
+      "nhm2.transport.steering_bondi_flux_budget",
       "nhm2.qei.sampling_window",
       "nhm2.qei.worldline_dossier",
       "nhm2.natario.curvature_invariants",
@@ -256,6 +268,16 @@ export const THEORY_RUNTIME_ENTRYPOINTS: TheoryRuntimeEntrypointV1[] = [
       sourceRef("runtime", "scripts/warp-full-solve-calculator.ts", "Full-solve calculator path."),
       sourceRef("config", "configs/warp-needle-hull-mark2-theory-directory.v1.json", "NHM2 theory directory."),
       sourceRef("artifact", "artifacts/research/full-solve", "Expected campaign artifact root."),
+      sourceRef(
+        "artifact",
+        "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+        "Canonical 0p7000 profile-campaign package root.",
+      ),
+      sourceRef(
+        "repo_module",
+        "formal/lean/NHM2Formal/Generated/CurrentCampaignCertificate.lean",
+        "Generated Lean-facing certificate for the governed 0p7000 diagnostic package.",
+      ),
     ],
     timeoutPolicy: {
       smallMs: 120_000,
@@ -266,6 +288,9 @@ export const THEORY_RUNTIME_ENTRYPOINTS: TheoryRuntimeEntrypointV1[] = [
       "dual tensor observer audit",
       "QEI/worldline dossier",
       "certificate integrity receipt",
+      "mechanical support-retention overlap receipt",
+      "finite-temperature Maxwell-stress receipt when finite Casimir geometry is invoked",
+      "premise-aware Bondi-flux receipt when steering premises apply",
       "human claim-boundary review",
     ]),
   }),
@@ -280,6 +305,8 @@ export const THEORY_RUNTIME_ENTRYPOINTS: TheoryRuntimeEntrypointV1[] = [
     argsSchema: null,
     outputArtifactGlobs: [
       "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/alpha-sweep/**/*.json",
+      "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/**/*.json",
+      "formal/lean/NHM2Formal/Generated/**/*.lean",
       "docs/audits/nhm2-shift-lapse/alpha-sweep/**/*.json",
       "docs/audits/nhm2-shift-lapse/alpha-sweep/**/*.md",
     ],
@@ -296,6 +323,12 @@ export const THEORY_RUNTIME_ENTRYPOINTS: TheoryRuntimeEntrypointV1[] = [
       "nhm2.source.same_basis_tensor_authority",
       "nhm2.closure.coupled_pass_candidate",
       "nhm2.closure.regional_tensor_pass_path_harness",
+      "nhm2.formal.lean_certificate",
+      "nhm2.formal.certificate_hashes_pinned",
+      "nhm2.formal.diagnostic_campaign_admissible",
+      "nhm2.formal.claim_locks_closed",
+      "nhm2.formal.negative_fixtures_fail_closed",
+      "nhm2.mechanical.support_retention_overlap",
       "nhm2.qei.sampling_window",
       "nhm2.qei.worldline_dossier",
       "nhm2.energy_condition.observer_robust_gate",
@@ -309,6 +342,16 @@ export const THEORY_RUNTIME_ENTRYPOINTS: TheoryRuntimeEntrypointV1[] = [
         "Package script target for npm run warp:full-solve:nhm2-shift-lapse:alpha-sweep.",
       ),
       sourceRef("artifact", "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/alpha-sweep"),
+      sourceRef(
+        "artifact",
+        "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+        "Canonical 0p7000 profile-campaign package root.",
+      ),
+      sourceRef(
+        "repo_module",
+        "formal/lean/NHM2Formal/Generated/CurrentCampaignCertificate.lean",
+        "Generated certificate bound to the 0p7000 diagnostic package.",
+      ),
       sourceRef("doc", "docs/audits/nhm2-shift-lapse/alpha-sweep", "Expected audit output root."),
     ],
     timeoutPolicy: {
@@ -320,6 +363,7 @@ export const THEORY_RUNTIME_ENTRYPOINTS: TheoryRuntimeEntrypointV1[] = [
       "source closure residual surface",
       "gate status audit",
       "certificate integrity receipt",
+      "mechanical support-retention overlap receipt",
     ]),
   }),
 ];

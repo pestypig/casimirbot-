@@ -92,6 +92,8 @@
     "math:validate": "tsx scripts/validate-math-stage.ts",
     "math:report": "tsx scripts/math-report.ts",
     "formal:nhm2:certificate:emit": "tsx tools/nhm2/emit-lean-campaign-certificate.ts",
+    "formal:nhm2:alpha07-import:write": "tsx tools/nhm2/govern-alpha07-historical-import.ts --write",
+    "formal:nhm2:alpha07-import:check": "tsx tools/nhm2/govern-alpha07-historical-import.ts --check",
     "formal:lean:check": "node scripts/run-lean-lake-build.mjs",
     "formal:nhm2:certificate:check": "npm run formal:nhm2:certificate:emit && npm run formal:lean:check",
     "math:trace": "tsx scripts/math-trace.ts",

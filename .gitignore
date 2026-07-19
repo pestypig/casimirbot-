@@ -95,6 +95,15 @@ client/public/originals/*
 !/artifacts/research/curvature-leverage/curvature-leverage-benchmark-ladder-latest.json
 !/artifacts/research/full-solve/
 /artifacts/research/full-solve/*
+!/artifacts/research/full-solve/profile-search/
+/artifacts/research/full-solve/profile-search/*
+!/artifacts/research/full-solve/profile-search/nhm2-campaign-profile-run-manifest-latest.json
+!/artifacts/research/full-solve/profile-search/nhm2-campaign-profile-search-latest.json
+!/artifacts/research/full-solve/profile-search/nhm2-profile-campaign-frontier-latest.json
+!/artifacts/research/full-solve/profile-campaign-runs/
+/artifacts/research/full-solve/profile-campaign-runs/*
+!/artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/
+!/artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/**
 !/artifacts/research/full-solve/nhm2-warp-worldline-proof-latest.json
 !/artifacts/research/full-solve/nhm2-cruise-envelope-preflight-latest.json
 !/artifacts/research/full-solve/nhm2-route-time-worldline-latest.json

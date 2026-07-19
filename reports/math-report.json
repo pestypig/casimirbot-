@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-23T03:41:12.039Z",
+  "generatedAt": "2026-07-19T07:45:14.962Z",
   "registryCount": 129,
   "coverage": {
     "exploratory": {
@@ -153,18 +153,23 @@
     }
   },
   "unstaged": {
-    "count": 15,
+    "count": 20,
     "modules": [
       "modules/gr/gr-diagnostics.ts",
       "modules/warp/warp-metric-adapter.ts",
       "server/gr/gr-assistant-adapter.ts",
       "server/gr/gr-os-payload.ts",
+      "server/routes/agi.agent-providers.ts",
       "server/routes/agi.chat.ts",
       "server/routes/agi.contributions.ts",
       "server/routes/agi.demonstration.ts",
+      "server/routes/agi.moral-graph.ts",
       "server/routes/agi.plan.ancillary.ts",
+      "server/routes/agi.realtime-session.ts",
       "server/routes/agi.refinery.ts",
-      "server/routes/agi.zen-graph.ts",
+      "server/routes/agi.runtime-goals.ts",
+      "server/routes/agi.runtime-parity.ts",
+      "server/routes/agi.workstation-tool-gateway.ts",
       "server/services/observability/error-reporter.ts",
       "server/services/observability/event-spine-ring-buffer.ts",
       "server/services/observability/event-spine.ts",
@@ -179,12 +184,17 @@
       ],
       "reduced-order": [
         "modules/warp/warp-metric-adapter.ts",
+        "server/routes/agi.agent-providers.ts",
         "server/routes/agi.chat.ts",
         "server/routes/agi.contributions.ts",
         "server/routes/agi.demonstration.ts",
+        "server/routes/agi.moral-graph.ts",
         "server/routes/agi.plan.ancillary.ts",
+        "server/routes/agi.realtime-session.ts",
         "server/routes/agi.refinery.ts",
-        "server/routes/agi.zen-graph.ts"
+        "server/routes/agi.runtime-goals.ts",
+        "server/routes/agi.runtime-parity.ts",
+        "server/routes/agi.workstation-tool-gateway.ts"
       ],
       "exploratory": [
         "server/services/observability/error-reporter.ts",
@@ -251,8 +261,8 @@
     "modules": []
   },
   "autoGraph": {
-    "nodeCount": 2157,
-    "edgeCount": 4820
+    "nodeCount": 2516,
+    "edgeCount": 5986
   },
   "evidenceProfiles": [
     {

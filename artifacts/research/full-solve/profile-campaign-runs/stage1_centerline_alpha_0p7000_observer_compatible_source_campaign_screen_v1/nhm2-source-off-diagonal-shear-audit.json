@@ -1,0 +1,351 @@
+{
+  "contractVersion": "nhm2_source_off_diagonal_shear_audit/v1",
+  "generatedAt": "2026-06-19T19:03:10.661Z",
+  "laneId": "nhm2_shift_lapse",
+  "selectedProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "runId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1:candidate_regional_source_closure",
+  "sourceComponentAuthorityLedgerRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-source-component-authority-ledger.json",
+  "regionalFullTensorResidualRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-full-tensor-residual.json",
+  "regions": [
+    {
+      "regionId": "global",
+      "status": "pass",
+      "components": [
+        {
+          "componentId": "T12",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.0000027,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "relResidual": 0.0000027,
+          "currentToAllowedMagnitudeRatio": null,
+          "sourceFractionOfAbsT00": 0.00009,
+          "metricRequiredFractionOfAbsT00": null,
+          "fractionalSuppressionToRequirement": null,
+          "correctionStatus": "already_within_tolerance",
+          "authority": "source_model",
+          "mechanismStatus": "not_required",
+          "mechanismEvidenceRef": null,
+          "provenanceRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#global",
+          "blockers": []
+        },
+        {
+          "componentId": "T13",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.0000016199999999999997,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "relResidual": 0.0000016199999999999997,
+          "currentToAllowedMagnitudeRatio": null,
+          "sourceFractionOfAbsT00": 0.00005399999999999999,
+          "metricRequiredFractionOfAbsT00": null,
+          "fractionalSuppressionToRequirement": null,
+          "correctionStatus": "already_within_tolerance",
+          "authority": "source_model",
+          "mechanismStatus": "not_required",
+          "mechanismEvidenceRef": null,
+          "provenanceRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#global",
+          "blockers": []
+        },
+        {
+          "componentId": "T23",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.0000010799999999999998,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "relResidual": 0.0000010799999999999998,
+          "currentToAllowedMagnitudeRatio": null,
+          "sourceFractionOfAbsT00": 0.000035999999999999994,
+          "metricRequiredFractionOfAbsT00": null,
+          "fractionalSuppressionToRequirement": null,
+          "correctionStatus": "already_within_tolerance",
+          "authority": "source_model",
+          "mechanismStatus": "not_required",
+          "mechanismEvidenceRef": null,
+          "provenanceRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#global",
+          "blockers": []
+        }
+      ],
+      "worstComponentId": null,
+      "worstCurrentToAllowedMagnitudeRatio": null,
+      "blockers": []
+    },
+    {
+      "regionId": "hull",
+      "status": "pass",
+      "components": [
+        {
+          "componentId": "T12",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.0000015749999999999997,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "relResidual": 0.0000015749999999999997,
+          "currentToAllowedMagnitudeRatio": null,
+          "sourceFractionOfAbsT00": 0.00008999999999999999,
+          "metricRequiredFractionOfAbsT00": null,
+          "fractionalSuppressionToRequirement": null,
+          "correctionStatus": "already_within_tolerance",
+          "authority": "source_model",
+          "mechanismStatus": "not_required",
+          "mechanismEvidenceRef": null,
+          "provenanceRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#hull",
+          "blockers": []
+        },
+        {
+          "componentId": "T13",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 9.45e-7,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "relResidual": 9.45e-7,
+          "currentToAllowedMagnitudeRatio": null,
+          "sourceFractionOfAbsT00": 0.000054000000000000005,
+          "metricRequiredFractionOfAbsT00": null,
+          "fractionalSuppressionToRequirement": null,
+          "correctionStatus": "already_within_tolerance",
+          "authority": "source_model",
+          "mechanismStatus": "not_required",
+          "mechanismEvidenceRef": null,
+          "provenanceRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#hull",
+          "blockers": []
+        },
+        {
+          "componentId": "T23",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 6.299999999999999e-7,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "relResidual": 6.299999999999999e-7,
+          "currentToAllowedMagnitudeRatio": null,
+          "sourceFractionOfAbsT00": 0.000036,
+          "metricRequiredFractionOfAbsT00": null,
+          "fractionalSuppressionToRequirement": null,
+          "correctionStatus": "already_within_tolerance",
+          "authority": "source_model",
+          "mechanismStatus": "not_required",
+          "mechanismEvidenceRef": null,
+          "provenanceRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#hull",
+          "blockers": []
+        }
+      ],
+      "worstComponentId": null,
+      "worstCurrentToAllowedMagnitudeRatio": null,
+      "blockers": []
+    },
+    {
+      "regionId": "wall",
+      "status": "pass",
+      "components": [
+        {
+          "componentId": "T12",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.0000045,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "relResidual": 0.0000045,
+          "currentToAllowedMagnitudeRatio": null,
+          "sourceFractionOfAbsT00": 0.00008999999999999999,
+          "metricRequiredFractionOfAbsT00": null,
+          "fractionalSuppressionToRequirement": null,
+          "correctionStatus": "already_within_tolerance",
+          "authority": "source_model",
+          "mechanismStatus": "not_required",
+          "mechanismEvidenceRef": null,
+          "provenanceRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#wall",
+          "blockers": []
+        },
+        {
+          "componentId": "T13",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.0000027,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "relResidual": 0.0000027,
+          "currentToAllowedMagnitudeRatio": null,
+          "sourceFractionOfAbsT00": 0.000054,
+          "metricRequiredFractionOfAbsT00": null,
+          "fractionalSuppressionToRequirement": null,
+          "correctionStatus": "already_within_tolerance",
+          "authority": "source_model",
+          "mechanismStatus": "not_required",
+          "mechanismEvidenceRef": null,
+          "provenanceRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#wall",
+          "blockers": []
+        },
+        {
+          "componentId": "T23",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 0.0000018000000000000001,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "relResidual": 0.0000018000000000000001,
+          "currentToAllowedMagnitudeRatio": null,
+          "sourceFractionOfAbsT00": 0.000036,
+          "metricRequiredFractionOfAbsT00": null,
+          "fractionalSuppressionToRequirement": null,
+          "correctionStatus": "already_within_tolerance",
+          "authority": "source_model",
+          "mechanismStatus": "not_required",
+          "mechanismEvidenceRef": null,
+          "provenanceRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#wall",
+          "blockers": []
+        }
+      ],
+      "worstComponentId": null,
+      "worstCurrentToAllowedMagnitudeRatio": null,
+      "blockers": []
+    },
+    {
+      "regionId": "exterior_shell",
+      "status": "pass",
+      "components": [
+        {
+          "componentId": "T12",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 9.000000000000003e-7,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "relResidual": 9.000000000000003e-7,
+          "currentToAllowedMagnitudeRatio": null,
+          "sourceFractionOfAbsT00": 0.00009,
+          "metricRequiredFractionOfAbsT00": null,
+          "fractionalSuppressionToRequirement": null,
+          "correctionStatus": "already_within_tolerance",
+          "authority": "source_model",
+          "mechanismStatus": "not_required",
+          "mechanismEvidenceRef": null,
+          "provenanceRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#exterior_shell",
+          "blockers": []
+        },
+        {
+          "componentId": "T13",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 5.400000000000002e-7,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "relResidual": 5.400000000000002e-7,
+          "currentToAllowedMagnitudeRatio": null,
+          "sourceFractionOfAbsT00": 0.00005400000000000001,
+          "metricRequiredFractionOfAbsT00": null,
+          "fractionalSuppressionToRequirement": null,
+          "correctionStatus": "already_within_tolerance",
+          "authority": "source_model",
+          "mechanismStatus": "not_required",
+          "mechanismEvidenceRef": null,
+          "provenanceRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#exterior_shell",
+          "blockers": []
+        },
+        {
+          "componentId": "T23",
+          "metricRequired": 0,
+          "tileEffectiveCounterpart": 3.600000000000001e-7,
+          "passWindow": {
+            "minCounterpartForPassSI": -0.1,
+            "maxCounterpartForPassSI": 0.1,
+            "toleranceAbsSI": 0.1,
+            "derivedFromMetricRequiredTensor": true,
+            "sourceModelInputAllowed": false
+          },
+          "relResidual": 3.600000000000001e-7,
+          "currentToAllowedMagnitudeRatio": null,
+          "sourceFractionOfAbsT00": 0.000036,
+          "metricRequiredFractionOfAbsT00": null,
+          "fractionalSuppressionToRequirement": null,
+          "correctionStatus": "already_within_tolerance",
+          "authority": "source_model",
+          "mechanismStatus": "not_required",
+          "mechanismEvidenceRef": null,
+          "provenanceRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json#exterior_shell",
+          "blockers": []
+        }
+      ],
+      "worstComponentId": null,
+      "worstCurrentToAllowedMagnitudeRatio": null,
+      "blockers": []
+    }
+  ],
+  "summary": {
+    "allOffDiagonalComponentsPresent": true,
+    "allOffDiagonalWithinTolerance": true,
+    "anyShearMechanismMissing": false,
+    "worstRegionId": null,
+    "worstComponentId": null,
+    "worstCurrentToAllowedMagnitudeRatio": null,
+    "uniformFractionalShearAnsatzDetected": true,
+    "sourceFractionByComponent": {
+      "T12": 0.00008999999999999999,
+      "T13": 0.000054,
+      "T23": 0.000036
+    },
+    "worstFractionalSuppressionToRequirement": null,
+    "firstBlocker": null,
+    "falsifierCandidate": false,
+    "currentDeclaredSourceModelFalsified": false,
+    "falsifierScope": "none",
+    "falsifierReason": null,
+    "blockerCount": 0
+  },
+  "claimBoundary": {
+    "diagnosticOnly": true,
+    "shearAuditDoesNotValidatePhysicalSource": true,
+    "passWindowCannotBeUsedAsSourceModelInput": true,
+    "missingShearMechanismBlocksClosure": true,
+    "currentModelFalsifierDoesNotProveUniversalSourceImpossibility": true
+  }
+}

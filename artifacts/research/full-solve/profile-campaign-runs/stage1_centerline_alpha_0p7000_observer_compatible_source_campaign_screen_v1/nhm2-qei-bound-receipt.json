@@ -1,0 +1,57 @@
+{
+  "contractVersion": "nhm2_qei_bound_receipt/v1",
+  "generatedAt": "2026-06-19T19:03:10.644Z",
+  "laneId": "nhm2_shift_lapse",
+  "selectedProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "atlasRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-support-function-atlas.json",
+  "atlasHash": "41bdbf8140bce18f971b417014779f76eb8113c03ec5a79abfcc13d05bff9bb2",
+  "tensorRef": "nhm2_tile_effective_full_tensor_source",
+  "boundModelKind": "ford_roman_lorentzian",
+  "samplingFunction": {
+    "kind": "lorentzian",
+    "tauSeconds": 1e-10,
+    "normalized": true
+  },
+  "bound": {
+    "valueSI": 0,
+    "unit": "J/m^3",
+    "provenanceRef": "ford_roman_1996_quantum_inequality",
+    "status": "literature_bound"
+  },
+  "tauPolicy": {
+    "tauVsDuty": "pass",
+    "tauVsLightCrossing": "pass",
+    "tauVsModulation": "pass",
+    "dutyCycle": 0.5,
+    "lightCrossingSeconds": 0.000001,
+    "modulationSeconds": 0.000001
+  },
+  "provenance": {
+    "boundProvenanceRef": "ford_roman_1996_quantum_inequality",
+    "qftStateRef": "candidate-qei-policy.json#declaredQftState",
+    "renormalizationConventionRef": "candidate-qei-policy.json#renormalizedStressEnergyConvention",
+    "tauSourceRef": "candidate-qei-policy.json#tauSeconds",
+    "dutyCycleSourceRef": "candidate-qei-policy.json#dutyCycle",
+    "modulationSourceRef": "candidate-qei-policy.json#modulationSeconds",
+    "lightCrossingSourceRef": "candidate-qei-policy.json#lightCrossingSeconds"
+  },
+  "applicability": {
+    "appliesToRegions": [
+      "wall",
+      "hull_wall_transition",
+      "wall_exterior_transition"
+    ],
+    "stationaryWorldlineAssumption": true,
+    "reducedOrderOnly": false,
+    "qftStateSpecified": true,
+    "renormalizationConventionSpecified": true
+  },
+  "blockers": [],
+  "warnings": [],
+  "status": "pass",
+  "claimBoundary": {
+    "diagnosticOnly": true,
+    "qeiBoundReceiptDoesNotProvePhysicalViability": true,
+    "scalarMarginCannotSubstituteForWorldlineDossier": true
+  }
+}

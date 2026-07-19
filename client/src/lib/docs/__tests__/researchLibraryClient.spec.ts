@@ -57,6 +57,12 @@ describe("researchLibraryClient", () => {
     const document: HelixResearchLibraryDocument = {
       schema: "helix.research_library_document.v1",
       document_id: "research:calculator-paper",
+      viewer_ref: "private-research:account-token:calculator-paper-token",
+      private_translation_scope: {
+        doc_path: "research-library/private-research%3Aaccount-token%3Acalculator-paper-token",
+        source_id: "document_markdown:research-library/private-research%3Aaccount-token%3Acalculator-paper-token",
+        mailbox_thread_id: "helix-ask:private-research:account-token",
+      },
       profile_id: "profile:test",
       title: "Calculator paper",
       source_url: "https://example.test/paper.pdf",

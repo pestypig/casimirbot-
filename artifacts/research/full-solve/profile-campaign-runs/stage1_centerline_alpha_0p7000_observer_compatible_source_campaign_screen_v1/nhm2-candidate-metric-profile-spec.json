@@ -1,0 +1,71 @@
+{
+  "contractVersion": "nhm2_candidate_metric_profile_spec/v1",
+  "generatedAt": "2026-06-19T19:03:10.501Z",
+  "laneId": "nhm2_shift_lapse",
+  "candidateProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+  "alphaCenterline": 0.7,
+  "subjectiveEfficiencyProxy": 1.4285714285714286,
+  "proposalKind": "observer_compatible_source",
+  "sourceProfileSearchRef": "artifacts/research/full-solve/profile-search/nhm2-campaign-profile-search-latest.json",
+  "profileDefinition": {
+    "lapseDepthScale": 1,
+    "shiftAmplitudeScale": 1e-10,
+    "wallThicknessScale": 10,
+    "smoothingWidthScale": 20,
+    "transitionKernel": "compact_bump",
+    "projectedT0iSuppressionFactor": 44888115208571050,
+    "sourceTensorCopiedFromMetric": false,
+    "silentlyZeroesT0i": false,
+    "silentlyZeroesOffDiagonalTij": false,
+    "usesScalarT00Only": false
+  },
+  "tripClockingDiagnostic": {
+    "properTimeRatio": 0.7,
+    "subjectiveEfficiencyProxy": 1.4285714285714286,
+    "formula": "tau = alpha_centerline * T_coordinate",
+    "coordinateTimeSeconds": 137755965.917,
+    "shipProperTimeSeconds": 96429176.14189999,
+    "clockSavingSeconds": 41326789.77510001,
+    "routeEtaCertified": false
+  },
+  "executableGeometry": {
+    "runtimeProfileId": "stage1_centerline_alpha_0p7000_v1",
+    "runtimeProfileRef": null,
+    "runtimeProfileRegistered": true,
+    "runtimeProfileMatchesCandidateLevers": true,
+    "supportedCandidateLevers": [
+      "lapse_depth_scale",
+      "shift_amplitude_scale",
+      "wall_thickness_scale",
+      "smoothing_width_scale",
+      "transition_kernel"
+    ],
+    "unsupportedCandidateLevers": [],
+    "candidateGeometryAdapterStatus": "available",
+    "transitionKernelAdapterRef": "tools/nhm2/build-regional-support-function-atlas.ts#--transition-kernel-kind=smootherstep_c2",
+    "shiftFieldEvaluatorStatus": "available",
+    "shiftFieldEvaluatorRef": "modules/warp/natario-warp.ts#calculateNatarioWarpBubble.shiftVectorField.evaluateShiftVector",
+    "regionalSupportAtlasRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-support-function-atlas.json",
+    "gridRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-campaign-grid.json",
+    "admRouteReady": true,
+    "blockers": []
+  },
+  "campaignReadiness": {
+    "canEnterFullAdmMetricTensorRoute": true,
+    "needsFrozenCampaignRun": true,
+    "firstBlocker": "full_frozen_campaign_run_required",
+    "blockers": [
+      "full_frozen_campaign_run_required"
+    ]
+  },
+  "claimBoundary": {
+    "diagnosticOnly": true,
+    "profileSpecDoesNotValidateProfile": true,
+    "tripClockingDoesNotCertifyRouteEta": true,
+    "physicalViabilityClaimAllowed": false,
+    "transportClaimAllowed": false,
+    "routeEtaClaimAllowed": false,
+    "propulsionClaimAllowed": false
+  }
+}

@@ -1,6 +1,6 @@
 # Math Report
 
-Generated: 2026-06-23T03:41:12.039Z
+Generated: 2026-07-19T07:45:14.962Z
 Registry entries: 129
 
 ## Coverage by Stage
@@ -14,12 +14,17 @@ Registry entries: 129
 - modules/warp/warp-metric-adapter.ts
 - server/gr/gr-assistant-adapter.ts
 - server/gr/gr-os-payload.ts
+- server/routes/agi.agent-providers.ts
 - server/routes/agi.chat.ts
 - server/routes/agi.contributions.ts
 - server/routes/agi.demonstration.ts
+- server/routes/agi.moral-graph.ts
 - server/routes/agi.plan.ancillary.ts
+- server/routes/agi.realtime-session.ts
 - server/routes/agi.refinery.ts
-- server/routes/agi.zen-graph.ts
+- server/routes/agi.runtime-goals.ts
+- server/routes/agi.runtime-parity.ts
+- server/routes/agi.workstation-tool-gateway.ts
 - server/services/observability/error-reporter.ts
 - server/services/observability/event-spine-ring-buffer.ts
 - server/services/observability/event-spine.ts
@@ -28,7 +33,7 @@ Registry entries: 129
 
 ## Unstaged Stage Suggestions
 - diagnostic: 3
-- reduced-order: 7
+- reduced-order: 12
 - exploratory: 5
 - default: exploratory
 
@@ -60,8 +65,8 @@ none
 - tests considered: 0
 
 ## Auto-discovered Dependencies
-- nodes: 2157
-- edges: 4820
+- nodes: 2516
+- edges: 5986
 
 ## Stage Violations (Edges)
 none

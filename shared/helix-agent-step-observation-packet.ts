@@ -188,8 +188,13 @@ export type HelixAgentStepObservationPacket = {
       goal_binding_id?: string | null;
       goal_binding_key?: string | null;
       source_id: string;
+      panel_id?: string | null;
+      region_id?: string | null;
       bbox?: Record<string, unknown> | null;
       doc_path?: string | null;
+      document_source_kind?: "canonical_docs" | "research_library" | null;
+      document_ref?: string | null;
+      private_source?: boolean;
       source_hash?: string | null;
       source_kind?: string | null;
       account_locale?: string | null;

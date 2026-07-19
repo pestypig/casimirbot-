@@ -75,7 +75,11 @@ Adapters must:
 - avoid arbitrary user-provided shell.
 - use timeout policy from the entrypoint.
 - parse known artifacts into a `TheoryRuntimeReceiptV1`.
+- restrict successful executable-runtime parsing to the requested output directory and its concrete output manifest.
+- preserve command/process provenance instead of replacing it with a generic artifact-reader receipt.
+- record SHA-256 and `new`, `changed`, or `preexisting` freshness for every output artifact.
 - fail closed on missing outputs, stale artifacts, parse failures, unsupported status, or unrecognized gates.
+- treat file/path/text presence as non-authoritative until an explicit status-bearing field supplies the relevant verdict.
 - keep claim promotion blocked unless a future certificate/integrity adapter explicitly proves otherwise.
 
 Read-only adapters are valid. They inspect existing artifacts and return receipts without running commands.
@@ -120,7 +124,12 @@ A receipt must include:
 - `outputs.gates`
 - `outputs.missingSignals`
 - `outputs.warnings`
+- optional `outputs.artifactManifest` using `theory_runtime_output_manifest/v1`
+- optional `outputs.artifactEvidence`, with the manifest path, SHA-256,
+  freshness classification, explicit evidence status, and gates observed for each
+  parsed artifact (byte size remains authoritative in `outputs.artifactManifest`)
 - `provenance`
+- optional `execution` process details
 - `claimBoundary`
 
 Receipt statuses are:
@@ -139,8 +148,23 @@ Gate statuses are:
 - `not_ready`
 - `not_applicable`
 - `unknown`
+- `review`
 
 Missing or unknown gates should block stronger interpretation. A `completed` receipt still does not imply claim promotion unless its claim boundary says promotion is allowed and the required evidence chain exists.
+
+`review` is intentionally distinct from both `pass` and `fail`. For example, a full-loop source-closure section can aggregate as `pass` while the referenced source-closure artifact remains `review`; consumers must preserve both observations rather than collapsing them into one lamp.
+
+## Output Manifest and Freshness
+
+Executable long runtimes use `theory_runtime_output_manifest/v1`. The executor snapshots the requested output directory before and after the command, then emits per-file hashes and freshness classifications. A successful process is not a successful evidence receipt unless:
+
+- the command was actually bound to the requested output directory;
+- the manifest is concrete, hashed, and bound to the same runtime, commit, and execution interval;
+- every parsed artifact is inside the output boundary and matches its manifest hash and size;
+- at least one artifact is `new` or `changed`; and
+- the required artifact verdicts are explicit and authoritative.
+
+A historical package is allowed to carry an unbound manifest with all entries `preexisting`. This is useful committed provenance, but it is not a fresh runtime execution and must remain blocked by `runtime_artifact_freshness_unbound`.
 
 ## Long Runtime Jobs
 

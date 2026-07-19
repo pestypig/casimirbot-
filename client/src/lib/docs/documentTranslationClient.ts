@@ -13,6 +13,7 @@ import {
 } from "@shared/helix-live-translation-projection-target";
 import type { StagePlayMicroReasonerRunV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
+import { HELIX_RESEARCH_LIBRARY_PRIVATE_MAILBOX_THREAD_PREFIX } from "@shared/helix-research-library";
 import type { HelixLiveTranslationTerminalAuthorityStatus } from "@/lib/helix/live-translation-projection";
 import {
   listCapabilityLaneSessions,
@@ -225,6 +226,7 @@ export async function applyDocumentMarkdownMicroDeckPreset(params: {
   try {
     const response = await fetch("/api/helix/stage-play/micro-reasoner-prompt-preset/apply", {
       method: "POST",
+      credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         presetId: params.presetId ?? DOCUMENT_MARKDOWN_TRANSLATION_PRESET_ID,
@@ -254,6 +256,10 @@ export async function enqueueDocumentMarkdownTranslationMail(params: {
   sourceTextCharCount?: number | null;
   title?: string;
   sourceId?: string;
+  documentSourceKind?: "canonical_docs" | "research_library";
+  documentId?: string | null;
+  documentRef?: string | null;
+  privateSource?: boolean;
   chunkId?: string;
   chunkIndex?: number | null;
   laneSessionId?: string | null;
@@ -267,7 +273,7 @@ export async function enqueueDocumentMarkdownTranslationMail(params: {
   projectionTarget?: string | null;
   units: DocumentTranslationUnit[];
   signal?: AbortSignal;
-}): Promise<{ sourceId: string; mailId: string | null }> {
+}): Promise<{ sourceId: string; mailId: string | null; mailboxThreadId: string | null }> {
   const controller = new AbortController();
   const timeout = globalThis.setTimeout(() => controller.abort(), DOCUMENT_TRANSLATION_REQUEST_TIMEOUT_MS);
   const abortHandler = () => controller.abort();
@@ -303,9 +309,12 @@ export async function enqueueDocumentMarkdownTranslationMail(params: {
         targetLanguage,
       });
     const latestSourceBindingKey = params.latestSourceBindingKey ?? sourceBindingKey;
-    await applyDocumentMarkdownMicroDeckPreset({ sourceId, signal: controller.signal });
+    if (params.privateSource !== true) {
+      await applyDocumentMarkdownMicroDeckPreset({ sourceId, signal: controller.signal });
+    }
     const response = await fetch("/api/helix/stage-play/live-source-mail/document-markdown", {
       method: "POST",
+      credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         docPath: params.docPath,
@@ -318,6 +327,10 @@ export async function enqueueDocumentMarkdownTranslationMail(params: {
         sourceTextCharCount: params.sourceTextCharCount ?? null,
         title: params.title,
         sourceId,
+        documentSourceKind: params.documentSourceKind ?? "canonical_docs",
+        documentId: params.documentId ?? null,
+        documentRef: params.documentRef ?? null,
+        privateSource: params.privateSource === true,
         chunkId: params.chunkId,
         chunkIndex: params.chunkIndex ?? null,
         laneSessionId: params.laneSessionId ?? null,
@@ -338,10 +351,22 @@ export async function enqueueDocumentMarkdownTranslationMail(params: {
       const message = body && !body.ok ? body.message ?? body.error : `Document Markdown mail enqueue failed (${response.status}).`;
       throw new Error(message);
     }
-    await runDocumentMarkdownMicroDeckCycle({ sourceId, signal: controller.signal });
+    const mailboxThreadId = readNonEmptyText(body.mailboxThreadId);
+    if (
+      params.privateSource === true &&
+      !mailboxThreadId?.startsWith(HELIX_RESEARCH_LIBRARY_PRIVATE_MAILBOX_THREAD_PREFIX)
+    ) {
+      throw new Error("Private Research Library translation response did not include a scoped mailbox.");
+    }
+    await runDocumentMarkdownMicroDeckCycle({
+      sourceId,
+      threadId: mailboxThreadId ?? undefined,
+      signal: controller.signal,
+    });
     return {
       sourceId: body.sourceId,
       mailId: body.mail?.mailId ?? null,
+      mailboxThreadId,
     };
   } finally {
     globalThis.clearTimeout(timeout);
@@ -567,6 +592,7 @@ export async function runDocumentMarkdownMicroDeckCycle(params: {
   try {
     const response = await fetch("/api/helix/stage-play/live-source-mail/wake/cycle", {
       method: "POST",
+      credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         threadId: params.threadId ?? "helix-ask:desktop",
@@ -604,6 +630,7 @@ export async function readDocumentMarkdownMicroDeckRuns(params: {
     limit: String(params.limit ?? 24),
   });
   const response = await fetch(`/api/helix/stage-play/live-source-mail?${query.toString()}`, {
+    credentials: "same-origin",
     signal: params.signal,
   });
   const body = (await response.json().catch(() => null)) as StagePlayLiveSourceMailRead | null;

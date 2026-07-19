@@ -125,11 +125,13 @@ $env:HELIX_REPLIT_PARITY_TARGETS = "local=http://127.0.0.1:5050,replit=https://c
 npm run replit:parity:replay
 ```
 
-The replay forces the Codex provider for the canonical superconductivity
-referent turn, fetches each debug export, and writes a compact comparison under
-`artifacts/helix-replit-parity/`. It calls the configured model provider and can
-incur normal API usage. The build gate itself is keyless and does not call a
-model.
+The replay forces the Codex provider for two canonical superconductivity
+referent turns: explicit critical-surface language must locate the canonical
+badge exactly, while a natural Cooper-pair/BCS explanation must locate it only
+as likely context with nonzero represented mass. The replay fetches each debug
+export and writes a compact comparison under `artifacts/helix-replit-parity/`.
+It calls the configured model provider and can incur normal API usage. The
+build gate itself is keyless and does not call a model.
 
 Run both targets under the same account type. For authenticated comparisons,
 headers can be supplied without committing them:

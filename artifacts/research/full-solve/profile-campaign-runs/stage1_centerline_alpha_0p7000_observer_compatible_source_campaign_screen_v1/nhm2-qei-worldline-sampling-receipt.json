@@ -1,0 +1,73 @@
+{
+  "contractVersion": "nhm2_qei_worldline_sampling_receipt/v1",
+  "generatedAt": "2026-06-19T19:03:10.643Z",
+  "laneId": "nhm2_shift_lapse",
+  "selectedProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "atlasRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-support-function-atlas.json",
+  "atlasHash": "41bdbf8140bce18f971b417014779f76eb8113c03ec5a79abfcc13d05bff9bb2",
+  "tensorRef": "nhm2_tile_effective_full_tensor_source",
+  "worldlineSamples": [
+    {
+      "worldlineId": "qei:wall:atlas",
+      "regionId": "wall",
+      "chartId": "comoving_cartesian",
+      "supportFunctionRef": "compact_bump",
+      "sampleLocationsRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-campaign-grid.json:wall:worldline_samples",
+      "sampleMethod": "atlas_region_source_tensor",
+      "sampledRho": {
+        "valueSI": 0.05,
+        "provenanceRef": "nhm2_tile_effective_full_tensor_source:wall:T00",
+        "status": "computed"
+      },
+      "sourceTensorRef": "nhm2_tile_effective_full_tensor_source:wall",
+      "blockers": [],
+      "warnings": []
+    },
+    {
+      "worldlineId": "qei:hull_wall_transition:atlas",
+      "regionId": "hull_wall_transition",
+      "chartId": "comoving_cartesian",
+      "supportFunctionRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.W.hull_wall_transition",
+      "sampleLocationsRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-campaign-grid.json:hull_wall_transition:worldline_samples",
+      "sampleMethod": "explicit_transition_source_tensor",
+      "sampledRho": {
+        "valueSI": 0.017499999999999998,
+        "provenanceRef": "nhm2_tile_effective_full_tensor_source:hull_wall_transition:transition_kernel_source_tensor:T00",
+        "status": "computed"
+      },
+      "sourceTensorRef": "nhm2_tile_effective_full_tensor_source",
+      "blockers": [],
+      "warnings": []
+    },
+    {
+      "worldlineId": "qei:wall_exterior_transition:atlas",
+      "regionId": "wall_exterior_transition",
+      "chartId": "comoving_cartesian",
+      "supportFunctionRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.W.wall_exterior_transition",
+      "sampleLocationsRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-campaign-grid.json:wall_exterior_transition:worldline_samples",
+      "sampleMethod": "explicit_transition_source_tensor",
+      "sampledRho": {
+        "valueSI": 0.05,
+        "provenanceRef": "nhm2_tile_effective_full_tensor_source:wall_exterior_transition:transition_kernel_source_tensor:T00",
+        "status": "computed"
+      },
+      "sourceTensorRef": "nhm2_tile_effective_full_tensor_source",
+      "blockers": [],
+      "warnings": []
+    }
+  ],
+  "blockers": [],
+  "summary": {
+    "hasWallSample": true,
+    "hasTransitionSamples": true,
+    "allSamplesComputed": true,
+    "anyProxy": false,
+    "samplingComplete": true
+  },
+  "status": "pass",
+  "claimBoundary": {
+    "diagnosticOnly": true,
+    "samplingReceiptDoesNotProveQeiPass": true,
+    "transitionSamplesMustNotUseAdjacentRegionAverages": true
+  }
+}

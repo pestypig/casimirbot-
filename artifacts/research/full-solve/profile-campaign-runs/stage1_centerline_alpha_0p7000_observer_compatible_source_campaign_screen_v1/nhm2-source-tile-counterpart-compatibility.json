@@ -1,0 +1,70 @@
+{
+  "contractVersion": "nhm2_source_tile_counterpart_compatibility/v1",
+  "generatedAt": "2026-06-19T19:03:10.629Z",
+  "laneId": "nhm2_shift_lapse",
+  "candidateProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "runtimeProfileId": "stage1_centerline_alpha_0p7000_v1",
+  "metricRequiredFullRegionalTensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-metric-required-full-regional-tensor.json",
+  "sourceCounterpartRef": null,
+  "sourceFullTensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-tile-effective-full-tensor-source.json",
+  "regions": [
+    {
+      "regionId": "global",
+      "status": "pass",
+      "metricRequiredTensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-metric-required-full-regional-tensor.json#metric-required-full-tensor/global/sameChartFullTensor",
+      "sourceCounterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-tile-effective-full-tensor-source.json#global",
+      "sameProfile": true,
+      "fullMetricRequiredTensorAvailable": true,
+      "sourceCounterpartAvailable": true,
+      "sourceFullTensorAuthorityAvailable": true,
+      "blockers": []
+    },
+    {
+      "regionId": "hull",
+      "status": "pass",
+      "metricRequiredTensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-metric-required-full-regional-tensor.json#metric-required-full-tensor/hull/sameChartFullTensor",
+      "sourceCounterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-tile-effective-full-tensor-source.json#hull",
+      "sameProfile": true,
+      "fullMetricRequiredTensorAvailable": true,
+      "sourceCounterpartAvailable": true,
+      "sourceFullTensorAuthorityAvailable": true,
+      "blockers": []
+    },
+    {
+      "regionId": "wall",
+      "status": "pass",
+      "metricRequiredTensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-metric-required-full-regional-tensor.json#metric-required-full-tensor/wall/sameChartFullTensor",
+      "sourceCounterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-tile-effective-full-tensor-source.json#wall",
+      "sameProfile": true,
+      "fullMetricRequiredTensorAvailable": true,
+      "sourceCounterpartAvailable": true,
+      "sourceFullTensorAuthorityAvailable": true,
+      "blockers": []
+    },
+    {
+      "regionId": "exterior_shell",
+      "status": "pass",
+      "metricRequiredTensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-metric-required-full-regional-tensor.json#metric-required-full-tensor/exterior_shell/sameChartFullTensor",
+      "sourceCounterpartRegionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-tile-effective-full-tensor-source.json#exterior_shell",
+      "sameProfile": true,
+      "fullMetricRequiredTensorAvailable": true,
+      "sourceCounterpartAvailable": true,
+      "sourceFullTensorAuthorityAvailable": true,
+      "blockers": []
+    }
+  ],
+  "summary": {
+    "sourceCounterpartAvailable": true,
+    "sameProfileCounterpart": true,
+    "allRegionsCompatible": true,
+    "firstBlocker": null
+  },
+  "claimBoundary": {
+    "diagnosticOnly": true,
+    "compatibilityDoesNotValidateSourcePhysics": true,
+    "physicalViabilityClaimAllowed": false,
+    "transportClaimAllowed": false,
+    "routeEtaClaimAllowed": false,
+    "propulsionClaimAllowed": false
+  }
+}

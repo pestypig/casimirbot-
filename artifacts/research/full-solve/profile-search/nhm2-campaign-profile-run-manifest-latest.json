@@ -1,0 +1,1919 @@
+{
+  "contractVersion": "nhm2_campaign_profile_run_manifest/v1",
+  "generatedAt": "2026-06-19T19:06:21.280Z",
+  "laneId": "nhm2_shift_lapse",
+  "profileSearchRef": "artifacts/research/full-solve/profile-search/nhm2-campaign-profile-search-latest.json",
+  "baseline": {
+    "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+    "currentProfileRejected": true,
+    "worstRegionId": "hull",
+    "worstComponentId": "T02",
+    "worstRequiredSuppressionFactor": 2244405760428552.5
+  },
+  "runPolicy": {
+    "latestAliasesForbidden": true,
+    "onlyScreenPassCandidatesQueued": true,
+    "fullFrozenCampaignRequiredBeforeRankingAsAdmissible": true,
+    "missingEvidenceFailsClosed": true,
+    "fastestMeansLowestAlphaAfterCampaignPass": true
+  },
+  "candidates": [
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p9900_alpha_only_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.99,
+      "proposalKind": "alpha_only",
+      "runRoot": null,
+      "queuedForFrozenCampaign": false,
+      "priorityRank": null,
+      "sourceSearchStatus": "rejected_metric_momentum",
+      "manifestStatus": "not_queued_rejected_by_profile_screen",
+      "requiredEvidence": [
+        {
+          "evidenceId": "candidate_metric_profile_spec",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "metric_required_full_regional_tensor",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "projected_momentum_demand_audit",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "metric_momentum_remediation_targets",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "source_tile_counterpart_compatibility",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "regional_full_tensor_residuals",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "switching_covariant_conservation",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "frequency_convergence",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "dynamic_effective_geometry_agreement",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "qei_worldline_dossier",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "observer_family_energy_conditions",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "horizon_blueshift_particle_stability",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "time_dependent_source_campaign",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        }
+      ],
+      "nextCommand": null,
+      "blockers": [
+        "alpha_only_does_not_reduce_projected_t0i"
+      ]
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p9500_alpha_only_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.95,
+      "proposalKind": "alpha_only",
+      "runRoot": null,
+      "queuedForFrozenCampaign": false,
+      "priorityRank": null,
+      "sourceSearchStatus": "rejected_metric_momentum",
+      "manifestStatus": "not_queued_rejected_by_profile_screen",
+      "requiredEvidence": [
+        {
+          "evidenceId": "candidate_metric_profile_spec",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "metric_required_full_regional_tensor",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "projected_momentum_demand_audit",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "metric_momentum_remediation_targets",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "source_tile_counterpart_compatibility",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "regional_full_tensor_residuals",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "switching_covariant_conservation",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "frequency_convergence",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "dynamic_effective_geometry_agreement",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "qei_worldline_dossier",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "observer_family_energy_conditions",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "horizon_blueshift_particle_stability",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "time_dependent_source_campaign",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        }
+      ],
+      "nextCommand": null,
+      "blockers": [
+        "alpha_only_does_not_reduce_projected_t0i"
+      ]
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p9000_alpha_only_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.9,
+      "proposalKind": "alpha_only",
+      "runRoot": null,
+      "queuedForFrozenCampaign": false,
+      "priorityRank": null,
+      "sourceSearchStatus": "rejected_metric_momentum",
+      "manifestStatus": "not_queued_rejected_by_profile_screen",
+      "requiredEvidence": [
+        {
+          "evidenceId": "candidate_metric_profile_spec",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "metric_required_full_regional_tensor",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "projected_momentum_demand_audit",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "metric_momentum_remediation_targets",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "source_tile_counterpart_compatibility",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "regional_full_tensor_residuals",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "switching_covariant_conservation",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "frequency_convergence",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "dynamic_effective_geometry_agreement",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "qei_worldline_dossier",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "observer_family_energy_conditions",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "horizon_blueshift_particle_stability",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "time_dependent_source_campaign",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        }
+      ],
+      "nextCommand": null,
+      "blockers": [
+        "alpha_only_does_not_reduce_projected_t0i"
+      ]
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p7000_alpha_only_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.7,
+      "proposalKind": "alpha_only",
+      "runRoot": null,
+      "queuedForFrozenCampaign": false,
+      "priorityRank": null,
+      "sourceSearchStatus": "rejected_metric_momentum",
+      "manifestStatus": "not_queued_rejected_by_profile_screen",
+      "requiredEvidence": [
+        {
+          "evidenceId": "candidate_metric_profile_spec",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "metric_required_full_regional_tensor",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "projected_momentum_demand_audit",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "metric_momentum_remediation_targets",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "source_tile_counterpart_compatibility",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "regional_full_tensor_residuals",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "switching_covariant_conservation",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "frequency_convergence",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "dynamic_effective_geometry_agreement",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "qei_worldline_dossier",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "observer_family_energy_conditions",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "horizon_blueshift_particle_stability",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "time_dependent_source_campaign",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        }
+      ],
+      "nextCommand": null,
+      "blockers": [
+        "alpha_only_does_not_reduce_projected_t0i"
+      ]
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p9900_shift_suppressed_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.99,
+      "proposalKind": "shift_suppressed",
+      "runRoot": null,
+      "queuedForFrozenCampaign": false,
+      "priorityRank": null,
+      "sourceSearchStatus": "rejected_metric_momentum",
+      "manifestStatus": "not_queued_rejected_by_profile_screen",
+      "requiredEvidence": [
+        {
+          "evidenceId": "candidate_metric_profile_spec",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "metric_required_full_regional_tensor",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "projected_momentum_demand_audit",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "metric_momentum_remediation_targets",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "source_tile_counterpart_compatibility",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "regional_full_tensor_residuals",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "switching_covariant_conservation",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "frequency_convergence",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "dynamic_effective_geometry_agreement",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "qei_worldline_dossier",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "observer_family_energy_conditions",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "horizon_blueshift_particle_stability",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "time_dependent_source_campaign",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        }
+      ],
+      "nextCommand": null,
+      "blockers": [
+        "metric_momentum_rejection_not_cleared_by_screen"
+      ]
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p9500_shift_suppressed_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.95,
+      "proposalKind": "shift_suppressed",
+      "runRoot": null,
+      "queuedForFrozenCampaign": false,
+      "priorityRank": null,
+      "sourceSearchStatus": "rejected_metric_momentum",
+      "manifestStatus": "not_queued_rejected_by_profile_screen",
+      "requiredEvidence": [
+        {
+          "evidenceId": "candidate_metric_profile_spec",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "metric_required_full_regional_tensor",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "projected_momentum_demand_audit",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "metric_momentum_remediation_targets",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "source_tile_counterpart_compatibility",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "regional_full_tensor_residuals",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "switching_covariant_conservation",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "frequency_convergence",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "dynamic_effective_geometry_agreement",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "qei_worldline_dossier",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "observer_family_energy_conditions",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "horizon_blueshift_particle_stability",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "time_dependent_source_campaign",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        }
+      ],
+      "nextCommand": null,
+      "blockers": [
+        "metric_momentum_rejection_not_cleared_by_screen"
+      ]
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p9000_shift_suppressed_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.9,
+      "proposalKind": "shift_suppressed",
+      "runRoot": null,
+      "queuedForFrozenCampaign": false,
+      "priorityRank": null,
+      "sourceSearchStatus": "rejected_metric_momentum",
+      "manifestStatus": "not_queued_rejected_by_profile_screen",
+      "requiredEvidence": [
+        {
+          "evidenceId": "candidate_metric_profile_spec",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "metric_required_full_regional_tensor",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "projected_momentum_demand_audit",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "metric_momentum_remediation_targets",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "source_tile_counterpart_compatibility",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "regional_full_tensor_residuals",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "switching_covariant_conservation",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "frequency_convergence",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "dynamic_effective_geometry_agreement",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "qei_worldline_dossier",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "observer_family_energy_conditions",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "horizon_blueshift_particle_stability",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "time_dependent_source_campaign",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        }
+      ],
+      "nextCommand": null,
+      "blockers": [
+        "metric_momentum_rejection_not_cleared_by_screen"
+      ]
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p9900_smoothing_suppressed_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.99,
+      "proposalKind": "smoothing_suppressed",
+      "runRoot": null,
+      "queuedForFrozenCampaign": false,
+      "priorityRank": null,
+      "sourceSearchStatus": "rejected_metric_momentum",
+      "manifestStatus": "not_queued_rejected_by_profile_screen",
+      "requiredEvidence": [
+        {
+          "evidenceId": "candidate_metric_profile_spec",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "metric_required_full_regional_tensor",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "projected_momentum_demand_audit",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "metric_momentum_remediation_targets",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "source_tile_counterpart_compatibility",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "regional_full_tensor_residuals",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "switching_covariant_conservation",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "frequency_convergence",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "dynamic_effective_geometry_agreement",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "qei_worldline_dossier",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "observer_family_energy_conditions",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "horizon_blueshift_particle_stability",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "time_dependent_source_campaign",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        }
+      ],
+      "nextCommand": null,
+      "blockers": [
+        "metric_momentum_rejection_not_cleared_by_screen"
+      ]
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p9500_smoothing_suppressed_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.95,
+      "proposalKind": "smoothing_suppressed",
+      "runRoot": null,
+      "queuedForFrozenCampaign": false,
+      "priorityRank": null,
+      "sourceSearchStatus": "rejected_metric_momentum",
+      "manifestStatus": "not_queued_rejected_by_profile_screen",
+      "requiredEvidence": [
+        {
+          "evidenceId": "candidate_metric_profile_spec",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "metric_required_full_regional_tensor",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "projected_momentum_demand_audit",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "metric_momentum_remediation_targets",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "source_tile_counterpart_compatibility",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "regional_full_tensor_residuals",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "switching_covariant_conservation",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "frequency_convergence",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "dynamic_effective_geometry_agreement",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "qei_worldline_dossier",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "observer_family_energy_conditions",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "horizon_blueshift_particle_stability",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        },
+        {
+          "evidenceId": "time_dependent_source_campaign",
+          "required": false,
+          "artifactRef": null,
+          "status": "not_applicable_rejected_candidate",
+          "blockers": [
+            "candidate_rejected_by_profile_screen"
+          ]
+        }
+      ],
+      "nextCommand": null,
+      "blockers": [
+        "metric_momentum_rejection_not_cleared_by_screen"
+      ]
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p9900_combined_metric_redesign_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.99,
+      "proposalKind": "combined_metric_redesign",
+      "runRoot": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p9900_combined_metric_redesign_campaign_screen_v1",
+      "queuedForFrozenCampaign": true,
+      "priorityRank": 5,
+      "sourceSearchStatus": "screen_pass_needs_campaign_run",
+      "manifestStatus": "queued_full_campaign_required",
+      "requiredEvidence": [
+        {
+          "evidenceId": "candidate_metric_profile_spec",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9900_combined_metric_redesign_campaign_screen_v1\\nhm2-candidate-metric-profile-spec.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "metric_required_full_regional_tensor",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9900_combined_metric_redesign_campaign_screen_v1\\nhm2-metric-required-full-regional-tensor.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "projected_momentum_demand_audit",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9900_combined_metric_redesign_campaign_screen_v1\\nhm2-metric-required-momentum-demand-audit.json",
+          "status": "provided_blocked",
+          "blockers": [
+            "global:T01:global:T01:projected_metric_momentum_ratio_missing"
+          ]
+        },
+        {
+          "evidenceId": "metric_momentum_remediation_targets",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9900_combined_metric_redesign_campaign_screen_v1\\nhm2-metric-momentum-remediation-targets.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "source_tile_counterpart_compatibility",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9900_combined_metric_redesign_campaign_screen_v1\\nhm2-source-tile-counterpart-compatibility.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "regional_full_tensor_residuals",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9900_combined_metric_redesign_campaign_screen_v1\\nhm2-regional-full-tensor-residual.json",
+          "status": "provided_blocked",
+          "blockers": [
+            "wall:T00:full_tensor_residual_exceeded",
+            "global:global:T00:full_tensor_residual_exceeded",
+            "global:global:T11:full_tensor_residual_exceeded",
+            "global:global:T22:full_tensor_residual_exceeded",
+            "global:global:T33:full_tensor_residual_exceeded",
+            "global:source_evidence:residual_exceeded",
+            "hull:hull:T00:full_tensor_residual_exceeded",
+            "hull:hull:T11:full_tensor_residual_exceeded",
+            "hull:hull:T22:full_tensor_residual_exceeded",
+            "hull:hull:T33:full_tensor_residual_exceeded",
+            "hull:source_evidence:residual_exceeded",
+            "wall:wall:T00:full_tensor_residual_exceeded",
+            "wall:wall:T11:full_tensor_residual_exceeded",
+            "wall:wall:T22:full_tensor_residual_exceeded",
+            "wall:wall:T33:full_tensor_residual_exceeded",
+            "wall:source_evidence:residual_exceeded",
+            "exterior_shell:exterior_shell:T00:full_tensor_residual_exceeded",
+            "exterior_shell:exterior_shell:T11:full_tensor_residual_exceeded",
+            "exterior_shell:exterior_shell:T22:full_tensor_residual_exceeded",
+            "exterior_shell:exterior_shell:T33:full_tensor_residual_exceeded",
+            "exterior_shell:source_evidence:residual_exceeded"
+          ]
+        },
+        {
+          "evidenceId": "switching_covariant_conservation",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9900_combined_metric_redesign_campaign_screen_v1\\nhm2-switching-covariant-conservation-evidence.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "frequency_convergence",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9900_combined_metric_redesign_campaign_screen_v1\\nhm2-frequency-convergence-evidence.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "dynamic_effective_geometry_agreement",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9900_combined_metric_redesign_campaign_screen_v1\\nhm2-dynamic-effective-geometry-evidence.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "qei_worldline_dossier",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9900_combined_metric_redesign_campaign_screen_v1\\nhm2-qei-worldline-dossier.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "observer_family_energy_conditions",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9900_combined_metric_redesign_campaign_screen_v1\\nhm2-observer-robust-energy-conditions.json",
+          "status": "provided_blocked",
+          "blockers": [
+            "observer_robust_check_incomplete",
+            "observer_family_energy_condition_violation",
+            "eulerian:WEC:observer_energy_condition_violation",
+            "boosted_timelike_grid:WEC:observer_energy_condition_violation",
+            "null_direction_grid:DEC:observer_energy_condition_violation",
+            "algebraic_type_i:DEC:observer_energy_condition_violation",
+            "continuous_optimizer:continuous_optimizer_not_implemented"
+          ]
+        },
+        {
+          "evidenceId": "horizon_blueshift_particle_stability",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9900_combined_metric_redesign_campaign_screen_v1\\nhm2-campaign-stability-evidence.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "time_dependent_source_campaign",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9900_combined_metric_redesign_campaign_screen_v1\\nhm2-time-dependent-source-campaign.json",
+          "status": "provided_blocked",
+          "blockers": [
+            "momentum_density_causal_bound_frame_projection_blocked"
+          ]
+        }
+      ],
+      "nextCommand": "npm run nhm2:build-time-dependent-source-campaign -- --selected-profile-id stage1_centerline_alpha_0p9900_combined_metric_redesign_campaign_screen_v1 --out artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p9900_combined_metric_redesign_campaign_screen_v1/nhm2-time-dependent-source-campaign.json --require-frozen-inputs",
+      "blockers": [
+        "global:T01:global:T01:projected_metric_momentum_ratio_missing",
+        "wall:T00:full_tensor_residual_exceeded",
+        "global:global:T00:full_tensor_residual_exceeded",
+        "global:global:T11:full_tensor_residual_exceeded",
+        "global:global:T22:full_tensor_residual_exceeded",
+        "global:global:T33:full_tensor_residual_exceeded",
+        "global:source_evidence:residual_exceeded",
+        "hull:hull:T00:full_tensor_residual_exceeded",
+        "hull:hull:T11:full_tensor_residual_exceeded",
+        "hull:hull:T22:full_tensor_residual_exceeded",
+        "hull:hull:T33:full_tensor_residual_exceeded",
+        "hull:source_evidence:residual_exceeded",
+        "wall:wall:T00:full_tensor_residual_exceeded",
+        "wall:wall:T11:full_tensor_residual_exceeded",
+        "wall:wall:T22:full_tensor_residual_exceeded",
+        "wall:wall:T33:full_tensor_residual_exceeded",
+        "wall:source_evidence:residual_exceeded",
+        "exterior_shell:exterior_shell:T00:full_tensor_residual_exceeded",
+        "exterior_shell:exterior_shell:T11:full_tensor_residual_exceeded",
+        "exterior_shell:exterior_shell:T22:full_tensor_residual_exceeded",
+        "exterior_shell:exterior_shell:T33:full_tensor_residual_exceeded",
+        "exterior_shell:source_evidence:residual_exceeded",
+        "observer_robust_check_incomplete",
+        "observer_family_energy_condition_violation",
+        "eulerian:WEC:observer_energy_condition_violation",
+        "boosted_timelike_grid:WEC:observer_energy_condition_violation",
+        "null_direction_grid:DEC:observer_energy_condition_violation",
+        "algebraic_type_i:DEC:observer_energy_condition_violation",
+        "continuous_optimizer:continuous_optimizer_not_implemented",
+        "momentum_density_causal_bound_frame_projection_blocked"
+      ]
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p9500_combined_metric_redesign_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.95,
+      "proposalKind": "combined_metric_redesign",
+      "runRoot": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p9500_combined_metric_redesign_campaign_screen_v1",
+      "queuedForFrozenCampaign": true,
+      "priorityRank": 4,
+      "sourceSearchStatus": "screen_pass_needs_campaign_run",
+      "manifestStatus": "queued_full_campaign_required",
+      "requiredEvidence": [
+        {
+          "evidenceId": "candidate_metric_profile_spec",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9500_combined_metric_redesign_campaign_screen_v1\\nhm2-candidate-metric-profile-spec.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "metric_required_full_regional_tensor",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9500_combined_metric_redesign_campaign_screen_v1\\nhm2-metric-required-full-regional-tensor.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "projected_momentum_demand_audit",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9500_combined_metric_redesign_campaign_screen_v1\\nhm2-metric-required-momentum-demand-audit.json",
+          "status": "provided_blocked",
+          "blockers": [
+            "global:T01:global:T01:projected_metric_momentum_ratio_missing"
+          ]
+        },
+        {
+          "evidenceId": "metric_momentum_remediation_targets",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9500_combined_metric_redesign_campaign_screen_v1\\nhm2-metric-momentum-remediation-targets.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "source_tile_counterpart_compatibility",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9500_combined_metric_redesign_campaign_screen_v1\\nhm2-source-tile-counterpart-compatibility.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "regional_full_tensor_residuals",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9500_combined_metric_redesign_campaign_screen_v1\\nhm2-regional-full-tensor-residual.json",
+          "status": "provided_blocked",
+          "blockers": [
+            "wall:T00:full_tensor_residual_exceeded",
+            "global:global:T00:full_tensor_residual_exceeded",
+            "global:global:T11:full_tensor_residual_exceeded",
+            "global:source_evidence:residual_exceeded",
+            "hull:hull:T00:full_tensor_residual_exceeded",
+            "hull:source_evidence:residual_exceeded",
+            "wall:wall:T00:full_tensor_residual_exceeded",
+            "wall:wall:T11:full_tensor_residual_exceeded",
+            "wall:wall:T22:full_tensor_residual_exceeded",
+            "wall:wall:T33:full_tensor_residual_exceeded",
+            "wall:source_evidence:residual_exceeded",
+            "exterior_shell:exterior_shell:T00:full_tensor_residual_exceeded",
+            "exterior_shell:source_evidence:residual_exceeded"
+          ]
+        },
+        {
+          "evidenceId": "switching_covariant_conservation",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9500_combined_metric_redesign_campaign_screen_v1\\nhm2-switching-covariant-conservation-evidence.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "frequency_convergence",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9500_combined_metric_redesign_campaign_screen_v1\\nhm2-frequency-convergence-evidence.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "dynamic_effective_geometry_agreement",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9500_combined_metric_redesign_campaign_screen_v1\\nhm2-dynamic-effective-geometry-evidence.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "qei_worldline_dossier",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9500_combined_metric_redesign_campaign_screen_v1\\nhm2-qei-worldline-dossier.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "observer_family_energy_conditions",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9500_combined_metric_redesign_campaign_screen_v1\\nhm2-observer-robust-energy-conditions.json",
+          "status": "provided_blocked",
+          "blockers": [
+            "observer_robust_check_incomplete",
+            "observer_family_energy_condition_violation",
+            "eulerian:WEC:observer_energy_condition_violation",
+            "boosted_timelike_grid:WEC:observer_energy_condition_violation",
+            "null_direction_grid:DEC:observer_energy_condition_violation",
+            "algebraic_type_i:DEC:observer_energy_condition_violation",
+            "continuous_optimizer:continuous_optimizer_not_implemented"
+          ]
+        },
+        {
+          "evidenceId": "horizon_blueshift_particle_stability",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9500_combined_metric_redesign_campaign_screen_v1\\nhm2-campaign-stability-evidence.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "time_dependent_source_campaign",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9500_combined_metric_redesign_campaign_screen_v1\\nhm2-time-dependent-source-campaign.json",
+          "status": "provided_blocked",
+          "blockers": [
+            "momentum_density_causal_bound_frame_projection_blocked"
+          ]
+        }
+      ],
+      "nextCommand": "npm run nhm2:build-time-dependent-source-campaign -- --selected-profile-id stage1_centerline_alpha_0p9500_combined_metric_redesign_campaign_screen_v1 --out artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p9500_combined_metric_redesign_campaign_screen_v1/nhm2-time-dependent-source-campaign.json --require-frozen-inputs",
+      "blockers": [
+        "global:T01:global:T01:projected_metric_momentum_ratio_missing",
+        "wall:T00:full_tensor_residual_exceeded",
+        "global:global:T00:full_tensor_residual_exceeded",
+        "global:global:T11:full_tensor_residual_exceeded",
+        "global:source_evidence:residual_exceeded",
+        "hull:hull:T00:full_tensor_residual_exceeded",
+        "hull:source_evidence:residual_exceeded",
+        "wall:wall:T00:full_tensor_residual_exceeded",
+        "wall:wall:T11:full_tensor_residual_exceeded",
+        "wall:wall:T22:full_tensor_residual_exceeded",
+        "wall:wall:T33:full_tensor_residual_exceeded",
+        "wall:source_evidence:residual_exceeded",
+        "exterior_shell:exterior_shell:T00:full_tensor_residual_exceeded",
+        "exterior_shell:source_evidence:residual_exceeded",
+        "observer_robust_check_incomplete",
+        "observer_family_energy_condition_violation",
+        "eulerian:WEC:observer_energy_condition_violation",
+        "boosted_timelike_grid:WEC:observer_energy_condition_violation",
+        "null_direction_grid:DEC:observer_energy_condition_violation",
+        "algebraic_type_i:DEC:observer_energy_condition_violation",
+        "continuous_optimizer:continuous_optimizer_not_implemented",
+        "momentum_density_causal_bound_frame_projection_blocked"
+      ]
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.9,
+      "proposalKind": "combined_metric_redesign",
+      "runRoot": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1",
+      "queuedForFrozenCampaign": true,
+      "priorityRank": 2,
+      "sourceSearchStatus": "screen_pass_needs_campaign_run",
+      "manifestStatus": "queued_full_campaign_required",
+      "requiredEvidence": [
+        {
+          "evidenceId": "candidate_metric_profile_spec",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1\\nhm2-candidate-metric-profile-spec.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "metric_required_full_regional_tensor",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1\\nhm2-metric-required-full-regional-tensor.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "projected_momentum_demand_audit",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1\\nhm2-metric-required-momentum-demand-audit.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "metric_momentum_remediation_targets",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1\\nhm2-metric-momentum-remediation-targets.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "source_tile_counterpart_compatibility",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1\\nhm2-source-tile-counterpart-compatibility.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "regional_full_tensor_residuals",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1\\nhm2-regional-full-tensor-residual.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "switching_covariant_conservation",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1\\nhm2-switching-covariant-conservation-evidence.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "frequency_convergence",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1\\nhm2-frequency-convergence-evidence.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "dynamic_effective_geometry_agreement",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1\\nhm2-dynamic-effective-geometry-evidence.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "qei_worldline_dossier",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1\\nhm2-qei-worldline-dossier.json",
+          "status": "provided_blocked",
+          "blockers": [
+            "qei_worldline_dossier_incomplete",
+            "qei_margin_not_pass",
+            "qei:wall:atlas:qei_margin_failed",
+            "qei:hull_wall_transition:atlas:qei_margin_failed",
+            "qei:wall_exterior_transition:atlas:qei_margin_failed"
+          ]
+        },
+        {
+          "evidenceId": "observer_family_energy_conditions",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1\\nhm2-observer-robust-energy-conditions.json",
+          "status": "provided_blocked",
+          "blockers": [
+            "observer_robust_check_incomplete",
+            "observer_family_energy_condition_violation",
+            "eulerian:WEC:observer_energy_condition_violation",
+            "boosted_timelike_grid:WEC:observer_energy_condition_violation",
+            "null_direction_grid:DEC:observer_energy_condition_violation",
+            "algebraic_type_i:DEC:observer_energy_condition_violation",
+            "continuous_optimizer:continuous_optimizer_not_implemented"
+          ]
+        },
+        {
+          "evidenceId": "horizon_blueshift_particle_stability",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1\\nhm2-campaign-stability-evidence.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "time_dependent_source_campaign",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1\\nhm2-time-dependent-source-campaign.json",
+          "status": "provided_blocked",
+          "blockers": [
+            "observer_robust_check_incomplete"
+          ]
+        }
+      ],
+      "nextCommand": "npm run nhm2:build-time-dependent-source-campaign -- --selected-profile-id stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1 --out artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1/nhm2-time-dependent-source-campaign.json --require-frozen-inputs",
+      "blockers": [
+        "qei_worldline_dossier_incomplete",
+        "qei_margin_not_pass",
+        "qei:wall:atlas:qei_margin_failed",
+        "qei:hull_wall_transition:atlas:qei_margin_failed",
+        "qei:wall_exterior_transition:atlas:qei_margin_failed",
+        "observer_robust_check_incomplete",
+        "observer_family_energy_condition_violation",
+        "eulerian:WEC:observer_energy_condition_violation",
+        "boosted_timelike_grid:WEC:observer_energy_condition_violation",
+        "null_direction_grid:DEC:observer_energy_condition_violation",
+        "algebraic_type_i:DEC:observer_energy_condition_violation",
+        "continuous_optimizer:continuous_optimizer_not_implemented",
+        "observer_robust_check_incomplete"
+      ]
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p9000_observer_compatible_source_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.9,
+      "proposalKind": "observer_compatible_source",
+      "runRoot": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p9000_observer_compatible_source_campaign_screen_v1",
+      "queuedForFrozenCampaign": true,
+      "priorityRank": 3,
+      "sourceSearchStatus": "screen_pass_needs_campaign_run",
+      "manifestStatus": "queued_full_campaign_required",
+      "requiredEvidence": [
+        {
+          "evidenceId": "candidate_metric_profile_spec",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_observer_compatible_source_campaign_screen_v1\\nhm2-candidate-metric-profile-spec.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "metric_required_full_regional_tensor",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_observer_compatible_source_campaign_screen_v1\\nhm2-metric-required-full-regional-tensor.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "projected_momentum_demand_audit",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_observer_compatible_source_campaign_screen_v1\\nhm2-metric-required-momentum-demand-audit.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "metric_momentum_remediation_targets",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_observer_compatible_source_campaign_screen_v1\\nhm2-metric-momentum-remediation-targets.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "source_tile_counterpart_compatibility",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_observer_compatible_source_campaign_screen_v1\\nhm2-source-tile-counterpart-compatibility.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "regional_full_tensor_residuals",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_observer_compatible_source_campaign_screen_v1\\nhm2-regional-full-tensor-residual.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "switching_covariant_conservation",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_observer_compatible_source_campaign_screen_v1\\nhm2-switching-covariant-conservation-evidence.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "frequency_convergence",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_observer_compatible_source_campaign_screen_v1\\nhm2-frequency-convergence-evidence.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "dynamic_effective_geometry_agreement",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_observer_compatible_source_campaign_screen_v1\\nhm2-dynamic-effective-geometry-evidence.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "qei_worldline_dossier",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_observer_compatible_source_campaign_screen_v1\\nhm2-qei-worldline-dossier.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "observer_family_energy_conditions",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_observer_compatible_source_campaign_screen_v1\\nhm2-observer-robust-energy-conditions.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "horizon_blueshift_particle_stability",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_observer_compatible_source_campaign_screen_v1\\nhm2-campaign-stability-evidence.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "time_dependent_source_campaign",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p9000_observer_compatible_source_campaign_screen_v1\\nhm2-time-dependent-source-campaign.json",
+          "status": "provided",
+          "blockers": []
+        }
+      ],
+      "nextCommand": "npm run nhm2:build-time-dependent-source-campaign -- --selected-profile-id stage1_centerline_alpha_0p9000_observer_compatible_source_campaign_screen_v1 --out artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p9000_observer_compatible_source_campaign_screen_v1/nhm2-time-dependent-source-campaign.json --require-frozen-inputs",
+      "blockers": []
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.7,
+      "proposalKind": "observer_compatible_source",
+      "runRoot": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+      "queuedForFrozenCampaign": true,
+      "priorityRank": 1,
+      "sourceSearchStatus": "screen_pass_needs_campaign_run",
+      "manifestStatus": "queued_full_campaign_required",
+      "requiredEvidence": [
+        {
+          "evidenceId": "candidate_metric_profile_spec",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1\\nhm2-candidate-metric-profile-spec.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "metric_required_full_regional_tensor",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1\\nhm2-metric-required-full-regional-tensor.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "projected_momentum_demand_audit",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1\\nhm2-metric-required-momentum-demand-audit.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "metric_momentum_remediation_targets",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1\\nhm2-metric-momentum-remediation-targets.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "source_tile_counterpart_compatibility",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1\\nhm2-source-tile-counterpart-compatibility.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "regional_full_tensor_residuals",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1\\nhm2-regional-full-tensor-residual.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "switching_covariant_conservation",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1\\nhm2-switching-covariant-conservation-evidence.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "frequency_convergence",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1\\nhm2-frequency-convergence-evidence.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "dynamic_effective_geometry_agreement",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1\\nhm2-dynamic-effective-geometry-evidence.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "qei_worldline_dossier",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1\\nhm2-qei-worldline-dossier.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "observer_family_energy_conditions",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1\\nhm2-observer-robust-energy-conditions.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "horizon_blueshift_particle_stability",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1\\nhm2-campaign-stability-evidence.json",
+          "status": "provided",
+          "blockers": []
+        },
+        {
+          "evidenceId": "time_dependent_source_campaign",
+          "required": true,
+          "artifactRef": "artifacts\\research\\full-solve\\profile-campaign-runs\\stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1\\nhm2-time-dependent-source-campaign.json",
+          "status": "provided",
+          "blockers": []
+        }
+      ],
+      "nextCommand": "npm run nhm2:build-time-dependent-source-campaign -- --selected-profile-id stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1 --out artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-time-dependent-source-campaign.json --require-frozen-inputs",
+      "blockers": []
+    }
+  ],
+  "summary": {
+    "candidateCount": 14,
+    "queuedCandidateCount": 5,
+    "rejectedCandidateCount": 9,
+    "nextCandidateProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+    "firstBlocker": "candidate_frozen_campaign_evidence_missing",
+    "manifestComplete": false
+  },
+  "claimBoundary": {
+    "diagnosticOnly": true,
+    "runManifestDoesNotEvaluateCampaign": true,
+    "queuedCandidateDoesNotValidateProfile": true,
+    "physicalViabilityClaimAllowed": false,
+    "transportClaimAllowed": false,
+    "routeEtaClaimAllowed": false,
+    "propulsionClaimAllowed": false
+  }
+}

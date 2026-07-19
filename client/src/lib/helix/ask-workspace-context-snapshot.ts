@@ -1,3 +1,9 @@
+import { HELIX_ACTIVE_DOC_VISIBLE_TRANSLATION_CONTEXT_SCHEMA } from "@/lib/docs/visibleTranslationContext";
+import {
+  HELIX_RESEARCH_LIBRARY_DOC_VIEWER_PATH_PREFIX,
+  researchLibraryDocViewerPath,
+} from "@shared/helix-research-library";
+
 type WorkstationLayoutGroupLike = {
   activePanelId?: unknown;
   panelIds?: unknown;
@@ -291,6 +297,105 @@ const normalizeActiveDocVisibleTranslationContextForAskSnapshot = (
   });
 };
 
+type ResearchVisibleTranslationContextResolution = {
+  claimed: boolean;
+  path: string | null;
+};
+
+const visibleTranslationRecordMatchesResearchDocument = (
+  value: unknown,
+  input: {
+    docPath: string;
+    documentRef: string;
+    requireDocumentSourceId?: boolean;
+  },
+): boolean => {
+  const record = value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+  if (!record) return false;
+  const sourceId = readProjectionString(record, "sourceId", "source_id");
+  const expectedSourceId = `document_markdown:${input.docPath}`;
+  return (
+    readProjectionDocPath(record) === input.docPath &&
+    readProjectionString(record, "documentSourceKind", "document_source_kind") === "research_library" &&
+    readProjectionString(record, "documentRef", "document_ref") === input.documentRef &&
+    (record.private_source ?? record.privateSource) === true &&
+    (!input.requireDocumentSourceId || sourceId === expectedSourceId || sourceId?.startsWith(`${expectedSourceId}#`) === true)
+  );
+};
+
+const resolveResearchVisibleTranslationContext = (
+  value: Record<string, unknown> | null,
+  activePanel: string | null,
+): ResearchVisibleTranslationContextResolution => {
+  if (!value) return { claimed: false, path: null };
+  const docPath = readProjectionDocPath(value);
+  const sourceKind = readProjectionString(value, "documentSourceKind", "document_source_kind");
+  const privateSource = value.private_source ?? value.privateSource;
+  const claimed =
+    sourceKind === "research_library" ||
+    privateSource === true ||
+    docPath?.startsWith(HELIX_RESEARCH_LIBRARY_DOC_VIEWER_PATH_PREFIX) === true;
+  if (!claimed) return { claimed: false, path: null };
+  if (activePanel !== "docs-viewer") return { claimed: true, path: null };
+
+  const documentRef = readProjectionString(value, "documentRef", "document_ref");
+  if (
+    value.schema !== HELIX_ACTIVE_DOC_VISIBLE_TRANSLATION_CONTEXT_SCHEMA ||
+    readProjectionString(value, "panelId", "panel_id") !== "docs-viewer" ||
+    readProjectionString(value, "sourceKind", "source_kind") !== "docs_viewer" ||
+    sourceKind !== "research_library" ||
+    privateSource !== true ||
+    !documentRef
+  ) {
+    return { claimed: true, path: null };
+  }
+
+  const expectedPath = researchLibraryDocViewerPath(documentRef);
+  const expectedSourceId = `document_markdown:${expectedPath}`;
+  if (docPath !== expectedPath || readProjectionString(value, "sourceId", "source_id") !== expectedSourceId) {
+    return { claimed: true, path: null };
+  }
+
+  const chunks = Array.isArray(value.chunks) ? value.chunks : null;
+  const uiTextRegionsValue = value.ui_text_regions ?? value.uiTextRegions;
+  const uiTextRegions = Array.isArray(uiTextRegionsValue) ? uiTextRegionsValue : null;
+  const optionalRegionValues = [
+    value.panel_text_regions ?? value.panelTextRegions,
+    value.visible_ui_text_regions ?? value.visibleUiTextRegions,
+  ];
+  if (optionalRegionValues.some((entries) => entries != null && !Array.isArray(entries))) {
+    return { claimed: true, path: null };
+  }
+  const optionalRegionArrays = optionalRegionValues.filter(
+    (entries): entries is unknown[] => Array.isArray(entries),
+  );
+  if (
+    !chunks ||
+    !uiTextRegions ||
+    !chunks.every((entry) => visibleTranslationRecordMatchesResearchDocument(entry, {
+      docPath: expectedPath,
+      documentRef,
+      requireDocumentSourceId: true,
+    })) ||
+    !uiTextRegions.every((entry) => visibleTranslationRecordMatchesResearchDocument(entry, {
+      docPath: expectedPath,
+      documentRef,
+    })) ||
+    optionalRegionArrays.some((entries) => !entries.every((entry) =>
+      visibleTranslationRecordMatchesResearchDocument(entry, {
+        docPath: expectedPath,
+        documentRef,
+      })
+    ))
+  ) {
+    return { claimed: true, path: null };
+  }
+
+  return { claimed: true, path: expectedPath };
+};
+
 export function buildAskTurnWorkspaceContextSnapshotFromState(
   input: AskTurnWorkspaceContextSnapshotInput,
 ): Record<string, unknown> {
@@ -394,13 +499,29 @@ export function buildAskTurnWorkspaceContextSnapshotFromState(
       raw_content_included: false,
     }
     : null;
-  const currentPath = input.docContext.path;
-  const docContextSource = input.docContext.source;
-  const activeDocVisibleTranslationContext =
+  const suppliedVisibleTranslationContext =
     input.activeDocVisibleTranslationContext &&
-    typeof input.activeDocVisibleTranslationContext === "object"
+    typeof input.activeDocVisibleTranslationContext === "object" &&
+    !Array.isArray(input.activeDocVisibleTranslationContext)
+      ? input.activeDocVisibleTranslationContext
+      : null;
+  const researchVisibleContext = resolveResearchVisibleTranslationContext(
+    suppliedVisibleTranslationContext,
+    activePanel,
+  );
+  const rejectedResearchVisibleContext = researchVisibleContext.claimed && !researchVisibleContext.path;
+  const currentPath = rejectedResearchVisibleContext
+    ? null
+    : researchVisibleContext.path ?? input.docContext.path;
+  const docContextSource = researchVisibleContext.path
+    ? "active_research_library_visible_context"
+    : rejectedResearchVisibleContext
+      ? "invalid_research_library_visible_context"
+      : input.docContext.source;
+  const activeDocVisibleTranslationContext =
+    suppliedVisibleTranslationContext && !rejectedResearchVisibleContext
       ? normalizeActiveDocVisibleTranslationContextForAskSnapshot(
-        input.activeDocVisibleTranslationContext,
+        suppliedVisibleTranslationContext,
         currentPath,
       )
       : null;
@@ -409,7 +530,7 @@ export function buildAskTurnWorkspaceContextSnapshotFromState(
       .filter((entry): entry is Record<string, unknown> =>
         Boolean(entry) && typeof entry === "object" && !Array.isArray(entry)
       )
-      .filter((entry) => projectionMatchesActiveDoc(entry, currentPath))
+      .filter((entry) => !rejectedResearchVisibleContext && projectionMatchesActiveDoc(entry, currentPath))
       .map((entry) => normalizeProjectionEvidenceForAskSnapshot(entry, "account_language"))
       .slice(0, 24)
     : [];
@@ -418,7 +539,7 @@ export function buildAskTurnWorkspaceContextSnapshotFromState(
       .filter((entry): entry is Record<string, unknown> =>
         Boolean(entry) && typeof entry === "object" && !Array.isArray(entry)
       )
-      .filter((entry) => projectionMatchesActiveDoc(entry, currentPath))
+      .filter((entry) => !rejectedResearchVisibleContext && projectionMatchesActiveDoc(entry, currentPath))
       .map((entry) => normalizeProjectionEvidenceForAskSnapshot(entry))
       .slice(0, 24)
     : [];

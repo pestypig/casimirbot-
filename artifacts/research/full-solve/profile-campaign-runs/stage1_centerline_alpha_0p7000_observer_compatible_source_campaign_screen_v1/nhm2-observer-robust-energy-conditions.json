@@ -1,0 +1,92 @@
+{
+  "contractVersion": "nhm2_observer_robust_energy_conditions/v1",
+  "generatedAt": "2026-06-19T19:03:11.022Z",
+  "laneId": "nhm2_shift_lapse",
+  "selectedProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "tensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-tile-effective-full-tensor-source.json",
+  "atlasRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-support-function-atlas.json",
+  "atlasHash": "41bdbf8140bce18f971b417014779f76eb8113c03ec5a79abfcc13d05bff9bb2",
+  "sampleRegionCoverage": {
+    "global": 1728,
+    "hull": 8,
+    "wall": 128,
+    "exterior_shell": 344,
+    "hull_wall_transition": 16,
+    "wall_exterior_transition": 16
+  },
+  "observerFamilies": [
+    {
+      "familyId": "eulerian",
+      "status": "pass",
+      "sampleCount": 4,
+      "worstCase": {
+        "condition": "WEC",
+        "value": 0.010000000000000002,
+        "locationRef": "atlas-region:exterior_shell"
+      },
+      "blockers": []
+    },
+    {
+      "familyId": "boosted_timelike_grid",
+      "status": "pass",
+      "sampleCount": 384,
+      "worstCase": {
+        "condition": "DEC",
+        "value": 0.008200000000000002,
+        "locationRef": "atlas-region:exterior_shell",
+        "observerParams": {
+          "beta": 0.25,
+          "directionIndex": 0
+        }
+      },
+      "blockers": []
+    },
+    {
+      "familyId": "null_direction_grid",
+      "status": "pass",
+      "sampleCount": 128,
+      "worstCase": {
+        "condition": "DEC",
+        "value": 0.008200000000000002,
+        "locationRef": "atlas-region:exterior_shell",
+        "observerParams": {
+          "directionIndex": 0
+        }
+      },
+      "blockers": []
+    },
+    {
+      "familyId": "algebraic_type_i",
+      "status": "pass",
+      "sampleCount": 16,
+      "worstCase": {
+        "condition": "DEC",
+        "value": 0.008200000000000002,
+        "locationRef": "atlas-region:exterior_shell"
+      },
+      "blockers": []
+    },
+    {
+      "familyId": "continuous_optimizer",
+      "status": "not_run",
+      "optimizerUsed": false,
+      "blockers": [
+        "continuous_optimizer_not_implemented"
+      ]
+    }
+  ],
+  "summary": {
+    "eulerianOnly": false,
+    "robustCheckComplete": true,
+    "anyViolation": false,
+    "missedViolationRisk": "medium"
+  },
+  "literatureRefs": [
+    "le_2026_observer_robust_warp_energy_conditions",
+    "santiago_schuster_visser_2021_generic_warp_nec"
+  ],
+  "claimBoundary": {
+    "diagnosticOnly": true,
+    "friendlyObserverCannotProveWec": true
+  }
+}

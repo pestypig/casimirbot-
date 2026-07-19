@@ -1,7 +1,11 @@
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { isTheoryBadgeGraphV1, validateTheoryBadgeGraphV1, type TheoryBadgeV1 } from "../../contracts/theory-badge-graph.v1";
 import { buildHelixTheoryBadgeGraphV1 } from "../helix-theory-badge-graph";
-import { buildNhm2FullSolveTheoryBadgesV1 } from "../nhm2-full-solve-theory-badges";
+import {
+  buildNhm2FullSolveTheoryBadgesV1,
+  evaluateNhm2SteeringBondiFluxGate,
+} from "../nhm2-full-solve-theory-badges";
 
 const forbiddenPhrase = (...parts: string[]): RegExp => new RegExp(parts.join(""), "i");
 
@@ -26,6 +30,9 @@ describe("NHM2 full-solve theory badges", () => {
     "nhm2.qei.worldline_dossier",
     "casimir.material.lifshitz_receipt",
     "casimir.geometry.beyond_pfa_validity",
+    "casimir.geometry.finite_temperature_maxwell_stress",
+    "nhm2.mechanical.support_retention_overlap",
+    "nhm2.transport.steering_bondi_flux_budget",
     "nhm2.natario.invariant_audit",
   ];
   const leanFormalBadgeIds = [
@@ -352,6 +359,7 @@ describe("NHM2 full-solve theory badges", () => {
       "nhm2.experimental.research_gap_ledger",
       "nhm2.experimental.layer_stack_mechanical_receipt",
       "nhm2.experimental.layer_stack_support_fraction_sweep",
+      "nhm2.transport.steering_bondi_flux_budget",
       "nhm2.experimental.layer_stack_architecture_loop",
       "nhm2.experimental.full_apparatus_receipt_loop",
       "nhm2.experimental.tile_source_physical_validation_plan",
@@ -396,8 +404,57 @@ describe("NHM2 full-solve theory badges", () => {
     const leanCertificate = byId.get("nhm2.formal.lean_certificate");
     const refsText = JSON.stringify(leanCertificate?.sourceRefs);
     expect(refsText).toMatch(/nhm2-lean-campaign-certificate\.json/);
+    expect(refsText).toMatch(
+      /theory-runtime-output-manifest-alpha-0p7000-historical-import\.v1\.json/,
+    );
     expect(refsText).toMatch(/CurrentCampaignCertificate\.lean/);
     expect(refsText).toMatch(/npm run formal:nhm2:certificate:check/);
+
+    const manifestPath = leanCertificate?.sourceRefs.find(
+      (ref) =>
+        ref.kind === "artifact" &&
+        ref.path?.endsWith(
+          "theory-runtime-output-manifest-alpha-0p7000-historical-import.v1.json",
+        ),
+    )?.path;
+    expect(manifestPath).toBeTruthy();
+    const manifest = JSON.parse(readFileSync(manifestPath ?? "", "utf8")) as {
+      schemaVersion: string;
+      boundToExecution: boolean;
+      entries: Array<{ freshness: string }>;
+    };
+    expect(manifest).toMatchObject({
+      schemaVersion: "theory_runtime_output_manifest/v1",
+      boundToExecution: false,
+    });
+    expect(manifest.entries).toHaveLength(39);
+    expect(manifest.entries.every((entry) => entry.freshness === "preexisting")).toBe(true);
+
+    for (const badgeId of [
+      "nhm2.formal.lean_certificate",
+      "nhm2.formal.diagnostic_campaign_admissible",
+      "nhm2.formal.claim_locks_closed",
+      "nhm2.formal.certificate_hashes_pinned",
+    ]) {
+      expect(JSON.stringify(byId.get(badgeId)?.sourceRefs), badgeId).toMatch(
+        /theory-runtime-output-manifest-alpha-0p7000-historical-import\.v1\.json/,
+      );
+    }
+
+    const certificatePath = leanCertificate?.sourceRefs.find(
+      (ref) => ref.kind === "artifact" && ref.path?.endsWith("nhm2-lean-campaign-certificate.json"),
+    )?.path;
+    expect(certificatePath).toBeTruthy();
+    const certificate = JSON.parse(readFileSync(certificatePath ?? "", "utf8")) as {
+      claimLocks: Record<string, boolean>;
+    };
+    expect(certificate.claimLocks).toEqual({
+      physicalViabilityClaimAllowed: false,
+      transportClaimAllowed: false,
+      routeEtaClaimAllowed: false,
+      propulsionClaimAllowed: false,
+      certifiedWarpSpeedClaimAllowed: false,
+    });
   });
 
   it("keeps Lean formal certificate copy claim-safe", () => {
@@ -434,10 +491,6 @@ describe("NHM2 full-solve theory badges", () => {
     const campaign = byId.get("nhm2.experimental.physical_viability_campaign");
     expect(JSON.stringify(campaign)).toMatch(/diagnostic campaign can feed this ladder/i);
     expect(JSON.stringify(campaign)).toMatch(/cannot substitute for experimental receipts/i);
-    expect(JSON.stringify(campaign?.sourceRefs)).toMatch(/nhm2-physical-viability-campaign\.json/);
-    expect(JSON.stringify(campaign?.sourceRefs)).toMatch(
-      /nhm2-experiment-facing-theory-roadmap\.json/,
-    );
     expect(JSON.stringify(campaign?.sourceRefs)).toMatch(/nhm2-lean-campaign-certificate\.json/);
 
     const roadmap = byId.get("nhm2.experimental.theory_solve_roadmap");
@@ -476,6 +529,12 @@ describe("NHM2 full-solve theory badges", () => {
     expect(layerStackMechanicalReceipt?.calculatorPayloads).toEqual([]);
     expect(JSON.stringify(layerStackMechanicalReceipt?.sourceRefs)).toMatch(
       /nhm2-layer-stack-mechanical-receipt\.v1\.ts/,
+    );
+    expect(JSON.stringify(layerStackMechanicalReceipt?.sourceRefs)).not.toMatch(
+      /nhm2-layer-stack-mechanical-receipt\.json/,
+    );
+    expect(JSON.stringify(layerStackMechanicalReceipt)).toMatch(
+      /does not publish a layer-stack mechanical receipt artifact/i,
     );
     expect(JSON.stringify(layerStackMechanicalReceipt)).toMatch(/14\.2 kN internal normal attraction/i);
     expect(JSON.stringify(layerStackMechanicalReceipt)).toMatch(/not thrust/i);
@@ -524,6 +583,167 @@ describe("NHM2 full-solve theory badges", () => {
     expect(byId.get("nhm2.experimental.metric_upper_bound")?.calculatorPayloads.map(
       (payload) => payload.expression,
     )).toEqual(["h00_proxy = 2*G*DeltaE/(r*c^4)"]);
+  });
+
+  it("exposes the frozen support-retention overlap as a blocked scalar gate", () => {
+    const { badges, edges } = buildNhm2FullSolveTheoryBadgesV1();
+    const badge = badges.find(
+      (candidate: TheoryBadgeV1) =>
+        candidate.id === "nhm2.mechanical.support_retention_overlap",
+    );
+    const setupVariables = new Map(
+      badge?.calculatorPayloads[0]?.setupContext?.variables?.map((variable) => [
+        variable.symbol,
+        Number(variable.value),
+      ]) ?? [],
+    );
+    const overlap =
+      (setupVariables.get("f_support_max") ?? Number.NaN) /
+      (setupVariables.get("f_support_min") ?? Number.NaN);
+
+    expect(badge).toMatchObject({
+      status: "blocked",
+      level: "diagnostic_gate",
+      calculatorPayloads: [
+        expect.objectContaining({
+          id: "support_retention_overlap_payload",
+          expression: "M_overlap = f_support_max/f_support_min",
+          targetVariable: "M_overlap",
+        }),
+      ],
+      claimBoundary: {
+        diagnosticOnly: true,
+        doesValidateNHM2: false,
+        validationClaimAllowed: false,
+        physicalMechanismClaimAllowed: false,
+        promotionAllowed: false,
+      },
+    });
+    expect(overlap).toBeCloseTo(0.459119311228, 12);
+    expect(JSON.stringify(badge)).toMatch(/support_retention_overlap_window_missing/);
+    expect(JSON.stringify(badge?.sourceRefs)).toMatch(/2606\.28195/);
+    expect(edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          from: "nhm2.experimental.layer_stack_mechanical_receipt",
+          to: "nhm2.mechanical.support_retention_overlap",
+          relation: "derives",
+        }),
+        expect.objectContaining({
+          from: "nhm2.mechanical.support_retention_overlap",
+          to: "nhm2.claim_boundary.physical_viability_locked",
+          relation: "blocks",
+        }),
+      ]),
+    );
+  });
+
+  it("keeps the steering Bondi-flux gate premise-aware, nonuniversal, and transport-locked", () => {
+    const { badges, edges } = buildNhm2FullSolveTheoryBadgesV1();
+    const badge = badges.find(
+      (candidate: TheoryBadgeV1) =>
+        candidate.id === "nhm2.transport.steering_bondi_flux_budget",
+    );
+    const text = JSON.stringify(badge);
+
+    expect(badge).toMatchObject({
+      status: "blocked",
+      level: "diagnostic_gate",
+      calculatorPayloads: [],
+      claimBoundary: {
+        diagnosticOnly: true,
+        doesValidateNHM2: false,
+        validationClaimAllowed: false,
+        physicalMechanismClaimAllowed: false,
+        promotionAllowed: false,
+      },
+    });
+    expect(text).toMatch(/asymptotic flatness/i);
+    expect(text).toMatch(/confined matter/i);
+    expect(text).toMatch(/dominant energy condition/i);
+    expect(text).toMatch(/not_applicable/);
+    expect(text).toMatch(/not_ready/);
+    expect(text).toMatch(/not an NHM2 field/i);
+    expect(JSON.stringify(badge?.sourceRefs)).toMatch(/2606\.22531v3/);
+    expect(edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          from: "nhm2.transport.steering_bondi_flux_budget",
+          to: "nhm2.claim_boundary.transport_locked",
+          relation: "blocks",
+        }),
+      ]),
+    );
+  });
+
+  it("evaluates Bondi-flux applicability without ever granting claim authority", () => {
+    const applicable = {
+      asymptoticFlatness: true,
+      confinedMatter: true,
+      dominantEnergyCondition: true,
+      bondiSachsAsymptotics: true,
+      radiativeFluxBudgetReceipt: true,
+    } as const;
+    const premiseKeys = [
+      "asymptoticFlatness",
+      "confinedMatter",
+      "dominantEnergyCondition",
+      "bondiSachsAsymptotics",
+    ] as const;
+
+    for (const premise of premiseKeys) {
+      const result = evaluateNhm2SteeringBondiFluxGate({
+        ...applicable,
+        [premise]: false,
+      });
+      expect(result.status, premise).toBe("not_applicable");
+      expect(result.applicable, premise).toBe(false);
+      expect(result.radiativeBudgetRequired, premise).toBe(false);
+      expect(Object.values(result.claimLocks).every((allowed) => allowed === false)).toBe(true);
+    }
+
+    const unknown = evaluateNhm2SteeringBondiFluxGate({
+      ...applicable,
+      asymptoticFlatness: "unknown",
+    });
+    expect(unknown.status).toBe("not_ready");
+    expect(unknown.applicable).toBeNull();
+
+    const missingBudget = evaluateNhm2SteeringBondiFluxGate({
+      ...applicable,
+      radiativeFluxBudgetReceipt: undefined,
+    });
+    expect(missingBudget.status).toBe("not_ready");
+
+    const failedBudget = evaluateNhm2SteeringBondiFluxGate({
+      ...applicable,
+      radiativeFluxBudgetReceipt: false,
+    });
+    expect(failedBudget.status).toBe("blocked");
+
+    const diagnosticPass = evaluateNhm2SteeringBondiFluxGate(applicable);
+    expect(diagnosticPass.status).toBe("diagnostic_pass");
+    expect(diagnosticPass.applicable).toBe(true);
+    expect(diagnosticPass.claimLocks).toEqual({
+      physicalViabilityClaimAllowed: false,
+      transportClaimAllowed: false,
+      routeEtaClaimAllowed: false,
+      propulsionClaimAllowed: false,
+      certifiedWarpSpeedClaimAllowed: false,
+    });
+  });
+
+  it("keeps every local repo and artifact source reference resolvable", () => {
+    const localRefs = buildNhm2FullSolveTheoryBadgesV1().badges.flatMap((badge) =>
+      badge.sourceRefs
+        .filter((ref) => ref.kind === "repo_module" || ref.kind === "artifact")
+        .map((ref) => ({ badgeId: badge.id, ref })),
+    );
+
+    for (const { badgeId, ref } of localRefs) {
+      expect(ref.path, `${badgeId} sourceRef path`).toBeTruthy();
+      expect(existsSync(ref.path ?? ""), `${badgeId}: ${ref.path}`).toBe(true);
+    }
   });
 
   it("keeps the centerline clocking target calculator-loadable but bounded", () => {
@@ -636,6 +856,7 @@ describe("NHM2 full-solve theory badges", () => {
         "nhm2.experimental.parameter_targets",
         "nhm2.experimental.research_gap_ledger",
         "nhm2.experimental.layer_stack_mechanical_receipt",
+        "nhm2.mechanical.support_retention_overlap",
       "nhm2.experimental.layer_stack_support_fraction_sweep",
       "nhm2.experimental.layer_stack_architecture_loop",
       "nhm2.experimental.full_apparatus_receipt_loop",
@@ -652,6 +873,7 @@ describe("NHM2 full-solve theory badges", () => {
         "nhm2.experimental.independent_replication",
         "nhm2.claim_boundary.physical_viability_locked",
         "nhm2.claim_boundary.transport_locked",
+        "nhm2.transport.steering_bondi_flux_budget",
         "nhm2.claim_boundary.diagonal_proxy_not_full_tensor",
       ]),
     );
@@ -694,6 +916,8 @@ describe("NHM2 full-solve theory badges", () => {
       "nhm2.natario.invariant_audit",
       "casimir.material.lifshitz_receipt",
       "casimir.geometry.beyond_pfa_validity",
+      "casimir.geometry.finite_temperature_maxwell_stress",
+      "nhm2.transport.steering_bondi_flux_budget",
     ]) {
       const badge = byId.get(badgeId);
       expect(badge?.calculatorPayloads).toEqual([]);

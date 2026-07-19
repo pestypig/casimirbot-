@@ -25,6 +25,7 @@ import {
   readPositiveIntFromEnv,
   readPositiveTimeoutMsFromEnv,
   resolveSelectedTransportOnlyContract,
+  resolveNhm2SweepOutputRoots,
   resolveCitationRegistryPath,
   selectSweepSpecs,
   validateClaimsLedger,
@@ -824,6 +825,18 @@ describe("nhm2 lapse alpha sweep runner helpers", () => {
         NHM2_OUTPUT_DIR: "out",
       }),
     ).not.toThrow();
+  });
+
+  it("binds full-sweep artifacts and audits beneath NHM2_OUTPUT_DIR", () => {
+    const root = path.join("workspace", "repo");
+    const output = path.join("artifacts", "theory-runtime-jobs", "request_alpha");
+    const resolved = resolveNhm2SweepOutputRoots(root, { NHM2_OUTPUT_DIR: output });
+
+    expect(resolved).toEqual({
+      sweepRoot: path.resolve(root, output),
+      sweepAuditRoot: path.resolve(root, output, "audit"),
+      runBound: true,
+    });
   });
 
   it("derives expected clocking target from baseline anchor", () => {

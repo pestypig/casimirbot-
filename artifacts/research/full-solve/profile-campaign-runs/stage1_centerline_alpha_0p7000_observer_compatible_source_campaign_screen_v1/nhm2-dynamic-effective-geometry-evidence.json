@@ -1,0 +1,15 @@
+{
+  "contractVersion": "nhm2_dynamic_effective_geometry_evidence/v1",
+  "generatedAt": "2026-06-19T19:03:11.019Z",
+  "dynamicGeometryRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-dynamic-geometry-samples.json",
+  "effectiveGeometryRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-effective-geometry-reference.json",
+  "averagingWindowSeconds": 1,
+  "cycleAverageSourceFixed": true,
+  "averagedSourceTensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-averaged-source-tensor-receipt.json",
+  "backreactionResidualRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-backreaction-residual-receipt.json",
+  "residualLInf": 0,
+  "residualL2": 0,
+  "bounded": true,
+  "agreementStatus": "pass",
+  "blockers": []
+}

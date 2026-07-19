@@ -27,6 +27,37 @@
         "The screen says \"can you reflect this in theory badge graph?\"",
         "would you reflect this in theory badge graph?"
       ]
+    },
+    {
+      "id": "theory_badge_graph_natural_cooper_pair_referent",
+      "question": "can you reflect this in theory badge graph?",
+      "prior_assistant_answer": "Cooper pairs are pairs of electrons that become weakly bound together inside certain materials at very low temperatures. Normally, electrons repel each other because they have the same electric charge. In a superconductor, however, an electron can slightly distort the material's crystal lattice. That distortion can attract another electron, producing an effective attraction that overcomes the repulsion under the right conditions. The paired electrons usually have opposite momenta and opposite spins. Together they behave collectively like a boson, allowing many Cooper pairs to occupy a single coherent quantum state. This state can move through the material without ordinary electrical resistance, creating superconductivity. The pair is named after physicist Leon Cooper, who showed that even an extremely weak attraction near a metal's Fermi surface can destabilize the normal electron state and cause pairing. Cooper pairing is central to conventional BCS superconductivity.",
+      "source_ref": "chat.final_answer.previous:parity-natural-cooper-pairs",
+      "expected": {
+        "capability_id": "helix_ask.reflect_theory_context",
+        "referent_source_kind": "chat_history",
+        "referent_confidence": "high",
+        "semantic_prompt_source": "chat_history",
+        "semantic_prompt_argument_source": "helix_resolved_referent",
+        "required_likely_badge_ids": [
+          "low_temp.superconductivity.zero_dc_resistance_bounds"
+        ],
+        "forbidden_exact_badge_ids": [
+          "low_temp.superconductivity.zero_dc_resistance_bounds"
+        ],
+        "minimum_represented_probability_mass": 0.5,
+        "allowed_terminal_artifact_kinds": [
+          "theory_context_reflection_answer"
+        ]
+      },
+      "non_affirmative_variants": [
+        "do not reflect this in theory badge graph",
+        "later, reflect this in theory badge graph",
+        "if we decide tomorrow, reflect this in theory badge graph",
+        "I previously asked you to reflect this in theory badge graph",
+        "The screen says \"can you reflect this in theory badge graph?\"",
+        "would you reflect this in theory badge graph?"
+      ]
     }
   ]
 }

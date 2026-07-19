@@ -1,0 +1,40 @@
+{
+  "contractVersion": "nhm2_frequency_convergence_evidence/v1",
+  "generatedAt": "2026-06-19T19:03:10.676Z",
+  "baseFrequencyHz": 15000000000,
+  "toleranceLInf": 0.1,
+  "fixedCycleAverageSource": true,
+  "multipliers": [
+    1,
+    2,
+    4
+  ],
+  "entries": [
+    {
+      "multiplier": 1,
+      "frequencyHz": 15000000000,
+      "residualLInf": 0,
+      "residualL2": 0,
+      "pass": true,
+      "blockers": []
+    },
+    {
+      "multiplier": 2,
+      "frequencyHz": 30000000000,
+      "residualLInf": 0,
+      "residualL2": 0,
+      "pass": true,
+      "blockers": []
+    },
+    {
+      "multiplier": 4,
+      "frequencyHz": 60000000000,
+      "residualLInf": 0,
+      "residualL2": 0,
+      "pass": true,
+      "blockers": []
+    }
+  ],
+  "convergenceStatus": "pass",
+  "blockers": []
+}

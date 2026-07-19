@@ -1,0 +1,49 @@
+{
+  "artifactId": "nhm2_reference_run",
+  "schemaVersion": "nhm2_reference_run/v1",
+  "generatedAt": "2026-06-19T19:03:10.498Z",
+  "runId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "repo": {
+    "repositoryFullName": "pestypig/casimirbot-",
+    "branch": "main",
+    "commitSha": "3ffbd0e8cf0d89f7633659e84dfd836f7aeb905d",
+    "dirtyTreeStatus": "dirty"
+  },
+  "selectedFamily": {
+    "laneId": "nhm2_shift_lapse",
+    "selectedProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+    "expectedProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+    "profileMatch": true
+  },
+  "claimLock": {
+    "currentClaimTier": "unknown",
+    "maximumClaimTier": "unknown",
+    "validationMode": "red_team_hardening",
+    "validationClaimAllowed": false,
+    "latestAliasForbidden": true
+  },
+  "commands": [
+    {
+      "id": "freeze_reference_run",
+      "command": "node.exe tools/nhm2/build-candidate-profile-campaign-run.ts --profile-search artifacts/research/full-solve/profile-search/nhm2-campaign-profile-search-latest.json --candidate-profile-id stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1 --audit-only",
+      "status": "pass",
+      "startedAt": null,
+      "completedAt": "2026-06-19T19:03:10.499Z"
+    }
+  ],
+  "artifactSet": [],
+  "hashLock": {
+    "inputManifestSha256": null,
+    "toleranceManifestSha256": null,
+    "artifactSetSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "literatureClaimMapSha256": "e62fe5367da70558d4815a589047d3499ba4d4db388b8cc4ac5fa59b20c8b835"
+  },
+  "blockerSummary": {
+    "overallState": "unknown",
+    "blockingReasons": [],
+    "observerConsistencyStatus": "unknown",
+    "sourceClosureRegionalStatus": "unknown",
+    "qeiDossierStatus": "missing",
+    "reproducibilityStatus": "missing"
+  }
+}

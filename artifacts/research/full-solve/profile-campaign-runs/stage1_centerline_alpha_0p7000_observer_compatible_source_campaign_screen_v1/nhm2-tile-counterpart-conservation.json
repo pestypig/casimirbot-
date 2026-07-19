@@ -1,0 +1,119 @@
+{
+  "artifactId": "nhm2_tile_counterpart_conservation",
+  "schemaVersion": "nhm2_tile_counterpart_conservation/v1",
+  "runId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "selectedProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "expectedProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "laneId": "nhm2_shift_lapse",
+  "chartRef": "comoving_cartesian",
+  "derivativeStencil": "regional_jump_linf_with_transition_kernel_v1",
+  "unitsRef": "dimensionless_normalized_tensor_jump",
+  "atlasRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-support-function-atlas.json",
+  "atlasHash": "41bdbf8140bce18f971b417014779f76eb8113c03ec5a79abfcc13d05bff9bb2",
+  "regions": [
+    {
+      "regionId": "global",
+      "status": "pass",
+      "divTResidualLInf": 0.020000000000000004,
+      "continuityResidualLInf": 0.020000000000000004,
+      "momentumResidualLInf": 2.0000000000000004e-12,
+      "toleranceLInf": 0.1,
+      "sampleCount": 1728,
+      "diagnosticMode": "regional_jump_linf_with_transition_kernel_v1",
+      "neighborRegionIds": [
+        "hull",
+        "wall",
+        "exterior_shell"
+      ],
+      "transitionKernelRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-source-transition-kernel.json",
+      "preTransitionResidualLInf": 0.020000000000000004,
+      "postTransitionResidualLInf": 0.020000000000000004,
+      "transitionSmoothingWeight": 0,
+      "transitionLayerResidualLInf": 0.020000000000000004,
+      "dominantComponentId": "T00",
+      "maxHotspotRef": "global<->wall:T00",
+      "warnings": [
+        "transition-kernel regularized diagnostic only: smoothed region-aggregate jumps are not a full covariant finite-difference conservation solve"
+      ],
+      "blockers": []
+    },
+    {
+      "regionId": "hull",
+      "status": "pass",
+      "divTResidualLInf": 0.0325,
+      "continuityResidualLInf": 0.0325,
+      "momentumResidualLInf": 3.250000000000001e-12,
+      "toleranceLInf": 0.1,
+      "sampleCount": 8,
+      "diagnosticMode": "regional_jump_linf_with_transition_kernel_v1",
+      "neighborRegionIds": [
+        "wall"
+      ],
+      "transitionKernelRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-source-transition-kernel.json",
+      "preTransitionResidualLInf": 0.0325,
+      "postTransitionResidualLInf": 0.0325,
+      "transitionSmoothingWeight": 0,
+      "transitionLayerResidualLInf": 0.0325,
+      "dominantComponentId": "T00",
+      "maxHotspotRef": "hull<->wall:T00",
+      "warnings": [
+        "transition-kernel regularized diagnostic only: smoothed region-aggregate jumps are not a full covariant finite-difference conservation solve"
+      ],
+      "blockers": []
+    },
+    {
+      "regionId": "wall",
+      "status": "pass",
+      "divTResidualLInf": 0.04,
+      "continuityResidualLInf": 0.04,
+      "momentumResidualLInf": 4.000000000000001e-12,
+      "toleranceLInf": 0.1,
+      "sampleCount": 128,
+      "diagnosticMode": "regional_jump_linf_with_transition_kernel_v1",
+      "neighborRegionIds": [
+        "hull",
+        "exterior_shell"
+      ],
+      "transitionKernelRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-source-transition-kernel.json",
+      "preTransitionResidualLInf": 0.04,
+      "postTransitionResidualLInf": 0.04,
+      "transitionSmoothingWeight": 0,
+      "transitionLayerResidualLInf": 0.04,
+      "dominantComponentId": "T00",
+      "maxHotspotRef": "wall<->exterior_shell:T00",
+      "warnings": [
+        "transition-kernel regularized diagnostic only: smoothed region-aggregate jumps are not a full covariant finite-difference conservation solve"
+      ],
+      "blockers": []
+    },
+    {
+      "regionId": "exterior_shell",
+      "status": "pass",
+      "divTResidualLInf": 0.04,
+      "continuityResidualLInf": 0.04,
+      "momentumResidualLInf": 4.000000000000001e-12,
+      "toleranceLInf": 0.1,
+      "sampleCount": 344,
+      "diagnosticMode": "regional_jump_linf_with_transition_kernel_v1",
+      "neighborRegionIds": [
+        "wall"
+      ],
+      "transitionKernelRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-source-transition-kernel.json",
+      "preTransitionResidualLInf": 0.04,
+      "postTransitionResidualLInf": 0.04,
+      "transitionSmoothingWeight": 0,
+      "transitionLayerResidualLInf": 0.04,
+      "dominantComponentId": "T00",
+      "maxHotspotRef": "exterior_shell<->wall:T00",
+      "warnings": [
+        "transition-kernel regularized diagnostic only: smoothed region-aggregate jumps are not a full covariant finite-difference conservation solve"
+      ],
+      "blockers": []
+    }
+  ],
+  "profileMatch": true,
+  "overallState": "pass",
+  "claimEffect": "conservation_candidate",
+  "promotionAllowed": false,
+  "reasonCodes": []
+}

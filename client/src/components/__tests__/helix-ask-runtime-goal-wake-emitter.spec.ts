@@ -245,6 +245,82 @@ describe("HelixAskRuntimeGoalWakeEmitter", () => {
     });
   });
 
+  it.each([
+    {
+      label: "research-library provenance",
+      docPath: "docs/canonical-decoy.md",
+      snapshotDocPath: "docs/stale-canonical-fallback.md",
+      context: {
+        doc_path: "docs/canonical-decoy.md",
+        document_source_kind: "research_library",
+        chunks: [{ visible_text: "PRIVATE RESEARCH TEXT" }],
+      },
+    },
+    {
+      label: "private-source flag",
+      docPath: "docs/canonical-decoy.md",
+      snapshotDocPath: "docs/stale-canonical-fallback.md",
+      context: {
+        doc_path: "docs/canonical-decoy.md",
+        private_source: true,
+        chunks: [{ visible_text: "PRIVATE RESEARCH TEXT" }],
+      },
+    },
+    {
+      label: "opaque research viewer path",
+      docPath: "research-library/private-research%3Aaccount-token%3Adocument-token",
+      snapshotDocPath: "docs/stale-canonical-fallback.md",
+      context: {
+        doc_path: "research-library/private-research%3Aaccount-token%3Adocument-token",
+        chunks: [{ visible_text: "PRIVATE RESEARCH TEXT" }],
+      },
+    },
+    {
+      label: "nested private target provenance",
+      docPath: "docs/canonical-decoy.md",
+      snapshotDocPath: "docs/stale-canonical-fallback.md",
+      context: {
+        doc_path: "docs/canonical-decoy.md",
+        chunks: [{
+          document_source_kind: "research_library",
+          visible_text: "PRIVATE RESEARCH TEXT",
+        }],
+      },
+    },
+    {
+      label: "research viewer path hidden behind a canonical input path",
+      docPath: "docs/canonical-decoy.md",
+      snapshotDocPath: "research-library/private-research%3Aaccount-token%3Adocument-token",
+      context: {
+        doc_path: "docs/canonical-decoy.md",
+        chunks: [{ visible_text: "PRIVATE RESEARCH TEXT" }],
+      },
+    },
+  ])("does not build runtime-goal wakes from $label", ({ docPath, snapshotDocPath, context }) => {
+    const activeGoal = {
+      goalId: "goal:unrelated-active-goal",
+      runtimeAgentProvider: "codex" as const,
+      sessionStatus: "waiting",
+    };
+    const workspaceContextSnapshot = {
+      active_panel_id: "docs-viewer",
+      active_doc_path: snapshotDocPath,
+      active_doc_visible_translation_context: context,
+    };
+
+    expect(buildHelixAskRuntimeGoalVisibleSourceWakeCandidate({
+      activeGoal,
+      docPath,
+      workspaceContextSnapshot,
+    })).toBeNull();
+    expect(buildHelixAskRuntimeGoalVisibleSurfaceWakeCandidate({
+      activeGoal,
+      docPath,
+      workspaceContextSnapshot,
+      activeVisibleContext: context,
+    })).toBeNull();
+  });
+
   it("suppresses duplicate visible-source wake candidates by dedupe key", () => {
     const activeGoal = {
       goalId: "goal:abc",

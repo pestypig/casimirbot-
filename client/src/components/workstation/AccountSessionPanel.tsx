@@ -296,7 +296,10 @@ export default function AccountSessionPanel() {
       ]);
       setStatus(nextStatus);
       setPostulateReceipts(readClaimablePostulateReceipts());
-      cacheAccountCapabilityPolicy(nextStatus.account_policy ?? nextStatus.session?.account_policy ?? null);
+      cacheAccountCapabilityPolicy(
+        nextStatus.account_policy ?? nextStatus.session?.account_policy ?? null,
+        nextStatus.session?.profile.profile_id ?? null,
+      );
       setDiscordSessions(nextDiscordSessions);
       setCategorizationJobs(nextCategorizationJobs);
       setProfileArchives(await fetchProfileArchives(nextStatus.session?.profile.profile_id ?? fallbackProfileId));
@@ -350,7 +353,10 @@ export default function AccountSessionPanel() {
         setShowPasswordResetHint(Boolean(body?.show_password_reset_hint));
         throw new Error(body?.message ?? `account ${response.status}`);
       }
-      cacheAccountCapabilityPolicy(body?.session?.account_policy ?? body?.account_policy ?? null);
+      cacheAccountCapabilityPolicy(
+        body?.session?.account_policy ?? body?.account_policy ?? null,
+        body?.session?.profile?.profile_id ?? null,
+      );
       setAccountPassword("");
       setShowPasswordResetHint(false);
       await refresh();
@@ -455,7 +461,7 @@ export default function AccountSessionPanel() {
         { method: "POST" },
       );
       if (!response.ok) throw new Error(`sign-out ${response.status}`);
-      cacheAccountCapabilityPolicy(HELIX_USER_ACCOUNT_POLICY);
+      cacheAccountCapabilityPolicy(HELIX_USER_ACCOUNT_POLICY, null);
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to sign out.");
@@ -507,7 +513,7 @@ export default function AccountSessionPanel() {
       const response = await fetch("/api/account/profile", { method: "DELETE" });
       const body = await response.json();
       if (!response.ok) throw new Error(body?.message ?? `delete profile ${response.status}`);
-      cacheAccountCapabilityPolicy(HELIX_USER_ACCOUNT_POLICY);
+      cacheAccountCapabilityPolicy(HELIX_USER_ACCOUNT_POLICY, null);
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete profile.");

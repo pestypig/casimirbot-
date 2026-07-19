@@ -1,0 +1,71 @@
+{
+  "contractVersion": "nhm2_candidate_campaign_grid/v1",
+  "generatedAt": "2026-06-19T19:03:10.502Z",
+  "laneId": "nhm2_shift_lapse",
+  "candidateProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "runtimeProfileId": "stage1_centerline_alpha_0p7000_v1",
+  "chartId": "comoving_cartesian",
+  "gridId": "grid:stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1:reduced_order_campaign",
+  "gridKind": "reduced_order_campaign_grid",
+  "coordinateSystem": "comoving_cartesian",
+  "basisRef": "chart",
+  "regionSamples": {
+    "global": {
+      "sampleCount": 24,
+      "maskRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.mask.global",
+      "supportFunctionRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.W.global"
+    },
+    "hull": {
+      "sampleCount": 24,
+      "maskRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.mask.hull",
+      "supportFunctionRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.W.hull"
+    },
+    "wall": {
+      "sampleCount": 24,
+      "maskRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.mask.wall",
+      "supportFunctionRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.W.wall"
+    },
+    "exterior_shell": {
+      "sampleCount": 24,
+      "maskRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.mask.exterior_shell",
+      "supportFunctionRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.W.exterior_shell"
+    },
+    "hull_wall_transition": {
+      "sampleCount": 16,
+      "maskRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.mask.hull_wall_transition",
+      "supportFunctionRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.W.hull_wall_transition"
+    },
+    "wall_exterior_transition": {
+      "sampleCount": 16,
+      "maskRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.mask.wall_exterior_transition",
+      "supportFunctionRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.W.wall_exterior_transition"
+    }
+  },
+  "samplingPolicy": {
+    "regionalAggregationReady": true,
+    "admFiniteDifferenceReady": true,
+    "transitionSamplesIncluded": true,
+    "latestAliasesForbidden": true
+  },
+  "provenance": {
+    "candidateProfileSpecRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+    "sourceTensorCopiedFromMetric": false,
+    "targetDerivedFieldsUsed": false
+  },
+  "readiness": {
+    "gridAvailable": true,
+    "sameChartMetadataAvailable": true,
+    "candidateRuntimeProfileMapped": true,
+    "admSamplingReady": true,
+    "blockers": []
+  },
+  "claimBoundary": {
+    "diagnosticOnly": true,
+    "gridDoesNotEvaluateMetricTensor": true,
+    "gridDoesNotValidateProfile": true,
+    "physicalViabilityClaimAllowed": false,
+    "transportClaimAllowed": false,
+    "routeEtaClaimAllowed": false,
+    "propulsionClaimAllowed": false
+  }
+}

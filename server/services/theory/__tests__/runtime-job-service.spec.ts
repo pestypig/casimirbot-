@@ -11,13 +11,69 @@ import {
 import { updateTheoryRuntimeRunRequestStatus } from "../theory-runtime-run-request-manifest";
 import { getTheoryRuntimeEntrypoint } from "../../../../shared/theory/runtime-entrypoints";
 import { THEORY_RUNTIME_WORKSTATION_GRAPH_ID } from "../../../../shared/theory/runtime-execution-policy";
+import { buildTheoryRuntimeReceiptV1, type TheoryRuntimeReceiptStatus } from "../../../../shared/contracts/theory-runtime-receipt.v1";
+import { requestStatusForRuntimeReceipt } from "../runtime-jobs/runtime-job-finalizer";
 
 let tempRoot: string;
 const solarBadgeIds = [...(getTheoryRuntimeEntrypoint("solar.manifest")?.ownedBadgeIds ?? [])];
+const alphaSweepBadgeIds = [...(getTheoryRuntimeEntrypoint("nhm2.shift_lapse.alpha_sweep")?.ownedBadgeIds ?? [])];
 beforeEach(async () => { tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "theory-runtime-job-")); });
 afterEach(async () => { await fs.rm(tempRoot, { recursive: true, force: true }); });
 
 describe("theory runtime job service", () => {
+  it.each([
+    { receiptStatus: "completed", exitCode: 0, timedOut: false, expected: "completed" },
+    { receiptStatus: "blocked", exitCode: 0, timedOut: false, expected: "completed" },
+    { receiptStatus: "not_run", exitCode: 0, timedOut: false, expected: "completed" },
+    { receiptStatus: "stale", exitCode: 0, timedOut: false, expected: "completed" },
+    { receiptStatus: "failed", exitCode: 0, timedOut: false, expected: "failed" },
+    { receiptStatus: "completed", exitCode: 2, timedOut: false, expected: "failed" },
+    { receiptStatus: "completed", exitCode: null, timedOut: false, expected: "failed" },
+    { receiptStatus: "completed", exitCode: null, timedOut: true, expected: "timeout" },
+  ] as const)(
+    "maps process/evidence state $receiptStatus/$exitCode/$timedOut to $expected",
+    ({ receiptStatus, exitCode, timedOut, expected }) => {
+      const receipt = buildTheoryRuntimeReceiptV1({
+        generatedAt: "2026-07-19T12:00:01.000Z",
+        receiptId: "receipt:status-table",
+        runtimeId: "nhm2.shift_lapse.alpha_sweep",
+        graphId: THEORY_RUNTIME_WORKSTATION_GRAPH_ID,
+        badgeIds: [],
+        command: "npm run warp:full-solve:nhm2-shift-lapse:alpha-sweep",
+        args: {},
+        status: receiptStatus as TheoryRuntimeReceiptStatus,
+        outputs: { artifacts: [], scalars: {}, units: {}, gates: {}, missingSignals: [], warnings: [] },
+        provenance: {
+          gitSha: null,
+          startedAt: "2026-07-19T12:00:00.000Z",
+          completedAt: "2026-07-19T12:00:01.000Z",
+          durationMs: 1000,
+        },
+        execution: {
+          command: "npm",
+          args: ["run", "-s", "warp:full-solve:nhm2-shift-lapse:alpha-sweep"],
+          cwd: ".",
+          environment: { NHM2_OUTPUT_DIR: "artifacts/run" },
+          outputDirectory: "artifacts/run",
+          outputDirectoryBound: true,
+          exitCode,
+          stdout: "",
+          stderr: exitCode != null && exitCode !== 0 ? "failed" : "",
+          timedOut,
+          error: exitCode === 0 && !timedOut ? null : "execution did not complete successfully",
+        },
+        claimBoundary: {
+          currentTier: "diagnostic",
+          maximumTier: "reduced_order",
+          promotionAllowed: false,
+          promotionBlockedBy: ["physical_viability"],
+        },
+      });
+
+      expect(requestStatusForRuntimeReceipt(receipt)).toBe(expected);
+    },
+  );
+
   it("persists an asynchronous request and terminal receipt with honest running progress", async () => {
     const queued = await startTheoryRuntimeJob({ runtimeId: "solar.manifest", graphId: THEORY_RUNTIME_WORKSTATION_GRAPH_ID, badgeIds: solarBadgeIds, requestedScope: "quick", projectRoot: tempRoot }, { deferExecution: true });
     expect(queued.request.status).toBe("queued");
@@ -30,6 +86,40 @@ describe("theory runtime job service", () => {
     expect(terminal.request.heartbeat.progress).toBe(1);
     expect(terminal.result.available).toBe(true);
     expect((await readTheoryRuntimeResult({ requestId: queued.jobId, projectRoot: tempRoot }))?.status).toBe("failed");
+  });
+
+  it("keeps a successful long process completed when its evidence receipt is not_run", async () => {
+    const queued = await startTheoryRuntimeJob(
+      {
+        runtimeId: "nhm2.shift_lapse.alpha_sweep",
+        graphId: THEORY_RUNTIME_WORKSTATION_GRAPH_ID,
+        badgeIds: alphaSweepBadgeIds,
+        requestedScope: "full",
+        projectRoot: tempRoot,
+      },
+      { deferExecution: true },
+    );
+    const terminal = await runQueuedTheoryRuntimeJobNow({
+      requestId: queued.jobId,
+      projectRoot: tempRoot,
+      spawnExecutor: async () => ({
+        startedAt: "2026-07-19T12:00:00.000Z",
+        completedAt: "2026-07-19T12:00:01.000Z",
+        durationMs: 1000,
+        exitCode: 0,
+        stdout: "process completed",
+        stderr: "",
+        timedOut: false,
+        error: null,
+      }),
+    });
+    const receipt = await readTheoryRuntimeResult({ requestId: queued.jobId, projectRoot: tempRoot });
+
+    expect(receipt?.status).toBe("not_run");
+    expect(receipt?.execution?.exitCode).toBe(0);
+    expect(terminal.request.status).toBe("completed");
+    expect(terminal.request.heartbeat.message).toBe("Process completed; evidence receipt not_run.");
+    expect(receipt?.claimBoundary.promotionAllowed).toBe(false);
   });
 
   it("rejects unknown and registered-but-non-executable runtimes", async () => {

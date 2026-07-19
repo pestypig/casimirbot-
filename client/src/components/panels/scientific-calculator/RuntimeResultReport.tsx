@@ -2,6 +2,7 @@ import React from "react";
 import { Badge } from "@/components/ui/badge";
 import type { TheoryRuntimeJobSnapshotV1 } from "@shared/contracts/theory-runtime-job.v1";
 import type { TheoryRuntimeReceiptV1 } from "@shared/contracts/theory-runtime-receipt.v1";
+import { RuntimeReceiptStatusLamps } from "./RuntimeReceiptStatusLamps";
 
 const displayValue = (value: unknown) => value === null ? "null" : String(value);
 
@@ -9,8 +10,10 @@ export function RuntimeResultReport({ job, receipt }: {
   job: TheoryRuntimeJobSnapshotV1;
   receipt: TheoryRuntimeReceiptV1;
 }) {
-  const stdout = typeof receipt.args.stdout === "string" ? receipt.args.stdout.slice(0, 4000) : "";
-  const stderr = typeof receipt.args.stderr === "string" ? receipt.args.stderr.slice(0, 4000) : "";
+  const stdoutSource = receipt.execution?.stdout ?? receipt.args.stdout;
+  const stderrSource = receipt.execution?.stderr ?? receipt.args.stderr;
+  const stdout = typeof stdoutSource === "string" ? stdoutSource.slice(0, 4000) : "";
+  const stderr = typeof stderrSource === "string" ? stderrSource.slice(0, 4000) : "";
   return (
     <div className="space-y-3 rounded border border-violet-800/70 bg-slate-950/70 p-3" data-testid="theory-runtime-result-report">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -20,12 +23,17 @@ export function RuntimeResultReport({ job, receipt }: {
           <div className="mt-1 font-mono text-[11px] text-slate-400">{receipt.receiptId}</div>
         </div>
         <Badge variant="outline" className={receipt.status === "completed" ? "border-emerald-700 text-emerald-200" : "border-rose-700 text-rose-200"}>
-          {receipt.status}
+          lifecycle: {receipt.status}
         </Badge>
       </div>
+      <RuntimeReceiptStatusLamps
+        receipt={receipt}
+        aggregateStatus={receipt.status}
+        aggregateLabel="Aggregate runtime result"
+      />
       <div className="grid gap-2 text-[11px] md:grid-cols-2">
         <div className="rounded border border-slate-800 p-2"><span className="text-slate-500">request</span><div className="break-all font-mono">{job.jobId}</div></div>
-        <div className="rounded border border-slate-800 p-2"><span className="text-slate-500">command</span><div className="break-all font-mono">{receipt.command ?? "not recorded"}</div></div>
+        <div className="rounded border border-slate-800 p-2"><span className="text-slate-500">command</span><div className="break-all font-mono">{receipt.execution?.command ?? receipt.command ?? "not recorded"}</div></div>
         <div className="rounded border border-slate-800 p-2"><span className="text-slate-500">duration</span><div>{receipt.provenance.durationMs ?? "unknown"} ms</div></div>
         <div className="rounded border border-slate-800 p-2"><span className="text-slate-500">claim tier</span><div>{receipt.claimBoundary.currentTier} / max {receipt.claimBoundary.maximumTier}</div></div>
       </div>

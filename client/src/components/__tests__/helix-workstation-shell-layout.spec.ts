@@ -46,4 +46,48 @@ describe("HelixWorkstationShell layout contract", () => {
     expect(source.match(/\{sessionHeaderContent\}/g)).toHaveLength(2);
     expect(source.match(/\{sessionSwitcher\}/g)).toHaveLength(2);
   });
+
+  it("owns one isolated mobile navigation rail outside both surfaces", () => {
+    const source = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/workstation/HelixWorkstationShell.tsx"),
+      "utf8",
+    );
+
+    expect(source).toContain('style={{ "--helix-mobile-edge-rail": "3rem" } as CSSProperties}');
+    expect(source).toContain('data-testid="helix-mobile-surface-navigation"');
+    expect(source).toContain('className="pointer-events-none absolute inset-0 z-[60] isolate"');
+    expect(source).toContain("absolute inset-y-0 flex w-[var(--helix-mobile-edge-rail)] items-center");
+    expect(source.match(/data-testid="helix-mobile-surface-switch"/g)).toHaveLength(1);
+    expect(source).not.toContain("top-1/2 z-40");
+  });
+
+  it("reserves the rail and isolates the inactive mobile surface", () => {
+    const source = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/workstation/HelixWorkstationShell.tsx"),
+      "utf8",
+    );
+
+    expect(source).toContain("pl-[var(--helix-mobile-edge-rail)]");
+    expect(source).toContain("pr-[var(--helix-mobile-edge-rail)]");
+    expect(source).toContain('node.toggleAttribute("inert", mobileSurface !== "ask")');
+    expect(source).toContain('node.toggleAttribute("inert", mobileSurface !== "workstation")');
+    expect(source).toContain('"-translate-x-full pointer-events-none"');
+    expect(source).toContain('"translate-x-full pointer-events-none"');
+  });
+
+  it("uses the dynamic mobile viewport and safe-area insets", () => {
+    const desktopSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/pages/desktop.tsx"),
+      "utf8",
+    );
+    const htmlSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/index.html"),
+      "utf8",
+    );
+
+    expect(desktopSource).toContain('height: "100dvh"');
+    expect(desktopSource).toContain('paddingLeft: "env(safe-area-inset-left, 0px)"');
+    expect(desktopSource).toContain('paddingRight: "env(safe-area-inset-right, 0px)"');
+    expect(htmlSource).toContain("viewport-fit=cover");
+  });
 });

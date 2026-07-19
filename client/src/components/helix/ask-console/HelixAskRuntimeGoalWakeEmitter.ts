@@ -1,5 +1,6 @@
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
 import type { HelixRuntimeGoalSession } from "@shared/helix-runtime-goal-session";
+import { HELIX_RESEARCH_LIBRARY_DOC_VIEWER_PATH_PREFIX } from "@shared/helix-research-library";
 import type { RuntimeGoalWakeCandidatePayload } from "@/lib/agi/api";
 import { mergeHelixAskRuntimeGoalDebugFields } from "./HelixAskRuntimeGoalDebugContext";
 
@@ -27,6 +28,80 @@ const readNestedRecord = (source: RecordLike | null, key: string): RecordLike | 
   const direct = asRecord(source?.[key]);
   if (direct) return direct;
   return asRecord(asRecord(source?.debug)?.[key]);
+};
+
+const recordClaimsPrivateResearchDocument = (record: RecordLike | null): boolean => {
+  if (!record) return false;
+  const documentSourceKind = readString(
+    record.document_source_kind ?? record.documentSourceKind,
+  )?.toLowerCase();
+  const privateSource = record.private_source ?? record.privateSource;
+  const docPaths = [
+    record.doc_path,
+    record.docPath,
+    record.active_doc_path,
+    record.activeDocPath,
+    record.doc_context_path,
+    record.docContextPath,
+  ].map(readString).filter((value): value is string => Boolean(value));
+  const documentRefs = [
+    record.document_ref,
+    record.documentRef,
+    record.active_doc_ref,
+    record.activeDocRef,
+  ].map(readString).filter((value): value is string => Boolean(value));
+  const sourceIds = [
+    record.source_id,
+    record.sourceId,
+    record.active_doc_source_id,
+    record.activeDocSourceId,
+  ].map(readString).filter((value): value is string => Boolean(value));
+  return (
+    documentSourceKind === "research_library" ||
+    privateSource === true ||
+    readString(privateSource)?.toLowerCase() === "true" ||
+    docPaths.some((value) => value.startsWith(HELIX_RESEARCH_LIBRARY_DOC_VIEWER_PATH_PREFIX)) ||
+    documentRefs.some((value) => value.startsWith("private-research:")) ||
+    sourceIds.some((value) => value.startsWith(
+      `document_markdown:${HELIX_RESEARCH_LIBRARY_DOC_VIEWER_PATH_PREFIX}`,
+    ))
+  );
+};
+
+const visibleContextClaimsPrivateResearchDocument = (
+  activeVisibleContext: RecordLike | null,
+  snapshot: RecordLike,
+  requestedDocPath: string | null,
+): boolean => {
+  if (
+    recordClaimsPrivateResearchDocument(activeVisibleContext) ||
+    recordClaimsPrivateResearchDocument(snapshot) ||
+    requestedDocPath?.startsWith(HELIX_RESEARCH_LIBRARY_DOC_VIEWER_PATH_PREFIX) === true
+  ) {
+    return true;
+  }
+  const visibleTargets = [
+    ...(Array.isArray(activeVisibleContext?.chunks) ? activeVisibleContext.chunks : []),
+    ...(Array.isArray(activeVisibleContext?.ui_text_regions)
+      ? activeVisibleContext.ui_text_regions
+      : []),
+    ...(Array.isArray(activeVisibleContext?.uiTextRegions)
+      ? activeVisibleContext.uiTextRegions
+      : []),
+    ...(Array.isArray(activeVisibleContext?.panel_text_regions)
+      ? activeVisibleContext.panel_text_regions
+      : []),
+    ...(Array.isArray(activeVisibleContext?.panelTextRegions)
+      ? activeVisibleContext.panelTextRegions
+      : []),
+    ...(Array.isArray(activeVisibleContext?.visible_ui_text_regions)
+      ? activeVisibleContext.visible_ui_text_regions
+      : []),
+    ...(Array.isArray(activeVisibleContext?.visibleUiTextRegions)
+      ? activeVisibleContext.visibleUiTextRegions
+      : []),
+  ];
+  return visibleTargets.some((target) => recordClaimsPrivateResearchDocument(asRecord(target)));
 };
 
 export type HelixAskRuntimeGoalWakeActiveGoal = {
@@ -148,6 +223,9 @@ function buildHelixAskRuntimeGoalDocsWakeCandidate(input: {
     readString(snapshot.active_doc_path) ??
     readString(snapshot.activeDocPath);
   if (!docPath) return null;
+  if (visibleContextClaimsPrivateResearchDocument(activeVisibleContext, snapshot, docPath)) {
+    return null;
+  }
 
   const observedAtMs = Math.floor(input.observedAtMs ?? Date.now());
   const sourceId =

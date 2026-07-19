@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { validateTheoryBadgeGraphV1 } from "../../contracts/theory-badge-graph.v1";
 import type { TheoryBadgeLookupMatch } from "../theory-badge-overlap-locator";
@@ -23,6 +24,7 @@ describe("casimir cavity theory badges", () => {
     expect(badgeIds).toContain("casimir.material_receipts");
     expect(badgeIds).toContain("casimir.material.lifshitz_receipt");
     expect(badgeIds).toContain("casimir.geometry.beyond_pfa_validity");
+    expect(badgeIds).toContain("casimir.geometry.finite_temperature_maxwell_stress");
     expect(badgeIds).toContain("casimir.cavity.mode_frequency");
     expect(badgeIds).toContain("casimir.claim_boundary.diagnostic_source_context");
     expect(graph.edges).toEqual(
@@ -34,6 +36,16 @@ describe("casimir cavity theory badges", () => {
         }),
         expect.objectContaining({
           from: "casimir.material.lifshitz_receipt",
+          to: "nhm2.closure.wall_t00_source_residual",
+          relation: "diagnostic_checks",
+        }),
+        expect.objectContaining({
+          from: "casimir.material.lifshitz_receipt",
+          to: "casimir.geometry.finite_temperature_maxwell_stress",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "casimir.geometry.finite_temperature_maxwell_stress",
           to: "nhm2.closure.wall_t00_source_residual",
           relation: "diagnostic_checks",
         }),
@@ -60,6 +72,42 @@ describe("casimir cavity theory badges", () => {
     expect(matches.map((match: TheoryBadgeLookupMatch) => match.badgeId)).toContain("casimir.cavity.per_tile_energy");
     expect(matches.map((match: TheoryBadgeLookupMatch) => match.badgeId)).toContain("casimir.tile.duty_budget");
     expect(matches.map((match: TheoryBadgeLookupMatch) => match.badgeId)).toContain("casimir.material.lifshitz_receipt");
+  });
+
+  it("keeps finite-temperature Maxwell-stress evaluation receipt-backed and claim-safe", () => {
+    const badge = buildCasimirCavityTheoryBadgesV1().badges.find(
+      (candidate) => candidate.id === "casimir.geometry.finite_temperature_maxwell_stress",
+    );
+
+    expect(badge).toMatchObject({
+      status: "blocked",
+      level: "diagnostic_gate",
+      calculatorPayloads: [],
+      claimBoundary: {
+        diagnosticOnly: true,
+        doesValidateNHM2: false,
+        validationClaimAllowed: false,
+        physicalMechanismClaimAllowed: false,
+        promotionAllowed: false,
+      },
+    });
+    expect(badge?.equations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          computableExpression: null,
+          operatorKind: "gate_status",
+        }),
+      ]),
+    );
+    expect(JSON.stringify(badge?.sourceRefs)).toMatch(/arxiv\.org\/abs\/2603\.03888/);
+    expect(JSON.stringify(badge)).toMatch(/run-specific receipt/i);
+    expect(JSON.stringify(badge)).toMatch(/cannot establish NHM2, propulsion, transport, route ETA, or certified-speed claims/i);
+    for (const ref of badge?.sourceRefs.filter(
+      (candidate) => candidate.kind === "repo_module" || candidate.kind === "artifact",
+    ) ?? []) {
+      expect(ref.path).toBeTruthy();
+      expect(existsSync(ref.path ?? ""), String(ref.path)).toBe(true);
+    }
   });
 
   it("builds a Casimir scalar loadout from selected badges", () => {

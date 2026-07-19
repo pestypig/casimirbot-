@@ -16,7 +16,10 @@ type ParityScenario = {
   expected: {
     referent_source_kind: string;
     referent_confidence: string;
-    required_exact_badge_ids: string[];
+    required_exact_badge_ids?: string[];
+    required_likely_badge_ids?: string[];
+    forbidden_exact_badge_ids?: string[];
+    minimum_represented_probability_mass?: number;
   };
   non_affirmative_variants: string[];
 };
@@ -110,13 +113,33 @@ export const evaluateHelixReplitParityFixture = async () => {
     });
     const exactBadgeIds = [...receipt.reflectionV1.overlay.exactBadgeIds].sort();
     const likelyBadgeIds = [...receipt.reflectionV1.overlay.likelyBadgeIds].sort();
-    for (const requiredBadgeId of scenario.expected.required_exact_badge_ids) {
+    for (const requiredBadgeId of scenario.expected.required_exact_badge_ids ?? []) {
       assert(
         exactBadgeIds.includes(requiredBadgeId),
         `${scenario.id}: required exact badge is missing: ${requiredBadgeId}`,
       );
     }
+    for (const requiredBadgeId of scenario.expected.required_likely_badge_ids ?? []) {
+      assert(
+        likelyBadgeIds.includes(requiredBadgeId),
+        `${scenario.id}: required likely badge is missing: ${requiredBadgeId}`,
+      );
+    }
+    for (const forbiddenBadgeId of scenario.expected.forbidden_exact_badge_ids ?? []) {
+      assert(
+        !exactBadgeIds.includes(forbiddenBadgeId),
+        `${scenario.id}: contextual badge was incorrectly promoted to exact: ${forbiddenBadgeId}`,
+      );
+    }
     const uncertainty = receipt.reflectionV1.overlay.uncertainty;
+    const representedProbabilityMass = uncertainty?.representedProbabilityMass ?? null;
+    if (scenario.expected.minimum_represented_probability_mass !== undefined) {
+      assert(
+        representedProbabilityMass !== null &&
+          representedProbabilityMass >= scenario.expected.minimum_represented_probability_mass,
+        `${scenario.id}: represented probability mass is below the fixture minimum`,
+      );
+    }
     return {
       id: scenario.id,
       question_sha256: sha256(scenario.question),
@@ -125,7 +148,7 @@ export const evaluateHelixReplitParityFixture = async () => {
       semantic_prompt_sha256: sha256(resolution.resolvedText),
       exact_badge_ids: exactBadgeIds,
       likely_badge_ids: likelyBadgeIds,
-      represented_probability_mass: uncertainty?.representedProbabilityMass ?? null,
+      represented_probability_mass: representedProbabilityMass,
       out_of_graph_probability: uncertainty?.outOfGraphProbability ?? null,
       graph_id: receipt.reflectionV1.graphId,
     };

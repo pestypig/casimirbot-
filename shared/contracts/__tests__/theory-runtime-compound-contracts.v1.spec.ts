@@ -15,8 +15,10 @@ import {
   validateTheoryRuntimeMathTraceV1,
 } from "../theory-runtime-math-trace.v1";
 import {
+  buildTheoryRuntimeOutputManifestV1,
   buildTheoryRuntimeReceiptV1,
   isTheoryRuntimeReceiptV1,
+  validateTheoryRuntimeOutputManifestV1,
   validateTheoryRuntimeReceiptV1,
 } from "../theory-runtime-receipt.v1";
 
@@ -266,6 +268,71 @@ describe("theory runtime and compound run contracts", () => {
     expect(isTheoryRuntimeReceiptV1(receipt)).toBe(true);
     expect(validateTheoryRuntimeReceiptV1(missingBoundary).some((issue) => issue.includes("claimBoundary"))).toBe(true);
     expect(validateTheoryRuntimeReceiptV1(invalidGate).some((issue) => issue.includes("outputs.gates"))).toBe(true);
+  });
+
+  it("validates review-valued per-artifact evidence and content-addressed output manifests", () => {
+    const manifest = buildTheoryRuntimeOutputManifestV1({
+      generatedAt,
+      requestId: "request:test",
+      runtimeId: "nhm2.shift_lapse.alpha_sweep",
+      gitSha: "1234567890abcdef1234567890abcdef12345678",
+      startedAt: generatedAt,
+      completedAt: "2026-05-29T00:00:01.000Z",
+      outputDirectory: "artifacts/run",
+      boundToExecution: true,
+      manifestPath: "artifacts/run/theory-runtime-output-manifest-test.v1.json",
+      manifestSha256: "a".repeat(64),
+      entries: [{
+        path: "artifacts/run/source-closure.json",
+        sha256: "b".repeat(64),
+        sizeBytes: 42,
+        modifiedAt: generatedAt,
+        freshness: "new",
+      }],
+    });
+    const receipt = makeRuntimeReceipt();
+    const withEvidence = {
+      ...receipt,
+      outputs: {
+        ...receipt.outputs,
+        gates: { source_closure: "pass" as const },
+        artifactManifest: manifest,
+        artifactEvidence: [{
+          path: "artifacts/run/source-closure.json",
+          sha256: "b".repeat(64),
+          freshness: "new" as const,
+          status: "review" as const,
+          gates: { status: "review" as const },
+        }],
+      },
+    };
+
+    expect(validateTheoryRuntimeOutputManifestV1(manifest)).toEqual([]);
+    expect(validateTheoryRuntimeOutputManifestV1({
+      ...manifest,
+      gitSha: "abc123",
+      startedAt: "2026-05-29T00:00:02.000Z",
+      completedAt: "2026-05-29T00:00:01.000Z",
+      entries: [{
+        ...manifest.entries[0],
+        sha256: "short",
+        sizeBytes: 1.5,
+        modifiedAt: "not-a-timestamp",
+      }],
+    })).toEqual(expect.arrayContaining([
+      expect.stringContaining("gitSha"),
+      expect.stringContaining("completedAt"),
+      expect.stringContaining("entries"),
+    ]));
+    expect(validateTheoryRuntimeReceiptV1(withEvidence)).toEqual([]);
+    expect(isTheoryRuntimeReceiptV1(withEvidence)).toBe(true);
+    expect(validateTheoryRuntimeReceiptV1({
+      ...withEvidence,
+      outputs: {
+        ...withEvidence.outputs,
+        artifactEvidence: [{ ...withEvidence.outputs.artifactEvidence[0], status: "approved" }],
+      },
+    }).some((issue) => issue.includes("artifactEvidence"))).toBe(true);
   });
 
   it("validates compound run fixtures", () => {

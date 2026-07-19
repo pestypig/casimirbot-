@@ -26,6 +26,13 @@ const docRef = (path: string, id?: string, note?: string): TheoryBadgeV1["source
   note: note ?? null,
 });
 
+const literatureRef = (path: string, id: string, note?: string): TheoryBadgeV1["sourceRefs"][number] => ({
+  kind: "literature_ref",
+  path,
+  id,
+  note: note ?? null,
+});
+
 const payload = (args: {
   id: string;
   expression: string;
@@ -742,6 +749,109 @@ export const CASIMIR_CAVITY_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   casimirBadge({
+    id: "casimir.geometry.finite_temperature_maxwell_stress",
+    title: "Finite-Temperature Maxwell-Stress Receipt",
+    plainMeaning:
+      "Requires a converged, artifact-backed Maxwell-stress calculation for the declared finite geometry, material response, and temperature before that geometry is used as Casimir source context.",
+    whyItMatters:
+      "It creates an evidence gate for moving beyond ideal parallel plates around tile pockets, rims, anchors, and support structures without treating a numerical force calculation as an NHM2 mechanism.",
+    subjects: [
+      "casimir",
+      "geometry",
+      "finite_temperature",
+      "maxwell_stress",
+      "lifshitz",
+      "receipt",
+    ],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["casimir", "NHM2"],
+    equationFamilies: [
+      "finite_temperature_maxwell_stress",
+      "casimir_material_receipts",
+      "geometry_validity",
+    ],
+    tags: [
+      "finite_temperature",
+      "maxwell_stress",
+      "finite_geometry",
+      "material_response",
+      "receipt_required",
+      "blocked",
+    ],
+    equations: [
+      {
+        id: "finite_temperature_maxwell_stress_receipt_gate",
+        role: "gate",
+        displayLatex:
+          "receipt_{MST}=\\epsilon(\\omega)\\land T\\land geometry_{finite}\\land convergence\\land hashes",
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: [
+          "epsilon_omega",
+          "finite_temperature",
+          "finite_geometry",
+          "maxwell_stress_convergence",
+          "artifact_hashes",
+        ],
+        outputSymbols: ["maxwell_stress_receipt_status"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      "The gate requires a run-specific receipt with material model, temperature, geometry/mesh, convergence, and artifact provenance.",
+      "The discontinuous-Galerkin time-domain method is a candidate numerical formalism, not an already integrated NHM2 tile solver.",
+      "A passed Casimir force receipt would remain diagnostic source context and cannot establish NHM2, propulsion, transport, route ETA, or certified-speed claims.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      repoRef(
+        "shared/contracts/casimir-material-receipt.v1.ts",
+        "CasimirMaterialReceiptV1",
+        "Material and finite-temperature receipt contract that a Maxwell-stress artifact must satisfy.",
+      ),
+      repoRef(
+        "configs/needle-hull-mark2-cavity-contract.v1.json",
+        "layout",
+        "Declared finite tile-pocket, rim, anchor, and support geometry context.",
+      ),
+      literatureRef(
+        "https://arxiv.org/abs/2603.03888",
+        "arxiv_2603_03888_finite_temperature_maxwell_stress",
+        "Primary method source for finite-temperature Casimir-Lifshitz evaluation with the Maxwell stress tensor in realistic materials and finite geometries.",
+      ),
+    ],
+    hintKeys: {
+      subjects: [
+        "casimir",
+        "geometry",
+        "finite_temperature",
+        "maxwell_stress",
+        "lifshitz",
+        "receipt",
+      ],
+      symbols: [
+        "epsilon_omega",
+        "finite_temperature",
+        "finite_geometry",
+        "maxwell_stress_convergence",
+        "maxwell_stress_receipt_status",
+      ],
+      unitSignatures: [],
+      repoPaths: [
+        "shared/contracts/casimir-material-receipt.v1.ts",
+        "configs/needle-hull-mark2-cavity-contract.v1.json",
+        "https://arxiv.org/abs/2603.03888",
+      ],
+      equationFamilies: [
+        "finite_temperature_maxwell_stress",
+        "casimir_material_receipts",
+        "geometry_validity",
+      ],
+      simulationOwners: ["casimir", "NHM2"],
+    },
+  }),
+  casimirBadge({
     id: "casimir.claim_boundary.diagnostic_source_context",
     title: "Casimir Diagnostic Source Boundary",
     plainMeaning: "Marks Casimir cavity rows as diagnostic/source-context rows, not physical confirmation.",
@@ -920,6 +1030,38 @@ export const CASIMIR_CAVITY_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "requires",
     label: "Lifshitz material receipts require geometry/metrology context before shaped-tile source interpretation.",
     claimBoundaryNote: "A dielectric-response receipt without geometry validity remains diagnostic only.",
+  },
+  {
+    id: "casimir_lifshitz_receipt_feeds_finite_temperature_maxwell_stress",
+    from: "casimir.material.lifshitz_receipt",
+    to: "casimir.geometry.finite_temperature_maxwell_stress",
+    relation: "requires",
+    label: "Finite-temperature Maxwell-stress evaluation requires dielectric-response and material-model provenance.",
+    claimBoundaryNote: "A material model without a run-specific Maxwell-stress receipt remains diagnostic only.",
+  },
+  {
+    id: "casimir_beyond_pfa_feeds_finite_temperature_maxwell_stress",
+    from: "casimir.geometry.beyond_pfa_validity",
+    to: "casimir.geometry.finite_temperature_maxwell_stress",
+    relation: "requires",
+    label: "Finite-geometry Maxwell-stress evaluation requires explicit geometry and metrology validity.",
+    claimBoundaryNote: "A finite-geometry mesh cannot certify the fabricated tile geometry by itself.",
+  },
+  {
+    id: "casimir_finite_temperature_maxwell_stress_feeds_material_receipts",
+    from: "casimir.geometry.finite_temperature_maxwell_stress",
+    to: "casimir.material_receipts",
+    relation: "requires",
+    label: "The material-receipt gate requires an artifact-backed finite-temperature Maxwell-stress result when shaped finite geometry is invoked.",
+    claimBoundaryNote: "The receipt remains source context and cannot establish a physical NHM2 mechanism.",
+  },
+  {
+    id: "casimir_finite_temperature_maxwell_stress_checks_wall_t00_residual",
+    from: "casimir.geometry.finite_temperature_maxwell_stress",
+    to: "nhm2.closure.wall_t00_source_residual",
+    relation: "diagnostic_checks",
+    label: "A receipt-backed finite-geometry Casimir result may supply source-context evidence to the wall T00 residual gate.",
+    claimBoundaryNote: "A Casimir force receipt cannot repair a semantic or same-basis tensor mismatch.",
   },
   {
     id: "casimir_lifshitz_receipt_feeds_wall_t00_source_residual",

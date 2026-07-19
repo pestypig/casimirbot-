@@ -13,8 +13,14 @@ import { writeTheoryRuntimeJobReceipt } from "./runtime-job-store";
 export function requestStatusForRuntimeReceipt(
   receipt: TheoryRuntimeReceiptV1,
 ): Extract<TheoryRuntimeRunRequestStatus, "completed" | "failed" | "timeout"> {
+  if (receipt.status === "timeout" || receipt.execution?.timedOut) return "timeout";
+  if (receipt.execution) {
+    if (receipt.execution.exitCode !== 0) return "failed";
+    return ["completed", "blocked", "not_run", "stale"].includes(receipt.status)
+      ? "completed"
+      : "failed";
+  }
   if (receipt.status === "completed") return "completed";
-  if (receipt.status === "timeout") return "timeout";
   return "failed";
 }
 
@@ -27,6 +33,9 @@ export async function persistAndFinalizeTheoryRuntimeJob(input: {
   // manifest whose structured result has not been published yet.
   await writeTheoryRuntimeJobReceipt(input);
   const status = requestStatusForRuntimeReceipt(input.receipt);
+  const evidenceMessage = status === "completed" && input.receipt.status !== "completed"
+    ? `Process completed; evidence receipt ${input.receipt.status}.`
+    : input.receipt.outputs.warnings[0] ?? `Runtime ${status}.`;
   const { request } = await updateTheoryRuntimeRunRequestStatus({
     requestId: input.requestId,
     projectRoot: input.projectRoot,
@@ -34,7 +43,7 @@ export async function persistAndFinalizeTheoryRuntimeJob(input: {
     updatedAt: input.receipt.provenance.completedAt ?? input.receipt.generatedAt,
     heartbeat: {
       stage: status,
-      message: input.receipt.outputs.warnings[0] ?? `Runtime ${status}.`,
+      message: evidenceMessage,
       progress: 1,
     },
   });

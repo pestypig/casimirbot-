@@ -1,0 +1,76 @@
+{
+  "contractVersion": "nhm2_qei_pointwise_transition_source_samples/v1",
+  "generatedAt": "2026-06-19T19:03:10.641Z",
+  "laneId": "nhm2_shift_lapse",
+  "selectedProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "atlasRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-support-function-atlas.json",
+  "atlasHash": "41bdbf8140bce18f971b417014779f76eb8113c03ec5a79abfcc13d05bff9bb2",
+  "tensorRef": "nhm2_tile_effective_full_tensor_source",
+  "samplePlanRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-qei-worldline-sample-plan.json",
+  "transitionKernelRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-source-transition-kernel.json",
+  "samples": [
+    {
+      "worldlineId": "qei:hull_wall_transition:atlas",
+      "regionId": "hull_wall_transition",
+      "valueSI": 0.017499999999999998,
+      "unit": "J/m^3",
+      "provenanceRef": "nhm2_tile_effective_full_tensor_source:hull_wall_transition:transition_kernel_source_tensor:T00",
+      "sourceTensorRef": "nhm2_tile_effective_full_tensor_source",
+      "supportFunctionRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.W.hull_wall_transition",
+      "sampleLocationsRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-campaign-grid.json:hull_wall_transition:worldline_samples",
+      "samplingModel": "transition_kernel_support_weighted_source_tensor",
+      "transitionKernelRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-source-transition-kernel.json:hull_wall",
+      "transitionInterfaceId": "hull_wall",
+      "leftRegionId": "hull",
+      "rightRegionId": "wall",
+      "leftT00_SI": 0.017499999999999998,
+      "rightT00_SI": 0.05,
+      "blendWeight": 0,
+      "status": "computed",
+      "blockers": [],
+      "warnings": [
+        "reduced-order transition sample uses source-side transition kernel support weighting, not adjacent-region averaging",
+        "sample is diagnostic evidence for QEI dossier intake and does not prove QEI or material credibility"
+      ]
+    },
+    {
+      "worldlineId": "qei:wall_exterior_transition:atlas",
+      "regionId": "wall_exterior_transition",
+      "valueSI": 0.05,
+      "unit": "J/m^3",
+      "provenanceRef": "nhm2_tile_effective_full_tensor_source:wall_exterior_transition:transition_kernel_source_tensor:T00",
+      "sourceTensorRef": "nhm2_tile_effective_full_tensor_source",
+      "supportFunctionRef": "candidate.stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1.W.wall_exterior_transition",
+      "sampleLocationsRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-campaign-grid.json:wall_exterior_transition:worldline_samples",
+      "samplingModel": "transition_kernel_support_weighted_source_tensor",
+      "transitionKernelRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-source-transition-kernel.json:wall_exterior_shell",
+      "transitionInterfaceId": "wall_exterior_shell",
+      "leftRegionId": "wall",
+      "rightRegionId": "exterior_shell",
+      "leftT00_SI": 0.05,
+      "rightT00_SI": 0.010000000000000002,
+      "blendWeight": 0,
+      "status": "computed",
+      "blockers": [],
+      "warnings": [
+        "reduced-order transition sample uses source-side transition kernel support weighting, not adjacent-region averaging",
+        "sample is diagnostic evidence for QEI dossier intake and does not prove QEI or material credibility"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": {
+    "hasHullWallTransitionSample": true,
+    "hasWallExteriorTransitionSample": true,
+    "allTransitionSamplesComputed": true,
+    "anyProxy": false,
+    "samplingComplete": true
+  },
+  "status": "pass",
+  "claimBoundary": {
+    "diagnosticOnly": true,
+    "pointwiseSamplesDoNotProveQeiPass": true,
+    "transitionKernelBlendIsReducedOrder": true,
+    "notMaterialReceipt": true
+  }
+}

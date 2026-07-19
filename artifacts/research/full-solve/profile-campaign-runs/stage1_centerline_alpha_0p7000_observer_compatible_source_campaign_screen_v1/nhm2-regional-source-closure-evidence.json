@@ -1,0 +1,497 @@
+{
+  "artifactId": "nhm2_regional_source_closure_evidence",
+  "schemaVersion": "nhm2_regional_source_closure_evidence/v1",
+  "generatedAt": "2026-06-19T19:03:10.632Z",
+  "runId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1:candidate_regional_source_closure",
+  "selectedProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "expectedProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "laneId": "nhm2_shift_lapse",
+  "atlasRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-support-function-atlas.json",
+  "regions": [
+    {
+      "regionId": "global",
+      "status": "pass",
+      "comparisonBasisStatus": "same_basis",
+      "metricRequired": {
+        "tensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-metric-required-full-regional-tensor.json#metric-required-full-tensor/global/sameChartFullTensor",
+        "tensorAuthorityMode": "symmetric_full_tensor",
+        "tensor": {
+          "T00": 0,
+          "T01": 0,
+          "T02": 0,
+          "T03": 0,
+          "T11": 0,
+          "T12": 0,
+          "T13": 0,
+          "T22": 0,
+          "T23": 0,
+          "T33": 0
+        },
+        "chartRef": "comoving_cartesian",
+        "unitsRef": "J/m^3",
+        "aggregationMode": "mean",
+        "normalizationBasis": "sample_count",
+        "sampleCount": 1728
+      },
+      "tileEffectiveCounterpart": {
+        "tensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-tile-effective-full-tensor-source.json#global",
+        "tensorAuthorityMode": "symmetric_full_tensor",
+        "tensor": {
+          "T00": 0.03,
+          "T01": 3e-12,
+          "T02": 2.1e-12,
+          "T03": 1.2000000000000001e-12,
+          "T11": 0.005399999999999999,
+          "T12": 0.0000027,
+          "T13": 0.0000016199999999999997,
+          "T22": 0.0045899999999999995,
+          "T23": 0.0000010799999999999998,
+          "T33": 0.0037799999999999995
+        },
+        "chartRef": "comoving_cartesian",
+        "unitsRef": "J/m^3",
+        "aggregationMode": "mean",
+        "normalizationBasis": "sample_count",
+        "sampleCount": 1728,
+        "comparisonRole": "tile_effective_counterpart"
+      },
+      "residuals": {
+        "componentResiduals": {
+          "T00": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 0.03,
+            "absResidual": 0.03,
+            "relResidual": 0.03
+          },
+          "T01": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 3e-12,
+            "absResidual": 3e-12,
+            "relResidual": 3e-12
+          },
+          "T02": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 2.1e-12,
+            "absResidual": 2.1e-12,
+            "relResidual": 2.1e-12
+          },
+          "T03": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 1.2000000000000001e-12,
+            "absResidual": 1.2000000000000001e-12,
+            "relResidual": 1.2000000000000001e-12
+          },
+          "T11": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 0.005399999999999999,
+            "absResidual": 0.005399999999999999,
+            "relResidual": 0.005399999999999999
+          },
+          "T12": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 0.0000027,
+            "absResidual": 0.0000027,
+            "relResidual": 0.0000027
+          },
+          "T13": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 0.0000016199999999999997,
+            "absResidual": 0.0000016199999999999997,
+            "relResidual": 0.0000016199999999999997
+          },
+          "T22": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 0.0045899999999999995,
+            "absResidual": 0.0045899999999999995,
+            "relResidual": 0.0045899999999999995
+          },
+          "T23": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 0.0000010799999999999998,
+            "absResidual": 0.0000010799999999999998,
+            "relResidual": 0.0000010799999999999998
+          },
+          "T33": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 0.0037799999999999995,
+            "absResidual": 0.0037799999999999995,
+            "relResidual": 0.0037799999999999995
+          }
+        },
+        "relLInf": 0.03,
+        "absLInf": 0.03,
+        "toleranceRelLInf": 0.1,
+        "pass": true
+      },
+      "blockers": []
+    },
+    {
+      "regionId": "hull",
+      "status": "pass",
+      "comparisonBasisStatus": "same_basis",
+      "metricRequired": {
+        "tensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-metric-required-full-regional-tensor.json#metric-required-full-tensor/hull/sameChartFullTensor",
+        "tensorAuthorityMode": "symmetric_full_tensor",
+        "tensor": {
+          "T00": 0,
+          "T01": 0,
+          "T02": 0,
+          "T03": 0,
+          "T11": 0,
+          "T12": 0,
+          "T13": 0,
+          "T22": 0,
+          "T23": 0,
+          "T33": 0
+        },
+        "chartRef": "comoving_cartesian",
+        "unitsRef": "J/m^3",
+        "aggregationMode": "mean",
+        "normalizationBasis": "sample_count",
+        "sampleCount": 8
+      },
+      "tileEffectiveCounterpart": {
+        "tensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-tile-effective-full-tensor-source.json#hull",
+        "tensorAuthorityMode": "symmetric_full_tensor",
+        "tensor": {
+          "T00": 0.017499999999999998,
+          "T01": 1.7499999999999998e-12,
+          "T02": 1.2249999999999997e-12,
+          "T03": 6.999999999999999e-13,
+          "T11": 0.0031499999999999996,
+          "T12": 0.0000015749999999999997,
+          "T13": 9.45e-7,
+          "T22": 0.0026774999999999998,
+          "T23": 6.299999999999999e-7,
+          "T33": 0.0022049999999999995
+        },
+        "chartRef": "comoving_cartesian",
+        "unitsRef": "J/m^3",
+        "aggregationMode": "mean",
+        "normalizationBasis": "sample_count",
+        "sampleCount": 8,
+        "comparisonRole": "tile_effective_counterpart"
+      },
+      "residuals": {
+        "componentResiduals": {
+          "T00": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 0.017499999999999998,
+            "absResidual": 0.017499999999999998,
+            "relResidual": 0.017499999999999998
+          },
+          "T01": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 1.7499999999999998e-12,
+            "absResidual": 1.7499999999999998e-12,
+            "relResidual": 1.7499999999999998e-12
+          },
+          "T02": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 1.2249999999999997e-12,
+            "absResidual": 1.2249999999999997e-12,
+            "relResidual": 1.2249999999999997e-12
+          },
+          "T03": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 6.999999999999999e-13,
+            "absResidual": 6.999999999999999e-13,
+            "relResidual": 6.999999999999999e-13
+          },
+          "T11": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 0.0031499999999999996,
+            "absResidual": 0.0031499999999999996,
+            "relResidual": 0.0031499999999999996
+          },
+          "T12": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 0.0000015749999999999997,
+            "absResidual": 0.0000015749999999999997,
+            "relResidual": 0.0000015749999999999997
+          },
+          "T13": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 9.45e-7,
+            "absResidual": 9.45e-7,
+            "relResidual": 9.45e-7
+          },
+          "T22": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 0.0026774999999999998,
+            "absResidual": 0.0026774999999999998,
+            "relResidual": 0.0026774999999999998
+          },
+          "T23": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 6.299999999999999e-7,
+            "absResidual": 6.299999999999999e-7,
+            "relResidual": 6.299999999999999e-7
+          },
+          "T33": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 0.0022049999999999995,
+            "absResidual": 0.0022049999999999995,
+            "relResidual": 0.0022049999999999995
+          }
+        },
+        "relLInf": 0.017499999999999998,
+        "absLInf": 0.017499999999999998,
+        "toleranceRelLInf": 0.1,
+        "pass": true
+      },
+      "blockers": []
+    },
+    {
+      "regionId": "wall",
+      "status": "pass",
+      "comparisonBasisStatus": "same_basis",
+      "metricRequired": {
+        "tensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-metric-required-full-regional-tensor.json#metric-required-full-tensor/wall/sameChartFullTensor",
+        "tensorAuthorityMode": "symmetric_full_tensor",
+        "tensor": {
+          "T00": 0,
+          "T01": 0,
+          "T02": 0,
+          "T03": 0,
+          "T11": 0,
+          "T12": 0,
+          "T13": 0,
+          "T22": 0,
+          "T23": 0,
+          "T33": 0
+        },
+        "chartRef": "comoving_cartesian",
+        "unitsRef": "J/m^3",
+        "aggregationMode": "mean",
+        "normalizationBasis": "sample_count",
+        "sampleCount": 128
+      },
+      "tileEffectiveCounterpart": {
+        "tensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-tile-effective-full-tensor-source.json#wall",
+        "tensorAuthorityMode": "symmetric_full_tensor",
+        "tensor": {
+          "T00": 0.05,
+          "T01": 5.0000000000000005e-12,
+          "T02": 3.5e-12,
+          "T03": 2.0000000000000004e-12,
+          "T11": 0.009,
+          "T12": 0.0000045,
+          "T13": 0.0000027,
+          "T22": 0.007649999999999999,
+          "T23": 0.0000018000000000000001,
+          "T33": 0.006299999999999999
+        },
+        "chartRef": "comoving_cartesian",
+        "unitsRef": "J/m^3",
+        "aggregationMode": "mean",
+        "normalizationBasis": "sample_count",
+        "sampleCount": 128,
+        "comparisonRole": "tile_effective_counterpart"
+      },
+      "residuals": {
+        "componentResiduals": {
+          "T00": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 0.05,
+            "absResidual": 0.05,
+            "relResidual": 0.05
+          },
+          "T01": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 5.0000000000000005e-12,
+            "absResidual": 5.0000000000000005e-12,
+            "relResidual": 5.0000000000000005e-12
+          },
+          "T02": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 3.5e-12,
+            "absResidual": 3.5e-12,
+            "relResidual": 3.5e-12
+          },
+          "T03": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 2.0000000000000004e-12,
+            "absResidual": 2.0000000000000004e-12,
+            "relResidual": 2.0000000000000004e-12
+          },
+          "T11": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 0.009,
+            "absResidual": 0.009,
+            "relResidual": 0.009
+          },
+          "T12": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 0.0000045,
+            "absResidual": 0.0000045,
+            "relResidual": 0.0000045
+          },
+          "T13": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 0.0000027,
+            "absResidual": 0.0000027,
+            "relResidual": 0.0000027
+          },
+          "T22": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 0.007649999999999999,
+            "absResidual": 0.007649999999999999,
+            "relResidual": 0.007649999999999999
+          },
+          "T23": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 0.0000018000000000000001,
+            "absResidual": 0.0000018000000000000001,
+            "relResidual": 0.0000018000000000000001
+          },
+          "T33": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 0.006299999999999999,
+            "absResidual": 0.006299999999999999,
+            "relResidual": 0.006299999999999999
+          }
+        },
+        "relLInf": 0.05,
+        "absLInf": 0.05,
+        "toleranceRelLInf": 0.1,
+        "pass": true
+      },
+      "blockers": []
+    },
+    {
+      "regionId": "exterior_shell",
+      "status": "pass",
+      "comparisonBasisStatus": "same_basis",
+      "metricRequired": {
+        "tensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-metric-required-full-regional-tensor.json#metric-required-full-tensor/exterior_shell/sameChartFullTensor",
+        "tensorAuthorityMode": "symmetric_full_tensor",
+        "tensor": {
+          "T00": 0,
+          "T01": 0,
+          "T02": 0,
+          "T03": 0,
+          "T11": 0,
+          "T12": 0,
+          "T13": 0,
+          "T22": 0,
+          "T23": 0,
+          "T33": 0
+        },
+        "chartRef": "comoving_cartesian",
+        "unitsRef": "J/m^3",
+        "aggregationMode": "mean",
+        "normalizationBasis": "sample_count",
+        "sampleCount": 344
+      },
+      "tileEffectiveCounterpart": {
+        "tensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-tile-effective-full-tensor-source.json#exterior_shell",
+        "tensorAuthorityMode": "symmetric_full_tensor",
+        "tensor": {
+          "T00": 0.010000000000000002,
+          "T01": 1.0000000000000002e-12,
+          "T02": 7e-13,
+          "T03": 4.000000000000001e-13,
+          "T11": 0.0018000000000000004,
+          "T12": 9.000000000000003e-7,
+          "T13": 5.400000000000002e-7,
+          "T22": 0.0015300000000000003,
+          "T23": 3.600000000000001e-7,
+          "T33": 0.0012600000000000003
+        },
+        "chartRef": "comoving_cartesian",
+        "unitsRef": "J/m^3",
+        "aggregationMode": "mean",
+        "normalizationBasis": "sample_count",
+        "sampleCount": 344,
+        "comparisonRole": "tile_effective_counterpart"
+      },
+      "residuals": {
+        "componentResiduals": {
+          "T00": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 0.010000000000000002,
+            "absResidual": 0.010000000000000002,
+            "relResidual": 0.010000000000000002
+          },
+          "T01": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 1.0000000000000002e-12,
+            "absResidual": 1.0000000000000002e-12,
+            "relResidual": 1.0000000000000002e-12
+          },
+          "T02": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 7e-13,
+            "absResidual": 7e-13,
+            "relResidual": 7e-13
+          },
+          "T03": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 4.000000000000001e-13,
+            "absResidual": 4.000000000000001e-13,
+            "relResidual": 4.000000000000001e-13
+          },
+          "T11": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 0.0018000000000000004,
+            "absResidual": 0.0018000000000000004,
+            "relResidual": 0.0018000000000000004
+          },
+          "T12": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 9.000000000000003e-7,
+            "absResidual": 9.000000000000003e-7,
+            "relResidual": 9.000000000000003e-7
+          },
+          "T13": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 5.400000000000002e-7,
+            "absResidual": 5.400000000000002e-7,
+            "relResidual": 5.400000000000002e-7
+          },
+          "T22": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 0.0015300000000000003,
+            "absResidual": 0.0015300000000000003,
+            "relResidual": 0.0015300000000000003
+          },
+          "T23": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 3.600000000000001e-7,
+            "absResidual": 3.600000000000001e-7,
+            "relResidual": 3.600000000000001e-7
+          },
+          "T33": {
+            "metricRequired": 0,
+            "tileEffectiveCounterpart": 0.0012600000000000003,
+            "absResidual": 0.0012600000000000003,
+            "relResidual": 0.0012600000000000003
+          }
+        },
+        "relLInf": 0.010000000000000002,
+        "absLInf": 0.010000000000000002,
+        "toleranceRelLInf": 0.1,
+        "pass": true
+      },
+      "blockers": []
+    }
+  ],
+  "literatureRefs": [
+    "klimchitskaya_mohideen_mostepanenko_2009_lifshitz_review",
+    "reid_white_johnson_2010_arbitrary_geometry_casimir"
+  ],
+  "profileMatch": true,
+  "overallState": "pass",
+  "claimEffect": "reduced_order_candidate_blocker_retired",
+  "requiredRegions": [
+    "global",
+    "hull",
+    "wall",
+    "exterior_shell"
+  ],
+  "missingRequiredRegions": [],
+  "fullTensorRequiredForPromotion": true,
+  "diagonalProxyAllowedForPromotion": false,
+  "reasonCodes": []
+}

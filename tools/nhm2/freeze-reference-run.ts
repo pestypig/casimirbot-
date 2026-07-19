@@ -7,7 +7,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, isAbsolute, join, normalize } from "node:path";
+import { dirname, isAbsolute, join, normalize, posix, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
@@ -15,6 +15,9 @@ import {
   buildNhm2ReferenceRunArtifact,
   type Nhm2ReferenceRunArtifact,
 } from "../../shared/contracts/nhm2-reference-run.v1";
+
+type ArtifactRef = { artifactId: string; path: string };
+type ArtifactSetEntry = Nhm2ReferenceRunArtifact["artifactSet"][number];
 
 const asString = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value : null;
@@ -43,6 +46,36 @@ const parseArgs = (argv: string[]): Record<string, string | boolean> => {
 
 const resolvePath = (repoRoot: string, path: string): string =>
   isAbsolute(path) ? path : join(repoRoot, path);
+
+const quoteCommandArg = (value: string): string =>
+  /\s/.test(value) ? JSON.stringify(value) : value;
+
+export const renderPortableInvocation = (
+  argv: readonly string[],
+  repoRoot: string,
+): string =>
+  argv
+    .map((value: string) => {
+      const flavor = win32.isAbsolute(value)
+        ? win32
+        : posix.isAbsolute(value)
+          ? posix
+          : null;
+      if (flavor == null) return quoteCommandArg(value);
+      const repoRootUsesSameFlavor = flavor.isAbsolute(repoRoot);
+      const repoRelative = repoRootUsesSameFlavor
+        ? flavor.relative(repoRoot, value)
+        : null;
+      const portable =
+        repoRelative != null &&
+        repoRelative.length > 0 &&
+        !repoRelative.startsWith("..") &&
+        !flavor.isAbsolute(repoRelative)
+          ? repoRelative.replace(/\\/g, "/")
+          : flavor.basename(value);
+      return quoteCommandArg(portable);
+    })
+    .join(" ");
 
 const sha256Buffer = (buffer: Buffer | string): string =>
   createHash("sha256").update(buffer).digest("hex");
@@ -96,7 +129,9 @@ const findFullLoopAuditPath = (artifactRoot: string): string | null => {
   const latestPath = join(artifactRoot, "nhm2-full-loop-audit-latest.json");
   if (existsSync(latestPath)) return latestPath;
   const candidates = readdirSync(artifactRoot)
-    .filter((name) => /^nhm2-full-loop-audit-\d{4}-\d{2}-\d{2}\.json$/.test(name))
+    .filter((name: string) =>
+      /^nhm2-full-loop-audit-\d{4}-\d{2}-\d{2}\.json$/.test(name),
+    )
     .sort();
   const last = candidates.at(-1);
   return last == null ? null : join(artifactRoot, last);
@@ -104,8 +139,8 @@ const findFullLoopAuditPath = (artifactRoot: string): string | null => {
 
 const collectArtifactRefs = (
   fullLoopAudit: Record<string, unknown> | null,
-): Array<{ artifactId: string; path: string }> => {
-  const refs: Array<{ artifactId: string; path: string }> = [];
+): ArtifactRef[] => {
+  const refs: ArtifactRef[] = [];
   const sections = asRecord(fullLoopAudit?.sections);
   if (sections == null) return refs;
   for (const section of Object.values(sections)) {
@@ -143,38 +178,42 @@ export const freezeNhm2ReferenceRun = (args: {
     });
   }
 
-  const artifactSet = artifactRefs.map((ref) => {
-    const artifactPath = resolvePath(args.repoRoot, ref.path);
-    const json = readJson(artifactPath);
-    const profileId = extractProfileId(json);
-    return {
-      artifactId: ref.artifactId,
-      path: ref.path,
-      schemaVersion: extractSchemaVersion(json),
-      status: extractStatus(json),
-      sha256: sha256File(artifactPath),
-      generatedAt: extractGeneratedAt(json),
-      usesLatestAlias: pathUsesLatestAlias(ref.path),
-      profileId,
-      profileMatch: profileId == null ? null : profileId === args.profile,
-    };
-  });
+  const artifactSet: ArtifactSetEntry[] = artifactRefs.map(
+    (ref: ArtifactRef): ArtifactSetEntry => {
+      const artifactPath = resolvePath(args.repoRoot, ref.path);
+      const json = readJson(artifactPath);
+      const profileId = extractProfileId(json);
+      return {
+        artifactId: ref.artifactId,
+        path: ref.path,
+        schemaVersion: extractSchemaVersion(json),
+        status: extractStatus(json),
+        sha256: sha256File(artifactPath),
+        generatedAt: extractGeneratedAt(json),
+        usesLatestAlias: pathUsesLatestAlias(ref.path),
+        profileId,
+        profileMatch: profileId == null ? null : profileId === args.profile,
+      };
+    },
+  );
 
-  const latestAliasEntries = artifactSet.filter((entry) => entry.usesLatestAlias);
+  const latestAliasEntries = artifactSet.filter(
+    (entry: ArtifactSetEntry) => entry.usesLatestAlias,
+  );
   const profileMismatchEntries = artifactSet.filter(
-    (entry) => entry.profileMatch === false,
+    (entry: ArtifactSetEntry) => entry.profileMatch === false,
   );
   if (!args.auditOnly && latestAliasEntries.length > 0) {
     throw new Error(
       `latest aliases are forbidden in validation mode: ${latestAliasEntries
-        .map((entry) => entry.path)
+        .map((entry: ArtifactSetEntry) => entry.path)
         .join(", ")}`,
     );
   }
   if (!args.auditOnly && profileMismatchEntries.length > 0) {
     throw new Error(
       `profile mismatch is a hard blocker: ${profileMismatchEntries
-        .map((entry) => `${entry.path}:${entry.profileId}`)
+        .map((entry: ArtifactSetEntry) => `${entry.path}:${entry.profileId}`)
         .join(", ")}`,
     );
   }
@@ -199,8 +238,12 @@ export const freezeNhm2ReferenceRun = (args: {
   ];
 
   const blockingReasons = [
-    ...latestAliasEntries.map((entry) => `latest_alias:${entry.path}`),
-    ...profileMismatchEntries.map((entry) => `profile_mismatch:${entry.path}`),
+    ...latestAliasEntries.map(
+      (entry: ArtifactSetEntry) => `latest_alias:${entry.path}`,
+    ),
+    ...profileMismatchEntries.map(
+      (entry: ArtifactSetEntry) => `profile_mismatch:${entry.path}`,
+    ),
     ...((Array.isArray(fullLoopAudit?.blockingReasons)
       ? fullLoopAudit?.blockingReasons
       : []) as unknown[]).filter((entry): entry is string => typeof entry === "string"),
@@ -246,7 +289,7 @@ export const freezeNhm2ReferenceRun = (args: {
     commands: [
       {
         id: "freeze_reference_run",
-        command: process.argv.join(" "),
+        command: renderPortableInvocation(process.argv, args.repoRoot),
         status: "pass",
         startedAt: null,
         completedAt: new Date().toISOString(),
@@ -256,7 +299,9 @@ export const freezeNhm2ReferenceRun = (args: {
     hashLock: {
       inputManifestSha256: null,
       toleranceManifestSha256:
-        toleranceCandidates.map(sha256File).find((hash) => hash != null) ?? null,
+        toleranceCandidates
+          .map((candidatePath: string): string | null => sha256File(candidatePath))
+          .find((hash: string | null): hash is string => hash != null) ?? null,
       artifactSetSha256,
       literatureClaimMapSha256: sha256File(literaturePath),
     },

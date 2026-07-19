@@ -1,0 +1,43 @@
+{
+  "contractVersion": "nhm2_campaign_frontier_disposition/v1",
+  "generatedAt": "2026-06-19T19:03:11.035Z",
+  "laneId": "nhm2_shift_lapse",
+  "selectedProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "runId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1:candidate_regional_source_closure",
+  "chartId": "comoving_cartesian",
+  "campaignRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-time-dependent-source-campaign.json",
+  "metricMomentumRemediationTargetsRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-metric-momentum-remediation-targets.json",
+  "frontier": {
+    "gateId": "full_regional_tensor_closure",
+    "campaignFirstBlocker": "none",
+    "blockerClass": "none",
+    "currentProfileNonResolvable": false
+  },
+  "disposition": {
+    "status": "no_frontier_blocker",
+    "reason": "metric_required_projected_momentum_within_declared_bound",
+    "allowedNextActions": [
+      "continue_downstream_campaign_gates"
+    ],
+    "forbiddenNextActions": [
+      "copy_metric_required_tensor_into_source",
+      "hide_momentum_density_in_global_average",
+      "silently_zero_t0i",
+      "treat_reduced_order_projection_as_physical_viability"
+    ]
+  },
+  "quantitativeSummary": {
+    "worstRegionId": null,
+    "worstComponentId": null,
+    "worstRequiredSuppressionFactor": null,
+    "worstRequiredFractionalReduction": null,
+    "blockerCount": 0
+  },
+  "claimBoundary": {
+    "diagnosticOnly": true,
+    "frontierDispositionDoesNotValidateNewMetric": true,
+    "currentProfileRejectionDoesNotProveUniversalNoGo": true,
+    "physicalViabilityClaimAllowed": false,
+    "transportClaimAllowed": false
+  }
+}

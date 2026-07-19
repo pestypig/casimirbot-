@@ -37,6 +37,7 @@ export type TheoryRuntimeCommandV1 = {
   cwd: string;
   npmScript: string;
   timeoutMs: number;
+  env?: Record<string, string>;
 };
 
 export type TheoryRuntimeExecutionResult = {
@@ -88,6 +89,22 @@ function windowsNpmCliPath(): string | null {
   return candidates.find((candidate) =>
     candidate && path.basename(candidate).toLowerCase() === "npm-cli.js" && existsSync(candidate)
   ) ?? null;
+}
+
+export function buildTheoryRuntimeNpmInvocation(script: string): Pick<TheoryRuntimeCommandV1, "command" | "args"> {
+  const windows = process.platform === "win32";
+  const npmCliPath = windows ? windowsNpmCliPath() : null;
+  return {
+    // Node 24 rejects direct shell:false spawning of .cmd shims on Windows
+    // with EINVAL. Prefer the installed npm CLI through the current Node
+    // executable, with a fixed cmd.exe fallback for non-standard installs.
+    command: npmCliPath ? process.execPath : windows ? (process.env.ComSpec?.trim() || "cmd.exe") : "npm",
+    args: npmCliPath
+      ? [npmCliPath, "run", "-s", script]
+      : windows
+        ? ["/d", "/s", "/c", "npm.cmd", "run", "-s", script]
+        : ["run", "-s", script],
+  };
 }
 
 function includesRuntime(scope: TheoryRuntimeAdapterSolveScope): boolean {
@@ -172,18 +189,9 @@ function buildSmallRuntimeCommand(input: TheoryRuntimeAdapterInput): TheoryRunti
   if (!/^[A-Za-z0-9:_-]+$/.test(script)) {
     throw new Error(`Runtime ${input.runtimeId} resolved to an unsafe npm script name.`);
   }
-  const windows = process.platform === "win32";
-  const npmCliPath = windows ? windowsNpmCliPath() : null;
+  const invocation = buildTheoryRuntimeNpmInvocation(script);
   return {
-    // Node 24 rejects direct shell:false spawning of .cmd shims on Windows
-    // with EINVAL. Prefer the installed npm CLI through the current Node
-    // executable, with a fixed cmd.exe fallback for non-standard installs.
-    command: npmCliPath ? process.execPath : windows ? (process.env.ComSpec?.trim() || "cmd.exe") : "npm",
-    args: npmCliPath
-      ? [npmCliPath, "run", "-s", script]
-      : windows
-        ? ["/d", "/s", "/c", "npm.cmd", "run", "-s", script]
-        : ["run", "-s", script],
+    ...invocation,
     cwd: path.resolve(input.projectRoot ?? process.cwd()),
     npmScript: script,
     timeoutMs: Math.min(input.timeoutMs ?? entrypoint.timeoutPolicy.smallMs, entrypoint.timeoutPolicy.fullMs),
@@ -198,6 +206,7 @@ export async function executeTheoryRuntimeCommand(command: TheoryRuntimeCommandV
     try {
       child = spawn(command.command, command.args, {
         cwd: command.cwd,
+        env: command.env ? { ...process.env, ...command.env } : process.env,
         stdio: ["ignore", "pipe", "pipe"],
         shell: false,
         windowsHide: true,

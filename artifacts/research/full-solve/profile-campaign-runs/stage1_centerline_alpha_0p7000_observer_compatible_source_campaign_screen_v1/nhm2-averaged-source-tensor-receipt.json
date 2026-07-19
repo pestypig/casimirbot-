@@ -1,0 +1,66 @@
+{
+  "contractVersion": "nhm2_averaged_source_tensor_receipt/v1",
+  "generatedAt": "2026-06-19T19:03:10.679Z",
+  "laneId": "nhm2_shift_lapse",
+  "selectedProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "runId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "chartId": "comoving_cartesian",
+  "atlasRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-support-function-atlas.json",
+  "atlasHash": "41bdbf8140bce18f971b417014779f76eb8113c03ec5a79abfcc13d05bff9bb2",
+  "sourceTensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-tile-effective-full-tensor-source.json",
+  "frequencyConvergenceRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-frequency-convergence-evidence.json",
+  "switchingConservationRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-switching-covariant-conservation-evidence.json",
+  "averagingWindowSeconds": 1,
+  "cycleAverageSourceFixed": true,
+  "sourceModelClass": "cycle_averaged_tile_model",
+  "regionStatuses": [
+    {
+      "regionId": "global",
+      "cycleAverageStatus": "pass",
+      "tensorAuthorityMode": "symmetric_full_tensor",
+      "samplingAuthority": true,
+      "blockers": []
+    },
+    {
+      "regionId": "hull",
+      "cycleAverageStatus": "pass",
+      "tensorAuthorityMode": "symmetric_full_tensor",
+      "samplingAuthority": true,
+      "blockers": []
+    },
+    {
+      "regionId": "wall",
+      "cycleAverageStatus": "pass",
+      "tensorAuthorityMode": "symmetric_full_tensor",
+      "samplingAuthority": true,
+      "blockers": []
+    },
+    {
+      "regionId": "exterior_shell",
+      "cycleAverageStatus": "pass",
+      "tensorAuthorityMode": "symmetric_full_tensor",
+      "samplingAuthority": true,
+      "blockers": []
+    }
+  ],
+  "summary": {
+    "averagedSourceTensorAvailable": true,
+    "sourceSideOnly": true,
+    "notDerivedFromMetricRequiredTensor": true,
+    "noMetricRequiredInputRefs": true,
+    "fullTensorSamplingAuthority": true,
+    "allRegionsCycleAveragePass": true,
+    "frequencyConvergencePass": true,
+    "switchingConservationPass": true,
+    "firstBlocker": null,
+    "blockerCount": 0
+  },
+  "status": "pass",
+  "blockers": [],
+  "claimBoundary": {
+    "diagnosticOnly": true,
+    "averagedSourceDoesNotProveDynamicGeometryAgreement": true,
+    "averagedSourceDoesNotBoundBackreaction": true,
+    "physicalViabilityClaimAllowed": false
+  }
+}

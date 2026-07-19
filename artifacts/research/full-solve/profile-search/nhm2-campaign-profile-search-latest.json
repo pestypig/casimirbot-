@@ -1,0 +1,469 @@
+{
+  "contractVersion": "nhm2_campaign_profile_search/v1",
+  "generatedAt": "2026-06-19T18:36:56.228Z",
+  "laneId": "nhm2_shift_lapse",
+  "sourceCampaignRef": "artifacts/research/full-solve/validation-chain/axis-aligned-shear-suppressed-smoke-v1/nhm2-time-dependent-source-campaign.json",
+  "campaignFrontierDispositionRef": "artifacts/research/full-solve/validation-chain/axis-aligned-shear-suppressed-smoke-v1/nhm2-campaign-frontier-disposition.json",
+  "metricMomentumRemediationTargetsRef": "artifacts/research/full-solve/validation-chain/axis-aligned-shear-suppressed-smoke-v1/nhm2-metric-momentum-remediation-targets.json",
+  "baseline": {
+    "selectedProfileId": "stage1_centerline_alpha_0p995_v1",
+    "runId": "nhm2-reference-ledger-2026-05-05-v1",
+    "firstBlocker": "global:T02:metric_momentum_suppression_required",
+    "worstRegionId": "hull",
+    "worstComponentId": "T02",
+    "worstRequiredSuppressionFactor": 2244405760428552.5,
+    "currentProfileRejected": true
+  },
+  "searchPolicy": {
+    "fastestMeans": "lowest_alpha_after_campaign_screen",
+    "latestAliasesForbidden": true,
+    "alphaOnlyCannotRetireMetricMomentum": true,
+    "screenPassIsNotCampaignPass": true,
+    "candidateRequiresFrozenCampaignRun": true
+  },
+  "candidates": [
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p9900_alpha_only_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.99,
+      "subjectiveEfficiencyProxy": 1.0101010101010102,
+      "proposalKind": "alpha_only",
+      "levers": {
+        "lapseDepthScale": 1,
+        "shiftAmplitudeScale": 1,
+        "wallThicknessScale": 1,
+        "smoothingWidthScale": 1,
+        "transitionKernel": "reuse_current",
+        "projectedT0iSuppressionFactor": 1
+      },
+      "campaignScreen": {
+        "screeningModel": "declared_reduced_order_frontier_screen",
+        "sourceTensorCopiedFromMetric": false,
+        "silentlyZeroesT0i": false,
+        "silentlyZeroesOffDiagonalTij": false,
+        "usesScalarT00Only": false,
+        "estimatedWorstMetricMomentumRatio": 2244405760428552.5,
+        "requiredSuppressionFactor": 2244405760428552.5,
+        "clearsCurrentProfileMomentumRejection": false,
+        "needsFullCampaignRun": true,
+        "status": "rejected_metric_momentum",
+        "blockers": [
+          "alpha_only_does_not_reduce_projected_t0i"
+        ]
+      }
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p9500_alpha_only_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.95,
+      "subjectiveEfficiencyProxy": 1.0526315789473684,
+      "proposalKind": "alpha_only",
+      "levers": {
+        "lapseDepthScale": 1,
+        "shiftAmplitudeScale": 1,
+        "wallThicknessScale": 1,
+        "smoothingWidthScale": 1,
+        "transitionKernel": "reuse_current",
+        "projectedT0iSuppressionFactor": 1
+      },
+      "campaignScreen": {
+        "screeningModel": "declared_reduced_order_frontier_screen",
+        "sourceTensorCopiedFromMetric": false,
+        "silentlyZeroesT0i": false,
+        "silentlyZeroesOffDiagonalTij": false,
+        "usesScalarT00Only": false,
+        "estimatedWorstMetricMomentumRatio": 2244405760428552.5,
+        "requiredSuppressionFactor": 2244405760428552.5,
+        "clearsCurrentProfileMomentumRejection": false,
+        "needsFullCampaignRun": true,
+        "status": "rejected_metric_momentum",
+        "blockers": [
+          "alpha_only_does_not_reduce_projected_t0i"
+        ]
+      }
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p9000_alpha_only_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.9,
+      "subjectiveEfficiencyProxy": 1.1111111111111112,
+      "proposalKind": "alpha_only",
+      "levers": {
+        "lapseDepthScale": 1,
+        "shiftAmplitudeScale": 1,
+        "wallThicknessScale": 1,
+        "smoothingWidthScale": 1,
+        "transitionKernel": "reuse_current",
+        "projectedT0iSuppressionFactor": 1
+      },
+      "campaignScreen": {
+        "screeningModel": "declared_reduced_order_frontier_screen",
+        "sourceTensorCopiedFromMetric": false,
+        "silentlyZeroesT0i": false,
+        "silentlyZeroesOffDiagonalTij": false,
+        "usesScalarT00Only": false,
+        "estimatedWorstMetricMomentumRatio": 2244405760428552.5,
+        "requiredSuppressionFactor": 2244405760428552.5,
+        "clearsCurrentProfileMomentumRejection": false,
+        "needsFullCampaignRun": true,
+        "status": "rejected_metric_momentum",
+        "blockers": [
+          "alpha_only_does_not_reduce_projected_t0i"
+        ]
+      }
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p7000_alpha_only_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.7,
+      "subjectiveEfficiencyProxy": 1.4285714285714286,
+      "proposalKind": "alpha_only",
+      "levers": {
+        "lapseDepthScale": 1,
+        "shiftAmplitudeScale": 1,
+        "wallThicknessScale": 1,
+        "smoothingWidthScale": 1,
+        "transitionKernel": "reuse_current",
+        "projectedT0iSuppressionFactor": 1
+      },
+      "campaignScreen": {
+        "screeningModel": "declared_reduced_order_frontier_screen",
+        "sourceTensorCopiedFromMetric": false,
+        "silentlyZeroesT0i": false,
+        "silentlyZeroesOffDiagonalTij": false,
+        "usesScalarT00Only": false,
+        "estimatedWorstMetricMomentumRatio": 2244405760428552.5,
+        "requiredSuppressionFactor": 2244405760428552.5,
+        "clearsCurrentProfileMomentumRejection": false,
+        "needsFullCampaignRun": true,
+        "status": "rejected_metric_momentum",
+        "blockers": [
+          "alpha_only_does_not_reduce_projected_t0i"
+        ]
+      }
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p9900_shift_suppressed_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.99,
+      "subjectiveEfficiencyProxy": 1.0101010101010102,
+      "proposalKind": "shift_suppressed",
+      "levers": {
+        "lapseDepthScale": 1,
+        "shiftAmplitudeScale": 0.000001,
+        "wallThicknessScale": 1,
+        "smoothingWidthScale": 1,
+        "transitionKernel": "reuse_current",
+        "projectedT0iSuppressionFactor": 22444057604285.527
+      },
+      "campaignScreen": {
+        "screeningModel": "declared_reduced_order_frontier_screen",
+        "sourceTensorCopiedFromMetric": false,
+        "silentlyZeroesT0i": false,
+        "silentlyZeroesOffDiagonalTij": false,
+        "usesScalarT00Only": false,
+        "estimatedWorstMetricMomentumRatio": 99.99999999999999,
+        "requiredSuppressionFactor": 2244405760428552.5,
+        "clearsCurrentProfileMomentumRejection": false,
+        "needsFullCampaignRun": true,
+        "status": "rejected_metric_momentum",
+        "blockers": [
+          "metric_momentum_rejection_not_cleared_by_screen"
+        ]
+      }
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p9500_shift_suppressed_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.95,
+      "subjectiveEfficiencyProxy": 1.0526315789473684,
+      "proposalKind": "shift_suppressed",
+      "levers": {
+        "lapseDepthScale": 1,
+        "shiftAmplitudeScale": 1e-7,
+        "wallThicknessScale": 1,
+        "smoothingWidthScale": 1,
+        "transitionKernel": "reuse_current",
+        "projectedT0iSuppressionFactor": 224440576042855.25
+      },
+      "campaignScreen": {
+        "screeningModel": "declared_reduced_order_frontier_screen",
+        "sourceTensorCopiedFromMetric": false,
+        "silentlyZeroesT0i": false,
+        "silentlyZeroesOffDiagonalTij": false,
+        "usesScalarT00Only": false,
+        "estimatedWorstMetricMomentumRatio": 10,
+        "requiredSuppressionFactor": 2244405760428552.5,
+        "clearsCurrentProfileMomentumRejection": false,
+        "needsFullCampaignRun": true,
+        "status": "rejected_metric_momentum",
+        "blockers": [
+          "metric_momentum_rejection_not_cleared_by_screen"
+        ]
+      }
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p9000_shift_suppressed_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.9,
+      "subjectiveEfficiencyProxy": 1.1111111111111112,
+      "proposalKind": "shift_suppressed",
+      "levers": {
+        "lapseDepthScale": 1,
+        "shiftAmplitudeScale": 1e-8,
+        "wallThicknessScale": 1,
+        "smoothingWidthScale": 1,
+        "transitionKernel": "reuse_current",
+        "projectedT0iSuppressionFactor": 1122202880214276.2
+      },
+      "campaignScreen": {
+        "screeningModel": "declared_reduced_order_frontier_screen",
+        "sourceTensorCopiedFromMetric": false,
+        "silentlyZeroesT0i": false,
+        "silentlyZeroesOffDiagonalTij": false,
+        "usesScalarT00Only": false,
+        "estimatedWorstMetricMomentumRatio": 2,
+        "requiredSuppressionFactor": 2244405760428552.5,
+        "clearsCurrentProfileMomentumRejection": false,
+        "needsFullCampaignRun": true,
+        "status": "rejected_metric_momentum",
+        "blockers": [
+          "metric_momentum_rejection_not_cleared_by_screen"
+        ]
+      }
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p9900_smoothing_suppressed_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.99,
+      "subjectiveEfficiencyProxy": 1.0101010101010102,
+      "proposalKind": "smoothing_suppressed",
+      "levers": {
+        "lapseDepthScale": 1,
+        "shiftAmplitudeScale": 1,
+        "wallThicknessScale": 5,
+        "smoothingWidthScale": 10,
+        "transitionKernel": "smootherstep_c2",
+        "projectedT0iSuppressionFactor": 448881152085710.5
+      },
+      "campaignScreen": {
+        "screeningModel": "declared_reduced_order_frontier_screen",
+        "sourceTensorCopiedFromMetric": false,
+        "silentlyZeroesT0i": false,
+        "silentlyZeroesOffDiagonalTij": false,
+        "usesScalarT00Only": false,
+        "estimatedWorstMetricMomentumRatio": 5,
+        "requiredSuppressionFactor": 2244405760428552.5,
+        "clearsCurrentProfileMomentumRejection": false,
+        "needsFullCampaignRun": true,
+        "status": "rejected_metric_momentum",
+        "blockers": [
+          "metric_momentum_rejection_not_cleared_by_screen"
+        ]
+      }
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p9500_smoothing_suppressed_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.95,
+      "subjectiveEfficiencyProxy": 1.0526315789473684,
+      "proposalKind": "smoothing_suppressed",
+      "levers": {
+        "lapseDepthScale": 1,
+        "shiftAmplitudeScale": 1,
+        "wallThicknessScale": 10,
+        "smoothingWidthScale": 20,
+        "transitionKernel": "smootherstep_c2",
+        "projectedT0iSuppressionFactor": 1683304320321414.5
+      },
+      "campaignScreen": {
+        "screeningModel": "declared_reduced_order_frontier_screen",
+        "sourceTensorCopiedFromMetric": false,
+        "silentlyZeroesT0i": false,
+        "silentlyZeroesOffDiagonalTij": false,
+        "usesScalarT00Only": false,
+        "estimatedWorstMetricMomentumRatio": 1.3333333333333333,
+        "requiredSuppressionFactor": 2244405760428552.5,
+        "clearsCurrentProfileMomentumRejection": false,
+        "needsFullCampaignRun": true,
+        "status": "rejected_metric_momentum",
+        "blockers": [
+          "metric_momentum_rejection_not_cleared_by_screen"
+        ]
+      }
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p9900_combined_metric_redesign_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.99,
+      "subjectiveEfficiencyProxy": 1.0101010101010102,
+      "proposalKind": "combined_metric_redesign",
+      "levers": {
+        "lapseDepthScale": 1,
+        "shiftAmplitudeScale": 1e-8,
+        "wallThicknessScale": 10,
+        "smoothingWidthScale": 10,
+        "transitionKernel": "smootherstep_c2",
+        "projectedT0iSuppressionFactor": 2805507200535690.5
+      },
+      "campaignScreen": {
+        "screeningModel": "declared_reduced_order_frontier_screen",
+        "sourceTensorCopiedFromMetric": false,
+        "silentlyZeroesT0i": false,
+        "silentlyZeroesOffDiagonalTij": false,
+        "usesScalarT00Only": false,
+        "estimatedWorstMetricMomentumRatio": 0.8,
+        "requiredSuppressionFactor": 2244405760428552.5,
+        "clearsCurrentProfileMomentumRejection": true,
+        "needsFullCampaignRun": true,
+        "status": "screen_pass_needs_campaign_run",
+        "blockers": [
+          "full_frozen_campaign_run_required"
+        ]
+      }
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p9500_combined_metric_redesign_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.95,
+      "subjectiveEfficiencyProxy": 1.0526315789473684,
+      "proposalKind": "combined_metric_redesign",
+      "levers": {
+        "lapseDepthScale": 1,
+        "shiftAmplitudeScale": 1e-9,
+        "wallThicknessScale": 10,
+        "smoothingWidthScale": 10,
+        "transitionKernel": "smootherstep_c2",
+        "projectedT0iSuppressionFactor": 8977623041714210
+      },
+      "campaignScreen": {
+        "screeningModel": "declared_reduced_order_frontier_screen",
+        "sourceTensorCopiedFromMetric": false,
+        "silentlyZeroesT0i": false,
+        "silentlyZeroesOffDiagonalTij": false,
+        "usesScalarT00Only": false,
+        "estimatedWorstMetricMomentumRatio": 0.25,
+        "requiredSuppressionFactor": 2244405760428552.5,
+        "clearsCurrentProfileMomentumRejection": true,
+        "needsFullCampaignRun": true,
+        "status": "screen_pass_needs_campaign_run",
+        "blockers": [
+          "full_frozen_campaign_run_required"
+        ]
+      }
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.9,
+      "subjectiveEfficiencyProxy": 1.1111111111111112,
+      "proposalKind": "combined_metric_redesign",
+      "levers": {
+        "lapseDepthScale": 1,
+        "shiftAmplitudeScale": 1e-10,
+        "wallThicknessScale": 10,
+        "smoothingWidthScale": 20,
+        "transitionKernel": "compact_bump",
+        "projectedT0iSuppressionFactor": 44888115208571050
+      },
+      "campaignScreen": {
+        "screeningModel": "declared_reduced_order_frontier_screen",
+        "sourceTensorCopiedFromMetric": false,
+        "silentlyZeroesT0i": false,
+        "silentlyZeroesOffDiagonalTij": false,
+        "usesScalarT00Only": false,
+        "estimatedWorstMetricMomentumRatio": 0.05,
+        "requiredSuppressionFactor": 2244405760428552.5,
+        "clearsCurrentProfileMomentumRejection": true,
+        "needsFullCampaignRun": true,
+        "status": "screen_pass_needs_campaign_run",
+        "blockers": [
+          "full_frozen_campaign_run_required"
+        ]
+      }
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p9000_observer_compatible_source_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.9,
+      "subjectiveEfficiencyProxy": 1.1111111111111112,
+      "proposalKind": "observer_compatible_source",
+      "levers": {
+        "lapseDepthScale": 1,
+        "shiftAmplitudeScale": 1e-10,
+        "wallThicknessScale": 10,
+        "smoothingWidthScale": 20,
+        "transitionKernel": "compact_bump",
+        "projectedT0iSuppressionFactor": 44888115208571050
+      },
+      "campaignScreen": {
+        "screeningModel": "declared_reduced_order_frontier_screen",
+        "sourceTensorCopiedFromMetric": false,
+        "silentlyZeroesT0i": false,
+        "silentlyZeroesOffDiagonalTij": false,
+        "usesScalarT00Only": false,
+        "estimatedWorstMetricMomentumRatio": 0.05,
+        "requiredSuppressionFactor": 2244405760428552.5,
+        "clearsCurrentProfileMomentumRejection": true,
+        "needsFullCampaignRun": true,
+        "status": "screen_pass_needs_campaign_run",
+        "blockers": [
+          "full_frozen_campaign_run_required"
+        ]
+      }
+    },
+    {
+      "candidateProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+      "parentProfileId": "stage1_centerline_alpha_0p995_v1",
+      "alphaCenterline": 0.7,
+      "subjectiveEfficiencyProxy": 1.4285714285714286,
+      "proposalKind": "observer_compatible_source",
+      "levers": {
+        "lapseDepthScale": 1,
+        "shiftAmplitudeScale": 1e-10,
+        "wallThicknessScale": 10,
+        "smoothingWidthScale": 20,
+        "transitionKernel": "compact_bump",
+        "projectedT0iSuppressionFactor": 44888115208571050
+      },
+      "campaignScreen": {
+        "screeningModel": "declared_reduced_order_frontier_screen",
+        "sourceTensorCopiedFromMetric": false,
+        "silentlyZeroesT0i": false,
+        "silentlyZeroesOffDiagonalTij": false,
+        "usesScalarT00Only": false,
+        "estimatedWorstMetricMomentumRatio": 0.05,
+        "requiredSuppressionFactor": 2244405760428552.5,
+        "clearsCurrentProfileMomentumRejection": true,
+        "needsFullCampaignRun": true,
+        "status": "screen_pass_needs_campaign_run",
+        "blockers": [
+          "full_frozen_campaign_run_required"
+        ]
+      }
+    }
+  ],
+  "ranking": {
+    "fastestScreenedCandidateProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+    "fastestAlphaOnlyRejectedProfileId": "stage1_centerline_alpha_0p7000_alpha_only_campaign_screen_v1",
+    "recommendedNextProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+    "recommendationReason": "run_fastest_screened_candidate_through_full_frozen_campaign_before_any_promotion"
+  },
+  "summary": {
+    "candidateCount": 14,
+    "screenPassCount": 5,
+    "rejectedCount": 9,
+    "fastestScreenedAlpha": 0.7,
+    "firstBlocker": "full_frozen_campaign_run_required",
+    "profileSearchComplete": false
+  },
+  "claimBoundary": {
+    "diagnosticOnly": true,
+    "profileSearchDoesNotValidateProfile": true,
+    "screenPassDoesNotPassCampaign": true,
+    "physicalViabilityClaimAllowed": false,
+    "transportClaimAllowed": false,
+    "routeEtaClaimAllowed": false,
+    "propulsionClaimAllowed": false
+  }
+}

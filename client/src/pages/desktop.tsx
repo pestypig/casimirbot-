@@ -959,7 +959,17 @@ export default function DesktopPage({
     >
       {userSettings.enableSplashCursor && <SplashCursor />}
       <div
-        className="mood-transition-scope relative w-screen h-screen overflow-hidden bg-slate-950 text-slate-100"
+        className="mood-transition-scope relative box-border h-screen w-screen overflow-hidden bg-slate-950 text-slate-100"
+        data-layout-variant={layoutVariant}
+        style={layoutVariant === "mobile"
+          ? {
+              height: "100dvh",
+              paddingTop: "env(safe-area-inset-top, 0px)",
+              paddingRight: "env(safe-area-inset-right, 0px)",
+              paddingBottom: "env(safe-area-inset-bottom, 0px)",
+              paddingLeft: "env(safe-area-inset-left, 0px)",
+            }
+          : undefined}
       >
         <SurfaceStack recipe={wallpaperRecipe} />
         {processGraphSurfaceEnabled ? <ProcessGraphSurfaceLayer mood={mood} orientation={orientation} mode="ambient" /> : null}

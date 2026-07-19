@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { fileURLToPath } from "node:url";
 import type {
   HelixAgentProvider,
@@ -101,7 +102,11 @@ import {
   formatHelixAgentContinuationStateForRuntime,
 } from "../runtime/agent-continuation-state";
 import type { HelixAgentContinuationState } from "@shared/helix-agent-continuation-state";
-import { HELIX_RESEARCH_LIBRARY_READ_CAPABILITY } from "@shared/helix-research-library";
+import {
+  HELIX_RESEARCH_LIBRARY_DOC_VIEWER_PATH_PREFIX,
+  HELIX_RESEARCH_LIBRARY_READ_CAPABILITY,
+  researchLibraryDocumentRefFromDocViewerPath,
+} from "@shared/helix-research-library";
 import {
   HELIX_PAPER_EVIDENCE_ENRICHMENT_OBSERVATION_SCHEMA,
   HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY,
@@ -113,6 +118,7 @@ import {
 import {
   deriveScholarlyEvidenceDemand,
 } from "../scholarly-evidence-demand";
+import { researchLibraryPrivateAccountToken } from "../../helix-account/research-library-store";
 
 const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context" as const;
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression" as const;
@@ -4253,12 +4259,547 @@ const requestedTargetLanguageFromQuestion = (body: Record<string, unknown>): str
   return explicitLocale ? explicitLocale.toLowerCase().replace("_", "-") : null;
 };
 
-const activeDocVisibleTranslationContextFromBody = (body: Record<string, unknown>): Record<string, unknown> | null => {
-  const workspaceSnapshot = readRecord(body.workspace_context_snapshot ?? body.workspaceContextSnapshot);
-  return readRecord(
-    workspaceSnapshot?.active_doc_visible_translation_context ??
-    workspaceSnapshot?.activeDocVisibleTranslationContext,
+type RecordAliasInspection = {
+  selected: Record<string, unknown> | null;
+  records: Record<string, unknown>[];
+  conflict: boolean;
+};
+
+const inspectRecordAliases = (
+  owner: Record<string, unknown>,
+  snakeKey: string,
+  camelKey: string,
+): RecordAliasInspection => {
+  const snakeValue = owner[snakeKey];
+  const camelValue = owner[camelKey];
+  const snakeProvided = snakeValue !== null && snakeValue !== undefined;
+  const camelProvided = camelValue !== null && camelValue !== undefined;
+  const snakeRecord = snakeProvided ? readRecord(snakeValue) : null;
+  const camelRecord = camelProvided ? readRecord(camelValue) : null;
+  const records = [snakeRecord, camelRecord].filter(
+    (entry): entry is Record<string, unknown> => Boolean(entry),
   );
+  return {
+    selected: snakeRecord ?? camelRecord,
+    records,
+    conflict:
+      (snakeProvided && !snakeRecord) ||
+      (camelProvided && !camelRecord) ||
+      (snakeProvided && camelProvided && !isDeepStrictEqual(snakeValue, camelValue)),
+  };
+};
+
+const VISIBLE_TRANSLATION_CONTEXT_ALIAS_PAIRS = [
+  ["document_source_kind", "documentSourceKind"],
+  ["document_ref", "documentRef"],
+  ["private_source", "privateSource"],
+  ["source_kind", "sourceKind"],
+  ["panel_id", "panelId"],
+  ["doc_path", "docPath"],
+  ["source_id", "sourceId"],
+  ["source_hash", "sourceHash"],
+  ["source_text_hash", "sourceTextHash"],
+  ["source_text_char_count", "sourceTextCharCount"],
+  ["chunk_count", "chunkCount"],
+  ["total_unit_count", "totalUnitCount"],
+  ["translatable_unit_count", "translatableUnitCount"],
+  ["account_locale", "accountLocale"],
+  ["target_language", "targetLanguage"],
+  ["projection_target", "projectionTarget"],
+  ["collection_strategy", "collectionStrategy"],
+  ["raw_content_included", "rawContentIncluded"],
+  ["assistant_answer", "assistantAnswer"],
+  ["terminal_eligible", "terminalEligible"],
+  ["answer_authority", "answerAuthority"],
+  ["reentry_required", "reentryRequired"],
+  ["ui_text_regions", "uiTextRegions"],
+  ["panel_text_regions", "panelTextRegions"],
+  ["visible_ui_text_regions", "visibleUiTextRegions"],
+  ["visible_text", "visibleText"],
+] as const;
+
+const visibleTranslationContextAliasesConflict = (value: Record<string, unknown>): boolean =>
+  VISIBLE_TRANSLATION_CONTEXT_ALIAS_PAIRS.some(([snakeKey, camelKey]) => {
+    const snakeValue = value[snakeKey];
+    const camelValue = value[camelKey];
+    return snakeValue !== null && snakeValue !== undefined &&
+      camelValue !== null && camelValue !== undefined &&
+      !isDeepStrictEqual(snakeValue, camelValue);
+  });
+
+const hasMalformedVisibleTranslationSecurityField = (value: Record<string, unknown>): boolean => {
+  for (const key of ["private_source", "privateSource", "private"]) {
+    const entry = value[key];
+    if (entry !== null && entry !== undefined && typeof entry !== "boolean") return true;
+  }
+  for (const key of [
+    "document_source_kind", "documentSourceKind", "source_kind", "sourceKind",
+    "document_ref", "documentRef", "doc_path", "docPath", "source_id", "sourceId",
+  ]) {
+    const entry = value[key];
+    if (entry !== null && entry !== undefined && (typeof entry !== "string" || !entry.trim())) return true;
+  }
+  return false;
+};
+
+const readConsistentAliasedString = (
+  value: Record<string, unknown>,
+  snakeKey: string,
+  camelKey: string,
+): string | null => {
+  const snakeValue = value[snakeKey];
+  const camelValue = value[camelKey];
+  if (
+    snakeValue !== null && snakeValue !== undefined &&
+    camelValue !== null && camelValue !== undefined &&
+    !isDeepStrictEqual(snakeValue, camelValue)
+  ) return null;
+  return readString(snakeValue ?? camelValue);
+};
+
+const readConsistentAliasedBoolean = (
+  value: Record<string, unknown>,
+  snakeKey: string,
+  camelKey: string,
+): boolean | null => {
+  const snakeValue = value[snakeKey];
+  const camelValue = value[camelKey];
+  if (
+    snakeValue !== null && snakeValue !== undefined &&
+    camelValue !== null && camelValue !== undefined &&
+    !isDeepStrictEqual(snakeValue, camelValue)
+  ) return null;
+  return readBoolean(snakeValue ?? camelValue);
+};
+
+const readConsistentAliasedArray = (
+  value: Record<string, unknown>,
+  snakeKey: string,
+  camelKey: string,
+): unknown[] | null => {
+  const snakeValue = value[snakeKey];
+  const camelValue = value[camelKey];
+  if (
+    snakeValue !== null && snakeValue !== undefined &&
+    camelValue !== null && camelValue !== undefined &&
+    !isDeepStrictEqual(snakeValue, camelValue)
+  ) return null;
+  const selected = snakeValue ?? camelValue;
+  return Array.isArray(selected) ? selected : null;
+};
+
+const hasDirectPrivateResearchVisibleTranslationClaim = (
+  value: Record<string, unknown> | null,
+): boolean => Boolean(
+  value && (
+    [value.document_source_kind, value.documentSourceKind]
+      .some((entry) => readString(entry) === "research_library") ||
+    [value.source_kind, value.sourceKind]
+      .some((entry) => readString(entry) === "research_library") ||
+    [value.private_source, value.privateSource]
+      .some((entry) => readBoolean(entry) === true) ||
+    readBoolean(value.private) === true ||
+    [value.doc_path, value.docPath]
+      .some((entry) => readString(entry)?.startsWith(HELIX_RESEARCH_LIBRARY_DOC_VIEWER_PATH_PREFIX) === true) ||
+    [value.document_ref, value.documentRef]
+      .some((entry) => readString(entry)?.startsWith("private-research:") === true) ||
+    [value.source_id, value.sourceId]
+      .some((entry) => readString(entry)?.startsWith(
+        `document_markdown:${HELIX_RESEARCH_LIBRARY_DOC_VIEWER_PATH_PREFIX}`,
+      ) === true)
+  )
+);
+
+const knownVisibleTranslationNestedRecords = (
+  value: Record<string, unknown>,
+): Record<string, unknown>[] => {
+  const nested: Record<string, unknown>[] = [];
+  for (const key of [
+    "chunks",
+    "ui_text_regions", "uiTextRegions",
+    "panel_text_regions", "panelTextRegions",
+    "visible_ui_text_regions", "visibleUiTextRegions",
+  ]) {
+    const entries = value[key];
+    if (!Array.isArray(entries)) continue;
+    for (const entry of entries) {
+      const record = readRecord(entry);
+      if (record) nested.push(record);
+    }
+  }
+  const projection = readRecord(value.projection);
+  if (projection) nested.push(projection);
+  return nested;
+};
+
+const hasPrivateResearchVisibleTranslationContextClaim = (
+  value: Record<string, unknown> | null,
+): boolean => Boolean(
+  value && (
+    hasDirectPrivateResearchVisibleTranslationClaim(value) ||
+    knownVisibleTranslationNestedRecords(value).some(hasDirectPrivateResearchVisibleTranslationClaim)
+  )
+);
+
+const visibleTranslationContextTreeAliasesConflict = (
+  value: Record<string, unknown>,
+): boolean => visibleTranslationContextAliasesConflict(value) ||
+  hasMalformedVisibleTranslationSecurityField(value) ||
+  knownVisibleTranslationNestedRecords(value).some((nested) =>
+    visibleTranslationContextAliasesConflict(nested) ||
+    hasMalformedVisibleTranslationSecurityField(nested)
+  );
+
+type RecordArrayAliasInspection = {
+  records: Record<string, unknown>[];
+  conflict: boolean;
+};
+
+const inspectRecordArrayAliases = (
+  owner: Record<string, unknown>,
+  snakeKey: string,
+  camelKey: string,
+): RecordArrayAliasInspection => {
+  const snakeValue = owner[snakeKey];
+  const camelValue = owner[camelKey];
+  const snakeProvided = snakeValue !== null && snakeValue !== undefined;
+  const camelProvided = camelValue !== null && camelValue !== undefined;
+  const snakeArray = snakeProvided && Array.isArray(snakeValue) ? snakeValue : null;
+  const camelArray = camelProvided && Array.isArray(camelValue) ? camelValue : null;
+  const entries = [...(snakeArray ?? []), ...(camelArray ?? [])];
+  const records = entries.flatMap((entry) => {
+    const record = readRecord(entry);
+    return record ? [record] : [];
+  });
+  return {
+    records,
+    conflict:
+      (snakeProvided && !snakeArray) ||
+      (camelProvided && !camelArray) ||
+      entries.some((entry) => !readRecord(entry)) ||
+      (snakeProvided && camelProvided && !isDeepStrictEqual(snakeValue, camelValue)) ||
+      records.some(visibleTranslationContextTreeAliasesConflict),
+  };
+};
+
+type VisibleTranslationContextInspection = {
+  workspaceSnapshot: Record<string, unknown> | null;
+  activeContext: Record<string, unknown> | null;
+  contextRecords: Record<string, unknown>[];
+  aliasConflict: boolean;
+  privateResearchClaim: boolean;
+};
+
+const inspectVisibleTranslationContextFromBody = (
+  body: Record<string, unknown>,
+): VisibleTranslationContextInspection => {
+  const workspaceAliases = inspectRecordAliases(
+    body,
+    "workspace_context_snapshot",
+    "workspaceContextSnapshot",
+  );
+  const activeInspections = workspaceAliases.records.map((workspaceSnapshot) =>
+    inspectRecordAliases(
+      workspaceSnapshot,
+      "active_doc_visible_translation_context",
+      "activeDocVisibleTranslationContext",
+    )
+  );
+  const contextRecords = activeInspections.flatMap((inspection) => inspection.records);
+  const selectedActiveInspection = workspaceAliases.selected
+    ? inspectRecordAliases(
+        workspaceAliases.selected,
+        "active_doc_visible_translation_context",
+        "activeDocVisibleTranslationContext",
+      )
+    : null;
+  const activeContext = selectedActiveInspection?.selected ?? contextRecords[0] ?? null;
+  const contextsConflict = contextRecords.length > 1 &&
+    contextRecords.slice(1).some((context) => !isDeepStrictEqual(contextRecords[0], context));
+  const internalAliasConflict = contextRecords.some(visibleTranslationContextTreeAliasesConflict);
+  const projectionInspections = workspaceAliases.records.flatMap((workspaceSnapshot) => [
+    inspectRecordArrayAliases(
+      workspaceSnapshot,
+      "account_language_translation_projections",
+      "accountLanguageTranslationProjections",
+    ),
+    inspectRecordArrayAliases(
+      workspaceSnapshot,
+      "visible_translation_projections",
+      "visibleTranslationProjections",
+    ),
+  ]);
+  const projectionRecords = projectionInspections.flatMap((inspection) => inspection.records);
+  return {
+    workspaceSnapshot: workspaceAliases.selected,
+    activeContext,
+    contextRecords,
+    aliasConflict:
+      workspaceAliases.conflict ||
+      activeInspections.some((inspection) => inspection.conflict) ||
+      projectionInspections.some((inspection) => inspection.conflict) ||
+      contextsConflict ||
+      internalAliasConflict,
+    privateResearchClaim:
+      contextRecords.some(hasPrivateResearchVisibleTranslationContextClaim) ||
+      projectionRecords.some(hasPrivateResearchVisibleTranslationContextClaim),
+  };
+};
+
+const resolvePrivateResearchVisibleTranslationIdentity = (
+  value: Record<string, unknown> | null,
+): { documentRef: string; docPath: string; sourceId: string } | null => {
+  if (!value || visibleTranslationContextAliasesConflict(value)) return null;
+  const documentSourceKind = readConsistentAliasedString(
+    value,
+    "document_source_kind",
+    "documentSourceKind",
+  );
+  const privateSource = readConsistentAliasedBoolean(value, "private_source", "privateSource");
+  const documentRef = readConsistentAliasedString(value, "document_ref", "documentRef");
+  const docPath = readConsistentAliasedString(value, "doc_path", "docPath");
+  const sourceId = readConsistentAliasedString(value, "source_id", "sourceId");
+  if (
+    documentSourceKind !== "research_library" ||
+    privateSource !== true ||
+    !documentRef ||
+    !docPath ||
+    !sourceId ||
+    researchLibraryDocumentRefFromDocViewerPath(docPath) !== documentRef ||
+    sourceId !== `document_markdown:${docPath}`
+  ) return null;
+  return { documentRef, docPath, sourceId };
+};
+
+const visibleTranslationTargetMatchesPrivateResearchIdentity = (
+  value: unknown,
+  identity: { documentRef: string; docPath: string; sourceId: string },
+  requireDocumentSourceId: boolean,
+): boolean => {
+  const target = readRecord(value);
+  if (!target || visibleTranslationContextAliasesConflict(target)) return false;
+  const sourceId = readConsistentAliasedString(target, "source_id", "sourceId");
+  return (
+    readConsistentAliasedString(target, "document_source_kind", "documentSourceKind") === "research_library" &&
+    readConsistentAliasedBoolean(target, "private_source", "privateSource") === true &&
+    readConsistentAliasedString(target, "document_ref", "documentRef") === identity.documentRef &&
+    readConsistentAliasedString(target, "doc_path", "docPath") === identity.docPath &&
+    (!requireDocumentSourceId || sourceId === identity.sourceId || sourceId?.startsWith(`${identity.sourceId}#`) === true)
+  );
+};
+
+const isAdmissiblePrivateResearchVisibleTranslationContext = (
+  value: Record<string, unknown> | null,
+): boolean => {
+  const identity = resolvePrivateResearchVisibleTranslationIdentity(value);
+  if (!value || !identity) return false;
+  if (
+    value.schema !== "helix.ask.active_doc_visible_translation_context.v1" ||
+    readConsistentAliasedString(value, "panel_id", "panelId") !== "docs-viewer" ||
+    readConsistentAliasedString(value, "source_kind", "sourceKind") !== "docs_viewer" ||
+    !Array.isArray(value.chunks)
+  ) return false;
+  const uiTextRegions = readConsistentAliasedArray(value, "ui_text_regions", "uiTextRegions");
+  if (!uiTextRegions) return false;
+  const optionalRegionArrays = [
+    ["panel_text_regions", "panelTextRegions"],
+    ["visible_ui_text_regions", "visibleUiTextRegions"],
+  ] as const;
+  const optionalRegions: unknown[][] = [];
+  for (const [snakeKey, camelKey] of optionalRegionArrays) {
+    const supplied = value[snakeKey] ?? value[camelKey];
+    if (supplied === null || supplied === undefined) continue;
+    const regions = readConsistentAliasedArray(value, snakeKey, camelKey);
+    if (!regions) return false;
+    optionalRegions.push(regions);
+  }
+  return value.chunks.every((entry) =>
+    visibleTranslationTargetMatchesPrivateResearchIdentity(entry, identity, true)
+  ) && uiTextRegions.every((entry) =>
+    visibleTranslationTargetMatchesPrivateResearchIdentity(entry, identity, false)
+  ) && optionalRegions.every((entries) => entries.every((entry) =>
+    visibleTranslationTargetMatchesPrivateResearchIdentity(entry, identity, false)
+  ));
+};
+
+export const activeDocVisibleTranslationContextFromBody = (
+  body: Record<string, unknown>,
+): Record<string, unknown> | null => {
+  const inspection = inspectVisibleTranslationContextFromBody(body);
+  if (!inspection.activeContext || inspection.aliasConflict) return null;
+  if (
+    inspection.privateResearchClaim &&
+    !isAdmissiblePrivateResearchVisibleTranslationContext(inspection.activeContext)
+  ) return null;
+  return inspection.activeContext;
+};
+
+export const privateResearchVisibleTranslationContextOwnedByRequest = (
+  body: Record<string, unknown>,
+  context: Record<string, unknown> | null,
+): boolean => {
+  if (!hasPrivateResearchVisibleTranslationContextClaim(context)) return true;
+  const trustedProfileId = readString(body.research_library_owner_id);
+  const identity = resolvePrivateResearchVisibleTranslationIdentity(context);
+  const suppliedAccountToken = identity?.documentRef.match(/^private-research:([^:]+):[^:]+$/)?.[1] ?? null;
+  if (!trustedProfileId || !suppliedAccountToken) return false;
+  const expectedAccountToken = researchLibraryPrivateAccountToken(trustedProfileId);
+  const supplied = Buffer.from(suppliedAccountToken);
+  const expected = Buffer.from(expectedAccountToken);
+  return supplied.length === expected.length && crypto.timingSafeEqual(supplied, expected);
+};
+
+const PRIVATE_VISIBLE_CONTEXT_METADATA_KEYS = [
+  "schema",
+  "document_source_kind", "documentSourceKind", "document_ref", "documentRef", "private_source", "privateSource",
+  "source_kind", "sourceKind", "panel_id", "panelId", "doc_path", "docPath", "source_id", "sourceId",
+  "source_hash", "sourceHash", "source_text_hash", "sourceTextHash",
+  "source_text_char_count", "sourceTextCharCount", "chunk_count", "chunkCount",
+  "total_unit_count", "totalUnitCount", "translatable_unit_count", "translatableUnitCount",
+  "account_locale", "accountLocale", "target_language", "targetLanguage",
+  "projection_target", "projectionTarget", "collection_strategy", "collectionStrategy",
+  "raw_content_included", "rawContentIncluded", "assistant_answer", "assistantAnswer",
+  "terminal_eligible", "terminalEligible", "answer_authority", "answerAuthority",
+  "reentry_required", "reentryRequired",
+] as const;
+
+const PRIVATE_VISIBLE_TARGET_METADATA_KEYS = [
+  "document_source_kind", "documentSourceKind", "document_ref", "documentRef", "private_source", "privateSource",
+  "source_kind", "sourceKind", "panel_id", "panelId", "doc_path", "docPath", "source_id", "sourceId",
+  "source_hash", "sourceHash", "source_text_hash", "sourceTextHash",
+  "source_text_char_count", "sourceTextCharCount", "source_event_id", "sourceEventId",
+  "source_event_ms", "sourceEventMs", "observed_at_ms", "observedAtMs",
+  "chunk_id", "chunkId", "chunk_index", "chunkIndex", "dedupe_key", "dedupeKey",
+  "region_id", "regionId", "projection_target", "projectionTarget",
+  "existing_observation_ref", "existingObservationRef", "existing_receipt_ref", "existingReceiptRef",
+  "existing_projection_status", "existingProjectionStatus", "existing_freshness_status", "existingFreshnessStatus",
+  "existing_terminal_authority_status", "existingTerminalAuthorityStatus",
+  "existing_source_event_ms", "existingSourceEventMs", "existing_observed_at_ms", "existingObservedAtMs",
+  "raw_content_included", "rawContentIncluded", "assistant_answer", "assistantAnswer",
+  "terminal_eligible", "terminalEligible", "answer_authority", "answerAuthority",
+  "reentry_required", "reentryRequired",
+] as const;
+
+const pickPrivateVisibleMetadata = (
+  value: Record<string, unknown>,
+  allowedKeys: readonly string[],
+): Record<string, unknown> => Object.fromEntries(
+  allowedKeys.flatMap((key) => {
+    const entry = value[key];
+    return entry === null || typeof entry === "string" || typeof entry === "boolean" ||
+      (typeof entry === "number" && Number.isFinite(entry))
+      ? [[key, entry] as const]
+      : [];
+  }),
+);
+
+const projectPrivateVisibleContextForModel = (
+  value: Record<string, unknown> | null,
+): Record<string, unknown> | null => {
+  if (!value) return null;
+  const projected = pickPrivateVisibleMetadata(value, PRIVATE_VISIBLE_CONTEXT_METADATA_KEYS);
+  if (Array.isArray(value.chunks)) {
+    projected.chunks = value.chunks.flatMap((entry) => {
+      const record = readRecord(entry);
+      return record ? [pickPrivateVisibleMetadata(record, PRIVATE_VISIBLE_TARGET_METADATA_KEYS)] : [];
+    });
+  }
+  const uiTextRegions = readConsistentAliasedArray(value, "ui_text_regions", "uiTextRegions");
+  if (uiTextRegions) {
+    projected.ui_text_regions = uiTextRegions.flatMap((entry) => {
+      const record = readRecord(entry);
+      return record ? [pickPrivateVisibleMetadata(record, PRIVATE_VISIBLE_TARGET_METADATA_KEYS)] : [];
+    });
+  }
+  return projected;
+};
+
+export const buildCodexModelVisibleWorkspaceSnapshot = (
+  body: Record<string, unknown>,
+): Record<string, unknown> | null => {
+  const inspection = inspectVisibleTranslationContextFromBody(body);
+  const workspaceSnapshot = inspection.workspaceSnapshot;
+  if (!workspaceSnapshot) return null;
+  if (!inspection.privateResearchClaim && !inspection.aliasConflict) return workspaceSnapshot;
+  const contextForProjection = inspection.contextRecords.find(hasPrivateResearchVisibleTranslationContextClaim) ??
+    inspection.activeContext;
+  const redactedContext = projectPrivateVisibleContextForModel(contextForProjection);
+  return {
+    ...workspaceSnapshot,
+    activeDocVisibleTranslationContext: redactedContext,
+    active_doc_visible_translation_context: redactedContext,
+    privateVisibleTextRedacted: true,
+    private_visible_text_redacted: true,
+    privateVisibleTextRequiresAffirmativeTranslationAdmission: true,
+    private_visible_text_requires_affirmative_translation_admission: true,
+    privateVisibleContextAliasConflict: inspection.aliasConflict,
+    private_visible_context_alias_conflict: inspection.aliasConflict,
+    accountLanguageTranslationProjections: [],
+    account_language_translation_projections: [],
+    visibleTranslationProjections: [],
+    visible_translation_projections: [],
+    hasAccountLanguageTranslationProjections: false,
+    has_account_language_translation_projections: false,
+    hasVisibleTranslationProjections: false,
+    has_visible_translation_projections: false,
+  };
+};
+
+export const isAffirmativePrivateVisibleDocumentTranslationRequest = (question: string): boolean => {
+  const unquoted = question.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ").trim();
+  if (!/\btranslat(?:e|es|ed|ing|ion)\b/i.test(unquoted)) return false;
+  if (
+    /\b(?:let'?s|we\s+(?:should|will|can)|i\s+(?:want|need|would\s+like)\s+to)?\s*not\s+translat(?:e|es|ed|ing|ion)\b/i.test(unquoted) ||
+    /\b(?:want|need|request|prefer|asked\s+for)\s+(?:absolutely\s+)?no\s+(?:new\s+)?translation\b/i.test(unquoted) ||
+    /\b(?:want|need|would\s+like)\s+to\s+(?:know|ask|find\s+out|understand)\b[^.!?;]{0,100}\b(?:whether|if)\b[^.!?;]{0,80}\btranslat(?:e|es|ed|ing|ion)\b/i.test(unquoted) ||
+    /\b(?:wonder(?:ing)?|curious)\b[^.!?;]{0,80}\b(?:whether|if)\b[^.!?;]{0,80}\btranslat(?:e|es|ed|ing|ion)\b/i.test(unquoted) ||
+    /\b(?:but|and)\s+(?:please\s+)?(?:do\s+not|don'?t|dont|not|never)(?:\s+translat(?:e|es|ed|ing|ion))?\s+(?:this(?:\s+(?:current|visible|open|active))?|the\s+(?:current|visible|open|active)|my\s+(?:current|visible|open|active))\s+(?:private\s+|research\s+)?(?:paper|doc(?:ument)?|text|content|page|section|selection)\b/i.test(unquoted) ||
+    /\b(?:leave|keep)\s+(?:this(?:\s+(?:current|visible|open|active))?|the\s+(?:current|visible|open|active)|my\s+(?:current|visible|open|active))\s+(?:private\s+|research\s+)?(?:paper|doc(?:ument)?|text|content|page|section|selection)\s+untranslated\b/i.test(unquoted) ||
+    /\b(?:do\s+not|don'?t|dont|never|avoid|without|not\s+asking\s+(?:you\s+)?to|no\s+need\s+to|please\s+don'?t)\b[^.!?;]{0,80}\btranslat(?:e|es|ed|ing|ion)\b/i.test(unquoted) ||
+    /\btranslat(?:e|es|ed|ing|ion)\b[^.!?;]{0,100}\b(?:do\s+not|don'?t|dont|never|not\s+now|not\s+yet|no\s+need|cancel\s+that|disregard\s+that)\b/i.test(unquoted) ||
+    /\btranslat(?:e|es|ed|ing|ion)\b[^.!?;]{0,100}[.!?]\s*(?:(?:actually|wait|on\s+second\s+thought)[,:]?\s*)?(?:(?:do\s+not|don'?t)\s+(?:translate|do\s+(?:that|it)|proceed|continue)|no\b|cancel\s+(?:that|it))\b/i.test(unquoted) ||
+    /\b(?:later|tomorrow|next\s+(?:time|turn|week|month|year)|in\s+the\s+future|eventually|someday|hypothetically|before|after)\b[\s\S]{0,120}\btranslat(?:e|es|ed|ing|ion)\b/i.test(unquoted) ||
+    /\btranslat(?:e|es|ed|ing|ion)\b[^.!?;]{0,100}\b(?:later|tomorrow|next\s+(?:time|turn|week|month|year)|in\s+the\s+future|eventually|someday|hypothetically)\b/i.test(unquoted) ||
+    /\bif\b\s+(?!(?:possible|you\s+(?:can|could|are\s+able))\b)[^.!?;]{0,100}\btranslat(?:e|es|ed|ing|ion)\b/i.test(unquoted) ||
+    /\b(?:when|once)\b\s+(?!(?:possible|you\s+(?:can|could|are\s+able))\b)[^.!?;]{0,100}\btranslat(?:e|es|ed|ing|ion)\b/i.test(unquoted) ||
+    /\btranslat(?:e|es|ed|ing|ion)\b[^.!?;]{0,100}\bif\b\s+(?!(?:possible|you\s+(?:can|could|are\s+able))\b)/i.test(unquoted) ||
+    /\btranslat(?:e|es|ed|ing|ion)\b[^.!?;]{0,100}\b(?:when|once)\b\s+(?!(?:possible|you\s+(?:can|could|are\s+able))\b)/i.test(unquoted) ||
+    /\b(?:if|when|once)\b[^.!?;]{0,100}\b(?:i|we)\b[^.!?;]{0,50}\b(?:ask|request|decide|need|want|am\s+ready|are\s+ready)\b[^.!?;]{0,60}\btranslat(?:e|es|ed|ing|ion)\b/i.test(unquoted) ||
+    /\btranslat(?:e|es|ed|ing|ion)\b[^.!?;]{0,100}\b(?:if|when|once)\b[^.!?;]{0,60}\b(?:i|we)\b[^.!?;]{0,40}\b(?:ask|request|decide|need|want|am\s+ready|are\s+ready)\b/i.test(unquoted) ||
+    /\b(?:previously|historically|yesterday|last\s+(?:time|turn|week|month|year)|already)\b[\s\S]{0,100}\btranslat(?:e|es|ed|ing|ion)\b/i.test(unquoted) ||
+    /\btranslat(?:e|es|ed|ing|ion)\b[^.!?;]{0,100}\b(?:was|were|had\s+been|used\s+to\s+be)\b[^.!?;]{0,60}\b(?:my|our|the)\s+(?:request|instruction|plan)\b/i.test(unquoted) ||
+    /\b(?:would|could|might)\s+(?!you\b|like\b)[\s\S]{0,60}\btranslat(?:e|es|ed|ing|ion)\b/i.test(unquoted) ||
+    /\b(?:button|label|menu|tooltip|screen|dialog|option|control)\b[^.!?;]{0,100}\b(?:says?|reads?|shows?|display(?:s|ed)?|label(?:s|ed)?|called)\b[^.!?;]{0,80}\btranslat(?:e|es|ed|ing|ion)\b/i.test(unquoted) ||
+    /\btranslat(?:e|es|ed|ing|ion)\b[^.!?;]{0,80}\b(?:is|was|appears?|appeared)\b[^.!?;]{0,40}\b(?:button|label|menu|tooltip|screen|dialog|option|control)\b/i.test(unquoted)
+  ) return false;
+  const affirmativeAction =
+    /(?:^|[.!?;]\s*|\bplease\s+)translat(?:e|ing)\b/i.test(unquoted) ||
+    /^(?:if|when|once)\s+(?:possible|you\s+(?:can|could|are\s+able))\b[^.!?;]{0,30}\btranslat(?:e|ing)\b/i.test(unquoted) ||
+    /\b(?:can|could|would|will)\s+you\s+translate\b/i.test(unquoted) ||
+    /\b(?:i\s+(?:want|need|would\s+like)|let'?s)\b[\s\S]{0,60}\btranslat(?:e|ed|ing|ion)\b/i.test(unquoted) ||
+    /\b(?:provide|generate|make|create)\b[\s\S]{0,40}\btranslation\b/i.test(unquoted);
+  const currentVisibleTarget =
+    /\b(?:this|the\s+current|current|visible|selected|hovered|open|active)\s+(?:research\s+)?(?:paper|doc(?:ument)?|text|content|page|section|paragraph|selection)\b/i.test(unquoted) ||
+    /\b(?:my|the)\s+(?:currently\s+)?(?:open|active|visible|selected)\s+(?:research\s+)?(?:paper|doc(?:ument)?|text|content|page|section|paragraph|selection)\b/i.test(unquoted) ||
+    /\b(?:paper|doc(?:ument)?|text|content|page|section|paragraph|selection)\s+(?:i\s+have\s+)?(?:open|active|visible|selected)\b/i.test(unquoted) ||
+    /\b(?:paper|doc(?:ument)?|text|content)\s+(?:in|from)\s+(?:my\s+|the\s+)?(?:research\s+library|private\s+research)\b/i.test(unquoted) ||
+    /\b(?:research\s+library|private\s+research)\b[\s\S]{0,80}\b(?:paper|doc(?:ument)?|text|content)\b/i.test(unquoted) ||
+    /\btranslate\s+this\b/i.test(unquoted);
+  return affirmativeAction && currentVisibleTarget;
+};
+
+const stripVisibleTranslationSourcePayload = (
+  candidate: Record<string, unknown>,
+): Record<string, unknown> => {
+  const stripped = { ...candidate };
+  for (const key of [
+    "active_doc_visible_translation_context", "activeDocVisibleTranslationContext",
+    "visible_translation_context", "visibleTranslationContext", "visible_text_chunks", "visibleTextChunks",
+    "ui_text_regions", "uiTextRegions", "panel_text_regions", "panelTextRegions",
+    "visible_ui_text_regions", "visibleUiTextRegions", "title_text", "titleText", "body_text", "bodyText",
+    "selected_text", "selectedText", "selection_text", "selectionText", "hover_text", "hoverText", "visible_text",
+  ]) delete stripped[key];
+  return stripped;
 };
 
 const hasVisibleTranslationCollectorContent = (value: unknown): boolean => {
@@ -4281,18 +4822,53 @@ const hasVisibleTranslationCollectorContent = (value: unknown): boolean => {
   );
 };
 
-const enrichVisibleTranslationCollectorCandidateFromBody = (
+export const enrichVisibleTranslationCollectorCandidateFromBody = (
   body: Record<string, unknown>,
   candidate: Record<string, unknown>,
 ): Record<string, unknown> => {
   if (!isVisibleTranslationTargetCollectorCandidate(candidate)) return candidate;
   const requestedTargetLanguage = requestedTargetLanguageFromQuestion(body);
-  const enriched: Record<string, unknown> = { ...candidate };
+  const bodyVisibleTranslationInspection = inspectVisibleTranslationContextFromBody(body);
+  const bodyVisibleTranslationContext = activeDocVisibleTranslationContextFromBody(body);
+  const candidateVisibleTranslationContexts = [
+    candidate.active_doc_visible_translation_context,
+    candidate.activeDocVisibleTranslationContext,
+    candidate.visible_translation_context,
+    candidate.visibleTranslationContext,
+  ].flatMap((value) => {
+    const record = readRecord(value);
+    return record ? [record] : [];
+  });
+  const privateResearchBoundary =
+    bodyVisibleTranslationInspection.privateResearchClaim ||
+    bodyVisibleTranslationInspection.aliasConflict ||
+    hasPrivateResearchVisibleTranslationContextClaim(candidate) ||
+    candidateVisibleTranslationContexts.some((context) =>
+      hasPrivateResearchVisibleTranslationContextClaim(context) ||
+      visibleTranslationContextTreeAliasesConflict(context)
+    );
+  const enriched: Record<string, unknown> = privateResearchBoundary
+    ? stripVisibleTranslationSourcePayload(candidate)
+    : { ...candidate };
   if (
     requestedTargetLanguage &&
     !readString(enriched.target_language ?? enriched.targetLanguage)
   ) {
     enriched.target_language = requestedTargetLanguage;
+  }
+  if (privateResearchBoundary) {
+    if (
+      !bodyVisibleTranslationContext ||
+      !hasPrivateResearchVisibleTranslationContextClaim(bodyVisibleTranslationContext) ||
+      !privateResearchVisibleTranslationContextOwnedByRequest(body, bodyVisibleTranslationContext) ||
+      !isAffirmativePrivateVisibleDocumentTranslationRequest(readQuestion(body))
+    ) return enriched;
+    return bodyVisibleTranslationContext
+      ? {
+          ...enriched,
+          active_doc_visible_translation_context: bodyVisibleTranslationContext,
+        }
+      : enriched;
   }
   const candidateActiveContext =
     enriched.active_doc_visible_translation_context ?? enriched.activeDocVisibleTranslationContext;
@@ -4308,7 +4884,7 @@ const enrichVisibleTranslationCollectorCandidateFromBody = (
   ) {
     return enriched;
   }
-  const visibleTranslationContext = activeDocVisibleTranslationContextFromBody(body);
+  const visibleTranslationContext = bodyVisibleTranslationContext;
   if (!visibleTranslationContext) return enriched;
   return {
     ...enriched,
@@ -5374,6 +5950,14 @@ const enrichLiveTranslationCandidateFromVisibleTarget = (
   copyString("panel_id", ["panel_id", "panelId"]);
   copyString("region_id", ["region_id", "regionId"]);
   copyString("doc_path", ["doc_path", "docPath"]);
+  copyString("document_source_kind", ["document_source_kind", "documentSourceKind"]);
+  copyString("document_ref", ["document_ref", "documentRef"]);
+  if (
+    readBoolean(enriched.private_source ?? enriched.privateSource) === null &&
+    readBoolean(target.private_source ?? target.privateSource) !== null
+  ) {
+    enriched.private_source = readBoolean(target.private_source ?? target.privateSource);
+  }
   copyString("source_hash", ["source_hash", "sourceHash"]);
   copyString("source_kind", ["source_kind", "sourceKind"]);
   copyString("source_text_hash", ["source_text_hash", "sourceTextHash"]);
@@ -12793,6 +13377,7 @@ export const codexProvider: HelixAgentProvider = {
           "",
         ]
       : [];
+    const modelVisibleWorkspaceSnapshot = buildCodexModelVisibleWorkspaceSnapshot(request.body);
     const prompt = modelOnlyDirectAnswerForPrompt
       ? [
           "You are running inside Helix Codex Workstation Mode.",
@@ -12902,7 +13487,7 @@ export const codexProvider: HelixAgentProvider = {
         {
           mode: request.body.mode,
           context_mode: request.body.context_mode,
-          workspace_context_snapshot: request.body.workspace_context_snapshot,
+          workspace_context_snapshot: modelVisibleWorkspaceSnapshot,
           turn_input_items: request.body.turn_input_items,
           route_metadata: request.body.route_metadata,
         },

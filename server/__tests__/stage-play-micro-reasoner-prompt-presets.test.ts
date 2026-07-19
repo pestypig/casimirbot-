@@ -181,6 +181,8 @@ describe("stage play micro-reasoner prompt presets", () => {
       sourceId: "document_markdown:docs/example.md",
       sourceKind: "document_markdown",
     });
+    const classifierPrompt = prompts.find((prompt) => prompt.role === "claim_extractor");
+    const glossaryPrompt = prompts.find((prompt) => prompt.role === "observation_classifier");
     const packetComposerPrompt = prompts.find((prompt) => prompt.role === "packet_composer");
     const rejectedAudio = applyStagePlayMicroReasonerPromptPreset({
       presetId: "stage_play_micro_reasoner_prompt_preset:document-translate-haw-inline:v1",
@@ -205,6 +207,11 @@ describe("stage play micro-reasoner prompt presets", () => {
     expect(packetComposerPrompt?.title).toBe("Document Translate To Target Language Inline");
     expect(packetComposerPrompt?.template).toContain("target_language");
     expect(packetComposerPrompt?.template).toContain("Generate inline translation candidates in target_language");
+    expect(classifierPrompt?.template).toContain("may be in any language");
+    expect(classifierPrompt?.template).toContain("do not assume English");
+    expect(glossaryPrompt?.template).toContain("original language");
+    expect(packetComposerPrompt?.template).toContain("original source form");
+    expect(prompts.map((prompt) => prompt.template).join("\n")).not.toContain("canonical English");
     expect(packetComposerPrompt?.template).not.toContain("Generate Hawaiian");
     expect(packetComposerPrompt?.template).not.toContain('"locale": "haw"');
     expect(rejectedAudio).toBeNull();

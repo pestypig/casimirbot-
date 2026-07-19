@@ -1439,6 +1439,130 @@ describe("workstation_tool_reference.collect_visible_translation_targets lane", 
     });
   });
 
+  it("preserves private Research Library provenance from the collector target through the translation receipt", async () => {
+    const documentRef = "private-research:acct-token:document-token";
+    const docPath = `research-library/${documentRef}`;
+    const collected = runWorkstationToolReferenceCollectVisibleTranslationTargets({
+      provider: buildProvider({ id: "codex" }),
+      request: targetRequest({
+        doc_path: docPath,
+        source_hash: "sha256:private-research-document",
+        title_text: "",
+        body_text: "",
+        visible_text: "",
+        visible_text_chunks: [],
+        active_doc_visible_translation_context: {
+          schema: "helix.ask.active_doc_visible_translation_context.v1",
+          source_kind: "docs_viewer",
+          panel_id: "docs-viewer",
+          doc_path: docPath,
+          document_source_kind: "research_library",
+          document_ref: documentRef,
+          private_source: true,
+          source_id: `document_markdown:${docPath}`,
+          source_hash: "sha256:private-research-document",
+          account_locale: "es-US",
+          target_language: "es",
+          projection_target: "docs_chunk",
+          chunks: [{
+            source_kind: "docs_viewer",
+            panel_id: "docs-viewer",
+            doc_path: docPath,
+            source_id: `document_markdown:${docPath}#u0001`,
+            source_hash: "sha256:private-research-document",
+            source_text_hash: "sha256:private-research-title",
+            source_text_char_count: 5,
+            visible_text: "hello",
+            chunk_id: "u0001",
+            chunk_index: 0,
+            dedupe_key: `document_markdown:${docPath}::sha256:private-research-title::u0001::es-US::es`,
+            region_id: "docs-viewer:u0001",
+            projection_target: "docs_chunk",
+          }],
+          ui_text_regions: [],
+        },
+      }),
+      env: {} as NodeJS.ProcessEnv,
+    });
+    const target = collected.observation?.target_batch.targets[0];
+
+    expect(target).toMatchObject({
+      doc_path: docPath,
+      document_source_kind: "research_library",
+      document_ref: documentRef,
+      private_source: true,
+      source_id: `document_markdown:${docPath}#u0001`,
+      visible_text: "hello",
+    });
+    expect(collected.observation_packet.state_delta.visible_translation_target_batch?.targets[0]).toMatchObject({
+      document_source_kind: "research_library",
+      document_ref: documentRef,
+      private_source: true,
+    });
+
+    const laneRequest = translationRequest({
+      text: target?.visible_text,
+      target_language: target?.target_language,
+      source_id: target?.source_id,
+      panel_id: target?.panel_id,
+      region_id: target?.region_id,
+      doc_path: target?.doc_path,
+      document_source_kind: target?.document_source_kind,
+      document_ref: target?.document_ref,
+      private_source: target?.private_source,
+      source_hash: target?.source_hash,
+      source_kind: target?.source_kind,
+      source_text_hash: target?.source_text_hash,
+      source_text_char_count: target?.source_text_char_count,
+      account_locale: target?.account_locale,
+      chunk_id: target?.chunk_id,
+      chunk_index: target?.chunk_index,
+      dedupe_key: target?.dedupe_key,
+      source_event_id: target?.source_event_id,
+      source_event_ms: target?.source_event_ms,
+      projection_target: target?.projection_target,
+    });
+    expect(laneRequest).toMatchObject({
+      document_source_kind: "research_library",
+      document_ref: documentRef,
+      private_source: true,
+    });
+
+    const translated = await runLiveTranslationTranslateText({
+      provider: buildProvider({ id: "codex" }),
+      request: laneRequest,
+      turnId: "turn-private-research-visible-translation",
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(translated.observation).toMatchObject({
+      doc_path: docPath,
+      document_source_kind: "research_library",
+      document_ref: documentRef,
+      private_source: true,
+      source_id: `document_markdown:${docPath}#u0001`,
+    });
+    expect(translated.observation_packet.state_delta.live_translation_chunk).toMatchObject({
+      doc_path: docPath,
+      document_source_kind: "research_library",
+      document_ref: documentRef,
+      private_source: true,
+      source_id: `document_markdown:${docPath}#u0001`,
+    });
+    expect(translated.observation_packet.state_delta.live_translation_projection_receipt).toMatchObject({
+      schema: "helix.live_translation.projection_receipt.v1",
+      doc_path: docPath,
+      document_source_kind: "research_library",
+      document_ref: documentRef,
+      private_source: true,
+      source_id: `document_markdown:${docPath}#u0001`,
+      projection_status: "projected",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
   it("fails closed when visible text targets are absent", () => {
     const result = runWorkstationToolReferenceCollectVisibleTranslationTargets({
       provider: buildProvider({ id: "codex" }),

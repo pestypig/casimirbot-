@@ -1,0 +1,123 @@
+{
+  "contractVersion": "nhm2_regional_source_transition_kernel/v1",
+  "generatedAt": "2026-06-19T19:03:10.648Z",
+  "laneId": "nhm2_shift_lapse",
+  "selectedProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "chartId": "comoving_cartesian",
+  "unitsRef": "dimensionless_normalized_tensor_jump",
+  "sourceTensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-tile-effective-full-tensor-source.json",
+  "atlasRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-support-function-atlas.json",
+  "atlasHash": "41bdbf8140bce18f971b417014779f76eb8113c03ec5a79abfcc13d05bff9bb2",
+  "targetToleranceLInf": 0.1,
+  "maxAllowedSmoothingWeight": 0.95,
+  "interfaces": [
+    {
+      "interfaceId": "global_hull",
+      "leftRegionId": "global",
+      "rightRegionId": "hull",
+      "kernelKind": "cosine_blend",
+      "smoothingWeight": 0,
+      "blendWidthMeters": null,
+      "rawJumpLInf": 0.0125,
+      "postKernelJumpLInf": 0.0125,
+      "targetToleranceLInf": 0.1,
+      "dominantComponentId": "T00",
+      "hotspotRef": "global<->hull:T00",
+      "status": "pass",
+      "blockers": [],
+      "warnings": [
+        "diagnostic transition kernel only: smoothing attenuates region-aggregate jumps but does not prove local covariant conservation",
+        "kernel is source-side and computed from tile tensor discontinuities, not metric-required targets"
+      ]
+    },
+    {
+      "interfaceId": "global_wall",
+      "leftRegionId": "global",
+      "rightRegionId": "wall",
+      "kernelKind": "cosine_blend",
+      "smoothingWeight": 0,
+      "blendWidthMeters": null,
+      "rawJumpLInf": 0.020000000000000004,
+      "postKernelJumpLInf": 0.020000000000000004,
+      "targetToleranceLInf": 0.1,
+      "dominantComponentId": "T00",
+      "hotspotRef": "global<->wall:T00",
+      "status": "pass",
+      "blockers": [],
+      "warnings": [
+        "diagnostic transition kernel only: smoothing attenuates region-aggregate jumps but does not prove local covariant conservation",
+        "kernel is source-side and computed from tile tensor discontinuities, not metric-required targets"
+      ]
+    },
+    {
+      "interfaceId": "global_exterior_shell",
+      "leftRegionId": "global",
+      "rightRegionId": "exterior_shell",
+      "kernelKind": "cosine_blend",
+      "smoothingWeight": 0,
+      "blendWidthMeters": null,
+      "rawJumpLInf": 0.019999999999999997,
+      "postKernelJumpLInf": 0.019999999999999997,
+      "targetToleranceLInf": 0.1,
+      "dominantComponentId": "T00",
+      "hotspotRef": "global<->exterior_shell:T00",
+      "status": "pass",
+      "blockers": [],
+      "warnings": [
+        "diagnostic transition kernel only: smoothing attenuates region-aggregate jumps but does not prove local covariant conservation",
+        "kernel is source-side and computed from tile tensor discontinuities, not metric-required targets"
+      ]
+    },
+    {
+      "interfaceId": "hull_wall",
+      "leftRegionId": "hull",
+      "rightRegionId": "wall",
+      "kernelKind": "cosine_blend",
+      "smoothingWeight": 0,
+      "blendWidthMeters": null,
+      "rawJumpLInf": 0.0325,
+      "postKernelJumpLInf": 0.0325,
+      "targetToleranceLInf": 0.1,
+      "dominantComponentId": "T00",
+      "hotspotRef": "hull<->wall:T00",
+      "status": "pass",
+      "blockers": [],
+      "warnings": [
+        "diagnostic transition kernel only: smoothing attenuates region-aggregate jumps but does not prove local covariant conservation",
+        "kernel is source-side and computed from tile tensor discontinuities, not metric-required targets"
+      ]
+    },
+    {
+      "interfaceId": "wall_exterior_shell",
+      "leftRegionId": "wall",
+      "rightRegionId": "exterior_shell",
+      "kernelKind": "cosine_blend",
+      "smoothingWeight": 0,
+      "blendWidthMeters": null,
+      "rawJumpLInf": 0.04,
+      "postKernelJumpLInf": 0.04,
+      "targetToleranceLInf": 0.1,
+      "dominantComponentId": "T00",
+      "hotspotRef": "wall<->exterior_shell:T00",
+      "status": "pass",
+      "blockers": [],
+      "warnings": [
+        "diagnostic transition kernel only: smoothing attenuates region-aggregate jumps but does not prove local covariant conservation",
+        "kernel is source-side and computed from tile tensor discontinuities, not metric-required targets"
+      ]
+    }
+  ],
+  "summary": {
+    "maxRawJumpLInf": 0.04,
+    "maxPostKernelJumpLInf": 0.04,
+    "requiredSmoothingWeightMax": 0,
+    "allInterfacesWithinTolerance": true,
+    "blockerCount": 0
+  },
+  "claimBoundary": {
+    "diagnosticOnly": true,
+    "transitionKernelDoesNotProveLocalCovariantConservation": true,
+    "doesNotAlterRegionalClosureResiduals": true,
+    "metricEchoForbidden": true
+  }
+}

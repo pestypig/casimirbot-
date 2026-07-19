@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   isTheoryRuntimeEntrypointV1,
@@ -8,6 +9,7 @@ import {
   getTheoryRuntimeEntrypoint,
   THEORY_RUNTIME_ENTRYPOINTS,
 } from "../runtime-entrypoints";
+import { isTheoryRuntimeExecutableId } from "../runtime-execution-policy";
 
 describe("theory runtime entrypoint registry", () => {
   it("exports valid runtime entrypoint contracts", () => {
@@ -47,6 +49,49 @@ describe("theory runtime entrypoint registry", () => {
       expect(entrypoint.claimBoundary.maximumTier).not.toBe("certified");
       expect(entrypoint.claimBoundary.promotionRequires.length).toBeGreaterThan(0);
     }
+
+    expect(isTheoryRuntimeExecutableId("warp.full_solve.campaign")).toBe(false);
+    expect(isTheoryRuntimeExecutableId("nhm2.shift_lapse.alpha_sweep")).toBe(true);
+  });
+
+  it("governs the 0p7000 profile package and formal certificate without widening execution", () => {
+    const fullSolve = getTheoryRuntimeEntrypoint("warp.full_solve.campaign");
+    const alphaSweep = getTheoryRuntimeEntrypoint("nhm2.shift_lapse.alpha_sweep");
+    const profileRoot =
+      "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1";
+
+    for (const entrypoint of [fullSolve, alphaSweep]) {
+      expect(entrypoint).not.toBeNull();
+      expect(entrypoint?.ownedBadgeIds).toEqual(
+        expect.arrayContaining([
+          "nhm2.formal.lean_certificate",
+          "nhm2.formal.certificate_hashes_pinned",
+          "nhm2.formal.diagnostic_campaign_admissible",
+          "nhm2.formal.claim_locks_closed",
+          "nhm2.formal.negative_fixtures_fail_closed",
+          "nhm2.mechanical.support_retention_overlap",
+        ]),
+      );
+      expect(entrypoint?.outputArtifactGlobs.some((glob) => glob.startsWith(profileRoot))).toBe(true);
+      expect(entrypoint?.outputArtifactGlobs).toContain(
+        "formal/lean/NHM2Formal/Generated/**/*.lean",
+      );
+      expect(entrypoint?.sourceRefs.some((ref) => ref.path === profileRoot)).toBe(true);
+      expect(entrypoint?.claimBoundary.promotionAllowed).toBe(false);
+      for (const ref of entrypoint?.sourceRefs.filter(
+        (candidate) => candidate.kind === "repo_module" || candidate.kind === "artifact",
+      ) ?? []) {
+        expect(existsSync(ref.path), `${entrypoint?.runtimeId}: ${ref.path}`).toBe(true);
+      }
+    }
+
+    expect(fullSolve?.ownedBadgeIds).toEqual(
+      expect.arrayContaining([
+        "casimir.geometry.finite_temperature_maxwell_stress",
+        "nhm2.transport.steering_bondi_flux_budget",
+      ]),
+    );
+    expect(isTheoryRuntimeExecutableId(fullSolve?.runtimeId ?? "")).toBe(false);
   });
 
   it("stores commands as inert string metadata", () => {
@@ -96,6 +141,12 @@ describe("theory runtime entrypoint registry", () => {
     const casimirMaterialEntrypoints = findTheoryRuntimeEntrypointsForBadge("casimir.material_receipts").map(
       (entrypoint) => entrypoint.runtimeId,
     );
+    const formalEntrypoints = findTheoryRuntimeEntrypointsForBadge(
+      "nhm2.formal.lean_certificate",
+    ).map((entrypoint) => entrypoint.runtimeId);
+    const maxwellStressEntrypoints = findTheoryRuntimeEntrypointsForBadge(
+      "casimir.geometry.finite_temperature_maxwell_stress",
+    ).map((entrypoint) => entrypoint.runtimeId);
 
     expect(wallEntrypoints).toEqual(
       expect.arrayContaining(["warp.full_solve.campaign", "nhm2.shift_lapse.alpha_sweep"]),
@@ -120,5 +171,11 @@ describe("theory runtime entrypoint registry", () => {
     );
     expect(natarioInvariantEntrypoints).toContain("warp.full_solve.campaign");
     expect(casimirMaterialEntrypoints).toContain("casimir.verify");
+    expect(formalEntrypoints).toEqual(
+      expect.arrayContaining(["warp.full_solve.campaign", "nhm2.shift_lapse.alpha_sweep"]),
+    );
+    expect(maxwellStressEntrypoints).toEqual(
+      expect.arrayContaining(["casimir.verify", "warp.full_solve.campaign"]),
+    );
   });
 });

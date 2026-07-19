@@ -1,0 +1,289 @@
+{
+  "artifactId": "theory_runtime_output_manifest",
+  "schemaVersion": "theory_runtime_output_manifest/v1",
+  "generatedAt": "2026-07-19T06:24:11.548Z",
+  "requestId": null,
+  "runtimeId": "nhm2.shift_lapse.alpha_sweep",
+  "gitSha": "3ffbd0e8cf0d89f7633659e84dfd836f7aeb905d",
+  "startedAt": null,
+  "completedAt": null,
+  "outputDirectory": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "boundToExecution": false,
+  "manifestPath": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/theory-runtime-output-manifest-alpha-0p7000-historical-import.v1.json",
+  "manifestSha256": null,
+  "entries": [
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-averaged-source-tensor-receipt.json",
+      "sha256": "c42bfd637844eb9d825fa2255c3153a9975ccdc75b73e0457f9de886f9d71986",
+      "sizeBytes": 2788,
+      "modifiedAt": "2026-06-19T19:03:10.679Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-backreaction-residual-receipt.json",
+      "sha256": "d47a9f417ade72998a5c421dfeac1edb5c174d1974fd61fe4ecc27cbed197d4c",
+      "sizeBytes": 7269,
+      "modifiedAt": "2026-06-19T19:03:11.016Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-campaign-frontier-disposition.json",
+      "sha256": "d74dcf0f5b3cc2bcf0241103ea6e2afa8b5b99e8b5cdc3e61b626fcd8afb9a1c",
+      "sizeBytes": 1874,
+      "modifiedAt": "2026-06-19T19:03:11.035Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-campaign-stability-evidence.json",
+      "sha256": "d9c331dca5667efa0278e89a94fe6ba25877925129f8d5dbaea321cddf8ce775",
+      "sizeBytes": 263,
+      "modifiedAt": "2026-06-19T19:03:11.027Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-campaign-grid.json",
+      "sha256": "64da1f33d39cb35cfb20fdcccfdf77ba53a6a43c8b945839edd3953c090694d8",
+      "sizeBytes": 3411,
+      "modifiedAt": "2026-06-19T19:03:10.502Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json",
+      "sha256": "e8d9e213930e6b722cd25f64d95745b89d892221d5758e7c4db44ec64d056c46",
+      "sizeBytes": 3036,
+      "modifiedAt": "2026-06-19T19:03:10.501Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-tile-effective-full-tensor-source.json",
+      "sha256": "17c3b56d06092d160e22ca5f6a58414ed3f40450e5091f41880747e4fb94d8bc",
+      "sizeBytes": 12283,
+      "modifiedAt": "2026-06-19T19:03:10.504Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-dynamic-effective-geometry-evidence.json",
+      "sha256": "d87f9fe7a87233651942357c57e3543a8cdfcd50a3e240884c4185346a14bb65",
+      "sizeBytes": 1079,
+      "modifiedAt": "2026-06-19T19:03:11.019Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-dynamic-geometry-sample.brick.json",
+      "sha256": "f4a1a5d5f5b0d9e9347b8a55a86e071c88363a7477c15f686c2450b046d31cf5",
+      "sizeBytes": 159717,
+      "modifiedAt": "2026-06-19T19:03:11.003Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-dynamic-geometry-samples.json",
+      "sha256": "77e42014021bad7e22881022b8fea87746a9b6efbbc839c8cd219e86e663f893",
+      "sizeBytes": 3681,
+      "modifiedAt": "2026-06-19T19:03:11.006Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-effective-geometry-reference.brick.json",
+      "sha256": "47404ce0d159ac73d4fe9542fdd65aa011ba12fb3af92424d8b3a74420617284",
+      "sizeBytes": 159717,
+      "modifiedAt": "2026-06-19T19:03:10.876Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-effective-geometry-reference.json",
+      "sha256": "7a7a185f69bdba9cd8dae929a439f42ac7284cb6af52afb9f280b0182839f3e8",
+      "sizeBytes": 2522,
+      "modifiedAt": "2026-06-19T19:03:10.878Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-frequency-convergence-evidence.json",
+      "sha256": "3c2c3b6b1b2cebb3c1531b2bf6bba24e74e0d3c564b5d1aef8e85e398d995718",
+      "sizeBytes": 793,
+      "modifiedAt": "2026-06-19T19:03:10.676Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-lean-campaign-certificate.json",
+      "sha256": "95a9acb058ea8211d9dea62d599590d5a6ac21eeee52aaff162a9276f965bf94",
+      "sizeBytes": 8254,
+      "modifiedAt": "2026-06-20T13:58:51.890Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-metric-momentum-remediation-targets.json",
+      "sha256": "a1f6a51c1091b5c51eaf6750c2ac1b2c9a9f0854a4873e2dcf4584fcea6eb1d8",
+      "sizeBytes": 5241,
+      "modifiedAt": "2026-06-19T19:03:10.673Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-metric-required-full-regional-tensor.json",
+      "sha256": "cbe63b01b4a4412a4c6ea29f71b02ab7b5fb03c26fd681016ff911bb8a68effa",
+      "sizeBytes": 61535,
+      "modifiedAt": "2026-06-19T19:03:10.508Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-metric-required-momentum-demand-audit.json",
+      "sha256": "99e75333bd4e20a063702ed6e45183e878f85d642e931253bf28c1298c218b00",
+      "sizeBytes": 4602,
+      "modifiedAt": "2026-06-19T19:03:10.672Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-momentum-frame-projection-evidence.json",
+      "sha256": "9b320064e0d0a3dfa973f16b8374a33156f3c16b0b4546c5dfc50965ad83b8d9",
+      "sizeBytes": 4173,
+      "modifiedAt": "2026-06-19T19:03:10.669Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-momentum-frame-projection-receipt.json",
+      "sha256": "fec7a49f43e57cef74de3e4d2e8d2991c69bf41944f70a51e7bdc6b77bc1aa01",
+      "sizeBytes": 7576,
+      "modifiedAt": "2026-06-19T19:03:10.671Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-observer-robust-energy-conditions.json",
+      "sha256": "ff8473725f4cc440cfbf9eed992ea3fb5f210a76369bbb4a8c8d56952c334dc0",
+      "sizeBytes": 2736,
+      "modifiedAt": "2026-06-19T19:03:11.022Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-qei-bound-receipt.json",
+      "sha256": "6c5b408d91026a7e163e2dfda3776437c118d961785d1aa582255f63f952280b",
+      "sizeBytes": 2110,
+      "modifiedAt": "2026-06-19T19:03:10.644Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-qei-pointwise-transition-source-samples.json",
+      "sha256": "b9b0f988b4ae29cd28ff6af8e3a4cdb59eb383f26fa6847f9801ea373d546aaa",
+      "sizeBytes": 4519,
+      "modifiedAt": "2026-06-19T19:03:10.641Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-qei-worldline-dossier.json",
+      "sha256": "f37ba3c7cce0b2faedc69eeb71e14a9fea647cd5a757c35cd9bd144bc2f1aeed",
+      "sizeBytes": 3364,
+      "modifiedAt": "2026-06-19T19:03:10.647Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-qei-worldline-sample-plan.json",
+      "sha256": "a193fd03260a9c5f516d51a8b06a6588f0149640bac51b18d7ed8005082bf15d",
+      "sizeBytes": 5010,
+      "modifiedAt": "2026-06-19T19:03:10.639Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-qei-worldline-sampling-receipt.json",
+      "sha256": "df69044eb3c5e5d3c2f8eaa5f8fee0cf10583ecc397fb4b6af8bc6ea66ca7bcf",
+      "sizeBytes": 3513,
+      "modifiedAt": "2026-06-19T19:03:10.643Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-reference-run.json",
+      "sha256": "706d6dff5e6967cd28b3d7b21d192ca4af83044a4c87ef5fa1c3c37edf22cdb0",
+      "sizeBytes": 1919,
+      "modifiedAt": "2026-06-19T19:03:10.498Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-full-tensor-residual.json",
+      "sha256": "4eefca5324e2de0edbad5b1b3b2a4b65682655495519ffbc40dd9c33b7cc190f",
+      "sizeBytes": 41402,
+      "modifiedAt": "2026-06-19T19:03:10.634Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-source-closure-evidence.json",
+      "sha256": "8a67aacf0cb1f0b7642e16daf398f0fcc20d4468b7818b4559124ce4a6b68cd3",
+      "sizeBytes": 17941,
+      "modifiedAt": "2026-06-19T19:03:10.632Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-source-transition-kernel.json",
+      "sha256": "30d58d942fcf80b74b24119c37fcf4e73206bf5db4cad7744da65d3897388764",
+      "sizeBytes": 4908,
+      "modifiedAt": "2026-06-19T19:03:10.648Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-support-function-atlas.json",
+      "sha256": "bb9d0adf796f690065bb80c237e41d617239a0a303df3e94cdb59171f0d02cd1",
+      "sizeBytes": 8527,
+      "modifiedAt": "2026-06-19T19:03:10.506Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-source-component-authority-ledger.json",
+      "sha256": "271c419bd3d32e781d58bfac05a4886c9cf29cd2d75dd04932677161ad13f357",
+      "sizeBytes": 40013,
+      "modifiedAt": "2026-06-19T19:03:10.656Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-source-momentum-density-audit.json",
+      "sha256": "379b130920097328c1b93c3dad0d81c02db92101461485c758cebdfc2dd52ecb",
+      "sizeBytes": 18137,
+      "modifiedAt": "2026-06-19T19:03:10.663Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-source-off-diagonal-shear-audit.json",
+      "sha256": "fa936e209790c7bbb70eeb74638d76d756dce687d2540af819816e63b58d2cb6",
+      "sizeBytes": 15346,
+      "modifiedAt": "2026-06-19T19:03:10.661Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-source-tile-counterpart-compatibility.json",
+      "sha256": "12e8d53f90bceb4fa7ffee882df391788a8f3c53aa73c8f5c4c7bb9e9d3e8187",
+      "sizeBytes": 4222,
+      "modifiedAt": "2026-06-19T19:03:10.629Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-switching-covariant-conservation-evidence.json",
+      "sha256": "89ac70e3c28b9b50b06745c6fc0c4ad7820e5cd3db0d3c296b99880d35235276",
+      "sizeBytes": 1935,
+      "modifiedAt": "2026-06-19T19:03:10.675Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-counterpart-conservation.json",
+      "sha256": "7fd82d93c3f0c402494f5113223625573f44da9dc687a667a890573b9d122732",
+      "sizeBytes": 5284,
+      "modifiedAt": "2026-06-19T19:03:10.652Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-counterpart.json",
+      "sha256": "492c297c438d0d4eacedc5f33c1655669c7f0fd194fa8ba4769ee35c421bd1b1",
+      "sizeBytes": 8882,
+      "modifiedAt": "2026-06-19T19:03:10.655Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-tile-effective-full-tensor-counterpart.json",
+      "sha256": "baba4b3f9f98ce97d44eda20b43597aeabe784f1fc7dd320b185666b43c7f43f",
+      "sizeBytes": 6466,
+      "modifiedAt": "2026-06-19T19:03:10.656Z",
+      "freshness": "preexisting"
+    },
+    {
+      "path": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-time-dependent-source-campaign.json",
+      "sha256": "daec9e3f7f7f43d0c248dab5b80ef39e92947269b2a3abf2d9cb90a8d3cbd283",
+      "sizeBytes": 11540,
+      "modifiedAt": "2026-06-19T19:03:11.034Z",
+      "freshness": "preexisting"
+    }
+  ]
+}

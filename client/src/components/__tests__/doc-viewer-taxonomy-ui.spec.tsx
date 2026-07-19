@@ -6,6 +6,7 @@ import React from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { DocManifestEntry } from "@/lib/docs/docManifest";
 import { summarizeDocumentLiveTranslationProjectionSnapshot } from "@/lib/docs/liveTranslationProjectionRegistry";
+import type { HelixResearchLibraryDocument } from "@shared/helix-research-library";
 
 let DocViewerPanelModule: typeof import("@/components/DocViewerPanel");
 
@@ -174,6 +175,12 @@ describe("DocViewerPanel taxonomy UI", () => {
         researchLibraryDocuments={[{
           schema: "helix.research_library_document.v1",
           document_id: "research:test-paper",
+          viewer_ref: "private-research:account-token:test-paper-token",
+          private_translation_scope: {
+            doc_path: "research-library/private-research%3Aaccount-token%3Atest-paper-token",
+            source_id: "document_markdown:research-library/private-research%3Aaccount-token%3Atest-paper-token",
+            mailbox_thread_id: "helix-ask:private-research:account-token",
+          },
           profile_id: "profile:test",
           title: "Distributionally Robust Receive Combining",
           source_url: "https://arxiv.org/pdf/2401.12345",
@@ -216,6 +223,114 @@ describe("DocViewerPanel taxonomy UI", () => {
     );
   });
 
+  it("resolves a loaded research extraction as the active translation document even while directory mode retains a stale canonical path", () => {
+    const {
+      isActiveDocViewerTranslationEligible,
+      resolveActiveDocViewerDocument,
+    } = DocViewerPanelModule;
+    const staleCanonical = makeEntry({
+      id: "docs/same-title.md",
+      relativePath: "docs/same-title.md",
+      title: "Same title",
+    });
+    const researchDisplay = makeEntry({
+      id: "research:same-title",
+      relativePath: "My Research Library / Same title",
+      title: "Same title",
+    });
+    const researchDocument: HelixResearchLibraryDocument = {
+      schema: "helix.research_library_document.v1",
+      document_id: "research:same-title",
+      viewer_ref: "private-research:account-token:same-title-token",
+      private_translation_scope: {
+        doc_path: "research-library/private-research%3Aaccount-token%3Asame-title-token",
+        source_id: "document_markdown:research-library/private-research%3Aaccount-token%3Asame-title-token",
+        mailbox_thread_id: "helix-ask:private-research:account-token",
+      },
+      profile_id: "profile:test",
+      title: "Same title",
+      source_url: null,
+      source_kind: "pdf",
+      source_pdf_ref: null,
+      source_integrity_hash: "hash:same-title",
+      paper_result_id: null,
+      query: null,
+      page_count: 1,
+      text_char_count: 24,
+      extraction_status: "full_text_usable",
+      language: "en",
+      sidecar_refs: [],
+      created_at: "2026-07-18T00:00:00.000Z",
+      updated_at: "2026-07-18T00:00:00.000Z",
+      private: true,
+      pages: [{
+        page: 1,
+        text: "Private extracted text.",
+        text_char_count: 23,
+        extraction_status: "text",
+        source_text_ref: "artifact://private-paper#page=1&text",
+      }],
+      paper_evidence_sidecars: [],
+      raw_content_included: true,
+    };
+
+    expect(resolveActiveDocViewerDocument({
+      mode: "directory",
+      currentEntry: staleCanonical,
+      displayEntry: researchDisplay,
+      activeResearchDocument: researchDocument,
+    })).toMatchObject({
+      entry: researchDisplay,
+      docPath: researchDocument.private_translation_scope.doc_path,
+      sourceId: researchDocument.private_translation_scope.source_id,
+      documentId: researchDocument.document_id,
+      documentRef: researchDocument.viewer_ref,
+      mailboxThreadId: researchDocument.private_translation_scope.mailbox_thread_id,
+      documentSourceKind: "research_library",
+      privateSource: true,
+    });
+
+    expect(resolveActiveDocViewerDocument({
+      mode: "doc",
+      currentEntry: staleCanonical,
+      displayEntry: staleCanonical,
+      activeResearchDocument: null,
+    })).toMatchObject({
+      docPath: staleCanonical.relativePath,
+      sourceId: `document_markdown:${staleCanonical.relativePath}`,
+      documentSourceKind: "canonical_docs",
+      privateSource: false,
+    });
+    expect(isActiveDocViewerTranslationEligible({
+      contentReady: true,
+      documentSourceKind: "research_library",
+      interfaceLanguageCode: "en",
+    })).toBe(true);
+    expect(isActiveDocViewerTranslationEligible({
+      contentReady: true,
+      documentSourceKind: "canonical_docs",
+      interfaceLanguageCode: "en",
+    })).toBe(false);
+  });
+
+  it("purges every private Research Library translation session without removing canonical sessions", () => {
+    const { __testDocViewerTaxonomy } = DocViewerPanelModule;
+    const privatePrefix = "casimir.docs.inlineTranslation.v2:research-library/";
+    const privateKeyA = `${privatePrefix}private-research%3Aaccount-a%3Adoc-a:es`;
+    const privateKeyB = `${privatePrefix}private-research%3Aaccount-b%3Adoc-b:fr`;
+    const canonicalKey = "casimir.docs.inlineTranslation.v2:docs/current.md:es";
+    window.sessionStorage.setItem(privateKeyA, "PRIVATE TRANSLATION A");
+    window.sessionStorage.setItem(privateKeyB, "PRIVATE TRANSLATION B");
+    window.sessionStorage.setItem(canonicalKey, "CANONICAL TRANSLATION");
+
+    __testDocViewerTaxonomy.clearStoredPrivateResearchInlineTranslationSessions();
+
+    expect(window.sessionStorage.getItem(privateKeyA)).toBeNull();
+    expect(window.sessionStorage.getItem(privateKeyB)).toBeNull();
+    expect(window.sessionStorage.getItem(canonicalKey)).toBe("CANONICAL TRANSLATION");
+    window.sessionStorage.removeItem(canonicalKey);
+  });
+
   it("disables a research-library row while its deletion is pending", () => {
     const { __testDocViewerTaxonomy, DirectoryRail } = DocViewerPanelModule;
     render(
@@ -233,6 +348,12 @@ describe("DocViewerPanel taxonomy UI", () => {
         researchLibraryDocuments={[{
           schema: "helix.research_library_document.v1",
           document_id: "research:deleting",
+          viewer_ref: "private-research:account-token:deleting-token",
+          private_translation_scope: {
+            doc_path: "research-library/private-research%3Aaccount-token%3Adeleting-token",
+            source_id: "document_markdown:research-library/private-research%3Aaccount-token%3Adeleting-token",
+            mailbox_thread_id: "helix-ask:private-research:account-token",
+          },
           profile_id: "profile:test",
           title: "Deleting Paper",
           source_url: null,

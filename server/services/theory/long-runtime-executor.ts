@@ -1,8 +1,11 @@
-import { spawn } from "node:child_process";
+import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { promisify } from "node:util";
 import {
   buildTheoryRuntimeReceiptV1,
+  type TheoryRuntimeExecutionV1,
+  type TheoryRuntimeOutputManifestV1,
   type TheoryRuntimeReceiptV1,
 } from "../../../shared/contracts/theory-runtime-receipt.v1";
 import { getTheoryRuntimeEntrypoint } from "../../../shared/theory/runtime-entrypoints";
@@ -17,7 +20,14 @@ import type {
   TheoryRuntimeExecutionResult,
   TheoryRuntimeSpawnExecutor,
 } from "./runtime-adapters";
-import { appendBoundedTheoryRuntimeOutput } from "./runtime-output-buffer";
+import { buildTheoryRuntimeNpmInvocation, executeTheoryRuntimeCommand } from "./runtime-adapters";
+import {
+  classifyTheoryRuntimeArtifacts,
+  snapshotTheoryRuntimeOutput,
+  writeTheoryRuntimeOutputManifest,
+} from "./runtime-artifact-manifest";
+
+const execFileAsync = promisify(execFile);
 
 export const LONG_RUNTIME_EXECUTION_ALLOWLIST = THEORY_RUNTIME_LONG_EXECUTION_IDS;
 
@@ -40,10 +50,6 @@ export type ExecuteLongTheoryRuntimeRequestResult = {
   receiptV1: TheoryRuntimeReceiptV1;
 };
 
-function npmCommand(): string {
-  return process.platform === "win32" ? "npm.cmd" : "npm";
-}
-
 function scriptFromEntrypointCommand(command: string | null): string | null {
   const match = command?.match(/^npm\s+run\s+(.+)$/);
   return match?.[1]?.trim() ?? null;
@@ -53,11 +59,31 @@ function isAllowedLongRuntimeId(runtimeId: string): runtimeId is LongTheoryRunti
   return LONG_RUNTIME_EXECUTION_ALLOWLIST.includes(runtimeId as LongTheoryRuntimeId);
 }
 
-function assertOutputDirectoryInsideProject(projectRoot: string, outputDirectory: string): string {
+function isPathInside(parent: string, candidate: string): boolean {
+  const relative = path.relative(parent, candidate);
+  return !relative.startsWith("..") && !path.isAbsolute(relative);
+}
+
+function normalizeRelativePath(value: string): string {
+  return value.replace(/\\/g, "/").replace(/^\.\//, "");
+}
+
+async function prepareOutputDirectory(projectRoot: string, outputDirectory: string): Promise<string> {
   const resolved = path.resolve(projectRoot, outputDirectory);
-  const relative = path.relative(projectRoot, resolved);
-  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+  if (resolved === projectRoot || !isPathInside(projectRoot, resolved)) {
     throw new Error("Long runtime outputDirectory must resolve inside the project root.");
+  }
+  await fs.mkdir(resolved, { recursive: true });
+  const outputStat = await fs.lstat(resolved);
+  if (outputStat.isSymbolicLink()) {
+    throw new Error("Long runtime outputDirectory must not be a symbolic link.");
+  }
+  const [realProjectRoot, realOutputDirectory] = await Promise.all([
+    fs.realpath(projectRoot),
+    fs.realpath(resolved),
+  ]);
+  if (realOutputDirectory === realProjectRoot || !isPathInside(realProjectRoot, realOutputDirectory)) {
+    throw new Error("Long runtime outputDirectory must resolve inside the real project root.");
   }
   return resolved;
 }
@@ -65,84 +91,57 @@ function assertOutputDirectoryInsideProject(projectRoot: string, outputDirectory
 function buildLongRuntimeCommand(input: {
   runtimeId: LongTheoryRuntimeId;
   projectRoot: string;
+  outputDirectory: string;
   timeoutMs?: number;
 }): TheoryRuntimeCommandV1 {
   const entrypoint = getTheoryRuntimeEntrypoint(input.runtimeId);
   const script = scriptFromEntrypointCommand(entrypoint?.command ?? null);
   if (!entrypoint || !script) throw new Error(`Runtime ${input.runtimeId} does not have a fixed npm script command.`);
+  const invocation = buildTheoryRuntimeNpmInvocation(script);
   return {
-    command: npmCommand(),
-    args: ["run", "-s", script],
+    ...invocation,
     cwd: input.projectRoot,
     npmScript: script,
     timeoutMs: Math.min(input.timeoutMs ?? entrypoint.timeoutPolicy.fullMs, entrypoint.timeoutPolicy.fullMs),
+    env: {
+      NHM2_OUTPUT_DIR: normalizeRelativePath(path.relative(input.projectRoot, input.outputDirectory)) || ".",
+    },
   };
 }
 
-async function defaultSpawnExecutor(command: TheoryRuntimeCommandV1): Promise<TheoryRuntimeExecutionResult> {
-  const startedAt = new Date().toISOString();
-  const started = Date.now();
-  return new Promise((resolve) => {
-    const child = spawn(command.command, command.args, {
-      cwd: command.cwd,
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: false,
+async function resolveGitSha(projectRoot: string): Promise<string | null> {
+  try {
+    const result = await execFileAsync("git", ["rev-parse", "--verify", "HEAD"], {
+      cwd: projectRoot,
+      encoding: "utf8",
       windowsHide: true,
     });
-    let stdout = "";
-    let stderr = "";
-    let settled = false;
-    const timer = setTimeout(() => {
-      settled = true;
-      child.kill("SIGTERM");
-      resolve({
-        startedAt,
-        completedAt: new Date().toISOString(),
-        durationMs: Date.now() - started,
-        exitCode: null,
-        stdout,
-        stderr,
-        timedOut: true,
-        error: `Runtime command timed out after ${command.timeoutMs}ms.`,
-      });
-    }, command.timeoutMs);
-    child.stdout?.on("data", (chunk) => {
-      stdout = appendBoundedTheoryRuntimeOutput(stdout, chunk);
-    });
-    child.stderr?.on("data", (chunk) => {
-      stderr = appendBoundedTheoryRuntimeOutput(stderr, chunk);
-    });
-    child.on("error", (error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve({
-        startedAt,
-        completedAt: new Date().toISOString(),
-        durationMs: Date.now() - started,
-        exitCode: null,
-        stdout,
-        stderr,
-        timedOut: false,
-        error: error.message,
-      });
-    });
-    child.on("close", (code) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve({
-        startedAt,
-        completedAt: new Date().toISOString(),
-        durationMs: Date.now() - started,
-        exitCode: code,
-        stdout,
-        stderr,
-        timedOut: false,
-        error: code === 0 ? null : `Runtime command exited with code ${code}.`,
-      });
-    });
-  });
+    const sha = String(result.stdout).trim().toLowerCase();
+    return /^[a-f0-9]{40,64}$/.test(sha) ? sha : null;
+  } catch {
+    return null;
+  }
+}
+
+function buildExecutionProvenance(input: {
+  command: TheoryRuntimeCommandV1;
+  execution: TheoryRuntimeExecutionResult;
+  outputDirectory: string;
+}): TheoryRuntimeExecutionV1 {
+  const relativeOutputDirectory = normalizeRelativePath(path.relative(input.command.cwd, input.outputDirectory)) || ".";
+  return {
+    command: input.command.command,
+    args: [...input.command.args],
+    cwd: normalizeRelativePath(path.relative(input.command.cwd, input.command.cwd)) || ".",
+    environment: { ...(input.command.env ?? {}) },
+    outputDirectory: relativeOutputDirectory,
+    outputDirectoryBound: input.command.env?.NHM2_OUTPUT_DIR === relativeOutputDirectory,
+    exitCode: input.execution.exitCode,
+    stdout: input.execution.stdout,
+    stderr: input.execution.stderr,
+    timedOut: input.execution.timedOut,
+    error: input.execution.error,
+  };
 }
 
 function failedExecutionReceipt(input: {
@@ -152,9 +151,35 @@ function failedExecutionReceipt(input: {
   command: TheoryRuntimeCommandV1;
   execution: TheoryRuntimeExecutionResult;
   status: "failed" | "timeout";
+  outputDirectory: string;
+  gitSha: string | null;
+  artifactManifest: TheoryRuntimeOutputManifestV1 | null;
+  failureSignal?: string;
+  additionalWarnings?: string[];
   generatedAt?: string;
 }): TheoryRuntimeReceiptV1 {
   const entrypoint = getTheoryRuntimeEntrypoint(input.runtimeId);
+  const execution = buildExecutionProvenance({
+    command: input.command,
+    execution: input.execution,
+    outputDirectory: input.outputDirectory,
+  });
+  const provenanceComplete = Boolean(
+    input.gitSha && input.execution.startedAt && input.execution.completedAt && input.execution.durationMs != null,
+  );
+  const hasFreshArtifact = input.artifactManifest?.entries.some(
+    (entry) => entry.freshness === "new" || entry.freshness === "changed",
+  ) ?? false;
+  const primaryFailureSignal = input.execution.timedOut
+    ? "runtime_timeout"
+    : input.execution.exitCode !== 0
+      ? "runtime_execution_failed"
+      : null;
+  const failureSignals = Array.from(new Set([
+    ...(primaryFailureSignal ? [primaryFailureSignal] : []),
+    ...(input.failureSignal ? [input.failureSignal] : []),
+    ...(!primaryFailureSignal && !input.failureSignal ? ["runtime_receipt_failed"] : []),
+  ]));
   return buildTheoryRuntimeReceiptV1({
     generatedAt: input.generatedAt,
     receiptId: `runtime:${input.runtimeId}:long-execution:${Date.now().toString(36)}`,
@@ -164,36 +189,62 @@ function failedExecutionReceipt(input: {
     command: `npm run ${input.command.npmScript}`,
     args: {
       adapter: "long_runtime_executor",
-      stdout: input.execution.stdout,
-      stderr: input.execution.stderr,
+      outputDirectory: execution.outputDirectory,
+      outputManifestPath: input.artifactManifest?.manifestPath ?? null,
     },
     status: input.status,
     outputs: {
-      artifacts: [],
+      artifacts: input.artifactManifest?.entries.map((entry) => entry.path) ?? [],
       scalars: {},
       units: {},
       gates: {
-        runtime_execution: input.status === "timeout" ? "not_ready" : "fail",
+        runtime_execution: input.execution.timedOut
+          ? "not_ready"
+          : input.execution.exitCode === 0
+            ? "pass"
+            : "fail",
+        ...(input.failureSignal ? { runtime_receipt_construction: "fail" as const } : {}),
+        runtime_execution_provenance: provenanceComplete ? "pass" : "not_ready",
+        runtime_artifact_freshness: hasFreshArtifact ? "pass" : "not_ready",
       },
-      missingSignals: [input.status === "timeout" ? "runtime_timeout" : "runtime_execution_failed"],
+      missingSignals: [
+        ...failureSignals,
+        ...(!provenanceComplete ? ["runtime_execution_provenance_unbound"] : []),
+        ...(!input.artifactManifest ? ["runtime_output_manifest_missing"] : []),
+        ...(input.artifactManifest && !hasFreshArtifact ? ["runtime_artifact_freshness_preexisting_only"] : []),
+      ],
       warnings: [
         input.execution.error ?? `Long runtime ${input.status}.`,
+        ...(input.additionalWarnings ?? []),
         "No claim promotion is allowed from failed or timed-out runtime execution.",
       ],
+      ...(input.artifactManifest
+        ? {
+            artifactManifest: input.artifactManifest,
+            artifactEvidence: input.artifactManifest.entries.map((entry) => ({
+              path: entry.path,
+              sha256: entry.sha256,
+              freshness: entry.freshness,
+              status: "unknown" as const,
+              gates: {},
+            })),
+          }
+        : {}),
     },
     provenance: {
-      gitSha: null,
+      gitSha: input.gitSha,
       startedAt: input.execution.startedAt,
       completedAt: input.execution.completedAt,
       durationMs: input.execution.durationMs,
     },
+    execution,
     claimBoundary: {
       currentTier: entrypoint?.claimBoundary.currentTier ?? "diagnostic",
       maximumTier: entrypoint?.claimBoundary.maximumTier ?? "reduced_order",
       promotionAllowed: false,
       promotionBlockedBy: [
         ...(entrypoint?.claimBoundary.promotionRequires ?? []),
-        input.status === "timeout" ? "runtime_timeout" : "runtime_execution_failed",
+        ...failureSignals,
       ],
     },
   });
@@ -204,6 +255,7 @@ export async function executeLongTheoryRuntimeRequest(
   options: {
     spawnExecutor?: TheoryRuntimeSpawnExecutor;
     manageTerminalStatus?: boolean;
+    resolveGitSha?: (projectRoot: string) => Promise<string | null>;
   } = {},
 ): Promise<ExecuteLongTheoryRuntimeRequestResult> {
   if (input.execute !== true) throw new Error("Long runtime execution requires explicit execute: true.");
@@ -217,12 +269,24 @@ export async function executeLongTheoryRuntimeRequest(
   }
 
   const projectRoot = path.resolve(input.projectRoot ?? process.cwd());
-  const outputDirectory = assertOutputDirectoryInsideProject(projectRoot, input.outputDirectory);
-  await fs.mkdir(outputDirectory, { recursive: true });
+  const outputDirectory = await prepareOutputDirectory(projectRoot, input.outputDirectory);
+  const relativeOutputDirectory = normalizeRelativePath(path.relative(projectRoot, outputDirectory)) || ".";
+  const beforeSnapshot = await snapshotTheoryRuntimeOutput({ projectRoot, outputDirectory });
+  const gitResolver = options.resolveGitSha ?? resolveGitSha;
+  const safeResolveGitSha = async (): Promise<string | null> => {
+    try {
+      const value = (await gitResolver(projectRoot))?.trim().toLowerCase() ?? "";
+      return /^[a-f0-9]{40,64}$/.test(value) ? value : null;
+    } catch {
+      return null;
+    }
+  };
+  const startedGitSha = await safeResolveGitSha();
 
   const command = buildLongRuntimeCommand({
     runtimeId: request.runtimeId,
     projectRoot,
+    outputDirectory,
     timeoutMs: input.timeoutMs,
   });
 
@@ -238,59 +302,122 @@ export async function executeLongTheoryRuntimeRequest(
     },
   });
 
-  const execution = await (options.spawnExecutor ?? defaultSpawnExecutor)(command);
-  if (execution.timedOut || execution.exitCode !== 0) {
-    const status = execution.timedOut ? "timeout" : "failed";
-    if (options.manageTerminalStatus !== false) {
-      await updateTheoryRuntimeRunRequestStatus({
-        requestId: input.requestId,
-        projectRoot,
-        status,
-        updatedAt: execution.completedAt ?? input.generatedAt,
-        heartbeat: {
-          stage: status,
-          message: execution.error ?? `Runtime ${status}.`,
-          progress: 1,
-        },
-      });
-    }
-    return {
+  const execution = await (options.spawnExecutor ?? executeTheoryRuntimeCommand)(command);
+  const completedGitSha = await safeResolveGitSha();
+  const stableGitSha = startedGitSha && completedGitSha === startedGitSha ? startedGitSha : null;
+  const provenanceWarnings = [
+    ...(!startedGitSha || !completedGitSha
+      ? ["Execution commit SHA could not be resolved for the complete runtime interval."]
+      : []),
+    ...(startedGitSha && completedGitSha && startedGitSha !== completedGitSha
+      ? ["Repository HEAD changed during runtime execution; commit provenance is unbound."]
+      : []),
+  ];
+
+  let artifactManifest: TheoryRuntimeOutputManifestV1 | null = null;
+  let finalizationError: string | null = null;
+  let receiptConstructionFailed = false;
+  try {
+    const afterSnapshot = await snapshotTheoryRuntimeOutput({ projectRoot, outputDirectory });
+    artifactManifest = await writeTheoryRuntimeOutputManifest({
+      projectRoot,
+      outputDirectory,
       requestId: input.requestId,
       runtimeId: request.runtimeId,
+      gitSha: stableGitSha,
+      startedAt: execution.startedAt,
+      completedAt: execution.completedAt,
+      generatedAt: input.generatedAt,
+      entries: classifyTheoryRuntimeArtifacts({ before: beforeSnapshot, after: afterSnapshot }),
+    });
+  } catch (error) {
+    finalizationError = error instanceof Error ? error.message : "Runtime output manifest construction failed.";
+  }
+
+  let receiptV1: TheoryRuntimeReceiptV1;
+  if (execution.timedOut || execution.exitCode !== 0 || finalizationError) {
+    const status = execution.timedOut ? "timeout" : "failed";
+    receiptV1 = failedExecutionReceipt({
+      runtimeId: request.runtimeId,
+      graphId: request.graphId,
+      badgeIds: request.badgeIds,
       command,
       execution,
-      receiptV1: failedExecutionReceipt({
+      status,
+      outputDirectory,
+      gitSha: stableGitSha,
+      artifactManifest,
+      failureSignal: finalizationError
+        ? "runtime_receipt_construction_failed"
+        : undefined,
+      additionalWarnings: [...provenanceWarnings, ...(finalizationError ? [finalizationError] : [])],
+      generatedAt: input.generatedAt,
+    });
+  } else {
+    const executionV1 = buildExecutionProvenance({ command, execution, outputDirectory });
+    try {
+      receiptV1 = await readWarpNhm2RuntimeArtifacts({
+        runtimeId: request.runtimeId,
+        requestId: input.requestId,
+        graphId: request.graphId,
+        badgeIds: request.badgeIds,
+        projectRoot,
+        generatedAt: input.generatedAt,
+        outputDirectory: relativeOutputDirectory,
+        artifactManifest: artifactManifest!,
+        command: `npm run ${command.npmScript}`,
+        provenance: {
+          gitSha: stableGitSha,
+          startedAt: execution.startedAt,
+          completedAt: execution.completedAt,
+          durationMs: execution.durationMs,
+        },
+        execution: executionV1,
+        warnings: provenanceWarnings,
+      });
+    } catch (error) {
+      receiptConstructionFailed = true;
+      receiptV1 = failedExecutionReceipt({
         runtimeId: request.runtimeId,
         graphId: request.graphId,
         badgeIds: request.badgeIds,
         command,
         execution,
-        status,
+        status: "failed",
+        outputDirectory,
+        gitSha: stableGitSha,
+        artifactManifest,
+        failureSignal: "runtime_receipt_construction_failed",
+        additionalWarnings: [
+          ...provenanceWarnings,
+          error instanceof Error ? error.message : "Runtime receipt construction failed.",
+        ],
         generatedAt: input.generatedAt,
-      }),
-    };
+      });
+    }
   }
 
   if (options.manageTerminalStatus !== false) {
+    const terminalStatus = execution.timedOut
+      ? "timeout"
+      : execution.exitCode !== 0 || finalizationError || receiptConstructionFailed
+        ? "failed"
+        : "completed";
+    const evidenceMessage = terminalStatus === "completed"
+      ? `Process completed; evidence receipt ${receiptV1.status}.`
+      : receiptV1.outputs.warnings[0] ?? `Runtime ${terminalStatus}.`;
     await updateTheoryRuntimeRunRequestStatus({
       requestId: input.requestId,
       projectRoot,
-      status: "completed",
-      updatedAt: execution.completedAt ?? input.generatedAt,
+      status: terminalStatus,
+      updatedAt: receiptV1.provenance.completedAt ?? input.generatedAt,
       heartbeat: {
-        stage: "completed",
-        message: "Long runtime process completed; reading artifacts with fail-closed adapter.",
+        stage: terminalStatus,
+        message: evidenceMessage,
         progress: 1,
       },
     });
   }
-  const receiptV1 = await readWarpNhm2RuntimeArtifacts({
-    runtimeId: request.runtimeId,
-    graphId: request.graphId,
-    badgeIds: request.badgeIds,
-    projectRoot,
-    generatedAt: input.generatedAt,
-  });
 
   return {
     requestId: input.requestId,

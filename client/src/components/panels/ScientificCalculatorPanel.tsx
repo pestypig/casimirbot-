@@ -25,6 +25,7 @@ import {
 import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
 import { ScientificCalculatorLiveSourceControls } from "./ScientificCalculatorLiveSourceControls";
 import { RuntimeWorkbenchSection } from "./scientific-calculator/RuntimeWorkbenchSection";
+import { RuntimeReceiptStatusLamps } from "./scientific-calculator/RuntimeReceiptStatusLamps";
 import { DOC_CALCULATOR_LAUNCH_EVENT } from "@/lib/docs/docCalculatorLaunch";
 import type { DocCalculatorLaunchV1 } from "@shared/contracts/doc-calculator-launch.v1";
 import { useTheoryRuntimeJobStore } from "@/store/useTheoryRuntimeJobStore";
@@ -133,9 +134,9 @@ function theoryRunRowTone(kind: string, status: string): string {
 function theoryRunExecutionLabels(row: TheoryCompoundRunRowV1, t: Translate): string[] {
   const labels: string[] = [];
   if (row.runtimeRunRequestV1) labels.push("Manifest only");
-  if (row.runtimeReceiptV1?.command) labels.push("Runtime executed");
+  if (row.runtimeReceiptV1?.command) labels.push("Command recorded");
   if (row.runtimeReceiptV1 && row.runtimeReceiptV1.outputs.artifacts.length > 0 && !row.runtimeReceiptV1.command) {
-    labels.push("Artifact backed");
+    labels.push("Artifact referenced");
   }
   if (row.runtimeMathTraceV1 && !row.runtimeReceiptV1) labels.push("Static reference");
   if (
@@ -778,11 +779,21 @@ export default function ScientificCalculatorPanel() {
                     : t("scientificCalculator.theory.empty")}
               </div>
             </div>
-            {activeTheoryRunRow ? (
-              <Badge variant="outline" className="border-cyan-700/70 text-cyan-100">
-                {t("scientificCalculator.theory.selected", { index: activeTheoryRunRow.index })}
-              </Badge>
-            ) : null}
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {activeTheoryRun ? (
+                <div className="flex items-center gap-1" data-testid="theory-run-aggregate-status">
+                  <span className="text-[9px] uppercase tracking-wide text-slate-400">Aggregate theory run</span>
+                  <Badge variant="outline" className="border-cyan-700/70 text-cyan-100">
+                    {theoryRunStatus}
+                  </Badge>
+                </div>
+              ) : null}
+              {activeTheoryRunRow ? (
+                <Badge variant="outline" className="border-cyan-700/70 text-cyan-100">
+                  {t("scientificCalculator.theory.selected", { index: activeTheoryRunRow.index })}
+                </Badge>
+              ) : null}
+            </div>
           </div>
           {activeTheoryRun ? (
             <div className="mb-3 flex flex-wrap gap-2">
@@ -868,12 +879,18 @@ export default function ScientificCalculatorPanel() {
                         <div className="mb-1 flex flex-wrap items-center gap-2">
                           <span className="font-semibold">{t("scientificCalculator.theory.runtimeReceipt")}</span>
                           <Badge variant="outline" className="border-violet-700/70 text-violet-100">
-                            {row.runtimeReceiptV1.status}
+                            lifecycle: {row.runtimeReceiptV1.status}
                           </Badge>
                           <Badge variant="outline" className="border-slate-700 text-slate-300">
                             {row.runtimeReceiptV1.runtimeId}
                           </Badge>
                         </div>
+                        <RuntimeReceiptStatusLamps
+                          receipt={row.runtimeReceiptV1}
+                          aggregateStatus={row.status}
+                          aggregateLabel="Aggregate row / section"
+                          className="mb-2"
+                        />
                         <div className="grid gap-1 md:grid-cols-2">
                           <div>artifacts: {row.runtimeReceiptV1.outputs.artifacts.length}</div>
                           <div>{t("scientificCalculator.runtime.missingSignals")}: {row.runtimeReceiptV1.outputs.missingSignals.length}</div>

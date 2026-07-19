@@ -1,0 +1,9 @@
+{
+  "contractVersion": "nhm2_campaign_stability_evidence/v1",
+  "generatedAt": "2026-06-19T19:03:11.027Z",
+  "horizonStatus": "pass",
+  "blueshiftStatus": "pass",
+  "particleAccumulationStatus": "pass",
+  "perturbativeStabilityStatus": "pass",
+  "blockers": []
+}

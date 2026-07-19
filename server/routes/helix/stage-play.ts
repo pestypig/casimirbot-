@@ -1,5 +1,5 @@
 import { Router } from "express";
-import type { Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 import { validateStagePlayBadgeGraphV1 } from "../../../shared/contracts/stage-play-badge-graph.v1";
 import type { AgentGoalActuatorV1, AgentGoalSessionV1 } from "../../../shared/contracts/workstation-goal-context.v1";
 import {
@@ -10,9 +10,23 @@ import {
 import type {
   StagePlayLiveSourceMailInterpretationPayloadV1,
   StagePlayLiveSourceMailTranscriptEntryV1,
+  StagePlayMicroReasonerPromptPresetV1,
   StagePlayMicroReasonerRoleV1,
 } from "../../../shared/contracts/stage-play-live-source-mail.v1";
 import { HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK } from "../../../shared/helix-live-translation-projection-target";
+import {
+  HELIX_RESEARCH_LIBRARY_DOC_VIEWER_PATH_PREFIX,
+  researchLibraryDocumentRefFromDocViewerPath,
+} from "../../../shared/helix-research-library";
+import { getAccountSessionById } from "../../services/helix-account/account-session-store";
+import {
+  RESEARCH_LIBRARY_PRIVATE_MAILBOX_THREAD_PREFIX,
+  readResearchLibraryDocument,
+  researchLibraryDocumentViewerRef,
+  researchLibraryPrivateAccountToken,
+  researchLibraryPrivateMailboxThreadId,
+} from "../../services/helix-account/research-library-store";
+import { readHelixSessionCookie } from "../../services/helix-account/session-cookie";
 import { buildStagePlayGraphFromWorld } from "../../services/stage-play/stage-play-badge-graph-builder";
 import {
   buildStagePlayBuilderCatalog,
@@ -42,6 +56,7 @@ import {
 import {
   configureStagePlayLiveSourceWatchJobPolicy,
   enqueueStagePlayLiveSourceMailItem,
+  getStagePlayLiveSourceMailItem,
   getStagePlayLiveSourceMailboxRetentionStats,
   listStagePlayMailDecisions,
   listStagePlayLiveSourceMailCompactionIntervals,
@@ -56,6 +71,7 @@ import {
 import {
   dismissStagePlayMailWakeRequest,
   expireStaleStagePlayLiveSourceMailWakeRequests,
+  getStagePlayLiveSourceMailWakeRequest,
   listStagePlayLiveSourceMailWakeRequests,
   listStagePlayLiveSourceMailWakeResults,
   reconcileStagePlayMailWakeRequestsWithDecisions,
@@ -257,6 +273,73 @@ const readQueryBoolean = (value: unknown): boolean =>
   value === true ||
   (typeof value === "string" && value.trim().toLowerCase() === "true");
 
+const privateResearchMailboxThreadIdsFromRequest = (req: Request): string[] => {
+  const body = req.body && typeof req.body === "object" && !Array.isArray(req.body)
+    ? req.body as Record<string, unknown>
+    : {};
+  const query = req.query && typeof req.query === "object"
+    ? req.query as Record<string, unknown>
+    : {};
+  const directThreadIds = [
+    body.threadId,
+    body.thread_id,
+    body.mailboxThreadId,
+    body.mailbox_thread_id,
+    query.threadId,
+    query.thread_id,
+    query.mailboxThreadId,
+    query.mailbox_thread_id,
+  ]
+    .map(readQueryString)
+    .filter((value): value is string => value?.startsWith(RESEARCH_LIBRARY_PRIVATE_MAILBOX_THREAD_PREFIX) === true);
+  const mailIds = [
+    body.mailId,
+    body.mail_id,
+    query.mailId,
+    query.mail_id,
+    ...readStringArray(body.mailIds ?? body.mail_ids),
+    ...readStringArray(query.mailIds ?? query.mail_ids),
+  ].map(readQueryString).filter((value): value is string => Boolean(value));
+  const wakeRequestIds = [
+    body.wakeRequestId,
+    body.wake_request_id,
+    query.wakeRequestId,
+    query.wake_request_id,
+  ].map(readQueryString).filter((value): value is string => Boolean(value));
+  return Array.from(new Set([
+    ...directThreadIds,
+    ...mailIds.map((mailId) => getStagePlayLiveSourceMailItem(mailId)?.threadId ?? null),
+    ...wakeRequestIds.map((wakeRequestId) => getStagePlayLiveSourceMailWakeRequest(wakeRequestId)?.threadId ?? null),
+  ].filter((value): value is string => value?.startsWith(RESEARCH_LIBRARY_PRIVATE_MAILBOX_THREAD_PREFIX) === true)));
+};
+
+const privateResearchAccountTokensFromRequest = (req: Request): string[] => {
+  const body = req.body && typeof req.body === "object" && !Array.isArray(req.body)
+    ? req.body as Record<string, unknown>
+    : {};
+  const query = req.query && typeof req.query === "object"
+    ? req.query as Record<string, unknown>
+    : {};
+  const sourceValues = [
+    body.docPath,
+    body.doc_path,
+    body.sourceId,
+    body.source_id,
+    query.docPath,
+    query.doc_path,
+    query.sourceId,
+    query.source_id,
+    ...readStringArray(body.sourceIds ?? body.source_ids),
+    ...readStringArray(query.sourceIds ?? query.source_ids),
+  ];
+  return Array.from(new Set(sourceValues.flatMap((value) => {
+    const text = readQueryString(value)?.replace(/^document_markdown:/, "") ?? null;
+    const documentRef = researchLibraryDocumentRefFromDocViewerPath(text);
+    const accountToken = documentRef?.match(/^private-research:([^:]+):[^:]+$/)?.[1] ?? null;
+    return accountToken ? [accountToken] : [];
+  })));
+};
+
 export const resolveStagePlayWakeManualRunForRoute = (
   body: Record<string, unknown>,
   query: Record<string, unknown>,
@@ -446,6 +529,22 @@ const isRetentionPolicy = (value: unknown): value is StagePlayRawSessionBufferRe
 const readStringArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.map(String).map((item) => item.trim()).filter(Boolean) : [];
 
+const isPrivateResearchDocumentMarkdownSourceId = (value: unknown): boolean => {
+  const sourceId = readQueryString(value);
+  if (!sourceId?.startsWith("document_markdown:")) return false;
+  return researchLibraryDocumentRefFromDocViewerPath(sourceId.slice("document_markdown:".length)) !== null;
+};
+
+const redactPrivateResearchSourceIdsFromPromptPreset = (
+  preset: StagePlayMicroReasonerPromptPresetV1 | null,
+): StagePlayMicroReasonerPromptPresetV1 | null =>
+  preset
+    ? {
+        ...preset,
+        sourceIds: preset.sourceIds.filter((sourceId) => !isPrivateResearchDocumentMarkdownSourceId(sourceId)),
+      }
+    : null;
+
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean)));
 
@@ -588,6 +687,42 @@ const resolveMailboxThreadForRoute = (input: {
   mailIds: input.mailIds ?? [],
 });
 
+helixStagePlayRouter.use(async (req: Request, res: Response, next: NextFunction) => {
+  if (req.method === "OPTIONS") return next();
+  const requestedPrivateThreadIds = privateResearchMailboxThreadIdsFromRequest(req);
+  const requestedPrivateAccountTokens = privateResearchAccountTokensFromRequest(req);
+  if (requestedPrivateThreadIds.length === 0 && requestedPrivateAccountTokens.length === 0) return next();
+  try {
+    const session = await getAccountSessionById(readHelixSessionCookie(req.headers.cookie));
+    const profileId = session?.profile.profile_id ?? null;
+    const authorizedThreadId = profileId ? researchLibraryPrivateMailboxThreadId(profileId) : null;
+    const authorizedAccountToken = profileId ? researchLibraryPrivateAccountToken(profileId) : null;
+    if (
+      !authorizedThreadId ||
+      !authorizedAccountToken ||
+      requestedPrivateThreadIds.some((threadId) => threadId !== authorizedThreadId) ||
+      requestedPrivateAccountTokens.some((token) => token !== authorizedAccountToken)
+    ) {
+      return stagePlayJsonError(res, profileId ? 403 : 401, {
+        error: profileId
+          ? "private_research_mailbox_forbidden"
+          : "private_research_mailbox_profile_session_required",
+        message: profileId
+          ? "The private Research Library translation mailbox belongs to a different account."
+          : "Sign in to access a private Research Library translation mailbox.",
+        contextRole: "tool_evidence",
+      });
+    }
+    return next();
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "private-research-mailbox-authorization-failed",
+      err,
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
 const readRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -664,6 +799,30 @@ const compactStagePlayMailForOverview = <T extends Record<string, any>>(mail: T)
   evidenceRefs: compactStagePlayRouteRefs(mail.evidenceRefs, 14),
   causalTrace: undefined,
 });
+
+const redactPrivateResearchMailForRoute = <T extends Record<string, any>>(mail: T): T => {
+  if (!String(mail.threadId ?? "").startsWith(RESEARCH_LIBRARY_PRIVATE_MAILBOX_THREAD_PREFIX)) {
+    return mail;
+  }
+  return {
+    ...mail,
+    summary: {
+      ...(compactStagePlayRouteObject(mail.summary) ?? {}),
+      text: JSON.stringify({
+        schema: "stage_play.private_research_mail_route_redaction.v1",
+        source_id: mail.sourceId ?? null,
+        source_hash: mail.sourceRefs?.sourceHash ?? null,
+        source_text_hash: mail.sourceRefs?.sourceTextHash ?? null,
+        source_text_char_count: mail.sourceRefs?.sourceTextCharCount ?? null,
+        chunk_id: mail.sourceRefs?.chunkId ?? null,
+        private_source: true,
+        raw_content_included: false,
+      }),
+      preview: "Private Research Library source text is available only to the scoped translation worker.",
+    },
+    raw_content_included: false,
+  } as T;
+};
 
 const compactStagePlayPacketForOverview = <T extends Record<string, any>>(packet: T): T => ({
   ...packet,
@@ -1817,6 +1976,30 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
       wakeResults,
       budgetStates,
     });
+    const routeMicroReasonerPromptPresets = microReasonerPromptPresets
+      .map((preset) => redactPrivateResearchSourceIdsFromPromptPreset(preset))
+      .filter((preset): preset is StagePlayMicroReasonerPromptPresetV1 => Boolean(preset));
+    const routeActiveMicroReasonerPromptPreset = redactPrivateResearchSourceIdsFromPromptPreset(
+      activeMicroReasonerPromptPreset,
+    );
+    const authorizedPrivateResearchSourceId = isPrivateResearchDocumentMarkdownSourceId(activeMicroReasonerSourceId)
+      ? activeMicroReasonerSourceId
+      : null;
+    const routeMicroReasonerPromptToolActivities = includeConfig
+      ? listStagePlayMicroReasonerPromptToolActivities({
+          sourceId: activeMicroReasonerSourceId,
+          limit: operator ? 4 : 12,
+        }).filter((activity) =>
+          activity.sourceIds.every((activitySourceId) =>
+            !isPrivateResearchDocumentMarkdownSourceId(activitySourceId) ||
+            activitySourceId === authorizedPrivateResearchSourceId
+          ) &&
+          activity.evidenceRefs.every((evidenceRef) =>
+            !isPrivateResearchDocumentMarkdownSourceId(evidenceRef) ||
+            evidenceRef === authorizedPrivateResearchSourceId
+          )
+        )
+      : [];
     return res.json({
       ok: true,
       schema: "stage_play_live_source_mail_list_response/v1",
@@ -1824,7 +2007,9 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
       requestedThreadId,
       mailboxThreadId: threadId,
       mailboxThreadResolution,
-      mailItems: overview ? mailItems.map(compactStagePlayMailForOverview) : mailItems,
+      mailItems: overview
+        ? mailItems.map(redactPrivateResearchMailForRoute).map(compactStagePlayMailForOverview)
+        : mailItems.map(redactPrivateResearchMailForRoute),
       jobStates,
       watchJobPolicies,
       interpreterProfiles,
@@ -1835,14 +2020,9 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
             sourceKind: activeMicroReasonerSourceKind,
           })
         : [],
-      microReasonerPromptPresets,
-      activeMicroReasonerPromptPreset,
-      microReasonerPromptToolActivities: includeConfig
-        ? listStagePlayMicroReasonerPromptToolActivities({
-            sourceId: activeMicroReasonerSourceId,
-            limit: operator ? 4 : 12,
-          })
-        : [],
+      microReasonerPromptPresets: routeMicroReasonerPromptPresets,
+      activeMicroReasonerPromptPreset: routeActiveMicroReasonerPromptPreset,
+      microReasonerPromptToolActivities: routeMicroReasonerPromptToolActivities,
       visualObserverProfiles,
       activeVisualObserverProfile,
       microReasonerRuns: overview ? microReasonerRuns.map(compactStagePlayRunForOverview) : microReasonerRuns,
@@ -1878,20 +2058,94 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
   }
 });
 
-helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, res: Response) => {
+helixStagePlayRouter.post("/live-source-mail/document-markdown", async (req: Request, res: Response) => {
   setCors(res);
   res.setHeader("Cache-Control", "no-store");
   rememberStagePlayRequestBaseUrl(req);
 
   try {
     const body = readRecord(req.body) ?? {};
-    const requestedThreadId = readQueryString(body.threadId) ?? readQueryString(body.thread_id) ?? DEFAULT_STAGE_PLAY_MAILBOX_THREAD_ID;
+    const docPath = readQueryString(body.docPath) ?? readQueryString(body.doc_path) ?? "current-document";
+    const documentSourceKind =
+      readQueryString(body.documentSourceKind) ??
+      readQueryString(body.document_source_kind) ??
+      "canonical_docs";
+    const privateSource = body.privateSource === true || body.private_source === true;
+    const suppliedDocumentId = readQueryString(body.documentId) ?? readQueryString(body.document_id);
+    const suppliedDocumentRef = readQueryString(body.documentRef) ?? readQueryString(body.document_ref);
+    const researchDocumentRef = researchLibraryDocumentRefFromDocViewerPath(docPath);
+    const claimsResearchDocument =
+      documentSourceKind === "research_library" ||
+      privateSource ||
+      docPath.startsWith(HELIX_RESEARCH_LIBRARY_DOC_VIEWER_PATH_PREFIX);
+    if (claimsResearchDocument && !researchDocumentRef) {
+      return stagePlayJsonError(res, 400, {
+        error: "invalid_private_research_document_identity",
+        message: "Private Research Library translation requires a valid opaque Research Library document path.",
+        contextRole: "tool_evidence",
+      });
+    }
+    if (
+      researchDocumentRef &&
+      (
+        documentSourceKind !== "research_library" ||
+        !privateSource ||
+        !suppliedDocumentId ||
+        suppliedDocumentRef !== researchDocumentRef
+      )
+    ) {
+      return stagePlayJsonError(res, 400, {
+        error: "private_research_document_provenance_mismatch",
+        message: "Private Research Library translation provenance does not match the active document path.",
+        contextRole: "tool_evidence",
+      });
+    }
+
+    let privateResearchProfileId: string | null = null;
+    if (researchDocumentRef) {
+      const session = await getAccountSessionById(readHelixSessionCookie(req.headers.cookie));
+      privateResearchProfileId = session?.profile.profile_id ?? null;
+      if (!privateResearchProfileId) {
+        return stagePlayJsonError(res, 401, {
+          error: "private_research_translation_profile_session_required",
+          message: "Sign in to translate a private Research Library document.",
+          contextRole: "tool_evidence",
+        });
+      }
+      const ownedDocument = await readResearchLibraryDocument(privateResearchProfileId, suppliedDocumentId!);
+      if (!ownedDocument) {
+        return stagePlayJsonError(res, 404, {
+          error: "private_research_translation_document_not_found",
+          message: "The active Research Library document was not found for this account.",
+          contextRole: "tool_evidence",
+        });
+      }
+      if (
+        researchLibraryDocumentViewerRef(privateResearchProfileId, ownedDocument.document_id) !== researchDocumentRef ||
+        ownedDocument.viewer_ref !== researchDocumentRef
+      ) {
+        return stagePlayJsonError(res, 403, {
+          error: "private_research_translation_document_ref_forbidden",
+          message: "The active Research Library document reference does not belong to this account.",
+          contextRole: "tool_evidence",
+        });
+      }
+    }
+
+    const privateResearchThreadId = privateResearchProfileId
+      ? researchLibraryPrivateMailboxThreadId(privateResearchProfileId)
+      : null;
+    const requestedThreadId = privateResearchThreadId ??
+      readQueryString(body.threadId) ??
+      readQueryString(body.thread_id) ??
+      DEFAULT_STAGE_PLAY_MAILBOX_THREAD_ID;
     const mailboxThreadResolution = resolveMailboxThreadForRoute({
       threadId: requestedThreadId,
-      mailboxThreadId: readQueryString(body.mailboxThreadId) ?? readQueryString(body.mailbox_thread_id),
+      mailboxThreadId: privateResearchThreadId ??
+        readQueryString(body.mailboxThreadId) ??
+        readQueryString(body.mailbox_thread_id),
     });
     const threadId = mailboxThreadResolution.mailboxThreadId;
-    const docPath = readQueryString(body.docPath) ?? readQueryString(body.doc_path) ?? "current-document";
     const sourceHash = readQueryString(body.sourceHash) ?? readQueryString(body.source_hash) ?? null;
     const sourceTextHash = readQueryString(body.sourceTextHash) ?? readQueryString(body.source_text_hash) ?? null;
     const sourceTextCharCount = readOptionalNumber(body.sourceTextCharCount ?? body.source_text_char_count);
@@ -1917,6 +2171,13 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
       readQueryString(body.sourceId) ??
       readQueryString(body.source_id) ??
       `document_markdown:${docPath}`;
+    if (researchDocumentRef && sourceId !== `document_markdown:${docPath}`) {
+      return stagePlayJsonError(res, 400, {
+        error: "private_research_translation_source_id_mismatch",
+        message: "Private Research Library translation source identity does not match the active document path.",
+        contextRole: "tool_evidence",
+      });
+    }
     const chunkId =
       readQueryString(body.chunkId) ??
       readQueryString(body.chunk_id) ??
@@ -2027,6 +2288,8 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
       source_event_id: sourceEventId,
       source_event_ms: sourceEventMs,
       doc_path: docPath,
+      document_source_kind: documentSourceKind,
+      private_source: Boolean(researchDocumentRef),
       source_hash: sourceHash,
       source_text_hash: sourceTextHash,
       source_text_char_count: sourceTextCharCount,
@@ -2101,7 +2364,7 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
     return res.json({
       ok: true,
       schema: "stage_play_document_markdown_mail_enqueue_response/v1",
-      mail,
+      mail: redactPrivateResearchMailForRoute(mail),
       wakeRequest,
       traffic: {
         sourceHash,
@@ -2122,6 +2385,8 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
         projectionTarget,
         targetLanguage,
         accountLocale,
+        documentSourceKind,
+        privateSource: Boolean(researchDocumentRef),
         acceptedUnits: units.length,
         deferredUnits,
         acceptedChars,
@@ -2194,7 +2459,8 @@ helixStagePlayRouter.get("/live-source-visual-summaries", (req: Request, res: Re
       run.mailIds.some((mailId) => mailIds.has(mailId)) ||
       processedMailPackets.some((packet) => packet.microReasonerRunRefs.includes(run.runId))
     );
-    const summaries = mailItems.map((item) => {
+    const summaries = mailItems.map((mailItem) => {
+      const item = redactPrivateResearchMailForRoute(mailItem);
       const packets = processedPacketsByMailId.get(item.mailId) ?? [];
       const latestPacket = packets.at(-1) ?? null;
       return {
@@ -2745,12 +3011,16 @@ helixStagePlayRouter.get("/micro-reasoner-prompt-preset", (req: Request, res: Re
       sourceKind,
       presetId: activePreset?.presetId ?? presetId,
     });
+    const routePresets = presets
+      .map((preset) => redactPrivateResearchSourceIdsFromPromptPreset(preset))
+      .filter((preset): preset is StagePlayMicroReasonerPromptPresetV1 => Boolean(preset));
+    const routeActivePreset = redactPrivateResearchSourceIdsFromPromptPreset(activePreset);
     return res.json({
       ok: true,
       schema: "stage_play_micro_reasoner_prompt_preset_list_response/v1",
-      presets,
-      activePreset,
-      active_preset: activePreset,
+      presets: routePresets,
+      activePreset: routeActivePreset,
+      active_preset: routeActivePreset,
       prompts,
       microReasonerPrompts: prompts,
       assistant_answer: false,
@@ -2812,11 +3082,11 @@ helixStagePlayRouter.post("/micro-reasoner-prompt-preset", (req: Request, res: R
     return res.json({
       ok: true,
       schema: "stage_play_micro_reasoner_prompt_preset_create_response/v1",
-      preset: result.preset,
+      preset: redactPrivateResearchSourceIdsFromPromptPreset(result.preset),
       prompt: result.prompt,
       prompts,
       microReasonerPrompts: prompts,
-      sourceIds,
+      sourceIds: sourceIds.filter((sourceId) => !isPrivateResearchDocumentMarkdownSourceId(sourceId)),
       assistant_answer: false,
       terminal_eligible: false,
       context_role: "tool_evidence",
@@ -2867,9 +3137,9 @@ helixStagePlayRouter.post("/micro-reasoner-prompt-preset/apply", (req: Request, 
     return res.json({
       ok: true,
       schema: "stage_play_micro_reasoner_prompt_preset_apply_response/v1",
-      preset,
+      preset: redactPrivateResearchSourceIdsFromPromptPreset(preset),
       prompts,
-      sourceIds,
+      sourceIds: sourceIds.filter((sourceId) => !isPrivateResearchDocumentMarkdownSourceId(sourceId)),
       assistant_answer: false,
       terminal_eligible: false,
       context_role: "tool_evidence",
@@ -3183,16 +3453,20 @@ helixStagePlayRouter.post("/live-source-mail/check", (req: Request, res: Respons
         reason: readQueryString(body.voicePolicyReason) ?? readQueryString(body.voice_policy_reason),
       },
     });
+    const responseReadResult = {
+      ...readResult,
+      items: readResult.items.map(redactPrivateResearchMailForRoute),
+    };
     return res.json({
       ok: true,
       schema: "stage_play_live_source_mail_check_response/v1",
       requestedThreadId,
       mailboxThreadId: threadId,
       mailboxThreadResolution,
-      readResult,
+      readResult: responseReadResult,
       transcriptRows: buildMailLoopTranscriptRows({
-        mailItems: readResult.items,
-        readResult,
+        mailItems: responseReadResult.items,
+        readResult: responseReadResult,
       }),
       assistant_answer: false,
       terminal_eligible: false,

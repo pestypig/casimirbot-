@@ -125,6 +125,106 @@ describe("document translation MicroDeck output parsing", () => {
     });
   });
 
+  it("keeps private Research Library mail inside the server-issued account mailbox", async () => {
+    const privateMailbox = "helix-ask:private-research:account-token";
+    const docPath = "research-library/private-research%3Aaccount-token%3Adocument-token";
+    const sourceId = `document_markdown:${docPath}`;
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          ok: true,
+          sourceId,
+          sourceKind: "document_markdown",
+          mailboxThreadId: privateMailbox,
+          mail: { mailId: "mail-private-doc-1" },
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ok: true, cycle: { result: { wakeRequestId: "wake-private-doc-1" } } }),
+      } as Response) as unknown as typeof fetch;
+    globalThis.fetch = fetchMock;
+
+    const result = await enqueueDocumentMarkdownTranslationMail({
+      docPath,
+      locale: "es-US",
+      sourceHash: "fnv1a32:private",
+      sourceId,
+      documentSourceKind: "research_library",
+      documentId: "raw-document-id",
+      documentRef: "private-research:account-token:document-token",
+      privateSource: true,
+      units: [
+        {
+          unit_id: "u0001",
+          kind: "paragraph",
+          source_markdown: "Private source text",
+          translatable: true,
+          protected_spans: [],
+        },
+      ],
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[0]?.[0] ?? "")).toBe(
+      "/api/helix/stage-play/live-source-mail/document-markdown",
+    );
+    expect(String(fetchMock.mock.calls[1]?.[0] ?? "")).toBe(
+      "/api/helix/stage-play/live-source-mail/wake/cycle",
+    );
+    expect((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.credentials).toBe("same-origin");
+    expect((fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.credentials).toBe("same-origin");
+    const mailBody = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body ?? "{}"));
+    expect(mailBody).toMatchObject({
+      docPath,
+      sourceId,
+      documentSourceKind: "research_library",
+      documentId: "raw-document-id",
+      documentRef: "private-research:account-token:document-token",
+      privateSource: true,
+    });
+    const wakeBody = JSON.parse(String((fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.body ?? "{}"));
+    expect(wakeBody).toMatchObject({ threadId: privateMailbox, sourceId });
+    expect(result.mailboxThreadId).toBe(privateMailbox);
+  });
+
+  it.each([undefined, "helix-ask:desktop"])(
+    "rejects a private Research Library response without a scoped mailbox (%s)",
+    async (mailboxThreadId) => {
+      const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          ok: true,
+          sourceId: "document_markdown:research-library/private-document",
+          sourceKind: "document_markdown",
+          mailboxThreadId,
+          mail: { mailId: "mail-private-doc-1" },
+        }),
+      } as Response) as unknown as typeof fetch;
+      globalThis.fetch = fetchMock;
+
+      await expect(enqueueDocumentMarkdownTranslationMail({
+        docPath: "research-library/private-document",
+        locale: "haw",
+        sourceHash: "fnv1a32:private",
+        documentSourceKind: "research_library",
+        documentRef: "private-document",
+        privateSource: true,
+        units: [
+          {
+            unit_id: "u0001",
+            kind: "paragraph",
+            source_markdown: "Private source text",
+            translatable: true,
+            protected_spans: [],
+          },
+        ],
+      })).rejects.toThrow("did not include a scoped mailbox");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it("preserves distinct account locale and target language in document lane mail identity", async () => {
     const fetchMock = vi.fn<typeof fetch>()
       .mockResolvedValueOnce({

@@ -47,6 +47,9 @@ export type HelixVisibleTranslationTarget = {
   source_kind: HelixVisibleTranslationTargetSourceKind;
   panel_id: string | null;
   doc_path: string | null;
+  document_source_kind?: "canonical_docs" | "research_library" | null;
+  document_ref?: string | null;
+  private_source?: boolean;
   source_id: string;
   source_hash: string;
   source_text_hash: string;
@@ -122,6 +125,9 @@ export type HelixLiveTranslationOneShotRequest = {
   region_id?: string | null;
   bbox?: Record<string, unknown> | null;
   doc_path?: string | null;
+  document_source_kind?: "canonical_docs" | "research_library" | null;
+  document_ref?: string | null;
+  private_source?: boolean | null;
   source_hash?: string | null;
   source_kind?: string | null;
   source_text_hash?: string | null;
@@ -165,6 +171,9 @@ export type HelixLiveTranslationOneShotObservation = {
   region_id: string | null;
   bbox: Record<string, unknown> | null;
   doc_path: string | null;
+  document_source_kind?: "canonical_docs" | "research_library" | null;
+  document_ref?: string | null;
+  private_source?: boolean;
   source_hash: string | null;
   source_kind: string | null;
   account_locale: string | null;
@@ -213,6 +222,9 @@ export type HelixLiveTranslationProjectionReceipt = {
   region_id: string | null;
   bbox: Record<string, unknown> | null;
   doc_path: string | null;
+  document_source_kind?: "canonical_docs" | "research_library" | null;
+  document_ref?: string | null;
+  private_source?: boolean;
   source_hash: string | null;
   source_kind: string | null;
   account_locale: string | null;

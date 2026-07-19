@@ -19,6 +19,7 @@ describe("Warp / GR / NHM2 map", () => {
       "wall_t00_source_residual_payload",
       "source_residual_difference_payload",
       "qei_margin_difference_payload",
+      "support_retention_overlap_payload",
       "delta_m_energy_equivalent_payload",
       "delta_F_weight_equivalent_payload",
       "array_scaling_ratio_payload",
@@ -50,6 +51,7 @@ describe("Warp / GR / NHM2 map", () => {
         "nhm2.experimental.research_gap_ledger",
         "nhm2.experimental.layer_stack_mechanical_receipt",
         "nhm2.experimental.layer_stack_support_fraction_sweep",
+        "nhm2.mechanical.support_retention_overlap",
         "nhm2.experimental.layer_stack_architecture_loop",
         "nhm2.experimental.full_apparatus_receipt_loop",
         "nhm2.experimental.tile_source_physical_validation_plan",
@@ -65,6 +67,8 @@ describe("Warp / GR / NHM2 map", () => {
         "nhm2.experimental.independent_replication",
         "nhm2.claim_boundary.physical_viability_locked",
         "nhm2.claim_boundary.transport_locked",
+        "nhm2.transport.steering_bondi_flux_budget",
+        "casimir.geometry.finite_temperature_maxwell_stress",
         "nhm2.qei.worldline_dossier",
         "nhm2.natario.curvature_invariants",
         "nhm2.natario.invariant_audit",
@@ -97,6 +101,7 @@ describe("Warp / GR / NHM2 map", () => {
         "nhm2.formal.diagnostic_campaign_admissible",
         "nhm2.claim_boundary.physical_viability_locked",
         "nhm2.claim_boundary.transport_locked",
+        "nhm2.transport.steering_bondi_flux_budget",
       ]),
     );
   });

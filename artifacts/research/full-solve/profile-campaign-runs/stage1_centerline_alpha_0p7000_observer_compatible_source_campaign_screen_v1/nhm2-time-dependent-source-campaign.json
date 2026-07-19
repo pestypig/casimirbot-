@@ -1,0 +1,241 @@
+{
+  "contractVersion": "nhm2_time_dependent_source_campaign/v1",
+  "generatedAt": "2026-06-19T19:03:11.034Z",
+  "laneId": "nhm2_shift_lapse",
+  "selectedProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "runId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "chartId": "comoving_cartesian",
+  "atlasRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-support-function-atlas.json",
+  "atlasHash": "41bdbf8140bce18f971b417014779f76eb8113c03ec5a79abfcc13d05bff9bb2",
+  "artifactRefs": {
+    "sourceComponentAuthorityLedger": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-source-component-authority-ledger.json",
+    "regionalFullTensorResidual": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-full-tensor-residual.json",
+    "sourceOffDiagonalShearAudit": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-source-off-diagonal-shear-audit.json",
+    "sourceMomentumDensityAudit": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-source-momentum-density-audit.json",
+    "momentumFrameProjectionReceipt": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-momentum-frame-projection-receipt.json",
+    "metricRequiredMomentumDemandAudit": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-metric-required-momentum-demand-audit.json",
+    "metricMomentumRemediationTargets": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-metric-momentum-remediation-targets.json",
+    "campaignFrontierDisposition": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-campaign-frontier-disposition.json",
+    "covariantConservationDiagnostic": null,
+    "qeiWorldlineDossier": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-qei-worldline-dossier.json",
+    "observerRobustEnergyConditions": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-observer-robust-energy-conditions.json",
+    "natarioInvariantAudit": null,
+    "regionalSupportFunctionAtlas": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-support-function-atlas.json",
+    "casimirMaterialReceipt": null,
+    "coupledClosurePassCandidate": null,
+    "regionalTensorPassPathHarness": null,
+    "sourceModelRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-tile-effective-full-tensor-source.json",
+    "metricRequiredTensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-metric-required-full-regional-tensor.json",
+    "dynamicGeometryRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-dynamic-geometry-samples.json",
+    "effectiveGeometryRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-effective-geometry-reference.json",
+    "frequencyConvergence": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-frequency-convergence-evidence.json",
+    "switchingConservation": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-switching-covariant-conservation-evidence.json",
+    "dynamicEffectiveGeometry": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-dynamic-effective-geometry-evidence.json",
+    "campaignStability": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-campaign-stability-evidence.json"
+  },
+  "sourceIndependence": {
+    "independentlyDerivedTileMaterialTensor": true,
+    "copiedFromMetricRequiredTensor": false,
+    "fittedToMetricResidual": false,
+    "targetEchoDetected": false,
+    "blockers": []
+  },
+  "frequencyLadder": {
+    "baseFrequencyHz": 15000000000,
+    "toleranceLInf": 0.1,
+    "multipliers": [
+      1,
+      2,
+      4
+    ],
+    "fixedCycleAverageSource": true,
+    "entries": [
+      {
+        "multiplier": 1,
+        "frequencyHz": 15000000000,
+        "residualLInf": 0,
+        "residualL2": 0,
+        "pass": true,
+        "blockers": []
+      },
+      {
+        "multiplier": 2,
+        "frequencyHz": 30000000000,
+        "residualLInf": 0,
+        "residualL2": 0,
+        "pass": true,
+        "blockers": []
+      },
+      {
+        "multiplier": 4,
+        "frequencyHz": 60000000000,
+        "residualLInf": 0,
+        "residualL2": 0,
+        "pass": true,
+        "blockers": []
+      }
+    ],
+    "convergenceStatus": "pass",
+    "blockers": []
+  },
+  "switchingSchedule": {
+    "scheduleRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-metric-profile-spec.json#campaignReadiness",
+    "sectorBoundaryRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-candidate-campaign-grid.json#regionSamples",
+    "switchingFunctionRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-support-function-atlas.json#transitionKernels",
+    "includesRegionalSupportDerivatives": true,
+    "includesSectorBoundaryTerms": true,
+    "includesTimeDerivativeTerms": true,
+    "includesTransitionKernelTerms": true,
+    "toleranceLInf": 0.1,
+    "overallResidualLInf": 0.05,
+    "terms": [
+      {
+        "termId": "regional_support_derivative",
+        "included": true,
+        "residualLInf": 0.05,
+        "toleranceLInf": 0.1,
+        "pass": true,
+        "blockers": []
+      },
+      {
+        "termId": "sector_boundary",
+        "included": true,
+        "residualLInf": 0.05,
+        "toleranceLInf": 0.1,
+        "pass": true,
+        "blockers": []
+      },
+      {
+        "termId": "time_derivative",
+        "included": true,
+        "residualLInf": 0.05,
+        "toleranceLInf": 0.1,
+        "pass": true,
+        "blockers": []
+      },
+      {
+        "termId": "transition_kernel",
+        "included": true,
+        "residualLInf": 0.05,
+        "toleranceLInf": 0.1,
+        "pass": true,
+        "blockers": []
+      }
+    ],
+    "conservationStatus": "pass",
+    "blockers": []
+  },
+  "timeAveraging": {
+    "averagingWindowSeconds": 1,
+    "cycleAverageSourceFixed": true,
+    "averagedSourceTensorRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-averaged-source-tensor-receipt.json"
+  },
+  "backreaction": {
+    "dynamicGeometryRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-dynamic-geometry-samples.json",
+    "effectiveGeometryRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-effective-geometry-reference.json",
+    "residualLInf": 0,
+    "residualL2": 0,
+    "bounded": true,
+    "status": "pass",
+    "blockers": []
+  },
+  "stability": {
+    "horizonStatus": "pass",
+    "blueshiftStatus": "pass",
+    "particleAccumulationStatus": "pass",
+    "perturbativeStabilityStatus": "pass",
+    "blockers": []
+  },
+  "gates": [
+    {
+      "gateId": "source_independence",
+      "status": "pass",
+      "pass": true,
+      "blockers": [],
+      "warnings": [],
+      "primaryMetric": "sourceSideComponentAuthorityComplete=true"
+    },
+    {
+      "gateId": "switching_covariant_conservation",
+      "status": "pass",
+      "pass": true,
+      "blockers": [],
+      "warnings": [],
+      "primaryMetric": "overallResidualLInf=0.05"
+    },
+    {
+      "gateId": "frequency_convergence",
+      "status": "pass",
+      "pass": true,
+      "blockers": [],
+      "warnings": [],
+      "primaryMetric": "multipliers=1,2,4"
+    },
+    {
+      "gateId": "dynamic_effective_geometry_agreement",
+      "status": "pass",
+      "pass": true,
+      "blockers": [],
+      "warnings": [],
+      "primaryMetric": "residualLInf=0"
+    },
+    {
+      "gateId": "full_regional_tensor_closure",
+      "status": "pass",
+      "pass": true,
+      "blockers": [],
+      "warnings": [
+        "source_off_diagonal_uniform_fractional_shear_ansatz",
+        "source_momentum_density_uniform_fractional_ansatz"
+      ],
+      "primaryMetric": "worstRelResidual=0.05;family=t00;component=T00;region=wall;currentToAllowedMagnitudeRatio=missing;shearAuditWorstRatio=missing;shearAuditWorstSuppression=missing;momentumAuditWorstAmplification=missing;momentumAuditWorstFractionalAmplification=0;momentumAuditWorstMetricRequiredRatio=0;momentumAuditCausalBoundApplicability=blocked;momentumFrameProjection=applicable;metricMomentumDemandWorstRatio=0;metricMomentumDemandFalsified=false;metricMomentumWorstSuppression=missing;metricMomentumNonResolvableForCurrentProfile=false;campaignFrontierDisposition=no_frontier_blocker"
+    },
+    {
+      "gateId": "observer_family_energy_conditions",
+      "status": "pass",
+      "pass": true,
+      "blockers": [
+        "continuous_optimizer:continuous_optimizer_not_implemented"
+      ],
+      "warnings": [],
+      "primaryMetric": "robustCheckComplete=true"
+    },
+    {
+      "gateId": "qei_worldline_receipts",
+      "status": "pass",
+      "pass": true,
+      "blockers": [],
+      "warnings": [],
+      "primaryMetric": "dossierComplete=true"
+    },
+    {
+      "gateId": "horizon_blueshift_particle_stability",
+      "status": "pass",
+      "pass": true,
+      "blockers": [],
+      "warnings": [],
+      "primaryMetric": "horizon=pass;particle=pass"
+    }
+  ],
+  "summary": {
+    "campaignPass": true,
+    "sourceIndependencePass": true,
+    "switchingConservationPass": true,
+    "frequencyConvergencePass": true,
+    "dynamicGeometryAgreementPass": true,
+    "fullRegionalTensorClosurePass": true,
+    "observerFamilyPass": true,
+    "qeiReceiptsPass": true,
+    "stabilityPass": true,
+    "firstBlocker": "none",
+    "blockerCount": 1
+  },
+  "claimBoundary": {
+    "diagnosticOnly": true,
+    "physicalViabilityClaimAllowed": false,
+    "transportClaimAllowed": false,
+    "routeEtaClaimAllowed": false,
+    "propulsionClaimAllowed": false,
+    "staticEvidenceCannotPassDynamicCampaign": true
+  }
+}

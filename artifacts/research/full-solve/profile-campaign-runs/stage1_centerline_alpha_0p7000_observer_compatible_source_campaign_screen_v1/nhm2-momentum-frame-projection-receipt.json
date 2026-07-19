@@ -1,0 +1,180 @@
+{
+  "contractVersion": "nhm2_momentum_frame_projection_receipt/v1",
+  "generatedAt": "2026-06-19T19:03:10.671Z",
+  "laneId": "nhm2_shift_lapse",
+  "selectedProfileId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "runId": "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1:candidate_regional_source_closure",
+  "sourceMomentumDensityAuditRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-source-momentum-density-audit.json",
+  "regionalSupportFunctionAtlasRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-regional-support-function-atlas.json",
+  "atlasHash": "41bdbf8140bce18f971b417014779f76eb8113c03ec5a79abfcc13d05bff9bb2",
+  "momentumFrameProjectionEvidenceRef": "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1/nhm2-momentum-frame-projection-evidence.json",
+  "frame": {
+    "requestedFrame": "local_orthonormal",
+    "sourceTensorBasis": "local_orthonormal_to_chart",
+    "tetradRef": "declared://nhm2/reduced-order/campaign-profile-local-orthonormal-frame",
+    "projectionMethod": "declared_reduced_order_local_orthonormal",
+    "ratioPolicy": "use_audit_same_chart_ratios_as_local_frame_reduced_order",
+    "projectionStatus": "pass",
+    "assumptions": [
+      "candidate metric momentum remediation targets provide projected metric momentum-to-energy ratios",
+      "when remediation targets lack a projected metric ratio, the source momentum-density audit same-chart metric ratio is used as a declared reduced-order local-frame proxy",
+      "source momentum ratios are read from the source momentum-density audit",
+      "reduced-order frame evidence does not replace a full ADM tetrad projection"
+    ],
+    "blockers": []
+  },
+  "regions": [
+    {
+      "regionId": "global",
+      "projectionStatus": "pass",
+      "components": [
+        {
+          "componentId": "T01",
+          "sameChartMetricRequiredMomentumToEnergyRatio": 0,
+          "projectedMetricRequiredMomentumToEnergyRatio": 0,
+          "sameChartSourceMomentumToEnergyRatio": 1e-10,
+          "projectedSourceMomentumToEnergyRatio": 1e-10,
+          "projectionStatus": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T02",
+          "sameChartMetricRequiredMomentumToEnergyRatio": 0,
+          "projectedMetricRequiredMomentumToEnergyRatio": 0,
+          "sameChartSourceMomentumToEnergyRatio": 7e-11,
+          "projectedSourceMomentumToEnergyRatio": 7e-11,
+          "projectionStatus": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T03",
+          "sameChartMetricRequiredMomentumToEnergyRatio": 0,
+          "projectedMetricRequiredMomentumToEnergyRatio": 0,
+          "sameChartSourceMomentumToEnergyRatio": 4.0000000000000004e-11,
+          "projectedSourceMomentumToEnergyRatio": 4.0000000000000004e-11,
+          "projectionStatus": "pass",
+          "blockers": []
+        }
+      ],
+      "blockers": []
+    },
+    {
+      "regionId": "hull",
+      "projectionStatus": "pass",
+      "components": [
+        {
+          "componentId": "T01",
+          "sameChartMetricRequiredMomentumToEnergyRatio": 0,
+          "projectedMetricRequiredMomentumToEnergyRatio": 0,
+          "sameChartSourceMomentumToEnergyRatio": 1e-10,
+          "projectedSourceMomentumToEnergyRatio": 1e-10,
+          "projectionStatus": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T02",
+          "sameChartMetricRequiredMomentumToEnergyRatio": 0,
+          "projectedMetricRequiredMomentumToEnergyRatio": 0,
+          "sameChartSourceMomentumToEnergyRatio": 6.999999999999999e-11,
+          "projectedSourceMomentumToEnergyRatio": 6.999999999999999e-11,
+          "projectionStatus": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T03",
+          "sameChartMetricRequiredMomentumToEnergyRatio": 0,
+          "projectedMetricRequiredMomentumToEnergyRatio": 0,
+          "sameChartSourceMomentumToEnergyRatio": 4.0000000000000004e-11,
+          "projectedSourceMomentumToEnergyRatio": 4.0000000000000004e-11,
+          "projectionStatus": "pass",
+          "blockers": []
+        }
+      ],
+      "blockers": []
+    },
+    {
+      "regionId": "wall",
+      "projectionStatus": "pass",
+      "components": [
+        {
+          "componentId": "T01",
+          "sameChartMetricRequiredMomentumToEnergyRatio": 0,
+          "projectedMetricRequiredMomentumToEnergyRatio": 0,
+          "sameChartSourceMomentumToEnergyRatio": 1e-10,
+          "projectedSourceMomentumToEnergyRatio": 1e-10,
+          "projectionStatus": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T02",
+          "sameChartMetricRequiredMomentumToEnergyRatio": 0,
+          "projectedMetricRequiredMomentumToEnergyRatio": 0,
+          "sameChartSourceMomentumToEnergyRatio": 6.999999999999999e-11,
+          "projectedSourceMomentumToEnergyRatio": 6.999999999999999e-11,
+          "projectionStatus": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T03",
+          "sameChartMetricRequiredMomentumToEnergyRatio": 0,
+          "projectedMetricRequiredMomentumToEnergyRatio": 0,
+          "sameChartSourceMomentumToEnergyRatio": 4.0000000000000004e-11,
+          "projectedSourceMomentumToEnergyRatio": 4.0000000000000004e-11,
+          "projectionStatus": "pass",
+          "blockers": []
+        }
+      ],
+      "blockers": []
+    },
+    {
+      "regionId": "exterior_shell",
+      "projectionStatus": "pass",
+      "components": [
+        {
+          "componentId": "T01",
+          "sameChartMetricRequiredMomentumToEnergyRatio": 0,
+          "projectedMetricRequiredMomentumToEnergyRatio": 0,
+          "sameChartSourceMomentumToEnergyRatio": 1e-10,
+          "projectedSourceMomentumToEnergyRatio": 1e-10,
+          "projectionStatus": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T02",
+          "sameChartMetricRequiredMomentumToEnergyRatio": 0,
+          "projectedMetricRequiredMomentumToEnergyRatio": 0,
+          "sameChartSourceMomentumToEnergyRatio": 6.999999999999999e-11,
+          "projectedSourceMomentumToEnergyRatio": 6.999999999999999e-11,
+          "projectionStatus": "pass",
+          "blockers": []
+        },
+        {
+          "componentId": "T03",
+          "sameChartMetricRequiredMomentumToEnergyRatio": 0,
+          "projectedMetricRequiredMomentumToEnergyRatio": 0,
+          "sameChartSourceMomentumToEnergyRatio": 4.0000000000000004e-11,
+          "projectedSourceMomentumToEnergyRatio": 4.0000000000000004e-11,
+          "projectionStatus": "pass",
+          "blockers": []
+        }
+      ],
+      "blockers": []
+    }
+  ],
+  "summary": {
+    "projectionAvailable": true,
+    "causalBoundApplicabilityStatus": "applicable",
+    "worstProjectedMetricRequiredMomentumToEnergyRatio": 0,
+    "worstProjectedSourceMomentumToEnergyRatio": 1e-10,
+    "anyProjectedMetricRequiredCausalMomentumBoundViolation": false,
+    "anyProjectedSourceCausalMomentumBoundViolation": false,
+    "firstBlocker": null,
+    "blockerCount": 0
+  },
+  "claimBoundary": {
+    "diagnosticOnly": true,
+    "frameProjectionDoesNotValidatePhysicalSource": true,
+    "chartBasisRatioCannotProveCausalBound": true,
+    "localFrameReceiptRequiredForCausalMaterialBound": true
+  }
+}

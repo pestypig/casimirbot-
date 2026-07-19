@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { hashDocumentSource, segmentMarkdownForTranslation } from "@shared/document-translation";
+import { researchLibraryDocViewerPath } from "@shared/helix-research-library";
+import { buildActiveDocVisibleTranslationContext } from "@/lib/docs/visibleTranslationContext";
 
 import {
   buildAskTurnWorkspaceContextSnapshotFromState,
@@ -835,6 +838,148 @@ describe("ask workspace context snapshot helpers", () => {
     expect(snapshot.active_doc_visible_translation_context).toBeNull();
     expect(snapshot.hasActiveDocVisibleTranslationContext).toBe(false);
     expect(snapshot.has_active_doc_visible_translation_context).toBe(false);
+  });
+
+  it("lets validated private Research Library context replace stale canonical document identity", () => {
+    const documentRef = "private-research:account-token:snapshot-document-token";
+    const docPath = researchLibraryDocViewerPath(documentRef);
+    const rawMarkdown = "# Research extraction\n\nVisible private paragraph.";
+    const visibleContext = buildActiveDocVisibleTranslationContext({
+      docPath,
+      title: "Research extraction",
+      documentSourceKind: "research_library",
+      documentRef,
+      privateSource: true,
+      rawMarkdown,
+      rawMarkdownSourceHash: hashDocumentSource(rawMarkdown),
+      units: segmentMarkdownForTranslation(rawMarkdown),
+      accountLocale: "en",
+      targetLanguage: "es",
+    });
+    expect(visibleContext).not.toBeNull();
+    if (!visibleContext) throw new Error("expected private research visible context");
+
+    const snapshot = buildAskTurnWorkspaceContextSnapshotFromState({
+      sessionId: "session-private-research",
+      layoutState: {
+        activeGroupId: "docs",
+        groups: { docs: { activePanelId: "docs-viewer", panelIds: ["docs-viewer"] } },
+      },
+      notesState: {},
+      calculatorState: {},
+      docContext: { path: "docs/stale-canonical.md", source: "desktop_url" },
+      activeDocVisibleTranslationContext: visibleContext,
+      visibleTranslationProjections: [
+        { key: "stale", docPath: "docs/stale-canonical.md", displayText: "stale" },
+        { key: "research", doc_path: docPath, displayText: "traducido" },
+      ],
+      lastUpdatedAtMs: 20,
+    });
+
+    expect(snapshot).toMatchObject({
+      activePanel: "docs-viewer",
+      activeDocPath: docPath,
+      active_doc_path: docPath,
+      docContextSource: "active_research_library_visible_context",
+      doc_context_source: "active_research_library_visible_context",
+      hasDocContext: true,
+      hasActiveDocVisibleTranslationContext: true,
+    });
+    expect(snapshot.activeDocVisibleTranslationContext).toMatchObject({
+      document_source_kind: "research_library",
+      document_ref: documentRef,
+      private_source: true,
+      doc_path: docPath,
+    });
+    expect(snapshot.visibleTranslationProjections).toEqual([
+      expect.objectContaining({ key: "research", doc_path: docPath }),
+    ]);
+  });
+
+  it("fails closed on mismatched private Research Library provenance", () => {
+    const documentRef = "private-research:account-token:claimed-document-token";
+    const docPath = researchLibraryDocViewerPath(documentRef);
+    const rawMarkdown = "# Private extraction";
+    const validContext = buildActiveDocVisibleTranslationContext({
+      docPath,
+      documentSourceKind: "research_library",
+      documentRef,
+      privateSource: true,
+      rawMarkdown,
+      rawMarkdownSourceHash: hashDocumentSource(rawMarkdown),
+      units: segmentMarkdownForTranslation(rawMarkdown),
+      accountLocale: "en",
+      targetLanguage: "es",
+    });
+    if (!validContext) throw new Error("expected private research visible context");
+    const malformedContext = {
+      ...validContext,
+      document_ref: "private-research:account-token:different-document-token",
+    } as Record<string, unknown>;
+
+    const snapshot = buildAskTurnWorkspaceContextSnapshotFromState({
+      layoutState: {
+        activeGroupId: "docs",
+        groups: { docs: { activePanelId: "docs-viewer", panelIds: ["docs-viewer"] } },
+      },
+      notesState: {},
+      calculatorState: {},
+      docContext: { path: "docs/stale-canonical.md", source: "desktop_url" },
+      activeDocVisibleTranslationContext: malformedContext,
+      visibleTranslationProjections: [{ key: "research", docPath, displayText: "should-drop" }],
+      lastUpdatedAtMs: 21,
+    });
+
+    expect(snapshot).toMatchObject({
+      activeDocPath: null,
+      active_doc_path: null,
+      source: "invalid_research_library_visible_context",
+      hasDocContext: false,
+      hasActiveDocVisibleTranslationContext: false,
+      visibleTranslationProjections: [],
+    });
+  });
+
+  it("fails closed when a private Research Library region collection is not an array", () => {
+    const documentRef = "private-research:account-token:malformed-regions-token";
+    const docPath = researchLibraryDocViewerPath(documentRef);
+    const rawMarkdown = "# Private extraction";
+    const validContext = buildActiveDocVisibleTranslationContext({
+      docPath,
+      documentSourceKind: "research_library",
+      documentRef,
+      privateSource: true,
+      rawMarkdown,
+      rawMarkdownSourceHash: hashDocumentSource(rawMarkdown),
+      units: segmentMarkdownForTranslation(rawMarkdown),
+      accountLocale: "en",
+      targetLanguage: "es",
+    });
+    if (!validContext) throw new Error("expected private research visible context");
+
+    const snapshot = buildAskTurnWorkspaceContextSnapshotFromState({
+      layoutState: {
+        activeGroupId: "docs",
+        groups: { docs: { activePanelId: "docs-viewer", panelIds: ["docs-viewer"] } },
+      },
+      notesState: {},
+      calculatorState: {},
+      docContext: { path: "docs/stale-canonical.md", source: "desktop_url" },
+      activeDocVisibleTranslationContext: {
+        ...validContext,
+        panel_text_regions: "private text must not bypass provenance validation",
+      },
+      visibleTranslationProjections: [{ key: "research", docPath, displayText: "should-drop" }],
+      lastUpdatedAtMs: 22,
+    });
+
+    expect(snapshot).toMatchObject({
+      activeDocPath: null,
+      source: "invalid_research_library_visible_context",
+      hasDocContext: false,
+      hasActiveDocVisibleTranslationContext: false,
+      visibleTranslationProjections: [],
+    });
   });
 
   it("bounds account-language projection context and drops malformed entries", () => {

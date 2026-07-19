@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, MessageSquarePlus, Trash2 } from "lucide-react";
 import { WorkstationStage } from "@/components/workstation/WorkstationStage";
 import { HelixAskDock } from "@/components/workstation/HelixAskDock";
@@ -140,6 +148,20 @@ export function HelixWorkstationShell({
   const handleMobileSwipePointerCancel = useCallback(() => {
     mobileSwipeStartRef.current = null;
   }, []);
+
+  const setMobileAskSurfaceNode = useCallback(
+    (node: HTMLElement | null) => {
+      if (node) node.toggleAttribute("inert", mobileSurface !== "ask");
+    },
+    [mobileSurface],
+  );
+
+  const setMobileWorkstationSurfaceNode = useCallback(
+    (node: HTMLElement | null) => {
+      if (node) node.toggleAttribute("inert", mobileSurface !== "workstation");
+    },
+    [mobileSurface],
+  );
 
   const helixSessions = useMemo(() => listHelixAskChatSessions(sessions), [sessions]);
   const activeSession = useMemo(
@@ -347,15 +369,24 @@ export function HelixWorkstationShell({
     const showingWorkstation = mobileSurface === "workstation";
     return (
       <div
-        className="relative z-10 h-full min-h-0 w-full touch-pan-y overflow-hidden"
+        className="relative isolate z-10 h-full min-h-0 w-full touch-pan-y overflow-hidden"
+        style={{ "--helix-mobile-edge-rail": "3rem" } as CSSProperties}
+        data-testid="helix-mobile-workstation-shell"
+        data-mobile-surface={mobileSurface}
         onPointerDown={handleMobileSwipePointerDown}
         onPointerUp={handleMobileSwipePointerEnd}
         onPointerCancel={handleMobileSwipePointerCancel}
       >
         <section
+          id="helix-mobile-ask-surface"
+          ref={setMobileAskSurfaceNode}
           aria-hidden={showingWorkstation}
-          className={`absolute inset-0 min-h-0 transform-gpu transition-transform duration-300 ease-out ${
-            showingWorkstation ? "-translate-x-full" : "translate-x-0"
+          data-testid="helix-mobile-ask-surface"
+          data-surface-state={showingWorkstation ? "inactive" : "active"}
+          className={`absolute inset-0 z-0 min-h-0 min-w-0 overflow-hidden pl-[var(--helix-mobile-edge-rail)] transform-gpu transition-transform duration-300 ease-out ${
+            showingWorkstation
+              ? "-translate-x-full pointer-events-none"
+              : "translate-x-0 pointer-events-auto"
           }`}
         >
           <HelixAskDock
@@ -369,9 +400,15 @@ export function HelixWorkstationShell({
         </section>
 
         <section
+          id="helix-mobile-workstation-surface"
+          ref={setMobileWorkstationSurfaceNode}
           aria-hidden={!showingWorkstation}
-          className={`absolute inset-0 min-h-0 transform-gpu bg-slate-950 transition-transform duration-300 ease-out ${
-            showingWorkstation ? "translate-x-0" : "translate-x-full"
+          data-testid="helix-mobile-workstation-surface"
+          data-surface-state={showingWorkstation ? "active" : "inactive"}
+          className={`absolute inset-0 z-0 min-h-0 min-w-0 overflow-hidden pr-[var(--helix-mobile-edge-rail)] transform-gpu bg-slate-950 transition-transform duration-300 ease-out ${
+            showingWorkstation
+              ? "translate-x-0 pointer-events-auto"
+              : "translate-x-full pointer-events-none"
           }`}
         >
           <div
@@ -389,27 +426,53 @@ export function HelixWorkstationShell({
           </div>
         </section>
 
-        {!showingWorkstation ? (
-          <button
-            type="button"
-            aria-label={t("workstation.shell.openWorkstation")}
-            title={t("workstation.shell.openWorkstation")}
-            onClick={() => setMobileSurface("workstation")}
-            className="absolute left-0 top-1/2 z-40 inline-flex h-24 w-11 -translate-y-1/2 items-center justify-center rounded-r-full border border-l-0 border-cyan-300/40 bg-slate-950/90 text-cyan-100 shadow-[0_0_28px_rgba(34,211,238,0.24)] backdrop-blur transition hover:bg-slate-900 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 active:scale-[0.98]"
+        <div
+          className="pointer-events-none absolute inset-0 z-[60] isolate"
+          data-testid="helix-mobile-surface-navigation"
+          aria-live="off"
+        >
+          <div
+            className={`absolute inset-y-0 flex w-[var(--helix-mobile-edge-rail)] items-center ${
+              showingWorkstation ? "right-0 justify-end" : "left-0 justify-start"
+            }`}
+            data-testid="helix-mobile-surface-rail"
+            data-active-edge={showingWorkstation ? "right" : "left"}
           >
-            <ChevronRight className="h-5 w-5" />
-          </button>
-        ) : (
-          <button
-            type="button"
-            aria-label={t("workstation.shell.openHelixAsk")}
-            title={t("workstation.shell.openHelixAsk")}
-            onClick={() => setMobileSurface("ask")}
-            className="absolute right-0 top-1/2 z-40 inline-flex h-24 w-11 -translate-y-1/2 items-center justify-center rounded-l-full border border-r-0 border-cyan-300/40 bg-slate-950/90 text-cyan-100 shadow-[0_0_28px_rgba(34,211,238,0.24)] backdrop-blur transition hover:bg-slate-900 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 active:scale-[0.98]"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-        )}
+            <button
+              type="button"
+              data-testid="helix-mobile-surface-switch"
+              data-active-surface={mobileSurface}
+              data-target-surface={showingWorkstation ? "ask" : "workstation"}
+              aria-controls={
+                showingWorkstation
+                  ? "helix-mobile-ask-surface"
+                  : "helix-mobile-workstation-surface"
+              }
+              aria-label={
+                showingWorkstation
+                  ? t("workstation.shell.openHelixAsk")
+                  : t("workstation.shell.openWorkstation")
+              }
+              title={
+                showingWorkstation
+                  ? t("workstation.shell.openHelixAsk")
+                  : t("workstation.shell.openWorkstation")
+              }
+              onClick={() => setMobileSurface(showingWorkstation ? "ask" : "workstation")}
+              className={`pointer-events-auto inline-flex h-24 w-11 items-center justify-center border border-cyan-300/40 bg-slate-950 text-cyan-100 shadow-[0_0_28px_rgba(34,211,238,0.24)] transition hover:bg-slate-900 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 active:scale-[0.98] ${
+                showingWorkstation
+                  ? "rounded-l-full border-r-0"
+                  : "rounded-r-full border-l-0"
+              }`}
+            >
+              {showingWorkstation ? (
+                <ChevronLeft className="h-5 w-5" aria-hidden />
+              ) : (
+                <ChevronRight className="h-5 w-5" aria-hidden />
+              )}
+            </button>
+          </div>
+        </div>
       </div>
     );
   }

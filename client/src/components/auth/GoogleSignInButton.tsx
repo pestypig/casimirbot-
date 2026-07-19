@@ -129,7 +129,10 @@ export function GoogleSignInButton({
             }
 
             const profile = receipt.session.profile;
-            cacheAccountCapabilityPolicy(receipt.session.account_policy ?? receipt.account_policy ?? null);
+            cacheAccountCapabilityPolicy(
+              receipt.session.account_policy ?? receipt.account_policy ?? null,
+              profile.profile_id,
+            );
             setSessionUser({
               username: profile.profile_id,
               name: profile.display_name,

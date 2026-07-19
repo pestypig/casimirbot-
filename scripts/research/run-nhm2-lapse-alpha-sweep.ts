@@ -452,24 +452,42 @@ type Nhm2RunHeartbeatPayload = {
 
 const repoRoot = process.cwd();
 const configPath = path.join(repoRoot, "configs", "research", "nhm2-lapse-alpha-sweep.json");
-const sweepRoot = path.join(
-  repoRoot,
-  "artifacts",
-  "research",
-  "full-solve",
-  "selected-family",
-  "nhm2-shift-lapse",
-  "alpha-sweep",
-);
-const sweepAuditRoot = path.join(
-  repoRoot,
-  "docs",
-  "audits",
-  "research",
-  "selected-family",
-  "nhm2-shift-lapse",
-  "alpha-sweep",
-);
+export const resolveNhm2SweepOutputRoots = (
+  root: string,
+  env: NodeJS.ProcessEnv = process.env,
+): { sweepRoot: string; sweepAuditRoot: string; runBound: boolean } => {
+  const requestedOutputDirectory = (env.NHM2_OUTPUT_DIR ?? "").trim();
+  if (requestedOutputDirectory) {
+    const sweepRoot = path.resolve(root, requestedOutputDirectory);
+    return {
+      sweepRoot,
+      sweepAuditRoot: path.join(sweepRoot, "audit"),
+      runBound: true,
+    };
+  }
+  return {
+    sweepRoot: path.join(
+      root,
+      "artifacts",
+      "research",
+      "full-solve",
+      "selected-family",
+      "nhm2-shift-lapse",
+      "alpha-sweep",
+    ),
+    sweepAuditRoot: path.join(
+      root,
+      "docs",
+      "audits",
+      "research",
+      "selected-family",
+      "nhm2-shift-lapse",
+      "alpha-sweep",
+    ),
+    runBound: false,
+  };
+};
+const { sweepRoot, sweepAuditRoot } = resolveNhm2SweepOutputRoots(repoRoot);
 const citationChecklistPath = path.join(
   repoRoot,
   "docs",

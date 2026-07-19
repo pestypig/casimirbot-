@@ -248,6 +248,9 @@ const buildLaneObservationPacket = (input: {
     regionId: string | null;
     bbox: Record<string, unknown> | null;
     docPath: string | null;
+    documentSourceKind: "canonical_docs" | "research_library" | null;
+    documentRef: string | null;
+    privateSource: boolean;
     sourceHash: string | null;
     sourceKind: string | null;
     accountLocale: string | null;
@@ -303,6 +306,9 @@ const buildLaneObservationPacket = (input: {
           region_id: input.chunk.regionId,
           bbox: input.chunk.bbox,
           doc_path: input.chunk.docPath,
+          document_source_kind: input.chunk.documentSourceKind,
+          document_ref: input.chunk.documentRef,
+          private_source: input.chunk.privateSource,
           source_hash: input.chunk.sourceHash,
           source_kind: input.chunk.sourceKind,
           account_locale: input.chunk.accountLocale,
@@ -371,6 +377,9 @@ const buildProjectionReceipt = (input: {
     regionId: string | null;
     bbox: Record<string, unknown> | null;
     docPath: string | null;
+    documentSourceKind: "canonical_docs" | "research_library" | null;
+    documentRef: string | null;
+    privateSource: boolean;
     sourceHash: string | null;
     sourceKind: string | null;
     accountLocale: string | null;
@@ -433,6 +442,9 @@ const buildProjectionReceipt = (input: {
     region_id: input.chunk.regionId,
     bbox: input.chunk.bbox,
     doc_path: input.chunk.docPath,
+    document_source_kind: input.chunk.documentSourceKind,
+    document_ref: input.chunk.documentRef,
+    private_source: input.chunk.privateSource,
     source_hash: input.chunk.sourceHash,
     source_kind: input.chunk.sourceKind,
     account_locale: input.chunk.accountLocale,
@@ -508,6 +520,12 @@ export const runLiveTranslationTranslateText = async (input: {
       ? input.request.bbox
       : null;
   const docPath = normalizeOptionalText(input.request.doc_path);
+  const requestedDocumentSourceKind = normalizeOptionalText(input.request.document_source_kind);
+  const documentSourceKind = requestedDocumentSourceKind === "canonical_docs" || requestedDocumentSourceKind === "research_library"
+    ? requestedDocumentSourceKind
+    : null;
+  const documentRef = normalizeOptionalText(input.request.document_ref);
+  const privateSource = input.request.private_source === true;
   const sourceHash = normalizeOptionalText(input.request.source_hash);
   const sourceKind = normalizeOptionalText(input.request.source_kind);
   const sourceTextHash = normalizeOptionalText(input.request.source_text_hash) ?? hashShort(text);
@@ -547,6 +565,9 @@ export const runLiveTranslationTranslateText = async (input: {
     regionId,
     bbox,
     docPath,
+    documentSourceKind,
+    documentRef,
+    privateSource,
     sourceHash,
     sourceKind,
     accountLocale,
@@ -781,6 +802,9 @@ export const runLiveTranslationTranslateText = async (input: {
     region_id: regionId,
     bbox,
     doc_path: docPath,
+    document_source_kind: documentSourceKind,
+    document_ref: documentRef,
+    private_source: privateSource,
     source_hash: sourceHash,
     source_kind: sourceKind,
     account_locale: accountLocale,

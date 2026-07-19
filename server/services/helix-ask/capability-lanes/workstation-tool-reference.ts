@@ -411,6 +411,17 @@ const buildVisibleTranslationTargets = (input: {
         source_kind: sourceKind,
         panel_id: readText(chunk.panel_id ?? chunk.panelId) || panelId,
         doc_path: readText(chunk.doc_path ?? chunk.docPath) || docPath,
+        document_source_kind: (
+          readText(chunk.document_source_kind ?? chunk.documentSourceKind) ||
+          readText(context?.document_source_kind ?? context?.documentSourceKind) ||
+          null
+        ) as HelixVisibleTranslationTarget["document_source_kind"],
+        document_ref:
+          readText(chunk.document_ref ?? chunk.documentRef) ||
+          readText(context?.document_ref ?? context?.documentRef) ||
+          null,
+        private_source:
+          (chunk.private_source ?? chunk.privateSource ?? context?.private_source ?? context?.privateSource) === true,
         source_id: sourceId,
         source_hash: readText(chunk.source_hash ?? chunk.sourceHash) || sourceHash,
         source_text_hash: sourceTextHash,

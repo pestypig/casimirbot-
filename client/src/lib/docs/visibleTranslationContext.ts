@@ -20,6 +20,14 @@ const MAX_VISIBLE_CONTEXT_UNITS = 6;
 const MAX_VISIBLE_CONTEXT_CHARS = 5200;
 const MAX_VISIBLE_CONTEXT_UNIT_CHARS = 1400;
 
+export type HelixDocViewerDocumentSourceKind = "canonical_docs" | "research_library";
+
+type HelixDocViewerDocumentProvenance = {
+  document_source_kind: HelixDocViewerDocumentSourceKind;
+  document_ref: string | null;
+  private_source: boolean;
+};
+
 export type HelixVisibleTranslationRegionBbox = {
   x: number;
   y: number;
@@ -34,7 +42,7 @@ export type HelixVisibleTranslationRegionBbox = {
   source?: string;
 };
 
-export type HelixActiveDocVisibleTranslationChunk = {
+export type HelixActiveDocVisibleTranslationChunk = HelixDocViewerDocumentProvenance & {
   source_kind: "docs_viewer" | "selection" | "hover_region";
   panel_id: "docs-viewer";
   doc_path: string;
@@ -69,7 +77,7 @@ export type HelixActiveDocVisibleTranslationChunk = {
   reentry_required: true;
 };
 
-export type HelixActiveDocVisibleTranslationUiRegion = {
+export type HelixActiveDocVisibleTranslationUiRegion = HelixDocViewerDocumentProvenance & {
   source_kind: "button_label" | "panel_text";
   panel_id: "docs-viewer";
   doc_path: string;
@@ -101,7 +109,7 @@ export type HelixActiveDocVisibleTranslationUiRegion = {
   reentry_required: true;
 };
 
-export type HelixActiveDocVisibleTranslationContext = {
+export type HelixActiveDocVisibleTranslationContext = HelixDocViewerDocumentProvenance & {
   schema: typeof HELIX_ACTIVE_DOC_VISIBLE_TRANSLATION_CONTEXT_SCHEMA;
   source_kind: "docs_viewer";
   panel_id: "docs-viewer";
@@ -181,6 +189,9 @@ const buildVisibleContextIdentityKey = (
     ].join("/"))
     .join("|");
   return [
+    context.document_source_kind,
+    context.document_ref ?? "",
+    context.private_source ? "private" : "public",
     context.doc_path,
     context.source_id,
     context.source_hash,
@@ -239,6 +250,9 @@ const normalizeBbox = (
 export function buildActiveDocVisibleTranslationContext(input: {
   docPath: string;
   title?: string | null;
+  documentSourceKind?: HelixDocViewerDocumentSourceKind;
+  documentRef?: string | null;
+  privateSource?: boolean;
   rawMarkdown: string;
   rawMarkdownSourceHash: string;
   units: DocumentTranslationUnit[];
@@ -294,6 +308,16 @@ export function buildActiveDocVisibleTranslationContext(input: {
   if (!docPath || !rawMarkdown || !sourceHash || !accountLocale || !targetLanguage) return null;
 
   const sourceId = documentMarkdownSourceId(docPath);
+  const documentSourceKind = input.documentSourceKind ?? "canonical_docs";
+  const documentRef = readText(input.documentRef);
+  const privateSource = input.privateSource === true;
+  if (documentSourceKind === "research_library" && (!documentRef || !privateSource)) return null;
+  if (documentSourceKind === "canonical_docs" && privateSource) return null;
+  const documentProvenance: HelixDocViewerDocumentProvenance = {
+    document_source_kind: documentSourceKind,
+    document_ref: documentRef,
+    private_source: privateSource,
+  };
   const translatableUnits = input.units.filter((unit) => unit.translatable && readText(unit.source_markdown));
   const visibleUnitIdSet = new Set(
     Array.isArray(input.visibleUnitIds)
@@ -315,6 +339,7 @@ export function buildActiveDocVisibleTranslationContext(input: {
   if (selectedText) {
     const sourceTextHash = hashDocumentSource(selectedText);
     chunks.push({
+      ...documentProvenance,
       source_kind: "selection",
       panel_id: "docs-viewer",
       doc_path: docPath,
@@ -357,6 +382,7 @@ export function buildActiveDocVisibleTranslationContext(input: {
   if (hoverText) {
     const sourceTextHash = hashDocumentSource(hoverText);
     chunks.push({
+      ...documentProvenance,
       source_kind: "hover_region",
       panel_id: "docs-viewer",
       doc_path: docPath,
@@ -432,6 +458,7 @@ export function buildActiveDocVisibleTranslationContext(input: {
       readFiniteNumber(existingTranslation?.observedAtMs) ??
       readFiniteNumber(existingTranslation?.suppressedObservedAtMs);
     chunks.push({
+      ...documentProvenance,
       source_kind: "docs_viewer",
       panel_id: "docs-viewer",
       doc_path: docPath,
@@ -481,6 +508,7 @@ export function buildActiveDocVisibleTranslationContext(input: {
     const sourceTextHash = hashDocumentSource(visibleText);
     const chunkId = regionId;
     uiTextRegions.push({
+      ...documentProvenance,
       source_kind: region.sourceKind ?? "panel_text",
       panel_id: "docs-viewer",
       doc_path: docPath,
@@ -524,6 +552,7 @@ export function buildActiveDocVisibleTranslationContext(input: {
   if (chunks.length === 0 && uiTextRegions.length === 0) return null;
 
   return {
+    ...documentProvenance,
     schema: HELIX_ACTIVE_DOC_VISIBLE_TRANSLATION_CONTEXT_SCHEMA,
     source_kind: "docs_viewer",
     panel_id: "docs-viewer",
