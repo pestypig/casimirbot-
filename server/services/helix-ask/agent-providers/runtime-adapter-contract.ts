@@ -300,12 +300,15 @@ export const buildHelixAgentRuntimeAdapterContract = (input: {
   requestedRuntime: HelixAgentRuntimeId;
   provider: HelixAgentProvider;
   gatewayMode: HelixWorkstationGatewayMode;
+  gatewayManifest?: HelixWorkstationGatewayListResult;
   fallbackReason?: string | null;
 }): HelixAgentRuntimeAdapterContract => {
-  const gatewayManifest = listWorkstationGatewayCapabilities({
-    agentRuntime: input.provider.id,
-    mode: input.gatewayMode,
-  });
+  const gatewayManifest =
+    input.gatewayManifest ??
+    listWorkstationGatewayCapabilities({
+      agentRuntime: input.provider.id,
+      mode: input.gatewayMode,
+    });
   const capabilityLaneManifest = listHelixCapabilityLanes({
     provider: input.provider,
   });

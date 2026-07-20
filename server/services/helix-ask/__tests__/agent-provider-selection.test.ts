@@ -813,6 +813,17 @@ describe("Helix Ask agent provider selection", () => {
     expect(result.text).toBe(providerAnswer);
     expect((result.debug as any)?.workstation_gateway_call_results?.map((entry: any) => entry.capability_id))
       .toEqual(["workspace_os.status"]);
+    expect((result.debug as any)?.codex_native_provider_bridge).toMatchObject({
+      schema: "helix.codex_native_provider_bridge.v1",
+      enabled: true,
+      eligible: true,
+      attempted: false,
+      status: "unavailable",
+      fallback_required: true,
+      fallback_reason: "legacy_fake_runtime_configured",
+      native_transport: "codex_app_server",
+      compatibility_transport: "codex_exec",
+    });
     expect(result.turn_transcript_events?.map((event: any) => event.source_event_type)).toEqual([
       "runtime_selected",
       "tool_request",
@@ -5806,7 +5817,7 @@ describe("Helix Ask agent provider selection", () => {
     const body = {
       turn_id: "ask:test:codex-active-workstation-context",
       agent_runtime: "codex",
-      question: "What panel is active right now?",
+      question: "What panel in the workstation is active?",
       workspace_context_snapshot: {
         activePanel: "docs-viewer",
         activeGroupId: "main",
@@ -5875,7 +5886,7 @@ describe("Helix Ask agent provider selection", () => {
       body: {
         ...body,
         turn_id: "ask:test:codex-active-workstation-context-realtime-handoff",
-        question: "What panel do you see?",
+        question: "What panel in the workstation is active?",
         route_metadata: {
           source: "realtime_stage_play",
           invocationKind: "stage_play_realtime_transcript_handoff",

@@ -14,6 +14,9 @@ import {
   type GoalRuntimeSessionResult,
 } from "./agent-providers/goal-runtime-session";
 import { buildRuntimeGoalDebugSummary } from "./runtime-goal-debug-summary";
+import { readHelixSessionCookie } from "../helix-account/session-cookie";
+import { resolveWorkstationGatewayAccountContext } from "./workstation-tool-gateway/account-policy";
+import type { HelixWorkstationGatewayAccountContext } from "./workstation-tool-gateway/account-policy";
 
 type RecordLike = Record<string, unknown>;
 
@@ -56,18 +59,32 @@ const parseGoalCommand = (question: string): { kind: HelixRuntimeGoalCommandKind
   return { kind: "start", objective: rest };
 };
 
-const activeGoalSessions = (): HelixRuntimeGoalSession[] =>
+const accountVisibleGoalSessions = (
+  accountContext: HelixWorkstationGatewayAccountContext,
+): HelixRuntimeGoalSession[] =>
   helixRuntimeGoalSessionStore
     .listGoalRuntimeSessions()
+    .filter((session) => helixRuntimeGoalSessionStore.isGoalRuntimeSessionAccessible({
+      goalId: session.goal_id,
+      accountContext,
+    }));
+
+const activeGoalSessions = (
+  accountContext: HelixWorkstationGatewayAccountContext,
+): HelixRuntimeGoalSession[] =>
+  accountVisibleGoalSessions(accountContext)
     .filter((session) => !["completed", "cancelled", "failed"].includes(session.status))
     .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at));
 
-const latestActiveGoalSession = (): HelixRuntimeGoalSession | null =>
-  activeGoalSessions()[0] ?? null;
+const latestActiveGoalSession = (
+  accountContext: HelixWorkstationGatewayAccountContext,
+): HelixRuntimeGoalSession | null =>
+  activeGoalSessions(accountContext)[0] ?? null;
 
-const latestGoalSession = (): HelixRuntimeGoalSession | null =>
-  helixRuntimeGoalSessionStore
-    .listGoalRuntimeSessions()
+const latestGoalSession = (
+  accountContext: HelixWorkstationGatewayAccountContext,
+): HelixRuntimeGoalSession | null =>
+  accountVisibleGoalSessions(accountContext)
     .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))[0] ?? null;
 
 const readWorkspaceSnapshot = (body: RecordLike): RecordLike =>
@@ -414,6 +431,7 @@ export const buildHelixRuntimeGoalCommandPayload = (input: {
     runtime_goal_progress_summary: session.latest_progress_summary,
     runtime_goal_source_binding: session.latest_source_binding,
     runtime_goal_observation_refs: session.latest_observation_refs,
+    workstation_gateway_call_results: input.result.workstation_gateway_call_results ?? [],
     runtime_goal_terminal_authority_status: session.terminal_authority_status,
     runtime_goal_stage_play_projection: input.result.stage_play_projection,
     runtime_goal_debug_export: debugExport,
@@ -437,6 +455,7 @@ export const buildHelixRuntimeGoalCommandPayload = (input: {
       runtime_goal_progress_summary: session.latest_progress_summary,
       runtime_goal_source_binding: session.latest_source_binding,
       runtime_goal_observation_refs: session.latest_observation_refs,
+      workstation_gateway_call_results: input.result.workstation_gateway_call_results ?? [],
       runtime_goal_terminal_authority_status: session.terminal_authority_status,
       runtime_goal_stage_play_projection: input.result.stage_play_projection,
       runtime_goal_debug_export: debugExport,
@@ -457,6 +476,7 @@ export const buildHelixRuntimeGoalCommandPayload = (input: {
       runtime_goal_progress_summary: session.latest_progress_summary,
       runtime_goal_source_binding: session.latest_source_binding,
       runtime_goal_observation_refs: session.latest_observation_refs,
+      workstation_gateway_call_results: input.result.workstation_gateway_call_results ?? [],
       runtime_goal_terminal_authority_status: session.terminal_authority_status,
       runtime_goal_stage_play_projection: input.result.stage_play_projection,
       runtime_goal_debug_export: debugExport,
@@ -580,6 +600,12 @@ export const routeHelixRuntimeGoalCommand = async (input: {
       headers: input.headers ?? {},
     }),
   );
+  const cookieHeader = Array.isArray(input.headers?.cookie)
+    ? input.headers?.cookie.join("; ")
+    : input.headers?.cookie;
+  const accountContext = await resolveWorkstationGatewayAccountContext(
+    readHelixSessionCookie(cookieHeader),
+  );
 
   let result: GoalRuntimeSessionResult;
   if (command.kind === "start") {
@@ -596,9 +622,11 @@ export const routeHelixRuntimeGoalCommand = async (input: {
         null,
       sourceBinding: buildGoalStartSourceBinding(input.body),
       reportPolicy: "report_only_failure",
+      accountContext,
     });
   } else {
-    const active = latestActiveGoalSession() ?? (command.kind === "wake" ? latestGoalSession() : null);
+    const active = latestActiveGoalSession(accountContext) ??
+      (command.kind === "wake" ? latestGoalSession(accountContext) : null);
     if (!active) {
       const providerResult = await helixRuntimeGoalSessionStore.startGoalRuntimeSession({
         objective: "No active runtime goal session.",
@@ -606,16 +634,19 @@ export const routeHelixRuntimeGoalCommand = async (input: {
         goalId: `goal:missing:${crypto.randomUUID()}`,
         threadId: readRuntimeGoalThreadId(input.body),
         reportPolicy: "report_only_failure",
+        accountContext,
       });
       result = helixRuntimeGoalSessionStore.blockGoalRuntimeSession({
         goalId: providerResult.session.goal_id,
         reason: "goal_session_not_found",
+        accountContext,
       });
     } else if (command.kind === "stop") {
       result = helixRuntimeGoalSessionStore.stopGoalRuntimeSession({
         goalId: active.goal_id,
         status: "cancelled",
         reason: "user_cancel",
+        accountContext,
       });
     } else if (["completed", "cancelled", "failed"].includes(active.status)) {
       result = await helixRuntimeGoalSessionStore.resumeGoalRuntimeSession({
@@ -623,6 +654,7 @@ export const routeHelixRuntimeGoalCommand = async (input: {
         wakeEventKind: "manual_resume",
         turnId,
         body: input.body,
+        accountContext,
       });
     } else {
       const visible = readRuntimeGoalVisibleDocContext(input.body);
@@ -630,6 +662,7 @@ export const routeHelixRuntimeGoalCommand = async (input: {
         result = helixRuntimeGoalSessionStore.blockGoalRuntimeSession({
           goalId: active.goal_id,
           reason: visible.unavailableReason,
+          accountContext,
         });
       } else {
         result = await helixRuntimeGoalSessionStore.resumeGoalRuntimeSession({
@@ -644,6 +677,7 @@ export const routeHelixRuntimeGoalCommand = async (input: {
             source_freshness_ms: visible.sourceFreshnessMs,
             workstation_gateway_call: buildRuntimeGoalReadableSurfaceGatewayCall(input.body),
           },
+          accountContext,
         });
       }
     }
@@ -665,7 +699,14 @@ export const routeHelixRuntimeGoalCommand = async (input: {
   });
   return {
     handled: true,
-    statusCode: result.ok ? 200 : command.kind === "wake" && result.blocked_reason === "goal_session_not_found" ? 404 : 409,
+    statusCode: result.ok
+      ? 200
+      : command.kind === "wake" && result.blocked_reason === "goal_session_not_found"
+        ? 404
+        : result.blocked_reason === "permission_revoked" ||
+            result.blocked_reason?.startsWith("runtime_goal_account_")
+          ? 403
+          : 409,
     payload: attachTranscriptEventsToPayload({ payload, transcriptEvents }),
     transcriptEvents,
   };

@@ -222,6 +222,27 @@ describe("helix ask prompt launch bridge", () => {
     expect(window.localStorage.getItem(HELIX_PENDING_ASK_KEY)).toBeNull();
   });
 
+  it("preserves only registered server-admitted runtime bindings", () => {
+    launchHelixAskPrompt({
+      question: "Check the current workstation state.",
+      serverAdmittedRuntimeAgentProvider: "codex",
+    });
+    expect(consumePendingHelixAskPrompt()).toMatchObject({
+      serverAdmittedRuntimeAgentProvider: "codex",
+    });
+
+    window.localStorage.setItem(
+      HELIX_PENDING_ASK_KEY,
+      JSON.stringify({
+        question: "Check the current workstation state.",
+        serverAdmittedRuntimeAgentProvider: "unregistered-runtime",
+      }),
+    );
+    expect(
+      consumePendingHelixAskPrompt()?.serverAdmittedRuntimeAgentProvider,
+    ).toBeUndefined();
+  });
+
   it("preserves workflow QTE causal metadata across editable prompt handoff", () => {
     launchHelixAskPrompt({
       question: "Find one bounded scholarly paper.",

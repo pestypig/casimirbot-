@@ -36,6 +36,8 @@ export function buildHelixAskMinimalRuntimeSubmitPlan(args: {
   durableReplies?: readonly HelixAskChatReferentReplyLike[];
   visibleReplies?: readonly HelixAskChatReferentReplyLike[];
 }): HelixAskMinimalRuntimeSubmitPlan {
+  const effectiveRuntime =
+    args.pendingPrompt?.serverAdmittedRuntimeAgentProvider ?? args.selectedRuntime;
   const admission = buildHelixAskSubmitAdmission({
     entries: [args.draft],
     askBusy: false,
@@ -73,7 +75,7 @@ export function buildHelixAskMinimalRuntimeSubmitPlan(args: {
     envelope: admission.firstEntry
       ? buildHelixAskConsoleRequestEnvelope({
           question: admission.firstEntry,
-          agentRuntime: args.selectedRuntime,
+          agentRuntime: effectiveRuntime,
           languageModelProfile: args.selectedLanguageModelProfile,
           context,
         })

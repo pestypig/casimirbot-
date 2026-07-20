@@ -42,7 +42,11 @@ export const NHM2_RUNTIME_FIELD_BINDINGS: Nhm2RuntimeFieldBinding[] = [
     artifactFields: ["metricT00Geom", "metricT00Si", "G_mu_nu", "T_mu_nu"],
     scalarCuts: [],
     gates: ["hard_constraints", "observer_audit"],
-    requiredEvidence: ["observer_audit", "hard_constraint_report", "metric_contract"],
+    requiredEvidence: [
+      "observer_audit",
+      "hard_constraint_report",
+      "metric_contract",
+    ],
     claimBoundaryNotes: [
       "Einstein field equation rows are tensor/model context; scalar calculator rows may only inspect cuts around the runtime.",
     ],
@@ -52,7 +56,11 @@ export const NHM2_RUNTIME_FIELD_BINDINGS: Nhm2RuntimeFieldBinding[] = [
     kind: "model_relation",
     runtimeId: "gr_nhm2.artifact_reader",
     laneId: "warp_gr_nhm2",
-    artifactFields: ["sourceClosureResidualRms", "sourceClosureResidualMax", "divergenceRms"],
+    artifactFields: [
+      "sourceClosureResidualRms",
+      "sourceClosureResidualMax",
+      "divergenceRms",
+    ],
     scalarCuts: [],
     gates: ["source_closure", "observer_audit"],
     requiredEvidence: ["source_closure_artifact", "observer_audit"],
@@ -65,7 +73,12 @@ export const NHM2_RUNTIME_FIELD_BINDINGS: Nhm2RuntimeFieldBinding[] = [
     kind: "model_relation",
     runtimeId: "gr_nhm2.artifact_reader",
     laneId: "warp_gr_nhm2",
-    artifactFields: ["alpha", "beta_i", "betaOverAlphaMax", "wallHorizonMargin"],
+    artifactFields: [
+      "alpha",
+      "beta_i",
+      "betaOverAlphaMax",
+      "wallHorizonMargin",
+    ],
     scalarCuts: [
       {
         id: "wall_horizon_margin_cut",
@@ -85,7 +98,13 @@ export const NHM2_RUNTIME_FIELD_BINDINGS: Nhm2RuntimeFieldBinding[] = [
     kind: "runtime_bound_output",
     runtimeId: "gr_nhm2.artifact_reader",
     laneId: "warp_gr_nhm2",
-    artifactFields: ["tauSelected", "properTimeS", "savedDays", "betaOverAlphaMax", "wallHorizonMargin"],
+    artifactFields: [
+      "tauSelected",
+      "properTimeS",
+      "savedDays",
+      "betaOverAlphaMax",
+      "wallHorizonMargin",
+    ],
     scalarCuts: [
       {
         id: "proper_time_offset_cut",
@@ -111,7 +130,12 @@ export const NHM2_RUNTIME_FIELD_BINDINGS: Nhm2RuntimeFieldBinding[] = [
     kind: "runtime_bound_output",
     runtimeId: "gr_nhm2.artifact_reader",
     laneId: "warp_gr_nhm2",
-    artifactFields: ["rhoMetric", "rhoProxy", "rhoCoupledShadow", "couplingResidualRel"],
+    artifactFields: [
+      "rhoMetric",
+      "rhoProxy",
+      "rhoCoupledShadow",
+      "couplingResidualRel",
+    ],
     scalarCuts: [
       {
         id: "energy_density_proxy_cut",
@@ -148,8 +172,7 @@ export const NHM2_RUNTIME_FIELD_BINDINGS: Nhm2RuntimeFieldBinding[] = [
       {
         id: "wall_t00_source_residual_cut",
         expression: "R_wall_T00 = T00_wall_required - T00_wall_available",
-        displayLatex:
-          "R_{wall,T00}=T00_{wall,required}-T00_{wall,available}",
+        displayLatex: "R_{wall,T00}=T00_{wall,required}-T00_{wall,available}",
         outputSymbols: ["R_wall_T00"],
       },
     ],
@@ -168,7 +191,11 @@ export const NHM2_RUNTIME_FIELD_BINDINGS: Nhm2RuntimeFieldBinding[] = [
     kind: "runtime_bound_output",
     runtimeId: "gr_nhm2.artifact_reader",
     laneId: "warp_gr_nhm2",
-    artifactFields: ["sourceClosureResidualRms", "sourceClosureResidualMax", "sourceClosureResidualByRegion"],
+    artifactFields: [
+      "sourceClosureResidualRms",
+      "sourceClosureResidualMax",
+      "sourceClosureResidualByRegion",
+    ],
     scalarCuts: [
       {
         id: "source_residual_difference_cut",
@@ -178,7 +205,11 @@ export const NHM2_RUNTIME_FIELD_BINDINGS: Nhm2RuntimeFieldBinding[] = [
       },
     ],
     gates: ["source_closure"],
-    requiredEvidence: ["source_closure_artifact", "source_closure_region_report", "observer_audit"],
+    requiredEvidence: [
+      "source_closure_artifact",
+      "source_closure_region_report",
+      "observer_audit",
+    ],
     claimBoundaryNotes: [
       "Source residual is runtime-bound closure evidence; a scalar residual row is only a local diagnostic check.",
     ],
@@ -197,14 +228,19 @@ export const NHM2_RUNTIME_FIELD_BINDINGS: Nhm2RuntimeFieldBinding[] = [
     scalarCuts: [
       {
         id: "wall_t00_rel_linf_cut",
-        expression: "wall_t00_relLInf = abs(T00_geom_wall - T00_tile_wall) / max(abs(T00_geom_wall), eps)",
+        expression:
+          "wall_t00_relLInf = abs(T00_geom_wall - T00_tile_wall) / max(abs(T00_geom_wall), eps)",
         displayLatex:
           "\\mathrm{relLInf}_{wall}=|T_{00,geom}^{wall}-T_{00,tile}^{wall}|/\\max(|T_{00,geom}^{wall}|,\\epsilon)",
         outputSymbols: ["wall_t00_relLInf"],
       },
     ],
     gates: ["source_closure", "wall_t00_trace"],
-    requiredEvidence: ["source_closure_region_report", "metric_required_wall_tensor", "tile_effective_wall_tensor"],
+    requiredEvidence: [
+      "source_closure_region_report",
+      "metric_required_wall_tensor",
+      "tile_effective_wall_tensor",
+    ],
     claimBoundaryNotes: [
       "Wall T00 trace is a runtime-bound blocker; global source closure summaries must not hide wall-region mismatch.",
     ],
@@ -236,7 +272,11 @@ export const NHM2_RUNTIME_FIELD_BINDINGS: Nhm2RuntimeFieldBinding[] = [
     ],
     scalarCuts: [],
     gates: ["observer_audit", "tensor_authority"],
-    requiredEvidence: ["observer_audit", "metric_t0i_emission", "metric_off_diagonal_tij_emission"],
+    requiredEvidence: [
+      "observer_audit",
+      "metric_t0i_emission",
+      "metric_off_diagonal_tij_emission",
+    ],
     claimBoundaryNotes: [
       "Full tensor authority remains blocked until same-chart T00, J_i, diagonal S_ij, and off-diagonal S_ij evidence is present.",
     ],
@@ -309,7 +349,11 @@ export const NHM2_RUNTIME_FIELD_BINDINGS: Nhm2RuntimeFieldBinding[] = [
       "nhm2WallSourceClosure.available.sourceAuthorityRef",
     ],
     scalarCuts: [],
-    gates: ["source_closure", "source_side_same_basis_tensor_authority", "wall_t00_trace"],
+    gates: [
+      "source_closure",
+      "source_side_same_basis_tensor_authority",
+      "wall_t00_trace",
+    ],
     requiredEvidence: [
       "source_side_same_basis_tensor_authority_artifact",
       "tile_effective_counterpart_artifact",
@@ -321,11 +365,166 @@ export const NHM2_RUNTIME_FIELD_BINDINGS: Nhm2RuntimeFieldBinding[] = [
     ],
   },
   {
+    badgeId: "nhm2.meta.experiment_ready_theory_closure",
+    kind: "runtime_gate",
+    runtimeId: "gr_nhm2.artifact_reader",
+    laneId: "warp_gr_nhm2",
+    artifactFields: [
+      "nhm2ExperimentReadyTheoryClosure.contractVersion",
+      "nhm2ExperimentReadyTheoryClosure.evaluationAuthority",
+      "nhm2ExperimentReadyTheoryClosure.candidate.candidateId",
+      "nhm2ExperimentReadyTheoryClosure.candidate.primaryRunId",
+      "nhm2ExperimentReadyTheoryClosure.candidate.primaryRequestId",
+      "nhm2ExperimentReadyTheoryClosure.candidate.primaryRuntimeId",
+      "nhm2ExperimentReadyTheoryClosure.candidate.chartId",
+      "nhm2ExperimentReadyTheoryClosure.candidate.atlasSha256",
+      "nhm2ExperimentReadyTheoryClosure.candidate.unitsSha256",
+      "nhm2ExperimentReadyTheoryClosure.candidate.normalizationSha256",
+      "nhm2ExperimentReadyTheoryClosure.candidate.candidateManifestSha256",
+      "nhm2ExperimentReadyTheoryClosure.candidate.candidateManifestId",
+      "nhm2ExperimentReadyTheoryClosure.candidate.candidateManifestContractVersion",
+      "nhm2ExperimentReadyTheoryClosure.candidate.numericPolicySetPath",
+      "nhm2ExperimentReadyTheoryClosure.candidate.numericPolicySetSha256",
+      "nhm2ExperimentReadyTheoryClosure.candidate.numericPolicySetSemanticSha256",
+      "nhm2ExperimentReadyTheoryClosure.candidate.primaryReceiptPath",
+      "nhm2ExperimentReadyTheoryClosure.candidate.primaryReceiptSha256",
+      "nhm2ExperimentReadyTheoryClosure.evidence[].artifactContractVersion",
+      "nhm2ExperimentReadyTheoryClosure.evidence[].receiptPath",
+      "nhm2ExperimentReadyTheoryClosure.evidence[].receiptSha256",
+      "nhm2ExperimentReadyTheoryClosure.evidence[].checks.*.frozenPolicySha256",
+      "nhm2ExperimentReadyTheoryClosure.evidence[].checks.*.policySetSemanticSha256",
+      "nhm2ExperimentReadyTheoryClosure.gates[].gateId",
+      "nhm2ExperimentReadyTheoryClosure.gates[].status",
+      "nhm2ExperimentReadyTheoryClosure.gates[].blockers",
+      "nhm2ExperimentReadyTheoryClosure.gates[].failedCheckIds",
+      "nhm2ExperimentReadyTheoryClosure.status",
+      "nhm2ExperimentReadyTheoryClosure.verdictLabel",
+      "nhm2ExperimentReadyTheoryClosure.summary.experimentReadyTheoryClosed",
+      "nhm2ExperimentReadyTheoryClosure.summary.filesystemVerificationRequired",
+      "nhm2ExperimentReadyTheoryClosure.summary.allEvidenceRunBoundFreshAndHashed",
+      "nhm2ExperimentReadyTheoryClosure.summary.firstBlocker",
+      "nhm2ExperimentReadyTheoryClosure.summary.empiricalStatus",
+      "nhm2ExperimentReadyTheoryClosure.claimBoundary.physicalViabilityClaimAllowed",
+      "nhm2ExperimentReadyTheoryClosure.claimBoundary.transportClaimAllowed",
+      "nhm2ExperimentReadyTheoryClosure.claimBoundary.propulsionClaimAllowed",
+      "nhm2ExperimentReadyTheoryClosure.claimBoundary.routeEtaClaimAllowed",
+      "nhm2ExperimentReadyTheoryClosure.claimBoundary.speedAuthorityClaimAllowed",
+    ],
+    scalarCuts: [],
+    gates: [
+      "experiment_ready_theory_closure",
+      "runtime_reproducibility",
+      "same_chart_full_source_tensor",
+      "semiclassical_state_realizability",
+      "covariant_conservation",
+      "continuous_observer_optimization",
+      "worldline_qei_coverage",
+      "dynamic_backreaction_stability_causality",
+      "finite_temperature_finite_geometry_material_model",
+      "mechanical_control_energy_margin",
+      "independent_numerical_formal_replication",
+      "prediction_falsifier_freeze",
+    ],
+    requiredEvidence: [
+      "theory_runtime_receipt",
+      "theory_runtime_output_manifest",
+      "theory_runtime_freshness_snapshot_proof",
+      "persisted_theory_runtime_receipts",
+      "candidate_manifest",
+      "full_apparatus_source_tensor",
+      "semiclassical_state",
+      "covariant_conservation",
+      "continuous_observer_optimizer",
+      "worldline_qei",
+      "dynamic_backreaction_stability_causality",
+      "finite_temperature_finite_geometry_maxwell_stress",
+      "mechanical_support_control_margin",
+      "independent_numerical_replication",
+      "formal_manifest_certificate",
+      "prediction_falsifier_freeze",
+    ],
+    claimBoundaryNotes: [
+      "Experiment-ready theory closure is a separate runtime meta gate; it does not replace regional source-closure status.",
+      "The pre-run candidate manifest freezes identities, execution plans, and semantic numeric policy; post-run receipts and output manifests must then bind fresh typed evidence before filesystem replay can produce THEORY_CLOSED_EXPERIMENT_READY_CANDIDATE.",
+      "Even a theory-closed candidate leaves physical viability, transport, propulsion, route ETA, and speed authority blocked pending empirical receipts.",
+    ],
+  },
+  {
+    badgeId: "nhm2.qei.feasibility_frontier",
+    kind: "runtime_bound_output",
+    runtimeId: "nhm2.qei.feasibility_frontier",
+    laneId: "qei_stress_energy",
+    artifactFields: [
+      "nhm2QeiFeasibilityFrontier.contractVersion",
+      "nhm2QeiFeasibilityFrontier.provenance.run.runId",
+      "nhm2QeiFeasibilityFrontier.provenance.run.commitSha",
+      "nhm2QeiFeasibilityFrontier.provenance.run.epochId",
+      "nhm2QeiFeasibilityFrontier.provenance.runManifest.sha256",
+      "nhm2QeiFeasibilityFrontier.provenance.runtimeReceipt.sha256",
+      "nhm2QeiFeasibilityFrontier.domain.finiteDomainDeclared",
+      "nhm2QeiFeasibilityFrontier.domain.cartesianCoverageRequired",
+      "nhm2QeiFeasibilityFrontier.candidates[].coverage.complete",
+      "nhm2QeiFeasibilityFrontier.candidates[].evaluationStatus",
+      "nhm2QeiFeasibilityFrontier.candidates[].worstCase.marginRawComputed",
+      "nhm2QeiFeasibilityFrontier.candidates[].distanceToStrictBoundary.worstMargin",
+      "nhm2QeiFeasibilityFrontier.candidates[].distanceToStrictBoundary.strictMarginGap",
+      "nhm2QeiFeasibilityFrontier.candidates[].evaluations[].sensitivity.theoremCrossoverTauSeconds",
+      "nhm2QeiFeasibilityFrontier.candidates[].evaluations[].sensitivity.currentTauToCrossoverRatio",
+      "nhm2QeiFeasibilityFrontier.candidates[].evaluations[].sensitivity.logRawMarginLogTauSensitivity",
+      "nhm2QeiFeasibilityFrontier.evaluationStatus",
+      "nhm2QeiFeasibilityFrontier.verdict",
+      "nhm2QeiFeasibilityFrontier.summary.frontierComplete",
+      "nhm2QeiFeasibilityFrontier.summary.closestCandidateId",
+      "nhm2QeiFeasibilityFrontier.summary.closestCandidateWorstMargin",
+      "nhm2QeiFeasibilityFrontier.summary.closestStrictMarginGap",
+      "nhm2QeiFeasibilityFrontier.summary.firstBlocker",
+      "nhm2QeiFeasibilityFrontier.claimBoundary.finiteDomainNoCandidateIsNotUniversalNoGo",
+      "nhm2QeiFeasibilityFrontier.claimBoundary.filesystemVerificationRequired",
+      "nhm2QeiFeasibilityFrontier.claimBoundary.cannotSatisfyWorldlineQeiClosure",
+      "nhm2QeiFeasibilityFrontier.claimBoundary.sensitivityDoesNotAuthorizeParameterScaling",
+      "nhm2QeiFeasibilityFrontier.claimBoundary.physicalViabilityClaimAllowed",
+      "nhm2QeiFeasibilityFrontier.claimBoundary.transportClaimAllowed",
+      "nhm2QeiFeasibilityFrontier.claimBoundary.propulsionClaimAllowed",
+      "nhm2QeiFeasibilityFrontier.claimBoundary.routeEtaClaimAllowed",
+      "nhm2QeiFeasibilityFrontier.claimBoundary.certifiedSpeedClaimAllowed",
+    ],
+    scalarCuts: [],
+    gates: [
+      "qei_feasibility_frontier",
+      "qei_frontier_filesystem_verification",
+      "qei_frontier_cartesian_coverage",
+      "qei_frontier_raw_margin",
+      "qei_frontier_same_epoch_provenance",
+    ],
+    requiredEvidence: [
+      "qei_feasibility_frontier_artifact",
+      "qei_frontier_runtime_receipt",
+      "qei_frontier_run_manifest",
+      "qei_frontier_filesystem_evaluation",
+      "qei_frontier_raw_evaluation_evidence",
+      "qei_frontier_quadrature_evidence",
+      "same_epoch_full_tensor_qft_observer_worldline_bindings",
+    ],
+    claimBoundaryNotes: [
+      "The invariant cannotSatisfyWorldlineQeiClosure lock means this finite-domain frontier cannot satisfy the worldline-QEI dossier or experiment-ready theory-closure gate.",
+      "A candidate-found or no-candidate result remains a diagnostic statement about the declared finite domain, not a universal QEI no-go or promotion authority.",
+      "Crossover times and distance-to-boundary sensitivities are analytic diagnostics only; they do not authorize direct T00 scaling or assert that a boundary point is dynamically, causally, or materially realizable.",
+      "Physical viability, transport, propulsion, route ETA, and certified-speed claims remain blocked pending separate theory-closure and empirical receipts.",
+    ],
+  },
+  {
     badgeId: "nhm2.qei.sampling_window",
     kind: "runtime_bound_output",
     runtimeId: "qei_stress_energy.artifact_reader",
     laneId: "qei_stress_energy",
-    artifactFields: ["qei_bound", "qei_sample", "qei_margin", "marginRatio", "tauSelected", "tauWindow"],
+    artifactFields: [
+      "qei_bound",
+      "qei_sample",
+      "qei_margin",
+      "marginRatio",
+      "tauSelected",
+      "tauWindow",
+    ],
     scalarCuts: [
       {
         id: "qei_margin_difference_cut",
@@ -349,7 +548,12 @@ export const NHM2_RUNTIME_FIELD_BINDINGS: Nhm2RuntimeFieldBinding[] = [
       "semantic_bridge",
       "qei_margin",
     ],
-    requiredEvidence: ["qei_worldline_dossier", "operator_mapping", "semantic_bridge", "sampling_normalization"],
+    requiredEvidence: [
+      "qei_worldline_dossier",
+      "operator_mapping",
+      "semantic_bridge",
+      "sampling_normalization",
+    ],
     claimBoundaryNotes: [
       "QEI sampling values are runtime-bound applicability diagnostics and must fail closed when semantics are missing.",
     ],
@@ -368,8 +572,19 @@ export const NHM2_RUNTIME_FIELD_BINDINGS: Nhm2RuntimeFieldBinding[] = [
       "dutyLightCrossingConsistency",
     ],
     scalarCuts: [],
-    gates: ["timelike_worldline", "sampling_normalization", "operator_mapping", "qei_margin", "qei_dossier"],
-    requiredEvidence: ["qei_worldline_dossier", "sampling_normalization", "operator_mapping", "regional_margin_report"],
+    gates: [
+      "timelike_worldline",
+      "sampling_normalization",
+      "operator_mapping",
+      "qei_margin",
+      "qei_dossier",
+    ],
+    requiredEvidence: [
+      "qei_worldline_dossier",
+      "sampling_normalization",
+      "operator_mapping",
+      "regional_margin_report",
+    ],
     claimBoundaryNotes: [
       "QEI worldline dossier is a blocked provenance gate until worldline, sampling, source, bound, and regional margin receipts exist.",
     ],
@@ -379,10 +594,20 @@ export const NHM2_RUNTIME_FIELD_BINDINGS: Nhm2RuntimeFieldBinding[] = [
     kind: "runtime_bound_output",
     runtimeId: "gr_nhm2.artifact_reader",
     laneId: "warp_gr_nhm2",
-    artifactFields: ["weylScalar", "ricciInvariant", "petrovClass", "momentumDensity", "natarioInvariantStatus"],
+    artifactFields: [
+      "weylScalar",
+      "ricciInvariant",
+      "petrovClass",
+      "momentumDensity",
+      "natarioInvariantStatus",
+    ],
     scalarCuts: [],
     gates: ["observer_audit", "tensor_authority", "curvature_invariants"],
-    requiredEvidence: ["curvature_invariant_report", "observer_audit", "metric_t0i_emission"],
+    requiredEvidence: [
+      "curvature_invariant_report",
+      "observer_audit",
+      "metric_t0i_emission",
+    ],
     claimBoundaryNotes: [
       "Natario curvature invariants are runtime targets and cannot promote NHM2 without observer and tensor authority.",
     ],
@@ -412,7 +637,11 @@ export const NHM2_RUNTIME_FIELD_BINDINGS: Nhm2RuntimeFieldBinding[] = [
       "nhm2NatarioInvariantAudit.blockers",
     ],
     scalarCuts: [],
-    gates: ["natario_invariant_audit", "curvature_invariants", "observer_audit"],
+    gates: [
+      "natario_invariant_audit",
+      "curvature_invariants",
+      "observer_audit",
+    ],
     requiredEvidence: [
       "natario_invariant_audit_artifact",
       "curvature_invariant_report",
@@ -443,7 +672,11 @@ export const NHM2_RUNTIME_FIELD_BINDINGS: Nhm2RuntimeFieldBinding[] = [
       "nhm2ObserverRobustEnergyConditions.summary.missedViolationRisk",
     ],
     scalarCuts: [],
-    gates: ["observer_audit", "observer_robust_energy_conditions", "tensor_authority"],
+    gates: [
+      "observer_audit",
+      "observer_robust_energy_conditions",
+      "tensor_authority",
+    ],
     requiredEvidence: [
       "observer_robust_energy_conditions_artifact",
       "same_chart_full_tensor_artifact",
@@ -458,7 +691,12 @@ export const NHM2_RUNTIME_FIELD_BINDINGS: Nhm2RuntimeFieldBinding[] = [
     kind: "runtime_gate",
     runtimeId: "qei_stress_energy.artifact_reader",
     laneId: "qei_stress_energy",
-    artifactFields: ["gateStatus", "gateDetails", "missingSignals", "requiredSignals"],
+    artifactFields: [
+      "gateStatus",
+      "gateDetails",
+      "missingSignals",
+      "requiredSignals",
+    ],
     scalarCuts: [],
     gates: [
       "source_closure",
@@ -467,7 +705,11 @@ export const NHM2_RUNTIME_FIELD_BINDINGS: Nhm2RuntimeFieldBinding[] = [
       "hard_constraints",
       "qei_margin",
     ],
-    requiredEvidence: ["source_closure_artifact", "qei_worldline_dossier", "observer_audit"],
+    requiredEvidence: [
+      "source_closure_artifact",
+      "qei_worldline_dossier",
+      "observer_audit",
+    ],
     claimBoundaryNotes: [
       "Energy-condition gate badges are gate summaries, not calculator validations.",
     ],
@@ -477,7 +719,12 @@ export const NHM2_RUNTIME_FIELD_BINDINGS: Nhm2RuntimeFieldBinding[] = [
     kind: "claim_boundary",
     runtimeId: "gr_nhm2.artifact_reader",
     laneId: "warp_gr_nhm2",
-    artifactFields: ["claimPosture", "promotionBlockedBy", "certificateIntegrity", "certificateIssued"],
+    artifactFields: [
+      "claimPosture",
+      "promotionBlockedBy",
+      "certificateIntegrity",
+      "certificateIssued",
+    ],
     scalarCuts: [],
     gates: ["certificate_issued", "certificate_integrity"],
     requiredEvidence: [...NHM2_PROMOTION_EVIDENCE],
@@ -490,13 +737,19 @@ export const NHM2_RUNTIME_FIELD_BINDINGS: Nhm2RuntimeFieldBinding[] = [
 export function getNhm2RuntimeFieldBinding(
   badgeId: string,
 ): Nhm2RuntimeFieldBinding | null {
-  return NHM2_RUNTIME_FIELD_BINDINGS.find((binding) => binding.badgeId === badgeId) ?? null;
+  return (
+    NHM2_RUNTIME_FIELD_BINDINGS.find(
+      (binding) => binding.badgeId === badgeId,
+    ) ?? null
+  );
 }
 
 export function findNhm2RuntimeFieldBindingsForGate(
   gateId: string,
 ): Nhm2RuntimeFieldBinding[] {
-  return NHM2_RUNTIME_FIELD_BINDINGS.filter((binding) => binding.gates.includes(gateId));
+  return NHM2_RUNTIME_FIELD_BINDINGS.filter((binding) =>
+    binding.gates.includes(gateId),
+  );
 }
 
 export function isNhm2RuntimeBoundBadge(badgeId: string): boolean {

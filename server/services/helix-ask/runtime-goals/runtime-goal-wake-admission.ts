@@ -8,6 +8,7 @@ import type {
   HelixRuntimeGoalWakeCandidateEventKind,
 } from "@shared/helix-runtime-goal-session";
 import { helixRuntimeGoalSessionStore } from "../agent-providers/goal-runtime-session";
+import type { HelixWorkstationGatewayAccountContext } from "../workstation-tool-gateway/account-policy";
 
 type RecordLike = Record<string, unknown>;
 
@@ -42,14 +43,22 @@ const normalizeFreshnessStatus = (value: unknown): HelixRuntimeGoalWakeCandidate
   return raw === "fresh" || raw === "stale" || raw === "unknown" ? raw : "unknown";
 };
 
-export const activeRuntimeGoalSessions = (): HelixRuntimeGoalSession[] =>
+export const activeRuntimeGoalSessions = (
+  accountContext?: HelixWorkstationGatewayAccountContext | null,
+): HelixRuntimeGoalSession[] =>
   helixRuntimeGoalSessionStore
     .listGoalRuntimeSessions()
+    .filter((session) => !accountContext || helixRuntimeGoalSessionStore.isGoalRuntimeSessionAccessible({
+      goalId: session.goal_id,
+      accountContext,
+    }))
     .filter((session) => !terminalStatuses.has(session.status))
     .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at));
 
-export const latestActiveRuntimeGoalSession = (): HelixRuntimeGoalSession | null =>
-  activeRuntimeGoalSessions()[0] ?? null;
+export const latestActiveRuntimeGoalSession = (
+  accountContext?: HelixWorkstationGatewayAccountContext | null,
+): HelixRuntimeGoalSession | null =>
+  activeRuntimeGoalSessions(accountContext)[0] ?? null;
 
 export const buildRuntimeGoalWakeCandidate = (body: RecordLike): HelixRuntimeGoalWakeCandidate => {
   const snapshot = readRecord(body.workspace_context_snapshot ?? body.workspaceContextSnapshot) ?? {};
@@ -169,10 +178,18 @@ const sessionAllowsCandidate = (
 
 export const admitRuntimeGoalWakeCandidate = (
   candidate: HelixRuntimeGoalWakeCandidate,
+  accountContext?: HelixWorkstationGatewayAccountContext | null,
 ): { session: HelixRuntimeGoalSession | null; admission: HelixRuntimeGoalWakeAdmissionResult } => {
-  const session = candidate.goal_id
+  const selectedSession = candidate.goal_id
     ? helixRuntimeGoalSessionStore.getGoalRuntimeSession(candidate.goal_id)
-    : latestActiveRuntimeGoalSession();
+    : latestActiveRuntimeGoalSession(accountContext);
+  const session = selectedSession && accountContext &&
+    !helixRuntimeGoalSessionStore.isGoalRuntimeSessionAccessible({
+      goalId: selectedSession.goal_id,
+      accountContext,
+    })
+    ? null
+    : selectedSession;
   const sourceBinding = sourceBindingFromWakeCandidate(candidate);
   if (!session) {
     return {

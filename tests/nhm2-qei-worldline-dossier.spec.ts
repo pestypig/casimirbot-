@@ -41,7 +41,7 @@ describe("nhm2 qei worldline dossier contract", () => {
             normalized: true,
           },
           sampledRho: {
-            valueSI: -1,
+            valueSI: 1,
             provenanceRef: "warp.metric.T00.natario.shift",
             status: "computed",
           },
@@ -64,6 +64,48 @@ describe("nhm2 qei worldline dossier contract", () => {
     expect(dossier.summary.dossierComplete).toBe(false);
     expect(dossier.worldlines[0]?.margin.valueSI).toBe(1);
     expect(isNhm2QeiWorldlineDossier(dossier)).toBe(true);
+  });
+
+  it("derives a fallback lower-bound margin as sampled rho minus the bound", () => {
+    const dossier = buildNhm2QeiWorldlineDossier({
+      generatedAt: "2026-06-09T00:00:00.000Z",
+      laneId: "nhm2_shift_lapse",
+      selectedProfileId: "runtime",
+      worldlines: [
+        {
+          worldlineId: "qei:wall:fallback-margin",
+          regionId: "wall",
+          chartId: "adm_eulerian",
+          samplingFunction: {
+            kind: "gaussian",
+            tauSeconds: 1e-9,
+            normalized: true,
+          },
+          sampledRho: {
+            valueSI: -2,
+            provenanceRef: "source:wall",
+            status: "computed",
+          },
+          bound: {
+            valueSI: -1,
+            provenanceRef: "ford_roman_1996_quantum_inequality",
+            status: "literature_bound",
+          },
+          consistency: {
+            tauVsDuty: "pass",
+            tauVsLightCrossing: "pass",
+            tauVsModulation: "pass",
+          },
+        },
+      ],
+    });
+
+    expect(dossier.worldlines[0]?.margin).toEqual({ valueSI: -1, pass: false });
+    expect(dossier.worldlines[0]?.blockers).toContain("qei_margin_failed");
+    expect(dossier.summary).toMatchObject({
+      allMarginsPass: false,
+      dossierComplete: false,
+    });
   });
 
   it("adapts QI guardrail telemetry into a complete wall dossier when provenance is metric-derived", () => {

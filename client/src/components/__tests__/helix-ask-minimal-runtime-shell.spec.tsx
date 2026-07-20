@@ -32,10 +32,64 @@ afterEach(() => {
   useAgiChatStore.setState({ sessions: {}, activeId: undefined });
   window.localStorage.removeItem(HELIX_ASK_LANGUAGE_MODEL_PROFILE_STORAGE_KEY);
   vi.useRealTimers();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
 describe("HelixAskMinimalRuntimeShell", () => {
+  it("enables the shared recrowned carousel when minimal-runtime controls overflow", async () => {
+    const observers: ResizeObserverMock[] = [];
+    class ResizeObserverMock implements ResizeObserver {
+      readonly targets = new Set<Element>();
+
+      constructor(readonly callback: ResizeObserverCallback) {
+        observers.push(this);
+      }
+
+      observe(target: Element) {
+        this.targets.add(target);
+      }
+
+      unobserve(target: Element) {
+        this.targets.delete(target);
+      }
+
+      disconnect() {
+        this.targets.clear();
+      }
+    }
+    vi.stubGlobal("ResizeObserver", ResizeObserverMock);
+
+    render(<HelixAskMinimalRuntimeShell contextId="ctx" />);
+
+    const viewport = screen.getByTestId(
+      "helix-ask-action-carousel-viewport",
+    ) as HTMLDivElement;
+    const track = screen.getByTestId("helix-ask-action-carousel-track");
+    Object.defineProperties(viewport, {
+      clientWidth: { configurable: true, value: 300 },
+      scrollWidth: { configurable: true, value: 800 },
+      scrollLeft: { configurable: true, writable: true, value: 0 },
+    });
+    const observer = observers[0];
+    if (!observer) throw new Error("Expected the shared carousel observer");
+    expect(observer.targets.has(viewport)).toBe(true);
+    expect(observer.targets.has(track)).toBe(true);
+
+    act(() => {
+      observer.callback(
+        [{ target: track } as unknown as ResizeObserverEntry],
+        observer,
+      );
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Scroll Ask controls right" }),
+      ).toBeEnabled();
+    });
+  });
+
   it("submits the selected language model profile from the recrowned minimal shell", async () => {
     vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue("minimal-shell-language-profile");
     const runTurn = vi.fn(async (payload) => ({

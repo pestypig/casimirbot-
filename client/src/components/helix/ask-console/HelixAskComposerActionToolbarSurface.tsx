@@ -25,14 +25,14 @@ import {
   type HelixAskLiveRuntimeControlsModel,
   type HelixAskLiveRuntimeToolbarBridge,
 } from "./HelixAskLiveRuntimeControls";
+import {
+  useHelixAskActionCarousel,
+  type HelixAskActionCarouselDirection,
+} from "./useHelixAskActionCarousel";
 
 export type HelixAskComposerActionToolbarSurfaceProps = {
-  carouselRef?: Ref<HTMLDivElement>;
   imageInputRef?: Ref<HTMLInputElement>;
-  canScrollLeft: boolean;
-  canScrollRight: boolean;
-  onScrollLeft: () => void;
-  onScrollRight: () => void;
+  onCarouselScrollIntent?: (direction: HelixAskActionCarouselDirection) => void;
   onImageSelect: ChangeEventHandler<HTMLInputElement>;
   onAttachImage: () => void;
   attachDisabled?: boolean;
@@ -65,12 +65,8 @@ export type HelixAskComposerActionToolbarSurfaceProps = {
 };
 
 export function HelixAskComposerActionToolbarSurface({
-  carouselRef,
   imageInputRef,
-  canScrollLeft,
-  canScrollRight,
-  onScrollLeft,
-  onScrollRight,
+  onCarouselScrollIntent,
   onImageSelect,
   onAttachImage,
   attachDisabled = false,
@@ -101,6 +97,9 @@ export function HelixAskComposerActionToolbarSurface({
   onSubmitIntent,
   onStop,
 }: HelixAskComposerActionToolbarSurfaceProps) {
+  const actionCarousel = useHelixAskActionCarousel({
+    onScrollIntent: onCarouselScrollIntent,
+  });
   const [liveRuntimeBridge, setLiveRuntimeBridge] =
     useState<HelixAskLiveRuntimeToolbarBridge | null>(null);
   const legacyMicDisableRequestedRef = useRef(false);
@@ -126,19 +125,22 @@ export function HelixAskComposerActionToolbarSurface({
   const effectiveMicEnabled = liveOwnsMicrophone
     ? liveRuntimeBridge?.microphoneEnabled === true
     : micEnabled;
-  const effectiveVoiceTranscribing = liveOwnsMicrophone ? false : voiceTranscribing;
+  const effectiveVoiceTranscribing = liveOwnsMicrophone
+    ? false
+    : voiceTranscribing;
   const effectiveToggleMic = liveOwnsMicrophone
     ? () => liveRuntimeBridge?.toggleMicrophone()
     : onToggleMic;
 
   return (
     <HelixAskActionToolbar
-      carouselRef={carouselRef}
+      carouselRef={actionCarousel.viewportRef}
+      carouselTrackRef={actionCarousel.trackRef}
       imageInputRef={imageInputRef}
-      canScrollLeft={canScrollLeft}
-      canScrollRight={canScrollRight}
-      onScrollLeft={onScrollLeft}
-      onScrollRight={onScrollRight}
+      canScrollLeft={actionCarousel.canScrollLeft}
+      canScrollRight={actionCarousel.canScrollRight}
+      onScrollLeft={actionCarousel.onScrollLeft}
+      onScrollRight={actionCarousel.onScrollRight}
       onImageSelect={onImageSelect}
       onAttachImage={onAttachImage}
       attachDisabled={attachDisabled}
@@ -147,7 +149,10 @@ export function HelixAskComposerActionToolbarSurface({
       micEnabled={effectiveMicEnabled}
       showMicButton={!liveOwnsMicrophone}
       micInputMode={liveOwnsMicrophone ? "live_runtime" : "voice_lane"}
-      micDisabled={liveOwnsMicrophone && liveRuntimeBridge?.microphoneToggleDisabled !== false}
+      micDisabled={
+        liveOwnsMicrophone &&
+        liveRuntimeBridge?.microphoneToggleDisabled !== false
+      }
       voiceTranscribing={effectiveVoiceTranscribing}
       onToggleMic={effectiveToggleMic}
       showRetryVoiceSample={showRetryVoiceSample}

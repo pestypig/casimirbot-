@@ -1,6 +1,10 @@
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
-import { callWorkstationGatewayCapability } from "../workstation-tool-gateway/registry";
 import type { HelixWorkstationGatewayCallResult } from "../workstation-tool-gateway/types";
+import {
+  callAccountAuthorizedWorkstationGatewayCapabilityForProvider,
+  resolveWorkstationGatewayAccountContext,
+  type HelixWorkstationGatewayAccountContext,
+} from "../workstation-tool-gateway/account-policy";
 import {
   buildCompoundCapabilityDependencyGatewayCallRequests,
   buildCompoundDependencyRailStatus,
@@ -692,7 +696,12 @@ const deferRuntimeTheoryReflectionRequests = (
 export const readWorkstationGatewayCallRequestsForTurn = (input: {
   body: Record<string, unknown>;
   includePlannerDerived?: boolean;
+  deferRuntimeTheoryReflection?: boolean;
 }): Record<string, unknown>[] => {
+  const deferRuntimeOwnedReflection = (requests: Record<string, unknown>[]) =>
+    input.deferRuntimeTheoryReflection === false
+      ? requests
+      : deferRuntimeTheoryReflectionRequests(requests);
   const explicit = readExplicitWorkstationGatewayCallRequests(input.body);
   if (explicit.length > 0) {
     const deduplicated: Record<string, unknown>[] = [];
@@ -702,10 +711,9 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
       input.body,
       chainAwareExplicit,
     );
-    const runtimeDeferredExplicit = deferRuntimeTheoryReflectionRequests(
-      dependencyCompleteExplicit,
-      explicit,
-    );
+    const runtimeDeferredExplicit = input.deferRuntimeTheoryReflection === false
+      ? dependencyCompleteExplicit
+      : deferRuntimeTheoryReflectionRequests(dependencyCompleteExplicit, explicit);
     const prompt = readPrompt(input.body) ?? "";
     const admittedExplicit = filterRequestsAllowedByCommittedRoute(input.body, runtimeDeferredExplicit).filter((request) => {
       const capability = readString(request.capability_id) ?? readString(request.capabilityId);
@@ -733,7 +741,7 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   const seen = new Set<string>();
   const prompt = readPrompt(input.body) ?? "";
   const finalizeRequests = (candidates: Record<string, unknown>[]): Record<string, unknown>[] =>
-    deferRuntimeTheoryReflectionRequests(
+    deferRuntimeOwnedReflection(
       filterRequestsAllowedByCommittedRoute(input.body, candidates),
     )
       .filter((request) => {
@@ -915,6 +923,7 @@ export const runExplicitWorkstationGatewayCalls = async (input: {
   body: Record<string, unknown>;
   agentRuntime: HelixAgentRuntimeId;
   turnId?: string | null;
+  accountContext?: HelixWorkstationGatewayAccountContext;
 }): Promise<HelixWorkstationGatewayCallResult[]> => {
   const requests = readWorkstationGatewayCallRequestsForTurn({
     body: input.body,
@@ -922,7 +931,8 @@ export const runExplicitWorkstationGatewayCalls = async (input: {
   });
   const turnId = input.turnId ?? readHelixAgentTurnId(input.body);
   const results: HelixWorkstationGatewayCallResult[] = [];
-  const profileId = readString(input.body.research_library_owner_id);
+  const accountContext = input.accountContext ??
+    await resolveWorkstationGatewayAccountContext(null);
   const executeDependentChain = async (
     request: Record<string, unknown>,
     result: HelixWorkstationGatewayCallResult,
@@ -957,14 +967,14 @@ export const runExplicitWorkstationGatewayCalls = async (input: {
     let dependentDepth = 0;
     while (nextDependentRequest && dependentDepth < 4) {
       dependentDepth += 1;
-      const dependentResult = await callWorkstationGatewayCapability({
-        agentRuntime: input.agentRuntime,
-        mode: readString(nextDependentRequest.mode),
+      const dependentResult = await callAccountAuthorizedWorkstationGatewayCapabilityForProvider({
+        accountContext,
+        requestedRuntime: input.agentRuntime,
+        requestedMode: readString(nextDependentRequest.mode),
         capabilityId: readString(nextDependentRequest.capability_id) ?? "",
         arguments: readRecord(nextDependentRequest.arguments) ?? {},
         turnId,
         iteration: results.length + 1,
-        profileId,
       });
       results.push(dependentResult);
       const followupDependentRequest = buildDependentCompoundCapabilityGatewayCallRequest({
@@ -1002,15 +1012,15 @@ export const runExplicitWorkstationGatewayCalls = async (input: {
     result: HelixWorkstationGatewayCallResult;
   } | null = null;
   for (const [index, request] of requests.entries()) {
-    const result = await callWorkstationGatewayCapability({
-      agentRuntime: input.agentRuntime,
-      mode: readString(request.mode),
+    const result = await callAccountAuthorizedWorkstationGatewayCapabilityForProvider({
+      accountContext,
+      requestedRuntime: input.agentRuntime,
+      requestedMode: readString(request.mode),
       capabilityId: readString(request.capability_id) ?? readString(request.capabilityId) ?? "",
       arguments: readRecord(request.arguments ?? request.args) ?? {},
       approvalToken: readString(request.approval_token) ?? readString(request.approvalToken),
       turnId,
       iteration: typeof request.iteration === "number" ? request.iteration : index + 1,
-      profileId,
     });
     results.push(result);
     if (isScholarlyLookupPortfolioCloser(request)) {

@@ -1,4 +1,4 @@
-import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -119,6 +119,24 @@ import {
   deriveScholarlyEvidenceDemand,
 } from "../scholarly-evidence-demand";
 import { researchLibraryPrivateAccountToken } from "../../helix-account/research-library-store";
+import { readHelixSessionCookie } from "../../helix-account/session-cookie";
+import {
+  listAccountAuthorizedWorkstationGatewayCapabilities,
+  resolveWorkstationGatewayAccountContext,
+  type HelixWorkstationGatewayAccountContext,
+} from "../workstation-tool-gateway/account-policy";
+import {
+  buildCodexSpawnCommand,
+  resolveCodexBinary,
+} from "./codex-native/codex-binary";
+import {
+  resolveCodexNativeProviderBridgeAvailability,
+  runCodexNativeProviderBridge,
+} from "./codex-native/provider-bridge";
+export {
+  readCodexArgs,
+  resolveCodexBinary,
+} from "./codex-native/codex-binary";
 
 const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context" as const;
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression" as const;
@@ -186,31 +204,11 @@ const codexTimeoutMs = (): number => {
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 120_000;
 };
 
-const DEFAULT_CODEX_ARGS = [
-  "exec",
-  "--sandbox",
-  "read-only",
-  "--skip-git-repo-check",
-  "--color",
-  "never",
-] as const;
-
 export const CODEX_FINAL_ANSWER_PRESENTATION_POLICY_LINES = [
   "Final-answer presentation contract: return readable GitHub-flavored Markdown as the visible terminal candidate; do not wrap the whole answer in JSON or a generic code fence.",
   "Write inline mathematics as \\( ... \\) and display mathematics as \\[ ... \\] using valid LaTeX. For multiline display mathematics, prefer a fenced latex block; never substitute standalone bare [ and ] lines for LaTeX delimiters. Do not leave intended mathematical notation as bare pseudo-LaTeX or plaintext identifiers.",
   "When a diagram materially clarifies the answer, use a fenced mermaid block containing valid Mermaid syntax. Do not imitate a renderable diagram with ASCII arrows, box-drawing characters, or raw graph indicators.",
 ] as const;
-
-export const readCodexArgs = (): string[] => {
-  const configured = process.env.CODEX_ARGS;
-  if (configured === undefined || !configured.trim()) {
-    return [...DEFAULT_CODEX_ARGS];
-  }
-  return configured
-    .split(/\s+/)
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-};
 
 const readRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
@@ -8031,255 +8029,6 @@ const buildCodexDirectTerminalAuthority = (input: {
   });
 };
 
-type CodexBinaryResolution = {
-  launchable: boolean;
-  reason: string | null;
-  resolved_bin: string | null;
-  args: string[];
-};
-
-const CODEX_LAUNCH_PROBE_TIMEOUT_MS = 2_500;
-
-const fileExists = (candidate: string): boolean => {
-  try {
-    fs.accessSync(candidate, fs.constants.X_OK);
-    return true;
-  } catch {
-    try {
-      fs.accessSync(candidate, fs.constants.F_OK);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-};
-
-const isPathLikeCommand = (value: string): boolean =>
-  value.includes("/") || value.includes("\\") || path.isAbsolute(value);
-
-const resolveFromPath = (command: string): string | null => {
-  const pathValue = process.env.PATH ?? process.env.Path ?? "";
-  const extensions =
-    process.platform === "win32"
-      ? ["", ...String(process.env.PATHEXT ?? ".EXE;.CMD;.BAT;.COM").split(";")]
-      : [""];
-  for (const entry of pathValue.split(path.delimiter)) {
-    const directory = entry.trim();
-    if (!directory) continue;
-    for (const extension of extensions) {
-      const candidate = path.join(
-        directory,
-        command.endsWith(extension.toLowerCase()) || command.endsWith(extension)
-          ? command
-          : `${command}${extension.toLowerCase()}`,
-      );
-      if (fileExists(candidate)) return candidate;
-    }
-  }
-  return null;
-};
-
-const resolveFromWindowsApps = (): string | null => {
-  if (process.platform !== "win32" && !process.env.CODEX_WINDOWS_APPS_DIR) return null;
-  const windowsAppsDir =
-    process.env.CODEX_WINDOWS_APPS_DIR ??
-    path.join(process.env.ProgramFiles ?? "C:\\Program Files", "WindowsApps");
-  let entries: string[];
-  try {
-    entries = fs.readdirSync(windowsAppsDir);
-  } catch {
-    return null;
-  }
-  const matchingDirs = entries
-    .filter((entry) => /^OpenAI\.Codex_/i.test(entry))
-    .sort()
-    .reverse();
-  for (const entry of matchingDirs) {
-    const base = path.join(windowsAppsDir, entry, "app", "resources");
-    for (const filename of ["codex.exe", "codex"]) {
-      const candidate = path.join(base, filename);
-      if (fileExists(candidate)) return candidate;
-    }
-  }
-  return null;
-};
-
-const resolveFromCodexInstallLocation = (installLocation: string | null): string | null => {
-  if (!installLocation) return null;
-  for (const candidate of [
-    path.join(installLocation, "app", "resources", "codex.exe"),
-    path.join(installLocation, "app", "resources", "codex"),
-    path.join(installLocation, "resources", "codex.exe"),
-    path.join(installLocation, "resources", "codex"),
-    path.join(installLocation, "codex.exe"),
-    path.join(installLocation, "codex"),
-  ]) {
-    if (fileExists(candidate)) return candidate;
-  }
-  return null;
-};
-
-const resolveFromLocalNpmPackage = (): string | null => {
-  if (readBooleanEnv(process.env.CODEX_DISABLE_LOCAL_PACKAGE_BIN, false)) return null;
-  const candidates = [
-    path.join(process.cwd(), "node_modules", "@openai", "codex", "bin", "codex.js"),
-    path.join(process.cwd(), "node_modules", ".bin", process.platform === "win32" ? "codex.cmd" : "codex"),
-  ];
-  for (const candidate of candidates) {
-    if (fileExists(candidate)) return candidate;
-  }
-  return null;
-};
-
-const buildCodexSpawnCommand = (
-  resolvedBin: string,
-  args: string[],
-): { bin: string; args: string[] } => {
-  if (/[/\\]@openai[/\\]codex[/\\]bin[/\\]codex\.js$/i.test(resolvedBin)) {
-    return {
-      bin: process.execPath,
-      args: [resolvedBin, ...args],
-    };
-  }
-  return {
-    bin: resolvedBin,
-    args,
-  };
-};
-
-const resolveFromWindowsAppxPackage = (): string | null => {
-  const configuredInstallLocation = readString(process.env.CODEX_APPX_INSTALL_LOCATION);
-  if (configuredInstallLocation) {
-    return resolveFromCodexInstallLocation(configuredInstallLocation);
-  }
-  if (process.platform !== "win32") return null;
-
-  try {
-    const powershellBin = path.join(
-      process.env.SystemRoot ?? "C:\\Windows",
-      "System32",
-      "WindowsPowerShell",
-      "v1.0",
-      "powershell.exe",
-    );
-    const output = execFileSync(
-      fileExists(powershellBin) ? powershellBin : "powershell.exe",
-      [
-        "-NoProfile",
-        "-NonInteractive",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-Command",
-        [
-          "$ErrorActionPreference = 'SilentlyContinue';",
-          "$pkg = Get-AppxPackage -Name 'OpenAI.Codex' |",
-          "Sort-Object Version -Descending |",
-          "Select-Object -First 1;",
-          "if ($pkg -and $pkg.InstallLocation) {",
-          "  [Console]::Out.Write($pkg.InstallLocation)",
-          "}",
-        ].join(" "),
-      ],
-      {
-        encoding: "utf8",
-        timeout: 2_000,
-        windowsHide: true,
-        env: {
-          PATH: process.env.PATH,
-          Path: process.env.Path,
-          SystemRoot: process.env.SystemRoot,
-          ProgramFiles: process.env.ProgramFiles,
-        },
-      },
-    );
-    return resolveFromCodexInstallLocation(output.trim());
-  } catch {
-    return null;
-  }
-};
-
-const withLaunchProbe = (resolution: CodexBinaryResolution): CodexBinaryResolution => {
-  if (!resolution.launchable || !resolution.resolved_bin) return resolution;
-  const probeCommand = buildCodexSpawnCommand(resolution.resolved_bin, ["--version"]);
-  const probe = spawnSync(probeCommand.bin, probeCommand.args, {
-    encoding: "utf8",
-    timeout: CODEX_LAUNCH_PROBE_TIMEOUT_MS,
-    windowsHide: true,
-    env: {
-      PATH: process.env.PATH,
-      Path: process.env.Path,
-      HOME: process.env.HOME,
-      USERPROFILE: process.env.USERPROFILE,
-      SystemRoot: process.env.SystemRoot,
-      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-      CODEX_HOME: process.env.CODEX_HOME,
-    },
-  });
-
-  if (probe.error || probe.status === null) {
-    return {
-      ...resolution,
-      launchable: false,
-      reason: probe.error?.name === "TimeoutError"
-        ? "codex_binary_probe_timeout"
-        : "codex_binary_not_spawnable",
-    };
-  }
-
-  if (probe.status !== 0) {
-    return {
-      ...resolution,
-      launchable: false,
-      reason: "codex_binary_not_spawnable",
-    };
-  }
-
-  return resolution;
-};
-
-export const resolveCodexBinary = (): CodexBinaryResolution => {
-  const args = readCodexArgs();
-  const configured = readString(process.env.CODEX_BIN);
-
-  if (configured) {
-    if (isPathLikeCommand(configured)) {
-      return fileExists(configured)
-        ? withLaunchProbe({ launchable: true, reason: null, resolved_bin: configured, args })
-        : { launchable: false, reason: "codex_binary_not_found", resolved_bin: null, args };
-    }
-    const resolvedConfigured = resolveFromPath(configured);
-    if (resolvedConfigured) {
-      return withLaunchProbe({ launchable: true, reason: null, resolved_bin: resolvedConfigured, args });
-    }
-    return { launchable: false, reason: "codex_binary_not_found", resolved_bin: null, args };
-  }
-
-  const fromLocalNpmPackage = resolveFromLocalNpmPackage();
-  if (fromLocalNpmPackage) {
-    return withLaunchProbe({ launchable: true, reason: null, resolved_bin: fromLocalNpmPackage, args });
-  }
-
-  const fromPath = resolveFromPath("codex");
-  if (fromPath) return withLaunchProbe({ launchable: true, reason: null, resolved_bin: fromPath, args });
-
-  if (process.env.CODEX_WINDOWS_APPS_DIR) {
-    const fromConfiguredWindowsApps = resolveFromWindowsApps();
-    if (fromConfiguredWindowsApps) {
-      return withLaunchProbe({ launchable: true, reason: null, resolved_bin: fromConfiguredWindowsApps, args });
-    }
-  }
-
-  const fromWindowsAppxPackage = resolveFromWindowsAppxPackage();
-  if (fromWindowsAppxPackage) {
-    return withLaunchProbe({ launchable: true, reason: null, resolved_bin: fromWindowsAppxPackage, args });
-  }
-
-  const fromWindowsApps = resolveFromWindowsApps();
-  if (fromWindowsApps) return withLaunchProbe({ launchable: true, reason: null, resolved_bin: fromWindowsApps, args });
-
-  return { launchable: false, reason: "codex_binary_not_found", resolved_bin: null, args };
-};
-
 const readTurnId = (body: Record<string, unknown>): string =>
   readString(body.turn_id) ?? readString(body.turnId) ?? `ask:codex:${crypto.randomUUID()}`;
 
@@ -10917,11 +10666,13 @@ const emitCodexProviderProgressTranscriptEvents = (input: {
 export const runExplicitCodexWorkstationGatewayCalls = async (input: {
   body: Record<string, unknown>;
   turnId?: string | null;
+  accountContext?: HelixWorkstationGatewayAccountContext;
 }): Promise<HelixWorkstationGatewayCallResult[]> => {
   return runExplicitWorkstationGatewayCalls({
     body: input.body,
     agentRuntime: "codex",
     turnId: input.turnId ?? readTurnId(input.body),
+    accountContext: input.accountContext,
   });
 };
 
@@ -11660,6 +11411,24 @@ export async function runCodexProcess(input: {
     };
   }
 
+  const runningUnderTest = process.env.VITEST !== undefined || process.env.NODE_ENV === "test";
+  if (
+    runningUnderTest &&
+    !readBooleanEnv(process.env.HELIX_CODEX_COMPATIBILITY_PROCESS_TEST_ENABLED, false)
+  ) {
+    return {
+      stdout: "",
+      stderr: "Codex compatibility process execution is disabled in deterministic tests.",
+      exitCode: null,
+      timedOut: false,
+      killed: false,
+      failReason: "codex_process_disabled_in_test",
+      bin: null,
+      args: [],
+      prompt_diagnostics: promptDiagnostics,
+    };
+  }
+
   const binary = resolveCodexBinary();
   if (!binary.launchable || !binary.resolved_bin) {
     const stderr = binary.reason === "codex_binary_not_spawnable"
@@ -11851,6 +11620,13 @@ export const codexProvider: HelixAgentProvider = {
     const question = readQuestion(request.body);
     const turnId = readTurnId(request.body);
     const threadId = readThreadId(request.body);
+    const requestCookieHeader = Array.isArray(request.headers?.cookie)
+      ? request.headers?.cookie.join("; ")
+      : request.headers?.cookie;
+    const workstationAccountContext = request.workstationAccountContext ??
+      await resolveWorkstationGatewayAccountContext(
+        readHelixSessionCookie(requestCookieHeader),
+      );
     const terminalProductPolicySuppliedByCaller = Boolean(
       readRecord(request.body.committed_ask_route) ||
       readRecord(request.body.route_product_contract) ||
@@ -11862,6 +11638,9 @@ export const codexProvider: HelixAgentProvider = {
       turnId,
       selectedRoute: request.route,
     });
+    const nativeProviderDecisionLoopPreferred =
+      resolveCodexNativeProviderBridgeAvailability().available &&
+      !routeAllowsModelOnlyDirectAnswer(request.body);
     const referentResolution = resolveHelixAskReadAloudReferent(request.body);
     const referentResolutionTrace =
       referentResolution.trace.resolution_confidence === "not_applicable"
@@ -11887,11 +11666,17 @@ export const codexProvider: HelixAgentProvider = {
       });
     };
     const modelMetadata = buildCodexProviderModelMetadata();
+    const accountAuthorizedGatewayManifest = listAccountAuthorizedWorkstationGatewayCapabilities({
+      accountContext: workstationAccountContext,
+      requestedMode: "act",
+      requestedRuntime: request.runtime,
+    });
     const adapterContract = buildHelixAgentRuntimeAdapterContract({
       route: request.route,
       requestedRuntime: request.runtime,
       provider: codexProvider,
       gatewayMode: "act",
+      gatewayManifest: accountAuthorizedGatewayManifest,
     });
     const gatewayManifest = adapterContract.workstation_gateway_manifest;
     const runtimeSelectionTrace = adapterContract.runtime_selection_trace;
@@ -12021,10 +11806,13 @@ export const codexProvider: HelixAgentProvider = {
       packets: capabilityLaneContext.observation_packets,
     });
     let capabilityLaneDebugProjection = capabilityLaneContext.debug_projection;
-    let evidenceGatewayCallResults = await runExplicitCodexWorkstationGatewayCalls({
-      body: request.body,
-      turnId,
-    });
+    let evidenceGatewayCallResults = nativeProviderDecisionLoopPreferred
+      ? []
+      : await runExplicitCodexWorkstationGatewayCalls({
+          body: request.body,
+          turnId,
+          accountContext: workstationAccountContext,
+        });
     let scholarlyFollowupEvidenceLookup: ScholarlyFollowupEvidenceLookup | null = null;
     let priorScholarlyEvidenceMemoryRecord: ScholarlyFollowupEvidenceMemoryRecord | null = null;
     let currentTurnScholarlyDeepEvidenceMemoryRecord: ScholarlyFollowupEvidenceMemoryRecord | null = null;
@@ -12105,6 +11893,7 @@ export const codexProvider: HelixAgentProvider = {
           const recoveredGatewayResults = await runExplicitCodexWorkstationGatewayCalls({
             body: recovery.body,
             turnId,
+            accountContext: workstationAccountContext,
           });
           evidenceGatewayCallResults = [
             ...evidenceGatewayCallResults,
@@ -12482,24 +12271,24 @@ export const codexProvider: HelixAgentProvider = {
       ...actionReceiptResults,
       ...noteCreateActionReceiptResults,
     ];
-    const projectedActionReceiptResults = [
+    let projectedActionReceiptResults = [
       ...actionReceiptResults,
       ...noteCreateActionReceiptResults,
       ...evidenceGatewayCallResults.filter(isWorkstationActionReceipt),
     ];
-    const actionEnvelope = buildCodexActionEnvelopeFromReceipts(projectedActionReceiptResults);
-    const hostWorkstationAffordances = buildCodexHostWorkstationAffordances({
+    let actionEnvelope = buildCodexActionEnvelopeFromReceipts(projectedActionReceiptResults);
+    let hostWorkstationAffordances = buildCodexHostWorkstationAffordances({
       turnId,
       gatewayCallResults,
     });
     const currentTurnTheoryReflectionSucceeded =
       hasSuccessfulTheoryContextReflectionGatewayResult(gatewayCallResults);
-    const workstationArtifactAdmissionTrace = buildWorkstationArtifactAdmissionTrace({
+    let workstationArtifactAdmissionTrace = buildWorkstationArtifactAdmissionTrace({
       turnId,
       gatewayCallResults,
       affordances: hostWorkstationAffordances,
     });
-    const agentStepLoop = buildCodexAgentStepLoopFromReceipts({
+    let agentStepLoop = buildCodexAgentStepLoopFromReceipts({
       turnId,
       actionReceiptResults: projectedActionReceiptResults,
       gatewayCallResults: evidenceGatewayCallResults,
@@ -13511,20 +13300,160 @@ export const codexProvider: HelixAgentProvider = {
       emittedIds: emittedLiveTranscriptEventIds,
     });
 
-    let result = await runCodexProcess({
+    const nativeProviderBridgeAttempt = await runCodexNativeProviderBridge({
+      eligible: !modelOnlyDirectAnswerForPrompt,
       prompt,
-      signal: request.signal,
       turnId,
-      onNativeEvent: emitCodexNativeRuntimeEvent,
+      body: request.body,
+      headers: request.headers,
+      accountContext: workstationAccountContext,
+      signal: request.signal,
     });
+    const nativeGatewayCallResults = nativeProviderBridgeAttempt.gatewayCallResults;
+    const nativeTurnSucceeded = nativeProviderBridgeAttempt.result?.ok === true;
+    const nativeUnobservedCapabilityIds =
+      nativeProviderBridgeAttempt.result?.debug.route_unobserved_tools ?? [];
+    const compatibilityGatewayRecoveryAttempted =
+      !nativeTurnSucceeded &&
+      nativeProviderBridgeAttempt.attempted &&
+      (
+        nativeGatewayCallResults.length === 0 ||
+        nativeUnobservedCapabilityIds.length > 0
+      );
+    const compatibilityGatewayRecoveryResults = compatibilityGatewayRecoveryAttempted
+      ? await runExplicitCodexWorkstationGatewayCalls({
+          body: request.body,
+          turnId,
+          accountContext: workstationAccountContext,
+        })
+      : [];
+    const providerBridgeGatewayCallResults = mergeUniqueGatewayCallResults(
+      nativeGatewayCallResults,
+      compatibilityGatewayRecoveryResults,
+    );
+    if (providerBridgeGatewayCallResults.length > 0) {
+      evidenceGatewayCallResults = mergeUniqueGatewayCallResults(
+        evidenceGatewayCallResults,
+        providerBridgeGatewayCallResults,
+      );
+      gatewayCallResults = mergeUniqueGatewayCallResults(
+        gatewayCallResults,
+        providerBridgeGatewayCallResults,
+      );
+      projectedActionReceiptResults = [
+        ...actionReceiptResults,
+        ...noteCreateActionReceiptResults,
+        ...evidenceGatewayCallResults.filter(isWorkstationActionReceipt),
+      ];
+      actionEnvelope = buildCodexActionEnvelopeFromReceipts(projectedActionReceiptResults);
+      gatewayObservationPackets = gatewayCallResults.map((gatewayResult) => gatewayResult.observation_packet);
+      normalizedObservationResult = buildCodexNormalizedObservationArtifacts({
+        turnId,
+        gatewayCallResults,
+      });
+      normalizedObservationArtifacts = normalizedObservationResult.artifacts;
+      normalizedObservationPackets = buildNormalizedObservationPacketsFromArtifacts({
+        turnId,
+        artifacts: normalizedObservationArtifacts,
+      });
+      if (priorScholarlyEvidencePacket) {
+        normalizedObservationPackets = [
+          ...normalizedObservationPackets,
+          priorScholarlyEvidencePacket,
+        ];
+      }
+      providerGatewayPacketLedger = buildCurrentTurnArtifactLedgerFromGatewayPackets({
+        turnId,
+        packets: gatewayObservationPackets,
+      });
+      currentTurnArtifactLedger = [
+        ...normalizedObservationArtifacts,
+        ...providerGatewayPacketLedger,
+        ...capabilityLaneContext.artifact_ledger,
+        ...(priorScholarlyEvidenceArtifact ? [priorScholarlyEvidenceArtifact] : []),
+        ...(scientificImageContinuationArtifact ? [scientificImageContinuationArtifact] : []),
+        ...(scholarlyPdfWorkbenchArtifact ? [scholarlyPdfWorkbenchArtifact] : []),
+      ];
+      codexCompoundSubgoalLedger = buildCodexCompoundSubgoalLedger({
+        turnId,
+        normalizedArtifacts: normalizedObservationArtifacts,
+        gatewayCallResults: evidenceGatewayCallResults,
+      });
+      gatewayLifecycleTraces = gatewayCallResults.map((gatewayResult) => gatewayResult.tool_lifecycle_trace);
+      gatewayFollowupDecisions = gatewayCallResults.map((gatewayResult) => gatewayResult.tool_followup_decision);
+      hostWorkstationAffordances = buildCodexHostWorkstationAffordances({
+        turnId,
+        gatewayCallResults,
+      });
+      workstationArtifactAdmissionTrace = buildWorkstationArtifactAdmissionTrace({
+        turnId,
+        gatewayCallResults,
+        affordances: hostWorkstationAffordances,
+      });
+      agentStepLoop = buildCodexAgentStepLoopFromReceipts({
+        turnId,
+        actionReceiptResults: projectedActionReceiptResults,
+        gatewayCallResults: evidenceGatewayCallResults,
+      });
+      providerContinuationState = publishProviderContinuationState("post_attempt");
+    }
+    const codexNativeCompatibilityFallback = {
+      schema: "helix.codex_native_compatibility_fallback.v1",
+      activated: nativeProviderBridgeAttempt.eligible && !nativeTurnSucceeded,
+      native_attempted: nativeProviderBridgeAttempt.attempted,
+      native_fallback_reason: nativeProviderBridgeAttempt.fallbackReason,
+      native_unobserved_capability_ids: nativeUnobservedCapabilityIds,
+      gateway_recovery_attempted: compatibilityGatewayRecoveryAttempted,
+      gateway_recovery_result_count: compatibilityGatewayRecoveryResults.length,
+      gateway_recovery_capability_ids: compatibilityGatewayRecoveryResults.map(
+        (gatewayResult) => gatewayResult.capability_id,
+      ),
+      compatibility_transport: "codex_exec",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const compatibilityPrompt = providerBridgeGatewayCallResults.length > 0
+      ? [
+          prompt,
+          "",
+          "The Codex app-server compatibility handoff below contains observations produced during the failed native attempt. They are current-turn evidence and must re-enter reasoning before the final answer:",
+          JSON.stringify(providerBridgeGatewayCallResults, null, 2),
+        ].join("\n")
+      : prompt;
+    let result: CodexProcessResult = nativeTurnSucceeded
+      ? {
+          stdout: nativeProviderBridgeAttempt.result?.answer ?? "",
+          stderr: nativeProviderBridgeAttempt.result?.native?.stderr ?? "",
+          exitCode: 0,
+          timedOut: false,
+          killed: false,
+          failReason: null,
+          bin: "codex-app-server",
+          args: ["app-server", "--listen", "stdio://"],
+          prompt_diagnostics: {
+            char_count: prompt.length,
+            prompt_hash: hashScientificImageSourceShort(["codex_native_prompt", prompt]),
+            protected_marker_ids: detectProviderPromptLeakMarkers(prompt),
+            raw_prompt_included: false,
+          },
+        }
+      : await runCodexProcess({
+          prompt: compatibilityPrompt,
+          signal: request.signal,
+          turnId,
+          onNativeEvent: emitCodexNativeRuntimeEvent,
+        });
     const initialCodexText =
       result.stdout.trim() ||
       result.stderr.trim() ||
       "Codex runtime did not return output before the provider adapter stopped waiting.";
-    let runtimeSemanticRouteProposal = extractCodexSemanticRouteProposalCandidate(initialCodexText, {
-      turnId,
-      question,
-    });
+    let runtimeSemanticRouteProposal =
+      nativeProviderBridgeAttempt.result?.debug.route_proposal ??
+      extractCodexSemanticRouteProposalCandidate(initialCodexText, {
+        turnId,
+        question,
+      });
     let runtimeLaneRequestCandidate: Record<string, unknown> | Record<string, unknown>[] | null =
       capabilityLaneContext.observation_packets.length === 0
         ? extractCodexCapabilityLaneRequestCandidate(initialCodexText)
@@ -15617,6 +15546,8 @@ export const codexProvider: HelixAgentProvider = {
         : {}),
       chat_referent_context_presence: chatReferentContextPresence,
       chat_referent_context_source_summary: chatReferentContextSourceSummary,
+      codex_native_provider_bridge: nativeProviderBridgeAttempt.debug,
+      codex_native_compatibility_fallback: codexNativeCompatibilityFallback,
       provider_prompt_diagnostics: result.prompt_diagnostics,
       provider_prompt_leak_guard: providerPromptLeakDetected
         ? {
@@ -15784,6 +15715,8 @@ export const codexProvider: HelixAgentProvider = {
         conversational_referent_resolution: conversationalReferentResolutionTrace,
         chat_referent_context_presence: chatReferentContextPresence,
         chat_referent_context_source_summary: chatReferentContextSourceSummary,
+        codex_native_provider_bridge: nativeProviderBridgeAttempt.debug,
+        codex_native_compatibility_fallback: codexNativeCompatibilityFallback,
         runtime_lane_request_loop: runtimeLaneRequestLoop,
         scientific_image_artifact_admission_trace: scientificImageArtifactAdmissionTrace,
         workstation_artifact_admission_trace: workstationArtifactAdmissionTrace,

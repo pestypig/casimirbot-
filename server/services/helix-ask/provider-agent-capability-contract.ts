@@ -437,6 +437,14 @@ const explicitClassificationByCapability = new Map(
   ]),
 );
 
+export const resolveProviderGatewayCapabilityId = (
+  capabilityId: string | null | undefined,
+): string | null => {
+  const normalized = String(capabilityId ?? "").trim();
+  if (!normalized) return null;
+  return explicitClassificationByCapability.get(normalized)?.provider_gateway_alias_target ?? normalized;
+};
+
 const currentGatewayCapabilities = listWorkstationGatewayCapabilities({
   agentRuntime: "codex",
   mode: "observe",

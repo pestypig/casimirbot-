@@ -358,6 +358,7 @@ export { HelixAskMoodAvatar } from "./HelixAskMoodAvatar";
 export { HelixAskMoodAvatarSurface } from "./HelixAskMoodAvatarSurface";
 export { buildHelixAskMoodAvatarState } from "./HelixAskMoodAvatarState";
 export { HelixAskActionToolbar } from "./HelixAskActionToolbar";
+export { useHelixAskActionCarousel } from "./useHelixAskActionCarousel";
 export { HelixAskComposerActionToolbarSurface } from "./HelixAskComposerActionToolbarSurface";
 export { buildHelixAskComposerActionToolbarState } from "./HelixAskComposerActionToolbarState";
 export { HelixAskGoalPill } from "./HelixAskGoalPill";
@@ -934,6 +935,12 @@ export type {
   HelixAskActionToolbarProps,
   HelixAskVisualSourceKind,
 } from "./HelixAskActionToolbar";
+export type {
+  HelixAskActionCarouselController,
+  HelixAskActionCarouselDirection,
+  HelixAskActionCarouselEdges,
+  UseHelixAskActionCarouselOptions,
+} from "./useHelixAskActionCarousel";
 export type { HelixAskComposerActionToolbarSurfaceProps } from "./HelixAskComposerActionToolbarSurface";
 export type {
   HelixAskGoalPillProps,

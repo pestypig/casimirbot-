@@ -1,9 +1,12 @@
 import crypto from "node:crypto";
 import {
-  HELIX_REALTIME_WORKER_ADMISSION_SCHEMA,
-  type HelixRealtimeWorkerAdmissionOutcomeV1,
-  type HelixRealtimeWorkerAdmissionV1,
-} from "@shared/contracts/helix-realtime-worker-relay.v1";
+  HELIX_REALTIME_WORKER_ADMISSION_V2_SCHEMA,
+  HELIX_REALTIME_WORKER_DISPATCH_V2_SCHEMA,
+  type HelixRealtimeWorkerAdmissionOutcomeV2,
+  type HelixRealtimeWorkerAdmissionV2,
+  type HelixRealtimeWorkerDispatchKindV2,
+  type HelixRealtimeWorkerDispatchStateV2,
+} from "@shared/contracts/helix-realtime-worker-dispatch.v2";
 import type { HelixRealtimeStagePlayGoalBindingV1 } from "@shared/contracts/helix-realtime-stage-play.v1";
 import { readWorkstationGatewayCallRequestsForTurn } from "../agent-providers/explicit-workstation-gateway";
 import { arbitrateAskSourceTarget } from "../ask-source-target-arbitrator";
@@ -56,8 +59,8 @@ const buildAdmission = (input: {
   handoffId: string;
   realtimeSessionId: string;
   threadId: string;
-  decisionPhase: HelixRealtimeWorkerAdmissionV1["decision_phase"];
-  outcome: HelixRealtimeWorkerAdmissionOutcomeV1;
+  decisionPhase: HelixRealtimeWorkerAdmissionV2["decision_phase"];
+  outcome: HelixRealtimeWorkerAdmissionOutcomeV2;
   reasonCodes: string[];
   primaryIntent?: string | null;
   selectedRoute?: string | null;
@@ -66,12 +69,27 @@ const buildAdmission = (input: {
   candidateReadonlyCapabilityIds?: string[];
   observedReadonlyCapabilityIds?: string[];
   actionCandidateCapabilityIds?: string[];
+  goalId?: string | null;
+  runtimeGoalSessionRef?: string | null;
+  dispatchState?: HelixRealtimeWorkerDispatchStateV2;
+  workerTurnDispatched?: boolean;
   evidenceRefs?: string[];
   nowMs?: number;
-}): HelixRealtimeWorkerAdmissionV1 => {
+}): HelixRealtimeWorkerAdmissionV2 => {
   const decidedAtMs = input.nowMs ?? Date.now();
+  const dispatchKind: HelixRealtimeWorkerDispatchKindV2 =
+    input.outcome === "conversation_local"
+      ? "none"
+      : input.outcome === "durable_goal_bound"
+        ? "goal_wake"
+        : input.outcome === "action_candidate"
+          ? "ask_runtime_read_only"
+          : "ask_runtime";
+  const dispatchRequested = dispatchKind !== "none";
+  const dispatchState = input.dispatchState ??
+    (dispatchRequested ? "requested" : "not_required");
   return {
-    schema: HELIX_REALTIME_WORKER_ADMISSION_SCHEMA,
+    schema: HELIX_REALTIME_WORKER_ADMISSION_V2_SCHEMA,
     admission_id: `realtime-worker-admission:${hash([
       input.handoffId,
       input.decisionPhase,
@@ -92,7 +110,31 @@ const buildAdmission = (input: {
     candidate_readonly_capability_ids: unique(input.candidateReadonlyCapabilityIds ?? []),
     observed_readonly_capability_ids: unique(input.observedReadonlyCapabilityIds ?? []),
     action_candidate_capability_ids: unique(input.actionCandidateCapabilityIds ?? []),
-    worker_turn_dispatched: true,
+    dispatch: {
+      schema: HELIX_REALTIME_WORKER_DISPATCH_V2_SCHEMA,
+      kind: dispatchKind,
+      state: dispatchState,
+      requested: dispatchRequested,
+      completed: dispatchState === "completed",
+      target_runtime_agent_provider: input.runtimeProvider ?? null,
+      runtime_selection_source: input.outcome === "durable_goal_bound"
+        ? "goal_binding"
+        : dispatchRequested && Boolean(input.runtimeProvider)
+          ? "ask_ui_selected_runtime"
+          : "none",
+      goal_id: input.goalId ?? null,
+      runtime_goal_session_ref: input.runtimeGoalSessionRef ?? null,
+      suppress_parallel_ask_turn:
+        input.outcome === "conversation_local" || input.outcome === "durable_goal_bound",
+      read_only: true,
+      workstation_action_execution_allowed: false,
+      realtime_provider_tool_execution_allowed: false,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    },
+    worker_turn_dispatched: input.workerTurnDispatched === true,
     spoken_relay_eligible:
       input.outcome === "worker_grounded" || input.outcome === "durable_goal_bound",
     workstation_action_execution_allowed: false,
@@ -113,9 +155,10 @@ export const buildRealtimeTranscriptWorkerAdmission = (input: {
   transcriptText: string;
   sourceBinding?: RecordLike | null;
   activeGoalBinding?: HelixRealtimeStagePlayGoalBindingV1 | null;
+  selectedRuntimeAgentProvider?: string | null;
   evidenceRefs?: string[];
   nowMs?: number;
-}): HelixRealtimeWorkerAdmissionV1 => {
+}): HelixRealtimeWorkerAdmissionV2 => {
   const workspaceSnapshot = workspaceSnapshotFromBinding(input.sourceBinding);
   const interpretation = interpretHelixAskPrompt(input.transcriptText);
   const hypotheses = buildHelixIntentHypotheses({
@@ -157,7 +200,7 @@ export const buildRealtimeTranscriptWorkerAdmission = (input: {
     sourceTargetIntent.target_source !== "unknown" &&
     sourceTargetIntent.target_source !== "model_only" &&
     sourceTargetIntent.allow_no_tool_direct === false;
-  const outcome: HelixRealtimeWorkerAdmissionOutcomeV1 = input.activeGoalBinding
+  const outcome: HelixRealtimeWorkerAdmissionOutcomeV2 = input.activeGoalBinding
     ? "durable_goal_bound"
     : actionCapabilityIds.length > 0 || primaryIntent === "control_command"
       ? "action_candidate"
@@ -170,6 +213,9 @@ export const buildRealtimeTranscriptWorkerAdmission = (input: {
         : "conversation_local";
   const reasonCodes = [
     input.activeGoalBinding ? "active_runtime_goal_binding" : null,
+    !input.activeGoalBinding && input.selectedRuntimeAgentProvider
+      ? "ask_ui_selected_runtime"
+      : null,
     actionCapabilityIds.length > 0 ? "normal_ask_policy_found_action_candidate" : null,
     readonlyCapabilityIds.length > 0 ? "normal_ask_policy_found_readonly_capability" : null,
     sourceTargetRequiresEvidence
@@ -188,7 +234,12 @@ export const buildRealtimeTranscriptWorkerAdmission = (input: {
     reasonCodes,
     primaryIntent,
     selectedRoute: sourceTargetIntent.target_source,
-    runtimeProvider: input.activeGoalBinding?.runtime_agent_provider ?? null,
+    runtimeProvider:
+      input.activeGoalBinding?.runtime_agent_provider ??
+      input.selectedRuntimeAgentProvider ??
+      null,
+    goalId: input.activeGoalBinding?.goal_id ?? null,
+    runtimeGoalSessionRef: input.activeGoalBinding?.runtime_session_ref ?? null,
     candidateReadonlyCapabilityIds: readonlyCapabilityIds,
     actionCandidateCapabilityIds: actionCapabilityIds,
     evidenceRefs: input.evidenceRefs,
@@ -235,13 +286,13 @@ const readSelectedModel = (payload: RecordLike, debug: RecordLike | null): strin
 };
 
 export const resolveRealtimeFinalWorkerAdmission = (input: {
-  preliminary: HelixRealtimeWorkerAdmissionV1;
+  preliminary: HelixRealtimeWorkerAdmissionV2;
   payload: RecordLike;
   debug?: RecordLike | null;
   solverTrace?: RecordLike | null;
   evidenceRefs?: string[];
   nowMs?: number;
-}): HelixRealtimeWorkerAdmissionV1 => {
+}): HelixRealtimeWorkerAdmissionV2 => {
   const debug = input.debug ?? null;
   const solverTrace = input.solverTrace ?? null;
   const observedCapabilities = readSuccessfulRealtimeGatewayCapabilityIds({
@@ -256,7 +307,7 @@ export const resolveRealtimeFinalWorkerAdmission = (input: {
   const greetingOnlyPolicy = input.preliminary.reason_codes.includes(
     "ask_smalltalk_greeting_only_policy",
   );
-  const outcome: HelixRealtimeWorkerAdmissionOutcomeV1 =
+  const outcome: HelixRealtimeWorkerAdmissionOutcomeV2 =
     input.preliminary.outcome === "durable_goal_bound"
       ? "durable_goal_bound"
       : input.preliminary.outcome === "action_candidate" || primaryIntent === "control_command"
@@ -289,6 +340,10 @@ export const resolveRealtimeFinalWorkerAdmission = (input: {
       input.preliminary.selected_runtime_agent_provider,
     ),
     selectedModel: readSelectedModel(input.payload, debug),
+    goalId: input.preliminary.dispatch.goal_id,
+    runtimeGoalSessionRef: input.preliminary.dispatch.runtime_goal_session_ref,
+    dispatchState: input.preliminary.dispatch.requested ? "completed" : "not_required",
+    workerTurnDispatched: input.preliminary.dispatch.requested,
     candidateReadonlyCapabilityIds: input.preliminary.candidate_readonly_capability_ids,
     observedReadonlyCapabilityIds: observedCapabilities,
     actionCandidateCapabilityIds: input.preliminary.action_candidate_capability_ids,

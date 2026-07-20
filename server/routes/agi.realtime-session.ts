@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { getAccountCapabilityPolicy } from "../services/helix-account/account-session-store";
+import { resolveHelixRuntimeAgentAccess } from "@shared/helix-account-session";
 import { readHelixSessionCookie } from "../services/helix-account/session-cookie";
 import {
   buildRealtimeClientReceiptResponse,
@@ -31,6 +32,7 @@ import {
 import { buildRealtimeStagePlayDebugProvenance } from "../services/helix-ask/realtime-session/debug-provenance";
 import { createRealtimeGroundedAnswerFeedbackMiddleware } from "../services/helix-ask/realtime-session/grounded-answer-feedback";
 import { recordRealtimeGroundedRelayClientReceipt } from "../services/helix-ask/realtime-session/grounded-answer-relay";
+import { getHelixAgentProviderById } from "../services/helix-ask/agent-providers/registry";
 import {
   isHelixRealtimeToolSuggestionEventType,
   isHelixRealtimeTranscriptEventType,
@@ -44,6 +46,8 @@ import {
   mergeRealtimeWorkstationSourceBinding,
   readSafeRealtimeSourceBinding,
 } from "../services/helix-ask/realtime-session/source-binding";
+import { resolveWorkstationGatewayAccountContext } from "../services/helix-ask/workstation-tool-gateway/account-policy";
+import { buildRuntimeGoalAccountScope } from "../services/helix-ask/runtime-goals/runtime-goal-account-binding";
 
 export const realtimeSessionRouter = Router();
 
@@ -97,7 +101,11 @@ const respondRealtimeBoundary = async (input: {
   realtimeSessionId?: string | null;
 }) => {
   const body = readRecord(input.req.body);
-  const accountPolicy = await accountPolicyForRequest(input.req);
+  const accountContext = await resolveWorkstationGatewayAccountContext(
+    readHelixSessionCookie(input.req.headers.cookie),
+  );
+  const accountPolicy = accountContext.account_policy;
+  const runtimeGoalAccountScope = buildRuntimeGoalAccountScope(accountContext);
   const policyGate = resolveRealtimeSessionPolicyGate({ accountPolicy, body });
 
   if (!policyGate.runtime_agent_controls_available) {
@@ -107,6 +115,35 @@ const respondRealtimeBoundary = async (input: {
       body,
       realtimeSessionId: input.realtimeSessionId ?? null,
       blockedReason: "account_policy_locked",
+    }));
+  }
+
+  const requestedRuntimeAgentProvider = readString(
+    body.selected_runtime_agent_provider ?? body.selectedRuntimeAgentProvider,
+  );
+  const requestedRuntimeProvider = requestedRuntimeAgentProvider
+    ? getHelixAgentProviderById(requestedRuntimeAgentProvider)
+    : null;
+  const requestedRuntimeAccess = requestedRuntimeAgentProvider
+    ? resolveHelixRuntimeAgentAccess(accountPolicy, requestedRuntimeAgentProvider)
+    : null;
+  if (
+    requestedRuntimeAgentProvider &&
+    (
+      requestedRuntimeAccess?.state !== "available" ||
+      !requestedRuntimeProvider?.enabled()
+    )
+  ) {
+    return input.res.status(403).json(buildRealtimeSessionBoundaryResponse({
+      action: input.action,
+      accountPolicy,
+      body,
+      realtimeSessionId: input.realtimeSessionId ?? null,
+      blockedReason: requestedRuntimeAccess?.state !== "available"
+        ? "runtime_agent_outside_account_policy"
+        : requestedRuntimeProvider
+          ? "runtime_agent_provider_unavailable"
+          : "runtime_agent_provider_unknown",
     }));
   }
 
@@ -151,6 +188,8 @@ const respondRealtimeBoundary = async (input: {
         voice: readString(body.selected_realtime_voice ?? body.selectedRealtimeVoice ?? body.voice),
         threadId: readThreadId(body, sourceBinding),
         sourceBinding,
+        selectedRuntimeAgentProvider: requestedRuntimeAgentProvider,
+        runtimeGoalAccountScope,
       });
     }
     return input.res.status(200).json(response);
@@ -253,15 +292,23 @@ const respondRealtimeBoundary = async (input: {
     const currentWorkstationSourceBinding = readSafeRealtimeSourceBinding(
       body.workstation_source_binding ?? body.workstationSourceBinding,
     );
-    const contextualSession = session && currentWorkstationSourceBinding
+    const selectedRuntimeAgentProvider =
+      requestedRuntimeAgentProvider ?? session?.selectedRuntimeAgentProvider ?? null;
+    const contextualSession = session
       ? updateAdmittedRealtimeSession({
           realtimeSessionId: session.realtimeSessionId,
           requesterRef: session.requesterRef,
           patch: {
-            sourceBinding: mergeRealtimeWorkstationSourceBinding({
-              base: session.sourceBinding,
-              current: currentWorkstationSourceBinding,
-            }),
+            ...(currentWorkstationSourceBinding
+              ? {
+                  sourceBinding: mergeRealtimeWorkstationSourceBinding({
+                    base: session.sourceBinding,
+                    current: currentWorkstationSourceBinding,
+                  }),
+                }
+              : {}),
+            selectedRuntimeAgentProvider,
+            runtimeGoalAccountScope,
           },
         }) ?? session
       : session;
@@ -276,6 +323,8 @@ const respondRealtimeBoundary = async (input: {
           transcriptText,
           observation,
           sourceBinding: contextualSession.sourceBinding,
+          selectedRuntimeAgentProvider: contextualSession.selectedRuntimeAgentProvider,
+          runtimeGoalAccountScope: contextualSession.runtimeGoalAccountScope,
           providerCallRef: contextualSession.providerCallRef,
           transportReceiptRef: readString(
             body.realtime_transport_receipt_ref ?? body.transport_receipt_ref,

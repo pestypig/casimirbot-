@@ -515,6 +515,7 @@ export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
       "live_pipeline_control",
       "live-source.set_rate",
       "situation-room.live-source.set_rate",
+      "live_source:control_live_source",
       "set_rate",
     ],
   }),

@@ -3,6 +3,7 @@ import type {
   HelixLiveRuntimeAgentAuthority,
   HelixLiveRuntimeAgentMode,
 } from "@shared/helix-live-runtime-agent";
+import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
 import type { HelixRealtimeSessionResponse } from "@shared/helix-realtime-session";
 import type { HelixRealtimeGroundedRelayStatusV1 } from "@shared/contracts/helix-realtime-worker-relay.v1";
 import {
@@ -110,6 +111,7 @@ export const useHelixAskLiveRuntimeSession = (input: {
   enabled: boolean;
   mode: HelixLiveRuntimeAgentMode;
   authority: HelixLiveRuntimeAgentAuthority;
+  selectedRuntimeAgentProvider: HelixAgentRuntimeId;
   initialLifecycleState?: HelixAskLiveRuntimeLifecycleState;
   initialTransportState?: HelixAskLiveRuntimeTransportControllerState;
 }) => {
@@ -123,6 +125,8 @@ export const useHelixAskLiveRuntimeSession = (input: {
   const sessionIdRef = useRef<string | null>(null);
   const microphoneEnabledRef = useRef(false);
   const visualInputEnabledRef = useRef(false);
+  const selectedRuntimeAgentProviderRef = useRef(input.selectedRuntimeAgentProvider);
+  selectedRuntimeAgentProviderRef.current = input.selectedRuntimeAgentProvider;
   const runtimeContextRef = useRef<LiveRuntimeSafeContext>({
     transportReceiptRef: null,
     vadState: null,
@@ -222,6 +226,7 @@ export const useHelixAskLiveRuntimeSession = (input: {
         ...request.body,
         runtime_agent_mode: mode,
         runtime_agent_authority: input.authority,
+        selected_runtime_agent_provider: selectedRuntimeAgentProviderRef.current,
         transport: "webrtc",
         sdp_exchange_mode: "server",
         requested_backend_provider: "realtime_session.openai_realtime",
@@ -252,6 +257,7 @@ export const useHelixAskLiveRuntimeSession = (input: {
           ...runtimeContextRef.current,
           audioFocusOwner: getAudioFocusSnapshot().active_kind,
           sourceBinding: readLiveRuntimeSourceBinding(),
+          selectedRuntimeAgentProvider: selectedRuntimeAgentProviderRef.current,
         }),
         onProjection: (projection) => {
           if (projection.vad_state) {

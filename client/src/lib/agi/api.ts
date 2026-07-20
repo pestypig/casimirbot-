@@ -824,6 +824,8 @@ export type RuntimeGoalWakeCandidatePayload = {
   agent_runtime?: HelixAgentRuntimeId;
   turnId?: string;
   turn_id?: string;
+  realtimeHandoffId?: string;
+  realtime_handoff_id?: string;
   question?: string;
   workspaceContextSnapshot?: Record<string, unknown>;
   workspace_context_snapshot?: Record<string, unknown>;
@@ -2476,6 +2478,8 @@ export async function submitRuntimeGoalWakeCandidate(
     body.turnId = turnId;
     body.turn_id = turnId;
   }
+  const realtimeHandoffId = payload.realtimeHandoffId ?? payload.realtime_handoff_id;
+  if (realtimeHandoffId) body.realtime_handoff_id = realtimeHandoffId;
   if (payload.question?.trim()) body.question = payload.question.trim();
   const snapshot = payload.workspaceContextSnapshot ?? payload.workspace_context_snapshot;
   if (snapshot && typeof snapshot === "object") body.workspace_context_snapshot = snapshot;

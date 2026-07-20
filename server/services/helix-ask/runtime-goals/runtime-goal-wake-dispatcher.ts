@@ -18,6 +18,15 @@ import {
   admitRuntimeGoalWakeCandidate,
   buildRuntimeGoalWakeCandidate,
 } from "./runtime-goal-wake-admission";
+import { readHelixSessionCookie } from "../../helix-account/session-cookie";
+import { resolveWorkstationGatewayAccountContext } from "../workstation-tool-gateway/account-policy";
+import { readRealtimeStagePlayAskHandoff } from "../live-source/realtime-stage-play-handoff";
+import { recordRealtimeGroundedAnswerFromRuntimeGoalPayload } from "../realtime-session/grounded-answer-feedback";
+import { readRealtimeGroundedAnswerRelay } from "../realtime-session/grounded-answer-relay";
+import {
+  buildRealtimeRequesterRef,
+  readAdmittedRealtimeSession,
+} from "../realtime-session/session-registry";
 
 type RecordLike = Record<string, unknown>;
 
@@ -146,13 +155,89 @@ const attachWakeCandidate = (input: {
   };
 };
 
+const attachRealtimeGoalFeedback = (input: {
+  payload: RecordLike;
+  realtimeHandoffId: string | null;
+  goalId: string;
+  requesterRef: string;
+  askTurnId: string;
+}): RecordLike => {
+  if (!input.realtimeHandoffId) return input.payload;
+  const handoff = readRealtimeStagePlayAskHandoff(input.realtimeHandoffId);
+  const realtimeSession = handoff
+    ? readAdmittedRealtimeSession({
+        realtimeSessionId: handoff.realtime_session_id,
+        requesterRef: input.requesterRef,
+      })
+    : null;
+  const accountBound = Boolean(
+    handoff &&
+    realtimeSession &&
+    handoff.goal_id === input.goalId &&
+    handoff.thread_id === realtimeSession.threadId,
+  );
+  const feedback = accountBound && input.payload.ok === true
+    ? recordRealtimeGroundedAnswerFromRuntimeGoalPayload({
+        handoffId: input.realtimeHandoffId,
+        payload: input.payload,
+        askTurnId: input.askTurnId,
+      })
+    : null;
+  const relay = accountBound
+    ? readRealtimeGroundedAnswerRelay(input.realtimeHandoffId)
+    : null;
+  const projection = {
+    schema: "helix.runtime_goal.realtime_grounded_feedback.v1",
+    handoff_id: input.realtimeHandoffId,
+    account_bound: accountBound,
+    feedback_recorded: Boolean(feedback),
+    relay_status: relay?.status ?? null,
+    relay_failure_code: relay?.failure_code ?? null,
+    blocked_reason: !accountBound
+      ? "realtime_handoff_not_account_authorized"
+      : input.payload.ok !== true
+        ? "runtime_goal_wake_not_successful"
+        : feedback
+          ? null
+          : relay?.status_reason ?? "runtime_goal_feedback_not_eligible",
+    answer_authority: false,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+  const debug = input.payload.debug && typeof input.payload.debug === "object"
+    ? input.payload.debug as RecordLike
+    : {};
+  const debugExport = input.payload.debug_export && typeof input.payload.debug_export === "object"
+    ? input.payload.debug_export as RecordLike
+    : {};
+  return {
+    ...input.payload,
+    realtime_grounded_answer_feedback: projection,
+    debug: {
+      ...debug,
+      realtime_grounded_answer_feedback: projection,
+    },
+    debug_export: {
+      ...debugExport,
+      realtime_grounded_answer_feedback: projection,
+    },
+  };
+};
+
 export const dispatchRuntimeGoalWakeCandidate = async (input: {
   body: RecordLike;
   headers?: IncomingHttpHeaders;
   route?: "/ask/turn" | "/ask/turn/stream";
 }): Promise<RuntimeGoalWakeCandidateDispatchResult> => {
   const candidate = buildRuntimeGoalWakeCandidate(input.body);
-  const { session, admission } = admitRuntimeGoalWakeCandidate(candidate);
+  const cookieHeader = Array.isArray(input.headers?.cookie)
+    ? input.headers?.cookie.join("; ")
+    : input.headers?.cookie;
+  const accountContext = await resolveWorkstationGatewayAccountContext(
+    readHelixSessionCookie(cookieHeader),
+  );
+  const { session, admission } = admitRuntimeGoalWakeCandidate(candidate, accountContext);
   if (admission.status !== "admitted" || !session) {
     const payload = rejectionPayload({ candidate, admission });
     return {
@@ -189,18 +274,27 @@ export const dispatchRuntimeGoalWakeCandidate = async (input: {
         input.body.workstationGatewayCall ??
         buildRuntimeGoalReadableSurfaceGatewayCall(input.body),
     },
+    accountContext,
   });
-  const payload = attachWakeCandidate({
-    payload: buildHelixRuntimeGoalCommandPayload({
-      command: "wake",
-      question,
-      turnId,
-      result,
-      route: input.route ?? "/ask/turn",
+  const payload = attachRealtimeGoalFeedback({
+    payload: attachWakeCandidate({
+      payload: buildHelixRuntimeGoalCommandPayload({
+        command: "wake",
+        question,
+        turnId,
+        result,
+        route: input.route ?? "/ask/turn",
+      }),
+      candidate,
+      admission,
+      wakeEvent: result.wake_event ?? null,
     }),
-    candidate,
-    admission,
-    wakeEvent: result.wake_event ?? null,
+    realtimeHandoffId: readString(
+      input.body.realtime_handoff_id ?? input.body.realtimeHandoffId,
+    ) || null,
+    goalId: session.goal_id,
+    requesterRef: buildRealtimeRequesterRef(readHelixSessionCookie(cookieHeader)),
+    askTurnId: turnId,
   });
   const transcriptEvents = buildHelixRuntimeGoalTranscriptEvents({
     command: "wake",
@@ -211,7 +305,11 @@ export const dispatchRuntimeGoalWakeCandidate = async (input: {
   });
   return {
     handled: true,
-    statusCode: result.ok ? 200 : 409,
+    statusCode: result.ok
+      ? 200
+      : result.blocked_reason?.startsWith("runtime_goal_account_")
+        ? 403
+        : 409,
     payload: {
       ...payload,
       turn_transcript_events: transcriptEvents,

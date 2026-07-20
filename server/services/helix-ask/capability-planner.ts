@@ -34,6 +34,7 @@ import {
   extractExplicitCapabilityContract,
 } from "./explicit-capability-contract";
 import { resolveAskCapabilityContractArbitration } from "./capability-contract-arbitration";
+import { resolveAuthoritativeLivePipelineRoute } from "./live-pipeline-route-authority";
 import { buildHelixCompoundCapabilityContract } from "./compound-capability-contract";
 import { isAskCapabilityCatalogPrompt } from "./capability-catalog-intent";
 import { hasExplicitRepoEvidenceRequest } from "./repo-code-intent-detector";
@@ -645,9 +646,17 @@ export const buildCapabilityPlan = (input: {
     ? capabilityFamilyForMandatoryCapability(mandatoryConcreteCapability, mandatoryRouteToolFamily, mandatoryRouteSourceTarget)
     : null;
   const mandatoryPhaseTool = mandatoryToolForPhase(input.liveSourceTurnPhaseResolution as LiveSourceTurnPhaseResolutionV1 | null);
-  const requestedCapabilityContract =
+  const authoritativeLivePipelineRoute = resolveAuthoritativeLivePipelineRoute({
+    turnId: input.turnId,
+    canonicalGoalFrame,
+    routeProductContract,
+  });
+  const requestedCapabilityContractCandidate =
     explicitCapabilityContractForCapability(readString(toolCallAdmissionDecision?.requested_capability)) ??
     extractExplicitCapabilityContract(input.promptText);
+  const requestedCapabilityContract = authoritativeLivePipelineRoute
+    ? null
+    : requestedCapabilityContractCandidate;
   const explicitDocsPathOperation = isExplicitDocsPathDocumentOperation(input.promptText);
   const hardLiveSourceMailboxRoute = !explicitDocsPathOperation && isHardLiveSourceMailboxRoute({
     routeMetadata,
@@ -695,6 +704,7 @@ export const buildCapabilityPlan = (input: {
     !internetEvidenceDrivesPlan &&
     toolUseRestatement.requiredToolFamilies.includes("docs_viewer");
   const fallbackSourceTarget =
+    (authoritativeLivePipelineRoute?.sourceTarget ?? "") ||
     (hardLiveSourceMailboxRoute ? "live_source_mailbox" : "") ||
     (mandatoryConcreteCapability && mandatoryRouteSourceTarget ? mandatoryRouteSourceTarget : "") ||
     (requestedCapabilityContract?.source_target ?? "") ||
@@ -713,6 +723,7 @@ export const buildCapabilityPlan = (input: {
   const targetKind = readString(sourceTargetIntent?.target_kind) || fallbackSourceTarget;
   const admittedFamilies = uniqueStrings([
     ...readStringArray(toolCallAdmissionDecision?.admitted_tool_families),
+    ...(authoritativeLivePipelineRoute ? ["live_pipeline"] : []),
     ...(requiresAgentGoalSessionSetup ? ["live_environment"] : []),
   ]);
   const originalCanonicalGoalKind = readString(canonicalGoalFrame?.goal_kind);
@@ -724,6 +735,8 @@ export const buildCapabilityPlan = (input: {
   });
   const fallbackFamily: HelixCapabilityFamily = hardLiveSourceMailboxRoute
     ? "live_environment"
+    : authoritativeLivePipelineRoute
+    ? "live_source"
     : mandatoryPlanFamily
     ? mandatoryPlanFamily
     : requiresCapabilityCatalog
@@ -795,6 +808,8 @@ export const buildCapabilityPlan = (input: {
     );
   const effectiveRequestedCapabilityContract = contextualSuppressionBlocksPlan
     ? null
+    : contractArbitration.contract_state === "authoritative_live_pipeline_contract"
+    ? null
     : requestedCapabilityContract;
   const compoundCapabilityContract = contextualSuppressionBlocksPlan || requiresCapabilityCatalog
     ? null
@@ -813,6 +828,9 @@ export const buildCapabilityPlan = (input: {
           ? "live_env.configure_route_watch"
           : mandatoryPhaseTool ?? "live_env.read_processed_live_source_mail"
       )
+    : contractArbitration.contract_state === "authoritative_live_pipeline_contract" &&
+      canonicalGoalKind === "live_pipeline_control"
+      ? "control_live_source"
     : contextualSuppressionBlocksPlan
       ? "suppressed_contextual_tool_reference"
     : requiresAgentGoalSessionSetup
@@ -847,6 +865,10 @@ export const buildCapabilityPlan = (input: {
     : [];
   const operatorCommandPresent =
     hasOperatorCommand(input.promptText) ||
+    (
+      contractArbitration.contract_state === "authoritative_live_pipeline_contract" &&
+      canonicalGoalKind === "live_pipeline_control"
+    ) ||
     (
       requestedAction === "live_env.start_agent_goal_session" &&
       isAffirmativeAgentGoalSessionCommand(input.promptText)

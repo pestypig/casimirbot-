@@ -928,6 +928,7 @@ describe("Helix Ask Console recrown boundary", () => {
       "HelixAskMoodAvatarSurface.tsx",
       "HelixAskMoodAvatarState.ts",
       "HelixAskActionToolbar.tsx",
+      "useHelixAskActionCarousel.ts",
       "HelixAskComposerActionToolbarSurface.tsx",
       "HelixAskComposerActionToolbarState.ts",
       "HelixAskGoalPill.tsx",
@@ -1751,7 +1752,7 @@ describe("Helix Ask Console recrown boundary", () => {
       bridgeReplacementReady: false,
       liveDayToDaySliceCount: 1,
       pureDisplayRecrownedSliceCount: 86,
-      behaviorSensitiveRecrownedWithParitySliceCount: 67,
+      behaviorSensitiveRecrownedWithParitySliceCount: 68,
       behaviorSensitiveQuarantinedSliceCount: 5,
       unknownTrapDoorSliceCount: 1,
     });
@@ -5492,6 +5493,7 @@ describe("Helix Ask Console recrown boundary", () => {
           requires_client_consent_receipt: true,
           client_secret_requested: false,
           client_secret_issued: false,
+          ephemeral_client_secret_expires_at_ms: null,
           sdp_exchange_requested: false,
           server_sideband_requested: false,
           provider_session_ref: null,
@@ -5603,6 +5605,7 @@ describe("Helix Ask Console recrown boundary", () => {
           requires_client_consent_receipt: true,
           client_secret_requested: false,
           client_secret_issued: false,
+          ephemeral_client_secret_expires_at_ms: null,
           sdp_exchange_requested: false,
           server_sideband_requested: false,
           provider_session_ref: null,
@@ -5846,6 +5849,7 @@ describe("Helix Ask Console recrown boundary", () => {
           requires_client_consent_receipt: true,
           client_secret_requested: false,
           client_secret_issued: false,
+          ephemeral_client_secret_expires_at_ms: null,
           sdp_exchange_requested: false,
           server_sideband_requested: false,
           provider_session_ref: null,
@@ -6330,11 +6334,17 @@ describe("Helix Ask Console recrown boundary", () => {
     const legacyComposerSurface = read("client/src/components/helix/ask-console/HelixAskLegacyComposerSurface.tsx");
     const toolbar = read("client/src/components/helix/ask-console/HelixAskActionToolbar.tsx");
     const actionToolbarSurface = read("client/src/components/helix/ask-console/HelixAskComposerActionToolbarSurface.tsx");
+    const actionCarousel = read("client/src/components/helix/ask-console/useHelixAskActionCarousel.ts");
+    const minimalShell = read("client/src/components/helix/ask-console/HelixAskMinimalRuntimeShell.tsx");
 
     expect(legacyPill).toContain("composer: composerState");
     expect(legacyPill).not.toContain("<HelixAskComposerActionToolbarSurface");
     expect(legacyPill).not.toContain("<HelixAskActionToolbar");
-    expect(legacyPill).toContain("carouselRef: askActionCarouselRef");
+    expect(legacyPill).toContain("onCarouselScrollIntent: triggerAskActionHaptic");
+    expect(legacyPill).not.toContain("askActionCarouselRef");
+    expect(legacyPill).not.toContain("askActionCarouselEdges");
+    expect(legacyPill).not.toContain("updateAskActionCarouselEdges");
+    expect(legacyPill).not.toContain("scrollAskActionCarousel");
     expect(legacyPill).toContain("imageInputRef: askImageInputRef");
     expect(legacyPill).toContain("onImageSelect: handleAskImageSelect");
     expect(legacyPill).toContain("askImageInputRef.current?.click()");
@@ -6353,17 +6363,20 @@ describe("Helix Ask Console recrown boundary", () => {
 
     expect(toolbar).toContain("export function HelixAskActionToolbar");
     expect(toolbar).toContain('title="Attach image"');
-    expect(toolbar).toContain('const micTitle = micInputMode === "live_runtime"');
+    expect(toolbar).toContain('micInputMode === "live_runtime"');
     expect(toolbar).toContain('data-microphone-owner={micInputMode}');
-    expect(toolbar).toContain("const visualCaptureTitle = visualSituationSourceStatus");
+    expect(toolbar).toContain('visualSituationSourceStatus === "requesting"');
     expect(toolbar).toContain("title={visualCaptureTitle}");
     expect(toolbar).toContain("const visualAudioTitle = visualSituationIncludeAudio");
     expect(toolbar).toContain("<Plus className=");
-    expect(toolbar).toContain("<Mic className=");
-    expect(toolbar).toContain("<ImageIcon className=");
+    expect(toolbar).toContain("<Mic");
+    expect(toolbar).toContain("<ImageIcon");
     expect(toolbar).toContain("<Headphones");
     expect(toolbar).toContain('aria-label="Scroll Ask controls left"');
     expect(toolbar).toContain('aria-label="Scroll Ask controls right"');
+    expect(toolbar).toContain('data-testid="helix-ask-action-carousel-viewport"');
+    expect(toolbar).toContain('data-testid="helix-ask-action-carousel-track"');
+    expect(toolbar).toContain("flex w-max min-w-full items-center justify-end gap-2 px-12");
     expect(toolbar).toContain("{runtimePicker}");
     expect(toolbar).toContain("{submitButton}");
     expect(toolbar).not.toContain("handleAskImageSelect");
@@ -6374,6 +6387,8 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(toolbar).not.toContain("navigator.clipboard");
     expect(actionToolbarSurface).toContain("export function HelixAskComposerActionToolbarSurface");
     expect(actionToolbarSurface).toContain("<HelixAskActionToolbar");
+    expect(actionToolbarSurface).toContain("useHelixAskActionCarousel({");
+    expect(actionToolbarSurface).toContain("onScrollIntent: onCarouselScrollIntent");
     expect(actionToolbarSurface).toContain("<HelixAskRuntimePicker");
     expect(actionToolbarSurface).toContain("<HelixAskComposerSubmitButton");
     expect(legacyComposerSurface).toContain("<HelixAskComposerActionToolbarSurface {...actionToolbar}");
@@ -6384,6 +6399,17 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(actionToolbarSurface).not.toContain("runAskTurn");
     expect(actionToolbarSurface).not.toContain("fetch(");
     expect(actionToolbarSurface).not.toContain("setAskReplies");
+    expect(actionCarousel).toContain("export function useHelixAskActionCarousel");
+    expect(actionCarousel).toContain("resizeObserver?.observe(viewport)");
+    expect(actionCarousel).toContain("resizeObserver?.observe(track)");
+    expect(actionCarousel).not.toContain("HelixAskPill");
+    expect(actionCarousel).not.toContain("runAskTurn");
+    expect(actionCarousel).not.toContain("fetch(");
+    expect(minimalShell).not.toContain("toolbarCarouselRef");
+    expect(minimalShell).not.toContain("canScrollLeft: false");
+    expect(minimalShell).not.toContain("canScrollRight: false");
+    expect(minimalShell).not.toContain("onScrollLeft: () => undefined");
+    expect(minimalShell).not.toContain("onScrollRight: () => undefined");
   });
 
   it("owns the surface frame display while submit and audio priming stay in the bridge", () => {
@@ -6771,10 +6797,7 @@ describe("Helix Ask Console recrown boundary", () => {
 
     const onStop = vi.fn();
     expect(buildHelixAskComposerActionToolbarState({
-      canScrollLeft: true,
-      canScrollRight: false,
-      onScrollLeft: vi.fn(),
-      onScrollRight: vi.fn(),
+      onCarouselScrollIntent: vi.fn(),
       onImageSelect: vi.fn(),
       onAttachImage: vi.fn(),
       micEnabled: true,
@@ -6805,8 +6828,7 @@ describe("Helix Ask Console recrown boundary", () => {
       onSubmitIntent: vi.fn(),
       onStop,
     })).toMatchObject({
-      canScrollLeft: true,
-      canScrollRight: false,
+      onCarouselScrollIntent: expect.any(Function),
       micEnabled: true,
       visualSituationSourceStatus: "idle",
       runtimeMenuOpen: false,

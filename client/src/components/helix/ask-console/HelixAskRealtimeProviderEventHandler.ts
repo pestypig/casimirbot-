@@ -11,6 +11,11 @@ import {
   interruptAudioFocusByKind,
 } from "@/lib/audio-focus";
 import { recordHelixAskLiveRuntimeStagePlayHandoff } from "./HelixAskLiveRuntimeDebugState";
+import {
+  executeHelixAskRealtimeWorkerDispatch,
+  parseHelixRealtimeWorkerAdmissionV2,
+  type HelixAskRealtimeGoalWakeRequest,
+} from "./HelixAskRealtimeWorkerDispatch";
 
 export const HELIX_REALTIME_BARGE_MIN_SPEECH_MS = 700;
 
@@ -40,6 +45,11 @@ export type HelixAskRealtimeProviderEventProjection = {
   stage_play_event_ref: string | null;
   context_pack_id: string | null;
   context_sync_status: string | null;
+  worker_admission_schema: string | null;
+  worker_dispatch_kind: string | null;
+  worker_dispatch_state: string | null;
+  worker_turn_dispatched: boolean;
+  runtime_goal_wake_requested: boolean;
   tool_execution_attempted: false;
   workstation_action_executed: false;
   reentry_required: boolean;
@@ -117,6 +127,11 @@ const buildProjection = (input: {
   stagePlayEventRef?: string | null;
   contextPackId?: string | null;
   contextSyncStatus?: string | null;
+  workerAdmissionSchema?: string | null;
+  workerDispatchKind?: string | null;
+  workerDispatchState?: string | null;
+  workerTurnDispatched?: boolean;
+  runtimeGoalWakeRequested?: boolean;
 }): HelixAskRealtimeProviderEventProjection => ({
   schema: "helix.ask.realtime.provider_event_projection.v1",
   event_ref: input.eventRef,
@@ -136,6 +151,11 @@ const buildProjection = (input: {
   stage_play_event_ref: input.stagePlayEventRef ?? null,
   context_pack_id: input.contextPackId ?? null,
   context_sync_status: input.contextSyncStatus ?? null,
+  worker_admission_schema: input.workerAdmissionSchema ?? null,
+  worker_dispatch_kind: input.workerDispatchKind ?? null,
+  worker_dispatch_state: input.workerDispatchState ?? null,
+  worker_turn_dispatched: input.workerTurnDispatched === true,
+  runtime_goal_wake_requested: input.runtimeGoalWakeRequested === true,
   tool_execution_attempted: false,
   workstation_action_executed: false,
   reentry_required: input.kind === "input_transcript_final",
@@ -156,9 +176,11 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
     interruptionCount?: number;
     audioFocusOwner?: string | null;
     sourceBinding?: Record<string, unknown> | null;
+    selectedRuntimeAgentProvider?: string | null;
   };
   postEvent?: (path: string, body: Record<string, unknown>) => Promise<unknown>;
   launchPrompt?: typeof launchHelixAskPrompt;
+  requestGoalWake?: (request: HelixAskRealtimeGoalWakeRequest) => boolean;
   onProjection?: (projection: HelixAskRealtimeProviderEventProjection) => void;
   nowMs?: () => number;
   bargeMinSpeechMs?: number;
@@ -453,6 +475,8 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
           transcript_text: transcript,
           transcript_text_char_count: transcript.length,
           runtime_agent_authority: input.runtimeAgentAuthority,
+          selected_runtime_agent_provider:
+            runtimeContext.selectedRuntimeAgentProvider ?? null,
           source_binding: {
             source_id: `realtime-mic:${input.realtimeSessionId}`,
             source_kind: "realtime_microphone",
@@ -479,7 +503,7 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
         const handoff = readRecord(response.realtime_stage_play_ask_handoff);
         const routeMetadata = readRecord(handoff.route_metadata);
         const sourceTargetIntent = readRecord(routeMetadata.source_target_intent);
-        const workerAdmission = readRecord(handoff.worker_admission);
+        const rawWorkerAdmission = readRecord(handoff.worker_admission);
         const routedWorkerAdmission = readRecord(sourceTargetIntent.realtime_worker_admission);
         const forbiddenCapabilities = Array.isArray(routeMetadata.forbiddenCapabilities)
           ? routeMetadata.forbiddenCapabilities.filter((value): value is string =>
@@ -489,6 +513,16 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
         const handoffId = readString(handoff.handoff_id);
         const stagePlayEventRef = readString(handoff.stage_play_event_ref);
         const contextPackId = readString(handoff.context_pack_id);
+        const workerAdmission = handoffId
+          ? parseHelixRealtimeWorkerAdmissionV2({
+              value: rawWorkerAdmission,
+              handoffId,
+              realtimeSessionId: input.realtimeSessionId,
+            })
+          : null;
+        const askRuntimeDispatch =
+          workerAdmission?.dispatch.kind === "ask_runtime" ||
+          workerAdmission?.dispatch.kind === "ask_runtime_read_only";
         if (
           handoff.schema !== "helix.realtime_stage_play.ask_handoff.v1" ||
           handoff.transcript_observation_ref !== observationRef ||
@@ -500,24 +534,14 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
           handoff.assistant_answer !== false ||
           handoff.terminal_eligible !== false ||
           handoff.raw_content_included !== false ||
-          workerAdmission.schema !== "helix.realtime_worker_admission.v1" ||
-          workerAdmission.handoff_id !== handoffId ||
-          workerAdmission.realtime_session_id !== input.realtimeSessionId ||
-          workerAdmission.decision_phase !== "transcript_handoff" ||
-          workerAdmission.worker_turn_dispatched !== true ||
-          workerAdmission.workstation_action_execution_allowed !== false ||
-          workerAdmission.realtime_provider_tool_execution_allowed !== false ||
-          workerAdmission.answer_authority !== false ||
-          workerAdmission.assistant_answer !== false ||
-          workerAdmission.terminal_eligible !== false ||
-          workerAdmission.raw_content_included !== false ||
+          !workerAdmission ||
           routedWorkerAdmission.admission_id !== workerAdmission.admission_id ||
           !handoffId ||
           !stagePlayEventRef ||
           !contextPackId ||
           routeMetadata.source !== "realtime_stage_play" ||
           routeMetadata.invocationKind !== "stage_play_realtime_transcript_handoff" ||
-          sourceTargetIntent.must_enter_backend_ask !== true ||
+          sourceTargetIntent.must_enter_backend_ask !== askRuntimeDispatch ||
           sourceTargetIntent.allow_client_shortcut !== false ||
           sourceTargetIntent.admitted_readonly_handoff !== true ||
           sourceTargetIntent.assistant_answer !== false ||
@@ -528,16 +552,6 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
         ) {
           throw new Error("realtime_stage_play_ask_handoff_missing");
         }
-        launchPrompt({
-          question: transcript,
-          autoSubmit: true,
-          bypassWorkstationDispatch: true,
-          forceReasoningDispatch: true,
-          requiresBackendAskEntrypoint: true,
-          suppressWorkstationPayloadActions: true,
-          routeMetadata: routeMetadata as HelixAskRouteMetadata,
-        });
-        consumedEventRefs.add(eventRef);
         recordHelixAskLiveRuntimeStagePlayHandoff({
           handoff: handoff as unknown as HelixRealtimeStagePlayAskHandoffV1,
           contextSync: Object.keys(contextSync).length > 0
@@ -545,17 +559,59 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
             : null,
           observedAtMs,
         });
+        const dispatchResult = executeHelixAskRealtimeWorkerDispatch({
+          admission: workerAdmission,
+          transcript,
+          transcriptHash: readString(handoff.transcript_text_hash),
+          observationRef,
+          observedAtMs,
+          sourceBinding: runtimeContext.sourceBinding ?? null,
+          routeMetadata: routeMetadata as HelixAskRouteMetadata,
+          launchPrompt,
+          requestGoalWake: input.requestGoalWake,
+        });
+        void Promise.resolve(postEvent(
+          `/api/agi/realtime/session/${encodeURIComponent(input.realtimeSessionId)}/client-receipt`,
+          {
+            client_receipt_ref: `receipt:realtime:worker-dispatch:${workerAdmission.admission_id}`,
+            receipt_kind: dispatchResult.workerTurnDispatched
+              ? "worker_dispatch_requested"
+              : "worker_dispatch_skipped",
+            status: dispatchResult.workerTurnDispatched ? "requested" : "received",
+            observed_at_ms: observedAtMs,
+            lifecycle_state: "active",
+            handoff_id: handoffId,
+            worker_admission_id: workerAdmission.admission_id,
+            worker_dispatch_kind: dispatchResult.kind,
+            worker_dispatch_state: dispatchResult.state,
+            worker_turn_dispatched: dispatchResult.workerTurnDispatched,
+            runtime_goal_wake_requested: dispatchResult.runtimeGoalWakeRequested,
+            workstation_action_executed: false,
+            realtime_provider_tool_executed: false,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+            reentry_required: dispatchResult.workerTurnDispatched,
+          },
+        )).catch(() => null);
+        consumedEventRefs.add(eventRef);
         const projection = buildProjection({
           eventRef,
           type,
           kind,
           transcriptCharCount: transcript.length,
-          reentryStatus: "reentered",
+          reentryStatus: dispatchResult.workerTurnDispatched ? "reentered" : "not_required",
           qualifiedUserInterruption,
           handoffId,
           stagePlayEventRef,
           contextPackId,
           contextSyncStatus: readString(contextSync.status),
+          workerAdmissionSchema: workerAdmission.schema,
+          workerDispatchKind: dispatchResult.kind,
+          workerDispatchState: dispatchResult.state,
+          workerTurnDispatched: dispatchResult.workerTurnDispatched,
+          runtimeGoalWakeRequested: dispatchResult.runtimeGoalWakeRequested,
         });
         input.onProjection?.(projection);
         return projection;

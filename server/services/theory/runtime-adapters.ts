@@ -38,6 +38,17 @@ export type TheoryRuntimeCommandV1 = {
   npmScript: string;
   timeoutMs: number;
   env?: Record<string, string>;
+  inheritProcessEnv?: boolean;
+  launcherBindings?: Array<{
+    role:
+      | "node_runtime"
+      | "typescript_loader"
+      | "producer_source"
+      | "standalone_bundle";
+    path: string;
+    sha256: string;
+    sizeBytes?: number;
+  }>;
 };
 
 export type TheoryRuntimeExecutionResult = {
@@ -206,7 +217,12 @@ export async function executeTheoryRuntimeCommand(command: TheoryRuntimeCommandV
     try {
       child = spawn(command.command, command.args, {
         cwd: command.cwd,
-        env: command.env ? { ...process.env, ...command.env } : process.env,
+        env:
+          command.inheritProcessEnv === false
+            ? { ...(command.env ?? {}) }
+            : command.env
+              ? { ...process.env, ...command.env }
+              : process.env,
         stdio: ["ignore", "pipe", "pipe"],
         shell: false,
         windowsHide: true,

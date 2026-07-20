@@ -1,6 +1,12 @@
-import React, { type ChangeEventHandler, type ReactNode, type Ref } from "react";
+import React, {
+  type ChangeEventHandler,
+  type ReactNode,
+  type Ref,
+} from "react";
 import {
   Camera,
+  ChevronLeft,
+  ChevronRight,
   Headphones,
   Image as ImageIcon,
   Mic,
@@ -13,6 +19,7 @@ export type HelixAskVisualSourceKind = "screen" | "camera";
 
 export type HelixAskActionToolbarProps = {
   carouselRef?: Ref<HTMLDivElement>;
+  carouselTrackRef?: Ref<HTMLDivElement>;
   imageInputRef?: Ref<HTMLInputElement>;
   canScrollLeft: boolean;
   canScrollRight: boolean;
@@ -36,7 +43,8 @@ export type HelixAskActionToolbarProps = {
   visualSourceKind?: HelixAskVisualSourceKind;
   visualSourceSelectionDisabled?: boolean;
   onToggleVisualSourceKind?: () => void;
-  visualSituationSourceStatus: "idle" | "active" | "requesting" | "error" | string;
+  visualSituationSourceStatus:
+    "idle" | "active" | "requesting" | "error" | string;
   onCaptureVisualSource: () => void;
   visualSituationIncludeAudio: boolean;
   displayAudioStatus?: "idle" | "active" | "requesting" | "error" | string;
@@ -64,15 +72,20 @@ function readMicButtonClassName(args: {
   micEnabled: boolean;
   voiceTranscribing?: boolean;
 }): string {
-  if (!args.micEnabled) return "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10";
-  if (args.voiceTranscribing) return "border-cyan-300/45 bg-cyan-400/12 text-cyan-100";
+  if (!args.micEnabled)
+    return "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10";
+  if (args.voiceTranscribing)
+    return "border-cyan-300/45 bg-cyan-400/12 text-cyan-100";
   return "border-emerald-300/55 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/20";
 }
 
 function readVisualSourceButtonClassName(status: string): string {
-  if (status === "active") return "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-400/20";
-  if (status === "requesting") return "border-amber-300/45 bg-amber-400/12 text-amber-100";
-  if (status === "error") return "border-rose-300/45 bg-rose-400/12 text-rose-100 hover:bg-rose-400/20";
+  if (status === "active")
+    return "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-400/20";
+  if (status === "requesting")
+    return "border-amber-300/45 bg-amber-400/12 text-amber-100";
+  if (status === "error")
+    return "border-rose-300/45 bg-rose-400/12 text-rose-100 hover:bg-rose-400/20";
   return "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10";
 }
 
@@ -80,8 +93,10 @@ function readVisualAudioButtonClassName(args: {
   visualSituationIncludeAudio: boolean;
   displayAudioStatus?: string;
 }): string {
-  if (!args.visualSituationIncludeAudio) return "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10";
-  if (args.displayAudioStatus === "error") return "border-rose-300/45 bg-rose-400/12 text-rose-100 hover:bg-rose-400/20";
+  if (!args.visualSituationIncludeAudio)
+    return "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10";
+  if (args.displayAudioStatus === "error")
+    return "border-rose-300/45 bg-rose-400/12 text-rose-100 hover:bg-rose-400/20";
   return "border-teal-300/50 bg-teal-400/15 text-teal-100 hover:bg-teal-400/20";
 }
 
@@ -90,6 +105,7 @@ const actionButtonBaseClassName =
 
 export function HelixAskActionToolbar({
   carouselRef,
+  carouselTrackRef,
   imageInputRef,
   canScrollLeft,
   canScrollRight,
@@ -123,14 +139,20 @@ export function HelixAskActionToolbar({
   liveRuntimeControls = null,
   submitButton,
 }: HelixAskActionToolbarProps) {
-  const micTitle = micInputMode === "live_runtime"
-    ? micEnabled ? "Disable Live Voice microphone" : "Enable Live Voice microphone"
-    : micEnabled ? "Disable microphone" : "Enable microphone";
+  const micTitle =
+    micInputMode === "live_runtime"
+      ? micEnabled
+        ? "Disable Live Voice microphone"
+        : "Enable Live Voice microphone"
+      : micEnabled
+        ? "Disable microphone"
+        : "Enable microphone";
   const visualAudioTitle = visualSituationIncludeAudio
     ? "Disable tab audio for visual capture"
     : "Enable tab audio for visual capture";
   const visualSourceLabel = visualSourceKind === "camera" ? "Camera" : "Screen";
-  const nextVisualSourceLabel = visualSourceKind === "camera" ? "screen" : "camera";
+  const nextVisualSourceLabel =
+    visualSourceKind === "camera" ? "screen" : "camera";
   const visualCaptureTitle = visualSituationSourceStatus === "requesting"
     ? `Cancel ${visualSourceLabel.toLowerCase()} sharing request`
     : visualSituationSourceStatus === "active"
@@ -144,140 +166,170 @@ export function HelixAskActionToolbar({
       <button
         type="button"
         aria-label="Scroll Ask controls left"
-        className={`absolute inset-y-0 left-0 z-10 w-12 rounded-l-full bg-gradient-to-r from-slate-950/95 via-slate-950/50 to-transparent transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${
+        className={`absolute inset-y-0 left-0 z-10 flex w-12 items-center justify-center rounded-l-full bg-gradient-to-r from-slate-950/95 via-slate-950/50 to-transparent text-cyan-100 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${
           canScrollLeft ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
         onClick={onScrollLeft}
         disabled={!canScrollLeft}
-      />
+      >
+        <ChevronLeft
+          aria-hidden="true"
+          className="h-5 w-5 drop-shadow-[0_0_5px_rgba(103,232,249,0.65)]"
+        />
+      </button>
       <div
         ref={carouselRef}
-        className="flex min-w-0 snap-x snap-mandatory items-center justify-end gap-2 overflow-x-auto scroll-smooth px-12 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        data-testid="helix-ask-action-carousel-viewport"
+        className="w-full min-w-0 snap-x snap-mandatory overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        <input
-          ref={imageInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={onImageSelect}
-        />
-        {liveRuntimeControls}
-        {runtimePicker}
-        <button
-          type="button"
-          data-helix-ask-action-item="true"
-          aria-label="Attach image"
-          title="Attach image"
-          className={`${actionButtonBaseClassName} ${readAttachButtonClassName({
-            hasReadyAttachment,
-            hasAnyAttachment,
-          })}`}
-          onClick={onAttachImage}
-          disabled={attachDisabled}
+        <div
+          ref={carouselTrackRef}
+          data-testid="helix-ask-action-carousel-track"
+          className="flex w-max min-w-full items-center justify-end gap-2 px-12"
         >
-          <Plus className="h-4 w-4" />
-        </button>
-        {showMicButton ? (
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={onImageSelect}
+          />
+          {liveRuntimeControls}
+          {runtimePicker}
           <button
             type="button"
             data-helix-ask-action-item="true"
-            aria-label={micTitle}
-            aria-pressed={micEnabled}
-            title={micTitle}
-            data-microphone-owner={micInputMode}
-            className={`${actionButtonBaseClassName} ${readMicButtonClassName({
-              micEnabled,
-              voiceTranscribing,
-            })}`}
-            onClick={onToggleMic}
-            disabled={micDisabled}
+            aria-label="Attach image"
+            title="Attach image"
+            className={`${actionButtonBaseClassName} ${readAttachButtonClassName(
+              {
+                hasReadyAttachment,
+                hasAnyAttachment,
+              },
+            )}`}
+            onClick={onAttachImage}
+            disabled={attachDisabled}
           >
-            <Mic className={`h-4 w-4 ${micEnabled || voiceTranscribing ? "animate-pulse" : ""}`} />
+            <Plus className="h-4 w-4" />
           </button>
-        ) : null}
-        {showRetryVoiceSample ? (
-          <button
-            type="button"
-            data-helix-ask-action-item="true"
-            aria-label="Retry saved voice sample"
-            title="Retry saved voice sample"
-            className="inline-flex h-10 w-10 shrink-0 snap-center items-center justify-center rounded-full border border-amber-300/45 bg-amber-400/12 text-amber-100 transition hover:bg-amber-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/70 disabled:opacity-60"
-            onClick={onRetryVoiceSample}
-            disabled={retryVoiceSampleDisabled}
-          >
-            <RotateCcw className="h-4 w-4" />
-          </button>
-        ) : null}
-        {showVisualCaptureControls ? (
-          <>
+          {showMicButton ? (
             <button
               type="button"
               data-helix-ask-action-item="true"
-              data-visual-source-kind={visualSourceKind}
-              aria-label={`Visual source: ${visualSourceLabel}. Switch to ${nextVisualSourceLabel}`}
-              title={`Visual source: ${visualSourceLabel}. Switch to ${nextVisualSourceLabel}`}
-              className="inline-flex h-10 shrink-0 snap-center items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 text-sm font-medium text-slate-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60"
-              onClick={onToggleVisualSourceKind}
-              disabled={
-                visualSourceSelectionDisabled ||
-                visualSituationSourceStatus === "active" ||
-                visualSituationSourceStatus === "requesting" ||
-                !onToggleVisualSourceKind
-              }
+              aria-label={micTitle}
+              aria-pressed={micEnabled}
+              title={micTitle}
+              data-microphone-owner={micInputMode}
+              className={`${actionButtonBaseClassName} ${readMicButtonClassName(
+                {
+                  micEnabled,
+                  voiceTranscribing,
+                },
+              )}`}
+              onClick={onToggleMic}
+              disabled={micDisabled}
             >
-              {visualSourceKind === "camera" ? (
-                <Camera className="h-4 w-4" />
-              ) : (
-                <MonitorUp className="h-4 w-4" />
-              )}
-              <span>{visualSourceLabel}</span>
+              <Mic
+                className={`h-4 w-4 ${micEnabled || voiceTranscribing ? "animate-pulse" : ""}`}
+              />
             </button>
+          ) : null}
+          {showRetryVoiceSample ? (
             <button
               type="button"
               data-helix-ask-action-item="true"
-              aria-label={visualCaptureTitle}
-              aria-pressed={visualSituationSourceStatus === "active"}
-              title={visualCaptureTitle}
-              className={`${actionButtonBaseClassName} ${readVisualSourceButtonClassName(visualSituationSourceStatus)}`}
-              onClick={onCaptureVisualSource}
+              aria-label="Retry saved voice sample"
+              title="Retry saved voice sample"
+              className="inline-flex h-10 w-10 shrink-0 snap-center items-center justify-center rounded-full border border-amber-300/45 bg-amber-400/12 text-amber-100 transition hover:bg-amber-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/70 disabled:opacity-60"
+              onClick={onRetryVoiceSample}
+              disabled={retryVoiceSampleDisabled}
             >
-              <ImageIcon className={`h-4 w-4 ${visualSituationSourceStatus === "active" ? "animate-pulse" : ""}`} />
+              <RotateCcw className="h-4 w-4" />
             </button>
-            {visualSourceKind === "screen" ? (
+          ) : null}
+          {showVisualCaptureControls ? (
+            <>
               <button
                 type="button"
                 data-helix-ask-action-item="true"
-                aria-label={visualAudioTitle}
-                aria-pressed={visualSituationIncludeAudio}
-                title={visualAudioTitle}
-                className={`${actionButtonBaseClassName} ${readVisualAudioButtonClassName({
-                  visualSituationIncludeAudio,
-                  displayAudioStatus,
-                })}`}
-                onClick={onToggleVisualAudio}
-                disabled={visualAudioToggleDisabled}
+                data-visual-source-kind={visualSourceKind}
+                aria-label={`Visual source: ${visualSourceLabel}. Switch to ${nextVisualSourceLabel}`}
+                title={`Visual source: ${visualSourceLabel}. Switch to ${nextVisualSourceLabel}`}
+                className="inline-flex h-10 shrink-0 snap-center items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 text-sm font-medium text-slate-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60"
+                onClick={onToggleVisualSourceKind}
+                disabled={
+                  visualSourceSelectionDisabled ||
+                  visualSituationSourceStatus === "active" ||
+                  visualSituationSourceStatus === "requesting" ||
+                  !onToggleVisualSourceKind
+                }
               >
-                <Headphones
-                  className={`h-4 w-4 ${
-                    visualSituationIncludeAudio && displayAudioStatus !== "error" ? "animate-pulse" : ""
-                  }`}
+                {visualSourceKind === "camera" ? (
+                  <Camera className="h-4 w-4" />
+                ) : (
+                  <MonitorUp className="h-4 w-4" />
+                )}
+                <span>{visualSourceLabel}</span>
+              </button>
+              <button
+                type="button"
+                data-helix-ask-action-item="true"
+                aria-label={visualCaptureTitle}
+                aria-pressed={visualSituationSourceStatus === "active"}
+                title={visualCaptureTitle}
+                className={`${actionButtonBaseClassName} ${readVisualSourceButtonClassName(visualSituationSourceStatus)}`}
+                onClick={onCaptureVisualSource}
+              >
+                <ImageIcon
+                  className={`h-4 w-4 ${visualSituationSourceStatus === "active" ? "animate-pulse" : ""}`}
                 />
               </button>
-            ) : null}
-          </>
-        ) : null}
-        {submitButton}
+              {visualSourceKind === "screen" ? (
+                <button
+                  type="button"
+                  data-helix-ask-action-item="true"
+                  aria-label={visualAudioTitle}
+                  aria-pressed={visualSituationIncludeAudio}
+                  title={visualAudioTitle}
+                  className={`${actionButtonBaseClassName} ${readVisualAudioButtonClassName(
+                    {
+                      visualSituationIncludeAudio,
+                      displayAudioStatus,
+                    },
+                  )}`}
+                  onClick={onToggleVisualAudio}
+                  disabled={visualAudioToggleDisabled}
+                >
+                  <Headphones
+                    className={`h-4 w-4 ${
+                      visualSituationIncludeAudio &&
+                      displayAudioStatus !== "error"
+                        ? "animate-pulse"
+                        : ""
+                    }`}
+                  />
+                </button>
+              ) : null}
+            </>
+          ) : null}
+          {submitButton}
+        </div>
       </div>
       <button
         type="button"
         aria-label="Scroll Ask controls right"
-        className={`absolute inset-y-0 right-0 z-10 w-12 rounded-r-full bg-gradient-to-l from-slate-950/95 via-slate-950/50 to-transparent transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${
+        className={`absolute inset-y-0 right-0 z-10 flex w-12 items-center justify-center rounded-r-full bg-gradient-to-l from-slate-950/95 via-slate-950/50 to-transparent text-cyan-100 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${
           canScrollRight ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
         onClick={onScrollRight}
         disabled={!canScrollRight}
-      />
+      >
+        <ChevronRight
+          aria-hidden="true"
+          className="h-5 w-5 drop-shadow-[0_0_5px_rgba(103,232,249,0.65)]"
+        />
+      </button>
     </div>
   );
 }

@@ -135,7 +135,6 @@ export function HelixAskMinimalRuntimeShell({
   const pendingExternalPromptRef = useRef<PendingHelixAskPrompt | null>(null);
   const workflowQteBridge = useHelixAskWorkflowQteBridge();
   const askInputRef = useRef<HTMLTextAreaElement | null>(null);
-  const toolbarCarouselRef = useRef<HTMLDivElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const ensureContextSession = useAgiChatStore((state) => state.ensureContextSession);
   const addChatMessage = useAgiChatStore((state) => state.addMessage);
@@ -533,12 +532,7 @@ export function HelixAskMinimalRuntimeShell({
                 onImageError: () => undefined,
               }}
               actionToolbar={{
-                carouselRef: toolbarCarouselRef,
                 imageInputRef,
-                canScrollLeft: false,
-                canScrollRight: false,
-                onScrollLeft: () => undefined,
-                onScrollRight: () => undefined,
                 onImageSelect: () => undefined,
                 onAttachImage: () => imageInputRef.current?.click(),
                 attachDisabled: true,

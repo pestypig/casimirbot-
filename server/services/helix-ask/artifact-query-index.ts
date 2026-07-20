@@ -275,6 +275,11 @@ const isGenericPlannerCapability = (capability: unknown): boolean => {
   return normalized ? GENERIC_PLANNER_CAPABILITIES.has(normalized) : false;
 };
 
+const isLivePipelinePlannerPlaceholder = (capability: unknown): boolean => {
+  const normalized = normalize(capability);
+  return normalized === "control_live_source" || normalized === "live_source_control_live_source";
+};
+
 const preferConcreteCapability = (
   candidate: unknown,
   concreteCapability: string | null,
@@ -410,6 +415,8 @@ const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
       readString(artifactPayload(artifact)?.tool_name),
       readString(artifactPayload(artifact)?.capability),
       readString(artifactPayload(artifact)?.capability_key),
+      readString(artifactPayload(artifact)?.action_id),
+      ...readStringArray(artifactPayload(artifact)?.actions),
       readString(artifactPayload(artifact)?.requiredActuator),
       readString(artifactPayload(artifact)?.required_actuator),
       readString(artifactPayload(artifact)?.actuator),
@@ -443,6 +450,9 @@ const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
   }
   if (/text_to_speech\.speak_text|text_to_speech_speak_text|capability_lane:text_to_speech\.speak_text|voice_delivery/.test(haystack)) {
     return TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY;
+  }
+  if (/situation[-_]room[-_.:]live[-_]source[-_.:]set[-_]rate|visual_producer_cadence_receipt/.test(haystack)) {
+    return "situation-room.live-source.set_rate";
   }
   if (/situation[-_]room[-_.:]describe[-_]visual[-_]capture|situation_context_pack|helix\.situation_context_pack\.v1|visual_capture|image_lens/.test(haystack)) {
     return "situation-room.describe_visual_capture";
@@ -615,7 +625,8 @@ const shouldPreferArtifactCapability = (capability: string | null): boolean => {
   const normalizedCapability = normalize(capability);
   return (
     !normalizedCapability ||
-    isModelAnswerCapability(normalizedCapability)
+    isModelAnswerCapability(normalizedCapability) ||
+    isLivePipelinePlannerPlaceholder(normalizedCapability)
   );
 };
 
@@ -1284,6 +1295,7 @@ const buildToolTurnChainAudit = (input: {
   lifecycleTrace: RecordLike | null;
   followupDecision: RecordLike | null;
   capability: string | null;
+  artifactCapability: string | null;
   toolFamily: string | null;
   contract: ToolFamilyContract | null;
   requiredObservationCoverage: RecordLike[];
@@ -1308,6 +1320,7 @@ const buildToolTurnChainAudit = (input: {
   const operationalTrace = readRecord(input.payload.operational_capability_trace);
   const runtimeToolCall = readRecord(input.payload.runtime_tool_call);
   const concreteSelectedCapability = firstString(
+    nonModelToolCapability(input.artifactCapability),
     nonModelToolCapability(operationalTrace?.model_proposed_capability),
     nonModelToolCapability(input.lifecycleTrace?.admitted_capability),
     nonModelToolCapability(input.lifecycleTrace?.requested_capability),
@@ -1502,6 +1515,27 @@ const buildToolTurnChainAudit = (input: {
       authorityTerminalEvidence.proven &&
       visibleTerminalProjection.proven,
   );
+  const canonicalGoal = readRecord(input.payload.canonical_goal_frame);
+  const routeProductContract = readRecord(input.payload.route_product_contract);
+  const routeAllowedTerminalKinds = readStringArray(routeProductContract?.allowed_terminal_artifact_kinds);
+  const contractAuthorizedReceiptTerminal = Boolean(
+    input.contract?.authority === "control_receipt" &&
+      observationArtifact &&
+      materializedTerminal &&
+      TERMINAL_RECEIPT_KINDS.has(normalize(materializedTerminal)) &&
+      requiredTerminal &&
+      normalizedEqual(requiredTerminal, materializedTerminal) &&
+      normalizedEqual(canonicalGoal?.required_terminal_kind, materializedTerminal) &&
+      (normalizedEqual(routeProductContract?.required_terminal_artifact_kind, materializedTerminal) ||
+        normalizedEqual(routeProductContract?.required_terminal_kind, materializedTerminal) ||
+        routeAllowedTerminalKinds.some((kind) => normalizedEqual(kind, materializedTerminal))) &&
+      authorityTerminalEvidence.proven &&
+      normalizedEqual(authorityTerminal, materializedTerminal) &&
+      visibleTerminalProjection.proven &&
+      normalizedEqual(visibleTerminal, materializedTerminal),
+  );
+  const observationTerminalAllowed =
+    textToSpeechHandoffTerminalAllowed || contractAuthorizedReceiptTerminal;
   const visibleTerminalUnproven = Boolean(visibleTerminal && !visibleTerminalProjection.proven);
   const staleDebugMirrors = staleTerminalDebugMirrors(input.payload, authorityTerminal);
   const finalDraftRef = finalAnswerDraftRef(input.payload, input.artifacts);
@@ -1570,7 +1604,7 @@ const buildToolTurnChainAudit = (input: {
   const observationNeedsReentry = Boolean(
     observationRef &&
       !reentryExecuted &&
-      !textToSpeechHandoffTerminalAllowed,
+      !observationTerminalAllowed,
   );
   const expectedReentryMissing = Boolean(observationNeedsReentry && expectedReentry);
   const terminalProjectionMismatch = Boolean(authorityTerminal && visibleTerminal && !normalizedEqual(authorityTerminal, visibleTerminal));
@@ -1591,7 +1625,7 @@ const buildToolTurnChainAudit = (input: {
   const concreteTurnChainComplete = Boolean(
     executedCapability &&
       observationRef &&
-      reentryExecuted &&
+      (reentryExecuted || observationTerminalAllowed) &&
       terminalProductAllowed &&
       authorityTerminal &&
       visibleTerminal &&
@@ -1694,7 +1728,7 @@ const buildToolTurnChainAudit = (input: {
                       ? requestedCapability
                         ? "required_observation_missing"
                         : "observation_missing"
-                      : expectedReentry && !reentryExecuted && !textToSpeechHandoffTerminalAllowed
+                      : expectedReentry && !reentryExecuted && !observationTerminalAllowed
                         ? "reentry_step_not_executed"
                           : draftNeedsSupport && supportCount === 0
                             ? "support_refs_missing"
@@ -1758,13 +1792,16 @@ const buildToolTurnChainAudit = (input: {
     observation_ref: observationRef,
     handoff_status: textToSpeechHandoffStatus,
     handoff_terminal_allowed: textToSpeechHandoffTerminalAllowed,
+    receipt_terminal_allowed: contractAuthorizedReceiptTerminal,
     required_terminal_kind: requiredTerminal,
     expected_reentry_capability: expectedReentry,
-    reentry_executed: reentryExecuted || textToSpeechHandoffTerminalAllowed,
+    reentry_executed: reentryExecuted || observationTerminalAllowed,
     reentry_proof_source: textToSpeechHandoffTerminalAllowed
       ? "voice_tts_handoff_terminal_allowed"
+      : contractAuthorizedReceiptTerminal
+        ? "control_receipt_route_product_terminal_allowed"
       : reentryProofSource,
-    reentry_proven: reentryExecuted || textToSpeechHandoffTerminalAllowed,
+    reentry_proven: reentryExecuted || observationTerminalAllowed,
     final_answer_draft_ref: finalDraftRef,
     support_refs_count: supportCount,
     materialized_terminal_artifact_kind: materializedTerminal,
@@ -2404,19 +2441,22 @@ const readAdmittedCapabilityEvidence = (
   const auditExecutedCapability = nonModelToolCapability(audit.executed_capability);
   const auditSelectedCapability = nonModelToolCapability(audit.selected_capability);
   const auditObservationRef = readString(audit.observation_ref);
-  const staleModelAdmission = Boolean(
-    isModelAnswerCapability(admission?.admitted_capability) ||
+  const staleNonConcreteAdmission = Boolean(
+      isModelAnswerCapability(admission?.admitted_capability) ||
       isModelAnswerCapability(admission?.selected_capability) ||
-      isModelAnswerCapability(operationalTrace?.policy_admitted_capability),
+      isModelAnswerCapability(operationalTrace?.policy_admitted_capability) ||
+      isLivePipelinePlannerPlaceholder(admission?.admitted_capability) ||
+      isLivePipelinePlannerPlaceholder(admission?.selected_capability) ||
+      isLivePipelinePlannerPlaceholder(operationalTrace?.policy_admitted_capability),
   );
-  if (auditExecutedCapability && staleModelAdmission) {
+  if (auditExecutedCapability && staleNonConcreteAdmission) {
     return {
       capability: auditExecutedCapability,
       source: "tool_turn_chain_audit.executed_capability",
       proven: true,
     };
   }
-  if (auditSelectedCapability && auditObservationRef && staleModelAdmission) {
+  if (auditSelectedCapability && auditObservationRef && staleNonConcreteAdmission) {
     return {
       capability: auditSelectedCapability,
       source: "tool_turn_chain_audit.selected_capability_observation",
@@ -3069,10 +3109,12 @@ export const buildArtifactQueryIndex = (input: {
   const admission = readRecord(input.payload.tool_call_admission_decision);
   const lifecycleCapability = capabilityFromPayload(input.payload, lifecycleTrace);
   const artifactCapability = capabilityFromArtifacts(artifacts);
-  const capability =
+  const preferredArtifactCapability =
     artifactCapability && shouldPreferArtifactCapability(lifecycleCapability)
       ? artifactCapability
-      : lifecycleCapability ?? artifactCapability;
+      : null;
+  const capability =
+    preferredArtifactCapability ?? lifecycleCapability ?? artifactCapability;
   const lifecycleFamily = familyFromPayload(input.payload, lifecycleTrace);
   const inferredArtifactFamily = artifactInferredFamily(artifacts);
   const toolFamily =
@@ -3148,6 +3190,7 @@ export const buildArtifactQueryIndex = (input: {
     lifecycleTrace,
     followupDecision,
     capability,
+    artifactCapability: preferredArtifactCapability,
     toolFamily: resolvedToolFamily,
     contract,
     requiredObservationCoverage,

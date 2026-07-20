@@ -1,6 +1,10 @@
 import { useEffect, type MutableRefObject } from "react";
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
-import { fetchActiveRuntimeGoalSession, submitRuntimeGoalWakeCandidate } from "@/lib/agi/api";
+import {
+  fetchActiveRuntimeGoalSession,
+  submitRuntimeGoalWakeCandidate,
+  type RuntimeGoalWakeCandidatePayload,
+} from "@/lib/agi/api";
 import {
   HELIX_ACTIVE_DOC_VISIBLE_TRANSLATION_CONTEXT_CHANGED_EVENT,
   type HelixActiveDocVisibleTranslationContextChangedEventDetail,
@@ -14,6 +18,10 @@ import {
   selectHelixAskActiveRuntimeGoalFromReplies,
   type HelixAskRuntimeGoalWakePostDecision,
 } from "./HelixAskRuntimeGoalWakeEmitter";
+import {
+  HELIX_ASK_REALTIME_GOAL_WAKE_REQUEST_EVENT,
+  type HelixAskRealtimeGoalWakeRequestEventDetail,
+} from "./HelixAskRealtimeWorkerDispatch";
 
 type RecordLike = Record<string, unknown>;
 
@@ -158,11 +166,56 @@ export function useHelixAskRuntimeGoalWakeSubscriptions(input: {
         });
       }, debounceMs);
     };
+    const handleRealtimeGoalWakeRequest = (event: Event) => {
+      const detail = (event as CustomEvent<HelixAskRealtimeGoalWakeRequestEventDetail>).detail;
+      const request = detail?.request;
+      if (!request?.goalId || !request.handoffId || !request.transcript.trim()) return;
+
+      detail.accepted = true;
+      const dedupeKey = `realtime-goal-wake:${request.handoffId}`;
+      if (runtimeGoalWakeLastSubmittedKeyRef.current === dedupeKey) return;
+
+      const candidate: RuntimeGoalWakeCandidatePayload = {
+        goalId: request.goalId,
+        eventKind: "manual_resume",
+        sourceKind: "realtime_transcript",
+        sourceId: request.observationRef,
+        sourceHash: request.transcriptHash,
+        sourceLabel: "GPT Live transcript",
+        reason: "realtime_durable_goal_voice_turn",
+        dedupeKey,
+        freshnessStatus: "fresh",
+        observedAtMs: request.observedAtMs,
+        requiresUserVisibleTurn: true,
+        agentRuntime: request.runtimeAgentProvider as HelixAgentRuntimeId | null ?? selectedAgentRuntime,
+        turnId: `${request.handoffId}:goal-wake`,
+        realtimeHandoffId: request.realtimeHandoffId,
+        question: request.transcript,
+        workspaceContextSnapshot: {
+          ...buildWorkspaceContextSnapshot(getHelixAskSessionId()),
+          ...(request.sourceBinding
+            ? { realtime_stage_play_source_binding: request.sourceBinding }
+            : {}),
+        },
+      };
+      submitWakeDecision(
+        {
+          shouldSubmit: true,
+          reason: "candidate_ready",
+          candidate,
+          dedupeKey,
+        },
+        request.transcript,
+        "Runtime goal wake queued from Live Voice...",
+      );
+    };
     window.addEventListener(HELIX_ACTIVE_DOC_VISIBLE_TRANSLATION_CONTEXT_CHANGED_EVENT, handleVisibleContextChanged);
+    window.addEventListener(HELIX_ASK_REALTIME_GOAL_WAKE_REQUEST_EVENT, handleRealtimeGoalWakeRequest);
     return () => {
       clearWakeTimer();
       clearVisibleSurfaceWakeTimer();
       window.removeEventListener(HELIX_ACTIVE_DOC_VISIBLE_TRANSLATION_CONTEXT_CHANGED_EVENT, handleVisibleContextChanged);
+      window.removeEventListener(HELIX_ASK_REALTIME_GOAL_WAKE_REQUEST_EVENT, handleRealtimeGoalWakeRequest);
       unsubscribe();
     };
   }, [

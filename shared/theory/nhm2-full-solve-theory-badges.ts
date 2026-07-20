@@ -19,80 +19,50 @@ const NHM2_QEI_RECEIPTED_SMOKE_ROOT =
   "artifacts/research/full-solve/validation-chain/qei-worldline-receipted-smoke-v1";
 const NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT =
   "artifacts/research/full-solve/validation-chain/axis-aligned-shear-suppressed-smoke-v1";
-const NHM2_SOURCE_COMPONENT_AUTHORITY_LEDGER =
-  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-source-component-authority-ledger.json`;
-const NHM2_COUPLED_CLOSURE_PASS_CANDIDATE =
-  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-coupled-closure-pass-candidate.json`;
-const NHM2_REGIONAL_TENSOR_PASS_PATH_HARNESS =
-  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-regional-tensor-pass-path-harness.json`;
-const NHM2_TIME_DEPENDENT_SOURCE_CAMPAIGN =
-  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-time-dependent-source-campaign.json`;
-const NHM2_SOURCE_OFF_DIAGONAL_SHEAR_AUDIT =
-  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-source-off-diagonal-shear-audit.json`;
-const NHM2_AXIS_ALIGNED_SOURCE_OFF_DIAGONAL_SHEAR_AUDIT =
-  `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-source-off-diagonal-shear-audit.json`;
-const NHM2_AXIS_ALIGNED_SOURCE_MOMENTUM_DENSITY_AUDIT =
-  `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-source-momentum-density-audit.json`;
-const NHM2_AXIS_ALIGNED_MOMENTUM_FRAME_PROJECTION_RECEIPT =
-  `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-momentum-frame-projection-receipt.json`;
+const NHM2_SOURCE_COMPONENT_AUTHORITY_LEDGER = `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-source-component-authority-ledger.json`;
+const NHM2_COUPLED_CLOSURE_PASS_CANDIDATE = `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-coupled-closure-pass-candidate.json`;
+const NHM2_REGIONAL_TENSOR_PASS_PATH_HARNESS = `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-regional-tensor-pass-path-harness.json`;
+const NHM2_TIME_DEPENDENT_SOURCE_CAMPAIGN = `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-time-dependent-source-campaign.json`;
+const NHM2_SOURCE_OFF_DIAGONAL_SHEAR_AUDIT = `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-source-off-diagonal-shear-audit.json`;
+const NHM2_AXIS_ALIGNED_SOURCE_OFF_DIAGONAL_SHEAR_AUDIT = `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-source-off-diagonal-shear-audit.json`;
+const NHM2_AXIS_ALIGNED_SOURCE_MOMENTUM_DENSITY_AUDIT = `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-source-momentum-density-audit.json`;
+const NHM2_AXIS_ALIGNED_MOMENTUM_FRAME_PROJECTION_RECEIPT = `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-momentum-frame-projection-receipt.json`;
 const NHM2_AXIS_ALIGNED_MOMENTUM_FRAME_PROJECTION_EVIDENCE =
   "fixtures/nhm2/momentum-frame-projection-evidence.axis-aligned-reduced-order-v1.json";
-const NHM2_AXIS_ALIGNED_METRIC_REQUIRED_MOMENTUM_DEMAND_AUDIT =
-  `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-metric-required-momentum-demand-audit.json`;
-const NHM2_AXIS_ALIGNED_METRIC_MOMENTUM_REMEDIATION_TARGETS =
-  `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-metric-momentum-remediation-targets.json`;
-const NHM2_AXIS_ALIGNED_CAMPAIGN_FRONTIER_DISPOSITION =
-  `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-campaign-frontier-disposition.json`;
+const NHM2_AXIS_ALIGNED_METRIC_REQUIRED_MOMENTUM_DEMAND_AUDIT = `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-metric-required-momentum-demand-audit.json`;
+const NHM2_AXIS_ALIGNED_METRIC_MOMENTUM_REMEDIATION_TARGETS = `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-metric-momentum-remediation-targets.json`;
+const NHM2_AXIS_ALIGNED_CAMPAIGN_FRONTIER_DISPOSITION = `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-campaign-frontier-disposition.json`;
 const NHM2_CAMPAIGN_PROFILE_SEARCH =
   "artifacts/research/full-solve/profile-search/nhm2-campaign-profile-search-latest.json";
 const NHM2_CAMPAIGN_PROFILE_RUN_MANIFEST =
   "artifacts/research/full-solve/profile-search/nhm2-campaign-profile-run-manifest-latest.json";
 const NHM2_0P9000_COMBINED_PROFILE_CAMPAIGN_RUN_ROOT =
   "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1";
-const NHM2_0P9000_COMBINED_CANDIDATE_METRIC_PROFILE_SPEC =
-  `${NHM2_0P9000_COMBINED_PROFILE_CAMPAIGN_RUN_ROOT}/nhm2-candidate-metric-profile-spec.json`;
-const NHM2_0P9000_COMBINED_METRIC_REQUIRED_FULL_REGIONAL_TENSOR =
-  `${NHM2_0P9000_COMBINED_PROFILE_CAMPAIGN_RUN_ROOT}/nhm2-metric-required-full-regional-tensor.json`;
-const NHM2_0P9000_COMBINED_METRIC_REQUIRED_MOMENTUM_DEMAND_AUDIT =
-  `${NHM2_0P9000_COMBINED_PROFILE_CAMPAIGN_RUN_ROOT}/nhm2-metric-required-momentum-demand-audit.json`;
-const NHM2_0P9000_COMBINED_METRIC_MOMENTUM_REMEDIATION_TARGETS =
-  `${NHM2_0P9000_COMBINED_PROFILE_CAMPAIGN_RUN_ROOT}/nhm2-metric-momentum-remediation-targets.json`;
-const NHM2_AXIS_ALIGNED_TIME_DEPENDENT_SOURCE_CAMPAIGN =
-  `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-time-dependent-source-campaign.json`;
-const NHM2_AXIS_ALIGNED_REGIONAL_MATERIAL_SOURCE_TENSOR_MODEL =
-  `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-regional-material-source-tensor-model.json`;
-const NHM2_SWITCHING_COVARIANT_CONSERVATION_EVIDENCE =
-  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-switching-covariant-conservation-evidence.json`;
-const NHM2_FREQUENCY_CONVERGENCE_EVIDENCE =
-  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-frequency-convergence-evidence.json`;
-const NHM2_DYNAMIC_GEOMETRY_SAMPLES =
-  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-dynamic-geometry-samples.json`;
-const NHM2_GR_EVOLVE_DYNAMIC_GEOMETRY_SAMPLE =
-  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-gr-evolve-dynamic-geometry-sample-000.json`;
-const NHM2_EFFECTIVE_GEOMETRY_REFERENCE =
-  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-effective-geometry-reference.json`;
-const NHM2_GR_EVOLVE_EFFECTIVE_GEOMETRY_REFERENCE =
-  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-gr-evolve-effective-geometry-reference-000.json`;
-const NHM2_DYNAMIC_EFFECTIVE_GEOMETRY_EVIDENCE =
-  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-dynamic-effective-geometry-evidence.json`;
-const NHM2_AVERAGED_SOURCE_TENSOR_RECEIPT =
-  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-averaged-source-tensor-receipt.json`;
-const NHM2_BACKREACTION_RESIDUAL_RECEIPT =
-  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-backreaction-residual-receipt.json`;
+const NHM2_0P9000_COMBINED_CANDIDATE_METRIC_PROFILE_SPEC = `${NHM2_0P9000_COMBINED_PROFILE_CAMPAIGN_RUN_ROOT}/nhm2-candidate-metric-profile-spec.json`;
+const NHM2_0P9000_COMBINED_METRIC_REQUIRED_FULL_REGIONAL_TENSOR = `${NHM2_0P9000_COMBINED_PROFILE_CAMPAIGN_RUN_ROOT}/nhm2-metric-required-full-regional-tensor.json`;
+const NHM2_0P9000_COMBINED_METRIC_REQUIRED_MOMENTUM_DEMAND_AUDIT = `${NHM2_0P9000_COMBINED_PROFILE_CAMPAIGN_RUN_ROOT}/nhm2-metric-required-momentum-demand-audit.json`;
+const NHM2_0P9000_COMBINED_METRIC_MOMENTUM_REMEDIATION_TARGETS = `${NHM2_0P9000_COMBINED_PROFILE_CAMPAIGN_RUN_ROOT}/nhm2-metric-momentum-remediation-targets.json`;
+const NHM2_AXIS_ALIGNED_TIME_DEPENDENT_SOURCE_CAMPAIGN = `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-time-dependent-source-campaign.json`;
+const NHM2_AXIS_ALIGNED_REGIONAL_MATERIAL_SOURCE_TENSOR_MODEL = `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-regional-material-source-tensor-model.json`;
+const NHM2_SWITCHING_COVARIANT_CONSERVATION_EVIDENCE = `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-switching-covariant-conservation-evidence.json`;
+const NHM2_FREQUENCY_CONVERGENCE_EVIDENCE = `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-frequency-convergence-evidence.json`;
+const NHM2_DYNAMIC_GEOMETRY_SAMPLES = `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-dynamic-geometry-samples.json`;
+const NHM2_GR_EVOLVE_DYNAMIC_GEOMETRY_SAMPLE = `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-gr-evolve-dynamic-geometry-sample-000.json`;
+const NHM2_EFFECTIVE_GEOMETRY_REFERENCE = `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-effective-geometry-reference.json`;
+const NHM2_GR_EVOLVE_EFFECTIVE_GEOMETRY_REFERENCE = `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-gr-evolve-effective-geometry-reference-000.json`;
+const NHM2_DYNAMIC_EFFECTIVE_GEOMETRY_EVIDENCE = `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-dynamic-effective-geometry-evidence.json`;
+const NHM2_AVERAGED_SOURCE_TENSOR_RECEIPT = `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-averaged-source-tensor-receipt.json`;
+const NHM2_BACKREACTION_RESIDUAL_RECEIPT = `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-backreaction-residual-receipt.json`;
 const NHM2_TRIP_CLOCKING_PROFILE_INDEX =
   "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-trip-clocking-profile-index-latest.json";
 const NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_PROFILE_ID =
   "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1";
-const NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT =
-  `artifacts/research/full-solve/profile-campaign-runs/${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_PROFILE_ID}`;
-const NHM2_0P7000_HISTORICAL_IMPORT_MANIFEST =
-  `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/theory-runtime-output-manifest-alpha-0p7000-historical-import.v1.json`;
-const NHM2_LEAN_CAMPAIGN_CERTIFICATE =
-  `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-lean-campaign-certificate.json`;
+const NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT = `artifacts/research/full-solve/profile-campaign-runs/${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_PROFILE_ID}`;
+const NHM2_0P7000_HISTORICAL_IMPORT_MANIFEST = `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/theory-runtime-output-manifest-alpha-0p7000-historical-import.v1.json`;
+const NHM2_LEAN_CAMPAIGN_CERTIFICATE = `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-lean-campaign-certificate.json`;
 const NHM2_LEAN_GENERATED_CAMPAIGN_CERTIFICATE =
   "formal/lean/NHM2Formal/Generated/CurrentCampaignCertificate.lean";
-const NHM2_LEAN_CERTIFICATE_MODULE =
-  "formal/lean/NHM2Formal/Certificate.lean";
+const NHM2_LEAN_CERTIFICATE_MODULE = "formal/lean/NHM2Formal/Certificate.lean";
 const NHM2_LEAN_CLAIM_BOUNDARY_MODULE =
   "formal/lean/NHM2Formal/ClaimBoundary.lean";
 const NHM2_LEAN_CERTIFICATE_EXPORTER =
@@ -103,58 +73,71 @@ const NHM2_LEAN_CERTIFICATE_TEST =
   "tests/nhm2/lean-campaign-certificate.spec.ts";
 const NHM2_LEAN_CERTIFICATE_CHECK_COMMAND =
   "npm run formal:nhm2:certificate:check";
-const NHM2_PHYSICAL_VIABILITY_CAMPAIGN =
-  `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-physical-viability-campaign.json`;
+const NHM2_PHYSICAL_VIABILITY_CAMPAIGN = `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-physical-viability-campaign.json`;
 const NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT =
   "shared/contracts/nhm2-physical-viability-campaign.v1.ts";
-const NHM2_EXPERIMENT_FACING_THEORY_ROADMAP =
-  `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-experiment-facing-theory-roadmap.json`;
+const NHM2_EXPERIMENT_FACING_THEORY_ROADMAP = `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-experiment-facing-theory-roadmap.json`;
 const NHM2_EXPERIMENT_FACING_THEORY_ROADMAP_CONTRACT =
   "shared/contracts/nhm2-experiment-facing-theory-roadmap.v1.ts";
-const NHM2_EXPERIMENT_PARAMETER_TARGETS =
-  `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-experiment-parameter-targets.json`;
+const NHM2_EXPERIMENT_PARAMETER_TARGETS = `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-experiment-parameter-targets.json`;
 const NHM2_EXPERIMENT_PARAMETER_TARGETS_CONTRACT =
   "shared/contracts/nhm2-experiment-parameter-targets.v1.ts";
-const NHM2_EXPERIMENT_RESEARCH_GAP_LEDGER =
-  `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-experiment-research-gap-ledger.json`;
+const NHM2_EXPERIMENT_RESEARCH_GAP_LEDGER = `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-experiment-research-gap-ledger.json`;
 const NHM2_EXPERIMENT_RESEARCH_GAP_LEDGER_CONTRACT =
   "shared/contracts/nhm2-experiment-research-gap-ledger.v1.ts";
-const NHM2_LAYER_STACK_MECHANICAL_RECEIPT =
-  `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-layer-stack-mechanical-receipt.json`;
+const NHM2_EXPERIMENT_READY_THEORY_CLOSURE_CONTRACT =
+  "shared/contracts/nhm2-experiment-ready-theory-closure.v1.ts";
+const NHM2_EXPERIMENT_READY_THEORY_CLOSURE_TEST =
+  "tests/nhm2-experiment-ready-theory-closure.spec.ts";
+const NHM2_EXPERIMENT_READY_THEORY_CANDIDATE_MANIFEST_CONTRACT =
+  "shared/contracts/nhm2-experiment-ready-theory-candidate-manifest.v1.ts";
+const NHM2_EXPERIMENT_READY_THEORY_CANDIDATE_MANIFEST_TEST =
+  "tests/nhm2-experiment-ready-theory-candidate-manifest.spec.ts";
+const NHM2_SEMICLASSICAL_STATE_REALIZABILITY_CONTRACT =
+  "shared/contracts/nhm2-semiclassical-state-realizability.v1.ts";
+const NHM2_PREDICTION_FALSIFIER_FREEZE_CONTRACT =
+  "shared/contracts/nhm2-prediction-falsifier-freeze.v1.ts";
+const NHM2_EXPERIMENT_READY_THEORY_CLOSURE_EVALUATOR =
+  "server/services/theory/nhm2-experiment-ready-theory-closure-evaluator.ts";
+const NHM2_THEORY_RUNTIME_RECEIPT_FILESYSTEM_VERIFIER =
+  "server/services/theory/theory-runtime-receipt-filesystem-verifier.ts";
+const NHM2_LAYER_STACK_MECHANICAL_RECEIPT = `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-layer-stack-mechanical-receipt.json`;
 const NHM2_LAYER_STACK_MECHANICAL_RECEIPT_CONTRACT =
   "shared/contracts/nhm2-layer-stack-mechanical-receipt.v1.ts";
-const NHM2_LAYER_STACK_SUPPORT_FRACTION_SWEEP =
-  `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-layer-stack-support-fraction-sweep.json`;
+const NHM2_LAYER_STACK_SUPPORT_FRACTION_SWEEP = `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-layer-stack-support-fraction-sweep.json`;
 const NHM2_LAYER_STACK_SUPPORT_FRACTION_SWEEP_CONTRACT =
   "shared/contracts/nhm2-layer-stack-support-fraction-sweep.v1.ts";
-const NHM2_LAYER_STACK_ENGINEERING_ARCHITECTURE_LOOP =
-  `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-layer-stack-engineering-architecture-loop.json`;
+const NHM2_LAYER_STACK_ENGINEERING_ARCHITECTURE_LOOP = `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-layer-stack-engineering-architecture-loop.json`;
 const NHM2_LAYER_STACK_ENGINEERING_ARCHITECTURE_LOOP_CONTRACT =
   "shared/contracts/nhm2-layer-stack-engineering-architecture-loop.v1.ts";
-const NHM2_LAYER_STACK_FULL_APPARATUS_RECEIPT_LOOP =
-  `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-layer-stack-full-apparatus-receipt-loop.json`;
+const NHM2_LAYER_STACK_FULL_APPARATUS_RECEIPT_LOOP = `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-layer-stack-full-apparatus-receipt-loop.json`;
 const NHM2_LAYER_STACK_FULL_APPARATUS_RECEIPT_LOOP_CONTRACT =
   "shared/contracts/nhm2-layer-stack-full-apparatus-receipt-loop.v1.ts";
-const NHM2_TILE_SOURCE_PHYSICAL_VALIDATION_PLAN =
-  `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-tile-source-physical-validation-plan.json`;
+const NHM2_TILE_SOURCE_PHYSICAL_VALIDATION_PLAN = `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-tile-source-physical-validation-plan.json`;
 const NHM2_TILE_SOURCE_PHYSICAL_VALIDATION_PLAN_CONTRACT =
   "shared/contracts/nhm2-tile-source-physical-validation-plan.v1.ts";
 const NHM2_RESEARCH_DYNAMICAL_CASIMIR_NATURE_2011 =
   "https://www.nature.com/articles/nature10561";
-const NHM2_RESEARCH_CASIMIR_GRAVITATIONAL_MASS = "https://arxiv.org/abs/0710.3841";
-const NHM2_RESEARCH_REGULARIZED_CASIMIR_GRAVITY = "https://arxiv.org/abs/1401.0784";
-const NHM2_RESEARCH_CONDUCTIVE_PLANE_STACK_CASIMIR = "https://arxiv.org/abs/1505.04169";
+const NHM2_RESEARCH_CASIMIR_GRAVITATIONAL_MASS =
+  "https://arxiv.org/abs/0710.3841";
+const NHM2_RESEARCH_REGULARIZED_CASIMIR_GRAVITY =
+  "https://arxiv.org/abs/1401.0784";
+const NHM2_RESEARCH_CONDUCTIVE_PLANE_STACK_CASIMIR =
+  "https://arxiv.org/abs/1505.04169";
 const NHM2_RESEARCH_SCHARNHORST_CAUTION =
   "https://www.sciencedirect.com/science/article/pii/037026939090997K";
 const NHM2_RESEARCH_ARCHIMEDES_BALANCE_PROTOTYPE =
   "https://link.springer.com/article/10.1140/epjp/s13360-024-04920-x";
-const NHM2_RESEARCH_ARCHIMEDES_2025_STATUS = "https://iris.uniss.it/handle/11388/372656";
+const NHM2_RESEARCH_ARCHIMEDES_2025_STATUS =
+  "https://iris.uniss.it/handle/11388/372656";
 const NHM2_RESEARCH_ARCHIMEDES_2025_EPJ =
   "https://www.epj-conferences.org/articles/epjconf/abs/2025/04/epjconf_ricap2024_09003/epjconf_ricap2024_09003.html";
-const NHM2_RESEARCH_ADVANCED_LIGO_SENSITIVITY = "https://dcc.ligo.org/LIGO-P1500260/public";
+const NHM2_RESEARCH_ADVANCED_LIGO_SENSITIVITY =
+  "https://dcc.ligo.org/LIGO-P1500260/public";
 const NHM2_RESEARCH_ADVANCED_LIGO_PHYSREVD_93_112004 =
   "https://journals.aps.org/prd/abstract/10.1103/PhysRevD.93.112004";
-const NHM2_RESEARCH_SILICON_CASIMIR_CHIP = "https://www.nature.com/articles/ncomms2842";
+const NHM2_RESEARCH_SILICON_CASIMIR_CHIP =
+  "https://www.nature.com/articles/ncomms2842";
 const NHM2_RESEARCH_PATCH_POTENTIALS = "https://arxiv.org/abs/1409.5012";
 const NHM2_RESEARCH_PATCH_POTENTIAL_MEASUREMENT =
   "https://link.aps.org/doi/10.1103/PhysRevResearch.2.023355";
@@ -162,8 +145,10 @@ const NHM2_RESEARCH_MILLIMETRE_GRAVITY =
   "https://www.nature.com/articles/s41586-021-03250-7";
 const NHM2_RESEARCH_PFENNING_FORD_QI = "https://arxiv.org/abs/gr-qc/9702026";
 const NHM2_RESEARCH_REAL_MATERIAL_CASIMIR = "https://arxiv.org/abs/0902.4022";
-const NHM2_RESEARCH_ARBITRARY_MATERIAL_CASIMIR = "https://arxiv.org/abs/1010.5539";
-const NHM2_RESEARCH_STATIONARY_WORLDLINE_QEI = "https://arxiv.org/abs/2301.01698";
+const NHM2_RESEARCH_ARBITRARY_MATERIAL_CASIMIR =
+  "https://arxiv.org/abs/1010.5539";
+const NHM2_RESEARCH_STATIONARY_WORLDLINE_QEI =
+  "https://arxiv.org/abs/2301.01698";
 const NHM2_RESEARCH_WARPAX_OBSERVER_ROBUST = "https://arxiv.org/abs/2602.18023";
 const NHM2_RESEARCH_GENERIC_WARP_NEC = "https://arxiv.org/abs/2105.03079";
 const NHM2_RESEARCH_HIGH_STRESS_NANOMECHANICAL_RESONATORS =
@@ -176,29 +161,28 @@ const NHM2_RESEARCH_ALN_ALSCN_MEMS_MIRROR_REVIEW =
   "https://www.nature.com/articles/s41378-025-01053-8";
 const NHM2_RESEARCH_TIN_MEMBRANE_RESONATORS =
   "https://pubs.aip.org/aip/apl/article/127/22/222202/3373788/High-Q-membrane-resonators-using-ultra-high-stress";
-const NHM2_RESEARCH_CASIMIR_MEMS_REVIEW = "https://pmc.ncbi.nlm.nih.gov/articles/PMC11278474/";
+const NHM2_RESEARCH_CASIMIR_MEMS_REVIEW =
+  "https://pmc.ncbi.nlm.nih.gov/articles/PMC11278474/";
 const NHM2_RESEARCH_ROUGHNESS_PULL_IN =
   "https://link.aps.org/doi/10.1103/PhysRevB.72.115426";
 const NHM2_RESEARCH_ROUGHNESS_MEMS_ACTUATION =
   "https://link.aps.org/doi/10.1103/PhysRevB.87.125413";
-const NHM2_RESEARCH_SURFACE_POTENTIAL_NANOMEMBRANE = "https://arxiv.org/abs/1207.4429";
+const NHM2_RESEARCH_SURFACE_POTENTIAL_NANOMEMBRANE =
+  "https://arxiv.org/abs/1207.4429";
 const NHM2_RESEARCH_CASIMIR_PULL_IN_FRAMEWORK =
   "https://royalsocietypublishing.org/doi/10.1098/rspa.2020.0311";
 const NHM2_RESEARCH_RF_MEMS_REAL_MATERIAL_ROUGHNESS =
   "https://arxiv.org/abs/2606.28195";
-const NHM2_RESEARCH_STEERING_BONDI_FLUX =
-  "https://arxiv.org/abs/2606.22531v3";
+const NHM2_RESEARCH_STEERING_BONDI_FLUX = "https://arxiv.org/abs/2606.22531v3";
 
 const NHM2_SUPPORT_RETENTION_F_SUPPORT_MIN = 0.185065881969;
 const NHM2_SUPPORT_RETENTION_F_SUPPORT_MAX = 0.0849673202614;
 const NHM2_SUPPORT_RETENTION_OVERLAP_MARGIN = 0.459119311228;
 
-export type Nhm2SteeringBondiPremiseState = boolean | "unknown" | null | undefined;
+export type Nhm2SteeringBondiPremiseState =
+  boolean | "unknown" | null | undefined;
 export type Nhm2SteeringBondiFluxGateStatus =
-  | "not_applicable"
-  | "not_ready"
-  | "blocked"
-  | "diagnostic_pass";
+  "not_applicable" | "not_ready" | "blocked" | "diagnostic_pass";
 
 export type Nhm2SteeringBondiFluxGateResult = {
   status: Nhm2SteeringBondiFluxGateStatus;
@@ -269,35 +253,54 @@ const COMMON_ASSUMPTIONS = [
   "No row establishes NHM2 validation, propulsion, physical feasibility, QEI completion, or a transport route.",
 ];
 
-const docRef = (path: string, id?: string, note?: string): TheoryBadgeV1["sourceRefs"][number] => ({
+const docRef = (
+  path: string,
+  id?: string,
+  note?: string,
+): TheoryBadgeV1["sourceRefs"][number] => ({
   kind: "doc",
   path,
   id: id ?? null,
   note: note ?? null,
 });
 
-const repoRef = (path: string, id?: string, note?: string): TheoryBadgeV1["sourceRefs"][number] => ({
+const repoRef = (
+  path: string,
+  id?: string,
+  note?: string,
+): TheoryBadgeV1["sourceRefs"][number] => ({
   kind: "repo_module",
   path,
   id: id ?? null,
   note: note ?? null,
 });
 
-const artifactRef = (path: string, id?: string, note?: string): TheoryBadgeV1["sourceRefs"][number] => ({
+const artifactRef = (
+  path: string,
+  id?: string,
+  note?: string,
+): TheoryBadgeV1["sourceRefs"][number] => ({
   kind: "artifact",
   path,
   id: id ?? null,
   note: note ?? null,
 });
 
-const literatureRef = (path: string, id: string, note?: string): TheoryBadgeV1["sourceRefs"][number] => ({
+const literatureRef = (
+  path: string,
+  id: string,
+  note?: string,
+): TheoryBadgeV1["sourceRefs"][number] => ({
   kind: "literature_ref",
   path,
   id,
   note: note ?? null,
 });
 
-const equationMapRef = (id: string, note?: string): TheoryBadgeV1["sourceRefs"][number] => ({
+const equationMapRef = (
+  id: string,
+  note?: string,
+): TheoryBadgeV1["sourceRefs"][number] => ({
   kind: "equation_map_node",
   path: NHM2_OBSERVABLE_EQUATION_MAP,
   id,
@@ -318,7 +321,9 @@ const payload = (args: {
   setupContext: null,
 });
 
-const nhm2FullSolveBadge = (badge: Omit<TheoryBadgeV1, "claimBoundary">): TheoryBadgeV1 => ({
+const nhm2FullSolveBadge = (
+  badge: Omit<TheoryBadgeV1, "claimBoundary">,
+): TheoryBadgeV1 => ({
   ...badge,
   claimBoundary: NHM2_FULL_SOLVE_BOUNDARY,
 });
@@ -327,7 +332,8 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
   nhm2FullSolveBadge({
     id: "nhm2.observer.eulerian_normal",
     title: "Eulerian Normal Observer",
-    plainMeaning: "Defines the Eulerian normal observer from the same-chart lapse and shift fields.",
+    plainMeaning:
+      "Defines the Eulerian normal observer from the same-chart lapse and shift fields.",
     whyItMatters:
       "It makes the observer basis explicit before any energy, momentum, stress, or energy-condition diagnostic is interpreted.",
     subjects: ["nhm2", "observer", "eulerian", "adm", "same_chart"],
@@ -340,7 +346,8 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       {
         id: "eulerian_normal_components",
         role: "definition",
-        displayLatex: "n_\\mu=(-\\alpha,0,0,0),\\quad n^\\mu=(1/\\alpha,-\\beta^i/\\alpha)",
+        displayLatex:
+          "n_\\mu=(-\\alpha,0,0,0),\\quad n^\\mu=(1/\\alpha,-\\beta^i/\\alpha)",
         computableExpression: null,
         operatorKind: "tensor_component",
         inputSymbols: ["alpha", "beta_i"],
@@ -348,10 +355,23 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       },
     ],
     units: [
-      { symbol: "alpha", unit: null, quantity: "lapse", dimensionSignature: "1" },
+      {
+        symbol: "alpha",
+        unit: null,
+        quantity: "lapse",
+        dimensionSignature: "1",
+      },
       { symbol: "beta_i", quantity: "shift", dimensionSignature: "L T^-1" },
-      { symbol: "n_mu", quantity: "covariant_observer_normal", dimensionSignature: "1" },
-      { symbol: "n^mu", quantity: "contravariant_observer_normal", dimensionSignature: "1" },
+      {
+        symbol: "n_mu",
+        quantity: "covariant_observer_normal",
+        dimensionSignature: "1",
+      },
+      {
+        symbol: "n^mu",
+        quantity: "contravariant_observer_normal",
+        dimensionSignature: "1",
+      },
     ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
@@ -360,8 +380,15 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "eulerian-observers", "Whitepaper observer-normal section."),
-      equationMapRef("eulerian_observer_normal", "Observable equation map node."),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "eulerian-observers",
+        "Whitepaper observer-normal section.",
+      ),
+      equationMapRef(
+        "eulerian_observer_normal",
+        "Observable equation map node.",
+      ),
     ],
     hintKeys: {
       subjects: ["nhm2", "observer", "eulerian", "adm", "same_chart"],
@@ -375,10 +402,17 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
   nhm2FullSolveBadge({
     id: "nhm2.observer.energy_density_projection",
     title: "Observer Energy-Density Projection",
-    plainMeaning: "Projects the same-chart stress-energy tensor into Eulerian energy density.",
+    plainMeaning:
+      "Projects the same-chart stress-energy tensor into Eulerian energy density.",
     whyItMatters:
       "It separates observer-projected energy density from a raw coordinate component or scalar source proxy.",
-    subjects: ["nhm2", "observer", "stress_energy", "energy_density", "projection"],
+    subjects: [
+      "nhm2",
+      "observer",
+      "stress_energy",
+      "energy_density",
+      "projection",
+    ],
     level: "derived_relation",
     status: "review",
     simulationOwners: ["NHM2", "general_relativity"],
@@ -395,7 +429,14 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         outputSymbols: ["E"],
       },
     ],
-    units: [{ symbol: "E", unit: "J/m^3", quantity: "observer_energy_density", dimensionSignature: "M L^-1 T^-2" }],
+    units: [
+      {
+        symbol: "E",
+        unit: "J/m^3",
+        quantity: "observer_energy_density",
+        dimensionSignature: "M L^-1 T^-2",
+      },
+    ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
       "Projected E is observer-family evidence, not a full energy-condition result.",
@@ -403,11 +444,24 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "stress-energy-projections", "Whitepaper projection grammar."),
-      equationMapRef("observer_energy_density", "Observable equation map node."),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "stress-energy-projections",
+        "Whitepaper projection grammar.",
+      ),
+      equationMapRef(
+        "observer_energy_density",
+        "Observable equation map node.",
+      ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "observer", "stress_energy", "energy_density", "projection"],
+      subjects: [
+        "nhm2",
+        "observer",
+        "stress_energy",
+        "energy_density",
+        "projection",
+      ],
       symbols: ["T_mu_nu", "n^mu", "E"],
       unitSignatures: ["M L^-1 T^-2"],
       repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
@@ -418,15 +472,27 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
   nhm2FullSolveBadge({
     id: "nhm2.observer.momentum_density_projection",
     title: "Observer Momentum-Density Projection",
-    plainMeaning: "Projects the same-chart stress-energy tensor into Eulerian momentum density.",
+    plainMeaning:
+      "Projects the same-chart stress-energy tensor into Eulerian momentum density.",
     whyItMatters:
       "It makes the missing or review-gated momentum channels visible so diagonal-only source proxies cannot stand in for full observer authority.",
-    subjects: ["nhm2", "observer", "stress_energy", "momentum_density", "projection"],
+    subjects: [
+      "nhm2",
+      "observer",
+      "stress_energy",
+      "momentum_density",
+      "projection",
+    ],
     level: "derived_relation",
     status: "review",
     simulationOwners: ["NHM2", "general_relativity"],
     equationFamilies: ["observer_projection", "stress_energy_projection"],
-    tags: ["momentum_density", "tensor_component", "same_chart", "diagonal_proxy_boundary"],
+    tags: [
+      "momentum_density",
+      "tensor_component",
+      "same_chart",
+      "diagonal_proxy_boundary",
+    ],
     equations: [
       {
         id: "observer_momentum_density_projection",
@@ -438,7 +504,14 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         outputSymbols: ["J_i"],
       },
     ],
-    units: [{ symbol: "J_i", unit: "J/m^3", quantity: "momentum_density_projection", dimensionSignature: "M L^-1 T^-2" }],
+    units: [
+      {
+        symbol: "J_i",
+        unit: "J/m^3",
+        quantity: "momentum_density_projection",
+        dimensionSignature: "M L^-1 T^-2",
+      },
+    ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
       "A diagonal-only stress proxy cannot substitute for observer momentum-density channels.",
@@ -446,11 +519,21 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "stress-energy-projections", "Whitepaper projection grammar."),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "stress-energy-projections",
+        "Whitepaper projection grammar.",
+      ),
       equationMapRef("momentum_density", "Observable equation map node."),
     ],
     hintKeys: {
-      subjects: ["nhm2", "observer", "stress_energy", "momentum_density", "projection"],
+      subjects: [
+        "nhm2",
+        "observer",
+        "stress_energy",
+        "momentum_density",
+        "projection",
+      ],
       symbols: ["T_mu_nu", "n^mu", "gamma^nu_i", "J_i"],
       unitSignatures: ["M L^-1 T^-2"],
       repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
@@ -461,15 +544,27 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
   nhm2FullSolveBadge({
     id: "nhm2.observer.spatial_stress_projection",
     title: "Observer Spatial-Stress Projection",
-    plainMeaning: "Projects the same-chart stress-energy tensor into spatial stress components.",
+    plainMeaning:
+      "Projects the same-chart stress-energy tensor into spatial stress components.",
     whyItMatters:
       "It records the off-diagonal spatial-stress authority required before observer-family diagnostics can be interpreted strongly.",
-    subjects: ["nhm2", "observer", "stress_energy", "spatial_stress", "projection"],
+    subjects: [
+      "nhm2",
+      "observer",
+      "stress_energy",
+      "spatial_stress",
+      "projection",
+    ],
     level: "derived_relation",
     status: "review",
     simulationOwners: ["NHM2", "general_relativity"],
     equationFamilies: ["observer_projection", "stress_energy_projection"],
-    tags: ["spatial_stress", "tensor_component", "same_chart", "off_diagonal_authority"],
+    tags: [
+      "spatial_stress",
+      "tensor_component",
+      "same_chart",
+      "off_diagonal_authority",
+    ],
     equations: [
       {
         id: "observer_spatial_stress_projection",
@@ -481,7 +576,14 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         outputSymbols: ["S_ij"],
       },
     ],
-    units: [{ symbol: "S_ij", unit: "J/m^3", quantity: "spatial_stress_projection", dimensionSignature: "M L^-1 T^-2" }],
+    units: [
+      {
+        symbol: "S_ij",
+        unit: "J/m^3",
+        quantity: "spatial_stress_projection",
+        dimensionSignature: "M L^-1 T^-2",
+      },
+    ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
       "Off-diagonal stress authority is required for full observer-family interpretation.",
@@ -489,11 +591,21 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "stress-energy-projections", "Whitepaper projection grammar."),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "stress-energy-projections",
+        "Whitepaper projection grammar.",
+      ),
       equationMapRef("spatial_stress", "Observable equation map node."),
     ],
     hintKeys: {
-      subjects: ["nhm2", "observer", "stress_energy", "spatial_stress", "projection"],
+      subjects: [
+        "nhm2",
+        "observer",
+        "stress_energy",
+        "spatial_stress",
+        "projection",
+      ],
       symbols: ["T_mu_nu", "gamma^mu_i", "gamma^nu_j", "S_ij"],
       unitSignatures: ["M L^-1 T^-2"],
       repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
@@ -513,12 +625,18 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     status: "blocked",
     simulationOwners: ["NHM2", "general_relativity"],
     equationFamilies: ["tensor_authority", "observer_projection"],
-    tags: ["full_tensor", "diagonal_proxy_boundary", "momentum_density", "off_diagonal_authority"],
+    tags: [
+      "full_tensor",
+      "diagonal_proxy_boundary",
+      "momentum_density",
+      "off_diagonal_authority",
+    ],
     equations: [
       {
         id: "full_tensor_authority_gate",
         role: "gate",
-        displayLatex: "\\mathrm{authority}=T_{00}\\land J_i\\land S_{ii}\\land S_{ij,i\\ne j}",
+        displayLatex:
+          "\\mathrm{authority}=T_{00}\\land J_i\\land S_{ii}\\land S_{ij,i\\ne j}",
         computableExpression: null,
         operatorKind: "gate_status",
         inputSymbols: ["T00", "J_i", "S_ii", "S_ij_offdiag"],
@@ -533,13 +651,23 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "why-diagonal-only-was-insufficient", "Diagonal-only limitation."),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "why-diagonal-only-was-insufficient",
+        "Diagonal-only limitation.",
+      ),
       equationMapRef("momentum_density", "Momentum projection node."),
       equationMapRef("spatial_stress", "Spatial-stress projection node."),
     ],
     hintKeys: {
       subjects: ["nhm2", "tensor", "full_authority", "observer", "same_chart"],
-      symbols: ["T00", "J_i", "S_ii", "S_ij_offdiag", "tensor_authority_status"],
+      symbols: [
+        "T00",
+        "J_i",
+        "S_ii",
+        "S_ij_offdiag",
+        "tensor_authority_status",
+      ],
       unitSignatures: ["M L^-1 T^-2"],
       repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
       equationFamilies: ["tensor_authority", "observer_projection"],
@@ -558,7 +686,13 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     status: "blocked",
     simulationOwners: ["NHM2", "general_relativity"],
     equationFamilies: ["same_chart_full_tensor", "adm_decomposition"],
-    tags: ["full_tensor", "same_chart", "component_status", "adm", "blocks_promotion"],
+    tags: [
+      "full_tensor",
+      "same_chart",
+      "component_status",
+      "adm",
+      "blocks_promotion",
+    ],
     equations: [
       {
         id: "same_chart_full_tensor_gate",
@@ -567,13 +701,32 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
           "\\mathrm{Tensor}_{full}=T_{00}\\land T_{0i}\\land T_{ii}\\land T_{ij,i\\ne j}",
         computableExpression: null,
         operatorKind: "gate_status",
-        inputSymbols: ["T00", "T0i", "Tii", "Tij_offdiag", "alpha", "beta_i", "gamma_ij", "K_ij"],
+        inputSymbols: [
+          "T00",
+          "T0i",
+          "Tii",
+          "Tij_offdiag",
+          "alpha",
+          "beta_i",
+          "gamma_ij",
+          "K_ij",
+        ],
         outputSymbols: ["same_chart_full_tensor_status"],
       },
     ],
     units: [
-      { symbol: "T00", unit: "J/m^3", quantity: "energy_density_component", dimensionSignature: "M L^-1 T^-2" },
-      { symbol: "Tij", unit: "Pa", quantity: "spatial_stress_component", dimensionSignature: "M L^-1 T^-2" },
+      {
+        symbol: "T00",
+        unit: "J/m^3",
+        quantity: "energy_density_component",
+        dimensionSignature: "M L^-1 T^-2",
+      },
+      {
+        symbol: "Tij",
+        unit: "Pa",
+        quantity: "spatial_stress_component",
+        dimensionSignature: "M L^-1 T^-2",
+      },
     ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
@@ -582,15 +735,31 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      artifactRef("shared/contracts/nhm2-same-chart-full-tensor.v1.ts", "nhm2-same-chart-full-tensor-contract", "Typed component status and provenance contract."),
+      artifactRef(
+        "shared/contracts/nhm2-same-chart-full-tensor.v1.ts",
+        "nhm2-same-chart-full-tensor-contract",
+        "Typed component status and provenance contract.",
+      ),
       equationMapRef("momentum_density", "Momentum projection node."),
       equationMapRef("spatial_stress", "Spatial-stress projection node."),
     ],
     hintKeys: {
       subjects: ["nhm2", "tensor", "same_chart", "full_tensor", "adm"],
-      symbols: ["T00", "T0i", "Tii", "Tij_offdiag", "alpha", "beta_i", "gamma_ij", "K_ij"],
+      symbols: [
+        "T00",
+        "T0i",
+        "Tii",
+        "Tij_offdiag",
+        "alpha",
+        "beta_i",
+        "gamma_ij",
+        "K_ij",
+      ],
       unitSignatures: ["M L^-1 T^-2"],
-      repoPaths: ["shared/contracts/nhm2-same-chart-full-tensor.v1.ts", NHM2_OBSERVABLE_EQUATION_MAP],
+      repoPaths: [
+        "shared/contracts/nhm2-same-chart-full-tensor.v1.ts",
+        NHM2_OBSERVABLE_EQUATION_MAP,
+      ],
       equationFamilies: ["same_chart_full_tensor", "adm_decomposition"],
       simulationOwners: ["NHM2", "general_relativity"],
     },
@@ -598,10 +767,17 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
   nhm2FullSolveBadge({
     id: "nhm2.tensor.metric_required_stress_energy",
     title: "Metric-Required Stress-Energy Tensor",
-    plainMeaning: "Names the geometry-first stress-energy tensor required by the selected same-chart metric.",
+    plainMeaning:
+      "Names the geometry-first stress-energy tensor required by the selected same-chart metric.",
     whyItMatters:
       "It separates what the metric demands from any proposed source-side mechanism or tile-effective counterpart.",
-    subjects: ["nhm2", "tensor", "einstein_tensor", "metric_required_source", "same_chart"],
+    subjects: [
+      "nhm2",
+      "tensor",
+      "einstein_tensor",
+      "metric_required_source",
+      "same_chart",
+    ],
     level: "simulation_specific",
     status: "diagnostic",
     simulationOwners: ["NHM2", "general_relativity"],
@@ -619,8 +795,17 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       },
     ],
     units: [
-      { symbol: "G_ab", quantity: "einstein_tensor", dimensionSignature: "L^-2" },
-      { symbol: "T_geom_ab", unit: "geometric_units", quantity: "metric_required_stress_energy", dimensionSignature: "L^-2" },
+      {
+        symbol: "G_ab",
+        quantity: "einstein_tensor",
+        dimensionSignature: "L^-2",
+      },
+      {
+        symbol: "T_geom_ab",
+        unit: "geometric_units",
+        quantity: "metric_required_stress_energy",
+        dimensionSignature: "L^-2",
+      },
     ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
@@ -629,11 +814,21 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "einstein-tensor-route", "Geometry-first tensor route."),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "einstein-tensor-route",
+        "Geometry-first tensor route.",
+      ),
       equationMapRef("einstein_tensor_source", "Observable equation map node."),
     ],
     hintKeys: {
-      subjects: ["nhm2", "tensor", "einstein_tensor", "metric_required_source", "same_chart"],
+      subjects: [
+        "nhm2",
+        "tensor",
+        "einstein_tensor",
+        "metric_required_source",
+        "same_chart",
+      ],
       symbols: ["G_ab", "T_geom_ab"],
       unitSignatures: ["L^-2"],
       repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
@@ -648,11 +843,20 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Represents the source-side tile-effective tensor requirement in the same chart, basis, region mask, and normalization convention.",
     whyItMatters:
       "It prevents a mechanism-side Casimir narrative from being mistaken for the tensor counterpart required by the metric route.",
-    subjects: ["nhm2", "tensor", "tile_effective_counterpart", "source_side", "same_basis"],
+    subjects: [
+      "nhm2",
+      "tensor",
+      "tile_effective_counterpart",
+      "source_side",
+      "same_basis",
+    ],
     level: "diagnostic_gate",
     status: "review",
     simulationOwners: ["NHM2", "casimir"],
-    equationFamilies: ["tile_effective_counterpart", "source_side_tensor_requirement"],
+    equationFamilies: [
+      "tile_effective_counterpart",
+      "source_side_tensor_requirement",
+    ],
     tags: ["tile_effective", "source_side", "review_gated", "same_basis"],
     equations: [
       {
@@ -662,12 +866,22 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
           "T^{tile\\_eff}_{ab}\\;\\mathrm{requires}\\;sourceSide\\land sameBasis\\land regionMask\\land componentAuthority",
         computableExpression: null,
         operatorKind: "gate_status",
-        inputSymbols: ["sourceSide", "sameBasis", "regionMask", "componentAuthority"],
+        inputSymbols: [
+          "sourceSide",
+          "sameBasis",
+          "regionMask",
+          "componentAuthority",
+        ],
         outputSymbols: ["T_tile_eff_ab"],
       },
     ],
     units: [
-      { symbol: "T_tile_eff_ab", unit: "geometric_units", quantity: "tile_effective_stress_energy", dimensionSignature: "L^-2" },
+      {
+        symbol: "T_tile_eff_ab",
+        unit: "geometric_units",
+        quantity: "tile_effective_stress_energy",
+        dimensionSignature: "L^-2",
+      },
     ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
@@ -676,15 +890,34 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "source-side-full-tensor-counterpart", "Source-side tensor counterpart section."),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "source-side-full-tensor-counterpart",
+        "Source-side tensor counterpart section.",
+      ),
       equationMapRef("tile_effective_tensor", "Observable equation map node."),
     ],
     hintKeys: {
-      subjects: ["nhm2", "tensor", "tile_effective_counterpart", "source_side", "same_basis"],
-      symbols: ["T_tile_eff_ab", "sourceSide", "sameBasis", "regionMask", "componentAuthority"],
+      subjects: [
+        "nhm2",
+        "tensor",
+        "tile_effective_counterpart",
+        "source_side",
+        "same_basis",
+      ],
+      symbols: [
+        "T_tile_eff_ab",
+        "sourceSide",
+        "sameBasis",
+        "regionMask",
+        "componentAuthority",
+      ],
       unitSignatures: ["L^-2"],
       repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
-      equationFamilies: ["tile_effective_counterpart", "source_side_tensor_requirement"],
+      equationFamilies: [
+        "tile_effective_counterpart",
+        "source_side_tensor_requirement",
+      ],
       simulationOwners: ["NHM2", "casimir"],
     },
   }),
@@ -695,12 +928,27 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Records whether the tile/material side supplies an independent same-chart tensor counterpart instead of a proxy scalar or metric echo.",
     whyItMatters:
       "It prevents wall T00 closure from comparing metric-required geometry against a scalar or observation path that is not source-side tensor authority.",
-    subjects: ["nhm2", "source_side", "same_basis", "tensor_authority", "wall_region"],
+    subjects: [
+      "nhm2",
+      "source_side",
+      "same_basis",
+      "tensor_authority",
+      "wall_region",
+    ],
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "casimir", "general_relativity"],
-    equationFamilies: ["source_side_same_basis_tensor_authority", "tile_effective_counterpart"],
-    tags: ["source_side", "same_basis", "tensor_authority", "metric_echo_forbidden", "blocks_promotion"],
+    equationFamilies: [
+      "source_side_same_basis_tensor_authority",
+      "tile_effective_counterpart",
+    ],
+    tags: [
+      "source_side",
+      "same_basis",
+      "tensor_authority",
+      "metric_echo_forbidden",
+      "blocks_promotion",
+    ],
     equations: [
       {
         id: "source_side_same_basis_tensor_authority_gate",
@@ -722,20 +970,47 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      artifactRef("shared/contracts/nhm2-source-side-same-basis-tensor-authority.v1.ts", "nhm2-source-side-same-basis-tensor-authority-contract", "Typed source-side same-basis tensor authority receipt."),
-      artifactRef("shared/contracts/nhm2-tile-effective-counterpart.v1.ts", "nhm2-tile-effective-counterpart-contract", "Existing tile-effective counterpart contract consumed by the authority receipt."),
-      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "source-side-full-tensor-counterpart", "Source-side tensor authority discussion."),
+      artifactRef(
+        "shared/contracts/nhm2-source-side-same-basis-tensor-authority.v1.ts",
+        "nhm2-source-side-same-basis-tensor-authority-contract",
+        "Typed source-side same-basis tensor authority receipt.",
+      ),
+      artifactRef(
+        "shared/contracts/nhm2-tile-effective-counterpart.v1.ts",
+        "nhm2-tile-effective-counterpart-contract",
+        "Existing tile-effective counterpart contract consumed by the authority receipt.",
+      ),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "source-side-full-tensor-counterpart",
+        "Source-side tensor authority discussion.",
+      ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "source_side", "same_basis", "tensor_authority", "wall_region"],
-      symbols: ["source_side_same_basis_authority_status", "sourceSide", "sameChart", "fullTensor", "metricEcho"],
+      subjects: [
+        "nhm2",
+        "source_side",
+        "same_basis",
+        "tensor_authority",
+        "wall_region",
+      ],
+      symbols: [
+        "source_side_same_basis_authority_status",
+        "sourceSide",
+        "sameChart",
+        "fullTensor",
+        "metricEcho",
+      ],
       unitSignatures: [],
       repoPaths: [
         "shared/contracts/nhm2-source-side-same-basis-tensor-authority.v1.ts",
         "shared/contracts/nhm2-tile-effective-counterpart.v1.ts",
         NHM2_FULL_SOLVE_WHITEPAPER,
       ],
-      equationFamilies: ["source_side_same_basis_tensor_authority", "tile_effective_counterpart"],
+      equationFamilies: [
+        "source_side_same_basis_tensor_authority",
+        "tile_effective_counterpart",
+      ],
       simulationOwners: ["NHM2", "casimir", "general_relativity"],
     },
   }),
@@ -746,12 +1021,27 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Records whether each regional source-side tensor component is present, admissible, non-proxy, and non-metric-echo.",
     whyItMatters:
       "It lets the theory graph distinguish evidence admission from physical material proof and prevents stale source-authority blockers from hiding the next gate.",
-    subjects: ["nhm2", "source_side", "component_authority", "full_tensor", "anti_proxy"],
+    subjects: [
+      "nhm2",
+      "source_side",
+      "component_authority",
+      "full_tensor",
+      "anti_proxy",
+    ],
     level: "diagnostic_gate",
     status: "diagnostic",
     simulationOwners: ["NHM2", "casimir", "general_relativity"],
-    equationFamilies: ["source_component_authority_ledger", "tile_effective_counterpart"],
-    tags: ["component_authority", "anti_proxy", "full_tensor", "metric_echo_forbidden", "runtime_artifact"],
+    equationFamilies: [
+      "source_component_authority_ledger",
+      "tile_effective_counterpart",
+    ],
+    tags: [
+      "component_authority",
+      "anti_proxy",
+      "full_tensor",
+      "metric_echo_forbidden",
+      "runtime_artifact",
+    ],
     equations: [
       {
         id: "source_component_authority_ledger_gate",
@@ -760,7 +1050,13 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
           "\\mathrm{Ledger}_{source}=\\bigwedge_R(T_{00}\\land T_{0i}\\land T_{ii}\\land T_{ij,i\\ne j})_{source}",
         computableExpression: null,
         operatorKind: "gate_status",
-        inputSymbols: ["T00_R", "T0i_R", "Tii_R", "Tij_offdiag_R", "authority_R"],
+        inputSymbols: [
+          "T00_R",
+          "T0i_R",
+          "Tii_R",
+          "Tij_offdiag_R",
+          "authority_R",
+        ],
         outputSymbols: ["source_component_authority_status"],
       },
     ],
@@ -783,10 +1079,20 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         "sha256:be165467299ebb898ced93106e9bf3d979b60c6624537294c5e74ea3b668ebfa",
         "Pinned local smoke-chain ledger: complete source component authority is evidence admission only.",
       ),
-      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "may-baseline-and-june-pass-path-delta", "June pass-path delta."),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "may-baseline-and-june-pass-path-delta",
+        "June pass-path delta.",
+      ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "source_side", "component_authority", "full_tensor", "anti_proxy"],
+      subjects: [
+        "nhm2",
+        "source_side",
+        "component_authority",
+        "full_tensor",
+        "anti_proxy",
+      ],
       symbols: ["T00_R", "T0i_R", "Tii_R", "Tij_offdiag_R", "authority_R"],
       unitSignatures: [],
       repoPaths: [
@@ -794,7 +1100,10 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_SOURCE_COMPONENT_AUTHORITY_LEDGER,
         NHM2_FULL_SOLVE_WHITEPAPER,
       ],
-      equationFamilies: ["source_component_authority_ledger", "tile_effective_counterpart"],
+      equationFamilies: [
+        "source_component_authority_ledger",
+        "tile_effective_counterpart",
+      ],
       simulationOwners: ["NHM2", "casimir", "general_relativity"],
     },
   }),
@@ -810,12 +1119,19 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     status: "blocked",
     simulationOwners: ["NHM2", "general_relativity", "casimir"],
     equationFamilies: ["regional_source_closure", "wall_t00_trace"],
-    tags: ["wall_region", "T00", "relLInf", "t00_mismatch_present", "blocks_promotion"],
+    tags: [
+      "wall_region",
+      "T00",
+      "relLInf",
+      "t00_mismatch_present",
+      "blocks_promotion",
+    ],
     equations: [
       {
         id: "wall_t00_residual_norm",
         role: "residual",
-        displayLatex: "\\Delta T_{00}^{wall}=T_{00,geom}^{wall}-T_{00,tile}^{wall}",
+        displayLatex:
+          "\\Delta T_{00}^{wall}=T_{00,geom}^{wall}-T_{00,tile}^{wall}",
         computableExpression: null,
         operatorKind: "residual",
         inputSymbols: ["T00_geom_wall", "T00_tile_wall"],
@@ -824,7 +1140,8 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       {
         id: "wall_t00_rel_linf",
         role: "residual",
-        displayLatex: "\\mathrm{relLInf}_{wall}=\\|\\Delta T_{00}^{wall}\\|_\\infty/\\|T_{00,geom}^{wall}\\|_\\infty",
+        displayLatex:
+          "\\mathrm{relLInf}_{wall}=\\|\\Delta T_{00}^{wall}\\|_\\infty/\\|T_{00,geom}^{wall}\\|_\\infty",
         computableExpression: null,
         operatorKind: "region_aggregate",
         inputSymbols: ["Delta_T00_wall", "T00_geom_wall"],
@@ -832,8 +1149,18 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       },
     ],
     units: [
-      { symbol: "Delta_T00_wall", unit: "geometric_units", quantity: "wall_t00_residual", dimensionSignature: "L^-2" },
-      { symbol: "wall_t00_relLInf", unit: null, quantity: "relative_linf_residual", dimensionSignature: "1" },
+      {
+        symbol: "Delta_T00_wall",
+        unit: "geometric_units",
+        quantity: "wall_t00_residual",
+        dimensionSignature: "L^-2",
+      },
+      {
+        symbol: "wall_t00_relLInf",
+        unit: null,
+        quantity: "relative_linf_residual",
+        dimensionSignature: "1",
+      },
     ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
@@ -852,11 +1179,20 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         "tile-effective-wall-t00",
         "Wall-region tile-effective diagonal tensor artifact.",
       ),
-      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "same-basis-closure", "Regional closure discussion."),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "same-basis-closure",
+        "Regional closure discussion.",
+      ),
     ],
     hintKeys: {
       subjects: ["nhm2", "source_closure", "wall_region", "T00", "residual"],
-      symbols: ["T00_geom_wall", "T00_tile_wall", "Delta_T00_wall", "wall_t00_relLInf"],
+      symbols: [
+        "T00_geom_wall",
+        "T00_tile_wall",
+        "Delta_T00_wall",
+        "wall_t00_relLInf",
+      ],
       unitSignatures: ["L^-2", "1"],
       repoPaths: [
         "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-wall-latest.json",
@@ -870,15 +1206,27 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
   nhm2FullSolveBadge({
     id: "nhm2.closure.same_basis_regional_residual",
     title: "Same-Basis Regional Tensor Residual",
-    plainMeaning: "Compares metric-required and tile-effective tensors only after same-basis regional alignment.",
+    plainMeaning:
+      "Compares metric-required and tile-effective tensors only after same-basis regional alignment.",
     whyItMatters:
       "It names the central full-solve divergence surface without implying the source-to-geometry bridge is complete.",
-    subjects: ["nhm2", "closure_residual", "same_basis", "regional_closure", "tensor"],
+    subjects: [
+      "nhm2",
+      "closure_residual",
+      "same_basis",
+      "regional_closure",
+      "tensor",
+    ],
     level: "diagnostic_gate",
     status: "review",
     simulationOwners: ["NHM2", "general_relativity", "casimir"],
     equationFamilies: ["same_basis_regional_closure", "tensor_residual"],
-    tags: ["regional_residual", "same_basis", "review_gated", "tensor_comparison"],
+    tags: [
+      "regional_residual",
+      "same_basis",
+      "review_gated",
+      "tensor_comparison",
+    ],
     equations: [
       {
         id: "same_basis_tensor_residual",
@@ -900,8 +1248,18 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       },
     ],
     units: [
-      { symbol: "Delta_T_ab", unit: "geometric_units", quantity: "tensor_residual", dimensionSignature: "L^-2" },
-      { symbol: "Delta_T_norm_R", unit: "geometric_units", quantity: "regional_tensor_residual", dimensionSignature: "L^-2" },
+      {
+        symbol: "Delta_T_ab",
+        unit: "geometric_units",
+        quantity: "tensor_residual",
+        dimensionSignature: "L^-2",
+      },
+      {
+        symbol: "Delta_T_norm_R",
+        unit: "geometric_units",
+        quantity: "regional_tensor_residual",
+        dimensionSignature: "L^-2",
+      },
     ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
@@ -910,13 +1268,29 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "same-basis-closure", "Regional closure discussion."),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "same-basis-closure",
+        "Regional closure discussion.",
+      ),
       equationMapRef("same_basis_closure", "Same-basis closure node."),
       equationMapRef("regional_source_closure", "Regional closure node."),
     ],
     hintKeys: {
-      subjects: ["nhm2", "closure_residual", "same_basis", "regional_closure", "tensor"],
-      symbols: ["Delta_T_ab", "Delta_T_norm_R", "T_geom_ab", "T_tile_eff_ab", "R"],
+      subjects: [
+        "nhm2",
+        "closure_residual",
+        "same_basis",
+        "regional_closure",
+        "tensor",
+      ],
+      symbols: [
+        "Delta_T_ab",
+        "Delta_T_norm_R",
+        "T_geom_ab",
+        "T_tile_eff_ab",
+        "R",
+      ],
       unitSignatures: ["L^-2"],
       repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
       equationFamilies: ["same_basis_regional_closure", "tensor_residual"],
@@ -930,12 +1304,23 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Synchronizes source authority, regional residuals, conservation, QEI dossier, observer robustness, and material receipt gates into one diagnostic candidate.",
     whyItMatters:
       "It is the runtime row that prevents a green-looking individual gate from being mistaken for full-solve closure.",
-    subjects: ["nhm2", "coupled_closure", "pass_candidate", "proof_stack", "artifact_governance"],
+    subjects: [
+      "nhm2",
+      "coupled_closure",
+      "pass_candidate",
+      "proof_stack",
+      "artifact_governance",
+    ],
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "general_relativity", "casimir"],
     equationFamilies: ["coupled_closure_pass_candidate", "closure_stack"],
-    tags: ["coupled_closure", "passCandidate_false", "runtime_artifact", "blocks_promotion"],
+    tags: [
+      "coupled_closure",
+      "passCandidate_false",
+      "runtime_artifact",
+      "blocks_promotion",
+    ],
     equations: [
       {
         id: "coupled_closure_pass_candidate_gate",
@@ -944,7 +1329,14 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
           "passCandidate=source\\land residuals\\land conservation\\land QEI\\land observer\\land material",
         computableExpression: null,
         operatorKind: "gate_status",
-        inputSymbols: ["source", "residuals", "conservation", "QEI", "observer", "material"],
+        inputSymbols: [
+          "source",
+          "residuals",
+          "conservation",
+          "QEI",
+          "observer",
+          "material",
+        ],
         outputSymbols: ["passCandidate"],
       },
     ],
@@ -967,11 +1359,29 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         "sha256:739ec5b9b887c42575ff8184bfe8e3d99e06c70e397abe233357d2e9aef040bc",
         "Pinned local smoke-chain artifact: passCandidate=false.",
       ),
-      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "may-baseline-and-june-pass-path-delta", "June pass-path delta."),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "may-baseline-and-june-pass-path-delta",
+        "June pass-path delta.",
+      ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "coupled_closure", "pass_candidate", "proof_stack", "artifact_governance"],
-      symbols: ["source", "residuals", "conservation", "QEI", "observer", "material", "passCandidate"],
+      subjects: [
+        "nhm2",
+        "coupled_closure",
+        "pass_candidate",
+        "proof_stack",
+        "artifact_governance",
+      ],
+      symbols: [
+        "source",
+        "residuals",
+        "conservation",
+        "QEI",
+        "observer",
+        "material",
+        "passCandidate",
+      ],
       unitSignatures: [],
       repoPaths: [
         "shared/contracts/nhm2-coupled-closure-pass-candidate.v1.ts",
@@ -989,12 +1399,23 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Reports whether the regional tensor closure path is numerically ready after source authority, wall T00, residual, conservation, QEI, observer, material, and coupled-candidate gates.",
     whyItMatters:
       "It is the graph row that answers what still has to pass numerically without converting smoke-chain progress into physical viability.",
-    subjects: ["nhm2", "regional_tensor", "pass_path", "numerical_readiness", "closure_stack"],
+    subjects: [
+      "nhm2",
+      "regional_tensor",
+      "pass_path",
+      "numerical_readiness",
+      "closure_stack",
+    ],
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "general_relativity", "casimir"],
     equationFamilies: ["regional_tensor_pass_path_harness", "closure_stack"],
-    tags: ["pass_path_harness", "numericalPassPathReady_false", "runtime_artifact", "blocks_promotion"],
+    tags: [
+      "pass_path_harness",
+      "numericalPassPathReady_false",
+      "runtime_artifact",
+      "blocks_promotion",
+    ],
     equations: [
       {
         id: "regional_tensor_pass_path_harness_gate",
@@ -1035,10 +1456,20 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         "sha256:b16bf1f9e0f288c7ba1dea2b800333292b4a6c16b119c4a8443d0805f0527b71",
         "Pinned local smoke-chain artifact: numericalPassPathReady=false; wall.relLInf=0.08853034907135743.",
       ),
-      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "may-baseline-and-june-pass-path-delta", "June pass-path delta."),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "may-baseline-and-june-pass-path-delta",
+        "June pass-path delta.",
+      ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "regional_tensor", "pass_path", "numerical_readiness", "closure_stack"],
+      subjects: [
+        "nhm2",
+        "regional_tensor",
+        "pass_path",
+        "numerical_readiness",
+        "closure_stack",
+      ],
       symbols: [
         "regionalTensors",
         "R_wall_T00",
@@ -1067,12 +1498,24 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Records whether the dynamic source campaign includes regional-support, sector-boundary, time-derivative, and transition-kernel conservation terms.",
     whyItMatters:
       "It prevents static covariant conservation from being mistaken for conservation of a sector-switched time-dependent source.",
-    subjects: ["nhm2", "dynamic_campaign", "switching", "covariant_conservation"],
+    subjects: [
+      "nhm2",
+      "dynamic_campaign",
+      "switching",
+      "covariant_conservation",
+    ],
     level: "diagnostic_gate",
     status: "diagnostic",
     simulationOwners: ["NHM2", "general_relativity", "casimir"],
-    equationFamilies: ["switching_covariant_conservation", "time_dependent_source_campaign"],
-    tags: ["switching_conservation", "runtime_artifact", "noncomputable_reference"],
+    equationFamilies: [
+      "switching_covariant_conservation",
+      "time_dependent_source_campaign",
+    ],
+    tags: [
+      "switching_conservation",
+      "runtime_artifact",
+      "noncomputable_reference",
+    ],
     equations: [
       {
         id: "switching_covariant_conservation_gate",
@@ -1110,15 +1553,30 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "dynamic_campaign", "switching", "covariant_conservation"],
-      symbols: ["W_R", "sector", "partial_t", "kernel", "T_mu_nu(t)", "switchingConservationPass"],
+      subjects: [
+        "nhm2",
+        "dynamic_campaign",
+        "switching",
+        "covariant_conservation",
+      ],
+      symbols: [
+        "W_R",
+        "sector",
+        "partial_t",
+        "kernel",
+        "T_mu_nu(t)",
+        "switchingConservationPass",
+      ],
       unitSignatures: [],
       repoPaths: [
         "shared/contracts/nhm2-time-dependent-source-campaign.v1.ts",
         "tools/nhm2/build-switching-covariant-conservation-evidence.ts",
         NHM2_SWITCHING_COVARIANT_CONSERVATION_EVIDENCE,
       ],
-      equationFamilies: ["switching_covariant_conservation", "time_dependent_source_campaign"],
+      equationFamilies: [
+        "switching_covariant_conservation",
+        "time_dependent_source_campaign",
+      ],
       simulationOwners: ["NHM2", "general_relativity", "casimir"],
     },
   }),
@@ -1133,8 +1591,15 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     level: "diagnostic_gate",
     status: "diagnostic",
     simulationOwners: ["NHM2", "general_relativity", "casimir"],
-    equationFamilies: ["frequency_convergence", "time_dependent_source_campaign"],
-    tags: ["frequency_convergence", "runtime_artifact", "noncomputable_reference"],
+    equationFamilies: [
+      "frequency_convergence",
+      "time_dependent_source_campaign",
+    ],
+    tags: [
+      "frequency_convergence",
+      "runtime_artifact",
+      "noncomputable_reference",
+    ],
     equations: [
       {
         id: "frequency_convergence_gate",
@@ -1146,7 +1611,14 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         outputSymbols: ["frequencyConvergencePass"],
       },
     ],
-    units: [{ symbol: "f", unit: "Hz", quantity: "switching_frequency", dimensionSignature: "T^-1" }],
+    units: [
+      {
+        symbol: "f",
+        unit: "Hz",
+        quantity: "switching_frequency",
+        dimensionSignature: "T^-1",
+      },
+    ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
       "A single-frequency result fails closed.",
@@ -1172,15 +1644,28 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "dynamic_campaign", "frequency_ladder", "cycle_average"],
-      symbols: ["f", "cycleAverageSource", "residualLInf", "frequencyConvergencePass"],
+      subjects: [
+        "nhm2",
+        "dynamic_campaign",
+        "frequency_ladder",
+        "cycle_average",
+      ],
+      symbols: [
+        "f",
+        "cycleAverageSource",
+        "residualLInf",
+        "frequencyConvergencePass",
+      ],
       unitSignatures: ["T^-1"],
       repoPaths: [
         "shared/contracts/nhm2-time-dependent-source-campaign.v1.ts",
         "tools/nhm2/build-frequency-convergence-evidence.ts",
         NHM2_FREQUENCY_CONVERGENCE_EVIDENCE,
       ],
-      equationFamilies: ["frequency_convergence", "time_dependent_source_campaign"],
+      equationFamilies: [
+        "frequency_convergence",
+        "time_dependent_source_campaign",
+      ],
       simulationOwners: ["NHM2", "general_relativity", "casimir"],
     },
   }),
@@ -1191,12 +1676,27 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Checks whether a time-averaged dynamic source geometry agrees with the reduced-order effective-source geometry and has bounded backreaction residuals.",
     whyItMatters:
       "It verifies the current smoke-chain dynamic and effective geometry channels have a bounded diagnostic residual, then hands the campaign to the full regional tensor closure gate.",
-    subjects: ["nhm2", "dynamic_campaign", "effective_geometry", "backreaction", "time_averaging"],
+    subjects: [
+      "nhm2",
+      "dynamic_campaign",
+      "effective_geometry",
+      "backreaction",
+      "time_averaging",
+    ],
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "general_relativity", "casimir"],
-    equationFamilies: ["dynamic_effective_geometry", "time_dependent_source_campaign"],
-    tags: ["dynamic_geometry", "effective_geometry", "backreaction", "runtime_artifact", "noncomputable_reference"],
+    equationFamilies: [
+      "dynamic_effective_geometry",
+      "time_dependent_source_campaign",
+    ],
+    tags: [
+      "dynamic_geometry",
+      "effective_geometry",
+      "backreaction",
+      "runtime_artifact",
+      "noncomputable_reference",
+    ],
     equations: [
       {
         id: "dynamic_effective_geometry_gate",
@@ -1205,7 +1705,11 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
           "\\langle g_{\\mu\\nu}(t)\\rangle_{cycle}\\stackrel{?}{\\sim}g^{eff}_{\\mu\\nu},\\quad \\|C^{backreaction}_{\\mu\\nu}\\|<\\epsilon",
         computableExpression: null,
         operatorKind: "noncomputable_reference",
-        inputSymbols: ["dynamicGeometryRef", "effectiveGeometryRef", "averagedSourceTensorRef"],
+        inputSymbols: [
+          "dynamicGeometryRef",
+          "effectiveGeometryRef",
+          "averagedSourceTensorRef",
+        ],
         outputSymbols: ["dynamicGeometryAgreementPass"],
       },
     ],
@@ -1294,7 +1798,12 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "dynamic_campaign", "effective_geometry", "backreaction"],
+      subjects: [
+        "nhm2",
+        "dynamic_campaign",
+        "effective_geometry",
+        "backreaction",
+      ],
       symbols: [
         "dynamicGeometryRef",
         "effectiveGeometryRef",
@@ -1322,7 +1831,10 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_BACKREACTION_RESIDUAL_RECEIPT,
         NHM2_DYNAMIC_EFFECTIVE_GEOMETRY_EVIDENCE,
       ],
-      equationFamilies: ["dynamic_effective_geometry", "time_dependent_source_campaign"],
+      equationFamilies: [
+        "dynamic_effective_geometry",
+        "time_dependent_source_campaign",
+      ],
       simulationOwners: ["NHM2", "general_relativity", "casimir"],
     },
   }),
@@ -1333,12 +1845,26 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Checks whether source-side off-diagonal spatial-stress components have documented shear or anisotropic mechanism evidence.",
     whyItMatters:
       "It separates a declared full tensor from a physically interpretable source model for T12, T13, and T23.",
-    subjects: ["nhm2", "source_tensor", "off_diagonal_stress", "shear", "dynamic_campaign"],
+    subjects: [
+      "nhm2",
+      "source_tensor",
+      "off_diagonal_stress",
+      "shear",
+      "dynamic_campaign",
+    ],
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "general_relativity", "casimir"],
-    equationFamilies: ["full_tensor_residual", "time_dependent_source_campaign"],
-    tags: ["runtime_artifact", "off_diagonal_tij", "shear_mechanism", "falsifier_candidate"],
+    equationFamilies: [
+      "full_tensor_residual",
+      "time_dependent_source_campaign",
+    ],
+    tags: [
+      "runtime_artifact",
+      "off_diagonal_tij",
+      "shear_mechanism",
+      "falsifier_candidate",
+    ],
     equations: [
       {
         id: "off_diagonal_shear_audit_gate",
@@ -1352,7 +1878,12 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       },
     ],
     units: [
-      { symbol: "Tij", unit: "Pa", quantity: "off_diagonal_spatial_stress", dimensionSignature: "M L^-1 T^-2" },
+      {
+        symbol: "Tij",
+        unit: "Pa",
+        quantity: "off_diagonal_spatial_stress",
+        dimensionSignature: "M L^-1 T^-2",
+      },
     ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
@@ -1384,8 +1915,20 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "source_tensor", "off_diagonal_stress", "shear", "dynamic_campaign"],
-      symbols: ["T12", "T13", "T23", "mechanism_shear", "source_off_diagonal_shear_status"],
+      subjects: [
+        "nhm2",
+        "source_tensor",
+        "off_diagonal_stress",
+        "shear",
+        "dynamic_campaign",
+      ],
+      symbols: [
+        "T12",
+        "T13",
+        "T23",
+        "mechanism_shear",
+        "source_off_diagonal_shear_status",
+      ],
       unitSignatures: ["M L^-1 T^-2"],
       repoPaths: [
         "shared/contracts/nhm2-source-off-diagonal-shear-audit.v1.ts",
@@ -1393,7 +1936,10 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_SOURCE_OFF_DIAGONAL_SHEAR_AUDIT,
         NHM2_AXIS_ALIGNED_SOURCE_OFF_DIAGONAL_SHEAR_AUDIT,
       ],
-      equationFamilies: ["full_tensor_residual", "time_dependent_source_campaign"],
+      equationFamilies: [
+        "full_tensor_residual",
+        "time_dependent_source_campaign",
+      ],
       simulationOwners: ["NHM2", "general_relativity", "casimir"],
     },
   }),
@@ -1404,12 +1950,26 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Checks whether source-side T0i momentum-density components have documented flux, current, or constitutive momentum evidence.",
     whyItMatters:
       "It separates a present T0i tensor row from a source model that can actually explain momentum density on the same chart.",
-    subjects: ["nhm2", "source_tensor", "momentum_density", "t0i", "dynamic_campaign"],
+    subjects: [
+      "nhm2",
+      "source_tensor",
+      "momentum_density",
+      "t0i",
+      "dynamic_campaign",
+    ],
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "general_relativity", "casimir"],
-    equationFamilies: ["full_tensor_residual", "time_dependent_source_campaign"],
-    tags: ["runtime_artifact", "momentum_t0i", "source_mechanism", "falsifier_candidate"],
+    equationFamilies: [
+      "full_tensor_residual",
+      "time_dependent_source_campaign",
+    ],
+    tags: [
+      "runtime_artifact",
+      "momentum_t0i",
+      "source_mechanism",
+      "falsifier_candidate",
+    ],
     equations: [
       {
         id: "momentum_density_audit_gate",
@@ -1423,7 +1983,12 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       },
     ],
     units: [
-      { symbol: "T0i", unit: "J/m^3", quantity: "momentum_density_channel", dimensionSignature: "M L^-1 T^-2" },
+      {
+        symbol: "T0i",
+        unit: "J/m^3",
+        quantity: "momentum_density_channel",
+        dimensionSignature: "M L^-1 T^-2",
+      },
     ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
@@ -1450,15 +2015,30 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "source_tensor", "momentum_density", "t0i", "dynamic_campaign"],
-      symbols: ["T01", "T02", "T03", "mechanism_J_i", "source_momentum_density_status"],
+      subjects: [
+        "nhm2",
+        "source_tensor",
+        "momentum_density",
+        "t0i",
+        "dynamic_campaign",
+      ],
+      symbols: [
+        "T01",
+        "T02",
+        "T03",
+        "mechanism_J_i",
+        "source_momentum_density_status",
+      ],
       unitSignatures: ["M L^-1 T^-2"],
       repoPaths: [
         "shared/contracts/nhm2-source-momentum-density-audit.v1.ts",
         "tools/nhm2/build-source-momentum-density-audit.ts",
         NHM2_AXIS_ALIGNED_SOURCE_MOMENTUM_DENSITY_AUDIT,
       ],
-      equationFamilies: ["full_tensor_residual", "time_dependent_source_campaign"],
+      equationFamilies: [
+        "full_tensor_residual",
+        "time_dependent_source_campaign",
+      ],
       simulationOwners: ["NHM2", "general_relativity", "casimir"],
     },
   }),
@@ -1469,12 +2049,27 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Checks whether same-chart T0i/T00 momentum ratios have a local orthonormal projection receipt before causal-material bound language is allowed.",
     whyItMatters:
       "It prevents chart-basis component ratios from being promoted into physical causal-material falsifiers without an observer-frame or tetrad receipt.",
-    subjects: ["nhm2", "source_tensor", "momentum_density", "local_frame", "dynamic_campaign"],
+    subjects: [
+      "nhm2",
+      "source_tensor",
+      "momentum_density",
+      "local_frame",
+      "dynamic_campaign",
+    ],
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "general_relativity", "casimir"],
-    equationFamilies: ["full_tensor_residual", "time_dependent_source_campaign"],
-    tags: ["runtime_artifact", "momentum_t0i", "local_frame", "projection_receipt", "blocks_promotion"],
+    equationFamilies: [
+      "full_tensor_residual",
+      "time_dependent_source_campaign",
+    ],
+    tags: [
+      "runtime_artifact",
+      "momentum_t0i",
+      "local_frame",
+      "projection_receipt",
+      "blocks_promotion",
+    ],
     equations: [
       {
         id: "momentum_frame_projection_gate",
@@ -1518,8 +2113,20 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "source_tensor", "momentum_density", "local_frame", "dynamic_campaign"],
-      symbols: ["T0i", "T00", "tetrad", "local_orthonormal_frame", "momentum_frame_projection_status"],
+      subjects: [
+        "nhm2",
+        "source_tensor",
+        "momentum_density",
+        "local_frame",
+        "dynamic_campaign",
+      ],
+      symbols: [
+        "T0i",
+        "T00",
+        "tetrad",
+        "local_orthonormal_frame",
+        "momentum_frame_projection_status",
+      ],
       unitSignatures: [],
       repoPaths: [
         "shared/contracts/nhm2-momentum-frame-projection-receipt.v1.ts",
@@ -1527,7 +2134,10 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_AXIS_ALIGNED_MOMENTUM_FRAME_PROJECTION_RECEIPT,
         NHM2_AXIS_ALIGNED_MOMENTUM_FRAME_PROJECTION_EVIDENCE,
       ],
-      equationFamilies: ["full_tensor_residual", "time_dependent_source_campaign"],
+      equationFamilies: [
+        "full_tensor_residual",
+        "time_dependent_source_campaign",
+      ],
       simulationOwners: ["NHM2", "general_relativity", "casimir"],
     },
   }),
@@ -1538,17 +2148,32 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Reports whether the metric-required projected momentum density exceeds the causal momentum-to-energy bound for the current profile.",
     whyItMatters:
       "It separates a source-model failure from a current metric-profile demand that is already too large under the declared reduced-order local-frame projection.",
-    subjects: ["nhm2", "metric_required_tensor", "momentum_density", "local_frame", "dynamic_campaign"],
+    subjects: [
+      "nhm2",
+      "metric_required_tensor",
+      "momentum_density",
+      "local_frame",
+      "dynamic_campaign",
+    ],
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "general_relativity", "casimir"],
-    equationFamilies: ["full_tensor_residual", "time_dependent_source_campaign"],
-    tags: ["runtime_artifact", "momentum_t0i", "current_profile_falsifier", "claim_boundary"],
+    equationFamilies: [
+      "full_tensor_residual",
+      "time_dependent_source_campaign",
+    ],
+    tags: [
+      "runtime_artifact",
+      "momentum_t0i",
+      "current_profile_falsifier",
+      "claim_boundary",
+    ],
     equations: [
       {
         id: "metric_required_momentum_demand_gate",
         role: "noncomputable_reference",
-        displayLatex: "\\left|T_{\\hat{0}\\hat{i}}\\right|/\\left|T_{\\hat{0}\\hat{0}}\\right| \\le 1",
+        displayLatex:
+          "\\left|T_{\\hat{0}\\hat{i}}\\right|/\\left|T_{\\hat{0}\\hat{0}}\\right| \\le 1",
         computableExpression: null,
         operatorKind: "noncomputable_reference",
         inputSymbols: ["T0i", "T00", "local_orthonormal_frame"],
@@ -1581,15 +2206,29 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "metric_required_tensor", "momentum_density", "local_frame", "dynamic_campaign"],
-      symbols: ["T0i", "T00", "local_orthonormal_frame", "current_metric_profile_falsified"],
+      subjects: [
+        "nhm2",
+        "metric_required_tensor",
+        "momentum_density",
+        "local_frame",
+        "dynamic_campaign",
+      ],
+      symbols: [
+        "T0i",
+        "T00",
+        "local_orthonormal_frame",
+        "current_metric_profile_falsified",
+      ],
       unitSignatures: [],
       repoPaths: [
         "shared/contracts/nhm2-metric-required-momentum-demand-audit.v1.ts",
         "tools/nhm2/build-metric-required-momentum-demand-audit.ts",
         NHM2_AXIS_ALIGNED_METRIC_REQUIRED_MOMENTUM_DEMAND_AUDIT,
       ],
-      equationFamilies: ["full_tensor_residual", "time_dependent_source_campaign"],
+      equationFamilies: [
+        "full_tensor_residual",
+        "time_dependent_source_campaign",
+      ],
       simulationOwners: ["NHM2", "general_relativity", "casimir"],
     },
   }),
@@ -1600,12 +2239,26 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Reports how much the current metric-required projected T0i demand would have to be suppressed before this profile could re-enter the reduced-order campaign.",
     whyItMatters:
       "It turns the metric-required momentum falsifier into a concrete redesign target instead of leaving the campaign blocked by an opaque T0i failure.",
-    subjects: ["nhm2", "metric_required_tensor", "momentum_density", "remediation", "dynamic_campaign"],
+    subjects: [
+      "nhm2",
+      "metric_required_tensor",
+      "momentum_density",
+      "remediation",
+      "dynamic_campaign",
+    ],
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "general_relativity", "casimir"],
-    equationFamilies: ["full_tensor_residual", "time_dependent_source_campaign"],
-    tags: ["runtime_artifact", "momentum_t0i", "profile_remediation", "current_profile_falsifier"],
+    equationFamilies: [
+      "full_tensor_residual",
+      "time_dependent_source_campaign",
+    ],
+    tags: [
+      "runtime_artifact",
+      "momentum_t0i",
+      "profile_remediation",
+      "current_profile_falsifier",
+    ],
     equations: [
       {
         id: "metric_momentum_required_suppression_gate",
@@ -1644,15 +2297,29 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "metric_required_tensor", "momentum_density", "remediation", "dynamic_campaign"],
-      symbols: ["T0i", "T00", "local_orthonormal_frame", "requiredSuppressionFactor"],
+      subjects: [
+        "nhm2",
+        "metric_required_tensor",
+        "momentum_density",
+        "remediation",
+        "dynamic_campaign",
+      ],
+      symbols: [
+        "T0i",
+        "T00",
+        "local_orthonormal_frame",
+        "requiredSuppressionFactor",
+      ],
       unitSignatures: [],
       repoPaths: [
         "shared/contracts/nhm2-metric-momentum-remediation-targets.v1.ts",
         "tools/nhm2/build-metric-momentum-remediation-targets.ts",
         NHM2_AXIS_ALIGNED_METRIC_MOMENTUM_REMEDIATION_TARGETS,
       ],
-      equationFamilies: ["full_tensor_residual", "time_dependent_source_campaign"],
+      equationFamilies: [
+        "full_tensor_residual",
+        "time_dependent_source_campaign",
+      ],
       simulationOwners: ["NHM2", "general_relativity", "casimir"],
     },
   }),
@@ -1663,12 +2330,26 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Turns the campaign's current frontier blocker into a typed disposition: the current profile is rejected under the declared reduced-order projected T0i demand evidence.",
     whyItMatters:
       "It keeps the solve loop focused on profile redesign, full ADM/tetrad projection evidence, or current-profile rejection instead of hiding a non-resolvable momentum-density demand behind generic campaign failure.",
-    subjects: ["nhm2", "dynamic_campaign", "frontier_disposition", "momentum_density", "profile_rejection"],
+    subjects: [
+      "nhm2",
+      "dynamic_campaign",
+      "frontier_disposition",
+      "momentum_density",
+      "profile_rejection",
+    ],
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "general_relativity", "casimir"],
-    equationFamilies: ["full_tensor_residual", "time_dependent_source_campaign"],
-    tags: ["runtime_artifact", "frontier_disposition", "current_profile_rejected", "blocks_promotion"],
+    equationFamilies: [
+      "full_tensor_residual",
+      "time_dependent_source_campaign",
+    ],
+    tags: [
+      "runtime_artifact",
+      "frontier_disposition",
+      "current_profile_rejected",
+      "blocks_promotion",
+    ],
     equations: [
       {
         id: "campaign_frontier_disposition_gate",
@@ -1677,7 +2358,11 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
           "D_{frontier}=\\mathrm{dispose}(campaign,\\;S_{required},\\;profile)",
         computableExpression: null,
         operatorKind: "noncomputable_reference",
-        inputSymbols: ["campaignFirstBlocker", "requiredSuppressionFactor", "profileId"],
+        inputSymbols: [
+          "campaignFirstBlocker",
+          "requiredSuppressionFactor",
+          "profileId",
+        ],
         outputSymbols: ["frontierDisposition"],
       },
     ],
@@ -1707,15 +2392,29 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "dynamic_campaign", "frontier_disposition", "momentum_density", "profile_rejection"],
-      symbols: ["frontierDisposition", "requiredSuppressionFactor", "T0i", "current_profile_rejected"],
+      subjects: [
+        "nhm2",
+        "dynamic_campaign",
+        "frontier_disposition",
+        "momentum_density",
+        "profile_rejection",
+      ],
+      symbols: [
+        "frontierDisposition",
+        "requiredSuppressionFactor",
+        "T0i",
+        "current_profile_rejected",
+      ],
       unitSignatures: [],
       repoPaths: [
         "shared/contracts/nhm2-campaign-frontier-disposition.v1.ts",
         "tools/nhm2/build-campaign-frontier-disposition.ts",
         NHM2_AXIS_ALIGNED_CAMPAIGN_FRONTIER_DISPOSITION,
       ],
-      equationFamilies: ["full_tensor_residual", "time_dependent_source_campaign"],
+      equationFamilies: [
+        "full_tensor_residual",
+        "time_dependent_source_campaign",
+      ],
       simulationOwners: ["NHM2", "general_relativity", "casimir"],
     },
   }),
@@ -1726,12 +2425,26 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Screens candidate NHM2 profiles against the current metric-required momentum frontier before spending a full frozen campaign run.",
     whyItMatters:
       "It separates faster clocking ambitions from profiles that actually reduce the projected T0i blocker exposed by the current campaign.",
-    subjects: ["nhm2", "profile_search", "dynamic_campaign", "momentum_density", "metric_redesign"],
+    subjects: [
+      "nhm2",
+      "profile_search",
+      "dynamic_campaign",
+      "momentum_density",
+      "metric_redesign",
+    ],
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "general_relativity", "casimir"],
-    equationFamilies: ["campaign_profile_search", "time_dependent_source_campaign"],
-    tags: ["profile_search", "runtime_artifact", "noncomputable_reference", "blocks_promotion"],
+    equationFamilies: [
+      "campaign_profile_search",
+      "time_dependent_source_campaign",
+    ],
+    tags: [
+      "profile_search",
+      "runtime_artifact",
+      "noncomputable_reference",
+      "blocks_promotion",
+    ],
     equations: [
       {
         id: "campaign_profile_search_gate",
@@ -1775,8 +2488,18 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "profile_search", "dynamic_campaign", "momentum_density"],
-      symbols: ["alpha", "T0i", "requiredSuppressionFactor", "recommendedNextProfileId"],
+      subjects: [
+        "nhm2",
+        "profile_search",
+        "dynamic_campaign",
+        "momentum_density",
+      ],
+      symbols: [
+        "alpha",
+        "T0i",
+        "requiredSuppressionFactor",
+        "recommendedNextProfileId",
+      ],
       unitSignatures: [],
       repoPaths: [
         "shared/contracts/nhm2-campaign-profile-search.v1.ts",
@@ -1786,7 +2509,10 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_AXIS_ALIGNED_METRIC_MOMENTUM_REMEDIATION_TARGETS,
         NHM2_FULL_SOLVE_WHITEPAPER,
       ],
-      equationFamilies: ["campaign_profile_search", "time_dependent_source_campaign"],
+      equationFamilies: [
+        "campaign_profile_search",
+        "time_dependent_source_campaign",
+      ],
       simulationOwners: ["NHM2", "general_relativity", "casimir"],
     },
   }),
@@ -1797,12 +2523,27 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Records the screened profile definition, diagnostic trip-clocking value, and whether executable candidate geometry exists for the full ADM tensor route.",
     whyItMatters:
       "It keeps fast-profile exploration honest: lower alpha and projected T0i suppression cannot enter the real metric tensor route until a candidate shift-field evaluator, regional atlas, and grid are declared.",
-    subjects: ["nhm2", "candidate_profile", "metric_geometry", "trip_clocking", "adm_route"],
+    subjects: [
+      "nhm2",
+      "candidate_profile",
+      "metric_geometry",
+      "trip_clocking",
+      "adm_route",
+    ],
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "general_relativity", "casimir"],
-    equationFamilies: ["campaign_profile_search", "centerline_clocking", "time_dependent_source_campaign"],
-    tags: ["candidate_profile", "runtime_artifact", "noncomputable_reference", "blocks_promotion"],
+    equationFamilies: [
+      "campaign_profile_search",
+      "centerline_clocking",
+      "time_dependent_source_campaign",
+    ],
+    tags: [
+      "candidate_profile",
+      "runtime_artifact",
+      "noncomputable_reference",
+      "blocks_promotion",
+    ],
     equations: [
       {
         id: "candidate_profile_clocking_spec",
@@ -1860,8 +2601,18 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "candidate_profile", "metric_geometry", "trip_clocking"],
-      symbols: ["alpha_centerline", "T_coordinate", "tau_candidate", "ADMRouteReady"],
+      subjects: [
+        "nhm2",
+        "candidate_profile",
+        "metric_geometry",
+        "trip_clocking",
+      ],
+      symbols: [
+        "alpha_centerline",
+        "T_coordinate",
+        "tau_candidate",
+        "ADMRouteReady",
+      ],
       unitSignatures: ["s"],
       repoPaths: [
         "shared/contracts/nhm2-candidate-metric-profile-spec.v1.ts",
@@ -1882,12 +2633,25 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Lists the frozen campaign evidence that each screened profile must produce before the profile can be ranked as campaign-admissible.",
     whyItMatters:
       "It turns a promising profile screen into an explicit missing-evidence checklist for full tensor, conservation, QEI, observer, dynamic, and stability gates.",
-    subjects: ["nhm2", "profile_run_manifest", "dynamic_campaign", "artifact_governance"],
+    subjects: [
+      "nhm2",
+      "profile_run_manifest",
+      "dynamic_campaign",
+      "artifact_governance",
+    ],
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "general_relativity", "casimir"],
-    equationFamilies: ["campaign_profile_run_manifest", "time_dependent_source_campaign"],
-    tags: ["profile_run_manifest", "runtime_artifact", "noncomputable_reference", "blocks_promotion"],
+    equationFamilies: [
+      "campaign_profile_run_manifest",
+      "time_dependent_source_campaign",
+    ],
+    tags: [
+      "profile_run_manifest",
+      "runtime_artifact",
+      "noncomputable_reference",
+      "blocks_promotion",
+    ],
     equations: [
       {
         id: "campaign_profile_run_manifest_gate",
@@ -1951,8 +2715,18 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "profile_run_manifest", "dynamic_campaign", "artifact_governance"],
-      symbols: ["nextCandidateProfileId", "manifestComplete", "evidence_i", "campaignRun"],
+      subjects: [
+        "nhm2",
+        "profile_run_manifest",
+        "dynamic_campaign",
+        "artifact_governance",
+      ],
+      symbols: [
+        "nextCandidateProfileId",
+        "manifestComplete",
+        "evidence_i",
+        "campaignRun",
+      ],
       unitSignatures: [],
       repoPaths: [
         "shared/contracts/nhm2-campaign-profile-run-manifest.v1.ts",
@@ -1965,7 +2739,10 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_CAMPAIGN_PROFILE_SEARCH,
         NHM2_FULL_SOLVE_WHITEPAPER,
       ],
-      equationFamilies: ["campaign_profile_run_manifest", "time_dependent_source_campaign"],
+      equationFamilies: [
+        "campaign_profile_run_manifest",
+        "time_dependent_source_campaign",
+      ],
       simulationOwners: ["NHM2", "general_relativity", "casimir"],
     },
   }),
@@ -1976,12 +2753,23 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Freezes the next dynamic proof campaign: independent source tensor, switching conservation, frequency convergence, dynamic/effective geometry agreement, full tensor closure, observer families, QEI receipts, and stability checks.",
     whyItMatters:
       "It prevents static or scalar pass-path progress from being read as a time-dependent physical-source result.",
-    subjects: ["nhm2", "time_dependent_source", "dynamic_campaign", "proof_stack", "artifact_governance"],
+    subjects: [
+      "nhm2",
+      "time_dependent_source",
+      "dynamic_campaign",
+      "proof_stack",
+      "artifact_governance",
+    ],
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "general_relativity", "casimir"],
     equationFamilies: ["time_dependent_source_campaign", "closure_stack"],
-    tags: ["time_dependent_campaign", "runtime_artifact", "noncomputable_reference", "blocks_promotion"],
+    tags: [
+      "time_dependent_campaign",
+      "runtime_artifact",
+      "noncomputable_reference",
+      "blocks_promotion",
+    ],
     equations: [
       {
         id: "time_dependent_source_campaign_gate",
@@ -2094,7 +2882,13 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "time_dependent_source", "dynamic_campaign", "proof_stack", "artifact_governance"],
+      subjects: [
+        "nhm2",
+        "time_dependent_source",
+        "dynamic_campaign",
+        "proof_stack",
+        "artifact_governance",
+      ],
       symbols: [
         "source_ind",
         "T_mu_nu(t)",
@@ -2129,12 +2923,24 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Runtime artifacts are exported into a Lean-facing certificate for the current 0p7000 diagnostic campaign profile.",
     whyItMatters:
       "It makes the campaign pass reusable as pinned rational and Boolean proof facts instead of UI-only wording.",
-    subjects: ["nhm2", "lean", "formal_certificate", "artifact_governance", "diagnostic_campaign"],
+    subjects: [
+      "nhm2",
+      "lean",
+      "formal_certificate",
+      "artifact_governance",
+      "diagnostic_campaign",
+    ],
     level: "diagnostic_gate",
     status: "diagnostic",
     simulationOwners: ["NHM2", "formal_methods"],
     equationFamilies: ["lean_campaign_certificate", "claim_boundary"],
-    tags: ["lean", "certificate", "runtime_reference", "noncomputable_reference", "claim_boundary"],
+    tags: [
+      "lean",
+      "certificate",
+      "runtime_reference",
+      "noncomputable_reference",
+      "claim_boundary",
+    ],
     equations: [
       {
         id: "lean_campaign_certificate_runtime_reference",
@@ -2189,8 +2995,20 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "lean", "formal_certificate", "artifact_governance", "diagnostic_campaign"],
-      symbols: ["LeanCertificate", "artifacts", "hashes", "bounds", "claimLocks"],
+      subjects: [
+        "nhm2",
+        "lean",
+        "formal_certificate",
+        "artifact_governance",
+        "diagnostic_campaign",
+      ],
+      symbols: [
+        "LeanCertificate",
+        "artifacts",
+        "hashes",
+        "bounds",
+        "claimLocks",
+      ],
       unitSignatures: [],
       repoPaths: [
         NHM2_LEAN_CAMPAIGN_CERTIFICATE,
@@ -2211,12 +3029,23 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Lean verifies diagnostic campaign admissibility from the emitted certificate for the current 0p7000 profile.",
     whyItMatters:
       "It gives the campaign pass a machine-checked policy meaning while keeping stronger claims locked.",
-    subjects: ["nhm2", "lean", "diagnostic_campaign", "admissibility", "proof_policy"],
+    subjects: [
+      "nhm2",
+      "lean",
+      "diagnostic_campaign",
+      "admissibility",
+      "proof_policy",
+    ],
     level: "diagnostic_gate",
     status: "diagnostic",
     simulationOwners: ["NHM2", "formal_methods"],
     equationFamilies: ["lean_campaign_certificate", "diagnostic_admissibility"],
-    tags: ["lean", "diagnostic_admissible", "noncomputable_reference", "claim_safe"],
+    tags: [
+      "lean",
+      "diagnostic_admissible",
+      "noncomputable_reference",
+      "claim_safe",
+    ],
     equations: [
       {
         id: "lean_diagnostic_campaign_admissible_theorem",
@@ -2260,8 +3089,19 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "lean", "diagnostic_campaign", "admissibility", "proof_policy"],
-      symbols: ["Gates_cert", "Bounds_cert", "Locks_closed", "DiagnosticCampaignAdmissible"],
+      subjects: [
+        "nhm2",
+        "lean",
+        "diagnostic_campaign",
+        "admissibility",
+        "proof_policy",
+      ],
+      symbols: [
+        "Gates_cert",
+        "Bounds_cert",
+        "Locks_closed",
+        "DiagnosticCampaignAdmissible",
+      ],
       unitSignatures: [],
       repoPaths: [
         NHM2_LEAN_GENERATED_CAMPAIGN_CERTIFICATE,
@@ -2269,7 +3109,10 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_LEAN_CAMPAIGN_CERTIFICATE,
         NHM2_0P7000_HISTORICAL_IMPORT_MANIFEST,
       ],
-      equationFamilies: ["lean_campaign_certificate", "diagnostic_admissibility"],
+      equationFamilies: [
+        "lean_campaign_certificate",
+        "diagnostic_admissibility",
+      ],
       simulationOwners: ["NHM2", "formal_methods"],
     },
   }),
@@ -2280,7 +3123,13 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Lean carries the claim locks as part of the certificate proof, so diagnostic admissibility keeps physical, route, propulsion, transport, and speed locks closed.",
     whyItMatters:
       "It prevents a formal diagnostic pass from being represented as a stronger NHM2 claim.",
-    subjects: ["nhm2", "lean", "claim_boundary", "claim_locks", "diagnostic_campaign"],
+    subjects: [
+      "nhm2",
+      "lean",
+      "claim_boundary",
+      "claim_locks",
+      "diagnostic_campaign",
+    ],
     level: "claim_boundary",
     status: "blocked",
     simulationOwners: ["NHM2", "formal_methods"],
@@ -2329,7 +3178,13 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "lean", "claim_boundary", "claim_locks", "diagnostic_campaign"],
+      subjects: [
+        "nhm2",
+        "lean",
+        "claim_boundary",
+        "claim_locks",
+        "diagnostic_campaign",
+      ],
       symbols: ["DiagnosticCampaignAdmissible", "ClaimLocksClosed"],
       unitSignatures: [],
       repoPaths: [
@@ -2349,12 +3204,23 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Static Lean examples and runtime fixture tests reject missing tensor components, stale hashes, Eulerian-only observers, scalar-only QEI, target echo, and open claim locks.",
     whyItMatters:
       "It makes the formal lane falsifiable instead of only proving the current happy-path certificate.",
-    subjects: ["nhm2", "lean", "negative_fixtures", "fail_closed", "falsifiability"],
+    subjects: [
+      "nhm2",
+      "lean",
+      "negative_fixtures",
+      "fail_closed",
+      "falsifiability",
+    ],
     level: "diagnostic_gate",
     status: "diagnostic",
     simulationOwners: ["NHM2", "formal_methods"],
     equationFamilies: ["fail_closed_certificate", "claim_boundary"],
-    tags: ["lean", "negative_fixture", "fail_closed", "noncomputable_reference"],
+    tags: [
+      "lean",
+      "negative_fixture",
+      "fail_closed",
+      "noncomputable_reference",
+    ],
     equations: [
       {
         id: "lean_negative_fixture_rejection",
@@ -2363,7 +3229,12 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
           "\\neg fields_{required}\\lor staleHash\\lor scalarQEI\\lor openLocks\\Rightarrow\\neg admissible",
         computableExpression: null,
         operatorKind: "noncomputable_reference",
-        inputSymbols: ["fields_required", "staleHash", "scalarQEI", "openLocks"],
+        inputSymbols: [
+          "fields_required",
+          "staleHash",
+          "scalarQEI",
+          "openLocks",
+        ],
         outputSymbols: ["notAdmissible"],
       },
     ],
@@ -2387,8 +3258,20 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "lean", "negative_fixtures", "fail_closed", "falsifiability"],
-      symbols: ["fields_required", "staleHash", "scalarQEI", "openLocks", "notAdmissible"],
+      subjects: [
+        "nhm2",
+        "lean",
+        "negative_fixtures",
+        "fail_closed",
+        "falsifiability",
+      ],
+      symbols: [
+        "fields_required",
+        "staleHash",
+        "scalarQEI",
+        "openLocks",
+        "notAdmissible",
+      ],
       unitSignatures: [],
       repoPaths: [NHM2_LEAN_CERTIFICATE_MODULE, NHM2_LEAN_CERTIFICATE_TEST],
       equationFamilies: ["fail_closed_certificate", "claim_boundary"],
@@ -2402,12 +3285,24 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "The Lean certificate JSON records the campaign artifact paths and SHA-256 hashes used to produce the generated Lean module.",
     whyItMatters:
       "It prevents the formal result from floating across mismatched profiles, charts, atlases, or runtime evidence bundles.",
-    subjects: ["nhm2", "lean", "artifact_hashes", "provenance", "diagnostic_campaign"],
+    subjects: [
+      "nhm2",
+      "lean",
+      "artifact_hashes",
+      "provenance",
+      "diagnostic_campaign",
+    ],
     level: "diagnostic_gate",
     status: "diagnostic",
     simulationOwners: ["NHM2", "formal_methods"],
     equationFamilies: ["certificate_provenance", "artifact_hashes"],
-    tags: ["lean", "sha256", "profile_scoped", "same_run", "noncomputable_reference"],
+    tags: [
+      "lean",
+      "sha256",
+      "profile_scoped",
+      "same_run",
+      "noncomputable_reference",
+    ],
     equations: [
       {
         id: "lean_certificate_hash_pin",
@@ -2461,8 +3356,19 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "lean", "artifact_hashes", "provenance", "diagnostic_campaign"],
-      symbols: ["artifactHashes", "profileId", "atlasHash", "certificateIdentity"],
+      subjects: [
+        "nhm2",
+        "lean",
+        "artifact_hashes",
+        "provenance",
+        "diagnostic_campaign",
+      ],
+      symbols: [
+        "artifactHashes",
+        "profileId",
+        "atlasHash",
+        "certificateIdentity",
+      ],
       unitSignatures: [],
       repoPaths: [
         NHM2_LEAN_CAMPAIGN_CERTIFICATE,
@@ -2477,6 +3383,175 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   nhm2FullSolveBadge({
+    id: "nhm2.meta.experiment_ready_theory_closure",
+    title: "Experiment-Ready Theory Closure",
+    plainMeaning:
+      "Reports the filesystem-replayed, fail-closed theory-closure meta verdict separately from regional source closure and the empirical physical-evidence campaign.",
+    whyItMatters:
+      "It identifies the strongest pre-experiment theory state without turning theory completeness into physical, propulsion, or transport authority.",
+    subjects: [
+      "nhm2",
+      "experiment_ready_theory_closure",
+      "meta_gate",
+      "proof_stack",
+      "claim_boundary",
+    ],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: [
+      "NHM2",
+      "general_relativity",
+      "casimir",
+      "formal_methods",
+    ],
+    equationFamilies: [
+      "experiment_ready_theory_closure",
+      "proof_meta_gate",
+      "claim_boundary",
+    ],
+    tags: [
+      "meta_gate",
+      "theoryClosureStatus_not_ready",
+      "filesystem_replay_required",
+      "two_phase_evidence_binding",
+      "theory_closure_only",
+      "experiment_ready_not_physical",
+      "blocks_promotion",
+    ],
+    equations: [
+      {
+        id: "experiment_ready_theory_closure_status",
+        role: "gate",
+        displayLatex:
+          "\\mathrm{TheoryClosureStatus}\\in\\{\\mathrm{NOT\\_READY},\\mathrm{FALSIFIED},\\mathrm{THEORY\\_CLOSED\\_EXPERIMENT\\_READY}\\}",
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: [
+          "preRunFrozenCandidateManifest",
+          "postRunReceiptEnvelope",
+          "filesystemReplayEvaluation",
+          "runtimeReproducibility",
+          "sameChartFullSourceTensor",
+          "semiclassicalStateRealizability",
+          "covariantConservation",
+          "continuousObserverOptimization",
+          "worldlineQeiCoverage",
+          "dynamicBackreactionStabilityCausality",
+          "finiteTemperatureFiniteGeometryMaterialModel",
+          "mechanicalControlEnergyMargin",
+          "independentNumericalFormalReplication",
+          "predictionFalsifierFreeze",
+        ],
+        outputSymbols: ["TheoryClosureStatus", "ExperimentReadyTheoryClosed"],
+      },
+      {
+        id: "experiment_ready_theory_closure_claim_locks",
+        role: "gate",
+        displayLatex:
+          "\\mathrm{ExperimentReadyTheoryClosed}\\not\\Rightarrow\\mathrm{PhysicalViability}\\lor\\mathrm{Transport}\\lor\\mathrm{Propulsion}",
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: ["ExperimentReadyTheoryClosed"],
+        outputSymbols: [
+          "physicalViabilityClaimAllowed_false",
+          "transportClaimAllowed_false",
+          "propulsionClaimAllowed_false",
+        ],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "No qualifying run-bound theory-closure artifact is currently registered, so this lamp is NOT_READY and remains blocked.",
+      "The candidate manifest is frozen before execution and contains identities, execution plans, expected evidence outputs, and the detached numeric-policy semantic digest; it does not contain post-run receipt or output hashes.",
+      "Post-run receipts and output manifests bind execution provenance and fresh evidence hashes; only the filesystem replay evaluator has authority to combine the two phases into the meta verdict.",
+      "The meta verdict requires every fail-closed contract gate to pass with fresh, hashed, candidate-bound evidence.",
+      "Regional source closure retains its own status; this meta gate does not replace or overwrite that lamp.",
+      "Even THEORY_CLOSED_EXPERIMENT_READY_CANDIDATE leaves physical viability, transport, propulsion, route ETA, and speed-authority claims false pending empirical receipts.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      repoRef(
+        NHM2_EXPERIMENT_READY_THEORY_CLOSURE_CONTRACT,
+        "nhm2_experiment_ready_theory_closure/v1",
+        "Fail-closed theory-closure contract and explicit empirical claim boundary.",
+      ),
+      repoRef(
+        NHM2_EXPERIMENT_READY_THEORY_CLOSURE_TEST,
+        "nhm2-experiment-ready-theory-closure-contract-tests",
+        "Contract tests covering missing evidence, falsification, all-gate closure, freshness, independence, and claim locks.",
+      ),
+      repoRef(
+        NHM2_EXPERIMENT_READY_THEORY_CANDIDATE_MANIFEST_CONTRACT,
+        "nhm2_experiment_ready_theory_candidate_manifest/v1",
+        "Pre-run frozen candidate identity, execution plans, expected evidence outputs, detached semantic numeric-policy binding, and claim locks; post-run receipt and output hashes are deliberately excluded.",
+      ),
+      repoRef(
+        NHM2_EXPERIMENT_READY_THEORY_CANDIDATE_MANIFEST_TEST,
+        "nhm2-experiment-ready-theory-candidate-manifest-tests",
+        "Negative fixtures for missing roles, mutable policies, non-deterministic receipt identity, post-run field injection, and authority spoofing.",
+      ),
+      repoRef(
+        NHM2_SEMICLASSICAL_STATE_REALIZABILITY_CONTRACT,
+        "nhm2_semiclassical_state_realizability/v1",
+        "State construction, admissibility, renormalized tensor, Ward identity, QEI, switching, and backreaction evidence contract.",
+      ),
+      repoRef(
+        NHM2_PREDICTION_FALSIFIER_FREEZE_CONTRACT,
+        "nhm2_prediction_falsifier_freeze/v1",
+        "Immutable predictions, decisions, falsifiers, null controls, blinding, and pre-data registration receipts.",
+      ),
+      repoRef(
+        NHM2_EXPERIMENT_READY_THEORY_CLOSURE_EVALUATOR,
+        "filesystem-theory-closure-evaluator",
+        "Re-hashes the pre-run candidate and detached policy plus post-run receipts, output manifests, and evidence files, then fails closed when a typed evidence adapter is unavailable.",
+      ),
+      repoRef(
+        NHM2_THEORY_RUNTIME_RECEIPT_FILESYSTEM_VERIFIER,
+        "runtime-receipt-filesystem-verifier",
+        "Replays output-directory confinement, inventory, raw hashes, and persisted pre/post freshness snapshots.",
+      ),
+    ],
+    hintKeys: {
+      subjects: [
+        "nhm2",
+        "experiment_ready_theory_closure",
+        "meta_gate",
+        "proof_stack",
+        "claim_boundary",
+      ],
+      symbols: [
+        "TheoryClosureStatus",
+        "ExperimentReadyTheoryClosed",
+        "physicalViabilityClaimAllowed_false",
+        "transportClaimAllowed_false",
+        "propulsionClaimAllowed_false",
+      ],
+      unitSignatures: [],
+      repoPaths: [
+        NHM2_EXPERIMENT_READY_THEORY_CLOSURE_CONTRACT,
+        NHM2_EXPERIMENT_READY_THEORY_CLOSURE_TEST,
+        NHM2_EXPERIMENT_READY_THEORY_CANDIDATE_MANIFEST_CONTRACT,
+        NHM2_EXPERIMENT_READY_THEORY_CANDIDATE_MANIFEST_TEST,
+        NHM2_SEMICLASSICAL_STATE_REALIZABILITY_CONTRACT,
+        NHM2_PREDICTION_FALSIFIER_FREEZE_CONTRACT,
+        NHM2_EXPERIMENT_READY_THEORY_CLOSURE_EVALUATOR,
+        NHM2_THEORY_RUNTIME_RECEIPT_FILESYSTEM_VERIFIER,
+      ],
+      equationFamilies: [
+        "experiment_ready_theory_closure",
+        "proof_meta_gate",
+        "claim_boundary",
+      ],
+      simulationOwners: [
+        "NHM2",
+        "general_relativity",
+        "casimir",
+        "formal_methods",
+      ],
+    },
+  }),
+  nhm2FullSolveBadge({
     id: "nhm2.experimental.physical_viability_campaign",
     title: "Physical Evidence Campaign",
     plainMeaning:
@@ -2488,7 +3563,12 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     status: "blocked",
     simulationOwners: ["NHM2", "casimir", "general_relativity"],
     equationFamilies: ["physical_viability_campaign", "experimental_receipts"],
-    tags: ["experimental_ladder", "claim_boundary", "runtime_reference", "noncomputable_reference"],
+    tags: [
+      "experimental_ladder",
+      "claim_boundary",
+      "runtime_reference",
+      "noncomputable_reference",
+    ],
     equations: [
       {
         id: "physical_viability_campaign_ladder",
@@ -2548,7 +3628,10 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_LEAN_CAMPAIGN_CERTIFICATE,
         NHM2_FULL_SOLVE_WHITEPAPER,
       ],
-      equationFamilies: ["physical_viability_campaign", "experimental_receipts"],
+      equationFamilies: [
+        "physical_viability_campaign",
+        "experimental_receipts",
+      ],
       simulationOwners: ["NHM2", "casimir", "general_relativity"],
     },
   }),
@@ -2563,8 +3646,16 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "casimir", "general_relativity"],
-    equationFamilies: ["experiment_facing_theory_roadmap", "physical_viability_campaign"],
-    tags: ["experimental_ladder", "roadmap", "runtime_reference", "noncomputable_reference"],
+    equationFamilies: [
+      "experiment_facing_theory_roadmap",
+      "physical_viability_campaign",
+    ],
+    tags: [
+      "experimental_ladder",
+      "roadmap",
+      "runtime_reference",
+      "noncomputable_reference",
+    ],
     equations: [
       {
         id: "experiment_facing_solve_chain",
@@ -2672,8 +3763,21 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "experiment", "roadmap", "falsifier", "claim_boundary"],
-      symbols: ["DeltaTmunu", "delta_phi", "delta_tau", "DeltaF", "h00_proxy", "QEI"],
+      subjects: [
+        "nhm2",
+        "experiment",
+        "roadmap",
+        "falsifier",
+        "claim_boundary",
+      ],
+      symbols: [
+        "DeltaTmunu",
+        "delta_phi",
+        "delta_tau",
+        "DeltaF",
+        "h00_proxy",
+        "QEI",
+      ],
       unitSignatures: ["J", "N", "Pa", "s"],
       repoPaths: [
         NHM2_EXPERIMENT_FACING_THEORY_ROADMAP_CONTRACT,
@@ -2681,7 +3785,10 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT,
         NHM2_FULL_SOLVE_WHITEPAPER,
       ],
-      equationFamilies: ["experiment_facing_theory_roadmap", "physical_viability_campaign"],
+      equationFamilies: [
+        "experiment_facing_theory_roadmap",
+        "physical_viability_campaign",
+      ],
       simulationOwners: ["NHM2", "casimir", "general_relativity"],
     },
   }),
@@ -2692,11 +3799,20 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Lists the NHM2 numerical and qualitative targets, independent research comparators, required receipts, and blockers for each experiment-facing roadmap stage.",
     whyItMatters:
       "It turns the roadmap into a measurable planning ledger without treating modeled scalars, literature ranges, or feasibility notes as experimental success.",
-    subjects: ["nhm2", "experiment", "parameter_targets", "roadmap", "claim_boundary"],
+    subjects: [
+      "nhm2",
+      "experiment",
+      "parameter_targets",
+      "roadmap",
+      "claim_boundary",
+    ],
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "casimir", "general_relativity"],
-    equationFamilies: ["experiment_parameter_targets", "experiment_facing_theory_roadmap"],
+    equationFamilies: [
+      "experiment_parameter_targets",
+      "experiment_facing_theory_roadmap",
+    ],
     tags: [
       "experimental_ladder",
       "parameter_targets",
@@ -2712,7 +3828,13 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
           "\\mathrm{Target}_{stage,parameter}=\\{\\mathrm{NHM2Target},\\mathrm{LiteratureRange},\\mathrm{Receipt},\\mathrm{Blocker}\\}",
         computableExpression: null,
         operatorKind: "noncomputable_reference",
-        inputSymbols: ["stageId", "parameterId", "NHM2Target", "LiteratureRange", "Receipt"],
+        inputSymbols: [
+          "stageId",
+          "parameterId",
+          "NHM2Target",
+          "LiteratureRange",
+          "Receipt",
+        ],
         outputSymbols: ["ParameterTargetStatus"],
       },
     ],
@@ -2803,7 +3925,13 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "experiment", "parameter_targets", "roadmap", "claim_boundary"],
+      subjects: [
+        "nhm2",
+        "experiment",
+        "parameter_targets",
+        "roadmap",
+        "claim_boundary",
+      ],
       symbols: [
         "gap",
         "E_tile",
@@ -2820,7 +3948,10 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_EXPERIMENT_FACING_THEORY_ROADMAP_CONTRACT,
         NHM2_FULL_SOLVE_WHITEPAPER,
       ],
-      equationFamilies: ["experiment_parameter_targets", "experiment_facing_theory_roadmap"],
+      equationFamilies: [
+        "experiment_parameter_targets",
+        "experiment_facing_theory_roadmap",
+      ],
       simulationOwners: ["NHM2", "casimir", "general_relativity"],
     },
   }),
@@ -2831,11 +3962,20 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Maps each NHM2 parameter target to the remaining research gap, nearest independent precedents, uncovered regime, earliest falsifier, null-result meaning, and claim impact.",
     whyItMatters:
       "It keeps the experiment campaign pointed at high-value measurements and falsifiers without treating literature comparators or target feasibility as NHM2 validation.",
-    subjects: ["nhm2", "experiment", "research_gap", "value_of_information", "claim_boundary"],
+    subjects: [
+      "nhm2",
+      "experiment",
+      "research_gap",
+      "value_of_information",
+      "claim_boundary",
+    ],
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "casimir", "general_relativity"],
-    equationFamilies: ["experiment_research_gap_ledger", "experiment_parameter_targets"],
+    equationFamilies: [
+      "experiment_research_gap_ledger",
+      "experiment_parameter_targets",
+    ],
     tags: [
       "experimental_ladder",
       "research_gap_ledger",
@@ -2852,7 +3992,13 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
           "\\mathrm{Gap}_{target}=\\{\\mathrm{Precedent},\\mathrm{UncoveredRegime},\\mathrm{Receipt},\\mathrm{NullMeaning},\\mathrm{ClaimImpact}\\}",
         computableExpression: null,
         operatorKind: "noncomputable_reference",
-        inputSymbols: ["targetId", "stageId", "precedent", "null_result", "claimImpact"],
+        inputSymbols: [
+          "targetId",
+          "stageId",
+          "precedent",
+          "null_result",
+          "claimImpact",
+        ],
         outputSymbols: ["ResearchGapStatus"],
       },
     ],
@@ -2919,7 +4065,13 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "experiment", "research_gap", "value_of_information", "claim_boundary"],
+      subjects: [
+        "nhm2",
+        "experiment",
+        "research_gap",
+        "value_of_information",
+        "claim_boundary",
+      ],
       symbols: ["Gap_target", "NullResult", "ClaimImpact", "SearchReceipt"],
       unitSignatures: [],
       repoPaths: [
@@ -2928,7 +4080,10 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_EXPERIMENT_PARAMETER_TARGETS_CONTRACT,
         NHM2_FULL_SOLVE_WHITEPAPER,
       ],
-      equationFamilies: ["experiment_research_gap_ledger", "experiment_parameter_targets"],
+      equationFamilies: [
+        "experiment_research_gap_ledger",
+        "experiment_parameter_targets",
+      ],
       simulationOwners: ["NHM2", "casimir", "general_relativity"],
     },
   }),
@@ -2939,11 +4094,20 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Computes the ideal internal load for the 447-layer wall-source candidate and records the missing mechanical receipts needed before the stack can count as material/source evidence.",
     whyItMatters:
       "The scalar 447-layer lead implies roughly 14.2 kN internal normal attraction and about 142 MPa projected stress; survivability, pull-in, support, thermal, fatigue, and active-control receipts are therefore front-door engineering blockers.",
-    subjects: ["nhm2", "casimir", "layer_stack", "mechanical_receipt", "pull_in"],
+    subjects: [
+      "nhm2",
+      "casimir",
+      "layer_stack",
+      "mechanical_receipt",
+      "pull_in",
+    ],
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "casimir"],
-    equationFamilies: ["layer_stack_mechanical_receipt", "experiment_parameter_targets"],
+    equationFamilies: [
+      "layer_stack_mechanical_receipt",
+      "experiment_parameter_targets",
+    ],
     tags: [
       "experimental_ladder",
       "mechanical_receipt",
@@ -2965,8 +4129,18 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       },
     ],
     units: [
-      { symbol: "P_ideal", unit: "Pa", quantity: "ideal Casimir pressure", dimensionSignature: "M L^-1 T^-2" },
-      { symbol: "F_stack", unit: "N", quantity: "internal stack load", dimensionSignature: "M L T^-2" },
+      {
+        symbol: "P_ideal",
+        unit: "Pa",
+        quantity: "ideal Casimir pressure",
+        dimensionSignature: "M L^-1 T^-2",
+      },
+      {
+        symbol: "F_stack",
+        unit: "N",
+        quantity: "internal stack load",
+        dimensionSignature: "M L T^-2",
+      },
     ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
@@ -3025,7 +4199,13 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "casimir", "layer_stack", "mechanical_receipt", "pull_in"],
+      subjects: [
+        "nhm2",
+        "casimir",
+        "layer_stack",
+        "mechanical_receipt",
+        "pull_in",
+      ],
       symbols: ["P_ideal", "F_tile", "F_stack", "N_layer", "sigma_effective"],
       unitSignatures: ["Pa", "N", "m"],
       repoPaths: [
@@ -3034,7 +4214,10 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_EXPERIMENT_PARAMETER_TARGETS_CONTRACT,
         NHM2_FULL_SOLVE_WHITEPAPER,
       ],
-      equationFamilies: ["layer_stack_mechanical_receipt", "experiment_parameter_targets"],
+      equationFamilies: [
+        "layer_stack_mechanical_receipt",
+        "experiment_parameter_targets",
+      ],
       simulationOwners: ["NHM2", "casimir"],
     },
   }),
@@ -3072,10 +4255,8 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       {
         id: "support_retention_overlap_margin",
         role: "calculator_demo",
-        displayLatex:
-          "M_{overlap}=\\frac{f_{support,max}}{f_{support,min}}",
-        computableExpression:
-          "M_overlap = f_support_max/f_support_min",
+        displayLatex: "M_{overlap}=\\frac{f_{support,max}}{f_{support,min}}",
+        computableExpression: "M_overlap = f_support_max/f_support_min",
         operatorKind: "scalar_expression",
         inputSymbols: ["f_support_max", "f_support_min"],
         outputSymbols: ["M_overlap"],
@@ -3112,15 +4293,13 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       {
         id: "support_retention_overlap_payload",
         expression: "M_overlap = f_support_max/f_support_min",
-        displayLatex:
-          "M_{overlap}=\\frac{f_{support,max}}{f_{support,min}}",
+        displayLatex: "M_{overlap}=\\frac{f_{support,max}}{f_{support,min}}",
         preferredAction: "solve_with_steps",
         targetVariable: "M_overlap",
         setupContext: {
           schema: HELIX_CALCULATOR_SETUP_CONTEXT_SCHEMA,
           expression: "M_overlap = f_support_max/f_support_min",
-          display_latex:
-            "M_{overlap}=\\frac{f_{support,max}}{f_{support,min}}",
+          display_latex: "M_{overlap}=\\frac{f_{support,max}}{f_{support,min}}",
           subgoal: "Replay the frozen scalar support-retention overlap margin.",
           domain: "generic",
           equation: "M_overlap = f_support_max/f_support_min",
@@ -3129,14 +4308,16 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
               symbol: "f_support_max",
               value: String(NHM2_SUPPORT_RETENTION_F_SUPPORT_MAX),
               unit: "1",
-              meaning: "maximum support fraction compatible with retained-source threshold",
+              meaning:
+                "maximum support fraction compatible with retained-source threshold",
               dimension_signature: "1",
             },
             {
               symbol: "f_support_min",
               value: String(NHM2_SUPPORT_RETENTION_F_SUPPORT_MIN),
               unit: "1",
-              meaning: "minimum support fraction required by the stress comparator",
+              meaning:
+                "minimum support fraction required by the stress comparator",
               dimension_signature: "1",
             },
           ],
@@ -3208,11 +4389,20 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Sweeps support area against active Casimir area for the 447-layer stack to find whether mechanical stress limits and wall-source retention can overlap.",
     whyItMatters:
       "Increasing support fraction lowers local support stress but removes active Casimir area; this badge exposes that engineering tradeoff before the stack can be treated as a source candidate.",
-    subjects: ["nhm2", "casimir", "layer_stack", "support_fraction", "go_no_go"],
+    subjects: [
+      "nhm2",
+      "casimir",
+      "layer_stack",
+      "support_fraction",
+      "go_no_go",
+    ],
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "casimir"],
-    equationFamilies: ["layer_stack_support_fraction_sweep", "layer_stack_mechanical_receipt"],
+    equationFamilies: [
+      "layer_stack_support_fraction_sweep",
+      "layer_stack_mechanical_receipt",
+    ],
     tags: [
       "experimental_ladder",
       "support_fraction",
@@ -3235,8 +4425,18 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       },
     ],
     units: [
-      { symbol: "sigma_support", unit: "Pa", quantity: "support stress", dimensionSignature: "M L^-1 T^-2" },
-      { symbol: "R_source", unit: null, quantity: "retained source fraction", dimensionSignature: "1" },
+      {
+        symbol: "sigma_support",
+        unit: "Pa",
+        quantity: "support stress",
+        dimensionSignature: "M L^-1 T^-2",
+      },
+      {
+        symbol: "R_source",
+        unit: null,
+        quantity: "retained source fraction",
+        dimensionSignature: "1",
+      },
     ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
@@ -3295,7 +4495,13 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "casimir", "layer_stack", "support_fraction", "go_no_go"],
+      subjects: [
+        "nhm2",
+        "casimir",
+        "layer_stack",
+        "support_fraction",
+        "go_no_go",
+      ],
       symbols: ["f_s", "sigma_support", "R_source", "C_mat", "eta_layer"],
       unitSignatures: ["Pa", "N", "1"],
       repoPaths: [
@@ -3304,7 +4510,10 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_LAYER_STACK_MECHANICAL_RECEIPT_CONTRACT,
         NHM2_FULL_SOLVE_WHITEPAPER,
       ],
-      equationFamilies: ["layer_stack_support_fraction_sweep", "layer_stack_mechanical_receipt"],
+      equationFamilies: [
+        "layer_stack_support_fraction_sweep",
+        "layer_stack_mechanical_receipt",
+      ],
       simulationOwners: ["NHM2", "casimir"],
     },
   }),
@@ -3315,11 +4524,20 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Tests whether frames, ribs, spacer posts, membranes, lattices, segmented cells, load-sharing stacks, or active gap control can decouple load support from active Casimir area.",
     whyItMatters:
       "The support-fraction sweep fails when support area and active source area compete directly; this loop asks whether an engineering architecture can create a review window while recording pull-in, roughness, patch, material, active-control, and tensor blockers.",
-    subjects: ["nhm2", "casimir", "layer_stack", "architecture", "engineering_gate"],
+    subjects: [
+      "nhm2",
+      "casimir",
+      "layer_stack",
+      "architecture",
+      "engineering_gate",
+    ],
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "casimir"],
-    equationFamilies: ["layer_stack_architecture_loop", "layer_stack_support_fraction_sweep"],
+    equationFamilies: [
+      "layer_stack_architecture_loop",
+      "layer_stack_support_fraction_sweep",
+    ],
     tags: [
       "experimental_ladder",
       "architecture_loop",
@@ -3338,13 +4556,21 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
           "\\sigma_{support}=F_{stack}/(A f_{load}),\\quad R_{source}=(1-f_{lost})C_{mat}\\eta_{layer}",
         computableExpression: null,
         operatorKind: "noncomputable_reference",
-        inputSymbols: ["F_stack", "A", "f_load", "f_lost", "C_mat", "eta_layer"],
+        inputSymbols: [
+          "F_stack",
+          "A",
+          "f_load",
+          "f_lost",
+          "C_mat",
+          "eta_layer",
+        ],
         outputSymbols: ["sigma_support", "R_source"],
       },
       {
         id: "pull_in_margin_proxy",
         role: "noncomputable_reference",
-        displayLatex: "M_{pull-in}=k_{eff}/(SF\\,\\partial F_{Casimir}/\\partial g)",
+        displayLatex:
+          "M_{pull-in}=k_{eff}/(SF\\,\\partial F_{Casimir}/\\partial g)",
         computableExpression: null,
         operatorKind: "noncomputable_reference",
         inputSymbols: ["k_eff", "SF", "partial_F_Casimir_partial_g"],
@@ -3352,9 +4578,24 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       },
     ],
     units: [
-      { symbol: "sigma_support", unit: "Pa", quantity: "support stress", dimensionSignature: "M L^-1 T^-2" },
-      { symbol: "R_source", unit: null, quantity: "retained source fraction", dimensionSignature: "1" },
-      { symbol: "M_pull-in", unit: null, quantity: "pull-in margin", dimensionSignature: "1" },
+      {
+        symbol: "sigma_support",
+        unit: "Pa",
+        quantity: "support stress",
+        dimensionSignature: "M L^-1 T^-2",
+      },
+      {
+        symbol: "R_source",
+        unit: null,
+        quantity: "retained source fraction",
+        dimensionSignature: "1",
+      },
+      {
+        symbol: "M_pull-in",
+        unit: null,
+        quantity: "pull-in margin",
+        dimensionSignature: "1",
+      },
     ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
@@ -3417,7 +4658,13 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "casimir", "layer_stack", "architecture", "engineering_gate"],
+      subjects: [
+        "nhm2",
+        "casimir",
+        "layer_stack",
+        "architecture",
+        "engineering_gate",
+      ],
       symbols: ["f_load", "f_lost", "sigma_support", "R_source", "M_pull-in"],
       unitSignatures: ["Pa", "N/m", "1"],
       repoPaths: [
@@ -3426,7 +4673,10 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_LAYER_STACK_SUPPORT_FRACTION_SWEEP_CONTRACT,
         NHM2_FULL_SOLVE_WHITEPAPER,
       ],
-      equationFamilies: ["layer_stack_architecture_loop", "layer_stack_support_fraction_sweep"],
+      equationFamilies: [
+        "layer_stack_architecture_loop",
+        "layer_stack_support_fraction_sweep",
+      ],
       simulationOwners: ["NHM2", "casimir"],
     },
   }),
@@ -3437,7 +4687,13 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Checks whether a 447-layer architecture has material, force-gap, pull-in, roughness, patch-potential, active-control, fatigue, layer-scaling, and full-apparatus tensor receipts.",
     whyItMatters:
       "The architecture loop can expose review windows, but a row cannot become a receipted engineering candidate until every receipt surface and every support/spacer/control tensor term is accounted for.",
-    subjects: ["nhm2", "casimir", "layer_stack", "receipt_loop", "full_apparatus_tensor"],
+    subjects: [
+      "nhm2",
+      "casimir",
+      "layer_stack",
+      "receipt_loop",
+      "full_apparatus_tensor",
+    ],
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "casimir"],
@@ -3477,8 +4733,18 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       },
     ],
     units: [
-      { symbol: "F(g)", unit: "N", quantity: "force-gap receipt", dimensionSignature: "M L T^-2" },
-      { symbol: "T_apparatus_mu_nu", unit: "J/m^3", quantity: "apparatus stress-energy tensor", dimensionSignature: "M L^-1 T^-2" },
+      {
+        symbol: "F(g)",
+        unit: "N",
+        quantity: "force-gap receipt",
+        dimensionSignature: "M L T^-2",
+      },
+      {
+        symbol: "T_apparatus_mu_nu",
+        unit: "J/m^3",
+        quantity: "apparatus stress-energy tensor",
+        dimensionSignature: "M L^-1 T^-2",
+      },
     ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
@@ -3551,8 +4817,20 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "casimir", "layer_stack", "receipt_loop", "full_apparatus_tensor"],
-      symbols: ["M_coupon", "F(g)", "R_rough_patch", "C_active", "T_apparatus_mu_nu"],
+      subjects: [
+        "nhm2",
+        "casimir",
+        "layer_stack",
+        "receipt_loop",
+        "full_apparatus_tensor",
+      ],
+      symbols: [
+        "M_coupon",
+        "F(g)",
+        "R_rough_patch",
+        "C_active",
+        "T_apparatus_mu_nu",
+      ],
       unitSignatures: ["N", "Pa", "J/m^3", "1"],
       repoPaths: [
         NHM2_LAYER_STACK_FULL_APPARATUS_RECEIPT_LOOP_CONTRACT,
@@ -3571,11 +4849,21 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Freezes the most promising 447-layer tile-source architecture candidate and lists the receipts needed before it can become a physically credible source-side stress-energy candidate.",
     whyItMatters:
       "The full solve can only become physically meaningful if the tile/material apparatus supplies an independently receipted full T_mu_nu, with material, pull-in, roughness, control, fatigue, layer-scaling, conservation, QEI, observer, and coupled-closure evidence all passing together.",
-    subjects: ["nhm2", "casimir", "tile_source", "physical_validation_plan", "full_apparatus_tensor"],
+    subjects: [
+      "nhm2",
+      "casimir",
+      "tile_source",
+      "physical_validation_plan",
+      "full_apparatus_tensor",
+    ],
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "casimir", "general_relativity"],
-    equationFamilies: ["tile_source_physical_validation_plan", "full_apparatus_tensor", "physical_viability_campaign"],
+    equationFamilies: [
+      "tile_source_physical_validation_plan",
+      "full_apparatus_tensor",
+      "physical_viability_campaign",
+    ],
     tags: [
       "experimental_ladder",
       "tile_source",
@@ -3608,8 +4896,18 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       },
     ],
     units: [
-      { symbol: "T_apparatus_mu_nu", unit: "J/m^3", quantity: "full apparatus source tensor", dimensionSignature: "M L^-1 T^-2" },
-      { symbol: "R_closure", unit: "1", quantity: "regional closure residual", dimensionSignature: "1" },
+      {
+        symbol: "T_apparatus_mu_nu",
+        unit: "J/m^3",
+        quantity: "full apparatus source tensor",
+        dimensionSignature: "M L^-1 T^-2",
+      },
+      {
+        symbol: "R_closure",
+        unit: "1",
+        quantity: "regional closure residual",
+        dimensionSignature: "1",
+      },
     ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
@@ -3663,8 +4961,20 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "casimir", "tile_source", "physical_validation_plan", "full_apparatus_tensor"],
-      symbols: ["Candidate_source", "T_apparatus_mu_nu", "R_closure", "QEI", "EC_obs"],
+      subjects: [
+        "nhm2",
+        "casimir",
+        "tile_source",
+        "physical_validation_plan",
+        "full_apparatus_tensor",
+      ],
+      symbols: [
+        "Candidate_source",
+        "T_apparatus_mu_nu",
+        "R_closure",
+        "QEI",
+        "EC_obs",
+      ],
       unitSignatures: ["J/m^3", "Pa", "N", "1"],
       repoPaths: [
         NHM2_TILE_SOURCE_PHYSICAL_VALIDATION_PLAN_CONTRACT,
@@ -3672,7 +4982,10 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_LAYER_STACK_FULL_APPARATUS_RECEIPT_LOOP_CONTRACT,
         NHM2_FULL_SOLVE_WHITEPAPER,
       ],
-      equationFamilies: ["tile_source_physical_validation_plan", "full_apparatus_tensor"],
+      equationFamilies: [
+        "tile_source_physical_validation_plan",
+        "full_apparatus_tensor",
+      ],
       simulationOwners: ["NHM2", "casimir", "general_relativity"],
     },
   }),
@@ -3707,7 +5020,12 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Predictions must be frozen before data collection; post-hoc fitting is a blocker.",
     ],
     calculatorPayloads: [],
-    sourceRefs: [repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "stage0_prediction_freeze")],
+    sourceRefs: [
+      repoRef(
+        NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT,
+        "stage0_prediction_freeze",
+      ),
+    ],
     hintKeys: {
       subjects: ["nhm2", "experiment", "prediction_freeze", "falsifier"],
       symbols: ["DeltaTmunu", "delta_phi", "delta_tau", "R_0i0j"],
@@ -3737,7 +5055,13 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         displayLatex: "F(a,T,\\epsilon,roughness,patches)\\ \\mathrm{measured}",
         computableExpression: null,
         operatorKind: "noncomputable_reference",
-        inputSymbols: ["gap", "temperature", "dielectricResponse", "roughness", "patchPotential"],
+        inputSymbols: [
+          "gap",
+          "temperature",
+          "dielectricResponse",
+          "roughness",
+          "patchPotential",
+        ],
         outputSymbols: ["TileForceReceipt"],
       },
     ],
@@ -3748,14 +5072,20 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "stage1_tile_metrology"),
+      repoRef(
+        NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT,
+        "stage1_tile_metrology",
+      ),
       docRef(NHM2_FULL_SOLVE_WHITEPAPER, "tile-metrology"),
     ],
     hintKeys: {
       subjects: ["nhm2", "casimir", "tile_metrology", "experiment"],
       symbols: ["F_gap", "dielectricResponse", "roughness", "patchPotential"],
       unitSignatures: ["N", "m", "K"],
-      repoPaths: [NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, NHM2_FULL_SOLVE_WHITEPAPER],
+      repoPaths: [
+        NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT,
+        NHM2_FULL_SOLVE_WHITEPAPER,
+      ],
       equationFamilies: ["tile_metrology", "physical_viability_campaign"],
       simulationOwners: ["NHM2", "casimir"],
     },
@@ -3813,14 +5143,20 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       }),
     ],
     sourceRefs: [
-      repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "tile_cycle_energy_balance"),
+      repoRef(
+        NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT,
+        "tile_cycle_energy_balance",
+      ),
       docRef(NHM2_FULL_SOLVE_WHITEPAPER, "energy-conversion-not-creation"),
     ],
     hintKeys: {
       subjects: ["nhm2", "casimir", "energy_balance", "experiment"],
       symbols: ["DeltaE", "delta_m", "delta_F"],
       unitSignatures: ["J", "kg", "N"],
-      repoPaths: [NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, NHM2_FULL_SOLVE_WHITEPAPER],
+      repoPaths: [
+        NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT,
+        NHM2_FULL_SOLVE_WHITEPAPER,
+      ],
       equationFamilies: ["energy_balance", "physical_viability_campaign"],
       simulationOwners: ["NHM2", "casimir"],
     },
@@ -3862,7 +5198,12 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         targetVariable: "array_scaling",
       }),
     ],
-    sourceRefs: [repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "stage2_array_scaling")],
+    sourceRefs: [
+      repoRef(
+        NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT,
+        "stage2_array_scaling",
+      ),
+    ],
     hintKeys: {
       subjects: ["nhm2", "casimir", "array_scaling", "experiment"],
       symbols: ["DeltaE_N", "DeltaE_1", "N", "array_scaling"],
@@ -3889,7 +5230,8 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       {
         id: "full_apparatus_tensor_receipt",
         role: "noncomputable_reference",
-        displayLatex: "T^{apparatus}_{\\hat a\\hat b}=E,J_{\\hat i},S_{\\hat i\\hat j}",
+        displayLatex:
+          "T^{apparatus}_{\\hat a\\hat b}=E,J_{\\hat i},S_{\\hat i\\hat j}",
         computableExpression: null,
         operatorKind: "noncomputable_reference",
         inputSymbols: ["E", "J_i", "S_ij"],
@@ -3902,13 +5244,21 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Full apparatus tensor authority is required before physical source credibility can be reviewed.",
     ],
     calculatorPayloads: [],
-    sourceRefs: [repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "full_apparatus_tensor")],
+    sourceRefs: [
+      repoRef(
+        NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT,
+        "full_apparatus_tensor",
+      ),
+    ],
     hintKeys: {
       subjects: ["nhm2", "stress_energy", "apparatus_tensor", "experiment"],
       symbols: ["T_ab_apparatus", "E", "J_i", "S_ij"],
       unitSignatures: ["J/m^3", "Pa"],
       repoPaths: [NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT],
-      equationFamilies: ["full_apparatus_tensor", "physical_viability_campaign"],
+      equationFamilies: [
+        "full_apparatus_tensor",
+        "physical_viability_campaign",
+      ],
       simulationOwners: ["NHM2", "casimir", "general_relativity"],
     },
   }),
@@ -3942,7 +5292,12 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "A vacuum-weight receipt must reject thermal, electromagnetic, mechanical, and ordinary-mass dummy paths.",
     ],
     calculatorPayloads: [],
-    sourceRefs: [repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "stage3_vacuum_weight")],
+    sourceRefs: [
+      repoRef(
+        NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT,
+        "stage3_vacuum_weight",
+      ),
+    ],
     hintKeys: {
       subjects: ["nhm2", "casimir", "vacuum_weight", "experiment"],
       symbols: ["DeltaF_measured", "DeltaE", "g"],
@@ -3989,7 +5344,9 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         targetVariable: "h00_proxy",
       }),
     ],
-    sourceRefs: [repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "metric_upper_bound")],
+    sourceRefs: [
+      repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "metric_upper_bound"),
+    ],
     hintKeys: {
       subjects: ["nhm2", "metric_response", "weak_field", "experiment"],
       symbols: ["h00_proxy", "G", "DeltaE", "r", "c"],
@@ -4016,7 +5373,8 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       {
         id: "invariant_metric_response_receipt",
         role: "noncomputable_reference",
-        displayLatex: "\\delta\\phi,\\delta\\tau,\\delta a^{\\hat i}\\rightarrow g_{\\mu\\nu}^{measured}",
+        displayLatex:
+          "\\delta\\phi,\\delta\\tau,\\delta a^{\\hat i}\\rightarrow g_{\\mu\\nu}^{measured}",
         computableExpression: null,
         operatorKind: "noncomputable_reference",
         inputSymbols: ["delta_phi", "delta_tau", "delta_a"],
@@ -4029,9 +5387,19 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Thermal, electromagnetic, mechanical, optical-dispersion, and Newtonian paths must be bounded below the reported signal.",
     ],
     calculatorPayloads: [],
-    sourceRefs: [repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "stage4_metric_response")],
+    sourceRefs: [
+      repoRef(
+        NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT,
+        "stage4_metric_response",
+      ),
+    ],
     hintKeys: {
-      subjects: ["nhm2", "metric_response", "experiment", "invariant_observable"],
+      subjects: [
+        "nhm2",
+        "metric_response",
+        "experiment",
+        "invariant_observable",
+      ],
       symbols: ["delta_phi", "delta_tau", "delta_a", "g_mu_nu_measured"],
       unitSignatures: [],
       repoPaths: [NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT],
@@ -4046,7 +5414,12 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Requires a neutral test body or clock worldline response in the predicted direction and magnitude without a conventional force path.",
     whyItMatters:
       "This is the first transport-precursor evidence class and must remain separate from route, propulsion, or speed claims.",
-    subjects: ["nhm2", "transport_precursor", "geodesic_response", "experiment"],
+    subjects: [
+      "nhm2",
+      "transport_precursor",
+      "geodesic_response",
+      "experiment",
+    ],
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "general_relativity"],
@@ -4056,7 +5429,8 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       {
         id: "neutral_geodesic_response_receipt",
         role: "noncomputable_reference",
-        displayLatex: "\\delta x^{\\mu}_{test}\\stackrel{?}{=}\\delta x^{\\mu}_{metric}",
+        displayLatex:
+          "\\delta x^{\\mu}_{test}\\stackrel{?}{=}\\delta x^{\\mu}_{metric}",
         computableExpression: null,
         operatorKind: "noncomputable_reference",
         inputSymbols: ["testWorldline", "metricPrediction"],
@@ -4069,9 +5443,19 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "A transport precursor requires composition independence, recoil accounting, and reversible control before transport review can even begin.",
     ],
     calculatorPayloads: [],
-    sourceRefs: [repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "stage6_transport_precursor")],
+    sourceRefs: [
+      repoRef(
+        NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT,
+        "stage6_transport_precursor",
+      ),
+    ],
     hintKeys: {
-      subjects: ["nhm2", "transport_precursor", "geodesic_response", "experiment"],
+      subjects: [
+        "nhm2",
+        "transport_precursor",
+        "geodesic_response",
+        "experiment",
+      ],
       symbols: ["testWorldline", "metricPrediction", "delta_x_mu"],
       unitSignatures: [],
       repoPaths: [NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT],
@@ -4090,7 +5474,10 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     level: "claim_boundary",
     status: "blocked",
     simulationOwners: ["NHM2", "casimir", "general_relativity"],
-    equationFamilies: ["independent_replication", "physical_viability_campaign"],
+    equationFamilies: [
+      "independent_replication",
+      "physical_viability_campaign",
+    ],
     tags: ["experimental_ladder", "replication", "noncomputable_reference"],
     equations: [
       {
@@ -4109,13 +5496,21 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Replication is an experimental receipt, not a calculator row.",
     ],
     calculatorPayloads: [],
-    sourceRefs: [repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "independent_replication")],
+    sourceRefs: [
+      repoRef(
+        NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT,
+        "independent_replication",
+      ),
+    ],
     hintKeys: {
       subjects: ["nhm2", "replication", "experiment", "claim_boundary"],
       symbols: ["replicated_independent"],
       unitSignatures: [],
       repoPaths: [NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT],
-      equationFamilies: ["independent_replication", "physical_viability_campaign"],
+      equationFamilies: [
+        "independent_replication",
+        "physical_viability_campaign",
+      ],
       simulationOwners: ["NHM2", "casimir", "general_relativity"],
     },
   }),
@@ -4245,7 +5640,11 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     status: "blocked",
     simulationOwners: ["NHM2", "casimir", "general_relativity"],
     equationFamilies: ["claim_boundary", "physical_viability_campaign"],
-    tags: ["claim_boundary", "physical_viability_locked", "noncomputable_reference"],
+    tags: [
+      "claim_boundary",
+      "physical_viability_locked",
+      "noncomputable_reference",
+    ],
     equations: [
       {
         id: "physical_viability_lock",
@@ -4263,7 +5662,12 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Diagnostic campaign admission and Lean certificate admission cannot unlock this claim boundary.",
     ],
     calculatorPayloads: [],
-    sourceRefs: [repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "physicalViabilityClaimAllowed=false")],
+    sourceRefs: [
+      repoRef(
+        NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT,
+        "physicalViabilityClaimAllowed=false",
+      ),
+    ],
     hintKeys: {
       subjects: ["nhm2", "claim_boundary", "physical_viability", "experiment"],
       symbols: ["physicalViabilityClaimAllowed"],
@@ -4303,7 +5707,12 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Transport remains separate from physical source and metric-response evidence.",
     ],
     calculatorPayloads: [],
-    sourceRefs: [repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "transportClaimAllowed=false")],
+    sourceRefs: [
+      repoRef(
+        NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT,
+        "transportClaimAllowed=false",
+      ),
+    ],
     hintKeys: {
       subjects: ["nhm2", "claim_boundary", "transport", "experiment"],
       symbols: ["transportClaimAllowed"],
@@ -4320,20 +5729,40 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Names the canonical regional support-function atlas used by source residual, conservation, QEI, observer, and claim-admission artifacts.",
     whyItMatters:
       "It prevents downstream gates from evaluating different implied hull, wall, exterior, or transition geometries.",
-    subjects: ["nhm2", "regional_atlas", "support_functions", "artifact_governance"],
+    subjects: [
+      "nhm2",
+      "regional_atlas",
+      "support_functions",
+      "artifact_governance",
+    ],
     level: "diagnostic_gate",
     status: "diagnostic",
     simulationOwners: ["NHM2", "general_relativity", "casimir"],
-    equationFamilies: ["regional_support_function_atlas", "reference_run_provenance"],
-    tags: ["regional_atlas", "support_function", "same_run", "artifact_receipt"],
+    equationFamilies: [
+      "regional_support_function_atlas",
+      "reference_run_provenance",
+    ],
+    tags: [
+      "regional_atlas",
+      "support_function",
+      "same_run",
+      "artifact_receipt",
+    ],
     equations: [
       {
         id: "regional_support_function_atlas_receipt",
         role: "noncomputable_reference",
-        displayLatex: "\\mathcal{A}_{R}=\\{W_R,\\mathrm{regions},\\mathrm{aggregation},\\mathrm{hashes}\\}",
+        displayLatex:
+          "\\mathcal{A}_{R}=\\{W_R,\\mathrm{regions},\\mathrm{aggregation},\\mathrm{hashes}\\}",
         computableExpression: null,
         operatorKind: "noncomputable_reference",
-        inputSymbols: ["runId", "chartId", "gridRef", "W_R", "aggregationPolicy"],
+        inputSymbols: [
+          "runId",
+          "chartId",
+          "gridRef",
+          "W_R",
+          "aggregationPolicy",
+        ],
         outputSymbols: ["atlasHash"],
       },
     ],
@@ -4345,18 +5774,34 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      artifactRef("shared/contracts/nhm2-regional-support-function-atlas.v1.ts", "nhm2-regional-support-function-atlas-contract", "Typed regional support-function atlas contract."),
-      artifactRef("tools/nhm2/build-regional-support-function-atlas.ts", "nhm2-regional-support-function-atlas-generator", "Reference-run atlas generator."),
+      artifactRef(
+        "shared/contracts/nhm2-regional-support-function-atlas.v1.ts",
+        "nhm2-regional-support-function-atlas-contract",
+        "Typed regional support-function atlas contract.",
+      ),
+      artifactRef(
+        "tools/nhm2/build-regional-support-function-atlas.ts",
+        "nhm2-regional-support-function-atlas-generator",
+        "Reference-run atlas generator.",
+      ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "regional_atlas", "support_functions", "artifact_governance"],
+      subjects: [
+        "nhm2",
+        "regional_atlas",
+        "support_functions",
+        "artifact_governance",
+      ],
       symbols: ["A_R", "W_R", "atlasHash", "aggregationPolicy"],
       unitSignatures: [],
       repoPaths: [
         "shared/contracts/nhm2-regional-support-function-atlas.v1.ts",
         "tools/nhm2/build-regional-support-function-atlas.ts",
       ],
-      equationFamilies: ["regional_support_function_atlas", "reference_run_provenance"],
+      equationFamilies: [
+        "regional_support_function_atlas",
+        "reference_run_provenance",
+      ],
       simulationOwners: ["NHM2", "general_relativity", "casimir"],
     },
   }),
@@ -4367,12 +5812,22 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Tracks whether the closure-region support weights form the declared partition policy within tolerance.",
     whyItMatters:
       "It makes hidden regional overlap or gaps visible before source and conservation gates aggregate tensor samples.",
-    subjects: ["nhm2", "regional_atlas", "partition_of_unity", "support_functions"],
+    subjects: [
+      "nhm2",
+      "regional_atlas",
+      "partition_of_unity",
+      "support_functions",
+    ],
     level: "diagnostic_gate",
     status: "review",
     simulationOwners: ["NHM2", "general_relativity"],
     equationFamilies: ["regional_support_function_atlas", "partition_of_unity"],
-    tags: ["regional_atlas", "partition_of_unity", "support_weight", "review_gated"],
+    tags: [
+      "regional_atlas",
+      "partition_of_unity",
+      "support_weight",
+      "review_gated",
+    ],
     equations: [
       {
         id: "support_partition_of_unity",
@@ -4384,7 +5839,14 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         outputSymbols: ["partitionStatus"],
       },
     ],
-    units: [{ symbol: "W_R", unit: null, quantity: "support_weight", dimensionSignature: "1" }],
+    units: [
+      {
+        symbol: "W_R",
+        unit: null,
+        quantity: "support_weight",
+        dimensionSignature: "1",
+      },
+    ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
       "Partition status is read from the atlas artifact.",
@@ -4392,18 +5854,34 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      artifactRef("shared/contracts/nhm2-regional-support-function-atlas.v1.ts", "partitionOfUnity", "Atlas partition-of-unity status field."),
-      artifactRef("tests/nhm2-regional-support-function-atlas.spec.ts", "atlas-partition-test", "Focused atlas partition fixture."),
+      artifactRef(
+        "shared/contracts/nhm2-regional-support-function-atlas.v1.ts",
+        "partitionOfUnity",
+        "Atlas partition-of-unity status field.",
+      ),
+      artifactRef(
+        "tests/nhm2-regional-support-function-atlas.spec.ts",
+        "atlas-partition-test",
+        "Focused atlas partition fixture.",
+      ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "regional_atlas", "partition_of_unity", "support_functions"],
+      subjects: [
+        "nhm2",
+        "regional_atlas",
+        "partition_of_unity",
+        "support_functions",
+      ],
       symbols: ["W_R", "sumW", "partitionStatus"],
       unitSignatures: ["1"],
       repoPaths: [
         "shared/contracts/nhm2-regional-support-function-atlas.v1.ts",
         "tests/nhm2-regional-support-function-atlas.spec.ts",
       ],
-      equationFamilies: ["regional_support_function_atlas", "partition_of_unity"],
+      equationFamilies: [
+        "regional_support_function_atlas",
+        "partition_of_unity",
+      ],
       simulationOwners: ["NHM2", "general_relativity"],
     },
   }),
@@ -4418,8 +5896,16 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     level: "diagnostic_gate",
     status: "review",
     simulationOwners: ["NHM2", "general_relativity", "casimir"],
-    equationFamilies: ["regional_support_function_atlas", "transition_kernel_regularization"],
-    tags: ["regional_atlas", "transition_support", "smoothing_kernel", "same_run"],
+    equationFamilies: [
+      "regional_support_function_atlas",
+      "transition_kernel_regularization",
+    ],
+    tags: [
+      "regional_atlas",
+      "transition_support",
+      "smoothing_kernel",
+      "same_run",
+    ],
     equations: [
       {
         id: "transition_support_kernel_receipt",
@@ -4432,7 +5918,12 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       },
     ],
     units: [
-      { symbol: "\\Delta_{RS}", unit: "m", quantity: "transition_width", dimensionSignature: "L" },
+      {
+        symbol: "\\Delta_{RS}",
+        unit: "m",
+        quantity: "transition_width",
+        dimensionSignature: "L",
+      },
     ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
@@ -4441,8 +5932,16 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      artifactRef("shared/contracts/nhm2-regional-support-function-atlas.v1.ts", "transitionKernels", "Canonical transition-kernel references."),
-      artifactRef("shared/contracts/nhm2-regional-source-transition-kernel.v1.ts", "nhm2-regional-source-transition-kernel-contract", "Transition regularization consumer contract."),
+      artifactRef(
+        "shared/contracts/nhm2-regional-support-function-atlas.v1.ts",
+        "transitionKernels",
+        "Canonical transition-kernel references.",
+      ),
+      artifactRef(
+        "shared/contracts/nhm2-regional-source-transition-kernel.v1.ts",
+        "nhm2-regional-source-transition-kernel-contract",
+        "Transition regularization consumer contract.",
+      ),
     ],
     hintKeys: {
       subjects: ["nhm2", "regional_atlas", "transition_region", "smoothing"],
@@ -4452,7 +5951,10 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         "shared/contracts/nhm2-regional-support-function-atlas.v1.ts",
         "shared/contracts/nhm2-regional-source-transition-kernel.v1.ts",
       ],
-      equationFamilies: ["regional_support_function_atlas", "transition_kernel_regularization"],
+      equationFamilies: [
+        "regional_support_function_atlas",
+        "transition_kernel_regularization",
+      ],
       simulationOwners: ["NHM2", "general_relativity", "casimir"],
     },
   }),
@@ -4467,13 +5969,22 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "general_relativity"],
-    equationFamilies: ["regional_support_function_atlas", "covariant_conservation"],
-    tags: ["regional_atlas", "derivative_support", "covariant_conservation", "blocks_promotion"],
+    equationFamilies: [
+      "regional_support_function_atlas",
+      "covariant_conservation",
+    ],
+    tags: [
+      "regional_atlas",
+      "derivative_support",
+      "covariant_conservation",
+      "blocks_promotion",
+    ],
     equations: [
       {
         id: "support_derivative_terms_required",
         role: "constraint",
-        displayLatex: "\\nabla_\\mu(W_R T_R^{\\mu\\nu})=(\\partial_\\mu W_R)T_R^{\\mu\\nu}+W_R\\nabla_\\mu T_R^{\\mu\\nu}",
+        displayLatex:
+          "\\nabla_\\mu(W_R T_R^{\\mu\\nu})=(\\partial_\\mu W_R)T_R^{\\mu\\nu}+W_R\\nabla_\\mu T_R^{\\mu\\nu}",
         computableExpression: null,
         operatorKind: "tensor_component",
         inputSymbols: ["partial_mu_W_R", "T_R_mu_nu", "nabla_mu_T_R_mu_nu"],
@@ -4481,8 +5992,17 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       },
     ],
     units: [
-      { symbol: "\\partial_\\mu W_R", quantity: "support_weight_derivative", dimensionSignature: "L^-1" },
-      { symbol: "T_R^{\\mu\\nu}", unit: "Pa", quantity: "stress_energy", dimensionSignature: "M L^-1 T^-2" },
+      {
+        symbol: "\\partial_\\mu W_R",
+        quantity: "support_weight_derivative",
+        dimensionSignature: "L^-1",
+      },
+      {
+        symbol: "T_R^{\\mu\\nu}",
+        unit: "Pa",
+        quantity: "stress_energy",
+        dimensionSignature: "M L^-1 T^-2",
+      },
     ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
@@ -4491,12 +6011,29 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      artifactRef("shared/contracts/nhm2-regional-support-function-atlas.v1.ts", "derivativeSupport", "Atlas derivative-support receipt."),
-      artifactRef("shared/contracts/nhm2-regional-support-derivative-receipt.v1.ts", "nhm2-regional-support-derivative-receipt-contract", "Support-function partial derivative receipt consumed by the atlas generator."),
-      artifactRef("shared/contracts/nhm2-tile-counterpart-conservation.v1.ts", "nhm2-tile-counterpart-conservation-contract", "Conservation consumer contract."),
+      artifactRef(
+        "shared/contracts/nhm2-regional-support-function-atlas.v1.ts",
+        "derivativeSupport",
+        "Atlas derivative-support receipt.",
+      ),
+      artifactRef(
+        "shared/contracts/nhm2-regional-support-derivative-receipt.v1.ts",
+        "nhm2-regional-support-derivative-receipt-contract",
+        "Support-function partial derivative receipt consumed by the atlas generator.",
+      ),
+      artifactRef(
+        "shared/contracts/nhm2-tile-counterpart-conservation.v1.ts",
+        "nhm2-tile-counterpart-conservation-contract",
+        "Conservation consumer contract.",
+      ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "regional_atlas", "conservation", "derivative_support"],
+      subjects: [
+        "nhm2",
+        "regional_atlas",
+        "conservation",
+        "derivative_support",
+      ],
       symbols: ["partial_mu_W_R", "T_R_mu_nu", "div_T_region_shaped"],
       unitSignatures: ["L^-1", "M L^-1 T^-2"],
       repoPaths: [
@@ -4504,7 +6041,10 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         "shared/contracts/nhm2-regional-support-derivative-receipt.v1.ts",
         "shared/contracts/nhm2-tile-counterpart-conservation.v1.ts",
       ],
-      equationFamilies: ["regional_support_function_atlas", "covariant_conservation"],
+      equationFamilies: [
+        "regional_support_function_atlas",
+        "covariant_conservation",
+      ],
       simulationOwners: ["NHM2", "general_relativity"],
     },
   }),
@@ -4515,20 +6055,34 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Checks that source residual, conservation, QEI, observer, coupled closure, and claim admission artifacts reference the same atlas hash.",
     whyItMatters:
       "It makes later pass lights mean the gates evaluated the same regional geometry rather than almost-compatible sidecars.",
-    subjects: ["nhm2", "regional_atlas", "consumer_congruence", "artifact_governance"],
+    subjects: [
+      "nhm2",
+      "regional_atlas",
+      "consumer_congruence",
+      "artifact_governance",
+    ],
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "general_relativity", "casimir"],
-    equationFamilies: ["regional_support_function_atlas", "same_atlas_congruence"],
+    equationFamilies: [
+      "regional_support_function_atlas",
+      "same_atlas_congruence",
+    ],
     tags: ["regional_atlas", "hash_congruence", "same_run", "blocks_promotion"],
     equations: [
       {
         id: "same_atlas_hash_gate",
         role: "gate",
-        displayLatex: "hash(\\mathcal{A})_{source}=hash(\\mathcal{A})_{conservation}=hash(\\mathcal{A})_{QEI}=hash(\\mathcal{A})_{observer}",
+        displayLatex:
+          "hash(\\mathcal{A})_{source}=hash(\\mathcal{A})_{conservation}=hash(\\mathcal{A})_{QEI}=hash(\\mathcal{A})_{observer}",
         computableExpression: null,
         operatorKind: "gate_status",
-        inputSymbols: ["atlasHash_source", "atlasHash_conservation", "atlasHash_qei", "atlasHash_observer"],
+        inputSymbols: [
+          "atlasHash_source",
+          "atlasHash_conservation",
+          "atlasHash_qei",
+          "atlasHash_observer",
+        ],
         outputSymbols: ["atlas_consumer_congruence_status"],
       },
     ],
@@ -4540,12 +6094,29 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      artifactRef("shared/contracts/nhm2-coupled-closure-pass-candidate.v1.ts", "atlasConsumerCongruencePass", "Coupled closure same-atlas gate."),
-      artifactRef("shared/contracts/nhm2-regional-tensor-pass-path-harness.v1.ts", "atlasConsumerCongruencePass", "Regional tensor pass-path same-atlas gate."),
-      artifactRef("tools/nhm2/run-reference-validation-chain.ts", "regional-support-atlas-wiring", "Reference-chain atlas consumer wiring."),
+      artifactRef(
+        "shared/contracts/nhm2-coupled-closure-pass-candidate.v1.ts",
+        "atlasConsumerCongruencePass",
+        "Coupled closure same-atlas gate.",
+      ),
+      artifactRef(
+        "shared/contracts/nhm2-regional-tensor-pass-path-harness.v1.ts",
+        "atlasConsumerCongruencePass",
+        "Regional tensor pass-path same-atlas gate.",
+      ),
+      artifactRef(
+        "tools/nhm2/run-reference-validation-chain.ts",
+        "regional-support-atlas-wiring",
+        "Reference-chain atlas consumer wiring.",
+      ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "regional_atlas", "consumer_congruence", "artifact_governance"],
+      subjects: [
+        "nhm2",
+        "regional_atlas",
+        "consumer_congruence",
+        "artifact_governance",
+      ],
       symbols: ["atlasHash", "atlas_consumer_congruence_status"],
       unitSignatures: [],
       repoPaths: [
@@ -4553,7 +6124,10 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         "shared/contracts/nhm2-regional-tensor-pass-path-harness.v1.ts",
         "tools/nhm2/run-reference-validation-chain.ts",
       ],
-      equationFamilies: ["regional_support_function_atlas", "same_atlas_congruence"],
+      equationFamilies: [
+        "regional_support_function_atlas",
+        "same_atlas_congruence",
+      ],
       simulationOwners: ["NHM2", "general_relativity", "casimir"],
     },
   }),
@@ -4564,17 +6138,31 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Blocks treating shared regional geometry as material credibility, conservation, QEI, observer robustness, or transport viability.",
     whyItMatters:
       "It keeps atlas congruence in the correct role: a prerequisite map for proof gates, not a proof that those gates pass.",
-    subjects: ["nhm2", "regional_atlas", "claim_boundary", "artifact_governance"],
+    subjects: [
+      "nhm2",
+      "regional_atlas",
+      "claim_boundary",
+      "artifact_governance",
+    ],
     level: "claim_boundary",
     status: "blocked",
     simulationOwners: ["NHM2"],
-    equationFamilies: ["regional_support_function_atlas", "nhm2_claim_boundary"],
-    tags: ["regional_atlas", "claim_boundary", "diagnostic_only", "blocks_promotion"],
+    equationFamilies: [
+      "regional_support_function_atlas",
+      "nhm2_claim_boundary",
+    ],
+    tags: [
+      "regional_atlas",
+      "claim_boundary",
+      "diagnostic_only",
+      "blocks_promotion",
+    ],
     equations: [
       {
         id: "atlas_not_closure_boundary",
         role: "noncomputable_reference",
-        displayLatex: "\\mathcal{A}_{R}\\not\\Rightarrow\\mathrm{sourceClosure}\\land\\mathrm{physicalViability}",
+        displayLatex:
+          "\\mathcal{A}_{R}\\not\\Rightarrow\\mathrm{sourceClosure}\\land\\mathrm{physicalViability}",
         computableExpression: null,
         operatorKind: "noncomputable_reference",
         inputSymbols: ["atlasHash"],
@@ -4589,25 +6177,53 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      artifactRef("shared/contracts/nhm2-regional-support-function-atlas.v1.ts", "claimBoundary", "Atlas diagnostic-only claim boundary."),
-      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "closure-stack-summary", "Whitepaper closure-stack claim boundary."),
+      artifactRef(
+        "shared/contracts/nhm2-regional-support-function-atlas.v1.ts",
+        "claimBoundary",
+        "Atlas diagnostic-only claim boundary.",
+      ),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "closure-stack-summary",
+        "Whitepaper closure-stack claim boundary.",
+      ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "regional_atlas", "claim_boundary", "artifact_governance"],
+      subjects: [
+        "nhm2",
+        "regional_atlas",
+        "claim_boundary",
+        "artifact_governance",
+      ],
       symbols: ["A_R", "atlasHash", "atlas_claim_boundary"],
       unitSignatures: [],
-      repoPaths: ["shared/contracts/nhm2-regional-support-function-atlas.v1.ts", NHM2_FULL_SOLVE_WHITEPAPER],
-      equationFamilies: ["regional_support_function_atlas", "nhm2_claim_boundary"],
+      repoPaths: [
+        "shared/contracts/nhm2-regional-support-function-atlas.v1.ts",
+        NHM2_FULL_SOLVE_WHITEPAPER,
+      ],
+      equationFamilies: [
+        "regional_support_function_atlas",
+        "nhm2_claim_boundary",
+      ],
       simulationOwners: ["NHM2"],
     },
   }),
   nhm2FullSolveBadge({
     id: "nhm2.energy_condition.wec_nec_sec_dec_family",
     title: "Observer-Family Energy-Condition Surface",
-    plainMeaning: "Collects WEC, NEC, SEC, and DEC as observer-family diagnostics over the projected tensor.",
+    plainMeaning:
+      "Collects WEC, NEC, SEC, and DEC as observer-family diagnostics over the projected tensor.",
     whyItMatters:
       "It prevents a single scalar or favorable slice from being treated as clearance for the whole observer-family surface.",
-    subjects: ["nhm2", "energy_conditions", "observer_family", "wec", "nec", "sec", "dec"],
+    subjects: [
+      "nhm2",
+      "energy_conditions",
+      "observer_family",
+      "wec",
+      "nec",
+      "sec",
+      "dec",
+    ],
     level: "diagnostic_gate",
     status: "review",
     simulationOwners: ["NHM2", "general_relativity"],
@@ -4617,7 +6233,8 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       {
         id: "energy_condition_family_gate",
         role: "gate",
-        displayLatex: "\\mathrm{EC}_{family}=\\{WEC,NEC,SEC,DEC\\}_{observer\\ family}",
+        displayLatex:
+          "\\mathrm{EC}_{family}=\\{WEC,NEC,SEC,DEC\\}_{observer\\ family}",
         computableExpression: null,
         operatorKind: "gate_status",
         inputSymbols: ["E", "J_i", "S_ij", "observer_family"],
@@ -4633,11 +6250,26 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "observer-energy-condition-gates", "Whitepaper observer gate section."),
-      equationMapRef("energy_condition_family", "Observable equation map node."),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "observer-energy-condition-gates",
+        "Whitepaper observer gate section.",
+      ),
+      equationMapRef(
+        "energy_condition_family",
+        "Observable equation map node.",
+      ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "energy_conditions", "observer_family", "wec", "nec", "sec", "dec"],
+      subjects: [
+        "nhm2",
+        "energy_conditions",
+        "observer_family",
+        "wec",
+        "nec",
+        "sec",
+        "dec",
+      ],
       symbols: ["E", "J_i", "S_ij", "observer_family", "EC_family_status"],
       unitSignatures: ["M L^-1 T^-2"],
       repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
@@ -4656,8 +6288,17 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "general_relativity"],
-    equationFamilies: ["observer_robust_energy_conditions", "energy_condition_family"],
-    tags: ["observer_robust", "eulerian_only_boundary", "wec", "nec", "blocks_promotion"],
+    equationFamilies: [
+      "observer_robust_energy_conditions",
+      "energy_condition_family",
+    ],
+    tags: [
+      "observer_robust",
+      "eulerian_only_boundary",
+      "wec",
+      "nec",
+      "blocks_promotion",
+    ],
     equations: [
       {
         id: "observer_robust_energy_condition_gate",
@@ -4666,7 +6307,14 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
           "\\mathrm{EC}_{robust}=\\{WEC,NEC,DEC,SEC\\}_{observer\\ families}",
         computableExpression: null,
         operatorKind: "gate_status",
-        inputSymbols: ["T_mu_nu", "observer_family", "WEC", "NEC", "DEC", "SEC"],
+        inputSymbols: [
+          "T_mu_nu",
+          "observer_family",
+          "WEC",
+          "NEC",
+          "DEC",
+          "SEC",
+        ],
         outputSymbols: ["observer_robust_ec_status"],
       },
     ],
@@ -4678,22 +6326,168 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      artifactRef("shared/contracts/nhm2-observer-robust-energy-conditions.v1.ts", "nhm2-observer-robust-energy-conditions-contract", "Typed observer-family EC contract."),
-      equationMapRef("energy_condition_family", "Observable equation map node."),
+      artifactRef(
+        "shared/contracts/nhm2-observer-robust-energy-conditions.v1.ts",
+        "nhm2-observer-robust-energy-conditions-contract",
+        "Typed observer-family EC contract.",
+      ),
+      equationMapRef(
+        "energy_condition_family",
+        "Observable equation map node.",
+      ),
     ],
     hintKeys: {
       subjects: ["nhm2", "energy_conditions", "observer_robust", "wec", "nec"],
-      symbols: ["T_mu_nu", "observer_family", "WEC", "NEC", "DEC", "SEC", "observer_robust_ec_status"],
+      symbols: [
+        "T_mu_nu",
+        "observer_family",
+        "WEC",
+        "NEC",
+        "DEC",
+        "SEC",
+        "observer_robust_ec_status",
+      ],
       unitSignatures: ["M L^-1 T^-2"],
-      repoPaths: ["shared/contracts/nhm2-observer-robust-energy-conditions.v1.ts", NHM2_OBSERVABLE_EQUATION_MAP],
-      equationFamilies: ["observer_robust_energy_conditions", "energy_condition_family"],
+      repoPaths: [
+        "shared/contracts/nhm2-observer-robust-energy-conditions.v1.ts",
+        NHM2_OBSERVABLE_EQUATION_MAP,
+      ],
+      equationFamilies: [
+        "observer_robust_energy_conditions",
+        "energy_condition_family",
+      ],
+      simulationOwners: ["NHM2", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.qei.feasibility_frontier",
+    title: "NHM2 QEI Feasibility Frontier",
+    plainMeaning:
+      "Records a run-bound, finite-domain search over NHM2 candidates, worldlines, sampling families, and sampling times against raw computed QEI margins.",
+    whyItMatters:
+      "It distinguishes a replayable candidate search from policy-floor admission, historical dossier reuse, a universal no-go claim, or worldline-QEI closure authority.",
+    subjects: [
+      "nhm2",
+      "qei",
+      "feasibility_frontier",
+      "finite_domain",
+      "run_bound",
+    ],
+    level: "simulation_specific",
+    status: "diagnostic",
+    simulationOwners: ["NHM2", "general_relativity"],
+    equationFamilies: [
+      "qei_feasibility_frontier",
+      "qei_worldline_sampling",
+    ],
+    tags: [
+      "qei",
+      "finite_domain",
+      "run_bound",
+      "diagnostic_only",
+      "non_authoritative",
+    ],
+    equations: [
+      {
+        id: "qei_finite_domain_frontier_gate",
+        role: "gate",
+        displayLatex:
+          "\\min_c\\;\\max_{w,f,\\tau}\\;\\max\\!\\left(m_{raw},m_{policy}\\right)<1",
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: [
+          "candidate",
+          "worldline",
+          "sampling_family",
+          "tau",
+          "qei_margin_raw",
+          "qei_margin_policy",
+        ],
+        outputSymbols: ["qei_frontier_verdict"],
+      },
+    ],
+    units: [
+      {
+        symbol: "tau",
+        unit: "s",
+        quantity: "sampling_time",
+        dimensionSignature: "T",
+      },
+      {
+        symbol: "qei_margin_raw",
+        unit: null,
+        quantity: "raw_computed_qei_margin_ratio",
+        dimensionSignature: "1",
+      },
+      {
+        symbol: "qei_margin_policy",
+        unit: null,
+        quantity: "policy_qei_margin_ratio",
+        dimensionSignature: "1",
+      },
+    ],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "The search domain is finite, declared in advance, and evaluated as a complete Cartesian product before a finite-domain result is reported.",
+      "All profile, tensor, state, observer, worldline, theorem, raw-evaluation, quadrature, manifest, and runtime-receipt bindings must be run-specific and hash verified.",
+      "Duty-scaled or directly scaled metric T00 and historical or unbound dossiers are forbidden; policy limits and bound floors may veto but have no independent pass or promotion authority.",
+      "A no-candidate result is limited to the declared finite domain and is not a universal QEI no-go.",
+      "Analytic crossover times and distance-to-boundary sensitivities are diagnostic derivatives only and do not establish that any boundary point is dynamically, causally, materially, or experimentally realizable.",
+      "This frontier cannot satisfy the worldline-QEI dossier or experiment-ready theory-closure gate and cannot authorize physical viability, transport, propulsion, route ETA, or speed claims.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      repoRef(
+        "shared/contracts/nhm2-qei-feasibility-frontier.v1.ts",
+        "nhm2-qei-feasibility-frontier-contract",
+        "Typed finite-domain frontier contract and invariant claim locks.",
+      ),
+      repoRef(
+        "server/services/theory/nhm2-qei-feasibility-frontier-evaluator.ts",
+        "nhm2-qei-feasibility-frontier-filesystem-evaluator",
+        "Filesystem, receipt, hash, epoch, and finite-domain verification lane.",
+      ),
+      repoRef(
+        "tools/nhm2/evaluate-qei-feasibility-frontier.ts",
+        "nhm2-qei-feasibility-frontier-cli",
+        "Pinned CLI replay surface for the diagnostic frontier.",
+      ),
+    ],
+    hintKeys: {
+      subjects: [
+        "nhm2",
+        "qei",
+        "feasibility_frontier",
+        "finite_domain",
+        "run_bound",
+      ],
+      symbols: [
+        "candidate",
+        "worldline",
+        "sampling_family",
+        "tau",
+        "qei_margin_raw",
+        "qei_margin_policy",
+        "qei_frontier_verdict",
+      ],
+      unitSignatures: ["T", "1"],
+      repoPaths: [
+        "shared/contracts/nhm2-qei-feasibility-frontier.v1.ts",
+        "server/services/theory/nhm2-qei-feasibility-frontier-evaluator.ts",
+        "tools/nhm2/evaluate-qei-feasibility-frontier.ts",
+      ],
+      equationFamilies: [
+        "qei_feasibility_frontier",
+        "qei_worldline_sampling",
+      ],
       simulationOwners: ["NHM2", "general_relativity"],
     },
   }),
   nhm2FullSolveBadge({
     id: "nhm2.qei.worldline_sampling_requirement",
     title: "QEI Worldline Sampling Requirement",
-    plainMeaning: "Records the weighted worldline stress-energy sampling requirement for a QEI dossier.",
+    plainMeaning:
+      "Records the weighted worldline stress-energy sampling requirement for a QEI dossier.",
     whyItMatters:
       "It keeps QEI discussion tied to an explicit sampling requirement instead of treating literature context as repository completion.",
     subjects: ["nhm2", "qei", "worldline_sampling", "stress_energy", "blocked"],
@@ -4714,7 +6508,11 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       },
     ],
     units: [
-      { symbol: "qei_worldline_sample", quantity: "weighted_stress_energy_integral", dimensionSignature: "M L^-1 T^-1" },
+      {
+        symbol: "qei_worldline_sample",
+        quantity: "weighted_stress_energy_integral",
+        dimensionSignature: "M L^-1 T^-1",
+      },
     ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
@@ -4723,11 +6521,24 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "qei-reproducibility-limits", "QEI blocker context."),
-      equationMapRef("qei_sampling_requirement", "Observable equation map node."),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "qei-reproducibility-limits",
+        "QEI blocker context.",
+      ),
+      equationMapRef(
+        "qei_sampling_requirement",
+        "Observable equation map node.",
+      ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "qei", "worldline_sampling", "stress_energy", "blocked"],
+      subjects: [
+        "nhm2",
+        "qei",
+        "worldline_sampling",
+        "stress_energy",
+        "blocked",
+      ],
       symbols: ["f_tau", "T_mu_nu", "u^mu", "tau", "qei_worldline_sample"],
       unitSignatures: ["M L^-1 T^-1"],
       repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
@@ -4747,7 +6558,13 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     status: "blocked",
     simulationOwners: ["NHM2", "general_relativity"],
     equationFamilies: ["qei_worldline_dossier", "stress_energy_sampling"],
-    tags: ["qei", "worldline", "dossier_requirement", "provenance", "blocks_promotion"],
+    tags: [
+      "qei",
+      "worldline",
+      "dossier_requirement",
+      "provenance",
+      "blocks_promotion",
+    ],
     equations: [
       {
         id: "qei_dossier_gate",
@@ -4756,13 +6573,29 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
           "\\mathrm{QEI}_{dossier}=worldline\\land f(\\tau)\\land \\rho_{source}\\land bound\\land margin_R",
         computableExpression: null,
         operatorKind: "gate_status",
-        inputSymbols: ["worldline", "f_tau", "rho_source", "qei_bound", "regional_margin"],
+        inputSymbols: [
+          "worldline",
+          "f_tau",
+          "rho_source",
+          "qei_bound",
+          "regional_margin",
+        ],
         outputSymbols: ["qei_dossier_status"],
       },
     ],
     units: [
-      { symbol: "rho_source", unit: "J/m^3", quantity: "sampled_density_source", dimensionSignature: "M L^-1 T^-2" },
-      { symbol: "regional_margin", unit: "J/m^3", quantity: "qei_regional_margin", dimensionSignature: "M L^-1 T^-2" },
+      {
+        symbol: "rho_source",
+        unit: "J/m^3",
+        quantity: "sampled_density_source",
+        dimensionSignature: "M L^-1 T^-2",
+      },
+      {
+        symbol: "regional_margin",
+        unit: "J/m^3",
+        quantity: "qei_regional_margin",
+        dimensionSignature: "M L^-1 T^-2",
+      },
     ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
@@ -4771,15 +6604,37 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "qei-reproducibility-limits", "QEI blocker context."),
-      artifactRef("shared/contracts/nhm2-qei-worldline-dossier.v1.ts", "nhm2-qei-worldline-dossier-contract", "Typed QEI worldline dossier contract."),
-      equationMapRef("qei_sampling_requirement", "Observable equation map node."),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "qei-reproducibility-limits",
+        "QEI blocker context.",
+      ),
+      artifactRef(
+        "shared/contracts/nhm2-qei-worldline-dossier.v1.ts",
+        "nhm2-qei-worldline-dossier-contract",
+        "Typed QEI worldline dossier contract.",
+      ),
+      equationMapRef(
+        "qei_sampling_requirement",
+        "Observable equation map node.",
+      ),
     ],
     hintKeys: {
       subjects: ["nhm2", "qei", "worldline_dossier", "sampling", "provenance"],
-      symbols: ["worldline", "f_tau", "rho_source", "qei_bound", "regional_margin", "qei_dossier_status"],
+      symbols: [
+        "worldline",
+        "f_tau",
+        "rho_source",
+        "qei_bound",
+        "regional_margin",
+        "qei_dossier_status",
+      ],
       unitSignatures: ["M L^-1 T^-2"],
-      repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, "shared/contracts/nhm2-qei-worldline-dossier.v1.ts", NHM2_OBSERVABLE_EQUATION_MAP],
+      repoPaths: [
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "shared/contracts/nhm2-qei-worldline-dossier.v1.ts",
+        NHM2_OBSERVABLE_EQUATION_MAP,
+      ],
       equationFamilies: ["qei_worldline_dossier", "stress_energy_sampling"],
       simulationOwners: ["NHM2", "general_relativity"],
     },
@@ -4791,17 +6646,31 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Names Weyl, Ricci, Petrov-class, scalar-invariant, and momentum-density diagnostics as explicit runtime targets.",
     whyItMatters:
       "It prevents expansion-free Natario-adjacent language from outrunning curvature and momentum-density evidence.",
-    subjects: ["nhm2", "natario", "curvature_invariants", "petrov", "momentum_density"],
+    subjects: [
+      "nhm2",
+      "natario",
+      "curvature_invariants",
+      "petrov",
+      "momentum_density",
+    ],
     level: "diagnostic_gate",
     status: "review",
     simulationOwners: ["NHM2", "general_relativity"],
     equationFamilies: ["natario_curvature_invariants", "observer_projection"],
-    tags: ["natario", "weyl", "ricci", "petrov", "momentum_density", "runtime_target"],
+    tags: [
+      "natario",
+      "weyl",
+      "ricci",
+      "petrov",
+      "momentum_density",
+      "runtime_target",
+    ],
     equations: [
       {
         id: "natario_invariant_dossier",
         role: "gate",
-        displayLatex: "\\mathrm{Natario}_{audit}=C_{abcd}C^{abcd}\\land R_{ab}R^{ab}\\land Petrov\\land J_i",
+        displayLatex:
+          "\\mathrm{Natario}_{audit}=C_{abcd}C^{abcd}\\land R_{ab}R^{ab}\\land Petrov\\land J_i",
         computableExpression: null,
         operatorKind: "gate_status",
         inputSymbols: ["Weyl2", "Ricci2", "PetrovClass", "J_i"],
@@ -4809,9 +6678,22 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       },
     ],
     units: [
-      { symbol: "Weyl2", quantity: "weyl_scalar_invariant", dimensionSignature: "L^-4" },
-      { symbol: "Ricci2", quantity: "ricci_scalar_invariant", dimensionSignature: "L^-4" },
-      { symbol: "J_i", unit: "J/m^3", quantity: "momentum_density_projection", dimensionSignature: "M L^-1 T^-2" },
+      {
+        symbol: "Weyl2",
+        quantity: "weyl_scalar_invariant",
+        dimensionSignature: "L^-4",
+      },
+      {
+        symbol: "Ricci2",
+        quantity: "ricci_scalar_invariant",
+        dimensionSignature: "L^-4",
+      },
+      {
+        symbol: "J_i",
+        unit: "J/m^3",
+        quantity: "momentum_density_projection",
+        dimensionSignature: "M L^-1 T^-2",
+      },
     ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
@@ -4820,13 +6702,32 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "literature-context", "Natario-adjacent literature context."),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "literature-context",
+        "Natario-adjacent literature context.",
+      ),
       equationMapRef("momentum_density", "Momentum projection node."),
-      equationMapRef("curvature_invariants", "Curvature invariant target node."),
+      equationMapRef(
+        "curvature_invariants",
+        "Curvature invariant target node.",
+      ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "natario", "curvature_invariants", "petrov", "momentum_density"],
-      symbols: ["Weyl2", "Ricci2", "PetrovClass", "J_i", "natario_invariant_status"],
+      subjects: [
+        "nhm2",
+        "natario",
+        "curvature_invariants",
+        "petrov",
+        "momentum_density",
+      ],
+      symbols: [
+        "Weyl2",
+        "Ricci2",
+        "PetrovClass",
+        "J_i",
+        "natario_invariant_status",
+      ],
       unitSignatures: ["L^-4", "M L^-1 T^-2"],
       repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
       equationFamilies: ["natario_curvature_invariants", "observer_projection"],
@@ -4840,12 +6741,24 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Tracks zero-expansion status separately from curvature invariants, Petrov class, momentum density, tidal, blueshift, and convergence diagnostics.",
     whyItMatters:
       "It prevents theta-flat or zero-expansion rows from being treated as curvature, stability, or safety certificates.",
-    subjects: ["nhm2", "natario", "invariant_audit", "curvature_invariants", "stability"],
+    subjects: [
+      "nhm2",
+      "natario",
+      "invariant_audit",
+      "curvature_invariants",
+      "stability",
+    ],
     level: "diagnostic_gate",
     status: "blocked",
     simulationOwners: ["NHM2", "general_relativity"],
     equationFamilies: ["natario_invariant_audit", "observer_projection"],
-    tags: ["natario", "zero_expansion_boundary", "petrov", "momentum_density", "stability"],
+    tags: [
+      "natario",
+      "zero_expansion_boundary",
+      "petrov",
+      "momentum_density",
+      "stability",
+    ],
     equations: [
       {
         id: "natario_invariant_audit_gate",
@@ -4854,14 +6767,32 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
           "\\mathrm{Natario}_{invariant}=\\theta\\land R\\land K\\land C^2\\land Petrov\\land J_i\\land stability",
         computableExpression: null,
         operatorKind: "gate_status",
-        inputSymbols: ["theta", "R", "Kretschmann", "WeylProxy", "PetrovClass", "J_i", "tidalMax", "blueshiftMax"],
+        inputSymbols: [
+          "theta",
+          "R",
+          "Kretschmann",
+          "WeylProxy",
+          "PetrovClass",
+          "J_i",
+          "tidalMax",
+          "blueshiftMax",
+        ],
         outputSymbols: ["natario_invariant_audit_status"],
       },
     ],
     units: [
       { symbol: "theta", quantity: "expansion", dimensionSignature: "T^-1" },
-      { symbol: "Kretschmann", quantity: "curvature_invariant", dimensionSignature: "L^-4" },
-      { symbol: "J_i", unit: "J/m^3", quantity: "momentum_density_projection", dimensionSignature: "M L^-1 T^-2" },
+      {
+        symbol: "Kretschmann",
+        quantity: "curvature_invariant",
+        dimensionSignature: "L^-4",
+      },
+      {
+        symbol: "J_i",
+        unit: "J/m^3",
+        quantity: "momentum_density_projection",
+        dimensionSignature: "M L^-1 T^-2",
+      },
     ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
@@ -4870,15 +6801,40 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      artifactRef("shared/contracts/nhm2-natario-invariant-audit.v1.ts", "nhm2-natario-invariant-audit-contract", "Typed Natario invariant audit contract."),
-      equationMapRef("curvature_invariants", "Curvature invariant target node."),
+      artifactRef(
+        "shared/contracts/nhm2-natario-invariant-audit.v1.ts",
+        "nhm2-natario-invariant-audit-contract",
+        "Typed Natario invariant audit contract.",
+      ),
+      equationMapRef(
+        "curvature_invariants",
+        "Curvature invariant target node.",
+      ),
       equationMapRef("momentum_density", "Momentum projection node."),
     ],
     hintKeys: {
-      subjects: ["nhm2", "natario", "invariant_audit", "curvature_invariants", "stability"],
-      symbols: ["theta", "R", "Kretschmann", "WeylProxy", "PetrovClass", "J_i", "tidalMax", "blueshiftMax"],
+      subjects: [
+        "nhm2",
+        "natario",
+        "invariant_audit",
+        "curvature_invariants",
+        "stability",
+      ],
+      symbols: [
+        "theta",
+        "R",
+        "Kretschmann",
+        "WeylProxy",
+        "PetrovClass",
+        "J_i",
+        "tidalMax",
+        "blueshiftMax",
+      ],
       unitSignatures: ["T^-1", "L^-4", "M L^-1 T^-2"],
-      repoPaths: ["shared/contracts/nhm2-natario-invariant-audit.v1.ts", NHM2_OBSERVABLE_EQUATION_MAP],
+      repoPaths: [
+        "shared/contracts/nhm2-natario-invariant-audit.v1.ts",
+        NHM2_OBSERVABLE_EQUATION_MAP,
+      ],
       equationFamilies: ["natario_invariant_audit", "observer_projection"],
       simulationOwners: ["NHM2", "general_relativity"],
     },
@@ -4886,7 +6842,8 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
   nhm2FullSolveBadge({
     id: "nhm2.clock.centerline_tau_alpha_T",
     title: "Centerline Clocking Target",
-    plainMeaning: "Computes the selected-profile centerline proper-time target from lapse and coordinate duration.",
+    plainMeaning:
+      "Computes the selected-profile centerline proper-time target from lapse and coordinate duration.",
     whyItMatters:
       "It makes the whitepaper clocking relation calculator-loadable while blocking route, speed, and ETA interpretations.",
     subjects: ["nhm2", "clocking", "centerline", "lapse", "proper_time"],
@@ -4907,9 +6864,24 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       },
     ],
     units: [
-      { symbol: "alpha_centerline", unit: null, quantity: "centerline_lapse", dimensionSignature: "1" },
-      { symbol: "T_coordinate", unit: "s", quantity: "coordinate_duration", dimensionSignature: "T" },
-      { symbol: "tau", unit: "s", quantity: "proper_time_target", dimensionSignature: "T" },
+      {
+        symbol: "alpha_centerline",
+        unit: null,
+        quantity: "centerline_lapse",
+        dimensionSignature: "1",
+      },
+      {
+        symbol: "T_coordinate",
+        unit: "s",
+        quantity: "coordinate_duration",
+        dimensionSignature: "T",
+      },
+      {
+        symbol: "tau",
+        unit: "s",
+        quantity: "proper_time_target",
+        dimensionSignature: "T",
+      },
     ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
@@ -4926,7 +6898,11 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       }),
     ],
     sourceRefs: [
-      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "centerline-lapse-clocking", "Selected centerline clocking relation."),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "centerline-lapse-clocking",
+        "Selected centerline clocking relation.",
+      ),
       equationMapRef("alpha_lapse", "Lapse observable node."),
     ],
     hintKeys: {
@@ -4949,7 +6925,10 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     level: "derived_relation",
     status: "diagnostic",
     simulationOwners: ["NHM2"],
-    equationFamilies: ["trip_clocking_diagnostic", "centerline_clocking_target"],
+    equationFamilies: [
+      "trip_clocking_diagnostic",
+      "centerline_clocking_target",
+    ],
     tags: ["trip_clocking", "twin_paradox", "analogy_only", "claim_boundary"],
     equations: [
       {
@@ -4975,8 +6954,7 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       {
         id: "trip_clocking_round_trip_saved_days",
         role: "calculator_demo",
-        displayLatex:
-          "\\mathrm{roundTripSavedDays}=2\\,\\mathrm{savedDays}",
+        displayLatex: "\\mathrm{roundTripSavedDays}=2\\,\\mathrm{savedDays}",
         computableExpression: "round_trip_saved_days = 2*saved_days",
         operatorKind: "scalar_expression",
         inputSymbols: ["saved_days"],
@@ -4985,20 +6963,38 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       {
         id: "trip_clocking_sr_beta_analogy",
         role: "calculator_demo",
-        displayLatex:
-          "\\beta_{SR,analogy}=\\sqrt{1-\\alpha_{centerline}^{2}}",
-        computableExpression:
-          "beta_sr_analogy = sqrt(1-alpha_centerline^2)",
+        displayLatex: "\\beta_{SR,analogy}=\\sqrt{1-\\alpha_{centerline}^{2}}",
+        computableExpression: "beta_sr_analogy = sqrt(1-alpha_centerline^2)",
         operatorKind: "scalar_expression",
         inputSymbols: ["alpha_centerline"],
         outputSymbols: ["beta_sr_analogy"],
       },
     ],
     units: [
-      { symbol: "alpha_centerline", unit: null, quantity: "centerline_lapse", dimensionSignature: "1" },
-      { symbol: "T_coordinate", unit: "s", quantity: "coordinate_duration", dimensionSignature: "T" },
-      { symbol: "tau", unit: "s", quantity: "ship_proper_time", dimensionSignature: "T" },
-      { symbol: "saved_days", unit: "d", quantity: "ship_younger_by_days", dimensionSignature: "T" },
+      {
+        symbol: "alpha_centerline",
+        unit: null,
+        quantity: "centerline_lapse",
+        dimensionSignature: "1",
+      },
+      {
+        symbol: "T_coordinate",
+        unit: "s",
+        quantity: "coordinate_duration",
+        dimensionSignature: "T",
+      },
+      {
+        symbol: "tau",
+        unit: "s",
+        quantity: "ship_proper_time",
+        dimensionSignature: "T",
+      },
+      {
+        symbol: "saved_days",
+        unit: "d",
+        quantity: "ship_younger_by_days",
+        dimensionSignature: "T",
+      },
       {
         symbol: "beta_sr_analogy",
         unit: null,
@@ -5036,8 +7032,7 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       payload({
         id: "trip_clocking_sr_beta_analogy_payload",
         expression: "beta_sr_analogy = sqrt(1-alpha_centerline^2)",
-        displayLatex:
-          "\\beta_{SR,analogy}=\\sqrt{1-\\alpha_{centerline}^{2}}",
+        displayLatex: "\\beta_{SR,analogy}=\\sqrt{1-\\alpha_{centerline}^{2}}",
         targetVariable: "beta_sr_analogy",
       }),
     ],
@@ -5074,7 +7069,10 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         "shared/contracts/nhm2-trip-clocking-diagnostic.v1.ts",
         NHM2_TRIP_CLOCKING_PROFILE_INDEX,
       ],
-      equationFamilies: ["trip_clocking_diagnostic", "centerline_clocking_target"],
+      equationFamilies: [
+        "trip_clocking_diagnostic",
+        "centerline_clocking_target",
+      ],
       simulationOwners: ["NHM2"],
     },
   }),
@@ -5085,12 +7083,23 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       "Indexes coherent profile-scoped trip clocking diagnostics for the 0p995 anchor and 0p7000 frontier target.",
     whyItMatters:
       "It lets the theory graph display both profiles without treating latest aliases as cross-profile evidence.",
-    subjects: ["nhm2", "clocking", "profile_index", "proper_time", "artifact_governance"],
+    subjects: [
+      "nhm2",
+      "clocking",
+      "profile_index",
+      "proper_time",
+      "artifact_governance",
+    ],
     level: "diagnostic_gate",
     status: "diagnostic",
     simulationOwners: ["NHM2"],
     equationFamilies: ["trip_clocking_profile_index", "artifact_governance"],
-    tags: ["trip_clocking", "profile_scoped", "latest_alias_boundary", "noncomputable_runtime_reference"],
+    tags: [
+      "trip_clocking",
+      "profile_scoped",
+      "latest_alias_boundary",
+      "noncomputable_runtime_reference",
+    ],
     equations: [
       {
         id: "trip_clocking_profile_index_gate",
@@ -5104,9 +7113,24 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       },
     ],
     units: [
-      { symbol: "alpha_centerline", unit: null, quantity: "centerline_lapse", dimensionSignature: "1" },
-      { symbol: "shipProperYears", unit: "yr", quantity: "ship_proper_time", dimensionSignature: "T" },
-      { symbol: "shipYoungerByDays", unit: "d", quantity: "ship_clock_difference", dimensionSignature: "T" },
+      {
+        symbol: "alpha_centerline",
+        unit: null,
+        quantity: "centerline_lapse",
+        dimensionSignature: "1",
+      },
+      {
+        symbol: "shipProperYears",
+        unit: "yr",
+        quantity: "ship_proper_time",
+        dimensionSignature: "T",
+      },
+      {
+        symbol: "shipYoungerByDays",
+        unit: "d",
+        quantity: "ship_clock_difference",
+        dimensionSignature: "T",
+      },
     ],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
@@ -5134,8 +7158,20 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "clocking", "profile_index", "proper_time", "artifact_governance"],
-      symbols: ["profileScopedDiagnostics", "profileId", "alpha_centerline", "shipProperYears", "shipYoungerByDays"],
+      subjects: [
+        "nhm2",
+        "clocking",
+        "profile_index",
+        "proper_time",
+        "artifact_governance",
+      ],
+      symbols: [
+        "profileScopedDiagnostics",
+        "profileId",
+        "alpha_centerline",
+        "shipProperYears",
+        "shipYoungerByDays",
+      ],
       unitSignatures: ["1", "T"],
       repoPaths: [
         NHM2_FULL_SOLVE_WHITEPAPER,
@@ -5149,15 +7185,31 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
   nhm2FullSolveBadge({
     id: "nhm2.artifact.frozen_reference_run_provenance",
     title: "Frozen Reference-Run Provenance",
-    plainMeaning: "Names the run, hash, grid, seed, ledger, and convergence evidence needed to interpret full-solve artifacts.",
+    plainMeaning:
+      "Names the run, hash, grid, seed, ledger, and convergence evidence needed to interpret full-solve artifacts.",
     whyItMatters:
       "It keeps figure and solver outputs attached to reproducible artifact governance instead of answer-like summaries.",
-    subjects: ["nhm2", "artifact_governance", "reference_run", "convergence", "reproducibility"],
+    subjects: [
+      "nhm2",
+      "artifact_governance",
+      "reference_run",
+      "convergence",
+      "reproducibility",
+    ],
     level: "diagnostic_gate",
     status: "review",
     simulationOwners: ["NHM2"],
-    equationFamilies: ["reference_run_provenance", "convergence_reproducibility"],
-    tags: ["reference_run", "provenance", "hash", "convergence", "review_gated"],
+    equationFamilies: [
+      "reference_run_provenance",
+      "convergence_reproducibility",
+    ],
+    tags: [
+      "reference_run",
+      "provenance",
+      "hash",
+      "convergence",
+      "review_gated",
+    ],
     equations: [
       {
         id: "frozen_reference_run_provenance",
@@ -5166,7 +7218,13 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
           "\\mathrm{referenceRun}=\\mathrm{hashes}+\\mathrm{grid}+\\mathrm{seed}+\\mathrm{artifactLedger}+\\mathrm{convergence}",
         computableExpression: null,
         operatorKind: "noncomputable_reference",
-        inputSymbols: ["hashes", "grid", "seed", "artifactLedger", "convergence"],
+        inputSymbols: [
+          "hashes",
+          "grid",
+          "seed",
+          "artifactLedger",
+          "convergence",
+        ],
         outputSymbols: ["referenceRun"],
       },
     ],
@@ -5178,14 +7236,42 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      docRef(NHM2_OBSERVABLE_FIGURE_PLAN, "convergence-reproducibility", "Figure-plan reproducibility surface."),
-      artifactRef(NHM2_FULL_SOLVE_REFERENCE_CAPSULE, "full-solve-reference-capsule", "Reference capsule status."),
-      docRef(NHM2_PROOF_ANCHOR_INDEX, "proof-anchor-index", "Proof anchor and regeneration command index."),
-      equationMapRef("convergence_reproducibility", "Observable equation map node."),
+      docRef(
+        NHM2_OBSERVABLE_FIGURE_PLAN,
+        "convergence-reproducibility",
+        "Figure-plan reproducibility surface.",
+      ),
+      artifactRef(
+        NHM2_FULL_SOLVE_REFERENCE_CAPSULE,
+        "full-solve-reference-capsule",
+        "Reference capsule status.",
+      ),
+      docRef(
+        NHM2_PROOF_ANCHOR_INDEX,
+        "proof-anchor-index",
+        "Proof anchor and regeneration command index.",
+      ),
+      equationMapRef(
+        "convergence_reproducibility",
+        "Observable equation map node.",
+      ),
     ],
     hintKeys: {
-      subjects: ["nhm2", "artifact_governance", "reference_run", "convergence", "reproducibility"],
-      symbols: ["referenceRun", "hashes", "grid", "seed", "artifactLedger", "convergence"],
+      subjects: [
+        "nhm2",
+        "artifact_governance",
+        "reference_run",
+        "convergence",
+        "reproducibility",
+      ],
+      symbols: [
+        "referenceRun",
+        "hashes",
+        "grid",
+        "seed",
+        "artifactLedger",
+        "convergence",
+      ],
       unitSignatures: [],
       repoPaths: [
         NHM2_OBSERVABLE_FIGURE_PLAN,
@@ -5193,15 +7279,20 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_PROOF_ANCHOR_INDEX,
         NHM2_OBSERVABLE_EQUATION_MAP,
       ],
-      equationFamilies: ["reference_run_provenance", "convergence_reproducibility"],
+      equationFamilies: [
+        "reference_run_provenance",
+        "convergence_reproducibility",
+      ],
       simulationOwners: ["NHM2"],
     },
   }),
   nhm2FullSolveBadge({
     id: "nhm2.claim_boundary.shift_not_ship_speed",
     title: "Shift Is Not Ship Speed Boundary",
-    plainMeaning: "Blocks treating the chart-dependent shift field as ordinary vehicle velocity.",
-    whyItMatters: "It protects NHM2 prompts from turning geometry bookkeeping into route or transport claims.",
+    plainMeaning:
+      "Blocks treating the chart-dependent shift field as ordinary vehicle velocity.",
+    whyItMatters:
+      "It protects NHM2 prompts from turning geometry bookkeeping into route or transport claims.",
     subjects: ["nhm2", "claim_boundary", "shift", "speed_boundary", "geometry"],
     level: "claim_boundary",
     status: "blocked",
@@ -5226,11 +7317,21 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "local-transport-descriptor-not-speed", "Shift boundary discussion."),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "local-transport-descriptor-not-speed",
+        "Shift boundary discussion.",
+      ),
       equationMapRef("beta_shift", "Shift observable node."),
     ],
     hintKeys: {
-      subjects: ["nhm2", "claim_boundary", "shift", "speed_boundary", "geometry"],
+      subjects: [
+        "nhm2",
+        "claim_boundary",
+        "shift",
+        "speed_boundary",
+        "geometry",
+      ],
       symbols: ["beta_i", "shift_speed_boundary"],
       unitSignatures: ["L T^-1"],
       repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
@@ -5241,10 +7342,17 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
   nhm2FullSolveBadge({
     id: "nhm2.claim_boundary.diagonal_proxy_not_full_tensor",
     title: "Diagonal Proxy Is Not Full Tensor Boundary",
-    plainMeaning: "Blocks treating diagonal stress-energy bookkeeping as full observer tensor authority.",
+    plainMeaning:
+      "Blocks treating diagonal stress-energy bookkeeping as full observer tensor authority.",
     whyItMatters:
       "It forces momentum-density and spatial-stress channels back into the trace before any observer-family interpretation.",
-    subjects: ["nhm2", "claim_boundary", "diagonal_proxy", "full_tensor", "observer"],
+    subjects: [
+      "nhm2",
+      "claim_boundary",
+      "diagonal_proxy",
+      "full_tensor",
+      "observer",
+    ],
     level: "claim_boundary",
     status: "blocked",
     simulationOwners: ["NHM2"],
@@ -5269,12 +7377,22 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "why-diagonal-only-was-insufficient", "Diagonal-only limitation."),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "why-diagonal-only-was-insufficient",
+        "Diagonal-only limitation.",
+      ),
       equationMapRef("momentum_density", "Momentum projection boundary."),
       equationMapRef("spatial_stress", "Spatial-stress projection boundary."),
     ],
     hintKeys: {
-      subjects: ["nhm2", "claim_boundary", "diagonal_proxy", "full_tensor", "observer"],
+      subjects: [
+        "nhm2",
+        "claim_boundary",
+        "diagonal_proxy",
+        "full_tensor",
+        "observer",
+      ],
       symbols: ["T00_proxy", "E", "J_i", "S_ij", "full_tensor_boundary"],
       unitSignatures: ["M L^-1 T^-2"],
       repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
@@ -5285,10 +7403,17 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
   nhm2FullSolveBadge({
     id: "nhm2.claim_boundary.expected_clocking_not_route_result",
     title: "Clocking Target Is Not Route Result Boundary",
-    plainMeaning: "Blocks treating the centerline lapse clocking target as a route result, ETA, or transport certification.",
+    plainMeaning:
+      "Blocks treating the centerline lapse clocking target as a route result, ETA, or transport certification.",
     whyItMatters:
       "It keeps tau = alpha T in its proper role as a selected-profile timing calculation under frozen schedule assumptions.",
-    subjects: ["nhm2", "claim_boundary", "clocking", "route_boundary", "proper_time"],
+    subjects: [
+      "nhm2",
+      "claim_boundary",
+      "clocking",
+      "route_boundary",
+      "proper_time",
+    ],
     level: "claim_boundary",
     status: "blocked",
     simulationOwners: ["NHM2"],
@@ -5313,11 +7438,21 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "centerline-lapse-clocking", "Clocking target boundary."),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "centerline-lapse-clocking",
+        "Clocking target boundary.",
+      ),
       equationMapRef("alpha_lapse", "Lapse observable node."),
     ],
     hintKeys: {
-      subjects: ["nhm2", "claim_boundary", "clocking", "route_boundary", "proper_time"],
+      subjects: [
+        "nhm2",
+        "claim_boundary",
+        "clocking",
+        "route_boundary",
+        "proper_time",
+      ],
       symbols: ["tau", "alpha", "T", "clocking_route_boundary"],
       unitSignatures: ["1", "T"],
       repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
@@ -5328,10 +7463,17 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
   nhm2FullSolveBadge({
     id: "nhm2.claim_boundary.literature_not_validation",
     title: "Literature Is Context Boundary",
-    plainMeaning: "Blocks external papers from being treated as NHM2 artifact validation.",
+    plainMeaning:
+      "Blocks external papers from being treated as NHM2 artifact validation.",
     whyItMatters:
       "It preserves the whitepaper rule that papers provide formalism, constraints, and caution while repository artifacts define NHM2 row status.",
-    subjects: ["nhm2", "claim_boundary", "literature", "validation_boundary", "provenance"],
+    subjects: [
+      "nhm2",
+      "claim_boundary",
+      "literature",
+      "validation_boundary",
+      "provenance",
+    ],
     level: "claim_boundary",
     status: "blocked",
     simulationOwners: ["NHM2"],
@@ -5356,15 +7498,33 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
-      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "why-literature-context-is-not-validation", "Literature role boundary."),
-      docRef(NHM2_OBSERVABLE_FIGURE_PLAN, "claim-boundary", "Observable figure claim boundary."),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "why-literature-context-is-not-validation",
+        "Literature role boundary.",
+      ),
+      docRef(
+        NHM2_OBSERVABLE_FIGURE_PLAN,
+        "claim-boundary",
+        "Observable figure claim boundary.",
+      ),
       equationMapRef("claim_locks", "Claim-lock node."),
     ],
     hintKeys: {
-      subjects: ["nhm2", "claim_boundary", "literature", "validation_boundary", "provenance"],
+      subjects: [
+        "nhm2",
+        "claim_boundary",
+        "literature",
+        "validation_boundary",
+        "provenance",
+      ],
       symbols: ["literature_context", "literature_boundary"],
       unitSignatures: [],
-      repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_FIGURE_PLAN, NHM2_OBSERVABLE_EQUATION_MAP],
+      repoPaths: [
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        NHM2_OBSERVABLE_FIGURE_PLAN,
+        NHM2_OBSERVABLE_EQUATION_MAP,
+      ],
       equationFamilies: ["nhm2_claim_boundary", "literature_context"],
       simulationOwners: ["NHM2"],
     },
@@ -5377,24 +7537,30 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     from: "physics.gr.3p1_decomposition",
     to: "nhm2.observer.eulerian_normal",
     relation: "specializes",
-    label: "The 3+1 lapse-shift grammar defines the Eulerian normal observer field.",
-    claimBoundaryNote: "Observer bookkeeping is same-chart geometry, not transport validation.",
+    label:
+      "The 3+1 lapse-shift grammar defines the Eulerian normal observer field.",
+    claimBoundaryNote:
+      "Observer bookkeeping is same-chart geometry, not transport validation.",
   },
   {
     id: "adm_requires_same_chart_full_tensor",
     from: "physics.gr.3p1_decomposition",
     to: "nhm2.tensor.same_chart_full_tensor",
     relation: "requires",
-    label: "The 3+1 decomposition supplies the ADM variables required by the same-chart full tensor artifact.",
-    claimBoundaryNote: "ADM bookkeeping is component provenance, not source validation.",
+    label:
+      "The 3+1 decomposition supplies the ADM variables required by the same-chart full tensor artifact.",
+    claimBoundaryNote:
+      "ADM bookkeeping is component provenance, not source validation.",
   },
   {
     id: "efe_specializes_metric_required_tensor",
     from: "physics.gr.einstein_field_equation",
     to: "nhm2.tensor.metric_required_stress_energy",
     relation: "specializes",
-    label: "The Einstein equation supplies the metric-required stress-energy route in geometric units.",
-    claimBoundaryNote: "Metric-required tensor authority is not a source-side mechanism claim.",
+    label:
+      "The Einstein equation supplies the metric-required stress-energy route in geometric units.",
+    claimBoundaryNote:
+      "Metric-required tensor authority is not a source-side mechanism claim.",
   },
   {
     id: "eulerian_normal_requires_energy_projection",
@@ -5402,14 +7568,16 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     to: "nhm2.observer.energy_density_projection",
     relation: "requires",
     label: "Observer energy density requires the declared Eulerian normal.",
-    claimBoundaryNote: "Projection evidence remains observer-family diagnostic context.",
+    claimBoundaryNote:
+      "Projection evidence remains observer-family diagnostic context.",
   },
   {
     id: "metric_tensor_requires_observer_energy",
     from: "nhm2.tensor.metric_required_stress_energy",
     to: "nhm2.observer.energy_density_projection",
     relation: "requires",
-    label: "Metric-required tensor components feed observer energy-density projection.",
+    label:
+      "Metric-required tensor components feed observer energy-density projection.",
     claimBoundaryNote: "Projected E is not energy-condition clearance.",
   },
   {
@@ -5418,7 +7586,8 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     to: "nhm2.observer.momentum_density_projection",
     relation: "requires",
     label: "Full observer authority requires momentum-density channels.",
-    claimBoundaryNote: "Diagonal-only evidence blocks promotion-sensitive language.",
+    claimBoundaryNote:
+      "Diagonal-only evidence blocks promotion-sensitive language.",
   },
   {
     id: "metric_tensor_requires_spatial_stress_projection",
@@ -5426,15 +7595,18 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     to: "nhm2.observer.spatial_stress_projection",
     relation: "requires",
     label: "Full observer authority requires spatial-stress channels.",
-    claimBoundaryNote: "Off-diagonal authority remains review-gated unless evidenced.",
+    claimBoundaryNote:
+      "Off-diagonal authority remains review-gated unless evidenced.",
   },
   {
     id: "observer_energy_feeds_full_tensor_authority",
     from: "nhm2.observer.energy_density_projection",
     to: "nhm2.tensor.full_authority_gate",
     relation: "requires",
-    label: "Full tensor authority includes the observer energy-density channel.",
-    claimBoundaryNote: "Energy-density projection alone is not full tensor authority.",
+    label:
+      "Full tensor authority includes the observer energy-density channel.",
+    claimBoundaryNote:
+      "Energy-density projection alone is not full tensor authority.",
   },
   {
     id: "observer_momentum_feeds_full_tensor_authority",
@@ -5449,47 +7621,58 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     from: "nhm2.observer.spatial_stress_projection",
     to: "nhm2.tensor.full_authority_gate",
     relation: "requires",
-    label: "Full tensor authority requires diagonal and off-diagonal spatial stress.",
-    claimBoundaryNote: "Missing off-diagonal S_ij channels keep observer promotion blocked.",
+    label:
+      "Full tensor authority requires diagonal and off-diagonal spatial stress.",
+    claimBoundaryNote:
+      "Missing off-diagonal S_ij channels keep observer promotion blocked.",
   },
   {
     id: "same_chart_full_tensor_feeds_wall_t00_source_residual",
     from: "nhm2.tensor.same_chart_full_tensor",
     to: "nhm2.closure.wall_t00_source_residual",
     relation: "requires",
-    label: "Wall T00 closure reads the metric-required component status from the same-chart full tensor artifact.",
-    claimBoundaryNote: "Missing tensor components cannot be treated as zero in wall closure.",
+    label:
+      "Wall T00 closure reads the metric-required component status from the same-chart full tensor artifact.",
+    claimBoundaryNote:
+      "Missing tensor components cannot be treated as zero in wall closure.",
   },
   {
     id: "same_chart_full_tensor_feeds_observer_robust_gate",
     from: "nhm2.tensor.same_chart_full_tensor",
     to: "nhm2.energy_condition.observer_robust_gate",
     relation: "requires",
-    label: "Observer-robust energy-condition checks require the same-chart tensor component surface.",
-    claimBoundaryNote: "Eulerian-only or component-incomplete checks cannot become observer-robust passes.",
+    label:
+      "Observer-robust energy-condition checks require the same-chart tensor component surface.",
+    claimBoundaryNote:
+      "Eulerian-only or component-incomplete checks cannot become observer-robust passes.",
   },
   {
     id: "same_chart_full_tensor_context_feeds_source_side_authority",
     from: "nhm2.tensor.same_chart_full_tensor",
     to: "nhm2.source.same_basis_tensor_authority",
     relation: "requires",
-    label: "Source-side tensor authority must align with the same-chart tensor component surface.",
-    claimBoundaryNote: "Same-chart geometry evidence does not itself create source-side authority.",
+    label:
+      "Source-side tensor authority must align with the same-chart tensor component surface.",
+    claimBoundaryNote:
+      "Same-chart geometry evidence does not itself create source-side authority.",
   },
   {
     id: "same_chart_full_tensor_feeds_regional_atlas",
     from: "nhm2.tensor.same_chart_full_tensor",
     to: "nhm2.regional_atlas.available",
     relation: "requires",
-    label: "The regional atlas is meaningful only for the same run, chart, profile, and tensor basis used by full tensor artifacts.",
-    claimBoundaryNote: "Atlas identity is provenance alignment, not source validation.",
+    label:
+      "The regional atlas is meaningful only for the same run, chart, profile, and tensor basis used by full tensor artifacts.",
+    claimBoundaryNote:
+      "Atlas identity is provenance alignment, not source validation.",
   },
   {
     id: "regional_atlas_requires_partition_of_unity",
     from: "nhm2.regional_atlas.available",
     to: "nhm2.regional_atlas.partition_of_unity",
     relation: "requires",
-    label: "Atlas availability includes a declared partition policy for closure-region support weights.",
+    label:
+      "Atlas availability includes a declared partition policy for closure-region support weights.",
     claimBoundaryNote: "Partition consistency does not prove physical closure.",
   },
   {
@@ -5497,88 +7680,110 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     from: "nhm2.regional_atlas.partition_of_unity",
     to: "nhm2.regional_atlas.transition_supports",
     relation: "requires",
-    label: "Transition supports sit between the declared regional support functions.",
-    claimBoundaryNote: "Transition support rows are smoothing provenance, not residual tuning.",
+    label:
+      "Transition supports sit between the declared regional support functions.",
+    claimBoundaryNote:
+      "Transition support rows are smoothing provenance, not residual tuning.",
   },
   {
     id: "regional_atlas_transition_requires_derivative_support",
     from: "nhm2.regional_atlas.transition_supports",
     to: "nhm2.regional_atlas.derivative_support",
     relation: "requires",
-    label: "Transition smoothing introduces support-function derivative terms for conservation diagnostics.",
-    claimBoundaryNote: "Derivative availability is required before conservation can be interpreted strongly.",
+    label:
+      "Transition smoothing introduces support-function derivative terms for conservation diagnostics.",
+    claimBoundaryNote:
+      "Derivative availability is required before conservation can be interpreted strongly.",
   },
   {
     id: "regional_atlas_available_feeds_consumer_congruence",
     from: "nhm2.regional_atlas.available",
     to: "nhm2.regional_atlas.consumer_congruence",
     relation: "requires",
-    label: "All downstream artifacts must reference the same atlas hash before coupled closure is admissible.",
-    claimBoundaryNote: "Hash congruence is a provenance gate, not a physics pass.",
+    label:
+      "All downstream artifacts must reference the same atlas hash before coupled closure is admissible.",
+    claimBoundaryNote:
+      "Hash congruence is a provenance gate, not a physics pass.",
   },
   {
     id: "tile_counterpart_feeds_source_side_authority",
     from: "nhm2.tensor.tile_effective_counterpart",
     to: "nhm2.source.same_basis_tensor_authority",
     relation: "requires",
-    label: "The tile-effective counterpart is an input to source-side same-basis tensor authority.",
-    claimBoundaryNote: "Counterpart evidence must still prove source-side independence and full component authority.",
+    label:
+      "The tile-effective counterpart is an input to source-side same-basis tensor authority.",
+    claimBoundaryNote:
+      "Counterpart evidence must still prove source-side independence and full component authority.",
   },
   {
     id: "tile_counterpart_feeds_component_authority_ledger",
     from: "nhm2.tensor.tile_effective_counterpart",
     to: "nhm2.source.component_authority_ledger",
     relation: "requires",
-    label: "The tile-effective counterpart supplies component rows for the source component authority ledger.",
-    claimBoundaryNote: "Component authority is evidence admission, not material-source proof.",
+    label:
+      "The tile-effective counterpart supplies component rows for the source component authority ledger.",
+    claimBoundaryNote:
+      "Component authority is evidence admission, not material-source proof.",
   },
   {
     id: "component_authority_ledger_feeds_source_side_authority",
     from: "nhm2.source.component_authority_ledger",
     to: "nhm2.source.same_basis_tensor_authority",
     relation: "requires",
-    label: "Component-level source authority can retire stale source-authority blockers only when the ledger is complete and non-proxy.",
-    claimBoundaryNote: "The ledger cannot override residual, conservation, QEI, observer, material, or claim gates.",
+    label:
+      "Component-level source authority can retire stale source-authority blockers only when the ledger is complete and non-proxy.",
+    claimBoundaryNote:
+      "The ledger cannot override residual, conservation, QEI, observer, material, or claim gates.",
   },
   {
     id: "lifshitz_receipt_feeds_source_side_authority",
     from: "casimir.material.lifshitz_receipt",
     to: "nhm2.source.same_basis_tensor_authority",
     relation: "requires",
-    label: "Material receipt evidence is required before Casimir source rows can support source-side tensor authority.",
-    claimBoundaryNote: "Material receipts are diagnostics and do not validate a physical source by themselves.",
+    label:
+      "Material receipt evidence is required before Casimir source rows can support source-side tensor authority.",
+    claimBoundaryNote:
+      "Material receipts are diagnostics and do not validate a physical source by themselves.",
   },
   {
     id: "component_authority_ledger_feeds_wall_t00_source_residual",
     from: "nhm2.source.component_authority_ledger",
     to: "nhm2.closure.wall_t00_source_residual",
     relation: "requires",
-    label: "Wall T00 residual interpretation can use the component ledger to distinguish source evidence from stale authority summaries.",
-    claimBoundaryNote: "Wall T00 under tolerance is still narrower than wall closure.",
+    label:
+      "Wall T00 residual interpretation can use the component ledger to distinguish source evidence from stale authority summaries.",
+    claimBoundaryNote:
+      "Wall T00 under tolerance is still narrower than wall closure.",
   },
   {
     id: "source_side_authority_feeds_wall_t00_source_residual",
     from: "nhm2.source.same_basis_tensor_authority",
     to: "nhm2.closure.wall_t00_source_residual",
     relation: "requires",
-    label: "Wall T00 residual interpretation requires an independent source-side same-basis tensor authority receipt.",
-    claimBoundaryNote: "Wall residuals cannot be promoted when the source side is proxy, diagonal-only, or metric-echo-derived.",
+    label:
+      "Wall T00 residual interpretation requires an independent source-side same-basis tensor authority receipt.",
+    claimBoundaryNote:
+      "Wall residuals cannot be promoted when the source side is proxy, diagonal-only, or metric-echo-derived.",
   },
   {
     id: "tile_counterpart_checks_same_basis_closure",
     from: "nhm2.tensor.tile_effective_counterpart",
     to: "nhm2.closure.same_basis_regional_residual",
     relation: "diagnostic_checks",
-    label: "The source-side counterpart is compared against the metric-required tensor only in the same basis.",
-    claimBoundaryNote: "Unavailable or review-gated counterpart data blocks mechanism language.",
+    label:
+      "The source-side counterpart is compared against the metric-required tensor only in the same basis.",
+    claimBoundaryNote:
+      "Unavailable or review-gated counterpart data blocks mechanism language.",
   },
   {
     id: "wall_t00_trace_checks_same_basis_closure",
     from: "nhm2.source.wall_t00_trace",
     to: "nhm2.closure.same_basis_regional_residual",
     relation: "diagnostic_checks",
-    label: "The wall T00 trace is the priority regional view of same-basis source closure.",
-    claimBoundaryNote: "Wall mismatch remains a blocker, not a formula-retuning success signal.",
+    label:
+      "The wall T00 trace is the priority regional view of same-basis source closure.",
+    claimBoundaryNote:
+      "Wall mismatch remains a blocker, not a formula-retuning success signal.",
   },
   {
     id: "metric_tensor_checks_same_basis_closure",
@@ -5586,94 +7791,116 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     to: "nhm2.closure.same_basis_regional_residual",
     relation: "diagnostic_checks",
     label: "The metric-required tensor is one side of the same-basis residual.",
-    claimBoundaryNote: "Restating the metric-required route is not source-side closure.",
+    claimBoundaryNote:
+      "Restating the metric-required route is not source-side closure.",
   },
   {
     id: "regional_atlas_feeds_same_basis_closure",
     from: "nhm2.regional_atlas.consumer_congruence",
     to: "nhm2.closure.same_basis_regional_residual",
     relation: "requires",
-    label: "Same-basis regional residuals require the shared atlas hash used by source and metric tensor artifacts.",
-    claimBoundaryNote: "Shared regional geometry does not make the residual pass.",
+    label:
+      "Same-basis regional residuals require the shared atlas hash used by source and metric tensor artifacts.",
+    claimBoundaryNote:
+      "Shared regional geometry does not make the residual pass.",
   },
   {
     id: "component_authority_ledger_feeds_same_basis_closure",
     from: "nhm2.source.component_authority_ledger",
     to: "nhm2.closure.same_basis_regional_residual",
     relation: "requires",
-    label: "Same-basis regional residuals need component-authorized source tensors before residuals can be interpreted.",
-    claimBoundaryNote: "Residual math remains diagnostic and does not prove the source mechanism.",
+    label:
+      "Same-basis regional residuals need component-authorized source tensors before residuals can be interpreted.",
+    claimBoundaryNote:
+      "Residual math remains diagnostic and does not prove the source mechanism.",
   },
   {
     id: "regional_atlas_derivative_support_feeds_conservation",
     from: "nhm2.regional_atlas.derivative_support",
     to: "physics.gr.stress_energy_conservation",
     relation: "requires",
-    label: "Region-shaped source tensors need support-derivative terms before conservation diagnostics can be interpreted.",
-    claimBoundaryNote: "Derivative support is a prerequisite, not a conservation pass.",
+    label:
+      "Region-shaped source tensors need support-derivative terms before conservation diagnostics can be interpreted.",
+    claimBoundaryNote:
+      "Derivative support is a prerequisite, not a conservation pass.",
   },
   {
     id: "observer_energy_requires_energy_condition_family",
     from: "nhm2.observer.energy_density_projection",
     to: "nhm2.energy_condition.wec_nec_sec_dec_family",
     relation: "requires",
-    label: "Observer energy-density projection contributes to WEC/NEC/SEC/DEC diagnostics.",
-    claimBoundaryNote: "A scalar projection does not clear the energy-condition family.",
+    label:
+      "Observer energy-density projection contributes to WEC/NEC/SEC/DEC diagnostics.",
+    claimBoundaryNote:
+      "A scalar projection does not clear the energy-condition family.",
   },
   {
     id: "observer_momentum_requires_energy_condition_family",
     from: "nhm2.observer.momentum_density_projection",
     to: "nhm2.energy_condition.wec_nec_sec_dec_family",
     relation: "requires",
-    label: "Observer momentum-density projection contributes to WEC/NEC/SEC/DEC diagnostics.",
-    claimBoundaryNote: "Momentum authority remains part of the observer-family surface.",
+    label:
+      "Observer momentum-density projection contributes to WEC/NEC/SEC/DEC diagnostics.",
+    claimBoundaryNote:
+      "Momentum authority remains part of the observer-family surface.",
   },
   {
     id: "observer_spatial_stress_requires_energy_condition_family",
     from: "nhm2.observer.spatial_stress_projection",
     to: "nhm2.energy_condition.wec_nec_sec_dec_family",
     relation: "requires",
-    label: "Observer spatial-stress projection contributes to WEC/NEC/SEC/DEC diagnostics.",
-    claimBoundaryNote: "Spatial-stress authority remains part of the observer-family surface.",
+    label:
+      "Observer spatial-stress projection contributes to WEC/NEC/SEC/DEC diagnostics.",
+    claimBoundaryNote:
+      "Spatial-stress authority remains part of the observer-family surface.",
   },
   {
     id: "energy_condition_family_bounds_qei_worldline",
     from: "nhm2.energy_condition.wec_nec_sec_dec_family",
     to: "nhm2.qei.worldline_sampling_requirement",
     relation: "bounds",
-    label: "Observer-family energy-condition diagnostics are constrained by QEI-style worldline sampling requirements.",
-    claimBoundaryNote: "Observer diagnostics and QEI sampling remain separate review surfaces.",
+    label:
+      "Observer-family energy-condition diagnostics are constrained by QEI-style worldline sampling requirements.",
+    claimBoundaryNote:
+      "Observer diagnostics and QEI sampling remain separate review surfaces.",
   },
   {
     id: "wall_t00_source_residual_feeds_qei_worldline_dossier",
     from: "nhm2.closure.wall_t00_source_residual",
     to: "nhm2.qei.worldline_dossier",
     relation: "requires",
-    label: "The QEI dossier must include wall-region source-closure context before scalar margin language is trusted.",
-    claimBoundaryNote: "Wall closure failure remains a front-door blocker for QEI dossier completeness.",
+    label:
+      "The QEI dossier must include wall-region source-closure context before scalar margin language is trusted.",
+    claimBoundaryNote:
+      "Wall closure failure remains a front-door blocker for QEI dossier completeness.",
   },
   {
     id: "regional_atlas_consumer_congruence_feeds_qei_dossier",
     from: "nhm2.regional_atlas.consumer_congruence",
     to: "nhm2.qei.worldline_dossier",
     relation: "requires",
-    label: "QEI worldlines must be planned against the same regional atlas used by source residuals.",
-    claimBoundaryNote: "A same-atlas dossier is still not a QEI pass unless sampling, bounds, and margins pass.",
+    label:
+      "QEI worldlines must be planned against the same regional atlas used by source residuals.",
+    claimBoundaryNote:
+      "A same-atlas dossier is still not a QEI pass unless sampling, bounds, and margins pass.",
   },
   {
     id: "regional_atlas_consumer_congruence_feeds_observer_gate",
     from: "nhm2.regional_atlas.consumer_congruence",
     to: "nhm2.energy_condition.observer_robust_gate",
     relation: "requires",
-    label: "Observer sampling must reference the same regional atlas as the coupled closure candidate.",
-    claimBoundaryNote: "Atlas congruence cannot substitute for observer-family energy-condition checks.",
+    label:
+      "Observer sampling must reference the same regional atlas as the coupled closure candidate.",
+    claimBoundaryNote:
+      "Atlas congruence cannot substitute for observer-family energy-condition checks.",
   },
   {
     id: "qei_worldline_requires_dossier",
     from: "nhm2.qei.worldline_sampling_requirement",
     to: "nhm2.qei.worldline_dossier",
     relation: "requires",
-    label: "The worldline sampling requirement must be collected into a reproducible QEI dossier.",
+    label:
+      "The worldline sampling requirement must be collected into a reproducible QEI dossier.",
     claimBoundaryNote: "A scalar QEI row cannot replace dossier provenance.",
   },
   {
@@ -5681,207 +7908,258 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     from: "nhm2.source.component_authority_ledger",
     to: "nhm2.closure.coupled_pass_candidate",
     relation: "requires",
-    label: "The coupled closure candidate reads source component authority as one evidence-admission gate.",
-    claimBoundaryNote: "A complete component ledger cannot make the coupled candidate pass by itself.",
+    label:
+      "The coupled closure candidate reads source component authority as one evidence-admission gate.",
+    claimBoundaryNote:
+      "A complete component ledger cannot make the coupled candidate pass by itself.",
   },
   {
     id: "source_side_authority_feeds_coupled_candidate",
     from: "nhm2.source.same_basis_tensor_authority",
     to: "nhm2.closure.coupled_pass_candidate",
     relation: "requires",
-    label: "The coupled closure candidate requires source-side same-basis tensor authority.",
-    claimBoundaryNote: "Source authority is necessary but not sufficient for diagnostic closure.",
+    label:
+      "The coupled closure candidate requires source-side same-basis tensor authority.",
+    claimBoundaryNote:
+      "Source authority is necessary but not sufficient for diagnostic closure.",
   },
   {
     id: "same_basis_residual_feeds_coupled_candidate",
     from: "nhm2.closure.same_basis_regional_residual",
     to: "nhm2.closure.coupled_pass_candidate",
     relation: "requires",
-    label: "Regional residuals feed the synchronized coupled closure candidate.",
-    claimBoundaryNote: "Residuals remain review-gated until basis and readiness metadata are synchronized.",
+    label:
+      "Regional residuals feed the synchronized coupled closure candidate.",
+    claimBoundaryNote:
+      "Residuals remain review-gated until basis and readiness metadata are synchronized.",
   },
   {
     id: "conservation_feeds_coupled_candidate",
     from: "physics.gr.stress_energy_conservation",
     to: "nhm2.closure.coupled_pass_candidate",
     relation: "requires",
-    label: "The coupled closure candidate requires conservation diagnostics for the source tensor path.",
-    claimBoundaryNote: "Reduced transition-kernel checks do not substitute for stricter covariant derivative support.",
+    label:
+      "The coupled closure candidate requires conservation diagnostics for the source tensor path.",
+    claimBoundaryNote:
+      "Reduced transition-kernel checks do not substitute for stricter covariant derivative support.",
   },
   {
     id: "qei_dossier_feeds_coupled_candidate",
     from: "nhm2.qei.worldline_dossier",
     to: "nhm2.closure.coupled_pass_candidate",
     relation: "requires",
-    label: "The coupled closure candidate requires a same-run QEI worldline dossier.",
-    claimBoundaryNote: "A smoke-chain QEI pass must remain tied to the same frozen tensor/profile/run.",
+    label:
+      "The coupled closure candidate requires a same-run QEI worldline dossier.",
+    claimBoundaryNote:
+      "A smoke-chain QEI pass must remain tied to the same frozen tensor/profile/run.",
   },
   {
     id: "observer_robust_gate_feeds_coupled_candidate",
     from: "nhm2.energy_condition.observer_robust_gate",
     to: "nhm2.closure.coupled_pass_candidate",
     relation: "requires",
-    label: "The coupled closure candidate requires observer-robust energy-condition status.",
-    claimBoundaryNote: "Observer robustness is currently fail/incomplete in the pinned smoke chain.",
+    label:
+      "The coupled closure candidate requires observer-robust energy-condition status.",
+    claimBoundaryNote:
+      "Observer robustness is currently fail/incomplete in the pinned smoke chain.",
   },
   {
     id: "material_receipt_feeds_coupled_candidate",
     from: "casimir.material.lifshitz_receipt",
     to: "nhm2.closure.coupled_pass_candidate",
     relation: "requires",
-    label: "The coupled closure candidate requires material receipt evidence before source rows can be interpreted.",
-    claimBoundaryNote: "Declared material receipts do not establish physical material credibility.",
+    label:
+      "The coupled closure candidate requires material receipt evidence before source rows can be interpreted.",
+    claimBoundaryNote:
+      "Declared material receipts do not establish physical material credibility.",
   },
   {
     id: "coupled_candidate_feeds_regional_pass_path_harness",
     from: "nhm2.closure.coupled_pass_candidate",
     to: "nhm2.closure.regional_tensor_pass_path_harness",
     relation: "requires",
-    label: "The regional pass-path harness consumes the coupled closure candidate as one readiness gate.",
-    claimBoundaryNote: "The current coupled candidate is false, so the pass-path harness remains blocked.",
+    label:
+      "The regional pass-path harness consumes the coupled closure candidate as one readiness gate.",
+    claimBoundaryNote:
+      "The current coupled candidate is false, so the pass-path harness remains blocked.",
   },
   {
     id: "regional_pass_path_harness_blocks_diagnostic_boundary",
     from: "nhm2.closure.regional_tensor_pass_path_harness",
     to: "nhm2.claim_boundary.diagnostic_only",
     relation: "blocks",
-    label: "The regional pass-path harness keeps NHM2 in diagnostic/reduced-order wording until all gates pass together.",
-    claimBoundaryNote: "Numerical pass-path readiness cannot grant physical or transport claims.",
+    label:
+      "The regional pass-path harness keeps NHM2 in diagnostic/reduced-order wording until all gates pass together.",
+    claimBoundaryNote:
+      "Numerical pass-path readiness cannot grant physical or transport claims.",
   },
   {
     id: "regional_pass_path_harness_feeds_time_dependent_campaign",
     from: "nhm2.closure.regional_tensor_pass_path_harness",
     to: "nhm2.dynamic.time_dependent_source_campaign",
     relation: "requires",
-    label: "The frozen time-dependent campaign is stricter than the static regional pass-path harness and consumes it as one diagnostic prerequisite.",
-    claimBoundaryNote: "Static readiness cannot substitute for dynamic frequency, switching, backreaction, and stability receipts.",
+    label:
+      "The frozen time-dependent campaign is stricter than the static regional pass-path harness and consumes it as one diagnostic prerequisite.",
+    claimBoundaryNote:
+      "Static readiness cannot substitute for dynamic frequency, switching, backreaction, and stability receipts.",
   },
   {
     id: "regional_pass_path_harness_feeds_switching_conservation",
     from: "nhm2.closure.regional_tensor_pass_path_harness",
     to: "nhm2.dynamic.switching_covariant_conservation",
     relation: "documents",
-    label: "The static regional harness supplies upstream context, but switching conservation must carry its own dynamic terms.",
-    claimBoundaryNote: "Static conservation context cannot substitute for sector-switching conservation evidence.",
+    label:
+      "The static regional harness supplies upstream context, but switching conservation must carry its own dynamic terms.",
+    claimBoundaryNote:
+      "Static conservation context cannot substitute for sector-switching conservation evidence.",
   },
   {
     id: "switching_conservation_feeds_time_dependent_campaign",
     from: "nhm2.dynamic.switching_covariant_conservation",
     to: "nhm2.dynamic.time_dependent_source_campaign",
     relation: "requires",
-    label: "The time-dependent campaign requires switching conservation evidence across support, sector, time-derivative, and transition-kernel terms.",
-    claimBoundaryNote: "A switching pass is still diagnostic and does not clear dynamic geometry, observer, tensor, or stability gates.",
+    label:
+      "The time-dependent campaign requires switching conservation evidence across support, sector, time-derivative, and transition-kernel terms.",
+    claimBoundaryNote:
+      "A switching pass is still diagnostic and does not clear dynamic geometry, observer, tensor, or stability gates.",
   },
   {
     id: "frequency_convergence_feeds_time_dependent_campaign",
     from: "nhm2.dynamic.frequency_convergence",
     to: "nhm2.dynamic.time_dependent_source_campaign",
     relation: "requires",
-    label: "The time-dependent campaign requires fixed-cycle-average convergence over the frequency ladder.",
-    claimBoundaryNote: "A frequency pass is still diagnostic and cannot imply physical viability.",
+    label:
+      "The time-dependent campaign requires fixed-cycle-average convergence over the frequency ladder.",
+    claimBoundaryNote:
+      "A frequency pass is still diagnostic and cannot imply physical viability.",
   },
   {
     id: "dynamic_effective_geometry_feeds_time_dependent_campaign",
     from: "nhm2.dynamic.effective_geometry_agreement",
     to: "nhm2.dynamic.time_dependent_source_campaign",
     relation: "requires",
-    label: "The time-dependent campaign requires dynamic/effective geometry agreement and bounded backreaction evidence.",
-    claimBoundaryNote: "A dynamic/effective geometry receipt is diagnostic and cannot grant route, propulsion, or physical viability claims.",
+    label:
+      "The time-dependent campaign requires dynamic/effective geometry agreement and bounded backreaction evidence.",
+    claimBoundaryNote:
+      "A dynamic/effective geometry receipt is diagnostic and cannot grant route, propulsion, or physical viability claims.",
   },
   {
     id: "source_off_diagonal_shear_audit_feeds_time_dependent_campaign",
     from: "nhm2.source.off_diagonal_shear_audit",
     to: "nhm2.dynamic.time_dependent_source_campaign",
     relation: "documents",
-    label: "The source-side shear audit sharpens off-diagonal Tij failures inside the frozen time-dependent campaign.",
-    claimBoundaryNote: "Missing shear-mechanism evidence is a diagnostic falsifier candidate, not a physical-source validation result.",
+    label:
+      "The source-side shear audit sharpens off-diagonal Tij failures inside the frozen time-dependent campaign.",
+    claimBoundaryNote:
+      "Missing shear-mechanism evidence is a diagnostic falsifier candidate, not a physical-source validation result.",
   },
   {
     id: "source_momentum_density_audit_feeds_frame_projection_receipt",
     from: "nhm2.source.momentum_density_audit",
     to: "nhm2.source.momentum_frame_projection_receipt",
     relation: "requires",
-    label: "The momentum audit supplies same-chart T0i/T00 ratios that require a local-frame projection receipt before causal-bound interpretation.",
-    claimBoundaryNote: "A momentum audit alone cannot turn chart components into causal-material bound evidence.",
+    label:
+      "The momentum audit supplies same-chart T0i/T00 ratios that require a local-frame projection receipt before causal-bound interpretation.",
+    claimBoundaryNote:
+      "A momentum audit alone cannot turn chart components into causal-material bound evidence.",
   },
   {
     id: "momentum_frame_projection_receipt_feeds_metric_required_momentum_demand_audit",
     from: "nhm2.source.momentum_frame_projection_receipt",
     to: "nhm2.metric_required.momentum_demand_audit",
     relation: "requires",
-    label: "The projection receipt supplies local-frame momentum ratios for the metric-required momentum demand audit.",
-    claimBoundaryNote: "Projection evidence remains diagnostic and does not validate a physical source or transport claim.",
+    label:
+      "The projection receipt supplies local-frame momentum ratios for the metric-required momentum demand audit.",
+    claimBoundaryNote:
+      "Projection evidence remains diagnostic and does not validate a physical source or transport claim.",
   },
   {
     id: "metric_required_momentum_demand_audit_feeds_remediation_targets",
     from: "nhm2.metric_required.momentum_demand_audit",
     to: "nhm2.metric_required.momentum_remediation_targets",
     relation: "requires",
-    label: "The metric-required momentum demand audit supplies the projected T0i ratios used to compute current-profile remediation targets.",
-    claimBoundaryNote: "A remediation target is scoped to this profile and does not validate a redesigned metric.",
+    label:
+      "The metric-required momentum demand audit supplies the projected T0i ratios used to compute current-profile remediation targets.",
+    claimBoundaryNote:
+      "A remediation target is scoped to this profile and does not validate a redesigned metric.",
   },
   {
     id: "metric_momentum_remediation_targets_feed_campaign_frontier_disposition",
     from: "nhm2.metric_required.momentum_remediation_targets",
     to: "nhm2.campaign.frontier_disposition",
     relation: "documents",
-    label: "The metric momentum remediation targets sharpen the campaign blocker into a typed current-profile frontier disposition.",
-    claimBoundaryNote: "A current-profile falsifier is scoped to the declared projection evidence and is not a universal no-go theorem.",
+    label:
+      "The metric momentum remediation targets sharpen the campaign blocker into a typed current-profile frontier disposition.",
+    claimBoundaryNote:
+      "A current-profile falsifier is scoped to the declared projection evidence and is not a universal no-go theorem.",
   },
   {
     id: "campaign_frontier_disposition_feeds_time_dependent_campaign",
     from: "nhm2.campaign.frontier_disposition",
     to: "nhm2.dynamic.time_dependent_source_campaign",
     relation: "documents",
-    label: "The campaign frontier disposition records whether the current profile is rejected before the campaign continues to downstream proof gates.",
-    claimBoundaryNote: "A disposition artifact does not validate a redesigned metric profile or physical transport claim.",
+    label:
+      "The campaign frontier disposition records whether the current profile is rejected before the campaign continues to downstream proof gates.",
+    claimBoundaryNote:
+      "A disposition artifact does not validate a redesigned metric profile or physical transport claim.",
   },
   {
     id: "campaign_frontier_disposition_feeds_profile_search",
     from: "nhm2.campaign.frontier_disposition",
     to: "nhm2.profile.campaign_search",
     relation: "documents",
-    label: "The campaign frontier disposition supplies the current-profile rejection and suppression target used to screen redesigned profiles.",
-    claimBoundaryNote: "A profile-search screen pass is not a campaign pass or physical transport claim.",
+    label:
+      "The campaign frontier disposition supplies the current-profile rejection and suppression target used to screen redesigned profiles.",
+    claimBoundaryNote:
+      "A profile-search screen pass is not a campaign pass or physical transport claim.",
   },
   {
     id: "campaign_profile_search_feeds_time_dependent_campaign",
     from: "nhm2.profile.campaign_search",
     to: "nhm2.dynamic.time_dependent_source_campaign",
     relation: "documents",
-    label: "The profile search identifies candidate profiles that still require a full frozen time-dependent campaign run.",
-    claimBoundaryNote: "Candidate ranking is diagnostic steering only and cannot validate a profile.",
+    label:
+      "The profile search identifies candidate profiles that still require a full frozen time-dependent campaign run.",
+    claimBoundaryNote:
+      "Candidate ranking is diagnostic steering only and cannot validate a profile.",
   },
   {
     id: "campaign_profile_search_feeds_candidate_metric_profile_spec",
     from: "nhm2.profile.campaign_search",
     to: "nhm2.profile.candidate_metric_profile_spec",
     relation: "requires",
-    label: "A screened candidate must be written as an executable profile spec before the full ADM tensor route can evaluate it.",
-    claimBoundaryNote: "A candidate profile spec is an ADM-entry precondition, not a profile validation or route claim.",
+    label:
+      "A screened candidate must be written as an executable profile spec before the full ADM tensor route can evaluate it.",
+    claimBoundaryNote:
+      "A candidate profile spec is an ADM-entry precondition, not a profile validation or route claim.",
   },
   {
     id: "candidate_metric_profile_spec_feeds_profile_run_manifest",
     from: "nhm2.profile.candidate_metric_profile_spec",
     to: "nhm2.profile.campaign_run_manifest",
     relation: "requires",
-    label: "The run manifest consumes the candidate profile spec as the first frozen-campaign evidence row.",
-    claimBoundaryNote: "Missing executable geometry blocks campaign execution without implying a no-go theorem.",
+    label:
+      "The run manifest consumes the candidate profile spec as the first frozen-campaign evidence row.",
+    claimBoundaryNote:
+      "Missing executable geometry blocks campaign execution without implying a no-go theorem.",
   },
   {
     id: "candidate_metric_profile_spec_feeds_metric_tensor_screen",
     from: "nhm2.profile.candidate_metric_profile_spec",
     to: "nhm2.tensor.same_chart_full_tensor",
     relation: "requires",
-    label: "Candidate same-chart full tensor evidence requires executable candidate geometry from the metric profile spec.",
-    claimBoundaryNote: "Projected tensors remain blocked until a real ADM/Einstein route is run for the candidate profile.",
+    label:
+      "Candidate same-chart full tensor evidence requires executable candidate geometry from the metric profile spec.",
+    claimBoundaryNote:
+      "Projected tensors remain blocked until a real ADM/Einstein route is run for the candidate profile.",
   },
   {
     id: "campaign_profile_search_feeds_profile_run_manifest",
     from: "nhm2.profile.campaign_search",
     to: "nhm2.profile.campaign_run_manifest",
     relation: "requires",
-    label: "The profile-search output supplies the screened candidates that the run manifest turns into frozen campaign evidence requirements.",
+    label:
+      "The profile-search output supplies the screened candidates that the run manifest turns into frozen campaign evidence requirements.",
     claimBoundaryNote: "Queued profile runs are not campaign passes.",
   },
   {
@@ -5889,119 +8167,188 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     from: "nhm2.profile.campaign_run_manifest",
     to: "nhm2.dynamic.time_dependent_source_campaign",
     relation: "requires",
-    label: "The time-dependent campaign can only rank a candidate after the manifest evidence rows are produced for that profile.",
-    claimBoundaryNote: "A completed manifest would still be diagnostic evidence governance, not physical viability.",
+    label:
+      "The time-dependent campaign can only rank a candidate after the manifest evidence rows are produced for that profile.",
+    claimBoundaryNote:
+      "A completed manifest would still be diagnostic evidence governance, not physical viability.",
   },
   {
     id: "time_dependent_campaign_blocks_diagnostic_boundary",
     from: "nhm2.dynamic.time_dependent_source_campaign",
     to: "nhm2.claim_boundary.diagnostic_only",
     relation: "blocks",
-    label: "The time-dependent source campaign keeps NHM2 behind diagnostic-only language until dynamic gates pass together.",
-    claimBoundaryNote: "A campaign artifact cannot grant transport, route ETA, propulsion, or physical viability claims.",
+    label:
+      "The time-dependent source campaign keeps NHM2 behind diagnostic-only language until dynamic gates pass together.",
+    claimBoundaryNote:
+      "A campaign artifact cannot grant transport, route ETA, propulsion, or physical viability claims.",
   },
   {
     id: "time_dependent_campaign_feeds_lean_certificate",
     from: "nhm2.dynamic.time_dependent_source_campaign",
     to: "nhm2.formal.lean_certificate",
     relation: "requires",
-    label: "The Lean certificate exporter consumes the pinned time-dependent campaign artifacts as certificate inputs.",
-    claimBoundaryNote: "The Lean certificate is a formal diagnostic bridge and does not rerun the numerical solver.",
+    label:
+      "The Lean certificate exporter consumes the pinned time-dependent campaign artifacts as certificate inputs.",
+    claimBoundaryNote:
+      "The Lean certificate is a formal diagnostic bridge and does not rerun the numerical solver.",
   },
   {
     id: "lean_certificate_requires_hash_pins",
     from: "nhm2.formal.certificate_hashes_pinned",
     to: "nhm2.formal.lean_certificate",
     relation: "requires",
-    label: "The Lean certificate is scoped by profile, atlas, and artifact hash provenance.",
-    claimBoundaryNote: "Hash pinning prevents stale evidence from being promoted into certificate language.",
+    label:
+      "The Lean certificate is scoped by profile, atlas, and artifact hash provenance.",
+    claimBoundaryNote:
+      "Hash pinning prevents stale evidence from being promoted into certificate language.",
   },
   {
     id: "lean_certificate_feeds_diagnostic_admissibility",
     from: "nhm2.formal.lean_certificate",
     to: "nhm2.formal.diagnostic_campaign_admissible",
     relation: "requires",
-    label: "Lean checks the emitted certificate facts before the diagnostic campaign admissibility theorem is available.",
-    claimBoundaryNote: "Diagnostic admissibility is policy-scoped and cannot grant physical, transport, route, propulsion, or speed claims.",
+    label:
+      "Lean checks the emitted certificate facts before the diagnostic campaign admissibility theorem is available.",
+    claimBoundaryNote:
+      "Diagnostic admissibility is policy-scoped and cannot grant physical, transport, route, propulsion, or speed claims.",
   },
   {
     id: "negative_fixtures_document_lean_certificate",
     from: "nhm2.formal.negative_fixtures_fail_closed",
     to: "nhm2.formal.lean_certificate",
     relation: "documents",
-    label: "Negative fixtures document that missing, stale, scalar-only, narrow-frame, or open-lock evidence fails closed.",
-    claimBoundaryNote: "Fail-closed tests are proof-policy coverage, not physical-source evidence.",
+    label:
+      "Negative fixtures document that missing, stale, scalar-only, narrow-frame, or open-lock evidence fails closed.",
+    claimBoundaryNote:
+      "Fail-closed tests are proof-policy coverage, not physical-source evidence.",
   },
   {
     id: "diagnostic_admissibility_requires_claim_locks",
     from: "nhm2.formal.claim_locks_closed",
     to: "nhm2.formal.diagnostic_campaign_admissible",
     relation: "requires",
-    label: "The Lean diagnostic-admissibility theorem requires closed claim locks.",
-    claimBoundaryNote: "Open physical, route, propulsion, transport, or speed locks block the certificate.",
+    label:
+      "The Lean diagnostic-admissibility theorem requires closed claim locks.",
+    claimBoundaryNote:
+      "Open physical, route, propulsion, transport, or speed locks block the certificate.",
   },
   {
     id: "lean_claim_locks_block_diagnostic_boundary",
     from: "nhm2.formal.claim_locks_closed",
     to: "nhm2.claim_boundary.diagnostic_only",
     relation: "blocks",
-    label: "Lean claim locks keep formal campaign admissibility behind the diagnostic-only boundary.",
-    claimBoundaryNote: "Formal certificate admissibility cannot widen NHM2 claims.",
+    label:
+      "Lean claim locks keep formal campaign admissibility behind the diagnostic-only boundary.",
+    claimBoundaryNote:
+      "Formal certificate admissibility cannot widen NHM2 claims.",
   },
   {
     id: "lean_diagnostic_admissibility_documents_boundary",
     from: "nhm2.formal.diagnostic_campaign_admissible",
     to: "nhm2.claim_boundary.diagnostic_only",
     relation: "documents",
-    label: "Lean diagnostic admissibility documents the policy-scoped campaign result.",
-    claimBoundaryNote: "The result remains diagnostic/reduced-order evidence only.",
+    label:
+      "Lean diagnostic admissibility documents the policy-scoped campaign result.",
+    claimBoundaryNote:
+      "The result remains diagnostic/reduced-order evidence only.",
+  },
+  {
+    id: "coupled_closure_documents_experiment_ready_theory_closure",
+    from: "nhm2.closure.coupled_pass_candidate",
+    to: "nhm2.meta.experiment_ready_theory_closure",
+    relation: "documents",
+    label:
+      "Regional coupled closure remains a distinct lower-level input to the experiment-ready theory-closure meta verdict.",
+    claimBoundaryNote:
+      "Neither lamp replaces the other, and neither grants physical or transport authority.",
+  },
+  {
+    id: "experiment_ready_theory_closure_feeds_physical_campaign",
+    from: "nhm2.meta.experiment_ready_theory_closure",
+    to: "nhm2.experimental.physical_viability_campaign",
+    relation: "documents",
+    label:
+      "A theory-closed candidate would define the frozen pre-experiment package consumed by the physical evidence campaign.",
+    claimBoundaryNote:
+      "Theory closure cannot substitute for empirical physical-evidence receipts.",
+  },
+  {
+    id: "experiment_ready_theory_closure_blocks_physical_lock",
+    from: "nhm2.meta.experiment_ready_theory_closure",
+    to: "nhm2.claim_boundary.physical_viability_locked",
+    relation: "blocks",
+    label:
+      "The theory-closure contract keeps physical viability locked even when its theory-only verdict passes.",
+    claimBoundaryNote:
+      "Physical viability requires empirical receipts independently of theory closure.",
+  },
+  {
+    id: "experiment_ready_theory_closure_blocks_transport_lock",
+    from: "nhm2.meta.experiment_ready_theory_closure",
+    to: "nhm2.claim_boundary.transport_locked",
+    relation: "blocks",
+    label:
+      "The theory-closure contract keeps transport, route, propulsion, and speed authority locked.",
+    claimBoundaryNote:
+      "Experiment readiness is not transport evidence or a transport claim.",
   },
   {
     id: "diagnostic_campaign_feeds_physical_evidence_campaign",
     from: "nhm2.dynamic.time_dependent_source_campaign",
     to: "nhm2.experimental.physical_viability_campaign",
     relation: "documents",
-    label: "The diagnostic campaign provides the computational input to the physical evidence ladder.",
-    claimBoundaryNote: "Diagnostic campaign admission cannot substitute for experimental receipts.",
+    label:
+      "The diagnostic campaign provides the computational input to the physical evidence ladder.",
+    claimBoundaryNote:
+      "Diagnostic campaign admission cannot substitute for experimental receipts.",
   },
   {
     id: "lean_certificate_documents_physical_claim_lock",
     from: "nhm2.formal.claim_locks_closed",
     to: "nhm2.experimental.physical_viability_campaign",
     relation: "documents",
-    label: "Lean claim locks document that the physical evidence ladder starts with physical and transport claims closed.",
-    claimBoundaryNote: "Formal diagnostic admissibility does not unlock physical evidence stages.",
+    label:
+      "Lean claim locks document that the physical evidence ladder starts with physical and transport claims closed.",
+    claimBoundaryNote:
+      "Formal diagnostic admissibility does not unlock physical evidence stages.",
   },
   {
     id: "physical_campaign_documents_theory_solve_roadmap",
     from: "nhm2.experimental.physical_viability_campaign",
     to: "nhm2.experimental.theory_solve_roadmap",
     relation: "documents",
-    label: "The physical evidence campaign points to the experiment-facing theory roadmap for pre-hardware observables, receipts, and falsifiers.",
-    claimBoundaryNote: "A roadmap is planning evidence only and cannot substitute for experimental receipts.",
+    label:
+      "The physical evidence campaign points to the experiment-facing theory roadmap for pre-hardware observables, receipts, and falsifiers.",
+    claimBoundaryNote:
+      "A roadmap is planning evidence only and cannot substitute for experimental receipts.",
   },
   {
     id: "theory_solve_roadmap_documents_parameter_targets",
     from: "nhm2.experimental.theory_solve_roadmap",
     to: "nhm2.experimental.parameter_targets",
     relation: "documents",
-    label: "The experiment-facing roadmap is refined into stage-level parameter targets, literature comparators, receipts, and blockers.",
-    claimBoundaryNote: "Parameter targets are planning rows and cannot substitute for experimental receipts.",
+    label:
+      "The experiment-facing roadmap is refined into stage-level parameter targets, literature comparators, receipts, and blockers.",
+    claimBoundaryNote:
+      "Parameter targets are planning rows and cannot substitute for experimental receipts.",
   },
   {
     id: "parameter_targets_feed_research_gap_ledger",
     from: "nhm2.experimental.parameter_targets",
     to: "nhm2.experimental.research_gap_ledger",
     relation: "documents",
-    label: "Parameter targets are refined into research gaps, precedent receipts, falsifiers, null-result meanings, and claim-impact rows.",
-    claimBoundaryNote: "Research-gap rows guide value-of-information planning and cannot substitute for measurements.",
+    label:
+      "Parameter targets are refined into research gaps, precedent receipts, falsifiers, null-result meanings, and claim-impact rows.",
+    claimBoundaryNote:
+      "Research-gap rows guide value-of-information planning and cannot substitute for measurements.",
   },
   {
     id: "research_gap_ledger_prioritizes_full_apparatus_tensor",
     from: "nhm2.experimental.research_gap_ledger",
     to: "nhm2.experimental.full_apparatus_tensor",
     relation: "documents",
-    label: "The research-gap ledger marks full apparatus T_mu_nu authority as a P0 source-side gap.",
+    label:
+      "The research-gap ledger marks full apparatus T_mu_nu authority as a P0 source-side gap.",
     claimBoundaryNote: "A priority gap is not a material tensor receipt.",
   },
   {
@@ -6009,71 +8356,88 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     from: "nhm2.experimental.research_gap_ledger",
     to: "nhm2.experimental.array_scaling",
     relation: "documents",
-    label: "The research-gap ledger marks 447-layer stack scaling as a P0 parameter-regime gap.",
-    claimBoundaryNote: "Layer-count planning cannot replace stack scaling evidence.",
+    label:
+      "The research-gap ledger marks 447-layer stack scaling as a P0 parameter-regime gap.",
+    claimBoundaryNote:
+      "Layer-count planning cannot replace stack scaling evidence.",
   },
   {
     id: "research_gap_ledger_prioritizes_layer_stack_mechanics",
     from: "nhm2.experimental.research_gap_ledger",
     to: "nhm2.experimental.layer_stack_mechanical_receipt",
     relation: "documents",
-    label: "The research-gap ledger identifies mechanical survivability of the 447-layer stack as a value-of-information target.",
-    claimBoundaryNote: "A mechanical receipt target is not a material source tensor or physical pass.",
+    label:
+      "The research-gap ledger identifies mechanical survivability of the 447-layer stack as a value-of-information target.",
+    claimBoundaryNote:
+      "A mechanical receipt target is not a material source tensor or physical pass.",
   },
   {
     id: "research_gap_ledger_prioritizes_support_fraction_sweep",
     from: "nhm2.experimental.research_gap_ledger",
     to: "nhm2.experimental.layer_stack_support_fraction_sweep",
     relation: "documents",
-    label: "The research-gap ledger motivates a support-fraction sweep to test whether stress limits and active-source retention overlap.",
-    claimBoundaryNote: "A support-fraction sweep is a go/no-go planning map, not material evidence.",
+    label:
+      "The research-gap ledger motivates a support-fraction sweep to test whether stress limits and active-source retention overlap.",
+    claimBoundaryNote:
+      "A support-fraction sweep is a go/no-go planning map, not material evidence.",
   },
   {
     id: "research_gap_ledger_documents_support_retention_overlap",
     from: "nhm2.experimental.research_gap_ledger",
     to: "nhm2.mechanical.support_retention_overlap",
     relation: "documents",
-    label: "The research-gap ledger exposes the support-versus-retained-source conflict as a first-class scalar gate.",
-    claimBoundaryNote: "A scalar overlap margin is engineering diagnostic context, not material or tensor evidence.",
+    label:
+      "The research-gap ledger exposes the support-versus-retained-source conflict as a first-class scalar gate.",
+    claimBoundaryNote:
+      "A scalar overlap margin is engineering diagnostic context, not material or tensor evidence.",
   },
   {
     id: "research_gap_ledger_prioritizes_metric_upper_bound",
     from: "nhm2.experimental.research_gap_ledger",
     to: "nhm2.experimental.metric_upper_bound",
     relation: "documents",
-    label: "The research-gap ledger connects detector-scale h00_proxy bounds to metric-response planning.",
-    claimBoundaryNote: "A detector bound plan is not a measured metric response.",
+    label:
+      "The research-gap ledger connects detector-scale h00_proxy bounds to metric-response planning.",
+    claimBoundaryNote:
+      "A detector bound plan is not a measured metric response.",
   },
   {
     id: "research_gap_ledger_prioritizes_qei_dossier",
     from: "nhm2.experimental.research_gap_ledger",
     to: "nhm2.qei.worldline_dossier",
     relation: "documents",
-    label: "The research-gap ledger records QEI worldline applicability and null-result meaning as a P0 theory-to-measurement gap.",
-    claimBoundaryNote: "QEI applicability planning is not a universal QEI pass.",
+    label:
+      "The research-gap ledger records QEI worldline applicability and null-result meaning as a P0 theory-to-measurement gap.",
+    claimBoundaryNote:
+      "QEI applicability planning is not a universal QEI pass.",
   },
   {
     id: "research_gap_ledger_prioritizes_observer_robust_gate",
     from: "nhm2.experimental.research_gap_ledger",
     to: "nhm2.energy_condition.observer_robust_gate",
     relation: "documents",
-    label: "The research-gap ledger records observer-robust integration as a P0 blocker for energy-condition language.",
-    claimBoundaryNote: "Observer-robust planning cannot promote Eulerian-only or incomplete observer checks.",
+    label:
+      "The research-gap ledger records observer-robust integration as a P0 blocker for energy-condition language.",
+    claimBoundaryNote:
+      "Observer-robust planning cannot promote Eulerian-only or incomplete observer checks.",
   },
   {
     id: "research_gap_ledger_blocks_physical_viability_lock",
     from: "nhm2.experimental.research_gap_ledger",
     to: "nhm2.claim_boundary.physical_viability_locked",
     relation: "blocks",
-    label: "Open research gaps keep physical viability locked until receipts and null-result dispositions are produced.",
-    claimBoundaryNote: "Research-gap closure is necessary planning evidence, not automatic physical viability.",
+    label:
+      "Open research gaps keep physical viability locked until receipts and null-result dispositions are produced.",
+    claimBoundaryNote:
+      "Research-gap closure is necessary planning evidence, not automatic physical viability.",
   },
   {
     id: "parameter_targets_feed_prediction_freeze",
     from: "nhm2.experimental.parameter_targets",
     to: "nhm2.experimental.prediction_freeze",
     relation: "documents",
-    label: "Parameter targets identify which predictions and uncertainty bounds must be frozen before data collection.",
+    label:
+      "Parameter targets identify which predictions and uncertainty bounds must be frozen before data collection.",
     claimBoundaryNote: "Freezing a target is not a measured result.",
   },
   {
@@ -6081,7 +8445,8 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     from: "nhm2.experimental.parameter_targets",
     to: "nhm2.experimental.tile_force_receipt",
     relation: "documents",
-    label: "Parameter targets expose the gap, area, pressure, material, and systematic receipts required by tile metrology.",
+    label:
+      "Parameter targets expose the gap, area, pressure, material, and systematic receipts required by tile metrology.",
     claimBoundaryNote: "Ideal scalar tile rows remain non-receipted targets.",
   },
   {
@@ -6089,23 +8454,28 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     from: "nhm2.experimental.parameter_targets",
     to: "nhm2.experimental.layer_stack_mechanical_receipt",
     relation: "documents",
-    label: "Parameter targets expose the 8 nm, 10 mm x 10 mm, and 447-layer scalar load inputs consumed by the mechanical receipt.",
-    claimBoundaryNote: "Scalar load computation cannot substitute for pull-in, support, fatigue, thermal, or material receipts.",
+    label:
+      "Parameter targets expose the 8 nm, 10 mm x 10 mm, and 447-layer scalar load inputs consumed by the mechanical receipt.",
+    claimBoundaryNote:
+      "Scalar load computation cannot substitute for pull-in, support, fatigue, thermal, or material receipts.",
   },
   {
     id: "parameter_targets_feed_layer_stack_support_fraction_sweep",
     from: "nhm2.experimental.parameter_targets",
     to: "nhm2.experimental.layer_stack_support_fraction_sweep",
     relation: "documents",
-    label: "Parameter targets provide the area, force, and layer count used to sweep support fraction versus source retention.",
-    claimBoundaryNote: "Support-fraction arithmetic cannot substitute for tensor or material receipts.",
+    label:
+      "Parameter targets provide the area, force, and layer count used to sweep support fraction versus source retention.",
+    claimBoundaryNote:
+      "Support-fraction arithmetic cannot substitute for tensor or material receipts.",
   },
   {
     id: "parameter_targets_feed_metric_response",
     from: "nhm2.experimental.parameter_targets",
     to: "nhm2.experimental.invariant_metric_response",
     relation: "documents",
-    label: "Parameter targets connect the weak-field h00 proxy to detector and multi-probe metric-response planning.",
+    label:
+      "Parameter targets connect the weak-field h00 proxy to detector and multi-probe metric-response planning.",
     claimBoundaryNote: "A target scale is not detector evidence.",
   },
   {
@@ -6113,15 +8483,18 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     from: "nhm2.experimental.theory_solve_roadmap",
     to: "nhm2.experimental.prediction_freeze",
     relation: "documents",
-    label: "The roadmap enumerates the theoretical solves that must be frozen before experimental data are used.",
-    claimBoundaryNote: "A frozen prediction can start an experiment campaign but is not an experimental success result.",
+    label:
+      "The roadmap enumerates the theoretical solves that must be frozen before experimental data are used.",
+    claimBoundaryNote:
+      "A frozen prediction can start an experiment campaign but is not an experimental success result.",
   },
   {
     id: "physical_campaign_requires_prediction_freeze",
     from: "nhm2.experimental.prediction_freeze",
     to: "nhm2.experimental.physical_viability_campaign",
     relation: "requires",
-    label: "The physical evidence campaign requires pre-registered predictions and falsifiers before data collection.",
+    label:
+      "The physical evidence campaign requires pre-registered predictions and falsifiers before data collection.",
     claimBoundaryNote: "Prediction freeze is not experimental success.",
   },
   {
@@ -6129,23 +8502,28 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     from: "nhm2.experimental.prediction_freeze",
     to: "nhm2.experimental.tile_force_receipt",
     relation: "requires",
-    label: "Tile metrology must be evaluated against frozen predictions rather than post-hoc target fitting.",
-    claimBoundaryNote: "Tile metrology remains mechanism evidence, not spacetime response evidence.",
+    label:
+      "Tile metrology must be evaluated against frozen predictions rather than post-hoc target fitting.",
+    claimBoundaryNote:
+      "Tile metrology remains mechanism evidence, not spacetime response evidence.",
   },
   {
     id: "tile_force_receipt_requires_cycle_energy_balance",
     from: "nhm2.experimental.tile_cycle_energy_balance",
     to: "nhm2.experimental.tile_force_receipt",
     relation: "requires",
-    label: "The measured tile force receipt requires closed cyclic energy accounting.",
-    claimBoundaryNote: "Energy conversion bookkeeping is not free-energy evidence.",
+    label:
+      "The measured tile force receipt requires closed cyclic energy accounting.",
+    claimBoundaryNote:
+      "Energy conversion bookkeeping is not free-energy evidence.",
   },
   {
     id: "tile_metrology_feeds_array_scaling",
     from: "nhm2.experimental.tile_force_receipt",
     to: "nhm2.experimental.array_scaling",
     relation: "requires",
-    label: "Array scaling can only be reviewed after individual tile metrology is receipted.",
+    label:
+      "Array scaling can only be reviewed after individual tile metrology is receipted.",
     claimBoundaryNote: "Array scaling does not by itself measure gravity.",
   },
   {
@@ -6153,279 +8531,348 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     from: "nhm2.experimental.layer_stack_mechanical_receipt",
     to: "nhm2.experimental.array_scaling",
     relation: "requires",
-    label: "Array scaling review requires the 447-layer stack to survive pull-in, support, thermal, fatigue, and active-control constraints.",
-    claimBoundaryNote: "Mechanical survivability does not establish source tensor authority.",
+    label:
+      "Array scaling review requires the 447-layer stack to survive pull-in, support, thermal, fatigue, and active-control constraints.",
+    claimBoundaryNote:
+      "Mechanical survivability does not establish source tensor authority.",
   },
   {
     id: "layer_stack_mechanical_receipt_feeds_support_fraction_sweep",
     from: "nhm2.experimental.layer_stack_mechanical_receipt",
     to: "nhm2.experimental.layer_stack_support_fraction_sweep",
     relation: "requires",
-    label: "The support-fraction sweep consumes the mechanical receipt's ideal stack load and stress scale.",
-    claimBoundaryNote: "The consumed load remains ideal scalar context until material receipts exist.",
+    label:
+      "The support-fraction sweep consumes the mechanical receipt's ideal stack load and stress scale.",
+    claimBoundaryNote:
+      "The consumed load remains ideal scalar context until material receipts exist.",
   },
   {
     id: "layer_stack_mechanical_receipt_derives_support_retention_overlap",
     from: "nhm2.experimental.layer_stack_mechanical_receipt",
     to: "nhm2.mechanical.support_retention_overlap",
     relation: "derives",
-    label: "The mechanical receipt deterministically derives the support-retention overlap margin from its frozen stress and retention bounds.",
-    claimBoundaryNote: "The derived margin inherits the receipt's ideal-scalar and literature-comparator limitations.",
+    label:
+      "The mechanical receipt deterministically derives the support-retention overlap margin from its frozen stress and retention bounds.",
+    claimBoundaryNote:
+      "The derived margin inherits the receipt's ideal-scalar and literature-comparator limitations.",
   },
   {
     id: "support_retention_overlap_feeds_support_fraction_sweep",
     from: "nhm2.mechanical.support_retention_overlap",
     to: "nhm2.experimental.layer_stack_support_fraction_sweep",
     relation: "documents",
-    label: "The continuous overlap margin documents why the discrete support-fraction sweep has no simultaneous stress/retention window.",
-    claimBoundaryNote: "The scalar replay cannot replace measured support or full-apparatus tensor receipts.",
+    label:
+      "The continuous overlap margin documents why the discrete support-fraction sweep has no simultaneous stress/retention window.",
+    claimBoundaryNote:
+      "The scalar replay cannot replace measured support or full-apparatus tensor receipts.",
   },
   {
     id: "support_fraction_sweep_feeds_array_scaling",
     from: "nhm2.experimental.layer_stack_support_fraction_sweep",
     to: "nhm2.experimental.array_scaling",
     relation: "requires",
-    label: "Array scaling requires a support fraction that can carry load while preserving active Casimir area.",
-    claimBoundaryNote: "A candidate window still requires support/drive tensor terms and material receipts.",
+    label:
+      "Array scaling requires a support fraction that can carry load while preserving active Casimir area.",
+    claimBoundaryNote:
+      "A candidate window still requires support/drive tensor terms and material receipts.",
   },
   {
     id: "support_fraction_sweep_motivates_architecture_loop",
     from: "nhm2.experimental.layer_stack_support_fraction_sweep",
     to: "nhm2.experimental.layer_stack_architecture_loop",
     relation: "documents",
-    label: "The no-overlap support-fraction blocker motivates architectures that decouple load bearing from active area loss.",
-    claimBoundaryNote: "Architecture search prioritizes engineering receipts; it is not material-source evidence.",
+    label:
+      "The no-overlap support-fraction blocker motivates architectures that decouple load bearing from active area loss.",
+    claimBoundaryNote:
+      "Architecture search prioritizes engineering receipts; it is not material-source evidence.",
   },
   {
     id: "support_retention_overlap_motivates_architecture_loop",
     from: "nhm2.mechanical.support_retention_overlap",
     to: "nhm2.experimental.layer_stack_architecture_loop",
     relation: "documents",
-    label: "The blocked 0.459119311228 overlap margin motivates architectures that decouple load support from active-area retention.",
-    claimBoundaryNote: "Architecture exploration cannot unlock physical, transport, route, propulsion, or speed claims.",
+    label:
+      "The blocked 0.459119311228 overlap margin motivates architectures that decouple load support from active-area retention.",
+    claimBoundaryNote:
+      "Architecture exploration cannot unlock physical, transport, route, propulsion, or speed claims.",
   },
   {
     id: "architecture_loop_feeds_array_scaling",
     from: "nhm2.experimental.layer_stack_architecture_loop",
     to: "nhm2.experimental.array_scaling",
     relation: "requires",
-    label: "Array scaling must consume a load-path architecture that preserves active source area and pull-in margin.",
-    claimBoundaryNote: "Architecture review windows still require measured or simulated receipts before promotion.",
+    label:
+      "Array scaling must consume a load-path architecture that preserves active source area and pull-in margin.",
+    claimBoundaryNote:
+      "Architecture review windows still require measured or simulated receipts before promotion.",
   },
   {
     id: "architecture_loop_feeds_full_apparatus_receipt_loop",
     from: "nhm2.experimental.layer_stack_architecture_loop",
     to: "nhm2.experimental.full_apparatus_receipt_loop",
     relation: "requires",
-    label: "Architecture review rows must be converted into material, pull-in, metrology, control, fatigue, layer-scaling, and tensor receipt rows.",
-    claimBoundaryNote: "Receipt rows remain diagnostic and cannot become material-source authority by themselves.",
+    label:
+      "Architecture review rows must be converted into material, pull-in, metrology, control, fatigue, layer-scaling, and tensor receipt rows.",
+    claimBoundaryNote:
+      "Receipt rows remain diagnostic and cannot become material-source authority by themselves.",
   },
   {
     id: "full_apparatus_receipt_loop_feeds_array_scaling",
     from: "nhm2.experimental.full_apparatus_receipt_loop",
     to: "nhm2.experimental.array_scaling",
     relation: "requires",
-    label: "Array scaling review requires receipts for the selected architecture before treating the 447-layer route as an engineering candidate.",
-    claimBoundaryNote: "Engineering receipt readiness is not physical validation.",
+    label:
+      "Array scaling review requires receipts for the selected architecture before treating the 447-layer route as an engineering candidate.",
+    claimBoundaryNote:
+      "Engineering receipt readiness is not physical validation.",
   },
   {
     id: "full_apparatus_receipt_loop_feeds_full_tensor",
     from: "nhm2.experimental.full_apparatus_receipt_loop",
     to: "nhm2.experimental.full_apparatus_tensor",
     relation: "requires",
-    label: "The receipt loop enumerates support, spacer, active-control, thermal, electrostatic, fatigue, and layer-scaling terms that must enter the apparatus tensor.",
-    claimBoundaryNote: "Tensor term coverage is required before source-side tensor authority can judge the apparatus.",
+    label:
+      "The receipt loop enumerates support, spacer, active-control, thermal, electrostatic, fatigue, and layer-scaling terms that must enter the apparatus tensor.",
+    claimBoundaryNote:
+      "Tensor term coverage is required before source-side tensor authority can judge the apparatus.",
   },
   {
     id: "full_apparatus_receipt_loop_feeds_tile_source_validation_plan",
     from: "nhm2.experimental.full_apparatus_receipt_loop",
     to: "nhm2.experimental.tile_source_physical_validation_plan",
     relation: "requires",
-    label: "The tile-source validation plan freezes the strongest 447-layer candidate only after enumerating material, pull-in, metrology, control, fatigue, layer-scaling, and full-apparatus tensor receipt targets.",
-    claimBoundaryNote: "A validation plan is evidence planning and blocker localization, not physical validation.",
+    label:
+      "The tile-source validation plan freezes the strongest 447-layer candidate only after enumerating material, pull-in, metrology, control, fatigue, layer-scaling, and full-apparatus tensor receipt targets.",
+    claimBoundaryNote:
+      "A validation plan is evidence planning and blocker localization, not physical validation.",
   },
   {
     id: "tile_source_validation_plan_requires_full_apparatus_tensor",
     from: "nhm2.experimental.tile_source_physical_validation_plan",
     to: "nhm2.experimental.full_apparatus_tensor",
     relation: "requires",
-    label: "The plan requires a full apparatus tensor before source-side tensor authority can treat the tile stack as a source candidate.",
-    claimBoundaryNote: "A frozen candidate without T00, T0i, diagonal Tij, and off-diagonal Tij remains review-level.",
+    label:
+      "The plan requires a full apparatus tensor before source-side tensor authority can treat the tile stack as a source candidate.",
+    claimBoundaryNote:
+      "A frozen candidate without T00, T0i, diagonal Tij, and off-diagonal Tij remains review-level.",
   },
   {
     id: "tile_source_validation_plan_feeds_same_basis_authority",
     from: "nhm2.experimental.tile_source_physical_validation_plan",
     to: "nhm2.source.same_basis_tensor_authority",
     relation: "requires",
-    label: "A physically credible source candidate must feed the same-chart, same-basis, no-target-echo source authority gate.",
-    claimBoundaryNote: "Source authority is a prerequisite for closure review and cannot become a physical mechanism claim by itself.",
+    label:
+      "A physically credible source candidate must feed the same-chart, same-basis, no-target-echo source authority gate.",
+    claimBoundaryNote:
+      "Source authority is a prerequisite for closure review and cannot become a physical mechanism claim by itself.",
   },
   {
     id: "tile_source_validation_plan_feeds_coupled_closure",
     from: "nhm2.experimental.tile_source_physical_validation_plan",
     to: "nhm2.closure.coupled_pass_candidate",
     relation: "requires",
-    label: "The plan only becomes useful to the full solve when regional residual, conservation, QEI, observer, material, and coupled-closure gates pass together.",
-    claimBoundaryNote: "Coupled diagnostic closure remains separate from physical viability or transport claims.",
+    label:
+      "The plan only becomes useful to the full solve when regional residual, conservation, QEI, observer, material, and coupled-closure gates pass together.",
+    claimBoundaryNote:
+      "Coupled diagnostic closure remains separate from physical viability or transport claims.",
   },
   {
     id: "tile_source_validation_plan_blocks_physical_lock",
     from: "nhm2.experimental.tile_source_physical_validation_plan",
     to: "nhm2.claim_boundary.physical_viability_locked",
     relation: "blocks",
-    label: "Missing tile-source physical validation receipts keep physical viability locked even when a diagnostic campaign profile passes.",
-    claimBoundaryNote: "Physical, route, speed, transport, and propulsion claims remain forbidden until external physical validation exists.",
+    label:
+      "Missing tile-source physical validation receipts keep physical viability locked even when a diagnostic campaign profile passes.",
+    claimBoundaryNote:
+      "Physical, route, speed, transport, and propulsion claims remain forbidden until external physical validation exists.",
   },
   {
     id: "architecture_loop_feeds_full_apparatus_tensor",
     from: "nhm2.experimental.layer_stack_architecture_loop",
     to: "nhm2.experimental.full_apparatus_tensor",
     relation: "requires",
-    label: "Support, spacer, drive, thermal, and electrostatic terms identified by the architecture loop must enter the full apparatus tensor.",
-    claimBoundaryNote: "A support architecture cannot be treated as source tensor authority by itself.",
+    label:
+      "Support, spacer, drive, thermal, and electrostatic terms identified by the architecture loop must enter the full apparatus tensor.",
+    claimBoundaryNote:
+      "A support architecture cannot be treated as source tensor authority by itself.",
   },
   {
     id: "architecture_loop_blocks_physical_lock",
     from: "nhm2.experimental.layer_stack_architecture_loop",
     to: "nhm2.claim_boundary.physical_viability_locked",
     relation: "blocks",
-    label: "Missing material, pull-in, roughness, patch, active-control, or tensor receipts keep the 447-layer architecture at diagnostic review.",
-    claimBoundaryNote: "Engineering review cannot unlock physical, route, speed, transport, or propulsion claims.",
+    label:
+      "Missing material, pull-in, roughness, patch, active-control, or tensor receipts keep the 447-layer architecture at diagnostic review.",
+    claimBoundaryNote:
+      "Engineering review cannot unlock physical, route, speed, transport, or propulsion claims.",
   },
   {
     id: "full_apparatus_receipt_loop_blocks_physical_lock",
     from: "nhm2.experimental.full_apparatus_receipt_loop",
     to: "nhm2.claim_boundary.physical_viability_locked",
     relation: "blocks",
-    label: "Missing full-apparatus receipts keep the 447-layer architecture from becoming physical evidence.",
-    claimBoundaryNote: "Receipt-loop candidate rows cannot unlock physical, route, speed, transport, or propulsion claims.",
+    label:
+      "Missing full-apparatus receipts keep the 447-layer architecture from becoming physical evidence.",
+    claimBoundaryNote:
+      "Receipt-loop candidate rows cannot unlock physical, route, speed, transport, or propulsion claims.",
   },
   {
     id: "support_fraction_sweep_blocks_physical_lock",
     from: "nhm2.experimental.layer_stack_support_fraction_sweep",
     to: "nhm2.claim_boundary.physical_viability_locked",
     relation: "blocks",
-    label: "If stress and source-retention windows do not overlap, the 447-layer route remains blocked before physical review.",
-    claimBoundaryNote: "Go/no-go planning cannot unlock physical viability or transport claims.",
+    label:
+      "If stress and source-retention windows do not overlap, the 447-layer route remains blocked before physical review.",
+    claimBoundaryNote:
+      "Go/no-go planning cannot unlock physical viability or transport claims.",
   },
   {
     id: "support_retention_overlap_blocks_physical_lock",
     from: "nhm2.mechanical.support_retention_overlap",
     to: "nhm2.claim_boundary.physical_viability_locked",
     relation: "blocks",
-    label: "The missing support-retention overlap keeps the frozen 447-layer scalar route blocked before physical review.",
-    claimBoundaryNote: "A future overlap window would remain subject to material, pull-in, fatigue, control-energy, tensor, and replication receipts.",
+    label:
+      "The missing support-retention overlap keeps the frozen 447-layer scalar route blocked before physical review.",
+    claimBoundaryNote:
+      "A future overlap window would remain subject to material, pull-in, fatigue, control-energy, tensor, and replication receipts.",
   },
   {
     id: "layer_stack_mechanical_receipt_blocks_physical_lock",
     from: "nhm2.experimental.layer_stack_mechanical_receipt",
     to: "nhm2.claim_boundary.physical_viability_locked",
     relation: "blocks",
-    label: "Open mechanical receipt blockers keep physical viability locked even when scalar wall T00 arithmetic improves.",
-    claimBoundaryNote: "Internal Casimir load is not thrust, propulsion, or transport evidence.",
+    label:
+      "Open mechanical receipt blockers keep physical viability locked even when scalar wall T00 arithmetic improves.",
+    claimBoundaryNote:
+      "Internal Casimir load is not thrust, propulsion, or transport evidence.",
   },
   {
     id: "array_scaling_requires_full_apparatus_tensor",
     from: "nhm2.experimental.full_apparatus_tensor",
     to: "nhm2.experimental.array_scaling",
     relation: "requires",
-    label: "Array scaling must include full apparatus stress-energy, not only ideal interaction energy.",
-    claimBoundaryNote: "Full apparatus tensor evidence remains source credibility, not transport evidence.",
+    label:
+      "Array scaling must include full apparatus stress-energy, not only ideal interaction energy.",
+    claimBoundaryNote:
+      "Full apparatus tensor evidence remains source credibility, not transport evidence.",
   },
   {
     id: "array_scaling_feeds_vacuum_weight",
     from: "nhm2.experimental.array_scaling",
     to: "nhm2.experimental.vacuum_weight",
     relation: "requires",
-    label: "Vacuum-weight review requires a characterized source array and energy ledger.",
-    claimBoundaryNote: "A vacuum-weight result would test gravity coupling, not NHM2 transport.",
+    label:
+      "Vacuum-weight review requires a characterized source array and energy ledger.",
+    claimBoundaryNote:
+      "A vacuum-weight result would test gravity coupling, not NHM2 transport.",
   },
   {
     id: "metric_upper_bound_informs_metric_response",
     from: "nhm2.experimental.metric_upper_bound",
     to: "nhm2.experimental.invariant_metric_response",
     relation: "documents",
-    label: "Weak-field scalar estimates inform detector scale before invariant metric-response receipts are available.",
-    claimBoundaryNote: "A weak-field scalar estimate is not a detector response or measured metric.",
+    label:
+      "Weak-field scalar estimates inform detector scale before invariant metric-response receipts are available.",
+    claimBoundaryNote:
+      "A weak-field scalar estimate is not a detector response or measured metric.",
   },
   {
     id: "vacuum_weight_feeds_invariant_metric_response",
     from: "nhm2.experimental.vacuum_weight",
     to: "nhm2.experimental.invariant_metric_response",
     relation: "requires",
-    label: "A metric-response experiment should follow a characterized source and vacuum-weight receipt.",
-    claimBoundaryNote: "Metric response requires multiple probes agreeing with one metric prediction.",
+    label:
+      "A metric-response experiment should follow a characterized source and vacuum-weight receipt.",
+    claimBoundaryNote:
+      "Metric response requires multiple probes agreeing with one metric prediction.",
   },
   {
     id: "invariant_metric_response_feeds_physical_lock",
     from: "nhm2.experimental.invariant_metric_response",
     to: "nhm2.claim_boundary.physical_viability_locked",
     relation: "blocks",
-    label: "Physical viability remains locked until replicated source and invariant metric-response receipts exist.",
-    claimBoundaryNote: "Measured metric response would still require full policy and replication review.",
+    label:
+      "Physical viability remains locked until replicated source and invariant metric-response receipts exist.",
+    claimBoundaryNote:
+      "Measured metric response would still require full policy and replication review.",
   },
   {
     id: "independent_replication_blocks_physical_lock",
     from: "nhm2.experimental.independent_replication",
     to: "nhm2.claim_boundary.physical_viability_locked",
     relation: "blocks",
-    label: "Independent replication is required before physical viability review can proceed.",
-    claimBoundaryNote: "Local or unreplicated positive results cannot unlock physical viability.",
+    label:
+      "Independent replication is required before physical viability review can proceed.",
+    claimBoundaryNote:
+      "Local or unreplicated positive results cannot unlock physical viability.",
   },
   {
     id: "physical_viability_lock_blocks_transport_lock",
     from: "nhm2.claim_boundary.physical_viability_locked",
     to: "nhm2.claim_boundary.transport_locked",
     relation: "blocks",
-    label: "Transport review remains downstream of physical-source and metric-response evidence.",
-    claimBoundaryNote: "A physical-source review cannot automatically become a transport claim.",
+    label:
+      "Transport review remains downstream of physical-source and metric-response evidence.",
+    claimBoundaryNote:
+      "A physical-source review cannot automatically become a transport claim.",
   },
   {
     id: "geodesic_response_blocks_transport_lock",
     from: "nhm2.experimental.geodesic_response",
     to: "nhm2.claim_boundary.transport_locked",
     relation: "blocks",
-    label: "Transport remains locked until neutral test-worldline response is measured and replicated.",
-    claimBoundaryNote: "Geodesic response is a transport precursor, not route ETA or speed authority.",
+    label:
+      "Transport remains locked until neutral test-worldline response is measured and replicated.",
+    claimBoundaryNote:
+      "Geodesic response is a transport precursor, not route ETA or speed authority.",
   },
   {
     id: "steering_bondi_flux_budget_blocks_transport_lock",
     from: "nhm2.transport.steering_bondi_flux_budget",
     to: "nhm2.claim_boundary.transport_locked",
     relation: "blocks",
-    label: "An applicable steering claim remains blocked until the conditional Bondi-flux premises and radiative budget are receipted.",
-    claimBoundaryNote: "False premises mean not applicable and unknown premises mean not ready; this conditional gate is never universal transport authority.",
+    label:
+      "An applicable steering claim remains blocked until the conditional Bondi-flux premises and radiative budget are receipted.",
+    claimBoundaryNote:
+      "False premises mean not applicable and unknown premises mean not ready; this conditional gate is never universal transport authority.",
   },
   {
     id: "natario_invariants_document_observer_authority",
     from: "nhm2.natario.curvature_invariants",
     to: "nhm2.tensor.full_authority_gate",
     relation: "documents",
-    label: "Natario-adjacent curvature diagnostics document why tensor and momentum authority remain visible.",
-    claimBoundaryNote: "Curvature badges are runtime targets, not promotion evidence.",
+    label:
+      "Natario-adjacent curvature diagnostics document why tensor and momentum authority remain visible.",
+    claimBoundaryNote:
+      "Curvature badges are runtime targets, not promotion evidence.",
   },
   {
     id: "natario_invariant_audit_feeds_observer_robust_gate",
     from: "nhm2.natario.invariant_audit",
     to: "nhm2.energy_condition.observer_robust_gate",
     relation: "requires",
-    label: "Natario invariant and stability diagnostics inform observer-robust energy-condition review.",
-    claimBoundaryNote: "Zero expansion alone does not clear observer-family energy-condition language.",
+    label:
+      "Natario invariant and stability diagnostics inform observer-robust energy-condition review.",
+    claimBoundaryNote:
+      "Zero expansion alone does not clear observer-family energy-condition language.",
   },
   {
     id: "observer_robust_gate_blocks_nhm2_diagnostic_boundary",
     from: "nhm2.energy_condition.observer_robust_gate",
     to: "nhm2.claim_boundary.diagnostic_only",
     relation: "blocks",
-    label: "Observer-robust energy-condition incompleteness keeps NHM2 in diagnostic-only claim language.",
-    claimBoundaryNote: "Friendly observer checks cannot prove WEC/NEC/DEC/SEC robustness.",
+    label:
+      "Observer-robust energy-condition incompleteness keeps NHM2 in diagnostic-only claim language.",
+    claimBoundaryNote:
+      "Friendly observer checks cannot prove WEC/NEC/DEC/SEC robustness.",
   },
   {
     id: "same_basis_closure_blocks_diagonal_proxy_boundary",
     from: "nhm2.closure.same_basis_regional_residual",
     to: "nhm2.claim_boundary.diagonal_proxy_not_full_tensor",
     relation: "blocks",
-    label: "Closure remains blocked when tensor authority is partial, diagonal-only, or review-gated.",
+    label:
+      "Closure remains blocked when tensor authority is partial, diagonal-only, or review-gated.",
     claimBoundaryNote: "No source-closure completion language is allowed.",
   },
   {
@@ -6433,7 +8880,8 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     from: "nhm2.tensor.full_authority_gate",
     to: "nhm2.claim_boundary.diagonal_proxy_not_full_tensor",
     relation: "blocks",
-    label: "Full tensor authority remains blocked while output is diagonal-only or missing J_i/S_ij channels.",
+    label:
+      "Full tensor authority remains blocked while output is diagonal-only or missing J_i/S_ij channels.",
     claimBoundaryNote: "No observer-family promotion language is allowed.",
   },
   {
@@ -6441,15 +8889,18 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     from: "nhm2.source.wall_t00_trace",
     to: "nhm2.claim_boundary.diagnostic_only",
     relation: "blocks",
-    label: "The wall T00 residual keeps NHM2 in diagnostic/reduced-order wording.",
-    claimBoundaryNote: "Wall-region source mismatch blocks stronger source-closure language.",
+    label:
+      "The wall T00 residual keeps NHM2 in diagnostic/reduced-order wording.",
+    claimBoundaryNote:
+      "Wall-region source mismatch blocks stronger source-closure language.",
   },
   {
     id: "regional_atlas_claim_boundary_blocks_promotion",
     from: "nhm2.regional_atlas.claim_boundary",
     to: "nhm2.claim_boundary.diagnostic_only",
     relation: "blocks",
-    label: "Atlas congruence cannot promote NHM2 into material, conservation, QEI, observer, or transport claims.",
+    label:
+      "Atlas congruence cannot promote NHM2 into material, conservation, QEI, observer, or transport claims.",
     claimBoundaryNote: "The atlas is a shared proof map, not proof closure.",
   },
   {
@@ -6457,7 +8908,8 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     from: "nhm2.regional_atlas.consumer_congruence",
     to: "nhm2.regional_atlas.claim_boundary",
     relation: "documents",
-    label: "Same-atlas consumer congruence points at the atlas-specific claim boundary.",
+    label:
+      "Same-atlas consumer congruence points at the atlas-specific claim boundary.",
     claimBoundaryNote: "Even a green congruence gate stays diagnostic-only.",
   },
   {
@@ -6465,7 +8917,8 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     from: "nhm2.geometry.lapse_shift_profile",
     to: "nhm2.claim_boundary.shift_not_ship_speed",
     relation: "blocks",
-    label: "Lapse-shift profile rows must not be interpreted as ordinary vehicle velocity.",
+    label:
+      "Lapse-shift profile rows must not be interpreted as ordinary vehicle velocity.",
     claimBoundaryNote: "Shift is chart-dependent geometry context.",
   },
   {
@@ -6473,7 +8926,8 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     from: "nhm2.clock.centerline_tau_alpha_T",
     to: "nhm2.claim_boundary.expected_clocking_not_route_result",
     relation: "blocks",
-    label: "Centerline clocking targets must not be promoted into route results.",
+    label:
+      "Centerline clocking targets must not be promoted into route results.",
     claimBoundaryNote: "No speed, ETA, or full-loop pass claim is allowed.",
   },
   {
@@ -6521,32 +8975,40 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     from: "nhm2.qei.worldline_sampling_requirement",
     to: "nhm2.claim_boundary.literature_not_validation",
     relation: "blocks",
-    label: "QEI literature constrains the route but does not complete the repository dossier.",
-    claimBoundaryNote: "No QEI completion or external-validation claim is allowed.",
+    label:
+      "QEI literature constrains the route but does not complete the repository dossier.",
+    claimBoundaryNote:
+      "No QEI completion or external-validation claim is allowed.",
   },
   {
     id: "qei_dossier_blocks_literature_boundary",
     from: "nhm2.qei.worldline_dossier",
     to: "nhm2.claim_boundary.literature_not_validation",
     relation: "blocks",
-    label: "The QEI dossier must be repository evidence and cannot be substituted by literature context.",
-    claimBoundaryNote: "No QEI completion or external-validation claim is allowed.",
+    label:
+      "The QEI dossier must be repository evidence and cannot be substituted by literature context.",
+    claimBoundaryNote:
+      "No QEI completion or external-validation claim is allowed.",
   },
   {
     id: "full_solve_boundary_documents_nhm2_diagnostic_boundary",
     from: "nhm2.artifact.frozen_reference_run_provenance",
     to: "nhm2.claim_boundary.diagnostic_only",
     relation: "documents",
-    label: "Frozen-run provenance documents which rows are diagnostic, review, blocked, or unsupported.",
-    claimBoundaryNote: "Artifact governance cannot promote a physical mechanism claim by itself.",
+    label:
+      "Frozen-run provenance documents which rows are diagnostic, review, blocked, or unsupported.",
+    claimBoundaryNote:
+      "Artifact governance cannot promote a physical mechanism claim by itself.",
   },
   {
     id: "literature_boundary_documents_claim_locks",
     from: "nhm2.claim_boundary.literature_not_validation",
     to: "nhm2.claim_boundary.diagnostic_only",
     relation: "documents",
-    label: "The literature boundary documents the broader NHM2 diagnostic-only claim lock.",
-    claimBoundaryNote: "Formalism context never substitutes for repository artifact status.",
+    label:
+      "The literature boundary documents the broader NHM2 diagnostic-only claim lock.",
+    claimBoundaryNote:
+      "Formalism context never substitutes for repository artifact status.",
   },
 ];
 
@@ -6555,7 +9017,11 @@ export function buildNhm2FullSolveTheoryBadgesV1(): {
   edges: TheoryBadgeEdgeV1[];
 } {
   return {
-    badges: NHM2_FULL_SOLVE_THEORY_BADGES.map((badge: TheoryBadgeV1) => ({ ...badge })),
-    edges: NHM2_FULL_SOLVE_THEORY_EDGES.map((edge: TheoryBadgeEdgeV1) => ({ ...edge })),
+    badges: NHM2_FULL_SOLVE_THEORY_BADGES.map((badge: TheoryBadgeV1) => ({
+      ...badge,
+    })),
+    edges: NHM2_FULL_SOLVE_THEORY_EDGES.map((edge: TheoryBadgeEdgeV1) => ({
+      ...edge,
+    })),
   };
 }

@@ -261,6 +261,7 @@ export const requestRealtimeStagePlayContextSync = (input: {
     realtimeSessionId: session.realtimeSessionId,
     threadId: session.threadId,
     sourceBinding: session.sourceBinding,
+    runtimeGoalAccountScope: session.runtimeGoalAccountScope,
     nowMs: input.nowMs,
   });
   const boundSession = updateAdmittedRealtimeSession({
@@ -415,6 +416,7 @@ export const startRealtimeStagePlaySideband = (input: {
     realtimeSessionId: connectingSession.realtimeSessionId,
     threadId: connectingSession.threadId,
     sourceBinding: connectingSession.sourceBinding,
+    runtimeGoalAccountScope: connectingSession.runtimeGoalAccountScope,
   });
   connection.pending = { reason: "session_start", pack };
   return writeLatestSync(connectingSession, buildSync({

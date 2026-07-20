@@ -3,7 +3,7 @@ import {
   HELIX_REALTIME_GROUNDED_RELAY_SCHEMA,
   type HelixRealtimeGroundedRelayStatusV1,
   type HelixRealtimeGroundedRelayV1,
-  type HelixRealtimeWorkerAdmissionV1,
+  type HelixRealtimeWorkerAdmission,
 } from "@shared/contracts/helix-realtime-worker-relay.v1";
 import type {
   HelixRealtimeStagePlayAskHandoffV1,
@@ -292,7 +292,7 @@ const attemptRelayDelivery = (
 
 export const startRealtimeGroundedRelayForHandoff = (input: {
   handoff: HelixRealtimeStagePlayAskHandoffV1;
-  workerAdmission: HelixRealtimeWorkerAdmissionV1;
+  workerAdmission: HelixRealtimeWorkerAdmission;
   nowMs?: number;
 }): HelixRealtimeGroundedRelayV1 => {
   const existingId = relayIdByHandoffId.get(input.handoff.handoff_id);
@@ -349,7 +349,9 @@ export const startRealtimeGroundedRelayForHandoff = (input: {
     selected_model: input.workerAdmission.selected_model,
     status: eligible ? "worker_running" : "suppressed",
     status_reason: eligible
-      ? "readonly_runtime_worker_dispatched"
+      ? input.workerAdmission.worker_turn_dispatched
+        ? "readonly_runtime_worker_dispatched"
+        : "readonly_runtime_worker_dispatch_requested"
       : input.workerAdmission.outcome === "action_candidate"
         ? "read_only_action_candidate_not_relayed"
         : "conversation_local_no_delayed_relay",
@@ -385,7 +387,7 @@ export const startRealtimeGroundedRelayForHandoff = (input: {
 export const enqueueRealtimeGroundedAnswerRelay = (input: {
   handoff: HelixRealtimeStagePlayAskHandoffV1;
   feedback: HelixRealtimeStagePlayGroundedAnswerV1;
-  workerAdmission: HelixRealtimeWorkerAdmissionV1;
+  workerAdmission: HelixRealtimeWorkerAdmission;
   answerText: string;
   nowMs?: number;
 }): HelixRealtimeGroundedRelayV1 => {

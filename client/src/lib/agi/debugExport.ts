@@ -1054,6 +1054,163 @@ const normalizeRealtimeClientReceiptObservationsForExport = (
     };
   });
 
+const normalizeCodexNativeRouteProposalForExport = (
+  value: unknown,
+): Record<string, unknown> | null => {
+  const record = asRecord(value);
+  if (!record) return null;
+  return {
+    schema: readString(record.schema),
+    turn_id: readString(record.turn_id),
+    proposal_id: readString(record.proposal_id),
+    prompt_hash: readString(record.prompt_hash),
+    proposal_source: readString(record.proposal_source),
+    proposed_route: readString(record.proposed_route),
+    proposed_tool_family: readString(record.proposed_tool_family),
+    proposed_capability_id: readString(record.proposed_capability_id),
+    proposed_capability_ids: readStringArray(record.proposed_capability_ids).slice(0, 32),
+    confidence: readString(record.confidence),
+    supporting_hint_refs: readStringArray(record.supporting_hint_refs).slice(0, 16),
+    reason_summary_included: false,
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+const normalizeCodexNativeWorkstationTurnForExport = (
+  value: unknown,
+): Record<string, unknown> | null => {
+  const record = asRecord(value);
+  if (!record) return null;
+  return {
+    schema: readString(record.schema),
+    account_type: readString(record.account_type),
+    profile_bound: readBoolean(record.profile_bound) === true,
+    raw_profile_id_included: false,
+    trusted_account_session: readBoolean(record.trusted_account_session) === true,
+    trusted_account_binding_required:
+      readBoolean(record.trusted_account_binding_required) === true,
+    account_binding_status: readString(record.account_binding_status),
+    requested_mode: readString(record.requested_mode),
+    effective_mode: readString(record.effective_mode),
+    requested_runtime: readString(record.requested_runtime),
+    native_transport: readString(record.native_transport),
+    ephemeral_thread: readBoolean(record.ephemeral_thread) === true,
+    isolated_runtime_workspace: readBoolean(record.isolated_runtime_workspace) === true,
+    sandbox_policy: readString(record.sandbox_policy),
+    network_access: readBoolean(record.network_access) === true,
+    approval_policy: readString(record.approval_policy),
+    built_in_tools_disabled: readBoolean(record.built_in_tools_disabled) === true,
+    disabled_native_features: readStringArray(record.disabled_native_features).slice(0, 32),
+    model_visible_tools: readStringArray(record.model_visible_tools).slice(0, 64),
+    account_locked_tools: readStringArray(record.account_locked_tools).slice(0, 64),
+    goal_allowed_tools: Array.isArray(record.goal_allowed_tools)
+      ? readStringArray(record.goal_allowed_tools).slice(0, 64)
+      : null,
+    route_prompt_hash: readString(record.route_prompt_hash),
+    route_proposal: normalizeCodexNativeRouteProposalForExport(record.route_proposal),
+    route_admission_reason: readString(record.route_admission_reason),
+    route_admitted_tools: readStringArray(record.route_admitted_tools).slice(0, 64),
+    requested_tools: readStringArray(record.requested_tools).slice(0, 64),
+    executed_tools: readStringArray(record.executed_tools).slice(0, 64),
+    successful_tools: readStringArray(record.successful_tools).slice(0, 64),
+    failed_tools: readStringArray(record.failed_tools).slice(0, 64),
+    route_unobserved_tools: readStringArray(record.route_unobserved_tools).slice(0, 64),
+    observation_reentry_refs: readStringArray(record.observation_reentry_refs).slice(0, 64),
+    effective_model: readString(record.effective_model),
+    effective_reasoning_effort: readString(record.effective_reasoning_effort),
+    native_item_types: readStringArray(record.native_item_types).slice(0, 32),
+    forbidden_native_item_types: readStringArray(record.forbidden_native_item_types).slice(0, 32),
+    native_thread_id: readString(record.native_thread_id),
+    native_turn_id: readString(record.native_turn_id),
+    native_final_item_id: readString(record.native_final_item_id),
+    native_turn_status: readString(record.native_turn_status),
+    terminal_candidate_present: readBoolean(record.terminal_candidate_present) === true,
+    compatibility_fallback_required:
+      readBoolean(record.compatibility_fallback_required) === true,
+    compatibility_fallback_reason: readString(record.compatibility_fallback_reason),
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+const normalizeCodexNativeProviderBridgeForExport = (
+  value: unknown,
+): Record<string, unknown> | null => {
+  const record = asRecord(value);
+  if (!record) return null;
+  return {
+    schema: readString(record.schema),
+    enabled: readBoolean(record.enabled) === true,
+    eligible: readBoolean(record.eligible) === true,
+    attempted: readBoolean(record.attempted) === true,
+    status: readString(record.status),
+    native_transport: readString(record.native_transport),
+    compatibility_transport: readString(record.compatibility_transport),
+    fallback_required: readBoolean(record.fallback_required) === true,
+    fallback_reason: readString(record.fallback_reason),
+    model_policy_source: readString(record.model_policy_source),
+    effective_model: readString(record.effective_model),
+    effective_reasoning_effort: readString(record.effective_reasoning_effort),
+    trusted_goal_account_binding_required:
+      readBoolean(record.trusted_goal_account_binding_required) === true,
+    allowed_workstation_tools: Array.isArray(record.allowed_workstation_tools)
+      ? readStringArray(record.allowed_workstation_tools).slice(0, 64)
+      : null,
+    native_workstation_turn: normalizeCodexNativeWorkstationTurnForExport(
+      record.native_workstation_turn,
+    ),
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+const normalizeCodexNativeCompatibilityFallbackForExport = (
+  value: unknown,
+): Record<string, unknown> | null => {
+  const record = asRecord(value);
+  if (!record) return null;
+  return {
+    schema: readString(record.schema),
+    activated: readBoolean(record.activated) === true,
+    native_attempted: readBoolean(record.native_attempted) === true,
+    native_fallback_reason: readString(record.native_fallback_reason),
+    native_unobserved_capability_ids:
+      readStringArray(record.native_unobserved_capability_ids).slice(0, 64),
+    gateway_recovery_attempted: readBoolean(record.gateway_recovery_attempted) === true,
+    gateway_recovery_result_count: readNumberValue(record.gateway_recovery_result_count) ?? 0,
+    gateway_recovery_capability_ids:
+      readStringArray(record.gateway_recovery_capability_ids).slice(0, 64),
+    compatibility_transport: readString(record.compatibility_transport),
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+const normalizeRealtimeGroundedAnswerFeedbackForExport = (
+  value: unknown,
+): Record<string, unknown> | null => {
+  const record = asRecord(value);
+  if (!record) return null;
+  return {
+    schema: readString(record.schema),
+    handoff_id: readString(record.handoff_id),
+    account_bound: readBoolean(record.account_bound) === true,
+    feedback_recorded: readBoolean(record.feedback_recorded) === true,
+    relay_status: readString(record.relay_status),
+    relay_failure_code: readString(record.relay_failure_code),
+    blocked_reason: readString(record.blocked_reason),
+    answer_authority: false,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+};
+
 const readNestedRecord = (value: unknown, keys: string[]): Record<string, unknown> | null => {
   let cursor: unknown = value;
   for (const key of keys) {
@@ -1422,7 +1579,7 @@ const HELIX_DEBUG_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE =
   /\b(?:scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\s+viewer|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|moral-graph\.[a-z0-9_.-]+|(?:use|with|through|via)\s+(?:only\s+)?(?:the\s+)?moral\s+graph\b[\s\S]{0,120}\b(?:reflect|reflection|case|situation|dependency|repair|boundary|agency|badge|lens)|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|scholarly-research\.[a-z0-9_.-]+|scholarly_research\.[a-z0-9_.-]+|scholarly\s+research\s+tool|lookup_papers|fetch_full_text|extract_numeric_parameters|live_env\.[a-z0-9_.-]+|helix_ask\.[a-z0-9_.-]+|image[_\s-]?lens|visual_analysis\.inspect_image_region|visual_capture)\b/i;
 
 const isConceptualToolExplanationWithoutExecutionForDebugExport = (value: unknown): boolean => {
-  const text = readString(value).trim();
+  const text = readString(value)?.trim() ?? "";
   if (!text) return false;
   const asksForConcept =
     /\b(?:what\s+is|what\s+does|explain|describe|define|meaning\s+of|looks?\s+like)\b/i.test(text);
@@ -1655,6 +1812,9 @@ const copyRailCriticalDebugFields = (
     "language_model_policy",
     "language_model_debug_summary",
     "model_policy_debug_summary",
+    "codex_native_provider_bridge",
+    "codex_native_compatibility_fallback",
+    "realtime_grounded_answer_feedback",
     "agent_continuation_state",
     "agent_continuation_states",
     "terminal_rejection_observations",
@@ -3135,6 +3295,17 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     readString(debug?.model_policy_debug_summary) ??
     readString(agentLoop?.model_policy_debug_summary) ??
     languageModelDebugSummary;
+  const codexNativeProviderBridge = normalizeCodexNativeProviderBridgeForExport(
+    payload.codex_native_provider_bridge ??
+      debug?.codex_native_provider_bridge ??
+      agentLoop?.codex_native_provider_bridge,
+  );
+  const codexNativeCompatibilityFallback =
+    normalizeCodexNativeCompatibilityFallbackForExport(
+      payload.codex_native_compatibility_fallback ??
+        debug?.codex_native_compatibility_fallback ??
+        agentLoop?.codex_native_compatibility_fallback,
+    );
   const providerGatewayDebugSummary = asRecord(
     payload.provider_gateway_debug_summary ??
       debug?.provider_gateway_debug_summary ??
@@ -3290,6 +3461,11 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     payload.realtime_client_receipt_observations ??
     debug?.realtime_client_receipt_observations ??
     agentLoop?.realtime_client_receipt_observations;
+  const realtimeGroundedAnswerFeedback = normalizeRealtimeGroundedAnswerFeedbackForExport(
+    payload.realtime_grounded_answer_feedback ??
+      debug?.realtime_grounded_answer_feedback ??
+      agentLoop?.realtime_grounded_answer_feedback,
+  );
   const visibleTranslationChainSummary = buildVisibleTranslationChainSummaryForExport({
     runtimeLaneRequestLoop,
     capabilityLaneTurnTimeline,
@@ -3946,6 +4122,8 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       agent_continuation_states: agentContinuationStates,
       terminal_rejection_observations: terminalRejectionObservations,
     },
+    codex_native_provider_bridge: codexNativeProviderBridge,
+    codex_native_compatibility_fallback: codexNativeCompatibilityFallback,
     provider_gateway_debug_summary: providerGatewayDebugSummary,
     workstation_gateway_manifest: workstationGatewayManifest,
     workstation_gateway_manifest_version:
@@ -4004,6 +4182,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       realtimeClientReceiptObservations,
       fallbackRuntimeAgentProvider,
     ),
+    realtime_grounded_answer_feedback: realtimeGroundedAnswerFeedback,
     provider_prompt_leak_guard: providerPromptLeakGuard,
     visible_translation_chain_summary: visibleTranslationChainSummary,
     terminal_authority_status:

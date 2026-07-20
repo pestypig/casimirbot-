@@ -252,6 +252,178 @@ describe("Helix Ask debug export capability lanes", () => {
     expect(text).not.toContain("answer-must-not-export");
   });
 
+  it("exports native Codex and grounded relay proof without raw identity or prompt content", () => {
+    const rawProfileId = "profile:native-debug-must-not-export";
+    const rawPromptText = "raw native prompt must not export";
+    const groundedAnswerText = "grounded answer body must not export";
+    const text = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "ask:native-debug-proof",
+        question: "show native runtime proof",
+        content: "Native runtime proof recorded.",
+      },
+      {
+        selected_final_answer: "Native runtime proof recorded.",
+        final_answer_source: "agent_provider",
+        terminal_artifact_kind: "provider_answer",
+        codex_native_provider_bridge: {
+          schema: "helix.codex_native_provider_bridge.v1",
+          enabled: true,
+          eligible: true,
+          attempted: true,
+          status: "completed",
+          native_transport: "codex_app_server",
+          compatibility_transport: "codex_exec",
+          fallback_required: false,
+          fallback_reason: null,
+          model_policy_source: "language_model_policy",
+          effective_model: "gpt-5.4-mini",
+          effective_reasoning_effort: "low",
+          trusted_goal_account_binding_required: true,
+          allowed_workstation_tools: ["workspace_os.status"],
+          native_workstation_turn: {
+            schema: "helix.codex_native_workstation_turn_debug.v1",
+            account_type: "developer",
+            profile_id: rawProfileId,
+            profile_bound: true,
+            raw_profile_id_included: true,
+            trusted_account_session: true,
+            trusted_account_binding_required: true,
+            account_binding_status: "trusted",
+            requested_mode: "act",
+            effective_mode: "act",
+            requested_runtime: "codex",
+            native_transport: "app_server_stdio_jsonl",
+            ephemeral_thread: true,
+            isolated_runtime_workspace: true,
+            sandbox_policy: "read_only",
+            network_access: false,
+            approval_policy: "never",
+            built_in_tools_disabled: true,
+            disabled_native_features: ["shell", "web_search"],
+            model_visible_tools: ["workspace_os.status"],
+            account_locked_tools: ["repo.search"],
+            goal_allowed_tools: ["workspace_os.status"],
+            route_prompt_hash: "prompt:abc",
+            route_proposal: {
+              schema: "helix.runtime_semantic_route_proposal.v1",
+              turn_id: "ask:native-debug-proof",
+              proposal_id: "route-proposal:test",
+              prompt_hash: "prompt:abc",
+              proposal_source: "agent_runtime",
+              proposed_route: "workspace_status",
+              proposed_tool_family: "workspace",
+              proposed_capability_id: "workspace_os.status",
+              proposed_capability_ids: ["workspace_os.status"],
+              confidence: "high",
+              reason_summary: rawPromptText,
+              supporting_hint_refs: ["hint:workspace-status"],
+            },
+            route_admission_reason: "runtime_semantic_route_validated_against_helix_admission",
+            route_admitted_tools: ["workspace_os.status"],
+            requested_tools: ["workspace_os.status"],
+            executed_tools: ["workspace_os.status"],
+            successful_tools: ["workspace_os.status"],
+            failed_tools: [],
+            route_unobserved_tools: [],
+            observation_reentry_refs: ["observation:workspace-status"],
+            effective_model: "gpt-5.4-mini",
+            effective_reasoning_effort: "low",
+            native_item_types: ["dynamicToolCall", "agentMessage"],
+            forbidden_native_item_types: [],
+            native_thread_id: "thread:native:test",
+            native_turn_id: "turn:native:test",
+            native_final_item_id: "item:native:final",
+            native_turn_status: "completed",
+            terminal_candidate_present: true,
+            compatibility_fallback_required: false,
+            compatibility_fallback_reason: null,
+            prompt_text: rawPromptText,
+          },
+          Authorization: "Bearer native-secret-must-not-export",
+        },
+        codex_native_compatibility_fallback: {
+          schema: "helix.codex_native_compatibility_fallback.v1",
+          activated: false,
+          native_attempted: true,
+          native_fallback_reason: null,
+          native_unobserved_capability_ids: [],
+          gateway_recovery_attempted: false,
+          gateway_recovery_result_count: 0,
+          gateway_recovery_capability_ids: [],
+          compatibility_transport: "codex_exec",
+        },
+        realtime_grounded_answer_feedback: {
+          schema: "helix.runtime_goal.realtime_grounded_feedback.v1",
+          handoff_id: "realtime-handoff:test",
+          account_bound: true,
+          feedback_recorded: true,
+          relay_status: "response_requested",
+          relay_failure_code: null,
+          blocked_reason: null,
+          answer_text: groundedAnswerText,
+        },
+      },
+    );
+
+    const exported = JSON.parse(text) as Record<string, any>;
+    expect(exported.codex_native_provider_bridge).toMatchObject({
+      schema: "helix.codex_native_provider_bridge.v1",
+      attempted: true,
+      status: "completed",
+      effective_model: "gpt-5.4-mini",
+      effective_reasoning_effort: "low",
+      native_workstation_turn: {
+        profile_bound: true,
+        raw_profile_id_included: false,
+        model_visible_tools: ["workspace_os.status"],
+        route_admitted_tools: ["workspace_os.status"],
+        requested_tools: ["workspace_os.status"],
+        executed_tools: ["workspace_os.status"],
+        successful_tools: ["workspace_os.status"],
+        failed_tools: [],
+        route_unobserved_tools: [],
+        observation_reentry_refs: ["observation:workspace-status"],
+        native_turn_id: "turn:native:test",
+        native_final_item_id: "item:native:final",
+        native_turn_status: "completed",
+        terminal_candidate_present: true,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(exported.codex_native_provider_bridge.native_workstation_turn.route_proposal)
+      .toMatchObject({
+        proposed_capability_id: "workspace_os.status",
+        proposed_capability_ids: ["workspace_os.status"],
+        reason_summary_included: false,
+        terminal_eligible: false,
+      });
+    expect(exported.codex_native_compatibility_fallback).toMatchObject({
+      activated: false,
+      native_attempted: true,
+      native_unobserved_capability_ids: [],
+      compatibility_transport: "codex_exec",
+      terminal_eligible: false,
+    });
+    expect(exported.realtime_grounded_answer_feedback).toMatchObject({
+      handoff_id: "realtime-handoff:test",
+      account_bound: true,
+      feedback_recorded: true,
+      relay_status: "response_requested",
+      answer_authority: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(text).not.toContain(rawProfileId);
+    expect(text).not.toContain(rawPromptText);
+    expect(text).not.toContain(groundedAnswerText);
+    expect(text).not.toContain("native-secret-must-not-export");
+    expect(text).not.toContain('"profile_id":');
+    expect(text).not.toContain('"answer_text":');
+  });
+
   it("preserves client note persistence receipts for workstation note creation", () => {
     const text = buildHelixDebugExportEnvelopeFromMasterPayload(
       {
@@ -2790,8 +2962,6 @@ describe("Helix Ask debug export capability lanes", () => {
           "document_markdown:docs/research/nhm2.md::fnv1a32:goal-session::docs_chunk::es-US::es",
         lane_session_source_identity_key:
           "document_markdown:docs/research/nhm2.md::fnv1a32:goal-session::fnv1a32:goal-source-text::2048::docs::docs_chunk::es-US::es",
-        latest_mail_loop_observation_key:
-          "document_markdown:docs/research/nhm2.md::fnv1a32:goal-docs::document_markdown::docs_chunk::es-US::es::u0001::receipt:translation-goal-binding",
         report_action: "wake_on_salience",
         report_reason: "goal_binding_policy_requests_wake_on_salience",
         report_summary_text:
@@ -2893,8 +3063,9 @@ describe("Helix Ask debug export capability lanes", () => {
       terminal_rejected_count: 0,
       visible_lane_does_not_mean_executed: true,
     });
-    expect(exportPayload.capability_lane_timeline_summary.console_state_rows).toHaveLength(7);
-    expect(exportPayload.capability_lane_timeline_summary.console_state_rows).toEqual(expect.arrayContaining([
+    const timelineSummary = exportPayload.capability_lane_timeline_summary as Record<string, unknown>;
+    expect(timelineSummary.console_state_rows).toHaveLength(7);
+    expect(timelineSummary.console_state_rows).toEqual(expect.arrayContaining([
       expect.objectContaining({
         schema: "helix.capability_lane.console_state_row.v1",
         seq: 0,

@@ -1,7 +1,7 @@
 import type {
   HelixRealtimeGroundedRelayV1,
-  HelixRealtimeWorkerAdmissionV1,
 } from "./helix-realtime-worker-relay.v1";
+import type { HelixRealtimeWorkerAdmissionV2 } from "./helix-realtime-worker-dispatch.v2";
 
 export const HELIX_REALTIME_STAGE_PLAY_CONTEXT_PACK_SCHEMA =
   "helix.realtime_stage_play.context_pack.v1" as const;
@@ -112,7 +112,7 @@ export type HelixRealtimeStagePlayAskHandoffV1 = {
   runtime_goal_session_ref: string | null;
   runtime_agent_provider: string | null;
   required_grounding_capability_ids: string[];
-  worker_admission: HelixRealtimeWorkerAdmissionV1;
+  worker_admission: HelixRealtimeWorkerAdmissionV2;
   created_at_ms: number;
   route_metadata: Record<string, unknown>;
   read_only: true;
@@ -201,7 +201,7 @@ export type HelixRealtimeStagePlayDebugV1 = {
     runtime_goal_session_ref: string | null;
     runtime_agent_provider: string | null;
     required_grounding_capability_ids: string[];
-    worker_admission: HelixRealtimeWorkerAdmissionV1;
+    worker_admission: HelixRealtimeWorkerAdmissionV2;
     created_at_ms: number;
     grounded_answer: HelixRealtimeStagePlayGroundedAnswerV1 | null;
     grounded_relay: HelixRealtimeGroundedRelayV1 | null;

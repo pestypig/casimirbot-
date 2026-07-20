@@ -1,13 +1,18 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { isTheoryBadgeGraphV1, validateTheoryBadgeGraphV1, type TheoryBadgeV1 } from "../../contracts/theory-badge-graph.v1";
+import {
+  isTheoryBadgeGraphV1,
+  validateTheoryBadgeGraphV1,
+  type TheoryBadgeV1,
+} from "../../contracts/theory-badge-graph.v1";
 import { buildHelixTheoryBadgeGraphV1 } from "../helix-theory-badge-graph";
 import {
   buildNhm2FullSolveTheoryBadgesV1,
   evaluateNhm2SteeringBondiFluxGate,
 } from "../nhm2-full-solve-theory-badges";
 
-const forbiddenPhrase = (...parts: string[]): RegExp => new RegExp(parts.join(""), "i");
+const forbiddenPhrase = (...parts: string[]): RegExp =>
+  new RegExp(parts.join(""), "i");
 
 describe("NHM2 full-solve theory badges", () => {
   const newClosureStackBadgeIds = [
@@ -16,6 +21,7 @@ describe("NHM2 full-solve theory badges", () => {
     "nhm2.source.same_basis_tensor_authority",
     "nhm2.closure.wall_t00_source_residual",
     "nhm2.closure.coupled_pass_candidate",
+    "nhm2.meta.experiment_ready_theory_closure",
     "nhm2.closure.regional_tensor_pass_path_harness",
     "nhm2.dynamic.switching_covariant_conservation",
     "nhm2.dynamic.frequency_convergence",
@@ -82,7 +88,9 @@ describe("NHM2 full-solve theory badges", () => {
   });
 
   it("includes the whitepaper projection grammar as first-class badges", () => {
-    const ids = buildNhm2FullSolveTheoryBadgesV1().badges.map((badge: TheoryBadgeV1) => badge.id);
+    const ids = buildNhm2FullSolveTheoryBadgesV1().badges.map(
+      (badge: TheoryBadgeV1) => badge.id,
+    );
 
     expect(ids).toContain("nhm2.observer.eulerian_normal");
     expect(ids).toContain("nhm2.observer.energy_density_projection");
@@ -97,6 +105,7 @@ describe("NHM2 full-solve theory badges", () => {
     expect(ids).toContain("nhm2.tensor.same_chart_full_tensor");
     expect(ids).toContain("nhm2.closure.same_basis_regional_residual");
     expect(ids).toContain("nhm2.closure.coupled_pass_candidate");
+    expect(ids).toContain("nhm2.meta.experiment_ready_theory_closure");
     expect(ids).toContain("nhm2.closure.regional_tensor_pass_path_harness");
     expect(ids).toContain("nhm2.dynamic.switching_covariant_conservation");
     expect(ids).toContain("nhm2.dynamic.frequency_convergence");
@@ -333,6 +342,99 @@ describe("NHM2 full-solve theory badges", () => {
     );
   });
 
+  it("keeps experiment-ready theory closure as a separate blocked meta lamp", () => {
+    const { badges, edges } = buildNhm2FullSolveTheoryBadgesV1();
+    const byId = new Map(
+      badges.map((badge: TheoryBadgeV1) => [badge.id, badge]),
+    );
+    const theoryClosure = byId.get("nhm2.meta.experiment_ready_theory_closure");
+
+    expect(theoryClosure).toMatchObject({
+      level: "diagnostic_gate",
+      status: "blocked",
+      calculatorPayloads: [],
+      claimBoundary: {
+        diagnosticOnly: true,
+        doesValidateNHM2: false,
+        validationClaimAllowed: false,
+        physicalMechanismClaimAllowed: false,
+        promotionAllowed: false,
+      },
+    });
+    expect(JSON.stringify(theoryClosure?.sourceRefs)).toMatch(
+      /nhm2-experiment-ready-theory-closure\.v1\.ts/,
+    );
+    expect(JSON.stringify(theoryClosure?.sourceRefs)).toMatch(
+      /nhm2-experiment-ready-theory-closure\.spec\.ts/,
+    );
+    expect(JSON.stringify(theoryClosure?.sourceRefs)).toMatch(
+      /nhm2-experiment-ready-theory-candidate-manifest\.v1\.ts/,
+    );
+    expect(JSON.stringify(theoryClosure?.sourceRefs)).toMatch(
+      /nhm2-semiclassical-state-realizability\.v1\.ts/,
+    );
+    expect(JSON.stringify(theoryClosure?.sourceRefs)).toMatch(
+      /nhm2-prediction-falsifier-freeze\.v1\.ts/,
+    );
+    expect(JSON.stringify(theoryClosure?.sourceRefs)).toMatch(
+      /nhm2-experiment-ready-theory-closure-evaluator\.ts/,
+    );
+    expect(JSON.stringify(theoryClosure)).toMatch(/NOT_READY/);
+    expect(JSON.stringify(theoryClosure)).toMatch(
+      /THEORY_CLOSED_EXPERIMENT_READY_CANDIDATE/,
+    );
+    expect(JSON.stringify(theoryClosure)).toMatch(
+      /physical viability, transport, propulsion, route ETA, and speed-authority claims false/i,
+    );
+    expect(JSON.stringify(theoryClosure)).toMatch(
+      /candidate manifest is frozen before execution/i,
+    );
+    expect(JSON.stringify(theoryClosure)).toMatch(
+      /Post-run receipts and output manifests bind execution provenance/i,
+    );
+    expect(JSON.stringify(theoryClosure)).toMatch(
+      /only the filesystem replay evaluator has authority/i,
+    );
+
+    expect(byId.get("nhm2.closure.coupled_pass_candidate")?.status).toBe(
+      "blocked",
+    );
+    expect(
+      byId.get("nhm2.experimental.physical_viability_campaign")?.status,
+    ).toBe("blocked");
+    expect(
+      byId.get("nhm2.claim_boundary.physical_viability_locked")?.status,
+    ).toBe("blocked");
+    expect(byId.get("nhm2.claim_boundary.transport_locked")?.status).toBe(
+      "blocked",
+    );
+
+    expect(edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          from: "nhm2.closure.coupled_pass_candidate",
+          to: "nhm2.meta.experiment_ready_theory_closure",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "nhm2.meta.experiment_ready_theory_closure",
+          to: "nhm2.experimental.physical_viability_campaign",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "nhm2.meta.experiment_ready_theory_closure",
+          to: "nhm2.claim_boundary.physical_viability_locked",
+          relation: "blocks",
+        }),
+        expect.objectContaining({
+          from: "nhm2.meta.experiment_ready_theory_closure",
+          to: "nhm2.claim_boundary.transport_locked",
+          relation: "blocks",
+        }),
+      ]),
+    );
+  });
+
   it("keeps non-scalar full-solve artifacts out of calculator payloads", () => {
     const badges = buildNhm2FullSolveTheoryBadgesV1().badges;
     const nonScalarIds = [
@@ -340,6 +442,7 @@ describe("NHM2 full-solve theory badges", () => {
       "nhm2.source.component_authority_ledger",
       "nhm2.source.same_basis_tensor_authority",
       "nhm2.closure.coupled_pass_candidate",
+      "nhm2.meta.experiment_ready_theory_closure",
       "nhm2.closure.regional_tensor_pass_path_harness",
       "nhm2.dynamic.switching_covariant_conservation",
       "nhm2.dynamic.frequency_convergence",
@@ -375,22 +478,32 @@ describe("NHM2 full-solve theory badges", () => {
     ];
 
     for (const badgeId of nonScalarIds) {
-      const badge = badges.find((candidate: TheoryBadgeV1) => candidate.id === badgeId);
+      const badge = badges.find(
+        (candidate: TheoryBadgeV1) => candidate.id === badgeId,
+      );
       expect(badge?.calculatorPayloads).toEqual([]);
     }
   });
 
   it("wires Lean certificate badges to runtime refs without calculator payloads", () => {
     const badges = buildNhm2FullSolveTheoryBadgesV1().badges;
-    const byId = new Map(badges.map((badge: TheoryBadgeV1) => [badge.id, badge]));
+    const byId = new Map(
+      badges.map((badge: TheoryBadgeV1) => [badge.id, badge]),
+    );
 
     for (const badgeId of leanFormalBadgeIds) {
       const badge = byId.get(badgeId);
       expect(badge, badgeId).toBeDefined();
       expect(badge?.calculatorPayloads).toEqual([]);
-      expect(badge?.equations.every((equation) => equation.computableExpression == null)).toBe(true);
       expect(
-        badge?.equations.every((equation) => equation.operatorKind === "noncomputable_reference"),
+        badge?.equations.every(
+          (equation) => equation.computableExpression == null,
+        ),
+      ).toBe(true);
+      expect(
+        badge?.equations.every(
+          (equation) => equation.operatorKind === "noncomputable_reference",
+        ),
       ).toBe(true);
       expect(badge?.claimBoundary).toMatchObject({
         diagnosticOnly: true,
@@ -428,7 +541,9 @@ describe("NHM2 full-solve theory badges", () => {
       boundToExecution: false,
     });
     expect(manifest.entries).toHaveLength(39);
-    expect(manifest.entries.every((entry) => entry.freshness === "preexisting")).toBe(true);
+    expect(
+      manifest.entries.every((entry) => entry.freshness === "preexisting"),
+    ).toBe(true);
 
     for (const badgeId of [
       "nhm2.formal.lean_certificate",
@@ -442,10 +557,14 @@ describe("NHM2 full-solve theory badges", () => {
     }
 
     const certificatePath = leanCertificate?.sourceRefs.find(
-      (ref) => ref.kind === "artifact" && ref.path?.endsWith("nhm2-lean-campaign-certificate.json"),
+      (ref) =>
+        ref.kind === "artifact" &&
+        ref.path?.endsWith("nhm2-lean-campaign-certificate.json"),
     )?.path;
     expect(certificatePath).toBeTruthy();
-    const certificate = JSON.parse(readFileSync(certificatePath ?? "", "utf8")) as {
+    const certificate = JSON.parse(
+      readFileSync(certificatePath ?? "", "utf8"),
+    ) as {
       claimLocks: Record<string, boolean>;
     };
     expect(certificate.claimLocks).toEqual({
@@ -458,13 +577,17 @@ describe("NHM2 full-solve theory badges", () => {
   });
 
   it("keeps Lean formal certificate copy claim-safe", () => {
-    const badges = buildNhm2FullSolveTheoryBadgesV1().badges.filter((badge: TheoryBadgeV1) =>
-      leanFormalBadgeIds.includes(badge.id),
+    const badges = buildNhm2FullSolveTheoryBadgesV1().badges.filter(
+      (badge: TheoryBadgeV1) => leanFormalBadgeIds.includes(badge.id),
     );
     const text = JSON.stringify(badges);
 
-    expect(text).toMatch(/Lean verifies diagnostic campaign admissibility from the emitted certificate/);
-    expect(text).not.toMatch(forbiddenPhrase("Lean", " proves NHM2 is physically viable"));
+    expect(text).toMatch(
+      /Lean verifies diagnostic campaign admissibility from the emitted certificate/,
+    );
+    expect(text).not.toMatch(
+      forbiddenPhrase("Lean", " proves NHM2 is physically viable"),
+    );
     expect(text).not.toMatch(forbiddenPhrase("certified", " warp speed"));
     expect(text).not.toMatch(forbiddenPhrase("transport", " certified"));
     expect(text).not.toMatch(forbiddenPhrase("route ETA", " certified"));
@@ -474,7 +597,9 @@ describe("NHM2 full-solve theory badges", () => {
 
   it("wires the physical evidence campaign without promoting diagnostic campaign pass", () => {
     const badges = buildNhm2FullSolveTheoryBadgesV1().badges;
-    const byId = new Map(badges.map((badge: TheoryBadgeV1) => [badge.id, badge]));
+    const byId = new Map(
+      badges.map((badge: TheoryBadgeV1) => [badge.id, badge]),
+    );
 
     for (const badgeId of physicalEvidenceBadgeIds) {
       const badge = byId.get(badgeId);
@@ -489,9 +614,15 @@ describe("NHM2 full-solve theory badges", () => {
     }
 
     const campaign = byId.get("nhm2.experimental.physical_viability_campaign");
-    expect(JSON.stringify(campaign)).toMatch(/diagnostic campaign can feed this ladder/i);
-    expect(JSON.stringify(campaign)).toMatch(/cannot substitute for experimental receipts/i);
-    expect(JSON.stringify(campaign?.sourceRefs)).toMatch(/nhm2-lean-campaign-certificate\.json/);
+    expect(JSON.stringify(campaign)).toMatch(
+      /diagnostic campaign can feed this ladder/i,
+    );
+    expect(JSON.stringify(campaign)).toMatch(
+      /cannot substitute for experimental receipts/i,
+    );
+    expect(JSON.stringify(campaign?.sourceRefs)).toMatch(
+      /nhm2-lean-campaign-certificate\.json/,
+    );
 
     const roadmap = byId.get("nhm2.experimental.theory_solve_roadmap");
     expect(roadmap?.calculatorPayloads).toEqual([]);
@@ -501,14 +632,18 @@ describe("NHM2 full-solve theory badges", () => {
     expect(JSON.stringify(roadmap?.sourceRefs)).toMatch(/nature10561/);
     expect(JSON.stringify(roadmap?.sourceRefs)).toMatch(/0902\.4022/);
     expect(JSON.stringify(roadmap?.sourceRefs)).toMatch(/gr-qc\/9702026/);
-    expect(JSON.stringify(roadmap)).toMatch(/roadmap is an experiment-planning artifact/i);
+    expect(JSON.stringify(roadmap)).toMatch(
+      /roadmap is an experiment-planning artifact/i,
+    );
 
     const parameterTargets = byId.get("nhm2.experimental.parameter_targets");
     expect(parameterTargets?.calculatorPayloads).toEqual([]);
     expect(JSON.stringify(parameterTargets?.sourceRefs)).toMatch(
       /nhm2-experiment-parameter-targets\.v1\.ts/,
     );
-    expect(JSON.stringify(parameterTargets?.sourceRefs)).toMatch(/PhysRevApplied\.15\.034063/);
+    expect(JSON.stringify(parameterTargets?.sourceRefs)).toMatch(
+      /PhysRevApplied\.15\.034063/,
+    );
     expect(JSON.stringify(parameterTargets)).toMatch(/modeled scalar rows/i);
     expect(JSON.stringify(parameterTargets)).toMatch(/cannot substitute/i);
 
@@ -518,14 +653,22 @@ describe("NHM2 full-solve theory badges", () => {
       /nhm2-experiment-research-gap-ledger\.v1\.ts/,
     );
     expect(JSON.stringify(researchGapLedger?.sourceRefs)).toMatch(/1401\.0784/);
-    expect(JSON.stringify(researchGapLedger?.sourceRefs)).toMatch(/1505\.04169/);
-    expect(JSON.stringify(researchGapLedger?.sourceRefs)).toMatch(/2602\.18023/);
-    expect(JSON.stringify(researchGapLedger)).toMatch(/No direct precedent found is not a novelty claim/i);
+    expect(JSON.stringify(researchGapLedger?.sourceRefs)).toMatch(
+      /1505\.04169/,
+    );
+    expect(JSON.stringify(researchGapLedger?.sourceRefs)).toMatch(
+      /2602\.18023/,
+    );
+    expect(JSON.stringify(researchGapLedger)).toMatch(
+      /No direct precedent found is not a novelty claim/i,
+    );
     expect(JSON.stringify(researchGapLedger)).not.toMatch(
       new RegExp(["never", "done"].join("\\s+"), "i"),
     );
 
-    const layerStackMechanicalReceipt = byId.get("nhm2.experimental.layer_stack_mechanical_receipt");
+    const layerStackMechanicalReceipt = byId.get(
+      "nhm2.experimental.layer_stack_mechanical_receipt",
+    );
     expect(layerStackMechanicalReceipt?.calculatorPayloads).toEqual([]);
     expect(JSON.stringify(layerStackMechanicalReceipt?.sourceRefs)).toMatch(
       /nhm2-layer-stack-mechanical-receipt\.v1\.ts/,
@@ -536,53 +679,89 @@ describe("NHM2 full-solve theory badges", () => {
     expect(JSON.stringify(layerStackMechanicalReceipt)).toMatch(
       /does not publish a layer-stack mechanical receipt artifact/i,
     );
-    expect(JSON.stringify(layerStackMechanicalReceipt)).toMatch(/14\.2 kN internal normal attraction/i);
+    expect(JSON.stringify(layerStackMechanicalReceipt)).toMatch(
+      /14\.2 kN internal normal attraction/i,
+    );
     expect(JSON.stringify(layerStackMechanicalReceipt)).toMatch(/not thrust/i);
 
-    const supportFractionSweep = byId.get("nhm2.experimental.layer_stack_support_fraction_sweep");
+    const supportFractionSweep = byId.get(
+      "nhm2.experimental.layer_stack_support_fraction_sweep",
+    );
     expect(supportFractionSweep?.calculatorPayloads).toEqual([]);
     expect(JSON.stringify(supportFractionSweep?.sourceRefs)).toMatch(
       /nhm2-layer-stack-support-fraction-sweep\.v1\.ts/,
     );
-    expect(JSON.stringify(supportFractionSweep)).toMatch(/stress limits and wall-source retention/i);
-    expect(JSON.stringify(supportFractionSweep)).toMatch(/not material evidence/i);
+    expect(JSON.stringify(supportFractionSweep)).toMatch(
+      /stress limits and wall-source retention/i,
+    );
+    expect(JSON.stringify(supportFractionSweep)).toMatch(
+      /not material evidence/i,
+    );
 
-    const architectureLoop = byId.get("nhm2.experimental.layer_stack_architecture_loop");
+    const architectureLoop = byId.get(
+      "nhm2.experimental.layer_stack_architecture_loop",
+    );
     expect(architectureLoop?.calculatorPayloads).toEqual([]);
     expect(JSON.stringify(architectureLoop?.sourceRefs)).toMatch(
       /nhm2-layer-stack-engineering-architecture-loop\.v1\.ts/,
     );
-    expect(JSON.stringify(architectureLoop)).toMatch(/decouple load support from active Casimir area/i);
-    expect(JSON.stringify(architectureLoop)).toMatch(/pull-in, roughness, patch, material, active-control, and tensor blockers/i);
-    expect(JSON.stringify(architectureLoop)).toMatch(/not material-source evidence/i);
+    expect(JSON.stringify(architectureLoop)).toMatch(
+      /decouple load support from active Casimir area/i,
+    );
+    expect(JSON.stringify(architectureLoop)).toMatch(
+      /pull-in, roughness, patch, material, active-control, and tensor blockers/i,
+    );
+    expect(JSON.stringify(architectureLoop)).toMatch(
+      /not material-source evidence/i,
+    );
 
-    const receiptLoop = byId.get("nhm2.experimental.full_apparatus_receipt_loop");
+    const receiptLoop = byId.get(
+      "nhm2.experimental.full_apparatus_receipt_loop",
+    );
     expect(receiptLoop?.calculatorPayloads).toEqual([]);
     expect(JSON.stringify(receiptLoop?.sourceRefs)).toMatch(
       /nhm2-layer-stack-full-apparatus-receipt-loop\.v1\.ts/,
     );
-    expect(JSON.stringify(receiptLoop)).toMatch(/material, force-gap, pull-in, roughness, patch-potential, active-control, fatigue, layer-scaling/i);
+    expect(JSON.stringify(receiptLoop)).toMatch(
+      /material, force-gap, pull-in, roughness, patch-potential, active-control, fatigue, layer-scaling/i,
+    );
     expect(JSON.stringify(receiptLoop)).toMatch(/not material receipts/i);
-    expect(JSON.stringify(receiptLoop)).toMatch(/does not unlock physical, transport, propulsion, route, or speed claims/i);
+    expect(JSON.stringify(receiptLoop)).toMatch(
+      /does not unlock physical, transport, propulsion, route, or speed claims/i,
+    );
 
-    const validationPlan = byId.get("nhm2.experimental.tile_source_physical_validation_plan");
+    const validationPlan = byId.get(
+      "nhm2.experimental.tile_source_physical_validation_plan",
+    );
     expect(validationPlan?.calculatorPayloads).toEqual([]);
     expect(JSON.stringify(validationPlan?.sourceRefs)).toMatch(
       /nhm2-tile-source-physical-validation-plan\.v1\.ts/,
     );
-    expect(JSON.stringify(validationPlan)).toMatch(/physically credible source candidate still requires downstream/i);
-    expect(JSON.stringify(validationPlan)).toMatch(/Ideal scalar Casimir formulas/i);
-    expect(JSON.stringify(validationPlan)).toMatch(/cannot substitute for material evidence or transport claims/i);
+    expect(JSON.stringify(validationPlan)).toMatch(
+      /physically credible source candidate still requires downstream/i,
+    );
+    expect(JSON.stringify(validationPlan)).toMatch(
+      /Ideal scalar Casimir formulas/i,
+    );
+    expect(JSON.stringify(validationPlan)).toMatch(
+      /cannot substitute for material evidence or transport claims/i,
+    );
 
-    expect(byId.get("nhm2.experimental.tile_cycle_energy_balance")?.calculatorPayloads.map(
-      (payload) => payload.expression,
-    )).toEqual(["delta_m = DeltaE/c^2", "delta_F = g*DeltaE/c^2"]);
-    expect(byId.get("nhm2.experimental.array_scaling")?.calculatorPayloads.map(
-      (payload) => payload.expression,
-    )).toEqual(["array_scaling = DeltaE_N/(N*DeltaE_1)"]);
-    expect(byId.get("nhm2.experimental.metric_upper_bound")?.calculatorPayloads.map(
-      (payload) => payload.expression,
-    )).toEqual(["h00_proxy = 2*G*DeltaE/(r*c^4)"]);
+    expect(
+      byId
+        .get("nhm2.experimental.tile_cycle_energy_balance")
+        ?.calculatorPayloads.map((payload) => payload.expression),
+    ).toEqual(["delta_m = DeltaE/c^2", "delta_F = g*DeltaE/c^2"]);
+    expect(
+      byId
+        .get("nhm2.experimental.array_scaling")
+        ?.calculatorPayloads.map((payload) => payload.expression),
+    ).toEqual(["array_scaling = DeltaE_N/(N*DeltaE_1)"]);
+    expect(
+      byId
+        .get("nhm2.experimental.metric_upper_bound")
+        ?.calculatorPayloads.map((payload) => payload.expression),
+    ).toEqual(["h00_proxy = 2*G*DeltaE/(r*c^4)"]);
   });
 
   it("exposes the frozen support-retention overlap as a blocked scalar gate", () => {
@@ -620,7 +799,9 @@ describe("NHM2 full-solve theory badges", () => {
       },
     });
     expect(overlap).toBeCloseTo(0.459119311228, 12);
-    expect(JSON.stringify(badge)).toMatch(/support_retention_overlap_window_missing/);
+    expect(JSON.stringify(badge)).toMatch(
+      /support_retention_overlap_window_missing/,
+    );
     expect(JSON.stringify(badge?.sourceRefs)).toMatch(/2606\.28195/);
     expect(edges).toEqual(
       expect.arrayContaining([
@@ -699,7 +880,9 @@ describe("NHM2 full-solve theory badges", () => {
       expect(result.status, premise).toBe("not_applicable");
       expect(result.applicable, premise).toBe(false);
       expect(result.radiativeBudgetRequired, premise).toBe(false);
-      expect(Object.values(result.claimLocks).every((allowed) => allowed === false)).toBe(true);
+      expect(
+        Object.values(result.claimLocks).every((allowed) => allowed === false),
+      ).toBe(true);
     }
 
     const unknown = evaluateNhm2SteeringBondiFluxGate({
@@ -734,10 +917,13 @@ describe("NHM2 full-solve theory badges", () => {
   });
 
   it("keeps every local repo and artifact source reference resolvable", () => {
-    const localRefs = buildNhm2FullSolveTheoryBadgesV1().badges.flatMap((badge) =>
-      badge.sourceRefs
-        .filter((ref) => ref.kind === "repo_module" || ref.kind === "artifact")
-        .map((ref) => ({ badgeId: badge.id, ref })),
+    const localRefs = buildNhm2FullSolveTheoryBadgesV1().badges.flatMap(
+      (badge) =>
+        badge.sourceRefs
+          .filter(
+            (ref) => ref.kind === "repo_module" || ref.kind === "artifact",
+          )
+          .map((ref) => ({ badgeId: badge.id, ref })),
     );
 
     for (const { badgeId, ref } of localRefs) {
@@ -748,7 +934,8 @@ describe("NHM2 full-solve theory badges", () => {
 
   it("keeps the centerline clocking target calculator-loadable but bounded", () => {
     const badge = buildNhm2FullSolveTheoryBadgesV1().badges.find(
-      (candidate: TheoryBadgeV1) => candidate.id === "nhm2.clock.centerline_tau_alpha_T",
+      (candidate: TheoryBadgeV1) =>
+        candidate.id === "nhm2.clock.centerline_tau_alpha_T",
     );
 
     expect(badge?.calculatorPayloads).toEqual(
@@ -808,7 +995,9 @@ describe("NHM2 full-solve theory badges", () => {
       ]),
     );
     expect(JSON.stringify(badge)).toMatch(/analogy/i);
-    expect(JSON.stringify(badge)).not.toMatch(forbiddenPhrase("\\bcertified", " speed\\b"));
+    expect(JSON.stringify(badge)).not.toMatch(
+      forbiddenPhrase("\\bcertified", " speed\\b"),
+    );
     expect(JSON.stringify(badge)).not.toMatch(/\btrue ETA\b/i);
     expect(JSON.stringify(badge)).not.toMatch(/\bphysical warp trip\b/i);
     expect(badge?.claimBoundary.promotionAllowed).toBe(false);
@@ -857,11 +1046,11 @@ describe("NHM2 full-solve theory badges", () => {
         "nhm2.experimental.research_gap_ledger",
         "nhm2.experimental.layer_stack_mechanical_receipt",
         "nhm2.mechanical.support_retention_overlap",
-      "nhm2.experimental.layer_stack_support_fraction_sweep",
-      "nhm2.experimental.layer_stack_architecture_loop",
-      "nhm2.experimental.full_apparatus_receipt_loop",
-      "nhm2.experimental.tile_source_physical_validation_plan",
-      "nhm2.experimental.prediction_freeze",
+        "nhm2.experimental.layer_stack_support_fraction_sweep",
+        "nhm2.experimental.layer_stack_architecture_loop",
+        "nhm2.experimental.full_apparatus_receipt_loop",
+        "nhm2.experimental.tile_source_physical_validation_plan",
+        "nhm2.experimental.prediction_freeze",
         "nhm2.experimental.tile_force_receipt",
         "nhm2.experimental.tile_cycle_energy_balance",
         "nhm2.experimental.array_scaling",
@@ -878,16 +1067,19 @@ describe("NHM2 full-solve theory badges", () => {
       ]),
     );
     const wallClosure = graph.badges.find(
-      (badge: TheoryBadgeV1) => badge.id === "nhm2.closure.wall_t00_source_residual",
+      (badge: TheoryBadgeV1) =>
+        badge.id === "nhm2.closure.wall_t00_source_residual",
     );
-    expect(wallClosure?.calculatorPayloads.map((payload) => payload.expression)).toContain(
-      "R_wall_T00 = T00_wall_required - T00_wall_available",
-    );
+    expect(
+      wallClosure?.calculatorPayloads.map((payload) => payload.expression),
+    ).toContain("R_wall_T00 = T00_wall_required - T00_wall_available");
   });
 
   it("keeps new closure-stack badges diagnostic and noncomputable except scalar replay rows", () => {
     const graph = buildHelixTheoryBadgeGraphV1();
-    const byId = new Map(graph.badges.map((badge: TheoryBadgeV1) => [badge.id, badge]));
+    const byId = new Map(
+      graph.badges.map((badge: TheoryBadgeV1) => [badge.id, badge]),
+    );
 
     for (const badgeId of newClosureStackBadgeIds) {
       const badge = byId.get(badgeId);
@@ -921,33 +1113,39 @@ describe("NHM2 full-solve theory badges", () => {
     ]) {
       const badge = byId.get(badgeId);
       expect(badge?.calculatorPayloads).toEqual([]);
-      expect(badge?.equations.every((equation) => equation.computableExpression == null)).toBe(true);
       expect(
-        badge?.equations.every((equation) =>
-          ["gate_status", "noncomputable_reference"].includes(equation.operatorKind),
+        badge?.equations.every(
+          (equation) => equation.computableExpression == null,
+        ),
+      ).toBe(true);
+      expect(
+        badge?.equations.every(
+          (equation) =>
+            equation.operatorKind === "gate_status" ||
+            equation.operatorKind === "noncomputable_reference",
         ),
       ).toBe(true);
     }
 
     expect(
-      byId.get("nhm2.closure.wall_t00_source_residual")?.calculatorPayloads.map(
-        (payload) => payload.expression,
-      ),
+      byId
+        .get("nhm2.closure.wall_t00_source_residual")
+        ?.calculatorPayloads.map((payload) => payload.expression),
     ).toEqual(["R_wall_T00 = T00_wall_required - T00_wall_available"]);
     expect(
-      byId.get("nhm2.qei.sampling_window")?.calculatorPayloads.map(
-        (payload) => payload.expression,
-      ),
+      byId
+        .get("nhm2.qei.sampling_window")
+        ?.calculatorPayloads.map((payload) => payload.expression),
     ).toContain("qei_margin = qei_bound - qei_sample");
     expect(
-      byId.get("casimir.cavity.mass_equivalent_proxy")?.calculatorPayloads.map(
-        (payload) => payload.expression,
-      ),
+      byId
+        .get("casimir.cavity.mass_equivalent_proxy")
+        ?.calculatorPayloads.map((payload) => payload.expression),
     ).toEqual(["M_proxy = E_out/c^2"]);
     expect(
-      byId.get("nhm2.tile.duty_cycle_average")?.calculatorPayloads.map(
-        (payload) => payload.expression,
-      ),
+      byId
+        .get("nhm2.tile.duty_cycle_average")
+        ?.calculatorPayloads.map((payload) => payload.expression),
     ).toEqual(["P_avg = E_cycle / T_cycle"]);
   });
 
@@ -1227,17 +1425,25 @@ describe("NHM2 full-solve theory badges", () => {
     expect(text).not.toMatch(/\bphysical mechanism confirmed\b/i);
     expect(text).not.toMatch(forbiddenPhrase("\\bQEI", " passed\\b"));
     expect(text).not.toMatch(/\benergy conditions cleared\b/i);
-    expect(text).not.toMatch(forbiddenPhrase("\\bsource closure", " solved\\b"));
-    expect(text).not.toMatch(forbiddenPhrase("\\bexternal paper validates", " NHM2\\b"));
+    expect(text).not.toMatch(
+      forbiddenPhrase("\\bsource closure", " solved\\b"),
+    );
+    expect(text).not.toMatch(
+      forbiddenPhrase("\\bexternal paper validates", " NHM2\\b"),
+    );
     expect(text).not.toMatch(forbiddenPhrase("\\bcertified", " speed\\b"));
     expect(text).not.toMatch(/\btrue ETA\b/i);
     expect(text).not.toMatch(/\bphysical warp trip\b/i);
-    expect(text).not.toMatch(forbiddenPhrase("Lean", " proves NHM2 is physically viable"));
+    expect(text).not.toMatch(
+      forbiddenPhrase("Lean", " proves NHM2 is physically viable"),
+    );
     expect(text).not.toMatch(forbiddenPhrase("certified", " warp speed"));
     expect(text).not.toMatch(forbiddenPhrase("transport", " certified"));
     expect(text).not.toMatch(forbiddenPhrase("route ETA", " certified"));
     expect(text).not.toMatch(forbiddenPhrase("material", " realization"));
-    expect(text).not.toMatch(forbiddenPhrase("physical viability", " unlocked"));
+    expect(text).not.toMatch(
+      forbiddenPhrase("physical viability", " unlocked"),
+    );
     expect(text).not.toMatch(forbiddenPhrase("transport", " unlocked"));
   });
 });

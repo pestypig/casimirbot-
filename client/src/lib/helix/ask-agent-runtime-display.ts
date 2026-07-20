@@ -1,6 +1,7 @@
-import type {
-  HelixAgentRuntimeDescriptor,
-  HelixAgentRuntimeId,
+import {
+  isHelixAgentRuntimeId as isSharedHelixAgentRuntimeId,
+  type HelixAgentRuntimeDescriptor,
+  type HelixAgentRuntimeId,
 } from "@shared/helix-agent-runtime";
 
 type RecordLike = Record<string, unknown>;
@@ -56,7 +57,7 @@ function coerceModelMetadataText(value: unknown): string {
 }
 
 export function isHelixAgentRuntimeId(value: unknown): value is HelixAgentRuntimeId {
-  return value === "helix" || value === "codex" || value === "future";
+  return isSharedHelixAgentRuntimeId(value);
 }
 
 function normalizeHelixAgentProvider(value: unknown): HelixAgentRuntimeDescriptor | null {

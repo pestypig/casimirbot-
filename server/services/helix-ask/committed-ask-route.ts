@@ -18,6 +18,7 @@ import { applyCompoundTerminalPolicy } from "./compound-terminal-policy";
 import { explicitCapabilityContractForCapability } from "./explicit-capability-contract";
 import { buildToolUseRestatement } from "./internet-search-intent";
 import { asksForScientificImageTextEvidenceComparison } from "@shared/helix-scientific-image-intent";
+import { resolveAuthoritativeLivePipelineRoute } from "./live-pipeline-route-authority";
 
 type RecordLike = Record<string, unknown>;
 
@@ -424,7 +425,26 @@ export function buildCommittedAskRoute(input: {
 }): HelixCommittedAskRoute {
   const affirmativeScientificImageComparison =
     asksForScientificImageTextEvidenceComparison(input.promptText);
-  const existing = readCommittedAskRoute(input.payload);
+  const authoritativeLivePipelineRoute = resolveAuthoritativeLivePipelineRoute({
+    turnId: input.turnId,
+    canonicalGoalFrame: readRecord(input.payload.canonical_goal_frame),
+    routeProductContract: readRecord(input.payload.route_product_contract),
+  });
+  const existingCandidate = readCommittedAskRoute(input.payload);
+  const staleExistingLivePipelineRoute = Boolean(
+    existingCandidate &&
+    authoritativeLivePipelineRoute &&
+    (
+      existingCandidate.route.source_target !== authoritativeLivePipelineRoute.sourceTarget ||
+      existingCandidate.route.target_kind !== authoritativeLivePipelineRoute.targetKind ||
+      existingCandidate.canonical_goal.goal_kind !== authoritativeLivePipelineRoute.goalKind ||
+      existingCandidate.canonical_goal.required_terminal_kind !== authoritativeLivePipelineRoute.requiredTerminalKind ||
+      !existingCandidate.canonical_goal.allowed_terminal_artifact_kinds.includes(authoritativeLivePipelineRoute.requiredTerminalKind) ||
+      existingCandidate.canonical_goal.forbidden_terminal_artifact_kinds.includes(authoritativeLivePipelineRoute.requiredTerminalKind) ||
+      !existingCandidate.capability_policy.required_capability_families.includes("live_pipeline")
+    )
+  );
+  const existing = staleExistingLivePipelineRoute ? null : existingCandidate;
   if (existing) {
     const explicitCapabilityContract = readExplicitCapabilityContractFromPayload(input.payload);
     const shouldRepairExistingScientificImageComparisonRoute =
@@ -604,8 +624,18 @@ export function buildCommittedAskRoute(input: {
   }
 
   const route = readRouteSource(input.payload);
-  const explicitCapabilityContract = readExplicitCapabilityContractFromPayload(input.payload);
-  const effectiveRoute = affirmativeScientificImageComparison
+  const explicitCapabilityContractCandidate = readExplicitCapabilityContractFromPayload(input.payload);
+  const explicitCapabilityContract = authoritativeLivePipelineRoute
+    ? null
+    : explicitCapabilityContractCandidate;
+  const effectiveRoute = authoritativeLivePipelineRoute
+    ? {
+        sourceTarget: authoritativeLivePipelineRoute.sourceTarget,
+        targetKind: authoritativeLivePipelineRoute.targetKind,
+        strength: "hard" as const,
+        reason: authoritativeLivePipelineRoute.reason,
+      }
+    : affirmativeScientificImageComparison
     ? {
         sourceTarget: "scientific_image_evidence",
         targetKind: "scientific_image_evidence_sidecar",
@@ -661,7 +691,12 @@ export function buildCommittedAskRoute(input: {
         /^(?:summarize_doc|doc_|docs_|active_doc|repo_code_)/i.test(rawGoal.goalKind)
       )
     );
-  const goal = affirmativeScientificImageComparison
+  const goal = authoritativeLivePipelineRoute
+    ? {
+        goalKind: authoritativeLivePipelineRoute.goalKind,
+        requiredTerminalKind: authoritativeLivePipelineRoute.requiredTerminalKind,
+      }
+    : affirmativeScientificImageComparison
     ? { goalKind: "scholarly_research_lookup", requiredTerminalKind: "scholarly_research_answer" }
     : shouldUseModelOnlyGoal
     ? { goalKind: "model_only_concept", requiredTerminalKind: "direct_answer_text" }
@@ -805,7 +840,7 @@ export function buildCommittedAskRoute(input: {
     transitions: [],
     compatibility: {
       source_goal_capability_terminal_compatible: violations.length === 0,
-      stale_metadata_ignored: false,
+      stale_metadata_ignored: staleExistingLivePipelineRoute,
       shortcut_firewall_applied: suppressedFamilies.length > 0,
       violations,
     },

@@ -1,6 +1,6 @@
 import express from "express";
 import request from "supertest";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { agentProvidersRouter } from "../../../routes/agi.agent-providers";
 import { accountSessionRouter } from "../../../routes/account-session";
 import { resetAccountSessionStore } from "../../helix-account/account-session-store";
@@ -15,12 +15,17 @@ const ENV_KEYS = [
   "CODEX_AGENT_FAKE_EXIT_CODE",
   "CODEX_AGENT_FAKE_STDOUT_SEQUENCE",
   "CODEX_AGENT_FAKE_CALL_INDEX",
+  "HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED",
 ] as const;
 const originalEnv = new Map<string, string | undefined>();
 
 for (const key of ENV_KEYS) {
   originalEnv.set(key, process.env[key]);
 }
+
+beforeEach(() => {
+  process.env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED = "0";
+});
 
 afterEach(async () => {
   helixCapabilityLaneSessionStore.clear();
@@ -59,6 +64,7 @@ describe("AGI agent provider route", () => {
     process.env.ENABLE_CODEX_AGENT = "1";
     process.env.CODEX_AGENT_FAKE_STDOUT = "Goal progress candidate: translated title evidence is ready.";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    process.env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED = "0";
     delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
     delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
     const agent = await createDeveloperAgent();
@@ -288,7 +294,7 @@ describe("AGI agent provider route", () => {
       });
   }, 15000);
 
-  it("blocks /goal runtime sessions when account policy revokes the selected runtime agent", async () => {
+  it("enforces runtime policy at start and account ownership on later goal controls", async () => {
     process.env.ENABLE_CODEX_AGENT = "1";
     process.env.CODEX_AGENT_FAKE_STDOUT = "Goal progress candidate.";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
@@ -356,27 +362,53 @@ describe("AGI agent provider route", () => {
         expect(response.body).toMatchObject({
           schema: "helix.runtime_goal.session_resume_response.v1",
           ok: false,
-          error: "runtime_agent_locked_by_account_policy",
-          blocked_reason: "permission_revoked",
-          locked_reason: "runtime_agent_outside_account_policy",
-          session: {
-            goal_id: "goal:route:permission-revoked",
-            status: "blocked",
-            status_reason: "permission_revoked",
-            terminal_authority_status: "blocked",
-          },
-          debug_export: {
-            session_status: "blocked",
-            terminal_authority_status: "blocked",
+          error: "runtime_goal_account_session_mismatch",
+          blocked_reason: "runtime_goal_account_session_mismatch",
+          goal_id: "goal:route:permission-revoked",
+          runtime_goal_account_binding: {
+            trusted: false,
+            validation_status: "session_mismatch",
+            raw_session_id_included: false,
+            raw_profile_id_included: false,
           },
         });
-        expect(response.body.debug_export.debug_events).toContainEqual(
-          expect.objectContaining({
-            stage: "goal_blocked",
-            reason: "permission_revoked",
-          }),
-        );
       });
+
+    const hiddenList = await agent
+      .get("/api/agi/goal/runtime-session")
+      .expect(200);
+    expect(hiddenList.body.goal_session_count).toBe(0);
+
+    await agent
+      .get("/api/agi/goal/runtime-session/goal:route:permission-revoked/debug-export")
+      .expect(403)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          error: "runtime_goal_account_session_mismatch",
+          runtime_goal_account_binding: {
+            validation_status: "session_mismatch",
+            raw_session_id_included: false,
+            raw_profile_id_included: false,
+          },
+        });
+      });
+
+    await agent
+      .post("/api/agi/goal/runtime-session/goal:route:permission-revoked/stop")
+      .send({ reason: "cross_account_stop" })
+      .expect(403);
+
+    const ownerDebug = await developerAgent
+      .get("/api/agi/goal/runtime-session/goal:route:permission-revoked/debug-export")
+      .expect(200);
+    expect(ownerDebug.body).toMatchObject({
+      session_status: "waiting",
+      runtime_goal_account_binding: {
+        trusted: true,
+        validation_status: "trusted",
+      },
+    });
+    expect(ownerDebug.body.debug_events).toHaveLength(1);
   });
 
   it("lists provider descriptors and resolves the default through provider availability", async () => {

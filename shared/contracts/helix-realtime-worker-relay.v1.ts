@@ -1,3 +1,5 @@
+import type { HelixRealtimeWorkerAdmissionV2 } from "./helix-realtime-worker-dispatch.v2";
+
 export const HELIX_REALTIME_WORKER_ADMISSION_SCHEMA =
   "helix.realtime_worker_admission.v1" as const;
 
@@ -38,6 +40,10 @@ export type HelixRealtimeWorkerAdmissionV1 = {
   raw_content_included: false;
 };
 
+export type HelixRealtimeWorkerAdmission =
+  | HelixRealtimeWorkerAdmissionV1
+  | HelixRealtimeWorkerAdmissionV2;
+
 export type HelixRealtimeGroundedRelayStatusV1 =
   | "worker_running"
   | "result_ready"
@@ -58,7 +64,7 @@ export type HelixRealtimeGroundedRelayV1 = {
   realtime_session_id: string;
   thread_id: string;
   handoff_id: string;
-  worker_admission: HelixRealtimeWorkerAdmissionV1;
+  worker_admission: HelixRealtimeWorkerAdmission;
   feedback_id: string | null;
   ask_turn_id: string | null;
   selected_runtime_agent_provider: string | null;

@@ -18,6 +18,7 @@ import {
   procedureRecallTargetSource,
 } from "./procedure-memory-recall-router";
 import {
+  classifyLiveSourceContinuationIntent,
   isContextualLiveSourceCadenceMention,
   isLiveSourceCadenceControlPrompt,
   isLiveSourceMailLoopPrompt,
@@ -686,6 +687,38 @@ export function arbitrateAskSourceTarget(input: {
       ],
       precedenceReason: "historical_runtime_evidence_source_target",
       confidence: 0.92,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  const liveSourceContinuationIntent = classifyLiveSourceContinuationIntent(prompt);
+  if (liveSourceContinuationIntent) {
+    const bindingDiagnosis = liveSourceContinuationIntent.kind === "live_environment_binding_diagnosis";
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "live_pipeline",
+      targetKind: "live_pipeline",
+      strength: "hard",
+      explicitCues: [liveSourceContinuationIntent.kind],
+      reasons: [
+        "live_source_continuation_intent_source_target",
+        liveSourceContinuationIntent.reason,
+      ],
+      requestedOutputs: bindingDiagnosis
+        ? ["typed_failure"]
+        : ["live_pipeline_receipt", "tool_call_eligibility", "typed_failure"],
+      suppressedRoutes: [
+        "visual_frame_evidence",
+        "situation_context_question",
+        "active_doc_identity",
+        "active_doc_summary",
+        "doc_open_best",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
+      precedenceReason: "live_source_continuation_intent_source_target",
+      confidence: liveSourceContinuationIntent.confidence === "high" ? 0.98 : 0.9,
       allowClientShortcut: false,
       allowNoToolDirect: false,
     });

@@ -22,10 +22,10 @@ export const HELIX_ASK_LEGACY_CONSOLE_ACTIVE_PATH = [
 
 export const HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT = {
   file: "client/src/components/helix/HelixAskPill.tsx",
-  lineCountAtInventory: 23802,
+  lineCountAtInventory: 23740,
   exportedComponentStartsAtLine: 6374,
-  liveRenderSliceStartsAtLine: 23586,
-  liveLegacyConsoleViewStartsAtLine: 23586,
+  liveRenderSliceStartsAtLine: 23524,
+  liveLegacyConsoleViewStartsAtLine: 23524,
   inventoryReason:
     "The normal Ask path remains on the legacy-looking bridge until the recrowned minimal runtime shell reaches live visual parity. Extracted ask-console display owners should continue to grow in the recrowned directory, not inside HelixAskPill.",
 } as const;
@@ -120,14 +120,21 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     classification: "pure_display_already_recrowned",
     source: "ask-console",
     evidence:
-      "The action-toolbar composition for runtime picker and submit/stop button moved to HelixAskComposerActionToolbarSurface while haptics, mic toggles, attachment selection, visual/audio source controls, runtime selection behavior, submit/stop behavior, and request submission remain in the bridge.",
+      "The action-toolbar composition for runtime picker and submit/stop button moved to HelixAskComposerActionToolbarSurface, which mounts the shared recrowned carousel controller, while haptic policy, mic toggles, attachment selection, visual/audio source controls, runtime selection behavior, submit/stop behavior, and request submission remain in the bridge.",
+  },
+  {
+    key: "composer_action_carousel_controller",
+    classification: "behavior_sensitive_recrowned_with_parity",
+    source: "ask-console",
+    evidence:
+      "Action-carousel refs, physical action-endpoint measurement, viewport, track, delayed-child, and interface-direction observation, and scroll commands now live in useHelixAskActionCarousel and are shared by legacy and minimal runtimes through HelixAskComposerActionToolbarSurface. HelixAskPill retains only the injected haptic intent callback.",
   },
   {
     key: "composer_action_toolbar_state_projection",
     classification: "pure_display_already_recrowned",
     source: "ask-console",
     evidence:
-      "The live composer action-toolbar props now run through buildHelixAskComposerActionToolbarState while haptics, refs, mic/media toggles, runtime selection, submit/stop behavior, and request submission remain in the bridge.",
+      "The live composer action-toolbar props now run through buildHelixAskComposerActionToolbarState while only an injected carousel haptic-intent callback, mic/media toggles, runtime selection, submit/stop behavior, and request submission remain in the bridge.",
   },
   {
     key: "legacy_composer_surface_slot",

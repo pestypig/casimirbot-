@@ -8,6 +8,11 @@ import {
 import { buildHelixProviderGatewayObservationPayload } from "./workstation-gateway-observation";
 import { buildProviderGatewayDebugSummary } from "./provider-gateway-debug-summary";
 import { buildHelixAgentRuntimeAdapterContract } from "./runtime-adapter-contract";
+import { readHelixSessionCookie } from "../../helix-account/session-cookie";
+import {
+  resolveWorkstationGatewayAccountContext,
+  type HelixWorkstationGatewayAccountContext,
+} from "../workstation-tool-gateway/account-policy";
 
 const enabled = (): boolean => process.env.ENABLE_FUTURE_AGENT === "1";
 
@@ -23,11 +28,13 @@ const readTurnId = (body: Record<string, unknown>): string =>
 export const runExplicitFutureWorkstationGatewayCalls = async (input: {
   body: Record<string, unknown>;
   turnId?: string | null;
+  accountContext?: HelixWorkstationGatewayAccountContext;
 }) =>
   runExplicitWorkstationGatewayCalls({
     body: input.body,
     agentRuntime: "future",
     turnId: input.turnId ?? readHelixAgentTurnId(input.body),
+    accountContext: input.accountContext,
   });
 
 export const futureProvider: HelixAgentProvider = {
@@ -58,6 +65,13 @@ export const futureProvider: HelixAgentProvider = {
   async runTurn(request): Promise<HelixAgentRunResult> {
     const question = readQuestion(request.body);
     const turnId = readTurnId(request.body);
+    const cookieHeader = Array.isArray(request.headers?.cookie)
+      ? request.headers.cookie.join("; ")
+      : request.headers?.cookie;
+    const workstationAccountContext = request.workstationAccountContext ??
+      await resolveWorkstationGatewayAccountContext(
+        readHelixSessionCookie(cookieHeader),
+      );
     const adapterContract = buildHelixAgentRuntimeAdapterContract({
       route: request.route,
       requestedRuntime: request.runtime,
@@ -69,6 +83,7 @@ export const futureProvider: HelixAgentProvider = {
     const gatewayCallResults = await runExplicitFutureWorkstationGatewayCalls({
       body: request.body,
       turnId,
+      accountContext: workstationAccountContext,
     });
 
     if (gatewayCallResults.length > 0) {

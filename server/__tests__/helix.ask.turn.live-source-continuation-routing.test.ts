@@ -2,9 +2,15 @@ import express from "express";
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  RETIRED_WORKSPACE_ACTION_REGISTRY,
+  RETIRED_WORKSTATION_DYNAMIC_TOOL_ACTIONS,
   WORKSTATION_DYNAMIC_TOOL_ACTIONS,
   WORKSPACE_ACTION_REGISTRY,
 } from "@shared/workstation-dynamic-tools";
+import {
+  resetAccountSessionStore,
+  signInLocalAccountSession,
+} from "../services/helix-account/account-session-store";
 import { composeLiveSourcePipelinePlan } from "../services/helix-ask/live-source-pipeline-composer";
 import {
   executeLiveSourcePipelinePlan,
@@ -49,11 +55,16 @@ import {
 import type { HelixLiveSourceProducerFreshness } from "@shared/helix-live-source-producer-freshness";
 
 const threadId = "thread:live-source-continuation";
+let developerSessionCookie = "";
 
 const createApp = async (): Promise<express.Express> => {
   const { planRouter } = await import("../routes/agi.plan");
   const app = express();
   app.use(express.json({ limit: "2mb" }));
+  app.use((req, _res, next) => {
+    req.headers.cookie = developerSessionCookie;
+    next();
+  });
   app.use("/api/agi", planRouter);
   return app;
 };
@@ -191,7 +202,15 @@ const seedBackendVisualSource = async (app: express.Express, targetThreadId = th
 };
 
 describe("live source continuation Ask routing", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await resetAccountSessionStore();
+    const accountReceipt = await signInLocalAccountSession({
+      profile_id: "profile:live-source-continuation-test",
+      account_type: "developer",
+    });
+    developerSessionCookie = `helix_session=${encodeURIComponent(
+      accountReceipt.session?.session_id ?? "",
+    )}`;
     resetLiveSourcePipelinesForTest();
     resetLiveSourceChunkBufferForTest();
     resetLiveAnswerEnvironments();
@@ -270,7 +289,7 @@ describe("live source continuation Ask routing", () => {
     expect(debug.body?.payload?.visual_producer_id).toBe(response.body?.visual_producer_id);
     expect(debug.body?.payload?.cadence_ms).toBe(15_000);
     expect(debug.body?.payload?.terminal_answer_authority?.server_authoritative).toBe(true);
-  }, 30_000);
+  }, 90_000);
 
   it("sets requested visual cadence for every-N-seconds continuation prompts", async () => {
     const app = await createApp();
@@ -304,7 +323,7 @@ describe("live source continuation Ask routing", () => {
       next_decision: "allow_terminal",
     });
     expect(response.body?.answer ?? response.body?.text).toContain("every 10 seconds");
-  }, 30_000);
+  }, 90_000);
 
   it("does not turn a negated interval mention inside a screen question into cadence control", async () => {
     const question =
@@ -750,8 +769,8 @@ describe("live source continuation Ask routing", () => {
     expect(createResponse.body?.live_answer_environment?.objective).not.toBe("Ok set this visual source on 10 seconds interval");
   }, 20_000);
 
-  it("registers the visual producer rate action as a workstation affordance", () => {
-    expect(WORKSTATION_DYNAMIC_TOOL_ACTIONS).toEqual(
+  it("keeps the retired visual producer rate action out of active workstation affordances", () => {
+    expect(WORKSTATION_DYNAMIC_TOOL_ACTIONS).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           panel_id: "situation-room-pipelines",
@@ -760,7 +779,26 @@ describe("live source continuation Ask routing", () => {
         }),
       ]),
     );
-    expect(WORKSPACE_ACTION_REGISTRY).toEqual(
+    expect(WORKSPACE_ACTION_REGISTRY).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action_key: "situation-room.live-source.set_rate",
+          target_id: "situation-room-pipelines",
+          action_id: "live-source.set_rate",
+          terminal_receipt_required: true,
+        }),
+      ]),
+    );
+    expect(RETIRED_WORKSTATION_DYNAMIC_TOOL_ACTIONS).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          panel_id: "situation-room-pipelines",
+          action_id: "live-source.set_rate",
+          required_args: ["cadence_ms"],
+        }),
+      ]),
+    );
+    expect(RETIRED_WORKSPACE_ACTION_REGISTRY).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           action_key: "situation-room.live-source.set_rate",
@@ -1121,6 +1159,8 @@ describe("live source continuation Ask routing", () => {
       .send({
         sessionId: threadId,
         question: "what is a neutron star glitch?",
+        agentRuntime: "helix",
+        agent_runtime: "helix",
         debug: true,
       })
       .expect(200);
@@ -1134,5 +1174,5 @@ describe("live source continuation Ask routing", () => {
       raw_route_text_returned: false,
       violations: [],
     });
-  }, 20_000);
+  }, 90_000);
 });

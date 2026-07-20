@@ -22,6 +22,38 @@ import {
   requestRealtimeStagePlayContextSync,
   resetRealtimeStagePlaySidebandForTests,
 } from "../../realtime-session/sideband-context-sync";
+import { buildHelixAccountCapabilityPolicy } from "@shared/helix-account-session";
+import type { HelixWorkstationGatewayAccountContext } from "../../workstation-tool-gateway/account-policy";
+import { buildRuntimeGoalAccountScope } from "../runtime-goal-account-binding";
+
+const accountContext = (suffix: string): HelixWorkstationGatewayAccountContext => {
+  const policy = buildHelixAccountCapabilityPolicy("developer");
+  const timestamp = "2026-07-19T00:00:00.000Z";
+  return {
+    session_id: `session:${suffix}`,
+    profile_id: `profile:${suffix}`,
+    trusted_account_session: true,
+    account_policy: policy,
+    account_session: {
+      schema: "helix.account_session.v1",
+      session_id: `session:${suffix}`,
+      profile: {
+        profile_id: `profile:${suffix}`,
+        display_name: suffix,
+        auth_mode: "local_dev_profile",
+        account_type: "developer",
+        provider: "local",
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+      account_policy: policy,
+      status: "active",
+      memory_scope: "profile",
+      created_at: timestamp,
+      updated_at: timestamp,
+    },
+  };
+};
 
 describe("runtime goal Stage Play projection", () => {
   beforeEach(() => {
@@ -217,5 +249,40 @@ describe("runtime goal Stage Play projection", () => {
       runtime_session_ref: "runtime-session:runtime:helix:preferred",
       runtime_agent_provider: "helix",
     });
+  });
+
+  it("excludes an account-bound runtime goal from another Realtime account scope", async () => {
+    const owner = accountContext("realtime-goal-owner");
+    const other = accountContext("realtime-goal-other");
+    await helixRuntimeGoalSessionStore.startGoalRuntimeSession({
+      objective: "Keep this runtime goal private to its owning account.",
+      runtimeAgentProvider: "helix",
+      goalId: "goal:account-scoped-realtime",
+      threadId: "helix-ask:desktop",
+      runtimeSessionId: "runtime:helix:account-scoped",
+      accountContext: owner,
+    });
+
+    const ownerPack = buildHelixRealtimeStagePlayContextPack({
+      realtimeSessionId: "realtime:owner",
+      threadId: "helix-ask:desktop",
+      runtimeGoalAccountScope: buildRuntimeGoalAccountScope(owner),
+    });
+    const otherPack = buildHelixRealtimeStagePlayContextPack({
+      realtimeSessionId: "realtime:other",
+      threadId: "helix-ask:desktop",
+      runtimeGoalAccountScope: buildRuntimeGoalAccountScope(other),
+    });
+
+    expect(ownerPack.active_goal_binding).toMatchObject({
+      goal_id: "goal:account-scoped-realtime",
+      runtime_session_ref: "runtime-session:runtime:helix:account-scoped",
+    });
+    expect(otherPack.active_goal_binding).toBeNull();
+    expect(otherPack.workstation_goal_summaries).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ ref: "goal:account-scoped-realtime" }),
+      ]),
+    );
   });
 });

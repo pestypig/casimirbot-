@@ -12,6 +12,7 @@ import {
   type TheoryRuntimeReceiptV1,
 } from "../../../../shared/contracts/theory-runtime-receipt.v1";
 import { isNhm2LeanCampaignCertificateV1 } from "../../../../shared/contracts/nhm2-lean-campaign-certificate.v1";
+import { NHM2_EXPERIMENT_READY_THEORY_CLOSURE_CONTRACT_VERSION } from "../../../../shared/contracts/nhm2-experiment-ready-theory-closure.v1";
 import {
   NHM2_ALPHA07_EXPECTED_CERTIFICATE_PIN_IDS,
   NHM2_ALPHA07_EXPECTED_PACKAGE_ARTIFACTS,
@@ -28,6 +29,10 @@ import type {
   TheoryRuntimeAdapterInput,
 } from "./theory-runtime-adapter-types";
 import { readJsonArtifactFile } from "./json-artifact-reader";
+import {
+  evaluateNhm2ExperimentReadyTheoryClosureFilesystem,
+  type Nhm2TheoryClosureFilesystemEvaluationV1,
+} from "../nhm2-experiment-ready-theory-closure-evaluator";
 
 export const GR_NHM2_RUNTIME_ADAPTER_ID = "gr_nhm2.artifact_reader" as const;
 export const GR_NHM2_LANE_ID = "warp_gr_nhm2" as const;
@@ -52,17 +57,20 @@ export const GR_NHM2_SUPPORTED_BADGE_IDS = [
   "nhm2.formal.claim_locks_closed",
   "nhm2.formal.negative_fixtures_fail_closed",
   "nhm2.mechanical.support_retention_overlap",
+  "nhm2.meta.experiment_ready_theory_closure",
   "nhm2.claim_boundary.diagnostic_only",
 ] as const;
 
 export const GR_NHM2_ARTIFACT_ROOTS = [
   "artifacts/research/full-solve/selected-family/nhm2-shift-lapse",
   "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  "artifacts/research/full-solve/theory-closure-evaluations",
   "docs/audits/research/selected-family/nhm2-shift-lapse",
 ] as const;
 
 export const GR_NHM2_ALPHA07_SOURCE_COMMIT = NHM2_ALPHA07_SOURCE_COMMIT;
-export const GR_NHM2_ALPHA07_HISTORICAL_MANIFEST_PATH = NHM2_ALPHA07_IMPORT_MANIFEST_PATH;
+export const GR_NHM2_ALPHA07_HISTORICAL_MANIFEST_PATH =
+  NHM2_ALPHA07_IMPORT_MANIFEST_PATH;
 const GR_NHM2_FORMAL_BADGE_IDS = new Set([
   "nhm2.formal.lean_certificate",
   "nhm2.formal.certificate_hashes_pinned",
@@ -70,7 +78,11 @@ const GR_NHM2_FORMAL_BADGE_IDS = new Set([
   "nhm2.formal.claim_locks_closed",
   "nhm2.formal.negative_fixtures_fail_closed",
 ]);
-const GR_NHM2_ALPHA07_EXPECTED_PIN_IDS = new Set(NHM2_ALPHA07_EXPECTED_CERTIFICATE_PIN_IDS);
+const GR_NHM2_ALPHA07_EXPECTED_PIN_IDS = new Set(
+  NHM2_ALPHA07_EXPECTED_CERTIFICATE_PIN_IDS,
+);
+const GR_NHM2_THEORY_CLOSURE_BADGE_ID =
+  "nhm2.meta.experiment_ready_theory_closure" as const;
 
 const REQUIRED_GATE_IDS = [
   "source_closure",
@@ -122,7 +134,9 @@ function unique(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
 }
 
-function mergeGateStatuses(statuses: TheoryRuntimeGateStatus[]): TheoryRuntimeGateStatus {
+function mergeGateStatuses(
+  statuses: TheoryRuntimeGateStatus[],
+): TheoryRuntimeGateStatus {
   if (statuses.includes("fail")) return "fail";
   if (statuses.includes("review")) return "review";
   if (statuses.includes("not_ready")) return "not_ready";
@@ -146,15 +160,20 @@ function normalizeRelativePath(value: string): string {
 
 function isPathInside(root: string, candidate: string): boolean {
   const relative = path.relative(root, candidate);
-  return relative.length === 0 || (!relative.startsWith("..") && !path.isAbsolute(relative));
+  return (
+    relative.length === 0 ||
+    (!relative.startsWith("..") && !path.isAbsolute(relative))
+  );
 }
 
 function isPortableRepoPath(value: string): boolean {
-  return value.length > 0 &&
+  return (
+    value.length > 0 &&
     !value.includes("\\") &&
     !path.posix.isAbsolute(value) &&
     !path.win32.isAbsolute(value) &&
-    !value.split("/").includes("..");
+    !value.split("/").includes("..")
+  );
 }
 
 function sha256(bytes: Buffer): string {
@@ -165,7 +184,11 @@ function statusFromBoolean(value: unknown): TheoryRuntimeGateStatus {
   return value === true ? "pass" : value === false ? "fail" : "not_ready";
 }
 
-function walk(value: unknown, visit: (key: string, entry: unknown, keyPath: string) => void, prefix = ""): void {
+function walk(
+  value: unknown,
+  visit: (key: string, entry: unknown, keyPath: string) => void,
+  prefix = "",
+): void {
   if (Array.isArray(value)) {
     value.forEach((entry, index) => walk(entry, visit, `${prefix}[${index}]`));
     return;
@@ -179,22 +202,48 @@ function walk(value: unknown, visit: (key: string, entry: unknown, keyPath: stri
 }
 
 function candidateValueFromRecord(value: Record<string, unknown>): unknown {
-  for (const key of ["status", "state", "verdict", "result", "passed", "pass", "ok", "valid", "issued"]) {
+  for (const key of [
+    "status",
+    "state",
+    "verdict",
+    "result",
+    "passed",
+    "pass",
+    "ok",
+    "valid",
+    "issued",
+  ]) {
     if (key in value) return value[key];
   }
   return undefined;
 }
 
 function gateStatusFromValue(value: unknown): TheoryRuntimeGateStatus {
-  if (isRecord(value)) return gateStatusFromValue(candidateValueFromRecord(value));
+  if (isRecord(value))
+    return gateStatusFromValue(candidateValueFromRecord(value));
   if (typeof value === "boolean") return value ? "pass" : "fail";
   if (typeof value !== "string") return "unknown";
   const normalized = normalizeKey(value);
-  if (["pass", "passed", "ok", "valid", "issued", "complete", "completed", "admissible"].includes(normalized)) {
+  if (
+    [
+      "pass",
+      "passed",
+      "ok",
+      "valid",
+      "issued",
+      "complete",
+      "completed",
+      "admissible",
+    ].includes(normalized)
+  ) {
     return "pass";
   }
-  if (["fail", "failed", "false", "inadmissible", "invalid"].includes(normalized)) return "fail";
-  if (["review", "auditreview", "diagnostic"].includes(normalized)) return "review";
+  if (
+    ["fail", "failed", "false", "inadmissible", "invalid"].includes(normalized)
+  )
+    return "fail";
+  if (["review", "auditreview", "diagnostic"].includes(normalized))
+    return "review";
   if (
     [
       "missing",
@@ -218,26 +267,34 @@ function hasExplicitUnknownGateValue(value: unknown): boolean {
   return typeof candidate === "string" && normalizeKey(candidate) === "unknown";
 }
 
-function gateIdForKey(fieldName: string, keyPath: string): RequiredGateId | null {
+function gateIdForKey(
+  fieldName: string,
+  keyPath: string,
+): RequiredGateId | null {
   const field = normalizeKey(fieldName);
   const key = normalizeKey(keyPath);
   const statusBearingField =
-    /status|state|verdict|result|passed|pass|ok|valid|issued|complete|satisfied|admissible/.test(field);
+    /status|state|verdict|result|passed|pass|ok|valid|issued|complete|satisfied|admissible/.test(
+      field,
+    );
   if (
-    (/certificate.*integrity|integrity.*certificate/.test(key) &&
-      (statusBearingField || /integrity/.test(field)))
+    /certificate.*integrity|integrity.*certificate/.test(key) &&
+    (statusBearingField || /integrity/.test(field))
   ) {
     return "certificate_integrity";
   }
   if (
-    /certissued|certificateissued|certificatestatus|certificatediagnosticcampaignadmissible/.test(key) &&
+    /certissued|certificateissued|certificatestatus|certificatediagnosticcampaignadmissible/.test(
+      key,
+    ) &&
     statusBearingField
   ) {
     return "certificate_issued";
   }
   if (
     /sourceclosure|closureresidual|sourceresidual/.test(key) &&
-    (statusBearingField || ["sourceclosure", "closureresidual", "sourceresidual"].includes(field))
+    (statusBearingField ||
+      ["sourceclosure", "closureresidual", "sourceresidual"].includes(field))
   ) {
     return "source_closure";
   }
@@ -255,14 +312,17 @@ function gateIdForKey(fieldName: string, keyPath: string): RequiredGateId | null
   }
   if (
     /hardconstraints|hardconstraint|hardgate|constraintsverdict/.test(key) &&
-    (statusBearingField || ["hardconstraints", "hardconstraint", "hardgate"].includes(field))
+    (statusBearingField ||
+      ["hardconstraints", "hardconstraint", "hardgate"].includes(field))
   ) {
     return "hard_constraints";
   }
   return null;
 }
 
-function collectGates(artifacts: ParsedArtifact[]): Record<string, TheoryRuntimeGateStatus> {
+function collectGates(
+  artifacts: ParsedArtifact[],
+): Record<string, TheoryRuntimeGateStatus> {
   const candidates = new Map<RequiredGateId, TheoryRuntimeGateStatus[]>();
   const sourceClosureAggregate: TheoryRuntimeGateStatus[] = [];
   const sourceClosureArtifacts: TheoryRuntimeGateStatus[] = [];
@@ -277,9 +337,12 @@ function collectGates(artifacts: ParsedArtifact[]): Record<string, TheoryRuntime
       const statuses = candidates.get(gateId) ?? [];
       statuses.push(status);
       candidates.set(gateId, statuses);
-      const artifactLevel = /artifact(?:refs?|evidence|status)|supportingartifact/i.test(keyPath);
+      const artifactLevel =
+        /artifact(?:refs?|evidence|status)|supportingartifact/i.test(keyPath);
       if (gateId === "source_closure") {
-        (artifactLevel ? sourceClosureArtifacts : sourceClosureAggregate).push(status);
+        (artifactLevel ? sourceClosureArtifacts : sourceClosureAggregate).push(
+          status,
+        );
       }
       if (gateId === "observer_audit") {
         (artifactLevel ? observerArtifacts : observerAggregate).push(status);
@@ -307,36 +370,102 @@ function collectGates(artifacts: ParsedArtifact[]): Record<string, TheoryRuntime
   return gates;
 }
 
-function collectScalars(artifacts: ParsedArtifact[]): Record<string, number | string | boolean | null> {
-  const scalarByNormalizedKey = new Map(SCALAR_KEYS.map((key) => [normalizeKey(key), key] as const));
+async function collectExperimentReadyTheoryClosureGate(
+  projectRoot: string,
+  artifacts: ParsedArtifact[],
+): Promise<Nhm2TheoryClosureFilesystemEvaluationV1 | null> {
+  const closureArtifacts = artifacts.filter(
+    (artifact) =>
+      isRecord(artifact.data) &&
+      artifact.data.contractVersion ===
+        NHM2_EXPERIMENT_READY_THEORY_CLOSURE_CONTRACT_VERSION,
+  );
+  if (closureArtifacts.length === 0) return null;
+  if (closureArtifacts.length > 1) {
+    return {
+      status: "not_ready",
+      gateStatus: "fail",
+      filesystemVerified: false,
+      candidateManifestValidated: false,
+      evidenceAdapterCoverageComplete: false,
+      blockers: ["duplicate_theory_closure_artifacts"],
+      artifactPath: closureArtifacts
+        .map((artifact) => artifact.relativePath)
+        .join(","),
+    };
+  }
+  const artifact = closureArtifacts[0];
+  return evaluateNhm2ExperimentReadyTheoryClosureFilesystem({
+    projectRoot,
+    artifactPath: artifact.relativePath,
+    artifact: artifact.data,
+  });
+}
+
+function requestsExperimentReadyTheoryClosure(
+  input: TheoryRuntimeAdapterInput,
+): boolean {
+  return (
+    !input.badgeIds?.length ||
+    input.badgeIds.includes(GR_NHM2_THEORY_CLOSURE_BADGE_ID)
+  );
+}
+
+function collectScalars(
+  artifacts: ParsedArtifact[],
+): Record<string, number | string | boolean | null> {
+  const scalarByNormalizedKey = new Map(
+    SCALAR_KEYS.map((key) => [normalizeKey(key), key] as const),
+  );
   const scalars: Record<string, number | string | boolean | null> = {};
   for (const artifact of artifacts) {
     walk(artifact.data, (key, entry) => {
-      if (entry !== null && typeof entry !== "number" && typeof entry !== "string" && typeof entry !== "boolean") {
+      if (!(
+        entry === null ||
+        typeof entry === "number" ||
+        typeof entry === "string" ||
+        typeof entry === "boolean"
+      )) {
         return;
       }
       const scalarKey = scalarByNormalizedKey.get(normalizeKey(key));
-      if (scalarKey && !(scalarKey in scalars)) scalars[scalarKey] = entry;
+      if (scalarKey && !(scalarKey in scalars)) {
+        scalars[scalarKey] = entry as number | string | boolean | null;
+      }
     });
   }
   return scalars;
 }
 
-function missingSignalsForGates(gates: Record<string, TheoryRuntimeGateStatus>): string[] {
+function missingSignalsForGates(
+  gates: Record<string, TheoryRuntimeGateStatus>,
+): string[] {
   return REQUIRED_GATE_IDS.flatMap((gateId) => {
     const status = gates[gateId];
     if (status === "review") return [`${gateId}_review`];
-    if (!status || status === "unknown" || status === "not_ready" || status === "not_applicable") {
+    if (
+      !status ||
+      status === "unknown" ||
+      status === "not_ready" ||
+      status === "not_applicable"
+    ) {
       return [`${gateId}_missing`];
     }
     return [];
   });
 }
 
-function promotionBlockedBy(gates: Record<string, TheoryRuntimeGateStatus>, missingSignals: string[]): string[] {
+function promotionBlockedBy(
+  gates: Record<string, TheoryRuntimeGateStatus>,
+  missingSignals: string[],
+): string[] {
   return unique([
-    ...missingSignals.map((signal) => signal.replace(/_(?:missing|review)$/, "")),
-    ...REQUIRED_GATE_IDS.filter((gateId) => gates[gateId] === "fail").map((gateId) => `${gateId}_failed`),
+    ...missingSignals.map((signal) =>
+      signal.replace(/_(?:missing|review)$/, ""),
+    ),
+    ...REQUIRED_GATE_IDS.filter((gateId) => gates[gateId] === "fail").map(
+      (gateId) => `${gateId}_failed`,
+    ),
   ]);
 }
 
@@ -351,12 +480,18 @@ function receiptStatus(args: {
   return "completed";
 }
 
-async function readJsonArtifacts(projectRoot: string): Promise<ParsedArtifact[]> {
+async function readJsonArtifacts(
+  projectRoot: string,
+): Promise<ParsedArtifact[]> {
   return readJsonArtifactsUncached(projectRoot);
 }
 
-async function readJsonArtifactsUncached(projectRoot: string): Promise<ParsedArtifact[]> {
-  const patterns = GR_NHM2_ARTIFACT_ROOTS.map((root) => `${root.replace(/\\/g, "/")}/**/*.json`);
+async function readJsonArtifactsUncached(
+  projectRoot: string,
+): Promise<ParsedArtifact[]> {
+  const patterns = GR_NHM2_ARTIFACT_ROOTS.map(
+    (root) => `${root.replace(/\\/g, "/")}/**/*.json`,
+  );
   const paths = await fg(patterns, {
     cwd: projectRoot,
     onlyFiles: true,
@@ -395,15 +530,18 @@ function buildReadOnlyArtifactEvidence(
 async function readHistoricalAlpha07Package(
   projectRoot: string,
 ): Promise<HistoricalAlpha07Package> {
-  const { validateNhm2Alpha07HistoricalImportManifest } = await import(
-    "../../../../tools/nhm2/govern-alpha07-historical-import"
-  );
-  const issues = await validateNhm2Alpha07HistoricalImportManifest({ repoRoot: projectRoot });
+  const { validateNhm2Alpha07HistoricalImportManifest } =
+    await import("../../../../tools/nhm2/govern-alpha07-historical-import");
+  const issues = await validateNhm2Alpha07HistoricalImportManifest({
+    repoRoot: projectRoot,
+  });
   const manifestAbsolutePath = path.resolve(
     projectRoot,
     ...NHM2_ALPHA07_IMPORT_MANIFEST_PATH.split("/"),
   );
-  const manifestValue: unknown = JSON.parse(await fs.readFile(manifestAbsolutePath, "utf8"));
+  const manifestValue: unknown = JSON.parse(
+    await fs.readFile(manifestAbsolutePath, "utf8"),
+  );
   const contractIssues = validateTheoryRuntimeOutputManifestV1(manifestValue);
   if (contractIssues.length > 0 || !isRecord(manifestValue)) {
     throw new Error(
@@ -419,9 +557,13 @@ async function readHistoricalAlpha07Package(
   const actualEntryPaths = new Set(manifest.entries.map((entry) => entry.path));
   if (
     expectedEntryPaths.size !== actualEntryPaths.size ||
-    [...expectedEntryPaths].some((entryPath) => !actualEntryPaths.has(entryPath))
+    [...expectedEntryPaths].some(
+      (entryPath) => !actualEntryPaths.has(entryPath),
+    )
   ) {
-    issues.push("historical manifest inventory does not match the governed alpha=0.7 package");
+    issues.push(
+      "historical manifest inventory does not match the governed alpha=0.7 package",
+    );
   }
   if (
     manifest.generatedAt !== NHM2_ALPHA07_IMPORT_MANIFEST_GENERATED_AT ||
@@ -435,7 +577,9 @@ async function readHistoricalAlpha07Package(
     manifest.completedAt !== null ||
     manifest.manifestSha256 !== null
   ) {
-    issues.push("historical manifest identity or execution-boundary fields are not governed values");
+    issues.push(
+      "historical manifest identity or execution-boundary fields are not governed values",
+    );
   }
 
   const packageDirectory = path.resolve(
@@ -446,7 +590,10 @@ async function readHistoricalAlpha07Package(
     fs.realpath(projectRoot),
     fs.realpath(packageDirectory),
   ]);
-  if (!isPathInside(realProjectRoot, realPackageDirectory) || realPackageDirectory === realProjectRoot) {
+  if (
+    !isPathInside(realProjectRoot, realPackageDirectory) ||
+    realPackageDirectory === realProjectRoot
+  ) {
     throw new Error("Governed alpha=0.7 package escaped the repository root.");
   }
 
@@ -458,23 +605,31 @@ async function readHistoricalAlpha07Package(
     }
     const absolutePath = path.resolve(projectRoot, ...entry.path.split("/"));
     if (!isPathInside(packageDirectory, absolutePath)) {
-      issues.push(`historical manifest entry escaped the package: ${entry.path}`);
+      issues.push(
+        `historical manifest entry escaped the package: ${entry.path}`,
+      );
       continue;
     }
     const fileStat = await fs.lstat(absolutePath);
     if (fileStat.isSymbolicLink()) {
-      issues.push(`historical manifest entry is a symbolic link: ${entry.path}`);
+      issues.push(
+        `historical manifest entry is a symbolic link: ${entry.path}`,
+      );
       continue;
     }
     const realArtifactPath = await fs.realpath(absolutePath);
     if (!isPathInside(realPackageDirectory, realArtifactPath)) {
-      issues.push(`historical manifest entry resolved outside the package: ${entry.path}`);
+      issues.push(
+        `historical manifest entry resolved outside the package: ${entry.path}`,
+      );
       continue;
     }
     const bytes = await fs.readFile(absolutePath);
     const actualSha256 = sha256(bytes);
-    const hashMatchesManifest = actualSha256 === entry.sha256 && bytes.byteLength === entry.sizeBytes;
-    if (!hashMatchesManifest) issues.push(`historical artifact hash/size mismatch: ${entry.path}`);
+    const hashMatchesManifest =
+      actualSha256 === entry.sha256 && bytes.byteLength === entry.sizeBytes;
+    if (!hashMatchesManifest)
+      issues.push(`historical artifact hash/size mismatch: ${entry.path}`);
     artifacts.push({
       relativePath: entry.path,
       data: await readJsonArtifactFile(absolutePath),
@@ -484,49 +639,66 @@ async function readHistoricalAlpha07Package(
   }
 
   const certificateArtifact = artifacts.find((artifact) =>
-    artifact.relativePath.endsWith("/nhm2-lean-campaign-certificate.json")
+    artifact.relativePath.endsWith("/nhm2-lean-campaign-certificate.json"),
   );
   const certificate = certificateArtifact?.data;
   const certificateValid = isNhm2LeanCampaignCertificateV1(certificate);
-  if (!certificateValid) issues.push("historical Lean campaign certificate contract is invalid");
+  if (!certificateValid)
+    issues.push("historical Lean campaign certificate contract is invalid");
   const pinIds = certificateValid
     ? new Set(certificate.artifactHashes.map((entry) => entry.artifactId))
     : new Set<string>();
-  const certificatePinsComplete = certificateValid &&
+  const certificatePinsComplete =
+    certificateValid &&
     pinIds.size === GR_NHM2_ALPHA07_EXPECTED_PIN_IDS.size &&
     [...GR_NHM2_ALPHA07_EXPECTED_PIN_IDS].every((pinId) => pinIds.has(pinId));
-  if (!certificatePinsComplete) issues.push("historical Lean certificate pin IDs are incomplete");
-  const claimLocksClosed = certificateValid &&
-    Object.values(certificate.claimLocks).every((allowed) => allowed === false) &&
+  if (!certificatePinsComplete)
+    issues.push("historical Lean certificate pin IDs are incomplete");
+  const claimLocksClosed =
+    certificateValid &&
+    Object.values(certificate.claimLocks).every(
+      (allowed) => allowed === false,
+    ) &&
     certificate.clocking.routeEtaCertified === false;
-  if (!claimLocksClosed) issues.push("historical Lean certificate claim locks are not all closed");
+  if (!claimLocksClosed)
+    issues.push("historical Lean certificate claim locks are not all closed");
 
   const sourceClosureArtifact = artifacts.find((artifact) =>
-    artifact.relativePath.endsWith("/nhm2-regional-source-closure-evidence.json")
+    artifact.relativePath.endsWith(
+      "/nhm2-regional-source-closure-evidence.json",
+    ),
   );
   const sourceClosureData = isRecord(sourceClosureArtifact?.data)
     ? sourceClosureArtifact.data
     : null;
-  const sourceClosureStatus = gateStatusFromValue(sourceClosureData?.overallState);
-  const integrityOk = issues.length === 0 && artifacts.length === manifest.entries.length &&
+  const sourceClosureStatus = gateStatusFromValue(
+    sourceClosureData?.overallState,
+  );
+  const integrityOk =
+    issues.length === 0 &&
+    artifacts.length === manifest.entries.length &&
     artifacts.every((artifact) => artifact.hashMatchesManifest);
   const gates: Record<string, TheoryRuntimeGateStatus> = {
     ...collectGates(artifacts),
     source_closure: sourceClosureStatus,
     source_closure_aggregate: sourceClosureStatus,
     source_closure_artifact: sourceClosureStatus,
-    qei_applicability: certificateValid ? statusFromBoolean(certificate.qei.qeiReceiptsPass) : "not_ready",
+    qei_applicability: certificateValid
+      ? statusFromBoolean(certificate.qei.qeiReceiptsPass)
+      : "not_ready",
     observer_audit: certificateValid
       ? statusFromBoolean(
-          certificate.observer.observerFamilyPass && certificate.observer.robustCheckComplete &&
-          !certificate.observer.anyViolation,
+          certificate.observer.observerFamilyPass &&
+            certificate.observer.robustCheckComplete &&
+            !certificate.observer.anyViolation,
         )
       : "not_ready",
     certificate_issued: certificateValid
       ? statusFromBoolean(certificate.certificate.diagnosticCampaignAdmissible)
       : "not_ready",
     certificate_integrity: integrityOk ? "pass" : "fail",
-    formal_certificate_hashes_pinned: certificatePinsComplete && integrityOk ? "pass" : "fail",
+    formal_certificate_hashes_pinned:
+      certificatePinsComplete && integrityOk ? "pass" : "fail",
     formal_claim_locks_closed: claimLocksClosed ? "pass" : "fail",
     formal_diagnostic_campaign_admissible: certificateValid
       ? statusFromBoolean(certificate.certificate.diagnosticCampaignAdmissible)
@@ -537,12 +709,19 @@ async function readHistoricalAlpha07Package(
 
   const artifactEvidence = artifacts.map((artifact) => {
     const artifactGates = collectGates([artifact]);
-    if (artifact === sourceClosureArtifact) artifactGates.source_closure_artifact = sourceClosureStatus;
+    if (artifact === sourceClosureArtifact)
+      artifactGates.source_closure_artifact = sourceClosureStatus;
     if (artifact === certificateArtifact) {
-      artifactGates.formal_certificate_contract = certificateValid ? "pass" : "fail";
-      artifactGates.formal_claim_locks_closed = claimLocksClosed ? "pass" : "fail";
+      artifactGates.formal_certificate_contract = certificateValid
+        ? "pass"
+        : "fail";
+      artifactGates.formal_claim_locks_closed = claimLocksClosed
+        ? "pass"
+        : "fail";
     }
-    artifactGates.artifact_hash_integrity = artifact.hashMatchesManifest ? "pass" : "fail";
+    artifactGates.artifact_hash_integrity = artifact.hashMatchesManifest
+      ? "pass"
+      : "fail";
     const semanticStatuses = Object.entries(artifactGates)
       .filter(([gateId]) => gateId !== "artifact_hash_integrity")
       .map(([, status]) => status);
@@ -552,29 +731,46 @@ async function readHistoricalAlpha07Package(
       freshness: "preexisting" as const,
       status: artifact.hashMatchesManifest
         ? mergeGateStatuses(semanticStatuses)
-        : "fail" as const,
+        : ("fail" as const),
       gates: artifactGates,
     };
   });
 
-  return { manifest, artifacts, artifactEvidence, gates, issues: unique(issues) };
+  return {
+    manifest,
+    artifacts,
+    artifactEvidence,
+    gates,
+    issues: unique(issues),
+  };
 }
 
 function requestsGovernedAlpha07(input: TheoryRuntimeAdapterInput): boolean {
-  return Boolean(input.badgeIds?.some((badgeId) => GR_NHM2_FORMAL_BADGE_IDS.has(badgeId)));
+  return Boolean(
+    input.badgeIds?.some((badgeId) => GR_NHM2_FORMAL_BADGE_IDS.has(badgeId)),
+  );
 }
 
 function buildHistoricalAlpha07Receipt(input: {
   adapterInput: TheoryRuntimeAdapterInput;
   historical: HistoricalAlpha07Package;
 }): TheoryRuntimeReceiptV1 {
-  const generatedAt = input.adapterInput.generatedAt ?? new Date().toISOString();
+  const generatedAt =
+    input.adapterInput.generatedAt ?? new Date().toISOString();
   const gates = { ...input.historical.gates };
+  if (requestsExperimentReadyTheoryClosure(input.adapterInput)) {
+    gates.experiment_ready_theory_closure = "not_ready";
+  }
   const missingSignals = unique([
     ...missingSignalsForGates(gates),
+    requestsExperimentReadyTheoryClosure(input.adapterInput)
+      ? "experiment_ready_theory_closure_missing"
+      : "",
     "runtime_execution_provenance_unbound",
     "runtime_artifact_freshness_unbound",
-    ...input.historical.issues.map((_, index) => `alpha07_governance_issue_${index + 1}`),
+    ...input.historical.issues.map(
+      (_, index) => `alpha07_governance_issue_${index + 1}`,
+    ),
   ]);
   const failedGates = Object.entries(gates)
     .filter(([, status]) => status === "fail")
@@ -587,7 +783,9 @@ function buildHistoricalAlpha07Receipt(input: {
   const warnings = unique([
     "Governed historical alpha=0.7 package; no backend runtime was executed.",
     "All package artifacts are preexisting and bound to a historical import manifest, not to a fresh execution interval.",
-    ...input.historical.issues.map((issue) => `Historical import governance: ${issue}`),
+    ...input.historical.issues.map(
+      (issue) => `Historical import governance: ${issue}`,
+    ),
   ]);
   return buildTheoryRuntimeReceiptV1({
     generatedAt,
@@ -607,7 +805,9 @@ function buildHistoricalAlpha07Receipt(input: {
     },
     status: "blocked",
     outputs: {
-      artifacts: input.historical.artifacts.map((artifact) => artifact.relativePath),
+      artifacts: input.historical.artifacts.map(
+        (artifact) => artifact.relativePath,
+      ),
       scalars: collectScalars(input.historical.artifacts),
       units: {},
       gates,
@@ -635,8 +835,10 @@ function buildReceipt(input: {
   adapterInput: TheoryRuntimeAdapterInput;
   artifacts: ParsedArtifact[];
   parseError: string | null;
+  theoryClosureEvaluation?: Nhm2TheoryClosureFilesystemEvaluationV1 | null;
 }): TheoryRuntimeReceiptV1 {
-  const generatedAt = input.adapterInput.generatedAt ?? new Date().toISOString();
+  const generatedAt =
+    input.adapterInput.generatedAt ?? new Date().toISOString();
   const graphId = input.adapterInput.graphId ?? "nhm2-theory-badge-graph";
   const badgeIds = input.adapterInput.badgeIds?.length
     ? input.adapterInput.badgeIds
@@ -644,28 +846,69 @@ function buildReceipt(input: {
   const gates: Record<string, TheoryRuntimeGateStatus> = input.parseError
     ? {}
     : collectGates(input.artifacts);
+  const theoryClosureRequested = requestsExperimentReadyTheoryClosure(
+    input.adapterInput,
+  );
+  if (theoryClosureRequested) {
+    gates.experiment_ready_theory_closure = input.parseError
+      ? "not_ready"
+      : (input.theoryClosureEvaluation?.gateStatus ?? "not_ready");
+  }
   gates.runtime_artifact_freshness = "not_ready";
   gates.runtime_execution_provenance = "not_ready";
   const scalars = input.parseError ? {} : collectScalars(input.artifacts);
   const missingSignals = input.parseError
     ? ["artifact_parse_failed"]
-    : [...missingSignalsForGates(gates), "runtime_artifact_freshness_unbound"];
+    : [
+        ...missingSignalsForGates(gates),
+        ...(theoryClosureRequested &&
+        gates.experiment_ready_theory_closure === "not_ready"
+          ? [
+              input.theoryClosureEvaluation == null
+                ? "experiment_ready_theory_closure_missing"
+                : "experiment_ready_theory_closure_filesystem_unverified",
+            ]
+          : []),
+        ...(input.theoryClosureEvaluation?.blockers.map(
+          (blocker) => `experiment_ready_theory_closure:${blocker}`,
+        ) ?? []),
+        "runtime_artifact_freshness_unbound",
+      ];
   const status = receiptStatus({
     artifactCount: input.artifacts.length,
     parseFailed: Boolean(input.parseError),
     missingSignals,
   });
-  const blockedBy = status === "failed" ? ["artifact_parse_failed"] : promotionBlockedBy(gates, missingSignals);
+  const blockedBy =
+    status === "failed"
+      ? ["artifact_parse_failed"]
+      : unique([
+          ...promotionBlockedBy(gates, missingSignals),
+          ...(gates.experiment_ready_theory_closure === "fail"
+            ? ["experiment_ready_theory_closure_failed"]
+            : []),
+        ]);
   const promotionAllowed = false;
   const warnings = unique([
     "Read-only GR/NHM2 artifact adapter; no backend runtime executed.",
     "Artifacts are not bound to a run-specific output manifest; freshness and execution provenance remain unbound.",
-    input.artifacts.length === 0 && !input.parseError ? "No GR/NHM2 artifacts were found." : "",
+    input.artifacts.length === 0 && !input.parseError
+      ? "No GR/NHM2 artifacts were found."
+      : "",
     input.parseError ?? "",
-    ...missingSignals.map((signal) => `${signal.replace(/_/g, " ")}; claim promotion blocked.`),
-    ...REQUIRED_GATE_IDS.filter((gateId) => gates[gateId] === "fail").map(
-      (gateId) => `${gateId.replace(/_/g, " ")} failed; claim promotion blocked.`,
+    ...missingSignals.map(
+      (signal) => `${signal.replace(/_/g, " ")}; claim promotion blocked.`,
     ),
+    ...REQUIRED_GATE_IDS.filter((gateId) => gates[gateId] === "fail").map(
+      (gateId) =>
+        `${gateId.replace(/_/g, " ")} failed; claim promotion blocked.`,
+    ),
+    gates.experiment_ready_theory_closure === "fail"
+      ? "Experiment-ready theory-closure evidence is falsified; claim promotion blocked."
+      : "",
+    ...(input.theoryClosureEvaluation?.blockers.map(
+      (blocker) => `Theory-closure verification: ${blocker}.`,
+    ) ?? []),
   ]);
 
   return buildTheoryRuntimeReceiptV1({
@@ -688,7 +931,9 @@ function buildReceipt(input: {
       gates,
       missingSignals,
       warnings,
-      artifactEvidence: input.parseError ? [] : buildReadOnlyArtifactEvidence(input.artifacts),
+      artifactEvidence: input.parseError
+        ? []
+        : buildReadOnlyArtifactEvidence(input.artifacts),
     },
     provenance: {
       gitSha: null,
@@ -715,12 +960,23 @@ export async function readGrNhm2RuntimeArtifacts(
       return buildHistoricalAlpha07Receipt({ adapterInput: input, historical });
     }
     const artifacts = await readJsonArtifacts(projectRoot);
-    return buildReceipt({ adapterInput: input, artifacts, parseError: null });
+    const theoryClosureEvaluation = requestsExperimentReadyTheoryClosure(input)
+      ? await collectExperimentReadyTheoryClosureGate(projectRoot, artifacts)
+      : null;
+    return buildReceipt({
+      adapterInput: input,
+      artifacts,
+      parseError: null,
+      theoryClosureEvaluation,
+    });
   } catch (error) {
     return buildReceipt({
       adapterInput: input,
       artifacts: [],
-      parseError: error instanceof Error ? error.message : "GR/NHM2 artifact parse failed.",
+      parseError:
+        error instanceof Error
+          ? error.message
+          : "GR/NHM2 artifact parse failed.",
     });
   }
 }
@@ -734,12 +990,20 @@ export const grNhm2RuntimeAdapter: TheoryRuntimeAdapter = {
   canHandle: (input) =>
     input.runtimeId === GR_NHM2_RUNTIME_ADAPTER_ID ||
     input.laneId === GR_NHM2_LANE_ID ||
-    Boolean(input.badgeIds?.some((badgeId) => GR_NHM2_SUPPORTED_BADGE_IDS.includes(badgeId as typeof GR_NHM2_SUPPORTED_BADGE_IDS[number]))),
+    Boolean(
+      input.badgeIds?.some((badgeId) =>
+        GR_NHM2_SUPPORTED_BADGE_IDS.includes(
+          badgeId as (typeof GR_NHM2_SUPPORTED_BADGE_IDS)[number],
+        ),
+      ),
+    ),
   buildReferenceTrace: (input) =>
     buildStaticGrTensorTraceV1({
       runtimeId: GR_NHM2_RUNTIME_ADAPTER_ID,
       graphId: input.graphId ?? "nhm2-theory-badge-graph",
-      badgeIds: input.badgeIds?.length ? input.badgeIds : [...GR_NHM2_SUPPORTED_BADGE_IDS],
+      badgeIds: input.badgeIds?.length
+        ? input.badgeIds
+        : [...GR_NHM2_SUPPORTED_BADGE_IDS],
       generatedAt: input.generatedAt ?? undefined,
     }),
   readArtifacts: readGrNhm2RuntimeArtifacts,

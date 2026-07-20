@@ -8,6 +8,7 @@ import { recordStagePlayLiveSourceConversationEvent } from "../../stage-play/sta
 import { buildHelixRealtimeStagePlayContextPack } from "../realtime-session/context-pack";
 import { startRealtimeGroundedRelayForHandoff } from "../realtime-session/grounded-answer-relay";
 import { buildRealtimeTranscriptWorkerAdmission } from "../realtime-session/worker-admission";
+import type { HelixRuntimeGoalAccountScope } from "../runtime-goals/runtime-goal-account-binding";
 
 const handoffsById = new Map<string, HelixRealtimeStagePlayAskHandoffV1>();
 const handoffIdByProviderEventKey = new Map<string, string>();
@@ -51,6 +52,8 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
   transcriptText: string;
   observation: HelixRealtimeTranscriptObservation;
   sourceBinding?: Record<string, unknown> | null;
+  selectedRuntimeAgentProvider?: string | null;
+  runtimeGoalAccountScope?: HelixRuntimeGoalAccountScope | null;
   providerCallRef?: string | null;
   transportReceiptRef?: string | null;
   vadState?: string | null;
@@ -87,6 +90,7 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
     realtimeSessionId: input.realtimeSessionId,
     threadId: input.threadId,
     sourceBinding: input.sourceBinding,
+    runtimeGoalAccountScope: input.runtimeGoalAccountScope,
     nowMs,
   });
   const activeGoalBinding = contextPack.active_goal_binding;
@@ -110,12 +114,16 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
     transcriptText,
     sourceBinding: input.sourceBinding,
     activeGoalBinding,
+    selectedRuntimeAgentProvider: input.selectedRuntimeAgentProvider,
     evidenceRefs,
     nowMs,
   });
   const requiredGroundingCapabilityIds = workerAdmission.spoken_relay_eligible
     ? workerAdmission.candidate_readonly_capability_ids
     : [];
+  const mustEnterBackendAsk =
+    workerAdmission.dispatch.kind === "ask_runtime" ||
+    workerAdmission.dispatch.kind === "ask_runtime_read_only";
   const routeMetadata: Record<string, unknown> = {
     schema: "helix.ask.route_metadata.v1",
     source: "realtime_stage_play",
@@ -127,6 +135,8 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
     goalId: activeGoalBinding?.goal_id ?? null,
     runtimeGoalSessionRef: activeGoalBinding?.runtime_session_ref ?? null,
     boundRuntimeAgentProvider: activeGoalBinding?.runtime_agent_provider ?? null,
+    selectedRuntimeAgentProvider: workerAdmission.selected_runtime_agent_provider,
+    selected_runtime_agent_provider: workerAdmission.selected_runtime_agent_provider,
     requiredGroundingCapabilityIds,
     realtimeWorkerAdmission: workerAdmission,
     forbiddenCapabilities: [
@@ -143,14 +153,18 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
       strength: "hard",
       explicit_cues: ["server_admitted_realtime_transcript"],
       reasons: ["realtime_transcript_observed", "stage_play_handoff_issued"],
-      requested_outputs: ["grounded_runtime_agent_answer", "typed_failure"],
+      requested_outputs: mustEnterBackendAsk
+        ? ["grounded_runtime_agent_answer", "typed_failure"]
+        : workerAdmission.dispatch.kind === "goal_wake"
+          ? ["durable_goal_wake", "typed_failure"]
+          : ["realtime_conversation_local"],
       suppressed_routes: [
         "client_projection",
         "workstation_action_execution",
         "realtime_provider_tool_execution",
       ],
       precedence_reason: "server_admitted_realtime_transcript_handoff",
-      must_enter_backend_ask: true,
+      must_enter_backend_ask: mustEnterBackendAsk,
       allow_client_shortcut: false,
       allow_no_tool_direct: requiredGroundingCapabilityIds.length === 0,
       admitted_readonly_handoff: true,
@@ -158,7 +172,7 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
       required_grounding_capability_ids: requiredGroundingCapabilityIds,
       goal_id: activeGoalBinding?.goal_id ?? null,
       runtime_goal_session_ref: activeGoalBinding?.runtime_session_ref ?? null,
-      runtime_agent_provider: activeGoalBinding?.runtime_agent_provider ?? null,
+      runtime_agent_provider: workerAdmission.selected_runtime_agent_provider,
       realtime_worker_admission: workerAdmission,
       transcript_is_user_intent_after_admission: true,
       handoff_id: handoffId,
@@ -197,7 +211,7 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
     transcript_text_char_count: transcriptText.length,
     goal_id: activeGoalBinding?.goal_id ?? null,
     runtime_goal_session_ref: activeGoalBinding?.runtime_session_ref ?? null,
-    runtime_agent_provider: activeGoalBinding?.runtime_agent_provider ?? null,
+    runtime_agent_provider: workerAdmission.selected_runtime_agent_provider,
     required_grounding_capability_ids: requiredGroundingCapabilityIds,
     worker_admission: workerAdmission,
     created_at_ms: nowMs,

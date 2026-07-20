@@ -15603,7 +15603,7 @@ export function initializePipelineState(): EnergyPipelineState {
 
     // Sector management
     tilesPerSector: 0,
-    activeSectors: 1,
+    activeSectors: PROMOTED_WARP_PROFILE.concurrentSectors,
     activeTiles: 0,
     activeFraction: 0,
 
@@ -20616,10 +20616,86 @@ export async function updateParameters(
   opts: PipelineRunOptions = {},
 ): Promise<EnergyPipelineState> {
   const nextParams: Partial<EnergyPipelineState> = { ...params };
+  const hasOwn = (value: object, key: PropertyKey): boolean =>
+    Object.prototype.hasOwnProperty.call(value, key);
+  const validateSectorDuty = (value: unknown, field: string): number => {
+    if (
+      typeof value !== "number" ||
+      !Number.isFinite(value) ||
+      value < 1e-6 ||
+      value > 1
+    ) {
+      throw new RangeError(`${field} must be a finite number in [0.000001, 1]`);
+    }
+    return value;
+  };
   const clampPulseCap = (value: unknown, fallback: number): number => {
     const n = Number(value);
     return Number.isFinite(n) && n > 0 ? (n as number) : fallback;
   };
+
+  const incomingDynamicRaw = nextParams.dynamicConfig;
+  if (
+    incomingDynamicRaw != null &&
+    (typeof incomingDynamicRaw !== "object" || Array.isArray(incomingDynamicRaw))
+  ) {
+    throw new TypeError("dynamicConfig must be an object");
+  }
+  if (incomingDynamicRaw != null) {
+    const incomingDynamic = incomingDynamicRaw as MutableDynamicConfig;
+    if (hasOwn(incomingDynamic, "sectorDuty")) {
+      validateSectorDuty(
+        incomingDynamic.sectorDuty,
+        "dynamicConfig.sectorDuty",
+      );
+    }
+    if (hasOwn(incomingDynamic, "measuredSectorDuty")) {
+      validateSectorDuty(
+        incomingDynamic.measuredSectorDuty,
+        "dynamicConfig.measuredSectorDuty",
+      );
+    }
+  }
+  if (hasOwn(nextParams, "measuredSectorDuty")) {
+    const rootMeasuredDuty = validateSectorDuty(
+      (nextParams as any).measuredSectorDuty,
+      "measuredSectorDuty",
+    );
+    if (
+      incomingDynamicRaw != null &&
+      hasOwn(incomingDynamicRaw as MutableDynamicConfig, "measuredSectorDuty") &&
+      (incomingDynamicRaw as MutableDynamicConfig).measuredSectorDuty !==
+        rootMeasuredDuty
+    ) {
+      throw new Error(
+        "measuredSectorDuty conflicts with dynamicConfig.measuredSectorDuty",
+      );
+    }
+  }
+
+  if (hasOwn(nextParams, "dutyEffectiveFR")) {
+    const rootDuty = validateSectorDuty(
+      (nextParams as any).dutyEffectiveFR,
+      "dutyEffectiveFR",
+    );
+    const incomingDynamic: MutableDynamicConfig = {
+      ...((incomingDynamicRaw ?? {}) as MutableDynamicConfig),
+    };
+    if (hasOwn(incomingDynamic, "sectorDuty")) {
+      const nestedDuty = validateSectorDuty(
+        incomingDynamic.sectorDuty,
+        "dynamicConfig.sectorDuty",
+      );
+      if (nestedDuty !== rootDuty) {
+        throw new Error(
+          "dutyEffectiveFR conflicts with dynamicConfig.sectorDuty",
+        );
+      }
+    }
+    incomingDynamic.sectorDuty = rootDuty;
+    nextParams.dynamicConfig = incomingDynamic;
+    delete (nextParams as any).dutyEffectiveFR;
+  }
 
   if (nextParams.dynamicConfig) {
     const incoming = nextParams.dynamicConfig as MutableDynamicConfig;

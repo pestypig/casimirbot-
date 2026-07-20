@@ -3,6 +3,7 @@ import type {
   HelixAgentPermissionProfile,
   HelixAgentRuntimeId,
 } from "@shared/helix-agent-runtime";
+import type { HelixWorkstationGatewayAccountContext } from "../workstation-tool-gateway/account-policy";
 
 export type HelixAgentRunRoute = "/ask/turn" | "/ask/turn/stream" | "/ask";
 
@@ -13,6 +14,7 @@ export type HelixAgentRunRequest = {
   headers?: IncomingHttpHeaders;
   signal?: AbortSignal;
   onTranscriptEvent?: (event: Record<string, unknown>) => void;
+  workstationAccountContext?: HelixWorkstationGatewayAccountContext | null;
 };
 
 export type HelixAgentRuntimeEvent = {

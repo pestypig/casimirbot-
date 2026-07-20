@@ -11,6 +11,7 @@ import {
   Volume2,
 } from "lucide-react";
 import type { HelixAccountCapabilityPolicy } from "@shared/helix-account-session";
+import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
 import type { HelixRealtimeGroundedRelayStatusV1 } from "@shared/contracts/helix-realtime-worker-relay.v1";
 import {
   buildInactiveHelixLiveRuntimeAgentControlState,
@@ -39,6 +40,7 @@ export type HelixAskLiveRuntimeControlsModel = {
   transportControllerState: HelixAskLiveRuntimeTransportControllerState;
   transportControllerLabel: string;
   transportBlockedReason: string | null;
+  selectedRuntimeAgentProvider: HelixAgentRuntimeId;
   controlState: HelixLiveRuntimeAgentControlState;
 };
 
@@ -110,6 +112,7 @@ export function buildHelixAskLiveRuntimeControlsModel(args: {
   lifecycleState?: HelixAskLiveRuntimeLifecycleState;
   transportControllerState?: HelixAskLiveRuntimeTransportControllerState;
   transportBlockedReason?: string | null;
+  selectedRuntimeAgentProvider?: HelixAgentRuntimeId;
 }): HelixAskLiveRuntimeControlsModel {
   const accountPolicy = args.accountPolicy ?? null;
   const developerUnlocked =
@@ -132,6 +135,7 @@ export function buildHelixAskLiveRuntimeControlsModel(args: {
     transportControllerLabel:
       labelForHelixAskLiveRuntimeTransportControllerState(transportControllerState),
     transportBlockedReason: args.transportBlockedReason ?? null,
+    selectedRuntimeAgentProvider: args.selectedRuntimeAgentProvider ?? "helix",
     controlState: buildInactiveHelixLiveRuntimeAgentControlState({
       runtime_agent_mode: mode,
       runtime_agent_authority: authority,
@@ -172,6 +176,7 @@ function HelixAskVisibleLiveRuntimeControls({
     enabled: !model.locked,
     mode,
     authority,
+    selectedRuntimeAgentProvider: model.selectedRuntimeAgentProvider,
     initialLifecycleState: model.lifecycleState,
     initialTransportState: model.transportControllerState,
   });

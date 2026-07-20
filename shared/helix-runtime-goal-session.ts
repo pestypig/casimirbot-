@@ -331,6 +331,7 @@ export type HelixRuntimeGoalDebugExport = {
   quiet_report_decision: "quiet" | "report" | "report_failure" | "not_evaluated";
   latest_wake_candidate?: HelixRuntimeGoalWakeCandidate | null;
   latest_wake_admission?: HelixRuntimeGoalWakeAdmissionResult | null;
+  runtime_goal_account_binding?: Record<string, unknown> | null;
   answer_authority: false;
   assistant_answer: false;
   terminal_eligible: false;

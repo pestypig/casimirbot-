@@ -8,6 +8,7 @@ import {
 import { resolveHelixRuntimeAgentAccess } from "@shared/helix-account-session";
 import { getAccountCapabilityPolicy } from "../services/helix-account/account-session-store";
 import { readHelixSessionCookie } from "../services/helix-account/session-cookie";
+import { resolveWorkstationGatewayAccountContext } from "../services/helix-ask/workstation-tool-gateway/account-policy";
 import {
   buildCapabilityLaneProviderTimeline,
   buildHelixCapabilityLaneProviderAdapterContext,
@@ -59,6 +60,17 @@ const readRuntimeId = (value: unknown): HelixAgentRuntimeId =>
 
 const runtimeGoalDebugSummaryFor = (result: GoalRuntimeSessionResult) =>
   buildRuntimeGoalDebugSummary(result.session, result.debug_export);
+
+const runtimeGoalResultStatusCode = (result: GoalRuntimeSessionResult): number => {
+  if (result.ok) return 200;
+  if (
+    result.blocked_reason === "permission_revoked" ||
+    result.blocked_reason?.startsWith("runtime_goal_account_")
+  ) {
+    return 403;
+  }
+  return 409;
+};
 
 const readGoalReportPolicy = (value: unknown): HelixRuntimeGoalReportPolicy | undefined => {
   const normalized = readString(value);
@@ -140,10 +152,17 @@ agentProvidersRouter.get("/agent-providers", async (req: Request, res: Response)
   });
 });
 
-agentProvidersRouter.get("/goal/runtime-session", (req: Request, res: Response) => {
+agentProvidersRouter.get("/goal/runtime-session", async (req: Request, res: Response) => {
   const goalId = readQueryString(req.query.goal_id ?? req.query.goalId);
+  const accountContext = await resolveWorkstationGatewayAccountContext(
+    readHelixSessionCookie(req.headers.cookie),
+  );
   const sessions = helixRuntimeGoalSessionStore.listGoalRuntimeSessions()
-    .filter((session) => !goalId || session.goal_id === goalId);
+    .filter((session) => !goalId || session.goal_id === goalId)
+    .filter((session) => helixRuntimeGoalSessionStore.isGoalRuntimeSessionAccessible({
+      goalId: session.goal_id,
+      accountContext,
+    }));
   res.json({
     schema: "helix.runtime_goal.session_list_response.v1",
     ok: true,
@@ -160,9 +179,9 @@ agentProvidersRouter.get("/goal/runtime-session", (req: Request, res: Response) 
   });
 });
 
-agentProvidersRouter.get("/goal/runtime-session/:goalId/debug-export", (req: Request, res: Response) => {
-  const debugExport = helixRuntimeGoalSessionStore.buildGoalDebugExport(req.params.goalId);
-  if (!debugExport) {
+agentProvidersRouter.get("/goal/runtime-session/:goalId/debug-export", async (req: Request, res: Response) => {
+  const session = helixRuntimeGoalSessionStore.getGoalRuntimeSession(req.params.goalId);
+  if (!session) {
     return res.status(404).json({
       schema: "helix.runtime_goal.debug_export_response.v1",
       ok: false,
@@ -174,10 +193,33 @@ agentProvidersRouter.get("/goal/runtime-session/:goalId/debug-export", (req: Req
       raw_content_included: false,
     });
   }
-  const session = helixRuntimeGoalSessionStore.getGoalRuntimeSession(req.params.goalId);
-  const runtimeGoalDebugSummary = session
-    ? buildRuntimeGoalDebugSummary(session, debugExport)
-    : null;
+  const accountContext = await resolveWorkstationGatewayAccountContext(
+    readHelixSessionCookie(req.headers.cookie),
+  );
+  const accountValidation = helixRuntimeGoalSessionStore.validateGoalRuntimeSessionAccount({
+    goalId: session.goal_id,
+    accountContext,
+  });
+  if (!helixRuntimeGoalSessionStore.isGoalRuntimeSessionAccessible({
+    goalId: session.goal_id,
+    accountContext,
+  })) {
+    return res.status(403).json({
+      schema: "helix.runtime_goal.debug_export_response.v1",
+      ok: false,
+      error: accountValidation?.blockedReason ?? "runtime_goal_account_binding_required",
+      blocked_reason: accountValidation?.blockedReason ?? "runtime_goal_account_binding_required",
+      goal_id: session.goal_id,
+      runtime_goal_account_binding: accountValidation?.projection ?? null,
+      answer_authority: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  }
+  const debugExport = helixRuntimeGoalSessionStore.buildGoalDebugExport(req.params.goalId);
+  if (!debugExport) return res.status(404).end();
+  const runtimeGoalDebugSummary = buildRuntimeGoalDebugSummary(session, debugExport);
   return res.json({
     ...debugExport,
     schema: "helix.runtime_goal.debug_export_response.v1",
@@ -189,7 +231,10 @@ agentProvidersRouter.get("/goal/runtime-session/:goalId/debug-export", (req: Req
 
 agentProvidersRouter.post("/goal/runtime-session", async (req: Request, res: Response) => {
   const body = readBodyRecord(req.body);
-  const accountPolicy = await getAccountCapabilityPolicy(readHelixSessionCookie(req.headers.cookie));
+  const accountContext = await resolveWorkstationGatewayAccountContext(
+    readHelixSessionCookie(req.headers.cookie),
+  );
+  const accountPolicy = accountContext.account_policy;
   const runtimeAgentProvider = readRuntimeId(body.runtime_agent_provider ?? body.agent_runtime ?? body.agentRuntime);
   const providerAccess = resolveHelixRuntimeAgentAccess(accountPolicy, runtimeAgentProvider);
   if (providerAccess.state !== "available") {
@@ -217,8 +262,9 @@ agentProvidersRouter.post("/goal/runtime-session", async (req: Request, res: Res
     allowedWorkstationTools: readStringArray(body.allowed_workstation_tools ?? body.allowedWorkstationTools),
     stopPolicy: readGoalStopPolicy(body.stop_policy ?? body.stopPolicy),
     reportPolicy: readGoalReportPolicy(body.report_policy ?? body.reportPolicy),
+    accountContext,
   });
-  res.status(result.ok ? 200 : 409).json({
+  res.status(runtimeGoalResultStatusCode(result)).json({
     schema: "helix.runtime_goal.session_start_response.v1",
     ...result,
     runtime_goal_debug_summary: runtimeGoalDebugSummaryFor(result),
@@ -234,12 +280,37 @@ agentProvidersRouter.post("/goal/runtime-session/:goalId/resume", async (req: Re
   try {
     const session = helixRuntimeGoalSessionStore.getGoalRuntimeSession(req.params.goalId);
     if (!session) throw new Error(`Goal session not found: ${req.params.goalId}`);
-    const accountPolicy = await getAccountCapabilityPolicy(readHelixSessionCookie(req.headers.cookie));
+    const accountContext = await resolveWorkstationGatewayAccountContext(
+      readHelixSessionCookie(req.headers.cookie),
+    );
+    const accountValidation = helixRuntimeGoalSessionStore.validateGoalRuntimeSessionAccount({
+      goalId: session.goal_id,
+      accountContext,
+    });
+    if (!helixRuntimeGoalSessionStore.isGoalRuntimeSessionAccessible({
+      goalId: session.goal_id,
+      accountContext,
+    })) {
+      return res.status(403).json({
+        schema: "helix.runtime_goal.session_resume_response.v1",
+        ok: false,
+        error: accountValidation?.blockedReason ?? "runtime_goal_account_binding_required",
+        blocked_reason: accountValidation?.blockedReason ?? "runtime_goal_account_binding_required",
+        goal_id: session.goal_id,
+        runtime_goal_account_binding: accountValidation?.projection ?? null,
+        answer_authority: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      });
+    }
+    const accountPolicy = accountContext.account_policy;
     const providerAccess = resolveHelixRuntimeAgentAccess(accountPolicy, session.runtime_agent_provider);
     if (providerAccess.state !== "available") {
       const blocked = helixRuntimeGoalSessionStore.blockGoalRuntimeSession({
         goalId: req.params.goalId,
         reason: "permission_revoked",
+        accountContext,
       });
       return res.status(403).json({
         schema: "helix.runtime_goal.session_resume_response.v1",
@@ -259,8 +330,9 @@ agentProvidersRouter.post("/goal/runtime-session/:goalId/resume", async (req: Re
       wakeEventKind: readGoalWakeEventKind(body.wake_event_kind ?? body.wakeEventKind),
       turnId: readString(body.turn_id ?? body.turnId) || null,
       body,
+      accountContext,
     });
-    return res.status(result.ok ? 200 : 409).json({
+    return res.status(runtimeGoalResultStatusCode(result)).json({
       schema: "helix.runtime_goal.session_resume_response.v1",
       ...result,
       runtime_goal_debug_summary: runtimeGoalDebugSummaryFor(result),
@@ -283,15 +355,42 @@ agentProvidersRouter.post("/goal/runtime-session/:goalId/resume", async (req: Re
   }
 });
 
-agentProvidersRouter.post("/goal/runtime-session/:goalId/stop", (req: Request, res: Response) => {
+agentProvidersRouter.post("/goal/runtime-session/:goalId/stop", async (req: Request, res: Response) => {
   const body = readBodyRecord(req.body);
   try {
+    const accountContext = await resolveWorkstationGatewayAccountContext(
+      readHelixSessionCookie(req.headers.cookie),
+    );
+    const session = helixRuntimeGoalSessionStore.getGoalRuntimeSession(req.params.goalId);
+    if (!session) throw new Error(`Goal session not found: ${req.params.goalId}`);
+    const accountValidation = helixRuntimeGoalSessionStore.validateGoalRuntimeSessionAccount({
+      goalId: session.goal_id,
+      accountContext,
+    });
+    if (!helixRuntimeGoalSessionStore.isGoalRuntimeSessionAccessible({
+      goalId: session.goal_id,
+      accountContext,
+    })) {
+      return res.status(403).json({
+        schema: "helix.runtime_goal.session_stop_response.v1",
+        ok: false,
+        error: accountValidation?.blockedReason ?? "runtime_goal_account_binding_required",
+        blocked_reason: accountValidation?.blockedReason ?? "runtime_goal_account_binding_required",
+        goal_id: session.goal_id,
+        runtime_goal_account_binding: accountValidation?.projection ?? null,
+        answer_authority: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      });
+    }
     const result = helixRuntimeGoalSessionStore.stopGoalRuntimeSession({
       goalId: req.params.goalId,
       status: readGoalStopStatus(body.status),
       reason: readString(body.reason) || null,
+      accountContext,
     });
-    return res.json({
+    return res.status(runtimeGoalResultStatusCode(result)).json({
       schema: "helix.runtime_goal.session_stop_response.v1",
       ...result,
       runtime_goal_debug_summary: runtimeGoalDebugSummaryFor(result),

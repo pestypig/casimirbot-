@@ -244,7 +244,7 @@ describe("Realtime grounded answer feedback", () => {
     expect(groundedDebug).toMatchObject({
       worker_admission: {
         decision_phase: "transcript_handoff",
-        worker_turn_dispatched: true,
+        worker_turn_dispatched: false,
         workstation_action_execution_allowed: false,
       },
       grounded_answer: {

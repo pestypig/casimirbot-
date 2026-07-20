@@ -10,12 +10,14 @@ import {
   type ExplicitCapabilityContract,
 } from "./explicit-capability-contract";
 import { WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS } from "./workstation-context-feed-query-tool-contracts";
+import { resolveAuthoritativeLivePipelineRoute } from "./live-pipeline-route-authority";
 
 type RecordLike = Record<string, unknown>;
 
 export type AskCapabilityContractState =
   | "suppressed_contextual_reference"
   | "conversational_referent_no_evidence"
+  | "authoritative_live_pipeline_contract"
   | "explicit_capability_command"
   | "hard_live_source_phase"
   | "classifier_hypothesis"
@@ -389,6 +391,11 @@ export const resolveAskCapabilityContractArbitration = (input: {
   });
   const metadataSourceTarget = firstString(routeMetadata?.sourceTarget, routeMetadata?.source_target);
   const routeMetadataPresent = Boolean(metadataSourceTarget) || input.hardLiveSourceMailboxRoute === true;
+  const authoritativeLivePipelineRoute = resolveAuthoritativeLivePipelineRoute({
+    turnId: input.turnId,
+    canonicalGoalFrame,
+    routeProductContract,
+  });
   const hardLiveSourceMailboxRoute =
     input.hardLiveSourceMailboxRoute === true ||
     metadataSourceTarget === "live_source_mailbox" ||
@@ -439,6 +446,27 @@ export const resolveAskCapabilityContractArbitration = (input: {
       route_metadata_demoted: routeMetadataPresent,
       demotion_reason: routeMetadataPresent ? "contextual_tool_reference_demoted_route_metadata" : undefined,
       failure_code_if_incompatible: "contextual_tool_reference_demoted_route_metadata",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+
+  if (authoritativeLivePipelineRoute) {
+    return {
+      schema: "helix.ask_capability_contract_arbitration.v1",
+      turn_id: input.turnId,
+      contract_state: "authoritative_live_pipeline_contract",
+      requested_capability: requestedCapabilityContract?.capability ?? null,
+      selected_source_target: authoritativeLivePipelineRoute.sourceTarget,
+      selected_plan_family: "live_source",
+      canonical_goal_kind: authoritativeLivePipelineRoute.goalKind,
+      required_observation_kinds: [authoritativeLivePipelineRoute.requiredTerminalKind],
+      required_terminal_kind: authoritativeLivePipelineRoute.requiredTerminalKind,
+      allow_phase_repair: false,
+      route_metadata_demoted: false,
+      demotion_reason: requestedCapabilityContract
+        ? "authoritative_live_pipeline_contract_overrode_capability_hypothesis"
+        : undefined,
       assistant_answer: false,
       raw_content_included: false,
     };

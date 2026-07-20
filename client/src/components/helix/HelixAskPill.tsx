@@ -6399,11 +6399,6 @@ export function HelixAskPill({
   const helixAskSessionContextRef = useRef<string | null>(null);
   const askInputRef = useRef<HTMLTextAreaElement | null>(null);
   const askImageInputRef = useRef<HTMLInputElement | null>(null);
-  const askActionCarouselRef = useRef<HTMLDivElement | null>(null);
-  const [askActionCarouselEdges, setAskActionCarouselEdges] = useState({
-    canScrollLeft: false,
-    canScrollRight: false,
-  });
   const [agentRuntimeMenuOpen, setAgentRuntimeMenuOpen] = useState(false);
   const [agentRuntimeProviders, setAgentRuntimeProviders] = useState<HelixAgentRuntimeDescriptor[]>(
     DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS,
@@ -6434,45 +6429,6 @@ export function HelixAskPill({
       // Some browsers expose vibrate but reject it outside supported contexts.
     }
   }, []);
-  const updateAskActionCarouselEdges = useCallback(() => {
-    const node = askActionCarouselRef.current;
-    if (!node) {
-      setAskActionCarouselEdges({ canScrollLeft: false, canScrollRight: false });
-      return;
-    }
-    const maxScrollLeft = Math.max(0, node.scrollWidth - node.clientWidth);
-    const scrollLeft = Math.max(0, node.scrollLeft);
-    setAskActionCarouselEdges({
-      canScrollLeft: scrollLeft > 2,
-      canScrollRight: scrollLeft < maxScrollLeft - 2,
-    });
-  }, []);
-  const scrollAskActionCarousel = useCallback((direction: "left" | "right") => {
-    const node = askActionCarouselRef.current;
-    if (!node) return;
-    const firstAction = node.querySelector<HTMLElement>("[data-helix-ask-action-item='true']");
-    const step = Math.max(48, (firstAction?.offsetWidth ?? 40) + 8);
-    triggerAskActionHaptic();
-    node.scrollBy({
-      left: direction === "left" ? -step : step,
-      behavior: "smooth",
-    });
-    window.setTimeout(updateAskActionCarouselEdges, 260);
-  }, [triggerAskActionHaptic, updateAskActionCarouselEdges]);
-  useEffect(() => {
-    const node = askActionCarouselRef.current;
-    if (!node) return;
-    updateAskActionCarouselEdges();
-    const handleScroll = () => updateAskActionCarouselEdges();
-    node.addEventListener("scroll", handleScroll, { passive: true });
-    const resizeObserver =
-      typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateAskActionCarouselEdges) : null;
-    resizeObserver?.observe(node);
-    return () => {
-      node.removeEventListener("scroll", handleScroll);
-      resizeObserver?.disconnect();
-    };
-  }, [updateAskActionCarouselEdges]);
   const refreshAgentRuntimeProviders = useCallback(async () => {
     const response = await fetch("/api/agi/agent-providers", {
       headers: { Accept: "application/json" },
@@ -22757,20 +22713,6 @@ export function HelixAskPill({
   const maxWidthClass = maxWidthClassName ?? "max-w-4xl";
   const askAttachmentCommitChecks = buildHelixAskAttachmentCommitChecks(askAttachments);
   const hasReadyAskAttachment = hasReadyHelixAskAttachmentCommitCheck(askAttachmentCommitChecks);
-  useEffect(() => {
-    updateAskActionCarouselEdges();
-  }, [
-    agentRuntimeMenuOpen,
-    agentRuntimeProviders.length,
-    askAttachments.length,
-    askBusy,
-    hasReadyAskAttachment,
-    updateAskActionCarouselEdges,
-    visualSituationIncludeAudio,
-    visualSituationSourceKind,
-    visualSituationSourceStatus,
-    voiceRetainedTranscriptionRetry,
-  ]);
   const composerViewModel = useMemo(
     () =>
       buildHelixAskComposerViewModel({
@@ -23018,12 +22960,8 @@ export function HelixAskPill({
     onImageError: () => setAskMoodBroken(true),
   });
   const actionToolbarState = buildHelixAskComposerActionToolbarState({
-    carouselRef: askActionCarouselRef,
     imageInputRef: askImageInputRef,
-    canScrollLeft: askActionCarouselEdges.canScrollLeft,
-    canScrollRight: askActionCarouselEdges.canScrollRight,
-    onScrollLeft: () => scrollAskActionCarousel("left"),
-    onScrollRight: () => scrollAskActionCarousel("right"),
+    onCarouselScrollIntent: triggerAskActionHaptic,
     onImageSelect: handleAskImageSelect,
     onAttachImage: () => {
       triggerAskActionHaptic();

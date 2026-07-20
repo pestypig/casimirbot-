@@ -1,11 +1,16 @@
 import { Router } from "express";
 import { dispatchRuntimeGoalWakeCandidate } from "../services/helix-ask/runtime-goals/runtime-goal-wake-dispatcher";
 import { latestActiveRuntimeGoalSession } from "../services/helix-ask/runtime-goals/runtime-goal-wake-admission";
+import { readHelixSessionCookie } from "../services/helix-account/session-cookie";
+import { resolveWorkstationGatewayAccountContext } from "../services/helix-ask/workstation-tool-gateway/account-policy";
 
 export const runtimeGoalsRouter = Router();
 
-runtimeGoalsRouter.get("/runtime-goals/active", (_req, res) => {
-  const session = latestActiveRuntimeGoalSession();
+runtimeGoalsRouter.get("/runtime-goals/active", async (req, res) => {
+  const accountContext = await resolveWorkstationGatewayAccountContext(
+    readHelixSessionCookie(req.headers.cookie),
+  );
+  const session = latestActiveRuntimeGoalSession(accountContext);
   res.json({
     ok: true,
     schema: "helix.runtime_goal.active_session_response.v1",

@@ -447,6 +447,9 @@ export const buildRealtimeSessionBoundaryResponse = (input: {
   blockedReason:
     | "account_policy_locked"
     | "capability_lane_disabled_by_policy"
+    | "runtime_agent_outside_account_policy"
+    | "runtime_agent_provider_unavailable"
+    | "runtime_agent_provider_unknown"
     | "realtime_session_not_found"
     | "realtime_adapter_disabled_by_env"
     | "realtime_live_transport_disabled_by_env"

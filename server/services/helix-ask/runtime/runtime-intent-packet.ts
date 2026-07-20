@@ -81,6 +81,7 @@ export type HelixRuntimeSemanticRouteProposal = {
   proposed_route: string | null;
   proposed_tool_family: string | null;
   proposed_capability_id: string | null;
+  proposed_capability_ids: string[];
   confidence: "low" | "medium" | "high" | "unknown";
   uncertainty: string[];
   reason_summary: string;
@@ -148,7 +149,7 @@ const inferToolFamilyFromGoalKind = (goalKind: string | null): string | null => 
   return null;
 };
 
-const normalizeRuntimeSemanticRouteProposal = (args: {
+export const normalizeHelixRuntimeSemanticRouteProposal = (args: {
   value: unknown;
   turnId: string;
   promptHash: string;
@@ -162,7 +163,13 @@ const normalizeRuntimeSemanticRouteProposal = (args: {
   const proposalTurnId = args.dependencies.readString(record.turn_id);
   if (proposalTurnId && proposalTurnId !== args.turnId) return null;
   const proposedRoute = args.dependencies.readString(record.proposed_route);
-  const proposedCapabilityId = args.dependencies.readString(record.proposed_capability_id);
+  const proposedCapabilityIds = Array.from(new Set([
+    args.dependencies.readString(record.proposed_capability_id),
+    ...(Array.isArray(record.proposed_capability_ids)
+      ? record.proposed_capability_ids.map((entry: unknown) => args.dependencies.readString(entry))
+      : []),
+  ].filter((entry: string | null): entry is string => Boolean(entry)))).slice(0, 32);
+  const proposedCapabilityId = proposedCapabilityIds[0] ?? null;
   const proposedToolFamily =
     args.dependencies.readString(record.proposed_tool_family) ??
     inferToolFamilyFromCapabilityId(proposedCapabilityId) ??
@@ -193,13 +200,14 @@ const normalizeRuntimeSemanticRouteProposal = (args: {
         args.turnId,
         proposedRoute,
         proposedToolFamily,
-        proposedCapabilityId,
+        proposedCapabilityIds,
       ])}`,
     prompt_hash: args.dependencies.readString(record.prompt_hash) ?? args.promptHash,
     proposal_source: "agent_runtime",
     proposed_route: proposedRoute,
     proposed_tool_family: proposedToolFamily,
     proposed_capability_id: proposedCapabilityId,
+    proposed_capability_ids: proposedCapabilityIds,
     confidence,
     uncertainty,
     reason_summary:
@@ -433,6 +441,7 @@ export const buildHelixRuntimeSemanticRouteProposal = (args: {
     proposed_route: proposedRoute,
     proposed_tool_family: proposedToolFamily,
     proposed_capability_id: proposedCapabilityId,
+    proposed_capability_ids: proposedCapabilityId ? [proposedCapabilityId] : [],
     confidence,
     uncertainty,
     reason_summary:
@@ -458,7 +467,7 @@ export const appendHelixRuntimeIntentPacketToPayload = (args: {
     packet.canonical_goal_frame?.goal_kind,
   ]);
   const semanticRouteProposal =
-    normalizeRuntimeSemanticRouteProposal({
+    normalizeHelixRuntimeSemanticRouteProposal({
       value: args.payload.runtime_semantic_route_proposal ?? args.payload.agent_runtime_semantic_route_proposal,
       turnId: args.turnId,
       promptHash,

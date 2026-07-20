@@ -12,6 +12,8 @@ import {
   listStagePlayGoalContextUpdates,
 } from "../../stage-play/stage-play-goal-context-store";
 import { buildSituationContextPack } from "../../situation-room/situation-context-pack";
+import { helixRuntimeGoalSessionStore } from "../agent-providers/goal-runtime-session";
+import type { HelixRuntimeGoalAccountScope } from "../runtime-goals/runtime-goal-account-binding";
 
 const CONTEXT_FRESHNESS_MS = 30_000;
 const CONVERSATION_MAX_AGE_MS = 30 * 60_000;
@@ -112,6 +114,7 @@ export const buildHelixRealtimeStagePlayContextPack = (input: {
   realtimeSessionId: string;
   threadId: string;
   sourceBinding?: Record<string, unknown> | null;
+  runtimeGoalAccountScope?: HelixRuntimeGoalAccountScope | null;
   nowMs?: number;
 }): HelixRealtimeStagePlayContextPackV1 => {
   const nowMs = input.nowMs ?? Date.now();
@@ -120,7 +123,13 @@ export const buildHelixRealtimeStagePlayContextPack = (input: {
     limit: 40,
     now: new Date(nowMs).toISOString(),
   });
-  const goalSessions = listStagePlayAgentGoalSessions({ threadId: input.threadId, limit: 12 });
+  const goalSessions = listStagePlayAgentGoalSessions({ threadId: input.threadId, limit: 12 })
+    .filter((session) =>
+      !session.constructRefs.includes("runtime-goal-stage-play-projection") ||
+      helixRuntimeGoalSessionStore.isGoalRuntimeSessionVisibleToAccountScope({
+        goalId: session.goalId,
+        accountScope: input.runtimeGoalAccountScope,
+      }));
   const goalUpdates = listStagePlayGoalContextUpdates({ threadId: input.threadId, limit: 48 });
   const rejectedRefs: HelixRealtimeStagePlayRejectedRefV1[] = [];
   const freshGoalUpdates = goalUpdates.filter((update) => {

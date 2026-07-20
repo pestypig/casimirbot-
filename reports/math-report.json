@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-19T07:45:14.962Z",
-  "registryCount": 129,
+  "generatedAt": "2026-07-20T07:57:51.612Z",
+  "registryCount": 186,
   "coverage": {
     "exploratory": {
       "count": 19,
@@ -70,7 +70,7 @@
       ]
     },
     "diagnostic": {
-      "count": 65,
+      "count": 122,
       "modules": [
         "modules/gr/bssn-state.ts",
         "modules/gr/bssn-evolve.ts",
@@ -91,6 +91,63 @@
         "shared/contracts/casimir-material-receipt.v1.ts",
         "shared/contracts/nhm2-observer-robust-energy-conditions.v1.ts",
         "shared/contracts/nhm2-qei-worldline-dossier.v1.ts",
+        "shared/contracts/nhm2-experiment-ready-theory-closure.v1.ts",
+        "shared/contracts/nhm2-experiment-ready-theory-candidate-manifest.v1.ts",
+        "shared/contracts/nhm2-semiclassical-state-realizability.v1.ts",
+        "shared/contracts/nhm2-prediction-falsifier-freeze.v1.ts",
+        "shared/contracts/nhm2-numerical-observable-prediction.v1.ts",
+        "shared/contracts/nhm2-full-apparatus-source-tensor.v1.ts",
+        "shared/contracts/nhm2-covariant-conservation.v1.ts",
+        "shared/contracts/nhm2-dynamic-backreaction-stability-causality.v1.ts",
+        "shared/contracts/nhm2-continuous-observer-optimizer.v1.ts",
+        "shared/contracts/nhm2-worldline-qei-coverage.v1.ts",
+        "shared/contracts/casimir-finite-temperature-finite-geometry-maxwell-stress.v1.ts",
+        "shared/contracts/nhm2-mechanical-support-control-margin.v1.ts",
+        "shared/contracts/nhm2-independent-numerical-replication.v1.ts",
+        "shared/contracts/nhm2-independent-numerical-execution-descriptor.v1.ts",
+        "shared/contracts/nhm2-independent-field-array-manifest.v1.ts",
+        "shared/contracts/nhm2-server-owned-nine-field-float64-replay-receipt.v1.ts",
+        "server/services/theory/nhm2-secure-run-output-reader.ts",
+        "server/services/theory/nhm2-nine-field-float64-metric-kernel.ts",
+        "server/services/theory/nhm2-independent-numerical-replication-content-assessor.ts",
+        "server/services/theory/nhm2-independent-numerical-replication-executor.ts",
+        "server/services/theory/nhm2-independent-runtime-plan-admission.ts",
+        "shared/contracts/nhm2-formal-kernel-replay-manifest.v1.ts",
+        "shared/contracts/nhm2-primary-raw-output-manifest.v1.ts",
+        "shared/contracts/nhm2-primary-raw-solver-suite-enrollment.v1.ts",
+        "shared/contracts/nhm2-primary-comparison-projection.v1.ts",
+        "server/services/theory/nhm2-primary-comparison-projection-assessor.ts",
+        "server/services/theory/nhm2-primary-comparison-projection-finalizer.ts",
+        "server/services/theory/nhm2-primary-raw-gr-content-replay.ts",
+        "server/services/theory/nhm2-primary-raw-material-dynamics-content-replay.ts",
+        "server/services/theory/nhm2-primary-raw-experiment-ready-evidence-compiler.ts",
+        "server/services/theory/nhm2-external-numerical-kernel-executor.ts",
+        "server/services/theory/nhm2-warpax-frame-free-external-plan.ts",
+        "server/services/theory/nhm2-scuff-em-force-sweep-external-plan.ts",
+        "server/services/theory/nhm2-scuff-em-executor-receipt-admission.ts",
+        "server/services/theory/nhm2-scuff-em-force-sweep-partial-content-replay.ts",
+        "server/services/theory/nhm2-calculix-mechanics-support-control-external-plan.ts",
+        "shared/contracts/nhm2-prediction-bootstrap-freeze.v1.ts",
+        "shared/contracts/nhm2-prediction-run1-bootstrap.v2.ts",
+        "server/services/theory/nhm2-formal-kernel-executor.ts",
+        "shared/contracts/nhm2-formal-approved-toolchain-policy.v1.ts",
+        "server/services/theory/nhm2-formal-approved-toolchain-policy-verifier.ts",
+        "tools/nhm2/enroll-formal-approved-toolchain-policy.ts",
+        "tools/nhm2/preseal-experiment-ready-theory-formal-run.ts",
+        "server/services/theory/nhm2-formal-outer-observation-evidence-adapter.ts",
+        "tools/nhm2/run-experiment-ready-theory-formal-candidate.ts",
+        "shared/contracts/nhm2-formal-producer-bundle.v1.ts",
+        "server/services/theory/nhm2-formal-producer-bundle-admission.ts",
+        "server/services/theory/nhm2-formal-runtime-plan-admission.ts",
+        "server/services/theory/nhm2-formal-runtime-executor.ts",
+        "shared/contracts/nhm2-formal-manifest-certificate.v1.ts",
+        "server/services/theory/nhm2-experiment-ready-theory-closure-evaluator.ts",
+        "tools/nhm2/prepare-experiment-ready-theory-candidate.ts",
+        "tools/nhm2/run-experiment-ready-theory-primary.ts",
+        "server/services/theory/nhm2-theory-candidate-plan-admission.ts",
+        "server/services/theory/nhm2-evidence-nested-reference-verifier.ts",
+        "server/services/theory/nhm2-theory-candidate-primary-executor.ts",
+        "server/services/theory/runtime-jobs/nhm2-primary-runtime-dispatch.ts",
         "server/services/observability/training-trace-store.ts",
         "server/routes/training-trace.ts",
         "server/services/observability/gr-agent-loop-store.ts",
@@ -225,7 +282,7 @@
     }
   },
   "unitCoverage": {
-    "entriesWithUnits": 129,
+    "entriesWithUnits": 186,
     "entriesMissingUnits": [],
     "byStage": {
       "exploratory": {
@@ -239,8 +296,8 @@
         "missing": []
       },
       "diagnostic": {
-        "total": 65,
-        "withUnits": 65,
+        "total": 122,
+        "withUnits": 122,
         "missing": []
       },
       "certified": {
@@ -261,8 +318,8 @@
     "modules": []
   },
   "autoGraph": {
-    "nodeCount": 2516,
-    "edgeCount": 5986
+    "nodeCount": 2598,
+    "edgeCount": 6147
   },
   "evidenceProfiles": [
     {

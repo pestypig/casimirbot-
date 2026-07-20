@@ -22,6 +22,7 @@ import {
   defaultHelixRuntimeGoalWakePolicy,
 } from "@shared/helix-runtime-goal-session";
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
+import { resolveHelixRuntimeAgentAccess } from "@shared/helix-account-session";
 import type { HelixAgentProvider } from "./types";
 import { getHelixAgentProviderById } from "./registry";
 import { buildHelixAgentRuntimeAdapterContract } from "./runtime-adapter-contract";
@@ -33,6 +34,16 @@ import {
 } from "./explicit-workstation-gateway";
 import type { HelixWorkstationGatewayCallResult } from "../workstation-tool-gateway/types";
 import { projectRuntimeGoalSessionToStagePlay } from "../runtime-goals/runtime-goal-stage-play-projection";
+import type { HelixWorkstationGatewayAccountContext } from "../workstation-tool-gateway/account-policy";
+import {
+  buildRuntimeGoalTrustedAccountBinding,
+  intersectRuntimeGoalAllowedWorkstationTools,
+  runtimeGoalAccountScopeMatchesBinding,
+  validateRuntimeGoalAccountBinding,
+  type HelixRuntimeGoalAccountScope,
+  type HelixRuntimeGoalAccountBindingValidation,
+  type HelixRuntimeGoalTrustedAccountBinding,
+} from "../runtime-goals/runtime-goal-account-binding";
 
 type RecordLike = Record<string, unknown>;
 
@@ -57,6 +68,7 @@ export type StartGoalRuntimeSessionInput = {
   stopPolicy?: Partial<HelixRuntimeGoalStopPolicy>;
   reportPolicy?: HelixRuntimeGoalReportPolicy;
   quietPolicy?: Partial<HelixRuntimeGoalQuietPolicy>;
+  accountContext?: HelixWorkstationGatewayAccountContext | null;
 };
 
 export type ResumeGoalRuntimeSessionInput = {
@@ -64,12 +76,14 @@ export type ResumeGoalRuntimeSessionInput = {
   wakeEventKind?: HelixRuntimeGoalWakeEventKind;
   turnId?: string | null;
   body?: RecordLike;
+  accountContext?: HelixWorkstationGatewayAccountContext | null;
 };
 
 export type StopGoalRuntimeSessionInput = {
   goalId: string;
   status?: Extract<HelixRuntimeGoalSessionStatus, "completed" | "cancelled" | "failed">;
   reason?: string | null;
+  accountContext?: HelixWorkstationGatewayAccountContext | null;
 };
 
 export type GoalRuntimeSessionResult = {
@@ -78,6 +92,7 @@ export type GoalRuntimeSessionResult = {
   wake_event?: HelixRuntimeGoalWakeEvent;
   debug_export: HelixRuntimeGoalDebugExport;
   stage_play_projection: HelixRuntimeGoalDebugExport["runtime_goal_stage_play_projection"];
+  workstation_gateway_call_results?: HelixWorkstationGatewayCallResult[];
   blocked_reason?: string | null;
 };
 
@@ -443,12 +458,16 @@ export class HelixRuntimeGoalSessionStore {
   private wakeEvents = new Map<string, HelixRuntimeGoalWakeEvent[]>();
   private debugEvents = new Map<string, HelixRuntimeGoalDebugEvent[]>();
   private providerAuthority = new Map<string, GoalProviderAuthorityProjection>();
+  private accountBindings = new Map<string, HelixRuntimeGoalTrustedAccountBinding>();
+  private accountBindingValidations = new Map<string, HelixRuntimeGoalAccountBindingValidation>();
 
   clear(): void {
     this.sessions.clear();
     this.wakeEvents.clear();
     this.debugEvents.clear();
     this.providerAuthority.clear();
+    this.accountBindings.clear();
+    this.accountBindingValidations.clear();
   }
 
   listGoalRuntimeSessions(): HelixRuntimeGoalSession[] {
@@ -457,6 +476,41 @@ export class HelixRuntimeGoalSessionStore {
 
   getGoalRuntimeSession(goalId: string): HelixRuntimeGoalSession | null {
     return this.sessions.get(goalId) ?? null;
+  }
+
+  validateGoalRuntimeSessionAccount(input: {
+    goalId: string;
+    accountContext?: HelixWorkstationGatewayAccountContext | null;
+  }): HelixRuntimeGoalAccountBindingValidation | null {
+    const session = this.sessions.get(input.goalId);
+    if (!session) return null;
+    return validateRuntimeGoalAccountBinding({
+      binding: this.accountBindings.get(session.goal_id) ?? null,
+      accountContext: input.accountContext,
+      sessionAllowedWorkstationTools: session.allowed_workstation_tools,
+      runtimeAgentProvider: session.runtime_agent_provider,
+    });
+  }
+
+  isGoalRuntimeSessionAccessible(input: {
+    goalId: string;
+    accountContext?: HelixWorkstationGatewayAccountContext | null;
+  }): boolean {
+    const validation = this.validateGoalRuntimeSessionAccount(input);
+    if (!validation) return false;
+    if (validation.status !== "unbound") return validation.admitted;
+    return input.accountContext?.trusted_account_session !== true;
+  }
+
+  isGoalRuntimeSessionVisibleToAccountScope(input: {
+    goalId: string;
+    accountScope?: HelixRuntimeGoalAccountScope | null;
+  }): boolean {
+    if (!this.sessions.has(input.goalId)) return false;
+    return runtimeGoalAccountScopeMatchesBinding({
+      scope: input.accountScope,
+      binding: this.accountBindings.get(input.goalId) ?? null,
+    });
   }
 
   async startGoalRuntimeSession(input: StartGoalRuntimeSessionInput): Promise<GoalRuntimeSessionResult> {
@@ -498,6 +552,28 @@ export class HelixRuntimeGoalSessionStore {
       return this.resultFor(session, false, "unavailable_runtime_provider");
     }
 
+    if (
+      input.accountContext &&
+      resolveHelixRuntimeAgentAccess(
+        input.accountContext.account_policy,
+        runtimeId,
+      ).state !== "available"
+    ) {
+      const session = this.buildBlockedSession({
+        input,
+        provider,
+        runtimeId,
+        reason: "permission_revoked",
+      });
+      this.sessions.set(session.goal_id, session);
+      this.appendDebugEvent(session, {
+        stage: "goal_blocked",
+        status: "blocked",
+        reason: "permission_revoked",
+      });
+      return this.resultFor(session, false, "permission_revoked");
+    }
+
     const adapterContract = buildHelixAgentRuntimeAdapterContract({
       route: "/ask/turn",
       requestedRuntime: runtimeId,
@@ -510,9 +586,16 @@ export class HelixRuntimeGoalSessionStore {
     const threadId = normalizeThreadId(input.threadId);
     const objective = readString(input.objective);
     const allowedLanes = input.allowedLanes?.length ? [...input.allowedLanes] : [...adapterContract.capability_lane_ids];
-    const allowedWorkstationTools = input.allowedWorkstationTools?.length
-      ? [...input.allowedWorkstationTools]
-      : [...adapterContract.workstation_gateway_admitted_capability_ids];
+    const allowedWorkstationTools = intersectRuntimeGoalAllowedWorkstationTools({
+      adapterAllowedWorkstationTools: adapterContract.workstation_gateway_admitted_capability_ids,
+      requestedAllowedWorkstationTools: input.allowedWorkstationTools,
+      accountContext: input.accountContext,
+      runtimeAgentProvider: provider.id,
+    });
+    const accountBinding = buildRuntimeGoalTrustedAccountBinding({
+      accountContext: input.accountContext,
+      allowedWorkstationTools,
+    });
     const stopPolicy = mergeStopPolicy(input.stopPolicy);
     const sourceBinding = input.sourceBinding ?? null;
     const jobBrief = buildGoalJobBrief({
@@ -565,6 +648,16 @@ export class HelixRuntimeGoalSessionStore {
       raw_content_included: false,
     };
     this.sessions.set(session.goal_id, session);
+    if (accountBinding) this.accountBindings.set(session.goal_id, accountBinding);
+    this.accountBindingValidations.set(
+      session.goal_id,
+      validateRuntimeGoalAccountBinding({
+        binding: accountBinding,
+        accountContext: input.accountContext,
+        sessionAllowedWorkstationTools: allowedWorkstationTools,
+        runtimeAgentProvider: provider.id,
+      }),
+    );
     this.appendDebugEvent(session, {
       stage: "goal_started",
       status: "completed",
@@ -578,6 +671,28 @@ export class HelixRuntimeGoalSessionStore {
     if (!session) {
       throw new Error(`Goal session not found: ${input.goalId}`);
     }
+    const body = input.body ?? {};
+    const accountBinding = this.accountBindings.get(session.goal_id) ?? null;
+    const accountBindingValidation = validateRuntimeGoalAccountBinding({
+      binding: accountBinding,
+      accountContext: input.accountContext,
+      sessionAllowedWorkstationTools: session.allowed_workstation_tools,
+      runtimeAgentProvider: session.runtime_agent_provider,
+    });
+    const accountBindingRequired =
+      Boolean(accountBinding) ||
+      input.accountContext?.trusted_account_session === true ||
+      hasWorkstationGatewayCall(body);
+    if (!accountBindingValidation.admitted && accountBindingRequired) {
+      return this.resultFor(
+        session,
+        false,
+        accountBindingValidation.blockedReason ?? "runtime_goal_account_binding_required",
+        undefined,
+        accountBindingValidation,
+      );
+    }
+    this.accountBindingValidations.set(session.goal_id, accountBindingValidation);
     if (session.status === "cancelled" || session.status === "completed" || session.status === "failed") {
       this.appendDebugEvent(session, {
         stage: "goal_blocked",
@@ -601,8 +716,8 @@ export class HelixRuntimeGoalSessionStore {
       });
       return this.resultFor(blocked, false, "unavailable_runtime_provider");
     }
-
-    const body = input.body ?? {};
+    const effectiveAllowedWorkstationTools =
+      accountBindingValidation.effectiveAllowedWorkstationTools;
     const wakeEvent = this.appendWakeEvent(session, {
       kind: input.wakeEventKind ?? "manual_resume",
       turnId: input.turnId ?? (readString(body.turn_id ?? body.turnId) || null),
@@ -689,7 +804,7 @@ export class HelixRuntimeGoalSessionStore {
     }
 
     const disallowedGatewayCapability = requestedGatewayCapabilities.find(
-      (capability) => !this.sessionAllowsWorkstationTool(session, capability),
+      (capability) => !effectiveAllowedWorkstationTools.includes(capability),
     );
     const disallowedCapability =
       requestedLaneCapability && !this.sessionAllowsCapabilityLane(session, requestedLaneCapability)
@@ -742,6 +857,7 @@ export class HelixRuntimeGoalSessionStore {
           },
           agentRuntime: provider.id,
           turnId: wakeEvent.turn_id,
+          accountContext: input.accountContext,
         })
       : [];
     const observationRefs = [
@@ -840,11 +956,14 @@ export class HelixRuntimeGoalSessionStore {
                 wake_event_id: wakeEvent.wake_event_id,
                 observation_refs: observationRefs,
                 receipt_refs: receiptRefs,
+                allowed_workstation_tools: effectiveAllowedWorkstationTools,
+                trusted_account_binding: accountBindingValidation.projection,
                 terminal_eligible: false,
                 assistant_answer: false,
                 raw_content_included: false,
               },
             },
+            workstationAccountContext: input.accountContext,
           });
       const providerText = providerTextFromResult(providerResult);
       const providerTextAvailable = providerText.length > 0;
@@ -956,12 +1075,15 @@ export class HelixRuntimeGoalSessionStore {
       reason: null,
     });
     const resultSession = this.sessions.get(session.goal_id) ?? finalSession;
-    return this.resultFor(
+    return {
+      ...this.resultFor(
       resultSession,
       toolOrLaneSucceeded && resultSession.status !== "failed",
       resultSession.status_reason,
       wakeEvent,
-    );
+      ),
+      workstation_gateway_call_results: gatewayResults,
+    };
   }
 
   stopGoalRuntimeSession(input: StopGoalRuntimeSessionInput): GoalRuntimeSessionResult {
@@ -969,6 +1091,24 @@ export class HelixRuntimeGoalSessionStore {
     if (!session) {
       throw new Error(`Goal session not found: ${input.goalId}`);
     }
+    const validation = this.validateGoalRuntimeSessionAccount({
+      goalId: session.goal_id,
+      accountContext: input.accountContext,
+    });
+    if (
+      validation &&
+      !validation.admitted &&
+      (validation.status !== "unbound" || input.accountContext?.trusted_account_session === true)
+    ) {
+      return this.resultFor(
+        session,
+        false,
+        validation.blockedReason ?? "runtime_goal_account_binding_required",
+        undefined,
+        validation,
+      );
+    }
+    if (validation) this.accountBindingValidations.set(session.goal_id, validation);
     const timestamp = nowIso();
     const status = input.status ?? "cancelled";
     const updated = this.updateSession(session.goal_id, {
@@ -986,11 +1126,34 @@ export class HelixRuntimeGoalSessionStore {
     return this.resultFor(updated, true);
   }
 
-  blockGoalRuntimeSession(input: { goalId: string; reason: string; wakeEventId?: string | null }): GoalRuntimeSessionResult {
+  blockGoalRuntimeSession(input: {
+    goalId: string;
+    reason: string;
+    wakeEventId?: string | null;
+    accountContext?: HelixWorkstationGatewayAccountContext | null;
+  }): GoalRuntimeSessionResult {
     const session = this.sessions.get(input.goalId);
     if (!session) {
       throw new Error(`Goal session not found: ${input.goalId}`);
     }
+    const validation = this.validateGoalRuntimeSessionAccount({
+      goalId: session.goal_id,
+      accountContext: input.accountContext,
+    });
+    if (
+      validation &&
+      !validation.admitted &&
+      (validation.status !== "unbound" || input.accountContext?.trusted_account_session === true)
+    ) {
+      return this.resultFor(
+        session,
+        false,
+        validation.blockedReason ?? "runtime_goal_account_binding_required",
+        undefined,
+        validation,
+      );
+    }
+    if (validation) this.accountBindingValidations.set(session.goal_id, validation);
     const updated = this.updateSession(session.goal_id, {
       status: "blocked",
       status_reason: input.reason,
@@ -1077,10 +1240,6 @@ export class HelixRuntimeGoalSessionStore {
   private sessionAllowsCapabilityLane(session: HelixRuntimeGoalSession, capability: string): boolean {
     const lane = capability.split(".")[0] ?? capability;
     return session.allowed_lanes.includes(lane) || session.allowed_lanes.includes(capability);
-  }
-
-  private sessionAllowsWorkstationTool(session: HelixRuntimeGoalSession, capability: string): boolean {
-    return session.allowed_workstation_tools.includes(capability);
   }
 
   private updateSession(goalId: string, patch: Partial<HelixRuntimeGoalSession>): HelixRuntimeGoalSession {
@@ -1216,7 +1375,10 @@ export class HelixRuntimeGoalSessionStore {
     return event;
   }
 
-  private debugExportFor(session: HelixRuntimeGoalSession): HelixRuntimeGoalDebugExport {
+  private debugExportFor(
+    session: HelixRuntimeGoalSession,
+    accountBindingValidation?: HelixRuntimeGoalAccountBindingValidation | null,
+  ): HelixRuntimeGoalDebugExport {
     const debugEvents = this.debugEvents.get(session.goal_id) ?? [];
     const authority = this.providerAuthority.get(session.goal_id);
     const latestDecision =
@@ -1241,6 +1403,10 @@ export class HelixRuntimeGoalSessionStore {
       runtime_goal_observation_refs: session.latest_observation_refs,
       runtime_goal_stage_play_projection: null,
       runtime_goal_terminal_authority_status: session.terminal_authority_status,
+      runtime_goal_account_binding:
+        accountBindingValidation?.projection ??
+        this.accountBindingValidations.get(session.goal_id)?.projection ??
+        null,
       latest_observation_refs: session.latest_observation_refs,
       latest_receipt_refs: session.latest_receipt_refs,
       provider_terminal_candidate: authority?.providerTerminalCandidate ?? null,
@@ -1262,6 +1428,7 @@ export class HelixRuntimeGoalSessionStore {
     ok: boolean,
     blockedReason: string | null = null,
     wakeEvent?: HelixRuntimeGoalWakeEvent,
+    accountBindingValidation?: HelixRuntimeGoalAccountBindingValidation | null,
   ): GoalRuntimeSessionResult {
     const stagePlayProjection = projectRuntimeGoalSessionToStagePlay(session);
     return {
@@ -1269,7 +1436,7 @@ export class HelixRuntimeGoalSessionStore {
       session,
       ...(wakeEvent ? { wake_event: wakeEvent } : {}),
       debug_export: {
-        ...this.debugExportFor(session),
+        ...this.debugExportFor(session, accountBindingValidation),
         runtime_goal_stage_play_projection: stagePlayProjection,
       },
       stage_play_projection: stagePlayProjection,

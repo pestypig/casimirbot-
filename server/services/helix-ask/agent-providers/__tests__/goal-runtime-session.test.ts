@@ -1,5 +1,39 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { buildHelixAccountCapabilityPolicy } from "@shared/helix-account-session";
+import type { HelixWorkstationGatewayAccountContext } from "../../workstation-tool-gateway/account-policy";
 import { helixRuntimeGoalSessionStore } from "../goal-runtime-session";
+
+const trustedDeveloperContext = (
+  sessionId: string,
+  profileId = "profile:runtime-goal-owner",
+): HelixWorkstationGatewayAccountContext => {
+  const policy = buildHelixAccountCapabilityPolicy("developer");
+  const timestamp = "2026-07-19T00:00:00.000Z";
+  return {
+    session_id: sessionId,
+    profile_id: profileId,
+    trusted_account_session: true,
+    account_policy: policy,
+    account_session: {
+      schema: "helix.account_session.v1",
+      session_id: sessionId,
+      profile: {
+        profile_id: profileId,
+        display_name: profileId,
+        auth_mode: "local_dev_profile",
+        account_type: "developer",
+        provider: "local",
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+      account_policy: policy,
+      status: "active",
+      memory_scope: "profile",
+      created_at: timestamp,
+      updated_at: timestamp,
+    },
+  };
+};
 
 const translationCall = {
   capability: "live_translation.translate_text",
@@ -236,12 +270,14 @@ describe("runtime goal session controller", () => {
   });
 
   it("admits existing workstation gateway tools and records non-terminal observation evidence", async () => {
+    const accountContext = trustedDeveloperContext("session:calculator-tool");
     await helixRuntimeGoalSessionStore.startGoalRuntimeSession({
       objective: "Calculate visible title metadata when manually woken.",
       runtimeAgentProvider: "codex",
       goalId: "goal:test:calculator-tool",
       allowedLanes: [],
       allowedWorkstationTools: ["scientific-calculator.solve_expression"],
+      accountContext,
     });
 
     const result = await helixRuntimeGoalSessionStore.resumeGoalRuntimeSession({
@@ -258,6 +294,7 @@ describe("runtime goal session controller", () => {
           },
         },
       },
+      accountContext,
     });
 
     expect(result.ok).toBe(true);
@@ -268,6 +305,13 @@ describe("runtime goal session controller", () => {
       ]),
     );
     expect(result.session.terminal_authority_status).toBe("authorized");
+    expect(result.debug_export.runtime_goal_account_binding).toMatchObject({
+      trusted: true,
+      validation_status: "trusted",
+      allowed_workstation_tools: ["scientific-calculator.solve_expression"],
+      raw_session_id_included: false,
+      raw_profile_id_included: false,
+    });
     expect(result.debug_export.provider_terminal_authority_bridge).toMatchObject({
       terminal_authority_granted: true,
       final_answer_source: "agent_provider_terminal_candidate",
@@ -341,6 +385,78 @@ describe("runtime goal session controller", () => {
     );
     expect(result.debug_export.terminal_eligible).toBe(false);
     expect(result.debug_export.assistant_answer).toBe(false);
+  });
+
+  it("blocks workstation tools for an unbound durable goal", async () => {
+    await helixRuntimeGoalSessionStore.startGoalRuntimeSession({
+      objective: "Inspect repository state without a trusted account binding.",
+      runtimeAgentProvider: "codex",
+      goalId: "goal:test:unbound-tool",
+      allowedWorkstationTools: ["repo.search"],
+    });
+
+    const result = await helixRuntimeGoalSessionStore.resumeGoalRuntimeSession({
+      goalId: "goal:test:unbound-tool",
+      turnId: "turn:unbound-tool",
+      body: {
+        workstation_gateway_call: {
+          capability_id: "repo.search",
+          mode: "read",
+          arguments: { query: "runtime-goal-account-binding" },
+        },
+      },
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      blocked_reason: "runtime_goal_account_binding_required",
+      session: {
+        status: "waiting",
+        latest_observation_refs: [],
+      },
+      debug_export: {
+        runtime_goal_account_binding: {
+          trusted: false,
+          validation_status: "unbound",
+          blocked_reason: "runtime_goal_account_binding_required",
+        },
+      },
+    });
+  });
+
+  it("rejects a durable goal wake from a different trusted session", async () => {
+    const owner = trustedDeveloperContext("session:goal-owner", "profile:goal-owner");
+    await helixRuntimeGoalSessionStore.startGoalRuntimeSession({
+      objective: "Keep the owner-bound goal isolated.",
+      runtimeAgentProvider: "codex",
+      goalId: "goal:test:session-mismatch",
+      allowedWorkstationTools: ["repo.search"],
+      accountContext: owner,
+    });
+
+    const result = await helixRuntimeGoalSessionStore.resumeGoalRuntimeSession({
+      goalId: "goal:test:session-mismatch",
+      turnId: "turn:session-mismatch",
+      body: { question: "Continue the goal." },
+      accountContext: trustedDeveloperContext("session:other", "profile:other"),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      blocked_reason: "runtime_goal_account_session_mismatch",
+      session: {
+        status: "waiting",
+        wake_count: 0,
+      },
+      debug_export: {
+        runtime_goal_account_binding: {
+          trusted: false,
+          validation_status: "session_mismatch",
+        },
+      },
+    });
+    expect(result.debug_export.wake_events).toEqual([]);
+    expect(result.debug_export.debug_events).toHaveLength(1);
   });
 
   it("keeps Helix Native attached across a governed lane wake without invoking the placeholder provider", async () => {
@@ -420,12 +536,14 @@ describe("runtime goal session controller", () => {
   });
 
   it("blocks unavailable workstation gateway tools as typed goal state", async () => {
+    const accountContext = trustedDeveloperContext("session:blocked-tool");
     await helixRuntimeGoalSessionStore.startGoalRuntimeSession({
       objective: "Only calculator is allowed.",
       runtimeAgentProvider: "codex",
       goalId: "goal:test:blocked-tool",
       allowedLanes: [],
       allowedWorkstationTools: ["scientific-calculator.solve_expression"],
+      accountContext,
     });
 
     const result = await helixRuntimeGoalSessionStore.resumeGoalRuntimeSession({
@@ -441,6 +559,7 @@ describe("runtime goal session controller", () => {
           },
         },
       },
+      accountContext,
     });
 
     expect(result.ok).toBe(false);

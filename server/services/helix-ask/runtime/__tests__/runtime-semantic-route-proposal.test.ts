@@ -4,6 +4,7 @@ import {
   appendHelixRuntimeIntentPacketToPayload,
   buildHelixRuntimeIntentPacket,
   buildHelixRuntimeSemanticRouteProposal,
+  normalizeHelixRuntimeSemanticRouteProposal,
   type HelixRuntimeIntentPacketDependencies,
 } from "../runtime-intent-packet";
 import {
@@ -25,6 +26,38 @@ const dependencies: HelixRuntimeIntentPacketDependencies = {
 };
 
 describe("runtime semantic route proposal", () => {
+  it("normalizes a bounded ordered compound capability set while preserving its primary capability", () => {
+    const proposal = normalizeHelixRuntimeSemanticRouteProposal({
+      value: {
+        schema: "helix.runtime_semantic_route_proposal.v1",
+        proposal_source: "agent_runtime",
+        proposed_route: "compound_docs_calculator",
+        proposed_tool_family: "compound",
+        proposed_capability_id: "docs.search",
+        proposed_capability_ids: [
+          "docs.search",
+          "scientific-calculator.solve_expression",
+          "docs.search",
+          "",
+        ],
+      },
+      turnId: "ask:semantic-compound",
+      promptHash: "prompt:semantic-compound",
+      dependencies,
+    });
+
+    expect(proposal).toMatchObject({
+      proposed_capability_id: "docs.search",
+      proposed_capability_ids: [
+        "docs.search",
+        "scientific-calculator.solve_expression",
+      ],
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
   it("projects a non-terminal proposal from the runtime intent packet", () => {
     const packet = buildHelixRuntimeIntentPacket({
       payload: {

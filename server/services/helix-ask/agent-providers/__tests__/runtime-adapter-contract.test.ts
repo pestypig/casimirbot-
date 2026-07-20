@@ -94,6 +94,13 @@ describe("agent runtime adapter contract", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+    const modelVisibleLaneIds = contract.model_visible_capability_lane_manifest.lanes
+      .map((lane) => lane.lane_id);
+    expect(modelVisibleLaneIds).not.toContain("interactive_text");
+    expect(modelVisibleLaneIds).not.toContain("deliberate_text");
+    expect(modelVisibleLaneIds).not.toContain("code_text");
+    expect(modelVisibleLaneIds).toContain("speech_to_text");
+    expect(modelVisibleLaneIds).toContain("live_translation");
     const modelVisibleTranslation = contract.model_visible_capability_lane_manifest.lanes
       .flatMap((lane) => lane.capabilities)
       .find((capability) => capability.capability_id === "live_translation.translate_text");

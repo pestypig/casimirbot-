@@ -30,6 +30,7 @@ describe("Realtime transcript Stage Play handoff", () => {
       providerEventRef: "provider-event:1",
       transcriptText,
       observation: observation!,
+      selectedRuntimeAgentProvider: "codex",
       providerCallRef: "openai-realtime:call:hashed",
       nowMs: 100,
     };
@@ -52,6 +53,8 @@ describe("Realtime transcript Stage Play handoff", () => {
         source: "realtime_stage_play",
         invocationKind: "stage_play_realtime_transcript_handoff",
         sourceTarget: "operator_text",
+        selectedRuntimeAgentProvider: "codex",
+        selected_runtime_agent_provider: "codex",
         forbiddenCapabilities: expect.arrayContaining([
           "workstation_mutation",
           "workstation_action_execution",
@@ -62,15 +65,24 @@ describe("Realtime transcript Stage Play handoff", () => {
           allow_client_shortcut: false,
           allow_no_tool_direct: true,
           admitted_readonly_handoff: true,
+          runtime_agent_provider: "codex",
         }),
       },
+      runtime_agent_provider: "codex",
+      worker_admission: expect.objectContaining({
+        selected_runtime_agent_provider: "codex",
+        dispatch: expect.objectContaining({
+          target_runtime_agent_provider: "codex",
+          runtime_selection_source: "ask_ui_selected_runtime",
+        }),
+      }),
     });
     expect(JSON.stringify(first)).not.toContain(transcriptText);
     expect(JSON.stringify(first)).not.toContain("realtime_transcript_readonly_reentry");
   });
 
   it("requires an active-context observation for a deictic workstation question", () => {
-    const transcriptText = "What panel do you see?";
+    const transcriptText = "What panel in the workstation is active?";
     const observation = buildRealtimeTranscriptObservation({
       realtimeSessionId: "realtime:deictic",
       nowMs: 300,

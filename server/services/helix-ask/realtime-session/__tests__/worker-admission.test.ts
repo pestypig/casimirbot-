@@ -19,6 +19,7 @@ const buildAdmission = (
     document_ref: "docs/research/example.md",
   },
   activeGoalBinding,
+  selectedRuntimeAgentProvider: "codex",
   evidenceRefs: [`evidence:${suffix}`],
   nowMs: 100,
 });
@@ -28,8 +29,15 @@ describe("Realtime transcript worker admission", () => {
     const admission = buildAdmission("How are you today?", "smalltalk");
 
     expect(admission).toMatchObject({
+      schema: "helix.realtime_worker_admission.v2",
       outcome: "conversation_local",
-      worker_turn_dispatched: true,
+      dispatch: {
+        kind: "none",
+        state: "not_required",
+        requested: false,
+        suppress_parallel_ask_turn: true,
+      },
+      worker_turn_dispatched: false,
       spoken_relay_eligible: false,
       workstation_action_execution_allowed: false,
       realtime_provider_tool_execution_allowed: false,
@@ -55,6 +63,12 @@ describe("Realtime transcript worker admission", () => {
       decision_phase: "solver_final",
       outcome: "conversation_local",
       observed_readonly_capability_ids: ["internet-search.search_web"],
+      dispatch: {
+        kind: "none",
+        state: "not_required",
+        requested: false,
+      },
+      worker_turn_dispatched: false,
       spoken_relay_eligible: false,
     });
     expect(final.reason_codes).toContain("ask_smalltalk_greeting_only_policy_retained");
@@ -63,7 +77,7 @@ describe("Realtime transcript worker admission", () => {
   it.each([
     {
       name: "active panel",
-      prompt: "Which workstation panel is active?",
+      prompt: "What panel in the workstation is active?",
       route: "workspace_panel",
       capability: "workstation.active_context",
     },
@@ -91,7 +105,16 @@ describe("Realtime transcript worker admission", () => {
     expect(admission).toMatchObject({
       outcome: "worker_grounded",
       selected_route: route,
-      worker_turn_dispatched: true,
+      dispatch: {
+        kind: "ask_runtime",
+        state: "requested",
+        requested: true,
+        target_runtime_agent_provider: "codex",
+        runtime_selection_source: "ask_ui_selected_runtime",
+        suppress_parallel_ask_turn: false,
+      },
+      selected_runtime_agent_provider: "codex",
+      worker_turn_dispatched: false,
       spoken_relay_eligible: true,
       workstation_action_execution_allowed: false,
       realtime_provider_tool_execution_allowed: false,
@@ -122,6 +145,14 @@ describe("Realtime transcript worker admission", () => {
     expect(admission).toMatchObject({
       outcome: "durable_goal_bound",
       selected_runtime_agent_provider: "codex",
+      dispatch: {
+        kind: "goal_wake",
+        state: "requested",
+        goal_id: "goal:live-proof",
+        runtime_goal_session_ref: "runtime:goal:1",
+        suppress_parallel_ask_turn: true,
+      },
+      worker_turn_dispatched: false,
       spoken_relay_eligible: true,
       answer_authority: false,
       terminal_eligible: false,
@@ -137,6 +168,13 @@ describe("Realtime transcript worker admission", () => {
     expect(admission.outcome).toBe("action_candidate");
     expect(admission.action_candidate_capability_ids).toContain("docs-viewer.open_doc");
     expect(admission).toMatchObject({
+      dispatch: {
+        kind: "ask_runtime_read_only",
+        state: "requested",
+        read_only: true,
+        workstation_action_execution_allowed: false,
+      },
+      worker_turn_dispatched: false,
       spoken_relay_eligible: false,
       workstation_action_execution_allowed: false,
       realtime_provider_tool_execution_allowed: false,
@@ -195,6 +233,12 @@ describe("Realtime transcript worker admission", () => {
       selected_runtime_agent_provider: "codex",
       selected_model: "gpt-5.4",
       observed_readonly_capability_ids: ["docs.search"],
+      dispatch: {
+        kind: "ask_runtime",
+        state: "completed",
+        completed: true,
+      },
+      worker_turn_dispatched: true,
       spoken_relay_eligible: true,
     });
   });

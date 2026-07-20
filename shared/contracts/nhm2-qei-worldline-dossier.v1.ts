@@ -106,7 +106,9 @@ type PartialWorldlineInput = Partial<Nhm2QeiWorldlineDossierWorldlineV1> & {
   sampledRho?: Partial<Nhm2QeiWorldlineDossierWorldlineV1["sampledRho"]>;
   bound?: Partial<Nhm2QeiWorldlineDossierWorldlineV1["bound"]>;
   margin?: Partial<Nhm2QeiWorldlineDossierWorldlineV1["margin"]>;
-  samplingFunction?: Partial<Nhm2QeiWorldlineDossierWorldlineV1["samplingFunction"]>;
+  samplingFunction?: Partial<
+    Nhm2QeiWorldlineDossierWorldlineV1["samplingFunction"]
+  >;
   consistency?: Partial<Nhm2QeiWorldlineDossierWorldlineV1["consistency"]>;
 };
 
@@ -138,20 +140,22 @@ const toFinite = (value: unknown): number | null => {
 };
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
-  value != null && typeof value === "object" ? (value as Record<string, unknown>) : null;
+  value != null && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : null;
 
 const uniqueStrings = (values: unknown[]): string[] =>
   Array.from(
     new Set(
-      values
-        .map(asText)
-        .filter((value): value is string => value != null),
+      values.map(asText).filter((value): value is string => value != null),
     ),
   );
 
 const normalizeRegionId = (value: unknown): Nhm2QeiWorldlineRegionId => {
   const text = asText(value);
-  return NHM2_QEI_WORLDLINE_REGION_IDS.includes(text as Nhm2QeiWorldlineRegionId)
+  return NHM2_QEI_WORLDLINE_REGION_IDS.includes(
+    text as Nhm2QeiWorldlineRegionId,
+  )
     ? (text as Nhm2QeiWorldlineRegionId)
     : "custom";
 };
@@ -160,7 +164,8 @@ const normalizeSamplingKind = (
   value: unknown,
 ): Nhm2QeiWorldlineSamplingFunctionKind => {
   const text = asText(value)?.toLowerCase();
-  if (text === "compact" || text === "compact-support") return "compact_support";
+  if (text === "compact" || text === "compact-support")
+    return "compact_support";
   return NHM2_QEI_WORLDLINE_SAMPLING_FUNCTION_KINDS.includes(
     text as Nhm2QeiWorldlineSamplingFunctionKind,
   )
@@ -221,19 +226,27 @@ const normalizeWorldline = (
   const boundValue = toFinite(input.bound?.valueSI);
   const marginValue =
     toFinite(input.margin?.valueSI) ??
-    (sampledRhoValue != null && boundValue != null ? boundValue - sampledRhoValue : null);
+    (sampledRhoValue != null && boundValue != null
+      ? sampledRhoValue - boundValue
+      : null);
   const sampledRhoStatus =
-    normalizeValueStatus(input.sampledRho?.status) === "missing" && sampledRhoValue != null
+    normalizeValueStatus(input.sampledRho?.status) === "missing" &&
+    sampledRhoValue != null
       ? "computed"
       : normalizeValueStatus(input.sampledRho?.status);
   const boundStatus =
-    normalizeBoundStatus(input.bound?.status) === "missing" && boundValue != null
+    normalizeBoundStatus(input.bound?.status) === "missing" &&
+    boundValue != null
       ? "computed"
       : normalizeBoundStatus(input.bound?.status);
   const consistency = {
     tauVsDuty: normalizeConsistencyStatus(input.consistency?.tauVsDuty),
-    tauVsLightCrossing: normalizeConsistencyStatus(input.consistency?.tauVsLightCrossing),
-    tauVsModulation: normalizeConsistencyStatus(input.consistency?.tauVsModulation),
+    tauVsLightCrossing: normalizeConsistencyStatus(
+      input.consistency?.tauVsLightCrossing,
+    ),
+    tauVsModulation: normalizeConsistencyStatus(
+      input.consistency?.tauVsModulation,
+    ),
   };
   const blockers = uniqueStrings([
     ...(input.blockers ?? []),
@@ -263,7 +276,9 @@ const normalizeWorldline = (
     },
     bound: {
       valueSI: boundValue,
-      ...(boundProvenanceRef != null ? { provenanceRef: boundProvenanceRef } : {}),
+      ...(boundProvenanceRef != null
+        ? { provenanceRef: boundProvenanceRef }
+        : {}),
       status: boundStatus,
     },
     margin: {
@@ -283,7 +298,9 @@ const normalizeWorldline = (
 const summarizeWorldlines = (
   worldlines: Nhm2QeiWorldlineDossierWorldlineV1[],
 ): Nhm2QeiWorldlineDossierV1["summary"] => {
-  const hasWallWorldline = worldlines.some((worldline) => worldline.regionId === "wall");
+  const hasWallWorldline = worldlines.some(
+    (worldline) => worldline.regionId === "wall",
+  );
   const marginPassValues = worldlines.map((worldline) => worldline.margin.pass);
   const allMarginsPass =
     worldlines.length === 0 || marginPassValues.some((value) => value == null)
@@ -291,7 +308,8 @@ const summarizeWorldlines = (
       : marginPassValues.every((value) => value === true);
   const anyProxy = worldlines.some(
     (worldline) =>
-      worldline.sampledRho.status === "proxy" || worldline.bound.status === "proxy",
+      worldline.sampledRho.status === "proxy" ||
+      worldline.bound.status === "proxy",
   );
   const allValuesPresent =
     worldlines.length > 0 &&
@@ -324,8 +342,12 @@ export const buildNhm2QeiWorldlineDossier = (
     generatedAt: asText(input.generatedAt) ?? new Date(0).toISOString(),
     laneId: asText(input.laneId) ?? "nhm2_shift_lapse",
     selectedProfileId: asText(input.selectedProfileId) ?? "runtime",
-    ...(asText(input.atlasRef) == null ? {} : { atlasRef: asText(input.atlasRef) }),
-    ...(asText(input.atlasHash) == null ? {} : { atlasHash: asText(input.atlasHash) }),
+    ...(asText(input.atlasRef) == null
+      ? {}
+      : { atlasRef: asText(input.atlasRef) }),
+    ...(asText(input.atlasHash) == null
+      ? {}
+      : { atlasHash: asText(input.atlasHash) }),
     worldlines,
     summary: summarizeWorldlines(worldlines),
     literatureRefs: ["ford_roman_1996_quantum_inequality"],
@@ -344,7 +366,9 @@ const statusFromFiniteMetric = (
   return metricDerived === true ? "computed" : "proxy";
 };
 
-const passIfFinitePositive = (...values: Array<number | null>): Nhm2QeiWorldlineConsistencyStatus =>
+const passIfFinitePositive = (
+  ...values: Array<number | null>
+): Nhm2QeiWorldlineConsistencyStatus =>
   values.every((value) => value != null && value > 0) ? "pass" : "missing";
 
 const resolveTauVsDuty = (
@@ -385,17 +409,21 @@ export const buildNhm2QeiWorldlineDossierFromGuardrail = (
   const sampledRho = toFinite(guard.lhs_Jm3);
   const bound = toFinite(guard.bound_Jm3) ?? toFinite(guard.boundUsed_Jm3);
   const metricDerived =
-    typeof guard.metricDerived === "boolean" ? Boolean(guard.metricDerived) : null;
+    typeof guard.metricDerived === "boolean"
+      ? Boolean(guard.metricDerived)
+      : null;
   const samplingNormalization = asText(guard.qeiSamplingNormalization);
   const normalized =
     samplingNormalization === "unit_integral" ||
-    (toFinite(guard.sumWindowDt) != null && Math.abs((toFinite(guard.sumWindowDt) as number) - 1) <= 1e-3);
+    (toFinite(guard.sumWindowDt) != null &&
+      Math.abs((toFinite(guard.sumWindowDt) as number) - 1) <= 1e-3);
   const tauPulseSeconds = toFinite(guard.tauPulse_s);
   const worldline = normalizeWorldline(
     {
       worldlineId: "qei:wall:guardrail",
       regionId: "wall",
-      chartId: asText(guard.metricDerivedChart) ?? asText(input.chartId) ?? "unknown",
+      chartId:
+        asText(guard.metricDerivedChart) ?? asText(input.chartId) ?? "unknown",
       samplingFunction: {
         kind: normalizeSamplingKind(guard.sampler),
         tauSeconds,
@@ -404,7 +432,9 @@ export const buildNhm2QeiWorldlineDossierFromGuardrail = (
       sampledRho: {
         valueSI: sampledRho,
         provenanceRef:
-          asText(guard.metricDerivedSource) ?? asText(guard.rhoSource) ?? "runtime://pipeline/qiGuardrail",
+          asText(guard.metricDerivedSource) ??
+          asText(guard.rhoSource) ??
+          "runtime://pipeline/qiGuardrail",
         status: statusFromFiniteMetric(sampledRho, metricDerived),
       },
       bound: {
@@ -413,7 +443,8 @@ export const buildNhm2QeiWorldlineDossierFromGuardrail = (
         status: bound == null ? "missing" : "literature_bound",
       },
       margin: {
-        valueSI: sampledRho != null && bound != null ? bound - sampledRho : null,
+        valueSI:
+          sampledRho != null && bound != null ? bound - sampledRho : null,
         pass:
           typeof guard.congruentSolvePolicyMarginPass === "boolean"
             ? Boolean(guard.congruentSolvePolicyMarginPass)
@@ -465,8 +496,12 @@ export const isNhm2QeiWorldlineDossier = (
     asText(record.generatedAt) != null &&
     asText(record.laneId) != null &&
     asText(record.selectedProfileId) != null &&
-    (record.atlasRef === undefined || record.atlasRef === null || asText(record.atlasRef) != null) &&
-    (record.atlasHash === undefined || record.atlasHash === null || asText(record.atlasHash) != null) &&
+    (record.atlasRef === undefined ||
+      record.atlasRef === null ||
+      asText(record.atlasRef) != null) &&
+    (record.atlasHash === undefined ||
+      record.atlasHash === null ||
+      asText(record.atlasHash) != null) &&
     Array.isArray(record.worldlines) &&
     record.worldlines.every((entry) => {
       const worldline = asRecord(entry);
@@ -516,7 +551,8 @@ export const isNhm2QeiWorldlineDossier = (
     }) &&
     summary != null &&
     typeof summary.hasWallWorldline === "boolean" &&
-    (summary.allMarginsPass === null || typeof summary.allMarginsPass === "boolean") &&
+    (summary.allMarginsPass === null ||
+      typeof summary.allMarginsPass === "boolean") &&
     typeof summary.anyProxy === "boolean" &&
     typeof summary.dossierComplete === "boolean" &&
     Array.isArray(record.literatureRefs) &&

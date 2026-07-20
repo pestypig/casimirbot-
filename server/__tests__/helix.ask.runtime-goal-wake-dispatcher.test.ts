@@ -1,12 +1,43 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { helixRuntimeGoalSessionStore } from "../services/helix-ask/agent-providers/goal-runtime-session";
-import { routeHelixRuntimeGoalCommand } from "../services/helix-ask/runtime-goal-command-router";
-import { dispatchRuntimeGoalWakeCandidate } from "../services/helix-ask/runtime-goals/runtime-goal-wake-dispatcher";
+import { routeHelixRuntimeGoalCommand as routeHelixRuntimeGoalCommandImpl } from "../services/helix-ask/runtime-goal-command-router";
+import { dispatchRuntimeGoalWakeCandidate as dispatchRuntimeGoalWakeCandidateImpl } from "../services/helix-ask/runtime-goals/runtime-goal-wake-dispatcher";
 import { clearRuntimeGoalWakeAdmissionDedupe } from "../services/helix-ask/runtime-goals/runtime-goal-wake-admission";
+import {
+  resetAccountSessionStore,
+  signInLocalAccountSession,
+} from "../services/helix-account/account-session-store";
+import { resolveWorkstationGatewayAccountContext } from "../services/helix-ask/workstation-tool-gateway/account-policy";
+import type { HelixWorkstationGatewayAccountContext } from "../services/helix-ask/workstation-tool-gateway/account-policy";
+import {
+  bridgeRealtimeTranscriptToStagePlay,
+  resetRealtimeStagePlayAskHandoffsForTests,
+} from "../services/helix-ask/live-source/realtime-stage-play-handoff";
+import { buildRealtimeTranscriptObservation } from "../services/helix-ask/realtime-session/route-boundary";
+import {
+  admitRealtimeSession,
+  buildRealtimeRequesterRef,
+  resetRealtimeSessionRegistryForTests,
+} from "../services/helix-ask/realtime-session/session-registry";
+import {
+  readRealtimeGroundedAnswer,
+  resetRealtimeGroundedAnswerFeedbackForTests,
+} from "../services/helix-ask/realtime-session/grounded-answer-feedback";
+import { readRealtimeGroundedAnswerRelay } from "../services/helix-ask/realtime-session/grounded-answer-relay";
+import { resetStagePlayLiveSourceConversationStoreForTest } from "../services/stage-play/stage-play-live-source-conversation-store";
+import { buildRuntimeGoalAccountScope } from "../services/helix-ask/runtime-goals/runtime-goal-account-binding";
 
 const originalEnableCodexAgent = process.env.ENABLE_CODEX_AGENT;
 const originalCodexFakeStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
 const originalCodexFakeExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+let requestHeaders: { cookie: string };
+let accountContext: HelixWorkstationGatewayAccountContext;
+
+const routeHelixRuntimeGoalCommand: typeof routeHelixRuntimeGoalCommandImpl = (input) =>
+  routeHelixRuntimeGoalCommandImpl({ ...input, headers: input.headers ?? requestHeaders });
+
+const dispatchRuntimeGoalWakeCandidate: typeof dispatchRuntimeGoalWakeCandidateImpl = (input) =>
+  dispatchRuntimeGoalWakeCandidateImpl({ ...input, headers: input.headers ?? requestHeaders });
 
 const restoreEnv = () => {
   if (originalEnableCodexAgent === undefined) {
@@ -41,6 +72,21 @@ const visibleDocSnapshot = (docPath: string, visibleText: string, sourceHash = "
       },
     ],
   },
+});
+
+beforeEach(async () => {
+  resetRealtimeGroundedAnswerFeedbackForTests();
+  resetRealtimeStagePlayAskHandoffsForTests();
+  resetRealtimeSessionRegistryForTests();
+  resetStagePlayLiveSourceConversationStoreForTest();
+  await resetAccountSessionStore();
+  const receipt = await signInLocalAccountSession({
+    profile_id: "profile:runtime-goal-wake-test",
+    account_type: "developer",
+  });
+  const sessionId = receipt.session?.session_id ?? "";
+  requestHeaders = { cookie: `helix_session=${encodeURIComponent(sessionId)}` };
+  accountContext = await resolveWorkstationGatewayAccountContext(sessionId);
 });
 
 afterEach(() => {
@@ -229,6 +275,126 @@ describe("runtime goal wake dispatcher", () => {
     );
   }, 15_000);
 
+  it("returns an authorized durable-goal wake answer to the account-bound Realtime relay", async () => {
+    process.env.ENABLE_CODEX_AGENT = "1";
+    process.env.CODEX_AGENT_FAKE_STDOUT =
+      "Live goal summary: the visible document evidence was inspected and retained.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const start = await routeHelixRuntimeGoalCommand({
+      body: {
+        agent_runtime: "codex",
+        turn_id: "ask:test:live-goal-start",
+        question: "/goal Track the visible document and report grounded progress on voice wakes.",
+        workspace_context_snapshot: visibleDocSnapshot(
+          "docs/live-goal.md",
+          "The initial live-goal section establishes the baseline.",
+          "fnv1a32:live-goal-start",
+        ),
+      },
+    });
+    expect(start.statusCode).toBe(200);
+    const goalId = String((start.payload.runtime_goal_session as Record<string, unknown>).goal_id);
+    const realtimeSessionId = "realtime:goal-relay:test";
+    admitRealtimeSession({
+      realtimeSessionId,
+      requesterRef: buildRealtimeRequesterRef(accountContext.session_id),
+      visibleUserConsentReceipt: "receipt:visible-consent:goal-relay",
+      model: "gpt-realtime-2.1",
+      threadId: "helix-ask:desktop",
+      selectedRuntimeAgentProvider: "codex",
+      runtimeGoalAccountScope: buildRuntimeGoalAccountScope(accountContext),
+    });
+    const transcriptText = "What has the goal worker found so far?";
+    const observation = buildRealtimeTranscriptObservation({
+      realtimeSessionId,
+      body: {
+        event_type: "transcript.final",
+        event_ref: "provider-event:goal-relay",
+        transcript_text: transcriptText,
+      },
+    })!;
+    const handoff = bridgeRealtimeTranscriptToStagePlay({
+      realtimeSessionId,
+      threadId: "helix-ask:desktop",
+      providerEventRef: "provider-event:goal-relay",
+      transcriptText,
+      observation,
+      selectedRuntimeAgentProvider: "helix",
+      runtimeGoalAccountScope: buildRuntimeGoalAccountScope(accountContext),
+      sourceBinding: {
+        focus_panel_id: "docs-viewer",
+        document_ref: "docs/live-goal.md",
+      },
+    });
+    expect(handoff).toMatchObject({
+      goal_id: goalId,
+      runtime_agent_provider: "codex",
+      worker_admission: {
+        outcome: "durable_goal_bound",
+        selected_runtime_agent_provider: "codex",
+        dispatch: {
+          kind: "goal_wake",
+          target_runtime_agent_provider: "codex",
+          runtime_selection_source: "goal_binding",
+        },
+      },
+    });
+
+    const result = await dispatchRuntimeGoalWakeCandidate({
+      body: {
+        agent_runtime: "codex",
+        turn_id: `${handoff.handoff_id}:goal-wake`,
+        event_kind: "manual_resume",
+        goal_id: goalId,
+        source_kind: "realtime_transcript",
+        source_id: observation.observation_ref,
+        source_hash: handoff.transcript_text_hash,
+        source_label: "GPT Live transcript",
+        reason: "realtime_durable_goal_voice_turn",
+        dedupe_key: `realtime-goal-wake:${handoff.handoff_id}`,
+        requires_user_visible_turn: true,
+        question: transcriptText,
+        realtime_handoff_id: handoff.handoff_id,
+        workspace_context_snapshot: visibleDocSnapshot(
+          "docs/live-goal.md",
+          "The current section reports grounded progress for the Live wake.",
+          "fnv1a32:live-goal-current",
+        ),
+      },
+    });
+
+    expect(result.statusCode).toBe(200);
+    expect(result.payload).toMatchObject({
+      ok: true,
+      workstation_gateway_call_results: [
+        expect.objectContaining({
+          ok: true,
+          capability_id: "docs-viewer.read_visible_surface",
+        }),
+      ],
+      realtime_grounded_answer_feedback: {
+        schema: "helix.runtime_goal.realtime_grounded_feedback.v1",
+        handoff_id: handoff.handoff_id,
+        account_bound: true,
+        feedback_recorded: true,
+        blocked_reason: null,
+        answer_authority: false,
+      },
+    });
+    expect(readRealtimeGroundedAnswer(handoff.handoff_id)).toMatchObject({
+      handoff_id: handoff.handoff_id,
+      goal_id: goalId,
+      final_answer_source: "runtime_goal_command",
+      terminal_artifact_kind: "runtime_goal_command_result",
+      completed_solver_path: true,
+      server_authoritative: true,
+    });
+    expect(readRealtimeGroundedAnswerRelay(handoff.handoff_id)?.status).toBe(
+      "relay_queued_busy",
+    );
+  }, 15_000);
+
   it("admits a visible source change without a goal id by resolving the latest active runtime goal", async () => {
     process.env.ENABLE_CODEX_AGENT = "1";
     process.env.CODEX_AGENT_FAKE_STDOUT = "Server-resolved wake summary: the latest active goal was resumed.";
@@ -287,6 +453,95 @@ describe("runtime goal wake dispatcher", () => {
       },
     });
     expect(String(result.payload.selected_final_answer)).toContain("Server-resolved wake summary");
+  }, 15_000);
+
+  it("does not expose, wake, or consume dedupe state for another account's runtime goal", async () => {
+    process.env.ENABLE_CODEX_AGENT = "1";
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Owner wake accepted after the denied account attempt.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const start = await routeHelixRuntimeGoalCommand({
+      body: {
+        agent_runtime: "codex",
+        turn_id: "ask:test:account-owner-start",
+        question: "/goal Track visible source changes for this account.",
+      },
+    });
+    expect(start.statusCode).toBe(200);
+    const goalId = String((start.payload.runtime_goal_session as Record<string, unknown>).goal_id);
+
+    const intruderReceipt = await signInLocalAccountSession({
+      profile_id: "profile:runtime-goal-wake-intruder",
+      account_type: "developer",
+    });
+    const intruderSessionId = intruderReceipt.session?.session_id ?? "";
+    const intruderHeaders = {
+      cookie: `helix_session=${encodeURIComponent(intruderSessionId)}`,
+    };
+    const wakeBody = {
+      agent_runtime: "codex",
+      turn_id: "ask:test:account-wake",
+      event_kind: "visible_source_changed",
+      goal_id: goalId,
+      source_kind: "docs_viewer_visible_surface",
+      doc_path: "docs/account-owned.md",
+      active_panel_id: "docs-viewer",
+      reason: "docs_viewer_active_doc_changed",
+      dedupe_key: "docs-viewer:docs/account-owned.md:account-bound",
+      workspace_context_snapshot: visibleDocSnapshot(
+        "docs/account-owned.md",
+        "Only the owning account may wake this goal.",
+      ),
+    };
+
+    const deniedExplicit = await dispatchRuntimeGoalWakeCandidate({
+      headers: intruderHeaders,
+      body: wakeBody,
+    });
+    expect(deniedExplicit.statusCode).toBe(404);
+    expect(deniedExplicit.payload).toMatchObject({
+      ok: false,
+      blocked_reason: "goal_session_not_found",
+      runtime_goal_wake_admission: {
+        status: "rejected",
+        reason: "goal_session_not_found",
+      },
+    });
+
+    const deniedImplicit = await dispatchRuntimeGoalWakeCandidate({
+      headers: intruderHeaders,
+      body: {
+        ...wakeBody,
+        goal_id: undefined,
+        turn_id: "ask:test:account-wake-implicit",
+      },
+    });
+    expect(deniedImplicit.statusCode).toBe(404);
+    expect(deniedImplicit.payload).toMatchObject({
+      blocked_reason: "goal_session_not_found",
+      runtime_goal_wake_admission: {
+        goal_id: null,
+        reason: "goal_session_not_found",
+      },
+    });
+
+    const ownerResult = await dispatchRuntimeGoalWakeCandidate({ body: wakeBody });
+    expect(ownerResult.statusCode).toBe(200);
+    expect(ownerResult.payload).toMatchObject({
+      ok: true,
+      goal_id: goalId,
+      runtime_goal_wake_admission: {
+        status: "admitted",
+        goal_id: goalId,
+      },
+      runtime_goal_session: {
+        goal_id: goalId,
+        wake_count: 1,
+      },
+    });
+    expect(String(ownerResult.payload.selected_final_answer)).toContain(
+      "Owner wake accepted after the denied account attempt.",
+    );
   }, 15_000);
 
   it("rejects a duplicate visible source wake candidate instead of waking repeatedly", async () => {
@@ -350,7 +605,7 @@ describe("runtime goal wake dispatcher", () => {
       },
     });
     const goalId = String((start.payload.runtime_goal_session as Record<string, unknown>).goal_id);
-    const stopped = helixRuntimeGoalSessionStore.stopGoalRuntimeSession({ goalId });
+    const stopped = helixRuntimeGoalSessionStore.stopGoalRuntimeSession({ goalId, accountContext });
     expect(stopped.session.status).toBe("cancelled");
 
     const result = await dispatchRuntimeGoalWakeCandidate({
@@ -391,6 +646,7 @@ describe("runtime goal wake dispatcher", () => {
       wakePolicy: {
         timer_ms: null,
       },
+      accountContext,
     });
     const deniedGoalId = deniedStart.session.goal_id;
     const denied = await dispatchRuntimeGoalWakeCandidate({
@@ -423,6 +679,7 @@ describe("runtime goal wake dispatcher", () => {
       wakePolicy: {
         timer_ms: 30_000,
       },
+      accountContext,
     });
     const admittedGoalId = admittedStart.session.goal_id;
     const admitted = await dispatchRuntimeGoalWakeCandidate({

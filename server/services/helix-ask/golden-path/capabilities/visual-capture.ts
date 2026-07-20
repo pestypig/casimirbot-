@@ -37,12 +37,13 @@ export const isHelixAskGoldenPathVisualCaptureRequested = (body: RecordLike): bo
     ])
   )
     return true;
-  return (
+  const implicitVisualRequest = (
     /\bimage_lens\.inspect\b/i.test(prompt) ||
     /\bsituation-room\.describe_visual_capture\b/i.test(prompt) ||
     (/\b(?:visual capture|visual frame|image lens|screen capture|current screen|visible right now)\b/i.test(prompt) &&
       /\b(?:inspect|describe|review|summarize|what|seeing|visible)\b/i.test(prompt))
   );
+  return implicitVisualRequest && Boolean(readVisualCaptureSummary(body));
 };
 
 export const readVisualCaptureSummary = (body: RecordLike): string | null =>

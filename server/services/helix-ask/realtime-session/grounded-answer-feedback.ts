@@ -1,6 +1,9 @@
 import crypto from "node:crypto";
 import type { RequestHandler } from "express";
-import type { HelixRealtimeStagePlayGroundedAnswerV1 } from "@shared/contracts/helix-realtime-stage-play.v1";
+import type {
+  HelixRealtimeStagePlayAskHandoffV1,
+  HelixRealtimeStagePlayGroundedAnswerV1,
+} from "@shared/contracts/helix-realtime-stage-play.v1";
 import { readRealtimeStagePlayAskHandoff } from "../live-source/realtime-stage-play-handoff";
 import { recordStagePlayLiveSourceConversationEvent } from "../../stage-play/stage-play-live-source-conversation-store";
 import {
@@ -110,17 +113,10 @@ const requiredGroundingSatisfied = (input: {
   requiredCapabilityIds: string[];
   payload: RecordLike;
   debug: RecordLike | null;
-  solverTrace: RecordLike | null;
+  evidenceContinuationCompleted: boolean;
 }): { satisfied: boolean; evidenceRefs: string[] } => {
   if (input.requiredCapabilityIds.length === 0) return { satisfied: true, evidenceRefs: [] };
-  const evidenceReentry = readRecord(input.solverTrace?.evidence_reentry);
-  const followupReasoning = readRecord(input.solverTrace?.followup_reasoning);
-  if (
-    evidenceReentry?.required !== true ||
-    evidenceReentry.completed !== true ||
-    followupReasoning?.required !== true ||
-    followupReasoning.completed !== true
-  ) {
+  if (!input.evidenceContinuationCompleted) {
     return { satisfied: false, evidenceRefs: [] };
   }
   const gatewayResults = collectGatewayResults(input.payload, input.debug);
@@ -138,6 +134,93 @@ const requiredGroundingSatisfied = (input: {
     satisfied: true,
     evidenceRefs: unique(selectedResults.flatMap((result) => gatewayResultEvidenceRefs(result!))),
   };
+};
+
+const recordAcceptedRealtimeGroundedAnswer = (input: {
+  handoff: HelixRealtimeStagePlayAskHandoffV1;
+  payload: RecordLike;
+  debug: RecordLike | null;
+  solverTrace: RecordLike | null;
+  terminalAuthority: RecordLike;
+  answerText: string;
+  finalAnswerSource: string;
+  terminalArtifactKind: string;
+  groundingEvidenceRefs: string[];
+  askTurnId?: string | null;
+  additionalEvidenceRefs?: string[];
+  nowMs: number;
+}): HelixRealtimeStagePlayGroundedAnswerV1 => {
+  const askTurnId =
+    readString(input.askTurnId) ??
+    readString(input.payload.turn_id ?? input.payload.turnId) ??
+    readString(input.terminalAuthority.turn_id);
+  const runtimeGoalSession = readRecord(input.payload.runtime_goal_session);
+  const evidenceRefs = unique([
+    input.handoff.handoff_id,
+    input.handoff.transcript_observation_ref,
+    input.handoff.stage_play_event_ref,
+    input.handoff.context_pack_id,
+    input.handoff.goal_id,
+    input.handoff.runtime_goal_session_ref,
+    ...input.groundingEvidenceRefs,
+    ...(input.additionalEvidenceRefs ?? []),
+    ...readStringArray(input.payload.runtime_goal_observation_refs),
+    ...readStringArray(runtimeGoalSession?.latest_observation_refs),
+    ...readStringArray(runtimeGoalSession?.latest_receipt_refs),
+    ...readStringArray(input.payload.selected_terminal_support_refs),
+    ...readStringArray(input.payload.terminal_synthesis_support_refs),
+    ...readStringArray(input.terminalAuthority.support_refs),
+  ]);
+  const stagePlayEvent = recordStagePlayLiveSourceConversationEvent({
+    threadId: input.handoff.thread_id,
+    text: input.answerText,
+    source: "assistant_answer",
+    turnId: askTurnId,
+    evidenceRefs,
+    now: new Date(input.nowMs).toISOString(),
+  });
+  const feedback: HelixRealtimeStagePlayGroundedAnswerV1 = {
+    feedback_id: `realtime-grounded-answer:${crypto
+      .createHash("sha256")
+      .update(`${input.handoff.handoff_id}:${askTurnId ?? "unknown"}:${hashText(input.answerText)}`)
+      .digest("hex")
+      .slice(0, 20)}`,
+    handoff_id: input.handoff.handoff_id,
+    realtime_session_id: input.handoff.realtime_session_id,
+    thread_id: input.handoff.thread_id,
+    goal_id: input.handoff.goal_id,
+    ask_turn_id: askTurnId,
+    stage_play_event_ref: stagePlayEvent.eventId,
+    answer_text_hash: hashText(input.answerText),
+    answer_text_char_count: input.answerText.length,
+    final_answer_source: input.finalAnswerSource,
+    terminal_artifact_kind: input.terminalArtifactKind,
+    evidence_refs: evidenceRefs,
+    required_grounding_capability_ids: input.handoff.required_grounding_capability_ids,
+    grounding_evidence_satisfied: true,
+    recorded_at_ms: input.nowMs,
+    completed_solver_path: true,
+    server_authoritative: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  groundedAnswersByHandoffId.set(input.handoff.handoff_id, feedback);
+  const workerAdmission = resolveRealtimeFinalWorkerAdmission({
+    preliminary: input.handoff.worker_admission,
+    payload: input.payload,
+    debug: input.debug,
+    solverTrace: input.solverTrace,
+    evidenceRefs,
+    nowMs: input.nowMs,
+  });
+  enqueueRealtimeGroundedAnswerRelay({
+    handoff: input.handoff,
+    feedback,
+    workerAdmission,
+    answerText: input.answerText,
+    nowMs: input.nowMs,
+  });
+  return feedback;
 };
 
 export const recordRealtimeGroundedAnswerFromPayload = (input: {
@@ -168,11 +251,17 @@ export const recordRealtimeGroundedAnswerFromPayload = (input: {
     readString(input.payload.content) ??
     readString(input.payload.answer) ??
     readString(input.payload.text);
+  const evidenceReentry = readRecord(solverTrace?.evidence_reentry);
+  const followupReasoning = readRecord(solverTrace?.followup_reasoning);
   const grounding = requiredGroundingSatisfied({
     requiredCapabilityIds: handoff.required_grounding_capability_ids,
     payload: input.payload,
     debug,
-    solverTrace,
+    evidenceContinuationCompleted:
+      evidenceReentry?.required === true &&
+      evidenceReentry.completed === true &&
+      followupReasoning?.required === true &&
+      followupReasoning.completed === true,
   });
   const nowMs = input.nowMs ?? Date.now();
   const rejectionReason = !completedSolverPath
@@ -199,76 +288,120 @@ export const recordRealtimeGroundedAnswerFromPayload = (input: {
     });
     return null;
   }
-  const acceptedAnswerText = answerText as string;
-  const acceptedFinalAnswerSource = finalAnswerSource as string;
-  const acceptedTerminalArtifactKind = terminalArtifactKind as string;
-
-  const askTurnId =
-    readString(input.askTurnId) ??
-    readString(input.payload.turn_id ?? input.payload.turnId) ??
-    readString(terminalAuthority?.turn_id);
-  const evidenceRefs = unique([
-    handoff.handoff_id,
-    handoff.transcript_observation_ref,
-    handoff.stage_play_event_ref,
-    handoff.context_pack_id,
-    handoff.goal_id,
-    handoff.runtime_goal_session_ref,
-    ...grounding.evidenceRefs,
-    ...readStringArray(input.payload.selected_terminal_support_refs),
-    ...readStringArray(input.payload.terminal_synthesis_support_refs),
-    ...readStringArray(terminalAuthority?.support_refs),
-  ]);
-  const stagePlayEvent = recordStagePlayLiveSourceConversationEvent({
-    threadId: handoff.thread_id,
-    text: acceptedAnswerText,
-    source: "assistant_answer",
-    turnId: askTurnId,
-    evidenceRefs,
-    now: new Date(nowMs).toISOString(),
-  });
-  const feedback: HelixRealtimeStagePlayGroundedAnswerV1 = {
-    feedback_id: `realtime-grounded-answer:${crypto
-      .createHash("sha256")
-      .update(`${handoff.handoff_id}:${askTurnId ?? "unknown"}:${hashText(acceptedAnswerText)}`)
-      .digest("hex")
-      .slice(0, 20)}`,
-    handoff_id: handoff.handoff_id,
-    realtime_session_id: handoff.realtime_session_id,
-    thread_id: handoff.thread_id,
-    goal_id: handoff.goal_id,
-    ask_turn_id: askTurnId,
-    stage_play_event_ref: stagePlayEvent.eventId,
-    answer_text_hash: hashText(acceptedAnswerText),
-    answer_text_char_count: acceptedAnswerText.length,
-    final_answer_source: acceptedFinalAnswerSource,
-    terminal_artifact_kind: acceptedTerminalArtifactKind,
-    evidence_refs: evidenceRefs,
-    required_grounding_capability_ids: handoff.required_grounding_capability_ids,
-    grounding_evidence_satisfied: true,
-    recorded_at_ms: nowMs,
-    completed_solver_path: true,
-    server_authoritative: true,
-    assistant_answer: false,
-    raw_content_included: false,
-  };
-  groundedAnswersByHandoffId.set(handoff.handoff_id, feedback);
-  const workerAdmission = resolveRealtimeFinalWorkerAdmission({
-    preliminary: handoff.worker_admission,
+  return recordAcceptedRealtimeGroundedAnswer({
+    handoff,
     payload: input.payload,
     debug,
     solverTrace,
-    evidenceRefs,
+    terminalAuthority: terminalAuthority as RecordLike,
+    answerText: answerText as string,
+    finalAnswerSource: finalAnswerSource as string,
+    terminalArtifactKind: terminalArtifactKind as string,
+    groundingEvidenceRefs: grounding.evidenceRefs,
+    askTurnId: input.askTurnId,
     nowMs,
   });
-  enqueueRealtimeGroundedAnswerRelay({
+};
+
+export const recordRealtimeGroundedAnswerFromRuntimeGoalPayload = (input: {
+  handoffId: string;
+  payload: RecordLike;
+  askTurnId?: string | null;
+  nowMs?: number;
+}): HelixRealtimeStagePlayGroundedAnswerV1 | null => {
+  const existing = groundedAnswersByHandoffId.get(input.handoffId);
+  if (existing) return existing;
+  const handoff = readRealtimeStagePlayAskHandoff(input.handoffId);
+  if (!handoff) return null;
+  const debug = readDebug(input.payload);
+  const runtimeGoalDebug =
+    readRecord(input.payload.runtime_goal_debug_export) ??
+    readRecord(debug?.runtime_goal_debug_export);
+  const terminalAuthority =
+    readRecord(input.payload.terminal_answer_authority) ??
+    readRecord(debug?.terminal_answer_authority);
+  const providerTerminalAuthority = readRecord(runtimeGoalDebug?.terminal_answer_authority);
+  const runtimeGoalSession = readRecord(input.payload.runtime_goal_session);
+  const wakeEvent = readRecord(input.payload.runtime_goal_wake_event ?? input.payload.wake_event);
+  const wakeEventId =
+    readString(input.payload.wake_event_id) ??
+    readString(wakeEvent?.wake_event_id);
+  const debugEvents = readRecordArray(runtimeGoalDebug?.debug_events);
+  const matchesWake = (event: RecordLike): boolean =>
+    !wakeEventId || readString(event.wake_event_id) === wakeEventId;
+  const evidenceReentered = debugEvents.some((event) =>
+    matchesWake(event) && event.stage === "evidence_reentered" && event.status === "completed");
+  const terminalAuthorityEvaluated = debugEvents.some((event) =>
+    matchesWake(event) &&
+    event.stage === "terminal_authority_evaluated" &&
+    event.status === "completed" &&
+    event.terminal_authority_status === "authorized");
+  const payloadGoalId =
+    readString(input.payload.goal_id) ??
+    readString(runtimeGoalSession?.goal_id);
+  const terminalArtifactKind =
+    readString(input.payload.terminal_artifact_kind) ??
+    readString(terminalAuthority?.terminal_artifact_kind);
+  const finalAnswerSource =
+    readString(input.payload.final_answer_source) ??
+    readString(terminalAuthority?.final_answer_source);
+  const answerText =
+    readString(input.payload.selected_final_answer) ??
+    readString(input.payload.answer) ??
+    readString(input.payload.text);
+  const terminalAuthorityStatus =
+    readString(input.payload.runtime_goal_terminal_authority_status) ??
+    readString(runtimeGoalDebug?.terminal_authority_status) ??
+    readString(runtimeGoalSession?.terminal_authority_status);
+  const completedGoalSolverPath =
+    input.payload.ok === true &&
+    handoff.goal_id !== null &&
+    payloadGoalId === handoff.goal_id &&
+    terminalAuthorityStatus === "authorized" &&
+    evidenceReentered &&
+    terminalAuthorityEvaluated &&
+    providerTerminalAuthority?.server_authoritative === true;
+  const grounding = requiredGroundingSatisfied({
+    requiredCapabilityIds: handoff.required_grounding_capability_ids,
+    payload: input.payload,
+    debug,
+    evidenceContinuationCompleted: evidenceReentered && terminalAuthorityEvaluated,
+  });
+  const nowMs = input.nowMs ?? Date.now();
+  const rejectionReason = !completedGoalSolverPath
+    ? "runtime_goal_solver_path_not_completed"
+    : terminalAuthority?.server_authoritative !== true
+      ? "terminal_answer_not_server_authoritative"
+      : !answerText ||
+          terminalArtifactKind !== "runtime_goal_command_result" ||
+          finalAnswerSource !== "runtime_goal_command"
+        ? "runtime_goal_terminal_answer_contract_incomplete"
+        : !grounding.satisfied
+          ? "required_grounding_evidence_missing"
+          : null;
+  if (rejectionReason) {
+    suppressRealtimeGroundedAnswerRelay({
+      handoffId: handoff.handoff_id,
+      reason: rejectionReason,
+      failureCode: rejectionReason,
+      nowMs,
+    });
+    return null;
+  }
+  return recordAcceptedRealtimeGroundedAnswer({
     handoff,
-    feedback,
-    workerAdmission,
-    answerText: acceptedAnswerText,
+    payload: input.payload,
+    debug,
+    solverTrace: null,
+    terminalAuthority: terminalAuthority as RecordLike,
+    answerText: answerText as string,
+    finalAnswerSource: finalAnswerSource as string,
+    terminalArtifactKind: terminalArtifactKind as string,
+    groundingEvidenceRefs: grounding.evidenceRefs,
+    additionalEvidenceRefs: [wakeEventId],
+    askTurnId: input.askTurnId,
     nowMs,
   });
-  return feedback;
 };
 
 export const createRealtimeGroundedAnswerFeedbackMiddleware = (): RequestHandler =>

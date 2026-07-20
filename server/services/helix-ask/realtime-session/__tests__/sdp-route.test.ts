@@ -75,6 +75,7 @@ describe("Realtime SDP route", () => {
       transport: "webrtc",
       sdp_exchange_mode: "server",
       selected_model_or_service: "gpt-realtime-2.1",
+      selected_runtime_agent_provider: "codex",
       selected_realtime_voice: "marin",
       source_binding: {
         thread_id: "helix-ask:desktop",
@@ -132,10 +133,20 @@ describe("Realtime SDP route", () => {
         read_only: true,
         answer_authority: false,
         terminal_eligible: false,
+        runtime_agent_provider: "codex",
+        worker_admission: expect.objectContaining({
+          selected_runtime_agent_provider: "codex",
+          dispatch: expect.objectContaining({
+            target_runtime_agent_provider: "codex",
+            runtime_selection_source: "ask_ui_selected_runtime",
+          }),
+        }),
         route_metadata: {
           source: "realtime_stage_play",
           invocationKind: "stage_play_realtime_transcript_handoff",
           sourceTarget: "operator_text",
+          selectedRuntimeAgentProvider: "codex",
+          selected_runtime_agent_provider: "codex",
           source_target_intent: expect.objectContaining({
             must_enter_backend_ask: true,
             admitted_readonly_handoff: true,
@@ -144,6 +155,27 @@ describe("Realtime SDP route", () => {
       },
     });
     expect(JSON.stringify(transcript.body)).not.toContain("What is currently open");
+  });
+
+  it("rejects an unknown selected Ask runtime before admitting a Realtime session", async () => {
+    const agent = request.agent(createApp());
+    await agent.post("/api/account/session/sign-in")
+      .send({ profile_id: "profile:developer-realtime-runtime-policy" })
+      .expect(200);
+
+    const response = await agent.post("/api/agi/realtime/session").send({
+      runtime_agent_mode: "live_voice",
+      runtime_agent_authority: "observe_only",
+      selected_runtime_agent_provider: "unregistered-runtime",
+      visible_user_consent_receipt: "receipt:visible-consent:unknown-runtime",
+    }).expect(403);
+
+    expect(response.body).toMatchObject({
+      ok: false,
+      blocked_reason: "runtime_agent_provider_unknown",
+      answer_authority: false,
+      terminal_eligible: false,
+    });
   });
 
   it("fails closed before OpenAI for absent admission or mismatched consent", async () => {

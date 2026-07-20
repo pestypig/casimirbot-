@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import type { HelixRealtimeStagePlayContextSyncV1 } from "@shared/contracts/helix-realtime-stage-play.v1";
+import type { HelixRuntimeGoalAccountScope } from "../runtime-goals/runtime-goal-account-binding";
 
 const SESSION_TTL_MS = 15 * 60_000;
 
@@ -13,6 +14,8 @@ export type HelixRealtimeAdmittedSession = {
   boundGoalId: string | null;
   boundRuntimeSessionRef: string | null;
   boundRuntimeAgentProvider: string | null;
+  selectedRuntimeAgentProvider: string | null;
+  runtimeGoalAccountScope: HelixRuntimeGoalAccountScope | null;
   sourceBinding: Record<string, unknown> | null;
   providerCallId: string | null;
   providerCallRef: string | null;
@@ -58,6 +61,8 @@ export const admitRealtimeSession = (input: {
   voice?: string | null;
   threadId?: string | null;
   sourceBinding?: Record<string, unknown> | null;
+  selectedRuntimeAgentProvider?: string | null;
+  runtimeGoalAccountScope?: HelixRuntimeGoalAccountScope | null;
   nowMs?: number;
 }): HelixRealtimeAdmittedSession => {
   const nowMs = input.nowMs ?? Date.now();
@@ -72,6 +77,8 @@ export const admitRealtimeSession = (input: {
     boundGoalId: null,
     boundRuntimeSessionRef: null,
     boundRuntimeAgentProvider: null,
+    selectedRuntimeAgentProvider: input.selectedRuntimeAgentProvider?.trim() || null,
+    runtimeGoalAccountScope: input.runtimeGoalAccountScope ?? null,
     sourceBinding: input.sourceBinding ?? null,
     providerCallId: null,
     providerCallRef: null,
@@ -103,6 +110,8 @@ export const updateAdmittedRealtimeSession = (input: {
     | "boundGoalId"
     | "boundRuntimeSessionRef"
     | "boundRuntimeAgentProvider"
+    | "selectedRuntimeAgentProvider"
+    | "runtimeGoalAccountScope"
   >>;
 }): HelixRealtimeAdmittedSession | null => {
   const session = sessions.get(input.realtimeSessionId);

@@ -1783,6 +1783,48 @@ export async function evaluateWarpViability(
     (pipelineState as any).grEnabled = true;
     (pipelineState as any).gr = liveSnapshot.gr;
   }
+  const liveQiConfig = (liveSnapshot as any)?.qi;
+  if (liveQiConfig != null) {
+    if (typeof liveQiConfig !== "object" || Array.isArray(liveQiConfig)) {
+      throw new TypeError("live QI configuration must be an object");
+    }
+    const seededQiConfig = { ...((pipelineState as any).qi ?? {}) } as Record<
+      string,
+      unknown
+    >;
+    if (Object.prototype.hasOwnProperty.call(liveQiConfig, "sampler")) {
+      const sampler = (liveQiConfig as any).sampler;
+      if (
+        sampler !== "gaussian" &&
+        sampler !== "lorentzian" &&
+        sampler !== "compact"
+      ) {
+        throw new RangeError(
+          "live QI sampler must be gaussian, lorentzian, or compact",
+        );
+      }
+      seededQiConfig.sampler = sampler;
+    }
+    if (Object.prototype.hasOwnProperty.call(liveQiConfig, "tau_s_ms")) {
+      const tau = (liveQiConfig as any).tau_s_ms;
+      if (typeof tau !== "number" || !Number.isFinite(tau) || tau <= 0) {
+        throw new RangeError("live QI tau_s_ms must be a finite positive number");
+      }
+      seededQiConfig.tau_s_ms = tau;
+    }
+    if (Object.prototype.hasOwnProperty.call(liveQiConfig, "fieldType")) {
+      const fieldType = (liveQiConfig as any).fieldType;
+      if (
+        fieldType !== "scalar" &&
+        fieldType !== "em" &&
+        fieldType !== "dirac"
+      ) {
+        throw new RangeError("live QI fieldType must be scalar, em, or dirac");
+      }
+      seededQiConfig.fieldType = fieldType;
+    }
+    (pipelineState as any).qi = seededQiConfig;
+  }
   let pipeline = await calculateEnergyPipeline(pipelineState);
 
   const dutyEffective = extractDutyEffective(pipeline);
@@ -1815,13 +1857,6 @@ export async function evaluateWarpViability(
     Math.abs(vdbRegionIVDfdrMaxAbs) > VDB_DFDR_MIN_ABS;
   const vdbTwoWallDerivativeSupport =
     vdbRegionIIDerivativeSupport && vdbRegionIVDerivativeSupport;
-  const liveQiGuard = (liveSnapshot as any)?.qiGuardrail;
-  const qiGuard =
-    liveQiGuard != null && typeof liveQiGuard === "object"
-      ? (liveQiGuard as any)
-      : ((pipeline as any).qiGuardrail as any);
-  const qiProvenanceClass = resolveProvenanceClass(qiGuard?.rhoSource);
-  const qiConfidenceBand = CONFIDENCE_BY_PROVENANCE[qiProvenanceClass];
   const modeConfig = MODE_CONFIGS[pipeline.currentMode] as { zeta_max?: number } | undefined;
   const zetaMax = modeConfig?.zeta_max ?? 1;
   const strictCongruence = strictCongruenceEnabled();
@@ -2002,6 +2037,13 @@ export async function evaluateWarpViability(
   const pipelineRhoAvg = toFinite(pipeline.rho_avg ?? (pipeline as any).rho_avg);
   const pipelineRhoAvgGeom =
     pipelineRhoAvg == null ? undefined : pipelineRhoAvg * SI_TO_GEOM_STRESS;
+  // Freeze QEI evidence from the same settled pipeline epoch used for the
+  // metric tensor below. A caller snapshot can carry diagnostics/telemetry,
+  // but its guardrail may predate TS autoscale resampling and must not replace
+  // the guardrail rebuilt with the final pipeline state.
+  const qiGuard = (pipeline as any).qiGuardrail as any;
+  const qiProvenanceClass = resolveProvenanceClass(qiGuard?.rhoSource);
+  const qiConfidenceBand = CONFIDENCE_BY_PROVENANCE[qiProvenanceClass];
   const metricT00Ref = resolveMetricT00GeomFromPipeline(pipeline);
   const warpMetricT00Geom = metricT00Ref.value;
   const warpMetricSource = metricT00Ref.source;

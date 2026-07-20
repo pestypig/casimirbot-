@@ -166,6 +166,51 @@ const isStagePlayCaptureCadenceControlPrompt = (prompt: string): boolean => {
   return captureControl && isLiveSourceCadenceControlPrompt(prompt);
 };
 
+const hasCurrentLiveRuntimeRepairClause = (prompt: string): boolean => {
+  const unquoted = prompt.replace(/"[^"\n]*"|'[^'\n]*'|`[^`\n]*`/g, " ");
+  return unquoted.split(/[.!?;\n]+/).some((rawClause) => {
+    const clause = normalize(rawClause);
+    if (!clause) return false;
+    const liveSurface = /\b(?:live\s+(?:source|answer|pipeline|screen\s+source)|visual(?:\s+capture|\s+source)?|screen(?:\s+capture|\s+source)?|frame|capture\s+binding|worker\s+lanes?)\b/.test(clause);
+    const repairState = /\b(?:repair|fix|recover|run\s+due|run\s+analysis|analy[sz]e\s+latest|capture\s+now|capture\s+frame|not\s+updating|stale|attach)\b/.test(clause);
+    if (!liveSurface || !repairState) return false;
+
+    const explicitCurrentRepair = /(?:^|\b(?:and|then|but)\b|,)\s*(?:please\s+)?(?:repair|fix|recover|attach|capture)\b/.test(clause);
+    if (explicitCurrentRepair && !/\b(?:do\s+not|don\s+t|never|without)\b[\s\S]{0,60}\b(?:repair|fix|recover|attach|capture)\b/.test(clause)) {
+      return true;
+    }
+    return !(
+      /\b(?:do\s+not|don\s+t|never|without|not\s+asking\s+to)\b[\s\S]{0,100}\b(?:repair|fix|recover|attach|capture|not\s+updating|stale)\b/.test(clause) ||
+      /\b(?:if|when|before|after|would|could|might|hypothetically|later|next\s+time|in\s+the\s+future)\b[\s\S]{0,140}\b(?:repair|fix|recover|attach|capture|not\s+updating|stale)\b/.test(clause) ||
+      /\b(?:yesterday|earlier|previously|historically|last\s+(?:time|turn)|was|were|had)\b[\s\S]{0,140}\b(?:not\s+updating|stale|repair|fix|recover|attach)\b/.test(clause) ||
+      /\b(?:not\s+updating|stale|repair|fix|recover|attach)\b[\s\S]{0,100}\b(?:yesterday|earlier|previously|historically|last\s+(?:time|turn))\b/.test(clause) ||
+      /\b(?:screen|page|button|label|ui|text)\b[\s\S]{0,80}\b(?:says|shows|reads|contains|labeled|labelled)\b/.test(clause)
+    );
+  });
+};
+
+const hasContextualLiveRuntimeReference = (prompt: string): boolean => {
+  const liveSurface = String.raw`(?:live\s+(?:source|answer|pipeline|capture|screen|visual)|visual\s+(?:source|capture|frame)|screen\s+(?:source|capture|share)|worker\s+lanes?)`;
+  return (
+    new RegExp(String.raw`["'\x60][^"'\x60]*${liveSurface}[^"'\x60]*["'\x60]`, "i").test(prompt) ||
+    new RegExp(String.raw`\b(?:if|when|before|after|would|could|might|hypothetically|later|next\s+time|in\s+the\s+future)\b[\s\S]{0,180}\b${liveSurface}\b`, "i").test(prompt) ||
+    new RegExp(String.raw`\b(?:yesterday|earlier|previously|historically|last\s+(?:time|turn)|was|were|had)\b[\s\S]{0,180}\b${liveSurface}\b`, "i").test(prompt) ||
+    new RegExp(String.raw`\b${liveSurface}\b[\s\S]{0,140}\b(?:yesterday|earlier|previously|historically|last\s+(?:time|turn))\b`, "i").test(prompt) ||
+    new RegExp(String.raw`\b(?:screen|page|button|label|ui|text)\b[\s\S]{0,90}\b(?:says|shows|reads|contains|labeled|labelled)\b[\s\S]{0,160}\b${liveSurface}\b`, "i").test(prompt)
+  );
+};
+
+const hasCurrentLiveSourceOperatorClause = (prompt: string): boolean => {
+  const unquoted = prompt.replace(/"[^"\n]*"|'[^'\n]*'|`[^`\n]*`/g, " ");
+  return unquoted.split(/[.!?;\n]+/).some((rawClause) => {
+    const clause = normalize(rawClause);
+    if (!clause) return false;
+    if (!/\b(?:live\s+(?:source|answer|pipeline|capture|screen|visual)|visual\s+(?:source|capture|frame)|screen\s+(?:source|capture|share)|worker\s+lanes?)\b/.test(clause)) return false;
+    if (!/\b(?:start|set|enable|activate|turn\s+on|continue|keep|watch|monitor|track|check|inspect|repair|fix|recover|attach|capture|not\s+updating|stale)\b/.test(clause)) return false;
+    return !/\b(?:do\s+not|don\s+t|never|without|not\s+asking\s+to|if|when|before|after|would|could|might|hypothetically|later|next\s+time|in\s+the\s+future|yesterday|earlier|previously|historically|last\s+(?:time|turn)|was|were|had)\b/.test(clause);
+  });
+};
+
 export const readLiveSourceRequestedRateMs = (text: string): number | null =>
   isContextualLiveSourceCadenceMention(text) ? null : extractLiveSourceRequestedRateMs(text);
 
@@ -224,9 +269,15 @@ export function classifyLiveSourceContinuationIntent(prompt: string): HelixLiveS
     /\b(?:inspect|status|why|what happened|not updating|stuck|blocked|ready|readiness|still updating|attached|bound)\b/.test(text) &&
     /\b(?:live\s+(?:source|answer|pipeline|screen\s+source)|visual\s+source|screen\s+(?:source|capture)|frame|producer|capture\s+binding|minecraft events|world events|minehut|world event)\b/.test(text);
   const bindingDiagnosis = explicitBindingDiagnosis && !procedureEpochComparison;
-  const repair =
-    /\b(?:repair|fix|recover|run due|run analysis|analyze latest|analyse latest|capture now|capture frame|not updating|stale|attach)\b/.test(text) &&
-    /\b(?:live\s+(?:source|answer|pipeline|screen\s+source)|visual|frame|screen\s+(?:source|capture)|capture\s+binding|minecraft events|world events|minehut)\b/.test(text);
+  const repair = hasCurrentLiveRuntimeRepairClause(prompt);
+
+  if (
+    hasContextualLiveRuntimeReference(prompt) &&
+    !repair &&
+    !hasCurrentLiveSourceOperatorClause(prompt)
+  ) {
+    return null;
+  }
 
   if (bindingDiagnosis) {
     return {

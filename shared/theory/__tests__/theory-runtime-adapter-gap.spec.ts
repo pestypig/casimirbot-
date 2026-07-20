@@ -29,16 +29,57 @@ describe("theory runtime adapter gap report", () => {
 
   it("marks missing artifact_reader when no adapter is registered", () => {
     const report = buildReport([]);
-    const solar = report.lanes.find((lane) => lane.laneId === "solar_surface_spectrum");
+    const solar = report.lanes.find(
+      (lane) => lane.laneId === "solar_surface_spectrum",
+    );
 
     expect(solar?.artifactReaderAvailable).toBe(false);
     expect(solar?.missingAdapterKinds).toContain("artifact_reader");
   });
 
-  it("never reports live_runtime unless an adapter explicitly declares it", () => {
+  it("reports live_runtime only for lanes covered by an explicit live adapter", () => {
     const report = buildReport();
+    const liveLaneIds = report.lanes
+      .filter((lane) => lane.liveRuntimeAvailable)
+      .map((lane) => lane.laneId)
+      .sort();
+    const warp = report.lanes.find((lane) => lane.laneId === "warp_gr_nhm2");
+    const fullSolve = report.lanes.find(
+      (lane) => lane.laneId === "nhm2_full_solve",
+    );
+    const qei = report.lanes.find(
+      (lane) => lane.laneId === "qei_stress_energy",
+    );
+    const primaryExecutor = DEFAULT_THEORY_RUNTIME_ADAPTER_GAP_REGISTRY.find(
+      (adapter) =>
+        adapter.id === "nhm2.experiment_ready_theory.primary_executor",
+    );
 
-    expect(report.lanes.some((lane) => lane.liveRuntimeAvailable)).toBe(false);
+    expect(liveLaneIds).toEqual([
+      "nhm2_full_solve",
+      "qei_stress_energy",
+      "warp_gr_nhm2",
+    ]);
+    expect(report.summary.liveRuntimeCount).toBe(3);
+    expect(primaryExecutor).toMatchObject({
+      label: "NHM2 Dedicated Primary Runtime",
+      coverageLevels: ["long_job_manifest", "live_runtime"],
+      note: expect.stringMatching(
+        /shared in-flight polling.*immutable receipt projection/i,
+      ),
+    });
+    expect(warp?.implementedAdapters).toContain(
+      "nhm2.experiment_ready_theory.primary_executor",
+    );
+    expect(qei?.implementedAdapters).toContain(
+      "nhm2.experiment_ready_theory.primary_executor",
+    );
+    expect(fullSolve?.implementedAdapters).toContain(
+      "nhm2.experiment_ready_theory.primary_executor",
+    );
+    expect(warp?.missingAdapterKinds).not.toContain("live_runtime");
+    expect(qei?.missingAdapterKinds).not.toContain("live_runtime");
+    expect(fullSolve?.missingAdapterKinds).not.toContain("live_runtime");
 
     const explicitLiveAdapter: TheoryRuntimeAdapterGapRegistryEntry = {
       id: "solar.live_runtime.test_adapter",
@@ -51,25 +92,36 @@ describe("theory runtime adapter gap report", () => {
       ...DEFAULT_THEORY_RUNTIME_ADAPTER_GAP_REGISTRY,
       explicitLiveAdapter,
     ]);
-    const solar = liveReport.lanes.find((lane) => lane.laneId === "solar_surface_spectrum");
-    const casimir = liveReport.lanes.find((lane) => lane.laneId === "casimir_cavity_modes");
+    const solar = liveReport.lanes.find(
+      (lane) => lane.laneId === "solar_surface_spectrum",
+    );
+    const casimir = liveReport.lanes.find(
+      (lane) => lane.laneId === "casimir_cavity_modes",
+    );
 
     expect(solar?.liveRuntimeAvailable).toBe(true);
     expect(casimir?.liveRuntimeAvailable).toBe(false);
+    expect(liveReport.summary.liveRuntimeCount).toBe(4);
   });
 
   it("preserves claim-boundary badge IDs", () => {
     const report = buildReport();
-    const block = PHYSICS_ATLAS_BLOCKS.find((entry) => entry.id === "warp_gr_nhm2");
+    const block = PHYSICS_ATLAS_BLOCKS.find(
+      (entry) => entry.id === "warp_gr_nhm2",
+    );
     const lane = report.lanes.find((entry) => entry.laneId === "warp_gr_nhm2");
 
     expect(lane?.claimBoundaryBadgeIds).toEqual(block?.claimBoundaryBadgeIds);
-    expect(lane?.claimBoundaryBadgeIds).toContain("nhm2.claim_boundary.diagnostic_only");
+    expect(lane?.claimBoundaryBadgeIds).toContain(
+      "nhm2.claim_boundary.diagnostic_only",
+    );
   });
 
   it("reports static and runtime coverage without executing runtime commands", () => {
     const report = buildReport();
-    const casimir = report.lanes.find((lane) => lane.laneId === "casimir_cavity_modes");
+    const casimir = report.lanes.find(
+      (lane) => lane.laneId === "casimir_cavity_modes",
+    );
 
     expect(casimir?.staticTraceAvailable).toBe(true);
     expect(casimir?.quickRuntimeAvailable).toBe(true);
@@ -85,11 +137,15 @@ describe("theory runtime adapter gap report", () => {
     const report = buildReport();
     const errors: string[] = [];
 
-    for (const block of PHYSICS_ATLAS_BLOCKS.filter((entry) => entry.status === "active")) {
+    for (const block of PHYSICS_ATLAS_BLOCKS.filter(
+      (entry) => entry.status === "active",
+    )) {
       const lane = report.lanes.find((entry) => entry.laneId === block.id);
 
       if (!lane) {
-        errors.push(`Lane ${block.id} is active but missing from the runtime adapter gap report`);
+        errors.push(
+          `Lane ${block.id} is active but missing from the runtime adapter gap report`,
+        );
         continue;
       }
 
@@ -107,16 +163,25 @@ describe("theory runtime adapter gap report", () => {
 
       if (block.runtimeActions.length > 0) {
         if (lane.implementedAdapters.length === 0) {
-          errors.push(`Lane ${block.id} has runtimeActions but no adapter registered`);
+          errors.push(
+            `Lane ${block.id} has runtimeActions but no adapter registered`,
+          );
         }
 
         if (!lane.staticTraceAvailable) {
-          errors.push(`Lane ${block.id} has runtimeActions but no static_reference coverage`);
+          errors.push(
+            `Lane ${block.id} has runtimeActions but no static_reference coverage`,
+          );
         }
       }
 
-      if (block.claimBoundaryBadgeIds.length > 0 && lane.claimBoundaryNotes.length === 0) {
-        errors.push(`Lane ${block.id} has claimBoundaryBadgeIds but no claim boundary notes`);
+      if (
+        block.claimBoundaryBadgeIds.length > 0 &&
+        lane.claimBoundaryNotes.length === 0
+      ) {
+        errors.push(
+          `Lane ${block.id} has claimBoundaryBadgeIds but no claim boundary notes`,
+        );
       }
     }
 

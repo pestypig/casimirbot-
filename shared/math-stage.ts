@@ -12,6 +12,7 @@ export type MathCheckType =
   | "policy"
   | "certificate"
   | "snapshot"
+  | "fixture"
   | "doc"
   | "residual"
   | "stability";
@@ -44,7 +45,7 @@ export const mathStageRegistry: MathStageEntry[] = [
     notes: "Grid + BSSN state definitions.",
     checks: [
       { type: "residual", path: "tests/gr-constraint-network.spec.ts" },
-      { type: "stability", path: "tests/gr-constraint-network.spec.ts" },       
+      { type: "stability", path: "tests/gr-constraint-network.spec.ts" },
     ],
     residualsRequired: false,
     units: {
@@ -66,7 +67,7 @@ export const mathStageRegistry: MathStageEntry[] = [
     notes: "BSSN evolution + constraint fields.",
     checks: [
       { type: "residual", path: "tests/gr-constraint-gate.spec.ts" },
-      { type: "stability", path: "tests/gr-constraint-network.spec.ts" },       
+      { type: "stability", path: "tests/gr-constraint-network.spec.ts" },
     ],
     units: {
       dt: "T",
@@ -101,13 +102,13 @@ export const mathStageRegistry: MathStageEntry[] = [
       boostedEnergy: "M L^2 T^-2",
       cycleAverageEnergy: "M L^2 T^-2",
       totalEnergy_J: "M L^2 T^-2",
-        totalMomentum_kg_m_s: "M L T^-1",
-        momentumMagnitude_kg_m_s: "M L T^-1",
-        invariantMass_kg: "M",
-        invariantMassSigma_kg: "M",
-        invariantMassEnergy_J: "M L^2 T^-2",
-        massSigma_kg: "M",
-        exoticEnergyDensity: "M L^-1 T^-2",
+      totalMomentum_kg_m_s: "M L T^-1",
+      momentumMagnitude_kg_m_s: "M L T^-1",
+      invariantMass_kg: "M",
+      invariantMassSigma_kg: "M",
+      invariantMassEnergy_J: "M L^2 T^-2",
+      massSigma_kg: "M",
+      exoticEnergyDensity: "M L^-1 T^-2",
       P_avg_W: "M L^2 T^-3",
       instantaneousPower: "M L^2 T^-3",
       averagePower: "M L^2 T^-3",
@@ -139,7 +140,7 @@ export const mathStageRegistry: MathStageEntry[] = [
     notes: "Runs BSSN evolution (diagnostic).",
     checks: [
       { type: "residual", path: "tests/gr-constraint-network.spec.ts" },
-      { type: "stability", path: "tests/gr-constraint-network.spec.ts" },       
+      { type: "stability", path: "tests/gr-constraint-network.spec.ts" },
     ],
     units: {
       dt: "T",
@@ -210,7 +211,7 @@ export const mathStageRegistry: MathStageEntry[] = [
     notes: "Builds GR diagnostics + residuals.",
     checks: [
       { type: "residual", path: "tests/gr-constraint-gate.spec.ts" },
-      { type: "stability", path: "tests/gr-constraint-network.spec.ts" },       
+      { type: "stability", path: "tests/gr-constraint-network.spec.ts" },
     ],
     units: {
       dt: "T",
@@ -1212,7 +1213,7 @@ export const mathStageRegistry: MathStageEntry[] = [
     module: "server/energy-pipeline.ts",
     stage: "reduced-order",
     notes: "Energy pipeline core (mixed proxies + calibration).",
-    checks: [{ type: "test", path: "tests/pipeline-ts-qi-guard.spec.ts" }],     
+    checks: [{ type: "test", path: "tests/pipeline-ts-qi-guard.spec.ts" }],
     units: {
       gap_nm: "L",
       gap_m: "L",
@@ -1307,7 +1308,10 @@ export const mathStageRegistry: MathStageEntry[] = [
     notes:
       "Typed NHM2 full-loop audit contract for section-level readiness, blockers, and policy result reporting.",
     checks: [
-      { type: "stability", path: "tests/nhm2-full-loop-audit-contract.spec.ts" },
+      {
+        type: "stability",
+        path: "tests/nhm2-full-loop-audit-contract.spec.ts",
+      },
       { type: "policy", path: "WARP_AGENTS.md" },
     ],
     units: {
@@ -1361,7 +1365,10 @@ export const mathStageRegistry: MathStageEntry[] = [
       "Typed NHM2 wall-region source-closure artifact for metric-required wall T00, tile/material/proxy wall T00, wall residuals, blockers, and diagnostic-only claim boundary.",
     checks: [
       { type: "stability", path: "tests/nhm2-source-closure.spec.ts" },
-      { type: "stability", path: "tests/nhm2-full-loop-audit-contract.spec.ts" },
+      {
+        type: "stability",
+        path: "tests/nhm2-full-loop-audit-contract.spec.ts",
+      },
       { type: "policy", path: "WARP_AGENTS.md" },
     ],
     units: {
@@ -1403,7 +1410,10 @@ export const mathStageRegistry: MathStageEntry[] = [
         path: "tests/nhm2-observer-robust-energy-conditions.spec.ts",
       },
       { type: "stability", path: "tests/nhm2-observer-audit.spec.ts" },
-      { type: "stability", path: "tests/nhm2-full-loop-audit-contract.spec.ts" },
+      {
+        type: "stability",
+        path: "tests/nhm2-full-loop-audit-contract.spec.ts",
+      },
       { type: "policy", path: "WARP_AGENTS.md" },
     ],
     units: {
@@ -1423,7 +1433,10 @@ export const mathStageRegistry: MathStageEntry[] = [
       "Typed NHM2 QEI worldline dossier for sampling functions, sampled density, bound provenance, tau consistency, wall-worldline coverage, regional margins, and scalar-margin claim boundaries.",
     checks: [
       { type: "stability", path: "tests/nhm2-qei-worldline-dossier.spec.ts" },
-      { type: "stability", path: "tests/nhm2-full-loop-audit-contract.spec.ts" },
+      {
+        type: "stability",
+        path: "tests/nhm2-full-loop-audit-contract.spec.ts",
+      },
       { type: "policy", path: "WARP_AGENTS.md" },
     ],
     units: {
@@ -1435,6 +1448,1301 @@ export const mathStageRegistry: MathStageEntry[] = [
       allMarginsPass: "1",
       anyProxy: "1",
       dossierComplete: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-experiment-ready-theory-closure.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Fail-closed NHM2 pre-experimental theory-closure meta-contract for run-bound full-apparatus source closure, semiclassical state realizability, continuous observer and worldline-QEI coverage, dynamics, realistic Casimir/material mechanics, independent replay, and frozen falsifiers while physical claims remain blocked.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-experiment-ready-theory-closure.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      status: "1",
+      gateStatus: "1",
+      passedGateCount: "1",
+      requiredEvidenceCount: "1",
+      suppliedEvidenceCount: "1",
+      metricValue: "1",
+      tolerance: "1",
+      physicalViabilityClaimAllowed: "1",
+      transportClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-experiment-ready-theory-candidate-manifest.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Immutable NHM2 candidate manifest for exact evidence roles, persisted runtime receipts, hashed units and normalization, frozen numeric policies, diagnostic observer/QEI sampling and dynamics-horizon sufficiency preregistration, supersession, and closed empirical claim authority.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-experiment-ready-theory-candidate-manifest.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      evidenceRoleCount: "1",
+      numericCheckCount: "1",
+      numericThreshold: "1",
+      diagnosticSampleThreshold: "1",
+      normalizedHorizonThreshold: "1",
+      preRunManifestReady: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-semiclassical-state-realizability.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Fail-closed semiclassical state construction, admissibility, renormalized full tensor, Ward identity, same-state QEI, preparation switching, uncertainty, provenance, and self-consistent backreaction contract.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-semiclassical-state-realizability.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      fieldEquationResidualLInf: "1",
+      divergenceResidualLInf: "1",
+      minimumMarginSI: "M L^-1 T^-2",
+      einsteinResidualLInf: "1",
+      constraintResidualLInf: "1",
+      semiclassicalStateRealizabilityReady: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-prediction-falsifier-freeze.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Immutable pre-data NHM2 prediction, covariance, null-control, blinding, decision, falsifier, analysis-environment, registration-receipt, and supersession contract with empirical claim locks.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-prediction-falsifier-freeze.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      frozenAt: "T",
+      dataCollectionOpensAt: "T",
+      coverageProbability: "1",
+      familywiseAlpha: "1",
+      blockerCount: "1",
+      predictionFreezeReady: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-numerical-observable-prediction.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Exact pre-data numerical-observable prediction contract requiring finite ordered distributions, explicit sign/phase and scaling, run/source/uncertainty derivation hashes, and theory-only claim locks; null diagnostic seeds cannot satisfy it.",
+    checks: [
+      {
+        type: "stability",
+        path: "shared/contracts/__tests__/nhm2-numerical-observable-prediction.v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      generatedAt: "T",
+      frozenAt: "T",
+      coverageProbability: "1",
+      empiricalDataUsed: "1",
+      diagnosticSeed: "1",
+      physicalPredictionAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-full-apparatus-source-tensor.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Run-bound same-chart full-apparatus T_mu_nu contract with all ten components, supports, controls, material and return terms, source-provenance DAG, non-echo audit, convergence, and uncertainty-aware residuals.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-full-apparatus-source-tensor.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      metricSignalNormSI: "M L^-1 T^-2",
+      relativeResidualUpper95: "1",
+      observedConvergenceOrder: "1",
+      spatialSampleCount: "1",
+      fullApparatusSourceTensorReady: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-covariant-conservation.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Run-bound covariant conservation contract for the exact full-apparatus source tensor, including four-divergence components, discrete global balance, cycle energy ledger, convergence, and uncertainty propagation.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-covariant-conservation.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      divergenceResidualSI: "M L^-2 T^-2",
+      globalBalancePower: "M L^2 T^-3",
+      cycleEnergyResidual: "1",
+      observedConvergenceOrder: "1",
+      covariantConservationReady: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-dynamic-backreaction-stability-causality.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Nontrivial time-domain BSSN contract with candidate-frozen minimum samples and normalized switching/light-crossing/control-cycle horizons, semiclassical backreaction, stability, characteristic, ray, particle, causality, convergence, and exact source bindings.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-dynamic-backreaction-stability-causality.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      timestep: "T",
+      duration: "T",
+      switchingPeriod: "T",
+      lightCrossingTime: "T",
+      controlCyclePeriod: "T",
+      normalizedHorizon: "1",
+      evolutionSampleCount: "1",
+      constraintResidual: "1",
+      backreactionResidual: "1",
+      perturbationGrowth: "T^-1",
+      dynamicBackreactionStabilityCausalityReady: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-continuous-observer-optimizer.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Continuous timelike/null observer-manifold optimization contract with exact full-source binding, candidate-frozen spatial/null-direction sample minima and convergence order, globality evidence, uncertainty, contradiction handling, and complete admitted-domain coverage.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-continuous-observer-optimizer.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      coverageFraction: "1",
+      globalityGap: "1",
+      objectiveValue: "M L^-1 T^-2",
+      spatialSampleCount: "1",
+      nullDirectionCount: "1",
+      observedConvergenceOrder: "1",
+      continuousObserverOptimizerReady: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-worldline-qei-coverage.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Same-state worldline-QEI contract for explicit timelike trajectories with candidate-frozen family density, per-worldline sample and convergence minima, observer kinematics, curvature invariants, normalized sampling, theorem applicability, regional coverage, and uncertainty-aware margins.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-worldline-qei-coverage.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      fourVelocityNormalizationError: "1",
+      samplingIntegralError: "1",
+      combinedNumericalErrorRelative: "1",
+      samplingFunctionFamilyCount: "1",
+      worldlinesPerRegionFamily: "1",
+      samplesPerWorldline: "1",
+      observedConvergenceOrder: "1",
+      minimumMarginSI: "M L^-1 T^-2",
+      worldlineQeiCoverageReady: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/casimir-finite-temperature-finite-geometry-maxwell-stress.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Finite-temperature Lifshitz and finite-CAD Maxwell-stress contract with measured dielectric response, Matsubara and mesh convergence, nonlocal disposition, force-gap gradients, realistic uncertainty, and independent cross-checks.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/casimir-finite-temperature-finite-geometry-maxwell-stress.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      targetGap: "L",
+      pressure: "M L^-1 T^-2",
+      integratedForce: "M L T^-2",
+      forceGradient: "M T^-2",
+      relativeUncertainty: "1",
+      finiteTemperatureFiniteGeometryMaxwellStressReady: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-mechanical-support-control-margin.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Realistic force-gradient, nonlinear FEA, support-retention overlap, instability, structural, fabrication, active-control, cycle-energy, and apparatus stress-energy return contract.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-mechanical-support-control-margin.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      forceGradient: "M T^-2",
+      supportRetentionOverlap: "1",
+      structuralMargin: "1",
+      controlEnergy: "M L^2 T^-2",
+      cycleEnergyResidual: "1",
+      mechanicalSupportControlMarginReady: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-independent-numerical-replication.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Independent cold-run numerical replay contract with distinct implementation and independence group, exact pre-run invocation, frozen inputs and environments, raw field-level comparisons, uncertainty disposition, and reproducibility pins. Producer-declared comparison metadata is now permanently non-promoting; readiness requires a future server-owned nine-field float64 readback and recomputation receipt bound to both strict manifests.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-independent-numerical-replication.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      maximumFieldDifference: "1",
+      fieldComparisonTolerance: "1",
+      uncertaintyConfidenceLevel: "1",
+      comparedFieldCount: "1",
+      independentNumericalReplicationReady: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-independent-numerical-execution-descriptor.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Administrative-only external execution descriptor for the independent lane. It pins a distinct implementation source closure, approved server policy, executable, toolchain, target, environment, and primary-lineage anti-alias bindings while granting neither launch nor scientific authority.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-independent-numerical-execution-descriptor.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      sourceClosureEntryCount: "1",
+      sourceClosureAggregateBytes: "1",
+      toolchainEntryCount: "1",
+      executableSizeBytes: "1",
+      independentNumericalReplicationReady: "1",
+      physicalViabilityEstablished: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-independent-field-array-manifest.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Strict nine-field independent comparison-array manifest with exact component order and units, ordered sample-domain identity, float64 encoding, convergence and uncertainty derivations, a frozen relative-L-infinity policy, and complete run/candidate/primary-projection bindings. External sidecar admission remains explicitly pending.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-independent-field-array-manifest.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      requiredFieldCount: "1",
+      sampleCount: "1",
+      domainCoverageFraction: "1",
+      observedConvergenceOrder: "1",
+      maximumRelativeLInf: "1",
+      physicalViabilityEstablished: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-server-owned-nine-field-float64-replay-receipt.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Strict schema for a future server-owned nine-field float64 replay receipt. It binds the primary projection/operator replay, independent field manifest, exact 50-component metric ledger, readback inventory, and prerequisite declarations while explicitly denying schema-derived claim authority and every physical or empirical claim.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-server-owned-nine-field-float64-replay-receipt.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      requiredFieldCount: "1",
+      requiredComponentCount: "1",
+      sampleCount: "1",
+      maximumRelativeLInf: "1",
+      readbackDuration: "T",
+      claimAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "server/services/theory/nhm2-secure-run-output-reader.ts",
+    stage: "diagnostic",
+    notes:
+      "Authority-neutral bounded run-output reader with exact inventory, portable-path and realpath containment, link and identity rejection, resource caps, handle-based exact reads, double replay, SHA-256 binding, and finite little-endian float64 decoding. Filesystem readback alone grants no scientific authority.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-secure-run-output-reader.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      outputFileCount: "1",
+      outputSizeBytes: "1",
+      aggregateSizeBytes: "1",
+      float64ElementCount: "1",
+      scientificSemanticsAssessed: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "server/services/theory/nhm2-nine-field-float64-metric-kernel.ts",
+    stage: "diagnostic",
+    notes:
+      "Deterministic authority-neutral kernel for the exact nine-field, 50-component little-endian float64 comparison. It uses a non-tunable minimum-positive technical zero guard, componentwise primary-reference relative L-infinity reduction, strict finite arithmetic, and deterministic argmax selection while keeping theory and physical claims false.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-nine-field-float64-metric-kernel.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      requiredFieldCount: "1",
+      requiredComponentCount: "1",
+      sampleCount: "1",
+      maximumRelativeLInf: "1",
+      comparisonTolerance: "1",
+      claimAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "server/services/theory/nhm2-independent-numerical-replication-content-assessor.ts",
+    stage: "diagnostic",
+    notes:
+      "Fail-closed independent-output content assessor. It reopens the current opaque external observation and enumerates the exact nine field/domain/uncertainty comparisons, but remains not_evaluable until the executor inventory admits and the server replays the typed field-array sidecar closure.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-independent-numerical-replication-content-assessor.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      requiredComparisonCount: "1",
+      recomputedComparisonCount: "1",
+      relativeLInfTolerance: "1",
+      outputByteCount: "1",
+      independentNumericalReplicationReady: "1",
+      theoryClosureEstablished: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "server/services/theory/nhm2-independent-numerical-replication-executor.ts",
+    stage: "diagnostic",
+    notes:
+      "Server-owned independent external-process observer requiring an immutable installed toolchain policy, hash-addressed preseal, verified primary receipt, exact source/toolchain/environment identities, and fresh closed output inventory. Process observation alone cannot establish implementation independence or scientific agreement.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-independent-numerical-replication-executor.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      primaryOutputCount: "1",
+      executableSizeBytes: "1",
+      processDuration: "T",
+      outputInventorySha256: "1",
+      theoryClosureClaimAllowed: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "server/services/theory/nhm2-independent-runtime-plan-admission.ts",
+    stage: "diagnostic",
+    notes:
+      "No-launch production admission boundary for the independent lane. Its public API accepts only project root and candidate path, resolves policy solely through the server, and currently returns typed not_configured before reading candidate, descriptor, receipt, preseal, or process state.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-independent-runtime-plan-admission.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      manifestReadAttempted: "1",
+      presealPersistenceAttempted: "1",
+      processLaunchAttempted: "1",
+      runtimePlanAdmitted: "1",
+      independentNumericalReplicationReady: "1",
+      physicalViabilityEstablished: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-formal-kernel-replay-manifest.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Legacy self-consistency manifest for a claimed Lean-kernel replay. It verifies its referenced-byte and transcript structure without invoking or independently observing Lean, so it is superseded for formal authority by the outer-observation v2 adapter and cannot establish execution or proof authority on its own.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-formal-kernel-replay-manifest.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-formal-kernel-replay-filesystem-verifier.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      preRunSourceCount: "1",
+      replayedTheoremCount: "1",
+      usedAxiomCount: "1",
+      usedAssumptionCount: "1",
+      kernelExitCode: "1",
+      physicalViabilityClaimAllowed: "1",
+      transportClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-primary-raw-output-manifest.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Raw-only primary-output protocol with a hash-bound nonvacuous role policy, exact frozen input and family closure, typed finite arrays, canonical record schemas, closed claim authority, and an outer filesystem verifier that recomputes hashes and freshness without accepting producer-authored scientific dispositions.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-primary-raw-output-manifest.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-primary-raw-output-filesystem-verifier.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      rawFamilyCount: "1",
+      rawFileCount: "1",
+      rawSampleCount: "1",
+      float64ByteCount: "1",
+      inputClosureSha256: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-primary-raw-solver-suite-enrollment.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Administrative-only enrollment contract for a genuine primary raw solver suite. It binds the canonical nine-family, 107-role DAG and policy hash to pinned external/formal kernels, the producer bundle, manifest-last closed inventory, and server-only governed-root publication while keeping execution and every scientific claim false.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-primary-raw-solver-suite-enrollment.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      familyCount: "1",
+      roleCount: "1",
+      kernelEnrollmentCount: "1",
+      sourceClosureAggregateBytes: "1",
+      executionAuthorized: "1",
+      physicalViabilityEstablished: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-primary-comparison-projection.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Frozen server-owned comparison policy for exactly nine primary arrays derived only from primitive raw roles. It fixes component order and units, minimum sample counts, ordered-domain identity, projection and uncertainty derivations, float64 encoding, and pre-independent-spawn freeze semantics.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-primary-comparison-projection-assessor.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      projectionFieldCount: "1",
+      minimumSampleCount: "1",
+      tensorComponentCount: "1",
+      uncertaintyConfidenceLevel: "1",
+      projectionReplayPerformed: "1",
+      physicalViabilityEstablished: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "server/services/theory/nhm2-primary-comparison-projection-assessor.ts",
+    stage: "diagnostic",
+    notes:
+      "Strict assessment of a primary comparison projection against verified raw inputs and a server-owned freeze admission. Metadata conformance is explicitly not array readback or operator replay, and any absent binding leaves all nine fields not_ready.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-primary-comparison-projection-assessor.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      assessedFieldCount: "1",
+      outputFilesystemReadbackPerformed: "1",
+      orderedDomainFilesystemReadbackPerformed: "1",
+      serverOwnedProjectionReplayPerformed: "1",
+      primaryComparisonProjectionReady: "1",
+      theoryClosureEstablished: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "server/services/theory/nhm2-primary-comparison-projection-finalizer.ts",
+    stage: "diagnostic",
+    notes:
+      "P0 server-owned finalizer that publishes one immutable assessment sidecar after raw-package verification. It records exact raw manifest, input-closure, and file-inventory hashes, emits no projected arrays, and forces the projection gate to not_ready until a real server replay exists.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-primary-comparison-projection-finalizer.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      supplementaryRootCount: "1",
+      assessmentSizeBytes: "1",
+      rawFilesystemVerificationObserved: "1",
+      serverOwnedProjectionReplayPerformed: "1",
+      primaryComparisonProjectionReady: "1",
+      physicalViabilityEstablished: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "server/services/theory/nhm2-primary-raw-gr-content-replay.ts",
+    stage: "diagnostic",
+    notes:
+      "Outer-owned GR replay that requires the complete field/material/support/control/return source-term set with non-target hashed input bindings, recomputes same-chart apparatus sums, tensor residuals, all four covariant-conservation components, observer objectives, sparse worldline tensor/metric pullbacks, and QEI inputs from filesystem-verified primitives while retaining independent non-echo, global-observer, and theorem-binding blockers.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-primary-raw-gr-content-replay.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      spatialSampleCount: "1",
+      tensorComponentCount: "1",
+      relativeResidual: "1",
+      energyDensity: "M L^-1 T^-2",
+      qeiMargin: "M L^-1 T^-2",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "server/services/theory/nhm2-primary-raw-material-dynamics-content-replay.ts",
+    stage: "diagnostic",
+    notes:
+      "Outer-owned post-processing replay for semiclassical bookkeeping, Maxwell stress and force gradients, mechanical residual/support/control arithmetic, dynamics diagnostics, and numerical observables. Foundational Hadamard/RSET, Green-operator, nonlinear-FEA, receipt-content, feedback, and BSSN kernels remain explicit blockers.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-primary-raw-material-dynamics-content-replay.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      sampleCount: "1",
+      energyDensity: "M L^-1 T^-2",
+      force: "M L T^-2",
+      forceGradient: "M T^-2",
+      cycleEnergy: "M L^2 T^-2",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "server/services/theory/nhm2-primary-raw-experiment-ready-evidence-compiler.ts",
+    stage: "diagnostic",
+    notes:
+      "Production outer compiler that reopens run-specific raw filesystem evidence, constructs independent GR and material/dynamics replays, rehashes canonical primitives, maps all eight primary evidence families, rejects caller-forged dispositions, and preserves every unresolved scientific-kernel and empirical claim lock.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-primary-raw-experiment-ready-evidence-compiler.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      evidenceFamilyCount: "1",
+      rawFileCount: "1",
+      replayIntegrity: "1",
+      unresolvedKernelBlockerCount: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "server/services/theory/nhm2-external-numerical-kernel-executor.ts",
+    stage: "diagnostic",
+    notes:
+      "Sealed external-binary execution observer for governed warpax, SCUFF-EM, CalculiX, and Einstein Toolkit lanes. It copies the exact sealed toolchain from identity-checked handles into a fresh run-owned closure, launches the staged executable, replays staged/source ledgers and fresh outputs, and records timing, cleanup, and the residual same-user OS-immutability blocker; no scientific or physical authority is granted before independent content replay.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-external-numerical-kernel-executor.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      toolchainByteCount: "1",
+      inputByteCount: "1",
+      outputByteCount: "1",
+      processDuration: "T",
+      outputInventorySha256: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "server/services/theory/nhm2-warpax-frame-free-external-plan.ts",
+    stage: "diagnostic",
+    notes:
+      "Pinned warpax v1.3 frame-free sampled-observer lane over same-chart covariant T_ab and g_ab arrays. It binds the official package and critical source hashes, independently replays Type-I margins, forbids BFGS substitution for non-Type-I samples, and retains explicit sampled-to-continuum, global-interval, scientific-replay, and upstream tolerance-forwarding blockers.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-warpax-frame-free-external-plan.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      sampledSpacetimePointCount: "1",
+      requestedTolerance: "1",
+      stressEnergy: "L^-2",
+      metric: "1",
+      typeIMargin: "L^-2",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "server/services/theory/nhm2-scuff-em-force-sweep-external-plan.ts",
+    stage: "diagnostic",
+    notes:
+      "Pinned SCUFF-EM scuff-cas3D equilibrium-Matsubara compact-geometry energy/z-force sweep plan. It seals exact source, executable, geometry, mesh, material-model, metrology, and transform bytes while retaining SI-conversion, force-gradient uncertainty, mesh convergence, material correspondence, and local Maxwell-stress traction blockers.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-scuff-em-force-sweep-external-plan.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      temperatureKelvin: "Theta",
+      baseGapMeters: "L",
+      separationMeters: "L",
+      relativeTolerance: "1",
+      rawScuffEnergy: "unresolved",
+      rawScuffForce: "unresolved",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "server/services/theory/nhm2-scuff-em-executor-receipt-admission.ts",
+    stage: "diagnostic",
+    notes:
+      "Server-owned immutable SCUFF executor-receipt admission. Public replay accepts only an opaque receipt ID; admission securely reopens the persisted v2 observation, exact plan, complete source/build/toolchain provenance, and closed claim boundary, then rechecks receipt identity after content replay. Missing or invalid authority returns typed not-ready rather than execution evidence.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-scuff-em-force-sweep-partial-content-replay.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      receiptByteCount: "1",
+      sourceLedgerByteCount: "1",
+      toolchainLedgerByteCount: "1",
+      buildReceiptSha256: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "server/services/theory/nhm2-scuff-em-force-sweep-partial-content-replay.ts",
+    stage: "diagnostic",
+    notes:
+      "Receipt-admitted, byte-reopened partial scientific replay of one pinned SCUFF-EM scuff-cas3D run. It verifies the persisted v2 staged-toolchain observation, complete source/build binding, exact fresh three-file output, declared energy/z-force and Matsubara tables, print-precision Matsubara sequence, and raw central differences while retaining OS-hermeticity, SI, local-traction, mesh, material, convergence, and independent-replay blockers.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-scuff-em-force-sweep-partial-content-replay.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      separationMeters: "L",
+      temperatureKelvin: "Theta",
+      rawScuffEnergy: "unresolved",
+      rawScuffForce: "unresolved",
+      rawScuffForceGradient: "unresolved/L",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "server/services/theory/nhm2-calculix-mechanics-support-control-external-plan.ts",
+    stage: "diagnostic",
+    notes:
+      "Pinned CalculiX 2.23 full-apparatus mechanics/support/control plan binding the CAD/FEM deck closure, mesh, material coupons, SCUFF traction transfer, support, actuation, thermal, fatigue, contact, pull-in, nonlinear steps, and complete toolchain/input ledgers. Stock ccx is intentionally not admitted because its job-prefix and auxiliary-output behavior cannot yet satisfy the immutable separated-root exact-inventory executor contract.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-calculix-mechanics-support-control-external-plan.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      displacement: "L",
+      force: "M L T^-2",
+      stress: "M L^-1 T^-2",
+      temperature: "Theta",
+      time: "T",
+      supportRetentionOverlapRatio: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-prediction-bootstrap-freeze.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Acyclic two-run prediction bootstrap requiring a fresh generation receipt, six byte-reopened numerical predictions and provenance artifacts, deterministic content replay, and a distinct superseding reproduction candidate frozen before its run; empirical and physical authority remain closed.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-prediction-bootstrap-freeze.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-prediction-bootstrap-filesystem-verifier.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      frozenPredictionCount: "1",
+      predictionSetSha256: "1",
+      generationDuration: "T",
+      targetFreezeTime: "T",
+      physicalViabilityClaimAllowed: "1",
+      empiricalReceiptsRequired: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-prediction-run1-bootstrap.v2.ts",
+    stage: "diagnostic",
+    notes:
+      "Superseding six-observable run-1 bootstrap and compiler contract. It resolves a create-only digest-addressed runtime receipt through a server capability, replays filesystem freshness, reopens every run-bound source byte, composes a hashed governed unit-dimension registry across normalization/conversion/operator/uncertainty, recomputes the predictions, and reserves a distinct future target run with every theory, empirical, physical, and transport claim closed.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-prediction-run1-bootstrap-compiler.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      frozenPredictionCount: "1",
+      sourceComponent: "varies",
+      conversionScale: "varies",
+      interval95: "varies",
+      targetReceiptPresent: "1",
+      theoryClosureEstablished: "1",
+      physicalViabilityEstablished: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "server/services/theory/nhm2-formal-kernel-executor.ts",
+    stage: "diagnostic",
+    notes:
+      "Server-owned exact-binary formal execution primitive that verifies sealed source, toolchain, and input ledgers before and after two cold Lean replays, requires the exact pre-experimental claim-lock theorem and empty axiom report, and records only outer-observed process/output evidence.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-formal-kernel-executor.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "formal/lean/NHM2Formal/ExperimentReadyClaimLocks.lean",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      coldReplayCount: "1",
+      theoremCount: "1",
+      usedAxiomCount: "1",
+      processDuration: "T",
+      sourceLedgerSha256: "1",
+      toolchainLedgerSha256: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-formal-approved-toolchain-policy.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Server-owned immutable diagnostic toolchain allowlist contract pinning Lean 4.31.0, its release commit, Lake's Lean binding, the repository lean-toolchain file, platform/architecture target, exact Lean/Lake binaries, full sorted root-independent dependency ledger, and environment. It approves only a replay toolchain identity and grants no formal-proof, theory, empirical, or physical authority.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-formal-approved-toolchain-policy-verifier.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      toolchainEntryCount: "1",
+      toolchainAggregateBytes: "1",
+      toolchainLedgerSha256: "1",
+      releaseCommitSha: "1",
+      theoryClosureClaimAllowed: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "server/services/theory/nhm2-formal-approved-toolchain-policy-verifier.ts",
+    stage: "diagnostic",
+    notes:
+      "Fail-closed comparison of a presealed formal run against the server-owned toolchain policy. It exact-matches host target, repository toolchain file, complete ledger, executable roles and hashes, and environment while refusing caller version labels as authority.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-formal-approved-toolchain-policy-verifier.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      verifiedToolchainEntryCount: "1",
+      verifiedAggregateBytes: "1",
+      executableRoleCount: "1",
+      approvedEnvironmentEntryCount: "1",
+      callerReleaseLabelsAuthoritative: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "tools/nhm2/enroll-formal-approved-toolchain-policy.ts",
+    stage: "diagnostic",
+    notes:
+      "Offline administrative enrollment of the immutable Lean/Lake policy. It scans and rehashes the complete toolchain tree, rejects aliases and linked files, directly observes exact version output under an empty environment, verifies the repository lean-toolchain bytes, and publishes a no-overwrite policy whose paths cannot be supplied by a runtime caller.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-enroll-formal-approved-toolchain-policy.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      toolchainEntryCount: "1",
+      toolchainAggregateBytes: "1",
+      executableRoleCount: "1",
+      policySemanticSha256: "1",
+      runtimeCallerPathAuthority: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "tools/nhm2/preseal-experiment-ready-theory-formal-run.ts",
+    stage: "diagnostic",
+    notes:
+      "Run-specific direct-Lean preseal that stages exact candidate inputs, standalone formal sources, and the complete selected toolchain; rejects aliases, links, proof holes, imports, resource overflow, and non-plan staging paths; and emits a canonical closed-claim two-cold-replay spec. Caller-selected trusted roots remain developer-diagnostic inputs until production admission resolves them from an approved server-owned toolchain policy.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-preseal-experiment-ready-theory-formal-run.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      stagedInputFileCount: "1",
+      stagedSourceFileCount: "1",
+      stagedToolchainFileCount: "1",
+      timeout: "T",
+      capturedOutputByteCount: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "server/services/theory/nhm2-formal-outer-observation-evidence-adapter.ts",
+    stage: "diagnostic",
+    notes:
+      "Superseding formal-manifest certificate v2 derived only from an outer-observed direct-Lean execution artifact. It exact-binds the frozen candidate, formal plan and run spec, two distinct cold replays, native theorem/no-axiom transcripts, stable sealed ledgers, and fresh identical output inventories while granting no numerical, theory-closure, empirical, physical, transport, propulsion, ETA, or speed authority.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-formal-outer-observation-evidence-adapter.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      coldReplayCount: "1",
+      theoremCount: "1",
+      usedAxiomCount: "1",
+      transcriptSha256: "1",
+      outputInventorySha256: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "tools/nhm2/run-experiment-ready-theory-formal-candidate.ts",
+    stage: "diagnostic",
+    notes:
+      "Top-level formal candidate producer that invokes the sealed two-cold-run wrapper, securely reopens bounded candidate/spec/outer artifacts, requires the plan-derived run-spec path, deterministically re-derives formal v2 evidence, and no-overwrite publishes only the formal certificate. Its child output still requires independent server-side replay and an approved toolchain policy before production authority.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-run-experiment-ready-theory-formal-candidate.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      coldReplayCount: "1",
+      inputByteLimit: "1",
+      evidenceByteCount: "1",
+      executionDuration: "T",
+      evidenceSha256: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-formal-producer-bundle.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Lane-distinct deterministic standalone ESM bundle contract for the formal outer producer. It freezes the complete bundled source/metafile closure, admits only external Node built-ins, requires no runtime node_modules, and remains host-specific diagnostic launch evidence rather than formal, numerical, or physical authority.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-prepare-experiment-ready-theory-candidate.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      bundledSourceFileCount: "1",
+      bundleByteCount: "1",
+      sourceSnapshotSha256: "1",
+      runtimeNodeModulesRequired: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "server/services/theory/nhm2-formal-producer-bundle-admission.ts",
+    stage: "diagnostic",
+    notes:
+      "Dedicated formal-lane bundle admission component that reopens bounded single-link files, exact-matches candidate and solver refs, replays the esbuild metafile/source closure, hashes the actual host Node binary, and rejects primary-lane substitution. It establishes only a reproducible outer launcher; formal, theory, empirical, and physical authority remain closed.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-prepare-experiment-ready-theory-candidate.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      bundledSourceFileCount: "1",
+      aggregateSourceByteCount: "1",
+      bundleByteCount: "1",
+      hostRuntimeByteCount: "1",
+      theoryClosureEstablished: "1",
+      physicalViabilityEstablished: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "server/services/theory/nhm2-formal-runtime-plan-admission.ts",
+    stage: "diagnostic",
+    notes:
+      "Server-owned formal-plan admission accepting only candidateManifestPath. It recomputes run identities and the exact v2 evidence/output route, admits the formal-only standalone bundle, invokes preseal, verifies the complete approved toolchain policy, and defaults to typed not_configured when no server resolver is installed.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-formal-runtime-lane.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      approvedToolchainEntryCount: "1",
+      approvedToolchainAggregateBytes: "1",
+      expectedFormalOutputCount: "1",
+      formalAdmissionOnly: "1",
+      theoryClosureEstablished: "1",
+      physicalViabilityEstablished: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "server/services/theory/nhm2-formal-runtime-executor.ts",
+    stage: "diagnostic",
+    notes:
+      "Single-launch formal runtime that binds actual NUL-delimited Git porcelain digests and exact authorized runtime deltas, rehashes every admitted input and launcher before/after the host-Node producer, accepts exactly four fresh outputs, independently re-derives v2 formal evidence, and persists an immutable external receipt. Unauthorized source-state or child/evidence failure is not-ready diagnostic evidence, never physical falsification.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-formal-runtime-lane.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      executionDuration: "T",
+      exactFormalOutputCount: "1",
+      approvedToolchainEntryCount: "1",
+      outputInventorySha256: "1",
+      theoryClosureEstablished: "1",
+      physicalViabilityEstablished: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-formal-manifest-certificate.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Legacy formal-certificate structure for candidate commitment, theorem scope, typed assumptions, and closed physical/transport/propulsion/ETA/speed claim locks. Its replay claims are self-authored and therefore superseded for formal authority by the outer-observation v2 adapter.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-formal-manifest-certificate.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      merkleLeafCount: "1",
+      sourceMismatchCount: "1",
+      replayedTheoremCount: "1",
+      unscopedAssumptionCount: "1",
+      formalManifestCertificateReady: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "server/services/theory/nhm2-experiment-ready-theory-closure-evaluator.ts",
+    stage: "diagnostic",
+    notes:
+      "Independent filesystem replay authority for pre-run candidate commitments, persisted receipts, fresh hashed evidence, exact raw-domain adapters, cross-artifact source bindings, frozen numeric policies, and fail-closed theory-closure status.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-experiment-ready-theory-closure-evaluator.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      gateStatus: "1",
+      filesystemVerified: "1",
+      candidateManifestValidated: "1",
+      evidenceAdapterCoverageComplete: "1",
+      blockerCount: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "tools/nhm2/prepare-experiment-ready-theory-candidate.ts",
+    stage: "diagnostic",
+    notes:
+      "Immutable pre-run NHM2 candidate packager with governed historical-seed isolation, committed descriptor hashes, cycle-safe frozen prediction semantics, and closed empirical claim authority. Production publication now fails before filesystem mutation until both the primary raw solver-suite producer and independent external execution enrollment exist; only a path-restricted temporary contract-test fixture may inspect the unexecutable draft.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-prepare-experiment-ready-theory-candidate.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      executionPlanCount: "1",
+      expectedEvidenceCount: "1",
+      pinnedInputCount: "1",
+      manifestFrozenAt: "T",
+      predictionSemanticDigestBound: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "tools/nhm2/run-experiment-ready-theory-primary.ts",
+    stage: "diagnostic",
+    notes:
+      "Fail-closed primary child boundary. Production exits before touching the run tree until a genuine solver-suite producer can emit the canonical 107-role primitive raw package; the former nine governed-wrapper builder is restricted to path-guarded temporary contract tests because only the server may publish governed evidence roots.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-run-experiment-ready-theory-primary.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      requiredRawRoleCount: "1",
+      childGovernedEvidenceAuthority: "1",
+      producerDuration: "T",
+      theoryClosureStatus: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "server/services/theory/nhm2-theory-candidate-plan-admission.ts",
+    stage: "diagnostic",
+    notes:
+      "Pre-spawn NHM2 plan admission requiring exact Git source, a clean tree, immutable descriptor/reference closure, exact server-owned invocation and environment, resolved manifest digest, and an empty confined output directory.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-theory-candidate-plan-admission.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      admittedEvidenceCount: "1",
+      pinnedInputCount: "1",
+      sourceTreeClean: "1",
+      frozenBeforeExecution: "1",
+      manifestDigestResolved: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "server/services/theory/nhm2-evidence-nested-reference-verifier.ts",
+    stage: "diagnostic",
+    notes:
+      "Filesystem verifier for nested evidence references requiring exact containment, non-symlink files, SHA-256 and receipt-manifest agreement, fresh output status, and float64 shape/byte-length consistency.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-evidence-nested-reference-verifier.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      referenceCount: "1",
+      sizeBytes: "1",
+      expectedFloat64Bytes: "1",
+      verified: "1",
+      blockerCount: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "server/services/theory/nhm2-theory-candidate-primary-executor.ts",
+    stage: "diagnostic",
+    notes:
+      "Dedicated manifest-admitted NHM2 primary executor that binds a clean stable Git source, pre-spawn freshness commitment, exact nine-artifact output inventory, process interval, persisted receipt, and terminal request status while theory closure and physical claim promotion remain blocked.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-theory-candidate-primary-executor.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      expectedEvidenceCount: "1",
+      freshEvidenceCount: "1",
+      executionDuration: "T",
+      sourceTreeStable: "1",
+      artifactFreshnessVerified: "1",
+      theoryClosureStatus: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "server/services/theory/runtime-jobs/nhm2-primary-runtime-dispatch.ts",
+    stage: "diagnostic",
+    notes:
+      "Production NHM2 primary launch handler with server-owned admission, executor-exclusive request creation, shared in-flight poll ownership, immutable receipt projection, terminal recovery, explicit legacy-runner exclusion, and unchanged physical claim locks.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-primary-runtime-dispatch.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      inFlightOwnership: "1",
+      requestIdentityStable: "1",
+      immutableReceiptProjected: "1",
+      terminalStatus: "1",
+      legacyExecutionAllowed: "1",
+      physicalViabilityClaimAllowed: "1",
     },
   },
   {
@@ -1901,7 +3209,8 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "QST_PROXY",
     module: "shared/quantum-spacetime-congruence.ts",
     stage: "exploratory",
-    notes: "Quantum-spacetime congruence proxy contract for entropy stretch, holographic area proxy, and vacuum-channel gating.",
+    notes:
+      "Quantum-spacetime congruence proxy contract for entropy stretch, holographic area proxy, and vacuum-channel gating.",
     motivation:
       "Keep Big Bang expansion, ER=EPR, and entropy-stretch ideas in a diagnostic proxy lane that cannot bypass metric, stress-energy, or QI gates.",
     conceptualWaypoints: [
@@ -1933,7 +3242,8 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "ER_EPR_STAGE1_SIM",
     module: "shared/er-epr-simulation.ts",
     stage: "reduced-order",
-    notes: "Stage 1 ER=EPR simulation verdict contract for controlled holographic toy models, QST entropy-stretch demotion, and StarSim structure-prior boundaries.",
+    notes:
+      "Stage 1 ER=EPR simulation verdict contract for controlled holographic toy models, QST entropy-stretch demotion, and StarSim structure-prior boundaries.",
     motivation:
       "Test whether a controlled entangled model produces ER=EPR-like geometry observables while ordinary controls fail, without promoting the result into metric, stress-energy, or real-universe wormhole evidence.",
     conceptualWaypoints: [
@@ -1975,7 +3285,8 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "ER_EPR_STAGE1_RUNNER",
     module: "shared/er-epr-stage1-runner.ts",
     stage: "reduced-order",
-    notes: "Reproducible ER=EPR Stage 1 fixture/null-control runner and batch report contract.",
+    notes:
+      "Reproducible ER=EPR Stage 1 fixture/null-control runner and batch report contract.",
     motivation:
       "Make ER=EPR Stage 1 simulated-experiment claims replayable, control-paired, citation-bound, and explicitly fixture/simulation/reproduction scoped.",
     conceptualWaypoints: [
@@ -1988,7 +3299,10 @@ export const mathStageRegistry: MathStageEntry[] = [
     checks: [
       { type: "test", path: "tests/er-epr-stage1-runner.spec.ts" },
       { type: "test", path: "tests/er-epr-stage1-report.spec.ts" },
-      { type: "fixture", path: "tests/fixtures/er-epr-stage1/plan.fixture.json" },
+      {
+        type: "fixture",
+        path: "tests/fixtures/er-epr-stage1/plan.fixture.json",
+      },
     ],
     units: {
       signalMin: "1",
@@ -2006,7 +3320,8 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "ER_EPR_STAGE1_RUNNER",
     module: "shared/er-epr-safe-language.ts",
     stage: "reduced-order",
-    notes: "Claim-safe ER=EPR Stage 1 report language renderer and forbidden-phrase validator.",
+    notes:
+      "Claim-safe ER=EPR Stage 1 report language renderer and forbidden-phrase validator.",
     checks: [{ type: "test", path: "tests/er-epr-safe-language.spec.ts" }],
     units: {
       forbiddenPhraseCount: "1",
@@ -2030,9 +3345,15 @@ export const mathStageRegistry: MathStageEntry[] = [
     checks: [
       { type: "test", path: "tests/er-epr-raw-observables.spec.ts" },
       { type: "stability", path: "tests/er-epr-raw-observables.spec.ts" },
-      { type: "fixture", path: "tests/fixtures/er-epr-solver/two-sided-syk-raw.fixture.json" },
+      {
+        type: "fixture",
+        path: "tests/fixtures/er-epr-solver/two-sided-syk-raw.fixture.json",
+      },
       { type: "doc", path: "docs/research/er-epr-stage1-solver-adapter-v1.md" },
-      { type: "policy", path: "docs/knowledge/math-claims/er-epr-solver-adapter.claims.json" },
+      {
+        type: "policy",
+        path: "docs/knowledge/math-claims/er-epr-solver-adapter.claims.json",
+      },
     ],
     units: {
       nQubitsOrModes: "1",
@@ -2074,7 +3395,10 @@ export const mathStageRegistry: MathStageEntry[] = [
     checks: [
       { type: "test", path: "tests/er-epr-solver-adapter.spec.ts" },
       { type: "stability", path: "tests/er-epr-solver-adapter.spec.ts" },
-      { type: "fixture", path: "tests/fixtures/er-epr-solver/high-entropy-washout-raw.fixture.json" },
+      {
+        type: "fixture",
+        path: "tests/fixtures/er-epr-solver/high-entropy-washout-raw.fixture.json",
+      },
       { type: "doc", path: "docs/research/er-epr-stage1-solver-adapter-v1.md" },
     ],
     units: {
@@ -2121,7 +3445,10 @@ export const mathStageRegistry: MathStageEntry[] = [
     checks: [
       { type: "test", path: "tests/starsim-fusion-microphysics.spec.ts" },
       { type: "test", path: "tests/starsim-fusion-artifact.spec.ts" },
-      { type: "doc", path: "docs/research/starsim-fusion-microphysics-stage1.md" },
+      {
+        type: "doc",
+        path: "docs/research/starsim-fusion-microphysics-stage1.md",
+      },
       {
         type: "policy",
         path: "docs/knowledge/math-claims/starsim-fusion-microphysics.claims.json",
@@ -2185,7 +3512,10 @@ export const mathStageRegistry: MathStageEntry[] = [
     checks: [
       { type: "test", path: "tests/starsim-fusion-safe-language.spec.ts" },
       { type: "test", path: "tests/starsim-fusion-claims.spec.ts" },
-      { type: "doc", path: "docs/research/starsim-fusion-microphysics-stage1.md" },
+      {
+        type: "doc",
+        path: "docs/research/starsim-fusion-microphysics-stage1.md",
+      },
     ],
     units: {
       forbiddenPhraseCount: "1",
@@ -2210,9 +3540,18 @@ export const mathStageRegistry: MathStageEntry[] = [
     ],
     checks: [
       { type: "test", path: "tests/starsim-fusion-profile-import.spec.ts" },
-      { type: "fixture", path: "tests/fixtures/starsim-fusion-profiles/solar-mesa-profile.fixture.json" },
-      { type: "doc", path: "docs/research/starsim-fusion-profile-import-stage2-prep.md" },
-      { type: "policy", path: "docs/knowledge/math-claims/starsim-fusion-profile-import.claims.json" },
+      {
+        type: "fixture",
+        path: "tests/fixtures/starsim-fusion-profiles/solar-mesa-profile.fixture.json",
+      },
+      {
+        type: "doc",
+        path: "docs/research/starsim-fusion-profile-import-stage2-prep.md",
+      },
+      {
+        type: "policy",
+        path: "docs/knowledge/math-claims/starsim-fusion-profile-import.claims.json",
+      },
     ],
     units: {
       radius_Rstar: "1",
@@ -2239,7 +3578,9 @@ export const mathStageRegistry: MathStageEntry[] = [
     stage: "reduced-order",
     notes:
       "Profile validator for shell-integrated nuclear luminosity, channel fractions, fusion-zone radii, closure warnings, and Stage 1 proxy comparison.",
-    checks: [{ type: "test", path: "tests/starsim-fusion-profile-validation.spec.ts" }],
+    checks: [
+      { type: "test", path: "tests/starsim-fusion-profile-validation.spec.ts" },
+    ],
     units: {
       integratedNucLuminosity_Lsun: "1",
       surfaceLuminosity_Lsun: "1",
@@ -2260,7 +3601,9 @@ export const mathStageRegistry: MathStageEntry[] = [
     stage: "reduced-order",
     notes:
       "Artifact contract for StarSim fusion profile validation with safe-language and hSpectralFit guardrails.",
-    checks: [{ type: "test", path: "tests/starsim-fusion-profile-artifact.spec.ts" }],
+    checks: [
+      { type: "test", path: "tests/starsim-fusion-profile-artifact.spec.ts" },
+    ],
     units: {
       claimIdCount: "1",
       citationCount: "1",
@@ -2284,10 +3627,22 @@ export const mathStageRegistry: MathStageEntry[] = [
     checks: [
       { type: "test", path: "tests/starsim-fusion-benchmark-runner.spec.ts" },
       { type: "test", path: "tests/starsim-fusion-benchmark-verdict.spec.ts" },
-      { type: "stability", path: "tests/starsim-fusion-benchmark-runner.spec.ts" },
-      { type: "fixture", path: "tests/fixtures/starsim-fusion-benchmarks/plan.fixture.json" },
-      { type: "doc", path: "docs/research/starsim-fusion-benchmark-stage2-candidate.md" },
-      { type: "policy", path: "docs/knowledge/math-claims/starsim-fusion-benchmark.claims.json" },
+      {
+        type: "stability",
+        path: "tests/starsim-fusion-benchmark-runner.spec.ts",
+      },
+      {
+        type: "fixture",
+        path: "tests/fixtures/starsim-fusion-benchmarks/plan.fixture.json",
+      },
+      {
+        type: "doc",
+        path: "docs/research/starsim-fusion-benchmark-stage2-candidate.md",
+      },
+      {
+        type: "policy",
+        path: "docs/knowledge/math-claims/starsim-fusion-benchmark.claims.json",
+      },
     ],
     units: {
       profileCount: "1",
@@ -2303,7 +3658,8 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "STARSIM_FUSION_BENCHMARK_STAGE2_CANDIDATE",
     module: "shared/starsim-fusion-uncertainty.ts",
     stage: "diagnostic",
-    notes: "Interval and fixture Monte Carlo uncertainty propagation for benchmark profile outputs.",
+    notes:
+      "Interval and fixture Monte Carlo uncertainty propagation for benchmark profile outputs.",
     checks: [
       { type: "test", path: "tests/starsim-fusion-uncertainty.spec.ts" },
       { type: "stability", path: "tests/starsim-fusion-uncertainty.spec.ts" },
@@ -2325,7 +3681,10 @@ export const mathStageRegistry: MathStageEntry[] = [
     notes: "Observable closure checks for StarSim fusion benchmark reports.",
     checks: [
       { type: "test", path: "tests/starsim-fusion-profile-closure.spec.ts" },
-      { type: "stability", path: "tests/starsim-fusion-profile-closure.spec.ts" },
+      {
+        type: "stability",
+        path: "tests/starsim-fusion-profile-closure.spec.ts",
+      },
     ],
     units: {
       effectiveTemperatureFromLR_K: "Theta",
@@ -2339,8 +3698,14 @@ export const mathStageRegistry: MathStageEntry[] = [
     stage: "diagnostic",
     notes: "Safe-language renderer for StarSim fusion benchmark reports.",
     checks: [
-      { type: "test", path: "tests/starsim-fusion-benchmark-safe-language.spec.ts" },
-      { type: "stability", path: "tests/starsim-fusion-benchmark-safe-language.spec.ts" },
+      {
+        type: "test",
+        path: "tests/starsim-fusion-benchmark-safe-language.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "tests/starsim-fusion-benchmark-safe-language.spec.ts",
+      },
     ],
     units: {
       forbiddenPhraseCount: "1",
@@ -2364,9 +3729,18 @@ export const mathStageRegistry: MathStageEntry[] = [
     checks: [
       { type: "test", path: "tests/starsim-fusion-stage2-gate.spec.ts" },
       { type: "stability", path: "tests/starsim-fusion-stage2-gate.spec.ts" },
-      { type: "fixture", path: "tests/fixtures/starsim-fusion-stage2-gate/solar-mesa-repro.fixture.json" },
-      { type: "doc", path: "docs/research/starsim-fusion-external-repro-stage2-gate.md" },
-      { type: "policy", path: "docs/knowledge/math-claims/starsim-fusion-stage2-gate.claims.json" },
+      {
+        type: "fixture",
+        path: "tests/fixtures/starsim-fusion-stage2-gate/solar-mesa-repro.fixture.json",
+      },
+      {
+        type: "doc",
+        path: "docs/research/starsim-fusion-external-repro-stage2-gate.md",
+      },
+      {
+        type: "policy",
+        path: "docs/knowledge/math-claims/starsim-fusion-stage2-gate.claims.json",
+      },
     ],
     units: {
       blockerCount: "1",
@@ -2379,10 +3753,14 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "STARSIM_FUSION_EXTERNAL_REPRO_STAGE2_GATE",
     module: "shared/starsim-fusion-neutrino-closure.ts",
     stage: "diagnostic",
-    notes: "Solar neutrino residual closure for StarSim fusion Stage 2 gate review.",
+    notes:
+      "Solar neutrino residual closure for StarSim fusion Stage 2 gate review.",
     checks: [
       { type: "test", path: "tests/starsim-fusion-neutrino-closure.spec.ts" },
-      { type: "stability", path: "tests/starsim-fusion-neutrino-closure.spec.ts" },
+      {
+        type: "stability",
+        path: "tests/starsim-fusion-neutrino-closure.spec.ts",
+      },
     ],
     units: {
       ppFlux: "L^-2 T^-1",
@@ -2397,10 +3775,17 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "STARSIM_FUSION_EXTERNAL_REPRO_STAGE2_GATE",
     module: "shared/starsim-fusion-asteroseismic-closure.ts",
     stage: "diagnostic",
-    notes: "GYRE-style asteroseismic closure summaries for Stage 2 gate review.",
+    notes:
+      "GYRE-style asteroseismic closure summaries for Stage 2 gate review.",
     checks: [
-      { type: "test", path: "tests/starsim-fusion-asteroseismic-closure.spec.ts" },
-      { type: "stability", path: "tests/starsim-fusion-asteroseismic-closure.spec.ts" },
+      {
+        type: "test",
+        path: "tests/starsim-fusion-asteroseismic-closure.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "tests/starsim-fusion-asteroseismic-closure.spec.ts",
+      },
     ],
     units: {
       largeSeparation_uHz: "T^-1",
@@ -2415,8 +3800,14 @@ export const mathStageRegistry: MathStageEntry[] = [
     stage: "diagnostic",
     notes: "Safe-language renderer for Stage 2 gate reports.",
     checks: [
-      { type: "test", path: "tests/starsim-fusion-stage2-gate-safe-language.spec.ts" },
-      { type: "stability", path: "tests/starsim-fusion-stage2-gate-safe-language.spec.ts" },
+      {
+        type: "test",
+        path: "tests/starsim-fusion-stage2-gate-safe-language.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "tests/starsim-fusion-stage2-gate-safe-language.spec.ts",
+      },
     ],
     units: {
       forbiddenPhraseCount: "1",
@@ -2440,9 +3831,18 @@ export const mathStageRegistry: MathStageEntry[] = [
     checks: [
       { type: "test", path: "tests/starsim-solar-reference-run.spec.ts" },
       { type: "stability", path: "tests/starsim-solar-reference-run.spec.ts" },
-      { type: "fixture", path: "tests/fixtures/starsim-solar-reference/solar-reference-plan.fixture.json" },
-      { type: "doc", path: "docs/research/starsim-solar-reference-repro-run-v1.md" },
-      { type: "policy", path: "docs/knowledge/math-claims/starsim-solar-reference-run.claims.json" },
+      {
+        type: "fixture",
+        path: "tests/fixtures/starsim-solar-reference/solar-reference-plan.fixture.json",
+      },
+      {
+        type: "doc",
+        path: "docs/research/starsim-solar-reference-repro-run-v1.md",
+      },
+      {
+        type: "policy",
+        path: "docs/knowledge/math-claims/starsim-solar-reference-run.claims.json",
+      },
     ],
     units: {
       runCount: "1",
@@ -2455,7 +3855,8 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "STARSIM_SOLAR_REFERENCE_REPRO_RUN_V1",
     module: "server/modules/starsim/external/mesa-solar-runner.ts",
     stage: "diagnostic",
-    notes: "MESA solar runtime adapter with explicit fixture-only and unavailable external solver behavior.",
+    notes:
+      "MESA solar runtime adapter with explicit fixture-only and unavailable external solver behavior.",
     checks: [
       { type: "test", path: "tests/mesa-solar-runner.spec.ts" },
       { type: "stability", path: "tests/mesa-solar-runner.spec.ts" },
@@ -2487,8 +3888,14 @@ export const mathStageRegistry: MathStageEntry[] = [
     stage: "diagnostic",
     notes: "Safe-language renderer for solar reference reproduction reports.",
     checks: [
-      { type: "test", path: "tests/starsim-solar-reference-safe-language.spec.ts" },
-      { type: "stability", path: "tests/starsim-solar-reference-safe-language.spec.ts" },
+      {
+        type: "test",
+        path: "tests/starsim-solar-reference-safe-language.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "tests/starsim-solar-reference-safe-language.spec.ts",
+      },
     ],
     units: {
       forbiddenPhraseCount: "1",
@@ -2512,9 +3919,18 @@ export const mathStageRegistry: MathStageEntry[] = [
     checks: [
       { type: "test", path: "tests/mesa-runtime-adapter.spec.ts" },
       { type: "stability", path: "tests/mesa-runtime-adapter.spec.ts" },
-      { type: "fixture", path: "ops/mesa/solar-reference/mesa-runtime-policy.import-fixture.json" },
-      { type: "doc", path: "docs/research/starsim-solar-mesa-docker-repro-v1.md" },
-      { type: "policy", path: "docs/knowledge/math-claims/starsim-solar-mesa-repro.claims.json" },
+      {
+        type: "fixture",
+        path: "ops/mesa/solar-reference/mesa-runtime-policy.import-fixture.json",
+      },
+      {
+        type: "doc",
+        path: "docs/research/starsim-solar-mesa-docker-repro-v1.md",
+      },
+      {
+        type: "policy",
+        path: "docs/knowledge/math-claims/starsim-solar-mesa-repro.claims.json",
+      },
     ],
     units: {
       inlistHash: "1",
@@ -2527,7 +3943,8 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "STARSIM_SOLAR_MESA_DOCKER_REPRO_V1",
     module: "server/modules/starsim/external/mesa-output-parser.ts",
     stage: "diagnostic",
-    notes: "MESA-like profile/history parser for StarSim solar fusion profile imports.",
+    notes:
+      "MESA-like profile/history parser for StarSim solar fusion profile imports.",
     checks: [
       { type: "test", path: "tests/mesa-output-parser.spec.ts" },
       { type: "stability", path: "tests/mesa-output-parser.spec.ts" },
@@ -2544,10 +3961,14 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "STARSIM_SOLAR_MESA_DOCKER_REPRO_V1",
     module: "shared/starsim-solar-mesa-repro-artifact.ts",
     stage: "diagnostic",
-    notes: "Artifact contract for MESA solar reproduction/import reports with QST boundaries.",
+    notes:
+      "Artifact contract for MESA solar reproduction/import reports with QST boundaries.",
     checks: [
       { type: "test", path: "tests/starsim-solar-mesa-repro-artifact.spec.ts" },
-      { type: "stability", path: "tests/starsim-solar-mesa-repro-artifact.spec.ts" },
+      {
+        type: "stability",
+        path: "tests/starsim-solar-mesa-repro-artifact.spec.ts",
+      },
     ],
     units: {
       claimIdCount: "1",
@@ -2561,8 +3982,14 @@ export const mathStageRegistry: MathStageEntry[] = [
     stage: "diagnostic",
     notes: "Safe-language renderer for MESA solar reproduction/import reports.",
     checks: [
-      { type: "test", path: "tests/starsim-solar-mesa-repro-safe-language.spec.ts" },
-      { type: "stability", path: "tests/starsim-solar-mesa-repro-safe-language.spec.ts" },
+      {
+        type: "test",
+        path: "tests/starsim-solar-mesa-repro-safe-language.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "tests/starsim-solar-mesa-repro-safe-language.spec.ts",
+      },
     ],
     units: {
       forbiddenPhraseCount: "1",
@@ -2584,10 +4011,22 @@ export const mathStageRegistry: MathStageEntry[] = [
       "Preserve proxy-only QST boundaries.",
     ],
     checks: [
-      { type: "test", path: "tests/starsim-accordion-cosmology-context.spec.ts" },
-      { type: "stability", path: "tests/starsim-accordion-cosmology-context.spec.ts" },
-      { type: "doc", path: "docs/research/starsim-accordion-galactic-dynamics-null-model-v1.md" },
-      { type: "policy", path: "docs/knowledge/math-claims/starsim-accordion-galactic-dynamics.claims.json" },
+      {
+        type: "test",
+        path: "tests/starsim-accordion-cosmology-context.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "tests/starsim-accordion-cosmology-context.spec.ts",
+      },
+      {
+        type: "doc",
+        path: "docs/research/starsim-accordion-galactic-dynamics-null-model-v1.md",
+      },
+      {
+        type: "policy",
+        path: "docs/knowledge/math-claims/starsim-accordion-galactic-dynamics.claims.json",
+      },
     ],
     units: {
       redshift: "1",
@@ -2605,10 +4044,22 @@ export const mathStageRegistry: MathStageEntry[] = [
     notes:
       "Galactic rotation null controls for baryonic, dark-matter, MOND, and SPARC-like reference comparisons.",
     checks: [
-      { type: "test", path: "tests/starsim-galactic-rotation-controls.spec.ts" },
-      { type: "stability", path: "tests/starsim-galactic-rotation-controls.spec.ts" },
-      { type: "fixture", path: "tests/fixtures/starsim-accordion/sparc-rotation-curve.fixture.json" },
-      { type: "policy", path: "docs/knowledge/math-claims/starsim-accordion-galactic-dynamics.claims.json" },
+      {
+        type: "test",
+        path: "tests/starsim-galactic-rotation-controls.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "tests/starsim-galactic-rotation-controls.spec.ts",
+      },
+      {
+        type: "fixture",
+        path: "tests/fixtures/starsim-accordion/sparc-rotation-curve.fixture.json",
+      },
+      {
+        type: "policy",
+        path: "docs/knowledge/math-claims/starsim-accordion-galactic-dynamics.claims.json",
+      },
     ],
     units: {
       radius_kpc: "L",
@@ -2626,10 +4077,22 @@ export const mathStageRegistry: MathStageEntry[] = [
     notes:
       "Composes Accordion context, StarSim star nodes, fusion priors, rotation controls, and proxy-only QST annotations into a null-model report.",
     checks: [
-      { type: "test", path: "tests/starsim-accordion-galactic-null-model.spec.ts" },
-      { type: "stability", path: "tests/starsim-accordion-galactic-null-model.spec.ts" },
-      { type: "fixture", path: "tests/fixtures/starsim-accordion/accordion-local-volume.fixture.json" },
-      { type: "doc", path: "docs/research/starsim-accordion-galactic-dynamics-null-model-v1.md" },
+      {
+        type: "test",
+        path: "tests/starsim-accordion-galactic-null-model.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "tests/starsim-accordion-galactic-null-model.spec.ts",
+      },
+      {
+        type: "fixture",
+        path: "tests/fixtures/starsim-accordion/accordion-local-volume.fixture.json",
+      },
+      {
+        type: "doc",
+        path: "docs/research/starsim-accordion-galactic-dynamics-null-model-v1.md",
+      },
     ],
     units: {
       nodeCount: "1",
@@ -2647,9 +4110,18 @@ export const mathStageRegistry: MathStageEntry[] = [
     notes:
       "Safe-language renderer blocking direct ER=EPR, wormhole, propulsion, stress-energy, hydrostatic-rotation, and CL4 overclaims.",
     checks: [
-      { type: "test", path: "tests/starsim-galactic-dynamics-safe-language.spec.ts" },
-      { type: "test", path: "tests/starsim-galactic-dynamics-artifact.spec.ts" },
-      { type: "stability", path: "tests/starsim-galactic-dynamics-safe-language.spec.ts" },
+      {
+        type: "test",
+        path: "tests/starsim-galactic-dynamics-safe-language.spec.ts",
+      },
+      {
+        type: "test",
+        path: "tests/starsim-galactic-dynamics-artifact.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "tests/starsim-galactic-dynamics-safe-language.spec.ts",
+      },
     ],
     units: {
       forbiddenPhraseCount: "1",
@@ -2662,12 +4134,16 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "ER_EPR_TINY_SYK_EXACT_DIAG_V1",
     module: "shared/er-epr-majorana-operators.ts",
     stage: "diagnostic",
-    notes: "Tiny Clifford/Majorana operator construction for the Stage 1 SYK-like toy solver.",
+    notes:
+      "Tiny Clifford/Majorana operator construction for the Stage 1 SYK-like toy solver.",
     checks: [
       { type: "test", path: "tests/er-epr-majorana-operators.spec.ts" },
       { type: "stability", path: "tests/er-epr-majorana-operators.spec.ts" },
       { type: "doc", path: "docs/research/er-epr-tiny-syk-exact-diag-v1.md" },
-      { type: "policy", path: "docs/knowledge/math-claims/er-epr-tiny-syk.claims.json" },
+      {
+        type: "policy",
+        path: "docs/knowledge/math-claims/er-epr-tiny-syk.claims.json",
+      },
     ],
     units: {
       nMajoranas: "1",
@@ -2680,11 +4156,15 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "ER_EPR_TINY_SYK_EXACT_DIAG_V1",
     module: "shared/er-epr-tiny-syk-hamiltonian.ts",
     stage: "diagnostic",
-    notes: "Seeded q=4 tiny SYK-like Hamiltonian and double-trace-like two-sided coupling builder.",
+    notes:
+      "Seeded q=4 tiny SYK-like Hamiltonian and double-trace-like two-sided coupling builder.",
     checks: [
       { type: "test", path: "tests/er-epr-tiny-syk-hamiltonian.spec.ts" },
       { type: "stability", path: "tests/er-epr-tiny-syk-hamiltonian.spec.ts" },
-      { type: "fixture", path: "tests/fixtures/er-epr-tiny-syk/tiny-syk-plan.fixture.json" },
+      {
+        type: "fixture",
+        path: "tests/fixtures/er-epr-tiny-syk/tiny-syk-plan.fixture.json",
+      },
     ],
     units: {
       seed: "1",
@@ -2697,7 +4177,8 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "ER_EPR_TINY_SYK_EXACT_DIAG_V1",
     module: "shared/er-epr-tiny-syk.ts",
     stage: "diagnostic",
-    notes: "Tiny two-sided SYK-like solver backend that emits raw telemetry through the existing solver adapter.",
+    notes:
+      "Tiny two-sided SYK-like solver backend that emits raw telemetry through the existing solver adapter.",
     motivation:
       "Move ER_EPR_STAGE1 from fixture-only raw scores toward repo-local toy-solver telemetry while preserving model-internal and proxy-only boundaries.",
     conceptualWaypoints: [
@@ -2710,7 +4191,10 @@ export const mathStageRegistry: MathStageEntry[] = [
       { type: "test", path: "tests/er-epr-tiny-syk-evolution.spec.ts" },
       { type: "stability", path: "tests/er-epr-tiny-syk-telemetry.spec.ts" },
       { type: "doc", path: "docs/research/er-epr-tiny-syk-exact-diag-v1.md" },
-      { type: "policy", path: "docs/knowledge/math-claims/er-epr-tiny-syk.claims.json" },
+      {
+        type: "policy",
+        path: "docs/knowledge/math-claims/er-epr-tiny-syk.claims.json",
+      },
     ],
     units: {
       teleportationFidelityRaw: "1",
@@ -2724,11 +4208,15 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "ER_EPR_TINY_SYK_EXACT_DIAG_V1",
     module: "shared/er-epr-tiny-syk-safe-language.ts",
     stage: "diagnostic",
-    notes: "Safe-language renderer for tiny SYK reports, blocking real-universe, NHM2, stress-energy, and CL4 overclaims.",
+    notes:
+      "Safe-language renderer for tiny SYK reports, blocking real-universe, NHM2, stress-energy, and CL4 overclaims.",
     checks: [
       { type: "test", path: "tests/er-epr-tiny-syk-safe-language.spec.ts" },
       { type: "test", path: "tests/er-epr-tiny-syk-artifact.spec.ts" },
-      { type: "stability", path: "tests/er-epr-tiny-syk-safe-language.spec.ts" },
+      {
+        type: "stability",
+        path: "tests/er-epr-tiny-syk-safe-language.spec.ts",
+      },
     ],
     units: {
       forbiddenPhraseCount: "1",
@@ -2741,7 +4229,8 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "ER_EPR_TINY_SYK_VALIDATION_SWEEP_V1",
     module: "shared/er-epr-tiny-syk-validation-sweep.ts",
     stage: "diagnostic",
-    notes: "Validation sweep aggregating seeded tiny SYK-like runs, required controls, numerical honesty, and entropy washout.",
+    notes:
+      "Validation sweep aggregating seeded tiny SYK-like runs, required controls, numerical honesty, and entropy washout.",
     motivation:
       "Require repeatability across a declared ensemble before any model-internal ER=EPR-like support language is allowed.",
     conceptualWaypoints: [
@@ -2751,10 +4240,22 @@ export const mathStageRegistry: MathStageEntry[] = [
     ],
     checks: [
       { type: "test", path: "tests/er-epr-tiny-syk-validation-sweep.spec.ts" },
-      { type: "stability", path: "tests/er-epr-tiny-syk-validation-sweep.spec.ts" },
-      { type: "fixture", path: "tests/fixtures/er-epr-tiny-syk-validation/sweep-plan.fixture.json" },
-      { type: "doc", path: "docs/research/er-epr-tiny-syk-validation-sweep-v1.md" },
-      { type: "policy", path: "docs/knowledge/math-claims/er-epr-tiny-syk-validation.claims.json" },
+      {
+        type: "stability",
+        path: "tests/er-epr-tiny-syk-validation-sweep.spec.ts",
+      },
+      {
+        type: "fixture",
+        path: "tests/fixtures/er-epr-tiny-syk-validation/sweep-plan.fixture.json",
+      },
+      {
+        type: "doc",
+        path: "docs/research/er-epr-tiny-syk-validation-sweep-v1.md",
+      },
+      {
+        type: "policy",
+        path: "docs/knowledge/math-claims/er-epr-tiny-syk-validation.claims.json",
+      },
     ],
     units: {
       totalCandidateRuns: "1",
@@ -2782,10 +4283,14 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "ER_EPR_TINY_SYK_VALIDATION_SWEEP_V1",
     module: "shared/er-epr-tiny-syk-control-aggregate.ts",
     stage: "diagnostic",
-    notes: "Required-control aggregation for wrong-sign, no-coupling, disentangled, shuffled, random-matrix, and spin-chain controls.",
+    notes:
+      "Required-control aggregation for wrong-sign, no-coupling, disentangled, shuffled, random-matrix, and spin-chain controls.",
     checks: [
       { type: "test", path: "tests/er-epr-tiny-syk-control-aggregate.spec.ts" },
-      { type: "stability", path: "tests/er-epr-tiny-syk-control-aggregate.spec.ts" },
+      {
+        type: "stability",
+        path: "tests/er-epr-tiny-syk-control-aggregate.spec.ts",
+      },
     ],
     units: {
       controlLeakageMax: "1",
@@ -2797,11 +4302,21 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "ER_EPR_TINY_SYK_VALIDATION_SWEEP_V1",
     module: "shared/er-epr-tiny-syk-validation-safe-language.ts",
     stage: "diagnostic",
-    notes: "Safe-language renderer for tiny SYK validation reports, blocking real-universe, NHM2, stress-energy, exact-label, and CL4 overclaims.",
+    notes:
+      "Safe-language renderer for tiny SYK validation reports, blocking real-universe, NHM2, stress-energy, exact-label, and CL4 overclaims.",
     checks: [
-      { type: "test", path: "tests/er-epr-tiny-syk-validation-safe-language.spec.ts" },
-      { type: "test", path: "tests/er-epr-tiny-syk-validation-artifact.spec.ts" },
-      { type: "stability", path: "tests/er-epr-tiny-syk-validation-safe-language.spec.ts" },
+      {
+        type: "test",
+        path: "tests/er-epr-tiny-syk-validation-safe-language.spec.ts",
+      },
+      {
+        type: "test",
+        path: "tests/er-epr-tiny-syk-validation-artifact.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "tests/er-epr-tiny-syk-validation-safe-language.spec.ts",
+      },
     ],
     units: {
       forbiddenPhraseCount: "1",
@@ -2814,7 +4329,8 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "DP_COLLAPSE",
     module: "shared/dp-collapse.ts",
     stage: "exploratory",
-    notes: "Diosi-Penrose collapse estimator (DeltaE from mass-density difference).",
+    notes:
+      "Diosi-Penrose collapse estimator (DeltaE from mass-density difference).",
     checks: [{ type: "test", path: "tests/dp-collapse.spec.ts" }],
     units: {
       ell_m: "L",
@@ -2843,7 +4359,9 @@ export const mathStageRegistry: MathStageEntry[] = [
     module: "server/services/dp-adapter-build.ts",
     stage: "exploratory",
     notes: "Build DP adapter inputs from stress-energy and GR evolve bricks.",
-    checks: [{ type: "test", path: "tests/collapse-benchmark.phase2.routes.spec.ts" }],
+    checks: [
+      { type: "test", path: "tests/collapse-benchmark.phase2.routes.spec.ts" },
+    ],
     units: {
       ell_m: "L",
       rho_kg_m3: "M L^-3",
@@ -2940,7 +4458,8 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "HALOBANK_SOLAR",
     module: "server/modules/halobank-solar/time-core.ts",
     stage: "reduced-order",
-    notes: "Deterministic UTC/TAI/TT/TCG/TDB/TCB conversion core for HaloBank solar proofs.",
+    notes:
+      "Deterministic UTC/TAI/TT/TCG/TDB/TCB conversion core for HaloBank solar proofs.",
     checks: [{ type: "test", path: "tests/halobank-solar-routes.spec.ts" }],
     units: {
       tai_minus_utc_s: "T",
@@ -2954,7 +4473,8 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "HALOBANK_SOLAR",
     module: "server/modules/halobank-solar/ephemeris-core.ts",
     stage: "diagnostic",
-    notes: "Deterministic vector state core with BCRS/GCRS framing, observer handling, and compatibility exports.",
+    notes:
+      "Deterministic vector state core with BCRS/GCRS framing, observer handling, and compatibility exports.",
     checks: [
       { type: "test", path: "tests/halobank-solar-routes.spec.ts" },
       { type: "snapshot", path: "tests/halobank-solar-routes.spec.ts" },
@@ -2971,7 +4491,8 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "HALOBANK_SOLAR",
     module: "server/modules/halobank-solar/derived.ts",
     stage: "diagnostic",
-    notes: "Derived proof modules for Mercury precession, eclipse timing, and resonance-libration gates.",
+    notes:
+      "Derived proof modules for Mercury precession, eclipse timing, and resonance-libration gates.",
     checks: [
       { type: "test", path: "tests/halobank-solar-derived.spec.ts" },
       { type: "snapshot", path: "tests/halobank-solar-derived.spec.ts" },
@@ -2987,7 +4508,8 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "HALOBANK_SOLAR",
     module: "server/routes/halobank-solar.ts",
     stage: "diagnostic",
-    notes: "API contracts for vectors and derived proof modules with deterministic provenance/fail-id gate semantics.",
+    notes:
+      "API contracts for vectors and derived proof modules with deterministic provenance/fail-id gate semantics.",
     checks: [
       { type: "test", path: "tests/halobank-solar-routes.spec.ts" },
       { type: "test", path: "tests/halobank-solar-derived.spec.ts" },
@@ -3002,7 +4524,8 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "CURVATURE_LEVERAGE",
     module: "shared/curvature-leverage.ts",
     stage: "diagnostic",
-    notes: "Scale-normalized curvature leverage contract with non-promoting NHM2 full-solve records.",
+    notes:
+      "Scale-normalized curvature leverage contract with non-promoting NHM2 full-solve records.",
     motivation:
       "Curvature leverage is a dimensionless diagnostic bridge; it must stay separate from source validation and promotion.",
     conceptualWaypoints: [
@@ -3029,7 +4552,8 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "CURVATURE_LEVERAGE",
     module: "scripts/curvature-leverage-full-solve-report.ts",
     stage: "diagnostic",
-    notes: "NHM2 full-solve curvature leverage report generator from metric-required regional tensor artifacts.",
+    notes:
+      "NHM2 full-solve curvature leverage report generator from metric-required regional tensor artifacts.",
     motivation:
       "The report makes the tensor-first leverage route auditable from equation IDs and claim IDs to full-solve artifacts.",
     conceptualWaypoints: [
@@ -3039,9 +4563,15 @@ export const mathStageRegistry: MathStageEntry[] = [
       "emit explicit observer, QEI, conservation, and promotion gates",
     ],
     checks: [
-      { type: "test", path: "tests/curvature-leverage-full-solve-report.spec.ts" },
+      {
+        type: "test",
+        path: "tests/curvature-leverage-full-solve-report.spec.ts",
+      },
       { type: "test", path: "tests/curvature-leverage-claims.spec.ts" },
-      { type: "snapshot", path: "tests/curvature-leverage-full-solve-report.spec.ts" },
+      {
+        type: "snapshot",
+        path: "tests/curvature-leverage-full-solve-report.spec.ts",
+      },
     ],
     units: {
       tensorNormInput: "varies",
@@ -3055,7 +4585,8 @@ export const mathStageRegistry: MathStageEntry[] = [
     tag: "CURVATURE_LEVERAGE",
     module: "scripts/curvature-leverage-benchmark-ladder.ts",
     stage: "diagnostic",
-    notes: "Cross-scale curvature leverage benchmark ladder for compactness, quantum floors, raw Casimir energy, external observables, and NHM2 regional comparisons.",
+    notes:
+      "Cross-scale curvature leverage benchmark ladder for compactness, quantum floors, raw Casimir energy, external observables, and NHM2 regional comparisons.",
     motivation:
       "The ladder gives curvature leverage a known diagnostic scale without converting external observables into NHM2 validation.",
     conceptualWaypoints: [
@@ -3067,9 +4598,15 @@ export const mathStageRegistry: MathStageEntry[] = [
       "promotionAllowed remains false for benchmark and NHM2 comparison records",
     ],
     checks: [
-      { type: "test", path: "tests/curvature-leverage-benchmark-ladder.spec.ts" },
+      {
+        type: "test",
+        path: "tests/curvature-leverage-benchmark-ladder.spec.ts",
+      },
       { type: "test", path: "tests/curvature-leverage-claims.spec.ts" },
-      { type: "snapshot", path: "tests/curvature-leverage-benchmark-ladder.spec.ts" },
+      {
+        type: "snapshot",
+        path: "tests/curvature-leverage-benchmark-ladder.spec.ts",
+      },
     ],
     units: {
       leverage: "1",

@@ -122,6 +122,46 @@ describe("theory runtime run request manifests", () => {
     expect(first.manifestPath).not.toBe(second.manifestPath);
   });
 
+  it("never replaces an existing deterministic request identity", async () => {
+    const input = {
+      runtimeId: "solar.manifest",
+      graphId: "test.graph",
+      badgeIds: [] as string[],
+      requestedScope: "quick" as const,
+      requestId: "request:single-use",
+      projectRoot: tempRoot,
+      generatedAt: "2026-05-29T00:00:00.000Z",
+    };
+    const first = await createTheoryRuntimeRunRequestManifest(input);
+    await updateTheoryRuntimeRunRequestStatus({
+      requestId: input.requestId,
+      projectRoot: tempRoot,
+      status: "failed",
+      updatedAt: "2026-05-29T00:01:00.000Z",
+      heartbeat: {
+        stage: "failed",
+        message: "Original attempt failed.",
+        progress: 1,
+      },
+    });
+    const original = await fs.readFile(first.manifestPath);
+
+    await expect(
+      createTheoryRuntimeRunRequestManifest({
+        ...input,
+        generatedAt: "2026-05-29T00:02:00.000Z",
+      }),
+    ).rejects.toThrow(/already exists.*immutable/i);
+
+    expect(await fs.readFile(first.manifestPath)).toEqual(original);
+    expect(
+      (await readTheoryRuntimeRunRequestStatus({
+        requestId: input.requestId,
+        projectRoot: tempRoot,
+      }))?.status,
+    ).toBe("failed");
+  });
+
   it("keeps long warp/NHM2 requests manifest-only by default", async () => {
     const result = await createTheoryRuntimeRunRequestManifest({
       runtimeId: "warp.full_solve.campaign",

@@ -61,4 +61,46 @@ describe("Helix Ask minimal runtime workstation context", () => {
       focus_panel_id: "docs-viewer",
     });
   });
+
+  it("uses a validated Realtime dispatch runtime for one prompt without trusting route metadata", () => {
+    const routeMetadata = {
+      source: "realtime_stage_play",
+      invocationKind: "stage_play_realtime_transcript_handoff",
+      selectedRuntimeAgentProvider: "codex",
+    };
+    const admittedPlan = buildHelixAskMinimalRuntimeSubmitPlan({
+      draft: "Check the visible workstation panel.",
+      selectedRuntime: "helix",
+      desktopUrl: "http://localhost:1522/desktop",
+      pendingPrompt: {
+        promptId: "realtime:admitted",
+        question: "Check the visible workstation panel.",
+        autoSubmit: true,
+        serverAdmittedRuntimeAgentProvider: "codex",
+        routeMetadata,
+        createdAt: 100,
+      },
+    });
+    expect(admittedPlan.envelope).toMatchObject({
+      agentRuntime: "codex",
+      agent_runtime: "codex",
+    });
+
+    const metadataOnlyPlan = buildHelixAskMinimalRuntimeSubmitPlan({
+      draft: "Check the visible workstation panel.",
+      selectedRuntime: "helix",
+      desktopUrl: "http://localhost:1522/desktop",
+      pendingPrompt: {
+        promptId: "realtime:metadata-only",
+        question: "Check the visible workstation panel.",
+        autoSubmit: true,
+        routeMetadata,
+        createdAt: 100,
+      },
+    });
+    expect(metadataOnlyPlan.envelope).toMatchObject({
+      agentRuntime: "helix",
+      agent_runtime: "helix",
+    });
+  });
 });

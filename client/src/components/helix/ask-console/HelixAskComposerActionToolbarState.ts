@@ -2,7 +2,8 @@ import type { HelixAskComposerActionToolbarSurfaceProps } from "./HelixAskCompos
 import type { HelixAccountCapabilityPolicy } from "@shared/helix-account-session";
 import { buildHelixAskLiveRuntimeControlsModel } from "./HelixAskLiveRuntimeControls";
 
-export type HelixAskComposerActionToolbarState = HelixAskComposerActionToolbarSurfaceProps;
+export type HelixAskComposerActionToolbarState =
+  HelixAskComposerActionToolbarSurfaceProps;
 
 export type HelixAskComposerActionToolbarStateOptions =
   HelixAskComposerActionToolbarSurfaceProps & {
@@ -10,12 +11,8 @@ export type HelixAskComposerActionToolbarStateOptions =
   };
 
 export function buildHelixAskComposerActionToolbarState({
-  carouselRef,
   imageInputRef,
-  canScrollLeft,
-  canScrollRight,
-  onScrollLeft,
-  onScrollRight,
+  onCarouselScrollIntent,
   onImageSelect,
   onAttachImage,
   attachDisabled,
@@ -48,12 +45,8 @@ export function buildHelixAskComposerActionToolbarState({
   onStop,
 }: HelixAskComposerActionToolbarStateOptions): HelixAskComposerActionToolbarState {
   return {
-    carouselRef,
     imageInputRef,
-    canScrollLeft,
-    canScrollRight,
-    onScrollLeft,
-    onScrollRight,
+    onCarouselScrollIntent,
     onImageSelect,
     onAttachImage,
     attachDisabled,
@@ -79,13 +72,15 @@ export function buildHelixAskComposerActionToolbarState({
     runtimeMenuOpen,
     onRuntimePrimaryClick,
     onRuntimeSelect,
-    liveRuntimeControlsModel:
-      liveRuntimeControlsModel ??
-      buildHelixAskLiveRuntimeControlsModel({
-        accountPolicy,
-        mode: "live_voice",
-        authority: "observe_only",
-      }),
+    liveRuntimeControlsModel: {
+      ...(liveRuntimeControlsModel ??
+        buildHelixAskLiveRuntimeControlsModel({
+          accountPolicy,
+          mode: "live_voice",
+          authority: "observe_only",
+        })),
+      selectedRuntimeAgentProvider: runtimePickerModel.selectedRuntime,
+    },
     submitViewModel,
     onSubmitIntent,
     onStop,

@@ -1,5 +1,9 @@
 import { navigate } from "wouter/use-browser-location";
 import type { ResearchPaperToProposalStepId } from "@shared/contracts/helix-workflow-demo.v1";
+import {
+  isHelixAgentRuntimeId,
+  type HelixAgentRuntimeId,
+} from "@shared/helix-agent-runtime";
 
 export const HELIX_PENDING_ASK_KEY = "helix:pending-ask";
 export const HELIX_ASK_PROMPT_EVENT = "helix-ask:prompt";
@@ -82,6 +86,8 @@ export type HelixAskGenericRouteMetadata = {
   compact_context?: Record<string, unknown>;
   context_resume_frame?: Record<string, unknown> | null;
   contextResumeFrame?: Record<string, unknown> | null;
+  selectedRuntimeAgentProvider?: string | null;
+  selected_runtime_agent_provider?: string | null;
 };
 
 export type HelixAskRouteMetadata =
@@ -99,6 +105,7 @@ export type PendingHelixAskPrompt = {
   requiresBackendAskEntrypoint?: boolean;
   requires_backend_ask_entrypoint?: boolean;
   suppressWorkstationPayloadActions?: boolean;
+  serverAdmittedRuntimeAgentProvider?: HelixAgentRuntimeId;
   answerContract?: HelixAskAnswerContract;
   routeMetadata?: HelixAskRouteMetadata;
   route_metadata?: HelixAskRouteMetadata;
@@ -211,6 +218,11 @@ export function consumePendingHelixAskPrompt(): PendingHelixAskPrompt | null {
           : undefined,
       suppressWorkstationPayloadActions:
         parsed.suppressWorkstationPayloadActions === true ? true : undefined,
+      serverAdmittedRuntimeAgentProvider: isHelixAgentRuntimeId(
+        parsed.serverAdmittedRuntimeAgentProvider,
+      )
+        ? parsed.serverAdmittedRuntimeAgentProvider
+        : undefined,
       answerContract:
         parsed.answerContract &&
         typeof parsed.answerContract === "object" &&
@@ -246,6 +258,7 @@ export function launchHelixAskPrompt(args: {
   bypassWorkstationDispatch?: boolean;
   forceReasoningDispatch?: boolean;
   suppressWorkstationPayloadActions?: boolean;
+  serverAdmittedRuntimeAgentProvider?: HelixAgentRuntimeId;
   requiresBackendAskEntrypoint?: boolean;
   requires_backend_ask_entrypoint?: boolean;
   answerContract?: HelixAskAnswerContract;
@@ -273,6 +286,7 @@ export function launchHelixAskPrompt(args: {
     requiresBackendAskEntrypoint,
     requires_backend_ask_entrypoint: requiresBackendAskEntrypoint,
     suppressWorkstationPayloadActions: args.suppressWorkstationPayloadActions === true,
+    serverAdmittedRuntimeAgentProvider: args.serverAdmittedRuntimeAgentProvider,
     answerContract: args.answerContract,
     routeMetadata,
     route_metadata: routeMetadata,

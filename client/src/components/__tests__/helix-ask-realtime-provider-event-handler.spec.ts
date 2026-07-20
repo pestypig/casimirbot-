@@ -1,26 +1,72 @@
 import { describe, expect, it, vi } from "vitest";
 import { createHelixAskRealtimeProviderEventHandler } from "@/components/helix/ask-console/HelixAskRealtimeProviderEventHandler";
 
-const buildServerHandoff = (observationRef: string, suffix = "test") => {
+type ServerHandoffOptions = {
+  outcome?: "conversation_local" | "worker_grounded" | "durable_goal_bound" | "action_candidate";
+  dispatchKind?: "none" | "ask_runtime" | "goal_wake" | "ask_runtime_read_only";
+  goalId?: string | null;
+  runtimeProvider?: string | null;
+};
+
+const buildServerHandoff = (
+  observationRef: string,
+  suffix = "test",
+  options: ServerHandoffOptions = {},
+) => {
   const handoffId = `realtime-stage-play-handoff:${suffix}`;
+  const outcome = options.outcome ?? "worker_grounded";
+  const dispatchKind = options.dispatchKind ?? "ask_runtime";
+  const goalId = options.goalId ?? (dispatchKind === "goal_wake" ? `goal:${suffix}` : null);
+  const runtimeProvider = options.runtimeProvider ?? (dispatchKind === "none" ? null : "codex");
+  const dispatchRequested = dispatchKind !== "none";
+  const candidateReadonlyCapabilityIds =
+    outcome === "worker_grounded" || outcome === "action_candidate"
+      ? ["workstation.active_context"]
+      : [];
   const workerAdmission = {
-    schema: "helix.realtime_worker_admission.v1",
+    schema: "helix.realtime_worker_admission.v2",
     admission_id: `realtime-worker-admission:${suffix}`,
     handoff_id: handoffId,
     realtime_session_id: "realtime:test",
     thread_id: "helix-ask:desktop",
     decision_phase: "transcript_handoff",
-    outcome: "conversation_local",
+    outcome,
     reason_codes: ["intent_general_reasoning"],
     selected_primary_intent: "general_reasoning",
     selected_route: null,
-    selected_runtime_agent_provider: null,
+    selected_runtime_agent_provider: runtimeProvider,
     selected_model: null,
-    candidate_readonly_capability_ids: [],
+    candidate_readonly_capability_ids: candidateReadonlyCapabilityIds,
     observed_readonly_capability_ids: [],
-    action_candidate_capability_ids: [],
-    worker_turn_dispatched: true,
-    spoken_relay_eligible: false,
+    action_candidate_capability_ids:
+      outcome === "action_candidate" ? ["workstation.open_panel"] : [],
+    dispatch: {
+      schema: "helix.realtime_worker_dispatch.v2",
+      kind: dispatchKind,
+      state: dispatchRequested ? "requested" : "not_required",
+      requested: dispatchRequested,
+      completed: false,
+      target_runtime_agent_provider: runtimeProvider,
+      runtime_selection_source:
+        dispatchKind === "goal_wake"
+          ? "goal_binding"
+          : dispatchRequested
+            ? "ask_ui_selected_runtime"
+            : "none",
+      goal_id: goalId,
+      runtime_goal_session_ref: goalId ? `runtime-goal-session:${suffix}` : null,
+      suppress_parallel_ask_turn:
+        outcome === "conversation_local" || outcome === "durable_goal_bound",
+      read_only: true,
+      workstation_action_execution_allowed: false,
+      realtime_provider_tool_execution_allowed: false,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    },
+    worker_turn_dispatched: false,
+    spoken_relay_eligible: outcome === "worker_grounded" || outcome === "durable_goal_bound",
     workstation_action_execution_allowed: false,
     realtime_provider_tool_execution_allowed: false,
     evidence_refs: [observationRef],
@@ -42,10 +88,10 @@ const buildServerHandoff = (observationRef: string, suffix = "test") => {
   context_hash: `sha256:${suffix}`,
   transcript_text_hash: `sha256:transcript-${suffix}`,
   transcript_text_char_count: 37,
-  goal_id: null,
-  runtime_goal_session_ref: null,
-  runtime_agent_provider: null,
-  required_grounding_capability_ids: [],
+  goal_id: goalId,
+  runtime_goal_session_ref: goalId ? `runtime-goal-session:${suffix}` : null,
+  runtime_agent_provider: runtimeProvider,
+  required_grounding_capability_ids: candidateReadonlyCapabilityIds,
   worker_admission: workerAdmission,
   created_at_ms: 100,
   route_metadata: {
@@ -61,7 +107,8 @@ const buildServerHandoff = (observationRef: string, suffix = "test") => {
     ],
     evidenceRefs: [observationRef, `stage-play-event:${suffix}`],
     source_target_intent: {
-      must_enter_backend_ask: true,
+      must_enter_backend_ask:
+        dispatchKind === "ask_runtime" || dispatchKind === "ask_runtime_read_only",
       allow_client_shortcut: false,
       admitted_readonly_handoff: true,
       assistant_answer: false,
@@ -103,6 +150,7 @@ describe("Helix Ask Realtime provider event handler", () => {
         vadState: "speech_stopped",
         interruptionCount: 1,
         audioFocusOwner: "helix_realtime",
+        selectedRuntimeAgentProvider: "codex",
         sourceBinding: {
           thread_id: "helix-ask:desktop",
           source_id: "helix-ask:desktop",
@@ -124,6 +172,7 @@ describe("Helix Ask Realtime provider event handler", () => {
         event_type: "transcript.final",
         transcript_text: "Check the current workstation status.",
         runtime_agent_authority: "observe_only",
+        selected_runtime_agent_provider: "codex",
         realtime_transport_receipt_ref: "receipt:transport:test",
         realtime_vad_state: "speech_stopped",
         realtime_interruption_count: 1,
@@ -141,6 +190,7 @@ describe("Helix Ask Realtime provider event handler", () => {
       forceReasoningDispatch: true,
       requiresBackendAskEntrypoint: true,
       suppressWorkstationPayloadActions: true,
+      serverAdmittedRuntimeAgentProvider: "codex",
       routeMetadata: expect.objectContaining({
         source: "realtime_stage_play",
         invocationKind: "stage_play_realtime_transcript_handoff",
@@ -163,8 +213,152 @@ describe("Helix Ask Realtime provider event handler", () => {
       stage_play_event_ref: "stage-play-event:test",
       context_pack_id: "context-pack:test",
       context_sync_status: "sent",
+      worker_admission_schema: "helix.realtime_worker_admission.v2",
+      worker_dispatch_kind: "ask_runtime",
+      worker_dispatch_state: "ask_prompt_launched",
+      worker_turn_dispatched: true,
+      runtime_goal_wake_requested: false,
     });
     expect(result).not.toHaveProperty("transcript_text");
+  });
+
+  it("keeps conversation-local speech in GPT Live without a duplicate Ask turn", async () => {
+    const observationRef = "obs:realtime:local";
+    const launchPrompt = vi.fn();
+    const requestGoalWake = vi.fn(() => true);
+    const postEvent = vi.fn(async (path: string) =>
+      path.endsWith("/event")
+        ? {
+            ok: true,
+            realtime_transcript_observations: [{ observation_ref: observationRef }],
+            realtime_stage_play_ask_handoff: buildServerHandoff(observationRef, "local", {
+              outcome: "conversation_local",
+              dispatchKind: "none",
+            }),
+          }
+        : { ok: true });
+    const handler = createHelixAskRealtimeProviderEventHandler({
+      realtimeSessionId: "realtime:test",
+      runtimeAgentAuthority: "observe_only",
+      postEvent,
+      launchPrompt,
+      requestGoalWake,
+    });
+
+    const result = await handler.handle({
+      type: "conversation.item.input_audio_transcription.completed",
+      event_id: "event:transcript:local",
+      transcript: "Thanks, that is all.",
+    });
+
+    expect(result).toMatchObject({
+      reentry_status: "not_required",
+      worker_dispatch_kind: "none",
+      worker_dispatch_state: "skipped_local",
+      worker_turn_dispatched: false,
+      runtime_goal_wake_requested: false,
+    });
+    expect(launchPrompt).not.toHaveBeenCalled();
+    expect(requestGoalWake).not.toHaveBeenCalled();
+    expect(postEvent).toHaveBeenLastCalledWith(
+      "/api/agi/realtime/session/realtime%3Atest/client-receipt",
+      expect.objectContaining({
+        receipt_kind: "worker_dispatch_skipped",
+        reentry_required: false,
+      }),
+    );
+  });
+
+  it("wakes the bound durable goal without launching a parallel Ask answer", async () => {
+    const observationRef = "obs:realtime:goal";
+    const launchPrompt = vi.fn();
+    const requestGoalWake = vi.fn(() => true);
+    const postEvent = vi.fn(async (path: string) =>
+      path.endsWith("/event")
+        ? {
+            ok: true,
+            realtime_transcript_observations: [{ observation_ref: observationRef }],
+            realtime_stage_play_ask_handoff: buildServerHandoff(observationRef, "goal", {
+              outcome: "durable_goal_bound",
+              dispatchKind: "goal_wake",
+              goalId: "goal:voice-bound",
+            }),
+          }
+        : { ok: true });
+    const handler = createHelixAskRealtimeProviderEventHandler({
+      realtimeSessionId: "realtime:test",
+      runtimeAgentAuthority: "observe_only",
+      postEvent,
+      launchPrompt,
+      requestGoalWake,
+    });
+
+    const result = await handler.handle({
+      type: "conversation.item.input_audio_transcription.completed",
+      event_id: "event:transcript:goal",
+      transcript: "Continue the active document review goal.",
+    });
+
+    expect(requestGoalWake).toHaveBeenCalledWith(expect.objectContaining({
+      goalId: "goal:voice-bound",
+      runtimeGoalSessionRef: "runtime-goal-session:goal",
+      runtimeAgentProvider: "codex",
+      transcript: "Continue the active document review goal.",
+      observationRef,
+    }));
+    expect(launchPrompt).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      reentry_status: "reentered",
+      worker_dispatch_kind: "goal_wake",
+      worker_dispatch_state: "goal_wake_requested",
+      worker_turn_dispatched: true,
+      runtime_goal_wake_requested: true,
+    });
+  });
+
+  it("routes action candidates to read-only Ask reasoning without executing the action", async () => {
+    const observationRef = "obs:realtime:action";
+    const launchPrompt = vi.fn();
+    const postEvent = vi.fn(async (path: string) =>
+      path.endsWith("/event")
+        ? {
+            ok: true,
+            realtime_transcript_observations: [{ observation_ref: observationRef }],
+            realtime_stage_play_ask_handoff: buildServerHandoff(observationRef, "action", {
+              outcome: "action_candidate",
+              dispatchKind: "ask_runtime_read_only",
+            }),
+          }
+        : { ok: true });
+    const handler = createHelixAskRealtimeProviderEventHandler({
+      realtimeSessionId: "realtime:test",
+      runtimeAgentAuthority: "suggest_actions",
+      postEvent,
+      launchPrompt,
+    });
+
+    const result = await handler.handle({
+      type: "conversation.item.input_audio_transcription.completed",
+      event_id: "event:transcript:action",
+      transcript: "Open the account panel.",
+    });
+
+    expect(launchPrompt).toHaveBeenCalledWith(expect.objectContaining({
+      suppressWorkstationPayloadActions: true,
+      routeMetadata: expect.objectContaining({
+        forbiddenCapabilities: expect.arrayContaining([
+          "workstation_action_execution",
+          "realtime_provider_tool_execution",
+        ]),
+      }),
+    }));
+    expect(result).toMatchObject({
+      worker_dispatch_kind: "ask_runtime_read_only",
+      worker_dispatch_state: "ask_prompt_launched",
+      worker_turn_dispatched: true,
+      workstation_action_executed: false,
+      tool_execution_attempted: false,
+    });
   });
 
   it("does not execute or re-enter provider tool-call events", async () => {
@@ -549,6 +743,37 @@ describe("Helix Ask Realtime provider event handler", () => {
     expect(launchPrompt).not.toHaveBeenCalled();
   });
 
+  it("rejects an unregistered server-selected runtime before launching Ask", async () => {
+    const observationRef = "obs:realtime:invalid-runtime";
+    const launchPrompt = vi.fn();
+    const handler = createHelixAskRealtimeProviderEventHandler({
+      realtimeSessionId: "realtime:test",
+      runtimeAgentAuthority: "observe_only",
+      postEvent: vi.fn(async () => ({
+        ok: true,
+        realtime_transcript_observations: [{ observation_ref: observationRef }],
+        realtime_stage_play_ask_handoff: buildServerHandoff(
+          observationRef,
+          "invalid-runtime",
+          { runtimeProvider: "unregistered-runtime" },
+        ),
+      })),
+      launchPrompt,
+    });
+
+    const result = await handler.handle({
+      type: "conversation.item.input_audio_transcription.completed",
+      event_id: "event:transcript:invalid-runtime",
+      transcript: "Check the current workstation state.",
+    });
+
+    expect(result).toMatchObject({
+      reentry_status: "blocked",
+      blocked_reason: "realtime_stage_play_ask_handoff_missing",
+    });
+    expect(launchPrompt).not.toHaveBeenCalled();
+  });
+
   it("allows a failed server handoff request to retry without duplicate Ask launch", async () => {
     const observationRef = "obs:realtime:retry";
     const postEvent = vi.fn()
@@ -577,7 +802,7 @@ describe("Helix Ask Realtime provider event handler", () => {
       reentry_status: "blocked",
       blocked_reason: "duplicate_realtime_transcript_event",
     });
-    expect(postEvent).toHaveBeenCalledTimes(2);
+    expect(postEvent).toHaveBeenCalledTimes(3);
     expect(launchPrompt).toHaveBeenCalledTimes(1);
   });
 });

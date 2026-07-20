@@ -84,6 +84,7 @@ const Harness = () => {
     enabled: true,
     mode: "live_voice",
     authority: "observe_only",
+    selectedRuntimeAgentProvider: "codex",
   });
   return null;
 };
@@ -130,6 +131,14 @@ describe("Helix Ask GPT Live visual consent", () => {
       await latestSession!.start();
     });
     await waitFor(() => expect(latestSession?.active).toBe(true));
+    const sessionStartCall = vi.mocked(globalThis.fetch).mock.calls.find(([request]) =>
+      String(request).includes("/api/agi/realtime/session/start")
+    );
+    expect(sessionStartCall).toBeDefined();
+    expect(JSON.parse(String(sessionStartCall?.[1]?.body))).toMatchObject({
+      runtime_agent_authority: "observe_only",
+      selected_runtime_agent_provider: "codex",
+    });
 
     act(() => {
       expect(latestSession!.setVisualInputEnabled(true)).toBe(true);

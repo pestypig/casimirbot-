@@ -19,7 +19,9 @@ async function readTargetOrBackup(target: string): Promise<string> {
   return raw;
 }
 
-export async function readTheoryRuntimeJsonFile(target: string): Promise<string> {
+export async function readTheoryRuntimeJsonFile(
+  target: string,
+): Promise<string> {
   let lastError: unknown;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
@@ -62,15 +64,62 @@ async function replaceJsonFile(target: string, value: unknown): Promise<void> {
       if (movedCurrent) await fs.rename(backup, target).catch(() => undefined);
       throw error;
     }
-    if (movedCurrent) await fs.rm(backup, { force: true }).catch(() => undefined);
+    if (movedCurrent)
+      await fs.rm(backup, { force: true }).catch(() => undefined);
   } finally {
     await fs.rm(temporary, { force: true }).catch(() => undefined);
   }
 }
 
-export async function writeTheoryRuntimeJsonFile(target: string, value: unknown): Promise<void> {
+async function createJsonFileExclusive(
+  target: string,
+  value: unknown,
+): Promise<void> {
+  const temporary = `${target}.${process.pid}.${randomUUID()}.create.tmp`;
+  const payload = `${JSON.stringify(value, null, 2)}\n`;
+  await fs.mkdir(path.dirname(target), { recursive: true });
+  try {
+    const handle = await fs.open(temporary, "wx", 0o600);
+    try {
+      await handle.writeFile(payload, "utf8");
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+
+    // Linking a fully written sibling is an atomic create-if-absent operation
+    // on every filesystem supported by this runtime. Unlike rename, it never
+    // replaces an existing deterministic request identity on POSIX.
+    await fs.link(temporary, target);
+  } finally {
+    await fs.rm(temporary, { force: true }).catch(() => undefined);
+  }
+}
+
+export async function writeTheoryRuntimeJsonFile(
+  target: string,
+  value: unknown,
+): Promise<void> {
   const previous = writeLocks.get(target) ?? Promise.resolve();
-  const current = previous.catch(() => undefined).then(() => replaceJsonFile(target, value));
+  const current = previous
+    .catch(() => undefined)
+    .then(() => replaceJsonFile(target, value));
+  writeLocks.set(target, current);
+  try {
+    await current;
+  } finally {
+    if (writeLocks.get(target) === current) writeLocks.delete(target);
+  }
+}
+
+export async function createTheoryRuntimeJsonFile(
+  target: string,
+  value: unknown,
+): Promise<void> {
+  const previous = writeLocks.get(target) ?? Promise.resolve();
+  const current = previous
+    .catch(() => undefined)
+    .then(() => createJsonFileExclusive(target, value));
   writeLocks.set(target, current);
   try {
     await current;
