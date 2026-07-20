@@ -57,6 +57,10 @@ const fullTextRequested = (text: string, workflow?: HelixScholarlyRequestedWorkf
       workflow === "numeric_calculation"
     : /\b(?:full[-\s]?text|fetched\s+text|read\s+(?:the\s+)?(?:paper|pdf|article)|paper\s+content|parsed\s+page\s+count|page[-\s]?grounded|page[-\s]?numbered\s+(?:passage|excerpt))\b/i.test(text);
 
+const fullTextRequestedOnlyWhenAvailable = (text: string): boolean =>
+  /\b(?:fetch|retrieve|get|read|open|parse|use)\b[^.!?;\n]{0,160}\b(?:accessible\s+|available\s+|open[-\s]?access\s+)?(?:full[-\s]?text|pdf|paper\s+text|article\s+text)\b[^.!?;\n]{0,80}\b(?:if|when)\s+(?:it\s+is\s+)?(?:available|accessible|obtainable)\b/i.test(text) ||
+  /\b(?:if|when)\s+(?:it\s+is\s+)?(?:available|accessible|obtainable)\b[^.!?;\n]{0,120}\b(?:fetch|retrieve|get|read|open|parse|use)\b[^.!?;\n]{0,120}\b(?:full[-\s]?text|pdf|paper\s+text|article\s+text)\b/i.test(text);
+
 const explicitEquationRequested = (text: string): boolean =>
   /\b(?:equations?|formulae?|formulas?|derive|derivation|variables?|parameter\s+binding)\b/i.test(text) ||
   /\b(?:show\s+(?:me\s+)?(?:the\s+)?science|scientific\s+content|main\s+equations?|show\s+(?:me\s+)?(?:the\s+)?equations?)\b/i.test(text);
@@ -93,6 +97,10 @@ export const deriveScholarlyEvidenceDemand = (input: {
   const needsEquation = explicitEquationRequested(equationRequiredText);
   const needsPageImage = pageImageRequested(equationRequiredText);
   const needsFullText = fullTextRequested(affirmativeText, input.workflow);
+  const optionalFullText =
+    input.workflow === "full_text_summary" &&
+    needsFullText &&
+    fullTextRequestedOnlyWhenAvailable(affirmativeText);
   const alternatives: HelixScholarlyEvidenceAlternative[] = [];
   const requiredModes: string[] = [];
   const optionalModes: string[] = [];
@@ -148,6 +156,14 @@ export const deriveScholarlyEvidenceDemand = (input: {
     requiredModes.push("page_image_parse");
     if (needsFullText) requiredModes.push("full_text");
     reasons.push("page_image_output_explicitly_requested");
+  } else if (optionalFullText) {
+    alternatives.push({
+      product: "paper_metadata",
+      minimum_depth: "metadata_lookup",
+      exactness: "bounded",
+    });
+    optionalModes.push("full_text");
+    reasons.push("conditional_full_text_allows_metadata_fallback");
   } else if (needsFullText) {
     alternatives.push({
       product: /\b(?:passage|excerpt|quotation|quote)\b/i.test(affirmativeText)

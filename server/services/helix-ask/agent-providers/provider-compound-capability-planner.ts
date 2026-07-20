@@ -1438,7 +1438,7 @@ const buildScholarlyResearchWorkflowRequests = (body: Record<string, unknown>): 
       subgoal_id: `${SCHOLARLY_RESEARCH_WORKFLOW_OUTCOME}:scholarly_evidence`,
     } : {}),
     capability_id: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
-    dependent_capability_id: closesScholarlyLookupSet && intent.scholarlyIntent.requires_full_text
+    dependent_capability_id: closesScholarlyLookupSet && intent.fullTextRequested
       ? SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY
       : undefined,
     mode: "read",
@@ -1455,7 +1455,7 @@ const buildScholarlyResearchWorkflowRequests = (body: Record<string, unknown>): 
       },
       planned_scholarly_capability_chain: chainPlan,
       ...(requestedVariables.length > 0 ? { requested_variables: requestedVariables } : {}),
-      allow_scholarly_dependent_chain: closesScholarlyLookupSet && intent.scholarlyIntent.requires_full_text,
+      allow_scholarly_dependent_chain: closesScholarlyLookupSet && intent.fullTextRequested,
       requested_full_text_count: closesScholarlyLookupSet ? requestedFullTextCount : 1,
       ...(closesScholarlyLookupSet && directPortfolioDerived ? { scholarly_claim_portfolio: true } : {}),
       source_target_intent: {

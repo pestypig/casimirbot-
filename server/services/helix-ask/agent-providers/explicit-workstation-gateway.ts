@@ -776,7 +776,10 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   ) {
     return finalizeRequests(requests);
   }
-  const compoundDependencyRequests = buildCompoundCapabilityDependencyGatewayCallRequests(input.body);
+  const compoundDependencyRequests = filterContextuallySuppressedPromptRequests(
+    buildCompoundCapabilityDependencyGatewayCallRequests(input.body),
+    contextualSuppression,
+  );
   appendDedupe(requests, seen, compoundDependencyRequests);
   const compoundDependencyCapabilities = new Set(
     compoundDependencyRequests

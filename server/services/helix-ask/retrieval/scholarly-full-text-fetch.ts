@@ -216,8 +216,6 @@ const configuredOpenAccessFallbackUrls = async (input: {
     } catch (error) {
       input.missingRequirements.push(`unpaywall_request_failed:${error instanceof Error ? error.message : "unknown"}`);
     }
-  } else if (doi) {
-    input.missingRequirements.push("unpaywall_requires_doi_and_UNPAYWALL_EMAIL");
   }
 
   const coreApiKey = readString(process.env.CORE_API_KEY);
@@ -245,8 +243,6 @@ const configuredOpenAccessFallbackUrls = async (input: {
     } catch (error) {
       input.missingRequirements.push(`core_request_failed:${error instanceof Error ? error.message : "unknown"}`);
     }
-  } else {
-    input.missingRequirements.push("core_requires_CORE_API_KEY");
   }
   return unique(urls.filter((url) => /^https?:\/\//i.test(url)));
 };

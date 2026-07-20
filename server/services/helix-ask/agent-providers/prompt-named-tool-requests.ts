@@ -9,15 +9,19 @@ import {
   detectScholarlyResearchIntent,
   extractScholarlyArxivId,
   extractScholarlyDoi,
+  extractScholarlySourceTargets,
   extractScholarlySourceUrl,
   hasDirectScholarlyFullTextSourceIntent,
+  hasFullyNegatedScholarlyResearchInstruction,
   normalizeScholarlyFullTextSourceUrl,
+  stripScholarlySourceUrls,
 } from "../scholarly-research-intent";
 import { moralGraphPolicyAllowsProceduralBadgeReflection } from "../../../../shared/moral-graph/moral-graph-agent-invocation-policy";
 import {
   SHARED_INTERFACE_LANGUAGE_CODES,
   type SharedInterfaceLanguageCode,
 } from "@shared/interface-language-codes";
+import type { HelixScholarlySourceTarget } from "@shared/helix-scholarly-research-observation";
 import {
   ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY,
   CALCULATOR_SOLVE_ALIAS_CAPABILITIES,
@@ -194,6 +198,13 @@ const hasContextualInterfaceLanguageActionMention = (prompt: string): boolean =>
     /\b(?:do\s+not|don't|dont|without|no\s+need\s+to|not\s+asking\s+to|avoid|should\s+not)\b[\s\S]{0,120}\b(?:interface|ui|workstation|account|session)?\s*language\b/i.test(unquoted) ||
     /\b(?:text|sentence|phrase|quote|screen|page|button|label|ui)\b[\s\S]{0,140}\b(?:says|shows|reads|contains|mentions|labeled|labelled|called|named)\b[\s\S]{0,140}\b(?:interface|ui|workstation|account|session)?\s*language\b/i.test(unquoted) ||
     /\b(?:future|later|eventually|hypothetically|if|when|after|before|would|could|might)\b[\s\S]{0,160}\b(?:set|switch|change|update|use)\b[\s\S]{0,120}\b(?:interface|ui|workstation|account|session)?\s*language\b/i.test(unquoted)
+  );
+};
+
+const promptRequiresScholarlyMetadataResolutionBeforeFullText = (prompt: string): boolean => {
+  const sourceTargets = extractScholarlySourceTargets(prompt);
+  return sourceTargets.length > 0 && sourceTargets.every(
+    (target: HelixScholarlySourceTarget) => target.kind === "doi" || target.kind === "pubmed",
   );
 };
 
@@ -659,6 +670,8 @@ export const buildPromptNamedCapabilityGatewayCallRequests = (
 
   if (
     hasDirectScholarlyFullTextSourceIntent(prompt) &&
+    !hasFullyNegatedScholarlyResearchInstruction(prompt) &&
+    !promptRequiresScholarlyMetadataResolutionBeforeFullText(prompt) &&
     !hasExplicitScholarlyProviderRecordAuditIntent(prompt) &&
     !hasNegatedToolInstruction(prompt, /\bscholarly-research\.fetch_full_text\b/i)
   ) {
@@ -1009,12 +1022,12 @@ export const extractCalculatorExpressionFromPrompt = (prompt: string): string | 
   const percentOfExpression = extractCalculatorPercentOfExpression(unquoted);
   if (percentOfExpression) return percentOfExpression;
   const explicitCapability =
-    unquoted.match(/\bscientific-calculator\.(?:solve_expression|solve_with_steps|solve)\b[\s\S]{0,80}\b(?:for|with|expression|calculate|evaluate|solve|compute)?\s*:?\s*([0-9][0-9eE\s.+\-*/^%()[\]]{1,120})/i)?.[1] ??
-    unquoted.match(/\b(?:scientific\s+calculator|calculator|calc)\b[\s\S]{0,100}\b(?:calculate|evaluate|solve|compute|expression)\s*:?\s*([0-9][0-9eE\s.+\-*/^%()[\]]{1,120})/i)?.[1] ??
+    unquoted.match(/\bscientific-calculator\.(?:solve_expression|solve_with_steps|solve)\b[\s\S]{0,80}\b(?:for|with|expression|calculate|evaluate|solve|compute)?\s*:?\s*([0-9(][0-9eE\s.+\-*/^%()[\]]{1,120})/i)?.[1] ??
+    unquoted.match(/\b(?:scientific\s+calculator|calculator|calc)\b[\s\S]{0,100}\b(?:calculate|evaluate|solve|compute|expression)\s*:?\s*([0-9(][0-9eE\s.+\-*/^%()[\]]{1,120})/i)?.[1] ??
     null;
   if (explicitCapability) return extractCalculatorMathTokenSequence(explicitCapability);
   const direct =
-    unquoted.match(/\b(?:calculate|evaluate|compute|solve)\s+([0-9][0-9eE\s.+\-*/^%()[\]]{1,120})/i)?.[1] ??
+    unquoted.match(/\b(?:calculate|evaluate|compute|solve)\s+([0-9(][0-9eE\s.+\-*/^%()[\]]{1,120})/i)?.[1] ??
     null;
   return extractCalculatorMathTokenSequence(direct);
 };
@@ -1188,7 +1201,10 @@ export const buildPromptDerivedMoralGraphReflectionGatewayCallRequests = (
 };
 
 export const extractRepoSearchQueryFromPrompt = (prompt: string): string | null => {
-  if (hasNegatedToolInstruction(prompt, /\b(?:repo|repository|code|source|implementation|search)\b/i)) return null;
+  if (hasNegatedToolInstruction(
+    prompt,
+    /\b(?:repo|repository|codebase|code\s+base|code|source\s+code|implementation)\b/i,
+  )) return null;
   const unquoted = unquotePrompt(prompt);
   const cleanQuery = (value: string | null | undefined): string | null => {
     const normalized = value
@@ -1250,7 +1266,10 @@ const buildRepoSearchPromptQueryTerms = (query: string): string[] => {
 };
 
 export const hasAffirmativeRepoSearchIntent = (prompt: string): boolean => {
-  if (hasNegatedToolInstruction(prompt, /\b(?:repo|repository|code|source|implementation|search)\b/i)) return false;
+  if (hasNegatedToolInstruction(
+    prompt,
+    /\b(?:repo|repository|codebase|code\s+base|code|source\s+code|implementation)\b/i,
+  )) return false;
   const unquoted = unquotePrompt(prompt);
   return (
     /\b(?:search|grep|look\s+(?:in|through)|find|locate)\s+(?:the\s+)?(?:repo|repository|codebase|source|code)\b/i.test(unquoted) ||
@@ -1367,8 +1386,14 @@ export const buildPromptDerivedRepoSearchGatewayCallRequests = (
   if (!prompt) return [];
   if (isScientificImageEvidenceRefRevisionPrompt(prompt)) return [];
   if (hasExplicitScholarlyFullTextNumericChainIntent(prompt)) return [];
-  const query = extractRepoSearchQueryFromPrompt(prompt);
-  if (!query && !hasAffirmativeRepoSearchIntent(prompt)) return [];
+  const repoOperatorPrompt = stripScholarlySourceUrls(prompt);
+  const affirmativeRepoSearch = hasAffirmativeRepoSearchIntent(repoOperatorPrompt);
+  const hasRepoImplementationScope =
+    /\b(?:repo|repository|codebase|code\s+base|source\s+code|implementation)\b/i.test(repoOperatorPrompt) ||
+    /\bwhere\s+(?:is|are)\b[\s\S]{0,160}\b(?:implemented|defined|handled)\b/i.test(repoOperatorPrompt);
+  if (!affirmativeRepoSearch && !hasRepoImplementationScope) return [];
+  const query = extractRepoSearchQueryFromPrompt(repoOperatorPrompt);
+  if (!query && !affirmativeRepoSearch) return [];
   const queryTerms = query ? buildRepoSearchPromptQueryTerms(query) : [];
   return [{
     schema: "helix.workstation_gateway.prompt_derived_repo_search_call_request.v1",
@@ -1444,9 +1469,64 @@ export const buildPromptDerivedScholarlyResearchGatewayCallRequests = (
   )) return [];
   const intent = detectScholarlyResearchIntent(prompt);
   if (!intent.researchRequested) return [];
+  if (intent.supportingSourceOnly && intent.sourceTargets.length > 0) {
+    return intent.sourceTargets.map((target: HelixScholarlySourceTarget, sourceIndex: number) => {
+      const sourceTargetIntent = {
+        source: "helix_prompt_derived_supporting_scholarly_source",
+        target_source: "scholarly_research",
+        target_kind: target.retrieval_strategy === "metadata_lookup"
+          ? "research_paper_source_metadata"
+          : "research_paper_supporting_full_text",
+        strength: "soft",
+        explicit_cues: intent.explicitCues,
+        reasons: [...intent.reasons, "source_is_supporting_context_not_exclusive_answer_authority"],
+        requested_outputs: intent.requestedOutputs,
+        supporting_sources_only: true,
+        source_target: target,
+        source_portfolio_index: sourceIndex,
+        source_portfolio_count: intent.sourceTargets.length,
+        terminal_evidence_requirement: "metadata",
+      };
+      if (target.retrieval_strategy === "metadata_lookup") {
+        const query = target.pmid
+          ? `PMID:${target.pmid}`
+          : target.doi
+            ? `DOI:${target.doi}`
+            : target.arxiv_id
+              ? `arXiv:${target.arxiv_id}`
+              : target.canonical_url;
+        return {
+          schema: "helix.workstation_gateway.prompt_derived_supporting_scholarly_source_call_request.v1",
+          derivation_source: "helix_prompt_derived_supporting_scholarly_source",
+          capability_id: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+          mode: "read",
+          arguments: {
+            query,
+            mode: target.kind === "doi" ? "doi_lookup" : "paper_search",
+            ...(target.kind === "pubmed" ? { providers: ["pubmed"] } : {}),
+            ...(target.kind === "arxiv" ? { providers: ["arxiv", "semantic_scholar"] } : {}),
+            scholarly_intent: intent.scholarlyIntent,
+            planned_scholarly_capability_chain: intent.plannedScholarlyCapabilityChain,
+            source_target_intent: sourceTargetIntent,
+          },
+        };
+      }
+      return {
+        schema: "helix.workstation_gateway.prompt_derived_supporting_scholarly_source_call_request.v1",
+        derivation_source: "helix_prompt_derived_supporting_scholarly_source",
+        capability_id: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+        mode: "read",
+        arguments: {
+          query: intent.normalizedQuery,
+          source_url: target.canonical_url,
+          source_target_intent: sourceTargetIntent,
+        },
+      };
+    });
+  }
   const conversationalReferent = resolveHelixAskConversationalReferent(body);
   const hasExplicitIdentifierOrSourceTarget = Boolean(
-    intent.doi || intent.arxivId || extractScholarlySourceUrl(prompt),
+    intent.doi || intent.arxivId || intent.pmid || intent.pmcid || intent.sourceTargets.length > 0,
   );
   const explicitTopicFallbackQuery = conversationalReferent.trace.explicit_topic_phrase?.trim() ?? "";
   const normalizeReferentClaim = (value: string): string =>
@@ -1517,10 +1597,25 @@ export const buildPromptDerivedScholarlyResearchGatewayCallRequests = (
     if (token === "two" || token === "2") return 2;
     return 1;
   })();
-  const directPortfolioQueries = deriveDirectScholarlyPortfolioQueries(
-    intent.normalizedQuery,
-    requestedFullTextCount,
-  );
+  const exactMetadataTarget = intent.sourceTargets.length === 1 &&
+    intent.sourceTargets[0]?.retrieval_strategy === "metadata_lookup"
+    ? intent.sourceTargets[0]
+    : null;
+  const exactMetadataQuery = exactMetadataTarget?.pmid
+    ? `PMID:${exactMetadataTarget.pmid}`
+    : exactMetadataTarget?.pmcid
+      ? `PMCID:${exactMetadataTarget.pmcid}`
+      : exactMetadataTarget?.doi
+        ? `DOI:${exactMetadataTarget.doi}`
+        : exactMetadataTarget?.arxiv_id
+          ? `arXiv:${exactMetadataTarget.arxiv_id}`
+          : null;
+  const directPortfolioQueries = exactMetadataQuery
+    ? [exactMetadataQuery]
+    : deriveDirectScholarlyPortfolioQueries(
+        intent.normalizedQuery,
+        requestedFullTextCount,
+      );
   const queries = referentDerived
     ? resolvedReferentQueries
     : explicitTopicFallbackDerived
@@ -1534,7 +1629,7 @@ export const buildPromptDerivedScholarlyResearchGatewayCallRequests = (
   );
   return queries.map((query, claimIndex) => {
     const closesScholarlyLookupSet = Boolean(
-      intent.scholarlyIntent.requires_full_text &&
+      intent.fullTextRequested &&
       claimIndex === queries.length - 1
     );
     const derivationSource = referentDerived
@@ -1563,7 +1658,10 @@ export const buildPromptDerivedScholarlyResearchGatewayCallRequests = (
       mode: "read",
       arguments: {
         query,
-        mode: intent.mode,
+        mode: exactMetadataTarget?.kind === "doi" ? "doi_lookup" : intent.mode,
+        ...(exactMetadataTarget?.kind === "pubmed" ? { providers: ["pubmed"] } : {}),
+        ...(exactMetadataTarget?.kind === "pmc" ? { providers: ["pubmed", "core"] } : {}),
+        ...(exactMetadataTarget?.kind === "arxiv" ? { providers: ["arxiv", "semantic_scholar"] } : {}),
         scholarly_intent: scholarlyIntent,
         planned_scholarly_capability_chain: intent.plannedScholarlyCapabilityChain,
         ...(closesScholarlyLookupSet ? {
@@ -1581,6 +1679,9 @@ export const buildPromptDerivedScholarlyResearchGatewayCallRequests = (
           requested_outputs: intent.requestedOutputs,
           doi: intent.doi,
           arxiv_id: intent.arxivId,
+          pmid: intent.pmid,
+          pmcid: intent.pmcid,
+          ...(exactMetadataTarget ? { source_target: exactMetadataTarget } : {}),
           full_text_requested: intent.fullTextRequested,
           scholarly_intent: scholarlyIntent,
           planned_scholarly_capability_chain: intent.plannedScholarlyCapabilityChain,

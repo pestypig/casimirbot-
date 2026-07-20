@@ -706,6 +706,129 @@ describe("provider terminal authority for capability lanes", () => {
     expect(result.terminalAnswerAuthority).toBeNull();
   });
 
+  it("allows bounded metadata synthesis when an explicitly optional full-text fetch is unavailable", () => {
+    const turnId = "turn-scholar-optional-full-text";
+    const lookupRef = `${turnId}:lookup`;
+    const fullTextRef = `${turnId}:full-text-unavailable`;
+    const optionalIntent = {
+      scholarly_intent: {
+        schema: "helix.scholarly_intent.v1",
+        supporting_sources_only: false,
+        evidence_demand: {
+          schema: "helix.scholarly_evidence_demand.v1",
+          required_modes: [],
+          optional_modes: ["full_text"],
+        },
+      },
+    };
+    const lookupResult = {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: "test",
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: "scholarly-research.lookup_papers",
+      mode: "read",
+      gateway_admission: {
+        schema: "helix.workstation_tool_gateway.admission.v1",
+        requested_capability: "scholarly-research.lookup_papers",
+        selected_agent_provider: "codex",
+        permission_profile: "read",
+        source_target_intent: optionalIntent,
+        admission_status: "admitted",
+        admission_reason: "test",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        schema: HELIX_AGENT_STEP_OBSERVATION_PACKET_SCHEMA,
+        turn_id: turnId,
+        iteration: 0,
+        call_id: `${lookupRef}:call`,
+        decision_id: `${lookupRef}:decision`,
+        capability_key: "scholarly-research.lookup_papers",
+        panel_id: "scholarly-research",
+        action: "lookup_papers",
+        status: "succeeded",
+        produced_artifact_refs: [lookupRef],
+        observation_summary: "Selected DOI metadata and abstract are usable.",
+        receipts: [],
+        missing_requirements: [],
+        state_delta: { evidence_state: "lookup_usable", selected_for_answer: true },
+        suggested_next_steps: [],
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      tool_lifecycle_trace: {},
+      tool_followup_decision: {},
+      observation: {
+        schema: "helix.scholarly_research_observation.v1",
+        evidence_state: "lookup_usable",
+        selected_for_answer: true,
+      },
+      artifact_refs: [lookupRef],
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const fullTextResult = buildScholarlyFullTextRecoveryResult() as any;
+    fullTextResult.gateway_admission.source_target_intent = optionalIntent;
+    fullTextResult.gateway_admission.admission_status = "admitted";
+    fullTextResult.gateway_admission.admission_reason = "optional_full_text_attempt";
+    fullTextResult.gateway_admission.blocked_reason = undefined;
+    fullTextResult.observation.evidence_state = "full_text_unavailable";
+    fullTextResult.observation.selected_for_answer = false;
+    fullTextResult.observation_packet.turn_id = turnId;
+    fullTextResult.observation_packet.produced_artifact_refs = [fullTextRef];
+    fullTextResult.observation_packet.state_delta = {
+      ...fullTextResult.observation_packet.state_delta,
+      evidence_state: "full_text_unavailable",
+      selected_for_answer: false,
+    };
+    fullTextResult.artifact_refs = [fullTextRef];
+    fullTextResult.error = "full_text_http_403";
+
+    const gatewayCallResults = [lookupResult, fullTextResult] as any;
+    const result = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId,
+      threadId: "thread-scholar-optional-full-text",
+      route: "/ask/turn",
+      gatewayCallResults,
+      normalizedObservationPackets: gatewayCallResults.map((entry: any) => entry.observation_packet),
+      providerText: [
+        "The DOI metadata and abstract support a bounded microtubule/Alzheimer hypothesis summary.",
+        "The optional full text was unavailable, so this does not claim paper-body evidence or support a consciousness conclusion.",
+      ].join(" "),
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+    });
+
+    expect(result.providerReasoningReentry).toMatchObject({
+      status: "completed",
+      evidence_reentered: true,
+      post_tool_model_step_required: false,
+    });
+    expect(result.terminalAuthorityCandidateReview).toMatchObject({
+      terminal_authority_granted: true,
+      blockers: [],
+      selected_observation_refs: [lookupRef, fullTextRef],
+    });
+    expect(result.providerTerminalAuthorityBridge).toMatchObject({
+      all_gateway_calls_succeeded: true,
+      all_observations_succeeded: true,
+      terminal_authority_granted: true,
+    });
+    expect(result.terminalAnswerAuthority).toMatchObject({
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      terminal_eligible: true,
+    });
+  });
+
   it("allows Codex terminal candidates after calculator expression blocks re-enter reasoning", () => {
     const gatewayResult = buildCalculatorUnsupportedExpressionResult();
     const result = buildHelixProviderReasoningReentry({

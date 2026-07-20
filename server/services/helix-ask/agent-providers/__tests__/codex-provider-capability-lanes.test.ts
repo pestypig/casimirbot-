@@ -245,6 +245,17 @@ describe("Codex provider capability lane adapter", () => {
     })).toBe(true);
   });
 
+  it("does not treat fully negated scholarly URL examples as a prior-paper follow-up", () => {
+    const prompt = [
+      "Do not fetch, look up, open, or search any source now.",
+      "These URLs are examples only: https://pubmed.ncbi.nlm.nih.gov/2813384/",
+      "and https://karlpribram.com/wp-content/uploads/pdf/theory/T-167.pdf.",
+      "Explain what evidence would be needed without claiming those papers were inspected.",
+    ].join(" ");
+
+    expect(isScholarlyFollowupReferencePrompt(prompt)).toBe(false);
+  });
+
   it("routes retained-sidecar packet construction to continuity without admitting a fresh capture", () => {
     const packetPrompt = [
       "Using the saved page-8 text and retained Image Lens sidecar for https://arxiv.org/pdf/2401.12345,",

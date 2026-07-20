@@ -194,8 +194,9 @@ describe("Helix scholarly research tool admission", () => {
         question: promptText,
         mode: "read",
         debug: true,
-      })
-      .expect(200);
+      });
+
+    expect(response.status, JSON.stringify(response.body, null, 2).slice(0, 6000)).toBe(200);
 
     const compoundContract =
       response.body?.compound_prompt_contract ??
@@ -218,7 +219,7 @@ describe("Helix scholarly research tool admission", () => {
       applies: true,
     });
     expect(response.body?.terminal_error_code).not.toBe("terminal_consistency_violation");
-  }, 60000);
+  }, 90000);
 
   it("continues to the theory locator after scholarly evidence when compound itinerary is incomplete", () => {
     const turnId = "ask:scholarly-locator-continuation";

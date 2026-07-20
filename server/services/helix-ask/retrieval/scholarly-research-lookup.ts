@@ -7,6 +7,7 @@ import {
   type HelixScholarlyNextAffordance,
   type HelixScholarlyPaperAuthor,
   type HelixScholarlyPaperResult,
+  type HelixScholarlyRecoveryAffordance,
   type HelixScholarlyResearchIntentMode,
   type HelixScholarlyResearchObservation,
   type HelixScholarlyResearchProvider,
@@ -16,6 +17,7 @@ import {
   detectScholarlyResearchIntent,
   extractScholarlyArxivId,
   extractScholarlyDoi,
+  extractScholarlyPmid,
 } from "../scholarly-research-intent";
 
 type RecordLike = Record<string, unknown>;
@@ -43,6 +45,7 @@ export type RunScholarlyResearchLookupInput = {
 };
 
 const DEFAULT_PROVIDERS: HelixScholarlyResearchProvider[] = [
+  "pubmed",
   "arxiv",
   "openalex",
   "crossref",
@@ -75,6 +78,29 @@ const firstString = (...values: unknown[]): string | null => {
     if (text) return text;
   }
   return null;
+};
+
+const readXmlText = (value: unknown): string | null => {
+  if (typeof value === "string" || typeof value === "number") {
+    const text = String(value).replace(/\s+/g, " ").trim();
+    return text || null;
+  }
+  if (Array.isArray(value)) {
+    const text = value.map(readXmlText).filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+    return text || null;
+  }
+  const record = readRecord(value);
+  if (!record) return null;
+  const direct = readXmlText(record.text);
+  if (direct) return direct;
+  const text = Object.entries(record)
+    .filter(([key]) => !["IdType", "Label", "NlmCategory", "EIdType", "ValidYN"].includes(key))
+    .map(([, entry]) => readXmlText(entry))
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text || null;
 };
 
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
@@ -208,6 +234,8 @@ const makePaper = (input: {
   arxivId?: string | null;
   openalexId?: string | null;
   semanticScholarId?: string | null;
+  pmid?: string | null;
+  pmcid?: string | null;
   url?: string | null;
   pdfUrl?: string | null;
   fullTextUrl?: string | null;
@@ -220,7 +248,7 @@ const makePaper = (input: {
   if (!title) return null;
   const arxivId = normalizeArxivId(input.arxivId);
   return {
-    result_id: `${input.provider}:${hashShort([title, input.doi, arxivId, input.openalexId, input.semanticScholarId])}`,
+    result_id: `${input.provider}:${hashShort([title, input.doi, arxivId, input.openalexId, input.semanticScholarId, input.pmid, input.pmcid])}`,
     title,
     authors: input.authors ?? [],
     ...(input.year ? { year: input.year } : {}),
@@ -231,6 +259,8 @@ const makePaper = (input: {
       ...(arxivId ? { arxiv_id: arxivId } : {}),
       ...(input.openalexId ? { openalex_id: input.openalexId } : {}),
       ...(input.semanticScholarId ? { semantic_scholar_id: input.semanticScholarId } : {}),
+      ...(input.pmid ? { pmid: input.pmid } : {}),
+      ...(input.pmcid ? { pmcid: input.pmcid } : {}),
       ...(input.url ? { url: input.url } : {}),
       ...(input.pdfUrl ? { pdf_url: input.pdfUrl } : {}),
       ...(input.fullTextUrl ? { full_text_url: input.fullTextUrl } : {}),
@@ -359,7 +389,9 @@ const scholarlyLookupSearchTerms = (value: string): string[] =>
 
 const normalizeScholarlyLookupToken = (value: string): string => {
   let token = value;
-  if (token.length > 4 && token.endsWith("ies")) {
+  if (token.length > 8 && (token.endsWith("esis") || token.endsWith("etic"))) {
+    token = token.slice(0, -4);
+  } else if (token.length > 4 && token.endsWith("ies")) {
     token = `${token.slice(0, -3)}y`;
   } else if (token.length > 5 && token.endsWith("ing")) {
     token = token.slice(0, -3);
@@ -410,6 +442,8 @@ const paperSearchText = (paper: HelixScholarlyPaperResult): string =>
     ...paper.authors.map((author) => author.name),
     paper.identifiers.doi,
     paper.identifiers.arxiv_id,
+    paper.identifiers.pmid,
+    paper.identifiers.pmcid,
   ].filter(Boolean).join(" ").toLowerCase();
 
 const isHistoricalOriginalPaperQuery = (query: string, queryTokens: string[]): boolean =>
@@ -578,6 +612,14 @@ const paperMatchesArxivId = (paper: HelixScholarlyPaperResult, arxivId: string |
   return new RegExp(`arxiv\\.org\\/(?:abs|pdf)\\/${target.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:v\\d+)?(?:\\.pdf)?\\b`, "i").test(urlText);
 };
 
+const paperMatchesPmid = (paper: HelixScholarlyPaperResult, pmid: string | null): boolean => {
+  if (!pmid) return false;
+  if (paper.identifiers.pmid === pmid) return true;
+  return [paper.identifiers.url, paper.identifiers.full_text_url]
+    .filter(Boolean)
+    .some((url) => new RegExp(`(?:pubmed\\.ncbi\\.nlm\\.nih\\.gov|ncbi\\.nlm\\.nih\\.gov/pubmed)/${pmid}\\b`, "i").test(url ?? ""));
+};
+
 const makeFallbackArxivPaper = (input: {
   arxivId: string;
   ref: HelixScholarlyEvidenceRef;
@@ -630,7 +672,7 @@ const fetchText = async (input: {
 }): Promise<string | null> => {
   input.providersCalled.push(input.provider);
   try {
-    const response = await input.fetchImpl(input.url, { headers: { Accept: "application/atom+xml", "User-Agent": "CasimirBot-ScholarlyResearch/1.0" } });
+    const response = await input.fetchImpl(input.url, { headers: { Accept: input.provider === "pubmed" ? "application/xml" : "application/atom+xml", "User-Agent": "CasimirBot-ScholarlyResearch/1.0" } });
     if (!response.ok || !response.text) {
       input.missingRequirements.push(`${input.provider}_http_${response.status}`);
       return null;
@@ -640,6 +682,98 @@ const fetchText = async (input: {
     input.missingRequirements.push(`${input.provider}_request_failed:${error instanceof Error ? error.message : "unknown"}`);
     return null;
   }
+};
+
+const lookupPubmed = async (input: {
+  pmid: string | null;
+  fetchImpl: ScholarlyFetch;
+  providersCalled: HelixScholarlyResearchProvider[];
+  missingRequirements: string[];
+  evidenceRefs: HelixScholarlyEvidenceRef[];
+}): Promise<HelixScholarlyPaperResult[]> => {
+  if (!input.pmid) return [];
+  const xml = await fetchText({
+    ...input,
+    provider: "pubmed",
+    url: `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=${encodeURIComponent(input.pmid)}&retmode=xml`,
+  });
+  if (!xml) return [];
+  const parsed = readRecord(XML.parse(xml));
+  const articleSet = readRecord(parsed?.PubmedArticleSet);
+  const rawArticles = readArray(articleSet?.PubmedArticle).length > 0
+    ? readArray(articleSet?.PubmedArticle)
+    : articleSet?.PubmedArticle
+      ? [articleSet.PubmedArticle]
+      : [];
+  const papers: HelixScholarlyPaperResult[] = [];
+  for (const rawArticle of rawArticles) {
+    const pubmedArticle = readRecord(rawArticle);
+    const medlineCitation = readRecord(pubmedArticle?.MedlineCitation);
+    const article = readRecord(medlineCitation?.Article);
+    const journal = readRecord(article?.Journal);
+    const journalIssue = readRecord(journal?.JournalIssue);
+    const pubDate = readRecord(journalIssue?.PubDate);
+    const pubmedData = readRecord(pubmedArticle?.PubmedData);
+    const articleIdList = readRecord(pubmedData?.ArticleIdList);
+    const articleIds = (readArray(articleIdList?.ArticleId).length > 0
+      ? readArray(articleIdList?.ArticleId)
+      : articleIdList?.ArticleId
+        ? [articleIdList.ArticleId]
+        : [])
+      .map((entry) => ({ record: readRecord(entry), value: readXmlText(entry) }))
+      .filter((entry): entry is { record: RecordLike | null; value: string } => Boolean(entry.value));
+    const pmid = readXmlText(medlineCitation?.PMID) ??
+      articleIds.find((entry) => readString(entry.record?.IdType)?.toLowerCase() === "pubmed")?.value ??
+      input.pmid;
+    const doi = articleIds.find((entry) => readString(entry.record?.IdType)?.toLowerCase() === "doi")?.value ??
+      (readArray(article?.ELocationID).length > 0 ? readArray(article?.ELocationID) : article?.ELocationID ? [article.ELocationID] : [])
+        .map((entry) => ({ record: readRecord(entry), value: readXmlText(entry) }))
+        .find((entry) => readString(entry.record?.EIdType)?.toLowerCase() === "doi")?.value ??
+      null;
+    const pmcidRaw = articleIds.find((entry) => readString(entry.record?.IdType)?.toLowerCase() === "pmc")?.value ?? null;
+    const pmcid = pmcidRaw ? pmcidRaw.toUpperCase() : null;
+    const authorList = readRecord(article?.AuthorList);
+    const authors = (readArray(authorList?.Author).length > 0
+      ? readArray(authorList?.Author)
+      : authorList?.Author
+        ? [authorList.Author]
+        : [])
+      .map((entry) => readRecord(entry))
+      .filter((entry): entry is RecordLike => Boolean(entry))
+      .map((entry) => ({
+        name: firstString(
+          [readXmlText(entry.ForeName), readXmlText(entry.LastName)].filter(Boolean).join(" "),
+          readXmlText(entry.CollectiveName),
+          readXmlText(entry.Initials),
+        ) ?? "",
+      }))
+      .filter((entry) => entry.name.length > 0);
+    const yearText = firstString(
+      readXmlText(pubDate?.Year),
+      readXmlText(pubDate?.MedlineDate)?.match(/\b(?:18|19|20)\d{2}\b/)?.[0],
+    );
+    const url = `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`;
+    const ref = evidenceRef("pubmed", pmid, url);
+    input.evidenceRefs.push(ref);
+    const paper = makePaper({
+      provider: "pubmed",
+      ref,
+      title: readXmlText(article?.ArticleTitle),
+      authors,
+      year: yearText ? Number(yearText) || undefined : undefined,
+      venue: firstString(readXmlText(journal?.Title), readXmlText(journal?.ISOAbbreviation)),
+      abstract: readXmlText(readRecord(article?.Abstract)?.AbstractText),
+      doi,
+      pmid,
+      pmcid,
+      url,
+      fullTextUrl: pmcid ? `https://pmc.ncbi.nlm.nih.gov/articles/${pmcid}/` : url,
+      isOpenAccess: Boolean(pmcid),
+      confidence: "high",
+    });
+    if (paper) papers.push(paper);
+  }
+  return papers;
 };
 
 const lookupOpenAlex = async (input: {
@@ -862,7 +996,6 @@ const lookupUnpaywall = async (input: {
 }): Promise<HelixScholarlyPaperResult[]> => {
   const email = readString(process.env.UNPAYWALL_EMAIL);
   if (!input.doi || !email) {
-    input.missingRequirements.push("unpaywall_requires_doi_and_UNPAYWALL_EMAIL");
     return [];
   }
   const url = `https://api.unpaywall.org/v2/${encodeURIComponent(input.doi)}?email=${encodeURIComponent(email)}`;
@@ -897,7 +1030,6 @@ const lookupCore = async (input: {
 }): Promise<HelixScholarlyPaperResult[]> => {
   const apiKey = readString(process.env.CORE_API_KEY);
   if (!apiKey) {
-    input.missingRequirements.push("core_requires_CORE_API_KEY");
     return [];
   }
   const query = input.doi ? `doi:${input.doi}` : input.query;
@@ -941,6 +1073,7 @@ export async function runScholarlyResearchLookup(
   const intent = detectScholarlyResearchIntent(query);
   const doi = input.mode === "doi_lookup" ? extractScholarlyDoi(query) : intent.doi ?? extractScholarlyDoi(query);
   const arxivId = normalizeArxivId(intent.arxivId ?? extractScholarlyArxivId(query)) ?? null;
+  const pmid = intent.pmid ?? extractScholarlyPmid(query);
   const limit = Math.max(1, Math.min(Number(input.limit) || 8, 20));
   const providers = unique((input.providers?.length ? input.providers : DEFAULT_PROVIDERS)
     .filter((provider): provider is HelixScholarlyResearchProvider => DEFAULT_PROVIDERS.includes(provider)));
@@ -956,10 +1089,15 @@ export async function runScholarlyResearchLookup(
 
   for (const provider of providers) {
     if (!query) break;
+    if (pmid && provider !== "pubmed") {
+      continue;
+    }
     if (arxivId && !doi && !["arxiv", "semantic_scholar"].includes(provider)) {
       continue;
     }
-    if (provider === "openalex") {
+    if (provider === "pubmed") {
+      papers.push(...await lookupPubmed({ pmid, fetchImpl, providersCalled, missingRequirements, evidenceRefs }));
+    } else if (provider === "openalex") {
       papers.push(...await lookupOpenAlex({ query, doi, limit, fetchImpl, providersCalled, missingRequirements, evidenceRefs }));
     } else if (provider === "crossref") {
       papers.push(...await lookupCrossref({ query, doi, limit, fetchImpl, providersCalled, missingRequirements, evidenceRefs }));
@@ -991,13 +1129,19 @@ export async function runScholarlyResearchLookup(
     papers.push(makeFallbackArxivPaper({ arxivId, ref }));
   }
 
+  const exactPmidPapers = pmid
+    ? dedupePapers(papers).filter((paper) => paperMatchesPmid(paper, pmid))
+    : [];
+
   const candidatePapers = arxivId
     ? dedupePapers(papers).filter((paper) => paperMatchesArxivId(paper, arxivId))
-    : dedupePapers(papers);
+    : pmid
+      ? exactPmidPapers
+      : dedupePapers(papers);
   const queryTokens = scholarlyLookupTokens(query);
   const relevanceEvaluations = new Map(candidatePapers.map((paper) => [
     paper.result_id,
-    arxivId
+    arxivId || pmid
       ? {
           supported: true,
           matched_tokens: queryTokens,
@@ -1009,7 +1153,7 @@ export async function runScholarlyResearchLookup(
         }
       : evaluatePaperRelevance(paper, query, queryTokens),
   ]));
-  const relevantPapers = arxivId
+  const relevantPapers = arxivId || pmid
     ? candidatePapers
     : candidatePapers.filter((paper) => relevanceEvaluations.get(paper.result_id)?.supported);
   const dedupedPapers = relevantPapers.slice(0, limit);
@@ -1059,7 +1203,7 @@ export async function runScholarlyResearchLookup(
     assistant_answer: false,
     raw_content_included: false,
   };
-  const scholarlyLookupRecoveryAffordance = evidenceState === "lookup_usable"
+  const scholarlyLookupRecoveryAffordance: HelixScholarlyRecoveryAffordance | null = evidenceState === "lookup_usable"
     ? null
     : {
         schema: "helix.scholarly_lookup_recovery_affordance.v1",

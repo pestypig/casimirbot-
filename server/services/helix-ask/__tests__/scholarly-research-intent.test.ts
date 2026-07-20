@@ -87,6 +87,173 @@ describe("scholarly research intent", () => {
     expect(intent.plannedScholarlyCapabilityChain.terminal_evidence_requirement).toBe("full_text");
   });
 
+  it("treats supplied scholarly links as supporting context instead of an implicit full-text command", () => {
+    const prompt = [
+      "Dan Dennett may be wrong if consciousness is holographic and the self is represented across microtubule frequency scales.",
+      "https://ingentaconnect.com/content/imp/jcs/2026/00000033/f0020001/art00013;jsessionid=24w4io4ebkjc6.x-ic-live-02",
+      "Small holographic regions may recover a lower-resolution image.",
+      "https://pubmed.ncbi.nlm.nih.gov/2813384/",
+      "https://karlpribram.com/wp-content/uploads/pdf/theory/T-167.pdf",
+    ].join(" ");
+    const intent = detectScholarlyResearchIntent(prompt);
+
+    expect(intent).toMatchObject({
+      researchRequested: true,
+      strength: "soft",
+      pmid: "2813384",
+      supportingSourceOnly: true,
+      fullTextRequested: false,
+      scholarlyIntent: {
+        requested_workflow: "metadata_search",
+        requires_full_text: false,
+        supporting_sources_only: true,
+      },
+    });
+    expect(intent.sourceUrls).toEqual([
+      "https://ingentaconnect.com/content/imp/jcs/2026/00000033/f0020001/art00013",
+      "https://pubmed.ncbi.nlm.nih.gov/2813384/",
+      "https://karlpribram.com/wp-content/uploads/pdf/theory/T-167.pdf",
+    ]);
+    expect(intent.sourceTargets.map((target) => [target.kind, target.retrieval_strategy])).toEqual([
+      ["publisher", "direct_full_text"],
+      ["pubmed", "metadata_lookup"],
+      ["pdf", "direct_full_text"],
+    ]);
+    expect(intent.normalizedQuery).not.toMatch(/https?:\/\/|jsessionid/i);
+    expect(intent.plannedScholarlyCapabilityChain.planned_capabilities).toEqual([
+      "scholarly-research.fetch_full_text",
+      "scholarly-research.lookup_papers",
+    ]);
+    expect(arbitrateAskSourceTarget({
+      turnId: "ask:mixed-conceptual-supporting-sources",
+      threadId: "helix-ask:test",
+      promptText: prompt,
+    })).toMatchObject({
+      target_source: "scholarly_research",
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+    });
+  });
+
+  it("keeps an explicitly labeled source portfolio supporting despite incidental retrieval wording", () => {
+    const prompt = [
+      "Evaluate the hypothesis rather than merely reporting retrieval status.",
+      "Treat these as supporting sources, continue reasoning if one is unavailable, and keep evidence boundaries explicit.",
+      "https://ingentaconnect.com/content/imp/jcs/2026/00000033/f0020001/art00013",
+      "https://pubmed.ncbi.nlm.nih.gov/2813384/",
+      "https://karlpribram.com/wp-content/uploads/pdf/theory/T-167.pdf",
+      "Do not search the repo.",
+    ].join(" ");
+    const intent = detectScholarlyResearchIntent(prompt);
+
+    expect(intent).toMatchObject({
+      researchRequested: true,
+      supportingSourceOnly: true,
+      strength: "soft",
+    });
+    expect(intent.sourceTargets).toHaveLength(3);
+    expect(intent.plannedScholarlyCapabilityChain.planned_capabilities).toEqual([
+      "scholarly-research.fetch_full_text",
+      "scholarly-research.lookup_papers",
+    ]);
+  });
+
+  it("keeps a repo-only search prohibition scoped away from an admitted scholarly citation", () => {
+    const prompt = [
+      "Evaluate a multiscale holographic-self hypothesis.",
+      "Treat the source as supporting context and keep evidence boundaries explicit.",
+      "https://pubmed.ncbi.nlm.nih.gov/2813384/",
+      "Do not search the repo.",
+    ].join(" ");
+
+    expect(detectScholarlyResearchIntent(prompt)).toMatchObject({
+      researchRequested: true,
+      supportingSourceOnly: true,
+    });
+    expect(arbitrateAskSourceTarget({
+      turnId: "ask:scoped-repo-prohibition-scholarly-source",
+      threadId: "helix-ask:test",
+      promptText: prompt,
+    })).toMatchObject({
+      target_source: "scholarly_research",
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+    });
+  });
+
+  it("keeps URL examples model-only when every current scholarly action is negated", () => {
+    const prompt = [
+      "Do not fetch, look up, open, or search any source now.",
+      "These URLs are examples only: https://pubmed.ncbi.nlm.nih.gov/2813384/",
+      "and https://karlpribram.com/wp-content/uploads/pdf/theory/T-167.pdf.",
+      "Explain what evidence would be needed without claiming those papers were inspected.",
+    ].join(" ");
+
+    expect(detectScholarlyResearchIntent(prompt).researchRequested).toBe(false);
+    expect(arbitrateAskSourceTarget({
+      turnId: "ask:negated-scholarly-url-examples",
+      threadId: "helix-ask:test",
+      promptText: prompt,
+    }).target_source).toBe("model_only");
+  });
+
+  it("resolves DOI metadata before a requested dependent full-text fetch", () => {
+    const intent = detectScholarlyResearchIntent(
+      "Look up DOI 10.1073/pnas.86.20.8152, fetch accessible full text if available, and summarize the fetched evidence.",
+    );
+
+    expect(intent.scholarlyIntent).toMatchObject({
+      requested_workflow: "full_text_summary",
+      requires_full_text: false,
+      terminal_evidence_requirement: "metadata",
+      evidence_demand: {
+        alternatives: [{ product: "paper_metadata", minimum_depth: "metadata_lookup" }],
+        required_modes: [],
+        optional_modes: ["full_text"],
+        minimum_satisfying_depth: "metadata_lookup",
+        derivation_reasons: ["conditional_full_text_allows_metadata_fallback"],
+      },
+    });
+    expect(intent.plannedScholarlyCapabilityChain.planned_capabilities).toEqual([
+      "scholarly-research.lookup_papers",
+      "scholarly-research.fetch_full_text",
+    ]);
+    expect(intent.plannedScholarlyCapabilityChain.terminal_evidence_requirement).toBe("metadata");
+  });
+
+  it("keeps an affirmative PMID metadata lookup when full text is negated", () => {
+    const intent = detectScholarlyResearchIntent(
+      "Look up PMID 2813384 and report its metadata. Do not fetch full text.",
+    );
+
+    expect(intent).toMatchObject({
+      researchRequested: true,
+      pmid: "2813384",
+      fullTextRequested: false,
+    });
+    expect(intent.plannedScholarlyCapabilityChain.planned_capabilities).toEqual([
+      "scholarly-research.lookup_papers",
+    ]);
+  });
+
+  it("does not execute a future PMID lookup", () => {
+    const prompt =
+      "Later, if needed, look up PMID 2813384. For now explain the evidence boundary without running tools.";
+
+    expect(detectScholarlyResearchIntent(prompt).researchRequested).toBe(true);
+    expect(arbitrateAskSourceTarget({
+      turnId: "ask:future-pmid-lookup",
+      threadId: "helix-ask:test",
+      promptText: prompt,
+    }).target_source).toBe("model_only");
+  });
+
+  it("keeps explicit general-web citation searches out of scholarly research", () => {
+    expect(detectScholarlyResearchIntent(
+      "Search the web for current OpenAI API status and cite the sources you use.",
+    ).researchRequested).toBe(false);
+  });
+
   it("recognizes a natural-language direct fetch for an old-style arXiv identifier", () => {
     const prompt =
       "FULLTEXT_SMOKE_01 — Fetch and parse the full text for arXiv gr-qc/9510071. Return the title, parsed page count, and one page-numbered passage or equation. Do not search for other papers.";

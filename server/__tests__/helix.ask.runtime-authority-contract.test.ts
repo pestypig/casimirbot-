@@ -1841,6 +1841,68 @@ describe("helix ask runtime authority contract", () => {
     );
   });
 
+  it("accepts a materialized compound provider product backed by the authorized Codex bridge", () => {
+    const turnId = "turn-provider-compound-authority";
+    const report = evaluateTerminalBoundaryEligibility({
+      turn_id: turnId,
+      canonical_goal_frame: {
+        turn_id: turnId,
+        goal_kind: "calculator_solve",
+        required_terminal_kind: "workstation_tool_evaluation",
+      },
+      route_product_contract: {
+        required_terminal_artifact_kind: "compound_evidence_synthesis_answer",
+        allowed_terminal_artifact_kinds: [
+          "compound_evidence_synthesis_answer",
+          "workstation_tool_evaluation",
+          "typed_failure",
+        ],
+      },
+      terminal_artifact_kind: "compound_evidence_synthesis_answer",
+      final_answer_source: "compound_evidence_synthesis_answer",
+      selected_final_answer: "Theory reflection and calculator result.",
+      provider_terminal_authority_bridge: {
+        schema: "helix.provider_terminal_authority_bridge.v1",
+        turn_id: turnId,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+        terminal_authority_granted: true,
+        final_visible_answer_authorized: true,
+        normalized_observations_ready: true,
+        all_observations_succeeded: true,
+        successful_gateway_observation_refs: [
+          `${turnId}:calculator-observation`,
+          `${turnId}:theory-observation`,
+        ],
+        successful_capability_lane_observation_refs: [`${turnId}:theory-observation`],
+      },
+      provider_route_product_materialization: {
+        schema: "helix.provider_route_product_materialization.v1",
+        turn_id: turnId,
+        status: "materialized",
+        materialized_terminal_artifact_kind: "compound_evidence_synthesis_answer",
+        materialized_terminal_artifact_ref: `${turnId}:compound-answer`,
+      },
+      provider_route_product_quality_gate: {
+        schema: "helix.final_answer_draft_quality_gate.v1",
+        turn_id: turnId,
+        ok: true,
+        violations: [],
+      },
+    });
+
+    expect(report.source_capability_diagnostic_turn).toBe(true);
+    expect(report.checks).toMatchObject({
+      agent_runtime_loop: true,
+      agent_step_decision: true,
+      selected_capability_observation: true,
+      post_observation_model_decision: true,
+      goal_satisfaction_allows_terminal: true,
+    });
+    expect(report.eligible).toBe(true);
+    expect(report.blocking_reasons).toEqual([]);
+  });
+
   it("blocks typed failures that do not carry a failure code", () => {
     const report = evaluateTerminalBoundaryEligibility({
       canonical_goal_frame: { goal_kind: "visual_capture_describe" },

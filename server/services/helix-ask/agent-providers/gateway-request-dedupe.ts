@@ -24,10 +24,20 @@ export const requestKey = (request: Record<string, unknown>): string => {
   }
   const expression = readString(args.expression) ?? readString(args.latex);
   const query = readString(args.query) ?? readString(args.prompt) ?? readString(args.text);
+  const sourceTargetIntent = readRecord(args.source_target_intent ?? args.sourceTargetIntent);
+  const sourceTarget = readRecord(sourceTargetIntent?.source_target ?? sourceTargetIntent?.sourceTarget);
+  const sourceIdentity =
+    readString(args.source_url ?? args.sourceUrl) ??
+    readString(
+      sourceTarget?.canonical_url ??
+      sourceTarget?.canonicalUrl ??
+      sourceTarget?.source_url ??
+      sourceTarget?.sourceUrl,
+    );
   const pathList = Array.isArray(args.paths)
     ? args.paths.map(readString).filter(Boolean).join(",")
     : readString(args.path) ?? "";
-  return [capability, expression, query, pathList].filter(Boolean).join(":");
+  return [capability, sourceIdentity, expression, query, pathList].filter(Boolean).join(":");
 };
 
 export const appendDedupe = (

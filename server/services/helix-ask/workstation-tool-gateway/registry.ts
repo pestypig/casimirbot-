@@ -323,6 +323,7 @@ const REPO_SEARCH_DEFAULT_PATHS = ["server", "shared", "client/src", "docs"] as 
 const DOCS_SEARCH_DEFAULT_PATHS = ["docs"] as const;
 const INTERNET_SEARCH_PROVIDERS = ["tavily", "exa", "google_custom_search"] as const;
 const SCHOLARLY_RESEARCH_PROVIDERS = [
+  "pubmed",
   "arxiv",
   "openalex",
   "crossref",

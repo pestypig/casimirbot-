@@ -49,9 +49,9 @@ const DOCS_VIEWER_EXPLANATION_RE = /\b(?:just\s+)?(?:explain|describe|tell\s+me|
 const SCIENTIFIC_CALCULATOR_CUE_RE = /\b(?:scientific\s+calculator|calculator|calculate|compute|solve|evaluate|equation|expression)\b/i;
 const SCIENTIFIC_CALCULATOR_ACTION_RE = /\b(?:open|open\s+up|show|view|pull\s+up|bring\s+up|switch\s+to|go\s+to|navigate\s+to|load|use|run|call|calculate|compute|solve|evaluate)\b[\s\S]{0,100}\b(?:scientific\s+calculator|calculator|equation|expression)\b|\b(?:calculate|compute|solve|evaluate)\b[\s\S]{0,120}(?:\d|[=+\-*/^()]|\\frac|\\sqrt)/i;
 const SCIENTIFIC_CALCULATOR_EXPLANATION_RE = /\b(?:just\s+)?(?:explain|describe|tell\s+me|what\s+is|what\s+are|what(?:'s|\s+is)?|what\s+does|what\s+tool\s+would\s+you\s+use)\b[\s\S]{0,140}\b(?:scientific\s+calculator|calculator|calculate|compute|solve|evaluate)\b[\s\S]{0,100}\b(?:for|mean|do|does|is|are|used\s+for|purpose|would\s+use|should\s+use)\b/i;
-const SCHOLARLY_CUE_RE = /\b(?:doi|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|citations?|references?|bibliograph(?:y|ies)|bibtex|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|page\s+images?|figures?|tables?|equations?)\b|\b10\.\d{4,9}\/[-._;()/:A-Z0-9]+\b/i;
+const SCHOLARLY_CUE_RE = /\b(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|citations?|references?|bibliograph(?:y|ies)|bibtex|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|page\s+images?|figures?|tables?|equations?)\b|\b10\.\d{4,9}\/[-._;()/:A-Z0-9]+\b/i;
 const SCHOLARLY_ACTION_RE = /\b(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|pull|query|get|resolve|repair|collect|cite|cross-?check)\b/i;
-const SCHOLARLY_ACTION_WITH_CUE_RE = /\b(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|pull|query|get|resolve|repair|collect|cite|cross-?check)\b[\s\S]{0,140}\b(?:doi|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|citations?|references?|bibliograph(?:y|ies)|bibtex|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|page\s+images?|figures?|tables?|equations?)\b|\b(?:doi|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|citations?|references?|bibliograph(?:y|ies)|bibtex|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|page\s+images?|figures?|tables?|equations?)\b[\s\S]{0,140}\b(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|pull|query|get|resolve|repair|collect|cite|cross-?check)\b/i;
+const SCHOLARLY_ACTION_WITH_CUE_RE = /\b(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|pull|query|get|resolve|repair|collect|cite|cross-?check)\b[\s\S]{0,140}\b(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|citations?|references?|bibliograph(?:y|ies)|bibtex|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|page\s+images?|figures?|tables?|equations?)\b|\b(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|citations?|references?|bibliograph(?:y|ies)|bibtex|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|page\s+images?|figures?|tables?|equations?)\b[\s\S]{0,140}\b(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|pull|query|get|resolve|repair|collect|cite|cross-?check)\b/i;
 const SCHOLARLY_EXPLANATION_RE = /\b(?:just\s+)?(?:explain|describe|tell\s+me|what\s+is|what\s+are|what(?:'s|\s+is)?|what\s+does)\b[\s\S]{0,120}\b(?:doi|arxiv|crossref|openalex|semantic\s+scholar|citation|reference|journal)\b[\s\S]{0,80}\b(?:for|mean|do|does|is|are|used\s+for|purpose)\b/i;
 const INTERNET_SEARCH_CUE_RE = /\b(?:browse|browsing|search|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|search\s+online|verify\s+online|latest|current|recent|today|breaking|ongoing\s+(?:conflict|war|crisis)|ceasefire|election|law|prices?|schedules?)\b/i;
 const INTERNET_SEARCH_ACTION_RE = /\b(?:browse|search|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|search\s+online|verify\s+online)\b/i;
@@ -324,7 +324,7 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       text: quotedCalculator,
     };
   }
-  const quotedScholarly = prompt.match(/["'`][^"'`]*(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|query|cite|read)[^"'`]*(?:doi|arxiv|crossref|openalex|semantic\s+scholar|citations?|references?|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?)[^"'`]*["'`]/i)?.[0];
+  const quotedScholarly = prompt.match(/["'`][^"'`]*(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|query|cite|read)[^"'`]*(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|citations?|references?|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?)[^"'`]*["'`]/i)?.[0];
   if (quotedScholarly) {
     return {
       tool_admission_suppressed: true,
@@ -506,7 +506,7 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
     };
   }
   const promptForExternalNegation = stripWriteOnlyNegationsForExternalToolMatching(prompt);
-  const negatedScholarly = promptForExternalNegation.match(/\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to)\b[\s\S]{0,120}(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|query|get|resolve|collect|cite|read)\b[\s\S]{0,160}(?:doi|arxiv|crossref|openalex|semantic\s+scholar|citations?|references?|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?|10\.\d{4,9}\/[-._;()/:A-Z0-9]+)\b/i)?.[0];
+  const negatedScholarly = promptForExternalNegation.match(/\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to)\b[\s\S]{0,120}(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|query|get|resolve|collect|cite|read)\b[\s\S]{0,160}(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|citations?|references?|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?|10\.\d{4,9}\/[-._;()/:A-Z0-9]+)\b/i)?.[0];
   if (negatedScholarly) {
     const negatedCapability = scholarlyVerbOrCue(negatedScholarly);
     const preservesAffirmativeMetadataLookup =
@@ -520,6 +520,21 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
         text: negatedScholarly,
       };
     }
+  }
+  const negatedScholarlyReferent = promptForExternalNegation.match(
+    /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to)\b[^.!?;\n]{0,120}\b(?:look\s+(?:it|that|this|them|those)\s+up|fetch\s+(?:it|that|this|them|those)|retrieve\s+(?:it|that|this|them|those)|open\s+(?:it|that|this|them|those)|search\s+for\s+(?:it|that|this|them|those))\b/i,
+  )?.[0];
+  if (
+    negatedScholarlyReferent &&
+    SCHOLARLY_CUE_RE.test(promptForExternalNegation) &&
+    !hasAffirmativeScholarlyActionClause(promptForExternalNegation.replace(negatedScholarlyReferent, " "))
+  ) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: "negated_tool_instruction",
+      verb_or_cue: "scholarly-research.lookup_papers",
+      text: negatedScholarlyReferent,
+    };
   }
   const negatedInternet = promptForExternalNegation.match(/\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no)\b[\s\S]{0,120}(?:browse|browsing|search(?:ing)?|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|verify\s+online)\b/i)?.[0];
   if (negatedInternet || REWRITE_ONLY_CURRENT_TEXT_RE.test(promptForExternalNegation)) {
@@ -548,7 +563,7 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       text: hypotheticalCalculator,
     };
   }
-  const hypotheticalScholarly = prompt.match(/\b(?:if|when|before|after|would|could|might|hypothetically)\b[\s\S]{0,120}(?:do\s+research|research|find|search|searched|look\s*up|looked\s+up|lookup|retrieve|retrieved|fetch|fetched|query|queried|get|resolve|collect|cite|read)\b[\s\S]{0,160}(?:doi|arxiv|crossref|openalex|semantic\s+scholar|citations?|references?|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?)\b/i)?.[0];
+  const hypotheticalScholarly = prompt.match(/\b(?:in\s+the\s+future|later|next\s+time|if|when|before|after|would|could|might|hypothetically)\b[\s\S]{0,120}(?:do\s+research|research|find|search|searched|look\s*up|looked\s+up|lookup|retrieve|retrieved|fetch|fetched|query|queried|get|resolve|collect|cite|read)\b[\s\S]{0,160}(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|citations?|references?|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?)\b/i)?.[0];
   if (hypotheticalScholarly && !hasAffirmativeScholarlyActionClause(prompt)) {
     return {
       tool_admission_suppressed: true,
@@ -585,7 +600,7 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       text: historicalCalculator,
     };
   }
-  const historicalScholarly = prompt.match(/\b(?:I|we|you)\s+(?:already\s+|previously\s+|earlier\s+)?(?:looked\s+up|searched|researched|queried|retrieved|fetched|read)\b[\s\S]{0,140}(?:doi|arxiv|crossref|openalex|semantic\s+scholar|citations?|references?|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?)\b|\b(?:earlier|previously|last\s+turn|before)\b[\s\S]{0,120}(?:looked\s+up|searched|researched|queried|retrieved|fetched|read)\b[\s\S]{0,140}(?:doi|arxiv|crossref|openalex|semantic\s+scholar|citations?|references?|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?)\b/i)?.[0];
+  const historicalScholarly = prompt.match(/\b(?:I|we|you)\s+(?:already\s+|previously\s+|earlier\s+)?(?:looked\s+up|searched|researched|queried|retrieved|fetched|read)\b[\s\S]{0,140}(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|citations?|references?|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?)\b|\b(?:earlier|previously|last\s+turn|before)\b[\s\S]{0,120}(?:looked\s+up|searched|researched|queried|retrieved|fetched|read)\b[\s\S]{0,140}(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|citations?|references?|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?)\b/i)?.[0];
   if (historicalScholarly) {
     return {
       tool_admission_suppressed: true,

@@ -49,4 +49,11 @@ describe("internet-search arbitration for workstation context", () => {
     expect(isActiveWorkstationContextPrompt(prompt)).toBe(true);
     expect(detectInternetSearchIntent(prompt).searchRequested).toBe(false);
   });
+
+  it("does not add general web search for a supplied scholarly URL", () => {
+    const prompt =
+      "Use https://ingentaconnect.com/content/imp/jcs/2026/00000033/f0020001/art00013 as a supporting scholarly source for this claim.";
+
+    expect(detectInternetSearchIntent(prompt).searchRequested).toBe(false);
+  });
 });

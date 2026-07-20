@@ -33,6 +33,17 @@ const normalizeArxivIdentity = (value: string): string | null => {
     : null;
 };
 
+const normalizePmidIdentity = (value: string): string | null => {
+  const normalized = value.trim().match(/(?:^PMID\s*:?\s*|pubmed\.ncbi\.nlm\.nih\.gov\/)(\d{5,10})\b/i)?.[1] ??
+    (/^\d{5,10}$/.test(value.trim()) ? value.trim() : null);
+  return normalized || null;
+};
+
+const normalizePmcidIdentity = (value: string): string | null => {
+  const normalized = value.trim().match(/(?:^|\/)(PMC\d{4,10})\b/i)?.[1];
+  return normalized?.toUpperCase() ?? null;
+};
+
 const normalizeTitleIdentity = (value: string): string | null => {
   const normalized = value
     .normalize("NFKD")
@@ -64,6 +75,8 @@ export const scholarlyPaperIdentityKeys = (paper: unknown): string[] => {
   const values = [
     readString(identifiers?.doi),
     readString(identifiers?.arxiv_id),
+    readString(identifiers?.pmid),
+    readString(identifiers?.pmcid),
     readString(identifiers?.url),
     readString(identifiers?.pdf_url),
     readString(identifiers?.full_text_url),
@@ -78,6 +91,10 @@ export const scholarlyPaperIdentityKeys = (paper: unknown): string[] => {
     if (doi) keys.add(`doi:${doi}`);
     const arxiv = normalizeArxivIdentity(value);
     if (arxiv) keys.add(`arxiv:${arxiv}`);
+    const pmid = normalizePmidIdentity(value);
+    if (pmid) keys.add(`pmid:${pmid}`);
+    const pmcid = normalizePmcidIdentity(value);
+    if (pmcid) keys.add(`pmcid:${pmcid}`);
     const url = normalizeUrlIdentity(value);
     if (url) keys.add(`url:${url}`);
   }

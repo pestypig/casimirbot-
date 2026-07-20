@@ -32,7 +32,10 @@ import {
   detectInternetSearchIntent,
   hasAffirmativeDocsViewerSearchCue,
 } from "./internet-search-intent";
-import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
+import {
+  detectScholarlyResearchIntent,
+  hasFullyNegatedScholarlyResearchInstruction,
+} from "./scholarly-research-intent";
 import {
   detectModelOnlyConceptSourceSignal,
   isExplicitEvidenceSourceRequest,
@@ -89,21 +92,24 @@ const isExplicitModelOnlyPrompt = (prompt: string): boolean => {
     isAffirmativeDocsSourceRequirementPrompt(prompt) &&
     !contextualToolSuppressionBlocksFamily(contextualSuppression, "docs_viewer");
   const scholarlyIntent = detectScholarlyResearchIntent(prompt);
+  const fullyNegatedSourceExamples =
+    hasFullyNegatedScholarlyResearchInstruction(prompt) &&
+    /\b(?:urls?|links?|sources?)\b[^.!?;\n]{0,60}\b(?:are|were)\s+(?:examples?|illustrations?)\s+only\b/i.test(prompt);
   const narrowerSearchSuppression = /^(?:internet_search\.web_research|scholarly-research\.lookup_papers)$/i.test(
     contextualSuppression?.verb_or_cue ?? "",
   );
-  const affirmativeScholarlyFullTextRequirement =
+  const affirmativeScholarlyRequirement =
     scholarlyIntent.researchRequested &&
-    scholarlyIntent.fullTextRequested &&
     (
       !contextualToolSuppressionBlocksFamily(contextualSuppression, "scholarly_research") ||
-      narrowerSearchSuppression
+      (scholarlyIntent.fullTextRequested && narrowerSearchSuppression)
     );
   return (
+    fullyNegatedSourceExamples ||
     Boolean(contextualSuppression) &&
     !(mutatingWriteOnlySuppression && isExplicitEvidenceSourceRequest(prompt)) &&
     !affirmativeDocsRequirement &&
-    !affirmativeScholarlyFullTextRequirement
+    !affirmativeScholarlyRequirement
   ) ||
     /\bwithout\s+(?:using|checking|looking\s+at|searching|consulting)\s+(?:the\s+)?(?:workspace|docs?|documents?|papers?|screen|visual|sources?)\b/i.test(prompt) ||
     /\b(?:do\s+not|don'?t)\s+(?:use|look\s+at|check|search|consult)\s+(?:the\s+)?(?:workspace|docs?|documents?|papers?|screen|visual|sources?)\b/i.test(prompt) ||
@@ -1104,7 +1110,19 @@ export function arbitrateAskSourceTarget(input: {
     });
   }
   const modelOnlyConceptSourceSignal = detectModelOnlyConceptSourceSignal(prompt);
-  if (modelOnlyConceptSourceSignal.should_prefer_model_only_concept) {
+  const scholarlyResearchIntent = detectScholarlyResearchIntent(prompt);
+  const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
+  const narrowerScholarlySearchSuppression =
+    /^(?:internet_search\.web_research|scholarly-research\.lookup_papers)$/i.test(
+      contextualSuppression?.verb_or_cue ?? "",
+    );
+  const admittedScholarlySource =
+    scholarlyResearchIntent.researchRequested &&
+    (
+      !contextualToolSuppressionBlocksFamily(contextualSuppression, "scholarly_research") ||
+      (scholarlyResearchIntent.fullTextRequested && narrowerScholarlySearchSuppression)
+    );
+  if (modelOnlyConceptSourceSignal.should_prefer_model_only_concept && !admittedScholarlySource) {
     return toSourceTargetIntent({
       turnId: input.turnId,
       threadId: input.threadId,
@@ -1164,7 +1182,6 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
-  const scholarlyResearchIntent = detectScholarlyResearchIntent(prompt);
   if (scholarlyResearchIntent.researchRequested) {
     return toSourceTargetIntent({
       turnId: input.turnId,

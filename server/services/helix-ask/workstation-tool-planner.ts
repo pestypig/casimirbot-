@@ -475,7 +475,7 @@ function calculatorArgs(latex: string | null, setup: HelixCalculatorSetupContext
 }
 
 export function extractCalculatorExpression(prompt: string): string | null {
-  const normalized = normalizePrompt(prompt);
+  const normalized = normalizePrompt(prompt.replace(/https?:\/\/[^\s<>"']+/gi, " "));
   if (isWorkstationToolDiagnosticPrompt(normalized)) return null;
   const photonEnergyExpression = extractPhotonEnergyExpression(normalized);
   if (photonEnergyExpression) return photonEnergyExpression;

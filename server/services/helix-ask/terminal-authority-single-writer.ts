@@ -306,6 +306,12 @@ const readBlockedTypedAffordanceRailFailure = (
   if (!plan) return null;
   const binding = readRecord(plan.typed_affordance_binding);
   const firstBrokenRail = readRecord(plan.first_broken_rail);
+  const bindingStatus = readString(binding?.status);
+  const bindingReason = readString(binding?.reason) ?? readString(firstBrokenRail?.reason);
+  const isTypedAffordanceFailure =
+    bindingStatus === "blocked" ||
+    Boolean(bindingReason && /(?:typed_affordance|missing_numeric_value_evidence)/i.test(bindingReason));
+  if (!isTypedAffordanceFailure) return null;
   const orderedSubgoals = readArray(plan.ordered_subgoals);
   const subgoals = orderedSubgoals.length > 0 ? orderedSubgoals : readArray(plan.subgoals);
   const blockedSubgoal =
@@ -358,7 +364,11 @@ const readTerminalBlockingToolRailFailure = (
   const triage = readRecord(payload.tool_rail_failure_triage);
   const railStatus = readString(triage?.rail_status) ?? readString(audit?.rail_status);
   if (railStatus !== "broken" && railStatus !== "fail_closed") return null;
+  const useExecutedCompoundFailure =
+    triage?.compound_incomplete_subgoal_did_tool_run === true &&
+    Boolean(readString(triage?.compound_rail_failure_code));
   const railFailureCode =
+    (useExecutedCompoundFailure ? readString(triage?.compound_rail_failure_code) : null) ??
     readString(triage?.rail_failure_code) ??
     readString(audit?.rail_failure_code) ??
     readString(payload.terminal_error_code);
@@ -366,10 +376,29 @@ const readTerminalBlockingToolRailFailure = (
   return {
     railStatus,
     railFailureCode,
-    firstBrokenRail: readString(triage?.first_broken_rail) ?? readString(audit?.first_broken_rail) ?? null,
-    repairTarget: readString(triage?.repair_target) ?? readString(audit?.repair_target) ?? null,
-    selectedCapability: readString(triage?.selected_capability) ?? readString(audit?.selected_capability) ?? null,
-    executedCapability: readString(triage?.executed_capability) ?? readString(audit?.executed_capability) ?? null,
+    firstBrokenRail:
+      (useExecutedCompoundFailure ? readString(triage?.compound_first_broken_rail) : null) ??
+      readString(triage?.first_broken_rail) ??
+      readString(audit?.first_broken_rail) ??
+      null,
+    repairTarget:
+      (useExecutedCompoundFailure ? readString(triage?.compound_repair_target) : null) ??
+      readString(triage?.repair_target) ??
+      readString(audit?.repair_target) ??
+      null,
+    selectedCapability:
+      (useExecutedCompoundFailure
+        ? readString(triage?.first_incomplete_compound_selected_capability) ??
+          readString(triage?.first_incomplete_compound_requested_capability)
+        : null) ??
+      readString(triage?.selected_capability) ??
+      readString(audit?.selected_capability) ??
+      null,
+    executedCapability:
+      (useExecutedCompoundFailure ? readString(triage?.first_incomplete_compound_executed_capability) : null) ??
+      readString(triage?.executed_capability) ??
+      readString(audit?.executed_capability) ??
+      null,
   };
 };
 
@@ -3037,12 +3066,22 @@ const hasObservedScholarlyFullText = (artifacts: ArtifactLike[]): boolean =>
     const payload = artifactPayload(artifact);
     if (!payload) return false;
     const pagesParsed = typeof payload.pages_parsed === "number" ? payload.pages_parsed : 0;
+    const evidenceState = readString(payload.evidence_state);
+    const status = readString(payload.status);
+    if (
+      status === "failed" ||
+      status === "blocked" ||
+      evidenceState === "full_text_unavailable" ||
+      evidenceState === "lookup_blocked"
+    ) {
+      return false;
+    }
     return (
       pagesParsed > 0 ||
       readArray(payload.selected_chunks).length > 0 ||
       readArray(payload.page_text_refs).length > 0 ||
       readArray(payload.selected_pages).length > 0 ||
-      Boolean(readString(payload.source_url) ?? readString(payload.source_pdf_ref))
+      evidenceState === "full_text_usable"
     );
   });
 

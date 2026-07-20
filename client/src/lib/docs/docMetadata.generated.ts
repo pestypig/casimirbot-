@@ -156,7 +156,7 @@ export const DOC_FILE_METADATA: Record<string, DocFileMetadata> = {
   "docs/audits/research/needle-hull-mark2/README.md": {"mtimeMs":1774474430520,"mtimeIso":"2026-03-25T21:33:50.520Z","sizeBytes":559},
   "docs/audits/research/needle-hull-mark2/theory-directory-2026-03-18.md": {"mtimeMs":1773815782149,"mtimeIso":"2026-03-18T06:36:22.149Z","sizeBytes":3476},
   "docs/audits/research/needle-hull-mark2/theory-directory-latest.md": {"mtimeMs":1773815782149,"mtimeIso":"2026-03-18T06:36:22.149Z","sizeBytes":3476},
-  "docs/audits/research/nhm2-nine-field-replay-authority-2026-07-20.md": {"mtimeMs":1784533981288,"mtimeIso":"2026-07-20T07:53:01.288Z","sizeBytes":6996},
+  "docs/audits/research/nhm2-nine-field-replay-authority-2026-07-20.md": {"mtimeMs":1784534932284,"mtimeIso":"2026-07-20T08:08:52.284Z","sizeBytes":7864},
   "docs/audits/research/observer-robust-warp-bubble-visualizer-build-plan-context-2026-02-26.md": {"mtimeMs":1772072898114,"mtimeIso":"2026-02-26T02:28:18.114Z","sizeBytes":9873},
   "docs/audits/research/orch-or-time-crystal-source-packet-2026-03-25.md": {"mtimeMs":1774490281962,"mtimeIso":"2026-03-26T01:58:01.962Z","sizeBytes":8409},
   "docs/audits/research/ownership-maturity-utility-deep-research-2026-02-25.md": {"mtimeMs":1772139201697,"mtimeIso":"2026-02-26T20:53:21.697Z","sizeBytes":7679},

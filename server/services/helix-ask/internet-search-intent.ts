@@ -7,6 +7,7 @@ import {
   contextualToolSuppressionBlocksFamily,
   detectContextualToolAdmissionSuppression,
 } from "./contextual-tool-admission";
+import { extractScholarlySourceTargets } from "./scholarly-research-intent";
 import { hasWorkstationPanelScopeCue } from "./workstation-active-context-intent";
 
 export type HelixInternetSearchIntent = {
@@ -53,7 +54,8 @@ const hasLocalObservationScopeCue = (promptText: string): boolean =>
   /\b(?:image\s*lens|pdf\s+page|page\s+\d+|current\s+page|crop(?:ped|ping)?|bbox|bounding\s+box|equation\s+row|exact\s+row|crop\s+ref|source\s+image\s+hash|page[-\s]?grounded|scientific\s+image\s+evidence|visual_analysis\.inspect_image_region)\b/i.test(promptText);
 
 const hasScholarlyScopeCue = (promptText: string): boolean =>
-  /\b(?:doi|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|journal|peer[-\s]?reviewed|citations?|references?|bibliograph(?:y|ies)|research\s+papers?|scholarly\s+(?:papers?|articles?|sources?))\b/i.test(promptText);
+  /\b(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|journal|peer[-\s]?reviewed|citations?|references?|bibliograph(?:y|ies)|research\s+papers?|scholarly\s+(?:papers?|articles?|sources?))\b/i.test(promptText) ||
+  extractScholarlySourceTargets(promptText).length > 0;
 
 const hasSearchActionCue = (promptText: string): boolean =>
   /\b(?:search|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|search\s+online|verify|source|sources)\b/i.test(promptText);

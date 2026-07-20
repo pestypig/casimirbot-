@@ -5943,4 +5943,77 @@ describe("Helix terminal authority single writer", () => {
       concise_text: expect.stringContaining("n_m3, T_eV"),
     });
   });
+
+  it("reports an executed scholarly fetch failure instead of inventing a typed-affordance failure", () => {
+    const turnId = "ask:test:scholarly-fetch-http-403";
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      selected_final_answer: "Unsupported stale answer",
+      answer: "Unsupported stale answer",
+      text: "Unsupported stale answer",
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      compound_dependency_turn_plan: {
+        schema: "helix.compound_capability_dependency_turn_plan.v1",
+        turn_id: turnId,
+        rail_status: "blocked",
+        ordered_subgoals: [
+          {
+            subgoal_id: "scholarly_research_workflow:scholarly_full_text",
+            requested_capability: "scholarly-research.fetch_full_text",
+            selected_capability: "scholarly-research.fetch_full_text",
+            executed_capability: null,
+            satisfied: false,
+            rail_status: "missing_observation",
+            rail_failure_code: "full_text_http_403",
+          },
+        ],
+        first_broken_rail: {
+          subgoal_id: "scholarly_research_workflow:scholarly_full_text",
+          requested_capability: "scholarly-research.fetch_full_text",
+          selected_capability: "scholarly-research.fetch_full_text",
+          rail_status: "missing_observation",
+          rail_failure_code: "full_text_http_403",
+        },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      tool_rail_failure_triage: {
+        schema: "helix.tool_rail_failure_triage.v1",
+        rail_status: "fail_closed",
+        rail_failure_code: "observation_missing",
+        first_broken_rail: "observation_artifact",
+        repair_target: "observation_materializer",
+        selected_capability: "scholarly-research.fetch_full_text",
+        executed_capability: "scholarly-research.fetch_full_text",
+        compound_incomplete_subgoal_did_tool_run: true,
+        compound_rail_failure_code: "full_text_http_403",
+        compound_first_broken_rail: "capability_execution",
+        compound_repair_target: "tool_result_reentry",
+        first_incomplete_compound_requested_capability: "scholarly-research.fetch_full_text",
+        first_incomplete_compound_selected_capability: "scholarly-research.fetch_full_text",
+        first_incomplete_compound_executed_capability: "scholarly-research.fetch_full_text",
+      },
+      current_turn_artifact_ledger: [],
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: [],
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("full_text_http_403");
+    expect(payload.selected_final_answer).toContain("full_text_http_403");
+    expect(payload.selected_final_answer).not.toContain("typed affordance");
+    expect(payload.typed_failure).toMatchObject({
+      error_code: "full_text_http_403",
+      first_broken_rail: "capability_execution",
+      repair_target: "tool_result_reentry",
+      selected_capability: "scholarly-research.fetch_full_text",
+      executed_capability: "scholarly-research.fetch_full_text",
+    });
+  });
 });

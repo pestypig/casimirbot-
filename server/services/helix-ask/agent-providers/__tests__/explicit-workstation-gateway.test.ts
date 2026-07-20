@@ -312,6 +312,77 @@ describe("explicit workstation gateway derived calls", () => {
     expect(capabilities(requests)).toEqual(["scholarly-research.fetch_full_text"]);
   });
 
+  it("routes DOI full-text requests through metadata resolution before dependent fetch", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question: [
+          "Look up DOI 10.1073/pnas.86.20.8152, fetch accessible full text if available,",
+          "and summarize only what the fetched evidence supports about microtubules.",
+          "Do not search the repo or the general web.",
+        ].join(" "),
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["scholarly-research.lookup_papers"]);
+    expect(requests[0]).toMatchObject({
+      compound_outcome: "scholarly_research_workflow",
+      dependent_capability_id: "scholarly-research.fetch_full_text",
+      arguments: {
+        mode: "doi_lookup",
+        allow_scholarly_dependent_chain: true,
+        source_target_intent: {
+          doi: "10.1073/pnas.86.20.8152",
+          full_text_requested: true,
+        },
+      },
+    });
+  });
+
+  it("keeps an explicit supporting-source portfolio exact and does not parse URL state as calculator math", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question: [
+          "Evaluate the hypothesis rather than merely reporting retrieval status: a multiscale holographic self might preserve coarse information without making every process a subject.",
+          "Treat these as supporting sources, continue reasoning if one is unavailable, and keep evidence boundaries explicit.",
+          "https://ingentaconnect.com/content/imp/jcs/2026/00000033/f0020001/art00013;jsessionid=24w4io4ebkjc6.x-ic-live-02",
+          "https://pubmed.ncbi.nlm.nih.gov/2813384/",
+          "https://karlpribram.com/wp-content/uploads/pdf/theory/T-167.pdf",
+          "Do not search the repo.",
+        ].join(" "),
+      },
+    });
+
+    expect(capabilities(requests)).toEqual([
+      "scholarly-research.fetch_full_text",
+      "scholarly-research.lookup_papers",
+      "scholarly-research.fetch_full_text",
+    ]);
+    expect(requests.map((request) => (request.arguments as Record<string, any>).source_target_intent.source_portfolio_index))
+      .toEqual([0, 1, 2]);
+    expect(capabilities(requests)).not.toContain("scientific-calculator.solve_expression");
+  });
+
+  it("does not execute tools for fully negated scholarly URL examples", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question: [
+          "Do not fetch, look up, open, or search any source now.",
+          "These URLs are examples only: https://pubmed.ncbi.nlm.nih.gov/2813384/",
+          "and https://karlpribram.com/wp-content/uploads/pdf/theory/T-167.pdf.",
+          "Explain what evidence would be needed without claiming those papers were inspected.",
+        ].join(" "),
+      },
+    });
+
+    expect(requests).toEqual([]);
+  });
+
   it("does not infer a provider-record audit from an explicitly negated provider-search clause", () => {
     expect(hasExplicitScholarlyProviderRecordAuditIntent([
       "Do not search scholarly providers or collect provider records.",
@@ -2943,6 +3014,123 @@ describe("explicit workstation gateway derived calls", () => {
     });
 
     expect(requests).toEqual([]);
+  });
+
+  it("does not derive repo search from scholarly URL tokens or scientific source wording", () => {
+    const requests = buildPromptDerivedRepoSearchGatewayCallRequests({
+      agent_runtime: "codex",
+      question: [
+        "If consciousness is holographic, a small region may reconstruct a fuzzy image from the original coherent source.",
+        "https://ingentaconnect.com/content/imp/jcs/2026/00000033/f0020001/art00013;jsessionid=24w4io4ebkjc6.x-ic-live-02",
+        "https://karlpribram.com/wp-content/uploads/pdf/theory/T-167.pdf",
+      ].join(" "),
+    });
+
+    expect(requests).toEqual([]);
+  });
+
+  it("retains an affirmative repo search when a scholarly URL is supporting context", () => {
+    const requests = buildPromptDerivedRepoSearchGatewayCallRequests({
+      agent_runtime: "codex",
+      question: [
+        "Search the repo for scholarly-research-intent.ts and compare the implementation with this source:",
+        "https://pubmed.ncbi.nlm.nih.gov/2813384/",
+      ].join(" "),
+    });
+
+    expect(requests).toEqual([
+      expect.objectContaining({
+        capability_id: "repo.search",
+        arguments: expect.objectContaining({
+          query: "scholarly-research-intent.ts",
+        }),
+      }),
+    ]);
+  });
+
+  it("retains repo search and exact PMID metadata when only general web search is negated", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question: [
+          "Search the repo for scholarly-research-intent.ts and use",
+          "https://pubmed.ncbi.nlm.nih.gov/2813384/ as supporting paper metadata.",
+          "Explain exact PMID routing and distinguish code evidence from paper evidence.",
+          "Do not search the general web.",
+        ].join(" "),
+      },
+    });
+
+    expect(capabilities(requests)).toEqual([
+      "scholarly-research.lookup_papers",
+      "repo.search",
+    ]);
+    expect(requests[0]).toMatchObject({
+      arguments: {
+        query: "PMID:2813384",
+        providers: ["pubmed"],
+      },
+    });
+    expect(requests[1]).toMatchObject({
+      arguments: { query: "scholarly-research-intent.ts" },
+    });
+  });
+
+  it("keeps PMID metadata lookup while honoring a full-text prohibition", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question: "Look up PMID 2813384 and report its metadata. Do not fetch full text.",
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["scholarly-research.lookup_papers"]);
+    expect(requests[0]).toMatchObject({
+      arguments: {
+        query: "PMID:2813384",
+        providers: ["pubmed"],
+      },
+    });
+  });
+
+  it("does not execute a future PMID lookup", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Later, if needed, look up PMID 2813384. For now explain the evidence boundary without running tools.",
+      },
+    });
+
+    expect(requests).toEqual([]);
+  });
+
+  it("keeps an explicit general-web citation request in the internet family", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question: "Search the web for current OpenAI API status and cite the sources you use.",
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["internet-search.search_web"]);
+  });
+
+  it("does not add general web search for a supplied scholarly source", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Use https://ingentaconnect.com/content/imp/jcs/2026/00000033/f0020001/art00013 as a supporting scholarly source for this claim.",
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["scholarly-research.fetch_full_text"]);
   });
 
   it("maps natural repo search variants named in the contract", () => {

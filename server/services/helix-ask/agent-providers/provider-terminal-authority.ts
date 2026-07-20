@@ -148,12 +148,48 @@ const scholarlyGatewayAttemptWasSupersededByUsableEvidence = (
   );
 };
 
+const scholarlyIntentForGatewayResult = (
+  result: HelixWorkstationGatewayCallResult,
+): Record<string, unknown> | null => {
+  const sourceTargetIntent = readRecord(result.gateway_admission.source_target_intent);
+  return readRecord(sourceTargetIntent?.scholarly_intent) ?? sourceTargetIntent;
+};
+
+const isOptionalScholarlyFailureObservation = (
+  result: HelixWorkstationGatewayCallResult,
+  gatewayCallResults: HelixWorkstationGatewayCallResult[],
+): boolean => {
+  if (result.ok === true || !isScholarlyGatewayCapability(result)) return false;
+  const sourceTargetIntent = readRecord(result.gateway_admission.source_target_intent);
+  const scholarlyIntent = scholarlyIntentForGatewayResult(result);
+  const evidenceDemand = readRecord(scholarlyIntent?.evidence_demand);
+  const requiredModes = readArray(evidenceDemand?.required_modes).map(readString).filter(Boolean);
+  const optionalModes = readArray(evidenceDemand?.optional_modes).map(readString).filter(Boolean);
+  const supportingSourcesOnly =
+    readBoolean(sourceTargetIntent?.supporting_sources_only) === true ||
+    readBoolean(scholarlyIntent?.supporting_sources_only) === true;
+  if (supportingSourcesOnly) return true;
+  if (
+    gatewayCapability(result) !== "scholarly-research.fetch_full_text" ||
+    requiredModes.includes("full_text") ||
+    !optionalModes.includes("full_text")
+  ) {
+    return false;
+  }
+  return gatewayCallResults.some((candidate) =>
+    gatewayCapability(candidate) === "scholarly-research.lookup_papers" &&
+    candidate.ok === true &&
+    isScholarlyEvidenceSelectedForAnswer(candidate)
+  );
+};
+
 const isGatewayObservationCompatibleWithProviderReasoning = (
   result: HelixWorkstationGatewayCallResult,
   gatewayCallResults: HelixWorkstationGatewayCallResult[],
 ): boolean =>
   isGatewayObservationReenteredForProviderReasoning(result) ||
-  scholarlyGatewayAttemptWasSupersededByUsableEvidence(result, gatewayCallResults);
+  scholarlyGatewayAttemptWasSupersededByUsableEvidence(result, gatewayCallResults) ||
+  isOptionalScholarlyFailureObservation(result, gatewayCallResults);
 
 const isTextToSpeechReceiptObservation = (packet: HelixAgentStepObservationPacket): boolean => {
   if (packet.capability_key !== "text_to_speech.speak_text") return false;
@@ -213,7 +249,9 @@ export const buildHelixProviderReasoningReentry = (input: {
     ...priorEvidenceObservationRefs,
   ];
   const successfulGatewayObservationRefs = input.gatewayCallResults
-    .filter(isGatewayObservationReenteredForProviderReasoning)
+    .filter((result) =>
+      isGatewayObservationCompatibleWithProviderReasoning(result, input.gatewayCallResults)
+    )
     .flatMap((result) => result.artifact_refs);
   const successfulObservationRefs = [
     ...successfulGatewayObservationRefs,

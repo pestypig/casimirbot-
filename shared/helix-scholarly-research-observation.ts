@@ -20,6 +20,7 @@ export const HELIX_MODEL_SYNTHESIZE_FROM_SCHOLARLY_RESEARCH_CAPABILITY =
   "model.synthesize_from_scholarly_research" as const;
 
 export type HelixScholarlyResearchProvider =
+  | "pubmed"
   | "arxiv"
   | "openalex"
   | "crossref"
@@ -83,6 +84,26 @@ export type HelixScholarlyEvidenceDemand = {
   raw_content_included: false;
 };
 
+export type HelixScholarlySourceTargetKind =
+  | "pubmed"
+  | "pmc"
+  | "doi"
+  | "arxiv"
+  | "pdf"
+  | "publisher";
+
+export type HelixScholarlySourceTarget = {
+  schema: "helix.scholarly_source_target.v1";
+  source_url: string;
+  canonical_url: string;
+  kind: HelixScholarlySourceTargetKind;
+  retrieval_strategy: "metadata_lookup" | "direct_full_text";
+  doi?: string;
+  arxiv_id?: string;
+  pmid?: string;
+  pmcid?: string;
+};
+
 export type HelixScholarlyIntent = {
   schema: "helix.scholarly_intent.v1";
   original_prompt: string;
@@ -96,6 +117,8 @@ export type HelixScholarlyIntent = {
   terminal_evidence_requirement: HelixScholarlyTerminalEvidenceRequirement;
   evidence_demand: HelixScholarlyEvidenceDemand;
   query_normalization_reasons: string[];
+  supporting_sources_only?: boolean;
+  source_targets?: HelixScholarlySourceTarget[];
   assistant_answer: false;
   raw_content_included: false;
 };
@@ -136,7 +159,8 @@ export type HelixScholarlyResponseMode =
   | "scholarly_full_text_answer"
   | "scholarly_parse_required"
   | "scholarly_numeric_binding"
-  | "scholarly_numeric_missing";
+  | "scholarly_numeric_missing"
+  | "scholarly_research_answer";
 
 export type HelixScholarlyResponseModeSelection = {
   schema: "helix.scholarly_response_mode_selection.v1";
@@ -183,6 +207,8 @@ export type HelixScholarlyRecoveryAffordance = {
 export type HelixScholarlyPaperIdentifier = {
   doi?: string;
   arxiv_id?: string;
+  pmid?: string;
+  pmcid?: string;
   openalex_id?: string;
   semantic_scholar_id?: string;
   url?: string;

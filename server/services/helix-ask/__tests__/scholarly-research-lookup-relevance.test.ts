@@ -5,6 +5,62 @@ import {
 } from "../retrieval/scholarly-research-lookup";
 
 describe("scholarly research lookup relevance", () => {
+  it("resolves an exact PMID through PubMed without applying broad-topic relevance rejection", async () => {
+    const fetchImpl: ScholarlyFetch = async (url) => {
+      expect(url).toContain("db=pubmed&id=2813384");
+      return {
+        ok: true,
+        status: 200,
+        text: async () => [
+          "<?xml version=\"1.0\"?>",
+          "<PubmedArticleSet><PubmedArticle>",
+          "<MedlineCitation><PMID Version=\"1\">2813384</PMID><Article>",
+          "<Journal><JournalIssue><PubDate><Year>1989</Year></PubDate></JournalIssue><Title>Proceedings of the National Academy of Sciences</Title></Journal>",
+          "<ArticleTitle>Hypothesis: microtubules, a key to Alzheimer disease</ArticleTitle>",
+          "<Abstract><AbstractText>Microtubule impairment is proposed as a mechanism in Alzheimer disease.</AbstractText></Abstract>",
+          "<AuthorList><Author><LastName>Matsuyama</LastName><ForeName>H</ForeName></Author></AuthorList>",
+          "</Article></MedlineCitation>",
+          "<PubmedData><ArticleIdList>",
+          "<ArticleId IdType=\"pubmed\">2813384</ArticleId>",
+          "<ArticleId IdType=\"doi\">10.1073/pnas.86.20.8152</ArticleId>",
+          "<ArticleId IdType=\"pmc\">PMC298233</ArticleId>",
+          "</ArticleIdList></PubmedData>",
+          "</PubmedArticle></PubmedArticleSet>",
+        ].join(""),
+      };
+    };
+
+    const observation = await runScholarlyResearchLookup({
+      turnId: "ask:pubmed-exact-pmid",
+      callId: "call:pubmed-exact-pmid",
+      query: "PMID:2813384",
+      providers: ["pubmed"],
+      limit: 3,
+      fetchImpl,
+    });
+
+    expect(observation).toMatchObject({
+      evidence_state: "lookup_usable",
+      selected_for_answer: true,
+      providers_called: ["pubmed"],
+      papers: [{
+        title: "Hypothesis: microtubules, a key to Alzheimer disease",
+        identifiers: {
+          pmid: "2813384",
+          pmcid: "PMC298233",
+          doi: "10.1073/pnas.86.20.8152",
+        },
+      }],
+      lookup_relevance_gate: {
+        status: "satisfied",
+        candidate_evaluations: [expect.objectContaining({
+          supported: true,
+          reason: "exact_identifier_match",
+        })],
+      },
+    });
+  });
+
   it("admits a claim-relevant paper across inflections without treating retry modifiers as topic terms", async () => {
     const fetchImpl: ScholarlyFetch = async () => ({
       ok: true,

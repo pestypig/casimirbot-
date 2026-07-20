@@ -1369,6 +1369,34 @@ const contractAuthorizedNoteReceiptTerminalAllowed = (payload: Record<string, un
   return goalSatisfactionAllowsTerminal(payload) && hasSelectedCapabilityObservation(payload);
 };
 
+const providerTerminalBridgeProvesRuntimeAuthority = (payload: Record<string, unknown>): boolean => {
+  const bridge = readRecord(payload.provider_terminal_authority_bridge);
+  const materialization = readRecord(payload.provider_route_product_materialization);
+  const qualityGate = readRecord(payload.provider_route_product_quality_gate);
+  const terminalKind = readString(payload.terminal_artifact_kind);
+  const materializedKind = readString(materialization?.materialized_terminal_artifact_kind);
+  const successfulObservationRefs = [
+    ...readArray(bridge?.successful_gateway_observation_refs),
+    ...readArray(bridge?.successful_capability_lane_observation_refs),
+  ]
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+  return Boolean(
+    bridge?.schema === "helix.provider_terminal_authority_bridge.v1" &&
+    bridge?.solver_completed === true &&
+    bridge?.goal_satisfaction_compatible === true &&
+    bridge?.terminal_authority_granted === true &&
+    bridge?.final_visible_answer_authorized === true &&
+    bridge?.normalized_observations_ready === true &&
+    bridge?.all_observations_succeeded === true &&
+    successfulObservationRefs.length > 0 &&
+    materialization?.status === "materialized" &&
+    materializedKind &&
+    materializedKind === terminalKind &&
+    qualityGate?.ok === true
+  );
+};
+
 export function hasCleanTypedFailure(payload: Record<string, unknown>): boolean {
   if (readString(payload.terminal_artifact_kind) !== "typed_failure" && readString(payload.final_answer_source) !== "typed_failure") return false;
   return Boolean(
@@ -1411,14 +1439,32 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
   const microDeckCapability = selectedMicroDeckCapability(payload);
   const ledgerBackedPostObservationAnswerDraft = hasLedgerBackedPostObservationAnswerDraft(payload);
   const repoEvidenceAnswerTerminal = repoEvidenceAnswerTerminalAllowed(payload);
+  const providerBridgeRuntimeAuthority = providerTerminalBridgeProvesRuntimeAuthority(payload);
   const checks = {
-    agent_runtime_loop: hasAgentRuntimeLoopDecisionChain(payload) || ledgerBackedPostObservationAnswerDraft,
-    agent_step_decision: Boolean(readRecord(payload.agent_step_decision)) || hasAgentRuntimeLoopDecisionChain(payload) || ledgerBackedPostObservationAnswerDraft,
+    agent_runtime_loop:
+      hasAgentRuntimeLoopDecisionChain(payload) ||
+      ledgerBackedPostObservationAnswerDraft ||
+      providerBridgeRuntimeAuthority,
+    agent_step_decision:
+      Boolean(readRecord(payload.agent_step_decision)) ||
+      hasAgentRuntimeLoopDecisionChain(payload) ||
+      ledgerBackedPostObservationAnswerDraft ||
+      providerBridgeRuntimeAuthority,
     runtime_tool_call: !microDeckObservationBackedRoute || hasRuntimeToolCallForSelectedCapability(payload, microDeckCapability),
     microdeck_selected_capability: !microDeckObservationBackedRoute || selectedCapabilityMatches(payload, microDeckCapability),
-    selected_capability_observation: repoEvidenceAnswerTerminal || hasSelectedCapabilityObservation(payload) || ledgerBackedPostObservationAnswerDraft,
-    post_observation_model_decision: hasPostObservationModelDecision(payload) || ledgerBackedPostObservationAnswerDraft,
-    goal_satisfaction_allows_terminal: goalSatisfactionAllowsTerminal(payload) || ledgerBackedPostObservationAnswerDraft,
+    selected_capability_observation:
+      repoEvidenceAnswerTerminal ||
+      hasSelectedCapabilityObservation(payload) ||
+      ledgerBackedPostObservationAnswerDraft ||
+      providerBridgeRuntimeAuthority,
+    post_observation_model_decision:
+      hasPostObservationModelDecision(payload) ||
+      ledgerBackedPostObservationAnswerDraft ||
+      providerBridgeRuntimeAuthority,
+    goal_satisfaction_allows_terminal:
+      goalSatisfactionAllowsTerminal(payload) ||
+      ledgerBackedPostObservationAnswerDraft ||
+      providerBridgeRuntimeAuthority,
     typed_failure_clean: hasCleanTypedFailure(payload),
   };
   const requiresRuntimeLoop =

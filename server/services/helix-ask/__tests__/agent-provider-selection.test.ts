@@ -7,6 +7,7 @@ import { selectHelixAgentRuntime } from "../agent-providers/runtime-select";
 import { buildHelixAgentRuntimeSelectionTrace } from "../agent-providers/runtime-debug";
 import {
   applyGatewayFailureAuthorityGuard,
+  buildScholarlyResearchResponseModeProjection,
   codexProvider,
   providerGatewayEvidenceReadyForSolver,
   readCodexArgs,
@@ -911,6 +912,222 @@ describe("Helix Ask agent provider selection", () => {
     )).toBe(true);
   });
 
+  it("routes each supplied supporting paper independently instead of searching the whole argument", () => {
+    const question = [
+      "Dan Dennett was a great guy and philosopher but possibly wrong on this point also.",
+      "If consciousness is holographic, the conscious self may be represented at multiple scales.",
+      "https://ingentaconnect.com/content/imp/jcs/2026/00000033/f0020001/art00013;jsessionid=24w4io4ebkjc6.x-ic-live-02",
+      "Small holographic regions may recover a lower-resolution image when reilluminated with the original coherent source.",
+      "https://pubmed.ncbi.nlm.nih.gov/2813384/",
+      "https://karlpribram.com/wp-content/uploads/pdf/theory/T-167.pdf",
+    ].join(" ");
+
+    const requests = buildPromptDerivedScholarlyResearchGatewayCallRequests({ question });
+
+    expect(requests).toHaveLength(3);
+    expect(requests.map((request: any) => request.capability_id)).toEqual([
+      "scholarly-research.fetch_full_text",
+      "scholarly-research.lookup_papers",
+      "scholarly-research.fetch_full_text",
+    ]);
+    expect((requests[0] as any).arguments.source_url).toBe(
+      "https://ingentaconnect.com/content/imp/jcs/2026/00000033/f0020001/art00013",
+    );
+    expect((requests[1] as any).arguments).toMatchObject({
+      query: "PMID:2813384",
+      providers: ["pubmed"],
+      source_target_intent: {
+        strength: "soft",
+        supporting_sources_only: true,
+        source_portfolio_index: 1,
+        source_portfolio_count: 3,
+      },
+    });
+    expect((requests[2] as any).arguments.source_url).toBe(
+      "https://karlpribram.com/wp-content/uploads/pdf/theory/T-167.pdf",
+    );
+    expect(requests.map((request: any) => request.arguments.query).join(" ")).not.toMatch(/https?:\/\//);
+
+    const admittedRequests = readWorkstationGatewayCallRequestsForTurn({
+      body: { question, agent_runtime: "codex" },
+      includePlannerDerived: true,
+    });
+    const admittedScholarlyRequests = admittedRequests.filter((request) =>
+      request.capability_id === "scholarly-research.fetch_full_text" ||
+      request.capability_id === "scholarly-research.lookup_papers"
+    );
+
+    expect(admittedScholarlyRequests).toHaveLength(3);
+    expect(admittedScholarlyRequests.map((request: any) => request.arguments.source_target_intent.source_portfolio_index))
+      .toEqual([0, 1, 2]);
+    expect(admittedScholarlyRequests.map((request: any) => request.arguments.source_url).filter(Boolean)).toEqual([
+      "https://ingentaconnect.com/content/imp/jcs/2026/00000033/f0020001/art00013",
+      "https://karlpribram.com/wp-content/uploads/pdf/theory/T-167.pdf",
+    ]);
+    expect(admittedRequests.map((request) => request.capability_id)).not.toContain("repo.search");
+  });
+
+  it("preserves conceptual provider synthesis when a supporting scholarly source is unavailable", () => {
+    const question = [
+      "If consciousness is holographic, the self may be represented across scales.",
+      "https://karlpribram.com/wp-content/uploads/pdf/theory/T-167.pdf",
+    ].join(" ");
+    const providerText = [
+      "The holographic analogy supports distributed, partially recoverable representation.",
+      "It does not by itself establish a separate conscious subject at every scale.",
+    ].join(" ");
+
+    const result = buildScholarlyResearchResponseModeProjection({
+      question,
+      text: providerText,
+      gatewayCallResults: [{
+        ok: false,
+        capability_id: "scholarly-research.fetch_full_text",
+        gateway_admission: {
+          requested_capability: "scholarly-research.fetch_full_text",
+        },
+        observation: {
+          evidence_state: "full_text_unavailable",
+          missing_requirements: ["full_text_http_403"],
+          next_affordances: [],
+        },
+        observation_packet: {
+          state_delta: {
+            evidence_state: "full_text_unavailable",
+            missing_requirements: ["full_text_http_403"],
+          },
+        },
+      } as any],
+    });
+
+    expect(result.text).toBe(providerText);
+    expect(result.text).not.toContain("Helix completed");
+    expect(result.projection).toMatchObject({
+      selected_response_mode: "scholarly_research_answer",
+      terminal_artifact_kind: "scholarly_research_answer",
+      terminal_eligible: true,
+      supporting_sources_only: true,
+      evidence_state: "full_text_unavailable",
+      missing_requirements: ["full_text_http_403"],
+    });
+  });
+
+  it("terminalizes mixed conceptual and supporting-source synthesis as a scholarly research answer", async () => {
+    const providerText = [
+      "A distributed self-model could be represented at several physical scales.",
+      "That does not establish a distinct conscious subject at each scale, and the cited Alzheimer paper does not supply that missing inference.",
+    ].join(" ");
+    process.env.CODEX_AGENT_FAKE_STDOUT = providerText;
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\"?>",
+        "<PubmedArticleSet><PubmedArticle><MedlineCitation>",
+        "<PMID>2813384</PMID><Article>",
+        "<Journal><JournalIssue><PubDate><Year>1989</Year></PubDate></JournalIssue><Title>PNAS</Title></Journal>",
+        "<ArticleTitle>Hypothesis: microtubules, a key to Alzheimer disease</ArticleTitle>",
+        "<Abstract><AbstractText>Microtubule impairment is considered in Alzheimer disease.</AbstractText></Abstract>",
+        "<AuthorList><Author><LastName>Matsuyama</LastName><ForeName>H</ForeName></Author></AuthorList>",
+        "</Article></MedlineCitation><PubmedData><ArticleIdList>",
+        "<ArticleId IdType=\"pubmed\">2813384</ArticleId>",
+        "<ArticleId IdType=\"doi\">10.1073/pnas.86.20.8152</ArticleId>",
+        "</ArticleIdList></PubmedData></PubmedArticle></PubmedArticleSet>",
+      ].join(""),
+    })) as typeof fetch;
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:mixed-conceptual-supporting-pubmed",
+        agent_runtime: "codex",
+        question: [
+          "If consciousness is holographic, the conscious self may be represented at multiple size and frequency scales.",
+          "The fast tiny selves might have poor resolution.",
+          "https://pubmed.ncbi.nlm.nih.gov/2813384/",
+        ].join(" "),
+      },
+      headers: {},
+    });
+
+    expect(result.text).toBe(providerText);
+    expect((result as any).ok).toBe(true);
+    expect((result as any).final_answer_source).toBe("scholarly_research_answer");
+    expect((result as any).terminal_artifact_kind).toBe("scholarly_research_answer");
+    expect((result.debug as any)?.scholarly_response_mode_selection).toMatchObject({
+      supporting_sources_only: true,
+      selected_response_mode: "scholarly_research_answer",
+      terminal_artifact_kind: "scholarly_research_answer",
+    });
+    expect((result.debug as any)?.workstation_gateway_call_results).toEqual([
+      expect.objectContaining({
+        ok: true,
+        capability_id: "scholarly-research.lookup_papers",
+        observation: expect.objectContaining({
+          evidence_state: "lookup_usable",
+          papers: [expect.objectContaining({
+            identifiers: expect.objectContaining({ pmid: "2813384" }),
+          })],
+        }),
+      }),
+    ]);
+  });
+
+  it("keeps a scoped repo-search prohibition from suppressing admitted supporting-source retrieval", async () => {
+    const providerText = [
+      "The conceptual hypothesis can be evaluated separately from the cited paper.",
+      "The PMID metadata supports a microtubule/Alzheimer hypothesis only, not a consciousness claim.",
+    ].join(" ");
+    process.env.CODEX_AGENT_FAKE_STDOUT = providerText;
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\"?>",
+        "<PubmedArticleSet><PubmedArticle><MedlineCitation>",
+        "<PMID>2813384</PMID><Article>",
+        "<Journal><JournalIssue><PubDate><Year>1989</Year></PubDate></JournalIssue><Title>PNAS</Title></Journal>",
+        "<ArticleTitle>Hypothesis: microtubules, a key to Alzheimer disease</ArticleTitle>",
+        "<Abstract><AbstractText>Microtubule impairment is considered in Alzheimer disease.</AbstractText></Abstract>",
+        "<AuthorList><Author><LastName>Matsuyama</LastName><ForeName>H</ForeName></Author></AuthorList>",
+        "</Article></MedlineCitation><PubmedData><ArticleIdList>",
+        "<ArticleId IdType=\"pubmed\">2813384</ArticleId>",
+        "<ArticleId IdType=\"doi\">10.1073/pnas.86.20.8152</ArticleId>",
+        "</ArticleIdList></PubmedData></PubmedArticle></PubmedArticleSet>",
+      ].join(""),
+    })) as typeof fetch;
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:supporting-source-scoped-repo-prohibition",
+        agent_runtime: "codex",
+        question: [
+          "Evaluate a multiscale holographic-self hypothesis.",
+          "Treat the source as supporting context and keep evidence boundaries explicit.",
+          "https://pubmed.ncbi.nlm.nih.gov/2813384/",
+          "Do not search the repo.",
+        ].join(" "),
+      },
+      headers: {},
+    });
+
+    const debug = result.debug as Record<string, any>;
+    expect(result).toMatchObject({ ok: true, text: providerText });
+    expect(debug.workstation_gateway_call_results.map((entry: any) => entry.capability_id))
+      .toEqual(["scholarly-research.lookup_papers"]);
+    expect(debug.workstation_gateway_call_results.map((entry: any) => entry.capability_id))
+      .not.toContain("repo.search");
+    expect(debug.provider_reasoning_reentry).toMatchObject({
+      model_only_direct_answer_allowed: false,
+      evidence_reentered: true,
+    });
+  });
+
   it("derives natural Codex scholarly prompts into bounded paper observations", async () => {
     process.env.CODEX_AGENT_FAKE_STDOUT = "Scholarly paper observation is available and bounded.";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
@@ -1250,8 +1467,13 @@ describe("Helix Ask agent provider selection", () => {
     )).toMatchObject({
       scholarly_query: "Weyl curvature general relativity",
       requested_workflow: "full_text_summary",
-      requires_full_text: true,
-      terminal_evidence_requirement: "full_text",
+      requires_full_text: false,
+      terminal_evidence_requirement: "metadata",
+      evidence_demand: {
+        required_modes: [],
+        optional_modes: ["full_text"],
+        minimum_satisfying_depth: "metadata_lookup",
+      },
     });
 
     expect(extractScholarlyIntent(
@@ -1296,12 +1518,22 @@ describe("Helix Ask agent provider selection", () => {
       "scholarly-research.lookup_papers",
     ]);
     expect((fullTextPlan[0] as any).arguments.query).toBe("Weyl curvature general relativity");
+    expect(fullTextPlan[0]).toMatchObject({
+      dependent_capability_id: "scholarly-research.fetch_full_text",
+      arguments: {
+        allow_scholarly_dependent_chain: true,
+        scholarly_intent: {
+          requires_full_text: false,
+          terminal_evidence_requirement: "metadata",
+        },
+      },
+    });
     expect((fullTextPlan[0] as any).arguments.planned_scholarly_capability_chain).toMatchObject({
       planned_capabilities: [
         "scholarly-research.lookup_papers",
         "scholarly-research.fetch_full_text",
       ],
-      terminal_evidence_requirement: "full_text",
+      terminal_evidence_requirement: "metadata",
     });
 
     const scienceBody = {
