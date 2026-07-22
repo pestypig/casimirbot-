@@ -90,8 +90,10 @@ const postRoomMutation = async (
   suffix: string,
   body: JsonRecord = {},
   method: "POST" | "PATCH" = "POST",
+  init: Pick<RequestInit, "keepalive"> = {},
 ): Promise<HelixSharedRealtimeRoomResponse> =>
   requestSharedRoomJson(roomPath(roomId, suffix), {
+    ...init,
     method,
     body: JSON.stringify(body),
   });
@@ -113,6 +115,7 @@ export type HelixSharedLiveRoomApi = {
   updatePresence(
     roomId: string,
     presence: Exclude<HelixSharedRealtimeRoomPresence, "left">,
+    options?: { keepalive?: boolean },
   ): Promise<HelixSharedRealtimeRoom>;
   reserveRuntime(roomId: string, model: string): Promise<HelixSharedRealtimeRoom>;
   bindRuntime(roomId: string, realtimeSessionId: string): Promise<HelixSharedRealtimeRoom>;
@@ -173,8 +176,14 @@ export const helixSharedLiveRoomApi: HelixSharedLiveRoomApi = {
     return requireRoom(await postRoomMutation(roomId, "/consent", { consent }, "PATCH"));
   },
 
-  async updatePresence(roomId, presence) {
-    return requireRoom(await postRoomMutation(roomId, "/presence", { presence }));
+  async updatePresence(roomId, presence, options) {
+    return requireRoom(await postRoomMutation(
+      roomId,
+      "/presence",
+      { presence },
+      "POST",
+      { keepalive: options?.keepalive === true },
+    ));
   },
 
   async reserveRuntime(roomId, model) {

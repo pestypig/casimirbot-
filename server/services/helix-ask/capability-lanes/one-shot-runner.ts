@@ -6,8 +6,11 @@ import type {
   HelixCapabilityLaneResolveTrace,
 } from "@shared/helix-capability-lane";
 import type { HelixAgentProvider } from "../agent-providers/types";
+import type { HelixAccountType } from "@shared/helix-account-session";
+import type { HelixWorkstationCapabilityManifest } from "../workstation-tool-gateway/types";
 import {
   buildUnknownHelixCapabilityLaneOneShotResult,
+  governedWorkstationGatewayBridgeHandler,
   readHelixCapabilityLaneCallCapability,
   resolveHelixCapabilityLaneOneShotHandler,
   type HelixCapabilityLaneOneShotCallResult,
@@ -34,6 +37,39 @@ export type HelixCapabilityLaneOneShotRunnerResult = {
   terminal_eligible: false;
   assistant_answer: false;
   raw_content_included: false;
+};
+
+export const resolveHelixCapabilityLaneOneShotDispatch = (input: {
+  capability: string;
+  authorizedGatewayCapabilities?: HelixWorkstationCapabilityManifest[];
+}): {
+  handler: ReturnType<typeof resolveHelixCapabilityLaneOneShotHandler>;
+  authorizedGatewayCapability: HelixWorkstationCapabilityManifest | null;
+  dispatchKind: "specialized_lane" | "governed_gateway" | "blocked";
+} => {
+  const authorizedGatewayCapability = input.authorizedGatewayCapabilities?.find(
+    (entry) => entry.capability_id === input.capability,
+  ) ?? null;
+  const specializedHandler = resolveHelixCapabilityLaneOneShotHandler(input.capability);
+  if (specializedHandler) {
+    return {
+      handler: specializedHandler,
+      authorizedGatewayCapability,
+      dispatchKind: "specialized_lane",
+    };
+  }
+  if (authorizedGatewayCapability) {
+    return {
+      handler: governedWorkstationGatewayBridgeHandler,
+      authorizedGatewayCapability,
+      dispatchKind: "governed_gateway",
+    };
+  }
+  return {
+    handler: null,
+    authorizedGatewayCapability: null,
+    dispatchKind: "blocked",
+  };
 };
 
 const readRecord = (value: unknown): RecordLike | null =>
@@ -435,6 +471,9 @@ export const runHelixCapabilityLaneOneShotRequests = async (input: {
   turnId?: string | null;
   iteration?: number | null;
   env?: NodeJS.ProcessEnv;
+  authorizedGatewayCapabilities?: HelixWorkstationCapabilityManifest[];
+  accountType?: HelixAccountType | null;
+  profileId?: string | null;
 }): Promise<HelixCapabilityLaneOneShotRunnerResult> => {
   const turnId = readString(input.turnId) || readString(input.body.turn_id ?? input.body.turnId) || null;
   const calls = readStructuredLaneCalls(input.body);
@@ -457,7 +496,13 @@ export const runHelixCapabilityLaneOneShotRequests = async (input: {
   const results: HelixCapabilityLaneOneShotCallResult[] = [];
   for (const call of calls) {
     const capability = readHelixCapabilityLaneCallCapability(call);
-    const handler = capability ? resolveHelixCapabilityLaneOneShotHandler(capability) : null;
+    const dispatch = capability
+      ? resolveHelixCapabilityLaneOneShotDispatch({
+          capability,
+          authorizedGatewayCapabilities: input.authorizedGatewayCapabilities,
+        })
+      : { handler: null, authorizedGatewayCapability: null };
+    const { handler, authorizedGatewayCapability } = dispatch;
     if (!handler) {
       results.push(buildUnknownHelixCapabilityLaneOneShotResult({
         provider: input.provider,
@@ -474,6 +519,9 @@ export const runHelixCapabilityLaneOneShotRequests = async (input: {
       turnId,
       iteration: input.iteration,
       env: input.env,
+      authorizedGatewayCapability,
+      accountType: input.accountType,
+      profileId: input.profileId,
     }));
   }
 

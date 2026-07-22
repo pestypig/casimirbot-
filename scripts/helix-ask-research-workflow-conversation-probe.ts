@@ -106,6 +106,10 @@ const TOPIC = process.env.HELIX_ASK_RESEARCH_WORKFLOW_TOPIC?.trim() || "Magnetar
 const FALLBACK_ARXIV_ID =
   process.env.HELIX_ASK_RESEARCH_WORKFLOW_FALLBACK_ARXIV_ID?.trim() || "astro-ph/0503030v1";
 const DRY_RUN = process.argv.includes("--dry-run") || process.env.HELIX_ASK_RESEARCH_WORKFLOW_DRY_RUN === "1";
+const TEST_MODEL = process.env.HELIX_ASK_TEST_MODEL?.trim() || "gpt-4o-mini";
+const TEST_MODEL_SELECTION = TEST_MODEL.toLowerCase() === "auto"
+  ? { mode: "auto" as const }
+  : { mode: "pinned" as const, model: TEST_MODEL };
 const STAGE_FILTER = new Set(
   (
     process.argv.find((entry) => entry.startsWith("--stages="))?.slice("--stages=".length) ??
@@ -599,35 +603,22 @@ const assess = (input: {
 };
 
 const paperLookupPrompt = (topic: string): string => {
-  const objectiveWordCount = topic.split(/\s+/).filter(Boolean).length;
-  const queryInstruction = objectiveWordCount <= 3
-    ? "Use the compact objective itself as the first query, or one conservative domain-specific expansion; do not invent unsupported specificity."
-    : "Do not send the entire objective as the scholarly query. First derive one short, specific query of at most 12 words from its most distinctive scientific terms.";
-  return `Find one PDF-accessible primary paper for this workflow objective: "${topic}". ` +
-    `${queryInstruction} Then search. ` +
-    "If that query has no usable topic-relevant paper, make one narrower retry. Select exactly one paper, fetch or materialize its full text, and report its canonical identity, DOI or arXiv ID when available, PDF/full-text affordance, and stable source refs.";
+  return `Find me one strong PDF-accessible primary research paper about ${topic} that we can use for a multi-step analysis. ` +
+    "Show me a short candidate list, recommend the best one, and then get the recommended paper's full text if it is available. " +
+    "Tell me its DOI or arXiv ID and whether the text is actually usable.";
 };
 
 const renderPagePrompt = (context: ReplayContext): string =>
-  `Continue from the selected paper evidence ref \`${context.paperRef ?? context.arxivId ?? context.pdfUrl ?? "unavailable"}\` ` +
-  `for the pinned workflow objective: "${context.topic}". Mount PDF page 2 in Image Lens as a source only. ` +
-  "Do not inspect, crop, OCR, analyze, extract, or read it yet. Report only whether typed page-mount evidence was created, including its page/source refs.";
+  `Use the ${context.topic} paper you just fetched. Open page 2 in Image Lens, but do not analyze it yet. ` +
+  "Tell me whether that page is ready and still tied to the same paper.";
 
 const equationCandidatePrompt = (context: ReplayContext): string =>
-  `Continue from selected-paper evidence ref \`${context.paperRef ?? context.arxivId ?? context.pdfUrl ?? "unavailable"}\`, ` +
-  `retained rendered-page evidence ref \`${context.renderedPageRef ?? "unavailable"}\`, and the pinned workflow objective: "${context.topic}". ` +
-  "The retained page ref is a provenance anchor; use it as the Image Lens source_id only when the active source also carries materializable page-image data. " +
-  "Inspect only the already mounted PDF page 2 with Image Lens. If its image bytes are unavailable after a runtime restart, re-materialize page 2 directly from the canonical DOI, arXiv identifier, or canonical paper URL in the typed paper evidence or pinned objective, without a broad lookup or selecting another paper. " +
-  "Then run visual_analysis.inspect_image_region on page 2 to extract the first displayed equation as observation-only evidence. Do not run docs-viewer.search_docs. " +
-  "If page 2 has no OCR or LaTeX candidate, stop this turn with the typed blocker; the workflow will choose at most one bounded adjacent-page retry. " +
-  "Report the source id, page number, bbox or crop ref, extraction status, and OCR or LaTeX candidate refs. The visual capability output is evidence only, not an assistant answer.";
+  `Inspect the page that is already open from the ${context.topic} paper. ` +
+  "List any equations or mathematical candidates you can actually read and where they appear on the page so I can choose one. " +
+  "If the page has none, say so and recommend the smallest useful next step instead of switching papers.";
 
 const exactExtractPrompt = (context: ReplayContext): string => {
-  const pdfUrl = context.pdfUrl ?? (context.arxivId ? `https://arxiv.org/pdf/${context.arxivId}.pdf` : "");
-  const fullTextUrl = context.arxivId
-    ? `https://arxiv.org/abs/${context.arxivId}`
-    : context.canonicalUrl ?? pdfUrl;
-  return `extract this "Full-text / PDF affordance - PDF: ${pdfUrl} - Full-text URL: ${fullTextUrl}" into research docs`;
+  return `Use the ${context.topic} paper you just selected. Put its full text into my Research Library and tell me whether the saved document is usable.`;
 };
 
 const renderSummary = (input: {
@@ -735,6 +726,8 @@ async function main(): Promise<void> {
       agentRuntime: "codex",
       debug: true,
       mode: expectation.requestMode ?? "read",
+      language_model_selection: TEST_MODEL_SELECTION,
+      languageModelSelection: TEST_MODEL_SELECTION,
       question: prompt,
       prompt,
       ...(priorAssistantAnswers.length > 0 ? {
@@ -849,6 +842,7 @@ async function main(): Promise<void> {
       topic: TOPIC,
       preflight,
       fallback_arxiv_id: FALLBACK_ARXIV_ID,
+      model_selection: TEST_MODEL_SELECTION,
       stages: [
         "paper_lookup",
         "extract_exact_pdf_into_research_docs",
@@ -1030,6 +1024,7 @@ async function main(): Promise<void> {
     topic: TOPIC,
     preflight,
     recoveries,
+    model_selection: TEST_MODEL_SELECTION,
     status: stages.some((stage) => stage.status === "fail")
       ? "fail"
       : stages.some((stage) => stage.status === "blocked")

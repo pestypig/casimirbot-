@@ -13,6 +13,119 @@ const threadId = "thread:test-docs-search-admission";
 const prompt = "Search docs for Helix Ask console debug and tell me which document path you found.";
 
 describe("Helix Ask docs-search admission", () => {
+  it("treats a natural named-document explanation as a hard Docs Viewer lookup", () => {
+    const promptText = 'Ok we have a doc called "Casimir Dp Quantum Foam Study" what this abot?';
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, promptText, sourceTargetIntent });
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId,
+      promptText,
+      toolCallAdmissionDecision: admission,
+      availableCapabilities: {
+        capabilities: [
+          { capability_key: "docs-viewer.search_docs", availability: "available" },
+          { capability_key: "repo-code.search_concept", availability: "available" },
+        ],
+      },
+    });
+
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "docs_viewer",
+      strength: "hard",
+      precedence_reason: "named_doc_summary_source_target",
+      allow_no_tool_direct: false,
+    });
+    expect(sourceTargetIntent.reasons).toEqual(
+      expect.arrayContaining(["named_document_title_suppresses_repo_entity_inference"]),
+    );
+    expect(admission).toMatchObject({
+      source_target: "docs_viewer",
+      required: true,
+    });
+    expect(admission.admitted_tool_families).toContain("docs_viewer");
+    expect(admission.admitted_tool_families).not.toContain("model_only");
+    expect(admission.forbidden_routes).toEqual(expect.arrayContaining(["model_only_concept", "no_tool_direct"]));
+    expect(itinerary.relevant_tool_families).toEqual(["docs_viewer"]);
+    expect(itinerary.terminal_success_criteria.required_observation_families).toEqual(["docs_viewer"]);
+    expect(itinerary.planned_steps).toEqual([
+      expect.objectContaining({
+        tool_family: "docs_viewer",
+        capability_hint: "docs-viewer.search_docs",
+      }),
+    ]);
+  });
+
+  it("routes a natural local-document lookup to Docs Viewer before repo-code inference", () => {
+    const promptText = "Find the local document about Helix Ask terminal authority and tell me which document you used.";
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, promptText, sourceTargetIntent });
+
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "docs_viewer",
+      strength: "hard",
+      precedence_reason: "natural_local_document_lookup_source_target",
+      allow_no_tool_direct: false,
+    });
+    expect(sourceTargetIntent.reasons).toEqual(
+      expect.arrayContaining(["explicit_local_document_scope_suppresses_repo_entity_inference"]),
+    );
+    expect(admission.admitted_tool_families).toContain("docs_viewer");
+    expect(admission.admitted_tool_families).not.toContain("repo_code");
+  });
+
+  it("keeps a named-document search-read-summary compound prompt on Docs Viewer", () => {
+    const promptText =
+      'Find the document called "Casimir Dp Quantum Foam Study", read the best matching result, and explain what it is about in a short paragraph.';
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, promptText, sourceTargetIntent });
+
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "docs_viewer",
+      strength: "hard",
+      precedence_reason: "named_doc_summary_source_target",
+      allow_no_tool_direct: false,
+    });
+    expect(admission.admitted_tool_families).toContain("docs_viewer");
+    expect(admission.admitted_tool_families).not.toContain("scholarly_research");
+  });
+
+  it("does not reinterpret repo-like words inside a document title as a repo-code subgoal", () => {
+    const promptText = 'What is the doc called "Helix Ask Codex Loop Discipline" about?';
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, promptText, sourceTargetIntent });
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId,
+      promptText,
+      toolCallAdmissionDecision: admission,
+      availableCapabilities: {
+        capabilities: [
+          { capability_key: "docs-viewer.search_docs", availability: "available" },
+          { capability_key: "repo-code.search_concept", availability: "available" },
+        ],
+      },
+    });
+
+    expect(sourceTargetIntent.target_source).toBe("docs_viewer");
+    expect(itinerary.relevant_tool_families).toEqual(["docs_viewer"]);
+    expect(itinerary.relevant_tool_families).not.toContain("repo_code");
+  });
+
+  it("does not admit named-document lookup from contextual mentions", () => {
+    const prompts = [
+      'Do not look up the doc called "Casimir Dp Quantum Foam Study"; explain the wording only.',
+      '\'We have a doc called "Casimir Dp Quantum Foam Study" what is it about?\' was my earlier prompt. Do not search now.',
+      'If we later have a doc called "Casimir Dp Quantum Foam Study", what should we ask to learn what it is about?',
+      'The visible text on screen says doc called "Casimir Dp Quantum Foam Study"; explain the label without searching.',
+    ];
+
+    for (const promptText of prompts) {
+      const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+      const admission = buildToolCallAdmissionDecision({ turnId, promptText, sourceTargetIntent });
+      expect(sourceTargetIntent.target_source).not.toBe("docs_viewer");
+      expect(admission.admitted_tool_families).not.toContain("docs_viewer");
+    }
+  });
+
   it("treats affirmative local docs search as a hard docs-viewer evidence path", () => {
     const restatement = buildToolUseRestatement(prompt);
     const sourceTargetIntent = arbitrateAskSourceTarget({

@@ -10,7 +10,7 @@ export type HelixAskSharedLiveRoomControlsProps = {
   realtimeModel: string;
   visualInputEnabled: boolean;
   onSharedTransportChange?: (bound: boolean) => void;
-  onHostTransportConsentRevoked?: () => void;
+  onHostTransportInvalidated?: () => void;
   onOwnerRoomClosed?: () => void;
 };
 
@@ -20,7 +20,7 @@ export function HelixAskSharedLiveRoomControls({
   realtimeModel,
   visualInputEnabled,
   onSharedTransportChange,
-  onHostTransportConsentRevoked,
+  onHostTransportInvalidated,
   onOwnerRoomClosed,
 }: HelixAskSharedLiveRoomControlsProps) {
   const controller = useHelixSharedLiveRoom({
@@ -33,17 +33,18 @@ export function HelixAskSharedLiveRoomControls({
   const titleId = useId();
   const descriptionId = useId();
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
-  const hostRevocationHandledRef = useRef(false);
+  const hostInvalidationHandledRef = useRef(false);
+  const hostTransportSeenRef = useRef(false);
   const room = controller.room;
   const roomButtonLabel = room
     ? `Room ${room.participants.filter((participant) => participant.presence !== "left").length}/2`
     : "Room";
-  const sharedTransportBound = Boolean(
+  const hostTransportReferencePresent = Boolean(
     controller.selfParticipant?.role === "owner" &&
     room?.runtime.transport_owner === "host_browser" &&
-    room.runtime.realtime_session_ref_hash &&
-    room.runtime.state !== "closed",
+    room.runtime.realtime_session_ref_hash,
   );
+  const sharedTransportBound = hostTransportReferencePresent && room?.runtime.state !== "closed";
 
   useEffect(() => {
     onSharedTransportChange?.(sharedTransportBound);
@@ -51,21 +52,32 @@ export function HelixAskSharedLiveRoomControls({
   }, [onSharedTransportChange, sharedTransportBound]);
 
   useEffect(() => {
+    if (sharedTransportBound) hostTransportSeenRef.current = true;
     const hostTransportConsentValid = Boolean(
       controller.selfParticipant?.consent.microphone_to_model &&
       controller.selfParticipant?.consent.model_audio_output,
     );
-    if (!sharedTransportBound || hostTransportConsentValid) {
-      hostRevocationHandledRef.current = false;
+    const invalidRuntimeState =
+      room?.runtime.state === "degraded" ||
+      room?.runtime.state === "stopping" ||
+      room?.runtime.state === "closed" ||
+      room?.runtime.state === "error";
+    const shouldInvalidate = hostTransportSeenRef.current && (
+      !hostTransportConsentValid || invalidRuntimeState
+    );
+    if (!shouldInvalidate) {
+      hostInvalidationHandledRef.current = false;
       return;
     }
-    if (hostRevocationHandledRef.current) return;
-    hostRevocationHandledRef.current = true;
-    onHostTransportConsentRevoked?.();
+    if (hostInvalidationHandledRef.current) return;
+    hostInvalidationHandledRef.current = true;
+    hostTransportSeenRef.current = false;
+    onHostTransportInvalidated?.();
   }, [
     controller.selfParticipant?.consent.microphone_to_model,
     controller.selfParticipant?.consent.model_audio_output,
-    onHostTransportConsentRevoked,
+    onHostTransportInvalidated,
+    room?.runtime.state,
     sharedTransportBound,
   ]);
 
@@ -152,7 +164,7 @@ export function HelixAskSharedLiveRoomControls({
                   room={room}
                   controller={controller}
                   idPrefix={titleId}
-                  onHostTransportConsentRevoked={onHostTransportConsentRevoked}
+                  onHostTransportInvalidated={onHostTransportInvalidated}
                   onOwnerRoomClosed={onOwnerRoomClosed}
                 />
               ) : (

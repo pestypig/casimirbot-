@@ -1,7 +1,15 @@
 import React, { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
-import type { HelixLanguageModelProfileId } from "@shared/helix-language-model-policy";
-import { DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS } from "@/lib/helix/ask-agent-runtime-display";
+import type {
+  HelixLanguageModelProfileId,
+  HelixLanguageModelSelectionRequest,
+  HelixPinnedLanguageModelId,
+} from "@shared/helix-language-model-policy";
+import {
+  DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS,
+  normalizeHelixAgentProvidersResponse,
+  resolveSelectedHelixAgentRuntime,
+} from "@/lib/helix/ask-agent-runtime-display";
 import { useAgiChatStore } from "@/store/useAgiChatStore";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 
@@ -57,9 +65,12 @@ import {
 import {
   buildHelixAskLanguageModelPickerModel,
   HelixAskLanguageModelPicker,
+  type HelixAskLanguageModelPickerSelection,
 } from "./HelixAskLanguageModelPicker";
 import {
+  persistHelixAskPinnedLanguageModel,
   persistHelixAskLanguageModelProfile,
+  readStoredHelixAskPinnedLanguageModel,
   readStoredHelixAskLanguageModelProfile,
 } from "./HelixAskLanguageModelPreference";
 import { useHelixAskRuntimeGoalWakeSubscriptions } from "./HelixAskRuntimeGoalWakeSubscriptions";
@@ -119,9 +130,13 @@ export function HelixAskMinimalRuntimeShell({
 }: HelixAskMinimalRuntimeShellProps) {
   const shellProps = buildHelixAskConsoleRuntimeBridgeProps(props);
   const [draft, setDraft] = useState("");
-  const [selectedRuntime, setSelectedRuntime] = useState<HelixAgentRuntimeId>("helix");
+  const [selectedRuntime, setSelectedRuntime] = useState<HelixAgentRuntimeId>("codex");
+  const [runtimeProviders, setRuntimeProviders] = useState(DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS);
   const [selectedLanguageModelProfile, setSelectedLanguageModelProfile] = useState<HelixLanguageModelProfileId>(() =>
     readStoredHelixAskLanguageModelProfile(),
+  );
+  const [selectedPinnedLanguageModel, setSelectedPinnedLanguageModel] = useState<HelixPinnedLanguageModelId | null>(() =>
+    readStoredHelixAskPinnedLanguageModel(),
   );
   const [runtimeMenuOpen, setRuntimeMenuOpen] = useState(false);
   const [languageModelMenuOpen, setLanguageModelMenuOpen] = useState(false);
@@ -141,6 +156,42 @@ export function HelixAskMinimalRuntimeShell({
   const setActiveChatSession = useAgiChatStore((state) => state.setActive);
   const chatSession = useAgiChatStore((state) => (chatSessionId ? state.sessions[chatSessionId] : undefined));
   const turnRunner = runTurn ?? runHelixAskMinimalRuntimeBackendTurn;
+  const selectedLanguageModelSelection = useMemo<HelixLanguageModelSelectionRequest>(
+    () => selectedPinnedLanguageModel
+      ? { mode: "pinned", model: selectedPinnedLanguageModel }
+      : selectedLanguageModelProfile === "auto"
+        ? { mode: "auto" }
+        : { mode: "profile", profile: selectedLanguageModelProfile },
+    [selectedLanguageModelProfile, selectedPinnedLanguageModel],
+  );
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/agi/agent-providers", {
+      headers: { Accept: "application/json" },
+      credentials: "include",
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`agent_providers_unavailable:${response.status}`);
+        return response.json();
+      })
+      .then((payload) => {
+        if (cancelled) return;
+        const providers = normalizeHelixAgentProvidersResponse(payload);
+        setRuntimeProviders(providers);
+        setSelectedRuntime((current) => resolveSelectedHelixAgentRuntime(current, providers));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setRuntimeProviders(DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS);
+        setSelectedRuntime((current) =>
+          resolveSelectedHelixAgentRuntime(current, DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS),
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const shellControlActions = useMemo<HelixAskMinimalRuntimeControlActions>(() => {
     if (controlActions) return controlActions;
     return {
@@ -264,6 +315,7 @@ export function HelixAskMinimalRuntimeShell({
       draft: draftText,
       selectedRuntime,
       selectedLanguageModelProfile,
+      selectedLanguageModelSelection,
       desktopUrl,
       workspaceContextSnapshot: buildMinimalWorkspaceContextSnapshot(chatSessionId),
       pendingPrompt,
@@ -388,6 +440,7 @@ export function HelixAskMinimalRuntimeShell({
     props.contextId,
     runtimeState.askBusy,
     selectedLanguageModelProfile,
+    selectedLanguageModelSelection,
     selectedRuntime,
     setActiveChatSession,
     turnRunner,
@@ -435,13 +488,16 @@ export function HelixAskMinimalRuntimeShell({
     () =>
       buildHelixAskRuntimePickerModel({
         selectedRuntime,
-        providers: DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS,
+        providers: runtimeProviders,
       }),
-    [selectedRuntime],
+    [runtimeProviders, selectedRuntime],
   );
   const languageModelPickerModel = useMemo(
-    () => buildHelixAskLanguageModelPickerModel(selectedLanguageModelProfile),
-    [selectedLanguageModelProfile],
+    () => buildHelixAskLanguageModelPickerModel({
+      selectedProfile: selectedLanguageModelProfile,
+      selectedPinnedModel: selectedPinnedLanguageModel,
+    }),
+    [selectedLanguageModelProfile, selectedPinnedLanguageModel],
   );
   const composerViewModel = useMemo(
     () =>
@@ -509,9 +565,16 @@ export function HelixAskMinimalRuntimeShell({
                   setRuntimeMenuOpen(false);
                   setLanguageModelMenuOpen((open) => !open);
                 }}
-                onSelect={(profile) => {
-                  setSelectedLanguageModelProfile(profile);
-                  persistHelixAskLanguageModelProfile(profile);
+                onSelect={(selection: HelixAskLanguageModelPickerSelection) => {
+                  if (selection.kind === "pinned") {
+                    setSelectedPinnedLanguageModel(selection.model);
+                    persistHelixAskPinnedLanguageModel(selection.model);
+                  } else {
+                    setSelectedLanguageModelProfile(selection.profile);
+                    persistHelixAskLanguageModelProfile(selection.profile);
+                    setSelectedPinnedLanguageModel(null);
+                    persistHelixAskPinnedLanguageModel(null);
+                  }
                   setLanguageModelMenuOpen(false);
                 }}
               />

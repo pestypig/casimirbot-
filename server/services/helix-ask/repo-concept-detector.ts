@@ -65,7 +65,7 @@ const PROJECT_ANCHOR_RE =
   /\b(?:in\s+helix|helix\s+ask|in\s+this\s+app|this\s+app|repo|repository|codebase|agent|workstation|casimirbot|casimir\s*bot)\b/i;
 
 const NEGATIVE_TOOL_CONSTRAINT_ANCHOR_RE =
-  /\b(?:do\s+not|don't|dont|without|unless\s+needed,?\s*do\s+not)\s+use\s+(?:the\s+)?(?:workstation\s+)?tools?\b|\bdo\s+not\s+use\s+workstation\s+tools\s+unless\s+(?:needed|necessary|genuinely\s+needed)\b/gi;
+  /\b(?:do\s+not|don't|dont|without|unless\s+needed,?\s*do\s+not)\s+us(?:e|ing)\s+(?:the\s+)?(?:workstation\s+)?tools?\b|\bdo\s+not\s+use\s+workstation\s+tools\s+unless\s+(?:needed|necessary|genuinely\s+needed)\b/gi;
 
 const EXPLICIT_NON_REPO_GROUNDING_RE =
   /\b(?:do\s+not|don't|dont|without)\s+(?:search|use|look\s+in|inspect|read)\s+(?:the\s+)?(?:repo|repository|code|codebase|workspace|source)\b|\b(?:just|only)\s+answer\s+generally\b|\bgeneral\s+(?:answer|explanation)\s+only\b/i;

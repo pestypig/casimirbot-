@@ -47,11 +47,18 @@ const asksForScholarlyPdfImageLensWorkflow = (promptText: string): boolean => {
     return false;
   }
   const unquoted = promptText.replace(/"[^"\n]*"|'[^'\n]*'|`[^`\n]*`/g, " ");
+  const namesImageLens =
+    /\b(?:image[_\s-]?lens|image\s+tool|visual_analysis\.inspect_image_region)\b/i.test(unquoted);
+  const namesPage =
+    /\b(?:page\s*(?:number\s*)?\d{1,4}|(?:a|the|this|that|selected|relevant)\s+page)\b/i.test(unquoted);
   return (
     /\b(?:open|render|load|mount|inspect|read|extract|show)\b/i.test(unquoted) &&
-    /\b(?:image[_\s-]?lens|visual_analysis\.inspect_image_region)\b/i.test(unquoted) &&
-    /\b(?:pdf\s+)?page\s*(?:number\s*)?\d{1,4}\b/i.test(unquoted) &&
-    /\b(?:doi|arxiv|pdf|paper|article|full[-\s]?text)\b|\b10\.\d{4,9}\/[-._;()/:A-Z0-9]+\b/i.test(unquoted)
+    namesImageLens &&
+    namesPage &&
+    (
+      /\b(?:doi|arxiv|pdf|paper|article|full[-\s]?text)\b|\b10\.\d{4,9}\/[-._;()/:A-Z0-9]+\b/i.test(unquoted) ||
+      namesImageLens
+    )
   );
 };
 
@@ -149,6 +156,7 @@ const sourceBackedTargets = new Set([
 export const inferCommittedRouteToolFamily = (capabilityId: string): string => {
   if (/^docs\.|docs[_-]?viewer|docs-viewer|doc[_-]?viewer/i.test(capabilityId)) return "docs_viewer";
   if (/research[-_.]?library|scholarly[-_.]?research|lookup[_-]?papers|fetch[_-]?full[_-]?text|semantic[-_.]?scholar|openalex|pubmed|crossref/i.test(capabilityId)) return "scholarly_research";
+  if (/visual[-_.]?analysis|inspect[_-]?image[_-]?region|image[-_.]?lens/i.test(capabilityId)) return "visual_analysis";
   if (/internet[-_.]?search|web[-_.]?research|web\.search/i.test(capabilityId)) return "internet_search";
   if (/text[-_.]?to[-_.]?speech|speak[_-]?text|voice[-_.]?delivery|voice[-_.]?output|request[_-]?interim[_-]?voice[_-]?callout|narrator[_-]?say/i.test(capabilityId)) return "voice_delivery";
   if (/scientific[-_.]?calculator|calculator|calculate|compute|solve/i.test(capabilityId)) return "scientific_calculator";
@@ -170,7 +178,7 @@ export const inferCommittedRouteToolFamily = (capabilityId: string): string => {
   return "unknown";
 };
 
-const familyForSourceTarget = (sourceTarget: string): string => {
+export const inferCommittedRouteToolFamilyFromSourceTarget = (sourceTarget: string): string => {
   if (sourceTarget === "docs_viewer" || sourceTarget === "active_doc") return "docs_viewer";
   if (sourceTarget === "repo_code" || sourceTarget === "runtime_evidence") return "repo_code";
   if (sourceTarget === "internet_search" || sourceTarget === "world_event") return "internet_search";
@@ -288,7 +296,7 @@ const suppressedFamiliesFromPayload = (
 
 const allowedFamiliesFromPayload = (payload: RecordLike, sourceTarget: string): string[] => {
   const fromAdmission = readStringArray(readRecord(payload.tool_call_admission_decision)?.admitted_tool_families);
-  const sourceFamily = familyForSourceTarget(sourceTarget);
+  const sourceFamily = inferCommittedRouteToolFamilyFromSourceTarget(sourceTarget);
   return unique([...fromAdmission, sourceFamily]);
 };
 
@@ -644,12 +652,12 @@ export function buildCommittedAskRoute(input: {
               ...existing.capability_policy.allowed_tool_families,
               ...explicitCapabilityContract.admission_families,
               explicitCapabilityContract.capability_family,
-              familyForSourceTarget(explicitCapabilityContract.source_target),
+              inferCommittedRouteToolFamilyFromSourceTarget(explicitCapabilityContract.source_target),
             ]),
             required_capability_families: unique([
               ...existing.capability_policy.required_capability_families,
               explicitCapabilityContract.capability_family,
-              familyForSourceTarget(explicitCapabilityContract.source_target),
+              inferCommittedRouteToolFamilyFromSourceTarget(explicitCapabilityContract.source_target),
             ]),
           }
         : shouldRepairExistingScholarlyPdfImageLensRoute
@@ -837,7 +845,9 @@ export function buildCommittedAskRoute(input: {
   const suppressedFamilies = affirmativeScholarlyPdfImageLensWorkflow
     ? rawSuppressedFamilies.filter((family) => !["scholarly_research", "visual_analysis"].includes(family))
     : rawSuppressedFamilies;
-  const allowedFamilies = unique([
+  const sourceTargetIntent = readRecord(input.payload.source_target_intent);
+  const sourceTargetFamily = inferCommittedRouteToolFamilyFromSourceTarget(effectiveRoute.sourceTarget);
+  const unboundedAllowedFamilies = unique([
     ...allowedFamiliesFromPayload(input.payload, effectiveRoute.sourceTarget),
     ...(explicitCapabilityContract?.admission_families ?? []),
     ...(explicitCapabilityContract ? [explicitCapabilityContract.capability_family] : []),
@@ -845,7 +855,12 @@ export function buildCommittedAskRoute(input: {
     ...(affirmativeScholarlyPdfImageLensWorkflow ? ["scholarly_research", "visual_analysis"] : []),
   ])
     .filter((family) => !suppressedFamilies.includes(family));
-  const sourceTargetIntent = readRecord(input.payload.source_target_intent);
+  const allowedFamilies =
+    readString(sourceTargetIntent?.strength) === "hard" &&
+    sourceTargetFamily &&
+    !affirmativeScholarlyPdfImageLensWorkflow
+    ? unboundedAllowedFamilies.filter((family) => family === sourceTargetFamily)
+    : unboundedAllowedFamilies;
   const reusesRetainedScientificImageSidecar =
     effectiveRoute.sourceTarget === "scientific_image_evidence" &&
     (
@@ -854,7 +869,7 @@ export function buildCommittedAskRoute(input: {
     );
   const requiredFamily = reusesRetainedScientificImageSidecar
     ? ""
-    : familyForSourceTarget(effectiveRoute.sourceTarget);
+    : sourceTargetFamily;
   const negativeConstraints = input.promptInterpretation?.negative_constraints ?? [];
   const sourceBacked = sourceBackedTargets.has(effectiveRoute.sourceTarget);
   const requiredTerminalProduct =

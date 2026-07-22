@@ -290,7 +290,7 @@ function HelixAskVisibleLiveRuntimeControls({
         realtimeModel={mode === "live_voice_mini" ? "gpt-realtime-2.1-mini" : "gpt-realtime-2.1"}
         visualInputEnabled={runtime.visualInputEnabled}
         onSharedTransportChange={setSharedRoomTransportBound}
-        onHostTransportConsentRevoked={() => {
+        onHostTransportInvalidated={() => {
           void runtime.stop();
         }}
         onOwnerRoomClosed={() => {

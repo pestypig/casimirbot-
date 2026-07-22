@@ -56,6 +56,25 @@ describe("Codex native provider bridge availability", () => {
     ]);
   });
 
+  it("does not expose a capability that conflicts with the committed hard source route", () => {
+    expect(readTurnAdmittedWorkstationTools({
+      question: "Find the local document about Helix Ask terminal authority.",
+      committed_ask_route: {
+        schema: "helix.committed_ask_route.v1",
+        turn_id: "ask:test:hard-doc-route",
+        capability_policy: {
+          allowed_tool_families: ["docs_viewer"],
+          suppressed_tool_families: [],
+        },
+      },
+      tool_call_admission_decision: {
+        admission_status: "admitted",
+        selected_capability: "repo.search",
+        admitted_capability: "repo.search",
+      },
+    })).toEqual(["docs.search"]);
+  });
+
   it("distinguishes an omitted goal tool list from an explicit hard-deny list", () => {
     expect(readTurnAdmittedWorkstationTools({})).toBeNull();
     expect(readTurnAdmittedWorkstationTools({

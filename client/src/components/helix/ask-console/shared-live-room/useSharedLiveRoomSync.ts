@@ -78,20 +78,26 @@ export function useSharedLiveRoomSync(input: {
   useEffect(() => {
     if (!input.activeRoomId) return;
     let disposed = false;
-    const sendCurrentPresence = (): void => {
-      const presence = document.visibilityState === "hidden" ? "away" : "present";
-      void input.api.updatePresence(input.activeRoomId as string, presence)
+    const sendPresentHeartbeat = (): void => {
+      void input.api.updatePresence(input.activeRoomId as string, "present")
         .then((room) => {
           if (!disposed) input.onRoom(room);
         })
         .catch(() => undefined);
     };
-    sendCurrentPresence();
-    document.addEventListener("visibilitychange", sendCurrentPresence);
-    const interval = window.setInterval(sendCurrentPresence, ROOM_PRESENCE_INTERVAL_MS);
+    const sendAwayOnPageExit = (): void => {
+      void input.api.updatePresence(input.activeRoomId as string, "away", { keepalive: true })
+        .catch(() => undefined);
+    };
+    // Visibility is intentionally not presence: a host may switch tabs while
+    // sharing a screen. The heartbeat proves connectivity; page exit or TTL
+    // expiry transitions the member away.
+    sendPresentHeartbeat();
+    window.addEventListener("pagehide", sendAwayOnPageExit);
+    const interval = window.setInterval(sendPresentHeartbeat, ROOM_PRESENCE_INTERVAL_MS);
     return () => {
       disposed = true;
-      document.removeEventListener("visibilitychange", sendCurrentPresence);
+      window.removeEventListener("pagehide", sendAwayOnPageExit);
       window.clearInterval(interval);
     };
   }, [input.activeRoomId, input.api, input.onRoom]);

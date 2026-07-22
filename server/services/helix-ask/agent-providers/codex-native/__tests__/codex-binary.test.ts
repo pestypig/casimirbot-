@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  appendCodexModelPolicyArgs,
   resolveCodexBinary,
   resolveCodexDesktopInstallCandidates,
   resolveFirstLaunchableCodexBinary,
@@ -35,6 +36,21 @@ afterEach(() => {
 });
 
 describe("Codex binary resolution", () => {
+  it("appends the pinned model and effort after compatibility defaults", () => {
+    expect(appendCodexModelPolicyArgs(
+      ["exec", "--sandbox", "read-only"],
+      { model: "gpt-4o-mini", reasoningEffort: "none" },
+    )).toEqual([
+      "exec",
+      "--sandbox",
+      "read-only",
+      "--model",
+      "gpt-4o-mini",
+      "-c",
+      'model_reasoning_effort="none"',
+    ]);
+  });
+
   it("prefers the newest desktop app binary before the stale root fallback", () => {
     const localAppData = makeTemporaryDirectory();
     const binDirectory = path.join(localAppData, "OpenAI", "Codex", "bin");

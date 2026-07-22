@@ -522,6 +522,32 @@ describe("explicit workstation gateway derived calls", () => {
     });
   });
 
+  it("resolves a natural deictic calculator check from the previous answer", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question: "Check that in the calculator.",
+        workspace_context_snapshot: {
+          chat_referent_context: {
+            previous_assistant_final_answer: {
+              role: "assistant",
+              source_ref: "chat.final_answer.previous:calculator-result",
+              text: "The factor change is 4 / 2 = 2, so the line energy doubles.",
+            },
+          },
+        },
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["scientific-calculator.solve_expression"]);
+    expect(requests[0]).toMatchObject({
+      arguments: {
+        expression: "4/2",
+      },
+    });
+  });
+
   it("does not execute generated capabilities outside the committed route", () => {
     const requests = readWorkstationGatewayCallRequestsForTurn({
       includePlannerDerived: true,
@@ -1061,6 +1087,62 @@ describe("explicit workstation gateway derived calls", () => {
         }),
       },
     });
+  });
+
+  it("materializes a named local document summary request without requiring active document context", () => {
+    const requests = buildActiveDocsContextWorkstationGatewayCallRequests({
+      question: 'Ok we have a doc called "Casimir Dp Quantum Foam Study" what this about?',
+    });
+
+    expect(requests).toEqual([
+      expect.objectContaining({
+        derivation_source: "helix_named_doc_summary_query",
+        capability_id: "docs.search",
+        mode: "read",
+        arguments: expect.objectContaining({
+          query: "Casimir Dp Quantum Foam Study",
+          paths: ["docs"],
+          source_target_intent: expect.objectContaining({
+            target_source: "docs_viewer",
+            target_kind: "named_doc",
+            named_doc_query: "Casimir Dp Quantum Foam Study",
+          }),
+        }),
+      }),
+    ]);
+  });
+
+  it("materializes a natural local topic-document lookup without model-dependent tool selection", () => {
+    expect(buildActiveDocsContextWorkstationGatewayCallRequests({
+      question: "Find the local document about Helix Ask terminal authority and tell me which document you used.",
+    })).toEqual([
+      expect.objectContaining({
+        derivation_source: "helix_topic_doc_lookup_query",
+        capability_id: "docs.search",
+        arguments: expect.objectContaining({
+          query: "Helix Ask terminal authority",
+          paths: ["docs"],
+          source_target_intent: expect.objectContaining({
+            target_source: "docs_viewer",
+            target_kind: "topic_doc",
+            topic_doc_query: "Helix Ask terminal authority",
+          }),
+        }),
+      }),
+    ]);
+  });
+
+  it("keeps contextual named-document wording dormant", () => {
+    const prompts = [
+      'Do not find the document called "Casimir Dp Quantum Foam Study"; explain what that request would do.',
+      'Later, find the document called "Casimir Dp Quantum Foam Study" and explain it, but not now.',
+      'Earlier I asked about a document called "Casimir Dp Quantum Foam Study"; explain why evidence was needed.',
+      'The screen says "find the document called Casimir Dp Quantum Foam Study and explain it"; explain the wording only.',
+    ];
+
+    for (const question of prompts) {
+      expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([]);
+    }
   });
 
   it("does not materialize retained docs from contextual or negated current-document mentions", () => {
@@ -3469,6 +3551,28 @@ describe("explicit workstation gateway derived calls", () => {
     });
   });
 
+  it("materializes natural implementation-location language as repo.search", () => {
+    const requests = buildPromptDerivedRepoSearchGatewayCallRequests({
+      agent_runtime: "codex",
+      question:
+        "Find where the Helix Ask terminal authority is implemented in this codebase and name the most relevant file.",
+    });
+
+    expect(requests).toEqual([
+      expect.objectContaining({
+        capability_id: "repo.search",
+        mode: "read",
+        arguments: expect.objectContaining({
+          query: "Helix Ask terminal authority",
+          source_target_intent: expect.objectContaining({
+            target_source: "repo_code",
+            target_kind: "repo_search",
+          }),
+        }),
+      }),
+    ]);
+  });
+
   it("maps workspace status prompts to workspace_os.status observations", () => {
     const requests = buildPromptDerivedWorkspaceStatusGatewayCallRequests({
       agent_runtime: "codex",
@@ -3488,6 +3592,31 @@ describe("explicit workstation gateway derived calls", () => {
         },
       }),
     ]);
+  });
+
+  it("keeps a hard workstation-status route from inheriting a current-web search", () => {
+    const body: Record<string, unknown> = {
+      agent_runtime: "codex",
+      question: "What is the current workstation status?",
+    };
+
+    ensureCodexPreGatewayRouteAuthority({
+      body,
+      turnId: "ask:test:natural-workstation-status",
+      selectedRoute: "/ask/turn",
+    });
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      body,
+      includePlannerDerived: true,
+    });
+
+    expect(body.committed_ask_route).toMatchObject({
+      route: { source_target: "workspace_diagnostic" },
+      capability_policy: {
+        allowed_tool_families: ["workspace_diagnostic"],
+      },
+    });
+    expect(capabilities(requests)).toEqual(["workspace_os.status"]);
   });
 
   it("maps affirmative voice-lane prompts to text-to-speech gateway requests", () => {

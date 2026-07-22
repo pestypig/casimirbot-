@@ -74,17 +74,21 @@ vi.mock("../HelixAskMinimalRuntimeWorkspaceContext", () => ({
 
 import { useHelixAskLiveRuntimeSession } from "../useHelixAskLiveRuntimeSession";
 import { requestHelixAskVisualFrameLivePromotion } from "../HelixAskVisualFramePromotion";
+import { useVisualSourceCaptureStore } from "@/store/useVisualSourceCaptureStore";
 
 type SessionApi = ReturnType<typeof useHelixAskLiveRuntimeSession>;
 
 let latestSession: SessionApi | null = null;
 
-const Harness = () => {
+const Harness = ({ directVisualInputSuppressed = false }: {
+  directVisualInputSuppressed?: boolean;
+}) => {
   latestSession = useHelixAskLiveRuntimeSession({
     enabled: true,
     mode: "live_voice",
     authority: "observe_only",
     selectedRuntimeAgentProvider: "codex",
+    directVisualInputSuppressed,
   });
   return null;
 };
@@ -109,6 +113,7 @@ describe("Helix Ask GPT Live visual consent", () => {
     mocks.sendVisualFrame.mockClear();
     mocks.startTransport.mockClear();
     mocks.stopTransport.mockClear();
+    useVisualSourceCaptureStore.setState({ producers: {} });
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
       ok: true,
       realtime_session_id: "realtime:visual-consent-test",
@@ -122,6 +127,7 @@ describe("Helix Ask GPT Live visual consent", () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    useVisualSourceCaptureStore.setState({ producers: {} });
   });
 
   it("blocks a same-turn frame immediately after Vision Off, before effect cleanup", async () => {
@@ -188,5 +194,36 @@ describe("Helix Ask GPT Live visual consent", () => {
     });
     expect(outcome).toMatchObject({ ok: true, code: "visual_frame_sent" });
     expect(mocks.sendVisualFrame).toHaveBeenCalledTimes(1);
+  });
+
+  it("routes automatic and explicit frames through the room lane while direct input is suppressed", async () => {
+    render(<Harness directVisualInputSuppressed />);
+    await act(async () => {
+      await latestSession!.start();
+    });
+    await waitFor(() => expect(latestSession?.active).toBe(true));
+    act(() => {
+      latestSession!.setVisualInputEnabled(true);
+    });
+    expect(mocks.frameSubscribers.size).toBe(0);
+
+    const outcome = requestHelixAskVisualFrameLivePromotion({
+      imageDataUrl: "data:image/jpeg;base64,AQID",
+      sourceKind: "screen",
+      sourceLabel: "Selected shared-room frame",
+    });
+    expect(outcome).toMatchObject({
+      ok: true,
+      code: "shared_room_visual_frame_queued",
+      receipt: null,
+    });
+    expect(mocks.sendVisualFrame).not.toHaveBeenCalled();
+    expect(useVisualSourceCaptureStore.getState().producers[
+      "visual:shared-room-manual-promotion"
+    ]?.frame_history?.at(-1)).toMatchObject({
+      preview_data_url: "data:image/jpeg;base64,AQID",
+      source_kind: "full_frame",
+      source_surface: "screen",
+    });
   });
 });

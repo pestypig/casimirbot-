@@ -19,7 +19,10 @@ import {
 } from "@/components/helix/ask-console/HelixAskVoiceConfirmationPanel";
 import { HelixAskVoiceLevelMonitor } from "@/components/helix/ask-console/HelixAskVoiceLevelMonitor";
 import { HelixAskVoiceStatusPill } from "@/components/helix/ask-console/HelixAskStatusLine";
-import { HELIX_ASK_LANGUAGE_MODEL_PROFILE_STORAGE_KEY } from "@/components/helix/ask-console/HelixAskLanguageModelPreference";
+import {
+  HELIX_ASK_LANGUAGE_MODEL_PROFILE_STORAGE_KEY,
+  HELIX_ASK_PINNED_LANGUAGE_MODEL_STORAGE_KEY,
+} from "@/components/helix/ask-console/HelixAskLanguageModelPreference";
 import { launchHelixAskPrompt } from "@/lib/helix/ask-prompt-launch";
 import type {
   HelixAskMinimalRuntimeControlActions,
@@ -31,6 +34,7 @@ afterEach(() => {
   cleanup();
   useAgiChatStore.setState({ sessions: {}, activeId: undefined });
   window.localStorage.removeItem(HELIX_ASK_LANGUAGE_MODEL_PROFILE_STORAGE_KEY);
+  window.localStorage.removeItem(HELIX_ASK_PINNED_LANGUAGE_MODEL_STORAGE_KEY);
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -120,6 +124,36 @@ describe("HelixAskMinimalRuntimeShell", () => {
     expect(window.localStorage.getItem(HELIX_ASK_LANGUAGE_MODEL_PROFILE_STORAGE_KEY)).toBe("deep");
   });
 
+  it("pins the lowest-cost supported Codex model in the UI and submits the explicit model-selection contract", async () => {
+    vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue("minimal-shell-pinned-model");
+    const runTurn = vi.fn(async (payload) => ({
+      selected_final_answer: "Pinned model received.",
+      turn_id: payload.turnId,
+    }));
+
+    render(<HelixAskMinimalRuntimeShell contextId="ctx" runTurn={runTurn} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Choose Ask AI mode" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: /GPT-5.4 mini/ }));
+    fireEvent.change(screen.getByLabelText("Ask Helix"), {
+      target: { value: "Check this agent workflow at low cost" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Submit prompt" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Pinned model received.")).toBeTruthy();
+    });
+    expect(runTurn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        languageModelSelection: { mode: "pinned", model: "gpt-5.4-mini" },
+        language_model_selection: { mode: "pinned", model: "gpt-5.4-mini" },
+        question: "Check this agent workflow at low cost",
+      }),
+      expect.any(Function),
+    );
+    expect(window.localStorage.getItem(HELIX_ASK_PINNED_LANGUAGE_MODEL_STORAGE_KEY)).toBe("gpt-5.4-mini");
+  });
+
   it("submits through injected transport and binds latest visible turn controls without HelixAskPill", async () => {
     window.history.pushState({}, "", "/desktop?doc=docs/research/nhm2-current-status-whitepaper.md");
     vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue("minimal-shell-turn");
@@ -160,6 +194,7 @@ describe("HelixAskMinimalRuntimeShell", () => {
     expect(runTurn).toHaveBeenCalledWith(
       expect.objectContaining({
         turnId: "ask:minimal-shell-turn",
+        agentRuntime: "codex",
         question: "Summarize the current whitepaper",
         contextFiles: ["docs/research/nhm2-current-status-whitepaper.md"],
       }),

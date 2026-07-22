@@ -93,6 +93,79 @@ const parseSseEvents = (text: string): Array<{ event: string; data: Record<strin
     });
 
 describe("Helix Ask agent provider route metadata", () => {
+  it("rejects the Helix-native runtime for a guest account", async () => {
+    const priorBypass = process.env.HELIX_ASK_TEST_RUNTIME_POLICY_BYPASS;
+    process.env.HELIX_ASK_TEST_RUNTIME_POLICY_BYPASS = "0";
+    try {
+      const response = await request(createApp())
+        .post("/api/agi/ask/turn")
+        .send({
+          agent_runtime: "helix",
+          turn_id: "ask:test:guest-helix-runtime-policy",
+          question: "Hello",
+        })
+        .expect(403);
+
+      expect(response.body).toMatchObject({
+        ok: false,
+        error: "runtime_agent_locked_by_account_policy",
+        terminal_error_code: "runtime_agent_locked_by_account_policy",
+        blocked_reason: "runtime_agent_outside_account_policy",
+        agent_runtime: "helix",
+        selected_agent_provider: "helix",
+        response_type: "typed_failure",
+        final_status: "final_failure",
+        account_policy: {
+          account_type: "user",
+          allowed_runtime_agents: ["codex"],
+        },
+      });
+    } finally {
+      if (priorBypass === undefined) {
+        delete process.env.HELIX_ASK_TEST_RUNTIME_POLICY_BYPASS;
+      } else {
+        process.env.HELIX_ASK_TEST_RUNTIME_POLICY_BYPASS = priorBypass;
+      }
+    }
+  });
+
+  it("rejects the Helix-native stream runtime for a guest account", async () => {
+    const priorBypass = process.env.HELIX_ASK_TEST_RUNTIME_POLICY_BYPASS;
+    process.env.HELIX_ASK_TEST_RUNTIME_POLICY_BYPASS = "0";
+    try {
+      const response = await request(createApp())
+        .post("/api/agi/ask/turn/stream")
+        .send({
+          agent_runtime: "helix",
+          turn_id: "ask:test:guest-helix-stream-runtime-policy",
+          question: "Hello",
+        })
+        .expect(200);
+      const finalEvent = parseSseEvents(response.text).find((entry) => entry.event === "turn_final");
+
+      expect(finalEvent?.data).toMatchObject({
+        ok: false,
+        error: "runtime_agent_locked_by_account_policy",
+        terminal_error_code: "runtime_agent_locked_by_account_policy",
+        blocked_reason: "runtime_agent_outside_account_policy",
+        agent_runtime: "helix",
+        selected_agent_provider: "helix",
+        response_type: "typed_failure",
+        final_status: "final_failure",
+        account_policy: {
+          account_type: "user",
+          allowed_runtime_agents: ["codex"],
+        },
+      });
+    } finally {
+      if (priorBypass === undefined) {
+        delete process.env.HELIX_ASK_TEST_RUNTIME_POLICY_BYPASS;
+      } else {
+        process.env.HELIX_ASK_TEST_RUNTIME_POLICY_BYPASS = priorBypass;
+      }
+    }
+  });
+
   it("carries named Image Lens receipt terminal authority through the stream final payload", async () => {
     process.env.ENABLE_CODEX_AGENT = "1";
     const turnId = "ask:test:named-image-lens-receipt-stream-terminal";

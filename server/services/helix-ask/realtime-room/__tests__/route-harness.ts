@@ -14,6 +14,8 @@ import { resetRealtimeSessionRegistryForTests } from
   "../../realtime-session/session-registry";
 import { setRealtimeSidebandControlSenderForTests } from
   "../../realtime-session/sideband-control-channel";
+import { resetSharedRealtimeProfileAdmissionLocksForTests } from
+  "../profile-admission-lock";
 
 export const createSharedRealtimeRoomTestApp = (): express.Express => {
   const app = express();
@@ -56,6 +58,7 @@ export const signInSharedRealtimeRoomTestAgent = async (input: {
 export const resetSharedRealtimeRoomRouteTestState = async (): Promise<void> => {
   setRealtimeSidebandControlSenderForTests(null);
   resetRealtimeSessionRegistryForTests();
+  resetSharedRealtimeProfileAdmissionLocksForTests();
   resetSharedRealtimeRoomRuntimeRegistryForTests();
   await resetSharedRealtimeRoomStore();
   await resetAccountSessionStore();

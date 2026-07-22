@@ -13,6 +13,8 @@ import {
   updateSharedRealtimeRoomVisualFrameProviderDelivery,
 } from "./runtime-registry";
 import { normalizeHelixSharedRoomVisualFramePayload } from "./visual-frame-payload";
+import { requestSharedRealtimeRoomProviderItemDeletion } from
+  "./provider-item-deletion";
 
 export type SharedRealtimeRoomVisualFrameIngressResult = {
   error: HelixSharedRealtimeRoomErrorCode | null;
@@ -79,20 +81,16 @@ export const ingestSharedRealtimeRoomVisualFrame = (input: {
     admission.providerItemId &&
     binding?.realtimeSessionId
   ) {
-    if (admission.prunedProviderItemId) {
-      sendRealtimeSidebandControlEvent({
-        realtimeSessionId: binding.realtimeSessionId,
-        event: {
-          type: "conversation.item.delete",
-          event_id: `room_visual_delete_${crypto.randomUUID()}`,
-          item_id: admission.prunedProviderItemId,
-        },
+    const retentionDeleteQueued = !admission.prunedProviderItemId ||
+      requestSharedRealtimeRoomProviderItemDeletion({
+        roomId: input.roomId,
+        providerItemIds: [admission.prunedProviderItemId],
+        reason: "retention_limit",
       });
-    }
 
     let senderReturned = false;
     let synchronousFailure: string | null | undefined;
-    const sent = sendRealtimeSidebandControlEvent({
+    const sent = retentionDeleteQueued && sendRealtimeSidebandControlEvent({
       realtimeSessionId: binding.realtimeSessionId,
       event: {
         type: "conversation.item.create",

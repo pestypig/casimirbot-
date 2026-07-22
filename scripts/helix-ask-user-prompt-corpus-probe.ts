@@ -18,6 +18,13 @@ export type UserPromptScenario = {
     | "compound"
     | "negated_context";
   notes?: string;
+  expected_tool_mode?: "none" | "required";
+  expected_capability_patterns?: string[];
+  expected_minimum_observations?: number;
+  expected_maximum_observations?: number;
+  expected_terminal_kinds?: string[];
+  expected_answer_patterns?: string[];
+  expected_minimum_answer_chars?: number;
 };
 
 type ProbePreflight = {
@@ -34,6 +41,10 @@ const TIMEOUT_MS = Math.max(1000, Number(process.env.HELIX_ASK_USER_PROMPT_TIMEO
 const DELAY_MS = Math.max(0, Number(process.env.HELIX_ASK_USER_PROMPT_DELAY_MS ?? 1000));
 const DRY_RUN = process.argv.includes("--dry-run") || process.env.HELIX_ASK_USER_PROMPT_DRY_RUN === "1";
 const FAIL_ON_WARN = process.env.HELIX_ASK_USER_PROMPT_FAIL_ON_WARN === "1";
+const TEST_MODEL = process.env.HELIX_ASK_TEST_MODEL?.trim() || "gpt-5.4-mini";
+const TEST_MODEL_SELECTION = TEST_MODEL.toLowerCase() === "auto"
+  ? { mode: "auto" as const }
+  : { mode: "pinned" as const, model: TEST_MODEL };
 const SCENARIO_FILTER = (process.env.HELIX_ASK_USER_PROMPT_SCENARIOS ?? "")
   .split(",")
   .map((entry) => entry.trim())
@@ -259,6 +270,32 @@ const selectedFinalText = (ask: RecordLike, debugExport: unknown): string => {
   );
 };
 
+const collectLifecycleStrings = (value: unknown, fieldNames: Set<string>): string[] => {
+  const collected = new Set<string>();
+  const seen = new WeakSet<object>();
+  const visit = (entry: unknown, depth: number): void => {
+    if (depth > 18 || entry === null || typeof entry !== "object" || seen.has(entry as object)) return;
+    seen.add(entry as object);
+    if (Array.isArray(entry)) {
+      for (const item of entry) visit(item, depth + 1);
+      return;
+    }
+    for (const [key, item] of Object.entries(entry as RecordLike)) {
+      if (fieldNames.has(key)) {
+        if (typeof item === "string" && item.trim()) collected.add(item.trim());
+        if (Array.isArray(item)) {
+          for (const candidate of item) {
+            if (typeof candidate === "string" && candidate.trim()) collected.add(candidate.trim());
+          }
+        }
+      }
+      visit(item, depth + 1);
+    }
+  };
+  visit(value, 0);
+  return Array.from(collected);
+};
+
 const compoundSynthesisTerminalKinds = new Set([
   "compound_evidence_synthesis_answer",
   "compound_research_locator_answer",
@@ -293,7 +330,7 @@ const readTerminalKind = (ask: RecordLike, debugExport: unknown, rail: RecordLik
   );
 };
 
-const summarizeTurn = (scenario: UserPromptScenario, ask: RecordLike, debugExport: unknown): RecordLike => {
+export const summarizeTurn = (scenario: UserPromptScenario, ask: RecordLike, debugExport: unknown): RecordLike => {
   const payload = extractPayload(debugExport);
   const rail = railTable(ask, debugExport);
   const subgoals = compoundSubgoals(ask, debugExport);
@@ -312,9 +349,51 @@ const summarizeTurn = (scenario: UserPromptScenario, ask: RecordLike, debugExpor
   const repairTarget = readString(rail?.repair_target);
   const requestedCapability = readString(rail?.requested_capability);
   const selectedCapability = readString(rail?.selected_capability);
+  const admittedCapability = readString(rail?.admitted_capability);
   const executedCapability = readString(rail?.executed_capability);
   const observationKind = readString(rail?.observation_kind);
   const observationRef = readString(rail?.observation_ref);
+  const reentryStatus = readString(rail?.reentry_status);
+  const executedCapabilities = collectLifecycleStrings(
+    { ask, debugExport },
+    new Set(["executed_capability", "executed_capabilities"]),
+  ).filter((capability) => !/^(?:none|null|model_only|model\.direct_answer)$/i.test(capability));
+  const observationRefs = collectLifecycleStrings(
+    { ask, debugExport },
+    new Set(["observation_ref", "observation_refs", "observed_artifact_refs", "observation_reentry_refs"]),
+  );
+  // Policy and route projections may carry placeholder observation refs even
+  // when no workstation capability ran. For model-only controls, execution is
+  // the authoritative signal; those policy refs are not tool observations.
+  const evaluatedObservationRefs = scenario.expected_tool_mode === "none" && executedCapabilities.length === 0
+    ? []
+    : observationRefs;
+  const modelOnlyLifecycleHealthy =
+    scenario.expected_tool_mode === "none" &&
+    executedCapabilities.length === 0 &&
+    !terminalError &&
+    terminalKind !== "typed_failure" &&
+    finalAnswerSource !== "typed_failure";
+  const evaluatedFirstBrokenRail = modelOnlyLifecycleHealthy ? null : firstBrokenRail;
+  const evaluatedRailStatus = modelOnlyLifecycleHealthy ? "complete" : railStatus;
+  const evaluatedCodexParityClass = modelOnlyLifecycleHealthy ? "complete" : codexParityClass;
+  const expectedCapabilityPatterns = (scenario.expected_capability_patterns ?? []).map(
+    (pattern) => new RegExp(pattern, "i"),
+  );
+  const expectedCapabilityObserved =
+    expectedCapabilityPatterns.length === 0 ||
+    expectedCapabilityPatterns.every((pattern) => executedCapabilities.some((capability) => pattern.test(capability)));
+  const expectedMinimumObservations = scenario.expected_minimum_observations ??
+    (scenario.expected_tool_mode === "required" ? 1 : 0);
+  const expectedMaximumObservations = scenario.expected_maximum_observations ??
+    (scenario.expected_tool_mode === "none" ? 0 : null);
+  const expectedTerminalKinds = scenario.expected_terminal_kinds ?? [];
+  const expectedAnswerPatterns = (scenario.expected_answer_patterns ?? []).map(
+    (pattern) => new RegExp(pattern, "i"),
+  );
+  const expectedMinimumAnswerChars = scenario.expected_minimum_answer_chars ?? 0;
+  const proposalOnlyText =
+    /\bcapability\s+proposal\s*:|\bI(?:'ll|\s+will)\s+(?:look\s*up|search|find|open|read|inspect|use|call)\b/i.test(text);
   const goalSatisfaction =
     readString(rail?.goal_satisfaction) ??
     readString(getPath(payload, ["goal_satisfaction", "status"])) ??
@@ -328,6 +407,29 @@ const summarizeTurn = (scenario: UserPromptScenario, ask: RecordLike, debugExpor
     Boolean(terminalKind) &&
     !compoundSynthesisTerminalKinds.has(terminalKind ?? "") &&
     singleSubgoalTerminalKinds.has(terminalKind ?? "");
+  const lifecycleFailureStage = (() => {
+    if (evaluatedFirstBrokenRail) return evaluatedFirstBrokenRail;
+    if (scenario.expected_tool_mode === "none") {
+      if (executedCapabilities.length > 0) return "unexpected_tool_lifecycle";
+      if (terminalError || terminalKind === "typed_failure" || finalAnswerSource === "typed_failure") {
+        return "terminal_authority";
+      }
+      return "not_required";
+    }
+    if (scenario.expected_tool_mode !== "required") return null;
+    if (executedCapabilities.length === 0) {
+      if (admittedCapability) return "capability_execution";
+      if (selectedCapability) return "tool_admission";
+      if (requestedCapability || proposalOnlyText) return "proposal_without_admission";
+      return "capability_selection";
+    }
+    if (evaluatedObservationRefs.length === 0) return "observation_artifact";
+    if (reentryStatus && reentryStatus !== "reentered") return "evidence_reentry";
+    if (terminalError || terminalKind === "typed_failure" || finalAnswerSource === "typed_failure") {
+      return "terminal_authority";
+    }
+    return "complete";
+  })();
 
   const qualityFlags = [
     !debugExport ? "debug_export_missing" : "",
@@ -338,14 +440,39 @@ const summarizeTurn = (scenario: UserPromptScenario, ask: RecordLike, debugExpor
     text.trim().length > 0 && text.trim().length < 80 && terminalKind !== "typed_failure" ? "short_answer" : "",
     terminalKind && visibleKind && terminalKind !== visibleKind ? `terminal_projection_mismatch:${terminalKind}!=${visibleKind}` : "",
     compoundTerminalNotSynthesis ? `compound_terminal_not_synthesis:${terminalKind}` : "",
-    railStatus && !["complete", "satisfied"].includes(railStatus) ? `rail_status:${railStatus}` : "",
-    codexParityClass && codexParityClass !== "complete" ? `codex_parity_class:${codexParityClass}` : "",
+    evaluatedRailStatus && !["complete", "satisfied"].includes(evaluatedRailStatus) ? `rail_status:${evaluatedRailStatus}` : "",
+    evaluatedCodexParityClass && evaluatedCodexParityClass !== "complete" ? `codex_parity_class:${evaluatedCodexParityClass}` : "",
+    scenario.expected_tool_mode === "none" && executedCapabilities.length > 0
+      ? `unexpected_tool_execution:${executedCapabilities.join(",")}`
+      : "",
+    scenario.expected_tool_mode === "required" && executedCapabilities.length === 0
+      ? "required_tool_not_executed"
+      : "",
+    scenario.expected_tool_mode === "required" && !expectedCapabilityObserved
+      ? `expected_capability_not_executed:${scenario.expected_capability_patterns?.join("|") ?? "unspecified"}`
+      : "",
+    evaluatedObservationRefs.length < expectedMinimumObservations
+      ? `required_tool_observation_missing:${evaluatedObservationRefs.length}/${expectedMinimumObservations}`
+      : "",
+    expectedMaximumObservations !== null && evaluatedObservationRefs.length > expectedMaximumObservations
+      ? `unexpected_tool_observation:${evaluatedObservationRefs.length}/${expectedMaximumObservations}`
+      : "",
+    expectedTerminalKinds.length > 0 && (!terminalKind || !expectedTerminalKinds.includes(terminalKind))
+      ? `unexpected_terminal_kind:${terminalKind ?? "missing"}/${expectedTerminalKinds.join("|")}`
+      : "",
+    text.trim().length < expectedMinimumAnswerChars
+      ? `answer_too_short:${text.trim().length}/${expectedMinimumAnswerChars}`
+      : "",
+    ...expectedAnswerPatterns
+      .filter((pattern) => !pattern.test(text))
+      .map((pattern) => `expected_answer_pattern_missing:${pattern.source}`),
+    proposalOnlyText && executedCapabilities.length === 0 ? "proposal_only_without_execution" : "",
   ].filter(Boolean);
 
   const verdict: Verdict =
-    terminalError || terminalKind === "typed_failure" || finalAnswerSource === "typed_failure" || firstBrokenRail
+    terminalError || terminalKind === "typed_failure" || finalAnswerSource === "typed_failure" || evaluatedFirstBrokenRail
       ? "FAIL"
-      : !rail || qualityFlags.length > 0 || railStatus !== "complete" || codexParityClass !== "complete"
+      : !rail || qualityFlags.length > 0 || evaluatedRailStatus !== "complete" || evaluatedCodexParityClass !== "complete"
       ? "WARN"
       : "PASS";
 
@@ -364,9 +491,21 @@ const summarizeTurn = (scenario: UserPromptScenario, ask: RecordLike, debugExpor
     terminal_error_code: terminalError,
     requested_capability: requestedCapability,
     selected_capability: selectedCapability,
+    admitted_capability: admittedCapability,
     executed_capability: executedCapability,
+    executed_capabilities: executedCapabilities,
     observation_kind: observationKind,
     observation_ref: observationRef,
+    observation_refs: observationRefs,
+    reentry_status: reentryStatus,
+    lifecycle_failure_stage: lifecycleFailureStage,
+    expected_tool_mode: scenario.expected_tool_mode ?? null,
+    expected_capability_patterns: scenario.expected_capability_patterns ?? [],
+    expected_minimum_observations: expectedMinimumObservations,
+    expected_maximum_observations: expectedMaximumObservations,
+    expected_terminal_kinds: expectedTerminalKinds,
+    expected_answer_patterns: scenario.expected_answer_patterns ?? [],
+    expected_minimum_answer_chars: expectedMinimumAnswerChars,
     goal_satisfaction: goalSatisfaction,
     terminal_authority_proven: terminalAuthorityProven,
     visible_projection_proven: visibleProjectionProven,
@@ -406,6 +545,28 @@ const loadScenarioFile = async (filePath: string): Promise<UserPromptScenario[]>
       category: (readString(record.category) as UserPromptScenario["category"] | null) ?? "compound",
       prompt,
       notes: readString(record.notes) ?? undefined,
+      expected_tool_mode: readString(record.expected_tool_mode) as UserPromptScenario["expected_tool_mode"] ?? undefined,
+      expected_capability_patterns: readArray(record.expected_capability_patterns)
+        .map((value) => readString(value))
+        .filter((value): value is string => Boolean(value)),
+      expected_minimum_observations:
+        typeof record.expected_minimum_observations === "number"
+          ? Math.max(0, Math.floor(record.expected_minimum_observations))
+          : undefined,
+      expected_maximum_observations:
+        typeof record.expected_maximum_observations === "number"
+          ? Math.max(0, Math.floor(record.expected_maximum_observations))
+          : undefined,
+      expected_terminal_kinds: readArray(record.expected_terminal_kinds)
+        .map((value) => readString(value))
+        .filter((value): value is string => Boolean(value)),
+      expected_answer_patterns: readArray(record.expected_answer_patterns)
+        .map((value) => readString(value))
+        .filter((value): value is string => Boolean(value)),
+      expected_minimum_answer_chars:
+        typeof record.expected_minimum_answer_chars === "number"
+          ? Math.max(0, Math.floor(record.expected_minimum_answer_chars))
+          : undefined,
     };
   });
 };
@@ -427,6 +588,7 @@ const runScenario = async (
   const scenarioDir = path.join(outputDir, slug(scenario.id));
   await fs.mkdir(scenarioDir, { recursive: true });
 
+  const startedAtMs = Date.now();
   const ask = await fetchJson<RecordLike>(`${BASE_URL}/api/agi/ask/turn`, {
     method: "POST",
     body: JSON.stringify({
@@ -434,6 +596,8 @@ const runScenario = async (
       question: scenario.prompt,
       mode: "read",
       debug: true,
+      language_model_selection: TEST_MODEL_SELECTION,
+      languageModelSelection: TEST_MODEL_SELECTION,
     }),
   });
   const turnId = readString(ask.turn_id);
@@ -447,6 +611,7 @@ const runScenario = async (
   await fs.writeFile(path.join(scenarioDir, "probe-result.json"), `${JSON.stringify(result, null, 2)}\n`);
   return {
     ...result,
+    elapsed_ms: Date.now() - startedAtMs,
     turn_id: turnId,
     artifact_dir: scenarioDir,
   };
@@ -475,21 +640,21 @@ const renderMarkdownSummary = (input: {
     lines.push(`- preflight: ${input.preflight.ok ? "ok" : "blocked"} (${input.preflight.reason})`);
     if (input.preflight.hint) lines.push(`- preflight_hint: ${input.preflight.hint}`);
   }
-  lines.push("", "| Scenario | Verdict | Terminal | Rail | First Broken Rail | Capability | Answer Quality |");
+  lines.push("", "| Scenario | Verdict | Terminal | Lifecycle Stage | Rail | Capability | Answer Quality |");
   lines.push("| --- | --- | --- | --- | --- | --- | --- |");
   for (const result of input.results) {
     const id = readString(result.id) ?? "unknown";
     const verdict = readString(result.verdict) ?? "WARN";
     const terminal = readString(result.terminal_artifact_kind) ?? "missing";
     const rail = [readString(result.rail_status), readString(result.codex_parity_class)].filter(Boolean).join(" / ") || "missing";
-    const firstBroken = readString(result.first_broken_rail) ?? "-";
+    const lifecycleStage = readString(result.lifecycle_failure_stage) ?? readString(result.first_broken_rail) ?? "-";
     const capability = [
       readString(result.requested_capability),
       readString(result.selected_capability),
       readString(result.executed_capability),
     ].map((entry) => entry ?? "-").join(" -> ");
     const quality = readArray(result.answer_quality_flags).join("<br>") || readString(result.answer_quality_status) || "needs_review";
-    lines.push(`| ${id} | ${verdict} | ${terminal} | ${rail} | ${firstBroken} | ${capability} | ${quality} |`);
+    lines.push(`| ${id} | ${verdict} | ${terminal} | ${lifecycleStage} | ${rail} | ${capability} | ${quality} |`);
   }
   lines.push("");
   lines.push("## Prompt Excerpts");
@@ -519,6 +684,7 @@ const writeBlockedSummary = async (
     blocked: true,
     preflight,
     scenario_count: scenarios.length,
+    model_selection: TEST_MODEL_SELECTION,
     results: [],
   };
   await fs.mkdir(outputDir, { recursive: true });
@@ -541,6 +707,7 @@ const main = async (): Promise<void> => {
       dry_run: true,
       ok: true,
       scenario_count: scenarios.length,
+      model_selection: TEST_MODEL_SELECTION,
       scenario_ids: scenarios.map((scenario) => scenario.id),
       scenarios,
     };
@@ -590,6 +757,11 @@ const main = async (): Promise<void> => {
     acc[verdict] = (acc[verdict] ?? 0) + 1;
     return acc;
   }, {});
+  const lifecycleStageCounts = results.reduce<Record<string, number>>((acc, result) => {
+    const stage = readString(result.lifecycle_failure_stage) ?? "unclassified";
+    acc[stage] = (acc[stage] ?? 0) + 1;
+    return acc;
+  }, {});
   const worst = results.reduce((max, result) => Math.max(max, verdictRank(result.verdict)), 0);
   const ok = worst < 3 && (!FAIL_ON_WARN || worst < 2);
   const summary = {
@@ -601,7 +773,9 @@ const main = async (): Promise<void> => {
     blocked: false,
     preflight,
     scenario_count: scenarios.length,
+    model_selection: TEST_MODEL_SELECTION,
     verdict_counts: counts,
+    lifecycle_stage_counts: lifecycleStageCounts,
     results,
   };
 

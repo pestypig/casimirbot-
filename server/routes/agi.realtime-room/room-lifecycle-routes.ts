@@ -15,6 +15,10 @@ import {
   buildRealtimeRequesterRef,
   listAdmittedRealtimeSessions,
 } from "../../services/helix-ask/realtime-session/session-registry";
+import { buildRuntimeGoalProfileRef } from
+  "../../services/helix-ask/runtime-goals/runtime-goal-account-binding";
+import { runWithSharedRealtimeProfileAdmissionLock } from
+  "../../services/helix-ask/realtime-room/profile-admission-lock";
 import {
   readAuthorizedRoom,
   readMembership,
@@ -64,20 +68,28 @@ sharedRealtimeRoomLifecycleRouter.post(
         "An invite code is required.",
       );
     }
-    const requesterRef = buildRealtimeRequesterRef(account.sessionId);
-    const hasPersonalRealtimeSession = listAdmittedRealtimeSessions()
-      .some((session) => session.requesterRef === requesterRef);
-    if (hasPersonalRealtimeSession) {
-      throw new SharedRealtimeRoomDomainError(
-        "shared_realtime_room_personal_session_blocked",
-        409,
-        "Stop your personal GPT Live session before joining a one-model room.",
-      );
-    }
-    const room = withRuntimeProjection(await joinSharedRealtimeRoom({
-      profileId: account.profileId,
-      inviteCode,
-    }));
+    const room = await runWithSharedRealtimeProfileAdmissionLock(
+      account.profileId,
+      async () => {
+        const requesterRef = buildRealtimeRequesterRef(account.sessionId);
+        const profileRef = buildRuntimeGoalProfileRef(account.profileId);
+        const hasPersonalRealtimeSession = listAdmittedRealtimeSessions()
+          .some((session) =>
+            session.requesterRef === requesterRef ||
+            session.runtimeGoalAccountScope?.profile_ref === profileRef);
+        if (hasPersonalRealtimeSession) {
+          throw new SharedRealtimeRoomDomainError(
+            "shared_realtime_room_personal_session_blocked",
+            409,
+            "Stop your personal GPT Live session before joining a one-model room.",
+          );
+        }
+        return withRuntimeProjection(await joinSharedRealtimeRoom({
+          profileId: account.profileId,
+          inviteCode,
+        }));
+      },
+    );
     res.json(buildHelixSharedRealtimeRoomResponse({
       ok: true,
       message: "Joined Shared Realtime room.",

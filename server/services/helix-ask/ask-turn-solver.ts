@@ -655,6 +655,11 @@ const providerTerminalPathMaterialized = (input: {
   const committedCanonicalGoal = readRecord(committedAskRoute?.canonical_goal);
   const routeProductContract = readRecord(input.payload.route_product_contract);
   const sourceTargetIntent = readRecord(input.payload.source_target_intent);
+  const modelOnlySourceTarget = ["model_only", "general_background"].includes(
+    readString(sourceTargetIntent?.target_source) || "",
+  );
+  const modelOnlySourceContract =
+    modelOnlySourceTarget || readString(sourceTargetIntent?.strength) !== "hard";
   const directModelOnlyGoalKind =
     readString(canonicalGoal?.goal_kind) || readString(committedCanonicalGoal?.goal_kind);
   const directModelOnlyTerminalAllowed =
@@ -666,7 +671,7 @@ const providerTerminalPathMaterialized = (input: {
     terminalUsesProviderCandidate &&
     presentationSupportRefs.length === 0 &&
     ["model_only_concept", "conversation", "workspace_help"].includes(directModelOnlyGoalKind) &&
-    readString(sourceTargetIntent?.strength) !== "hard" &&
+    modelOnlySourceContract &&
     providerBridge?.terminal_authority_granted === true &&
     providerBridge?.final_visible_answer_authorized === true &&
     readString(providerReasoningReentry?.status) === "completed" &&
@@ -687,8 +692,12 @@ const providerTerminalPathMaterialized = (input: {
     materializedProviderRouteProductRef === selectedProviderRouteProductRef &&
     Boolean(providerTerminalCandidateRef) &&
     Boolean(materializedProviderRouteProductRef?.startsWith(`${providerTerminalCandidateRef}:route_product:`)) &&
-    materializedSupportRefs.length > 0 &&
-    presentationSupportRefs.some((ref) => materializedSupportRefs.includes(ref)) &&
+    (
+      modelOnlySourceContract
+        ? materializedSupportRefs.length === 0 && presentationSupportRefs.length === 0
+        : materializedSupportRefs.length > 0 &&
+          presentationSupportRefs.some((ref) => materializedSupportRefs.includes(ref))
+    ) &&
     providerBridge?.terminal_authority_granted === true &&
     providerBridge?.final_visible_answer_authorized === true &&
     readString(providerReasoningReentry?.status) === "completed" &&
@@ -701,6 +710,7 @@ const providerTerminalPathMaterialized = (input: {
     readString(terminalPresentation?.terminal_artifact_kind) === input.terminalArtifactKind &&
     readString(terminalPresentation?.final_answer_source) === input.finalAnswerSource;
   if (!terminalUsesProviderCandidate && !terminalUsesMaterializedProviderRouteProduct) return false;
+  if (terminalUsesMaterializedProviderRouteProduct && modelOnlySourceContract) return true;
   if (presentationSupportRefs.length === 0) return false;
   if (terminalUsesMaterializedProviderRouteProduct) {
     return (

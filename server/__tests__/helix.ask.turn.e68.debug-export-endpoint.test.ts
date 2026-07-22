@@ -30,6 +30,7 @@ const createApp = (): express.Express => {
 };
 
 beforeEach(() => {
+  delete process.env.HELIX_ASK_DEFAULT_PINNED_MODEL;
   resetStagePlayLiveSourceMailWakeStoreForTest();
   runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
 });
@@ -215,6 +216,157 @@ describe("helix ask E68 debug export endpoint", () => {
     expect(Array.isArray(debugExport.body?.payload?.tool_turn_chain_family_matrix)).toBe(true);
     expect(Array.isArray(debugExport.body?.payload?.artifact_query_index?.artifact_refs)).toBe(true);
     expect(Array.isArray(debugExport.body?.payload?.artifact_query_index?.queryable_artifact_keys)).toBe(true);
+  }, 60000);
+
+  it("pins a low-cost model across the Ask API, debug export, and session continuation", async () => {
+    const app = createApp();
+    const sessionId = `e68-pinned-model-${Date.now()}`;
+    const firstTurn = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Open Scientific Calculator",
+        mode: "read",
+        debug: true,
+        sessionId,
+        languageModelSelection: {
+          mode: "pinned",
+          model: "gpt-5.4-mini",
+        },
+      })
+      .expect(200);
+
+    expect(firstTurn.body?.language_model_policy).toMatchObject({
+      requested_selection_mode: "pinned",
+      selection_mode: "pinned",
+      resolved_model: "gpt-5.4-mini",
+      reasoning_effort: "low",
+      selection_source: "operator_pinned",
+      persistence_scope: "session",
+      pinned_model_requested: true,
+      pinned_model: "gpt-5.4-mini",
+      pinned_model_allowed: true,
+      pinned_model_rejected_reason: null,
+    });
+    expect(firstTurn.body?.language_model_debug_summary).toContain(
+      "AI: Pinned | gpt-5.4-mini | reasoning: low | session-local",
+    );
+
+    const debugExport = await request(app)
+      .get(`/api/agi/ask/turn/${encodeURIComponent(firstTurn.body?.turn_id)}/debug-export`)
+      .expect(200);
+
+    expect(debugExport.body?.payload?.language_model_policy).toMatchObject({
+      requested_selection_mode: "pinned",
+      selection_mode: "pinned",
+      resolved_model: "gpt-5.4-mini",
+      reasoning_effort: "low",
+      selection_source: "operator_pinned",
+      pinned_model: "gpt-5.4-mini",
+      pinned_model_allowed: true,
+    });
+    expect(debugExport.body?.payload?.debug?.language_model_policy).toMatchObject({
+      selection_mode: "pinned",
+      resolved_model: "gpt-5.4-mini",
+    });
+
+    const continuedTurn = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Open Scientific Calculator",
+        mode: "read",
+        debug: true,
+        sessionId,
+      })
+      .expect(200);
+
+    expect(continuedTurn.body?.language_model_policy).toMatchObject({
+      requested_selection_mode: "pinned",
+      selection_mode: "pinned",
+      resolved_model: "gpt-5.4-mini",
+      reasoning_effort: "low",
+      selection_source: "operator_pinned",
+      persistence_scope: "session",
+      pinned_model: "gpt-5.4-mini",
+      pinned_model_allowed: true,
+    });
+  }, 60000);
+
+  it("accepts the simple language_model API alias as a public low-cost pin", async () => {
+    const app = createApp();
+    const turn = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Open Scientific Calculator",
+        mode: "read",
+        debug: true,
+        language_model: "gpt-5.4-mini",
+      })
+      .expect(200);
+
+    expect(turn.body?.language_model_policy).toMatchObject({
+      account_policy: "user",
+      requested_selection_mode: "pinned",
+      selection_mode: "pinned",
+      resolved_model: "gpt-5.4-mini",
+      reasoning_effort: "low",
+      pinned_model_allowed: true,
+    });
+
+    const unsupportedTurn = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Open Scientific Calculator",
+        mode: "read",
+        debug: true,
+        language_model_selection: { mode: "pinned", model: "gpt-5.5" },
+      })
+      .expect(200);
+
+    expect(unsupportedTurn.body?.language_model_policy).toMatchObject({
+      account_policy: "user",
+      selection_mode: "pinned",
+      selection_source: "policy_downgrade",
+      resolved_model: "gpt-5.4-mini",
+      pinned_model_allowed: false,
+      pinned_model_rejected_reason: "pinned_model_missing_or_not_allowlisted",
+    });
+  }, 60000);
+
+  it("uses the configured low-cost default only when the turn has no explicit model choice", async () => {
+    process.env.HELIX_ASK_DEFAULT_PINNED_MODEL = "gpt-5.4-mini";
+    const app = createApp();
+    const turn = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Open Scientific Calculator",
+        mode: "read",
+        debug: true,
+      })
+      .expect(200);
+
+    expect(turn.body?.language_model_policy).toMatchObject({
+      requested_selection_mode: "pinned",
+      selection_mode: "pinned",
+      resolved_model: "gpt-5.4-mini",
+      pinned_model_allowed: true,
+    });
+
+    const explicitAutoTurn = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Open Scientific Calculator",
+        mode: "read",
+        debug: true,
+        language_model_selection: { mode: "auto" },
+      })
+      .expect(200);
+
+    expect(explicitAutoTurn.body?.language_model_policy).toMatchObject({
+      requested_selection_mode: "auto",
+      selection_mode: "auto",
+      pinned_model_requested: false,
+      pinned_model: null,
+    });
   }, 60000);
 
   it("registers Ask turns with the runtime memory governor and exports the admission debug", async () => {

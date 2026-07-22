@@ -701,11 +701,24 @@ export const isHelixCapabilityItineraryFamilyObserved = (
 ): boolean => {
   if (family === "scholarly_research") {
     return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) => {
-      const status = readString(artifactPayload(artifact)?.status);
+      const payload = artifactPayload(artifact);
+      const status = readString(payload?.status);
       const successfulScholarlyGatewayObservation =
         artifactCapability(artifact)?.startsWith("scholarly-research.") === true &&
         /^(?:succeeded|completed|success|ok)$/i.test(status ?? "");
+      const usablePriorScholarlyEvidence =
+        /scholarly_prior_evidence_observation/i.test([
+          artifactKind(artifact),
+          artifactSchema(artifact),
+          artifactId(artifact),
+        ].join(" ")) &&
+        payload?.selected_for_answer === true &&
+        readString(payload?.evidence_grade) === "answer_grade" &&
+        /^(?:lookup_usable|full_text_usable|numeric_evidence_usable|answer_ready)$/i.test(
+          readString(payload?.evidence_state) ?? "",
+        );
       return successfulScholarlyGatewayObservation ||
+        usablePriorScholarlyEvidence ||
         /scholarly_research_observation|scholarly_full_text_observation|theory_frontier_literature_map/i.test([
         artifactKind(artifact),
         artifactSchema(artifact),
@@ -755,13 +768,17 @@ export const isHelixCapabilityItineraryFamilyObserved = (
     );
   }
   if (family === "workspace_diagnostic") {
-    return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>
-      /workspace_os_status_observation|workspace_status/i.test([
+    return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) => {
+      const status = readString(artifactPayload(artifact)?.status);
+      const successfulWorkspaceStatus =
+        artifactCapability(artifact) === "workspace_os.status" &&
+        /^(?:succeeded|completed|success|ok)$/i.test(status ?? "");
+      return successfulWorkspaceStatus || /workspace_os_status_observation|workspace_status/i.test([
         artifactKind(artifact),
         artifactSchema(artifact),
         artifactId(artifact),
-      ].join(" ")),
-    );
+      ].join(" "));
+    });
   }
   if (family === "capability_catalog") {
     return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>

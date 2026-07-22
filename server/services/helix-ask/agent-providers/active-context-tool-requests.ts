@@ -40,6 +40,10 @@ import {
 } from "./explicit-tool-requests";
 import { isTheoryBadgeGraphCurrentContextPrompt } from "../theory-badge-graph-current-context-intent";
 import { isActiveWorkstationContextPrompt } from "../workstation-active-context-intent";
+import {
+  resolveAskTurnNamedDocSummaryQueryArg,
+  resolveAskTurnTopicDocQueryArg,
+} from "../doc-args";
 import { appendDedupe } from "./gateway-request-dedupe";
 import {
   extractCalculatorMathTokenSequence,
@@ -142,21 +146,28 @@ export const buildActiveDocsContextWorkstationGatewayCallRequests = (
   if (!prompt) return [];
   const deicticPrompt = isActiveDocsViewerDeicticPrompt(prompt);
   const explicitPathSummaryPrompt = isImmediateExplicitDocsPathSummaryPrompt(prompt);
-  if (!deicticPrompt && !explicitPathSummaryPrompt) return [];
+  const namedDocQuery = resolveAskTurnNamedDocSummaryQueryArg(prompt);
+  const topicDocQuery = namedDocQuery ? null : resolveAskTurnTopicDocQueryArg(prompt);
+  const standaloneDocQuery = namedDocQuery ?? topicDocQuery;
+  if (!deicticPrompt && !explicitPathSummaryPrompt && !standaloneDocQuery) return [];
   const workspaceSnapshot = readWorkspaceSnapshot(body);
   const activePanel = readWorkspaceActivePanel(workspaceSnapshot);
   const explicitDocPath = explicitPathSummaryPrompt
     ? normalizeDocPath(extractUnquotedDocsMarkdownPaths(prompt)[0])
     : null;
   const activeDocPath = explicitDocPath ?? readWorkspaceActiveDocPath(workspaceSnapshot);
-  if (!activeDocPath) return [];
-  const fileName = activeDocPath.split("/").pop()?.replace(/\.md$/i, "").replace(/[-_]+/g, " ").trim();
+  if (!activeDocPath && !standaloneDocQuery) return [];
+  const fileName = activeDocPath?.split("/").pop()?.replace(/\.md$/i, "").replace(/[-_]+/g, " ").trim();
   const exactLocateTerms = explicitDocPath ? extractExplicitDocsLocateTerms(prompt) : [];
   const sectionRequest = explicitDocPath ? extractExplicitDocsSectionRequest(prompt) : null;
-  const query = sectionRequest?.headings.join(" ") ??
+  const query = standaloneDocQuery ?? sectionRequest?.headings.join(" ") ??
     (exactLocateTerms.length > 0 ? exactLocateTerms.join(" ") : fileName || activeDocPath);
   const derivationSource =
-    explicitDocPath
+    standaloneDocQuery
+      ? namedDocQuery
+        ? "helix_named_doc_summary_query"
+        : "helix_topic_doc_lookup_query"
+      : explicitDocPath
       ? "helix_explicit_doc_path_context"
       : activePanel === "docs-viewer"
       ? "helix_active_docs_viewer_context"
@@ -168,7 +179,7 @@ export const buildActiveDocsContextWorkstationGatewayCallRequests = (
     mode: "read",
     arguments: {
       query,
-      paths: [activeDocPath],
+      paths: standaloneDocQuery ? ["docs"] : [activeDocPath],
       ...(exactLocateTerms.length > 0 ? { exact_terms: exactLocateTerms, max_hits: 40 } : {}),
       ...(sectionRequest
         ? {
@@ -181,14 +192,16 @@ export const buildActiveDocsContextWorkstationGatewayCallRequests = (
         : {}),
       source_target_intent: {
         source: derivationSource,
-        target_source: "active_doc",
-        target_kind: "active_doc",
+        target_source: standaloneDocQuery ? "docs_viewer" : "active_doc",
+        target_kind: namedDocQuery ? "named_doc" : topicDocQuery ? "topic_doc" : "active_doc",
         focused_panel: activePanel,
         active_panel: activePanel,
         active_doc_path: activeDocPath,
         retained_source_context: !explicitDocPath && activePanel !== "docs-viewer",
         deictic_prompt: deicticPrompt,
         explicit_doc_path: explicitDocPath,
+        named_doc_query: namedDocQuery,
+        topic_doc_query: topicDocQuery,
       },
     },
   }];
@@ -225,14 +238,14 @@ export const isContextualSurfaceReadMention = (prompt: string): boolean => {
 export const isImageLensVisualRegionPrompt = (prompt: string): boolean => {
   const unquoted = unquotePrompt(prompt);
   if (
-    /\b(?:do\s+not|don'?t|dont|without|no\s+need\s+to|not\s+asking\s+to|avoid)\b[\s\S]{0,120}\b(?:image\s+lens|image-lens|attached\s+image|visible\s+image|crop|bbox|visual_analysis\.inspect_image_region)\b/i.test(unquoted)
+    /\b(?:do\s+not|don'?t|dont|without|no\s+need\s+to|not\s+asking\s+to|avoid)\b[\s\S]{0,120}\b(?:image\s+lens|image-lens|image\s+tool|attached\s+image|visible\s+image|crop|bbox|visual_analysis\.inspect_image_region)\b/i.test(unquoted)
   ) {
     return false;
   }
   const namesImageLensOrAttachment =
-    /\b(?:image\s+lens|image-lens|attached\s+image|image\s+attachment|visible\s+image|current\s+image|open\s+image|visual_analysis\.inspect_image_region)\b/i.test(unquoted);
+    /\b(?:image\s+lens|image-lens|image\s+tool|attached\s+image|image\s+attachment|visible\s+image|current\s+image|open\s+image|visual_analysis\.inspect_image_region)\b/i.test(unquoted);
   const asksForFocusedVisualRegion =
-    /\b(?:crop|bbox|bounding\s+box|region|area|look\s+closely|inspect|read|ocr|latex|equation|figure)\b/i.test(unquoted);
+    /\b(?:crop|bbox|bounding\s+box|region|area|look\s+closely|inspect|read|ocr|latex|equation|figure|put|show|open|load|render|mount|materialize)\b/i.test(unquoted);
   return namesImageLensOrAttachment && asksForFocusedVisualRegion;
 };
 

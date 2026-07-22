@@ -484,13 +484,21 @@ export function buildToolCallAdmissionDecision(input: {
       ? sourceTargetToolFamilies(sourceTarget, promptText, input.sourceTargetIntent)
           .filter(isToolCallAdmissionFamily)
       : [];
-  const promptScholarlyResearchRequested = detectScholarlyResearchIntent(promptText).researchRequested;
+  const promptScholarlyResearchIntent = detectScholarlyResearchIntent(promptText);
+  const promptInternetSearchIntent = detectInternetSearchIntent(promptText);
+  const promptRepoCodeEvidenceIntent = detectRepoCodeEvidenceIntent(promptText);
+  const promptScholarlyResearchRequested = promptScholarlyResearchIntent.researchRequested;
+  const unresolvedSourceTarget =
+    sourceTarget === "unknown" ||
+    sourceTarget === "" ||
+    sourceTarget === "model_only" ||
+    sourceTarget === "general_background";
   const effectiveSourceTarget =
     explicitCapabilityContract
       ? explicitCapabilityContract.source_target
       : calculatorAdmissionDominatesSourceTarget
       ? "calculator_stream"
-      : unknownSourceArtifactDiscoveryIntent
+      : unknownSourceArtifactDiscoveryIntent && unresolvedSourceTarget
       ? "unknown"
       : (
         sourceTarget === "unknown" ||
@@ -841,19 +849,33 @@ export function buildToolCallAdmissionDecision(input: {
       !contextualToolSuppressionBlocksFamily(contextualSuppression, family)
     );
   const compoundPromptFamilies: HelixToolCallAdmissionFamily[] = [];
-  if (promptScholarlyResearchRequested && familyAllowed("scholarly_research")) {
+  const boundedLiveSourceTarget = [
+    "workspace_diagnostic",
+    "theory_locator",
+    "calculator_stream",
+  ].includes(effectiveSourceTarget);
+  if (
+    promptScholarlyResearchRequested &&
+    (!boundedLiveSourceTarget || promptScholarlyResearchIntent.strength === "hard") &&
+    familyAllowed("scholarly_research")
+  ) {
     compoundPromptFamilies.push("scholarly_research");
   }
   if (
     (
-      detectInternetSearchIntent(promptText).searchRequested ||
+      (promptInternetSearchIntent.searchRequested &&
+        (!boundedLiveSourceTarget || promptInternetSearchIntent.strength === "hard")) ||
       toolUseRestatement.requiredToolFamilies.includes("internet_search")
     ) &&
     familyAllowed("internet_search")
   ) {
     compoundPromptFamilies.push("internet_search");
   }
-  if (detectRepoCodeEvidenceIntent(promptText).repoEvidenceRequested && familyAllowed("repo_code")) {
+  if (
+    promptRepoCodeEvidenceIntent.repoEvidenceRequested &&
+    (!boundedLiveSourceTarget || promptRepoCodeEvidenceIntent.strength === "hard") &&
+    familyAllowed("repo_code")
+  ) {
     compoundPromptFamilies.push("repo_code");
   }
   if (toolUseRestatement.requiredToolFamilies.includes("docs_viewer") && familyAllowed("docs_viewer")) {

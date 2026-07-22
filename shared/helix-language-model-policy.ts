@@ -3,10 +3,18 @@ import type { HelixAccountCapabilityPolicy, HelixAccountType } from "./helix-acc
 export const HELIX_LANGUAGE_MODEL_POLICY_SCHEMA = "helix.language_model_policy.v1" as const;
 
 export type HelixLanguageModelProfileId = "auto" | "fast" | "balanced" | "deep";
+export const HELIX_PINNED_LANGUAGE_MODEL_IDS = ["gpt-5.4-mini"] as const;
+export type HelixPinnedLanguageModelId = (typeof HELIX_PINNED_LANGUAGE_MODEL_IDS)[number];
+export type HelixLanguageModelSelectionMode = "auto" | "profile" | "pinned" | "developer_override";
+export type HelixLanguageModelSelectionRequest =
+  | { mode: "auto" }
+  | { mode: "profile"; profile: Exclude<HelixLanguageModelProfileId, "auto"> }
+  | { mode: "pinned"; model: HelixPinnedLanguageModelId };
 export type HelixLanguageReasoningEffort = "none" | "low" | "medium" | "high" | "xhigh";
 export type HelixLanguageToolSurfaceTier = "minimal" | "standard" | "expanded" | "developer";
 export type HelixLanguageModelSelectionSource =
   | "user_selected"
+  | "operator_pinned"
   | "policy"
   | "developer_override"
   | "policy_downgrade";
@@ -16,6 +24,8 @@ export type HelixLanguageModelPolicy = {
   schema: typeof HELIX_LANGUAGE_MODEL_POLICY_SCHEMA;
   requested_profile: HelixLanguageModelProfileId;
   initial_requested_profile: HelixLanguageModelProfileId;
+  requested_selection_mode: Exclude<HelixLanguageModelSelectionMode, "developer_override">;
+  selection_mode: HelixLanguageModelSelectionMode;
   resolved_profile: Exclude<HelixLanguageModelProfileId, "auto">;
   auto_selected_profile: Exclude<HelixLanguageModelProfileId, "auto"> | null;
   resolved_model: string;
@@ -39,6 +49,10 @@ export type HelixLanguageModelPolicy = {
   exact_model_override_allowed: boolean;
   exact_model_override_requested: boolean;
   exact_model_override_rejected_reason: string | null;
+  pinned_model_requested: boolean;
+  pinned_model: HelixPinnedLanguageModelId | null;
+  pinned_model_allowed: boolean;
+  pinned_model_rejected_reason: string | null;
   assistant_answer: false;
   terminal_eligible: false;
   raw_content_included: false;
@@ -47,6 +61,8 @@ export type HelixLanguageModelPolicy = {
 export type HelixLanguageModelPolicyInput = {
   requestedProfile?: unknown;
   persistedProfile?: unknown;
+  requestedSelectionMode?: unknown;
+  pinnedModel?: unknown;
   exactModelOverride?: unknown;
   accountType?: HelixAccountType | string | null;
   accountPolicy?: Pick<HelixAccountCapabilityPolicy, "account_type" | "quotas"> | null;
@@ -72,6 +88,10 @@ type ProfileSpec = {
   verbosity: "low" | "medium" | "high";
   toolTier: HelixLanguageToolSurfaceTier;
   maxTokens: number;
+};
+
+type PinnedModelSpec = ProfileSpec & {
+  model: HelixPinnedLanguageModelId;
 };
 
 const DEFAULT_PROFILE_SPECS: Record<Exclude<HelixLanguageModelProfileId, "auto">, ProfileSpec> = {
@@ -101,6 +121,17 @@ const DEFAULT_PROFILE_SPECS: Record<Exclude<HelixLanguageModelProfileId, "auto">
   },
 };
 
+const PINNED_MODEL_SPECS: Record<HelixPinnedLanguageModelId, PinnedModelSpec> = {
+  "gpt-5.4-mini": {
+    profile: "fast",
+    model: "gpt-5.4-mini",
+    reasoning: "low",
+    verbosity: "low",
+    toolTier: "standard",
+    maxTokens: 8_000,
+  },
+};
+
 const normalizeProfile = (value: unknown): HelixLanguageModelProfileId | null => {
   if (typeof value !== "string") return null;
   const normalized = value.trim().toLowerCase();
@@ -108,6 +139,22 @@ const normalizeProfile = (value: unknown): HelixLanguageModelProfileId | null =>
     return normalized;
   }
   return null;
+};
+
+export const isHelixPinnedLanguageModelId = (value: unknown): value is HelixPinnedLanguageModelId =>
+  typeof value === "string" && HELIX_PINNED_LANGUAGE_MODEL_IDS.includes(value.trim() as HelixPinnedLanguageModelId);
+
+const normalizePinnedModel = (value: unknown): HelixPinnedLanguageModelId | null =>
+  isHelixPinnedLanguageModelId(value) ? value.trim() as HelixPinnedLanguageModelId : null;
+
+const normalizeSelectionMode = (
+  value: unknown,
+): Exclude<HelixLanguageModelSelectionMode, "developer_override"> | null => {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "auto" || normalized === "profile" || normalized === "pinned"
+    ? normalized
+    : null;
 };
 
 const normalizeAccountType = (value: unknown): HelixAccountType =>
@@ -299,6 +346,12 @@ const profileWithAccess = (
 };
 
 export const buildHelixLanguageModelDebugSummary = (policy: HelixLanguageModelPolicy): string => {
+  if (policy.selection_mode === "pinned") {
+    return `AI: Pinned | ${policy.resolved_model} | reasoning: ${policy.reasoning_effort} | ${policy.persistence_scope}-local`;
+  }
+  if (policy.selection_mode === "developer_override") {
+    return `AI: Developer override | ${policy.resolved_model} | reasoning: ${policy.reasoning_effort} | ${policy.persistence_scope}-local`;
+  }
   const requested = policy.requested_profile.charAt(0).toUpperCase() + policy.requested_profile.slice(1);
   const resolved = policy.resolved_profile.charAt(0).toUpperCase() + policy.resolved_profile.slice(1);
   return `AI: ${requested} -> ${resolved} | ${policy.resolved_model} | reasoning: ${policy.reasoning_effort} | ${policy.persistence_scope}-local`;
@@ -311,13 +364,37 @@ export const resolveHelixLanguageModelPolicy = (
   const quotas = input.accountPolicy?.quotas;
   const requestedProfile =
     normalizeProfile(input.requestedProfile) ?? normalizeProfile(input.persistedProfile) ?? "auto";
-  const autoSelection = requestedProfile === "auto" ? classifyAutoProfile(input) : null;
-  const requestedConcreteProfile = autoSelection?.profile ?? requestedProfile;
+  const explicitSelectionMode = normalizeSelectionMode(input.requestedSelectionMode);
+  const pinnedModelText = readText(input.pinnedModel);
+  const pinnedModeRequested = explicitSelectionMode === "pinned" || (!explicitSelectionMode && Boolean(pinnedModelText));
+  const normalizedPinnedModel = normalizePinnedModel(pinnedModelText);
+  const pinnedModel = pinnedModeRequested
+    ? normalizedPinnedModel ?? "gpt-5.4-mini"
+    : null;
+  const pinnedModelRejectedReason =
+    pinnedModeRequested && !normalizedPinnedModel
+      ? "pinned_model_missing_or_not_allowlisted"
+      : null;
+  const requestedSelectionMode: Exclude<HelixLanguageModelSelectionMode, "developer_override"> =
+    pinnedModeRequested
+      ? "pinned"
+      : explicitSelectionMode === "auto" || requestedProfile === "auto"
+        ? "auto"
+        : "profile";
+  const autoSelection = requestedSelectionMode === "auto" ? classifyAutoProfile(input) : null;
+  const requestedConcreteProfile =
+    autoSelection?.profile ?? (requestedProfile === "auto" ? "balanced" : requestedProfile);
   const accessResolved = profileWithAccess(requestedConcreteProfile, input.modelAccess);
-  let resolvedProfile = accessResolved.profile;
-  let downgradeReason = accessResolved.downgradeReason;
+  let resolvedProfile = pinnedModel ? PINNED_MODEL_SPECS[pinnedModel].profile : accessResolved.profile;
+  let downgradeReason = pinnedModelRejectedReason ?? accessResolved.downgradeReason;
   let selectionSource: HelixLanguageModelSelectionSource =
-    requestedProfile === "auto" ? "policy" : "user_selected";
+    pinnedModel
+      ? pinnedModelRejectedReason
+        ? "policy_downgrade"
+        : "operator_pinned"
+      : requestedProfile === "auto"
+        ? "policy"
+        : "user_selected";
   const exactModelOverride = readText(input.exactModelOverride);
   const exactOverrideRequested = Boolean(exactModelOverride);
   const exactOverrideAllowed = accountType === "developer" && exactOverrideRequested;
@@ -329,21 +406,25 @@ export const resolveHelixLanguageModelPolicy = (
   const quotaMaxTurn = Math.max(1, Math.floor(quotas?.model_tokens_per_turn ?? 16_000));
   const quotaMaxDay = Math.max(1, Math.floor(quotas?.model_tokens_per_day ?? 100_000));
   const runtimeMinutes = Math.max(0, Math.floor(quotas?.runtime_minutes_per_day ?? 30));
-  if (quotaMaxTurn < DEFAULT_PROFILE_SPECS[resolvedProfile].maxTokens && resolvedProfile === "deep") {
+  if (!pinnedModel && quotaMaxTurn < DEFAULT_PROFILE_SPECS[resolvedProfile].maxTokens && resolvedProfile === "deep") {
     resolvedProfile = quotaMaxTurn >= DEFAULT_PROFILE_SPECS.balanced.maxTokens ? "balanced" : "fast";
     downgradeReason = downgradeReason ?? "profile_budget_exceeds_account_quota";
   }
-  if (quotaMaxTurn < DEFAULT_PROFILE_SPECS.fast.maxTokens && resolvedProfile === "balanced") {
+  if (!pinnedModel && quotaMaxTurn < DEFAULT_PROFILE_SPECS.fast.maxTokens && resolvedProfile === "balanced") {
     resolvedProfile = "fast";
     downgradeReason = downgradeReason ?? "profile_budget_exceeds_account_quota";
   }
-  const spec = DEFAULT_PROFILE_SPECS[resolvedProfile];
+  const spec = pinnedModel ? PINNED_MODEL_SPECS[pinnedModel] : DEFAULT_PROFILE_SPECS[resolvedProfile];
   if (downgradeReason) selectionSource = "policy_downgrade";
   if (exactOverrideAllowed) selectionSource = "developer_override";
-  const resolvedModel = exactOverrideAllowed ? exactModelOverride : spec.model;
+  const resolvedModel = exactOverrideAllowed ? exactModelOverride : pinnedModel ?? spec.model;
   const selectionReason =
     exactOverrideAllowed
       ? "Developer exact model override accepted by account policy."
+      : pinnedModel
+        ? pinnedModelRejectedReason
+          ? "Pinned model request was invalid, so policy selected the allowlisted Codex-compatible fallback gpt-5.4-mini."
+          : `Operator pinned ${pinnedModel}; adaptive model and reasoning selection are disabled for this session.`
       : autoSelection?.reason ??
         (downgradeReason
           ? `Resolved profile was downgraded by policy: ${downgradeReason}.`
@@ -352,6 +433,12 @@ export const resolveHelixLanguageModelPolicy = (
     schema: HELIX_LANGUAGE_MODEL_POLICY_SCHEMA,
     requested_profile: requestedProfile,
     initial_requested_profile: requestedProfile,
+    requested_selection_mode: requestedSelectionMode,
+    selection_mode: exactOverrideAllowed
+      ? "developer_override"
+      : pinnedModel
+        ? "pinned"
+        : requestedSelectionMode,
     resolved_profile: resolvedProfile,
     auto_selected_profile: autoSelection?.profile ?? null,
     resolved_model: resolvedModel,
@@ -359,7 +446,7 @@ export const resolveHelixLanguageModelPolicy = (
     verbosity: spec.verbosity,
     tool_surface_tier: accountType === "developer" && exactOverrideAllowed ? "developer" : spec.toolTier,
     selection_source: selectionSource,
-    persistence_scope: requestedProfile === "auto" ? "turn" : "session",
+    persistence_scope: pinnedModel || requestedProfile !== "auto" ? "session" : "turn",
     selection_reason: selectionReason,
     escalation_reason: autoSelection?.escalationReason ?? null,
     policy_signals: autoSelection?.signals ?? [],
@@ -375,6 +462,10 @@ export const resolveHelixLanguageModelPolicy = (
     exact_model_override_allowed: exactOverrideAllowed,
     exact_model_override_requested: exactOverrideRequested,
     exact_model_override_rejected_reason: exactOverrideRejectedReason,
+    pinned_model_requested: pinnedModeRequested,
+    pinned_model: pinnedModel,
+    pinned_model_allowed: pinnedModeRequested && pinnedModelRejectedReason === null,
+    pinned_model_rejected_reason: pinnedModelRejectedReason,
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,

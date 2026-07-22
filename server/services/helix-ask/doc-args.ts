@@ -316,6 +316,40 @@ export const cleanupAskTurnOpenDocSearchTopic = (rawTopic: string | null | undef
   return topic ? normalizeAskTurnLatestDocTopicText(topic) : null;
 };
 
+const ASK_TURN_NAMED_DOC_SUMMARY_QUESTION_RE =
+  /\b(?:what(?:'s|\s+is)?\s+(?:this|that|it)\s+(?:about|abot)|what\s+does\s+(?:this|that|it)\s+(?:say|cover|mean|discuss)|what(?:'s|\s+is)\s+(?:the\s+)?(?:doc|document|paper)\s+(?:called|named|titled)\b[\s\S]{0,220}\babout|what\s+(?:the\s+)?(?:doc|document|paper)\s+(?:called|named|titled)\b[\s\S]{0,220}\bis\s+about|(?:can|could|would)\s+you\s+(?:summari[sz]e|explain|describe|tell\s+me\s+about)|(?:summari[sz]e|explain|describe|give\s+me\s+the\s+gist\s+of)\s+(?:this|that|it)|(?:find|search|locate|open|read)\b[\s\S]{0,260}\b(?:doc|document|paper)\s+(?:called|named|titled)\b[\s\S]{0,260}\b(?:summari[sz]e|explain|describe|tell\s+me|what\s+(?:it|this|that)\s+is\s+about))\b/i;
+
+const isAskTurnContextualNamedDocReference = (transcript: string): boolean =>
+  /\b(?:do\s+not|don't|dont|never|no\s+need\s+to)\s+(?:look\s*up|search(?:\s+for)?|find|open|read|use|consult)\b[\s\S]{0,160}\b(?:doc|document|paper)\b/i.test(transcript) ||
+  /\b(?:if|when)\s+(?:we|i|you)\b[\s\S]{0,100}\b(?:have|get|add|save|load)\b[\s\S]{0,100}\b(?:doc|document|paper)\s+(?:called|named|titled)\b/i.test(transcript) ||
+  /\b(?:later|next\s+time|in\s+the\s+future|not\s+now|not\s+yet)\b[\s\S]{0,160}\b(?:doc|document|paper)\s+(?:called|named|titled)\b/i.test(transcript) ||
+  /\b(?:earlier|previously|last\s+turn|historically)\b[\s\S]{0,180}\b(?:doc|document|paper)\s+(?:called|named|titled)\b/i.test(transcript) ||
+  /\b(?:doc|document|paper)\s+(?:called|named|titled)\b[\s\S]{0,180}\b(?:earlier|previously|last\s+turn|was\s+my\s+(?:prompt|question)|is\s+what\s+i\s+(?:asked|said|typed))\b/i.test(transcript) ||
+  /\b(?:screen|visible\s+text|label|button|debug)\b[\s\S]{0,120}\b(?:says|shows|reads|contains|mentions)\b[\s\S]{0,120}\b(?:doc|document|paper)\s+(?:called|named|titled)\b/i.test(transcript);
+
+export const resolveAskTurnNamedDocSummaryQueryArg = (transcript: string): string | null => {
+  const normalized = transcript.trim();
+  if (
+    !normalized ||
+    !ASK_TURN_NAMED_DOC_SUMMARY_QUESTION_RE.test(normalized) ||
+    isAskTurnContextualNamedDocReference(normalized)
+  ) {
+    return null;
+  }
+  const quoted = normalized.match(
+    /\b(?:doc|document|paper)\s+(?:called|named|titled)\s+(?:"([^"\r\n]{2,200})"|'([^'\r\n]{2,200})'|`([^`\r\n]{2,200})`)/i,
+  );
+  const unquoted = quoted
+    ? null
+    : normalized.match(
+        /\b(?:doc|document|paper)\s+(?:called|named|titled)\s+(.{2,200}?)(?=\s*[,;:.!?-]*\s*(?:what(?:'s|\s+is)?\s+(?:this|that|it)\s+(?:about|abot)|what\s+does\s+(?:this|that|it)\s+(?:say|cover|mean|discuss)|(?:can|could|would)\s+you\s+(?:summari[sz]e|explain|describe|tell\s+me\s+about))\b)/i,
+      );
+  return cleanupAskTurnOpenDocSearchTopic(quoted?.[1] ?? quoted?.[2] ?? quoted?.[3] ?? unquoted?.[1]);
+};
+
+export const isAskTurnNamedDocSummaryIntent = (transcript: string): boolean =>
+  Boolean(resolveAskTurnNamedDocSummaryQueryArg(transcript));
+
 export const resolveAskTurnCreateThenOpenDocTopicArg = (transcript: string): string | null => {
   const normalized = transcript.trim();
   const match = normalized.match(
@@ -333,9 +367,16 @@ export const resolveAskTurnCreateThenOpenDocTopicArg = (transcript: string): str
 export const resolveAskTurnTopicDocQueryArg = (transcript: string): string | null => {
   const normalized = transcript.trim();
   if (!normalized || /\b(?:latest|newest|most\s+recent|recent)\b/i.test(normalized)) return null;
+  const unquoted = normalized.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
+  if (
+    /\b(?:do\s+not|don't|dont|never|no\s+need\s+to)\s+(?:find|search|pick|select|get|open|view|show)\b[\s\S]{0,140}\b(?:doc|docs|document|paper)\b/i.test(unquoted) ||
+    /\b(?:later|next\s+time|in\s+the\s+future|not\s+now|not\s+yet)\b[\s\S]{0,160}\b(?:find|search|pick|select|get|open|view|show)\b[\s\S]{0,120}\b(?:doc|docs|document|paper)\b/i.test(unquoted) ||
+    /\b(?:earlier|previously|last\s+turn|historically)\b[\s\S]{0,180}\b(?:find|search|pick|select|get|open|view|show)\b[\s\S]{0,120}\b(?:doc|docs|document|paper)\b/i.test(unquoted) ||
+    /\b(?:screen|visible\s+text|label|button|debug)\b[\s\S]{0,120}\b(?:says|shows|reads|contains|mentions)\b/i.test(unquoted)
+  ) return null;
   const patterns = [
-    /\b(?:find\s+and\s+open|search\s+for\s+and\s+open|pull\s+up|open|view|show|pick|grab|go\s+to|navigate\s+to|take\s+me\s+to|bring\s+me\s+to)\s+(?:a|an|the)?\s*(?:doc|docs|document|paper)\s+(?:about|on|regarding|for)\s+(.+)$/i,
-    /\b(?:find|search|pick|select|get)\s+(?:me\s+)?(?:(?:a|an|the)\s+)?(?:best|right|top|closest|most\s+relevant)?\s*(?:doc|docs|document|paper)\s+(?:about|on|regarding|for)\s+(.+)$/i,
+    /\b(?:find\s+and\s+open|search\s+for\s+and\s+open|pull\s+up|open|view|show|pick|grab|go\s+to|navigate\s+to|take\s+me\s+to|bring\s+me\s+to)\s+(?:a|an|the)?\s*(?:(?:local|workspace)\s+)?(?:doc|docs|document|paper)\s+(?:about|on|regarding|for)\s+(.+)$/i,
+    /\b(?:find|search|pick|select|get)\s+(?:me\s+)?(?:(?:a|an|the)\s+)?(?:best|right|top|closest|most\s+relevant)?\s*(?:(?:local|workspace)\s+)?(?:doc|docs|document|paper)\s+(?:about|on|regarding|for)\s+(.+)$/i,
   ];
   for (const pattern of patterns) {
     const match = normalized.match(pattern);
@@ -496,6 +537,7 @@ export const createAskTurnLatestDocIntentReaders = (
       : /\bNHM2\b[\s\S]{0,80}\bdeeper\s+reformulation\s+decision\s+memo\b/i.test(transcript)
         ? "NHM2 deeper reformulation decision memo"
       : resolveAskTurnRecentDocAcquisitionQueryArg(transcript) ??
+        resolveAskTurnNamedDocSummaryQueryArg(transcript) ??
         resolveAskTurnTopicDocQueryArg(transcript) ??
         resolveAskTurnOpenResultDocQueryArg(transcript) ??
         resolveAskTurnTitleLikeOpenDocQueryArg(transcript);
@@ -526,7 +568,8 @@ export const createAskTurnDocSummaryIntentReaders = (
 ) => {
   const isAskTurnCompoundDocAnswerIntent = (transcript: string): boolean =>
     Boolean(deps.resolveAskTurnOpenDocSearchQueryArg(transcript)) &&
-    /\b(?:tell\s+me|answer|summari[sz]e|explain|extract|key|numeric|number|result|takeaway|what\s+is|what\s+are)\b/i.test(transcript);
+    (isAskTurnNamedDocSummaryIntent(transcript) ||
+      /\b(?:tell\s+me|answer|summari[sz]e|explain|extract|key|numeric|number|result|takeaway|what\s+is|what\s+are)\b/i.test(transcript));
 
   const isAskTurnDocAboutSummaryPrompt = (transcript: string): boolean =>
     isAskTurnActiveDocUsefulnessIntent(transcript) ||
@@ -551,9 +594,10 @@ export const createAskTurnDocSummaryIntentReaders = (
     !/\bbackground\s+only\b/i.test(transcript) &&
     !isAskTurnDocsViewerCapabilityTopicLabelPrompt(transcript) &&
     !deps.isAskTurnNoWorkspaceBackgroundScope(transcript) &&
-    /\b(?:summari[sz]e|summary|overview|takeaways?|explain|describe|gist|what\s+(?:it|the\s+(?:doc|document|paper))\s+says)\b/i.test(
-      transcript,
-    );
+    (isAskTurnNamedDocSummaryIntent(transcript) ||
+      /\b(?:summari[sz]e|summary|overview|takeaways?|explain|describe|gist|what\s+(?:it|the\s+(?:doc|document|paper))\s+says)\b/i.test(
+        transcript,
+      ));
 
   const isAskTurnDocsOpenAndSummarizeIntent = (transcript: string): boolean =>
     isAskTurnDocsSummaryRequest(transcript) &&

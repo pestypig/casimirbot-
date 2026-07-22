@@ -35,6 +35,38 @@ pnpm dev
 
 Tip: Start with a strong model (gpt-4o / gpt-4o-mini) to set a baseline, then downshift if acceptable.
 
+### Helix Ask Codex model control
+
+The Codex-facing Ask UI exposes `GPT-5.4 mini` as the lowest-cost supported
+pinned model. The selection is available to both `user` and `developer`
+accounts; account quotas still cap output tokens and runtime use.
+
+API callers can pin it with either contract:
+
+```json
+{ "language_model": "gpt-5.4-mini" }
+```
+
+```json
+{
+  "language_model_selection": {
+    "mode": "pinned",
+    "model": "gpt-5.4-mini"
+  }
+}
+```
+
+For low-cost local regression runs, set:
+
+```bash
+export HELIX_ASK_DEFAULT_PINNED_MODEL="gpt-5.4-mini"
+```
+
+That default applies only when a turn and its session have no explicit model
+choice. Selecting Auto or another supported profile in the UI/API takes
+precedence. Unsupported pinned IDs are recorded as rejected and resolve to the
+allowlisted mini policy instead of silently selecting a more expensive model.
+
 ## 2) Posture + registration checks
 
 ```bash

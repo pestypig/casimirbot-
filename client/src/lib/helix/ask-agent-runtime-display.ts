@@ -1,4 +1,5 @@
 import {
+  DEFAULT_HELIX_AGENT_RUNTIME_ID,
   isHelixAgentRuntimeId as isSharedHelixAgentRuntimeId,
   type HelixAgentRuntimeDescriptor,
   type HelixAgentRuntimeId,
@@ -8,13 +9,13 @@ type RecordLike = Record<string, unknown>;
 
 export const DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS: HelixAgentRuntimeDescriptor[] = [
   {
-    id: "helix",
-    label: "Helix Ask Native",
+    id: "codex",
+    label: "Codex Workstation Mode",
     enabled: true,
     experimental: false,
     permission_profile: {
-      id: "helix-native",
-      label: "Helix native governed runtime",
+      id: "read-observe-act",
+      label: "Read/observe plus non-mutating workstation action",
       allows: {
         observe: true,
         read: true,
@@ -137,10 +138,12 @@ export function resolveSelectedHelixAgentRuntime(
   requested: unknown,
   providers: HelixAgentRuntimeDescriptor[],
 ): HelixAgentRuntimeId {
-  const candidate = isHelixAgentRuntimeId(requested) ? requested : "helix";
+  const candidate = isHelixAgentRuntimeId(requested) ? requested : DEFAULT_HELIX_AGENT_RUNTIME_ID;
   const provider = providers.find((entry: HelixAgentRuntimeDescriptor) => entry.id === candidate);
   if (provider?.enabled) return provider.id;
-  return providers.find((entry: HelixAgentRuntimeDescriptor) => entry.enabled)?.id ?? "helix";
+  return providers.find((entry: HelixAgentRuntimeDescriptor) => entry.enabled)?.id ??
+    providers[0]?.id ??
+    DEFAULT_HELIX_AGENT_RUNTIME_ID;
 }
 
 export function resolveNextSelectableHelixAgentRuntime(
@@ -148,11 +151,11 @@ export function resolveNextSelectableHelixAgentRuntime(
   providers: HelixAgentRuntimeDescriptor[],
 ): HelixAgentRuntimeId {
   const enabledProviders = providers.filter((provider) => provider.enabled);
-  if (enabledProviders.length === 0) return "helix";
+  if (enabledProviders.length === 0) return providers[0]?.id ?? DEFAULT_HELIX_AGENT_RUNTIME_ID;
   const currentRuntime = resolveSelectedHelixAgentRuntime(current, providers);
   const currentIndex = enabledProviders.findIndex((provider) => provider.id === currentRuntime);
   const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % enabledProviders.length : 0;
-  return enabledProviders[nextIndex]?.id ?? "helix";
+  return enabledProviders[nextIndex]?.id ?? DEFAULT_HELIX_AGENT_RUNTIME_ID;
 }
 
 export type HelixAgentRuntimeSelectDecision = {

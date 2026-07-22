@@ -137,7 +137,9 @@ type Translate = InterfaceTextResolver["t"];
 type DisplayMessageMap = Record<string, InterfaceMessageId>;
 export type DocumentTranslationUiStatus = "idle" | "cached" | "translating" | "ready" | "unavailable" | "error";
 type InlineTranslationState = DocumentInlineTranslationRenderState;
-type DocTaxonomyFilter = "all" | "canonical-research" | "current-development" | "synthetic-research" | "legacy-development" | "uncategorized";
+type DocTaxonomyFilter = "all" | "runtime-whitepaper" | "canonical-research" | "current-development" | "synthetic-research" | "legacy-development" | "uncategorized";
+type ManifestDocClass = Exclude<DocTaxonomyFilter, "all" | "runtime-whitepaper">;
+export type DocDirectorySort = "last-edited" | "title" | "subject";
 type DocBadgeTone = "cyan" | "emerald" | "amber" | "slate";
 type DocBadge = {
   label: string;
@@ -389,7 +391,7 @@ const docSubjectLabelMessages: DisplayMessageMap = {
   "Warp Mechanics": "docsViewer.group.warpMechanics",
 } satisfies DisplayMessageMap;
 
-const docTaxonomyLabelMessages: Record<Exclude<DocTaxonomyFilter, "all" | "uncategorized">, InterfaceMessageId> = {
+const docTaxonomyLabelMessages: Record<Exclude<ManifestDocClass, "uncategorized">, InterfaceMessageId> = {
   "canonical-research": "docsViewer.taxonomy.canonicalResearch",
   "current-development": "docsViewer.taxonomy.currentDevelopment",
   "synthetic-research": "docsViewer.taxonomy.syntheticResearch",
@@ -398,6 +400,7 @@ const docTaxonomyLabelMessages: Record<Exclude<DocTaxonomyFilter, "all" | "uncat
 
 const docTaxonomyFilterOptions: Array<{ key: DocTaxonomyFilter; messageId: InterfaceMessageId }> = [
   { key: "all", messageId: "docsViewer.taxonomy.all" },
+  { key: "runtime-whitepaper", messageId: "docsViewer.taxonomy.runtimeWhitepapers" },
   { key: "canonical-research", messageId: "docsViewer.taxonomy.research" },
   { key: "current-development", messageId: "docsViewer.taxonomy.development" },
   { key: "synthetic-research", messageId: "docsViewer.taxonomy.syntheticResearchShort" },
@@ -570,6 +573,7 @@ export function DocViewerPanel() {
   const [activeResearchDocument, setActiveResearchDocument] = React.useState<HelixResearchLibraryDocument | null>(null);
   const activeResearchDocumentRef = React.useRef<HelixResearchLibraryDocument | null>(null);
   const [docClassFilter, setDocClassFilter] = React.useState<DocTaxonomyFilter>("all");
+  const [directorySort, setDirectorySort] = React.useState<DocDirectorySort>("last-edited");
   const [html, setHtml] = React.useState<string>("");
   const [rawMarkdown, setRawMarkdown] = React.useState<string>("");
   const [inlineTranslationEnabled, setInlineTranslationEnabled] = React.useState(false);
@@ -2385,7 +2389,10 @@ export function DocViewerPanel() {
   const filteredEntries = React.useMemo(() => {
     return queryMatchedEntries.filter((entry) => docMatchesTaxonomyFilter(entry, docClassFilter));
   }, [docClassFilter, queryMatchedEntries]);
-  const grouped = React.useMemo(() => groupBySubject(filteredEntries, t), [filteredEntries, t]);
+  const grouped = React.useMemo(
+    () => arrangeDirectoryEntries(filteredEntries, directorySort, t),
+    [directorySort, filteredEntries, t],
+  );
   const handleDocMathClick = React.useCallback(
     (event: React.MouseEvent<HTMLElement>) => {
       const target = event.target as HTMLElement | null;
@@ -2443,9 +2450,11 @@ export function DocViewerPanel() {
           currentRoute={currentPath}
           query={query}
           docClassFilter={docClassFilter}
+          sort={directorySort}
           taxonomyCounts={taxonomyCounts}
           onQueryChange={setQuery}
           onDocClassFilterChange={setDocClassFilter}
+          onSortChange={setDirectorySort}
           onSelect={handleSelectCanonicalDoc}
           researchLibraryDocuments={researchLibraryDocuments}
           researchLibraryStatus={researchLibraryStatus}
@@ -2557,9 +2566,11 @@ type DirectoryRailProps = {
   currentRoute?: string;
   query: string;
   docClassFilter: DocTaxonomyFilter;
+  sort?: DocDirectorySort;
   taxonomyCounts: Record<DocTaxonomyFilter, number>;
   onQueryChange: (value: string) => void;
   onDocClassFilterChange: (value: DocTaxonomyFilter) => void;
+  onSortChange?: (value: DocDirectorySort) => void;
   onSelect: (path: string) => void;
   researchLibraryDocuments?: HelixResearchLibraryDocumentSummary[];
   researchLibraryStatus?: "loading" | "ready" | "signed_out" | "error";
@@ -2580,9 +2591,11 @@ export function DirectoryRail({
   currentRoute,
   query,
   docClassFilter,
+  sort = "last-edited",
   taxonomyCounts,
   onQueryChange,
   onDocClassFilterChange,
+  onSortChange,
   onSelect,
   researchLibraryDocuments = [],
   researchLibraryStatus = "ready",
@@ -2696,6 +2709,21 @@ export function DirectoryRail({
               </button>
             );
           })}
+        </div>
+        <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/10 pt-3">
+          <label htmlFor="docs-directory-sort" className="text-xs font-medium text-slate-300">
+            {t("docsViewer.sort.label")}
+          </label>
+          <select
+            id="docs-directory-sort"
+            value={sort}
+            onChange={(event) => onSortChange?.(event.target.value as DocDirectorySort)}
+            className="h-8 min-w-36 rounded-md border border-white/10 bg-slate-900 px-2 text-xs text-slate-100 outline-none transition-colors hover:border-white/20 focus:border-cyan-400/70 focus:ring-1 focus:ring-cyan-400/40"
+          >
+            <option value="last-edited">{t("docsViewer.sort.lastEdited")}</option>
+            <option value="title">{t("docsViewer.sort.title")}</option>
+            <option value="subject">{t("docsViewer.sort.subject")}</option>
+          </select>
         </div>
       </div>
       <div
@@ -3677,6 +3705,7 @@ function groupBySubject(entries: DocManifestEntry[], t: Translate): GroupedDocs[
 function buildDocTaxonomyCounts(entries: DocManifestEntry[]): Record<DocTaxonomyFilter, number> {
   const counts: Record<DocTaxonomyFilter, number> = {
     all: entries.length,
+    "runtime-whitepaper": 0,
     "canonical-research": 0,
     "current-development": 0,
     "synthetic-research": 0,
@@ -3684,6 +3713,7 @@ function buildDocTaxonomyCounts(entries: DocManifestEntry[]): Record<DocTaxonomy
     uncategorized: 0,
   };
   entries.forEach((entry) => {
+    if (isRuntimeWhitepaper(entry)) counts["runtime-whitepaper"] += 1;
     const key = normalizeDocTaxonomyFilter(entry.docClass);
     counts[key] += 1;
   });
@@ -3692,10 +3722,19 @@ function buildDocTaxonomyCounts(entries: DocManifestEntry[]): Record<DocTaxonomy
 
 function docMatchesTaxonomyFilter(entry: DocManifestEntry, filter: DocTaxonomyFilter): boolean {
   if (filter === "all") return true;
+  if (filter === "runtime-whitepaper") return isRuntimeWhitepaper(entry);
   return normalizeDocTaxonomyFilter(entry.docClass) === filter;
 }
 
-function normalizeDocTaxonomyFilter(docClass: string | null | undefined): DocTaxonomyFilter {
+function isRuntimeWhitepaper(entry: DocManifestEntry): boolean {
+  return entry.docClass === "canonical-research"
+    && entry.canonical
+    && entry.bundleKind === "equation-action-whitepaper"
+    && entry.toolHints?.calculatorReady === true
+    && entry.sidecars.length > 0;
+}
+
+function normalizeDocTaxonomyFilter(docClass: string | null | undefined): ManifestDocClass {
   if (
     docClass === "canonical-research" ||
     docClass === "current-development" ||
@@ -3709,6 +3748,9 @@ function normalizeDocTaxonomyFilter(docClass: string | null | undefined): DocTax
 
 function getDocBadges(entry: DocManifestEntry, t: Translate): DocBadge[] {
   const badges: DocBadge[] = [];
+  if (isRuntimeWhitepaper(entry)) {
+    badges.push({ label: t("docsViewer.taxonomy.runtimeWhitepaper"), tone: "amber" });
+  }
   const docClass = normalizeDocTaxonomyFilter(entry.docClass);
   if (docClass !== "all" && docClass !== "uncategorized") {
     badges.push({
@@ -3756,6 +3798,28 @@ function shouldAutoEnableInlineTranslationProjection(
 ): boolean {
   if (snapshot.version <= 0) return false;
   return Object.values(snapshot.translations).some((translation) => translation.status === "ready");
+}
+
+export function arrangeDirectoryEntries(
+  entries: DocManifestEntry[],
+  sort: DocDirectorySort,
+  t: Translate,
+): GroupedDocs[] {
+  if (sort === "subject") return groupBySubject(entries, t);
+
+  const sortedEntries = [...entries].sort((a, b) => {
+    if (sort === "title") {
+      return a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+    }
+    const editedDelta = (b.fileMtimeMs ?? 0) - (a.fileMtimeMs ?? 0);
+    return editedDelta || a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+  });
+  return sortedEntries.length > 0
+    ? [{
+        label: sort === "last-edited" ? t("docsViewer.sort.lastEdited") : t("docsViewer.sort.title"),
+        entries: sortedEntries,
+      }]
+    : [];
 }
 
 function localizeDocSubjectLabel(subjectLabel: string | null | undefined, t: Translate): string {

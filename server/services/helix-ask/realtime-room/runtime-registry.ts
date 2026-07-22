@@ -50,6 +50,13 @@ export type {
 } from "./runtime-registry/visual-frames";
 
 export {
+  reconcileSharedRealtimeRoomVisualFramesForConsent,
+} from "./runtime-registry/visual-consent";
+export type {
+  SharedRealtimeRoomVisualConsentReconciliation,
+} from "./runtime-registry/visual-consent";
+
+export {
   buildSharedRealtimeRoomRuntimeDebugProjection,
 } from "./runtime-registry/debug";
 export type {

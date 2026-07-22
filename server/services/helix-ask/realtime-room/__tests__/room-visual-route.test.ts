@@ -230,4 +230,115 @@ describe("Shared Realtime room visual routes", () => {
       .expect(403);
     expect(blocked.body.error).toBe("shared_realtime_room_consent_required");
   });
+
+  it("blocks away ingress and purges a departing participant's retained lane", async () => {
+    const app = createSharedRealtimeRoomTestApp();
+    const owner = await signInSharedRealtimeRoomTestAgent({
+      app,
+      profileId: "profile:visual-away-owner",
+      displayName: "Away Owner",
+    });
+    const guest = await signInSharedRealtimeRoomTestAgent({
+      app,
+      profileId: "profile:visual-away-guest",
+      displayName: "Away Guest",
+    });
+    const roomId = await createReadySharedRealtimeRoom({
+      owner,
+      guest,
+      title: "Away visual lane",
+    });
+    await guest.agent
+      .patch(`/api/agi/realtime/rooms/${roomId}/consent`)
+      .send({ consent: { screen_thumbnail_to_room: true } })
+      .expect(200);
+    await guest.agent
+      .post(`/api/agi/realtime/rooms/${roomId}/presence`)
+      .send({ presence: "away" })
+      .expect(200);
+    const awayUpload = await guest.agent
+      .post(`/api/agi/realtime/rooms/${roomId}/visual-frames`)
+      .send(visualPayload({ sourceId: "screen:away", sequence: 1 }))
+      .expect(409);
+    expect(awayUpload.body.error).toBe("shared_realtime_room_not_ready");
+
+    await guest.agent
+      .post(`/api/agi/realtime/rooms/${roomId}/presence`)
+      .send({ presence: "present" })
+      .expect(200);
+    await guest.agent
+      .post(`/api/agi/realtime/rooms/${roomId}/visual-frames`)
+      .send(visualPayload({ sourceId: "screen:away", sequence: 1 }))
+      .expect(200);
+    expect((await owner.agent
+      .get(`/api/agi/realtime/rooms/${roomId}/visual-frames`)
+      .expect(200)).body.frames).toHaveLength(1);
+
+    await guest.agent.post(`/api/agi/realtime/rooms/${roomId}/leave`).expect(200);
+    expect((await owner.agent
+      .get(`/api/agi/realtime/rooms/${roomId}/visual-frames`)
+      .expect(200)).body.frames).toEqual([]);
+  });
+
+  it("retries an undelivered identical frame after bind and reconciles visual revocation", async () => {
+    const app = createSharedRealtimeRoomTestApp();
+    const owner = await signInSharedRealtimeRoomTestAgent({
+      app,
+      profileId: "profile:visual-retry-owner",
+      displayName: "Retry Owner",
+    });
+    const guest = await signInSharedRealtimeRoomTestAgent({
+      app,
+      profileId: "profile:visual-retry-guest",
+      displayName: "Retry Guest",
+    });
+    const roomId = await createReadySharedRealtimeRoom({
+      owner,
+      guest,
+      title: "Visual retry",
+    });
+    await guest.agent
+      .patch(`/api/agi/realtime/rooms/${roomId}/consent`)
+      .send({ consent: { screen_to_model: true, screen_thumbnail_to_room: true } })
+      .expect(200);
+    const payload = visualPayload({ sourceId: "screen:retry", sequence: 1 });
+    const beforeBind = await guest.agent
+      .post(`/api/agi/realtime/rooms/${roomId}/visual-frames`)
+      .send(payload)
+      .expect(200);
+    expect(beforeBind.body.frame_receipt.provider_delivery).toBe("runtime_not_bound");
+
+    await bindOwnerTransport({ roomId, owner });
+    const events: Record<string, unknown>[] = [];
+    setRealtimeSidebandControlSenderForTests(({ event, onComplete }) => {
+      events.push(event);
+      onComplete?.(null);
+      return true;
+    });
+    const retried = await guest.agent
+      .post(`/api/agi/realtime/rooms/${roomId}/visual-frames`)
+      .send(payload)
+      .expect(200);
+    expect(retried.body.frame_receipt.provider_delivery).toBe("sent_to_shared_model");
+    expect(events.filter((event) => event.type === "conversation.item.create")).toHaveLength(1);
+
+    await guest.agent
+      .patch(`/api/agi/realtime/rooms/${roomId}/consent`)
+      .send({ consent: { screen_thumbnail_to_room: false } })
+      .expect(200);
+    const withoutPreview = await owner.agent
+      .get(`/api/agi/realtime/rooms/${roomId}/visual-frames`)
+      .expect(200);
+    expect(withoutPreview.body.frames).toHaveLength(1);
+    expect(withoutPreview.body.frames[0].preview_data_url).toBeNull();
+
+    await guest.agent
+      .patch(`/api/agi/realtime/rooms/${roomId}/consent`)
+      .send({ consent: { screen_to_model: false } })
+      .expect(200);
+    expect((await owner.agent
+      .get(`/api/agi/realtime/rooms/${roomId}/visual-frames`)
+      .expect(200)).body.frames).toEqual([]);
+    expect(events.some((event) => event.type === "conversation.item.delete")).toBe(true);
+  });
 });

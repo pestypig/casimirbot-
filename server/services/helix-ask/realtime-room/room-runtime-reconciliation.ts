@@ -1,18 +1,17 @@
-import crypto from "node:crypto";
 import type { HelixSharedRealtimeRoom } from "@shared/helix-shared-realtime-room";
 import {
   markSharedRealtimeRoomRuntimeState,
   purgeSharedRealtimeRoomVisualFrames,
   readSharedRealtimeRoomRuntime,
-  readSharedRealtimeRoomRuntimeBinding,
+  reconcileSharedRealtimeRoomVisualFramesForConsent,
   stopSharedRealtimeRoomRuntime,
 } from "./runtime-registry";
 import {
   buildRealtimeRequesterRef,
   removeAdmittedRealtimeSession,
 } from "../realtime-session/session-registry";
-import { sendRealtimeSidebandControlEvent } from
-  "../realtime-session/sideband-control-channel";
+import { requestSharedRealtimeRoomProviderItemDeletion } from
+  "./provider-item-deletion";
 
 export const degradeSharedRealtimeRoomRuntimeForReadiness = (
   room: HelixSharedRealtimeRoom,
@@ -36,6 +35,27 @@ export const degradeSharedRealtimeRoomRuntimeForReadiness = (
 export const degradeSharedRealtimeRoomRuntimeForConsent =
   degradeSharedRealtimeRoomRuntimeForReadiness;
 
+export const reconcileSharedRealtimeRoomVisualConsent = (input: {
+  room: HelixSharedRealtimeRoom;
+  participantId: string;
+}): void => {
+  const participant = input.room.participants.find(
+    (candidate) => candidate.participant_id === input.participantId,
+  );
+  if (!participant) return;
+  const reconciled = reconcileSharedRealtimeRoomVisualFramesForConsent({
+    roomId: input.room.room_id,
+    participantId: input.participantId,
+    screenToModelAuthorized: participant.consent.screen_to_model,
+    thumbnailToRoomAuthorized: participant.consent.screen_thumbnail_to_room,
+  });
+  requestSharedRealtimeRoomProviderItemDeletion({
+    roomId: input.room.room_id,
+    providerItemIds: reconciled.providerItemIds,
+    reason: "consent_revoked",
+  });
+};
+
 export const reconcileSharedRealtimeRoomRuntimeAfterLeave = (input: {
   roomId: string;
   memberRole: "owner" | "participant";
@@ -48,22 +68,11 @@ export const reconcileSharedRealtimeRoomRuntimeAfterLeave = (input: {
     participantId: input.memberRole === "owner" ? null : input.participantId,
   });
   if (!runtime?.runtime_id) return;
-  const binding = readSharedRealtimeRoomRuntimeBinding({
+  requestSharedRealtimeRoomProviderItemDeletion({
     roomId: input.roomId,
-    runtimeId: runtime.runtime_id,
+    providerItemIds: purged.providerItemIds,
+    reason: "leave",
   });
-  if (binding?.realtimeSessionId) {
-    for (const providerItemId of purged.providerItemIds) {
-      sendRealtimeSidebandControlEvent({
-        realtimeSessionId: binding.realtimeSessionId,
-        event: {
-          type: "conversation.item.delete",
-          event_id: `room_visual_leave_delete_${crypto.randomUUID()}`,
-          item_id: providerItemId,
-        },
-      });
-    }
-  }
   if (input.memberRole === "owner") {
     const stopped = stopSharedRealtimeRoomRuntime({
       roomId: input.roomId,

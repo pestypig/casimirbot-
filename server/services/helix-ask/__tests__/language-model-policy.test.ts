@@ -41,6 +41,45 @@ describe("Helix language model policy", () => {
     expect(policy.persistence_scope).toBe("session");
   });
 
+  it("pins the Codex-compatible test model without allowing Auto to escalate model or effort", () => {
+    const policy = resolveHelixLanguageModelPolicy({
+      requestedProfile: "auto",
+      requestedSelectionMode: "pinned",
+      pinnedModel: "gpt-5.4-mini",
+      accountPolicy: HELIX_USER_ACCOUNT_POLICY,
+      promptText:
+        "Research, implement, and verify a multi-step tool-heavy workflow with source-backed synthesis.",
+    });
+
+    expect(policy.requested_selection_mode).toBe("pinned");
+    expect(policy.selection_mode).toBe("pinned");
+    expect(policy.selection_source).toBe("operator_pinned");
+    expect(policy.resolved_model).toBe("gpt-5.4-mini");
+    expect(policy.reasoning_effort).toBe("low");
+    expect(policy.auto_selected_profile).toBeNull();
+    expect(policy.escalation_reason).toBeNull();
+    expect(policy.policy_signals).toEqual([]);
+    expect(policy.persistence_scope).toBe("session");
+    expect(policy.pinned_model_allowed).toBe(true);
+    expect(buildHelixLanguageModelDebugSummary(policy)).toContain("AI: Pinned | gpt-5.4-mini");
+  });
+
+  it("fails to the Codex-compatible mini model when a pinned request is missing or not allowlisted", () => {
+    const policy = resolveHelixLanguageModelPolicy({
+      requestedSelectionMode: "pinned",
+      pinnedModel: "gpt-5.5",
+      accountPolicy: HELIX_DEVELOPER_ACCOUNT_POLICY,
+      promptText: "Perform the expensive deep workflow.",
+    });
+
+    expect(policy.selection_mode).toBe("pinned");
+    expect(policy.selection_source).toBe("policy_downgrade");
+    expect(policy.resolved_model).toBe("gpt-5.4-mini");
+    expect(policy.reasoning_effort).toBe("low");
+    expect(policy.pinned_model_allowed).toBe(false);
+    expect(policy.pinned_model_rejected_reason).toBe("pinned_model_missing_or_not_allowlisted");
+  });
+
   it("lets Auto choose deep turn-locally for complex work", () => {
     const policy = resolveHelixLanguageModelPolicy({
       requestedProfile: "auto",

@@ -26,6 +26,78 @@ const visibleBulletCount = (text: string): number =>
   text.split(/\r?\n/).filter((line) => /^\s*(?:[-*•]|\d+[.)])\s+\S/.test(line)).length;
 
 describe("Helix Ask docs summary output coverage", () => {
+  it("searches and summarizes a naturally named document before answering", async () => {
+    const app = createApp();
+    const sessionId = `docs-summary-natural-named-${Date.now()}`;
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: 'Ok we have a doc called "Helix Ask Codex Loop Discipline" what this abot?',
+        mode: "read",
+        debug: true,
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "docs-viewer",
+          hasDocContext: false,
+          hasNoteContext: false,
+        },
+      })
+      .expect(200);
+
+    const iterations = response.body?.agent_runtime_loop?.iterations ?? [];
+    const answerText = String(response.body?.selected_final_answer ?? response.body?.answer ?? response.body?.text ?? "");
+    const failureDebug = JSON.stringify({
+      selected_final_answer: response.body?.selected_final_answer,
+      terminal_artifact_kind: response.body?.terminal_artifact_kind,
+      terminal_error_code: response.body?.terminal_error_code,
+      final_answer_source: response.body?.final_answer_source,
+      source_target_intent: response.body?.source_target_intent,
+      canonical_goal_frame: response.body?.canonical_goal_frame,
+      agent_runtime_loop: response.body?.agent_runtime_loop,
+      satisfaction_report: response.body?.satisfaction_report,
+      doc_open_coverage: response.body?.doc_open_coverage,
+      doc_location_coverage: response.body?.doc_location_coverage,
+      retrieval_required_signal: response.body?.retrieval_required_signal,
+      capability_itinerary: response.body?.capability_itinerary ?? response.body?.debug?.capability_itinerary,
+      capability_itinerary_execution_state:
+        response.body?.capability_itinerary_execution_state ?? response.body?.debug?.capability_itinerary_execution_state,
+      tool_call_admission_decision:
+        response.body?.tool_call_admission_decision ?? response.body?.debug?.tool_call_admission_decision,
+      goal_satisfaction_evaluation: response.body?.goal_satisfaction_evaluation,
+      current_turn_goal_satisfaction: response.body?.current_turn_goal_satisfaction,
+      runtime_authority_audit: response.body?.runtime_authority_audit,
+      route_authority_audit: response.body?.route_authority_audit,
+      solver_controller_decision: response.body?.solver_controller_decision,
+    }, null, 2);
+    expect(response.body?.source_target_intent).toMatchObject({
+      target_source: "docs_viewer",
+      strength: "hard",
+      allow_no_tool_direct: false,
+    });
+    expect(response.body?.canonical_goal_frame).toMatchObject({
+      goal_kind: "doc_summary",
+      required_terminal_kind: "doc_summary",
+    });
+    expect(response.body?.tool_call_admission_decision?.admitted_tool_families).toContain("docs_viewer");
+    expect(response.body?.tool_call_admission_decision?.admitted_tool_families).not.toContain("model_only");
+    expect(iterations.some((iteration: any) => iteration?.chosen_capability === "docs-viewer.search_docs")).toBe(true);
+    expect(
+      iterations.some(
+        (iteration: any) =>
+          iteration?.chosen_capability === "docs-viewer.summarize_doc" &&
+          Array.isArray(iteration?.observed_artifact_refs) &&
+          iteration.observed_artifact_refs.length > 0,
+      ),
+    ).toBe(true);
+    expect(response.body?.terminal_artifact_kind, failureDebug).toBe("doc_summary");
+    expect(response.body?.terminal_artifact_kind).not.toBe("typed_failure");
+    expect(response.body?.solver_controller_decision?.decision).toBe("allow_terminal");
+    expect(response.body?.route_authority_audit?.route_authority_ok).toBe(true);
+    expect(answerText).toMatch(/Helix Ask|Codex|loop|discipline/i);
+    expect(answerText).not.toMatch(/Capability proposal\s*:/i);
+  }, 60000);
+
   it("covers requested summary bullet count and path before allowing terminal success", async () => {
     const app = createApp();
     const sessionId = `docs-summary-covered-${Date.now()}`;

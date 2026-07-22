@@ -16,13 +16,13 @@ export function SharedLiveRoomActivePanel({
   room,
   controller,
   idPrefix,
-  onHostTransportConsentRevoked,
+  onHostTransportInvalidated,
   onOwnerRoomClosed,
 }: {
   room: HelixSharedRealtimeRoom;
   controller: HelixSharedLiveRoomController;
   idPrefix: string;
-  onHostTransportConsentRevoked?: () => void;
+  onHostTransportInvalidated?: () => void;
   onOwnerRoomClosed?: () => void;
 }) {
   const isOwner = controller.selfParticipant?.role === "owner";
@@ -62,7 +62,7 @@ export function SharedLiveRoomActivePanel({
           participant={controller.selfParticipant}
           controller={controller}
           sectionId={`${idPrefix}-consent`}
-          onHostTransportConsentRevoked={onHostTransportConsentRevoked}
+          onHostTransportInvalidated={onHostTransportInvalidated}
         />
       ) : null}
       <SharedLiveRoomRuntimePanel

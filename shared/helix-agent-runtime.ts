@@ -4,6 +4,8 @@ export const HELIX_AGENT_RUNTIME_IDS = ["helix", "codex", "future"] as const;
 
 export type HelixAgentRuntimeId = (typeof HELIX_AGENT_RUNTIME_IDS)[number];
 
+export const DEFAULT_HELIX_AGENT_RUNTIME_ID: HelixAgentRuntimeId = "codex";
+
 export const isHelixAgentRuntimeId = (value: unknown): value is HelixAgentRuntimeId =>
   typeof value === "string" &&
   (HELIX_AGENT_RUNTIME_IDS as readonly string[]).includes(value);

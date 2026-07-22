@@ -73,6 +73,8 @@ export const bindOwnerRealtimeSessionToSharedRoom = (input: {
   if (!claimed.ok) return { error: claimed.error };
 
   const roomThreadId = `helix-ask:room:${input.roomId}`;
+  const priorThreadId = admitted.threadId;
+  const priorSourceBinding = admitted.sourceBinding;
   const updated = updateAdmittedRealtimeSession({
     realtimeSessionId: input.realtimeSessionId,
     requesterRef,
@@ -102,6 +104,14 @@ export const bindOwnerRealtimeSessionToSharedRoom = (input: {
     transportOwner: "host_browser",
   });
   if (!activated.ok) {
+    updateAdmittedRealtimeSession({
+      realtimeSessionId: input.realtimeSessionId,
+      requesterRef,
+      patch: {
+        threadId: priorThreadId,
+        sourceBinding: priorSourceBinding,
+      },
+    });
     stopSharedRealtimeRoomRuntime({
       roomId: input.roomId,
       runtimeId: input.runtimeId,

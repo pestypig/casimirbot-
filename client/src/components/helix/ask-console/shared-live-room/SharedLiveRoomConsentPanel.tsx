@@ -48,12 +48,12 @@ export function SharedLiveRoomConsentPanel({
   participant,
   controller,
   sectionId,
-  onHostTransportConsentRevoked,
+  onHostTransportInvalidated,
 }: {
   participant: HelixSharedRealtimeRoomParticipant;
   controller: HelixSharedLiveRoomController;
   sectionId: string;
-  onHostTransportConsentRevoked?: () => void;
+  onHostTransportInvalidated?: () => void;
 }) {
   const toggleConsent = async (key: ConsentKey, enabled: boolean): Promise<void> => {
     const nextEnabled = !enabled;
@@ -64,15 +64,16 @@ export function SharedLiveRoomConsentPanel({
       !nextEnabled &&
       (key === "microphone_to_model" || key === "model_audio_output")
     ) {
-      onHostTransportConsentRevoked?.();
+      onHostTransportInvalidated?.();
     }
   };
   return (
     <section aria-labelledby={sectionId} className="rounded-xl border border-white/10 bg-black/20 p-3">
       <p id={sectionId} className="text-xs font-semibold text-slate-100">Your permission records</p>
       <p className="mt-1 text-[10px] leading-4 text-slate-500">
-        Only you can change these grants. Turning one off blocks future room ingress for that source;
-        turning one on never activates a microphone, camera, screen, or speaker by itself.
+        Only you can change these grants. Turning one off blocks future room ingress and reconciles
+        retained room content for that source; turning one on never activates a microphone, camera,
+        screen, or speaker by itself.
       </p>
       <div className="mt-2 grid gap-2 md:grid-cols-2">
         {consentControls.map((control) => {

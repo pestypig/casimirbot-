@@ -34,6 +34,7 @@ import {
   resolveAskTurnCreateThenOpenDocTopicArg,
   resolveAskTurnDocPathArg,
   resolveAskTurnLatestDocTopicArg,
+  resolveAskTurnNamedDocSummaryQueryArg,
   resolveAskTurnWorkspaceActionDocPath,
   resolveAskTurnTitleLikeOpenDocQueryArg,
   resolveAskTurnTopicDocQueryArg,
@@ -217,6 +218,15 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(isAskTurnDocsPanelOpenIntent("open the docs viewer")).toBe(true);
     expect(isAskTurnDocsPanelOpenIntent("open the docs about NHM2")).toBe(false);
     expect(resolveAskTurnTopicDocQueryArg("open the doc about Casimir tile load bearing")).toBe("Casimir tile load bearing");
+    expect(resolveAskTurnTopicDocQueryArg(
+      "Find the local document about Helix Ask terminal authority and tell me which document you used.",
+    )).toBe("Helix Ask terminal authority");
+    expect(resolveAskTurnTopicDocQueryArg(
+      "Do not find the local document about Helix Ask terminal authority; explain the request only.",
+    )).toBeNull();
+    expect(resolveAskTurnTopicDocQueryArg(
+      "Later, find the local document about Helix Ask terminal authority, but not now.",
+    )).toBeNull();
     expect(resolveAskTurnTitleLikeOpenDocQueryArg("open the NHM2 deeper reformulation decision memo")).toBe(
       "NHM2 deeper reformulation decision memo",
     );
@@ -228,6 +238,15 @@ describe("Helix Ask doc args extraction boundary", () => {
     );
     expect(readers.isAskTurnTopicDocAcquisitionIntent("find a doc about Casimir tiles")).toBe(true);
     expect(readers.isAskTurnOpenDocSearchIntent("open the docs viewer")).toBe(false);
+    expect(resolveAskTurnNamedDocSummaryQueryArg('Ok we have a doc called "Casimir Dp Quantum Foam Study" what this abot?')).toBe(
+      "Casimir Dp Quantum Foam Study",
+    );
+    expect(resolveAskTurnNamedDocSummaryQueryArg("We have a document named Casimir Dp Quantum Foam Study. What is it about?")).toBe(
+      "Casimir Dp Quantum Foam Study",
+    );
+    expect(
+      readers.resolveAskTurnOpenDocSearchQueryArg('Can you tell me what the document called "Casimir Dp Quantum Foam Study" is about?'),
+    ).toBe("Casimir Dp Quantum Foam Study");
   });
 
   it("preserves doc summary prompt readers", () => {
@@ -260,6 +279,21 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(summaryReaders.isAskTurnDocsTopicSummaryPrompt("summarize the NHM2 whitepaper docs")).toBe(true);
     expect(summaryReaders.shouldAskTurnSearchDocsBeforeSummary("summarize the NHM2 whitepaper docs")).toBe(true);
     expect(summaryReaders.shouldAskTurnSearchDocsBeforeSummary("summarize this document")).toBe(false);
+    expect(summaryReaders.isAskTurnDocAboutSummaryPrompt('Ok we have a doc called "Casimir Dp Quantum Foam Study" what this abot?')).toBe(true);
+    expect(summaryReaders.shouldAskTurnSearchDocsBeforeSummary('Ok we have a doc called "Casimir Dp Quantum Foam Study" what this abot?')).toBe(true);
+  });
+
+  it("does not admit contextual named-document summary references", () => {
+    const prompts = [
+      'Do not look up the doc called "Casimir Dp Quantum Foam Study"; explain the wording only.',
+      '\'We have a doc called "Casimir Dp Quantum Foam Study" what is it about?\' was my earlier prompt. Do not search now.',
+      'If we later have a doc called "Casimir Dp Quantum Foam Study", what should we ask to learn what it is about?',
+      'The visible text on screen says doc called "Casimir Dp Quantum Foam Study"; explain the label without searching.',
+    ];
+
+    for (const prompt of prompts) {
+      expect(resolveAskTurnNamedDocSummaryQueryArg(prompt)).toBeNull();
+    }
   });
 
   it("preserves active-doc identity prompt readers with visual precedence", () => {

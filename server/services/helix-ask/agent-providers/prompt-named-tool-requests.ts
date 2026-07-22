@@ -1053,12 +1053,30 @@ export const extractCalculatorExpressionFromPrompt = (prompt: string): string | 
   return extractCalculatorMathTokenSequence(direct);
 };
 
+const isDeicticCalculatorVerificationPrompt = (prompt: string): boolean => {
+  const unquoted = unquotePrompt(prompt);
+  return /^\s*(?:please\s+)?(?:check|verify|run|evaluate|calculate)\s+(?:that|it)\s+(?:in|with|through)\s+(?:the\s+)?(?:scientific\s+)?calculator\s*[.!?]*\s*$/i.test(unquoted);
+};
+
+const extractCalculatorExpressionFromResolvedReferent = (body: Record<string, unknown>): string | null => {
+  const referent = resolveHelixAskConversationalReferent(body).resolvedText;
+  if (!referent) return null;
+  const arithmetic = referent.match(
+    /-?\d+(?:\.\d+)?(?:e[+-]?\d+)?\s*[+\-*/^%]\s*-?\d+(?:\.\d+)?(?:e[+-]?\d+)?(?:\s*[+\-*/^%]\s*-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)*/i,
+  )?.[0];
+  return cleanCalculatorExpression(arithmetic);
+};
+
 export const buildPromptDerivedCalculatorSolveGatewayCallRequests = (
   body: Record<string, unknown>,
 ): Record<string, unknown>[] => {
   const prompt = readPrompt(body);
   if (!prompt) return [];
-  const expression = extractCalculatorExpressionFromPrompt(prompt);
+  const expression =
+    extractCalculatorExpressionFromPrompt(prompt) ??
+    (isDeicticCalculatorVerificationPrompt(prompt)
+      ? extractCalculatorExpressionFromResolvedReferent(body)
+      : null);
   if (!expression) return [];
   return [{
     schema: "helix.workstation_gateway.prompt_derived_calculator_solve_call_request.v1",
@@ -1235,6 +1253,13 @@ export const extractRepoSearchQueryFromPrompt = (prompt: string): string | null 
       .trim();
     return normalized && normalized.length >= 3 ? normalized : null;
   };
+  const naturalImplementationLocation = unquoted.match(
+    /\b(?:find|locate|show(?:\s+me)?)\s+where\s+(?:the\s+)?(.{3,140}?)\s+(?:is|are)\s+(?:implemented|defined|handled)\s+in\s+(?:this|the)\s+(?:repo|repository|codebase|code\s+base|source\s+code)\b/i,
+  );
+  if (naturalImplementationLocation) {
+    const query = cleanQuery(naturalImplementationLocation[1]);
+    if (query) return query;
+  }
   const implementationQuestion = unquoted.match(
     /\b(?:repo|repository|codebase|source|code|implementation)\b[\s\S]{0,180}\b(?:how\s+does|how\s+is|where\s+is|what\s+does)\s+(?:the\s+)?([A-Za-z][A-Za-z0-9_. -]{2,80}?)(?:\s+(?:work|implemented|defined|handled|locate|match(?:es)?|score(?:s)?))?(?:\s+(?:for|in|on|of)\s+(?:the\s+)?([A-Za-z][A-Za-z0-9_. -]{2,80}))?(?:[?.!]|$)/i,
   );

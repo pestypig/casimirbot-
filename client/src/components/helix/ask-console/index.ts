@@ -228,7 +228,10 @@ export {
 } from "./HelixAskRuntimePreference";
 export {
   HELIX_ASK_LANGUAGE_MODEL_PROFILE_STORAGE_KEY,
+  HELIX_ASK_PINNED_LANGUAGE_MODEL_STORAGE_KEY,
+  persistHelixAskPinnedLanguageModel,
   persistHelixAskLanguageModelProfile,
+  readStoredHelixAskPinnedLanguageModel,
   readStoredHelixAskLanguageModelProfile,
 } from "./HelixAskLanguageModelPreference";
 export {

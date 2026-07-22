@@ -320,6 +320,24 @@ describe("Helix Ask committed route contract", () => {
     expect(writer.selected_terminal_artifact_kind).toBe("typed_failure");
     expect(payload.terminal_error_code).toBe("model_runtime_not_called");
     expect(payload.selected_final_answer).toContain("required direct answer artifact");
+
+    const authFailureText = "Codex was called, but this model is unavailable for the active authentication mode.";
+    payload.terminal_error_code = "codex_model_not_supported_for_auth_mode";
+    payload.terminal_failure_text = authFailureText;
+    payload.selected_final_answer = authFailureText;
+    payload.typed_failure = {
+      schema: "helix.typed_failure.v1",
+      error_code: "codex_model_not_supported_for_auth_mode",
+      text: authFailureText,
+    };
+    const preservedFailureWriter = applyHelixTerminalAuthoritySingleWriter({
+      turnId: testTurnId,
+      payload,
+      artifactLedger: [],
+    });
+    expect(preservedFailureWriter.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("codex_model_not_supported_for_auth_mode");
+    expect(payload.selected_final_answer).toBe(authFailureText);
   });
 
   it("selects a direct answer when the committed route is only present in the solver trace", () => {

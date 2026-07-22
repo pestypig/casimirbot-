@@ -8,7 +8,10 @@ import {
   SharedRealtimeRoomDomainError,
   updateSharedRealtimeRoomPresence,
 } from "../../services/helix-ask/realtime-room/room-store";
-import { degradeSharedRealtimeRoomRuntimeForReadiness } from
+import {
+  degradeSharedRealtimeRoomRuntimeForReadiness,
+  reconcileSharedRealtimeRoomVisualConsent,
+} from
   "../../services/helix-ask/realtime-room/room-runtime-reconciliation";
 import {
   readRecord,
@@ -33,6 +36,10 @@ sharedRealtimeRoomParticipantRouter.patch(
       consentPatch: consent,
     });
     degradeSharedRealtimeRoomRuntimeForReadiness(room);
+    reconcileSharedRealtimeRoomVisualConsent({
+      room,
+      participantId: room.self_participant_id,
+    });
     res.json(buildHelixSharedRealtimeRoomResponse({
       ok: true,
       message: "Your room consent was updated.",

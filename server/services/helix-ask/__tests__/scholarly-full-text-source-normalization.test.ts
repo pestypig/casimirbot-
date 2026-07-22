@@ -48,4 +48,63 @@ describe("scholarly full-text source normalization", () => {
       evidence_state: "full_text_usable",
     });
   });
+
+  it("ranks an exact quoted passage ahead of generic title and abstract vocabulary", async () => {
+    const bytes = new Uint8Array([37, 80, 68, 70, 45, 49, 46, 55]);
+    const observation = await runScholarlyFullTextFetch({
+      turnId: "ask:scholarly-exact-passage-ranking",
+      callId: "call:scholarly-exact-passage-ranking",
+      query: [
+        "page 3",
+        '"show that line energy is linear with line width within error bars"',
+        '"Our preliminary calculations above show that the magnetic flux tube shape can be determined conclusively"',
+      ].join(" "),
+      paper: {
+        result_id: "arxiv:magnetar-lines",
+        title: "Probing Magnetars Using Spectral Lines with Future Telescopes",
+        abstract: "Line energy, width, and depth constrain magnetar emission geometry.",
+        authors: [{ name: "D. Kirmizibayrak" }],
+        year: 2022,
+        identifiers: { arxiv_id: "2202.09424v1" },
+        evidence_refs: ["arxiv:2202.09424v1"],
+        source_providers: ["arxiv"],
+        confidence: "high",
+      },
+      sourceUrl: "https://arxiv.org/pdf/2202.09424v1.pdf",
+      cachePdf: false,
+      fetchImpl: async () => ({
+        ok: true,
+        status: 200,
+        headers: { get: () => "application/pdf" },
+        arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+      }),
+      extractPdfTextImpl: async () => ({
+        totalPages: 3,
+        pages: [
+          {
+            page: 1,
+            text: "Abstract. Probing magnetars with spectral lines relates line energy, width, and depth to emission geometry and future telescopes.",
+          },
+          {
+            page: 3,
+            text: [
+              "Results.",
+              "We show that line energy is linear with line width within error bars.",
+              "Our preliminary calculations above show that the magnetic flux tube shape can be determined conclusively if width, depth and energy are studied concurrently.",
+            ].join(" "),
+          },
+        ],
+      }),
+      maxPages: 3,
+      maxChunks: 2,
+    });
+
+    expect(observation.selected_chunks[0]).toMatchObject({
+      page_start: 3,
+      section_hint: "Results",
+    });
+    expect(observation.selected_chunks[0].text_excerpt).toContain(
+      "show that line energy is linear with line width within error bars",
+    );
+  });
 });

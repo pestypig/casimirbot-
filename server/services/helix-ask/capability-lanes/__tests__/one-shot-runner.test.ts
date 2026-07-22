@@ -5,6 +5,9 @@ import { buildHelixAgentRuntimeSelectionTrace } from "../../agent-providers/runt
 import { buildHelixAgentProviderAskPayload } from "../../agent-providers/provider-response-projection";
 import type { HelixAgentProvider } from "../../agent-providers/types";
 import { runHelixCapabilityLaneOneShotRequests } from "../one-shot-runner";
+import { resolveHelixCapabilityLaneOneShotDispatch } from "../one-shot-runner";
+import { HELIX_USER_ACCOUNT_POLICY } from "../../../../../shared/helix-account-session";
+import { listAccountAuthorizedWorkstationGatewayCapabilities } from "../../workstation-tool-gateway/account-policy";
 import { buildScientificEvidencePacket } from "../../../../../shared/scientific-evidence-adaptor";
 import { resetStagePlayLiveSourceMailboxForTest } from "../../../stage-play/stage-play-live-source-mailbox-store";
 import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../../../stage-play/stage-play-live-source-mail-wake-store";
@@ -106,6 +109,32 @@ beforeEach(() => {
 });
 
 describe("provider-neutral capability lane one-shot runner", () => {
+  it("has an executable dispatch for every user-account gateway capability advertised to Codex", () => {
+    const manifest = listAccountAuthorizedWorkstationGatewayCapabilities({
+      accountContext: {
+        session_id: null,
+        profile_id: null,
+        trusted_account_session: false,
+        account_session: null,
+        account_policy: HELIX_USER_ACCOUNT_POLICY,
+      },
+      requestedMode: "act",
+      requestedRuntime: "codex",
+    });
+
+    const rows = manifest.capabilities.map((capability) => ({
+      capability_id: capability.capability_id,
+      ...resolveHelixCapabilityLaneOneShotDispatch({
+        capability: capability.capability_id,
+        authorizedGatewayCapabilities: manifest.capabilities,
+      }),
+    }));
+
+    expect(rows).not.toHaveLength(0);
+    expect(rows.filter((row) => !row.handler || row.dispatchKind === "blocked")).toEqual([]);
+    expect(rows.some((row) => row.dispatchKind === "governed_gateway")).toBe(true);
+    expect(rows.some((row) => row.dispatchKind === "specialized_lane")).toBe(true);
+  });
   it("lets Helix and Codex request the same one-shot translation lane through the same body contract", async () => {
     const helix = await runHelixCapabilityLaneOneShotRequests({
       provider: buildProvider("helix"),
@@ -2869,6 +2898,117 @@ describe("provider-neutral capability lane one-shot runner", () => {
       execution_status: "executed_observation_only",
       terminal_eligible: false,
       assistant_answer: false,
+    });
+  });
+
+  it("bridges Codex docs.search requests through the governed gateway for provider re-entry", async () => {
+    const result = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-provider-neutral-docs-search",
+        capability_lane_call: {
+          capability: "docs.search",
+          arguments: { query: "Casimir Dp Quantum Foam Study" },
+        },
+      },
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(result.requested).toBe(true);
+    expect(result.call_results).toHaveLength(1);
+    expect(result.call_results[0]).toMatchObject({
+      schema: "helix.workstation_tool_reference.gateway_bridge_result.v1",
+      lane_id: "workstation_tool_reference",
+      capability: "docs.search",
+      delegated_capability_id: "docs.search",
+      delegation_status: "gateway_executed",
+      selected_runtime_agent_provider: "codex",
+      arguments: { query: "Casimir Dp Quantum Foam Study" },
+      reentry_required: true,
+      answer_authority: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      delegated_gateway_call_result: {
+        capability_id: "docs.search",
+      },
+    });
+    expect(result.resolve_traces[0]).toMatchObject({
+      requested_lane: "workstation_tool_reference",
+      execution_status: "executed_observation_only",
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+    expect(result.observation_packets[0].capability_key).toBe("docs.search");
+    expect(result.observation_packets[0].post_tool_model_step_required).toBe(true);
+  });
+
+  it("bridges any account-authorized gateway capability not covered by a specialized lane handler", async () => {
+    const repoSearch = listWorkstationGatewayCapabilities({ mode: "act" }).capabilities.find(
+      (capability) => capability.capability_id === "repo.search",
+    );
+    expect(repoSearch).toBeDefined();
+
+    const result = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-provider-neutral-governed-gateway",
+        capability_lane_call: {
+          capability: "repo.search",
+          arguments: { query: "terminal authority" },
+        },
+      },
+      authorizedGatewayCapabilities: repoSearch ? [repoSearch] : [],
+      accountType: "user",
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(result.call_results[0]).toMatchObject({
+      schema: "helix.workstation_tool_reference.gateway_bridge_result.v1",
+      lane_id: "workstation_tool_reference",
+      capability: "repo.search",
+      delegated_capability_id: "repo.search",
+      delegation_status: "gateway_executed",
+      arguments: { query: "terminal authority" },
+      delegated_gateway_call_result: {
+        capability_id: "repo.search",
+      },
+      reentry_required: true,
+      answer_authority: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+    expect(result.resolve_traces[0]).toMatchObject({
+      requested_lane: "workstation_tool_reference",
+      execution_status: "executed_observation_only",
+    });
+  });
+
+  it("does not execute a registered gateway capability when it is absent from the account-authorized manifest", async () => {
+    const result = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-provider-neutral-unauthorized-gateway",
+        capability_lane_call: {
+          capability: "repo.search",
+          arguments: { query: "terminal authority" },
+        },
+      },
+      authorizedGatewayCapabilities: [],
+      accountType: "user",
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(result.call_results[0]).toMatchObject({
+      schema: "helix.capability_lane.shadow_one_shot_result.v1",
+      ok: false,
+      capability: "repo.search",
+      error: "unknown_capability_lane",
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+    expect(result.observation_packets[0]).toMatchObject({
+      capability_key: "repo.search",
+      status: "blocked",
     });
   });
 

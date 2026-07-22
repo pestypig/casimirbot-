@@ -189,6 +189,20 @@ export const buildCodexSpawnCommand = (
   };
 };
 
+export const appendCodexModelPolicyArgs = (
+  args: readonly string[],
+  policy: { model?: string | null; reasoningEffort?: string | null },
+): string[] => {
+  const next = [...args];
+  const model = readString(policy.model);
+  const reasoningEffort = readString(policy.reasoningEffort);
+  if (model) next.push("--model", model);
+  if (reasoningEffort) {
+    next.push("-c", `model_reasoning_effort=${JSON.stringify(reasoningEffort)}`);
+  }
+  return next;
+};
+
 const resolveFromWindowsAppxPackage = (): string[] => {
   const configuredInstallLocation = readString(process.env.CODEX_APPX_INSTALL_LOCATION);
   if (configuredInstallLocation) {

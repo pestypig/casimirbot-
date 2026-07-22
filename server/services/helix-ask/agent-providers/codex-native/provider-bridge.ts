@@ -6,6 +6,10 @@ import {
 } from "../../workstation-tool-gateway/account-policy";
 import type { HelixWorkstationGatewayCallResult } from "../../workstation-tool-gateway/types";
 import { resolveProviderGatewayCapabilityId } from "../../provider-agent-capability-contract";
+import {
+  assertCapabilityAllowedByCommittedRoute,
+  readCommittedAskRoute,
+} from "../../committed-ask-route";
 import { readWorkstationGatewayCallRequestsForTurn } from "../explicit-workstation-gateway";
 import { resolveCodexNativeModelPolicy } from "./model-policy";
 import {
@@ -102,12 +106,24 @@ export const readTurnAdmittedWorkstationTools = (body: Record<string, unknown>):
     ? null
     : Array.from(new Set([...(routeTools ?? []), ...plannedTools]));
 
-  if (goalTools === null) return turnTools;
-  if (turnTools === null) return goalTools;
-  if (goalTools.includes("*")) return turnTools;
-  if (turnTools.includes("*")) return goalTools;
-  const goalSet = new Set(goalTools);
-  return turnTools.filter((capabilityId) => goalSet.has(capabilityId));
+  const goalIntersectedTools = goalTools === null
+    ? turnTools
+    : turnTools === null
+      ? goalTools
+      : goalTools.includes("*")
+        ? turnTools
+        : turnTools.includes("*")
+          ? goalTools
+          : turnTools.filter((capabilityId) => new Set(goalTools).has(capabilityId));
+  const committedRoute = readCommittedAskRoute(body);
+  if (!committedRoute || goalIntersectedTools === null) return goalIntersectedTools;
+  return goalIntersectedTools.filter((capabilityId) =>
+    capabilityId !== "*" &&
+    assertCapabilityAllowedByCommittedRoute({
+      committedRoute,
+      capabilityId,
+    }).allowed
+  );
 };
 
 export type CodexNativeProviderBridgeAttempt = {

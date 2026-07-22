@@ -436,13 +436,35 @@ const buildPageChunks = (pages: ScholarlyPdfTextPage[]): Array<{
   return chunks;
 };
 
-const scoreChunk = (chunkText: string, queryTokens: string[]): number => {
+const quotedQueryPhrases = (query: string): string[] =>
+  unique(
+    Array.from(query.matchAll(/["“]([^"”\n]{12,260})["”]/g))
+      .map((match) => normalizeWhitespace(match[1]).toLowerCase())
+      .filter(Boolean),
+  ).slice(0, 8);
+
+const exactQueryPhraseHits = (chunkText: string, exactQueryPhrases: string[]): number => {
+  const lower = normalizeWhitespace(chunkText).toLowerCase();
+  return exactQueryPhrases.reduce(
+    (count, phrase) => count + (lower.includes(phrase) ? 1 : 0),
+    0,
+  );
+};
+
+const scoreChunk = (
+  chunkText: string,
+  queryTokens: string[],
+  exactPhraseHits: number,
+): number => {
   if (!queryTokens.length) return 0.05;
-  const lower = chunkText.toLowerCase();
+  const lower = normalizeWhitespace(chunkText).toLowerCase();
   const hits = queryTokens.reduce((count: number, token: string) => count + (lower.includes(token) ? 1 : 0), 0);
   const density = hits / Math.sqrt(Math.max(1, queryTokens.length));
   const sectionBoost = /\b(?:abstract|conclusion|results?|methods?|discussion)\b/i.test(chunkText) ? 0.08 : 0;
-  return Math.min(1, Number((density / 2 + sectionBoost).toFixed(3)));
+  const exactPhraseBoost = exactPhraseHits > 0
+    ? 0.6 + Math.min(0.25, (exactPhraseHits - 1) * 0.15)
+    : 0;
+  return Math.min(1, Number((density / 2 + sectionBoost + exactPhraseBoost).toFixed(3)));
 };
 
 const selectChunks = (input: {
@@ -453,13 +475,23 @@ const selectChunks = (input: {
   sourcePdfRef?: string;
 }): HelixScholarlyFullTextChunk[] => {
   const queryTokens = tokenize([input.query, input.paper?.title ?? "", input.paper?.abstract ?? ""].join(" "));
-  const scored = buildPageChunks(input.pages).map((chunk: ReturnType<typeof buildPageChunks>[number], index: number) => ({
-    chunk,
-    index,
-    score: scoreChunk(chunk.text, queryTokens),
-  }));
+  const exactQueryPhrases = quotedQueryPhrases(input.query);
+  const scored = buildPageChunks(input.pages).map((chunk: ReturnType<typeof buildPageChunks>[number], index: number) => {
+    const exactPhraseHits = exactQueryPhraseHits(chunk.text, exactQueryPhrases);
+    return {
+      chunk,
+      index,
+      exactPhraseHits,
+      score: scoreChunk(chunk.text, queryTokens, exactPhraseHits),
+    };
+  });
   const ranked = scored
-    .sort((left: typeof scored[number], right: typeof scored[number]) => right.score - left.score || left.chunk.page - right.chunk.page || left.index - right.index)
+    .sort((left: typeof scored[number], right: typeof scored[number]) =>
+      right.exactPhraseHits - left.exactPhraseHits ||
+      right.score - left.score ||
+      left.chunk.page - right.chunk.page ||
+      left.index - right.index
+    )
     .slice(0, input.maxChunks);
   return ranked.map(({ chunk, score }: typeof ranked[number], index: number) => {
     const sourceTextRef = `${input.sourcePdfRef ?? "artifact://scholarly-source"}/page/${chunk.page}#text`;

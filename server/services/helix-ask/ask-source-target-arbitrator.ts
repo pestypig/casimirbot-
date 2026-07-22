@@ -56,6 +56,7 @@ import {
   isExplicitDocsPathLocateSynthesisPrompt,
   isExplicitDocsPathSummaryPrompt as isExplicitDocsMarkdownPathSummaryPrompt,
 } from "./docs-viewer-intent";
+import { resolveAskTurnNamedDocSummaryQueryArg } from "./doc-args";
 import {
   isAffirmativeTheoryBadgeGraphReflectionPrompt,
   isTheoryBadgeGraphCurrentContextPrompt,
@@ -111,8 +112,8 @@ const isExplicitModelOnlyPrompt = (prompt: string): boolean => {
     !affirmativeDocsRequirement &&
     !affirmativeScholarlyRequirement
   ) ||
-    /\bwithout\s+(?:using|checking|looking\s+at|searching|consulting)\s+(?:the\s+)?(?:workspace|docs?|documents?|papers?|screen|visual|sources?)\b/i.test(prompt) ||
-    /\b(?:do\s+not|don'?t)\s+(?:use|look\s+at|check|search|consult)\s+(?:the\s+)?(?:workspace|docs?|documents?|papers?|screen|visual|sources?)\b/i.test(prompt) ||
+    /\bwithout\s+(?:using|checking|looking\s+at|searching|consulting)\s+(?:the\s+)?(?:workspace|workstation(?:\s+tools?)?|docs?|documents?|papers?|screen|visual|sources?)\b/i.test(prompt) ||
+    /\b(?:do\s+not|don'?t)\s+(?:use|look\s+at|check|search|consult)\s+(?:the\s+)?(?:workspace|workstation(?:\s+tools?)?|docs?|documents?|papers?|screen|visual|sources?)\b/i.test(prompt) ||
     /\bno\s+(?:workspace|docs?|source|screen|visual)\s+(?:lookup|use|search|context)\b/i.test(prompt) ||
     /\b(?:background\s+only|background\s+mode|general\s+(?:knowledge|reasoning)|just\s+answer\s+from\s+general\s+reasoning)\b/i.test(prompt);
 };
@@ -207,6 +208,7 @@ const isAffirmativeDocsSourceRequirementPrompt = (prompt: string): boolean =>
   isExplicitDocsPathSummaryPrompt(prompt) ||
   isDocsTopicSummaryPrompt(prompt) ||
   isDocsOpenAndSummarizePrompt(prompt) ||
+  Boolean(resolveAskTurnNamedDocSummaryQueryArg(prompt)) ||
   (
     /\b(?:open|find|search|show|load|summari[sz]e|summary|overview|takeaways?|explain|describe|gist)\b/i.test(prompt) &&
     /\b(?:doc|docs|document|documents|audit|white\s*paper|paper)\b/i.test(prompt) &&
@@ -224,8 +226,26 @@ const isAffirmativeLocalDocumentEvidencePrompt = (prompt: string): boolean => {
   return evidenceCue && (valueCue || /\b(?:NHM[-\s]?2|casimir|tile)\b/i.test(prompt));
 };
 
-const isAffirmativeDocsSearchPrompt = (prompt: string): boolean =>
-  hasAffirmativeDocsViewerSearchCue(prompt);
+const isAffirmativeDocsSearchPrompt = (prompt: string): boolean => {
+  const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
+  return (
+    hasAffirmativeDocsViewerSearchCue(prompt) ||
+    (
+      Boolean(resolveAskTurnNamedDocSummaryQueryArg(prompt)) &&
+      !contextualToolSuppressionBlocksFamily(contextualSuppression, "docs_viewer")
+    )
+  );
+};
+
+const isNaturalLocalDocumentLookupPrompt = (prompt: string): boolean => {
+  const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
+  if (contextualToolSuppressionBlocksFamily(contextualSuppression, "docs_viewer")) return false;
+  return (
+    /\b(?:find|search|locate|get|look\s+up)\b/i.test(prompt) &&
+    /\b(?:local|workspace|our|project)\s+(?:doc|document|paper|report|memo)\b/i.test(prompt) &&
+    /\b(?:about|on|regarding|for|called|named|titled)\b/i.test(prompt)
+  );
+};
 
 const isExplicitProcessGraphPrompt = (prompt: string): boolean =>
   /\b(?:process\s+graph|workstation\s+(?:process\s+)?graph|workstation\s+state|what\s+panels\s+are\s+open|which\s+panels\s+are\s+open|panels\s+open)\b/i.test(prompt);
@@ -244,6 +264,10 @@ const isConditionalPriorEvidenceCalculatorFollowup = (prompt: string): boolean =
 
 const isCalculatorSolvePrompt = (prompt: string): boolean => {
   if (isConditionalPriorEvidenceCalculatorFollowup(prompt) && !hasConcreteCalculatorExpression(prompt)) return false;
+  const unquoted = prompt.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
+  const deicticCalculatorVerification =
+    /^\s*(?:please\s+)?(?:check|verify|run|evaluate|calculate)\s+(?:that|it)\s+(?:in|with|through)\s+(?:the\s+)?(?:scientific\s+)?calculator\s*[.!?]*\s*$/i.test(unquoted);
+  if (deicticCalculatorVerification) return true;
   return (
     /\b(?:scientific\s+)?calculator\b/i.test(prompt) &&
     /\b(?:run|solve|evaluate|compute|calculate|check|verify)\b[\s\S]{0,160}(?:\d|[=+\-*/^()]|\\frac|\\sqrt|\bequation\b|\bexpression\b|\bformula\b)/i.test(prompt)
@@ -545,7 +569,7 @@ const rules: CueRule[] = [
     suppressedRoutes: ["active_doc_identity", "active_doc_summary", "situation_context_question"],
     cues: [
       { label: "no_workspace", pattern: /\b(?:don't|do\s+not)\s+(?:use|look\s+at|check|search|consult)\s+(?:the\s+)?(?:workspace|docs?|documents?|papers?|screen|visual|sources?)\b/i },
-      { label: "without_workspace", pattern: /\bwithout\s+(?:using|checking|looking\s+at|searching|consulting)\s+(?:the\s+)?(?:workspace|docs?|documents?|papers?|screen|visual|sources?)\b/i },
+      { label: "without_workspace", pattern: /\bwithout\s+(?:using|checking|looking\s+at|searching|consulting)\s+(?:the\s+)?(?:workspace|workstation(?:\s+tools?)?|docs?|documents?|papers?|screen|visual|sources?)\b/i },
       { label: "general_question", pattern: /\bgeneral\s+(?:knowledge|reasoning)\b/i },
     ],
   },
@@ -697,6 +721,32 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
+  if (isWorkspaceOsStatusPrompt(prompt)) {
+    const reasonCodes = workspaceOsStatusReasonCodes(prompt);
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "workspace_diagnostic",
+      targetKind: "workspace_diagnostic",
+      strength: "hard",
+      explicitCues: reasonCodes,
+      reasons: ["workspace_os_status_source_target", ...reasonCodes],
+      requestedOutputs: ["workspace_os_status", "tool_call_eligibility", "typed_failure"],
+      suppressedRoutes: [
+        "workspace_action_receipt",
+        "workstation_action",
+        "workspace_panel",
+        "client_projection",
+        "panel_generated_answer",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
+      precedenceReason: "workspace_os_status_source_target",
+      confidence: 0.96,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
   const affirmativeTheoryReflection = isAffirmativeTheoryBadgeGraphReflectionPrompt(prompt);
   if (affirmativeTheoryReflection || isTheoryBadgeGraphCurrentContextPrompt(prompt)) {
     return toSourceTargetIntent({
@@ -812,6 +862,64 @@ export function arbitrateAskSourceTarget(input: {
     isCurrentOpenDocsViewerSummaryPrompt(prompt) ||
     isDocsTopicSummaryPrompt(prompt) ||
     isAffirmativeDocsSearchPrompt(prompt);
+  const namedDocSummaryQuery = resolveAskTurnNamedDocSummaryQueryArg(prompt);
+  if (namedDocSummaryQuery) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "docs_viewer",
+      targetKind: "docs_viewer",
+      strength: "hard",
+      explicitCues: ["named_doc_summary", namedDocSummaryQuery],
+      reasons: ["named_doc_summary_source_target", "named_document_title_suppresses_repo_entity_inference"],
+      requestedOutputs: ["file_path", "doc_summary", "tool_call_eligibility", "typed_failure"],
+      suppressedRoutes: [
+        "repo_code_evidence_question",
+        "internet_search_lookup",
+        "scholarly_research_lookup",
+        "situation_context_question",
+        "visual_deictic",
+        "visual_frame_evidence",
+        "active_doc_identity",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
+      precedenceReason: "named_doc_summary_source_target",
+      confidence: 0.98,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  if (isNaturalLocalDocumentLookupPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "docs_viewer",
+      targetKind: "docs_viewer",
+      strength: "hard",
+      explicitCues: ["natural_local_document_lookup"],
+      reasons: [
+        "natural_local_document_lookup_source_target",
+        "explicit_local_document_scope_suppresses_repo_entity_inference",
+      ],
+      requestedOutputs: ["file_path", "tool_call_eligibility", "typed_failure"],
+      suppressedRoutes: [
+        "repo_code_evidence_question",
+        "internet_search_lookup",
+        "scholarly_research_lookup",
+        "situation_context_question",
+        "visual_deictic",
+        "visual_frame_evidence",
+        "active_doc_identity",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
+      precedenceReason: "natural_local_document_lookup_source_target",
+      confidence: 0.97,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
   if (selectedEvidenceCandidate?.target_source === "docs_viewer" && !explicitDocsOperationSelected) {
     const localDocumentEvidence = isAffirmativeLocalDocumentEvidencePrompt(prompt);
     return toSourceTargetIntent({
@@ -1171,32 +1279,6 @@ export function arbitrateAskSourceTarget(input: {
       confidence: 0.9,
       allowClientShortcut: false,
       allowNoToolDirect: true,
-    });
-  }
-  if (isWorkspaceOsStatusPrompt(prompt)) {
-    const reasonCodes = workspaceOsStatusReasonCodes(prompt);
-    return toSourceTargetIntent({
-      turnId: input.turnId,
-      threadId: input.threadId,
-      target: "workspace_diagnostic",
-      targetKind: "workspace_diagnostic",
-      strength: "hard",
-      explicitCues: reasonCodes,
-      reasons: ["workspace_os_status_source_target", ...reasonCodes],
-      requestedOutputs: ["workspace_os_status", "tool_call_eligibility", "typed_failure"],
-      suppressedRoutes: [
-        "workspace_action_receipt",
-        "workstation_action",
-        "workspace_panel",
-        "client_projection",
-        "panel_generated_answer",
-        "model_only_concept",
-        "no_tool_direct",
-      ],
-      precedenceReason: "workspace_os_status_source_target",
-      confidence: 0.96,
-      allowClientShortcut: false,
-      allowNoToolDirect: false,
     });
   }
   if (scholarlyResearchIntent.researchRequested) {

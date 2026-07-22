@@ -180,6 +180,21 @@ describe("Helix Ask capability itinerary", () => {
     expect(isHelixCapabilityItineraryFamilyObserved("docs_viewer", [packet("succeeded")])).toBe(true);
   });
 
+  it("counts only successful workspace_os.status gateway packets as workspace diagnostics", () => {
+    const packet = (status: string) => ({
+      artifact_id: `ask:workspace-status:workstation_gateway:workspace_os.status:${status}`,
+      kind: "provider_gateway_observation_packet",
+      payload: {
+        schema: "helix.agent_step_observation_packet.v1",
+        capability_key: "workspace_os.status",
+        status,
+      },
+    });
+
+    expect(isHelixCapabilityItineraryFamilyObserved("workspace_diagnostic", [packet("failed")])).toBe(false);
+    expect(isHelixCapabilityItineraryFamilyObserved("workspace_diagnostic", [packet("succeeded")])).toBe(true);
+  });
+
   it("counts only successful Image Lens gateway packets as visual capture observations", () => {
     const packet = (status: string) => ({
       artifact_id: `ask:image-lens-status:workstation_gateway:visual_analysis.inspect_image_region:${status}`,
@@ -1497,6 +1512,31 @@ describe("Helix Ask capability itinerary", () => {
       "theory_frontier_exact_contract_verification",
       "theory_frontier_search",
     ]);
+  });
+
+  it("counts only usable selected prior scholarly evidence as scholarly observation", () => {
+    const usablePrior = {
+      artifact_id: "ask:test:prior-scholarly:usable",
+      kind: "scholarly_prior_evidence_observation",
+      payload: {
+        schema: "helix.scholarly_prior_evidence_observation.v1",
+        evidence_state: "full_text_usable",
+        evidence_grade: "answer_grade",
+        selected_for_answer: true,
+      },
+    };
+    expect(isHelixCapabilityItineraryFamilyObserved("scholarly_research", [usablePrior])).toBe(true);
+
+    expect(isHelixCapabilityItineraryFamilyObserved("scholarly_research", [{
+      ...usablePrior,
+      artifact_id: "ask:test:prior-scholarly:rejected",
+      payload: {
+        ...usablePrior.payload,
+        evidence_state: "lookup_weak_match",
+        evidence_grade: "exploratory",
+        selected_for_answer: false,
+      },
+    }])).toBe(false);
   });
 
   it("requires every frontier artifact kind before itinerary completion", () => {

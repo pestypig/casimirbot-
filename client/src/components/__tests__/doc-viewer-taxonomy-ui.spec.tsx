@@ -4,7 +4,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import React from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import type { DocManifestEntry } from "@/lib/docs/docManifest";
+import { DOC_MANIFEST, type DocManifestEntry } from "@/lib/docs/docManifest";
 import { summarizeDocumentLiveTranslationProjectionSnapshot } from "@/lib/docs/liveTranslationProjectionRegistry";
 import type { HelixResearchLibraryDocument } from "@shared/helix-research-library";
 
@@ -13,9 +13,15 @@ let DocViewerPanelModule: typeof import("@/components/DocViewerPanel");
 const messages: Record<string, string> = {
   "docsViewer.search.placeholder": "Search docs & digests",
   "docsViewer.search.count": "{filteredCount} of {total} documents",
+  "docsViewer.sort.label": "Sort files",
+  "docsViewer.sort.lastEdited": "Last edited",
+  "docsViewer.sort.title": "Title (A–Z)",
+  "docsViewer.sort.subject": "Subject",
   "docsViewer.empty.noMatches": "No matching documents.",
   "docsViewer.taxonomy.filterLabel": "Document category filters",
   "docsViewer.taxonomy.all": "All",
+  "docsViewer.taxonomy.runtimeWhitepapers": "Runtime Whitepapers",
+  "docsViewer.taxonomy.runtimeWhitepaper": "Runtime whitepaper",
   "docsViewer.taxonomy.research": "Research",
   "docsViewer.taxonomy.development": "Development",
   "docsViewer.taxonomy.syntheticResearchShort": "Synthetic Research",
@@ -131,6 +137,7 @@ describe("DocViewerPanel taxonomy UI", () => {
 
     expect(screen.getByLabelText("Document category filters")).toBeTruthy();
     expect(screen.getByRole("button", { name: /All\s+2/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Runtime Whitepapers\s+1/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Research\s+1/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Development\s+1/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Synthetic Research\s+0/i })).toBeTruthy();
@@ -140,10 +147,14 @@ describe("DocViewerPanel taxonomy UI", () => {
     fireEvent.click(screen.getByRole("button", { name: /Research\s+1/i }));
     expect(onDocClassFilterChange).toHaveBeenCalledWith("canonical-research");
 
+    fireEvent.click(screen.getByRole("button", { name: /Runtime Whitepapers\s+1/i }));
+    expect(onDocClassFilterChange).toHaveBeenCalledWith("runtime-whitepaper");
+
     const whitepaperButton = screen.getByRole("button", {
       name: /Nhm2 Current Status Whitepaper/i,
     });
     expect(within(whitepaperButton).getByText("Canonical research")).toBeTruthy();
+    expect(within(whitepaperButton).getByText("Runtime whitepaper")).toBeTruthy();
     expect(within(whitepaperButton).getByText("Calculator-ready")).toBeTruthy();
     expect(within(whitepaperButton).getByText("Sidecars attached")).toBeTruthy();
 
@@ -154,6 +165,60 @@ describe("DocViewerPanel taxonomy UI", () => {
 
     fireEvent.click(whitepaperButton);
     expect(onSelect).toHaveBeenCalledWith("/docs/research/nhm2-current-status-whitepaper.md");
+  });
+
+  it("offers a sort setting and orders files by their exact last-edited timestamp", () => {
+    const { arrangeDirectoryEntries, __testDocViewerTaxonomy, DirectoryRail } = DocViewerPanelModule;
+    const older = makeEntry({
+      id: "older",
+      title: "Older file",
+      fileMtimeMs: Date.parse("2026-07-20T09:00:00.000Z"),
+    });
+    const newer = makeEntry({
+      id: "newer",
+      title: "Newer file",
+      fileMtimeMs: Date.parse("2026-07-20T17:00:00.000Z"),
+    });
+    const onSortChange = vi.fn();
+
+    const arranged = arrangeDirectoryEntries([older, newer], "last-edited", t);
+    expect(arranged[0].entries.map((entry: DocManifestEntry) => entry.id)).toEqual(["newer", "older"]);
+
+    render(
+      <DirectoryRail
+        entries={arranged}
+        total={2}
+        filteredCount={2}
+        query=""
+        docClassFilter="all"
+        sort="last-edited"
+        taxonomyCounts={__testDocViewerTaxonomy.buildDocTaxonomyCounts([older, newer])}
+        onQueryChange={vi.fn()}
+        onDocClassFilterChange={vi.fn()}
+        onSortChange={onSortChange}
+        onSelect={vi.fn()}
+        variant="full"
+        t={t}
+      />,
+    );
+
+    const sortSetting = screen.getByLabelText("Sort files");
+    expect(sortSetting).toHaveValue("last-edited");
+    fireEvent.change(sortSetting, { target: { value: "title" } });
+    expect(onSortChange).toHaveBeenCalledWith("title");
+  });
+
+  it("groups only the two fully qualified experiment-hosting papers as runtime whitepapers", () => {
+    const { __testDocViewerTaxonomy } = DocViewerPanelModule;
+    const runtimeWhitepapers = DOC_MANIFEST.filter((entry) =>
+      __testDocViewerTaxonomy.docMatchesTaxonomyFilter(entry, "runtime-whitepaper"),
+    );
+
+    expect(runtimeWhitepapers.map((entry) => entry.relativePath).sort()).toEqual([
+      "docs/research/casimir-dp-quantum-foam-study.md",
+      "docs/research/nhm2-current-status-whitepaper.md",
+    ]);
+    expect(__testDocViewerTaxonomy.buildDocTaxonomyCounts(DOC_MANIFEST)["runtime-whitepaper"]).toBe(2);
   });
 
   it("renders and opens profile-private research extractions separately from canonical docs", () => {

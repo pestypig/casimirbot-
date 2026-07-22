@@ -6,6 +6,8 @@ import type {
   HelixCapabilityLaneGoalDispatchReadiness,
 } from "@shared/helix-capability-lane-goal-binding";
 import type { HelixAgentProvider } from "../agent-providers/types";
+import type { HelixAccountType } from "@shared/helix-account-session";
+import type { HelixWorkstationCapabilityManifest } from "../workstation-tool-gateway/types";
 import type { HelixAgentModelVisibleCapabilityLaneManifest } from "../agent-providers/runtime-adapter-contract";
 import { buildModelVisibleCapabilityLaneManifest } from "../agent-providers/runtime-adapter-contract";
 import { listHelixCapabilityLanes } from "./registry";
@@ -1018,6 +1020,9 @@ export const buildHelixCapabilityLaneProviderAdapterContext = async (input: {
   env?: NodeJS.ProcessEnv;
   sessionStore?: HelixCapabilityLaneSessionStore;
   goalBindingStore?: HelixCapabilityLaneGoalBindingStore;
+  authorizedGatewayCapabilities?: HelixWorkstationCapabilityManifest[];
+  accountType?: HelixAccountType | null;
+  profileId?: string | null;
 }): Promise<HelixCapabilityLaneProviderAdapterContext> => {
   const turnId = readString(input.turnId) || readString(input.body.turn_id ?? input.body.turnId) || "ask:capability-lane";
   const oneShot = await runHelixCapabilityLaneOneShotRequests({
@@ -1026,6 +1031,9 @@ export const buildHelixCapabilityLaneProviderAdapterContext = async (input: {
     turnId,
     iteration: input.iteration,
     env: input.env,
+    authorizedGatewayCapabilities: input.authorizedGatewayCapabilities,
+    accountType: input.accountType,
+    profileId: input.profileId,
   });
   const sessions = runHelixCapabilityLaneSessionRequests({
     provider: input.provider,

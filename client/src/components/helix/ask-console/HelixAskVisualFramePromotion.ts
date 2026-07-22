@@ -6,6 +6,7 @@ import type {
 export type HelixAskVisualFrameLivePromotionCode =
   | "live_runtime_unavailable"
   | "visual_input_consent_required"
+  | "shared_room_visual_frame_queued"
   | HelixAskLiveRuntimeVisualFrameReceipt["code"];
 
 export type HelixAskVisualFrameLivePromotionOutcome = {

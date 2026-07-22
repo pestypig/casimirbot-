@@ -1,5 +1,8 @@
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
-import type { HelixLanguageModelProfileId } from "@shared/helix-language-model-policy";
+import type {
+  HelixLanguageModelProfileId,
+  HelixLanguageModelSelectionRequest,
+} from "@shared/helix-language-model-policy";
 import type { HelixAskRouteMetadata } from "@/lib/helix/ask-prompt-launch";
 import type { HelixAskContextBridgeSnapshot } from "./HelixAskContextBridge";
 import { readHelixAskRealtimeGroundedFeedbackBinding } from "./HelixAskRealtimeGroundedFeedbackBinding";
@@ -10,6 +13,8 @@ export type HelixAskConsoleRequestEnvelope = {
   agent_runtime: HelixAgentRuntimeId;
   languageModelProfile?: HelixLanguageModelProfileId;
   language_model_profile?: HelixLanguageModelProfileId;
+  languageModelSelection?: HelixLanguageModelSelectionRequest;
+  language_model_selection?: HelixLanguageModelSelectionRequest;
   doc_path?: string;
 };
 
@@ -62,6 +67,7 @@ export function buildHelixAskConsoleRequestEnvelope(args: {
   question: string;
   agentRuntime: HelixAgentRuntimeId;
   languageModelProfile?: HelixLanguageModelProfileId;
+  languageModelSelection?: HelixLanguageModelSelectionRequest;
   context: HelixAskContextBridgeSnapshot;
 }): HelixAskConsoleRequestEnvelope {
   const envelope: HelixAskConsoleRequestEnvelope = {
@@ -73,6 +79,10 @@ export function buildHelixAskConsoleRequestEnvelope(args: {
     envelope.languageModelProfile = args.languageModelProfile;
     envelope.language_model_profile = args.languageModelProfile;
   }
+  if (args.languageModelSelection) {
+    envelope.languageModelSelection = args.languageModelSelection;
+    envelope.language_model_selection = args.languageModelSelection;
+  }
   if (args.context.activeDocPath) envelope.doc_path = args.context.activeDocPath;
   return envelope;
 }
@@ -81,6 +91,7 @@ export function buildHelixAskConsoleBackendTurnPayloadCore(args: {
   sessionId?: string | null;
   agentRuntime: HelixAgentRuntimeId;
   languageModelProfile?: HelixLanguageModelProfileId;
+  languageModelSelection?: HelixLanguageModelSelectionRequest;
   traceId: string;
   turnId: string;
   maxTokens: number;
@@ -107,6 +118,12 @@ export function buildHelixAskConsoleBackendTurnPayloadCore(args: {
       ? {
           languageModelProfile: args.languageModelProfile,
           language_model_profile: args.languageModelProfile,
+        }
+      : {}),
+    ...(args.languageModelSelection
+      ? {
+          languageModelSelection: args.languageModelSelection,
+          language_model_selection: args.languageModelSelection,
         }
       : {}),
     traceId: args.traceId,

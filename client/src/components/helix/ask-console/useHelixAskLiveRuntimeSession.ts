@@ -38,6 +38,8 @@ import {
 import { registerHelixAskVisualFrameLivePromotionHandler } from "./HelixAskVisualFramePromotion";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import { buildHelixAskLiveRuntimeSourceBinding } from "./HelixAskMinimalRuntimeWorkspaceContext";
+import { stageSharedLiveRoomManualVisualFrame } from
+  "./shared-live-room/SharedLiveRoomManualFrame";
 
 type LiveRuntimeSessionState = {
   lifecycleState: HelixAskLiveRuntimeLifecycleState;
@@ -602,6 +604,17 @@ export const useHelixAskLiveRuntimeSession = (input: {
         terminal_eligible: false,
       };
     }
+    if (input.directVisualInputSuppressed === true) {
+      stageSharedLiveRoomManualVisualFrame(frame);
+      return {
+        ok: true,
+        code: "shared_room_visual_frame_queued",
+        receipt: null,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+      };
+    }
     const receipt = controller.sendVisualFrame(frame);
     applyVisualFrameReceipt(sessionId, receipt);
     return {
@@ -612,7 +625,12 @@ export const useHelixAskLiveRuntimeSession = (input: {
       assistant_answer: false,
       terminal_eligible: false,
     };
-  }), [applyVisualFrameReceipt, state.active, state.realtimeSessionId]);
+  }), [
+    applyVisualFrameReceipt,
+    input.directVisualInputSuppressed,
+    state.active,
+    state.realtimeSessionId,
+  ]);
 
   useEffect(() => {
     const sessionId = state.realtimeSessionId;

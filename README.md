@@ -16,134 +16,75 @@ observational lanes for measured or simulated systems, theoretical lanes for
 first-principles and derived math, and workstation tools that let the agent use
 those lanes without treating any receipt as a final answer by itself.
 
+## Agent And Tool Contract (Read First)
+
+All Helix Ask tools and runtime adapters follow one lifecycle:
+
+```text
+intent -> admission -> execution -> observation -> runtime re-entry -> terminal decision
+```
+
+Remember these rules:
+
+- Codex owns conversational reasoning, tool choice among admitted capabilities,
+  retries, observation review, and the terminal candidate.
+- Helix owns source and tool admission, evidence identity and provenance,
+  observation normalization, route products, proof gates, and terminal
+  eligibility.
+- The client projects the server-authoritative lifecycle. Panel state, receipts,
+  route labels, debug data, and continuation summaries are never answer
+  authority.
+- The latest assistant answer is bounded conversational context, not permission
+  to run a tool or proof that a hard evidence requirement is satisfied.
+- A tool result must re-enter the runtime before it can support a final answer.
+  Hard workflows with missing identity or evidence fail closed with a typed
+  recovery path.
+
+This ownership and lifecycle are frozen. Tool implementations may be repaired
+to conform, but must not introduce a competing planner, model loop, retry
+system, context format, or terminal path. The normative specifications are
+`docs/helix-ask-codex-loop-discipline.md`,
+`docs/helix-ask-turn-solver-spine.md`, and
+`docs/helix-ask-api-parity-matrix.md`.
+
 ## Research Paper Evidence Workflow
 
-Helix Ask paper work should move through a staged evidence ladder. The goal is
-to let the agent keep searching and escalating only while the user's request
-still needs deeper evidence, without turning metadata, OCR, or tool receipts
-into scientific authority too early.
+Paper workflows use the shared agent/tool lifecycle and deepen evidence only
+while the user's request requires it:
 
 ```text
 paper lookup
-  -> PDF/page render
-  -> page OCR/math candidate
-  -> exact row promotion
-  -> graph reflection
-  -> provenance audit
+-> accessible full text or PDF page
+-> text, math, or image candidate
+-> exact evidence promotion when supported
+-> graph/calculator/postulate handoff when requested
+-> provenance-aware answer
 ```
 
-Each stage has a different authority boundary:
+Users should be able to ask naturally, for example, "Find me a paper about
+magnetars," then "Get the PDF," then "What equations are available here?" The
+runtime chooses useful next steps; Helix verifies source identity, admission,
+and evidence depth. Metadata is not full text, OCR is not an exact equation,
+and a receipt is never a scientific conclusion.
 
-- `paper lookup`: find bounded scholarly records, identifiers, provider
-  limits, and accessible PDF/full-text affordances.
-- `PDF/page render`: materialize a specific page image into Image Lens with
-  page number, source id, source hash, and reloadable PDF/page provenance when
-  available.
-- `page OCR/math candidate`: inspect the rendered page for text, equations, or
-  symbolic math candidates. A page with no equation candidate should not trigger
-  exact-row promotion from arbitrary fragments.
-- `exact row promotion`: crop and promote only a clean equation row. If the
-  current page has no equation candidate, the agent may use the retained PDF
-  page navigation metadata to scan a bounded number of adjacent pages before
-  stopping.
-- `graph reflection`: reflect promoted scientific image evidence to the Theory
-  Badge Graph as diagnostic context unless stronger authority is explicitly
-  supported by the evidence packet and branch gates.
-- `provenance audit`: answer follow-ups from the latest scientific Image Lens
-  sidecar first, naming the paper/page/equation/crop/evidence depth, and fall
-  back to scholarly lookup memory only when no page-image/scientific evidence
-  chain exists.
-
-Useful example prompt sequence (this topic is documentation-only, not the
-Workflow Demo Lab default):
-
-```text
-Search scholarly research papers for a PDF-accessible paper about Weyl geometry
-or Casimir scalar fields. Choose one accessible PDF, render page 1 into Image
-Lens, and report only whether page evidence was created.
-
-Now inspect page 2 of that same paper and extract the first displayed equation
-with page evidence.
-
-Use the page 2 equation you just found. Crop only the exact equation row and
-promote it only if the row crop supports exact equation admissibility.
-
-Reflect the promoted exact equation row to the Theory Badge Graph. Keep the
-boundary diagnostic-only unless the evidence supports stronger authority.
-
-Tell me which paper, page, equation, crop ref, and evidence depth you are using
-from the prior steps.
-```
-
-Developer accounts can run this sequence from **Workflow Demo Lab**. Enabling
-the `Research paper to proposal` demo adds an editable next-prompt quick-time
-event to both the legacy and ReCrowned Ask layouts. The QTE inserts text into
-the composer but never auto-sends it. Each run first binds an operator-confirmed
-workflow objective from the latest bounded research request in the active Helix
-Ask chat, a custom topic, or a blank placeholder. Blank runs do not emit a QTE
-until an objective is bound. The binding is frozen for the run and may be
-rebased only before typed evidence advances the first step.
-
-Demo progress is deterministic: typed scholarly workbench state, scientific
-evidence status, graph-reflection refs, provenance-audit state, and a postulate
-submission receipt advance the steps. Assistant prose does not. The suggestion
-is explicitly non-terminal (`assistantAnswer=false`,
-`terminalEligible=false`, `autoSubmit=false`). The context-bound template makes
-the first prompt relevant without sampling a model. A future goal/runtime
-coaching lane may refine the wording, but it must receive the current unmet step
-from this deterministic reducer and cannot mark a step complete.
-
-While a demo is active, QTE observations and operator actions are retained in
-an append-only `helix.workflow_demo_debug.v1` ledger. Each evidence transition
-records the source client reply, backend turn/trace when available, before/after
-step, typed artifact refs, and any post-final debug amendment. Per-answer
-**Debug Copy** includes the matching ledger events as `workflow_demo_debug` and
-as `workflow_demo` master-clock rows. Edited prompt text is not copied into this
-ledger; only its hash, length, and whether it differs from the template are
-recorded. Context-binding events likewise retain source ids and an objective
-hash, while the run session retains the operator-visible objective needed to
-render later prompts. All workflow debug artifacts remain non-answer,
-non-terminal, and observation-only.
-
-Local deterministic tests cover the server-side workbench path, but keyed live
-validation should use the operator-owned Helix Ask server. Do not start a new
-unkeyed server for this check. With the normal keyed server already running:
+Workflow Demo Lab may suggest editable next prompts, but suggestions and demo
+progress are non-terminal. Typed observations, not assistant prose, advance an
+evidence stage. For keyed live validation against an already-running server:
 
 ```bash
 npm run helix:ask:scholarly-pdf-workbench
 ```
 
-The probe sends the workflow through `/api/agi/ask/turn`, fetches debug exports,
-and checks that each turn exposes:
-
-- `scholarly_pdf_workbench_state`
-- debug-export workbench state, not only the immediate Ask response
-- page inventory and non-terminal page-scout state
-- selected workbench affordance
-- advertised workbench affordance menu for the requested next action
-- paper/PDF/page/Image Lens evidence chain
-- expected evidence-chain fields for paper, PDF, page, OCR/math, promoted
-  equation, scientific packet, and graph reflection refs
-- Image Lens source continuity for rendered PDF pages
-- claim-boundary metadata
-- terminal-authority reason
-- absence of the old `terminal_authority_missing` collapse
-- graph-reflection or exact-row continuity when requested
-
 Use `npm run helix:ask:scholarly-pdf-workbench -- --dry-run` to print the prompt
-sequence without contacting a server. Without an explicit `--base-url`, the
-probe tries both `http://127.0.0.1:5050` and `http://localhost:5050` before
-reporting the keyed server as unreachable. On a reachable server, failed runs
-include `failed_steps` with per-step contract checks such as missing debug
-workbench state, missing Image Lens source continuity, incomplete evidence
-chain shape, or stale `terminal_authority_missing` collapse.
+sequence without contacting a server. Tool-specific contracts live under
+`docs/helix-ask/workstation-tool-contracts/`.
 
 ## What To Look At First
 
 | Area | Why it matters | Entry points |
 | --- | --- | --- |
 | Helix Ask + Live Answer loop | Primary user and agent interface. Handles prompt interpretation, tool admission, evidence re-entry, terminal authority, streamed debug, and the visible answer. | `server/routes/agi.plan.ts`, `docs/helix-ask-agentic-loop-current-overview.md`, `docs/helix-ask-codex-loop-discipline.md`, `npm run helix:ask:regression:light` |
-| Agent runtime adapters | Provider edge for Codex Workstation Mode and future selectable agents. Keeps each runtime's invocation/protocol glue outside Helix Ask policy and workstation truth. | `server/services/helix-ask/agent-providers/`, `server/services/helix-ask/workstation-tool-gateway/`, `shared/helix-agent-runtime.ts`, `docs/helix-ask-codex-loop-discipline.md` |
+| Agent runtime adapter | Provider edge for Codex Workstation Mode. Future providers must conform to the same edge and are not user options by default. | `server/services/helix-ask/agent-providers/`, `server/services/helix-ask/workstation-tool-gateway/`, `shared/helix-agent-runtime.ts`, `docs/helix-ask-codex-loop-discipline.md` |
 | Terminal product authority | Contract for turning admitted artifacts into one visible Ask answer. Covers product materializers, explicit route-product allowance, preview-vs-full-answer projection, and sidecar admission boundaries. | `docs/helix-ask-terminal-authority-contract.md`, `server/services/helix-ask/terminal-product-materializers.ts`, `server/services/helix-ask/terminal-authority-single-writer.ts`, `client/src/components/helix/ask-console/HelixAskVisibleFinalAnswerSelection.ts` |
 | Account-based workstation access | Release boundary for profile sign-in. `developer` accounts see the full development workstation; no-sign-in and `user` accounts get the stable public subset enforced by server policy, with UI locks only as guidance. | `shared/helix-account-session.ts`, `server/services/helix-account/account-session-store.ts`, `server/routes/agi.workstation-tool-gateway.ts`, `AGENTS.md` |
 | Workstation launch panels | User-facing capability surfaces. Launch panels expose docs, calculators, theory maps, stellar/solar simulators, NHM2 panels, notes, process graphs, and runtime diagnostics. | `client/src/pages/desktop.tsx`, `client/src/pages/helix-core.panels.ts`, `docs/helix-desktop-panels.md` |
@@ -423,72 +364,17 @@ artifacts/ reports/ generated evidence and verification outputs
 
 ### Helix Ask And Live Answer
 
-Helix Ask is the reasoning interface over the workstation. It interprets the
-prompt, decides whether a tool or source is required, requests deterministic
-workstation capabilities, receives typed observations, and synthesizes the
-visible answer only after those observations re-enter the solver path.
+Helix Ask is the policy and evidence boundary around Codex Workstation Mode.
+Codex is the user-facing runtime agent; internal or test runtimes must not be
+silently substituted during a turn. Runtime-specific launch, streaming, and
+protocol translation belongs under
+`server/services/helix-ask/agent-providers/`.
 
-The Live Answer path is replacing older observation-first surfaces as the place
-where users see the answer lifecycle: progress events, tool receipts, debug
-exports, and the final terminal artifact selected by authority gates.
-
-Selectable agent runtimes must enter through provider adapters, not through
-route-local grafts or workstation-specific forks. Each runtime speaks a
-different protocol, so some adapter-specific glue is expected for launch,
-streaming, tool-request translation, and final output normalization. Keep that
-glue at the adapter edge. The shared Helix contract remains the source of truth:
-capability manifests, permission/admission decisions, workstation gateway
-observations, action receipts, evidence re-entry, terminal authority, debug
-exports, and visible trace projection.
-
-Adding another agent should normally mean adding a thin provider under
-`server/services/helix-ask/agent-providers/` that consumes the same workstation
-gateway contract. It should not require copying Helix Ask solver policy into the
-agent, importing `server/routes/agi.plan.ts`, or giving the agent direct access
-to panel internals, filesystem mutation, shell execution, or final-answer
-authority.
-
-#### Runtime Agents And Capability Lanes
-
-The selectable Ask runtime is now modeled as a runtime agent provider. The
-runtime provider owns the turn style and final candidate path, while Helix owns
-capability admission, observation normalization, evidence re-entry, terminal
-authority, and debug projection.
-
-Keep these layers separate:
-
-| Layer | Meaning | Current examples |
-| --- | --- | --- |
-| Runtime agent provider | The agent that owns the turn and produces the final candidate. | `helix` / Helix Ask Native, `codex` / Codex Workstation Mode |
-| Capability lane | A governed class of service the runtime may request during a turn. Lane results are observations or receipts, not answers. | `workstation_tool_reference`, `utility_text`, `live_translation`, `visual_analysis` |
-| Backend provider | The implementation that can fulfill a lane when that lane graduates from shadow/catalog mode. | Helix workstation gateway, OpenAI-compatible text/vision, Gemini translation, ElevenLabs voice |
-
-The provider-neutral lane catalog lets Helix expose the same governed capability
-surface to Helix Native, Codex Workstation Mode, and future runtime agents
-without making any lane replace the root agent. A lane can help a runtime
-delegate a subtask, such as translation, narration, visual analysis, or compact
-classification, but its output must re-enter as a structured observation before
-the selected runtime can use it in a final answer.
-
-Current lane catalog:
-
-| Lane | Family | Current status | Notes |
-| --- | --- | --- | --- |
-| `workstation_tool_reference` | Existing workstation gateway | `available` | Reference lane for the live gateway catalog; this is what Codex is using for `docs.search`, calculator, repo search, reflection, and panel projection receipts. |
-| `utility_text` | Text inference | `dry_run` | Cataloged for small classification, extraction, normalization, and compact summary calls. |
-| `interactive_text` | Text inference | `dry_run` | Cataloged for low-latency conversational or tool-backed text inference. |
-| `deliberate_text` | Text inference | `dry_run` | Cataloged for higher-effort synthesis, planning, and consistency review. |
-| `code_text` | Code inference | `dry_run` | Cataloged for code reasoning/review as text; no filesystem mutation authority. |
-| `speech_to_text` | Speech to text | `dry_run` | Cataloged for future governed audio transcript observations. |
-| `text_to_speech` | Text to speech | `dry_run` | Cataloged for narration/callout receipts; playback is not answer authority. |
-| `live_translation` | Live translation | `unconfigured` | Intended for a translation backend such as Gemini realtime translation once keys/endpoints and receipt contracts are configured. |
-| `visual_analysis` | Visual analysis | `dry_run` | Cataloged for future image/screen observations. |
-
-This is intentionally additive. Existing workstation gateway calls continue to
-work without routing through model/service lanes. Lane execution is still
-shadow/catalog-only unless a later patch explicitly graduates a lane with
-permission, backend configuration, observation schema, negative-admission tests,
-and terminal-authority projection.
+Capability lanes and workstation tools may use different executors and typed
+observation schemas, but they all conform to the lifecycle in **Agent And Tool
+Contract (Read First)**. Their output is non-terminal until it re-enters Codex
+and passes Helix terminal eligibility. Current lane implementation status
+belongs in `docs/helix-ask-provider-capability-contracts.md`, not in this README.
 
 Important paths:
 
@@ -497,7 +383,6 @@ Important paths:
 - `server/services/helix-ask/agent-providers/`
 - `server/services/helix-ask/workstation-tool-gateway/`
 - `server/services/helix-ask/capability-lanes/`
-- `server/services/helix-ask/agent-providers/runtime-adapter-contract.ts`
 - `client/src/components/helix/HelixAskPill.tsx`
 - `shared/helix-capability-lane.ts`
 - `shared/helix-ask-*.ts`
@@ -662,49 +547,16 @@ Useful docs and artifacts:
 - `docs/audits/research/selected-family/nhm2-shift-lapse/`
 - `artifacts/research/full-solve/`
 
-### Solver Contract
+### Agent-Loop Verification
 
-Every Ask route and workstation panel should preserve this rule of thumb:
-
-```text
-Routes are proposed procedures.
-Classifiers are hypotheses.
-Receipts are observations.
-Only the completed solver path can answer.
-```
-
-The intended lifecycle is:
-
-```text
-prompt + context
--> prompt interpretation and intent arbitration
--> source and tool admission
--> capability or panel action, when admitted
--> typed receipt or observation
--> evidence re-entry into the model-facing turn
--> model-authored answer draft, user-input request, or typed failure
--> goal satisfaction, route authority, poison audit, and terminal authority
--> one visible final answer, request_user_input, or typed_failure
-```
-
-This keeps Helix Ask aligned with Codex-style tool use without recreating a
-private Codex runtime. Helix owns prompt interpretation policy, evidence
-identity, route/product contracts, proof gates, terminal eligibility, and debug
-traces. It does not own generic model sampling, sandboxing, approvals, session
-compaction, subagent orchestration, or terminal completion machinery.
-
-For agent-loop changes, follow:
-
-- `docs/helix-ask-terminal-authority-contract.md`
-- `docs/helix-ask-codex-loop-discipline.md`
-- `docs/helix-ask-turn-solver-spine.md`
-- `docs/helix-ask-api-parity-matrix.md`
-
-Representative checks:
+Use the quick guard plus the narrow test for the contract changed. Run the full
+discipline gate for live-source identity or continuation changes:
 
 ```bash
 npm run helix:ask:discipline:quick
-npm run helix:ask:discipline
+npx vitest run server/__tests__/helix.ask.prompt-solving-benchmark.test.ts --pool=forks
+npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks
+npm run helix:ask:discipline:full
 npm run helix:ask:api-parity
 ```
 
@@ -712,6 +564,9 @@ For live agent/LLM-path parity, use the operator's already-keyed localhost
 server. Agents should not start their own development server to prove model-path
 behavior unless explicitly asked; if no suitable server is running, ask the user
 to start the normal local server and then run the parity probe against it.
+
+Broad-suite baseline failures do not replace isolated contract tests, but they
+must be reported rather than silently ignored.
 
 ### Verification Layer
 

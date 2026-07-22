@@ -84,6 +84,48 @@ provider selected
 -> visible/debug projection
 ```
 
+## Conversational Continuity Is Context, Not Authority
+
+Ordinary follow-up reasoning must not depend on a finite dictionary of phrases
+such as `do that`, `make it a table`, or `what does that paragraph mean`.
+Before each model turn, the provider supplies a bounded copy of the latest
+assistant final answer as non-authoritative conversational context. This lets
+the runtime resolve natural references, revise prose, explain a prior claim,
+and choose a useful next step without Helix recreating a private language model
+or planner.
+
+Deterministic referent resolution remains useful when Helix needs an auditable
+binding to a retained source, answer, artifact, or capability argument. It adds
+identity and admission evidence; it is not a prerequisite for ordinary
+conversation. The bounded answer context must therefore be present even when
+no deterministic referent rule matches.
+
+The authority split is:
+
+```txt
+latest assistant answer
+-> bounded non-authoritative model context
+-> runtime interprets the user's natural follow-up
+-> runtime may answer directly or propose a capability
+-> Helix independently admits sources and tools
+-> observations re-enter the runtime
+-> runtime produces the terminal candidate
+-> Helix verifies terminal eligibility and projects that same artifact
+```
+
+The prior answer cannot itself authorize a tool call, satisfy a hard evidence
+requirement, or become a new terminal answer merely because it is visible to
+the model. Internal continuation state, capability manifests, receipts, route
+labels, and debug projections must be clearly separated from conversational
+context and must never become the referent for user phrases such as `that` or
+`it`.
+
+For hard source or tool continuations, fail closed when the required retained
+identity or observation is absent. For ordinary prose continuation, let the
+runtime reason over the bounded answer rather than adding another lexical
+shortcut. Every new shortcut must still cover negated, future, historical,
+quoted, screen-visible, and mixed-intent adversarial cases.
+
 ## Semantic Route Proposal Boundary
 
 Helix may build prompt-derived gateway requests as policy fallbacks, but those
@@ -189,6 +231,16 @@ None of those are Helix Ask route policy. Helix Ask may observe or wrap their
 outputs, but it must not recreate them.
 
 ## Patch-Time Contract
+
+### Advertised gateway parity
+
+Every workstation gateway capability shown to the runtime agent as admitted must
+have an executable adapter path for the same turn. Structured runtime requests
+for account-authorized gateway capabilities enter the governed workstation
+gateway, produce an observation packet, and re-enter the Codex turn. A
+capability absent from the account-authorized manifest must fail closed before
+execution. Do not advertise a gateway capability and then reinterpret its
+structured request as an unknown provider lane.
 
 Every Helix Ask patch that touches routing, source-target admission,
 tool-admission, live-source handling, workstation actions, route-product

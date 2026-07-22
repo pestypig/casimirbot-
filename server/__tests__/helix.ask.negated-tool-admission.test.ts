@@ -60,6 +60,30 @@ const availableCapabilities = (keys: string[]) => ({
 });
 
 describe("Helix Ask negated/contextual tool admission", () => {
+  it("keeps natural no-workstation requests on the model-only route", () => {
+    const prompts = [
+      "In plain language, explain the difference between a scientific hypothesis and a scientific theory without using workstation tools.",
+      "Without using workstation tools, compare a scientific hypothesis with a scientific theory and give one example of each.",
+      "Do not use the workstation tools; explain the distinction from general reasoning.",
+    ];
+
+    for (const promptText of prompts) {
+      const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+      const admission = buildToolCallAdmissionDecision({ turnId, sourceTargetIntent, promptText });
+
+      expect(sourceTargetIntent).toMatchObject({
+        target_source: "model_only",
+        target_kind: "general_background",
+        allow_no_tool_direct: true,
+      });
+      expect(admission).toMatchObject({
+        source_target: "model_only",
+        required: false,
+        admitted_tool_families: ["model_only"],
+      });
+    }
+  });
+
   it("recognizes capability lane observation packets as admission evidence for actual lane calls", () => {
     const trace = buildAskTurnSolverTrace({
       turnId: "ask:test:tts-lane-admission",

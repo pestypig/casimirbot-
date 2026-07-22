@@ -29,6 +29,23 @@ describe("Codex native model policy", () => {
     });
   });
 
+  it("passes a pinned low-cost policy to the Codex app-server boundary unchanged", () => {
+    expect(resolveCodexNativeModelPolicy({
+      language_model_policy: {
+        schema: "helix.language_model_policy.v1",
+        selection_mode: "pinned",
+        resolved_model: "gpt-4o-mini",
+        reasoning_effort: "none",
+      },
+      model: "gpt-5.5",
+      reasoning_effort: "high",
+    })).toMatchObject({
+      model: "gpt-4o-mini",
+      reasoningEffort: "none",
+      source: "language_model_policy",
+    });
+  });
+
   it("does not pass an invalid reasoning effort", () => {
     expect(resolveCodexNativeModelPolicy({
       model: "gpt-5.4-mini",

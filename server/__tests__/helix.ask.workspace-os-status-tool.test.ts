@@ -57,6 +57,30 @@ const canonicalGoalFrame = {
 };
 
 describe("Helix Ask Workspace OS status tool", () => {
+  it("gives a natural current-workstation-status read precedence over repository evidence", () => {
+    const promptText = "What is the current workstation status?";
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId: "ask:workspace-os:natural",
+      threadId: "helix-ask:test",
+      promptText,
+    });
+
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "workspace_diagnostic",
+      target_kind: "workspace_diagnostic",
+      strength: "hard",
+      precedence_reason: "workspace_os_status_source_target",
+    });
+    expect(buildToolCallAdmissionDecision({
+      turnId: "ask:workspace-os:natural",
+      sourceTargetIntent,
+      promptText,
+    })).toMatchObject({
+      admitted_tool_families: ["workspace_diagnostic"],
+      required: true,
+    });
+  });
+
   it("routes status and capability-health prompts to a diagnostic-only tool path", () => {
     const promptText =
       "Check the Workspace OS status: are browser tab capture, clipboard write, source bindings, and runtime memory healthy?";

@@ -102,6 +102,9 @@ export const fingerprintRuntimeGoalAccountPolicy = (
 const opaqueRef = (kind: "session" | "profile", value: string): string =>
   `runtime-goal-${kind}:sha256:${hash(value).slice(0, 24)}`;
 
+export const buildRuntimeGoalProfileRef = (profileId: string): string =>
+  opaqueRef("profile", profileId.trim());
+
 export const buildRuntimeGoalAccountScope = (
   context: HelixWorkstationGatewayAccountContext | null | undefined,
 ): HelixRuntimeGoalAccountScope | null => {
@@ -120,7 +123,7 @@ export const buildRuntimeGoalAccountScope = (
     schema: HELIX_RUNTIME_GOAL_ACCOUNT_SCOPE_SCHEMA,
     trusted: true,
     session_ref: opaqueRef("session", sessionId),
-    profile_ref: opaqueRef("profile", profileId),
+    profile_ref: buildRuntimeGoalProfileRef(profileId),
     account_type: context.account_policy.account_type,
     policy_fingerprint: fingerprintRuntimeGoalAccountPolicy(context.account_policy),
     raw_session_id_included: false,

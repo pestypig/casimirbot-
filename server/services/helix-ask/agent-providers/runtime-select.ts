@@ -1,5 +1,6 @@
 import type { IncomingHttpHeaders } from "node:http";
 import {
+  DEFAULT_HELIX_AGENT_RUNTIME_ID,
   HELIX_AGENT_RUNTIME_IDS,
   type HelixAgentRuntimeId,
 } from "@shared/helix-agent-runtime";
@@ -23,7 +24,7 @@ export function selectHelixAgentRuntime(input: {
     : readString(rawHeader);
 
   const fromEnv = readString(process.env.HELIX_ASK_AGENT_RUNTIME);
-  const selected = fromBody || fromHeader || fromEnv || "helix";
+  const selected = fromBody || fromHeader || fromEnv || DEFAULT_HELIX_AGENT_RUNTIME_ID;
 
-  return runtimeSet.has(selected) ? (selected as HelixAgentRuntimeId) : "helix";
+  return runtimeSet.has(selected) ? (selected as HelixAgentRuntimeId) : DEFAULT_HELIX_AGENT_RUNTIME_ID;
 }

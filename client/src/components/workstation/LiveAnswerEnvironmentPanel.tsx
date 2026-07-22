@@ -2659,7 +2659,9 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       detail: selectedVisualFrameHistory.crop_only ? "high" : "auto",
     });
     setLastActionStatus(outcome.ok
-      ? `Selected frame sent to GPT Live (${outcome.receipt?.item_id ?? "accepted"}).`
+      ? outcome.code === "shared_room_visual_frame_queued"
+        ? "Selected frame queued through the Shared GPT Live room visual lane."
+        : `Selected frame sent to GPT Live (${outcome.receipt?.item_id ?? "accepted"}).`
       : outcome.code === "visual_input_consent_required"
         ? "Turn Vision On in GPT Live before sending a selected frame."
         : outcome.code === "live_runtime_unavailable"

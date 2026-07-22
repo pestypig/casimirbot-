@@ -9,6 +9,8 @@ import {
 import { publishRealtimeSidebandSessionClosed } from
   "../../realtime-session/sideband-control-channel";
 import { readSharedRealtimeRoomRuntimeBinding } from "../runtime-registry";
+import { buildRuntimeGoalProfileRef } from
+  "../../runtime-goals/runtime-goal-account-binding";
 import {
   createSharedRealtimeRoomTestApp,
   createReadySharedRealtimeRoom,
@@ -64,6 +66,18 @@ describe("Shared Realtime room runtime routes", () => {
       transport_owner: "host_browser",
       model: "gpt-realtime-2.1",
     });
+    await owner.agent
+      .post(`/api/agi/realtime/rooms/${roomId}/presence`)
+      .send({ presence: "away" })
+      .expect(200);
+    const awayFloor = await owner.agent
+      .post(`/api/agi/realtime/rooms/${roomId}/runtime/floor`)
+      .expect(409);
+    expect(awayFloor.body.error).toBe("shared_realtime_room_not_ready");
+    await owner.agent
+      .post(`/api/agi/realtime/rooms/${roomId}/presence`)
+      .send({ presence: "present" })
+      .expect(200);
     await guest.agent
       .post(`/api/agi/realtime/rooms/${roomId}/runtime/bind`)
       .send({ realtime_session_id: "realtime:spoofed-owner-session" })
@@ -166,6 +180,10 @@ describe("Shared Realtime room runtime routes", () => {
       state: "degraded",
       limitations: expect.arrayContaining(["bound_realtime_sideband_closed"]),
     });
+    expect(readSharedRealtimeRoomRuntimeBinding({
+      roomId: roomA,
+      runtimeId: reserveA.body.room.runtime.runtime_id,
+    })).toEqual({ realtimeSessionId: null, providerCallId: null });
 
     expect(removeAdmittedRealtimeSession({
       realtimeSessionId: "realtime:shared-owner",
@@ -175,6 +193,22 @@ describe("Shared Realtime room runtime routes", () => {
       .get(`/api/agi/realtime/rooms/${roomA}`)
       .expect(200);
     expect(degraded.body.room.runtime.state).toBe("degraded");
+    admitRealtimeSession({
+      realtimeSessionId: "realtime:shared-owner-rebound",
+      requesterRef,
+      visibleUserConsentReceipt: "receipt:visible:owner-rebound",
+      model: "gpt-realtime-2.1",
+    });
+    updateAdmittedRealtimeSession({
+      realtimeSessionId: "realtime:shared-owner-rebound",
+      requesterRef,
+      patch: { providerCallId: "call_shared_owner_rebound" },
+    });
+    const rebound = await owner.agent
+      .post(`/api/agi/realtime/rooms/${roomA}/runtime/bind`)
+      .send({ realtime_session_id: "realtime:shared-owner-rebound" })
+      .expect(200);
+    expect(rebound.body.room.runtime.state).toBe("host_transport_active");
     expect(reserveA.body.room.runtime.runtime_id).toBeTruthy();
   });
 
@@ -190,6 +224,11 @@ describe("Shared Realtime room runtime routes", () => {
       profileId: "profile:personal-guest",
       displayName: "Personal Guest",
     });
+    const alternateGuestLogin = await signInSharedRealtimeRoomTestAgent({
+      app,
+      profileId: guest.profileId,
+      displayName: "Personal Guest",
+    });
     const created = await owner.agent
       .post("/api/agi/realtime/rooms")
       .send({ title: "One-call admission" })
@@ -200,9 +239,19 @@ describe("Shared Realtime room runtime routes", () => {
 
     admitRealtimeSession({
       realtimeSessionId: "realtime:guest-personal",
-      requesterRef: buildRealtimeRequesterRef(guest.sessionId),
+      requesterRef: buildRealtimeRequesterRef(alternateGuestLogin.sessionId),
       visibleUserConsentReceipt: "receipt:visible:guest",
       model: "gpt-realtime-2.1",
+      runtimeGoalAccountScope: {
+        schema: "helix.runtime_goal.account_scope.v1",
+        trusted: true,
+        session_ref: "runtime-goal-session:sha256:test",
+        profile_ref: buildRuntimeGoalProfileRef(guest.profileId),
+        account_type: "developer",
+        policy_fingerprint: "sha256:test",
+        raw_session_id_included: false,
+        raw_profile_id_included: false,
+      },
     });
     const response = await guest.agent
       .post("/api/agi/realtime/rooms/join")
@@ -228,6 +277,11 @@ describe("Shared Realtime room runtime routes", () => {
       guest,
       title: "Owner close",
     });
+    const alternateOwnerLogin = await signInSharedRealtimeRoomTestAgent({
+      app,
+      profileId: owner.profileId,
+      displayName: "Close Owner",
+    });
     await owner.agent
       .post(`/api/agi/realtime/rooms/${roomId}/runtime/reserve`)
       .send({ model: "gpt-realtime-2.1" })
@@ -249,7 +303,9 @@ describe("Shared Realtime room runtime routes", () => {
       .send({ realtime_session_id: "realtime:owner-close" })
       .expect(200);
 
-    await owner.agent.post(`/api/agi/realtime/rooms/${roomId}/leave`).expect(200);
+    await alternateOwnerLogin.agent
+      .post(`/api/agi/realtime/rooms/${roomId}/leave`)
+      .expect(200);
     expect(readAdmittedRealtimeSession({
       realtimeSessionId: "realtime:owner-close",
       requesterRef,

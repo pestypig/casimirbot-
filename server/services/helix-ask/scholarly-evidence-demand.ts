@@ -25,7 +25,7 @@ const affirmativeScholarlyEvidenceText = (promptText: string): string =>
       " ",
     )
     .replace(
-      /\b(?:later|in\s+(?:a\s+)?future\s+turn)\b[^.!?;\n]{0,220}\b(?:equations?|formulae?|formulas?|image\s+lens|page\s+images?)\b/gi,
+      /\b(?:later|eventually|next\s+time|in\s+(?:a\s+)?future(?:\s+turn)?)\b[^.!?;\n]{0,220}\b(?:equations?|formulae?|formulas?|image\s+lens|page\s+images?|higher[-\s]+resolution|rerender|paragraphs?|passages?|sections?)\b/gi,
       " ",
     )
     .replace(
@@ -58,6 +58,8 @@ const fullTextRequested = (text: string, workflow?: HelixScholarlyRequestedWorkf
     : /\b(?:full[-\s]?text|fetched\s+text|read\s+(?:the\s+)?(?:paper|pdf|article)|paper\s+content|parsed\s+page\s+count|page[-\s]?grounded|page[-\s]?numbered\s+(?:passage|excerpt))\b/i.test(text) ||
       /\b(?:get|fetch|retrieve|open|download|access|obtain|load|parse)\b[^.!?;\n]{0,120}\b(?:the\s+|this\s+|that\s+|same\s+|selected\s+)?(?:pdf|full[-\s]?text|paper\s+text|article\s+text)\b/i.test(text) ||
       /\b(?:fetch|retrieve|get|open|download|access|obtain|load|parse)\b[^.!?;\n]{0,80}\b(?:the\s+|this\s+|that\s+|same\s+|selected\s+)?(?:paper|article)\b/i.test(text) ||
+      /\b(?:use|read|search|inspect|scan|check|try)\s+(?:the\s+|this\s+|that\s+|same\s+|selected\s+)(?:fetched\s+text|full[-\s]?text|paper\s+text|text(?:\s+version)?)\b[^.!?;\n]{0,140}\b(?:paragraphs?|passages?|sections?|point|locate|find|show|read)\b/i.test(text) ||
+      /^(?:\s*(?:yes|yeah|yep|ok(?:ay)?|please|sure|go\s+ahead|do\s+that)\b[,;:]?\s*)+(?:give|show|find|locate|narrow|mark|identify)?[\s\S]{0,100}\b(?:exact|precise)\b[\s\S]{0,50}\b(?:start|beginning)\b[\s\S]{0,30}\b(?:end|ending)\b/i.test(text) ||
       /\b(?:pull\s+out|extract|summari[sz]e|identify|show|list|walk\s+(?:me\s+)?through)\b[\s\S]{0,100}\b(?:useful|important|key|relevant|main|substantive|scientific)\b[\s\S]{0,50}\b(?:parts?|points?|sections?|passages?|findings?|content|material)\b/i.test(text);
 
 const fullTextRequestedOnlyWhenAvailable = (text: string): boolean =>
@@ -70,9 +72,10 @@ const explicitEquationRequested = (text: string): boolean =>
   /\b(?:show\s+(?:me\s+)?(?:the\s+)?science|scientific\s+content|main\s+equations?|show\s+(?:me\s+)?(?:the\s+)?equations?)\b/i.test(text);
 
 const pageImageRequested = (text: string): boolean =>
-  /\b(?:page\s+images?|screenshots?|render(?:ed)?\s+pages?|pdf\s+pages?|image\s+lens|ocr)\b/i.test(text) ||
+  /\b(?:page\s+images?|screenshots?|render(?:ed)?\s+pages?|pdf\s+pages?|image\s+lens|image\s+tool|ocr)\b/i.test(text) ||
+  /\b(?:higher[-\s]+resolution\s+)?rerender\b/i.test(text) ||
   /\b(?:inspect|read|extract|show|find|locate)\b[^.!?;\n]{0,100}\b(?:figures?|tables?|plots?)\b/i.test(text) ||
-  /\b(?:render|inspect|ocr|crop|load|mount|open)\b[^.!?;\n]{0,160}\b(?:page\s*(?:number\s*)?\d{1,3}|next\s+pages?|following\s+pages?|subsequent\s+pages?)\b/i.test(text);
+  /\b(?:render|inspect|ocr|crop|load|mount|open|put|show)\b[^.!?;\n]{0,160}\b(?:page\s*(?:number\s*)?\d{1,3}|next\s+pages?|following\s+pages?|subsequent\s+pages?)\b/i.test(text);
 
 const minimumDepth = (
   alternatives: HelixScholarlyEvidenceAlternative[],

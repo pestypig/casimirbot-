@@ -222,11 +222,11 @@ describe("Helix Ask agent provider selection", () => {
     expect(guarded).toContain("without fabricating values or claiming a calculator result");
   });
 
-  it("defaults to the native Helix runtime", () => {
+  it("defaults to the Codex runtime", () => {
     delete process.env.HELIX_ASK_AGENT_RUNTIME;
 
-    expect(selectHelixAgentRuntime({ body: {} })).toBe("helix");
-    expect(resolveHelixAgentProvider({ body: {} }).id).toBe("helix");
+    expect(selectHelixAgentRuntime({ body: {} })).toBe("codex");
+    expect(resolveHelixAgentProvider({ body: {} }).id).toBe("codex");
   });
 
   it("prefers body runtime over header and env runtime", () => {
@@ -249,24 +249,24 @@ describe("Helix Ask agent provider selection", () => {
     ).toBe("codex");
   });
 
-  it("falls back to Helix for unknown runtimes", () => {
+  it("falls back to Codex for unknown runtimes", () => {
     process.env.HELIX_ASK_AGENT_RUNTIME = "future-runtime";
 
-    expect(selectHelixAgentRuntime({ body: { agent_runtime: "unknown" } })).toBe("helix");
-    expect(resolveHelixAgentProvider({ body: { agent_runtime: "unknown" } }).id).toBe("helix");
+    expect(selectHelixAgentRuntime({ body: { agent_runtime: "unknown" } })).toBe("codex");
+    expect(resolveHelixAgentProvider({ body: { agent_runtime: "unknown" } }).id).toBe("codex");
   });
 
-  it("falls back to Helix when Codex is requested but disabled", () => {
+  it("preserves an explicit Codex selection when Codex is disabled", () => {
     process.env.ENABLE_CODEX_AGENT = "0";
 
-    expect(resolveHelixAgentProvider({ body: { agent_runtime: "codex" } }).id).toBe("helix");
+    expect(resolveHelixAgentProvider({ body: { agent_runtime: "codex" } }).id).toBe("codex");
   });
 
-  it("falls back to Helix when the future provider is requested but disabled", () => {
+  it("preserves an explicit future-provider selection when it is disabled", () => {
     delete process.env.ENABLE_FUTURE_AGENT;
 
     expect(selectHelixAgentRuntime({ body: { agent_runtime: "future" } })).toBe("future");
-    expect(resolveHelixAgentProvider({ body: { agent_runtime: "future" } }).id).toBe("helix");
+    expect(resolveHelixAgentProvider({ body: { agent_runtime: "future" } }).id).toBe("future");
   });
 
   it("selects Codex when requested by default", () => {
@@ -565,7 +565,7 @@ describe("Helix Ask agent provider selection", () => {
       expect.objectContaining({
         id: "helix",
         enabled: true,
-        experimental: false,
+        experimental: true,
         permission_profile: expect.objectContaining({
           id: "helix-native",
         }),
@@ -575,7 +575,7 @@ describe("Helix Ask agent provider selection", () => {
       expect.objectContaining({
         id: "codex",
         enabled: true,
-        experimental: true,
+        experimental: false,
         permission_profile: expect.objectContaining({
           id: "read-observe-act",
           allows: expect.objectContaining({

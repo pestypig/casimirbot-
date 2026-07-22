@@ -35,6 +35,7 @@ import { resolveCompoundCapabilitySynthesisReadiness } from "./compound-capabili
 import {
   filterProviderTerminalSupportRefsForMoralGraph,
   inspectAgentProviderRouteProductEligibility,
+  isProviderAuthoredRouteProductKind,
   materializeAgentProviderRouteProductTerminal,
   materializeAgentProviderTerminalCandidate,
   materializeCalculatorWorkstationToolEvaluationFromReceiptTerminal,
@@ -1972,6 +1973,92 @@ const routeRequiredTerminalKind = (payload: Record<string, unknown>): string | n
   );
 };
 
+const currentTurnProviderBridgeAllowsCanonicalTerminalKind = (
+  payload: Record<string, unknown>,
+  kind: string,
+): boolean => {
+  if (kind !== "agent_provider_terminal_candidate" && !isProviderAuthoredRouteProductKind(kind)) return false;
+  const committedRoute = readCommittedAskRoute(payload);
+  const routeProductContract = readRecord(payload.route_product_contract);
+  const committedCanonicalGoal = readRecord(committedRoute?.canonical_goal);
+  const explicitlyForbidden = [
+    ...readArray(committedCanonicalGoal?.forbidden_terminal_artifact_kinds),
+    ...readArray(routeProductContract?.forbidden_terminal_artifact_kinds),
+  ].map(readString).filter((entry): entry is string => Boolean(entry));
+  if (explicitlyForbidden.includes(kind)) return false;
+
+  const canonicalGoalFrame = readRecord(payload.canonical_goal_frame);
+  const turnId = readString(payload.turn_id) ?? readString(canonicalGoalFrame?.turn_id);
+  const canonicalGoalSource = readString(canonicalGoalFrame?.source);
+  const providerGatewayTerminalProjection = Boolean(
+    canonicalGoalSource === "codex_provider_workstation_gateway_projection" &&
+    readString(canonicalGoalFrame?.goal_kind) === "agent_provider_gateway_turn" &&
+    readString(canonicalGoalFrame?.requested_capability) &&
+    readConcreteTerminalKind(canonicalGoalFrame?.required_terminal_kind) === kind
+  );
+  const capabilityLaneProviderAnswerHandoff = Boolean(
+    kind === "agent_provider_terminal_candidate" &&
+    canonicalGoalSource === "codex_provider_capability_lane_terminal_authority" &&
+    readString(canonicalGoalFrame?.requested_capability) &&
+    readConcreteTerminalKind(canonicalGoalFrame?.required_terminal_kind)
+  );
+  if (
+    !turnId ||
+    (!providerGatewayTerminalProjection && !capabilityLaneProviderAnswerHandoff)
+  ) return false;
+
+  const debug = readRecord(payload.debug);
+  const bridge =
+    readRecord(payload.provider_terminal_authority_bridge) ??
+    readRecord(debug?.provider_terminal_authority_bridge);
+  const reentry =
+    readRecord(payload.provider_reasoning_reentry) ??
+    readRecord(debug?.provider_reasoning_reentry);
+  const authority = readRecord(bridge?.terminal_answer_authority);
+  const presentation = readRecord(bridge?.terminal_presentation);
+  const candidate =
+    readRecord(payload.provider_terminal_candidate) ??
+    readRecord(debug?.provider_terminal_candidate) ??
+    readRecord(bridge?.provider_terminal_candidate);
+  const candidateRef =
+    readString(candidate?.candidate_id) ??
+    readString(bridge?.provider_terminal_candidate_ref);
+  const authorityRef =
+    readString(authority?.terminal_item_id) ??
+    readString(authority?.terminal_artifact_ref);
+  const evidenceRequired = bridge?.evidence_reentry_required === true;
+  const normalizedObservationCount = Number(bridge?.normalized_observation_packet_count ?? 0);
+
+  return Boolean(
+    readString(bridge?.schema) === "helix.provider_terminal_authority_bridge.v1" &&
+    readString(bridge?.turn_id) === turnId &&
+    bridge?.terminal_authority_granted === true &&
+    bridge?.final_visible_answer_authorized === true &&
+    bridge?.solver_completed === true &&
+    bridge?.goal_satisfaction_compatible === true &&
+    bridge?.all_gateway_calls_succeeded === true &&
+    bridge?.all_capability_lane_observations_succeeded === true &&
+    bridge?.all_observations_succeeded === true &&
+    bridge?.normalized_observations_ready === true &&
+    readString(reentry?.schema) === "helix.provider_reasoning_reentry.v1" &&
+    readString(reentry?.turn_id) === turnId &&
+    readString(reentry?.status) === "completed" &&
+    reentry?.evidence_reentered === true &&
+    reentry?.solver_completed === true &&
+    reentry?.goal_satisfaction_compatible === true &&
+    (!evidenceRequired || normalizedObservationCount > 0) &&
+    readString(authority?.turn_id) === turnId &&
+    readString(authority?.terminal_kind) === "answer" &&
+    readString(authority?.terminal_artifact_kind) === "agent_provider_terminal_candidate" &&
+    readString(authority?.final_answer_source) === "agent_provider_terminal_candidate" &&
+    authority?.server_authoritative === true &&
+    readString(presentation?.turn_id) === turnId &&
+    readString(presentation?.final_answer_source) === "agent_provider_terminal_candidate" &&
+    Boolean(candidateRef?.startsWith(`${turnId}:`)) &&
+    authorityRef === candidateRef
+  );
+};
+
 const hasCurrentTurnImageLensObservation = (payload: Record<string, unknown>): boolean => {
   const debug = readRecord(payload.debug);
   const candidates = [
@@ -2014,6 +2101,11 @@ const hasCurrentTurnImageLensObservation = (payload: Record<string, unknown>): b
 
 const routeContractExplicitlyAllowsTerminalKind = (payload: Record<string, unknown>, kind: string): boolean => {
   if (routeEvidenceAuthorityForbidsTerminalKind(payload, kind)) return false;
+  const compoundTerminalPolicy = readCompoundTerminalPolicy(payload);
+  if (compoundTerminalPolicy.active) {
+    if (compoundTerminalPolicy.forbidden_terminal_artifact_kinds.includes(kind)) return false;
+    if (compoundTerminalPolicy.allowed_terminal_artifact_kinds.includes(kind)) return true;
+  }
   if (
     kind === "direct_answer_text" &&
     readString(payload.dispatch_policy) === "direct_answer_only" &&
@@ -2033,7 +2125,8 @@ const routeContractExplicitlyAllowsTerminalKind = (payload: Record<string, unkno
       .filter((entry): entry is string => Boolean(entry));
     const required = readString(canonicalGoal?.required_terminal_kind);
     if (forbidden.includes(kind)) return false;
-    return required === kind || allowed.includes(kind);
+    if (required === kind || allowed.includes(kind)) return true;
+    return currentTurnProviderBridgeAllowsCanonicalTerminalKind(payload, kind);
   }
   if (routeContractAllowedTerminalKinds(payload).includes(kind)) return true;
 
@@ -2054,6 +2147,8 @@ const routeContractExplicitlyAllowsTerminalKind = (payload: Record<string, unkno
     const required = readString(routeEvidenceAuthority.required_terminal_kind);
     if (required === kind || allowed.includes(kind)) return true;
   }
+
+  if (currentTurnProviderBridgeAllowsCanonicalTerminalKind(payload, kind)) return true;
 
   return false;
 };
@@ -2133,6 +2228,21 @@ const routeContractAllowsTerminalKind = (
   ) {
     return false;
   }
+  const compoundPolicy = applyCompoundTerminalPolicy(payload, {
+    allowed: routeContractAllowedTerminalKinds(payload),
+    forbidden: committedRouteForbiddenTerminalKinds(payload),
+    requiredTerminalKind: readString(canonicalGoal?.required_terminal_kind),
+  });
+  if (compoundPolicy.policy.active) {
+    if (compoundPolicy.forbidden.includes(kind)) return false;
+    if (
+      compoundPolicy.allowed.length === 0 ||
+      compoundPolicy.allowed.includes(kind) ||
+      (kind === "doc_evidence_synthesis_answer" && compoundPolicy.allowed.includes("doc_evidence_synthesis"))
+    ) {
+      return true;
+    }
+  }
   const routeEvidenceAuthority = readRouteEvidenceAuthority(payload);
   if (routeEvidenceAuthority?.schema === "helix.route_evidence_authority.v1") {
     const routeProduct = readRecord(payload.route_product_contract);
@@ -2166,17 +2276,6 @@ const routeContractAllowsTerminalKind = (
     ) {
       return false;
     }
-  }
-  const compoundPolicy = applyCompoundTerminalPolicy(payload, {
-    allowed: routeContractAllowedTerminalKinds(payload),
-    forbidden: committedRouteForbiddenTerminalKinds(payload),
-    requiredTerminalKind: readString(canonicalGoal?.required_terminal_kind),
-  });
-  if (compoundPolicy.policy.active) {
-    if (compoundPolicy.forbidden.includes(kind)) return false;
-    return compoundPolicy.allowed.length === 0 ||
-      compoundPolicy.allowed.includes(kind) ||
-      (kind === "doc_evidence_synthesis_answer" && compoundPolicy.allowed.includes("doc_evidence_synthesis"));
   }
   if (
     kind === "doc_evidence_synthesis_answer" &&
@@ -3265,6 +3364,79 @@ const terminalKindCanMirrorSupport = (kind: string | null): kind is string =>
       kind !== "tool_receipt",
   );
 
+const readAuthorizedCurrentTurnProviderCandidateProjection = (
+  payload: Record<string, unknown>,
+): {
+  candidate: Record<string, unknown>;
+  authority: Record<string, unknown>;
+  presentation: Record<string, unknown>;
+} | null => {
+  const turnId = readString(payload.turn_id);
+  const debug = readRecord(payload.debug);
+  const bridge =
+    readRecord(payload.provider_terminal_authority_bridge) ??
+    readRecord(debug?.provider_terminal_authority_bridge);
+  const reentry =
+    readRecord(payload.provider_reasoning_reentry) ??
+    readRecord(debug?.provider_reasoning_reentry);
+  const candidate =
+    readRecord(payload.provider_terminal_candidate) ??
+    readRecord(debug?.provider_terminal_candidate) ??
+    readRecord(bridge?.provider_terminal_candidate);
+  const authority = readRecord(bridge?.terminal_answer_authority);
+  const presentation = readRecord(bridge?.terminal_presentation);
+  const candidateRef = readString(candidate?.candidate_id);
+  const bridgeCandidateRef = readString(bridge?.provider_terminal_candidate_ref);
+  const authorityRef =
+    readString(authority?.terminal_item_id) ??
+    readString(authority?.terminal_artifact_ref);
+  const presentationRef = readString(presentation?.terminal_authority_ref);
+  const evidenceRequired = bridge?.evidence_reentry_required === true;
+  const normalizedObservationCount = Number(bridge?.normalized_observation_packet_count ?? 0);
+  const selectedObservationRefs = readArray(presentation?.selected_observation_refs)
+    .map(readString)
+    .filter((ref): ref is string => Boolean(ref));
+
+  if (!turnId || !bridge || !reentry || !candidate || !authority || !presentation) return null;
+  if (
+    readString(bridge.schema) !== "helix.provider_terminal_authority_bridge.v1" ||
+    readString(bridge.turn_id) !== turnId ||
+    readString(bridge.terminal_authority_status) !== "authorized_by_helix_provider_candidate_bridge" ||
+    bridge.terminal_authority_granted !== true ||
+    bridge.final_visible_answer_authorized !== true ||
+    bridge.solver_completed !== true ||
+    bridge.goal_satisfaction_compatible !== true ||
+    bridge.all_gateway_calls_succeeded !== true ||
+    bridge.all_capability_lane_observations_succeeded !== true ||
+    bridge.all_observations_succeeded !== true ||
+    bridge.normalized_observations_ready !== true ||
+    readString(reentry.schema) !== "helix.provider_reasoning_reentry.v1" ||
+    readString(reentry.turn_id) !== turnId ||
+    readString(reentry.status) !== "completed" ||
+    reentry.evidence_reentered !== true ||
+    reentry.solver_completed !== true ||
+    reentry.goal_satisfaction_compatible !== true ||
+    readString(candidate.turn_id) !== turnId ||
+    candidate.provider_reasoning_completed !== true ||
+    !candidateRef?.startsWith(`${turnId}:`) ||
+    bridgeCandidateRef !== candidateRef ||
+    readString(authority.turn_id) !== turnId ||
+    readString(authority.terminal_kind) !== "answer" ||
+    readString(authority.terminal_artifact_kind) !== "agent_provider_terminal_candidate" ||
+    readString(authority.final_answer_source) !== "agent_provider_terminal_candidate" ||
+    authority.server_authoritative !== true ||
+    authorityRef !== candidateRef ||
+    readString(presentation.turn_id) !== turnId ||
+    readString(presentation.final_answer_source) !== "agent_provider_terminal_candidate" ||
+    presentationRef !== candidateRef ||
+    (evidenceRequired && (normalizedObservationCount <= 0 || selectedObservationRefs.length === 0))
+  ) {
+    return null;
+  }
+
+  return { candidate, authority, presentation };
+};
+
 const artifactMatchesTerminalSelection = (
   artifact: ArtifactLike,
   selectedTerminalArtifactKind: string,
@@ -3318,9 +3490,19 @@ const authoritativeProviderTerminalCandidate = (
   text: string;
   supportRefs: string[];
   rejectedSupportRefs: string[];
+  providerBridgeVerified: boolean;
 } | null => {
+  const authorizedBridgeProjection = readAuthorizedCurrentTurnProviderCandidateProjection(payload);
+  const materializationPayload = authorizedBridgeProjection
+    ? {
+        ...payload,
+        provider_terminal_candidate: authorizedBridgeProjection.candidate,
+        terminal_answer_authority: authorizedBridgeProjection.authority,
+        terminal_presentation: authorizedBridgeProjection.presentation,
+      }
+    : payload;
   const result = materializeAgentProviderTerminalCandidate({
-    payload,
+    payload: materializationPayload,
     artifacts: artifactLedger,
     routeAllowsTerminalKind: (kind) => routeContractExplicitlyAllowsTerminalKind(payload, kind),
     invalidText: (text) => isStaleWorkspaceFailureText(text) || isHelixGenericTypedFailureText(text),
@@ -3331,6 +3513,7 @@ const authoritativeProviderTerminalCandidate = (
     text: result.text,
     supportRefs: result.supportRefs ?? [],
     rejectedSupportRefs: result.rejectedSupportRefs ?? [],
+    providerBridgeVerified: Boolean(authorizedBridgeProjection),
   };
 };
 
@@ -4932,7 +5115,8 @@ export function applyHelixTerminalAuthoritySingleWriter(
     Boolean(readString(input.payload.fail_reason));
   const initialTypedFailureErrorCode = initialPayloadIsFailure
     ? readString(initialTypedFailure?.error_code) ??
-      readString(input.payload.terminal_error_code)
+      readString(input.payload.terminal_error_code) ??
+      readString(input.payload.fail_reason)
     : null;
   const initialTypedFailureText = initialPayloadIsFailure
     ? readString(initialTypedFailure?.answer_text) ??
@@ -6717,6 +6901,26 @@ export function applyHelixTerminalAuthoritySingleWriter(
       assistant_answer: false,
       raw_content_included: false,
     };
+    if (
+      selectedProviderTerminalCandidate.providerBridgeVerified ||
+      currentTurnProviderBridgeAllowsCanonicalTerminalKind(
+        input.payload,
+        "agent_provider_terminal_candidate",
+      )
+    ) {
+      input.payload.provider_terminal_runtime_authority = {
+        schema: "helix.provider_terminal_runtime_authority.v1",
+        turn_id: input.turnId,
+        provider_terminal_candidate_ref: selectedProviderTerminalCandidate.ref,
+        selected_observation_refs: selectedProviderTerminalCandidate.supportRefs,
+        evidence_reentered: true,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+        server_authoritative: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
     delete input.payload.terminal_error_code;
     delete input.payload.terminal_failure_text;
     delete input.payload.typed_failure;
@@ -7478,9 +7682,17 @@ export function applyHelixTerminalAuthoritySingleWriter(
       isHelixGenericTypedFailureText(selectedTextBeforeModelRuntimeFailure)
     )
   ) {
-    const terminalErrorText =
+    const hasSpecificInitialFailure = Boolean(
+      initialTypedFailureErrorCode && initialTypedFailureErrorCode !== "typed_failure",
+    );
+    const terminalErrorCode = hasSpecificInitialFailure
+      ? initialTypedFailureErrorCode as string
+      : "model_runtime_not_called";
+    const terminalErrorText = hasSpecificInitialFailure && initialTypedFailureText
+      ? initialTypedFailureText
+      :
       "I could not complete this model-only turn because the selected runtime did not produce the required direct answer artifact.";
-    selectedArtifactRef = `${input.turnId}:typed_failure:model_runtime_not_called`;
+    selectedArtifactRef = `${input.turnId}:typed_failure:${terminalErrorCode}`;
     selectedArtifactKind = "typed_failure";
     selectedSource = "typed_failure";
     input.payload.ok = false;
@@ -7489,7 +7701,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     input.payload.status = "final_failure";
     input.payload.terminal_artifact_kind = "typed_failure";
     input.payload.final_answer_source = "typed_failure";
-    input.payload.terminal_error_code = "model_runtime_not_called";
+    input.payload.terminal_error_code = terminalErrorCode;
     input.payload.terminal_failure_text = terminalErrorText;
     input.payload.selected_final_answer = terminalErrorText;
     input.payload.answer = terminalErrorText;
@@ -7498,7 +7710,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     input.payload.typed_failure = {
       ...(readRecord(input.payload.typed_failure) ?? {}),
       schema: "helix.typed_failure.v1",
-      error_code: "model_runtime_not_called",
+      error_code: terminalErrorCode,
       message: terminalErrorText,
       text: terminalErrorText,
       answer_text: terminalErrorText,
@@ -7736,6 +7948,16 @@ export function applyHelixTerminalAuthoritySingleWriter(
     };
   }
   let appliedEnvelope = applyTerminalAnswerEnvelope(input.payload, envelope);
+  if (
+    appliedEnvelope.terminal_artifact_kind === "typed_failure" &&
+    readString(input.payload.terminal_error_code) === "terminal_boundary_ineligible" &&
+    selectedArtifactKind === "agent_provider_terminal_candidate" &&
+    readString(readRecord(input.payload.provider_terminal_runtime_authority)?.schema) ===
+      "helix.provider_terminal_runtime_authority.v1"
+  ) {
+    input.payload.terminal_boundary_rechecked_after_provider_authority_handoff = true;
+    appliedEnvelope = applyTerminalAnswerEnvelope(input.payload, envelope);
+  }
   const appliedTypedFailureErrorCode =
     readString(readRecord(input.payload.typed_failure)?.error_code) ??
     readString(input.payload.terminal_error_code);

@@ -123,10 +123,17 @@ export const transportLimitations = (
   ? [
       "host_browser_transport_is_one_provider_peer_not_room_media_fanout",
       "additional_participants_do_not_receive_provider_audio_until_room_media_bridge",
+      "room_runtime_registry_is_process_local_single_server_only",
     ]
   : active
-    ? ["room_media_bridge_is_transport_only_and_has_no_answer_authority"]
-    : ["room_media_bridge_contract_reserved_not_started"];
+    ? [
+        "room_media_bridge_is_transport_only_and_has_no_answer_authority",
+        "room_runtime_registry_is_process_local_single_server_only",
+      ]
+    : [
+        "room_media_bridge_contract_reserved_not_started",
+        "room_runtime_registry_is_process_local_single_server_only",
+      ];
 
 export const releaseExpiredFloor = (record: RuntimeRecord, nowMs: number): void => {
   if (!record.floor || record.floor.leaseExpiresAtMs > nowMs) return;

@@ -18,7 +18,7 @@ export function listHelixAgentProviders(): HelixAgentRuntimeDescriptor[] {
     id: provider.id,
     label: provider.label,
     enabled: provider.enabled(),
-    experimental: provider.id !== "helix",
+    experimental: provider.id !== "codex",
     permission_profile: provider.permissionProfile,
     ...(provider.runtimeStatus ? { runtime_status: provider.runtimeStatus() } : {}),
     capability_lane_manifest: listHelixCapabilityLanes({ provider }),
@@ -41,9 +41,9 @@ export function resolveHelixAgentProvider(input: {
   const requested = selectHelixAgentRuntime(input);
   const provider = providers.get(requested);
 
-  if (provider?.enabled()) {
+  if (provider) {
     return provider;
   }
 
-  return helixNativeProvider;
+  return codexProvider;
 }

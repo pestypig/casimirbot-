@@ -31,6 +31,7 @@ export type HelixProviderRouteProductEligibility = {
   presentation_shape_valid: boolean;
   authority_ref_current_turn_scoped: boolean;
   usable_text_present: boolean;
+  support_refs_required: boolean;
   requested_support_ref_count: number;
   current_turn_support_ref_count: number;
   rejection_reason: string | null;
@@ -61,6 +62,9 @@ const PROVIDER_AUTHORED_ROUTE_PRODUCT_KINDS = new Set([
   "situation_room_live_job_setup_answer",
 ]);
 
+export const isProviderAuthoredRouteProductKind = (kind: string): boolean =>
+  PROVIDER_AUTHORED_ROUTE_PRODUCT_KINDS.has(kind);
+
 const readRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -73,6 +77,14 @@ const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : 
 
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.filter((value): value is string => Boolean(value))));
+
+const providerTerminalSupportRefsRequired = (
+  providerBridge: Record<string, unknown> | null,
+  candidate: Record<string, unknown> | null,
+): boolean => !(
+  providerBridge?.model_only_direct_answer_allowed === true &&
+  candidate?.evidence_reentry_required === false
+);
 
 const withOutputRole = (
   result: HelixTerminalProductMaterializerResult,
@@ -201,6 +213,7 @@ export const inspectAgentProviderRouteProductEligibility = (input: {
     ...readArray(candidate?.normalized_observation_refs).map(readString),
   ]);
   const currentTurnSupportRefCount = requestedSupportRefs.filter((ref) => currentTurnArtifactRefs.has(ref)).length;
+  const supportRefsRequired = providerTerminalSupportRefsRequired(providerBridge, candidate);
   const rejectionReason =
     !targetKind ? "required_terminal_kind_missing" :
     !providerAuthoredTargetKind ? "required_terminal_kind_not_provider_authored" :
@@ -212,7 +225,7 @@ export const inspectAgentProviderRouteProductEligibility = (input: {
     !presentationShapeValid ? "presentation_shape_invalid" :
     !authorityRefCurrentTurnScoped ? "authority_ref_not_current_turn_scoped" :
     !usableTextPresent ? "authorized_text_missing_or_invalid" :
-    currentTurnSupportRefCount === 0 ? "current_turn_support_refs_missing" :
+    supportRefsRequired && currentTurnSupportRefCount === 0 ? "current_turn_support_refs_missing" :
     null;
   return {
     target_kind: targetKind,
@@ -226,6 +239,7 @@ export const inspectAgentProviderRouteProductEligibility = (input: {
     presentation_shape_valid: presentationShapeValid,
     authority_ref_current_turn_scoped: authorityRefCurrentTurnScoped,
     usable_text_present: usableTextPresent,
+    support_refs_required: supportRefsRequired,
     requested_support_ref_count: requestedSupportRefs.length,
     current_turn_support_ref_count: currentTurnSupportRefCount,
     rejection_reason: rejectionReason,
@@ -754,7 +768,7 @@ export const materializeAgentProviderRouteProductTerminal = (input: {
     ...readArray(candidate?.normalized_observation_refs).map(readString),
   ]);
   const supportRefs = requestedSupportRefs.filter((ref) => currentTurnArtifactRefs.has(ref));
-  if (supportRefs.length === 0) return null;
+  if (providerTerminalSupportRefsRequired(providerBridge, candidate) && supportRefs.length === 0) return null;
 
   const rejectedSupportRefs = requestedSupportRefs.filter((ref) => !currentTurnArtifactRefs.has(ref));
   const artifactRef = `${authorityRef}:route_product:${targetKind}`;

@@ -428,14 +428,14 @@ describe("AGI agent provider route", () => {
 
     expect(response.body).toMatchObject({
       schema: "helix.agent_providers.v1",
-      default_provider: "helix",
-      default_provider_label: "Helix Ask Native",
+      default_provider: "codex",
+      default_provider_label: "Codex Workstation Mode",
     });
     expect(response.body.providers).toContainEqual(
       expect.objectContaining({
         id: "helix",
         enabled: true,
-        experimental: false,
+        experimental: true,
         permission_profile: expect.objectContaining({
           id: "helix-native",
         }),
@@ -445,12 +445,12 @@ describe("AGI agent provider route", () => {
       expect.objectContaining({
         id: "codex",
         enabled: true,
-        experimental: true,
+        experimental: false,
         permission_profile: expect.objectContaining({
-          id: "read-observe",
+          id: "read-observe-act",
           allows: expect.objectContaining({
             read: true,
-            act: false,
+            act: true,
             write: false,
             shell: false,
             codeMutation: false,
@@ -524,6 +524,33 @@ describe("AGI agent provider route", () => {
         permission_profile: expect.objectContaining({
           id: "read-observe",
         }),
+      }),
+    );
+  });
+
+  it("exposes only Codex to user accounts and reports Helix as locked", async () => {
+    const agent = request.agent(createApp());
+    await agent
+      .post("/api/account/session/sign-in")
+      .send({ profile_id: "profile:user-provider-picker", account_type: "user" })
+      .expect(200);
+
+    const response = await agent.get("/api/agi/agent-providers").expect(200);
+
+    expect(response.body).toMatchObject({
+      default_provider: "codex",
+      default_provider_label: "Codex Workstation Mode",
+      account_policy: {
+        account_type: "user",
+        allowed_runtime_agents: ["codex"],
+      },
+    });
+    expect(response.body.providers.map((provider: { id: string }) => provider.id)).toEqual(["codex"]);
+    expect(response.body.locked_providers).toContainEqual(
+      expect.objectContaining({
+        id: "helix",
+        locked: true,
+        locked_reason: "runtime_agent_outside_account_policy",
       }),
     );
   });

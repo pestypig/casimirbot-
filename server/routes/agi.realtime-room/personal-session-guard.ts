@@ -11,6 +11,8 @@ import {
   withRuntimeProjection,
   type SharedRoomRequestAccount,
 } from "./http-context";
+import { acquireSharedRealtimeProfileAdmissionLock } from
+  "../../services/helix-ask/realtime-room/profile-admission-lock";
 
 export const sharedRealtimePersonalSessionGuardRouter = Router();
 
@@ -34,23 +36,32 @@ sharedRealtimePersonalSessionGuardRouter.post(
       throw error;
     }
 
-    const rooms = await listSharedRealtimeRooms({ profileId: account.profileId });
-    const blockedRoom = rooms.find((room) => {
-      const self = room.participants.find((participant) =>
-        participant.participant_id === room.self_participant_id);
-      return self?.role === "participant" && room.status !== "closed";
-    });
+    const release = await acquireSharedRealtimeProfileAdmissionLock(account.profileId);
+    let releaseOnResponse = false;
+    try {
+      const rooms = await listSharedRealtimeRooms({ profileId: account.profileId });
+      const blockedRoom = rooms.find((room) => {
+        const self = room.participants.find((participant) =>
+          participant.participant_id === room.self_participant_id);
+        return self?.role === "participant" && room.status !== "closed";
+      });
 
-    if (!blockedRoom) {
-      next();
-      return;
+      if (!blockedRoom) {
+        releaseOnResponse = true;
+        res.once("finish", release);
+        res.once("close", release);
+        next();
+        return;
+      }
+
+      res.status(409).json(buildHelixSharedRealtimeRoomResponse({
+        ok: false,
+        error: "shared_realtime_room_personal_session_blocked",
+        message: "This account joined a one-model room; use the room session instead of starting a second GPT Live call.",
+        room: withRuntimeProjection(blockedRoom),
+      }));
+    } finally {
+      if (!releaseOnResponse) release();
     }
-
-    res.status(409).json(buildHelixSharedRealtimeRoomResponse({
-      ok: false,
-      error: "shared_realtime_room_personal_session_blocked",
-      message: "This account joined a one-model room; use the room session instead of starting a second GPT Live call.",
-      room: withRuntimeProjection(blockedRoom),
-    }));
   }),
 );

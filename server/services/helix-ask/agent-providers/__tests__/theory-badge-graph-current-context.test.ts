@@ -160,6 +160,34 @@ describe("Theory Badge Graph current-context admission", () => {
     expect(requests[0]).toMatchObject({ capability_id: "theory-badge-graph.current_context" });
   });
 
+  it("admits a natural request to explain the current Theory Badge Graph context", () => {
+    const question = "Show me the current Theory Badge Graph context and explain what is represented.";
+    const intent = arbitrateAskSourceTarget({
+      turnId: "ask:test:theory-natural-current-context",
+      threadId: "thread:test",
+      promptText: question,
+    });
+
+    expect(intent).toMatchObject({
+      target_source: "theory_locator",
+      target_kind: "theory_locator",
+      strength: "hard",
+      precedence_reason: "theory_badge_graph_current_context_source_target",
+    });
+    expect(buildActiveTheoryBadgeGraphContextWorkstationGatewayCallRequests(bodyFor(question))).toEqual([
+      expect.objectContaining({ capability_id: "theory-badge-graph.current_context" }),
+    ]);
+  });
+
+  it.each([
+    "Do not show me the current Theory Badge Graph context or explain what is represented.",
+    "If we continue later, show me the current Theory Badge Graph context.",
+    "Previously you showed me the current Theory Badge Graph context.",
+    'The screen says "Show me the current Theory Badge Graph context."',
+  ])("does not execute a contextual current-graph mention: %s", (question) => {
+    expect(buildActiveTheoryBadgeGraphContextWorkstationGatewayCallRequests(bodyFor(question))).toEqual([]);
+  });
+
   it("arbitrates the deictic selection as a hard Theory source target", () => {
     const intent = arbitrateAskSourceTarget({
       turnId: "ask:test:theory-current-context",

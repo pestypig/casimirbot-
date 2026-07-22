@@ -1,0 +1,49 @@
+{
+  "schema": "helix.ask.user_prompt_corpus.v1",
+  "scenarios": [
+    {
+      "id": "natural_workstation_status",
+      "category": "workspace_status",
+      "prompt": "What is the current workstation status?",
+      "notes": "Natural bounded-state read: the adapter must admit workspace_os.status without widening to web or repository search.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": ["^workspace_os\\.status$"],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": ["workstation|workspace", "status|available|healthy|blocked"],
+      "expected_minimum_answer_chars": 80
+    },
+    {
+      "id": "natural_calculator_evaluation",
+      "category": "calculator",
+      "prompt": "Calculate 2*pi*3 and show the result in the scientific calculator.",
+      "notes": "Natural calculator request: Codex should choose the calculator capability and synthesize from its observation.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": ["^scientific-calculator\\.(?:solve_expression|solve_scalar_expression)$"],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": ["18\\.849|6\\s*pi|6π"],
+      "expected_minimum_answer_chars": 24
+    },
+    {
+      "id": "natural_repo_lookup",
+      "category": "repo_code",
+      "prompt": "Find where the Helix Ask terminal authority is implemented in this codebase and name the most relevant file.",
+      "notes": "Natural repository lookup: use governed repository evidence, re-enter it, then answer with a concrete file.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": ["^(?:repo\\.search|repo-code\\.(?:search_concept|search_text|read_file))$"],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": ["terminal", "server/|server\\\\|\\.ts"],
+      "expected_minimum_answer_chars": 100
+    },
+    {
+      "id": "natural_theory_graph_reflection",
+      "category": "theory_reflection",
+      "prompt": "Reflect the claim that Casimir cavities alter vacuum-mode boundary conditions with the Theory Badge Graph, and separate represented connections from unresolved ones.",
+      "notes": "Natural graph reflection: admit the Theory route, obtain a graph observation, and let Codex synthesize the boundary-aware answer.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": ["^(?:helix_ask\\.reflect_theory_context|theory-badge-graph\\.(?:reflect_discussion_context|current_context))$"],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": ["Casimir|vacuum", "represent|graph|badge", "unresolved|missing|unsupported|boundary"],
+      "expected_minimum_answer_chars": 140
+    }
+  ]
+}

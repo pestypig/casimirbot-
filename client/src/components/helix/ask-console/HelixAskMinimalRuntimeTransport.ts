@@ -1,5 +1,8 @@
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
-import type { HelixLanguageModelProfileId } from "@shared/helix-language-model-policy";
+import type {
+  HelixLanguageModelProfileId,
+  HelixLanguageModelSelectionRequest,
+} from "@shared/helix-language-model-policy";
 import type { HelixRealtimeGroundedFeedbackBindingV1 } from "@shared/contracts/helix-realtime-stage-play.v1";
 import type { HelixAskRouteMetadata } from "@/lib/helix/ask-prompt-launch";
 
@@ -20,6 +23,8 @@ export type HelixAskMinimalRuntimeTurnPayload = {
   agent_runtime: HelixAgentRuntimeId;
   languageModelProfile?: HelixLanguageModelProfileId;
   language_model_profile?: HelixLanguageModelProfileId;
+  languageModelSelection?: HelixLanguageModelSelectionRequest;
+  language_model_selection?: HelixLanguageModelSelectionRequest;
   traceId: string;
   turnId: string;
   maxTokens: number;
@@ -100,6 +105,7 @@ export function buildHelixAskMinimalRuntimeTurnPayload(args: {
     sessionId: args.sessionId,
     agentRuntime: envelope.agent_runtime,
     languageModelProfile: envelope.language_model_profile,
+    languageModelSelection: envelope.language_model_selection,
     traceId: args.traceId,
     turnId: args.turnId,
     maxTokens: args.maxTokens,

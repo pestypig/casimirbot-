@@ -68,6 +68,17 @@ describe("Helix Ask repo concept evidence", () => {
       allow_model_direct_answer: true,
     });
     expect(
+      detectRepoConcept(
+        "In plain language, explain the difference between a scientific hypothesis and a scientific theory without using workstation tools.",
+      ),
+    ).toMatchObject({
+      applies: true,
+      confidence: "low",
+      reason: "generic_concept_without_project_anchor",
+      require_repo_evidence: false,
+      allow_model_direct_answer: true,
+    });
+    expect(
       detectRepoCodeEvidenceIntent(
         "Explain why momentum is conserved in an isolated two-object collision. Do not use workstation tools unless genuinely needed.",
       ),

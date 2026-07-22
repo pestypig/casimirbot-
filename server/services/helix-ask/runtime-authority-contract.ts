@@ -1379,17 +1379,88 @@ const contractAuthorizedNoteReceiptTerminalAllowed = (payload: Record<string, un
 };
 
 const providerTerminalBridgeProvesRuntimeAuthority = (payload: Record<string, unknown>): boolean => {
-  const bridge = readRecord(payload.provider_terminal_authority_bridge);
+  const terminalKind = readString(payload.terminal_artifact_kind);
+  const turnId = readString(payload.turn_id);
+  const singleWriterAuthority = readRecord(payload.provider_terminal_runtime_authority);
+  const singleWriterCandidateRef = readString(singleWriterAuthority?.provider_terminal_candidate_ref);
+  const singleWriterObservationRefs = readArray(singleWriterAuthority?.selected_observation_refs)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+  if (
+    terminalKind === "agent_provider_terminal_candidate" &&
+    turnId &&
+    readString(singleWriterAuthority?.schema) === "helix.provider_terminal_runtime_authority.v1" &&
+    readString(singleWriterAuthority?.turn_id) === turnId &&
+    singleWriterCandidateRef?.startsWith(`${turnId}:`) &&
+    singleWriterAuthority?.evidence_reentered === true &&
+    singleWriterAuthority?.solver_completed === true &&
+    singleWriterAuthority?.goal_satisfaction_compatible === true &&
+    singleWriterAuthority?.server_authoritative === true &&
+    singleWriterObservationRefs.length > 0
+  ) {
+    return true;
+  }
+  const debug = readRecord(payload.debug);
+  const bridge =
+    readRecord(payload.provider_terminal_authority_bridge) ??
+    readRecord(debug?.provider_terminal_authority_bridge);
+  const reentry =
+    readRecord(payload.provider_reasoning_reentry) ??
+    readRecord(debug?.provider_reasoning_reentry);
+  const candidate =
+    readRecord(payload.provider_terminal_candidate) ??
+    readRecord(debug?.provider_terminal_candidate) ??
+    readRecord(bridge?.provider_terminal_candidate);
+  const bridgeAuthority = readRecord(bridge?.terminal_answer_authority);
+  const bridgePresentation = readRecord(bridge?.terminal_presentation);
   const materialization = readRecord(payload.provider_route_product_materialization);
   const qualityGate = readRecord(payload.provider_route_product_quality_gate);
-  const terminalKind = readString(payload.terminal_artifact_kind);
   const materializedKind = readString(materialization?.materialized_terminal_artifact_kind);
+  const candidateRef = readString(candidate?.candidate_id);
+  const bridgeCandidateRef = readString(bridge?.provider_terminal_candidate_ref);
+  const bridgeAuthorityRef =
+    readString(bridgeAuthority?.terminal_item_id) ??
+    readString(bridgeAuthority?.terminal_artifact_ref);
+  const bridgePresentationRef = readString(bridgePresentation?.terminal_authority_ref);
   const successfulObservationRefs = [
     ...readArray(bridge?.successful_gateway_observation_refs),
     ...readArray(bridge?.successful_capability_lane_observation_refs),
   ]
     .map(readString)
     .filter((entry): entry is string => Boolean(entry));
+  const supportRefsSatisfyContract =
+    successfulObservationRefs.length > 0 ||
+    (
+      bridge?.model_only_direct_answer_allowed === true &&
+      bridge?.evidence_reentry_required === false
+    );
+  const directProviderCandidateAuthority = Boolean(
+    turnId &&
+    terminalKind === "agent_provider_terminal_candidate" &&
+    readString(bridge?.turn_id) === turnId &&
+    readString(bridge?.terminal_authority_status) === "authorized_by_helix_provider_candidate_bridge" &&
+    bridge?.all_gateway_calls_succeeded === true &&
+    bridge?.all_capability_lane_observations_succeeded === true &&
+    readString(reentry?.schema) === "helix.provider_reasoning_reentry.v1" &&
+    readString(reentry?.turn_id) === turnId &&
+    readString(reentry?.status) === "completed" &&
+    reentry?.evidence_reentered === true &&
+    reentry?.solver_completed === true &&
+    reentry?.goal_satisfaction_compatible === true &&
+    readString(candidate?.turn_id) === turnId &&
+    candidate?.provider_reasoning_completed === true &&
+    candidateRef?.startsWith(`${turnId}:`) &&
+    bridgeCandidateRef === candidateRef &&
+    readString(bridgeAuthority?.turn_id) === turnId &&
+    readString(bridgeAuthority?.terminal_kind) === "answer" &&
+    readString(bridgeAuthority?.terminal_artifact_kind) === "agent_provider_terminal_candidate" &&
+    readString(bridgeAuthority?.final_answer_source) === "agent_provider_terminal_candidate" &&
+    bridgeAuthority?.server_authoritative === true &&
+    bridgeAuthorityRef === candidateRef &&
+    readString(bridgePresentation?.turn_id) === turnId &&
+    readString(bridgePresentation?.final_answer_source) === "agent_provider_terminal_candidate" &&
+    bridgePresentationRef === candidateRef
+  );
   return Boolean(
     bridge?.schema === "helix.provider_terminal_authority_bridge.v1" &&
     bridge?.solver_completed === true &&
@@ -1398,11 +1469,16 @@ const providerTerminalBridgeProvesRuntimeAuthority = (payload: Record<string, un
     bridge?.final_visible_answer_authorized === true &&
     bridge?.normalized_observations_ready === true &&
     bridge?.all_observations_succeeded === true &&
-    successfulObservationRefs.length > 0 &&
-    materialization?.status === "materialized" &&
-    materializedKind &&
-    materializedKind === terminalKind &&
-    qualityGate?.ok === true
+    supportRefsSatisfyContract &&
+    (
+      directProviderCandidateAuthority ||
+      (
+        materialization?.status === "materialized" &&
+        materializedKind &&
+        materializedKind === terminalKind &&
+        qualityGate?.ok === true
+      )
+    )
   );
 };
 

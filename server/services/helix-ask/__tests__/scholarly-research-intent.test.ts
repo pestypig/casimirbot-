@@ -35,6 +35,19 @@ describe("scholarly research intent", () => {
     });
   });
 
+  it("routes a deictic calculator verification through the calculator stream", () => {
+    expect(arbitrateAskSourceTarget({
+      turnId: "ask:test:deictic-calculator-check",
+      threadId: "thread:test",
+      promptText: "Check that in the calculator.",
+    })).toMatchObject({
+      target_source: "calculator_stream",
+      target_kind: "calculator_stream",
+      strength: "hard",
+      allow_no_tool_direct: false,
+    });
+  });
+
   it("still admits an explicit request to cross-check scholarly literature", () => {
     const intent = detectScholarlyResearchIntent(
       "Cross-check the scholarly literature for primary studies about magnetar giant flares.",

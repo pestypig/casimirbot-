@@ -268,6 +268,105 @@ describe("Helix Ask conversational referent resolution", () => {
     });
   });
 
+  it.each([
+    "What does that paragraph actually establish?",
+    "Explain what this passage means.",
+    "What does the selected section show?",
+  ])("resolves a deictic content-unit follow-up to the previous assistant answer: %s", (question) => {
+    const resolution = resolveHelixAskConversationalReferent(bodyWithPreviousAnswer(question));
+
+    expect(resolution.resolvedText).toBe("Navigation team is ready for the next burn window.");
+    expect(resolution.trace).toMatchObject({
+      referent_detected: true,
+      referent_phrase: "deictic_previous_assistant_answer",
+      source_kind: "chat_history",
+      resolved_source_ref: "chat.final_answer.previous:reply-1",
+      resolution_confidence: "high",
+      context_role: "evidence_for_followup_reasoning",
+    });
+  });
+
+  it.each([
+    "Do not explain what that paragraph establishes.",
+    "Later, explain what that paragraph establishes.",
+    'The screen says "What does that paragraph actually establish?" Explain the wording.',
+  ])("keeps dormant deictic content-unit wording out of referent execution: %s", (question) => {
+    const resolution = resolveHelixAskConversationalReferent(bodyWithPreviousAnswer(question));
+
+    expect(resolution.resolvedText).toBeNull();
+    expect(resolution.trace.referent_detected).toBe(false);
+  });
+
+  it.each([
+    "Do that.",
+    "Yes, please do it.",
+    "Okay, go ahead with that.",
+    "Check that in the calculator.",
+  ])("binds a terse affirmative offer acceptance to the previous assistant answer: %s", (question) => {
+    const resolution = resolveHelixAskConversationalReferent(bodyWithPreviousAnswer(question));
+
+    expect(resolution.resolvedText).toBe("Navigation team is ready for the next burn window.");
+    expect(resolution.trace).toMatchObject({
+      referent_detected: true,
+      referent_phrase: "deictic_previous_assistant_answer",
+      resolution_confidence: "high",
+      selection_policy: "latest_answer",
+    });
+  });
+
+  it("fails closed when a terse affirmative offer acceptance has no retained answer", () => {
+    const resolution = resolveHelixAskConversationalReferent({
+      turn_id: "ask:test:terse-offer-acceptance-missing",
+      question: "Do that.",
+      workspace_context_snapshot: {},
+    });
+
+    expect(resolution.resolvedText).toBeNull();
+    expect(resolution.trace).toMatchObject({
+      referent_detected: true,
+      resolution_confidence: "blocked",
+      resolution_block_reason: "referent_resolution_required:missing_previous_assistant_final_answer",
+    });
+  });
+
+  it.each([
+    "Do not do that.",
+    "Later, do that.",
+    'The screen says "Do that." Explain the wording.',
+  ])("keeps dormant terse offer-acceptance wording out of referent execution: %s", (question) => {
+    const resolution = resolveHelixAskConversationalReferent(bodyWithPreviousAnswer(question));
+
+    expect(resolution.resolvedText).toBeNull();
+    expect(resolution.trace.referent_detected).toBe(false);
+  });
+
+  it.each([
+    "Make it a table.",
+    "Turn that into a bullet list.",
+    "Rewrite this as a one-sentence version.",
+  ])("binds a presentation-only transformation to the previous assistant answer: %s", (question) => {
+    const resolution = resolveHelixAskConversationalReferent(bodyWithPreviousAnswer(question));
+
+    expect(resolution.resolvedText).toBe("Navigation team is ready for the next burn window.");
+    expect(resolution.trace).toMatchObject({
+      referent_detected: true,
+      referent_phrase: "deictic_previous_assistant_answer",
+      resolution_confidence: "high",
+      selection_policy: "latest_answer",
+    });
+  });
+
+  it.each([
+    "Do not make it a table.",
+    "Later, make it a table.",
+    'The UI says "Make it a table." Explain that phrase.',
+  ])("keeps dormant presentation transformations out of referent execution: %s", (question) => {
+    const resolution = resolveHelixAskConversationalReferent(bodyWithPreviousAnswer(question));
+
+    expect(resolution.resolvedText).toBeNull();
+    expect(resolution.trace.referent_detected).toBe(false);
+  });
+
   it("fails closed when a conversational referent has no previous assistant answer", () => {
     const resolution = resolveHelixAskConversationalReferent({
       turn_id: "ask:test:conversational-referent-missing",

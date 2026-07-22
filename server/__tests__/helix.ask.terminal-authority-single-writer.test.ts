@@ -1001,6 +1001,178 @@ describe("Helix terminal authority single writer", () => {
     ]));
   });
 
+  it("preserves a current-turn Docs provider answer while committed-route projection is pending", () => {
+    const turnId = "ask:test:docs-provider-projection-gap";
+    const observationRef = `${turnId}:workstation_gateway:docs.search:1`;
+    const candidateRef = `${turnId}:agent_provider_terminal_candidate:codex:docs`;
+    const answerText = "The terminal-authority document defines one server-owned writer for visible Ask answers.";
+    const artifacts = [{
+      artifact_id: observationRef,
+      kind: "provider_gateway_observation_packet",
+      payload: {
+        schema: "helix.agent_step_observation_packet.v1",
+        turn_id: turnId,
+        capability_key: "docs.search",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    }];
+    const authority = {
+      schema: "helix.turn_terminal_authority.v1",
+      turn_id: turnId,
+      terminal_kind: "answer",
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_item_id: candidateRef,
+      server_authoritative: true,
+    };
+    const presentation = {
+      schema: "helix.terminal_presentation.v1",
+      turn_id: turnId,
+      concise_text: answerText,
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_authority_ref: candidateRef,
+      selected_observation_refs: [observationRef],
+    };
+    const providerCandidate = {
+      schema: "helix.agent_provider_terminal_candidate.v1",
+      turn_id: turnId,
+      candidate_id: candidateRef,
+      candidate_text: answerText,
+      grounded_in_observation_refs: [observationRef],
+      normalized_observation_refs: [observationRef],
+      provider_reasoning_completed: true,
+      terminal_eligible: false,
+    };
+    const makePayload = (): Record<string, unknown> => ({
+      turn_id: turnId,
+      thread_id: "thread:test",
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        turn_id: turnId,
+        goal_kind: "agent_provider_gateway_turn",
+        requested_capability: "docs.search",
+        required_terminal_kind: "model_synthesized_answer",
+        source: "codex_provider_workstation_gateway_projection",
+      },
+      provider_reasoning_reentry: {
+        schema: "helix.provider_reasoning_reentry.v1",
+        turn_id: turnId,
+        status: "completed",
+        normalized_observation_refs: [observationRef],
+        normalized_observation_packet_count: 1,
+        evidence_reentry_required: true,
+        evidence_reentered: true,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+      },
+      provider_terminal_candidate: providerCandidate,
+      provider_terminal_authority_bridge: {
+        schema: "helix.provider_terminal_authority_bridge.v1",
+        turn_id: turnId,
+        provider_terminal_candidate_ref: candidateRef,
+        normalized_observation_refs: [observationRef],
+        normalized_observation_packet_count: 1,
+        all_gateway_calls_succeeded: true,
+        all_capability_lane_observations_succeeded: true,
+        all_observations_succeeded: true,
+        normalized_observations_ready: true,
+        evidence_reentry_required: true,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+        terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+        terminal_authority_granted: true,
+        final_visible_answer_authorized: true,
+        terminal_answer_authority: authority,
+        terminal_presentation: presentation,
+        provider_terminal_candidate: providerCandidate,
+      },
+      terminal_answer_authority: { terminal_kind: "failure", final_answer_source: "typed_failure" },
+      terminal_presentation: { turn_id: turnId, concise_text: "stale failure", terminal_artifact_kind: "typed_failure" },
+      current_turn_artifact_ledger: artifacts,
+    });
+
+    const payload = makePayload();
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result).toMatchObject({
+      selected_terminal_artifact_kind: "model_synthesized_answer",
+      visible_text: answerText,
+    });
+    expect(payload.terminal_error_code).toBeUndefined();
+
+    const staleBridgePayload = makePayload();
+    (staleBridgePayload.provider_terminal_authority_bridge as Record<string, unknown>).turn_id = "ask:test:stale";
+    expect(applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload: staleBridgePayload,
+      artifactLedger: artifacts,
+    }).selected_terminal_artifact_kind).toBe("typed_failure");
+
+    const incompleteReentryPayload = makePayload();
+    (incompleteReentryPayload.provider_reasoning_reentry as Record<string, unknown>).evidence_reentered = false;
+    expect(applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload: incompleteReentryPayload,
+      artifactLedger: artifacts,
+    }).selected_terminal_artifact_kind).toBe("typed_failure");
+
+    const mismatchedGoalPayload = makePayload();
+    (mismatchedGoalPayload.canonical_goal_frame as Record<string, unknown>).required_terminal_kind = "repo_code_evidence_answer";
+    expect(applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload: mismatchedGoalPayload,
+      artifactLedger: artifacts,
+    }).selected_terminal_artifact_kind).toBe("typed_failure");
+
+    const forbiddenRoutePayload = makePayload();
+    forbiddenRoutePayload.committed_ask_route = {
+      schema: "helix.committed_ask_route.v1",
+      turn_id: turnId,
+      route: {
+        selected_route: "/ask/turn",
+        source_target: "docs_viewer",
+        target_kind: "docs_viewer",
+        strength: "hard",
+      },
+      canonical_goal: {
+        required_terminal_kind: "typed_failure",
+        allowed_terminal_artifact_kinds: ["typed_failure"],
+        forbidden_terminal_artifact_kinds: ["model_synthesized_answer"],
+      },
+      capability_policy: {
+        allowed_tool_families: ["docs_viewer"],
+        suppressed_tool_families: [],
+        required_capability_families: ["docs_viewer"],
+        mutating_families_allowed: false,
+      },
+      terminal_product: {
+        terminal_authority_required: true,
+        evidence_reentry_required: true,
+        followup_reasoning_required: true,
+        required_terminal_product: "typed_failure",
+      },
+    };
+    expect(applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload: forbiddenRoutePayload,
+      artifactLedger: artifacts,
+    }).selected_terminal_artifact_kind).toBe("typed_failure");
+  });
+
   it("materializes an authorized scholarly answer after lookup and full-text steps stay within one route family", () => {
     const turnId = "ask:test:scholarly-provider-same-family-pipeline";
     const lookupRef = `${turnId}:workstation_gateway:scholarly-research.lookup_papers:1`;
@@ -1410,6 +1582,156 @@ describe("Helix terminal authority single writer", () => {
       provider_authored_target_kind: true,
       route_allows_target_kind: true,
       rejection_reason: null,
+    });
+  });
+
+  it("materializes an authorized model-only provider candidate without observation support refs", () => {
+    const turnId = "ask:test:model-only-provider-route-product";
+    const providerCandidateRef = `${turnId}:agent_provider_terminal_candidate:codex:model-only`;
+    const answerText = "A hypothesis is a testable proposal; a theory is a broad explanation supported by converging evidence.";
+    const terminalAuthority = {
+      schema: "helix.turn_terminal_authority.v1",
+      thread_id: "thread:test",
+      turn_id: turnId,
+      route: "/ask/turn",
+      terminal_kind: "answer",
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      terminal_item_id: providerCandidateRef,
+      server_authoritative: true,
+    };
+    const terminalPresentation = {
+      schema: "helix.terminal_presentation.v1",
+      turn_id: turnId,
+      concise_text: answerText,
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_authority_ref: providerCandidateRef,
+      selected_observation_refs: [],
+    };
+    const providerTerminalCandidate = {
+      schema: "helix.agent_provider_terminal_candidate.v1",
+      candidate_id: providerCandidateRef,
+      candidate_text: answerText,
+      grounded_in_observation_refs: [],
+      normalized_observation_refs: [],
+      evidence_reentry_required: false,
+      provider_reasoning_completed: true,
+    };
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      active_prompt: "Without using workstation tools, compare a scientific hypothesis with a scientific theory.",
+      source_target_intent: {
+        schema: "helix.ask_source_target_intent.v1",
+        target_source: "model_only",
+        target_kind: "general_background",
+        strength: "hard",
+        allow_no_tool_direct: true,
+      },
+      committed_ask_route: {
+        schema: "helix.committed_ask_route.v1",
+        turn_id: turnId,
+        route: { selected_route: "/ask/turn", source_target: "model_only" },
+        canonical_goal: {
+          goal_kind: "model_only_concept",
+          required_terminal_kind: "direct_answer_text",
+          allowed_terminal_artifact_kinds: ["direct_answer_text", "typed_failure"],
+          forbidden_terminal_artifact_kinds: [],
+        },
+        compatibility: { compatible: true, violations: [] },
+      },
+      canonical_goal_frame: {
+        goal_kind: "model_only_concept",
+        required_terminal_kind: "direct_answer_text",
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "model_only",
+        required_terminal_kind: "direct_answer_text",
+        allowed_terminal_artifact_kinds: ["direct_answer_text", "typed_failure"],
+      },
+      route_evidence_authority: {
+        turn_id: turnId,
+        terminal_product_allowed: true,
+        required_terminal_kind: "direct_answer_text",
+        allowed_terminal_artifact_kinds: ["direct_answer_text", "typed_failure"],
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+        required_terminal_kind: "direct_answer_text",
+      },
+      provider_terminal_candidate: providerTerminalCandidate,
+      provider_reasoning_reentry: {
+        schema: "helix.provider_reasoning_reentry.v1",
+        turn_id: turnId,
+        status: "completed",
+        evidence_reentry_required: false,
+        evidence_reentered: true,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+      },
+      provider_terminal_authority_bridge: {
+        schema: "helix.provider_terminal_authority_bridge.v1",
+        turn_id: turnId,
+        model_only_direct_answer_allowed: true,
+        evidence_reentry_required: false,
+        terminal_authority_granted: true,
+        final_visible_answer_authorized: true,
+        terminal_answer_authority: terminalAuthority,
+        terminal_presentation: terminalPresentation,
+        provider_terminal_candidate: providerTerminalCandidate,
+      },
+      terminal_answer_authority: terminalAuthority,
+      terminal_presentation: terminalPresentation,
+      current_turn_artifact_ledger: [],
+    };
+
+    expect(materializeAgentProviderRouteProductTerminal({
+      payload,
+      artifacts: [],
+      turnId,
+      requiredTerminalKind: "direct_answer_text",
+      routeAllowsTerminalKind: (kind) => kind === "direct_answer_text",
+    })).toMatchObject({
+      kind: "direct_answer_text",
+      text: answerText,
+      supportRefs: [],
+    });
+    expect(inspectAgentProviderRouteProductEligibility({
+      payload,
+      artifacts: [],
+      turnId,
+      requiredTerminalKind: "direct_answer_text",
+      routeAllowsTerminalKind: (kind) => kind === "direct_answer_text",
+    })).toMatchObject({
+      provider_bridge_authorizes_candidate: true,
+      support_refs_required: false,
+      current_turn_support_ref_count: 0,
+      rejection_reason: null,
+    });
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: [],
+    });
+    expect(result).toMatchObject({
+      selected_terminal_artifact_kind: "direct_answer_text",
+      visible_text: answerText,
+    });
+    delete payload.committed_ask_route;
+    expect(buildAskTurnSolverTrace({
+      turnId,
+      promptText: String(payload.active_prompt),
+      selectedRoute: "/ask/turn",
+      terminalArtifactKind: String(payload.terminal_artifact_kind),
+      finalAnswerSource: String(payload.final_answer_source),
+      payload,
+    })).toMatchObject({
+      completed_solver_path: true,
+      terminal_authority_ok: true,
     });
   });
 
@@ -4439,6 +4761,324 @@ describe("Helix terminal authority single writer", () => {
     });
   });
 
+  it("surfaces a same-turn provider candidate authorized after evidence re-entry even when top-level authority is stale", () => {
+    const turnId = "ask:test:authorized-provider-bridge-after-tool";
+    const observation = makePostToolObservation(turnId);
+    const observationRef = String(observation.artifact_id);
+    const candidateRef = `${turnId}:agent_provider_terminal_candidate:codex:repo`;
+    const answerText = "The terminal authority implementation is in server/services/helix-ask/terminal-authority-single-writer.ts.";
+    const artifacts = [observation];
+    const candidate = {
+      schema: "helix.agent_provider_terminal_candidate.v1",
+      candidate_id: candidateRef,
+      turn_id: turnId,
+      candidate_text_preview: answerText,
+      grounded_in_observation_refs: [observationRef],
+      normalized_observation_refs: [observationRef],
+      provider_reasoning_completed: true,
+      terminal_eligible: false,
+    };
+    const bridgeAuthority = {
+      schema: "helix.turn_terminal_authority.v1",
+      thread_id: "thread:test",
+      turn_id: turnId,
+      route: "/ask/turn",
+      terminal_kind: "answer",
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      terminal_item_id: candidateRef,
+      server_authoritative: true,
+      terminal_eligible: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const bridgePresentation = {
+      schema: "helix.terminal_presentation.v1",
+      turn_id: turnId,
+      concise_text: answerText,
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_authority_ref: candidateRef,
+      selected_observation_refs: [observationRef],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      current_turn_artifact_ledger: artifacts,
+      committed_ask_route: {
+        schema: "helix.committed_ask_route.v1",
+        turn_id: turnId,
+        route: {
+          selected_route: "/ask/turn",
+          source_target: "repo_code",
+          target_kind: "repo_code",
+          strength: "hard",
+        },
+        canonical_goal: {
+          goal_kind: "unknown",
+          required_terminal_kind: "unknown",
+          allowed_terminal_artifact_kinds: [],
+          forbidden_terminal_artifact_kinds: [],
+        },
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        required_terminal_artifact_kind: "agent_provider_terminal_candidate",
+        allowed_terminal_artifact_kinds: ["agent_provider_terminal_candidate", "typed_failure"],
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        source: "codex_provider_workstation_gateway_projection",
+        goal_kind: "agent_provider_gateway_turn",
+        requested_capability: "repo.search",
+        required_terminal_kind: "agent_provider_terminal_candidate",
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        turn_id: turnId,
+        terminal_kind: "failure",
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+        server_authoritative: true,
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        turn_id: turnId,
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+        concise_text: "A tool observation required a follow-up model answer step.",
+      },
+      provider_reasoning_reentry: {
+        schema: "helix.provider_reasoning_reentry.v1",
+        turn_id: turnId,
+        status: "completed",
+        evidence_reentered: true,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+      },
+      provider_terminal_candidate: candidate,
+      provider_terminal_authority_bridge: {
+        schema: "helix.provider_terminal_authority_bridge.v1",
+        turn_id: turnId,
+        terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+        provider_terminal_candidate_ref: candidateRef,
+        provider_terminal_candidate: candidate,
+        evidence_reentry_required: true,
+        normalized_observation_packet_count: 1,
+        normalized_observations_ready: true,
+        all_gateway_calls_succeeded: true,
+        all_capability_lane_observations_succeeded: true,
+        all_observations_succeeded: true,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+        terminal_authority_granted: true,
+        final_visible_answer_authorized: true,
+        terminal_answer_authority: bridgeAuthority,
+        terminal_presentation: bridgePresentation,
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("agent_provider_terminal_candidate");
+    expect(result.source).toBe("agent_provider_terminal_candidate");
+    expect(result.visible_text).toBe(answerText);
+    expect(payload.terminal_error_code).toBeUndefined();
+    expect(payload.final_status).toBe("final_answer");
+    expect(payload.selected_final_answer).toBe(answerText);
+    expect(payload.provider_terminal_runtime_authority).toMatchObject({
+      schema: "helix.provider_terminal_runtime_authority.v1",
+      turn_id: turnId,
+      provider_terminal_candidate_ref: candidateRef,
+      selected_observation_refs: [observationRef],
+      evidence_reentered: true,
+      solver_completed: true,
+      goal_satisfaction_compatible: true,
+      server_authoritative: true,
+    });
+  });
+
+  it("surfaces an authorized provider answer after a capability-lane observation product is re-entered", () => {
+    const turnId = "ask:test:authorized-provider-bridge-after-capability-lane";
+    const observation = makePostToolObservation(turnId);
+    const observationRef = String(observation.artifact_id);
+    const candidateRef = `${turnId}:agent_provider_terminal_candidate:codex:visual`;
+    const answerText = "The requested discussion is on page 3; the rendered page is ready in Image Lens.";
+    const candidate = {
+      schema: "helix.agent_provider_terminal_candidate.v1",
+      candidate_id: candidateRef,
+      turn_id: turnId,
+      candidate_text_preview: answerText,
+      grounded_in_observation_refs: [observationRef],
+      normalized_observation_refs: [observationRef],
+      provider_reasoning_completed: true,
+      terminal_eligible: false,
+    };
+    const bridgeAuthority = {
+      schema: "helix.turn_terminal_authority.v1",
+      turn_id: turnId,
+      terminal_kind: "answer",
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_item_id: candidateRef,
+      server_authoritative: true,
+    };
+    const bridgePresentation = {
+      schema: "helix.terminal_presentation.v1",
+      turn_id: turnId,
+      concise_text: answerText,
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_authority_ref: candidateRef,
+      selected_observation_refs: [observationRef],
+    };
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      current_turn_artifact_ledger: [observation],
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        required_terminal_artifact_kind: "image_lens_observation_report",
+        required_terminal_kind: "image_lens_observation_report",
+        allowed_terminal_artifact_kinds: ["image_lens_observation_report", "typed_failure"],
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        turn_id: turnId,
+        source: "codex_provider_capability_lane_terminal_authority",
+        goal_kind: "image_lens_region_inspection",
+        requested_capability: "visual_analysis.inspect_image_region",
+        required_terminal_kind: "image_lens_observation_report",
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        turn_id: turnId,
+        terminal_kind: "failure",
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+        server_authoritative: true,
+      },
+      provider_reasoning_reentry: {
+        schema: "helix.provider_reasoning_reentry.v1",
+        turn_id: turnId,
+        status: "completed",
+        evidence_reentered: true,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+      },
+      provider_terminal_candidate: candidate,
+      provider_terminal_authority_bridge: {
+        schema: "helix.provider_terminal_authority_bridge.v1",
+        turn_id: turnId,
+        terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+        provider_terminal_candidate_ref: candidateRef,
+        provider_terminal_candidate: candidate,
+        evidence_reentry_required: true,
+        normalized_observation_packet_count: 1,
+        normalized_observations_ready: true,
+        all_gateway_calls_succeeded: true,
+        all_capability_lane_observations_succeeded: true,
+        all_observations_succeeded: true,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+        terminal_authority_granted: true,
+        final_visible_answer_authorized: true,
+        terminal_answer_authority: bridgeAuthority,
+        terminal_presentation: bridgePresentation,
+      },
+      terminal_candidate_rejections: [{ artifactKind: "normal_answer", reason: "missing_evidence_reentry" }],
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: [observation],
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("agent_provider_terminal_candidate");
+    expect(result.source).toBe("agent_provider_terminal_candidate");
+    expect(result.visible_text).toBe(answerText);
+    expect(payload.terminal_error_code).toBeUndefined();
+    expect(payload.final_status).toBe("final_answer");
+  });
+
+  it("does not surface a capability-lane provider answer before evidence re-entry completes", () => {
+    const turnId = "ask:test:blocked-provider-bridge-before-capability-lane-reentry";
+    const observation = makePostToolObservation(turnId);
+    const observationRef = String(observation.artifact_id);
+    const candidateRef = `${turnId}:agent_provider_terminal_candidate:codex:visual`;
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      current_turn_artifact_ledger: [observation],
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        required_terminal_kind: "image_lens_observation_report",
+        allowed_terminal_artifact_kinds: ["image_lens_observation_report", "typed_failure"],
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        turn_id: turnId,
+        source: "codex_provider_capability_lane_terminal_authority",
+        goal_kind: "image_lens_region_inspection",
+        requested_capability: "visual_analysis.inspect_image_region",
+        required_terminal_kind: "image_lens_observation_report",
+      },
+      provider_reasoning_reentry: {
+        schema: "helix.provider_reasoning_reentry.v1",
+        turn_id: turnId,
+        status: "pending",
+        evidence_reentered: false,
+        solver_completed: false,
+        goal_satisfaction_compatible: false,
+      },
+      provider_terminal_candidate: {
+        schema: "helix.agent_provider_terminal_candidate.v1",
+        candidate_id: candidateRef,
+        turn_id: turnId,
+        candidate_text_preview: "Unsupported early answer.",
+        grounded_in_observation_refs: [observationRef],
+        normalized_observation_refs: [observationRef],
+        provider_reasoning_completed: false,
+        terminal_eligible: false,
+      },
+      provider_terminal_authority_bridge: {
+        schema: "helix.provider_terminal_authority_bridge.v1",
+        turn_id: turnId,
+        terminal_authority_status: "blocked_by_observation_state",
+        provider_terminal_candidate_ref: candidateRef,
+        evidence_reentry_required: true,
+        normalized_observation_packet_count: 0,
+        normalized_observations_ready: false,
+        all_gateway_calls_succeeded: true,
+        all_capability_lane_observations_succeeded: true,
+        all_observations_succeeded: true,
+        solver_completed: false,
+        goal_satisfaction_compatible: false,
+        terminal_authority_granted: false,
+        final_visible_answer_authorized: false,
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: [observation],
+    });
+
+    expect(result.selected_terminal_artifact_kind).not.toBe("agent_provider_terminal_candidate");
+    expect(payload.final_answer_source).not.toBe("agent_provider_terminal_candidate");
+  });
+
   it("preserves a grounded provider observation blocker as a specific typed failure", () => {
     const turnId = "ask:test:grounded-provider-observation-blocker";
     const observation = makePostToolObservation(turnId);
@@ -5611,17 +6251,25 @@ describe("Helix terminal authority single writer", () => {
       active_prompt: "Check workspace status, reflect through the Moral Graph, and synthesize what both observations support.",
       route_product_contract: {
         schema: "helix.route_product_contract.v1",
-        source_target: "runtime_evidence",
-        required_terminal_kind: "compound_evidence_synthesis_answer",
-        allowed_terminal_artifact_kinds: [
-          "compound_evidence_synthesis_answer",
-          "model_synthesized_answer",
-          "typed_failure",
-        ],
+        source_target: "visual_capture",
+        required_terminal_kind: "image_lens_observation_report",
+        allowed_terminal_artifact_kinds: ["image_lens_observation_report", "typed_failure"],
+      },
+      route_evidence_authority: {
+        schema: "helix.route_evidence_authority.v1",
+        turn_id: turnId,
+        terminal_product_allowed: true,
+        required_terminal_kind: "image_lens_observation_report",
+        allowed_terminal_artifact_kinds: ["image_lens_observation_report", "typed_failure"],
+        forbidden_terminal_artifact_kinds: [],
       },
       canonical_goal_frame: {
-        goal_kind: "compound_tool",
-        required_terminal_kind: "compound_evidence_synthesis_answer",
+        schema: "helix.canonical_goal_frame.v1",
+        turn_id: turnId,
+        source: "codex_provider_capability_lane_terminal_authority",
+        goal_kind: "image_lens_region_inspection",
+        requested_capability: "visual_analysis.inspect_image_region",
+        required_terminal_kind: "image_lens_observation_report",
       },
       compound_capability_contract: {
         schema: "helix.compound_capability_contract.v1",

@@ -1,15 +1,23 @@
 import React from "react";
-import type { HelixLanguageModelProfileId } from "@shared/helix-language-model-policy";
+import type {
+  HelixLanguageModelProfileId,
+  HelixPinnedLanguageModelId,
+} from "@shared/helix-language-model-policy";
+
+export type HelixAskLanguageModelPickerSelection =
+  | { kind: "profile"; profile: HelixLanguageModelProfileId }
+  | { kind: "pinned"; model: HelixPinnedLanguageModelId };
 
 export type HelixAskLanguageModelPickerProps = {
   model: HelixAskLanguageModelPickerModel;
   menuOpen: boolean;
   onPrimaryClick: () => void;
-  onSelect: (value: HelixLanguageModelProfileId) => void;
+  onSelect: (value: HelixAskLanguageModelPickerSelection) => void;
 };
 
 export type HelixAskLanguageModelPickerItem = {
-  id: HelixLanguageModelProfileId;
+  id: string;
+  selection: HelixAskLanguageModelPickerSelection;
   label: string;
   shortLabel: string;
   description: string;
@@ -18,47 +26,65 @@ export type HelixAskLanguageModelPickerItem = {
 
 export type HelixAskLanguageModelPickerModel = {
   selectedProfile: HelixLanguageModelProfileId;
+  selectedPinnedModel: HelixPinnedLanguageModelId | null;
   selectedLabel: string;
   items: HelixAskLanguageModelPickerItem[];
 };
 
 const LANGUAGE_MODEL_PROFILE_ITEMS: Array<Omit<HelixAskLanguageModelPickerItem, "selected">> = [
   {
-    id: "auto",
+    id: "profile:auto",
+    selection: { kind: "profile", profile: "auto" },
     label: "Auto",
     shortLabel: "AI Auto",
     description: "Let policy choose per turn",
   },
   {
-    id: "fast",
+    id: "profile:fast",
+    selection: { kind: "profile", profile: "fast" },
     label: "Fast",
     shortLabel: "AI Fast",
     description: "Lower latency",
   },
   {
-    id: "balanced",
+    id: "profile:balanced",
+    selection: { kind: "profile", profile: "balanced" },
     label: "Balanced",
     shortLabel: "AI Bal",
     description: "General purpose",
   },
   {
-    id: "deep",
+    id: "profile:deep",
+    selection: { kind: "profile", profile: "deep" },
     label: "Deep",
     shortLabel: "AI Deep",
     description: "Higher reasoning",
   },
+  {
+    id: "pinned:gpt-5.4-mini",
+    selection: { kind: "pinned", model: "gpt-5.4-mini" },
+    label: "GPT-5.4 mini",
+    shortLabel: "AI 5.4 mini",
+    description: "Lowest-cost supported Codex model",
+  },
 ];
 
 export function buildHelixAskLanguageModelPickerModel(
-  selectedProfile: HelixLanguageModelProfileId,
+  args: {
+    selectedProfile: HelixLanguageModelProfileId;
+    selectedPinnedModel: HelixPinnedLanguageModelId | null;
+  },
 ): HelixAskLanguageModelPickerModel {
   const items = LANGUAGE_MODEL_PROFILE_ITEMS.map((item) => ({
     ...item,
-    selected: item.id === selectedProfile,
+    selected: item.selection.kind === "pinned"
+      ? item.selection.model === args.selectedPinnedModel
+      : args.selectedPinnedModel === null && item.selection.profile === args.selectedProfile,
   }));
   const selected = items.find((item) => item.selected) ?? items[0];
   return {
-    selectedProfile: selected.id,
+    selectedProfile: args.selectedProfile,
+    selectedPinnedModel: args.selectedPinnedModel,
     selectedLabel: selected.shortLabel,
     items,
   };
@@ -106,7 +132,7 @@ export function HelixAskLanguageModelPicker({
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                onSelect(item.id);
+                onSelect(item.selection);
               }}
             >
               <span>
@@ -117,7 +143,9 @@ export function HelixAskLanguageModelPicker({
                   {item.description}
                 </span>
               </span>
-              <span className="text-[9px] uppercase tracking-[0.14em] text-slate-400">ai</span>
+              <span className="text-[9px] uppercase tracking-[0.14em] text-slate-400">
+                {item.selection.kind === "pinned" ? "pin" : "ai"}
+              </span>
             </button>
           ))}
         </div>

@@ -24,7 +24,10 @@ import {
   type GoalRuntimeSessionResult,
 } from "../services/helix-ask/agent-providers/goal-runtime-session";
 import { buildRuntimeGoalDebugSummary } from "../services/helix-ask/runtime-goal-debug-summary";
-import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
+import {
+  DEFAULT_HELIX_AGENT_RUNTIME_ID,
+  type HelixAgentRuntimeId,
+} from "@shared/helix-agent-runtime";
 import type {
   HelixRuntimeGoalReportPolicy,
   HelixRuntimeGoalSessionStatus,
@@ -56,7 +59,9 @@ const readBodyRecord = (value: unknown): Record<string, unknown> =>
     : {};
 
 const readRuntimeId = (value: unknown): HelixAgentRuntimeId =>
-  readString(value) === "codex" || readString(value) === "future" ? (readString(value) as HelixAgentRuntimeId) : "helix";
+  readString(value) === "helix" || readString(value) === "codex" || readString(value) === "future"
+    ? (readString(value) as HelixAgentRuntimeId)
+    : DEFAULT_HELIX_AGENT_RUNTIME_ID;
 
 const runtimeGoalDebugSummaryFor = (result: GoalRuntimeSessionResult) =>
   buildRuntimeGoalDebugSummary(result.session, result.debug_export);

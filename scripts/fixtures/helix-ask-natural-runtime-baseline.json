@@ -1,0 +1,56 @@
+{
+  "schema": "helix.ask.user_prompt_corpus.v1",
+  "scenarios": [
+    {
+      "id": "natural_model_only_reasoning",
+      "category": "negated_context",
+      "prompt": "In plain language, explain the difference between a scientific hypothesis and a scientific theory without using workstation tools.",
+      "notes": "Control case: Codex should answer directly with no tool observation.",
+      "expected_tool_mode": "none",
+      "expected_minimum_observations": 0,
+      "expected_maximum_observations": 0,
+      "expected_terminal_kinds": ["direct_answer_text"],
+      "expected_answer_patterns": ["hypothes", "theor", "evidence|support"],
+      "expected_minimum_answer_chars": 160
+    },
+    {
+      "id": "natural_compound_model_only_reasoning",
+      "category": "compound",
+      "prompt": "Without using workstation tools, compare a scientific hypothesis with a scientific theory, then explain why repeated support does not turn a theory into a fact. Give two distinctions and one concrete example.",
+      "notes": "Compound reasoning control: Codex must satisfy several reasoning clauses without inventing a tool requirement.",
+      "expected_tool_mode": "none",
+      "expected_minimum_observations": 0,
+      "expected_maximum_observations": 0,
+      "expected_terminal_kinds": ["direct_answer_text"],
+      "expected_answer_patterns": ["hypothes", "theor", "fact", "evidence|support", "example"],
+      "expected_minimum_answer_chars": 280
+    },
+    {
+      "id": "natural_local_docs_lookup",
+      "category": "docs",
+      "prompt": "Find the local document about Helix Ask terminal authority and tell me which document you used.",
+      "notes": "Natural single-tool case: infer local Docs Viewer search without an internal capability name.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": ["^(?:docs\\.search|docs-viewer\\.(?:search_docs|locate_in_doc|open_doc_by_path|summarize_doc))$"],
+      "expected_minimum_observations": 1
+    },
+    {
+      "id": "natural_named_doc_explanation",
+      "category": "docs",
+      "prompt": "Ok we have a doc called \"Casimir Dp Quantum Foam Study\" what this about?",
+      "notes": "Regression from a real user turn: named-document lookup must not be classified as model-only.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": ["^(?:docs\\.search|docs-viewer\\.(?:search_docs|open_doc_by_path|summarize_doc))$"],
+      "expected_minimum_observations": 1
+    },
+    {
+      "id": "natural_named_doc_lookup_and_summary",
+      "category": "compound",
+      "prompt": "Find the document called \"Casimir Dp Quantum Foam Study\", read the best matching result, and explain what it is about in a short paragraph.",
+      "notes": "Natural compound case: search, select/read, observation re-entry, then synthesis.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": ["^(?:docs\\.search|docs-viewer\\.(?:search_docs|open_doc_by_path|summarize_doc))$"],
+      "expected_minimum_observations": 2
+    }
+  ]
+}

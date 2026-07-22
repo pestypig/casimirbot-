@@ -1903,6 +1903,208 @@ describe("helix ask runtime authority contract", () => {
     expect(report.blocking_reasons).toEqual([]);
   });
 
+  it("accepts an authorized model-only provider product without observation refs", () => {
+    const turnId = "turn-provider-model-only-authority";
+    const report = evaluateTerminalBoundaryEligibility({
+      turn_id: turnId,
+      canonical_goal_frame: {
+        turn_id: turnId,
+        goal_kind: "model_only_concept",
+        required_terminal_kind: "direct_answer_text",
+      },
+      route_product_contract: {
+        source_target: "model_only",
+        required_terminal_kind: "direct_answer_text",
+        allowed_terminal_artifact_kinds: ["direct_answer_text", "typed_failure"],
+      },
+      terminal_artifact_kind: "direct_answer_text",
+      final_answer_source: "direct_answer_text",
+      selected_final_answer: "A hypothesis is testable; a theory is a broad evidence-backed explanation.",
+      direct_answer_text: {
+        schema: "helix.direct_answer_text.v1",
+        text: "A hypothesis is testable; a theory is a broad evidence-backed explanation.",
+      },
+      provider_terminal_authority_bridge: {
+        schema: "helix.provider_terminal_authority_bridge.v1",
+        turn_id: turnId,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+        terminal_authority_granted: true,
+        final_visible_answer_authorized: true,
+        normalized_observations_ready: true,
+        all_observations_succeeded: true,
+        model_only_direct_answer_allowed: true,
+        evidence_reentry_required: false,
+        successful_gateway_observation_refs: [],
+        successful_capability_lane_observation_refs: [],
+      },
+      provider_route_product_materialization: {
+        schema: "helix.provider_route_product_materialization.v1",
+        turn_id: turnId,
+        status: "materialized",
+        materialized_terminal_artifact_kind: "direct_answer_text",
+        materialized_terminal_artifact_ref: `${turnId}:direct-answer`,
+        selected_observation_refs: [],
+      },
+      provider_route_product_quality_gate: {
+        schema: "helix.final_answer_draft_quality_gate.v1",
+        turn_id: turnId,
+        ok: true,
+        violations: [],
+      },
+    });
+
+    expect(report.checks).toMatchObject({
+      agent_runtime_loop: true,
+      agent_step_decision: true,
+      post_observation_model_decision: true,
+      goal_satisfaction_allows_terminal: true,
+    });
+    expect(report.blocking_reasons).toEqual([]);
+    expect(report.eligible).toBe(true);
+  });
+
+  it("accepts a directly authorized provider candidate after current-turn evidence re-entry", () => {
+    const turnId = "turn-provider-candidate-authority";
+    const observationRef = `${turnId}:workstation_gateway:repo.search:1`;
+    const candidateRef = `${turnId}:agent_provider_terminal_candidate:codex:repo`;
+    const candidate = {
+      schema: "helix.agent_provider_terminal_candidate.v1",
+      turn_id: turnId,
+      candidate_id: candidateRef,
+      candidate_text_preview: "The terminal authority implementation is in server/services/helix-ask/terminal-authority-single-writer.ts.",
+      grounded_in_observation_refs: [observationRef],
+      provider_reasoning_completed: true,
+      terminal_eligible: false,
+    };
+    const report = evaluateTerminalBoundaryEligibility({
+      turn_id: turnId,
+      committed_ask_route: {
+        schema: "helix.committed_ask_route.v1",
+        turn_id: turnId,
+        route: {
+          selected_route: "/ask/turn",
+          source_target: "repo_code",
+          target_kind: "repo_code",
+          strength: "hard",
+        },
+        capability_policy: {
+          allowed_tool_families: ["repo_code"],
+        },
+        canonical_goal: {
+          goal_kind: "unknown",
+          required_terminal_kind: "unknown",
+          allowed_terminal_artifact_kinds: [],
+          forbidden_terminal_artifact_kinds: [],
+        },
+      },
+      canonical_goal_frame: {
+        turn_id: turnId,
+        source: "codex_provider_workstation_gateway_projection",
+        goal_kind: "agent_provider_gateway_turn",
+        requested_capability: "repo.search",
+        required_terminal_kind: "agent_provider_terminal_candidate",
+      },
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      final_answer_source: "agent_provider_terminal_candidate",
+      selected_final_answer: candidate.candidate_text_preview,
+      debug: {
+        provider_terminal_candidate: candidate,
+        provider_reasoning_reentry: {
+          schema: "helix.provider_reasoning_reentry.v1",
+          turn_id: turnId,
+          status: "completed",
+          evidence_reentered: true,
+          solver_completed: true,
+          goal_satisfaction_compatible: true,
+        },
+        provider_terminal_authority_bridge: {
+          schema: "helix.provider_terminal_authority_bridge.v1",
+          turn_id: turnId,
+          terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+          provider_terminal_candidate_ref: candidateRef,
+          provider_terminal_candidate: candidate,
+          evidence_reentry_required: true,
+          normalized_observations_ready: true,
+          all_gateway_calls_succeeded: true,
+          all_capability_lane_observations_succeeded: true,
+          all_observations_succeeded: true,
+          solver_completed: true,
+          goal_satisfaction_compatible: true,
+          terminal_authority_granted: true,
+          final_visible_answer_authorized: true,
+          successful_gateway_observation_refs: [observationRef],
+          terminal_answer_authority: {
+            turn_id: turnId,
+            terminal_kind: "answer",
+            terminal_artifact_kind: "agent_provider_terminal_candidate",
+            final_answer_source: "agent_provider_terminal_candidate",
+            terminal_item_id: candidateRef,
+            server_authoritative: true,
+          },
+          terminal_presentation: {
+            turn_id: turnId,
+            final_answer_source: "agent_provider_terminal_candidate",
+            terminal_authority_ref: candidateRef,
+            selected_observation_refs: [observationRef],
+          },
+        },
+      },
+    });
+
+    expect(report.checks).toMatchObject({
+      agent_runtime_loop: true,
+      agent_step_decision: true,
+      selected_capability_observation: true,
+      post_observation_model_decision: true,
+      goal_satisfaction_allows_terminal: true,
+    });
+    expect(report.blocking_reasons).toEqual([]);
+    expect(report.eligible).toBe(true);
+  });
+
+  it("accepts the single-writer provider runtime authority handoff without reconstructing another loop", () => {
+    const turnId = "turn-provider-single-writer-authority";
+    const candidateRef = `${turnId}:agent_provider_terminal_candidate:codex:repo`;
+    const observationRef = `${turnId}:workstation_gateway:repo.search:1`;
+    const report = evaluateTerminalBoundaryEligibility({
+      turn_id: turnId,
+      source_target_intent: {
+        target_source: "repo_code",
+        strength: "hard",
+      },
+      canonical_goal_frame: {
+        turn_id: turnId,
+        goal_kind: "agent_provider_gateway_turn",
+        requested_capability: "repo.search",
+        required_terminal_kind: "agent_provider_terminal_candidate",
+      },
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      final_answer_source: "agent_provider_terminal_candidate",
+      selected_final_answer: "The terminal authority implementation is in terminal-authority-single-writer.ts.",
+      provider_terminal_runtime_authority: {
+        schema: "helix.provider_terminal_runtime_authority.v1",
+        turn_id: turnId,
+        provider_terminal_candidate_ref: candidateRef,
+        selected_observation_refs: [observationRef],
+        evidence_reentered: true,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+        server_authoritative: true,
+      },
+    });
+
+    expect(report.checks).toMatchObject({
+      agent_runtime_loop: true,
+      agent_step_decision: true,
+      selected_capability_observation: true,
+      post_observation_model_decision: true,
+      goal_satisfaction_allows_terminal: true,
+    });
+    expect(report.blocking_reasons).toEqual([]);
+    expect(report.eligible).toBe(true);
+  });
+
   it("blocks typed failures that do not carry a failure code", () => {
     const report = evaluateTerminalBoundaryEligibility({
       canonical_goal_frame: { goal_kind: "visual_capture_describe" },

@@ -353,7 +353,22 @@ const conversationalReferentPhrase = (prompt: string): string | null => {
   }
   if (
     /\bbased\s+on\s+(?:that|those|this|the\s+(?:previous|last|prior)\s+(?:answer|response|reply|explanation|statement|summary))\b/i.test(unquoted) ||
-    /\b(?:can|could|would)\s+you\s+(?:do|apply|explain|continue|expand\s+on|clarify)\s+that\b/i.test(unquoted)
+    /\b(?:can|could|would)\s+you\s+(?:do|apply|explain|continue|expand\s+on|clarify)\s+that\b/i.test(unquoted) ||
+    /^\s*(?:(?:yes|okay|ok)[,.!]?\s*)?(?:please\s+)?(?:do|apply|continue\s+with|proceed\s+with|go\s+ahead\s+with)\s+(?:that|it)\s*[.!?]*\s*$/i.test(unquoted) ||
+    /^\s*(?:please\s+)?(?:check|verify|run|evaluate|calculate)\s+(?:that|it)\s+(?:in|with|through)\s+(?:the\s+)?(?:scientific\s+)?calculator\s*[.!?]*\s*$/i.test(unquoted) ||
+    /^\s*(?:please\s+)?(?:make|turn|format|put|rewrite|convert)\s+(?:that|it|this)\s+(?:(?:(?:in)?to|as)\s+)?(?:a\s+)?(?:table|chart|list|bullet(?:ed)?\s+list|summary|one[-\s]+sentence(?:\s+version)?|claim[-\s]+evidence\s+table)\s*[.!?]*\s*$/i.test(unquoted)
+  ) {
+    return "deictic_previous_assistant_answer";
+  }
+  if (
+    /\b(?:do\s+not|don't|dont|without|avoid|ignore|disregard)\b[\s\S]{0,100}\b(?:this|that|the|same|selected)\s+(?:paragraph|passage|section|excerpt|quote|finding|result|claim|argument|point)\b/i.test(unquoted) ||
+    /^\s*(?:later|eventually|next\s+time|in\s+the\s+future)\b[\s\S]{0,140}\b(?:this|that|the|same|selected)\s+(?:paragraph|passage|section|excerpt|quote|finding|result|claim|argument|point)\b/i.test(unquoted)
+  ) {
+    return null;
+  }
+  if (
+    /\b(?:what\s+does|what\s+did|explain|clarify|summari[sz]e|interpret|expand\s+on)\s+(?:this|that|the|same|selected)\s+(?:paragraph|passage|section|excerpt|quote|finding|result|claim|argument|point)\b/i.test(unquoted) ||
+    /\b(?:this|that|the|same|selected)\s+(?:paragraph|passage|section|excerpt|quote|finding|result|claim|argument|point)\b[\s\S]{0,100}\b(?:mean|means|establish|establishes|show|shows|demonstrate|demonstrates|imply|implies|support|supports|argue|argues|say|says)\b/i.test(unquoted)
   ) {
     return "deictic_previous_assistant_answer";
   }

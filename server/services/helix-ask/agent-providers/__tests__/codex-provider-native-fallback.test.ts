@@ -201,4 +201,137 @@ describe("Codex native compatibility fallback", () => {
       ],
     });
   });
+
+  it("recovers a governed observation when the native process succeeds without executing the hard route", async () => {
+    nativeBridgeMock.run.mockResolvedValueOnce({
+      attempted: true,
+      eligible: true,
+      fallbackRequired: false,
+      fallbackReason: null,
+      result: {
+        ok: true,
+        answer: "The local document is probably the terminal authority contract.",
+        failReason: null,
+        native: null,
+        gatewayCallResults: [],
+        debug: {
+          route_proposal: null,
+          route_unobserved_tools: [],
+        },
+      },
+      gatewayCallResults: [],
+      debug: {
+        schema: "helix.codex_native_provider_bridge.v1",
+        enabled: true,
+        eligible: true,
+        attempted: true,
+        status: "completed",
+        native_transport: "codex_app_server",
+        compatibility_transport: "codex_exec",
+        fallback_required: false,
+        fallback_reason: null,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:native-success-missing-doc-observation",
+        agent_runtime: "codex",
+        question: "Find the local document about Helix Ask terminal authority and tell me which document you used.",
+      },
+      headers: {},
+    });
+
+    expect(result.ok).toBe(true);
+    const debug = result.debug as Record<string, any>;
+    expect(debug.workstation_gateway_call_results.map(
+      (entry: Record<string, unknown>) => entry.capability_id,
+    )).toEqual(["docs.search"]);
+    expect(debug.codex_native_compatibility_fallback).toMatchObject({
+      activated: true,
+      native_attempted: true,
+      planned_gateway_recovery_capability_ids: ["docs.search"],
+      gateway_recovery_attempted: true,
+      gateway_recovery_result_count: 1,
+      gateway_recovery_capability_ids: ["docs.search"],
+    });
+    expect(result.text).toBe(process.env.CODEX_AGENT_FAKE_STDOUT);
+  });
+
+  it("quarantines a native observation outside the committed source route and recovers the admitted tool", async () => {
+    const turnId = "ask:test:native-route-violation-recovery";
+    const repoResult = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: "repo.search",
+      arguments: { query: "Helix Ask terminal authority" },
+      turnId,
+      iteration: 1,
+      accountType: "user",
+    });
+    expect(repoResult.ok).toBe(true);
+    nativeBridgeMock.run.mockResolvedValueOnce({
+      attempted: true,
+      eligible: true,
+      fallbackRequired: false,
+      fallbackReason: null,
+      result: {
+        ok: true,
+        answer: "I used repository search.",
+        failReason: null,
+        native: null,
+        gatewayCallResults: [repoResult],
+        debug: {
+          route_proposal: null,
+          route_unobserved_tools: [],
+        },
+      },
+      gatewayCallResults: [repoResult],
+      debug: {
+        schema: "helix.codex_native_provider_bridge.v1",
+        enabled: true,
+        eligible: true,
+        attempted: true,
+        status: "completed",
+        native_transport: "codex_app_server",
+        compatibility_transport: "codex_exec",
+        fallback_required: false,
+        fallback_reason: null,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: turnId,
+        agent_runtime: "codex",
+        question: "Find the local document about Helix Ask terminal authority and tell me which document you used.",
+      },
+      headers: {},
+    });
+
+    expect(result.ok).toBe(true);
+    const debug = result.debug as Record<string, any>;
+    expect(debug.workstation_gateway_call_results.map(
+      (entry: Record<string, unknown>) => entry.capability_id,
+    )).toEqual(["docs.search"]);
+    expect(debug.codex_native_compatibility_fallback).toMatchObject({
+      activated: true,
+      native_fallback_reason: "native_observation_outside_committed_route",
+      native_route_violation_capability_ids: ["repo.search"],
+      planned_gateway_recovery_capability_ids: ["docs.search"],
+      gateway_recovery_attempted: true,
+      gateway_recovery_capability_ids: ["docs.search"],
+    });
+    expect(result.text).toBe(process.env.CODEX_AGENT_FAKE_STDOUT);
+  });
 });

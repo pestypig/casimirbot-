@@ -12,3 +12,12 @@ if (!process.env.TOOL_LOG_BUFFER_SIZE) {
 if (!process.env.TOOL_LOG_TENANT_BUFFER_SIZE) {
   process.env.TOOL_LOG_TENANT_BUFFER_SIZE = "25";
 }
+
+// Most route-contract fixtures exercise the legacy Helix-native policy runtime.
+// Production requests default to Codex; provider-specific tests override this explicitly.
+if (!process.env.HELIX_ASK_AGENT_RUNTIME) {
+  process.env.HELIX_ASK_AGENT_RUNTIME = "helix";
+}
+if (!process.env.HELIX_ASK_TEST_RUNTIME_POLICY_BYPASS) {
+  process.env.HELIX_ASK_TEST_RUNTIME_POLICY_BYPASS = "1";
+}

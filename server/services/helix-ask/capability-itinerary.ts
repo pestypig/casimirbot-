@@ -420,9 +420,13 @@ export function buildHelixCapabilityItinerary(input: {
     ? admission.forbidden_tool_families
     : []) as string[];
   const admissionSourceTarget = readString(admission?.source_target);
+  const docsAdmissionSelected =
+    admissionSourceTarget === "docs_viewer" ||
+    admissionSourceTarget === "active_doc";
   const localAdmissionSuppressesGenericResearch =
     [
       "active_doc",
+      "docs_viewer",
       "workspace_panel",
       "workspace_action",
       "workspace_diagnostic",
@@ -442,13 +446,21 @@ export function buildHelixCapabilityItinerary(input: {
     ? []
     : requestedResearchFamilies(input.promptText);
   const nonCompoundResearchFamilies = researchFamilies.filter((family) => !compoundFamilies.includes(family));
-  const repoFamilies = (capabilityHelpIntent ? [] : requestedRepoFamilies(input.promptText)).filter((family) =>
-    family !== "repo_code" ||
-    compoundSubgoals.length === 0 ||
-    compoundRequestsRepoCode ||
-    explicitRepoEvidenceCueAllowedInCompound(input.promptText)
-  );
-  const docsFamilies = capabilityHelpIntent ? [] : requestedDocsFamilies(input.promptText);
+  const explicitRepoEvidenceRequested = explicitRepoEvidenceCueAllowedInCompound(input.promptText);
+  const repoFamilies: HelixCapabilityItineraryFamily[] =
+    capabilityHelpIntent || (docsAdmissionSelected && !compoundRequestsRepoCode && !explicitRepoEvidenceRequested)
+      ? []
+      : requestedRepoFamilies(input.promptText).filter((family) =>
+          family !== "repo_code" ||
+          compoundSubgoals.length === 0 ||
+          compoundRequestsRepoCode ||
+          explicitRepoEvidenceRequested
+        );
+  const docsFamilies: HelixCapabilityItineraryFamily[] = capabilityHelpIntent
+    ? []
+    : docsAdmissionSelected && admittedFamilies.includes("docs_viewer")
+      ? ["docs_viewer"]
+      : requestedDocsFamilies(input.promptText);
   const locatorFamilies: HelixCapabilityItineraryFamily[] =
     !capabilityHelpIntent && (theoryLocatorRequested(input.promptText) || isTheoryFrontierVectorFieldTracePrompt(input.promptText))
     ? ["theory_locator"]

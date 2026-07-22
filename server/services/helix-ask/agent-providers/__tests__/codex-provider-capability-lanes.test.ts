@@ -10,6 +10,7 @@ import {
   buildCodexScholarlyEvidenceDecisionCorrectionInstruction,
   buildCodexScholarlyEvidenceDecisionInstruction,
   buildCodexRuntimeLaneCapabilityAdmissionCorrection,
+  runtimeProviderAdmittedCapabilityIdsForQuestion,
   buildImageLensObservationFallbackAnswer,
   buildScholarlyCapabilityLaneReentryEvidenceLines,
   buildScholarlyResearchResponseModeProjection,
@@ -23,6 +24,7 @@ import {
   codexRouteAllowsTerminalKind,
   codexProvider,
   continuationStateAdmitsPreparedRecoveryLaneRequest,
+  detectProviderPromptLeakMarkers,
   enrichCapabilityLaneCandidatesFromBody,
   enrichScholarlyNumericCandidateFromGatewayResults,
   explicitlyExcludesScientificImageContext,
@@ -31,6 +33,7 @@ import {
   forbiddenEvidenceFamiliesForLaneCapability,
   imageLensObservationReportCanSelfTerminal,
   asksForImageLensSidecarMetadataReport,
+  ensureCodexPreGatewayRouteAuthority,
   isScholarlyFollowupReferencePrompt,
   resetScholarlyPdfWorkbenchVolatileMemoryForTest,
   runtimeLaneRequestCandidateUsesAdmittedCapabilities,
@@ -275,6 +278,26 @@ describe("Codex provider capability lane adapter", () => {
     expect(correction).toContain("scholarly-research.parse_pdf_page_image");
     expect(correction).toContain("visual_analysis.inspect_image_region");
     expect(correction).toContain("Do not invent, rename, or combine capability identifiers");
+  });
+
+  it("does not let a panel-open action satisfy a selected-paper page materialization request", () => {
+    const admittedCapabilityIds = [
+      "workstation.open_panel",
+      "visual_analysis.inspect_image_region",
+      "scholarly-research.fetch_full_text",
+    ];
+
+    expect(runtimeProviderAdmittedCapabilityIdsForQuestion({
+      question: "Yes, put page 3 in the image tool.",
+      admittedCapabilityIds,
+    })).toEqual([
+      "scholarly-research.fetch_full_text",
+      "visual_analysis.inspect_image_region",
+    ]);
+    expect(runtimeProviderAdmittedCapabilityIdsForQuestion({
+      question: "Open the image tool.",
+      admittedCapabilityIds,
+    })).toContain("workstation.open_panel");
   });
 
   it("does not reopen continuation affordances after a validated runtime terminal decision", () => {
@@ -960,6 +983,12 @@ describe("Codex provider capability lane adapter", () => {
     expect(isScholarlyFollowupReferencePrompt(prompt)).toBe(false);
   });
 
+  it("does not treat a current-turn named local document lookup as a scholarly follow-up", () => {
+    expect(isScholarlyFollowupReferencePrompt(
+      'Find the document called "Casimir Dp Quantum Foam Study", read the best matching result, and explain what it is about in a short paragraph.',
+    )).toBe(false);
+  });
+
   it("routes retained-sidecar packet construction to continuity without admitting a fresh capture", () => {
     const packetPrompt = [
       "Using the saved page-8 text and retained Image Lens sidecar for https://arxiv.org/pdf/2401.12345,",
@@ -1221,6 +1250,54 @@ describe("Codex provider capability lane adapter", () => {
       "openalex:rea-2013",
       "openalex:unrelated-first",
     ]);
+  });
+
+  it("preserves runtime-selected identity from a singular full-text observation", () => {
+    const sourcePdfRef = "artifact://scholarly-pdf/selected-paper.pdf";
+    const record = scholarlyMemoryRecordFromGatewayResult({
+      body: { session_id: "session-runtime-full-text-selection" },
+      turnId: "ask:test:runtime-full-text-selection",
+      selectedResultIds: ["arxiv:selected-paper"],
+      result: {
+        ok: true,
+        capability_id: "scholarly-research.fetch_full_text",
+        gateway_admission: { requested_capability: "scholarly-research.fetch_full_text" },
+        artifact_refs: ["ask:test:runtime-full-text-selection:observation"],
+        observation: {
+          evidence_state: "full_text_usable",
+          selected_for_answer: true,
+          paper_result_id: "arxiv:selected-paper",
+          title: "A selected paper",
+          source_url: "https://arxiv.org/pdf/1234.5678.pdf",
+          source_pdf_ref: sourcePdfRef,
+          cache_path: "C:\\cache\\selected-paper.pdf",
+          page_text_refs: [{ page: 1, text_ref: `${sourcePdfRef}/page/1#text` }],
+        },
+        observation_packet: {
+          produced_artifact_refs: ["ask:test:runtime-full-text-selection:observation"],
+          state_delta: {},
+        },
+      } as any,
+    });
+
+    expect(record).toMatchObject({
+      selected_for_answer: true,
+      evidence_grade: "answer_grade",
+      runtime_selected_result_ids: ["arxiv:selected-paper"],
+      runtime_semantic_selection_status: "matched",
+      source_pdf_ref: sourcePdfRef,
+      cache_path: "C:\\cache\\selected-paper.pdf",
+    });
+    expect(record?.papers).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        result_id: "arxiv:selected-paper",
+        title: "A selected paper",
+        identifiers: expect.objectContaining({
+          url: "https://arxiv.org/pdf/1234.5678.pdf",
+          pdf_url: "https://arxiv.org/pdf/1234.5678.pdf",
+        }),
+      }),
+    ]));
   });
 
   it("binds a deictic full-text lane call to the runtime-selected prior paper", () => {
@@ -1823,6 +1900,22 @@ describe("Codex provider capability lane adapter", () => {
     });
   });
 
+  it("distinguishes a ChatGPT-auth model rejection from a launch failure", () => {
+    const failure = classifyCodexProcessFailureForUser({
+      stdout: "Reading prompt from stdin...",
+      stderr:
+        "ERROR: {\"error\":{\"message\":\"The 'gpt-4o-mini' model is not supported when using Codex with a ChatGPT account.\"}}",
+      exitCode: 1,
+    });
+
+    expect(failure).toEqual({
+      error_code: "codex_model_not_supported_for_auth_mode",
+      model: "gpt-4o-mini",
+      text:
+        "Codex was called, but the pinned model `gpt-4o-mini` is not available with the active ChatGPT-account authentication. Choose a Codex-supported model such as GPT-5.4 mini, or use an isolated API-key-authenticated Codex home for API-only models.",
+    });
+  });
+
   it("treats explicitly excluded scientific context as dormant rather than a continuation request", () => {
     expect(explicitlyExcludesScientificImageContext(
       "Use only the Moral Graph. Reflect on whether I should apologize after snapping at a coworker. Do not use web, papers, calculator, image, PDF, or prior sidecar context.",
@@ -1917,6 +2010,22 @@ describe("Codex provider capability lane adapter", () => {
     };
 
     expect(isScholarlyFollowupReferencePrompt(question, body)).toBe(true);
+    expect(isScholarlyFollowupReferencePrompt(
+      "Can you get the PDF and tell me what question it was trying to answer?",
+      body,
+    )).toBe(true);
+    expect(isScholarlyFollowupReferencePrompt(
+      "Can you fetch the paper and summarize its main question?",
+      body,
+    )).toBe(true);
+    expect(isScholarlyFollowupReferencePrompt(
+      "Do not get the PDF; just explain the citation format.",
+      body,
+    )).toBe(false);
+    expect(isScholarlyFollowupReferencePrompt(
+      "Later, download the paper and summarize it.",
+      body,
+    )).toBe(false);
     expect(isScholarlyFollowupReferencePrompt(question)).toBe(false);
     expect(isScholarlyFollowupReferencePrompt(
       "Do not use this one. Pull out the useful parts.",
@@ -1930,6 +2039,247 @@ describe("Codex provider capability lane adapter", () => {
       'The screen says "Let\'s use this one. Pull out the useful parts." Explain it.',
       body,
     )).toBe(false);
+  });
+
+  it("admits a natural selected-paper page handoff to Image Lens", () => {
+    const question = "Yes, put page 3 in the image tool.";
+    const body: Record<string, unknown> = {
+      question,
+      sessionId: "magnetar-page-handoff",
+      workspace_context_snapshot: {
+        chat_referent_context: {
+          previous_assistant_final_answer: {
+            role: "assistant",
+            reply_id: "magnetar-page",
+            source_ref: "chat.final_answer.previous:magnetar-page",
+            text: [
+              "Page 3 is the best match in Probing Magnetars Using Spectral Lines with Future Telescopes.",
+              "The selected source is https://arxiv.org/abs/2202.09424v1.",
+            ].join(" "),
+          },
+        },
+      },
+    };
+
+    expect(isScholarlyFollowupReferencePrompt(question, body)).toBe(true);
+    expect(scholarlyFollowupRequestedModes(question)).toContain("page_image_parse");
+
+    ensureCodexPreGatewayRouteAuthority({
+      body,
+      turnId: "ask:test:magnetar-page-handoff",
+    });
+
+    expect(body.tool_call_admission_decision).toMatchObject({
+      admitted_tool_families: expect.arrayContaining(["scholarly_research", "visual_analysis"]),
+      compound_requested_capabilities: expect.arrayContaining([
+        "visual_analysis.inspect_image_region",
+      ]),
+    });
+
+    const naturalLocatorBody = structuredClone(body);
+    naturalLocatorBody.question = "Show me the page with the X-band profile change in the image tool.";
+    expect(isScholarlyFollowupReferencePrompt(String(naturalLocatorBody.question), naturalLocatorBody)).toBe(true);
+    ensureCodexPreGatewayRouteAuthority({
+      body: naturalLocatorBody,
+      turnId: "ask:test:magnetar-natural-page-locator",
+    });
+    expect(naturalLocatorBody.tool_call_admission_decision).toMatchObject({
+      admitted_tool_families: expect.arrayContaining(["scholarly_research", "visual_analysis"]),
+      compound_requested_capabilities: expect.arrayContaining([
+        "visual_analysis.inspect_image_region",
+      ]),
+    });
+    expect(naturalLocatorBody.committed_ask_route).toMatchObject({
+      capability_policy: {
+        allowed_tool_families: expect.arrayContaining(["scholarly_research", "visual_analysis"]),
+      },
+    });
+
+    const negatedBody = structuredClone(body);
+    negatedBody.question = "Do not put page 3 in the image tool.";
+    expect(scholarlyFollowupRequestedModes(String(negatedBody.question))).not.toContain("page_image_parse");
+  });
+
+  it("admits a natural higher-resolution paragraph follow-up without treating dormant wording as execution", () => {
+    const question = "Try the higher-resolution rerender and tell me what paragraph I should read.";
+    const body: Record<string, unknown> = {
+      question,
+      sessionId: "magnetar-rerender-followup",
+      workspace_context_snapshot: {
+        chat_referent_context: {
+          previous_assistant_final_answer: {
+            role: "assistant",
+            reply_id: "magnetar-page-three",
+            source_ref: "chat.final_answer.previous:magnetar-page-three",
+            text: [
+              "The relevant page is page 3 of the selected magnetar PDF.",
+              "OCR failed, so try a higher-resolution rerender to locate the paragraph.",
+            ].join(" "),
+          },
+        },
+      },
+    };
+
+    expect(isScholarlyFollowupReferencePrompt(question, body)).toBe(true);
+    expect(scholarlyFollowupRequestedModes(question)).toContain("page_image_parse");
+
+    ensureCodexPreGatewayRouteAuthority({
+      body,
+      turnId: "ask:test:magnetar-rerender-followup",
+    });
+
+    expect(body.tool_call_admission_decision).toMatchObject({
+      admitted_tool_families: expect.arrayContaining(["scholarly_research", "visual_analysis"]),
+      compound_requested_capabilities: expect.arrayContaining([
+        "visual_analysis.inspect_image_region",
+      ]),
+    });
+
+    for (const dormantQuestion of [
+      "Do not try the higher-resolution rerender; just explain what that phrase means.",
+      "Later, try the higher-resolution rerender and tell me what paragraph to read.",
+      'The screen says "Try the higher-resolution rerender and tell me what paragraph I should read." Explain that instruction.',
+    ]) {
+      const dormantBody = structuredClone(body);
+      dormantBody.question = dormantQuestion;
+      expect(isScholarlyFollowupReferencePrompt(dormantQuestion, dormantBody)).toBe(false);
+      expect(scholarlyFollowupRequestedModes(dormantQuestion)).not.toContain("page_image_parse");
+    }
+  });
+
+  it("uses an already-fetched paper text when a natural recovery follow-up asks for the paragraph", () => {
+    const question = "Use the text instead and point me to the paragraph.";
+    const body: Record<string, unknown> = {
+      question,
+      sessionId: "magnetar-text-recovery",
+      workspace_context_snapshot: {
+        chat_referent_context: {
+          previous_assistant_final_answer: {
+            role: "assistant",
+            reply_id: "magnetar-rerender-result",
+            source_ref: "chat.final_answer.previous:magnetar-rerender-result",
+            text: [
+              "The page rerender did not produce readable OCR.",
+              "The selected paper is Probing Magnetars Using Spectral Lines with Future Telescopes, arXiv:2202.09424v1.",
+              "Its fetched full text is available for a text-based lookup.",
+            ].join(" "),
+          },
+        },
+      },
+    };
+
+    expect(isScholarlyFollowupReferencePrompt(question, body)).toBe(true);
+    expect(isScholarlyFollowupReferencePrompt(question)).toBe(false);
+    expect(scholarlyFollowupRequestedModes(question)).toContain("full_text");
+    const retryInstruction = buildCodexCapabilityLaneRetryInstruction(question);
+    expect(retryInstruction).toContain("include query with distinctive words from the bounded prior-answer target");
+    expect(retryInstruction).toContain("Do not use only the paper result ID as the retrieval query");
+
+    ensureCodexPreGatewayRouteAuthority({
+      body,
+      turnId: "ask:test:magnetar-text-recovery",
+    });
+
+    expect(body.tool_call_admission_decision).toMatchObject({
+      admitted_tool_families: expect.arrayContaining(["scholarly_research"]),
+    });
+    expect(body.canonical_goal_frame).toMatchObject({
+      goal_kind: "scholarly_research_followup",
+      forbidden_terminal_artifact_kinds: expect.arrayContaining(["direct_answer_text"]),
+    });
+
+    expect(enrichCapabilityLaneCandidatesFromBody(body, {
+      capability: "scholarly-research.fetch_full_text",
+      query: 'page 3 "show that line energy is linear with line width within error bars"',
+      max_pages: 2,
+    })).toMatchObject({
+      capability: "scholarly-research.fetch_full_text",
+      max_pages: 3,
+    });
+
+    for (const dormantQuestion of [
+      "Do not use the text instead; explain what text extraction means.",
+      "Later, use the text instead and point me to the paragraph.",
+      'The screen says "Use the text instead and point me to the paragraph." Explain that instruction.',
+    ]) {
+      const dormantBody = structuredClone(body);
+      dormantBody.question = dormantQuestion;
+      expect(isScholarlyFollowupReferencePrompt(dormantQuestion, dormantBody)).toBe(false);
+      expect(scholarlyFollowupRequestedModes(dormantQuestion)).not.toContain("full_text");
+    }
+  });
+
+  it("binds a terse acceptance to the prior scholarly paragraph-boundary offer", () => {
+    const question = "Yes, give me the exact start and end.";
+    const body: Record<string, unknown> = {
+      question,
+      sessionId: "magnetar-paragraph-boundary",
+      workspace_context_snapshot: {
+        chat_referent_context: {
+          previous_assistant_final_answer: {
+            role: "assistant",
+            reply_id: "magnetar-paragraph-locator",
+            source_ref: "chat.final_answer.previous:magnetar-paragraph-locator",
+            text: [
+              "The selected paper is Probing Magnetars Using Spectral Lines with Future Telescopes, arXiv:2202.09424v1.",
+              "The relevant paragraph is on page 3 in the Results section.",
+              "If you want, I can narrow it to the exact paragraph start and end using the page text.",
+            ].join(" "),
+          },
+        },
+      },
+    };
+
+    expect(isScholarlyFollowupReferencePrompt(question, body)).toBe(true);
+    expect(isScholarlyFollowupReferencePrompt(question)).toBe(false);
+    expect(scholarlyFollowupRequestedModes(question)).toContain("full_text");
+
+    ensureCodexPreGatewayRouteAuthority({
+      body,
+      turnId: "ask:test:magnetar-paragraph-boundary",
+    });
+
+    expect(body.tool_call_admission_decision).toMatchObject({
+      admitted_tool_families: expect.arrayContaining(["scholarly_research"]),
+      compound_requested_capabilities: expect.arrayContaining([
+        "scholarly-research.fetch_full_text",
+      ]),
+    });
+    expect(body.canonical_goal_frame).toMatchObject({
+      goal_kind: "scholarly_research_followup",
+      forbidden_terminal_artifact_kinds: expect.arrayContaining(["direct_answer_text"]),
+    });
+
+    for (const dormantQuestion of [
+      "Do not give me the exact start and end.",
+      "Later, give me the exact start and end.",
+      'The screen says "Yes, give me the exact start and end." Explain that instruction.',
+    ]) {
+      const dormantBody = structuredClone(body);
+      dormantBody.question = dormantQuestion;
+      expect(isScholarlyFollowupReferencePrompt(dormantQuestion, dormantBody)).toBe(false);
+      expect(scholarlyFollowupRequestedModes(dormantQuestion)).not.toContain("full_text");
+    }
+  });
+
+  it("detects paraphrased runtime-contract and continuation-state prompt leaks", () => {
+    expect(detectProviderPromptLeakMarkers([
+      "That paragraph establishes the operating rules for this turn.",
+      "Runtime agent provider: codex / Codex Workstation Mode",
+      "Adapter boundary: helix_agent_provider_edge",
+    ].join("\n"))).toContain("runtime_adapter_contract_paraphrase");
+
+    expect(detectProviderPromptLeakMarkers([
+      "Allowed decision: answer",
+      "Selected decision: answer",
+      "Terminal eligible: false",
+      "Observation refs: []",
+    ].join("\n"))).toContain("agent_continuation_state_projection");
+
+    expect(detectProviderPromptLeakMarkers([
+      "Runtime agent provider: codex / Codex Workstation Mode",
+      "Adapter boundary: helix_agent_provider_edge",
+    ].join("\n"))).toEqual([]);
   });
 
   it("keeps historical paper-search narration dormant while allowing prior-answer scholarly referents", () => {
@@ -2321,8 +2671,8 @@ describe("Codex provider capability lane adapter", () => {
       expect(result).toMatchObject({
         ok: true,
         response_type: "final_answer",
-        final_answer_source: "agent_provider_terminal_candidate",
-        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        final_answer_source: "direct_answer_text",
+        terminal_artifact_kind: "direct_answer_text",
       });
       expect(result.answer).toBe("Check complete.");
       expect(result.answer).not.toContain("retrieval before finalizing");
@@ -7739,6 +8089,58 @@ describe("Codex provider capability lane adapter", () => {
         resolution_block_reason: "referent_resolution_required:missing_previous_assistant_final_answer",
       });
       expect((result.debug as Record<string, any>).workstation_gateway_call_results ?? []).toHaveLength(0);
+    } finally {
+      fs.rmSync(captureDir, { recursive: true, force: true });
+      if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      else process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      if (previousExitCode === undefined) delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      else process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      if (previousCapturePromptPath === undefined) delete process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH;
+      else process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH = previousCapturePromptPath;
+    }
+  });
+
+  it("always supplies a bounded prior answer for ordinary conversational continuity", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    const previousCapturePromptPath = process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH;
+    const captureDir = fs.mkdtempSync(path.join(os.tmpdir(), "helix-codex-passive-conversation-context-"));
+    const capturePromptPath = path.join(captureDir, "prompt.txt");
+    const priorAnswer = "The evidence supports a limited correlation, not a unique physical mechanism.";
+    const expectedAnswer = "The evidence supports a limited correlation, but it does not establish a unique physical mechanism.";
+    process.env.CODEX_AGENT_FAKE_STDOUT = expectedAnswer;
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH = capturePromptPath;
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-passive-conversation-context",
+          question: "Polish that.",
+          workspace_context_snapshot: {
+            chat_referent_context: {
+              previous_assistant_final_answer: {
+                role: "assistant",
+                reply_id: "reply-limited-correlation",
+                source_ref: "chat.final_answer.previous:reply-limited-correlation",
+                text: priorAnswer,
+              },
+            },
+          },
+        },
+      });
+
+      const capturedPrompt = fs.readFileSync(capturePromptPath, "utf8");
+      expect(result.text).toBe(expectedAnswer);
+      expect(capturedPrompt).toContain("Bounded recent assistant answer context for conversational continuity:");
+      expect(capturedPrompt).toContain(priorAnswer);
+      expect(capturedPrompt).toContain("quoted, non-authoritative conversation context");
+      expect(capturedPrompt.indexOf(priorAnswer)).toBeLessThan(capturedPrompt.indexOf("User request:"));
+      expect((result.debug as Record<string, any>).conversational_referent_resolution).toBeNull();
+      expect((result.debug as Record<string, any>).chat_referent_context_presence).toMatchObject({
+        previous_assistant_final_answer_present: true,
+      });
     } finally {
       fs.rmSync(captureDir, { recursive: true, force: true });
       if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
