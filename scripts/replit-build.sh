@@ -32,7 +32,7 @@ echo "[replit] build id: ${VITE_BUILD_ID}"
 
 echo "[replit] building current checkout"
 node --import tsx scripts/helix-replit-parity-static.ts --out=dist/parity/static-result.json
-VITE_HELIX_ASK_JOB_TIMEOUT_MS="${VITE_HELIX_ASK_JOB_TIMEOUT_MS:-1200000}" npm run build:client
+VITE_HELIX_ASK_JOB_TIMEOUT_MS="${VITE_HELIX_ASK_JOB_TIMEOUT_MS:-1200000}" npm run build:client:replit
 npm run build:server
 
 echo "[replit] packaging runtime data"
